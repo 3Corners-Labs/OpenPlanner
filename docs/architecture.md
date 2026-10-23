@@ -1,0 +1,488 @@
+# Architecture
+
+How OpenPlanner is built: context, containers, code structure, domain model, runtime flows,
+security and quality assurance. The *why* behind each choice is in the ADRs (`docs/adr/`);
+the stakeholder design is in `docs/HANDOVER.md` (Dutch).
+
+Status: October 2026, after work package 3 (first demo slice). Parts drawn with a **dashed
+border** are designed but not built yet; the roadmap at the end says when.
+
+## 1. Purpose and scope
+
+Citizens book a video call with a team of a government contact center (a *group*, one
+Webex Contact Center queue). The service offers free time slots, takes the booking, sends
+confirmation and reminders, hands the call to the queue just before the start, and deletes
+personal data 24 hours after the appointment.
+
+Out of scope: the organisation's decision tree (its website links to the group page), agent
+scheduling (the WxCC queue assigns agents), and the video call itself (Webex).
+
+## 2. Quality goals
+
+| Priority | Goal | How |
+|---|---|---|
+| 1 | Privacy | PII only on bookings, purged at end + 24 h; no PII in logs, URLs, jobs or errors |
+| 2 | Security | Deny by default, one authorisation dependency, mandatory CI gates, external pentest |
+| 3 | Accessibility | WCAG 2.2 AA: works without JavaScript and without a mouse; axe and Lighthouse in CI |
+| 4 | Maintainability | Pure domain behind ports, enforced layers, docstrings, no copy-paste |
+| 5 | Simplicity | Two containers, SQLite, no message broker; about 80 bookings per working day |
+
+## 3. System context
+
+```mermaid
+flowchart LR
+    citizen([Citizen])
+    website[Organisation website<br/>decision tree]
+    admin([Group / organisation admin])
+    agent([Contact center agent])
+
+    subgraph op [OpenPlanner]
+        service[Booking service]
+    end
+
+    smtp[Mail provider<br/>SMTP]
+    wxcc[Webex Contact Center<br/>Tasks API]
+    video[Webex video<br/>Instant Connect or Meetings API]
+    idp[Identity provider<br/>OIDC]
+    sms[SMS route]
+    whatsapp[WhatsApp]
+
+    website -- links to /g/slug --> service
+    citizen -- books, changes, cancels --> service
+    service -- confirmation, reminders --> smtp --> citizen
+    admin -. manages groups, texts, settings .-> service
+    service -. task with host link at T-5 .-> wxcc
+    wxcc -. offers task .-> agent
+    service -. creates meeting, reads status .-> video
+    admin -. login .-> idp
+    service -. reminders .-> sms
+    service -. roadmap .-> whatsapp
+
+    classDef planned stroke-dasharray: 5 5
+    class wxcc,video,idp,sms,whatsapp planned
+```
+
+| External system | Direction | Purpose | Decision |
+|---|---|---|---|
+| Mail provider (SMTP) | out | Confirmation, change, reminder, cancellation | ADR 0009; per organisation in the admin UI (ADR 0008) |
+| Webex Contact Center | out, in | Create a task in the group's queue; task events | ADR 0007 (Tasks API) |
+| Webex video | out, in | Host and guest links; live meeting status | HANDOVER B7, O1; ADR 0010 |
+| Identity provider | in | Admin login with roles | HANDOVER B8, O3 |
+| SMS route / WhatsApp | out | Reminders | ADR 0009 (WhatsApp on the roadmap) |
+
+## 4. Containers and deployment
+
+```mermaid
+flowchart TB
+    browser([Browser])
+    proxy[Reverse proxy<br/>TLS, body limit, forwarded IPs]
+
+    subgraph host [One VM]
+        web["web<br/>FastAPI + uvicorn<br/>pages, migrations on start"]
+        worker["worker<br/>job loop, heartbeat"]
+        volume[("data volume<br/>SQLite (WAL)")]
+        mailpit["mailpit<br/>dev profile only"]
+    end
+
+    smtp[Mail provider]
+
+    browser --> proxy --> web
+    web <--> volume
+    worker <--> volume
+    worker -- SMTP --> smtp
+    worker -. dev .-> mailpit
+
+    classDef planned stroke-dasharray: 5 5
+    class proxy planned
+```
+
+- **One image, two roles.** `web` runs `alembic upgrade head` and then uvicorn; `worker` runs
+  `python -m app.jobs.worker` and starts only when `web` is healthy. Both run as uid 10001
+  with a read-only root filesystem, no capabilities and `no-new-privileges`.
+- **SQLite in WAL mode** on a shared volume: readers never wait; writers take
+  `BEGIN IMMEDIATE`. Postgres is not a target (decided 2026-10-23).
+- **Health.** `web`: `/healthz` (liveness) and `/readyz` (database). `worker`: a heartbeat file
+  checked by `python -m app.jobs.healthcheck`.
+- **Configuration** comes from the environment only. `ENVIRONMENT` defaults to `prod`, which
+  requires `MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`.
+- **Images** are built in CI, pushed to GHCR, signed keyless with cosign and carry an SBOM
+  attestation (ADR 0006). Hosting and backups: open point O7.
+
+## 5. Code structure
+
+### Layers
+
+```mermaid
+flowchart TB
+    main["app.main<br/>composition root"]
+
+    subgraph entry [Entry points, never import each other]
+        api["app.api<br/>public pages, health"]
+        adminpkg["app.admin<br/>admin UI (WP7)"]
+        jobs["app.jobs<br/>worker, runner, messages"]
+        cli["app.cli<br/>seed-demo"]
+    end
+
+    web["app.web<br/>locale, templates, render(),<br/>protection, error pages"]
+    adapters["app.adapters<br/>db (SQL, unit of work, job queue),<br/>smtp, clock"]
+    domain["app.domain<br/>pure business rules + ports"]
+    i18n["app.i18n<br/>negotiation, translator,<br/>catalogues, dates"]
+
+    main --> entry
+    api --> web
+    adminpkg --> web
+    jobs --> web
+    entry --> adapters
+    web --> adapters
+    adapters --> domain
+    entry --> domain
+    web --> i18n
+    jobs --> i18n
+
+    classDef planned stroke-dasharray: 5 5
+    class adminpkg planned
+```
+
+import-linter enforces these arrows in CI (ADR 0005):
+
+- `app.domain` imports no framework and no other `app` package.
+- `app.i18n` imports nothing from the rest of `app` (ADR 0004).
+- The entry points (`api`, `admin`, `jobs`, `cli`) never import each other.
+
+### Ports and adapters
+
+```mermaid
+flowchart LR
+    subgraph domain [app.domain]
+        service[BookingService]
+        ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider"}}
+        service --> ports
+    end
+
+    clock[adapters.clock<br/>SystemClock]
+    uow[adapters.db.uow<br/>SqlUnitOfWork]
+    smtp[adapters.smtp<br/>SmtpMailSender]
+    videoad[video adapter<br/>WP5]
+    wxccad[WxCC adapter<br/>WP6]
+    idpad[OIDC adapter<br/>WP7]
+
+    clock -.implements.-> ports
+    uow -.implements.-> ports
+    smtp -.implements.-> ports
+    videoad -.implements.-> ports
+    wxccad -.implements.-> ports
+    idpad -.implements.-> ports
+
+    classDef planned stroke-dasharray: 5 5
+    class videoad,wxccad,idpad planned
+```
+
+Tests replace every adapter with a fake from `tests/fakes/`. The in-memory unit of work has the
+same commit and rollback behaviour as the SQL one.
+
+### Module map
+
+| Concern | Module |
+|---|---|
+| Opening hours, groups | `app/domain/scheduling.py` |
+| Slot calculation (time zones, daylight saving) | `app/domain/availability.py` |
+| Bookings, contact validation | `app/domain/booking.py` |
+| Book, cancel, reschedule (use cases) | `app/domain/services.py` |
+| Which jobs, when | `app/domain/job_plan.py` |
+| Channels, reminder rules | `app/domain/channels.py` |
+| Management tokens | `app/domain/tokens.py` |
+| Error codes | `app/domain/errors.py` |
+| Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |
+| Transactions, write lock | `app/adapters/db/uow.py`, `app/adapters/db/engine.py` |
+| Job queue | `app/adapters/db/jobs.py` |
+| Citizen pages | `app/api/booking_pages.py`, `app/api/templates/` |
+| CSRF and rate limits | `app/web/protection.py` |
+| Rendering and security headers | `app/web/templates.py`, `app/api/security_headers.py` |
+| Translations and locale | `app/i18n/` |
+| Messages and calendar files | `app/jobs/messages.py`, `app/jobs/calendar.py` |
+| Job execution | `app/jobs/runner.py`, `app/jobs/worker.py` |
+
+## 6. Domain model
+
+```mermaid
+erDiagram
+    ORGANISATION ||--o{ GROUP : owns
+    GROUP ||--o{ SCHEDULE_RULE : "opens weekly"
+    GROUP ||--o{ SCHEDULE_OVERRIDE : "changes a date"
+    GROUP ||--o{ REMINDER_RULE : reminds
+    GROUP ||--o{ SLOT : "has booked"
+    SLOT ||--o{ BOOKING : holds
+    BOOKING ||--o{ JOB : schedules
+    BOOKING |o--o| BOOKING : "rescheduled from"
+
+    ORGANISATION {
+        int id
+        string slug
+        string default_locale
+    }
+    GROUP {
+        int id
+        string slug
+        string timezone
+        int slot_minutes
+        int min_notice_minutes
+        int horizon_days
+        int dispatch_lead_minutes
+        string phone_mode
+        string wxcc_queue_id
+    }
+    SCHEDULE_RULE {
+        int weekday
+        time opens
+        time closes
+        int capacity
+        date valid_from
+        date valid_to
+    }
+    SCHEDULE_OVERRIDE {
+        date day
+        time opens
+        time closes
+        int capacity
+    }
+    REMINDER_RULE {
+        string channel
+        int minutes_before
+        bool enabled
+    }
+    SLOT {
+        datetime start
+        datetime end
+        int capacity_snapshot
+    }
+    BOOKING {
+        string status
+        string name "PII"
+        string email "PII"
+        string phone "PII"
+        string locale
+        string management_token_salt
+        string management_token_hash
+        string guest_join_url "PII"
+        string host_join_url "PII"
+        datetime pii_purged_at
+    }
+    JOB {
+        string type
+        datetime run_at
+        datetime pinned_start
+        string channel
+        string status
+        int attempts
+    }
+```
+
+Rules that matter for the rest of the system:
+
+- **Capacity** is one number per opening window, because the WxCC queue assigns the agent
+  (HANDOVER B5). A slot row is created by the first booking and snapshots that capacity.
+  Later schedule edits change new slots only.
+- **An override replaces every rule on its date.** A closed override blocks new bookings,
+  even in slots that already exist.
+- **The dispatch lead** (`dispatch_lead_minutes`, default 5) sets two moments: when the WxCC
+  task is created, and when the booking becomes read-only. The minimum notice can never be
+  shorter than it.
+- **All times are stored in UTC.** They are converted to the group's time zone only when
+  rendering and parsing.
+
+## 7. Runtime views
+
+### Booking
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Citizen
+    participant W as web (booking_pages)
+    participant S as BookingService
+    participant DB as SQLite
+    participant K as worker (JobRunner)
+    participant M as Mail provider
+
+    C->>W: GET /g/demo
+    W->>S: availability(week)
+    S->>DB: read (deferred BEGIN, never blocked)
+    W-->>C: slot picker
+    C->>W: POST /g/demo/book (same-origin, rate-limited, honeypot)
+    W->>S: book(start, contact, locale)
+    S->>DB: BEGIN IMMEDIATE
+    Note over S,DB: offered? capacity left? create slot,<br/>booking (salt + token hash), plan jobs
+    S->>DB: COMMIT
+    S-->>W: receipt (token, only in memory)
+    W-->>C: 303 /b/{token}?status=booked
+    loop every poll interval
+        K->>DB: claim due jobs (write lock)
+        K->>DB: read booking (skip if stale)
+        K->>M: confirmation + .ics + manage link
+        K->>DB: done / retry (1, 5, 15 min) / failed
+    end
+```
+
+### What happens to one booking over time
+
+```mermaid
+flowchart LR
+    book(["booked"]) --> confirm["create video room<br/>send confirmation<br/>now"]
+    confirm --> remind["reminders<br/>per group rule<br/>e.g. T-24h"]
+    remind --> dispatch["T-dispatch lead<br/>WxCC task created,<br/>booking read-only"]
+    dispatch --> meeting(["call<br/>from start to finish"])
+    meeting --> purge["slot end + 24h<br/>purge PII"]
+
+    cancel(["cancelled"]) --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
+
+    classDef planned stroke-dasharray: 5 5
+    class dispatch planned
+```
+
+Every job that is tied to a start time stores that start (`pinned_start`). On run it does
+nothing if the booking is no longer confirmed, its start changed, or its data was purged.
+Cancelling or moving a booking replaces its pending jobs in the same transaction. The video
+room and the WxCC task are planned today but only executed from WP5 and WP6; the read-only
+moment already applies.
+
+### Booking status
+
+```mermaid
+stateDiagram-v2
+    [*] --> confirmed: book
+    confirmed --> cancelled: cancel (before the dispatch lead)
+    confirmed --> cancelled: reschedule (old booking; a new one is confirmed)
+    confirmed --> completed: after the call (WP6)
+    confirmed --> no_show: task not picked up (O2)
+    cancelled --> [*]
+    completed --> [*]
+    no_show --> [*]
+```
+
+### Job status
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: planned in the booking transaction
+    pending --> running: claimed (write lock)
+    running --> done: executed or skipped as stale
+    running --> pending: failure, retry after 1, 5, 15 min
+    running --> failed: fourth failure
+    running --> pending: claim older than 10 min (worker crashed)
+    pending --> [*]: replaced by cancel or reschedule
+```
+
+## 8. Security architecture
+
+```mermaid
+flowchart LR
+    subgraph internet [Internet, untrusted]
+        browser([Browser])
+        bot([Bot / attacker])
+    end
+
+    subgraph edge [Edge]
+        proxy[Reverse proxy<br/>TLS, body limit]
+    end
+
+    subgraph app [Application, trusted]
+        mw[Security headers<br/>CSP, HSTS, COOP/COEP/CORP,<br/>Permissions-Policy]
+        prot[require_same_origin<br/>rate limits, honeypot]
+        pages[Booking pages]
+        domain[Domain rules<br/>validation, error codes]
+        db[(SQLite<br/>PII only in bookings)]
+    end
+
+    subgraph ext [Third parties]
+        smtp[Mail provider]
+        wxcc[WxCC]
+    end
+
+    browser --> proxy --> mw --> prot --> pages --> domain --> db
+    bot -. blocked .-> prot
+    domain -. via worker .-> smtp
+    domain -. first name + host link only .-> wxcc
+
+    classDef planned stroke-dasharray: 5 5
+    class proxy,wxcc planned
+```
+
+| Control | Where | Reference |
+|---|---|---|
+| Strict response headers: CSP without scripts, HSTS, frame denial, COOP/COEP/CORP, Permissions-Policy | `app/api/security_headers.py`, `app/web/templates.py` | threat model |
+| CSRF through Fetch Metadata (`Sec-Fetch-Site`), with an Origin fallback | `app/web/protection.py` | threat model |
+| Rate limits (10 writes/hour, 60 reads/minute) and a honeypot field | `app/web/protection.py`, `booking_pages.py` | CLAUDE.md |
+| Management tokens: 256 bits, HMAC-derived, only the salt and hash stored | `app/domain/tokens.py` | ADR 0011 |
+| No PII in logs (masking processor and semgrep rule), errors, URLs or jobs | `app/logging.py`, `.semgrep/` | CLAUDE.md |
+| One authorisation dependency, `require_scope` (admin) | WP7 | CLAUDE.md |
+| Encrypted, write-only integration secrets | WP7 | ADR 0008 |
+| Signed images, SBOM, image and dependency scanning | CI | ADR 0006 |
+
+The STRIDE analysis per flow, with a test for every abuse case, is in
+`docs/threat-model.md`.
+
+## 9. Privacy
+
+- **Personal data:** name, email, phone, guest and host join URL. These live only in
+  `bookings`; jobs, slots and logs hold IDs.
+- **Purge:** the `purge_pii` job sets them to NULL at slot end + 24 h, or 24 h after a
+  cancellation. The nightly sweep and alert follow in WP8.
+- **What leaves the system:** mails carry the first name, date, team and the management link;
+  the calendar file carries no personal data. WxCC will receive only the first name and the
+  host link.
+- **The management page** shows no contact details, so a forwarded link reveals only the
+  appointment.
+- The DPIA input is in `docs/dataflow.md`.
+
+## 10. Quality assurance
+
+```mermaid
+flowchart LR
+    pr([Pull request]) --> lint[ruff incl. docstrings<br/>mypy strict<br/>import-linter<br/>jscpd]
+    pr --> tests["pytest: domain/i18n coverage ≥ 90%<br/>overall ≥ 75%; migrations up/down"]
+    pr --> sec[bandit, semgrep,<br/>pip-audit, licenses,<br/>gitleaks]
+    pr --> image[hadolint, trivy,<br/>schemathesis, SBOM + grype]
+    pr --> a11y[Playwright keyboard flow,<br/>axe, Lighthouse ≥ 95]
+    lint & tests & sec & image & a11y --> review{human review}
+    review --> main([merge to main])
+    main --> zap[OWASP ZAP baseline]
+    main --> mut[mutmut ≥ 80%]
+    zap & mut --> publish[build, push to GHCR,<br/>cosign sign, SBOM attest]
+```
+
+Per work package the plan is reviewed (`/plan-eng-review`) and the diff is checked with the
+repository's `security-review` skill before the PR (`docs/skills.md`).
+
+## 11. Decisions
+
+| ADR | Decision |
+|---|---|
+| 0001 | Record decisions as numbered ADRs |
+| 0002 | Runtime layout: web migrates, worker heartbeat, health endpoints, deny-by-default headers |
+| 0003 | certifi (MPL-2.0) as the only license exception |
+| 0004 | Self-contained i18n module: Dutch default, browser detection, admin overrides |
+| 0005 | Modularity and docstrings, enforced in CI |
+| 0006 | Test tooling outside the runtime; images signed with cosign |
+| 0007 | WxCC tasks through the Tasks API (no dedicated Webex Connect) |
+| 0008 | Integration secrets in the admin UI, encrypted and write-only |
+| 0009 | Channels as data, reminder rules, templates as text blocks |
+| 0010 | Live meeting status for group admins (aggregates only) |
+| 0011 | Management tokens derived from a per-booking salt and a server key |
+
+## 12. Status and roadmap
+
+| Work package | Content | Status |
+|---|---|---|
+| WP1 | Skeleton, CI, containers, logging, health | done |
+| i18n core | Language module, home page | done |
+| WP2 | Domain, persistence, write lock | done |
+| WP3 (slice 1) | Citizen pages, mail, worker, demo | done |
+| WP3 (rest) | Embeddable widget (grid calendar), branding (O5) | planned |
+| WP4 | SMS reminders, message editors | planned |
+| WP5 | Video adapter, live meeting status (O1) | planned |
+| WP6 | WxCC Tasks API dispatch, task events (O2, O6) | planned |
+| WP7 | Admin portal, OIDC, roles, encrypted settings (O3) | planned |
+| WP8 | Purge sweep and alerting, audit events | planned |
+| WP9 | Hardening, pentest, accessibility audit (O10) | planned |
+
+The open decisions (O1–O10) are listed in `docs/HANDOVER.md` §11.
