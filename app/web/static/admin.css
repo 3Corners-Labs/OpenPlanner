@@ -678,6 +678,35 @@ body.admin {
   font-size: 0.9rem;
 }
 
+.choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choice__option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 32px;
+}
+
+.choice__option input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: var(--adm-accent);
+}
+
+.choice__option label {
+  font-weight: 500;
+}
+
+.optional {
+  color: var(--adm-text-muted);
+  font-weight: 400;
+}
+
 .form-actions {
   display: flex;
   flex-wrap: wrap;
@@ -779,6 +808,18 @@ body.admin {
   padding: 0.5rem 0.65rem;
   border-radius: var(--adm-radius-s);
   background: var(--adm-accent-soft);
+}
+
+.window--closed {
+  background: var(--adm-warning-soft);
+}
+
+.window--closed .window__capacity {
+  color: var(--adm-warning);
+}
+
+.window .inline-form {
+  margin-left: auto;
 }
 
 .window__time {

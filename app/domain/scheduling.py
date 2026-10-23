@@ -26,6 +26,7 @@ _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 MAX_NAME_LENGTH = 200
 MAX_SLUG_LENGTH = 64
+MAX_QUEUE_ID_LENGTH = 128
 MAX_CAPACITY = 1000
 """Upper bound per window; protects against typos such as 1000000."""
 
@@ -112,6 +113,11 @@ class Group:
             raise _invalid("dispatch_lead_minutes")
         if self.min_notice_minutes < self.dispatch_lead_minutes:
             raise _invalid("min_notice_minutes")
+        queue = self.wxcc_queue_id
+        if queue is not None and (
+            not queue.strip() or len(queue) > MAX_QUEUE_ID_LENGTH or _CONTROL_CHARS.search(queue)
+        ):
+            raise _invalid("wxcc_queue_id")
 
     @property
     def tz(self) -> ZoneInfo:

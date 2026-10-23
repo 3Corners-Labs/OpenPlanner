@@ -1,0 +1,25 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.tab.settings") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/settings" novalidate>
+  <div class="card__header">
+    <h2>{{ _("admin.tab.settings") }}</h2>
+    <p class="card__lead">{{ _("admin.settings.lead") }}</p>
+  </div>
+  <div class="form-grid">
+    <div class="field">
+      <label for="slug">{{ _("admin.field.slug") }}</label>
+      <input id="slug" type="text" value="{{ summary.group.slug }}" readonly aria-describedby="slug-hint">
+      <p class="hint" id="slug-hint">{{ _("admin.field.slug_fixed") }}</p>
+    </div>
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") }}</button>
+    <a href="/admin/groups/{{ summary.group.slug }}">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

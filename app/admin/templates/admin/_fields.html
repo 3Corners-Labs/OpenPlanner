@@ -1,0 +1,26 @@
+{#- One accessible input: visible label, hint and error linked with aria-describedby. -#}
+{% macro field(f) -%}
+<div class="field{% if f.error %} field--error{% endif %}">
+  <label for="{{ f.name }}">{{ f.label }}{% if not f.required and not f.readonly %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</label>
+  {%- if f.kind == "select" %}
+  <select id="{{ f.name }}" name="{{ f.name }}"{% if f.required %} required{% endif %}{% if f.error %} aria-invalid="true"{% endif %}{% if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}>
+    {%- for option in f.options %}
+    <option value="{{ option.value }}"{% if option.value == f.value %} selected{% endif %}>{{ option.label }}</option>
+    {%- endfor %}
+  </select>
+  {%- else %}
+  <input id="{{ f.name }}" name="{{ f.name }}" type="{{ f.kind }}" value="{{ f.value }}"
+    {%- if f.required and not f.readonly %} required{% endif %}
+    {%- if f.readonly %} readonly{% endif %}
+    {%- if f.error %} aria-invalid="true"{% endif %}
+    {%- if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}
+    {%- for key, value in f.attributes.items() %} {{ key }}="{{ value }}"{% endfor %}>
+  {%- endif %}
+  {%- if f.hint %}
+  <p class="hint" id="{{ f.name }}-hint">{{ f.hint }}</p>
+  {%- endif %}
+  {%- if f.error %}
+  <p class="error-message" id="{{ f.name }}-error">{{ f.error }}</p>
+  {%- endif %}
+</div>
+{%- endmacro %}

@@ -1,0 +1,26 @@
+{#- The weekly opening hours; with remove buttons when ``removable`` is set. -#}
+<ul class="week">
+  {% for day in week %}
+  <li class="day{% if not day.windows %} day--closed{% endif %}">
+    <h3>{{ day.name }}</h3>
+    {% if day.windows %}
+    <ul class="windows">
+      {% for window in day.windows %}
+      <li class="window">
+        <span class="window__time">{{ window.time }}</span>
+        <span class="window__capacity">{{ window.capacity }}</span>
+        {% if window.validity %}<span class="window__validity">{{ window.validity }}</span>{% endif %}
+        {% if removable | default(false) %}
+        <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/hours/{{ window.id }}/delete">
+          <button type="submit" class="button button--danger button--small" aria-label="{{ _("admin.hours.remove_label", day=day.name, time=window.time) }}">{{ _("admin.remove") }}</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">{{ _("admin.hours.closed") }}</p>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>

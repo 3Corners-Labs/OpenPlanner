@@ -43,6 +43,9 @@ def test_group_defaults() -> None:
         ("name", "   "),
         ("name", "x" * 201),
         ("name", "Team\nBcc: x@example.org"),
+        ("wxcc_queue_id", ""),
+        ("wxcc_queue_id", "q" * 129),
+        ("wxcc_queue_id", "queue\n1"),
     ],
 )
 def test_group_rejects_invalid_configuration(field: str, value: object) -> None:

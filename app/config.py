@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     session_secret: SecretStr | None = None
     dev_session_key_path: Path = Path("data/dev-session.key")
     admin_session_hours: int = 8
+    # A change needs a login of at most this age; older sessions are sent to the IdP first,
+    # which refreshes the roles (invisible with an active SSO session).
+    admin_reauth_minutes: int = 60
     admin_timezone: str = "Europe/Amsterdam"
     oidc_discovery_url: str | None = None
     oidc_client_id: str = "openplanner-admin"
