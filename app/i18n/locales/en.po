@@ -954,10 +954,10 @@ msgid "join.tips.lobby"
 msgstr "You first wait in a lobby. The agent lets you in."
 
 msgid "join.too_early"
-msgstr "You can join from {time}. This page refreshes itself."
+msgstr "You can join from {time}."
 
 msgid "join.preparing"
-msgstr "The video call is being prepared. This page refreshes itself."
+msgstr "The video call is being prepared. Please try again in a few minutes."
 
 msgid "join.closed"
 msgstr "This call has ended."
@@ -996,7 +996,7 @@ msgid "wait.title"
 msgstr "Your video call"
 
 msgid "wait.searching"
-msgstr "We are looking for an agent. You can go to the lobby already. This page refreshes itself."
+msgstr "We are looking for an agent. You can go to the lobby already."
 
 msgid "wait.accepted"
 msgstr "An agent has accepted your call and will come to the lobby shortly."
@@ -1183,3 +1183,6 @@ msgstr "No secret set: the address is disabled"
 
 msgid "admin.integrations.groups"
 msgstr "Groups"
+
+msgid "join.refresh"
+msgstr "Refresh status"

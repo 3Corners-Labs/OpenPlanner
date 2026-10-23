@@ -954,10 +954,10 @@ msgid "join.tips.lobby"
 msgstr "U wacht eerst in een wachtruimte. De medewerker laat u binnen."
 
 msgid "join.too_early"
-msgstr "U kunt deelnemen vanaf {time}. Deze pagina ververst zichzelf."
+msgstr "U kunt deelnemen vanaf {time}."
 
 msgid "join.preparing"
-msgstr "Het videogesprek wordt klaargezet. Deze pagina ververst zichzelf."
+msgstr "Het videogesprek wordt klaargezet. Probeer het over een paar minuten opnieuw."
 
 msgid "join.closed"
 msgstr "Dit gesprek is voorbij."
@@ -996,7 +996,7 @@ msgid "wait.title"
 msgstr "Uw videogesprek"
 
 msgid "wait.searching"
-msgstr "We zoeken een medewerker voor u. U kunt alvast naar de wachtruimte. Deze pagina ververst zichzelf."
+msgstr "We zoeken een medewerker voor u. U kunt alvast naar de wachtruimte gaan."
 
 msgid "wait.accepted"
 msgstr "Een medewerker heeft uw gesprek aangenomen en komt zo naar de wachtruimte."
@@ -1183,3 +1183,6 @@ msgstr "Geen geheim ingesteld: het adres is uitgeschakeld"
 
 msgid "admin.integrations.groups"
 msgstr "Groepen"
+
+msgid "join.refresh"
+msgstr "Status verversen"
