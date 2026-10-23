@@ -148,7 +148,9 @@ async def test_full_booking_flow(site: httpx.AsyncClient) -> None:
     assert "vrijdag 2 januari 2026, 09:00–09:30" in page.text
     assert "Bevestigd" in page.text
     assert f'href="/b/{token}/reschedule"' in page.text
-    assert "Ada" not in page.text  # the management page shows no contact details
+    # The management page shows no contact details. Check the whole surname: a short
+    # substring such as "Ada" can occur by chance in the random token in the page's links.
+    assert "Lovelace" not in page.text
     assert "example.org" not in page.text
 
 
