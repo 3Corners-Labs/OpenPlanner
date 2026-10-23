@@ -59,7 +59,7 @@ flowchart LR
     service -. roadmap .-> whatsapp
 
     classDef planned stroke-dasharray: 5 5
-    class wxcc,video,idp,sms,whatsapp planned
+    class wxcc,video,sms,whatsapp planned
 ```
 
 | External system | Direction | Purpose | Decision |
@@ -118,14 +118,14 @@ flowchart TB
 
     subgraph entry [Entry points, never import each other]
         api["app.api<br/>public pages, health"]
-        adminpkg["app.admin<br/>admin UI (WP7)"]
+        adminpkg["app.admin<br/>admin portal, RequirePermission"]
         jobs["app.jobs<br/>worker, runner, messages"]
         cli["app.cli<br/>seed-demo"]
     end
 
     web["app.web<br/>locale, templates, render(),<br/>protection, error pages"]
-    adapters["app.adapters<br/>db (SQL, unit of work, job queue),<br/>smtp, clock"]
-    domain["app.domain<br/>pure business rules + ports"]
+    adapters["app.adapters<br/>db (SQL, unit of work, job queue, scope filter),<br/>smtp, oidc, clock"]
+    domain["app.domain<br/>pure business rules, authorisation matrix, ports"]
     i18n["app.i18n<br/>negotiation, translator,<br/>catalogues, dates"]
 
     main --> entry
@@ -139,8 +139,6 @@ flowchart TB
     web --> i18n
     jobs --> i18n
 
-    classDef planned stroke-dasharray: 5 5
-    class adminpkg planned
 ```
 
 import-linter enforces these arrows in CI (ADR 0005):
@@ -154,7 +152,7 @@ import-linter enforces these arrows in CI (ADR 0005):
 ```mermaid
 flowchart LR
     subgraph domain [app.domain]
-        service[BookingService]
+        service[BookingService · AdminService]
         ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider"}}
         service --> ports
     end
@@ -164,7 +162,7 @@ flowchart LR
     smtp[adapters.smtp<br/>SmtpMailSender]
     videoad[video adapter<br/>WP5]
     wxccad[WxCC adapter<br/>WP6]
-    idpad[OIDC adapter<br/>WP7]
+    idpad[adapters.oidc<br/>OidcIdentityProvider]
 
     clock -.implements.-> ports
     uow -.implements.-> ports
@@ -174,7 +172,7 @@ flowchart LR
     idpad -.implements.-> ports
 
     classDef planned stroke-dasharray: 5 5
-    class videoad,wxccad,idpad planned
+    class videoad,wxccad planned
 ```
 
 Tests replace every adapter with a fake from `tests/fakes/`. The in-memory unit of work has the
@@ -192,6 +190,11 @@ same commit and rollback behaviour as the SQL one.
 | Channels, reminder rules | `app/domain/channels.py` |
 | Management tokens | `app/domain/tokens.py` |
 | Error codes | `app/domain/errors.py` |
+| Authorisation matrix, scopes (ADR 0014) | `app/domain/authorization.py` |
+| Admin use cases, audit events | `app/domain/admin.py`, `app/domain/audit.py` |
+| OIDC login (ADR 0013) | `app/adapters/oidc.py` |
+| Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
+| Generated matrix document | `app/web/authz_report.py`, `app/cli.py` (`authz-matrix`) |
 | Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |
 | Transactions, write lock | `app/adapters/db/uow.py`, `app/adapters/db/engine.py` |
 | Job queue | `app/adapters/db/jobs.py` |
@@ -323,6 +326,43 @@ sequenceDiagram
     end
 ```
 
+### Admin login and an authorised request
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant W as web (app.admin)
+    participant P as Identity provider
+    participant S as AdminService
+    participant DB as SQLite
+
+    A->>W: GET /admin/groups/demo (no session)
+    W-->>A: 303 /admin/login?next=…
+    W-->>A: 302 to the provider (state, nonce, PKCE S256)
+    A->>P: sign in
+    P-->>A: 302 /admin/callback?code&state
+    A->>W: callback
+    W->>P: token exchange (code + verifier)
+    W->>W: verify ID token (JWKS, alg allow-list, iss/aud/nonce/exp)
+    W->>S: record_login(principal)
+    S->>DB: audit event per organisation/group + admin profile
+    W-->>A: fresh session cookie, 303 next
+    A->>W: GET /admin/groups/demo
+    W->>S: authorize(principal, group.view, demo)
+    S->>S: decide() on the matrix
+    alt allowed
+        W-->>A: page, menu and buttons from can()
+    else denied
+        S->>DB: audit event (denied, reason)
+        W-->>A: 403 "Geen toegang" inside the portal
+    end
+```
+
+Listings never ask "may I see this row?" one by one: the matrix turns the permission into a
+`Scope`, and the SQL adapter filters with it. A test checks exhaustively that the scope and the
+single decision never disagree.
+
 ### What happens to one booking over time
 
 ```mermaid
@@ -414,7 +454,8 @@ flowchart LR
 | Rate limits (10 writes/hour, 60 reads/minute) and a honeypot field | `app/web/protection.py`, `booking_pages.py` | CLAUDE.md |
 | Management tokens: 256 bits, HMAC-derived, only the salt and hash stored | `app/domain/tokens.py` | ADR 0011 |
 | No PII in logs (masking processor and semgrep rule), errors, URLs or jobs | `app/logging.py`, `.semgrep/` | CLAUDE.md |
-| One authorisation dependency, `require_scope` (admin) | WP7 | CLAUDE.md |
+| Authorisation matrix: one `RequirePermission` per admin route, scoped SQL, audit of denials and logins | `app/domain/authorization.py`, `app/admin/authz.py` | ADR 0014 |
+| OIDC with PKCE, nonce, asymmetric algorithms only; RP-initiated logout | `app/adapters/oidc.py` | ADR 0013 |
 | Encrypted, write-only integration secrets | WP7 | ADR 0008 |
 | Signed images, SBOM, image and dependency scanning | CI | ADR 0006 |
 
@@ -469,6 +510,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0010 | Live meeting status for group admins (aggregates only) |
 | 0011 | Management tokens derived from a per-booking salt and a server key |
 | 0012 | Claude Code merges only on explicit instruction of the product owner, with green CI |
+| 0013 | Admin login with OIDC (PingFederate; Keycloak in development), httpx + PyJWT |
+| 0014 | The authorisation matrix as the single source of rights |
 
 ## 12. Status and roadmap
 
@@ -482,8 +525,9 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP4 | SMS reminders, message editors | planned |
 | WP5 | Video adapter, live meeting status (O1) | planned |
 | WP6 | WxCC Tasks API dispatch, task events (O2, O6) | planned |
-| WP7 | Admin portal, OIDC, roles, encrypted settings (O3) | planned |
-| WP8 | Purge sweep and alerting, audit events | planned |
+| WP7a | Admin portal login, authorisation matrix, audit log | done |
+| WP7b–d | Groups and planning, texts and reminders, encrypted integration settings (O3) | planned |
+| WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 
 The open decisions (O1–O10) are listed in `docs/HANDOVER.md` §11.
