@@ -1,0 +1,24 @@
+rules:
+  - id: no-print
+    languages: [python]
+    severity: ERROR
+    message: Use structlog instead of print(); print bypasses PII masking.
+    pattern: print(...)
+
+  - id: no-pii-in-log-call
+    languages: [python]
+    severity: ERROR
+    message: >-
+      PII field passed to a logger. Log identifiers (booking_id), never name, email,
+      phone, note or join URLs.
+    patterns:
+      - pattern-either:
+          - pattern: $LOG.$METHOD(..., $KEY=$VALUE, ...)
+          - pattern: $LOG.$METHOD(..., $OBJ.$KEY, ...)
+          - pattern: $LOG.$METHOD(..., <... $OBJ.$KEY ...>, ...)
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(debug|info|warning|warn|error|exception|critical|fatal|msg|log|bind|new)$
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: ^(name|email|phone|note|guest_join_url|host_join_url)$

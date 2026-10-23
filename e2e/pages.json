@@ -1,0 +1,4 @@
+{
+  "$comment": "Public pages under test. Single source for axe (tests/a11y.spec.ts) and Lighthouse (scripts/lighthouse.mjs). Each page is checked in every listed locale via ?lang=. Pages are added from work package 3 onwards.",
+  "pages": []
+}

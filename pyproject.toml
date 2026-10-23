@@ -1,0 +1,138 @@
+[project]
+name = "openplanner"
+version = "0.1.0"
+description = "Lightweight group-booking service with Webex Contact Center dispatch."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "aiosqlite>=0.20",
+    "alembic>=1.14",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "structlog>=24.4",
+    "httpx>=0.28",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "import-linter>=2.1",
+    "bandit>=1.8",
+    "pip-audit>=2.7",
+    "pip-licenses>=5.0",
+    "mutmut>=3.8.0",
+]
+
+# An application, not a library: run from the source tree, never built as a wheel.
+[tool.uv]
+package = false
+
+# --- ruff -------------------------------------------------------------------
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["app", "tests"]
+extend-exclude = [".semgrep"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "N", "ASYNC", "PT", "D"]
+
+# Google-style docstrings: readable by pdoc, mkdocstrings and Sphinx (napoleon) alike.
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "scripts", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is the pytest idiom; S101 only matters in production code.
+# Test names are the documentation; fixtures and fakes still explain themselves where useful.
+"tests/**" = ["S101", "D"]
+"migrations/**" = ["N999", "D103"]
+
+# --- mypy -------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["app", "scripts"]
+
+# --- pytest / coverage ------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--strict-markers --strict-config"
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+concurrency = ["greenlet", "thread"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+# --- import-linter ----------------------------------------------------------
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers: entry points > adapters > domain"
+type = "layers"
+layers = [
+    "app.main",
+    "app.api | app.admin | app.jobs",
+    "app.adapters",
+    "app.domain",
+]
+containers = []
+exhaustive = false
+
+[[tool.importlinter.contracts]]
+name = "Entry points do not import each other"
+type = "independence"
+modules = ["app.api", "app.admin", "app.jobs"]
+
+[[tool.importlinter.contracts]]
+name = "Domain is framework-free and adapter-free"
+type = "forbidden"
+source_modules = ["app.domain"]
+forbidden_modules = [
+    "app.adapters",
+    "app.api",
+    "app.admin",
+    "app.jobs",
+    "fastapi",
+    "starlette",
+    "sqlalchemy",
+    "alembic",
+    "httpx",
+    "pydantic_settings",
+    "structlog",
+    "uvicorn",
+]
+
+# --- bandit -----------------------------------------------------------------
+[tool.bandit]
+exclude_dirs = ["tests", "migrations"]
+
+# --- mutmut (on merge to main: mutation score >= 80% on app/domain) ------------
+[tool.mutmut]
+source_paths = ["app/domain/"]
+also_copy = ["app/", "alembic.ini", "migrations/"]
+pytest_add_cli_args_test_selection = ["tests/domain/"]
