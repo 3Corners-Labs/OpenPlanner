@@ -1,8 +1,12 @@
 {% extends "admin/layout.html" %}
 {% block title %}{{ _("admin.matrix.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
-<h1 id="page-title">{{ _("admin.matrix.title") }}</h1>
-<p>{{ _("admin.matrix.intro") }}</p>
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("admin.matrix.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.matrix.intro") }}</p>
+  </div>
+</div>
 <div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
 <table class="data-table">
   <caption class="visually-hidden">{{ _("admin.matrix.title") }}</caption>
@@ -18,13 +22,14 @@
     <tr>
       <th scope="row">{{ row.label }}</th>
       <td>{{ row.level }}</td>
-      {% for granted in row.granted %}<td>{% if granted %}<span aria-hidden="true">✓ </span>{{ _("admin.matrix.yes") }}{% else %}{{ _("admin.matrix.no") }}{% endif %}</td>{% endfor %}
+      {% for granted in row.granted %}<td>{% if granted %}<span class="cell-yes"><span aria-hidden="true">✓</span>{{ _("admin.matrix.yes") }}</span>{% else %}<span class="cell-no"><span aria-hidden="true">–</span>{{ _("admin.matrix.no") }}</span>{% endif %}</td>{% endfor %}
     </tr>
     {% endfor %}
   </tbody>
 </table>
 </div>
-<h2>{{ _("admin.matrix.citizen") }}</h2>
+<h2 class="section-title">{{ _("admin.matrix.citizen") }}</h2>
+<div class="table-scroll">
 <table class="data-table">
   <caption class="visually-hidden">{{ _("admin.matrix.citizen") }}</caption>
   <thead>
@@ -36,4 +41,5 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endblock %}

@@ -295,14 +295,8 @@ msgstr "These are the groups you have rights for."
 msgid "admin.dashboard.groups"
 msgstr "Your groups"
 
-msgid "admin.dashboard.organisation"
-msgstr "Organisation"
 
-msgid "admin.dashboard.group"
-msgstr "Group"
 
-msgid "admin.dashboard.public_page"
-msgstr "Booking page"
 
 msgid "admin.dashboard.no_groups"
 msgstr "You have no rights for any group yet. Ask your administrator for access."
@@ -564,3 +558,9 @@ msgstr "You have signed out of OpenPlanner. You are now also being signed out of
 
 msgid "admin.logging_out.continue"
 msgstr "Continue signing out"
+
+msgid "admin.dashboard.manage"
+msgstr "Manage"
+
+msgid "admin.dashboard.manage_group"
+msgstr "Manage {name}"

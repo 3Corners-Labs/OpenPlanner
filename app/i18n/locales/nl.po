@@ -295,14 +295,8 @@ msgstr "Hier ziet u de groepen waarvoor u rechten heeft."
 msgid "admin.dashboard.groups"
 msgstr "Uw groepen"
 
-msgid "admin.dashboard.organisation"
-msgstr "Organisatie"
 
-msgid "admin.dashboard.group"
-msgstr "Groep"
 
-msgid "admin.dashboard.public_page"
-msgstr "Boekingspagina"
 
 msgid "admin.dashboard.no_groups"
 msgstr "U heeft (nog) geen rechten op een groep. Vraag uw beheerder om toegang."
@@ -564,3 +558,9 @@ msgstr "U bent uitgelogd bij OpenPlanner. U wordt nu ook uitgelogd bij uw organi
 
 msgid "admin.logging_out.continue"
 msgstr "Doorgaan met uitloggen"
+
+msgid "admin.dashboard.manage"
+msgstr "Beheren"
+
+msgid "admin.dashboard.manage_group"
+msgstr "{name} beheren"

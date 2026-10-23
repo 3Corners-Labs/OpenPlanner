@@ -1,0 +1,857 @@
+/*
+ * Admin portal design (loaded after site.css, only on /admin pages). One fixed, calm look for
+ * every organisation: organisation branding (O5) applies to the citizen pages, not here.
+ * All colours are tokens; text contrast is at least 4.5:1 (WCAG 2.2 AA), focus is always
+ * visible, targets are at least 24x24 px. No JavaScript: layout and states are pure CSS.
+ */
+:root {
+  --adm-bg: #f5f6f8;
+  --adm-surface: #ffffff;
+  --adm-surface-muted: #f0f2f5;
+  --adm-border: #dde1e6;
+  --adm-border-strong: #8a939e;
+  --adm-text: #1b1f24;
+  --adm-text-muted: #545d68;
+  --adm-accent: #01689b;
+  --adm-accent-strong: #004f78;
+  --adm-accent-soft: #e5f0f6;
+  --adm-on-accent: #ffffff;
+  --adm-success: #26703a;
+  --adm-success-soft: #e7f3ea;
+  --adm-danger: #b42318;
+  --adm-danger-soft: #fcebea;
+  --adm-warning: #8a5300;
+  --adm-warning-soft: #fdf3e1;
+  --adm-focus: #1b1f24;
+  --adm-focus-halo: #ffbf47;
+  --adm-radius: 10px;
+  --adm-radius-s: 6px;
+  --adm-shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 8%);
+  --adm-nav-width: 15rem;
+  --adm-content-width: 72rem;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --adm-text-muted: #1b1f24;
+    --adm-border: #4a525c;
+    --adm-border-strong: #000000;
+    --adm-accent: #00436b;
+    --adm-shadow: none;
+  }
+}
+
+body.admin {
+  background: var(--adm-bg);
+  color: var(--adm-text);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.admin h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.admin h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+
+.admin a {
+  color: var(--adm-accent);
+}
+
+.admin :focus-visible {
+  outline: 3px solid var(--adm-focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--adm-focus-halo);
+}
+
+/* --- Shell: top bar, side navigation, content ------------------------------------------ */
+.admin-shell {
+  display: grid;
+  grid-template-columns: var(--adm-nav-width) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "top top"
+    "nav main";
+  min-height: 100vh;
+}
+
+.admin-shell--no-nav {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "top"
+    "main";
+}
+
+.admin-topbar {
+  grid-area: top;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--adm-border);
+  background: var(--adm-surface);
+}
+
+.admin-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 24px;
+  color: var(--adm-text);
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-decoration: none;
+}
+
+.admin .admin-brand {
+  color: var(--adm-text);
+}
+
+.admin-brand__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-accent);
+  color: var(--adm-on-accent);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+
+.admin-topbar__end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+}
+
+.admin .language-switcher a {
+  border-radius: var(--adm-radius-s);
+  font-size: 0.95rem;
+}
+
+.admin-user {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-user__name {
+  color: var(--adm-text-muted);
+  font-size: 0.95rem;
+}
+
+.admin-user form {
+  margin: 0;
+}
+
+.admin-nav {
+  grid-area: nav;
+  padding: 1.25rem 0.75rem;
+  border-right: 1px solid var(--adm-border);
+  background: var(--adm-surface);
+}
+
+.admin-nav ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 40px;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--adm-radius-s);
+  color: var(--adm-text);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.admin-nav a:hover {
+  background: var(--adm-surface-muted);
+}
+
+.admin-nav a[aria-current="page"] {
+  background: var(--adm-accent-soft);
+  color: var(--adm-accent-strong);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--adm-accent);
+}
+
+.icon {
+  flex: none;
+}
+
+.admin-main {
+  grid-area: main;
+  width: 100%;
+  max-width: var(--adm-content-width);
+  margin: 0;
+  padding: 2rem 2rem 4rem;
+}
+
+@media (max-width: 52rem) {
+  .admin-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "top"
+      "nav"
+      "main";
+  }
+
+  .admin-nav {
+    padding: 0.5rem 0.75rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--adm-border);
+    overflow-x: auto;
+  }
+
+  .admin-nav ul {
+    flex-direction: row;
+  }
+
+  .admin-nav a {
+    white-space: nowrap;
+  }
+
+  .admin-nav a[aria-current="page"] {
+    box-shadow: inset 0 -3px 0 var(--adm-accent);
+  }
+
+  .admin-main {
+    padding: 1.25rem 1rem 3rem;
+  }
+}
+
+/* --- Page header, breadcrumbs, tabs ------------------------------------------------------ */
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-header__lead {
+  margin: 0;
+  color: var(--adm-text-muted);
+}
+
+.page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  color: var(--adm-text-muted);
+  font-size: 0.9rem;
+  list-style: none;
+}
+
+.breadcrumbs li + li::before {
+  content: "/";
+  margin-right: 0.35rem;
+  color: var(--adm-border-strong);
+}
+
+.breadcrumbs a {
+  display: inline-block;
+  min-height: 24px;
+}
+
+.tabs {
+  margin: 0 0 1.5rem;
+  border-bottom: 1px solid var(--adm-border);
+}
+
+.tabs ul {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+}
+
+.tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  border-bottom: 3px solid transparent;
+  color: var(--adm-text-muted);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tabs a:hover {
+  color: var(--adm-text);
+}
+
+.tabs a[aria-current="page"] {
+  border-bottom-color: var(--adm-accent);
+  color: var(--adm-accent-strong);
+}
+
+/* --- Cards, grids, chips ------------------------------------------------------------------ */
+.card {
+  padding: 1.5rem;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius);
+  background: var(--adm-surface);
+  box-shadow: var(--adm-shadow);
+}
+
+.card + .card,
+.card + .stack,
+.stack + .card {
+  margin-top: 1.25rem;
+}
+
+.card-grid > .card,
+.week > .card {
+  margin-top: 0;
+}
+
+.card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.card__header h2 {
+  margin: 0;
+}
+
+.card__lead {
+  margin: 0;
+  color: var(--adm-text-muted);
+  font-size: 0.95rem;
+}
+
+.card--message {
+  max-width: 40rem;
+}
+
+.card--message h1 {
+  margin-bottom: 0.75rem;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.group-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  height: 100%;
+}
+
+.group-card h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.group-card h2 a {
+  color: var(--adm-text);
+  text-decoration: none;
+}
+
+.group-card h2 a:hover {
+  color: var(--adm-accent);
+  text-decoration: underline;
+}
+
+.group-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.section-title {
+  margin-top: 2rem;
+}
+
+.group-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--adm-border);
+  font-size: 0.95rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid var(--adm-border);
+  border-radius: 999px;
+  background: var(--adm-surface-muted);
+  color: var(--adm-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip--accent {
+  border-color: transparent;
+  background: var(--adm-accent-soft);
+  color: var(--adm-accent-strong);
+}
+
+.chip--success {
+  border-color: transparent;
+  background: var(--adm-success-soft);
+  color: var(--adm-success);
+}
+
+.chip--danger {
+  border-color: transparent;
+  background: var(--adm-danger-soft);
+  color: var(--adm-danger);
+}
+
+.chip--warning {
+  border-color: transparent;
+  background: var(--adm-warning-soft);
+  color: var(--adm-warning);
+}
+
+.link-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 24px;
+}
+
+.empty-state {
+  padding: 2rem;
+  border: 1px dashed var(--adm-border-strong);
+  border-radius: var(--adm-radius);
+  background: var(--adm-surface);
+  color: var(--adm-text-muted);
+  text-align: center;
+}
+
+/* --- Definition lists ---------------------------------------------------------------------- */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 0;
+}
+
+.facts div {
+  padding: 0.75rem 1rem;
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-surface-muted);
+}
+
+.facts dt {
+  color: var(--adm-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.facts dd {
+  margin: 0.15rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+/* --- Tables -------------------------------------------------------------------------------- */
+.admin .table-scroll {
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius);
+  background: var(--adm-surface);
+  box-shadow: var(--adm-shadow);
+}
+
+.admin .data-table {
+  font-size: 0.95rem;
+}
+
+.admin .data-table th,
+.admin .data-table td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--adm-border);
+}
+
+.admin .data-table thead th {
+  border-bottom: 1px solid var(--adm-border);
+  background: var(--adm-surface-muted);
+  color: var(--adm-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.admin .data-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.admin .data-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+.cell-yes,
+.cell-no {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+
+.cell-yes {
+  color: var(--adm-success);
+}
+
+.cell-no {
+  color: var(--adm-text-muted);
+}
+
+/* --- Buttons ------------------------------------------------------------------------------- */
+.admin .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0.45rem 1rem;
+  border: 1px solid var(--adm-accent);
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-accent);
+  color: var(--adm-on-accent);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.admin .button:hover {
+  border-color: var(--adm-accent-strong);
+  background: var(--adm-accent-strong);
+}
+
+.admin .button--secondary {
+  border-color: var(--adm-border-strong);
+  background: var(--adm-surface);
+  color: var(--adm-text);
+}
+
+.admin .button--secondary:hover {
+  border-color: var(--adm-text);
+  background: var(--adm-surface-muted);
+}
+
+.admin .button--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--adm-accent);
+}
+
+.admin .button--ghost:hover {
+  border-color: var(--adm-border);
+  background: var(--adm-surface-muted);
+}
+
+.admin .button--danger {
+  border-color: var(--adm-danger);
+  background: var(--adm-surface);
+  color: var(--adm-danger);
+}
+
+.admin .button--danger:hover {
+  background: var(--adm-danger-soft);
+}
+
+.admin .button--small {
+  min-height: 32px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.9rem;
+}
+
+/* --- Forms --------------------------------------------------------------------------------- */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1rem 1.5rem;
+}
+
+.admin .field {
+  margin: 0;
+}
+
+.admin .field label,
+.admin .field legend {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.admin .field input,
+.admin .field select {
+  width: 100%;
+  max-width: none;
+  min-height: 40px;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--adm-border-strong);
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-surface);
+  color: var(--adm-text);
+  font: inherit;
+}
+
+.admin .field input:hover,
+.admin .field select:hover {
+  border-color: var(--adm-text);
+}
+
+.admin .field input[readonly] {
+  background: var(--adm-surface-muted);
+  color: var(--adm-text-muted);
+}
+
+.admin .hint {
+  margin: 0.25rem 0 0;
+  color: var(--adm-text-muted);
+  font-size: 0.875rem;
+}
+
+.admin .field--error input,
+.admin .field--error select {
+  border: 2px solid var(--adm-danger);
+}
+
+.admin .field--error {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.admin .error-message {
+  margin: 0.25rem 0 0;
+  color: var(--adm-danger);
+  font-size: 0.9rem;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--adm-border);
+}
+
+.inline-form {
+  display: inline;
+  margin: 0;
+}
+
+/* --- Alerts -------------------------------------------------------------------------------- */
+.alert {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--adm-border);
+  border-left-width: 4px;
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-surface);
+}
+
+.alert p {
+  margin: 0;
+}
+
+.alert--success {
+  border-color: var(--adm-success);
+  background: var(--adm-success-soft);
+}
+
+.alert--error {
+  border-color: var(--adm-danger);
+  background: var(--adm-danger-soft);
+}
+
+.alert--info {
+  border-color: var(--adm-accent);
+  background: var(--adm-accent-soft);
+}
+
+.admin .error-summary {
+  border: 1px solid var(--adm-danger);
+  border-left-width: 4px;
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-danger-soft);
+}
+
+.admin .error-summary h2 {
+  font-size: 1rem;
+}
+
+/* --- Week schedule -------------------------------------------------------------------------- */
+.week {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day {
+  padding: 1rem;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius);
+  background: var(--adm-surface);
+}
+
+.day h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+
+.day--closed {
+  background: var(--adm-surface-muted);
+}
+
+.windows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.window {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-accent-soft);
+}
+
+.window__time {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.window__capacity {
+  color: var(--adm-accent-strong);
+  font-size: 0.875rem;
+}
+
+.window__validity {
+  flex-basis: 100%;
+  color: var(--adm-text-muted);
+  font-size: 0.8rem;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--adm-text-muted);
+}
+
+/* --- Preview of the citizen's slots ---------------------------------------------------------- */
+.preview-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preview-days li {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-surface);
+}
+
+.preview-days strong {
+  display: block;
+}
+
+/* --- Public card (logged out, login failed) --------------------------------------------------- */
+.admin-public {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 1.5rem 1rem;
+}
+
+.admin-public__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  max-width: 32rem;
+  margin: 8vh 0 1.25rem;
+}
+
+.admin-public__card {
+  width: 100%;
+  max-width: 32rem;
+  margin: 0;
+}
+
+.admin-public__card h1 {
+  margin-bottom: 0.75rem;
+}

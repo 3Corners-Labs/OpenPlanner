@@ -51,7 +51,7 @@ from app.domain.authorization import (
 from app.domain.ports import Clock, IdentityError, IdentityProvider
 from app.domain.scheduling import PhoneMode
 from app.i18n import BoundGettext
-from app.i18n.dates import format_clock, format_day, local_day
+from app.i18n.dates import format_clock, format_day_compact, local_day
 from app.web.authz_labels import (
     CITIZEN_LABELS,
     CONDITION_LABELS,
@@ -79,6 +79,13 @@ EVENT_LABELS: dict[str, str] = {
     LOGOUT_EVENT: "audit.event.logout",
 }
 
+OUTCOME_TONES: dict[Outcome, str] = {
+    Outcome.SUCCESS: "success",
+    Outcome.DENIED: "danger",
+    Outcome.FAILURE: "warning",
+}
+"""Chip colour per audit outcome; the outcome is always also written out (WCAG 1.4.1)."""
+
 PHONE_LABELS: dict[PhoneMode, str] = {
     PhoneMode.HIDDEN: "admin.group.phone_hidden",
     PhoneMode.OPTIONAL: "admin.group.phone_optional",
@@ -96,13 +103,14 @@ class NavItem:
     label_key: str
     href: str
     permission: Permission
+    icon: str
 
 
 NAVIGATION = (
-    NavItem("admin.nav.dashboard", "/admin/", Permission.DASHBOARD_VIEW),
-    NavItem("admin.nav.audit", "/admin/audit", Permission.AUDIT_VIEW),
-    NavItem("admin.nav.rights", "/admin/rights", Permission.RIGHTS_VIEW),
-    NavItem("admin.nav.matrix", "/admin/matrix", Permission.MATRIX_VIEW),
+    NavItem("admin.nav.dashboard", "/admin/", Permission.DASHBOARD_VIEW, "dashboard"),
+    NavItem("admin.nav.audit", "/admin/audit", Permission.AUDIT_VIEW, "audit"),
+    NavItem("admin.nav.rights", "/admin/rights", Permission.RIGHTS_VIEW, "rights"),
+    NavItem("admin.nav.matrix", "/admin/matrix", Permission.MATRIX_VIEW, "matrix"),
 )
 
 
@@ -113,6 +121,7 @@ class NavView:
     label: str
     href: str
     current: bool
+    icon: str
 
 
 def _identity_provider(request: Request) -> IdentityProvider | None:
@@ -155,16 +164,17 @@ def _page(
     """Render an admin page with navigation and ``can()`` from the matrix."""
     can = can_function(principal)
     nav = [
-        NavView(locale.gettext(item.label_key), item.href, request.url.path == item.href)
+        NavView(locale.gettext(item.label_key), item.href, request.url.path == item.href, item.icon)
         for item in NAVIGATION
         if can(item.permission)
     ]
+    role_labels = [locale.gettext(ROLE_LABELS[role]) for role in Role if role in principal.roles]
     return render(
         templates,
         request,
         name,
         locale,
-        {**context, "principal": principal, "nav": nav, "can": can},
+        {**context, "principal": principal, "nav": nav, "can": can, "role_labels": role_labels},
     )
 
 
@@ -363,6 +373,7 @@ class AuditView:
     action: str
     outcome: str
     target: str
+    tone: str
 
 
 def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
@@ -373,8 +384,8 @@ def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
 
 
 def _moment(at: datetime, tz: ZoneInfo, locale: str) -> str:
-    """Return a local date and time, e.g. ``maandag 5 januari 2026, 09:00``."""
-    return f"{format_day(local_day(at, tz), locale)}, {format_clock(at, tz, locale)}"
+    """Return a compact local date and time, e.g. ``5 jan 2026, 09:00``."""
+    return f"{format_day_compact(local_day(at, tz), locale)}, {format_clock(at, tz, locale)}"
 
 
 def _action_label(action: str, _: BoundGettext) -> str:
@@ -404,6 +415,7 @@ async def audit(
             _action_label(e.action, _),
             _(OUTCOME_LABELS[e.outcome]),
             " / ".join(t for t in (e.organisation, e.group) if t) or "–",
+            OUTCOME_TONES[e.outcome],
         )
         for entry in events
         for e in (entry.event,)
