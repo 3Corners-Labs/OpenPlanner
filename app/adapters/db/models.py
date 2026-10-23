@@ -72,7 +72,12 @@ class GroupRow(Base):
     min_notice_minutes: Mapped[int] = mapped_column(Integer)
     horizon_days: Mapped[int] = mapped_column(Integer)
     phone_mode: Mapped[str] = mapped_column(String(16))
-    wxcc_queue_id: Mapped[str | None] = mapped_column(String(128))
+    video_host_email: Mapped[str | None] = mapped_column(String(254))
+    wxcc_business_address: Mapped[str | None] = mapped_column(String(255))
+    wxcc_channel: Mapped[str | None] = mapped_column(String(255))
+    wxcc_routing_value: Mapped[str | None] = mapped_column(String(512))
+    direct_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
 
     __table_args__ = (

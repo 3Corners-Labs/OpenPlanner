@@ -53,7 +53,6 @@ async def seed_group(
             min_notice_minutes=60,
             horizon_days=60,
             phone_mode=phone_mode,
-            wxcc_queue_id="queue-1",
         )
         session.add(group)
         await session.flush()

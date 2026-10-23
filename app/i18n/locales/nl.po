@@ -337,8 +337,6 @@ msgstr "Optioneel"
 msgid "admin.group.phone_required"
 msgstr "Verplicht"
 
-msgid "admin.group.queue"
-msgstr "WxCC-wachtrij"
 
 msgid "admin.group.your_rights"
 msgstr "Uw rechten voor deze groep"
@@ -676,11 +674,7 @@ msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de burger. 0 tot 60."
 msgid "admin.field.phone_mode"
 msgstr "Telefoonnummer op het formulier"
 
-msgid "admin.field.wxcc_queue_id"
-msgstr "Webex Contact Center-wachtrij"
 
-msgid "admin.field.wxcc_queue_id_hint"
-msgstr "Het ID van de wachtrij die de taak ontvangt. Later kiest u hier uit de wachtrijen van uw omgeving."
 
 msgid "admin.field.weekday"
 msgstr "Dag"
@@ -742,8 +736,6 @@ msgstr "Vul een aantal minuten in van 0 tot 60."
 msgid "admin.form.error.phone_mode"
 msgstr "Kies of het telefoonnummer verborgen, optioneel of verplicht is."
 
-msgid "admin.form.error.wxcc_queue_id"
-msgstr "Vul een geldig wachtrij-ID in van hoogstens 128 tekens."
 
 msgid "admin.form.error.future_bookings"
 msgstr "Dit kan niet zolang er afspraken in de toekomst staan. Wijzig het nadat die zijn geweest of geannuleerd."
@@ -864,3 +856,72 @@ msgstr "Uitzondering toegevoegd"
 
 msgid "admin.audit.detail.override_remove"
 msgstr "Uitzondering verwijderd"
+
+msgid "admin.yes"
+msgstr "Ja"
+
+msgid "admin.no"
+msgstr "Nee"
+
+msgid "admin.settings.integrations"
+msgstr "Koppelingen: Webex en Webex Contact Center"
+
+msgid "admin.settings.integrations_lead"
+msgstr "Leeg laten zolang de koppeling niet is ingericht; afspraken werken dan zonder videogesprek of taak."
+
+msgid "admin.field.video_host_email"
+msgstr "Webex-host (e-mailadres)"
+
+msgid "admin.field.video_host_email_hint"
+msgstr "Gelicentieerd account waarop de meetings worden ingepland. Medewerkers met een account van de organisatie worden cohost."
+
+msgid "admin.field.wxcc_business_address"
+msgstr "WxCC business address"
+
+msgid "admin.field.wxcc_channel"
+msgstr "WxCC work item-kanaal"
+
+msgid "admin.field.wxcc_routing_value"
+msgstr "Routeringswaarde voor de WxCC-flow"
+
+msgid "admin.field.wxcc_routing_value_hint"
+msgstr "De flow kiest hiermee de wachtrij. Leeg: het webadres van de groep."
+
+msgid "admin.field.direct_call_enabled"
+msgstr "Direct gesprek starten"
+
+msgid "admin.field.direct_call_enabled_hint"
+msgstr "Burgers kunnen binnen de openingstijden meteen een gesprek starten."
+
+msgid "admin.field.not_picked_up_minutes"
+msgstr "Niet opgepakt na (minuten)"
+
+msgid "admin.field.not_picked_up_minutes_hint"
+msgstr "Zo lang mag een gesprek zonder medewerker blijven voordat het opvalt. 1 tot 120."
+
+msgid "admin.form.error.video_host_email"
+msgstr "Vul een geldig e-mailadres in."
+
+msgid "admin.form.error.integration_text"
+msgstr "Vul een waarde in zonder speciale tekens, of laat het veld leeg."
+
+msgid "admin.form.error.choice"
+msgstr "Maak een keuze."
+
+msgid "admin.form.error.not_picked_up_minutes"
+msgstr "Vul een aantal minuten in van 1 tot 120."
+
+msgid "admin.group.video"
+msgstr "Videogesprek (Webex)"
+
+msgid "admin.group.wxcc"
+msgstr "Webex Contact Center"
+
+msgid "admin.group.direct_call"
+msgstr "Direct gesprek"
+
+msgid "admin.group.connected"
+msgstr "Gekoppeld"
+
+msgid "admin.group.not_connected"
+msgstr "Niet gekoppeld"

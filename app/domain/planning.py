@@ -65,7 +65,12 @@ class GroupSettings:
     horizon_days: int
     phone_mode: PhoneMode
     dispatch_lead_minutes: int
-    wxcc_queue_id: str | None
+    video_host_email: str | None
+    wxcc_business_address: str | None
+    wxcc_channel: str | None
+    wxcc_routing_value: str | None
+    direct_call_enabled: bool
+    not_picked_up_minutes: int
 
 
 def settings_of(group: Group) -> GroupSettings:

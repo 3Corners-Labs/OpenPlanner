@@ -337,8 +337,6 @@ msgstr "Optional"
 msgid "admin.group.phone_required"
 msgstr "Required"
 
-msgid "admin.group.queue"
-msgstr "WxCC queue"
 
 msgid "admin.group.your_rights"
 msgstr "Your rights for this group"
@@ -676,11 +674,7 @@ msgstr "From this moment the citizen can no longer change the appointment. 0 to 
 msgid "admin.field.phone_mode"
 msgstr "Phone number on the form"
 
-msgid "admin.field.wxcc_queue_id"
-msgstr "Webex Contact Center queue"
 
-msgid "admin.field.wxcc_queue_id_hint"
-msgstr "The ID of the queue that receives the task. Later you will pick from the queues of your environment here."
 
 msgid "admin.field.weekday"
 msgstr "Day"
@@ -742,8 +736,6 @@ msgstr "Enter a number of minutes from 0 to 60."
 msgid "admin.form.error.phone_mode"
 msgstr "Choose whether the phone number is hidden, optional or required."
 
-msgid "admin.form.error.wxcc_queue_id"
-msgstr "Enter a valid queue ID of at most 128 characters."
 
 msgid "admin.form.error.future_bookings"
 msgstr "This is not possible while appointments lie ahead. Change it after they have taken place or were cancelled."
@@ -864,3 +856,72 @@ msgstr "Exception added"
 
 msgid "admin.audit.detail.override_remove"
 msgstr "Exception removed"
+
+msgid "admin.yes"
+msgstr "Yes"
+
+msgid "admin.no"
+msgstr "No"
+
+msgid "admin.settings.integrations"
+msgstr "Integrations: Webex and Webex Contact Center"
+
+msgid "admin.settings.integrations_lead"
+msgstr "Leave empty while the integration is not set up; appointments then work without a video meeting or task."
+
+msgid "admin.field.video_host_email"
+msgstr "Webex host (email address)"
+
+msgid "admin.field.video_host_email_hint"
+msgstr "Licensed account the meetings are scheduled on. Staff with an organisation account become cohost."
+
+msgid "admin.field.wxcc_business_address"
+msgstr "WxCC business address"
+
+msgid "admin.field.wxcc_channel"
+msgstr "WxCC work item channel"
+
+msgid "admin.field.wxcc_routing_value"
+msgstr "Routing value for the WxCC flow"
+
+msgid "admin.field.wxcc_routing_value_hint"
+msgstr "The flow chooses the queue with it. Empty: the group's web address."
+
+msgid "admin.field.direct_call_enabled"
+msgstr "Start a call right away"
+
+msgid "admin.field.direct_call_enabled_hint"
+msgstr "Citizens can start a call right away within opening hours."
+
+msgid "admin.field.not_picked_up_minutes"
+msgstr "Not picked up after (minutes)"
+
+msgid "admin.field.not_picked_up_minutes_hint"
+msgstr "How long a call may stay without an agent before it is flagged. 1 to 120."
+
+msgid "admin.form.error.video_host_email"
+msgstr "Enter a valid email address."
+
+msgid "admin.form.error.integration_text"
+msgstr "Enter a value without special characters, or leave the field empty."
+
+msgid "admin.form.error.choice"
+msgstr "Make a choice."
+
+msgid "admin.form.error.not_picked_up_minutes"
+msgstr "Enter a number of minutes from 1 to 120."
+
+msgid "admin.group.video"
+msgstr "Video call (Webex)"
+
+msgid "admin.group.wxcc"
+msgstr "Webex Contact Center"
+
+msgid "admin.group.direct_call"
+msgstr "Direct call"
+
+msgid "admin.group.connected"
+msgstr "Connected"
+
+msgid "admin.group.not_connected"
+msgstr "Not connected"

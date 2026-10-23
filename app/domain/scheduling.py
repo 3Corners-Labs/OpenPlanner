@@ -26,9 +26,20 @@ _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 MAX_NAME_LENGTH = 200
 MAX_SLUG_LENGTH = 64
-MAX_QUEUE_ID_LENGTH = 128
 MAX_CAPACITY = 1000
 """Upper bound per window; protects against typos such as 1000000."""
+
+_EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,189}\.[^@\s]{2,63}$")
+
+INTEGRATION_TEXT_LIMITS = {
+    "wxcc_business_address": 255,
+    "wxcc_channel": 255,
+    "wxcc_routing_value": 512,
+}
+"""Maximum lengths (WxCC limits: flowSettings values up to 512 bytes)."""
+
+DEFAULT_NOT_PICKED_UP_MINUTES = 10
+MAX_NOT_PICKED_UP_MINUTES = 120
 
 DEFAULT_DISPATCH_LEAD_MINUTES = 5
 MAX_DISPATCH_LEAD_MINUTES = 60
@@ -68,7 +79,14 @@ class Group:
         min_notice_minutes: How long before the start booking closes.
         horizon_days: How far ahead citizens can book.
         phone_mode: Whether the form hides, offers or requires a phone number.
-        wxcc_queue_id: Queue that receives the task (ADR 0007).
+        video_host_email: Licensed Webex host on whose behalf meetings are scheduled
+            (ADR 0017); without it the group has no video meetings.
+        wxcc_business_address: Business address of the WxCC work item asset (ADR 0018).
+        wxcc_channel: Name of the WxCC work item channel.
+        wxcc_routing_value: Passed to the WxCC flow to choose the queue; the slug when empty.
+        direct_call_enabled: Whether citizens can start a call right away (ADR 0019).
+        not_picked_up_minutes: After this long without an agent a call counts as not
+            picked up (signal for O2).
         dispatch_lead_minutes: How long before the start the WxCC task is created; from
             that moment the booking is read-only (``job_plan.change_deadline``). At most
             ``min_notice_minutes``, so no booking is read-only when it is made.
@@ -86,7 +104,12 @@ class Group:
     min_notice_minutes: int = 60
     horizon_days: int = 60
     phone_mode: PhoneMode = PhoneMode.OPTIONAL
-    wxcc_queue_id: str | None = None
+    video_host_email: str | None = None
+    wxcc_business_address: str | None = None
+    wxcc_channel: str | None = None
+    wxcc_routing_value: str | None = None
+    direct_call_enabled: bool = False
+    not_picked_up_minutes: int = DEFAULT_NOT_PICKED_UP_MINUTES
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
 
     def __post_init__(self) -> None:
@@ -113,11 +136,31 @@ class Group:
             raise _invalid("dispatch_lead_minutes")
         if self.min_notice_minutes < self.dispatch_lead_minutes:
             raise _invalid("min_notice_minutes")
-        queue = self.wxcc_queue_id
-        if queue is not None and (
-            not queue.strip() or len(queue) > MAX_QUEUE_ID_LENGTH or _CONTROL_CHARS.search(queue)
-        ):
-            raise _invalid("wxcc_queue_id")
+        if self.video_host_email is not None and not _EMAIL.fullmatch(self.video_host_email):
+            raise _invalid("video_host_email")
+        for name, limit in INTEGRATION_TEXT_LIMITS.items():
+            value = getattr(self, name)
+            if value is not None and (
+                not value.strip() or len(value) > limit or _CONTROL_CHARS.search(value)
+            ):
+                raise _invalid(name)
+        if not 1 <= self.not_picked_up_minutes <= MAX_NOT_PICKED_UP_MINUTES:
+            raise _invalid("not_picked_up_minutes")
+
+    @property
+    def video_enabled(self) -> bool:
+        """Whether meetings are created for this group's bookings."""
+        return self.video_host_email is not None
+
+    @property
+    def dispatch_enabled(self) -> bool:
+        """Whether this group's bookings are sent to WxCC as work items."""
+        return self.wxcc_business_address is not None and self.wxcc_channel is not None
+
+    @property
+    def routing_value(self) -> str:
+        """The value the WxCC flow routes on: the configured one, or the slug."""
+        return self.wxcc_routing_value or self.slug
 
     @property
     def tz(self) -> ZoneInfo:
