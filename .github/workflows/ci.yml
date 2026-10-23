@@ -166,18 +166,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: build and start the app
+      - name: build and start the app with the development identity provider
         run: |
           docker build -t openplanner:e2e .
+          # Keycloak with one test user per role (dev/keycloak/), for the admin role specs.
+          network="$(scripts/run-keycloak-container.sh)"
           # Three browsers each book, move and cancel from one IP: raise the write limit.
-          scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour
+          scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour \
+            --network "$network" \
+            -e OIDC_DISCOVERY_URL=http://keycloak:8080/realms/openplanner/.well-known/openid-configuration \
+            -e OIDC_CLIENT_SECRET=dev-only-openplanner-admin-secret
           docker exec app alembic upgrade head
           docker exec app python -m app.cli seed-demo
       - name: install browsers
         working-directory: e2e
         timeout-minutes: 10
         run: npm ci && npx playwright install --with-deps
-      - name: keyboard flows + axe (WCAG 2.2 AA, zero violations)
+      - name: keyboard flows, admin roles + axe (WCAG 2.2 AA, zero violations)
         working-directory: e2e
         run: npm test
       - name: Lighthouse accessibility >= 95

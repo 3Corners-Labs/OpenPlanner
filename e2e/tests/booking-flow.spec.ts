@@ -3,23 +3,9 @@
  * step: choose a slot, fill in the form, book, view, move and cancel the appointment.
  * Needs the demo group (python -m app.cli seed-demo).
  */
-import AxeBuilder from '@axe-core/playwright';
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-const WCAG_22_AA = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
-
-async function expectNoAxeViolations(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page }).withTags(WCAG_22_AA).analyze();
-  expect(results.violations).toEqual([]);
-}
-
-async function tabTo(page: Page, locator: ReturnType<Page['locator']>): Promise<void> {
-  for (let i = 0; i < 200; i++) {
-    if (await locator.evaluate((el) => el === document.activeElement)) return;
-    await page.keyboard.press('Tab');
-  }
-  throw new Error('element not reachable with Tab');
-}
+import { expectNoAxeViolations, tabTo } from '../helpers';
 
 test('book, move and cancel with the keyboard only', async ({ page }) => {
   await page.goto('/g/demo');

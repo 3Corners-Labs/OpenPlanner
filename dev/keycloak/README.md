@@ -16,3 +16,6 @@ reach production, which uses PingFederate.
 | `norole` | none | – | logged in without rights: sees "no access" |
 
 Keycloak admin console: http://127.0.0.1:8080 (user `admin`, password `admin`, development only).
+
+`e2e/tests/admin-roles.spec.ts` logs in as each of these users (`cd e2e && npm test`); CI starts
+this realm with `scripts/run-keycloak-container.sh`.

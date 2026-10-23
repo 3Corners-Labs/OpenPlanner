@@ -241,19 +241,25 @@ async def test_failed_token_exchange(oidc: OidcIdentityProvider, provider: FakeP
         await login(oidc, provider)
 
 
-async def test_unreachable_discovery() -> None:
+@pytest.fixture
+async def unreachable() -> AsyncIterator[OidcIdentityProvider]:
+    """A provider whose discovery document answers 503."""
+
     def down(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(down)) as http:
-        oidc = OidcIdentityProvider(
+        yield OidcIdentityProvider(
             OidcConfig(
                 f"{ISSUER}/.well-known/openid-configuration", CLIENT, "s", "openid", MAPPING
             ),
             http,
         )
-        with pytest.raises(IdentityError, match="discovery_failed"):
-            await oidc.start_login(REDIRECT)
+
+
+async def test_unreachable_discovery(unreachable: OidcIdentityProvider) -> None:
+    with pytest.raises(IdentityError, match="discovery_failed"):
+        await unreachable.start_login(REDIRECT)
 
 
 @pytest.mark.parametrize(
@@ -307,15 +313,7 @@ async def test_logout_url_is_none_without_end_session_endpoint(
     assert await oidc.logout_url("https://x/admin/logged-out") is None
 
 
-async def test_logout_url_is_none_when_discovery_fails() -> None:
-    def down(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(503)
-
-    async with httpx.AsyncClient(transport=httpx.MockTransport(down)) as http:
-        oidc = OidcIdentityProvider(
-            OidcConfig(
-                f"{ISSUER}/.well-known/openid-configuration", CLIENT, "s", "openid", MAPPING
-            ),
-            http,
-        )
-        assert await oidc.logout_url("https://x/admin/logged-out") is None
+async def test_logout_url_is_none_when_discovery_fails(
+    unreachable: OidcIdentityProvider,
+) -> None:
+    assert await unreachable.logout_url("https://x/admin/logged-out") is None
