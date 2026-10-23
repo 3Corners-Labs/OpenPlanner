@@ -256,3 +256,293 @@ msgstr "Choose a new time. Your details stay the same."
 
 msgid "reschedule.submit"
 msgstr "Move"
+
+#. Admin portal and authorisation matrix (ADR 0014).
+
+msgid "admin.title"
+msgstr "Administration"
+
+msgid "admin.nav.label"
+msgstr "Administration menu"
+
+msgid "admin.nav.dashboard"
+msgstr "Overview"
+
+msgid "admin.nav.audit"
+msgstr "Audit log"
+
+msgid "admin.nav.rights"
+msgstr "My rights"
+
+msgid "admin.nav.matrix"
+msgstr "Rights matrix"
+
+msgid "admin.signed_in_as"
+msgstr "Signed in as {name}"
+
+msgid "admin.logout"
+msgstr "Sign out"
+
+msgid "admin.back_to_dashboard"
+msgstr "Back to the overview"
+
+msgid "admin.dashboard.title"
+msgstr "Overview"
+
+msgid "admin.dashboard.intro"
+msgstr "These are the groups you have rights for."
+
+msgid "admin.dashboard.groups"
+msgstr "Your groups"
+
+msgid "admin.dashboard.organisation"
+msgstr "Organisation"
+
+msgid "admin.dashboard.group"
+msgstr "Group"
+
+msgid "admin.dashboard.public_page"
+msgstr "Booking page"
+
+msgid "admin.dashboard.no_groups"
+msgstr "You have no rights for any group yet. Ask your administrator for access."
+
+msgid "admin.group.settings"
+msgstr "Settings"
+
+msgid "admin.group.slot_minutes"
+msgstr "Length of an appointment"
+
+msgid "admin.group.minutes"
+msgstr "{minutes} minutes"
+
+msgid "admin.group.notice"
+msgstr "Minimum notice"
+
+msgid "admin.group.horizon"
+msgstr "Book ahead"
+
+msgid "admin.group.days"
+msgstr "{days} days"
+
+msgid "admin.group.dispatch"
+msgstr "Task to the queue and appointment fixed"
+
+msgid "admin.group.dispatch_value"
+msgstr "{minutes} minutes before the start"
+
+msgid "admin.group.phone"
+msgstr "Phone number"
+
+msgid "admin.group.phone_hidden"
+msgstr "Not asked"
+
+msgid "admin.group.phone_optional"
+msgstr "Optional"
+
+msgid "admin.group.phone_required"
+msgstr "Required"
+
+msgid "admin.group.queue"
+msgstr "WxCC queue"
+
+msgid "admin.group.your_rights"
+msgstr "Your rights for this group"
+
+msgid "admin.rights.title"
+msgstr "My rights"
+
+msgid "admin.rights.intro"
+msgstr "This is what you may do in the administration portal, based on your roles from the identity provider."
+
+msgid "admin.rights.roles"
+msgstr "Roles"
+
+msgid "admin.rights.none"
+msgstr "You have no roles for this administration portal."
+
+msgid "admin.rights.permission"
+msgstr "Permission"
+
+msgid "admin.rights.scope"
+msgstr "Applies to"
+
+msgid "admin.rights.scope_portal"
+msgstr "The administration portal"
+
+msgid "admin.rights.scope_everything"
+msgstr "All organisations and groups"
+
+msgid "admin.rights.scope_organisations"
+msgstr "Organisations: {names}"
+
+msgid "admin.rights.scope_groups"
+msgstr "Groups: {names}"
+
+msgid "admin.matrix.title"
+msgstr "Rights matrix"
+
+msgid "admin.matrix.intro"
+msgstr "Which role may do what. This table comes straight from the code, like the documentation."
+
+msgid "admin.matrix.level"
+msgstr "Level"
+
+msgid "admin.matrix.yes"
+msgstr "Yes"
+
+msgid "admin.matrix.no"
+msgstr "No"
+
+msgid "admin.matrix.citizen"
+msgstr "Citizens (without logging in)"
+
+msgid "admin.matrix.action"
+msgstr "Action"
+
+msgid "admin.matrix.condition"
+msgstr "Condition"
+
+msgid "admin.audit.title"
+msgstr "Audit log"
+
+msgid "admin.audit.intro"
+msgstr "The latest logins, refused actions and changes within your organisations."
+
+msgid "admin.audit.when"
+msgstr "When"
+
+msgid "admin.audit.actor"
+msgstr "Who"
+
+msgid "admin.audit.action"
+msgstr "Action"
+
+msgid "admin.audit.outcome"
+msgstr "Outcome"
+
+msgid "admin.audit.target"
+msgstr "Organisation / group"
+
+msgid "admin.audit.empty"
+msgstr "There are no events yet."
+
+msgid "admin.login_failed.title"
+msgstr "Sign-in failed"
+
+msgid "admin.login_failed.text"
+msgstr "Signing in did not succeed. Go to the administration portal and try again."
+
+msgid "admin.forbidden.title"
+msgstr "No access"
+
+msgid "admin.forbidden.text"
+msgstr "You have no right to view this page. If you think this is wrong, contact your administrator."
+
+msgid "admin.not_configured.title"
+msgstr "Administration unavailable"
+
+msgid "admin.not_configured.text"
+msgstr "Sign-in for administrators has not been set up in this environment."
+
+msgid "admin.logged_out.title"
+msgstr "You have signed out"
+
+msgid "admin.logged_out.text"
+msgstr "You have signed out of the administration portal."
+
+msgid "audit.event.login"
+msgstr "Sign in"
+
+msgid "audit.event.logout"
+msgstr "Sign out"
+
+msgid "audit.outcome.success"
+msgstr "Succeeded"
+
+msgid "audit.outcome.denied"
+msgstr "Refused"
+
+msgid "audit.outcome.failure"
+msgstr "Failed"
+
+msgid "authz.role.superuser"
+msgstr "Superuser"
+
+msgid "authz.role.org_admin"
+msgstr "Organisation admin"
+
+msgid "authz.role.group_admin"
+msgstr "Group admin"
+
+msgid "authz.level.global"
+msgstr "Portal"
+
+msgid "authz.level.organisation"
+msgstr "Organisation"
+
+msgid "authz.level.group"
+msgstr "Group"
+
+msgid "authz.permission.dashboard_view"
+msgstr "View overview"
+
+msgid "authz.permission.rights_view"
+msgstr "View own rights"
+
+msgid "authz.permission.matrix_view"
+msgstr "View rights matrix"
+
+msgid "authz.permission.organisation_manage"
+msgstr "Manage organisations"
+
+msgid "authz.permission.audit_view"
+msgstr "View audit log"
+
+msgid "authz.permission.integrations_manage"
+msgstr "Manage integrations and secrets"
+
+msgid "authz.permission.group_create"
+msgstr "Create groups"
+
+msgid "authz.permission.group_view"
+msgstr "View group"
+
+msgid "authz.permission.group_edit"
+msgstr "Change group settings"
+
+msgid "authz.permission.schedule_manage"
+msgstr "Manage opening hours and exceptions"
+
+msgid "authz.permission.texts_manage"
+msgstr "Manage texts"
+
+msgid "authz.permission.reminders_manage"
+msgstr "Manage reminders"
+
+msgid "authz.permission.bookings_view"
+msgstr "View bookings"
+
+msgid "authz.citizen.availability_view"
+msgstr "View available times"
+
+msgid "authz.citizen.book"
+msgstr "Book an appointment"
+
+msgid "authz.citizen.booking_view"
+msgstr "View own appointment"
+
+msgid "authz.citizen.booking_change"
+msgstr "Move own appointment"
+
+msgid "authz.citizen.booking_cancel"
+msgstr "Cancel own appointment"
+
+msgid "authz.condition.public"
+msgstr "Anyone"
+
+msgid "authz.condition.management_link"
+msgstr "With the management link from the confirmation"
+
+msgid "authz.condition.management_link_before_deadline"
+msgstr "With the management link, until the task goes to the queue"

@@ -48,6 +48,22 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = None
     mail_from: str = "OpenPlanner <noreply@openplanner.invalid>"
 
+    # Admin portal (ADR 0013). Without OIDC_DISCOVERY_URL the admin portal is disabled.
+    session_secret: SecretStr | None = None
+    dev_session_key_path: Path = Path("data/dev-session.key")
+    admin_session_hours: int = 8
+    admin_timezone: str = "Europe/Amsterdam"
+    oidc_discovery_url: str | None = None
+    oidc_client_id: str = "openplanner-admin"
+    oidc_client_secret: SecretStr | None = None
+    oidc_scopes: str = "openid profile email"
+    oidc_role_claim: str = "roles"
+    oidc_organisation_claim: str = "organisations"
+    oidc_group_claim: str = "groups"
+    oidc_role_superuser: str = "openplanner-superuser"
+    oidc_role_org_admin: str = "openplanner-org-admin"
+    oidc_role_group_admin: str = "openplanner-group-admin"
+
     # Rate limits on public endpoints (CLAUDE.md security baseline).
     rate_limit_enabled: bool = True
     rate_limit_bookings: str = "10/hour"
@@ -61,6 +77,13 @@ class Settings(BaseSettings):
                 raise ValueError("MANAGEMENT_TOKEN_KEY is required in production")
             if not self.public_base_url.startswith("https://"):
                 raise ValueError("PUBLIC_BASE_URL must use https in production")
+            if self.session_secret is None:
+                raise ValueError("SESSION_SECRET is required in production")
+            if self.oidc_discovery_url is not None and (
+                not self.oidc_discovery_url.startswith("https://")
+                or self.oidc_client_secret is None
+            ):
+                raise ValueError("OIDC needs an https discovery URL and a client secret")
         return self
 
     @field_validator("log_level", mode="before")

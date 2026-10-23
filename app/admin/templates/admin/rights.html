@@ -1,0 +1,25 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.rights.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<h1>{{ _("admin.rights.title") }}</h1>
+<p>{{ _("admin.rights.intro") }}</p>
+<h2>{{ _("admin.rights.roles") }}</h2>
+{% if roles %}
+<ul>{% for role in roles %}<li>{{ role }}</li>{% endfor %}</ul>
+{% else %}
+<p class="notice">{{ _("admin.rights.none") }}</p>
+{% endif %}
+{% if rights %}
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("admin.rights.title") }}</caption>
+  <thead>
+    <tr><th scope="col">{{ _("admin.rights.permission") }}</th><th scope="col">{{ _("admin.rights.scope") }}</th></tr>
+  </thead>
+  <tbody>
+    {% for label, scope in rights %}
+    <tr><td>{{ label }}</td><td>{{ scope }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

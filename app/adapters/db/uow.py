@@ -10,10 +10,12 @@ All mapping between rows and domain objects lives in this module.
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import ColumnElement, case, delete, false, func, insert, or_, select, true, update
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy.sql.elements import SQLCoreOperations
 
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.models import (
@@ -63,7 +65,9 @@ def _group(row: GroupRow) -> Group:
 
 
 def scope_filter(
-    scope: Scope, organisation_slug: ColumnElement[str], group_slug: ColumnElement[str] | None
+    scope: Scope,
+    organisation_slug: SQLCoreOperations[Any],
+    group_slug: SQLCoreOperations[Any] | None,
 ) -> ColumnElement[bool]:
     """Translate a ``Scope`` into a SQL condition; the one place this happens (ADR 0014).
 

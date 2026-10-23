@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block site_name %}{{ _("admin.title") }}{% endblock %}
+{% block header_extra %}
+<div class="admin-bar">
+  <nav aria-label="{{ _("admin.nav.label") }}" class="admin-nav">
+    <ul>
+      {% for item in nav %}
+      <li><a href="{{ item.href }}"{% if item.current %} aria-current="page"{% endif %}>{{ item.label }}</a></li>
+      {% endfor %}
+    </ul>
+  </nav>
+  <div class="admin-user">
+    <span>{{ _("admin.signed_in_as", name=principal.display_name) }}</span>
+    <form method="post" action="/admin/logout">
+      <button type="submit" class="button button--secondary">{{ _("admin.logout") }}</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
