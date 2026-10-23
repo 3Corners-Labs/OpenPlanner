@@ -162,9 +162,20 @@ class SlotRow(Base):
     start: Mapped[datetime] = mapped_column(UTCDateTime())
     end: Mapped[datetime] = mapped_column(UTCDateTime())
     capacity_snapshot: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(16), server_default=text("'scheduled'"))
 
-    # Backstop for the write lock: one slot row per group and start.
-    __table_args__ = (UniqueConstraint("group_id", "start"),)
+    # Backstop for the write lock: one scheduled slot per group and start. Direct calls
+    # (ADR 0019) each have their own slot and are not part of it.
+    __table_args__ = (
+        Index(
+            "uq_slots_group_start_scheduled",
+            "group_id",
+            "start",
+            unique=True,
+            sqlite_where=text("kind = 'scheduled'"),
+        ),
+        CheckConstraint("kind IN ('scheduled', 'direct')", name="kind"),
+    )
 
 
 class BookingRow(Base):

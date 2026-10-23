@@ -13,7 +13,7 @@ dispatch lead before the start, T−5 min by default): cancel and reschedule the
 """
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from app.domain.availability import (
     AvailableSlot,
@@ -23,12 +23,17 @@ from app.domain.availability import (
     utc_bounds,
     validate_range,
 )
-from app.domain.booking import Booking, BookingStatus, Contact, Slot
+from app.domain.booking import Booking, BookingKind, BookingStatus, Contact, Slot
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.job_plan import change_deadline, plan_for_booking, plan_for_cancellation
+from app.domain.job_plan import (
+    change_deadline,
+    plan_for_booking,
+    plan_for_cancellation,
+    plan_for_direct,
+)
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.scheduling import Group
+from app.domain.scheduling import Group, is_open
 from app.domain.tokens import (
     MIN_KEY_BYTES,
     derive_token,
@@ -143,6 +148,66 @@ class BookingService:
                 phone_mode=group.phone_mode,
             )
             return await self._place(tx, group, start, details, locale, consents, None)
+
+    async def direct_call_available(self, group_slug: str) -> bool:
+        """Return whether a direct call can be started now (switched on and open).
+
+        Raises:
+            DomainError: ``group_not_found``.
+        """
+        async with self._uow.read() as tx:
+            group = await self._group(tx, group_slug)
+            if not group.direct_call_enabled:
+                return False
+            now = self._clock.now()
+            today = now.astimezone(group.tz).date()
+            rules, overrides = await tx.get_schedule(group.id, today, today)
+        return is_open(group, rules, overrides, now)
+
+    async def start_direct(
+        self, *, group_slug: str, contact: ContactInput, locale: str
+    ) -> BookingReceipt:
+        """Start a call right away (ADR 0019): a booking in its own slot from now on.
+
+        Raises:
+            DomainError: ``group_not_found``, ``invalid_contact`` or ``direct_call_unavailable``
+                (switched off, or the group is not open now).
+        """
+        async with self._uow.locked() as tx:
+            group = await self._group(tx, group_slug)
+            now = self._clock.now()
+            today = now.astimezone(group.tz).date()
+            rules, overrides = await tx.get_schedule(group.id, today, today)
+            if not group.direct_call_enabled or not is_open(group, rules, overrides, now):
+                raise DomainError(ErrorCode.DIRECT_CALL_UNAVAILABLE)
+            details = Contact.create(
+                name=contact.name,
+                email=contact.email,
+                phone=contact.phone,
+                phone_mode=group.phone_mode,
+            )
+            end = now + timedelta(minutes=group.slot_minutes)
+            slot = await tx.add_slot(Slot(None, group.id, now, end, 1, BookingKind.DIRECT))
+            salt = new_token_salt()
+            token = derive_token(self._token_key, salt)
+            booking = await tx.add_booking(
+                Booking(
+                    id=None,
+                    group_id=group.id,
+                    slot_id=_id(slot),
+                    start=now,
+                    end=end,
+                    status=BookingStatus.CONFIRMED,
+                    contact=details,
+                    locale=locale,
+                    token_hash=hash_token(token),
+                    created_at=now,
+                    token_salt=salt,
+                    kind=BookingKind.DIRECT,
+                )
+            )
+            await tx.replace_jobs(_id(booking), plan_for_direct(start=now, end=end))
+        return BookingReceipt(booking, token)
 
     async def find(self, management_token: str) -> BookingDetails:
         """Return the booking behind a management link, with its group and changeability.

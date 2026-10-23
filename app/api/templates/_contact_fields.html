@@ -1,0 +1,16 @@
+{#- Contact inputs with linked hints and errors, plus the hidden honeypot (HANDOVER B15). -#}
+  {% for field in fields %}
+  <div class="field{% if field.error %} field--error{% endif %}">
+    <label for="{{ field.name }}">{{ field.label }}{% if not field.required %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</label>
+    {% if field.hint %}<p class="hint" id="{{ field.name }}-hint">{{ field.hint }}</p>{% endif %}
+    {% if field.error %}<p class="error-message" id="{{ field.name }}-error">{{ field.error }}</p>{% endif %}
+    <input id="{{ field.name }}" name="{{ field.name }}" type="{{ field.type }}" autocomplete="{{ field.autocomplete }}" value="{{ field.value }}"
+      {%- if field.required %} required aria-required="true"{% endif %}
+      {%- if field.error %} aria-invalid="true"{% endif %}
+      {%- if field.described_by %} aria-describedby="{{ field.described_by }}"{% endif %}>
+  </div>
+  {% endfor %}
+  <div class="visually-hidden" aria-hidden="true">
+    <label for="{{ honeypot }}">{{ _("form.honeypot") }}</label>
+    <input id="{{ honeypot }}" name="{{ honeypot }}" type="text" tabindex="-1" autocomplete="off">
+  </div>

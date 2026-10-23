@@ -97,6 +97,13 @@ class Contact:
         return self.name.split()[0]
 
 
+class BookingKind(StrEnum):
+    """A booked slot, or a call started right away (ADR 0019)."""
+
+    SCHEDULED = "scheduled"
+    DIRECT = "direct"
+
+
 @dataclass(frozen=True)
 class MeetingRef:
     """The video meeting of a booking: the provider's id and its join link.
@@ -123,6 +130,7 @@ class Slot:
     """A start time of a group that has at least one booking; created by the first one.
 
     ``capacity_snapshot`` is the capacity at creation; later schedule edits do not change it.
+    A direct call has its own slot (``kind`` direct) that takes no scheduled capacity.
     """
 
     id: int | None
@@ -130,6 +138,7 @@ class Slot:
     start: datetime
     end: datetime
     capacity_snapshot: int
+    kind: BookingKind = BookingKind.SCHEDULED
 
 
 @dataclass(frozen=True)
@@ -164,6 +173,7 @@ class Booking:
     rescheduled_from_id: int | None = None
     meeting: MeetingRef | None = None
     wxcc_task_id: str | None = None
+    kind: BookingKind = BookingKind.SCHEDULED
 
     @property
     def reference(self) -> str:

@@ -34,7 +34,15 @@ from app.adapters.db.models import (
 )
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
 from app.domain.authorization import Scope
-from app.domain.booking import Booking, BookingStatus, Contact, MeetingRef, Slot, SlotUsage
+from app.domain.booking import (
+    Booking,
+    BookingKind,
+    BookingStatus,
+    Contact,
+    MeetingRef,
+    Slot,
+    SlotUsage,
+)
 from app.domain.calls import BookingEvent, CallState, CallStatus, EventKind, TaskState
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
@@ -161,6 +169,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         rescheduled_from_id=row.rescheduled_from_id,
         meeting=MeetingRef(row.video_room_id, row.guest_join_url) if row.video_room_id else None,
         wxcc_task_id=row.wxcc_task_id,
+        kind=BookingKind(slot.kind),
     )
 
 
@@ -496,7 +505,12 @@ class SqlTransaction:
         rows = await self._session.execute(
             select(SlotRow.start, SlotRow.capacity_snapshot, active)
             .outerjoin(BookingRow, BookingRow.slot_id == SlotRow.id)
-            .where(SlotRow.group_id == group_id, SlotRow.start >= lower, SlotRow.start < upper)
+            .where(
+                SlotRow.group_id == group_id,
+                SlotRow.start >= lower,
+                SlotRow.start < upper,
+                SlotRow.kind == BookingKind.SCHEDULED.value,
+            )
             .group_by(SlotRow.id)
         )
         return [SlotUsage(start, capacity, int(count)) for start, capacity, count in rows]
@@ -504,7 +518,11 @@ class SqlTransaction:
     async def get_slot(self, group_id: int, start: datetime) -> Slot | None:
         """Return the existing slot of the group at ``start``."""
         row = await self._session.scalar(
-            select(SlotRow).where(SlotRow.group_id == group_id, SlotRow.start == start)
+            select(SlotRow).where(
+                SlotRow.group_id == group_id,
+                SlotRow.start == start,
+                SlotRow.kind == BookingKind.SCHEDULED.value,
+            )
         )
         if row is None:
             return None
@@ -517,10 +535,11 @@ class SqlTransaction:
             start=slot.start,
             end=slot.end,
             capacity_snapshot=slot.capacity_snapshot,
+            kind=slot.kind.value,
         )
         self._session.add(row)
         await self._session.flush()
-        return Slot(row.id, slot.group_id, slot.start, slot.end, slot.capacity_snapshot)
+        return Slot(row.id, slot.group_id, slot.start, slot.end, slot.capacity_snapshot, slot.kind)
 
     async def count_active_bookings(self, slot_id: int) -> int:
         """Return the number of confirmed bookings in the slot."""

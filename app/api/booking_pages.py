@@ -19,12 +19,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.api.contact_form import HONEYPOT_FIELD, contact_fields, read_contact
 from app.api.labels import slot_label
 from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError
 from app.domain.ports import Clock
-from app.domain.scheduling import Group, PhoneMode
+from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService, ContactInput
 from app.i18n.dates import format_clock, format_day, format_day_short, local_day
 from app.web.errors import FormError, form_errors, status_for
@@ -41,7 +42,6 @@ from app.web.templates import create_templates, render
 router = APIRouter(include_in_schema=False)
 templates = create_templates([Path(__file__).parent / "templates"])
 
-HONEYPOT_FIELD = "website"
 """Hidden field that people never fill in; bots that fill every field are refused."""
 
 STATUS_NOTICES: dict[str, str] = {
@@ -88,26 +88,6 @@ class DayView:
 
     label: str
     slots: list[SlotView]
-
-
-@dataclass(frozen=True)
-class FieldView:
-    """One input of the contact form, fully prepared for the template."""
-
-    name: str
-    type: str
-    autocomplete: str
-    label: str
-    required: bool
-    value: str
-    hint: str | None
-    error: str | None
-
-    @property
-    def described_by(self) -> str:
-        """IDs of the hint and error message, for ``aria-describedby``."""
-        ids = [f"{self.name}-hint" if self.hint else "", f"{self.name}-error" if self.error else ""]
-        return " ".join(i for i in ids if i)
 
 
 @dataclass(frozen=True)
@@ -227,36 +207,13 @@ async def group_page(
         if status == "unavailable"
         else []
     )
-    context = {"group": group, "week": view, "errors": errors}
+    context = {
+        "group": group,
+        "week": view,
+        "errors": errors,
+        "direct_call_available": await service.direct_call_available(slug),
+    }
     return render(templates, request, "group.html", locale, context)
-
-
-def _fields(
-    group: Group, locale: RequestLocale, errors: list[FormError], values: dict[str, str]
-) -> list[FieldView]:
-    """Return the contact form inputs: name, email and (per group) phone (HANDOVER B15)."""
-    _ = locale.gettext
-    by_field = {error.field: error.message for error in errors if error.field}
-    fields = [
-        FieldView("name", "text", "name", _("form.name"), True, "", None, None),
-        FieldView("email", "email", "email", _("form.email"), True, "", _("form.email_hint"), None),
-    ]
-    if group.phone_mode is not PhoneMode.HIDDEN:
-        required = group.phone_mode is PhoneMode.REQUIRED
-        fields.append(FieldView("phone", "tel", "tel", _("form.phone"), required, "", None, None))
-    return [
-        FieldView(
-            f.name,
-            f.type,
-            f.autocomplete,
-            f.label,
-            f.required,
-            values.get(f.name, ""),
-            f.hint,
-            by_field.get(f.name),
-        )
-        for f in fields
-    ]
 
 
 def _book_context(
@@ -272,7 +229,7 @@ def _book_context(
         "group": group,
         "start": _slot_value(start),
         "slot_label": slot_label(start, slot.end, group, locale) if slot else "",
-        "fields": _fields(group, locale, errors, values),
+        "fields": contact_fields(group, locale, errors, values),
         "errors": errors,
         "honeypot": HONEYPOT_FIELD,
     }
@@ -302,12 +259,10 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
     service = _service(request)
     group = await service.get_group(slug)
     form = await request.form()
-    if form.get(HONEYPOT_FIELD):
-        raise RejectedRequest(400)
+    values = read_contact(form)
     start = _parse_start(str(form.get("start", "")))
     if start is None:
         raise RejectedRequest(400)
-    values = {key: str(form.get(key, ""))[:300] for key in ("name", "email", "phone")}
     try:
         receipt = await service.book(
             group_slug=group.slug,

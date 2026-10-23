@@ -15,7 +15,7 @@ from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTok
 from app.adapters.webex_meetings import WebexMeetings
 from app.adapters.wxcc import WxccTasks
 from app.config import Settings
-from app.domain.ports import Clock
+from app.domain.ports import Clock, ContactCenterDispatcher, VideoProvider
 from app.keys import settings_encryption_key
 
 
@@ -24,8 +24,8 @@ class Integrations:
     """The configured integration adapters (``None`` when not configured)."""
 
     tokens: WebexTokens | None = None
-    video: WebexMeetings | None = None
-    dispatcher: WxccTasks | None = None
+    video: VideoProvider | None = None
+    dispatcher: ContactCenterDispatcher | None = None
 
 
 def build_integrations(

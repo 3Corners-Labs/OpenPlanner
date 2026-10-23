@@ -120,3 +120,17 @@ def plan_for_cancellation(*, cancelled_at: datetime, notify: bool = True) -> lis
     message = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.EMAIL)
     purge = PlannedJob(JobType.PURGE_PII, cancelled_at + PURGE_AFTER, None)
     return [delete, message, purge] if notify else [delete, purge]
+
+
+def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:
+    """Return the jobs of a direct call: meeting, confirmation and work item now, then the purge.
+
+    The web request usually creates the meeting and the work item itself (ADR 0019); these
+    jobs are the fallback and do nothing once that has happened (they are idempotent).
+    """
+    return [
+        PlannedJob(JobType.CREATE_VIDEO_ROOM, start, start),
+        PlannedJob(JobType.SEND_CONFIRMATION, start, start, ChannelKind.EMAIL),
+        PlannedJob(JobType.DISPATCH_WXCC_TASK, start, start),
+        PlannedJob(JobType.PURGE_PII, end + PURGE_AFTER, None),
+    ]

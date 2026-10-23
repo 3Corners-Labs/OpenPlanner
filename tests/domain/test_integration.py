@@ -214,3 +214,13 @@ def test_join_window_opens_fifteen_minutes_before_and_closes_after_the_end() -> 
     assert join_state(replace(booking, meeting=None), start) is JoinState.NO_MEETING
     cancelled = replace(booking, status=BookingStatus.CANCELLED)
     assert join_state(cancelled, start) is JoinState.INACTIVE
+
+
+async def test_status_of_a_booking_for_the_waiting_page(service: IntegrationService) -> None:
+    from app.domain.calls import CallState, TaskState
+
+    assert (await service.status(123)).task is TaskState.NONE
+    await service.record(123, EventKind.TASK_CREATED)
+    status = await service.status(123)
+    assert status.task is TaskState.QUEUED
+    assert status.call is CallState.NONE
