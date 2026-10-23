@@ -10,6 +10,7 @@ meetings, tasks and event types are acknowledged and ignored, so the platforms d
 """
 
 import json
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Request
@@ -33,6 +34,15 @@ async def _body(request: Request) -> bytes | None:
     return body if len(body) <= MAX_BODY_BYTES else None
 
 
+def _json_object(body: bytes) -> dict[str, Any] | None:
+    """Return the body as a JSON object, or ``None`` if it is not one."""
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
 def _service(request: Request) -> IntegrationService:
     """Return the application's integration service."""
     service: IntegrationService = request.app.state.integration_service
@@ -52,7 +62,10 @@ async def webex(request: Request) -> Response:
     if not verify_webex(body, request.headers.get("x-spark-signature"), secret.get_secret_value()):
         log.warning("webhook.rejected", source="webex")
         return Response(status_code=401)
-    event = parse_webex(json.loads(body))
+    payload = _json_object(body)
+    if payload is None:
+        return Response(status_code=400)
+    event = parse_webex(payload)
     if event is not None:
         clock: Clock = request.app.state.clock
         known = await _service(request).record_meeting_event(
@@ -82,7 +95,10 @@ async def wxcc(request: Request) -> Response:
     ):
         log.warning("webhook.rejected", source="wxcc")
         return Response(status_code=401)
-    event = parse_wxcc(json.loads(body))
+    payload = _json_object(body)
+    if payload is None:  # pragma: no cover - verify_wxcc already requires an object
+        return Response(status_code=400)
+    event = parse_wxcc(payload)
     if event is not None:
         known = await _service(request).record_task_event(
             event.target_id, event.kind, clock.now(), event.detail
