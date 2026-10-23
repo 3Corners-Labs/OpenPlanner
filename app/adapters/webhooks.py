@@ -62,7 +62,7 @@ def verify_wxcc(
         sent_ms = int(timestamp)
     except (ValueError, TypeError):
         return False
-    if str(payload.get("comciscotimestamp")) != timestamp:
+    if not isinstance(payload, dict) or str(payload.get("comciscotimestamp")) != timestamp:
         return False
     sent = datetime.fromtimestamp(sent_ms / 1000, tz=now.tzinfo)
     return abs(now - sent) <= MAX_SKEW

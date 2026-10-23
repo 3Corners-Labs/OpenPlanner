@@ -148,3 +148,23 @@ async def test_without_a_secret_the_endpoints_do_not_exist(
     async with app_client(settings.model_copy(update={"database_url": database_url})) as client:
         assert (await client.post("/webhooks/wxcc", content=b"{}")).status_code == 404
         assert (await client.post("/webhooks/webex", content=b"{}")).status_code == 404
+
+
+async def test_signed_but_malformed_bodies_are_a_400(client: httpx.AsyncClient) -> None:
+    from datetime import UTC, datetime
+
+    for body in (b"not json", b"[1, 2]"):
+        webex = await client.post(
+            "/webhooks/webex", content=body, headers={"x-spark-signature": sign(body, "sha1")}
+        )
+        assert webex.status_code == 400
+    listing = json.dumps([{"comciscotimestamp": 1}]).encode()
+    wxcc = await client.post(
+        "/webhooks/wxcc",
+        content=listing,
+        headers={
+            "x-webexcc-signature": sign(listing),
+            "x-webexcc-timestamp": str(int(datetime.now(UTC).timestamp() * 1000)),
+        },
+    )
+    assert wxcc.status_code == 401  # not an object: never authentic
