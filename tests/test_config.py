@@ -56,3 +56,23 @@ def test_production_is_the_default_and_refuses_development_defaults(
 
     settings = Settings(**production)  # type: ignore[arg-type]
     assert settings.environment == "prod"
+
+
+def test_production_webex_needs_secrets_and_the_encryption_key() -> None:
+    production = {
+        "environment": "prod",
+        "management_token_key": "m" * 40,
+        "session_secret": "s" * 40,
+        "public_base_url": "https://afspraak.example.nl",
+    }
+    with pytest.raises(ValueError, match="WEBEX_CLIENT_SECRET"):
+        Settings(**production, webex_client_id="client")  # type: ignore[arg-type]
+    configured = Settings(
+        **production,  # type: ignore[arg-type]
+        webex_client_id="client",
+        webex_client_secret="secret",
+        webex_refresh_token="refresh",
+        settings_encryption_key="e" * 40,
+    )
+    assert configured.video_configured
+    assert not configured.dispatch_configured

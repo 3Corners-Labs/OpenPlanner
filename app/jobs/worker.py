@@ -8,14 +8,18 @@ import asyncio
 import signal
 from contextlib import suppress
 
+import httpx
 import structlog
 
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.integrations import build_integrations
 from app.adapters.smtp import SmtpConfig, SmtpMailSender
 from app.config import Settings
+from app.domain.admin import AdminService
+from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, MessageSender
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
@@ -58,9 +62,12 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
     """
     engine = create_engine(settings.database_url)
     sender = mail_sender(settings)
+    http = httpx.AsyncClient(timeout=15.0)
+    integrations = build_integrations(settings, engine, http, clock)
+    uow = SqlUnitOfWork(engine)
     runner = JobRunner(
         SqlJobQueue(engine),
-        SqlUnitOfWork(engine),
+        uow,
         clock,
         sender,
         MessageComposer(
@@ -68,8 +75,17 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
             management_token_key(settings),
             settings.public_base_url,
         ),
+        video=integrations.video,
+        dispatcher=integrations.dispatcher,
+        integration=IntegrationService(uow, clock, AdminService(uow, clock)),
     )
-    log.info("worker.started", poll_seconds=settings.worker_poll_seconds, mail_enabled=bool(sender))
+    log.info(
+        "worker.started",
+        poll_seconds=settings.worker_poll_seconds,
+        mail_enabled=bool(sender),
+        video_enabled=integrations.video is not None,
+        dispatch_enabled=integrations.dispatcher is not None,
+    )
     try:
         while not stop.is_set():
             if await is_reachable(engine):
@@ -81,6 +97,7 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=settings.worker_poll_seconds)
     finally:
+        await http.aclose()
         await engine.dispose()
         log.info("worker.stopped")
 
