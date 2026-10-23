@@ -50,6 +50,7 @@ from app.i18n import BoundGettext
 from app.i18n.dates import format_clock, format_day, format_day_short, weekday_names
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.locale import RequestLocale
+from app.web.protection import RejectedRequest
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -69,6 +70,9 @@ DONE_MESSAGES: dict[str, str] = {
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
 TIMEZONE_HINT_ZONES = "Europe/Amsterdam"
+
+MAX_FORM_BYTES = 16 * 1024
+"""Admin forms are small; anything larger is refused before parsing."""
 
 NUMBER_LABELS: dict[str, tuple[str, str]] = {
     "slot_minutes": ("admin.field.slot_minutes", "admin.field.slot_minutes_hint"),
@@ -161,8 +165,15 @@ def _redirect(url: str, done: str) -> RedirectResponse:
 
 
 async def _form(request: Request, locale: RequestLocale) -> FormData:
-    """Read a urlencoded form body (only the first value of every name)."""
-    body = (await request.body()).decode("utf-8", errors="replace")
+    """Read a urlencoded form body (only the first value of every name).
+
+    Raises:
+        RejectedRequest: 413 for bodies above ``MAX_FORM_BYTES``.
+    """
+    raw = await request.body()
+    if len(raw) > MAX_FORM_BYTES:
+        raise RejectedRequest(413)
+    body = raw.decode("utf-8", errors="replace")
     values: dict[str, str] = {}
     for key, value in parse_qsl(body, keep_blank_values=True):
         values.setdefault(key, value)
