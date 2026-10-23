@@ -37,3 +37,222 @@ msgstr "You receive a confirmation with the link to the video call. You can also
 
 msgid "home.privacy"
 msgstr "We keep your details until 24 hours after the call. Then we delete them."
+
+#. Messages (email). Placeholders: {first_name}, {date}, {time}, {group_name}, {deadline}.
+msgid "message.greeting"
+msgstr "Dear {first_name},"
+
+msgid "message.when"
+msgstr "When"
+
+msgid "message.team"
+msgstr "Team"
+
+msgid "message.manage"
+msgstr "You can view, change or cancel the appointment until {deadline}. After that the appointment is fixed."
+
+msgid "message.manage_link"
+msgstr "View or change appointment"
+
+msgid "message.signoff"
+msgstr "Kind regards, {group_name}"
+
+msgid "message.calendar_summary"
+msgstr "Video call with {group_name}"
+
+msgid "message.confirmation.subject"
+msgstr "Confirmation of your video call on {date}"
+
+msgid "message.confirmation.intro"
+msgstr "Your video call with {group_name} has been scheduled. An employee will contact you at the agreed time."
+
+msgid "message.change.subject"
+msgstr "Your video call has moved to {date}"
+
+msgid "message.change.intro"
+msgstr "Your video call with {group_name} has been moved. This is the new time."
+
+msgid "message.reminder.subject"
+msgstr "Reminder: video call on {date} at {time}"
+
+msgid "message.reminder.intro"
+msgstr "This is a reminder of your video call with {group_name}."
+
+msgid "message.cancellation.subject"
+msgstr "Your video call on {date} has been cancelled"
+
+msgid "message.cancellation.intro"
+msgstr "Your video call with {group_name} on {date} at {time} has been cancelled. You can always make a new appointment."
+
+#. Booking pages.
+
+msgid "group.intro"
+msgstr "Choose a day and time for a video call. A call takes {minutes} minutes."
+
+msgid "group.week_heading"
+msgstr "Week of {date}"
+
+msgid "group.weeks_label"
+msgstr "Weeks"
+
+msgid "group.previous_week"
+msgstr "Previous week"
+
+msgid "group.next_week"
+msgstr "Next week"
+
+msgid "group.no_slots"
+msgstr "There are no times available in this week. Choose another week."
+
+msgid "group.choose"
+msgstr "Continue"
+
+msgid "book.title"
+msgstr "Your details"
+
+msgid "book.selected"
+msgstr "Selected time"
+
+msgid "book.change_slot"
+msgstr "Choose another time"
+
+msgid "form.name"
+msgstr "Name"
+
+msgid "form.email"
+msgstr "Email address"
+
+msgid "form.email_hint"
+msgstr "We send the confirmation and the link to change the appointment here."
+
+msgid "form.phone"
+msgstr "Phone number"
+
+msgid "form.optional"
+msgstr "(optional)"
+
+msgid "form.honeypot"
+msgstr "Leave this field empty"
+
+msgid "form.submit"
+msgstr "Book appointment"
+
+msgid "errors.summary_title"
+msgstr "There is a problem"
+
+msgid "error.title"
+msgstr "Something went wrong"
+
+msgid "error.field.name"
+msgstr "Enter your name, at most 100 characters."
+
+msgid "error.field.email"
+msgstr "Enter a valid email address, for example name@example.com."
+
+msgid "error.field.phone"
+msgstr "Enter a valid phone number, for example +31 6 12345678."
+
+msgid "error.slot_full"
+msgstr "This time has just filled up. Choose another time."
+
+msgid "error.slot_unavailable"
+msgstr "This time is no longer available. Choose another time."
+
+msgid "error.outside_booking_window"
+msgstr "This time can no longer be booked. Choose another time."
+
+msgid "error.booking_locked"
+msgstr "This appointment is fixed and can no longer be changed."
+
+msgid "error.booking_not_active"
+msgstr "This appointment is no longer active."
+
+msgid "error.same_slot"
+msgstr "This is the time of your current appointment. Choose another time."
+
+msgid "error.database_busy"
+msgstr "It is very busy right now. Please try again in a few seconds."
+
+msgid "error.invalid_request"
+msgstr "This request could not be processed. Go back and try again."
+
+msgid "error.rate_limited"
+msgstr "You have tried this too often. Please try again later."
+
+msgid "error.not_found.title"
+msgstr "Page not found"
+
+msgid "error.not_found.text"
+msgstr "This link is not correct or no longer valid."
+
+msgid "manage.title"
+msgstr "Your appointment"
+
+msgid "manage.when"
+msgstr "When"
+
+msgid "manage.team"
+msgstr "Team"
+
+msgid "manage.status"
+msgstr "Status"
+
+msgid "manage.status.confirmed"
+msgstr "Confirmed"
+
+msgid "manage.status.cancelled"
+msgstr "Cancelled"
+
+msgid "manage.status.completed"
+msgstr "Completed"
+
+msgid "manage.status.no_show"
+msgstr "Did not take place"
+
+msgid "manage.deadline"
+msgstr "You can change or cancel this appointment until {deadline}."
+
+msgid "manage.locked"
+msgstr "This appointment is fixed. The call starts soon; it can no longer be changed or cancelled."
+
+msgid "manage.inactive"
+msgstr "This appointment is no longer active."
+
+msgid "manage.reschedule"
+msgstr "Move appointment"
+
+msgid "manage.cancel"
+msgstr "Cancel appointment"
+
+msgid "manage.notice.booked"
+msgstr "Your appointment has been booked. You will receive a confirmation by email."
+
+msgid "manage.notice.rescheduled"
+msgstr "Your appointment has been moved. You will receive a confirmation by email."
+
+msgid "manage.notice.cancelled"
+msgstr "Your appointment has been cancelled."
+
+msgid "cancel.title"
+msgstr "Cancel appointment"
+
+msgid "cancel.question"
+msgstr "Are you sure you want to cancel this appointment?"
+
+msgid "cancel.confirm"
+msgstr "Yes, cancel"
+
+msgid "cancel.back"
+msgstr "Back to your appointment"
+
+msgid "reschedule.title"
+msgstr "Move appointment"
+
+msgid "reschedule.current"
+msgstr "Your current appointment: {slot}."
+
+msgid "reschedule.intro"
+msgstr "Choose a new time. Your details stay the same."
+
+msgid "reschedule.submit"
+msgstr "Move"

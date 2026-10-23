@@ -1,0 +1,29 @@
+{# Slot picker: one fieldset per day, one radio per start time. Works without JavaScript.
+   Expects: week (WeekView), action, method, week_base (URL for week navigation). #}
+<nav class="week-nav" aria-label="{{ _("group.weeks_label") }}">
+  <h2 id="week-heading">{{ week.heading }}</h2>
+  <ul>
+    {% if week.previous %}<li><a href="{{ week_base }}?week={{ week.previous }}">{{ _("group.previous_week") }}</a></li>{% endif %}
+    {% if week.next %}<li><a href="{{ week_base }}?week={{ week.next }}">{{ _("group.next_week") }}</a></li>{% endif %}
+  </ul>
+</nav>
+{% if week.days %}
+<form method="{{ method }}" action="{{ action }}" class="slot-picker" aria-labelledby="week-heading">
+  {% for day in week.days %}
+  <fieldset>
+    <legend>{{ day.label }}</legend>
+    <div class="slots">
+      {% for slot in day.slots %}
+      <div class="slot">
+        <input type="radio" id="{{ slot.id }}" name="start" value="{{ slot.value }}" required>
+        <label for="{{ slot.id }}">{{ slot.label }}</label>
+      </div>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% endfor %}
+  <button type="submit" class="button">{{ submit_label }}</button>
+</form>
+{% else %}
+<p class="notice">{{ _("group.no_slots") }}</p>
+{% endif %}

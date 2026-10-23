@@ -6,8 +6,10 @@ from pathlib import Path
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 from app.config import Settings
+from app.domain.ports import Clock
 from app.main import create_app
 
 
@@ -18,6 +20,9 @@ def settings(tmp_path: Path) -> Settings:
         database_url=f"sqlite+aiosqlite:///{tmp_path / 'test.db'}",
         worker_heartbeat_path=tmp_path / "worker.heartbeat",
         worker_poll_seconds=0.01,
+        management_token_key=SecretStr("t" * 32),
+        dev_token_key_path=tmp_path / "dev-token.key",
+        rate_limit_enabled=False,
     )
 
 
@@ -28,9 +33,11 @@ def unreachable_db_settings(settings: Settings, tmp_path: Path) -> Settings:
 
 
 @asynccontextmanager
-async def app_client(settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
+async def app_client(
+    settings: Settings, clock: Clock | None = None
+) -> AsyncIterator[httpx.AsyncClient]:
     """Run the app's lifespan and yield a client that talks to it in-process."""
-    app = create_app(settings)
+    app = create_app(settings, clock)
     async with (
         app.router.lifespan_context(app),
         httpx.AsyncClient(

@@ -16,6 +16,8 @@ dependencies = [
     "httpx>=0.28",
     "babel>=2.16",
     "jinja2>=3.1",
+    "python-multipart>=0.0.20",
+    "slowapi>=0.1.9",
 ]
 
 [dependency-groups]
@@ -98,7 +100,7 @@ name = "Layers: entry points > adapters > domain"
 type = "layers"
 layers = [
     "app.main",
-    "app.api | app.admin | app.jobs",
+    "app.api | app.admin | app.jobs | app.cli",
     "app.web",
     "app.adapters",
     "app.domain",
@@ -109,7 +111,7 @@ exhaustive = false
 [[tool.importlinter.contracts]]
 name = "Entry points do not import each other"
 type = "independence"
-modules = ["app.api", "app.admin", "app.jobs"]
+modules = ["app.api", "app.admin", "app.jobs", "app.cli"]
 
 [[tool.importlinter.contracts]]
 name = "i18n is self-contained (ADR 0004)"
