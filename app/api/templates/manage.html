@@ -8,6 +8,9 @@
   <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
   <dt>{{ _("manage.status") }}</dt><dd>{{ status_label }}</dd>
 </dl>
+{% if active and group.video_enabled %}
+<p><a class="button button--large" href="/b/{{ token }}/join">{{ _("join.from_manage") }}</a></p>
+{% endif %}
 {% if changeable %}
 <p>{{ _("manage.deadline", deadline=deadline) }}</p>
 <ul class="actions">

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ _("join.title") }} – {{ group.name }}{% endblock %}
+{% block head_extra %}{% if refresh %}<meta http-equiv="refresh" content="60">{% endif %}{% endblock %}
+{% block content %}
+<h1>{{ _("join.title") }}</h1>
+<dl class="details">
+  <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
+  <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
+</dl>
+{% if state == "open" %}
+<p><a class="button button--large" href="/b/{{ token }}/join/go">{{ _("join.button") }}</a></p>
+<h2>{{ _("join.tips.title") }}</h2>
+<ul>
+  <li>{{ _("join.tips.browser") }}</li>
+  <li>{{ _("join.tips.devices") }}</li>
+  <li>{{ _("join.tips.lobby") }}</li>
+</ul>
+{% elif state == "too_early" %}
+<p class="notice" role="status">{{ _("join.too_early", time=opens_at) }}</p>
+{% elif state == "no_meeting" %}
+<p class="notice" role="status">{{ _("join.preparing") }}</p>
+{% elif state == "closed" %}
+<p class="notice">{{ _("join.closed") }}</p>
+{% else %}
+<p class="notice">{{ _("manage.inactive") }}</p>
+{% endif %}
+<p><a href="/b/{{ token }}">{{ _("join.back") }}</a></p>
+{% endblock %}

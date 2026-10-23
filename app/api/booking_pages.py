@@ -19,6 +19,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.api.labels import slot_label
 from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError
@@ -192,15 +193,6 @@ async def _week(
     )
 
 
-def _slot_label(start: datetime, end: datetime, group: Group, locale: RequestLocale) -> str:
-    """Return e.g. ``maandag 5 januari 2026, 09:00–09:30``."""
-    day = format_day(local_day(start, group.tz), locale.code)
-    return (
-        f"{day}, {format_clock(start, group.tz, locale.code)}"
-        f"–{format_clock(end, group.tz, locale.code)}"
-    )
-
-
 def _manage_url(token: str, status: str) -> str:
     """Return the management page URL with a one-time notice."""
     return f"/b/{token}?status={status}"
@@ -279,7 +271,7 @@ def _book_context(
     return {
         "group": group,
         "start": _slot_value(start),
-        "slot_label": _slot_label(start, slot.end, group, locale) if slot else "",
+        "slot_label": slot_label(start, slot.end, group, locale) if slot else "",
         "fields": _fields(group, locale, errors, values),
         "errors": errors,
         "honeypot": HONEYPOT_FIELD,
@@ -342,7 +334,7 @@ def _manage_context(
     deadline = details.change_deadline
     return {
         "group": group,
-        "slot_label": _slot_label(booking.start, booking.end, group, locale),
+        "slot_label": slot_label(booking.start, booking.end, group, locale),
         "status_label": locale.gettext(STATUS_LABELS[booking.status]),
         "active": booking.is_active,
         "changeable": details.changeable,

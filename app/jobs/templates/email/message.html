@@ -15,6 +15,10 @@
       <dt>{{ team_label }}</dt>
       <dd>{{ group_name }}</dd>
     </dl>
+    {% if join_url %}
+    <p>{{ join_text }}</p>
+    <p><a href="{{ join_url }}">{{ join_link }}</a></p>
+    {% endif %}
     {% if manage_url %}
     <p>{{ manage_text }}</p>
     <p><a href="{{ manage_url }}">{{ manage_link }}</a></p>

@@ -96,3 +96,18 @@ def test_purged_booking_cannot_be_messaged(composer: MessageComposer) -> None:
 def test_only_message_jobs_can_be_composed(composer: MessageComposer) -> None:
     with pytest.raises(KeyError):
         composer.compose(JobType.PURGE_PII, BOOKING, GROUP, NOW)
+
+
+def test_join_link_only_for_groups_with_video(composer: MessageComposer) -> None:
+    video_group = replace(GROUP, video_host_email="host@example.nl")
+    url = f"https://afspraak.example.nl/b/{derive_token(TEST_TOKEN_KEY, SALT)}/join"
+
+    with_video = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, video_group, NOW)
+    without = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW)
+    cancelled = composer.compose(JobType.SEND_CANCELLATION, BOOKING, video_group, NOW)
+
+    assert url in with_video.text
+    assert f'href="{url}"' in (with_video.html or "")
+    assert "15 minuten voor de start" in with_video.text
+    assert "/join" not in without.text
+    assert "/join" not in cancelled.text

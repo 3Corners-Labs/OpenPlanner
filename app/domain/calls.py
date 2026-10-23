@@ -41,6 +41,36 @@ class EventKind(StrEnum):
     INTEGRATION_ERROR = "integration_error"
 
 
+class JoinState(StrEnum):
+    """Whether the citizen's join page can send them to the meeting now."""
+
+    TOO_EARLY = "too_early"
+    OPEN = "open"
+    CLOSED = "closed"
+    NO_MEETING = "no_meeting"
+    INACTIVE = "inactive"
+
+
+JOIN_OPENS_BEFORE = timedelta(minutes=15)
+JOIN_CLOSES_AFTER = timedelta(minutes=30)
+
+
+def join_state(booking: Booking, now: datetime) -> JoinState:
+    """Return whether ``booking``'s meeting can be joined at ``now``.
+
+    The page opens 15 minutes before the start and stays open until 30 minutes after the end.
+    """
+    if not booking.is_active:
+        return JoinState.INACTIVE
+    if booking.meeting is None or booking.meeting.link is None:
+        return JoinState.NO_MEETING
+    if now < booking.start - JOIN_OPENS_BEFORE:
+        return JoinState.TOO_EARLY
+    if now > booking.end + JOIN_CLOSES_AFTER:
+        return JoinState.CLOSED
+    return JoinState.OPEN
+
+
 class CallState(StrEnum):
     """State of the video meeting."""
 
