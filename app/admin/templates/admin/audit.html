@@ -1,10 +1,10 @@
 {% extends "admin/layout.html" %}
 {% block title %}{{ _("admin.audit.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
-<h1>{{ _("admin.audit.title") }}</h1>
+<h1 id="page-title">{{ _("admin.audit.title") }}</h1>
 <p>{{ _("admin.audit.intro") }}</p>
 {% if events %}
-<div class="table-scroll">
+<div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
 <table class="data-table">
   <caption class="visually-hidden">{{ _("admin.audit.title") }}</caption>
   <thead>

@@ -21,7 +21,9 @@ async def audit_events(site: Site) -> list[tuple[str, str, Outcome, str]]:
     uow = SqlUnitOfWork(app.state.engine)
     async with uow.read() as tx:
         events = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return [(e.actor, e.action, e.outcome, e.reason) for e in reversed(events)]
+    return [
+        (e.event.actor, e.event.action, e.event.outcome, e.event.reason) for e in reversed(events)
+    ]
 
 
 async def test_login_redirects_to_the_identity_provider(site: Site) -> None:
@@ -140,7 +142,26 @@ async def test_logout(site: Site) -> None:
     assert "form-action 'self'" in response.headers["content-security-policy"]
     assert (await site.client.get("/admin/logged-out")).status_code == 200
     assert (await site.client.get("/admin/")).status_code == 303
-    assert ("sub-org", "admin.logout", Outcome.SUCCESS, "") in await audit_events(site)
+    assert ("sub-org", "admin.logout", Outcome.SUCCESS, "org_admin") in await audit_events(site)
+
+
+async def test_audit_log_shows_names_and_logins_within_the_organisation(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    await site.login_as(OUTSIDER)
+    await site.login_as(ORG_ADMIN)
+
+    text = (await site.client.get("/admin/audit")).text
+
+    assert "<td>Gina Group</td>" in text  # name, not the subject identifier
+    assert "sub-group" not in text
+    assert "Otto Other" not in text  # logged in to another organisation
+
+
+async def test_audit_log_names_failed_logins_as_not_signed_in(site: Site) -> None:
+    await site.client.get("/admin/callback", params={"code": "c", "state": "forged"})
+    await site.login_as(SUPER)
+
+    assert "<td>Niet ingelogd</td>" in (await site.client.get("/admin/audit")).text
 
 
 async def test_denials_are_audited(site: Site) -> None:

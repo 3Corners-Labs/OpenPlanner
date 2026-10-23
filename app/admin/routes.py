@@ -36,7 +36,8 @@ from app.admin.authz import (
     session_principal,
 )
 from app.admin.session import end_session, pop_login_start, save_login_start, start_session
-from app.domain.audit import Outcome
+from app.domain.admin import ANONYMOUS, LOGIN_EVENT, LOGOUT_EVENT
+from app.domain.audit import AuditEntry, Outcome
 from app.domain.authorization import (
     CITIZEN_ACTIONS,
     LEVELS,
@@ -73,8 +74,6 @@ PUBLIC_ADMIN_PATHS = frozenset(
 )
 """The only admin paths without a ``RequirePermission``: the login flow itself."""
 
-LOGIN_EVENT = "admin.login"
-LOGOUT_EVENT = "admin.logout"
 EVENT_LABELS: dict[str, str] = {
     LOGIN_EVENT: "audit.event.login",
     LOGOUT_EVENT: "audit.event.logout",
@@ -229,7 +228,7 @@ async def callback(
         or not state
         or not hmac.compare_digest(state, pending.get("state", ""))
     ):
-        await service.record("anonymous", LOGIN_EVENT, Outcome.FAILURE, "invalid_state")
+        await service.record(ANONYMOUS, LOGIN_EVENT, Outcome.FAILURE, "invalid_state")
         return _message(request, locale, 400, "admin.login_failed.title", "admin.login_failed.text")
     try:
         principal = await provider.finish_login(
@@ -239,12 +238,10 @@ async def callback(
             nonce=pending["nonce"],
         )
     except IdentityError as error:
-        await service.record("anonymous", LOGIN_EVENT, Outcome.FAILURE, error.code)
+        await service.record(ANONYMOUS, LOGIN_EVENT, Outcome.FAILURE, error.code)
         return _message(request, locale, 401, "admin.login_failed.title", "admin.login_failed.text")
     start_session(request, principal, _clock(request).now())
-    await service.record(
-        principal.subject, LOGIN_EVENT, Outcome.SUCCESS, ",".join(sorted(principal.roles))
-    )
+    await service.record_login(principal)
     log.info("admin.login", actor=principal.subject, roles=sorted(principal.roles))
     return RedirectResponse(_safe_next(pending.get("next")), status_code=303)
 
@@ -256,7 +253,7 @@ async def logout(request: Request, locale: Locale, _: SameOrigin) -> Response:
     principal = session_principal(request)
     end_session(request)
     if principal is not None:
-        await admin_service(request).record(principal.subject, LOGOUT_EVENT, Outcome.SUCCESS)
+        await admin_service(request).record_logout(principal)
     logged_out = f"{request.app.state.settings.public_base_url.rstrip('/')}/admin/logged-out"
     provider = _identity_provider(request)
     provider_logout = await provider.logout_url(logged_out) if provider else None
@@ -368,6 +365,13 @@ class AuditView:
     target: str
 
 
+def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
+    """Name the actor: display name, "not signed in", or the subject as a last resort."""
+    if entry.event.actor == ANONYMOUS:
+        return _("audit.actor.anonymous")
+    return entry.actor_name or entry.event.actor
+
+
 def _moment(at: datetime, tz: ZoneInfo, locale: str) -> str:
     """Return a local date and time, e.g. ``maandag 5 januari 2026, 09:00``."""
     return f"{format_day(local_day(at, tz), locale)}, {format_clock(at, tz, locale)}"
@@ -396,12 +400,13 @@ async def audit(
     views = [
         AuditView(
             _moment(e.at, tz, locale.code),
-            e.actor,
+            _actor_label(entry, _),
             _action_label(e.action, _),
             _(OUTCOME_LABELS[e.outcome]),
             " / ".join(t for t in (e.organisation, e.group) if t) or "–",
         )
-        for e in events
+        for entry in events
+        for e in (entry.event,)
     ]
     return _page(request, locale, "admin/audit.html", context.principal, {"events": views})
 

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
-from app.domain.audit import AuditEvent
+from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, Slot, SlotUsage
 from app.domain.channels import ReminderRule
@@ -26,6 +26,7 @@ class State:
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
     organisation_slugs: dict[int, str] = field(default_factory=dict)
     audit: list[AuditEvent] = field(default_factory=list)
+    admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     next_id: int = 1
 
 
@@ -52,9 +53,16 @@ class InMemoryTransaction:
     async def add_audit_event(self, event: AuditEvent) -> None:
         self.state.audit.append(event)
 
-    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEvent]:
+    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEntry]:
         events = [e for e in self.state.audit if scope.contains(e.organisation, e.group)]
-        return list(reversed(events))[:limit]
+        profiles = self.state.admin_profiles
+        return [
+            AuditEntry(e, profiles[e.actor].display_name if e.actor in profiles else None)
+            for e in reversed(events)
+        ][:limit]
+
+    async def save_admin_profile(self, profile: AdminProfile) -> None:
+        self.state.admin_profiles[profile.subject] = profile
 
     async def get_group(self, slug: str) -> Group | None:
         return next((g for g in self.state.groups.values() if g.slug == slug), None)

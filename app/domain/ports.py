@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Protocol
 
-from app.domain.audit import AuditEvent
+from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, Slot, SlotUsage
 from app.domain.channels import ChannelKind, ReminderRule
@@ -124,8 +124,15 @@ class Transaction(Protocol):
         """Store an audit event."""
         ...
 
-    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEvent]:
-        """Return the newest audit events about organisations and groups inside ``scope``."""
+    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEntry]:
+        """Return the newest audit events about organisations and groups inside ``scope``.
+
+        Each entry carries the actor's display name from their ``AdminProfile``, if any.
+        """
+        ...
+
+    async def save_admin_profile(self, profile: AdminProfile) -> None:
+        """Create or replace the profile of ``profile.subject``."""
         ...
 
     async def get_group(self, slug: str) -> Group | None:

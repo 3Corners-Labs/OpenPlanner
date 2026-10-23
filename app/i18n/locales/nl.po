@@ -454,6 +454,9 @@ msgstr "U bent uitgelogd"
 msgid "admin.logged_out.text"
 msgstr "U bent uitgelogd uit het beheerportaal."
 
+msgid "audit.actor.anonymous"
+msgstr "Niet ingelogd"
+
 msgid "audit.event.login"
 msgstr "Inloggen"
 

@@ -19,6 +19,7 @@ from sqlalchemy.sql.elements import SQLCoreOperations
 
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.models import (
+    AdminProfileRow,
     AuditEventRow,
     BookingRow,
     GroupRow,
@@ -29,7 +30,7 @@ from app.adapters.db.models import (
     ScheduleRuleRow,
     SlotRow,
 )
-from app.domain.audit import AuditEvent, Outcome
+from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, Contact, Slot, SlotUsage
 from app.domain.channels import ChannelKind, ReminderRule
@@ -161,26 +162,41 @@ class SqlTransaction:
         )
         await self._session.flush()
 
-    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEvent]:
+    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEntry]:
         """Return the newest audit events about organisations and groups inside ``scope``."""
-        rows = await self._session.scalars(
-            select(AuditEventRow)
+        rows = await self._session.execute(
+            select(AuditEventRow, AdminProfileRow.display_name)
+            .outerjoin(AdminProfileRow, AdminProfileRow.subject == AuditEventRow.actor)
             .where(scope_filter(scope, AuditEventRow.organisation, AuditEventRow.group))
             .order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc())
             .limit(limit)
         )
         return [
-            AuditEvent(
-                at=row.at,
-                actor=row.actor,
-                action=row.action,
-                outcome=Outcome(row.outcome),
-                reason=row.reason,
-                organisation=row.organisation,
-                group=row.group,
+            AuditEntry(
+                AuditEvent(
+                    at=row.at,
+                    actor=row.actor,
+                    action=row.action,
+                    outcome=Outcome(row.outcome),
+                    reason=row.reason,
+                    organisation=row.organisation,
+                    group=row.group,
+                ),
+                name,
             )
-            for row in rows
+            for row, name in rows
         ]
+
+    async def save_admin_profile(self, profile: AdminProfile) -> None:
+        """Create or replace the profile of ``profile.subject``."""
+        await self._session.merge(
+            AdminProfileRow(
+                subject=profile.subject[:255],
+                display_name=profile.display_name[:255],
+                last_login_at=profile.last_login_at,
+            )
+        )
+        await self._session.flush()
 
     async def get_group(self, slug: str) -> Group | None:
         """Return the group with ``slug``."""

@@ -2,10 +2,11 @@
 
 Written for every login, every denied authorisation decision and every change (ADR 0014).
 An event never contains personal data of citizens; the actor is the subject identifier from
-the identity provider.
+the identity provider. The admin's display name lives once in ``AdminProfile`` and is joined
+in when the log is read, so events stay immutable and a name is stored in one place only.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
@@ -39,3 +40,31 @@ class AuditEvent:
     reason: str = ""
     organisation: str | None = None
     group: str | None = None
+
+
+@dataclass(frozen=True)
+class AuditEntry:
+    """An audit event as the audit log shows it.
+
+    Attributes:
+        event: The stored event.
+        actor_name: The actor's latest known display name; ``None`` if unknown.
+    """
+
+    event: AuditEvent
+    actor_name: str | None = None
+
+
+@dataclass(frozen=True)
+class AdminProfile:
+    """What the portal remembers about an admin, refreshed at every login.
+
+    Attributes:
+        subject: Subject identifier from the identity provider.
+        display_name: Name from the identity provider, for the audit log.
+        last_login_at: Time of the latest login (UTC).
+    """
+
+    subject: str
+    display_name: str = field(repr=False)
+    last_login_at: datetime

@@ -4,6 +4,7 @@ Rows are persistence shapes only; ``app.adapters.db.uow`` maps them to domain ob
 PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
 
     audit_events (no foreign keys: events outlive what they describe)
+    admin_profiles (name per identity-provider subject; joined into the audit log)
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
@@ -30,6 +31,7 @@ from app.adapters.db.base import Base
 from app.adapters.db.types import UTCDateTime
 
 __all__ = [
+    "AdminProfileRow",
     "AuditEventRow",
     "Base",
     "BookingRow",
@@ -231,3 +233,13 @@ class AuditEventRow(Base):
         Index("ix_audit_events_organisation", "organisation"),
         CheckConstraint("outcome IN ('success', 'denied', 'failure')", name="outcome"),
     )
+
+
+class AdminProfileRow(Base):
+    """An admin's display name per identity-provider subject, refreshed at every login."""
+
+    __tablename__ = "admin_profiles"
+
+    subject: Mapped[str] = mapped_column(String(255), primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(255))
+    last_login_at: Mapped[datetime] = mapped_column(UTCDateTime())

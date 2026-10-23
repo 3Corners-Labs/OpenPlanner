@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.audit import AuditEvent, Outcome
+from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
 from app.domain.authorization import Scope
 from app.domain.ports import Transaction
 from tests.support.domain import NOW
@@ -85,10 +85,25 @@ async def test_audit_events_are_stored_and_scoped(engine: AsyncEngine) -> None:
         demo = await tx.list_audit_events(Scope(organisations=frozenset({"demo"})))
         limited = await tx.list_audit_events(EVERYTHING, limit=1)
 
-    assert [e.action for e in everything] == ["group.view", "group.view", "admin.login"]
-    assert everything[0] == events[2]
-    assert demo == [events[2]]
-    assert limited == [events[2]]
+    assert [e.event.action for e in everything] == ["group.view", "group.view", "admin.login"]
+    assert everything[0] == AuditEntry(events[2])
+    assert demo == [AuditEntry(events[2])]
+    assert limited == [AuditEntry(events[2])]
+
+
+async def test_audit_entries_carry_the_latest_profile_name(engine: AsyncEngine) -> None:
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        await tx.add_audit_event(AuditEvent(NOW, "sub-1", "admin.login", Outcome.SUCCESS))
+        await tx.add_audit_event(AuditEvent(NOW, "sub-2", "admin.login", Outcome.SUCCESS))
+        await tx.save_admin_profile(AdminProfile("sub-1", "Old Name", NOW))
+    async with uow.locked() as tx:
+        await tx.save_admin_profile(AdminProfile("sub-1", "Gina Groep", NOW + timedelta(hours=1)))
+
+    async with uow.read() as tx:
+        entries = await tx.list_audit_events(EVERYTHING)
+
+    assert {e.event.actor: e.actor_name for e in entries} == {"sub-1": "Gina Groep", "sub-2": None}
 
 
 def test_every_listing_query_requires_a_scope() -> None:
