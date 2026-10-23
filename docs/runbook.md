@@ -75,8 +75,10 @@ manage (directory groups or attributes users cannot edit themselves); a self-edi
 would let anyone grant themselves the superuser role.
 
 Roles are read at login and kept in the session for its lifetime (`ADMIN_SESSION_HOURS`,
-default 8). Revoking a role in PingFederate takes effect at the admin's next login, at the latest
-after that lifetime. For an urgent revocation, rotate `SESSION_SECRET` (logs everyone out).
+default 8). Changes need a login of at most `ADMIN_REAUTH_MINUTES` (default 60, ADR 0015):
+older sessions pass through PingFederate first, which refreshes the roles. A revoked role
+therefore stops granting changes within an hour; reading continues until the session ends.
+For an urgent revocation, rotate `SESSION_SECRET` (logs everyone out).
 
 Logout sends `client_id` and `post_logout_redirect_uri` to the `end_session_endpoint`, without
 `id_token_hint`. Check during set-up that PingFederate accepts this and ends the SSO session;

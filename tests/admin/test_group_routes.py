@@ -277,3 +277,31 @@ async def test_overview_shows_week_preview_and_exceptions(site: Site) -> None:
     assert "Openingstijden per week" in text
     assert "Zo zien burgers het" in text
     assert "tijdsloten" in text
+
+
+async def test_audit_log_says_what_changed(site: Site) -> None:
+    await site.login_as(SUPER)
+    await _post(
+        site,
+        f"{GROUP}/hours",
+        {"weekday": "5", "opens": "10:00", "closes": "11:00", "capacity": "1"},
+    )
+    await _post(
+        site,
+        f"{GROUP}/settings",
+        {
+            "name": "Demo-team",
+            "timezone": "Europe/Amsterdam",
+            "slot_minutes": "30",
+            "min_notice_minutes": "60",
+            "horizon_days": "45",
+            "dispatch_lead_minutes": "5",
+            "phone_mode": "optional",
+            "wxcc_queue_id": "demo-queue",
+        },
+    )
+
+    text = (await site.client.get("/admin/audit")).text
+
+    assert "Openingstijd toegevoegd" in text
+    assert "Vooruit boeken (dagen), Naam" in text

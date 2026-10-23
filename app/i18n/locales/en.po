@@ -852,3 +852,15 @@ msgstr "{count} slots, {first} to {last}, up to {capacity} at once"
 
 msgid "admin.preview.empty"
 msgstr "No slots yet: set opening hours first."
+
+msgid "admin.audit.detail.rule_add"
+msgstr "Opening hours added"
+
+msgid "admin.audit.detail.rule_remove"
+msgstr "Opening hours removed"
+
+msgid "admin.audit.detail.override_add"
+msgstr "Exception added"
+
+msgid "admin.audit.detail.override_remove"
+msgstr "Exception removed"

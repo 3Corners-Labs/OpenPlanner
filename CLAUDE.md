@@ -14,7 +14,7 @@ Lightweight group-booking service for a government contact center: embeddable wi
 - Python 3.12, FastAPI, SQLAlchemy 2.x (async), Alembic, Pydantic v2.
 - Database: SQLite in WAL mode (`DATABASE_URL=sqlite+aiosqlite:///data/booking.db`). Postgres is not a target (decided 2026-10-23); changing that needs an ADR. No raw SQL outside `app/adapters/db/`.
 - Jobs: own `jobs` table + worker loop in `app/jobs/`. No Celery, Redis, APScheduler.
-- Admin UI: Jinja2 + HTMX, server-rendered. No SPA framework.
+- Admin UI: Jinja2, server-rendered HTML forms without JavaScript; HTMX only per ADR 0016. No SPA framework.
 - Widget: one Web Component in vanilla JS under `widget/`, bundled with esbuild in CI only. No React/Vue. Shadow DOM; all colours, spacing, radius and font read from `--booking-*` CSS custom properties with NL Design System defaults; `font-family: inherit`; interactive elements exposed via `part="..."`. The host site styles the widget only through those tokens and parts; document them in `docs/widget.md`. No inline styles, no `!important`.
 - HTTP client: `httpx`. Logging: `structlog` (JSON). Settings: `pydantic-settings` from env only; no config files with secrets.
 - Containers: `web`, `worker`. One `docker-compose.yml` for dev and prod shape.

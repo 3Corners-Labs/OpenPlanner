@@ -852,3 +852,15 @@ msgstr "{count} tijdsloten, {first} tot {last}, tot {capacity} tegelijk"
 
 msgid "admin.preview.empty"
 msgstr "Nog geen tijdsloten: stel eerst openingstijden in."
+
+msgid "admin.audit.detail.rule_add"
+msgstr "Openingstijd toegevoegd"
+
+msgid "admin.audit.detail.rule_remove"
+msgstr "Openingstijd verwijderd"
+
+msgid "admin.audit.detail.override_add"
+msgstr "Uitzondering toegevoegd"
+
+msgid "admin.audit.detail.override_remove"
+msgstr "Uitzondering verwijderd"
