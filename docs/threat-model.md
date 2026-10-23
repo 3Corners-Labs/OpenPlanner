@@ -1,7 +1,7 @@
 # Threat model
 
 STRIDE per flow, plus abuse cases per public endpoint. Every abuse case has a test.
-Status: work package 1.
+Status: work package 7a.
 
 ## Flow: health checks
 
@@ -86,3 +86,27 @@ Public, unauthenticated: `GET /g/{slug}`, `GET/POST /g/{slug}/book`, `GET /b/{to
 | Tampering | Message sent for a moved or cancelled booking | Pinned jobs are skipped when the booking changed or was purged | `test_stale_jobs_send_nothing`, `tests/domain/test_job_plan.py::test_stale_jobs` |
 | Injection | Group name or text with HTML in emails | Jinja2 autoescape for the HTML part; plain-text part separate | `tests/jobs/test_messages.py::test_html_is_escaped_and_semantic` |
 | Information disclosure | Personal data in calendar files | `.ics` contains team, times and the management link only | `test_calendar_attachment` |
+
+## Flow: admin portal login and authorisation (WP7a)
+
+Admins only; citizens never log in. `GET /admin/login` → identity provider (PingFederate in
+production, Keycloak in development, ADR 0013) → `GET /admin/callback` → session cookie
+`op_admin`; `POST /admin/logout` → identity-provider logout → `GET /admin/logged-out`. Every
+other `/admin` route declares one permission of the matrix (ADR 0014). Inputs from outside:
+`code`, `state`, `next`, the ID token and its claims, the session cookie, path slugs.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Spoofing | Forged or replayed authorisation response | `state` compared in constant time and used once; PKCE S256; `nonce` in the ID token checked | `tests/admin/test_admin_flow.py::test_bad_state_or_missing_code_fails`, `test_a_login_can_be_completed_only_once`, `tests/adapters/test_oidc.py::test_nonce_mismatch_is_refused`, `test_full_flow_with_pkce` |
+| Spoofing | Forged ID token: wrong key, `alg: none`, HS256 with the public key as secret | Only asymmetric algorithms from an allow-list; signature verified against the provider's JWKS; `iss`, `aud`, `azp`, `exp`, `iat`, `sub` required | `test_forged_signature_is_refused`, `test_unsafe_algorithms_are_refused`, `test_invalid_claims_are_refused` |
+| Spoofing | Key rotation used to slip in an unknown key | Unknown `kid` triggers one JWKS refetch from the discovered URL, then refusal | `test_key_rotation_refetches_the_key_set` |
+| Elevation | A claim grants rights it should not (organisation claim without the org-admin role, unknown group) | Rights come only from `decide()` on role × permission × scope; claims without the matching role or for unknown groups grant nothing | `tests/domain/test_authorization.py::test_decide`, `tests/domain/test_admin_service.py::test_claims_without_the_matching_role_give_no_context` |
+| Elevation | An admin route without an authorisation check | Every admin route depends on exactly one `RequirePermission`; a test walks the router and the role × route × own/other-group table | `tests/admin/test_authorization_matrix.py::test_every_admin_route_declares_one_permission_and_is_in_the_table`, `test_matrix` |
+| Elevation / information disclosure | A listing shows data of another organisation | Listing queries take a mandatory `Scope`, filtered in SQL; the scope and the per-object decision come from the same matrix | `tests/adapters/db/test_admin_queries.py::test_every_listing_query_requires_a_scope`, `tests/domain/test_authorization.py::test_database_scope_and_decision_never_disagree` |
+| Spoofing | Session fixation or a stolen, long-lived session | Session cleared before login; signed cookie `HttpOnly; SameSite=Lax; Path=/admin` (`Secure` in production); absolute lifetime of 8 h enforced server-side; tampered cookie means logged out | `test_successful_login_starts_a_fresh_session_and_is_audited`, `test_session_has_an_absolute_lifetime`, `test_tampered_cookie_means_logged_out` |
+| Spoofing | Silent re-login after logout through the identity provider's SSO session | RP-initiated logout at the provider's `end_session_endpoint`; an interstitial page keeps CSP `form-action 'self'` | `test_logout`, `tests/adapters/test_oidc.py::test_logout_url_uses_the_end_session_endpoint`, `e2e/tests/admin-roles.spec.ts` (outsider logs out, super must log in afresh) |
+| Tampering (CSRF) | A third-party site logs an admin out | Logout is a POST with the Fetch Metadata check | `test_logout` |
+| Spoofing (open redirect) | `next` sends the admin to another site after login | `next` must be a path under `/admin/` | `test_next_cannot_leave_the_admin_portal` |
+| Repudiation | An admin denies a login, a refused attempt or a change | Logins, logouts, failed logins and denials go to `audit_events`, per organisation/group in the admin's scope; the audit log shows names from `admin_profiles` | `test_denials_are_audited`, `test_identity_errors_are_audited`, `test_audit_log_shows_names_and_logins_within_the_organisation` |
+| Information disclosure | Personal data in logs or audit events | Logs and audit events carry the subject identifier only; the display name is stored once in `admin_profiles` and hidden from `repr` | `tests/domain/test_authorization.py::test_principal_repr_hides_the_display_name`, `tests/test_logging.py` |
+| Elevation | A development shortcut reaches production (login bypass, role switcher, test users) | No bypass or switcher exists in code; test users exist only in the Keycloak dev realm; production requires an `https` discovery URL and a client secret | `tests/test_config.py::test_production_is_the_default_and_refuses_development_defaults`, `e2e/tests/admin-roles.spec.ts` logs in through the real provider |

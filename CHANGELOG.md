@@ -28,6 +28,14 @@ All notable changes are listed here, generated from Conventional Commits on rele
   cancel and reschedule; same-origin checks, honeypot and rate limits.
 - Confirmation, change, reminder and cancellation emails with calendar attachment, sent by
   the worker with retries; PII purge job executed.
+- Authorisation matrix as the single source of rights (ADR 0014): scoped admin queries,
+  audit events for logins, logouts and denials, generated `docs/authorization.md`.
+- Admin portal with OIDC login (ADR 0013; httpx + PyJWT, PKCE, RP-initiated logout), pages for
+  overview, group, my rights, matrix and audit log; menu and actions follow the matrix.
+- Audit log shows admins by name (`admin_profiles`, migration 0005) and lets organisation
+  admins see the logins of their own admins.
+- Development Keycloak with one test user per role; Playwright specs walk the portal as every
+  role, with axe on every admin page, also in CI.
 - ADR 0011: management tokens derived from a per-booking salt and a server key.
 - `seed-demo` command and a Mailpit `dev` profile for demos.
 
