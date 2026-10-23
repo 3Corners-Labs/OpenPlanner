@@ -12,7 +12,13 @@ from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, Slot, SlotUsage
 from app.domain.channels import ReminderRule
 from app.domain.job_plan import PlannedJob
-from app.domain.scheduling import Group, GroupSummary, ScheduleOverride, ScheduleRule
+from app.domain.scheduling import (
+    Group,
+    GroupSummary,
+    Organisation,
+    ScheduleOverride,
+    ScheduleRule,
+)
 
 
 @dataclass
@@ -25,6 +31,7 @@ class State:
     bookings: dict[int, Booking] = field(default_factory=dict)
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
     organisation_slugs: dict[int, str] = field(default_factory=dict)
+    organisations: dict[int, Organisation] = field(default_factory=dict)
     audit: list[AuditEvent] = field(default_factory=list)
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     next_id: int = 1
@@ -77,6 +84,60 @@ class InMemoryTransaction:
             o for o in self.state.overrides.get(group_id, []) if first_day <= o.day <= last_day
         ]
         return list(self.state.rules.get(group_id, [])), overrides
+
+    async def list_organisations(self, scope: Scope) -> list[Organisation]:
+        found = [o for o in self.state.organisations.values() if scope.contains(o.slug, None)]
+        return sorted(found, key=lambda o: o.slug)
+
+    async def get_organisation(self, slug: str) -> Organisation | None:
+        return next((o for o in self.state.organisations.values() if o.slug == slug), None)
+
+    async def add_group(self, group: Group) -> Group:
+        stored = replace(group, id=self._new_id())
+        self.state.groups[stored.id] = stored
+        return stored
+
+    async def save_group(self, group: Group) -> None:
+        self.state.groups[group.id] = group
+
+    async def count_future_bookings(self, group_id: int, now: datetime) -> int:
+        return sum(
+            1
+            for b in self.state.bookings.values()
+            if b.group_id == group_id and b.status is BookingStatus.CONFIRMED and b.start > now
+        )
+
+    async def get_schedule_items(
+        self, group_id: int, from_day: date | None = None
+    ) -> tuple[list[ScheduleRule], list[ScheduleOverride]]:
+        overrides = [
+            o
+            for o in self.state.overrides.get(group_id, [])
+            if from_day is None or o.day >= from_day
+        ]
+        return list(self.state.rules.get(group_id, [])), overrides
+
+    async def add_schedule_rule(self, group_id: int, rule: ScheduleRule) -> int:
+        stored = replace(rule, id=self._new_id())
+        self.state.rules.setdefault(group_id, []).append(stored)
+        return stored.id or 0
+
+    async def delete_schedule_rule(self, group_id: int, rule_id: int) -> bool:
+        rules = self.state.rules.get(group_id, [])
+        kept = [r for r in rules if r.id != rule_id]
+        self.state.rules[group_id] = kept
+        return len(kept) != len(rules)
+
+    async def add_schedule_override(self, group_id: int, override: ScheduleOverride) -> int:
+        stored = replace(override, id=self._new_id())
+        self.state.overrides.setdefault(group_id, []).append(stored)
+        return stored.id or 0
+
+    async def delete_schedule_override(self, group_id: int, override_id: int) -> bool:
+        overrides = self.state.overrides.get(group_id, [])
+        kept = [o for o in overrides if o.id != override_id]
+        self.state.overrides[group_id] = kept
+        return len(kept) != len(overrides)
 
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:
         return list(self.state.reminder_rules.get(group_id, []))

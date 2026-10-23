@@ -17,7 +17,13 @@ from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, Slot, SlotUsage
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.job_plan import PlannedJob
-from app.domain.scheduling import Group, GroupSummary, ScheduleOverride, ScheduleRule
+from app.domain.scheduling import (
+    Group,
+    GroupSummary,
+    Organisation,
+    ScheduleOverride,
+    ScheduleRule,
+)
 
 
 class Clock(Protocol):
@@ -147,6 +153,48 @@ class Transaction(Protocol):
         self, group_id: int, first_day: date, last_day: date
     ) -> tuple[list[ScheduleRule], list[ScheduleOverride]]:
         """Return all rules of the group and its overrides between the two dates."""
+        ...
+
+    async def list_organisations(self, scope: Scope) -> list[Organisation]:
+        """Return the organisations inside ``scope``, ordered by slug."""
+        ...
+
+    async def get_organisation(self, slug: str) -> Organisation | None:
+        """Return the organisation with ``slug``."""
+        ...
+
+    async def add_group(self, group: Group) -> Group:
+        """Store a new group and return it with its id; the slug must be free."""
+        ...
+
+    async def save_group(self, group: Group) -> None:
+        """Store the changed settings of an existing group (its slug never changes)."""
+        ...
+
+    async def count_future_bookings(self, group_id: int, now: datetime) -> int:
+        """Return how many confirmed bookings of the group start after ``now``."""
+        ...
+
+    async def get_schedule_items(
+        self, group_id: int, from_day: date | None = None
+    ) -> tuple[list[ScheduleRule], list[ScheduleOverride]]:
+        """Return the group's rules and overrides (from ``from_day`` on), each with its id."""
+        ...
+
+    async def add_schedule_rule(self, group_id: int, rule: ScheduleRule) -> int:
+        """Store a rule for the group and return its id."""
+        ...
+
+    async def delete_schedule_rule(self, group_id: int, rule_id: int) -> bool:
+        """Delete the group's rule ``rule_id``; ``False`` if the group has no such rule."""
+        ...
+
+    async def add_schedule_override(self, group_id: int, override: ScheduleOverride) -> int:
+        """Store an override for the group and return its id."""
+        ...
+
+    async def delete_schedule_override(self, group_id: int, override_id: int) -> bool:
+        """Delete the group's override ``override_id``; ``False`` if it has no such override."""
         ...
 
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:

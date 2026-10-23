@@ -23,6 +23,11 @@ class ErrorCode(StrEnum):
     BOOKING_LOCKED = "booking_locked"
     SAME_SLOT = "same_slot"
     DATABASE_BUSY = "database_busy"
+    NOT_PERMITTED = "not_permitted"
+    ORGANISATION_NOT_FOUND = "organisation_not_found"
+    SLUG_TAKEN = "slug_taken"
+    GROUP_HAS_FUTURE_BOOKINGS = "group_has_future_bookings"
+    SCHEDULE_ITEM_NOT_FOUND = "schedule_item_not_found"
 
 
 class DomainError(Exception):

@@ -15,7 +15,7 @@ time. That is a single number because the WxCC queue assigns the actual agent (H
 
 import re
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, time, timedelta
 from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -155,12 +155,16 @@ class TimeWindow:
 
 @dataclass(frozen=True)
 class ScheduleRule:
-    """A weekly window: ``weekday`` 0 (Monday) to 6, optionally limited to a date range."""
+    """A weekly window: ``weekday`` 0 (Monday) to 6, optionally limited to a date range.
+
+    ``id`` identifies a stored rule (for removal); it takes no part in equality.
+    """
 
     weekday: int
     window: TimeWindow
     valid_from: date | None = None
     valid_to: date | None = None
+    id: int | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         """Validate the weekday and the validity period."""
@@ -190,10 +194,14 @@ class ScheduleRule:
 
 @dataclass(frozen=True)
 class ScheduleOverride:
-    """Replaces all rules on ``day``: a window, or ``window=None`` for closed."""
+    """Replaces all rules on ``day``: a window, or ``window=None`` for closed.
+
+    ``id`` identifies a stored override (for removal); it takes no part in equality.
+    """
 
     day: date
     window: TimeWindow | None
+    id: int | None = field(default=None, compare=False)
 
 
 def windows_on(
