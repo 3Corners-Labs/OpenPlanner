@@ -925,3 +925,42 @@ msgstr "Connected"
 
 msgid "admin.group.not_connected"
 msgstr "Not connected"
+
+msgid "message.join"
+msgstr "You join from your browser; nothing to install. The link works from 15 minutes before the start."
+
+msgid "message.join_link"
+msgstr "Join the video call"
+
+msgid "join.title"
+msgstr "Your video call"
+
+msgid "join.button"
+msgstr "Join the video call"
+
+msgid "join.from_manage"
+msgstr "Go to the video call"
+
+msgid "join.tips.title"
+msgstr "Good to know"
+
+msgid "join.tips.browser"
+msgstr "The call opens in your browser. You do not need to install anything."
+
+msgid "join.tips.devices"
+msgstr "Allow your browser to use the camera and microphone when it asks."
+
+msgid "join.tips.lobby"
+msgstr "You first wait in a lobby. The agent lets you in."
+
+msgid "join.too_early"
+msgstr "You can join from {time}. This page refreshes itself."
+
+msgid "join.preparing"
+msgstr "The video call is being prepared. This page refreshes itself."
+
+msgid "join.closed"
+msgstr "This call has ended."
+
+msgid "join.back"
+msgstr "Back to your appointment"

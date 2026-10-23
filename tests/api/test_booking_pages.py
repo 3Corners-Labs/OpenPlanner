@@ -7,38 +7,19 @@ Calendar: "now" is Thursday 1 January 2026 08:00 UTC; the demo group is open on 
 import re
 from collections.abc import AsyncIterator
 from datetime import timedelta
-from pathlib import Path
 
 import httpx
 import pytest
 
-from app.adapters.db.engine import create_engine
-from app.adapters.db.seed import seed_demo
 from app.config import Settings
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
-from tests.support.database import migrated_database
 from tests.support.domain import NOW
 
 FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam
 FRIDAY_0930 = "2026-01-02T08:30:00Z"
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 ADA = {"name": "Ada Lovelace", "email": "ada@example.org", "phone": ""}
-
-
-@pytest.fixture
-def database_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
-    # Synchronous: Alembic runs its own event loop.
-    return migrated_database(tmp_path, monkeypatch, "pages")
-
-
-@pytest.fixture
-async def demo_settings(settings: Settings, database_url: str) -> Settings:
-    url = database_url
-    engine = create_engine(url)
-    await seed_demo(engine)
-    await engine.dispose()
-    return settings.model_copy(update={"database_url": url})
 
 
 @pytest.fixture

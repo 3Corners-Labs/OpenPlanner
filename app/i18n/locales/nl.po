@@ -925,3 +925,42 @@ msgstr "Gekoppeld"
 
 msgid "admin.group.not_connected"
 msgstr "Niet gekoppeld"
+
+msgid "message.join"
+msgstr "U neemt deel via uw browser; u hoeft niets te installeren. De link werkt vanaf 15 minuten voor de start."
+
+msgid "message.join_link"
+msgstr "Deelnemen aan het videogesprek"
+
+msgid "join.title"
+msgstr "Uw videogesprek"
+
+msgid "join.button"
+msgstr "Deelnemen aan het videogesprek"
+
+msgid "join.from_manage"
+msgstr "Naar het videogesprek"
+
+msgid "join.tips.title"
+msgstr "Goed om te weten"
+
+msgid "join.tips.browser"
+msgstr "Het gesprek opent in uw browser. U hoeft niets te installeren."
+
+msgid "join.tips.devices"
+msgstr "Geef uw browser toestemming voor camera en microfoon als daarom wordt gevraagd."
+
+msgid "join.tips.lobby"
+msgstr "U wacht eerst in een wachtruimte. De medewerker laat u binnen."
+
+msgid "join.too_early"
+msgstr "U kunt deelnemen vanaf {time}. Deze pagina ververst zichzelf."
+
+msgid "join.preparing"
+msgstr "Het videogesprek wordt klaargezet. Deze pagina ververst zichzelf."
+
+msgid "join.closed"
+msgstr "Dit gesprek is voorbij."
+
+msgid "join.back"
+msgstr "Terug naar uw afspraak"

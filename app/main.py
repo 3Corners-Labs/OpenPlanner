@@ -16,7 +16,7 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider
 from app.admin.routes import register_admin
-from app.api import booking_pages, health, pages, webhooks
+from app.api import booking_pages, health, join_pages, pages, webhooks
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.config import Settings
 from app.domain.admin import AdminService
@@ -125,6 +125,7 @@ def create_app(
     app.include_router(health.router)
     app.include_router(pages.router)
     app.include_router(booking_pages.router)
+    app.include_router(join_pages.router)
     app.include_router(webhooks.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app

@@ -199,3 +199,18 @@ async def test_timeline_needs_bookings_view_on_the_group(service: IntegrationSer
         await service.timeline(OUTSIDER, 123)
     with pytest.raises(DomainError, match="booking_not_found"):
         await service.timeline(GROUP_ADMIN, 999)
+
+
+def test_join_window_opens_fifteen_minutes_before_and_closes_after_the_end() -> None:
+    from app.domain.calls import JoinState, join_state
+
+    booking = _booking(meeting=MeetingRef("m", "https://site.webex.com/m"))
+    start, end = booking.start, booking.end
+
+    assert join_state(booking, start - timedelta(minutes=16)) is JoinState.TOO_EARLY
+    assert join_state(booking, start - timedelta(minutes=15)) is JoinState.OPEN
+    assert join_state(booking, end + timedelta(minutes=30)) is JoinState.OPEN
+    assert join_state(booking, end + timedelta(minutes=31)) is JoinState.CLOSED
+    assert join_state(replace(booking, meeting=None), start) is JoinState.NO_MEETING
+    cancelled = replace(booking, status=BookingStatus.CANCELLED)
+    assert join_state(cancelled, start) is JoinState.INACTIVE
