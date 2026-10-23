@@ -117,3 +117,213 @@ main {
   margin: 0 auto;
   padding: var(--op-space-m);
 }
+
+/* --- Booking pages ------------------------------------------------------ */
+:root {
+  --op-color-error: #d52b1e;
+  --op-color-success: #39870c;
+  --op-color-surface: #f3f3f3;
+  --op-color-button: #01689b;
+  --op-color-button-text: #ffffff;
+  --op-radius: 4px;
+}
+
+h1 {
+  font-size: 2rem;
+  line-height: 1.25;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.button {
+  display: inline-block;
+  min-height: 44px;
+  padding: var(--op-space-s) var(--op-space-m);
+  border: 2px solid var(--op-color-button);
+  border-radius: var(--op-radius);
+  background: var(--op-color-button);
+  color: var(--op-color-button-text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button--secondary {
+  background: var(--op-color-background);
+  color: var(--op-color-button);
+}
+
+.button--danger {
+  border-color: var(--op-color-error);
+  background: var(--op-color-error);
+}
+
+.button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--op-color-focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--op-color-focus-background);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--op-space-m);
+  padding: 0;
+  list-style: none;
+}
+
+.week-nav ul {
+  display: flex;
+  justify-content: space-between;
+  padding: 0;
+  list-style: none;
+}
+
+.week-nav a {
+  display: inline-block;
+  min-height: 24px;
+  padding: var(--op-space-s) 0;
+}
+
+.slot-picker fieldset {
+  margin: 0 0 var(--op-space-m);
+  padding: var(--op-space-m);
+  border: 1px solid var(--op-color-border);
+  border-radius: var(--op-radius);
+}
+
+.slot-picker legend {
+  padding: 0 var(--op-space-s);
+  font-weight: 700;
+}
+
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--op-space-s);
+}
+
+.slot input {
+  position: absolute;
+  opacity: 0;
+}
+
+/* The label is the visible, clickable target (at least 44x44 px). */
+.slot label {
+  display: inline-block;
+  min-width: 5.5rem;
+  min-height: 44px;
+  padding: var(--op-space-s) var(--op-space-m);
+  border: 2px solid var(--op-color-button);
+  border-radius: var(--op-radius);
+  color: var(--op-color-button);
+  text-align: center;
+  cursor: pointer;
+}
+
+.slot input:checked + label {
+  background: var(--op-color-button);
+  color: var(--op-color-button-text);
+  font-weight: 700;
+}
+
+.slot input:checked + label::before {
+  content: "✓ ";
+}
+
+.slot input:focus-visible + label {
+  outline: 3px solid var(--op-color-focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--op-color-focus-background);
+}
+
+.field {
+  margin-bottom: var(--op-space-m);
+}
+
+.field label {
+  display: block;
+  font-weight: 700;
+}
+
+.field input {
+  width: 100%;
+  max-width: 30rem;
+  min-height: 44px;
+  padding: var(--op-space-s);
+  border: 2px solid var(--op-color-text);
+  border-radius: var(--op-radius);
+  font: inherit;
+}
+
+.field--error {
+  padding-left: var(--op-space-m);
+  border-left: 4px solid var(--op-color-error);
+}
+
+.field--error input {
+  border-color: var(--op-color-error);
+}
+
+.hint {
+  margin: 0;
+  color: var(--op-color-text);
+}
+
+.optional {
+  font-weight: 400;
+}
+
+.error-message {
+  margin: 0;
+  color: var(--op-color-error);
+  font-weight: 700;
+}
+
+.error-message::before {
+  content: "⚠ ";
+}
+
+.error-summary {
+  margin-bottom: var(--op-space-l);
+  padding: var(--op-space-m);
+  border: 4px solid var(--op-color-error);
+}
+
+.error-summary h2 {
+  margin-top: 0;
+}
+
+.notice {
+  padding: var(--op-space-m);
+  border-left: 4px solid var(--op-color-button);
+  background: var(--op-color-surface);
+}
+
+.notice--success {
+  border-left-color: var(--op-color-success);
+}
+
+.summary,
+.details {
+  padding: var(--op-space-m);
+  background: var(--op-color-surface);
+  border-radius: var(--op-radius);
+}
+
+.details dt {
+  font-weight: 700;
+}
+
+.details dd {
+  margin: 0 0 var(--op-space-s);
+}

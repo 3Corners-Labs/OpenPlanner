@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="{{ locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ subject }}</title>
+</head>
+<body>
+  <main>
+    <p>{{ greeting }}</p>
+    <p>{{ intro }}</p>
+    <dl>
+      <dt>{{ when_label }}</dt>
+      <dd>{{ when }}</dd>
+      <dt>{{ team_label }}</dt>
+      <dd>{{ group_name }}</dd>
+    </dl>
+    {% if manage_url %}
+    <p>{{ manage_text }}</p>
+    <p><a href="{{ manage_url }}">{{ manage_link }}</a></p>
+    {% endif %}
+    <p>{{ signoff }}</p>
+  </main>
+</body>
+</html>

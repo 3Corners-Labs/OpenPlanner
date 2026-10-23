@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ _("cancel.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+<h1>{{ _("cancel.title") }}</h1>
+<p>{{ group.name }}<br>{{ slot_label }}</p>
+<p>{{ _("cancel.question") }}</p>
+<form method="post" action="/b/{{ token }}/cancel">
+  <ul class="actions">
+    <li><button type="submit" class="button button--danger">{{ _("cancel.confirm") }}</button></li>
+    <li><a class="button button--secondary" href="/b/{{ token }}">{{ _("cancel.back") }}</a></li>
+  </ul>
+</form>
+{% endblock %}

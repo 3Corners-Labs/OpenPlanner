@@ -37,3 +37,222 @@ msgstr "U krijgt een bevestiging met de link naar het videogesprek. Met die mail
 
 msgid "home.privacy"
 msgstr "We bewaren uw gegevens tot 24 uur na het gesprek. Daarna verwijderen we ze."
+
+#. Messages (email). Placeholders: {first_name}, {date}, {time}, {group_name}, {deadline}.
+msgid "message.greeting"
+msgstr "Beste {first_name},"
+
+msgid "message.when"
+msgstr "Wanneer"
+
+msgid "message.team"
+msgstr "Team"
+
+msgid "message.manage"
+msgstr "U kunt de afspraak bekijken, wijzigen of annuleren tot {deadline}. Daarna staat de afspraak vast."
+
+msgid "message.manage_link"
+msgstr "Afspraak bekijken of wijzigen"
+
+msgid "message.signoff"
+msgstr "Met vriendelijke groet, {group_name}"
+
+msgid "message.calendar_summary"
+msgstr "Videogesprek met {group_name}"
+
+msgid "message.confirmation.subject"
+msgstr "Bevestiging van uw videogesprek op {date}"
+
+msgid "message.confirmation.intro"
+msgstr "Uw videogesprek met {group_name} is ingepland. Een medewerker neemt op het afgesproken moment contact met u op."
+
+msgid "message.change.subject"
+msgstr "Uw videogesprek is verplaatst naar {date}"
+
+msgid "message.change.intro"
+msgstr "Uw videogesprek met {group_name} is verplaatst. Dit is het nieuwe moment."
+
+msgid "message.reminder.subject"
+msgstr "Herinnering: videogesprek op {date} om {time}"
+
+msgid "message.reminder.intro"
+msgstr "Dit is een herinnering aan uw videogesprek met {group_name}."
+
+msgid "message.cancellation.subject"
+msgstr "Uw videogesprek op {date} is geannuleerd"
+
+msgid "message.cancellation.intro"
+msgstr "Uw videogesprek met {group_name} op {date} om {time} is geannuleerd. U kunt altijd een nieuwe afspraak maken."
+
+#. Booking pages.
+
+msgid "group.intro"
+msgstr "Kies een dag en tijd voor een videogesprek. Een gesprek duurt {minutes} minuten."
+
+msgid "group.week_heading"
+msgstr "Week van {date}"
+
+msgid "group.weeks_label"
+msgstr "Weken"
+
+msgid "group.previous_week"
+msgstr "Vorige week"
+
+msgid "group.next_week"
+msgstr "Volgende week"
+
+msgid "group.no_slots"
+msgstr "In deze week zijn geen tijden beschikbaar. Kies een andere week."
+
+msgid "group.choose"
+msgstr "Verder"
+
+msgid "book.title"
+msgstr "Uw gegevens"
+
+msgid "book.selected"
+msgstr "Gekozen moment"
+
+msgid "book.change_slot"
+msgstr "Ander moment kiezen"
+
+msgid "form.name"
+msgstr "Naam"
+
+msgid "form.email"
+msgstr "E-mailadres"
+
+msgid "form.email_hint"
+msgstr "Hierop ontvangt u de bevestiging en de link om de afspraak te wijzigen."
+
+msgid "form.phone"
+msgstr "Telefoonnummer"
+
+msgid "form.optional"
+msgstr "(optioneel)"
+
+msgid "form.honeypot"
+msgstr "Laat dit veld leeg"
+
+msgid "form.submit"
+msgstr "Afspraak maken"
+
+msgid "errors.summary_title"
+msgstr "Er is een probleem"
+
+msgid "error.title"
+msgstr "Er ging iets mis"
+
+msgid "error.field.name"
+msgstr "Vul uw naam in, maximaal 100 tekens."
+
+msgid "error.field.email"
+msgstr "Vul een geldig e-mailadres in, bijvoorbeeld naam@voorbeeld.nl."
+
+msgid "error.field.phone"
+msgstr "Vul een geldig telefoonnummer in, bijvoorbeeld 06 12345678."
+
+msgid "error.slot_full"
+msgstr "Dit moment is net vol geraakt. Kies een ander moment."
+
+msgid "error.slot_unavailable"
+msgstr "Dit moment is niet meer beschikbaar. Kies een ander moment."
+
+msgid "error.outside_booking_window"
+msgstr "Dit moment kan niet meer worden geboekt. Kies een ander moment."
+
+msgid "error.booking_locked"
+msgstr "Deze afspraak staat vast en kan niet meer worden gewijzigd."
+
+msgid "error.booking_not_active"
+msgstr "Deze afspraak is niet meer actief."
+
+msgid "error.same_slot"
+msgstr "Dit is het moment van uw huidige afspraak. Kies een ander moment."
+
+msgid "error.database_busy"
+msgstr "Het is even erg druk. Probeer het over een paar seconden opnieuw."
+
+msgid "error.invalid_request"
+msgstr "Dit verzoek kon niet worden verwerkt. Ga terug en probeer het opnieuw."
+
+msgid "error.rate_limited"
+msgstr "U heeft dit te vaak geprobeerd. Probeer het later opnieuw."
+
+msgid "error.not_found.title"
+msgstr "Pagina niet gevonden"
+
+msgid "error.not_found.text"
+msgstr "Deze link klopt niet of is niet meer geldig."
+
+msgid "manage.title"
+msgstr "Uw afspraak"
+
+msgid "manage.when"
+msgstr "Wanneer"
+
+msgid "manage.team"
+msgstr "Team"
+
+msgid "manage.status"
+msgstr "Status"
+
+msgid "manage.status.confirmed"
+msgstr "Bevestigd"
+
+msgid "manage.status.cancelled"
+msgstr "Geannuleerd"
+
+msgid "manage.status.completed"
+msgstr "Afgerond"
+
+msgid "manage.status.no_show"
+msgstr "Niet doorgegaan"
+
+msgid "manage.deadline"
+msgstr "U kunt deze afspraak wijzigen of annuleren tot {deadline}."
+
+msgid "manage.locked"
+msgstr "Deze afspraak staat vast. Het gesprek begint binnenkort; wijzigen of annuleren kan niet meer."
+
+msgid "manage.inactive"
+msgstr "Deze afspraak is niet meer actief."
+
+msgid "manage.reschedule"
+msgstr "Afspraak verplaatsen"
+
+msgid "manage.cancel"
+msgstr "Afspraak annuleren"
+
+msgid "manage.notice.booked"
+msgstr "Uw afspraak is gemaakt. U ontvangt een bevestiging per e-mail."
+
+msgid "manage.notice.rescheduled"
+msgstr "Uw afspraak is verplaatst. U ontvangt een bevestiging per e-mail."
+
+msgid "manage.notice.cancelled"
+msgstr "Uw afspraak is geannuleerd."
+
+msgid "cancel.title"
+msgstr "Afspraak annuleren"
+
+msgid "cancel.question"
+msgstr "Weet u zeker dat u deze afspraak wilt annuleren?"
+
+msgid "cancel.confirm"
+msgstr "Ja, annuleren"
+
+msgid "cancel.back"
+msgstr "Terug naar uw afspraak"
+
+msgid "reschedule.title"
+msgstr "Afspraak verplaatsen"
+
+msgid "reschedule.current"
+msgstr "Uw huidige afspraak: {slot}."
+
+msgid "reschedule.intro"
+msgstr "Kies een nieuw moment. Uw gegevens blijven hetzelfde."
+
+msgid "reschedule.submit"
+msgstr "Verplaatsen"

@@ -47,6 +47,21 @@ class LanguageOption:
     current: bool
 
 
+def create_environment(template_dirs: Sequence[Path]) -> Environment:
+    """Return the one Jinja2 configuration used for pages and emails.
+
+    HTML templates are autoescaped; ``.txt`` templates (plain-text email parts) are not.
+    Undefined variables raise instead of rendering empty.
+    """
+    return Environment(
+        loader=FileSystemLoader(list(template_dirs)),
+        autoescape=select_autoescape(["html"]),
+        undefined=StrictUndefined,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+
 def create_templates(page_dirs: Sequence[Path]) -> Jinja2Templates:
     """Return a template renderer for an entry point.
 
@@ -54,14 +69,7 @@ def create_templates(page_dirs: Sequence[Path]) -> Jinja2Templates:
         page_dirs: The entry point's own template directories; they take precedence over
             the shared layout in ``SHARED_TEMPLATE_DIR``.
     """
-    environment = Environment(
-        loader=FileSystemLoader([*page_dirs, SHARED_TEMPLATE_DIR]),
-        autoescape=select_autoescape(["html"]),
-        undefined=StrictUndefined,
-        trim_blocks=True,
-        lstrip_blocks=True,
-    )
-    return Jinja2Templates(env=environment)
+    return Jinja2Templates(env=create_environment([*page_dirs, SHARED_TEMPLATE_DIR]))
 
 
 def language_options(request: Request, locale: RequestLocale) -> list[LanguageOption]:
