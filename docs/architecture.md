@@ -468,6 +468,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0009 | Channels as data, reminder rules, templates as text blocks |
 | 0010 | Live meeting status for group admins (aggregates only) |
 | 0011 | Management tokens derived from a per-booking salt and a server key |
+| 0012 | Claude Code merges only on explicit instruction of the product owner, with green CI |
 
 ## 12. Status and roadmap
 
