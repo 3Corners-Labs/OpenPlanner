@@ -23,7 +23,7 @@
         <td>{% if item.closed %}<span class="chip chip--warning">{{ _("admin.exceptions.closed") }}</span>{% else %}<span class="chip chip--accent">{{ item.time }}</span> {{ item.capacity }}{% endif %}</td>
         <td>
           <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/exceptions/{{ item.id }}/delete">
-            <button type="submit" class="button button--danger button--small" aria-label="{{ _("admin.exceptions.remove_label", day=item.day) }}">{{ _("admin.remove") }}</button>
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.exceptions.remove_label", day=item.day) }}">{{ _("admin.remove") }}</button>
           </form>
         </td>
       </tr>

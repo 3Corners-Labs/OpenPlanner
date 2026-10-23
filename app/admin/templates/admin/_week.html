@@ -12,7 +12,7 @@
         {% if window.validity %}<span class="window__validity">{{ window.validity }}</span>{% endif %}
         {% if removable | default(false) %}
         <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/hours/{{ window.id }}/delete">
-          <button type="submit" class="button button--danger button--small" aria-label="{{ _("admin.hours.remove_label", day=day.name, time=window.time) }}">{{ _("admin.remove") }}</button>
+          <button type="submit" class="button button--quiet" aria-label="{{ _("admin.hours.remove_label", day=day.name, time=window.time) }}">{{ _("admin.remove") }}</button>
         </form>
         {% endif %}
       </li>
