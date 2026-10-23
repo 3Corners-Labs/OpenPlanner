@@ -13,6 +13,7 @@ def migrated_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
     """Create a SQLite file in ``tmp_path``, migrate it to head and return its URL."""
     url = f"sqlite+aiosqlite:///{tmp_path / f'{name}.db'}"
     monkeypatch.setenv("DATABASE_URL", url)
+    monkeypatch.setenv("ENVIRONMENT", "test")
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "migrations"))
     command.upgrade(config, "head")

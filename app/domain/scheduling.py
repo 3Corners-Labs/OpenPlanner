@@ -23,6 +23,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.domain.errors import DomainError, ErrorCode
 
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+MAX_NAME_LENGTH = 200
 MAX_SLUG_LENGTH = 64
 MAX_CAPACITY = 1000
 """Upper bound per window; protects against typos such as 1000000."""
@@ -88,6 +90,12 @@ class Group:
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""
+        if (
+            not self.name.strip()
+            or len(self.name) > MAX_NAME_LENGTH
+            or _CONTROL_CHARS.search(self.name)
+        ):
+            raise _invalid("name")
         if len(self.slug) > MAX_SLUG_LENGTH or not _SLUG.fullmatch(self.slug):
             raise _invalid("slug")
         try:

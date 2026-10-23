@@ -147,8 +147,13 @@ async def _week(
     now: datetime,
     requested: str | None,
     locale: RequestLocale,
+    exclude: datetime | None = None,
 ) -> WeekView:
-    """Build the slot picker for the requested week, clamped to today … horizon."""
+    """Build the slot picker for a week, clamped to today … horizon.
+
+    Without a requested week the first week that still has free slots is shown, so a visitor
+    never lands on an empty week (for example on a Friday evening).
+    """
     first = _monday(local_day(now, group.tz))
     last = _monday(local_day(now + timedelta(days=group.horizon_days), group.tz))
     try:
@@ -157,9 +162,13 @@ async def _week(
         monday = first
     monday = min(max(monday, first), last)
     slots = await service.availability(group.slug, monday, monday + timedelta(days=6))
+    while requested is None and not slots and monday < last:
+        monday += timedelta(days=7)
+        slots = await service.availability(group.slug, monday, monday + timedelta(days=6))
     by_day: dict[date, list[AvailableSlot]] = {}
     for slot in slots:
-        by_day.setdefault(local_day(slot.start, group.tz), []).append(slot)
+        if slot.start != exclude:  # e.g. the booking that is being moved
+            by_day.setdefault(local_day(slot.start, group.tz), []).append(slot)
     days = [
         DayView(
             label=format_day_short(day, locale.code),
@@ -388,7 +397,9 @@ async def _reschedule_response(
     details = await service.find(token)
     if not details.changeable:
         return RedirectResponse(f"/b/{token}", status_code=303)
-    view = await _week(service, details.group, _clock(request).now(), week, locale)
+    view = await _week(
+        service, details.group, _clock(request).now(), week, locale, details.booking.start
+    )
     context = {
         **_manage_context(details, locale, None),
         "token": token,

@@ -37,7 +37,7 @@ licenses:
 	scripts/check-licenses.sh
 
 migrations:
-	DATABASE_URL=sqlite+aiosqlite:///$$(mktemp -d)/migrate.db sh -c '$(UV) alembic upgrade head && $(UV) alembic downgrade base && $(UV) alembic upgrade head'
+	ENVIRONMENT=dev DATABASE_URL=sqlite+aiosqlite:///$$(mktemp -d)/migrate.db sh -c '$(UV) alembic upgrade head && $(UV) alembic downgrade base && $(UV) alembic upgrade head'
 
 semgrep:
 	uvx semgrep --test --config .semgrep/rules.yml .semgrep/rules.py

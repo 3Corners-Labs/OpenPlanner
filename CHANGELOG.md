@@ -24,4 +24,10 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - Bookings are read-only from the WxCC dispatch moment (`dispatch_lead_minutes` per group,
   default 5): cancel and reschedule raise `booking_locked`.
 - ADR 0010: live meeting status (state, participants, host joined) for group admins.
+- Citizen booking pages: group page with week slot picker, contact form, management page,
+  cancel and reschedule; same-origin checks, honeypot and rate limits.
+- Confirmation, change, reminder and cancellation emails with calendar attachment, sent by
+  the worker with retries; PII purge job executed.
+- ADR 0011: management tokens derived from a per-booking salt and a server key.
+- `seed-demo` command and a Mailpit `dev` profile for demos.
 

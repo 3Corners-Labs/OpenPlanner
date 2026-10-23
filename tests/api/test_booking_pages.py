@@ -85,6 +85,18 @@ async def test_week_navigation_is_clamped(site: httpx.AsyncClient) -> None:
     assert "Vorige week" in future.text
 
 
+async def test_first_visit_skips_weeks_without_free_slots(demo_settings: Settings) -> None:
+    friday_evening = FixedClock(NOW + timedelta(days=1, hours=10))  # Fri 2 Jan 18:00 UTC
+
+    async with app_client(demo_settings, friday_evening) as client:
+        first_visit = await client.get("/g/demo")
+        chosen_week = await client.get("/g/demo", params={"week": "2026-01-02"})
+
+    assert "Week van maandag 5 januari" in first_visit.text
+    assert "Vorige week" in first_visit.text
+    assert "geen tijden beschikbaar" in chosen_week.text
+
+
 async def test_group_page_in_english(site: httpx.AsyncClient) -> None:
     text = (await site.get("/g/demo", params={"lang": "en"})).text
 
@@ -177,6 +189,7 @@ async def test_honeypot_is_refused(site: httpx.AsyncClient) -> None:
         {"origin": "null"},
         {"sec-fetch-site": "cross-site"},
         {"sec-fetch-site": "same-site"},
+        {"sec-fetch-site": "cross-site", "origin": "http://testserver"},
     ],
 )
 async def test_cross_site_posts_are_refused(
@@ -186,6 +199,23 @@ async def test_cross_site_posts_are_refused(
 
     assert response.status_code == 403
     assert (await site.get("/g/demo")).text.count(f'value="{FRIDAY_0900}"') == 1
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"sec-fetch-site": "same-origin", "origin": "null"},  # what real browsers can send
+        {"sec-fetch-site": "none"},
+        {"origin": "http://testserver"},  # older browser without Fetch Metadata
+        {},  # non-browser client: no CSRF risk
+    ],
+)
+async def test_same_origin_posts_are_accepted(
+    site: httpx.AsyncClient, headers: dict[str, str]
+) -> None:
+    response = await site.post("/g/demo/book", data={"start": FRIDAY_0900, **ADA}, headers=headers)
+
+    assert response.status_code == 303
 
 
 async def test_cancel_flow(site: httpx.AsyncClient) -> None:
@@ -212,6 +242,7 @@ async def test_reschedule_flow(site: httpx.AsyncClient) -> None:
     )
 
     assert "Uw huidige afspraak: vrijdag 2 januari 2026, 09:00–09:30." in picker.text
+    assert f'value="{FRIDAY_0900}"' not in picker.text  # the current slot is not offered
     assert f'action="/b/{old}/reschedule"' in picker.text
     new = token_of(response)
     assert new != old
