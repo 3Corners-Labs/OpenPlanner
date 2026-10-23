@@ -72,7 +72,8 @@ async def test_page_waits_until_fifteen_minutes_before(booked: tuple[str, int, S
         manage = (await client.get(f"/b/{token}")).text
         go = await client.get(f"/b/{token}/join/go")
 
-    assert 'http-equiv="refresh" content="60"' in early.text
+    assert "http-equiv" not in early.text  # no automatic reload (WCAG 2.2.1)
+    assert f'href="/b/{token}/join">Status verversen' in early.text
     assert "U kunt deelnemen vanaf 08:45" in early.text
     assert f'href="/b/{token}/join"' in manage
     assert go.headers["location"] == f"/b/{token}/join"
@@ -88,7 +89,7 @@ async def test_open_page_sends_the_citizen_to_webex(booked: tuple[str, int, Sett
         go = await client.get(f"/b/{token}/join/go")
 
     assert f'href="/b/{token}/join/go"' in page.text
-    assert "refresh" not in page.text
+    assert "Status verversen" not in page.text
     assert "wachtruimte" in page.text
     assert go.status_code == 303
     assert go.headers["location"] == LINK

@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block title %}{{ _("wait.title") }} – {{ group.name }}{% endblock %}
-{% block head_extra %}{% if refresh %}<meta http-equiv="refresh" content="{{ refresh }}">{% endif %}{% endblock %}
 {% block content %}
 <h1>{{ _("wait.title") }}</h1>
 <div role="status" class="notice{% if state == 'unavailable' %} notice--warning{% endif %}">
@@ -13,6 +12,9 @@
 {% if joinable %}
 <p><a class="button button--large" href="/b/{{ token }}/join/go">{{ _("join.button") }}</a></p>
 <p>{{ _("join.tips.lobby") }}</p>
+{% endif %}
+{% if refresh %}
+<p><a class="button button--secondary" href="/b/{{ token }}/wait">{{ _("join.refresh") }}</a></p>
 {% endif %}
 {% if state == "unavailable" %}
 <p><a class="button" href="/g/{{ group.slug }}">{{ _("direct.schedule_instead") }}</a></p>

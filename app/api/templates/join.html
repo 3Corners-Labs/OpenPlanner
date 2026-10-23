@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block title %}{{ _("join.title") }} – {{ group.name }}{% endblock %}
-{% block head_extra %}{% if refresh %}<meta http-equiv="refresh" content="60">{% endif %}{% endblock %}
 {% block content %}
 <h1>{{ _("join.title") }}</h1>
 <dl class="details">
@@ -24,5 +23,6 @@
 {% else %}
 <p class="notice">{{ _("manage.inactive") }}</p>
 {% endif %}
+{% if refresh %}<p><a class="button button--secondary" href="/b/{{ token }}/join">{{ _("join.refresh") }}</a></p>{% endif %}
 <p><a href="/b/{{ token }}">{{ _("join.back") }}</a></p>
 {% endblock %}

@@ -95,7 +95,8 @@ async def test_starting_creates_meeting_and_work_item_at_once(site: Site) -> Non
     )
     page = (await site.client.get(response.headers["location"])).text
     assert "We zoeken een medewerker" in page
-    assert 'http-equiv="refresh" content="15"' in page
+    assert "http-equiv" not in page  # no automatic reload (WCAG 2.2.1)
+    assert "Status verversen" in page
     assert "/join/go" in page  # the citizen can wait in the lobby right away
 
 
@@ -117,7 +118,7 @@ async def test_honest_when_no_agent_picks_up(site: Site) -> None:
     assert "geen medewerker beschikbaar" in page
     assert 'href="/g/demo"' in page
     assert "/join/go" not in page
-    assert "refresh" not in page
+    assert "Status verversen" not in page
 
 
 async def test_platform_failure_defers_to_the_worker(site: Site) -> None:

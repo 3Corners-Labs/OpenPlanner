@@ -2,8 +2,9 @@
 
 Starting a call creates a booking of kind direct, then the meeting and the work item right
 away so the citizen does not wait for the worker; if Webex or WxCC is slow or down, the
-worker's jobs take over (they are idempotent). The waiting page refreshes itself without
-scripts and says honestly when no agent is available.
+worker's jobs take over (they are idempotent). The waiting page says honestly when no agent
+is available. It never reloads by itself (no time limits, WCAG 2.2.1); a button refreshes the
+status, and the citizen can wait in the Webex lobby meanwhile.
 
     GET  /g/{slug}/direct   form (or "not possible now")
     POST /g/{slug}/direct   start, then 303 to the waiting page
@@ -38,9 +39,6 @@ log = structlog.get_logger()
 
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
 SameOrigin = Annotated[None, Depends(require_same_origin)]
-
-WAIT_REFRESH_SECONDS = 15
-
 
 def _bookings(request: Request) -> BookingService:
     """Return the booking service."""
@@ -145,6 +143,6 @@ async def wait_page(request: Request, token: str, locale: Locale) -> Response:
         "token": token,
         "state": state,
         "joinable": joinable,
-        "refresh": state in ("searching", "accepted") and WAIT_REFRESH_SECONDS,
+        "refresh": state in ("searching", "accepted"),
     }
     return render(templates, request, "wait.html", locale, context)

@@ -3,7 +3,7 @@
 The email links here, not to Webex: the link never expires, nothing about the citizen is sent
 to Webex for it, and opening and clicking are recorded on the booking's timeline. The page
 opens 15 minutes before the start; before that (and while the meeting is being prepared) it
-shows the time and refreshes itself every minute without scripts.
+shows the time and a button to check again. It never reloads by itself (WCAG 2.2.1).
 
     GET /b/{token}/join      status page (too early / open / ended / not active)
     GET /b/{token}/join/go   record the click, 303 to the meeting's Webex link
@@ -28,7 +28,7 @@ router = APIRouter(include_in_schema=False)
 templates = create_templates([Path(__file__).parent / "templates"])
 
 REFRESHING = frozenset({JoinState.TOO_EARLY, JoinState.NO_MEETING})
-"""States in which the page reloads itself every minute until it can open."""
+"""States in which the page offers a button to check again."""
 
 
 def _services(request: Request) -> tuple[BookingService, IntegrationService, Clock]:
