@@ -43,9 +43,14 @@ def test_group_defaults() -> None:
         ("name", "   "),
         ("name", "x" * 201),
         ("name", "Team\nBcc: x@example.org"),
-        ("wxcc_queue_id", ""),
-        ("wxcc_queue_id", "q" * 129),
-        ("wxcc_queue_id", "queue\n1"),
+        ("video_host_email", "no-at-sign"),
+        ("video_host_email", "host@example.nl\nBcc: x@example.org"),
+        ("wxcc_business_address", ""),
+        ("wxcc_business_address", "a" * 256),
+        ("wxcc_channel", "chan\tnel"),
+        ("wxcc_routing_value", "r" * 513),
+        ("not_picked_up_minutes", 0),
+        ("not_picked_up_minutes", 121),
     ],
 )
 def test_group_rejects_invalid_configuration(field: str, value: object) -> None:
@@ -307,3 +312,19 @@ def test_minimum_notice_may_not_be_shorter_than_the_dispatch_lead() -> None:
 
     assert excinfo.value.field == "min_notice_minutes"
     make_group(dispatch_lead_minutes=15, min_notice_minutes=15)
+
+
+def test_integrations_are_enabled_per_group() -> None:
+    plain = make_group()
+    wired = make_group(
+        video_host_email="host-demo@example.nl",
+        wxcc_business_address="openplanner@example.biz",
+        wxcc_channel="openplanner-video",
+    )
+
+    assert (plain.video_enabled, plain.dispatch_enabled) == (False, False)
+    assert (wired.video_enabled, wired.dispatch_enabled) == (True, True)
+    assert plain.routing_value == "aangifte-2026"  # the slug unless set
+    assert make_group(wxcc_routing_value="team-7").routing_value == "team-7"
+    # Dispatch needs both the business address and the channel.
+    assert not make_group(wxcc_business_address="a@example.biz").dispatch_enabled

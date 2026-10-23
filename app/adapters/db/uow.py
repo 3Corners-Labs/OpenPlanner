@@ -66,7 +66,12 @@ def _group(row: GroupRow) -> Group:
         min_notice_minutes=row.min_notice_minutes,
         horizon_days=row.horizon_days,
         phone_mode=PhoneMode(row.phone_mode),
-        wxcc_queue_id=row.wxcc_queue_id,
+        video_host_email=row.video_host_email,
+        wxcc_business_address=row.wxcc_business_address,
+        wxcc_channel=row.wxcc_channel,
+        wxcc_routing_value=row.wxcc_routing_value,
+        direct_call_enabled=row.direct_call_enabled,
+        not_picked_up_minutes=row.not_picked_up_minutes,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
     )
 
@@ -119,7 +124,12 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "min_notice_minutes": group.min_notice_minutes,
         "horizon_days": group.horizon_days,
         "phone_mode": group.phone_mode.value,
-        "wxcc_queue_id": group.wxcc_queue_id,
+        "video_host_email": group.video_host_email,
+        "wxcc_business_address": group.wxcc_business_address,
+        "wxcc_channel": group.wxcc_channel,
+        "wxcc_routing_value": group.wxcc_routing_value,
+        "direct_call_enabled": group.direct_call_enabled,
+        "not_picked_up_minutes": group.not_picked_up_minutes,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
     }
 

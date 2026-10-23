@@ -90,7 +90,12 @@ DETAIL_LABELS: dict[str, str] = {
     "horizon_days": "admin.field.horizon_days",
     "phone_mode": "admin.field.phone_mode",
     "dispatch_lead_minutes": "admin.field.dispatch_lead_minutes",
-    "wxcc_queue_id": "admin.field.wxcc_queue_id",
+    "video_host_email": "admin.field.video_host_email",
+    "wxcc_business_address": "admin.field.wxcc_business_address",
+    "wxcc_channel": "admin.field.wxcc_channel",
+    "wxcc_routing_value": "admin.field.wxcc_routing_value",
+    "direct_call_enabled": "admin.field.direct_call_enabled",
+    "not_picked_up_minutes": "admin.field.not_picked_up_minutes",
 }
 """Readable label per audit detail key (changed field names and schedule actions)."""
 
