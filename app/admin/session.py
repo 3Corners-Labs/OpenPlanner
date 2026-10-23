@@ -71,6 +71,17 @@ def current_principal(request: Request, now: datetime, lifetime: timedelta) -> P
     return principal
 
 
+def login_age(request: Request, now: datetime) -> timedelta | None:
+    """Return how long ago the admin logged in, or ``None`` without a (valid) login time."""
+    login_at: Any = request.session.get(_LOGIN_AT)
+    if not isinstance(login_at, str):
+        return None
+    try:
+        return now - datetime.fromisoformat(login_at)
+    except ValueError:
+        return None
+
+
 def end_session(request: Request) -> None:
     """Forget everything about the admin."""
     request.session.clear()

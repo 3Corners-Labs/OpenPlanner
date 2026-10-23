@@ -7,6 +7,7 @@ from app.i18n.dates import (
     format_day_compact,
     format_day_short,
     local_day,
+    weekday_names,
 )
 
 AMSTERDAM = ZoneInfo("Europe/Amsterdam")
@@ -44,3 +45,9 @@ def test_local_day_crosses_midnight() -> None:
 
     assert local_day(late, AMSTERDAM) == date(2026, 1, 6)
     assert local_day(late, UTC) == date(2026, 1, 5)
+
+
+def test_weekday_names_start_on_monday() -> None:
+    assert weekday_names("nl")[0] == "maandag"
+    assert weekday_names("nl")[6] == "zondag"
+    assert weekday_names("en")[2] == "Wednesday"

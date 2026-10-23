@@ -564,3 +564,291 @@ msgstr "Beheren"
 
 msgid "admin.dashboard.manage_group"
 msgstr "{name} beheren"
+
+msgid "admin.actions"
+msgstr "Acties"
+
+msgid "admin.breadcrumbs"
+msgstr "Kruimelpad"
+
+msgid "admin.cancel"
+msgstr "Annuleren"
+
+msgid "admin.save"
+msgstr "Opslaan"
+
+msgid "admin.remove"
+msgstr "Verwijderen"
+
+msgid "admin.done.added"
+msgstr "Toegevoegd."
+
+msgid "admin.done.created"
+msgstr "De groep is aangemaakt. Stel nu de openingstijden in."
+
+msgid "admin.done.removed"
+msgstr "Verwijderd."
+
+msgid "admin.done.saved"
+msgstr "De wijzigingen zijn opgeslagen."
+
+msgid "admin.done.unchanged"
+msgstr "Er was niets gewijzigd."
+
+msgid "admin.tab.overview"
+msgstr "Overzicht"
+
+msgid "admin.tab.settings"
+msgstr "Instellingen"
+
+msgid "admin.tab.hours"
+msgstr "Openingstijden"
+
+msgid "admin.tab.exceptions"
+msgstr "Uitzonderingen"
+
+msgid "admin.group.sections"
+msgstr "Onderdelen van de groep"
+
+msgid "admin.group.open_public_page"
+msgstr "Publieke pagina"
+
+msgid "admin.group.edit_settings"
+msgstr "Instellingen wijzigen"
+
+msgid "admin.settings.lead"
+msgstr "Wijzigingen gelden voor nieuwe afspraken; bestaande afspraken blijven staan."
+
+msgid "admin.new_group.title"
+msgstr "Nieuwe groep"
+
+msgid "admin.new_group.lead"
+msgstr "Een groep is een team met één wachtrij in Webex Contact Center. Na het aanmaken stelt u de openingstijden in."
+
+msgid "admin.new_group.create"
+msgstr "Groep aanmaken"
+
+msgid "admin.field.organisation"
+msgstr "Organisatie"
+
+msgid "admin.field.name"
+msgstr "Naam"
+
+msgid "admin.field.slug"
+msgstr "Webadres"
+
+msgid "admin.field.slug_hint"
+msgstr "Wordt /g/<webadres>. Kleine letters, cijfers en streepjes, bijvoorbeeld vergunningen-loket."
+
+msgid "admin.field.slug_fixed"
+msgstr "Het webadres verandert niet, zodat links op websites blijven werken."
+
+msgid "admin.field.timezone"
+msgstr "Tijdzone"
+
+msgid "admin.field.timezone_hint"
+msgstr "IANA-naam, bijvoorbeeld Europe/Amsterdam."
+
+msgid "admin.field.slot_minutes"
+msgstr "Duur van een gesprek (minuten)"
+
+msgid "admin.field.slot_minutes_hint"
+msgstr "Veelvoud van 5, tussen 5 en 480. Niet te wijzigen zolang er afspraken in de toekomst staan."
+
+msgid "admin.field.min_notice_minutes"
+msgstr "Minimale aanlooptijd (minuten)"
+
+msgid "admin.field.min_notice_minutes_hint"
+msgstr "Zo lang van tevoren sluit het boeken van een tijdslot. Minstens het moment van doorzetten naar de wachtrij."
+
+msgid "admin.field.horizon_days"
+msgstr "Vooruit boeken (dagen)"
+
+msgid "admin.field.horizon_days_hint"
+msgstr "Hoe ver vooruit burgers kunnen boeken, 1 tot 366 dagen."
+
+msgid "admin.field.dispatch_lead_minutes"
+msgstr "Doorzetten naar de wachtrij (minuten vooraf)"
+
+msgid "admin.field.dispatch_lead_minutes_hint"
+msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de burger. 0 tot 60."
+
+msgid "admin.field.phone_mode"
+msgstr "Telefoonnummer op het formulier"
+
+msgid "admin.field.wxcc_queue_id"
+msgstr "Webex Contact Center-wachtrij"
+
+msgid "admin.field.wxcc_queue_id_hint"
+msgstr "Het ID van de wachtrij die de taak ontvangt. Later kiest u hier uit de wachtrijen van uw omgeving."
+
+msgid "admin.field.weekday"
+msgstr "Dag"
+
+msgid "admin.field.opens"
+msgstr "Van"
+
+msgid "admin.field.closes"
+msgstr "Tot"
+
+msgid "admin.field.capacity"
+msgstr "Gelijktijdige gesprekken"
+
+msgid "admin.field.capacity_hint"
+msgstr "Hoeveel burgers op hetzelfde moment kunnen beginnen."
+
+msgid "admin.field.valid_from"
+msgstr "Geldig vanaf"
+
+msgid "admin.field.valid_to"
+msgstr "Geldig tot en met"
+
+msgid "admin.field.valid_hint"
+msgstr "Leeg laten voor altijd."
+
+msgid "admin.field.day"
+msgstr "Datum"
+
+msgid "admin.field.only_with_hours"
+msgstr "Alleen bij afwijkende tijden."
+
+msgid "admin.form.error.name"
+msgstr "Vul een naam in van hoogstens 200 tekens."
+
+msgid "admin.form.error.slug"
+msgstr "Gebruik alleen kleine letters, cijfers en streepjes (hoogstens 64 tekens)."
+
+msgid "admin.form.error.slug_taken"
+msgstr "Dit webadres is al in gebruik. Kies een ander."
+
+msgid "admin.form.error.organisation"
+msgstr "Kies een organisatie waarvoor u groepen mag aanmaken."
+
+msgid "admin.form.error.timezone"
+msgstr "Vul een geldige tijdzone in, bijvoorbeeld Europe/Amsterdam."
+
+msgid "admin.form.error.slot_minutes"
+msgstr "Vul een duur in van 5 tot 480 minuten, in stappen van 5."
+
+msgid "admin.form.error.min_notice_minutes"
+msgstr "Vul een aanlooptijd in van minstens het doorzetmoment."
+
+msgid "admin.form.error.horizon_days"
+msgstr "Vul een aantal dagen in van 1 tot 366."
+
+msgid "admin.form.error.dispatch_lead_minutes"
+msgstr "Vul een aantal minuten in van 0 tot 60."
+
+msgid "admin.form.error.phone_mode"
+msgstr "Kies of het telefoonnummer verborgen, optioneel of verplicht is."
+
+msgid "admin.form.error.wxcc_queue_id"
+msgstr "Vul een geldig wachtrij-ID in van hoogstens 128 tekens."
+
+msgid "admin.form.error.future_bookings"
+msgstr "Dit kan niet zolang er afspraken in de toekomst staan. Wijzig het nadat die zijn geweest of geannuleerd."
+
+msgid "admin.form.error.weekday"
+msgstr "Kies een dag."
+
+msgid "admin.form.error.time"
+msgstr "Vul een tijd in als uu:mm."
+
+msgid "admin.form.error.window"
+msgstr "De eindtijd moet na de begintijd liggen."
+
+msgid "admin.form.error.capacity"
+msgstr "Vul een aantal in van 1 tot 1000."
+
+msgid "admin.form.error.date"
+msgstr "Vul een geldige datum in."
+
+msgid "admin.form.error.valid_to"
+msgstr "De einddatum moet op of na de begindatum liggen."
+
+msgid "admin.form.error.day"
+msgstr "Kies een datum vanaf vandaag."
+
+msgid "admin.form.error.overlap"
+msgstr "Deze tijden overlappen met een bestaand blok op die dag."
+
+msgid "admin.form.error.override_conflict"
+msgstr "Voor deze datum bestaat al een uitzondering die hiermee botst."
+
+msgid "admin.hours.title"
+msgstr "Openingstijden per week"
+
+msgid "admin.hours.lead"
+msgstr "Per dag één of meer blokken. Burgers zien alleen tijdsloten die helemaal in een blok passen."
+
+msgid "admin.hours.manage"
+msgstr "Openingstijden beheren"
+
+msgid "admin.hours.closed"
+msgstr "Gesloten"
+
+msgid "admin.hours.capacity"
+msgstr "tot {count} tegelijk"
+
+msgid "admin.hours.validity"
+msgstr "{start} t/m {end}"
+
+msgid "admin.hours.add"
+msgstr "Blok toevoegen"
+
+msgid "admin.hours.add_lead"
+msgstr "Bestaande afspraken blijven staan; het nieuwe blok geldt voor nieuwe afspraken."
+
+msgid "admin.hours.add_button"
+msgstr "Blok toevoegen"
+
+msgid "admin.hours.remove_label"
+msgstr "Blok {day} {time} verwijderen"
+
+msgid "admin.exceptions.upcoming"
+msgstr "Komende uitzonderingen"
+
+msgid "admin.exceptions.lead"
+msgstr "Een uitzondering vervangt de openingstijden van die ene datum: gesloten, of andere tijden."
+
+msgid "admin.exceptions.manage"
+msgstr "Uitzonderingen beheren"
+
+msgid "admin.exceptions.none"
+msgstr "Geen uitzonderingen gepland."
+
+msgid "admin.exceptions.closed"
+msgstr "Gesloten"
+
+msgid "admin.exceptions.what"
+msgstr "Wat"
+
+msgid "admin.exceptions.add"
+msgstr "Uitzondering toevoegen"
+
+msgid "admin.exceptions.add_button"
+msgstr "Uitzondering toevoegen"
+
+msgid "admin.exceptions.kind"
+msgstr "Soort"
+
+msgid "admin.exceptions.kind_closed"
+msgstr "Hele dag gesloten"
+
+msgid "admin.exceptions.kind_hours"
+msgstr "Afwijkende tijden"
+
+msgid "admin.exceptions.remove_label"
+msgstr "Uitzondering op {day} verwijderen"
+
+msgid "admin.preview.title"
+msgstr "Zo zien burgers het"
+
+msgid "admin.preview.lead"
+msgstr "De komende twee weken, vóór boekingen en aanlooptijd."
+
+msgid "admin.preview.day"
+msgstr "{count} tijdsloten, {first} tot {last}, tot {capacity} tegelijk"
+
+msgid "admin.preview.empty"
+msgstr "Nog geen tijdsloten: stel eerst openingstijden in."

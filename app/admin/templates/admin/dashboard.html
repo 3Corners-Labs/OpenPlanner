@@ -7,6 +7,11 @@
     <h1>{{ _("admin.dashboard.title") }}</h1>
     <p class="page-header__lead">{{ _("admin.dashboard.intro") }}</p>
   </div>
+  {% if can("group.create") %}
+  <div class="page-header__actions">
+    <a class="button" href="/admin/groups/new">{{ icon("plus") }}<span>{{ _("admin.new_group.title") }}</span></a>
+  </div>
+  {% endif %}
 </div>
 <h2 id="groups-heading">{{ _("admin.dashboard.groups") }}</h2>
 {% if groups %}

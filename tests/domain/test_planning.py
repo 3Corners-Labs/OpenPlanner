@@ -102,6 +102,11 @@ async def test_slug_must_be_unique_and_organisation_must_exist(
         await planning.create_group(SUPER, NewGroup("nope", "X", "x", "Europe/Amsterdam", 30))
 
 
+async def test_reserved_slugs_cannot_be_taken(planning: PlanningService) -> None:
+    with pytest.raises(DomainError, match="slug_taken"):
+        await planning.create_group(SUPER, NewGroup("demo", "Nieuw", "new", "Europe/Amsterdam", 30))
+
+
 async def test_invalid_new_group_names_the_field(planning: PlanningService) -> None:
     with pytest.raises(DomainError, match="invalid_configuration: slug"):
         await planning.create_group(

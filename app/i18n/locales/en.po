@@ -564,3 +564,291 @@ msgstr "Manage"
 
 msgid "admin.dashboard.manage_group"
 msgstr "Manage {name}"
+
+msgid "admin.actions"
+msgstr "Actions"
+
+msgid "admin.breadcrumbs"
+msgstr "Breadcrumbs"
+
+msgid "admin.cancel"
+msgstr "Cancel"
+
+msgid "admin.save"
+msgstr "Save"
+
+msgid "admin.remove"
+msgstr "Remove"
+
+msgid "admin.done.added"
+msgstr "Added."
+
+msgid "admin.done.created"
+msgstr "The group has been created. Now set its opening hours."
+
+msgid "admin.done.removed"
+msgstr "Removed."
+
+msgid "admin.done.saved"
+msgstr "Your changes have been saved."
+
+msgid "admin.done.unchanged"
+msgstr "Nothing was changed."
+
+msgid "admin.tab.overview"
+msgstr "Overview"
+
+msgid "admin.tab.settings"
+msgstr "Settings"
+
+msgid "admin.tab.hours"
+msgstr "Opening hours"
+
+msgid "admin.tab.exceptions"
+msgstr "Exceptions"
+
+msgid "admin.group.sections"
+msgstr "Group sections"
+
+msgid "admin.group.open_public_page"
+msgstr "Public page"
+
+msgid "admin.group.edit_settings"
+msgstr "Change settings"
+
+msgid "admin.settings.lead"
+msgstr "Changes apply to new appointments; existing appointments stay as they are."
+
+msgid "admin.new_group.title"
+msgstr "New group"
+
+msgid "admin.new_group.lead"
+msgstr "A group is a team with one queue in Webex Contact Center. After creating it you set its opening hours."
+
+msgid "admin.new_group.create"
+msgstr "Create group"
+
+msgid "admin.field.organisation"
+msgstr "Organisation"
+
+msgid "admin.field.name"
+msgstr "Name"
+
+msgid "admin.field.slug"
+msgstr "Web address"
+
+msgid "admin.field.slug_hint"
+msgstr "Becomes /g/<web address>. Lower-case letters, digits and hyphens, for example permits-desk."
+
+msgid "admin.field.slug_fixed"
+msgstr "The web address does not change, so links on websites keep working."
+
+msgid "admin.field.timezone"
+msgstr "Time zone"
+
+msgid "admin.field.timezone_hint"
+msgstr "IANA name, for example Europe/Amsterdam."
+
+msgid "admin.field.slot_minutes"
+msgstr "Length of a call (minutes)"
+
+msgid "admin.field.slot_minutes_hint"
+msgstr "A multiple of 5, between 5 and 480. Cannot be changed while appointments lie ahead."
+
+msgid "admin.field.min_notice_minutes"
+msgstr "Minimum notice (minutes)"
+
+msgid "admin.field.min_notice_minutes_hint"
+msgstr "How long before the start booking a slot closes. At least the moment the task goes to the queue."
+
+msgid "admin.field.horizon_days"
+msgstr "Book ahead (days)"
+
+msgid "admin.field.horizon_days_hint"
+msgstr "How far ahead citizens can book, 1 to 366 days."
+
+msgid "admin.field.dispatch_lead_minutes"
+msgstr "Send to the queue (minutes before)"
+
+msgid "admin.field.dispatch_lead_minutes_hint"
+msgstr "From this moment the citizen can no longer change the appointment. 0 to 60."
+
+msgid "admin.field.phone_mode"
+msgstr "Phone number on the form"
+
+msgid "admin.field.wxcc_queue_id"
+msgstr "Webex Contact Center queue"
+
+msgid "admin.field.wxcc_queue_id_hint"
+msgstr "The ID of the queue that receives the task. Later you will pick from the queues of your environment here."
+
+msgid "admin.field.weekday"
+msgstr "Day"
+
+msgid "admin.field.opens"
+msgstr "From"
+
+msgid "admin.field.closes"
+msgstr "Until"
+
+msgid "admin.field.capacity"
+msgstr "Simultaneous calls"
+
+msgid "admin.field.capacity_hint"
+msgstr "How many citizens can start at the same time."
+
+msgid "admin.field.valid_from"
+msgstr "Valid from"
+
+msgid "admin.field.valid_to"
+msgstr "Valid until"
+
+msgid "admin.field.valid_hint"
+msgstr "Leave empty for always."
+
+msgid "admin.field.day"
+msgstr "Date"
+
+msgid "admin.field.only_with_hours"
+msgstr "Only for different hours."
+
+msgid "admin.form.error.name"
+msgstr "Enter a name of at most 200 characters."
+
+msgid "admin.form.error.slug"
+msgstr "Use only lower-case letters, digits and hyphens (at most 64 characters)."
+
+msgid "admin.form.error.slug_taken"
+msgstr "This web address is already in use. Choose another one."
+
+msgid "admin.form.error.organisation"
+msgstr "Choose an organisation you may create groups for."
+
+msgid "admin.form.error.timezone"
+msgstr "Enter a valid time zone, for example Europe/Amsterdam."
+
+msgid "admin.form.error.slot_minutes"
+msgstr "Enter a length of 5 to 480 minutes, in steps of 5."
+
+msgid "admin.form.error.min_notice_minutes"
+msgstr "Enter a notice of at least the send-to-queue moment."
+
+msgid "admin.form.error.horizon_days"
+msgstr "Enter a number of days from 1 to 366."
+
+msgid "admin.form.error.dispatch_lead_minutes"
+msgstr "Enter a number of minutes from 0 to 60."
+
+msgid "admin.form.error.phone_mode"
+msgstr "Choose whether the phone number is hidden, optional or required."
+
+msgid "admin.form.error.wxcc_queue_id"
+msgstr "Enter a valid queue ID of at most 128 characters."
+
+msgid "admin.form.error.future_bookings"
+msgstr "This is not possible while appointments lie ahead. Change it after they have taken place or were cancelled."
+
+msgid "admin.form.error.weekday"
+msgstr "Choose a day."
+
+msgid "admin.form.error.time"
+msgstr "Enter a time as hh:mm."
+
+msgid "admin.form.error.window"
+msgstr "The end time must be after the start time."
+
+msgid "admin.form.error.capacity"
+msgstr "Enter a number from 1 to 1000."
+
+msgid "admin.form.error.date"
+msgstr "Enter a valid date."
+
+msgid "admin.form.error.valid_to"
+msgstr "The end date must be on or after the start date."
+
+msgid "admin.form.error.day"
+msgstr "Choose a date from today on."
+
+msgid "admin.form.error.overlap"
+msgstr "These times overlap an existing block on that day."
+
+msgid "admin.form.error.override_conflict"
+msgstr "This date already has an exception that conflicts with this one."
+
+msgid "admin.hours.title"
+msgstr "Weekly opening hours"
+
+msgid "admin.hours.lead"
+msgstr "One or more blocks per day. Citizens only see slots that fit completely inside a block."
+
+msgid "admin.hours.manage"
+msgstr "Manage opening hours"
+
+msgid "admin.hours.closed"
+msgstr "Closed"
+
+msgid "admin.hours.capacity"
+msgstr "up to {count} at once"
+
+msgid "admin.hours.validity"
+msgstr "{start} to {end}"
+
+msgid "admin.hours.add"
+msgstr "Add a block"
+
+msgid "admin.hours.add_lead"
+msgstr "Existing appointments stay; the new block applies to new appointments."
+
+msgid "admin.hours.add_button"
+msgstr "Add block"
+
+msgid "admin.hours.remove_label"
+msgstr "Remove block {day} {time}"
+
+msgid "admin.exceptions.upcoming"
+msgstr "Upcoming exceptions"
+
+msgid "admin.exceptions.lead"
+msgstr "An exception replaces the opening hours of that one date: closed, or different hours."
+
+msgid "admin.exceptions.manage"
+msgstr "Manage exceptions"
+
+msgid "admin.exceptions.none"
+msgstr "No exceptions planned."
+
+msgid "admin.exceptions.closed"
+msgstr "Closed"
+
+msgid "admin.exceptions.what"
+msgstr "What"
+
+msgid "admin.exceptions.add"
+msgstr "Add an exception"
+
+msgid "admin.exceptions.add_button"
+msgstr "Add exception"
+
+msgid "admin.exceptions.kind"
+msgstr "Kind"
+
+msgid "admin.exceptions.kind_closed"
+msgstr "Closed all day"
+
+msgid "admin.exceptions.kind_hours"
+msgstr "Different hours"
+
+msgid "admin.exceptions.remove_label"
+msgstr "Remove exception on {day}"
+
+msgid "admin.preview.title"
+msgstr "What citizens see"
+
+msgid "admin.preview.lead"
+msgstr "The next two weeks, before bookings and notice."
+
+msgid "admin.preview.day"
+msgstr "{count} slots, {first} to {last}, up to {capacity} at once"
+
+msgid "admin.preview.empty"
+msgstr "No slots yet: set opening hours first."

@@ -16,7 +16,12 @@ from app.web.templates import create_templates, render
 
 templates = create_templates([])
 
-_NOT_FOUND = {ErrorCode.GROUP_NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND}
+_NOT_FOUND = {
+    ErrorCode.GROUP_NOT_FOUND,
+    ErrorCode.BOOKING_NOT_FOUND,
+    ErrorCode.SCHEDULE_ITEM_NOT_FOUND,
+    ErrorCode.ORGANISATION_NOT_FOUND,
+}
 
 
 def _page(request: Request, status: int, title_key: str, message_key: str) -> Response:

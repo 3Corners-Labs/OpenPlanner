@@ -34,6 +34,9 @@ from app.domain.scheduling import (
     windows_on,
 )
 
+RESERVED_SLUGS = frozenset({"new"})
+"""Slugs that are admin paths (``/admin/groups/new``), so no group may use them."""
+
 TIME_GRID_FIELDS = ("slot_minutes", "timezone")
 """Settings that move existing slots; frozen while confirmed bookings lie ahead."""
 
@@ -132,7 +135,7 @@ class PlanningService:
                 timezone=new.timezone,
                 slot_minutes=new.slot_minutes,
             )
-            if await tx.get_group(group.slug) is not None:
+            if group.slug in RESERVED_SLUGS or await tx.get_group(group.slug) is not None:
                 raise DomainError(ErrorCode.SLUG_TAKEN, "slug")
             stored = await tx.add_group(group)
             await self._audit(tx, principal, permission, organisation.slug, stored.slug)
