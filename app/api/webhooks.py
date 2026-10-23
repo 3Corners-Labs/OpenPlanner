@@ -1,0 +1,91 @@
+"""Inbound webhooks from Webex and WxCC (ADR 0010, 0017, 0018).
+
+Authenticated by signature, not by an admin session: the secret is configured per
+installation (``WEBEX_WEBHOOK_SECRET``, ``WXCC_WEBHOOK_SECRET``); without it the endpoint
+does not exist (404). The body is size-capped and verified before it is parsed. Unknown
+meetings, tasks and event types are acknowledged and ignored, so the platforms do not retry.
+
+    POST /webhooks/webex   meetings started/ended, participants joined/left
+    POST /webhooks/wxcc    task:connected, task:ended, task:failed
+"""
+
+import json
+
+import structlog
+from fastapi import APIRouter, Request
+from starlette.responses import Response
+
+from app.adapters.webhooks import parse_webex, parse_wxcc, verify_webex, verify_wxcc
+from app.domain.integration import IntegrationService
+from app.domain.ports import Clock
+from app.web.protection import limiter
+
+router = APIRouter(prefix="/webhooks", include_in_schema=False)
+log = structlog.get_logger()
+
+MAX_BODY_BYTES = 64 * 1024
+WEBHOOK_LIMIT = "600/minute"
+
+
+async def _body(request: Request) -> bytes | None:
+    """Return the raw body, or ``None`` if it is too large."""
+    body = await request.body()
+    return body if len(body) <= MAX_BODY_BYTES else None
+
+
+def _service(request: Request) -> IntegrationService:
+    """Return the application's integration service."""
+    service: IntegrationService = request.app.state.integration_service
+    return service
+
+
+@router.post("/webex")
+@limiter.limit(WEBHOOK_LIMIT)
+async def webex(request: Request) -> Response:
+    """Record a Webex meeting or participant event."""
+    secret = request.app.state.settings.webex_webhook_secret
+    if secret is None:
+        return Response(status_code=404)
+    body = await _body(request)
+    if body is None:
+        return Response(status_code=413)
+    if not verify_webex(body, request.headers.get("x-spark-signature"), secret.get_secret_value()):
+        log.warning("webhook.rejected", source="webex")
+        return Response(status_code=401)
+    event = parse_webex(json.loads(body))
+    if event is not None:
+        clock: Clock = request.app.state.clock
+        known = await _service(request).record_meeting_event(
+            event.target_id, event.kind, clock.now()
+        )
+        log.info("webhook.webex", kind=event.kind.value, known=known)
+    return Response(status_code=204)
+
+
+@router.post("/wxcc")
+@limiter.limit(WEBHOOK_LIMIT)
+async def wxcc(request: Request) -> Response:
+    """Record a WxCC task event."""
+    secret = request.app.state.settings.wxcc_webhook_secret
+    if secret is None:
+        return Response(status_code=404)
+    body = await _body(request)
+    if body is None:
+        return Response(status_code=413)
+    clock: Clock = request.app.state.clock
+    if not verify_wxcc(
+        body,
+        request.headers.get("x-webexcc-signature"),
+        request.headers.get("x-webexcc-timestamp"),
+        secret.get_secret_value(),
+        clock.now(),
+    ):
+        log.warning("webhook.rejected", source="wxcc")
+        return Response(status_code=401)
+    event = parse_wxcc(json.loads(body))
+    if event is not None:
+        known = await _service(request).record_task_event(
+            event.target_id, event.kind, clock.now(), event.detail
+        )
+        log.info("webhook.wxcc", kind=event.kind.value, known=known)
+    return Response(status_code=204)
