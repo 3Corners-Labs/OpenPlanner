@@ -11,26 +11,31 @@ from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 
-from sqlalchemy import case, delete, func, insert, select, update
+from sqlalchemy import ColumnElement, case, delete, false, func, insert, or_, select, true, update
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.models import (
+    AuditEventRow,
     BookingRow,
     GroupRow,
     JobRow,
+    OrganisationRow,
     ReminderRuleRow,
     ScheduleOverrideRow,
     ScheduleRuleRow,
     SlotRow,
 )
+from app.domain.audit import AuditEvent, Outcome
+from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, Contact, Slot, SlotUsage
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
     Group,
+    GroupSummary,
     PhoneMode,
     ScheduleOverride,
     ScheduleRule,
@@ -55,6 +60,23 @@ def _group(row: GroupRow) -> Group:
         wxcc_queue_id=row.wxcc_queue_id,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
     )
+
+
+def scope_filter(
+    scope: Scope, organisation_slug: ColumnElement[str], group_slug: ColumnElement[str] | None
+) -> ColumnElement[bool]:
+    """Translate a ``Scope`` into a SQL condition; the one place this happens (ADR 0014).
+
+    An empty scope matches nothing; ``everything`` matches all rows.
+    """
+    if scope.everything:
+        return true()
+    conditions: list[ColumnElement[bool]] = []
+    if scope.organisations:
+        conditions.append(organisation_slug.in_(sorted(scope.organisations)))
+    if scope.groups and group_slug is not None:
+        conditions.append(group_slug.in_(sorted(scope.groups)))
+    return or_(*conditions) if conditions else false()
 
 
 def _override(row: ScheduleOverrideRow) -> ScheduleOverride:
@@ -95,6 +117,66 @@ class SqlTransaction:
     def __init__(self, session: AsyncSession) -> None:
         """Wrap ``session``."""
         self._session = session
+
+    async def list_groups(self, scope: Scope) -> list[GroupSummary]:
+        """Return the groups inside ``scope``, ordered by organisation and name."""
+        rows = await self._session.execute(
+            select(GroupRow, OrganisationRow)
+            .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
+            .where(scope_filter(scope, OrganisationRow.slug, GroupRow.slug))
+            .order_by(OrganisationRow.name, GroupRow.name)
+        )
+        return [GroupSummary(_group(group), org.slug, org.name) for group, org in rows]
+
+    async def get_group_summary(self, slug: str) -> GroupSummary | None:
+        """Return one group with its organisation, for an authorisation decision."""
+        found = (
+            await self._session.execute(
+                select(GroupRow, OrganisationRow)
+                .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
+                .where(GroupRow.slug == slug)
+            )
+        ).one_or_none()
+        if found is None:
+            return None
+        group, organisation = found
+        return GroupSummary(_group(group), organisation.slug, organisation.name)
+
+    async def add_audit_event(self, event: AuditEvent) -> None:
+        """Store an audit event."""
+        self._session.add(
+            AuditEventRow(
+                at=event.at,
+                actor=event.actor[:255],
+                action=event.action[:64],
+                outcome=event.outcome.value,
+                reason=event.reason[:64],
+                organisation=event.organisation,
+                group=event.group,
+            )
+        )
+        await self._session.flush()
+
+    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEvent]:
+        """Return the newest audit events about organisations and groups inside ``scope``."""
+        rows = await self._session.scalars(
+            select(AuditEventRow)
+            .where(scope_filter(scope, AuditEventRow.organisation, AuditEventRow.group))
+            .order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc())
+            .limit(limit)
+        )
+        return [
+            AuditEvent(
+                at=row.at,
+                actor=row.actor,
+                action=row.action,
+                outcome=Outcome(row.outcome),
+                reason=row.reason,
+                organisation=row.organisation,
+                group=row.group,
+            )
+            for row in rows
+        ]
 
     async def get_group(self, slug: str) -> Group | None:
         """Return the group with ``slug``."""

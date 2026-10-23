@@ -12,10 +12,12 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Protocol
 
+from app.domain.audit import AuditEvent
+from app.domain.authorization import Scope
 from app.domain.booking import Booking, Slot, SlotUsage
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.job_plan import PlannedJob
-from app.domain.scheduling import Group, ScheduleOverride, ScheduleRule
+from app.domain.scheduling import Group, GroupSummary, ScheduleOverride, ScheduleRule
 
 
 class Clock(Protocol):
@@ -56,7 +58,27 @@ class MessageSender(Protocol):
 
 
 class Transaction(Protocol):
-    """Everything the domain reads and writes within one database transaction."""
+    """Everything the domain reads and writes within one database transaction.
+
+    Every ``list_*`` method takes a ``Scope`` and returns only what it covers (ADR 0014); a
+    test enforces this for new methods.
+    """
+
+    async def list_groups(self, scope: Scope) -> list[GroupSummary]:
+        """Return the groups inside ``scope``, ordered by organisation and name."""
+        ...
+
+    async def get_group_summary(self, slug: str) -> GroupSummary | None:
+        """Return one group with its organisation, for an authorisation decision."""
+        ...
+
+    async def add_audit_event(self, event: AuditEvent) -> None:
+        """Store an audit event."""
+        ...
+
+    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEvent]:
+        """Return the newest audit events about organisations and groups inside ``scope``."""
+        ...
 
     async def get_group(self, slug: str) -> Group | None:
         """Return the group with ``slug``."""
