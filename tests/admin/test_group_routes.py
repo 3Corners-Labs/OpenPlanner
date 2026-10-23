@@ -305,3 +305,13 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
 
     assert "Openingstijd toegevoegd" in text
     assert "Vooruit boeken (dagen), Naam" in text
+
+
+async def test_oversized_forms_are_refused(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    response = await site.client.post(
+        f"{GROUP}/hours", data={"weekday": "5", "padding": "x" * 20_000}, headers=SAME_ORIGIN
+    )
+
+    assert response.status_code == 413
