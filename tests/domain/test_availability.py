@@ -115,7 +115,7 @@ def test_minimum_notice_boundary() -> None:
 
 
 def test_horizon_boundary() -> None:
-    group = make_group(horizon_days=4, min_notice_minutes=0)
+    group = make_group(horizon_days=4, min_notice_minutes=0, dispatch_lead_minutes=0)
     at_horizon = available(group=group, now=utc(2026, 1, 1, 8, 0))  # 08:00 + 4 days
     beyond = available(group=group, now=utc(2026, 1, 1, 7, 59))
 

@@ -53,6 +53,7 @@ def _group(row: GroupRow) -> Group:
         horizon_days=row.horizon_days,
         phone_mode=PhoneMode(row.phone_mode),
         wxcc_queue_id=row.wxcc_queue_id,
+        dispatch_lead_minutes=row.dispatch_lead_minutes,
     )
 
 

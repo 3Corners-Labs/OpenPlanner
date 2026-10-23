@@ -43,6 +43,12 @@ def upgrade() -> None:
         sa.Column("horizon_days", sa.Integer(), nullable=False),
         sa.Column("phone_mode", sa.String(length=16), nullable=False),
         sa.Column("wxcc_queue_id", sa.String(length=128), nullable=True),
+        sa.Column(
+            "dispatch_lead_minutes", sa.Integer(), server_default=sa.text("5"), nullable=False
+        ),
+        sa.CheckConstraint(
+            "dispatch_lead_minutes BETWEEN 0 AND 60", name=op.f("ck_groups_dispatch_lead")
+        ),
         sa.CheckConstraint(
             "phone_mode IN ('hidden', 'optional', 'required')", name=op.f("ck_groups_phone_mode")
         ),
