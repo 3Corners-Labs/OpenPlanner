@@ -97,6 +97,18 @@ class Contact:
         return self.name.split()[0]
 
 
+@dataclass(frozen=True)
+class MeetingRef:
+    """The video meeting of a booking: the provider's id and its join link.
+
+    The link is personal data while the booking lives (CLAUDE.md privacy rules: it gives access
+    to the citizen's call), so it is excluded from ``repr`` and purged with the contact.
+    """
+
+    id: str
+    link: str | None = field(default=None, repr=False)
+
+
 class BookingStatus(StrEnum):
     """Lifecycle of a booking."""
 
@@ -150,6 +162,13 @@ class Booking:
     consents: frozenset[ChannelKind] = frozenset()
     cancelled_at: datetime | None = None
     rescheduled_from_id: int | None = None
+    meeting: MeetingRef | None = None
+    wxcc_task_id: str | None = None
+
+    @property
+    def reference(self) -> str:
+        """Human-readable booking reference for agents and reports, e.g. ``OP-000123``."""
+        return f"OP-{self.id or 0:06d}"
 
     @property
     def is_active(self) -> bool:

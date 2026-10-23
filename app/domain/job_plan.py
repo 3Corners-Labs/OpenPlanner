@@ -37,6 +37,7 @@ class JobType(StrEnum):
     """Every kind of background job."""
 
     CREATE_VIDEO_ROOM = "create_video_room"
+    DELETE_VIDEO_ROOM = "delete_video_room"
     SEND_CONFIRMATION = "send_confirmation"
     SEND_CHANGE = "send_change"
     SEND_REMINDER = "send_reminder"
@@ -112,8 +113,10 @@ def plan_for_cancellation(*, cancelled_at: datetime, notify: bool = True) -> lis
     """Return the jobs that replace all pending jobs of a cancelled booking.
 
     ``notify=False`` for the old booking of a reschedule: the citizen gets a change message
-    for the new booking instead of a cancellation.
+    for the new booking instead of a cancellation. The meeting is always removed; the job does
+    nothing when the booking never got one.
     """
-    jobs = [PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.EMAIL)]
+    delete = PlannedJob(JobType.DELETE_VIDEO_ROOM, cancelled_at, None)
+    message = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.EMAIL)
     purge = PlannedJob(JobType.PURGE_PII, cancelled_at + PURGE_AFTER, None)
-    return [*jobs, purge] if notify else [purge]
+    return [delete, message, purge] if notify else [delete, purge]
