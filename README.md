@@ -54,6 +54,8 @@ make check
 
 ## Where to look next
 
+- `docs/architecture.md` — architecture with diagrams: context, containers, layers, domain
+  model, runtime flows, security, quality assurance, roadmap.
 - `CLAUDE.md` — working agreements, architecture rules, quality gates.
 - `CONTRIBUTING.md` — dev setup, tests, PR checklist.
 - `docs/HANDOVER.md` — stakeholder design (Dutch).
