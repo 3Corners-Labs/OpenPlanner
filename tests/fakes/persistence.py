@@ -10,7 +10,7 @@ from datetime import date, datetime
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsage
-from app.domain.calls import BookingEvent, CallStatus
+from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channels import ReminderRule
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
@@ -163,6 +163,22 @@ class InMemoryTransaction:
 
     async def get_booking_events(self, booking_id: int) -> list[BookingEvent]:
         return list(self.state.booking_events.get(booking_id, []))
+
+    async def list_bookings(
+        self, scope: Scope, group_id: int, lower: datetime, upper: datetime
+    ) -> list[BookingOverview]:
+        group = self.state.groups.get(group_id)
+        if group is None or not scope.contains(self._summary(group).organisation_slug, group.slug):
+            return []
+        found = [
+            b
+            for b in self.state.bookings.values()
+            if b.group_id == group_id and lower <= b.start < upper
+        ]
+        return [
+            BookingOverview(b, self.state.call_status.get(b.id or 0) or new_status(b.id or 0))
+            for b in sorted(found, key=lambda b: (b.start, b.id or 0))
+        ]
 
     async def get_call_status(self, booking_id: int) -> CallStatus | None:
         return self.state.call_status.get(booking_id)
