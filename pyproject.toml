@@ -56,7 +56,7 @@ known-first-party = ["app", "scripts", "tests"]
 [tool.ruff.lint.per-file-ignores]
 # assert is the pytest idiom; S101 only matters in production code.
 # Test names are the documentation; fixtures and fakes still explain themselves where useful.
-"tests/**" = ["S101", "D"]
+"tests/**" = ["S101", "S105", "S106", "D"]
 "migrations/**" = ["N999", "D103"]
 
 # --- mypy -------------------------------------------------------------------
