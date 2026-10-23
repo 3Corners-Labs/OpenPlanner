@@ -7,7 +7,10 @@ SECURITY_HEADERS: dict[bytes, bytes] = {
     b"strict-transport-security": b"max-age=63072000; includeSubDomains",
     b"x-content-type-options": b"nosniff",
     b"x-frame-options": b"DENY",
-    b"referrer-policy": b"no-referrer",
+    # same-origin, not no-referrer: with no-referrer browsers send ``Origin: null`` on form
+    # posts, which breaks the origin fallback in ``app.web.protection``. Other sites still
+    # receive no referrer, so management tokens in paths never leak.
+    b"referrer-policy": b"same-origin",
 }
 """Strictest defaults. A route that renders HTML sets its own CSP, which is then kept."""
 

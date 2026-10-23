@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.fixture
 def alembic_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Config:
     monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'migrate.db'}")
+    monkeypatch.setenv("ENVIRONMENT", "test")
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "migrations"))
     return config

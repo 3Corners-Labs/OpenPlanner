@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 
-from app.domain.booking import Contact
+from app.domain.booking import Booking, Contact
 from app.domain.channels import ChannelKind, ReminderRule, reachable
 
 
@@ -95,6 +95,17 @@ def plan_for_booking(
     jobs.append(PlannedJob(JobType.DISPATCH_WXCC_TASK, dispatch_at, start))
     jobs.append(PlannedJob(JobType.PURGE_PII, end + PURGE_AFTER, None))
     return jobs
+
+
+def is_stale(pinned_start: datetime | None, booking: Booking) -> bool:
+    """Return whether a job pinned to ``pinned_start`` must do nothing for ``booking``.
+
+    Pinned jobs only act on a confirmed booking whose start is unchanged and whose personal
+    data still exists (CLAUDE.md). Unpinned jobs (cancellation mail, purge) always run.
+    """
+    if pinned_start is None:
+        return False
+    return not booking.is_active or booking.start != pinned_start or booking.contact is None
 
 
 def plan_for_cancellation(*, cancelled_at: datetime, notify: bool = True) -> list[PlannedJob]:

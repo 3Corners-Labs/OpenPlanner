@@ -1,7 +1,7 @@
-"""Worker process: polls for due jobs and proves liveness with a heartbeat file.
+"""Worker process: runs due jobs and proves liveness with a heartbeat file.
 
-Run with ``python -m app.jobs.worker``. Job types and the ``jobs`` table arrive in work
-package 4; until then each iteration only checks the database.
+Run with ``python -m app.jobs.worker``. Each iteration checks the database, runs due jobs
+(``app.jobs.runner``) and writes the heartbeat.
 """
 
 import asyncio
@@ -12,29 +12,71 @@ import structlog
 
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable
+from app.adapters.db.jobs import SqlJobQueue
+from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.smtp import SmtpConfig, SmtpMailSender
 from app.config import Settings
-from app.domain.ports import Clock
+from app.domain.ports import Clock, MessageSender
+from app.i18n import Translator, load_catalogues
+from app.jobs.messages import MessageComposer
+from app.jobs.runner import JobRunner
+from app.keys import management_token_key
 from app.logging import configure_logging
 
 log = structlog.get_logger()
+
+
+def mail_sender(settings: Settings) -> MessageSender | None:
+    """Return the SMTP sender, or ``None`` when ``SMTP_HOST`` is not set."""
+    if not settings.smtp_host:
+        return None
+    return SmtpMailSender(
+        SmtpConfig(
+            host=settings.smtp_host,
+            port=settings.smtp_port,
+            sender=settings.mail_from,
+            starttls=settings.smtp_starttls,
+            username=settings.smtp_username,
+            password=(
+                settings.smtp_password.get_secret_value() if settings.smtp_password else None
+            ),
+        )
+    )
 
 
 async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> None:
     """Run the poll loop until ``stop`` is set.
 
     After every iteration in which the database answered, the current time is written to
-    ``settings.worker_heartbeat_path``; ``app.jobs.healthcheck`` reads it.
+    ``settings.worker_heartbeat_path``; ``app.jobs.healthcheck`` reads it. A failing job run
+    is logged and does not stop the loop.
 
     Args:
-        settings: Database URL, poll interval and heartbeat path.
+        settings: Database, mail and worker settings.
         stop: Set by a signal handler (or a test) to end the loop after the current iteration.
-        clock: Source of the heartbeat timestamp.
+        clock: Source of the current time.
     """
     engine = create_engine(settings.database_url)
-    log.info("worker.started", poll_seconds=settings.worker_poll_seconds)
+    sender = mail_sender(settings)
+    runner = JobRunner(
+        SqlJobQueue(engine),
+        SqlUnitOfWork(engine),
+        clock,
+        sender,
+        MessageComposer(
+            Translator(load_catalogues()),
+            management_token_key(settings),
+            settings.public_base_url,
+        ),
+    )
+    log.info("worker.started", poll_seconds=settings.worker_poll_seconds, mail_enabled=bool(sender))
     try:
         while not stop.is_set():
             if await is_reachable(engine):
+                try:
+                    await runner.run_due()
+                except Exception as exc:  # e.g. schema not migrated yet; keep the loop alive
+                    log.warning("worker.run_failed", error=type(exc).__name__)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=settings.worker_poll_seconds)

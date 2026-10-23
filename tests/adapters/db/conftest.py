@@ -5,8 +5,6 @@ from datetime import time
 from pathlib import Path
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.db.engine import create_engine
@@ -17,18 +15,12 @@ from app.adapters.db.models import (
     ScheduleOverrideRow,
     ScheduleRuleRow,
 )
-
-ROOT = Path(__file__).resolve().parents[3]
+from tests.support.database import migrated_database
 
 
 @pytest.fixture
 def database_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
-    url = f"sqlite+aiosqlite:///{tmp_path / 'adapter.db'}"
-    monkeypatch.setenv("DATABASE_URL", url)
-    config = Config(str(ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(ROOT / "migrations"))
-    command.upgrade(config, "head")
-    return url
+    return migrated_database(tmp_path, monkeypatch, "adapter")
 
 
 @pytest.fixture

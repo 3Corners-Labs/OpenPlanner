@@ -1,0 +1,11 @@
+{# Error summary: focused on load, each message links to its field (WCAG 3.3.1). #}
+{% if errors %}
+<div class="error-summary" role="alert" tabindex="-1" autofocus aria-labelledby="error-summary-title">
+  <h2 id="error-summary-title">{{ _("errors.summary_title") }}</h2>
+  <ul>
+    {% for error in errors %}
+    <li>{% if error.field %}<a href="#{{ error.field }}">{{ error.message }}</a>{% else %}{{ error.message }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

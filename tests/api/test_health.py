@@ -36,7 +36,7 @@ async def test_security_headers_on_every_response(client: httpx.AsyncClient) -> 
 
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
-    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["referrer-policy"] == "same-origin"
     assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
     assert "max-age=" in response.headers["strict-transport-security"]
 

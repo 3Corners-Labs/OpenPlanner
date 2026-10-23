@@ -43,5 +43,19 @@ services:
       start_period: 15s
       retries: 3
 
+  # Development only (`docker compose --profile dev up`): catches all outgoing mail.
+  # Inbox at http://127.0.0.1:8025. Never part of the production shape.
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    profiles: [dev]
+    ports:
+      - "127.0.0.1:8025:8025"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   data:

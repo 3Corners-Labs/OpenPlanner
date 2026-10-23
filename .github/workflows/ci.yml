@@ -21,6 +21,7 @@ jobs:
   python:
     name: lint, types, tests, migrations
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -44,6 +45,7 @@ jobs:
   duplication:
     name: copy-paste detection
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,6 +57,7 @@ jobs:
   dependencies:
     name: lockfile, audit, licenses
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -77,6 +80,7 @@ jobs:
 
   semgrep:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     container: semgrep/semgrep:1.182.1
     steps:
       - uses: actions/checkout@v4
@@ -90,6 +94,7 @@ jobs:
 
   gitleaks:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -102,6 +107,7 @@ jobs:
   container:
     name: image build, scan, SBOM, API fuzzing
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: hadolint/hadolint-action@v3.1.0
@@ -154,6 +160,7 @@ jobs:
   e2e:
     name: accessibility (Playwright, axe-core, Lighthouse)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -163,8 +170,11 @@ jobs:
         run: |
           docker build -t openplanner:e2e .
           scripts/run-app-container.sh openplanner:e2e
+          docker exec app alembic upgrade head
+          docker exec app python -m app.cli seed-demo
       - name: install browsers
         working-directory: e2e
+        timeout-minutes: 10
         run: npm ci && npx playwright install --with-deps
       - name: keyboard flows + axe (WCAG 2.2 AA, zero violations)
         working-directory: e2e

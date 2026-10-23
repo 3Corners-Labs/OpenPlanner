@@ -82,6 +82,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         locale=row.locale,
         token_hash=row.management_token_hash,
         created_at=row.created_at,
+        token_salt=row.management_token_salt,
         consents=frozenset(ChannelKind(c) for c in row.consents.split(",") if c),
         cancelled_at=row.cancelled_at,
         rescheduled_from_id=row.rescheduled_from_id,
@@ -195,6 +196,7 @@ class SqlTransaction:
             locale=booking.locale,
             consents=",".join(sorted(booking.consents)),
             management_token_hash=booking.token_hash,
+            management_token_salt=booking.token_salt,
             created_at=booking.created_at,
             cancelled_at=booking.cancelled_at,
             rescheduled_from_id=booking.rescheduled_from_id,
@@ -202,6 +204,31 @@ class SqlTransaction:
         self._session.add(row)
         await self._session.flush()
         return _booking(row, await self._slot_row(row.slot_id))
+
+    async def get_booking(self, booking_id: int) -> Booking | None:
+        """Return the booking with ``booking_id``."""
+        result = await self._session.execute(
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(BookingRow.id == booking_id)
+        )
+        found = result.one_or_none()
+        return _booking(*found) if found else None
+
+    async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
+        """NULL every PII column (CLAUDE.md privacy rules) and record ``pii_purged_at``."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(
+                name=None,
+                email=None,
+                phone=None,
+                guest_join_url=None,
+                host_join_url=None,
+                pii_purged_at=now,
+            )
+        )
 
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         """Return the booking whose management token hashes to ``token_hash``."""
@@ -280,13 +307,26 @@ class SqlUnitOfWork:
         Raises:
             DomainError: ``database_busy`` if the write lock is not obtained in time.
         """
-        async with self._engine.connect() as raw:
-            connection = await raw.execution_options(**{BEGIN_MODE_OPTION: "IMMEDIATE"})
-            async with AsyncSession(bind=connection, expire_on_commit=False) as session:
-                try:
-                    async with session.begin():
-                        yield SqlTransaction(session)
-                except OperationalError as exc:
-                    if _is_lock_timeout(exc):
-                        raise DomainError(ErrorCode.DATABASE_BUSY) from exc
-                    raise
+        async with locked_session(self._engine) as session:
+            yield SqlTransaction(session)
+
+
+@asynccontextmanager
+async def locked_session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
+    """Yield a session whose transaction starts with ``BEGIN IMMEDIATE``; commit on success.
+
+    Shared by the unit of work and the job queue, so every writer takes the lock the same way.
+
+    Raises:
+        DomainError: ``database_busy`` if the write lock is not obtained in time.
+    """
+    async with engine.connect() as raw:
+        connection = await raw.execution_options(**{BEGIN_MODE_OPTION: "IMMEDIATE"})
+        async with AsyncSession(bind=connection, expire_on_commit=False) as session:
+            try:
+                async with session.begin():
+                    yield session
+            except OperationalError as exc:
+                if _is_lock_timeout(exc):
+                    raise DomainError(ErrorCode.DATABASE_BUSY) from exc
+                raise
