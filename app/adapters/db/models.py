@@ -5,6 +5,7 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
 
     audit_events (no foreign keys: events outlive what they describe)
     booking_events, call_status (per booking; no personal data, kept after the purge)
+    integration_credentials (encrypted tokens, ADR 0008)
     admin_profiles (name per identity-provider subject; joined into the audit log)
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
@@ -21,6 +22,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Time,
     UniqueConstraint,
@@ -33,6 +35,7 @@ from app.adapters.db.types import UTCDateTime
 
 __all__ = [
     "AdminProfileRow",
+    "IntegrationCredentialRow",
     "BookingEventRow",
     "CallStatusRow",
     "AuditEventRow",
@@ -288,3 +291,14 @@ class CallStatusRow(Base):
     task_created_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+
+class IntegrationCredentialRow(Base):
+    """An encrypted integration secret (AES-256-GCM, ADR 0008); never readable in plain text."""
+
+    __tablename__ = "integration_credentials"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())

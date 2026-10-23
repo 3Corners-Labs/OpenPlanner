@@ -67,6 +67,21 @@ class Settings(BaseSettings):
     oidc_role_org_admin: str = "openplanner-org-admin"
     oidc_role_group_admin: str = "openplanner-group-admin"
 
+    # Integration secrets at rest (ADR 0008): AES-256-GCM under a key derived from this value.
+    settings_encryption_key: SecretStr | None = None
+    dev_settings_key_path: Path = Path("data/dev-settings.key")
+
+    # Webex Service App (ADR 0017/0018): one app for meetings and WxCC work items. The refresh
+    # token bootstraps the token store; later tokens are rotated and stored encrypted.
+    webex_client_id: str | None = None
+    webex_client_secret: SecretStr | None = None
+    webex_refresh_token: SecretStr | None = None
+    webex_api_base_url: str = "https://webexapis.com/v1"
+    webex_webhook_secret: SecretStr | None = None
+    # WxCC API host of the organisation's region, e.g. https://api.wxcc-eu1.cisco.com.
+    wxcc_api_base_url: str | None = None
+    wxcc_webhook_secret: SecretStr | None = None
+
     # Rate limits on public endpoints (CLAUDE.md security baseline).
     rate_limit_enabled: bool = True
     rate_limit_bookings: str = "10/hour"
@@ -82,12 +97,31 @@ class Settings(BaseSettings):
                 raise ValueError("PUBLIC_BASE_URL must use https in production")
             if self.session_secret is None:
                 raise ValueError("SESSION_SECRET is required in production")
+            if self.webex_client_id is not None and (
+                self.webex_client_secret is None
+                or self.webex_refresh_token is None
+                or self.settings_encryption_key is None
+            ):
+                raise ValueError(
+                    "Webex needs WEBEX_CLIENT_SECRET, WEBEX_REFRESH_TOKEN and "
+                    "SETTINGS_ENCRYPTION_KEY in production"
+                )
             if self.oidc_discovery_url is not None and (
                 not self.oidc_discovery_url.startswith("https://")
                 or self.oidc_client_secret is None
             ):
                 raise ValueError("OIDC needs an https discovery URL and a client secret")
         return self
+
+    @property
+    def video_configured(self) -> bool:
+        """Whether the Webex Service App is configured (meetings can be created)."""
+        return bool(self.webex_client_id and self.webex_client_secret and self.webex_refresh_token)
+
+    @property
+    def dispatch_configured(self) -> bool:
+        """Whether WxCC work items can be created (Service App plus the WxCC API host)."""
+        return self.video_configured and bool(self.wxcc_api_base_url)
 
     @field_validator("log_level", mode="before")
     @classmethod
