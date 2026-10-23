@@ -373,6 +373,12 @@ input:focus-visible {
   overflow-x: auto;
 }
 
+/* Focusable so keyboard users can scroll a wide table (WCAG 2.1.1). */
+.table-scroll:focus-visible {
+  outline: 3px solid var(--op-color-focus);
+  outline-offset: 2px;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
