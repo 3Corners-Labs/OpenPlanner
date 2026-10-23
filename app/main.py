@@ -16,11 +16,12 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider
 from app.admin.routes import register_admin
-from app.api import booking_pages, health, pages
+from app.api import booking_pages, health, pages, webhooks
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.authorization import Role
+from app.domain.integration import IntegrationService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.services import BookingService
@@ -93,6 +94,7 @@ def create_app(
         app.state.booking_service = BookingService(uow, clock, token_key)
         app.state.admin_service = AdminService(uow, clock)
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
+        app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         try:
             yield
         finally:
@@ -123,5 +125,6 @@ def create_app(
     app.include_router(health.router)
     app.include_router(pages.router)
     app.include_router(booking_pages.router)
+    app.include_router(webhooks.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
