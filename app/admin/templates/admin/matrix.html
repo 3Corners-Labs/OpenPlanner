@@ -1,0 +1,39 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.matrix.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<h1 id="page-title">{{ _("admin.matrix.title") }}</h1>
+<p>{{ _("admin.matrix.intro") }}</p>
+<div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("admin.matrix.title") }}</caption>
+  <thead>
+    <tr>
+      <th scope="col">{{ _("admin.rights.permission") }}</th>
+      <th scope="col">{{ _("admin.matrix.level") }}</th>
+      {% for role in role_columns %}<th scope="col">{{ role }}</th>{% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <th scope="row">{{ row.label }}</th>
+      <td>{{ row.level }}</td>
+      {% for granted in row.granted %}<td>{% if granted %}<span aria-hidden="true">✓ </span>{{ _("admin.matrix.yes") }}{% else %}{{ _("admin.matrix.no") }}{% endif %}</td>{% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<h2>{{ _("admin.matrix.citizen") }}</h2>
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("admin.matrix.citizen") }}</caption>
+  <thead>
+    <tr><th scope="col">{{ _("admin.matrix.action") }}</th><th scope="col">{{ _("admin.matrix.condition") }}</th></tr>
+  </thead>
+  <tbody>
+    {% for label, condition in citizen %}
+    <tr><th scope="row">{{ label }}</th><td>{{ condition }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

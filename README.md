@@ -6,9 +6,11 @@ embedded as a Web Component. Five minutes before the start, the service dispatch
 a Webex video link to the group's queue via Webex Connect. Personal data is purged 24 hours
 after the appointment.
 
-Status: **work package 3, first demo slice**. Citizens can book, view, move and cancel an
-appointment on the group page; confirmation, change, reminder and cancellation emails are sent
-by the worker. Video links (WP5), WxCC dispatch (WP6) and the admin portal (WP7) follow. See `docs/HANDOVER.md` §10 for the work packages.
+Status: **work package 7a**. Citizens can book, view, move and cancel an appointment on the
+group page; confirmation, change, reminder and cancellation emails are sent by the worker.
+Admins log in to the admin portal through OIDC; what they see and may do follows the
+authorisation matrix (`docs/authorization.md`). Editing groups and settings (WP7b–d), video
+links (WP5) and WxCC dispatch (WP6) follow. See `docs/HANDOVER.md` §10 for the work packages.
 
 ## Quick start (demo)
 
@@ -24,8 +26,12 @@ Then open:
   language switcher).
 - http://127.0.0.1:8025 — Mailpit, which catches the confirmation, change, reminder and
   cancellation emails (with calendar attachment and the management link).
+- http://127.0.0.1:8000/admin/ — the admin portal. Log in at the development Keycloak with one
+  test user per role (`super`, `orgadmin`, `groupadmin`, `outsider`, `norole`; see
+  `dev/keycloak/README.md`) to walk the portal as each role.
 
-The `dev` profile adds Mailpit; without it the shape is the production one (web + worker).
+The `dev` profile adds Mailpit and Keycloak (standing in for PingFederate); without it the shape
+is the production one (web + worker).
 
 Two containers share one SQLite volume: `web` (FastAPI, runs Alembic migrations on start) and
 `worker` (job loop). Both run as non-root with a read-only filesystem.
@@ -48,6 +54,7 @@ make check
 | `GET/POST /g/{slug}/book` | Contact form and booking. |
 | `GET /b/{token}` | Management page; read-only from the dispatch moment. |
 | `GET/POST /b/{token}/cancel`, `/b/{token}/reschedule` | Cancel or move the appointment. |
+| `GET /admin/` and below | Admin portal (OIDC login, every route bound to one permission of the matrix). |
 | `GET /healthz` | Liveness: the process is up. |
 | `GET /readyz` | Readiness: the database answers. `503` otherwise. |
 | `GET /openapi.json` | OpenAPI spec (interactive docs are disabled). |

@@ -3,6 +3,8 @@
 Rows are persistence shapes only; ``app.adapters.db.uow`` maps them to domain objects.
 PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
 
+    audit_events (no foreign keys: events outlive what they describe)
+    admin_profiles (name per identity-provider subject; joined into the audit log)
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
@@ -29,6 +31,8 @@ from app.adapters.db.base import Base
 from app.adapters.db.types import UTCDateTime
 
 __all__ = [
+    "AdminProfileRow",
+    "AuditEventRow",
     "Base",
     "BookingRow",
     "GroupRow",
@@ -208,3 +212,34 @@ class JobRow(Base):
         Index("ix_jobs_booking_id", "booking_id"),
         CheckConstraint("status IN ('pending', 'running', 'done', 'failed')", name="status"),
     )
+
+
+class AuditEventRow(Base):
+    """An audited admin action (ADR 0014). Never holds personal data of citizens."""
+
+    __tablename__ = "audit_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime())
+    actor: Mapped[str] = mapped_column(String(255))
+    action: Mapped[str] = mapped_column(String(64))
+    outcome: Mapped[str] = mapped_column(String(16))
+    reason: Mapped[str] = mapped_column(String(64), server_default=text("''"))
+    organisation: Mapped[str | None] = mapped_column(String(64))
+    group: Mapped[str | None] = mapped_column(String(64))
+
+    __table_args__ = (
+        Index("ix_audit_events_at", "at"),
+        Index("ix_audit_events_organisation", "organisation"),
+        CheckConstraint("outcome IN ('success', 'denied', 'failure')", name="outcome"),
+    )
+
+
+class AdminProfileRow(Base):
+    """An admin's display name per identity-provider subject, refreshed at every login."""
+
+    __tablename__ = "admin_profiles"
+
+    subject: Mapped[str] = mapped_column(String(255), primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(255))
+    last_login_at: Mapped[datetime] = mapped_column(UTCDateTime())

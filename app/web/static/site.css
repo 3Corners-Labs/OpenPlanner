@@ -327,3 +327,71 @@ input:focus-visible {
 .details dd {
   margin: 0 0 var(--op-space-s);
 }
+
+/* --- Admin portal ------------------------------------------------------- */
+.admin-bar {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--op-space-m);
+}
+
+.admin-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--op-space-m);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-nav a {
+  display: inline-block;
+  min-height: 24px;
+  padding: var(--op-space-s) 0;
+}
+
+.admin-nav a[aria-current="page"] {
+  font-weight: 700;
+  text-decoration-thickness: 3px;
+}
+
+.admin-user {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--op-space-s);
+}
+
+.admin-user form {
+  margin: 0;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+/* Focusable so keyboard users can scroll a wide table (WCAG 2.1.1). */
+.table-scroll:focus-visible {
+  outline: 3px solid var(--op-color-focus);
+  outline-offset: 2px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--op-space-s);
+  border-bottom: 1px solid var(--op-color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.data-table thead th {
+  border-bottom: 2px solid var(--op-color-text);
+}

@@ -37,7 +37,26 @@ no full name. In development Mailpit (`--profile dev`) catches all mail locally.
 | Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the citizen, host URL to WxCC |
 | Management token | `bookings.management_token_hash` (SHA-256 only) | generated | kept (not personal data once the booking is purged) | token itself only in the confirmation mail |
 
-Jobs, slots, schedules and audit data carry no personal data.
+Jobs, slots, schedules and audit events carry no personal data of citizens.
+
+## Admin login and audit (WP7a)
+
+```
+admin ──browser──> web /admin/login ──redirect──> identity provider (PingFederate; Keycloak in dev)
+identity provider ──ID token (sub, name, roles, organisations, groups)──> web /admin/callback
+web ──signed session cookie op_admin (sub, name, roles, scope; 8 h)──> admin browser
+web ──SQL──> audit_events (sub, action, outcome, organisation, group)
+web ──SQL──> admin_profiles (sub, display name, last login)
+```
+
+| Data item | Table.column / place | Source | Retention | Leaves the system |
+|---|---|---|---|---|
+| Admin subject identifier | `audit_events.actor`, `admin_profiles.subject`, session cookie | identity provider | audit events: kept as the audit trail (retention to be set with the hosting owner, O7) | no |
+| Admin display name | `admin_profiles.display_name`, session cookie | identity provider | replaced at every login; to be removed for admins inactive longer than the audit retention (WP8) | no |
+
+Admin names are personal data of employees, processed for accountability (who did what in the
+portal). They never appear in logs, exceptions or audit events; the audit log joins them in when
+it is shown.
 
 ## Planned flows
 
@@ -46,5 +65,5 @@ Meetings API polling. Only aggregates are stored (state, participant count, host
 start/end times); participant names, emails and IP addresses are processed in memory only.
 
 To be added per work package: booking (WP3), mail (WP4), Webex video (WP5), Webex Connect task
-and SMS (WP6), admin/IdP (WP7), purge and backups (WP8). Each flow lists: data items, source,
+and SMS (WP6), admin settings (WP7b-d), purge and backups (WP8). Each flow lists: data items, source,
 destination, legal basis owner, retention.

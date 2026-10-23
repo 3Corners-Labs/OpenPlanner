@@ -256,3 +256,311 @@ msgstr "Kies een nieuw moment. Uw gegevens blijven hetzelfde."
 
 msgid "reschedule.submit"
 msgstr "Verplaatsen"
+
+#. Admin portal and authorisation matrix (ADR 0014).
+
+msgid "admin.title"
+msgstr "Beheer"
+
+msgid "admin.nav.label"
+msgstr "Beheermenu"
+
+msgid "admin.nav.dashboard"
+msgstr "Overzicht"
+
+msgid "admin.nav.audit"
+msgstr "Auditlog"
+
+msgid "admin.nav.rights"
+msgstr "Mijn rechten"
+
+msgid "admin.nav.matrix"
+msgstr "Rechtenmatrix"
+
+msgid "admin.signed_in_as"
+msgstr "Ingelogd als {name}"
+
+msgid "admin.logout"
+msgstr "Uitloggen"
+
+msgid "admin.back_to_dashboard"
+msgstr "Terug naar het overzicht"
+
+msgid "admin.dashboard.title"
+msgstr "Overzicht"
+
+msgid "admin.dashboard.intro"
+msgstr "Hier ziet u de groepen waarvoor u rechten heeft."
+
+msgid "admin.dashboard.groups"
+msgstr "Uw groepen"
+
+msgid "admin.dashboard.organisation"
+msgstr "Organisatie"
+
+msgid "admin.dashboard.group"
+msgstr "Groep"
+
+msgid "admin.dashboard.public_page"
+msgstr "Boekingspagina"
+
+msgid "admin.dashboard.no_groups"
+msgstr "U heeft (nog) geen rechten op een groep. Vraag uw beheerder om toegang."
+
+msgid "admin.group.settings"
+msgstr "Instellingen"
+
+msgid "admin.group.slot_minutes"
+msgstr "Duur van een afspraak"
+
+msgid "admin.group.minutes"
+msgstr "{minutes} minuten"
+
+msgid "admin.group.notice"
+msgstr "Minimale aanmeldtijd"
+
+msgid "admin.group.horizon"
+msgstr "Vooruit boeken"
+
+msgid "admin.group.days"
+msgstr "{days} dagen"
+
+msgid "admin.group.dispatch"
+msgstr "Taak naar de wachtrij en afspraak vast"
+
+msgid "admin.group.dispatch_value"
+msgstr "{minutes} minuten voor de start"
+
+msgid "admin.group.phone"
+msgstr "Telefoonnummer"
+
+msgid "admin.group.phone_hidden"
+msgstr "Niet gevraagd"
+
+msgid "admin.group.phone_optional"
+msgstr "Optioneel"
+
+msgid "admin.group.phone_required"
+msgstr "Verplicht"
+
+msgid "admin.group.queue"
+msgstr "WxCC-wachtrij"
+
+msgid "admin.group.your_rights"
+msgstr "Uw rechten voor deze groep"
+
+msgid "admin.rights.title"
+msgstr "Mijn rechten"
+
+msgid "admin.rights.intro"
+msgstr "Dit mag u in het beheerportaal, op basis van uw rollen uit de identiteitsprovider."
+
+msgid "admin.rights.roles"
+msgstr "Rollen"
+
+msgid "admin.rights.none"
+msgstr "U heeft geen rollen voor dit beheerportaal."
+
+msgid "admin.rights.permission"
+msgstr "Recht"
+
+msgid "admin.rights.scope"
+msgstr "Geldt voor"
+
+msgid "admin.rights.scope_portal"
+msgstr "Het beheerportaal"
+
+msgid "admin.rights.scope_everything"
+msgstr "Alle organisaties en groepen"
+
+msgid "admin.rights.scope_organisations"
+msgstr "Organisaties: {names}"
+
+msgid "admin.rights.scope_groups"
+msgstr "Groepen: {names}"
+
+msgid "admin.matrix.title"
+msgstr "Rechtenmatrix"
+
+msgid "admin.matrix.intro"
+msgstr "Welke rol wat mag. Deze tabel komt rechtstreeks uit de code, net als de documentatie."
+
+msgid "admin.matrix.level"
+msgstr "Niveau"
+
+msgid "admin.matrix.yes"
+msgstr "Ja"
+
+msgid "admin.matrix.no"
+msgstr "Nee"
+
+msgid "admin.matrix.citizen"
+msgstr "Burgers (zonder inloggen)"
+
+msgid "admin.matrix.action"
+msgstr "Handeling"
+
+msgid "admin.matrix.condition"
+msgstr "Voorwaarde"
+
+msgid "admin.audit.title"
+msgstr "Auditlog"
+
+msgid "admin.audit.intro"
+msgstr "De laatste inlogpogingen, geweigerde acties en wijzigingen binnen uw organisaties."
+
+msgid "admin.audit.when"
+msgstr "Wanneer"
+
+msgid "admin.audit.actor"
+msgstr "Wie"
+
+msgid "admin.audit.action"
+msgstr "Actie"
+
+msgid "admin.audit.outcome"
+msgstr "Resultaat"
+
+msgid "admin.audit.target"
+msgstr "Organisatie / groep"
+
+msgid "admin.audit.empty"
+msgstr "Er zijn nog geen gebeurtenissen."
+
+msgid "admin.login_failed.title"
+msgstr "Inloggen mislukt"
+
+msgid "admin.login_failed.text"
+msgstr "Het inloggen is niet gelukt. Ga naar het beheerportaal en probeer het opnieuw."
+
+msgid "admin.forbidden.title"
+msgstr "Geen toegang"
+
+msgid "admin.forbidden.text"
+msgstr "U heeft geen recht om deze pagina te bekijken. Denkt u dat dit niet klopt? Neem contact op met uw beheerder."
+
+msgid "admin.no_role.text"
+msgstr "U heeft geen rol in het beheerportaal. Neem contact op met uw beheerder als u toegang nodig heeft."
+
+msgid "admin.not_configured.title"
+msgstr "Beheer niet beschikbaar"
+
+msgid "admin.not_configured.text"
+msgstr "Inloggen voor beheerders is op deze omgeving nog niet ingesteld."
+
+msgid "admin.logged_out.title"
+msgstr "U bent uitgelogd"
+
+msgid "admin.logged_out.text"
+msgstr "U bent uitgelogd uit het beheerportaal."
+
+msgid "audit.actor.anonymous"
+msgstr "Niet ingelogd"
+
+msgid "audit.event.login"
+msgstr "Inloggen"
+
+msgid "audit.event.logout"
+msgstr "Uitloggen"
+
+msgid "audit.outcome.success"
+msgstr "Gelukt"
+
+msgid "audit.outcome.denied"
+msgstr "Geweigerd"
+
+msgid "audit.outcome.failure"
+msgstr "Mislukt"
+
+msgid "authz.role.superuser"
+msgstr "Superuser"
+
+msgid "authz.role.org_admin"
+msgstr "Organisatiebeheerder"
+
+msgid "authz.role.group_admin"
+msgstr "Groepsbeheerder"
+
+msgid "authz.level.global"
+msgstr "Portaal"
+
+msgid "authz.level.organisation"
+msgstr "Organisatie"
+
+msgid "authz.level.group"
+msgstr "Groep"
+
+msgid "authz.permission.dashboard_view"
+msgstr "Overzicht bekijken"
+
+msgid "authz.permission.rights_view"
+msgstr "Eigen rechten bekijken"
+
+msgid "authz.permission.matrix_view"
+msgstr "Rechtenmatrix bekijken"
+
+msgid "authz.permission.organisation_manage"
+msgstr "Organisaties beheren"
+
+msgid "authz.permission.audit_view"
+msgstr "Auditlog bekijken"
+
+msgid "authz.permission.integrations_manage"
+msgstr "Koppelingen en geheimen beheren"
+
+msgid "authz.permission.group_create"
+msgstr "Groepen aanmaken"
+
+msgid "authz.permission.group_view"
+msgstr "Groep bekijken"
+
+msgid "authz.permission.group_edit"
+msgstr "Groepsinstellingen wijzigen"
+
+msgid "authz.permission.schedule_manage"
+msgstr "Openingstijden en uitzonderingen beheren"
+
+msgid "authz.permission.texts_manage"
+msgstr "Teksten beheren"
+
+msgid "authz.permission.reminders_manage"
+msgstr "Herinneringen beheren"
+
+msgid "authz.permission.bookings_view"
+msgstr "Boekingen bekijken"
+
+msgid "authz.citizen.availability_view"
+msgstr "Beschikbare tijden bekijken"
+
+msgid "authz.citizen.book"
+msgstr "Afspraak maken"
+
+msgid "authz.citizen.booking_view"
+msgstr "Eigen afspraak bekijken"
+
+msgid "authz.citizen.booking_change"
+msgstr "Eigen afspraak verplaatsen"
+
+msgid "authz.citizen.booking_cancel"
+msgstr "Eigen afspraak annuleren"
+
+msgid "authz.condition.public"
+msgstr "Iedereen"
+
+msgid "authz.condition.management_link"
+msgstr "Met de beheerlink uit de bevestiging"
+
+msgid "authz.condition.management_link_before_deadline"
+msgstr "Met de beheerlink, tot de taak naar de wachtrij gaat"
+
+msgid "admin.to_portal"
+msgstr "Naar het beheerportaal"
+
+msgid "admin.logging_out.title"
+msgstr "U wordt uitgelogd"
+
+msgid "admin.logging_out.text"
+msgstr "U bent uitgelogd bij OpenPlanner. U wordt nu ook uitgelogd bij uw organisatieaccount."
+
+msgid "admin.logging_out.continue"
+msgstr "Doorgaan met uitloggen"

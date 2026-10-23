@@ -50,6 +50,44 @@ The image refuses to start in production (`ENVIRONMENT` defaults to `prod`) with
   for everyone.
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 
+## Admin portal login (PingFederate)
+
+Without `OIDC_DISCOVERY_URL` the admin portal is disabled; citizens' pages work regardless.
+In production also set `SESSION_SECRET` (at least 32 random bytes); the image refuses to start
+without it, and with an `http` discovery URL or without `OIDC_CLIENT_SECRET` (ADR 0013).
+
+In PingFederate, create an OIDC client:
+
+| Setting | Value |
+|---|---|
+| Client type | confidential, authorization code, PKCE (S256) allowed |
+| Client ID | `openplanner-admin` (or set `OIDC_CLIENT_ID`) |
+| Redirect URI | `https://<host>/admin/callback` |
+| Post-logout redirect URI | `https://<host>/admin/logged-out` |
+| ID token signing | RS256, PS256 or ES256 (symmetric algorithms are refused) |
+| Scopes | `openid profile email` |
+| Claims in the ID token | `roles`, `organisations`, `groups` (multi-valued; names configurable with `OIDC_ROLE_CLAIM`, `OIDC_ORGANISATION_CLAIM`, `OIDC_GROUP_CLAIM`) |
+| Role values | `openplanner-superuser`, `openplanner-org-admin`, `openplanner-group-admin` (configurable with `OIDC_ROLE_*`) |
+
+Organisation and group claims carry the slugs shown in the portal (`/g/<group-slug>`). A claim
+without the matching role grants nothing. Fill these claims only from sources that admins
+manage (directory groups or attributes users cannot edit themselves); a self-editable attribute
+would let anyone grant themselves the superuser role.
+
+Roles are read at login and kept in the session for its lifetime (`ADMIN_SESSION_HOURS`,
+default 8). Revoking a role in PingFederate takes effect at the admin's next login, at the latest
+after that lifetime. For an urgent revocation, rotate `SESSION_SECRET` (logs everyone out).
+
+Logout sends `client_id` and `post_logout_redirect_uri` to the `end_session_endpoint`, without
+`id_token_hint`. Check during set-up that PingFederate accepts this and ends the SSO session;
+otherwise the admin is logged straight back in on the next visit. Check a new set-up by logging in with one account per
+role and comparing "Mijn rechten" with `docs/authorization.md`; denied attempts and logins are
+in the audit log.
+
+If PingFederate is down, admins cannot log in; booking, reminders and dispatch keep working.
+Rotating `SESSION_SECRET` logs every admin out. Rotating the client secret needs the new value
+in `OIDC_CLIENT_SECRET` and a restart of `web`.
+
 ## Mail
 
 The worker sends mail when `SMTP_HOST` is set (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`,

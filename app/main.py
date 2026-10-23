@@ -6,31 +6,68 @@ Run with ``uvicorn app.main:create_app --factory``.
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider
+from app.admin.routes import register_admin
 from app.api import booking_pages, health, pages
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.config import Settings
-from app.domain.ports import Clock
+from app.domain.admin import AdminService
+from app.domain.authorization import Role
+from app.domain.ports import Clock, IdentityProvider
 from app.domain.services import BookingService
 from app.i18n import Translator, load_catalogues
-from app.keys import management_token_key
+from app.keys import management_token_key, session_secret
 from app.logging import configure_logging
 from app.web.error_pages import register_error_pages
 from app.web.protection import configure_rate_limits, limiter
 from app.web.templates import STATIC_DIR
 
 
-def create_app(settings: Settings | None = None, clock: Clock | None = None) -> FastAPI:
+def oidc_provider(settings: Settings, http: httpx.AsyncClient) -> IdentityProvider | None:
+    """Return the admin identity provider from the settings, or ``None`` if not configured."""
+    if settings.oidc_discovery_url is None:
+        return None
+    mapping = ClaimMapping(
+        role_claim=settings.oidc_role_claim,
+        organisation_claim=settings.oidc_organisation_claim,
+        group_claim=settings.oidc_group_claim,
+        role_values={
+            settings.oidc_role_superuser: Role.SUPERUSER,
+            settings.oidc_role_org_admin: Role.ORG_ADMIN,
+            settings.oidc_role_group_admin: Role.GROUP_ADMIN,
+        },
+    )
+    secret = settings.oidc_client_secret.get_secret_value() if settings.oidc_client_secret else ""
+    config = OidcConfig(
+        discovery_url=settings.oidc_discovery_url,
+        client_id=settings.oidc_client_id,
+        client_secret=secret,
+        scopes=settings.oidc_scopes,
+        mapping=mapping,
+    )
+    return OidcIdentityProvider(config, http)
+
+
+def create_app(
+    settings: Settings | None = None,
+    clock: Clock | None = None,
+    identity_provider: IdentityProvider | None = None,
+) -> FastAPI:
     """Build the application.
 
     Args:
         settings: Explicit settings (tests); defaults to reading the environment.
         clock: Explicit clock (tests); defaults to the system clock.
+        identity_provider: Explicit identity provider (tests); defaults to OIDC from the
+            settings, or none (admin login disabled).
 
     Returns:
         The FastAPI app with translator, booking service, rate limits and error pages. Its
@@ -40,6 +77,7 @@ def create_app(settings: Settings | None = None, clock: Clock | None = None) -> 
     settings = settings or Settings()
     clock = clock or SystemClock()
     token_key = management_token_key(settings)
+    http = httpx.AsyncClient(timeout=10.0)
     configure_rate_limits(
         enabled=settings.rate_limit_enabled,
         bookings=settings.rate_limit_bookings,
@@ -50,12 +88,13 @@ def create_app(settings: Settings | None = None, clock: Clock | None = None) -> 
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         configure_logging(settings.log_level)
         app.state.engine = create_engine(settings.database_url)
-        app.state.booking_service = BookingService(
-            SqlUnitOfWork(app.state.engine), clock, token_key
-        )
+        uow = SqlUnitOfWork(app.state.engine)
+        app.state.booking_service = BookingService(uow, clock, token_key)
+        app.state.admin_service = AdminService(uow, clock)
         try:
             yield
         finally:
+            await http.aclose()
             await app.state.engine.dispose()
 
     # Swagger UI and ReDoc load scripts from a CDN; only the JSON spec is served.
@@ -63,10 +102,22 @@ def create_app(settings: Settings | None = None, clock: Clock | None = None) -> 
     app.state.settings = settings
     app.state.clock = clock
     app.state.limiter = limiter
+    app.state.identity_provider = identity_provider or oidc_provider(settings, http)
     # Admin-edited overrides are wired in here once the database adapter exists (WP7).
     app.state.translator = Translator(load_catalogues())
+    # Admin session (ADR 0013): only sent to /admin, signed, HttpOnly, SameSite=Lax.
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=session_secret(settings),
+        session_cookie="op_admin",
+        path="/admin",
+        max_age=settings.admin_session_hours * 3600,
+        same_site="lax",
+        https_only=settings.environment == "prod",
+    )
     app.add_middleware(SecurityHeadersMiddleware)
     register_error_pages(app)
+    register_admin(app)
     app.include_router(health.router)
     app.include_router(pages.router)
     app.include_router(booking_pages.router)

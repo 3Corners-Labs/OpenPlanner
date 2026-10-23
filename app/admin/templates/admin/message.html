@@ -1,0 +1,9 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ title }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p>{{ message }}</p>
+{% if back_link %}
+<p><a href="/admin/">{{ _("admin.back_to_dashboard") }}</a></p>
+{% endif %}
+{% endblock %}

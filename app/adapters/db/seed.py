@@ -1,7 +1,10 @@
-"""Demo configuration: one organisation and one group with weekday opening hours.
+"""Demo configuration: two organisations with one group each, with weekday opening hours.
 
-Used by ``python -m app.cli seed-demo`` and by tests. Idempotent: an existing demo group is
-left untouched.
+``demo`` is the organisation of the development test admins; ``andere`` exists so that every
+role can be tested against an organisation and group that are *not* theirs (ADR 0014).
+
+Used by ``python -m app.cli seed-demo`` and by tests. Idempotent: existing groups are left
+untouched.
 """
 
 from datetime import time
@@ -12,23 +15,36 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.adapters.db.models import GroupRow, OrganisationRow, ReminderRuleRow, ScheduleRuleRow
 
 DEMO_SLUG = "demo"
+OTHER_ORGANISATION_SLUG = "andere"
+OTHER_GROUP_SLUG = "andere-team"
 DEMO_WINDOWS = ((time(9), time(12)), (time(13), time(17)))
 DEMO_CAPACITY = 2
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
-    """Create the demo organisation and group; return ``False`` if they already exist."""
+    """Create the demo organisations and groups; return ``False`` if they already exist."""
+    created = await _seed_group(engine, DEMO_SLUG, "Demo-gemeente", DEMO_SLUG, "Demo: videogesprek")
+    await _seed_group(
+        engine, OTHER_ORGANISATION_SLUG, "Andere gemeente", OTHER_GROUP_SLUG, "Andere: team"
+    )
+    return created
+
+
+async def _seed_group(
+    engine: AsyncEngine, organisation_slug: str, organisation_name: str, slug: str, name: str
+) -> bool:
+    """Create one organisation with one group open on weekdays; skip if the group exists."""
     async with AsyncSession(engine) as session, session.begin():
-        existing = await session.scalar(select(GroupRow.id).where(GroupRow.slug == DEMO_SLUG))
+        existing = await session.scalar(select(GroupRow.id).where(GroupRow.slug == slug))
         if existing is not None:
             return False
-        organisation = OrganisationRow(name="Demo-gemeente", slug=DEMO_SLUG)
+        organisation = OrganisationRow(name=organisation_name, slug=organisation_slug)
         session.add(organisation)
         await session.flush()
         group = GroupRow(
             organisation_id=organisation.id,
-            name="Demo: videogesprek",
-            slug=DEMO_SLUG,
+            name=name,
+            slug=slug,
             timezone="Europe/Amsterdam",
             slot_minutes=30,
             min_notice_minutes=60,
