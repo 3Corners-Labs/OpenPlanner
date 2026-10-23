@@ -12,10 +12,12 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Protocol
 
+from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
+from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, Slot, SlotUsage
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.job_plan import PlannedJob
-from app.domain.scheduling import Group, ScheduleOverride, ScheduleRule
+from app.domain.scheduling import Group, GroupSummary, ScheduleOverride, ScheduleRule
 
 
 class Clock(Protocol):
@@ -55,8 +57,83 @@ class MessageSender(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class LoginStart:
+    """Where to send an admin to log in, and the secrets to check the answer with.
+
+    ``state``, ``nonce`` and ``code_verifier`` are kept in the signed session until the
+    identity provider redirects back; they are never logged.
+    """
+
+    url: str
+    state: str = field(repr=False)
+    nonce: str = field(repr=False)
+    code_verifier: str = field(repr=False)
+
+
+class IdentityError(Exception):
+    """Login failed; ``code`` says why (``token_exchange_failed``, ``invalid_token``, …)."""
+
+    def __init__(self, code: str) -> None:
+        """Store the code; it is also the message."""
+        super().__init__(code)
+        self.code = code
+
+
+class IdentityProvider(Protocol):
+    """The admin portal's identity provider (OIDC; PingFederate in production, ADR 0013)."""
+
+    async def start_login(self, redirect_uri: str) -> LoginStart:
+        """Prepare an authorisation request with fresh ``state``, ``nonce`` and PKCE."""
+        ...
+
+    async def finish_login(
+        self, *, code: str, redirect_uri: str, code_verifier: str, nonce: str
+    ) -> Principal:
+        """Exchange the code, verify the ID token and return the admin it describes.
+
+        Raises:
+            IdentityError: If the exchange or any token check fails.
+        """
+        ...
+
+    async def logout_url(self, post_logout_redirect_uri: str) -> str | None:
+        """Return where to end the session at the provider, or ``None`` if it has no logout.
+
+        Without this, the provider's single sign-on would log the admin straight back in.
+        """
+        ...
+
+
 class Transaction(Protocol):
-    """Everything the domain reads and writes within one database transaction."""
+    """Everything the domain reads and writes within one database transaction.
+
+    Every ``list_*`` method takes a ``Scope`` and returns only what it covers (ADR 0014); a
+    test enforces this for new methods.
+    """
+
+    async def list_groups(self, scope: Scope) -> list[GroupSummary]:
+        """Return the groups inside ``scope``, ordered by organisation and name."""
+        ...
+
+    async def get_group_summary(self, slug: str) -> GroupSummary | None:
+        """Return one group with its organisation, for an authorisation decision."""
+        ...
+
+    async def add_audit_event(self, event: AuditEvent) -> None:
+        """Store an audit event."""
+        ...
+
+    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEntry]:
+        """Return the newest audit events about organisations and groups inside ``scope``.
+
+        Each entry carries the actor's display name from their ``AdminProfile``, if any.
+        """
+        ...
+
+    async def save_admin_profile(self, profile: AdminProfile) -> None:
+        """Create or replace the profile of ``profile.subject``."""
+        ...
 
     async def get_group(self, slug: str) -> Group | None:
         """Return the group with ``slug``."""

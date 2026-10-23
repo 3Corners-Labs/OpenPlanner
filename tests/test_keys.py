@@ -4,7 +4,7 @@ import pytest
 from pydantic import SecretStr
 
 from app.config import Settings
-from app.keys import management_token_key
+from app.keys import management_token_key, session_secret
 
 
 def test_environment_key_wins(tmp_path: Path) -> None:
@@ -40,3 +40,12 @@ def test_production_requires_a_key(tmp_path: Path) -> None:
 def test_short_keys_are_rejected() -> None:
     with pytest.raises(RuntimeError, match="at least 32"):
         management_token_key(Settings(environment="dev", management_token_key=SecretStr("short")))
+
+
+def test_session_secret_follows_the_same_rules(tmp_path: Path) -> None:
+    dev = Settings(environment="dev", dev_session_key_path=tmp_path / "session.key")
+
+    assert session_secret(dev) == session_secret(dev)
+    assert len(session_secret(dev)) >= 32
+    with pytest.raises(RuntimeError, match="SESSION_SECRET"):
+        session_secret(dev.model_copy(update={"environment": "prod"}))

@@ -161,28 +161,40 @@ jobs:
     name: accessibility (Playwright, axe-core, Lighthouse)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # Official image with browsers and their system packages preinstalled, so the job does not
+      # depend on apt mirrors (`playwright install --with-deps` timed out on them). The tag must
+      # match the @playwright/test version in e2e/package.json.
+      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.64.1-noble
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: build and start the app
+      - name: build and start the app with the development identity provider
         run: |
           docker build -t openplanner:e2e .
+          # Keycloak with one test user per role (dev/keycloak/), for the admin role specs.
+          network="$(scripts/run-keycloak-container.sh)"
           # Three browsers each book, move and cancel from one IP: raise the write limit.
-          scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour
+          scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour \
+            --network "$network" \
+            -e OIDC_DISCOVERY_URL=http://keycloak:8080/realms/openplanner/.well-known/openid-configuration \
+            -e OIDC_CLIENT_SECRET=dev-only-openplanner-admin-secret
           docker exec app alembic upgrade head
           docker exec app python -m app.cli seed-demo
-      - name: install browsers
-        working-directory: e2e
+      - name: install e2e tooling
         timeout-minutes: 10
-        run: npm ci && npx playwright install --with-deps
-      - name: keyboard flows + axe (WCAG 2.2 AA, zero violations)
-        working-directory: e2e
-        run: npm test
+        run: |
+          version="${PLAYWRIGHT_IMAGE#*:v}"
+          grep -q "\"@playwright/test\": \"${version%-*}\"" e2e/package.json \
+            || { echo "PLAYWRIGHT_IMAGE does not match @playwright/test in e2e/package.json" >&2; exit 1; }
+          docker run --rm -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE" npm ci
+      - name: keyboard flows, admin roles + axe (WCAG 2.2 AA, zero violations)
+        run: >-
+          docker run --rm --network host --ipc host -e CI=true
+          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE" npm test
       - name: Lighthouse accessibility >= 95
-        working-directory: e2e
-        run: npm run lighthouse
+        run: >-
+          docker run --rm --network host -e CI=true
+          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE" npm run lighthouse
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

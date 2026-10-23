@@ -124,6 +124,15 @@ class Group:
         return timedelta(minutes=self.dispatch_lead_minutes)
 
 
+@dataclass(frozen=True)
+class GroupSummary:
+    """A group with the slug and name of its organisation, for admin listings."""
+
+    group: Group
+    organisation_slug: str
+    organisation_name: str
+
+
 @dataclass(frozen=True, order=True)
 class TimeWindow:
     """Local opening hours ``opens``–``closes`` with ``capacity`` parallel appointments."""

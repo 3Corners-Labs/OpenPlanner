@@ -1,0 +1,22 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<p><a href="/admin/">{{ _("admin.back_to_dashboard") }}</a></p>
+<h1>{{ summary.group.name }}</h1>
+<p>{{ summary.organisation_name }}</p>
+<h2>{{ _("admin.group.settings") }}</h2>
+<dl class="details">
+  <dt>{{ _("admin.group.slot_minutes") }}</dt><dd>{{ _("admin.group.minutes", minutes=summary.group.slot_minutes) }}</dd>
+  <dt>{{ _("admin.group.notice") }}</dt><dd>{{ _("admin.group.minutes", minutes=summary.group.min_notice_minutes) }}</dd>
+  <dt>{{ _("admin.group.horizon") }}</dt><dd>{{ _("admin.group.days", days=summary.group.horizon_days) }}</dd>
+  <dt>{{ _("admin.group.dispatch") }}</dt><dd>{{ _("admin.group.dispatch_value", minutes=summary.group.dispatch_lead_minutes) }}</dd>
+  <dt>{{ _("admin.group.phone") }}</dt><dd>{{ phone_label }}</dd>
+  <dt>{{ _("admin.group.queue") }}</dt><dd>{{ summary.group.wxcc_queue_id or "–" }}</dd>
+</dl>
+<h2>{{ _("admin.group.your_rights") }}</h2>
+<ul>
+  {% for label in group_rights %}
+  <li>{{ label }}</li>
+  {% endfor %}
+</ul>
+{% endblock %}

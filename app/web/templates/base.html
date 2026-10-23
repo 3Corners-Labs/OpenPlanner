@@ -5,12 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ _("site.name") }}{% endblock %}</title>
   <link rel="stylesheet" href="/static/site.css">
+  {% block head_extra %}{% endblock %}
 </head>
 <body>
   <a class="skip-link" href="#content">{{ _("site.skip_to_content") }}</a>
   <header class="site-header">
-    <p class="site-name">{{ _("site.name") }}</p>
+    <p class="site-name">{% block site_name %}{{ _("site.name") }}{% endblock %}</p>
     {% include "_language_switcher.html" %}
+    {% block header_extra %}{% endblock %}
   </header>
   <main id="content" tabindex="-1">
     {% block content %}{% endblock %}

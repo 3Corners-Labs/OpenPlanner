@@ -41,8 +41,18 @@ def test_production_is_the_default_and_refuses_development_defaults(
     with pytest.raises(ValueError, match="https"):
         Settings(management_token_key="k" * 32)  # type: ignore[arg-type]
 
-    settings = Settings(
-        management_token_key="k" * 32,  # type: ignore[arg-type]
-        public_base_url="https://afspraak.example.nl",
-    )
+    with pytest.raises(ValueError, match="SESSION_SECRET"):
+        Settings(
+            management_token_key="k" * 32,  # type: ignore[arg-type]
+            public_base_url="https://afspraak.example.nl",
+        )
+    production = {
+        "management_token_key": "k" * 32,
+        "public_base_url": "https://afspraak.example.nl",
+        "session_secret": "s" * 32,
+    }
+    with pytest.raises(ValueError, match="OIDC"):
+        Settings(**production, oidc_discovery_url="http://idp.local/.well-known")  # type: ignore[arg-type]
+
+    settings = Settings(**production)  # type: ignore[arg-type]
     assert settings.environment == "prod"
