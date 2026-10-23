@@ -110,14 +110,14 @@ jobs:
       - name: build
         run: docker build -t openplanner:ci .
       - name: trivy (CVE)
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: openplanner:ci
           exit-code: "1"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
       - name: trivy (misconfiguration)
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: .
