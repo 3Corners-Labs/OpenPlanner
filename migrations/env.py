@@ -2,6 +2,11 @@
 
 The database URL comes from ``DATABASE_URL`` via ``app.config.Settings``, never from
 ``alembic.ini``. SQLite uses batch mode so that ALTER operations are reversible.
+
+Batch mode rebuilds a table (create copy, move rows, drop old). With foreign keys enforced,
+dropping a table that other rows reference fails, so on SQLite foreign keys are switched off
+for the migration (the pragma only works outside a transaction) and ``PRAGMA
+foreign_key_check`` must come back empty before the migration commits.
 """
 
 import asyncio
@@ -29,17 +34,35 @@ def _render_item(type_: str, obj: Any, autogen_context: Any) -> str | bool:
     return False
 
 
+def _pragma(connection: Connection, statement: str) -> None:
+    """Run a SQLite pragma on the raw connection, outside any transaction."""
+    cursor = connection.connection.dbapi_connection.cursor()  # type: ignore[union-attr]
+    try:
+        cursor.execute(statement)
+    finally:
+        cursor.close()
+
+
 def _run(connection: Connection) -> None:
     """Configure the migration context on ``connection`` and run pending migrations."""
+    sqlite = connection.dialect.name == "sqlite"
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        render_as_batch=connection.dialect.name == "sqlite",
+        render_as_batch=sqlite,
         compare_type=True,
         render_item=_render_item,
     )
-    with context.begin_transaction():
-        context.run_migrations()
+    if sqlite:
+        _pragma(connection, "PRAGMA foreign_keys=OFF")
+    try:
+        with context.begin_transaction():
+            context.run_migrations()
+            if sqlite and connection.exec_driver_sql("PRAGMA foreign_key_check").first():
+                raise RuntimeError("migration left rows that violate a foreign key")
+    finally:
+        if sqlite:
+            _pragma(connection, "PRAGMA foreign_keys=ON")
 
 
 async def _run_online() -> None:
