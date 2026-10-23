@@ -1,0 +1,35 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.audit.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<h1>{{ _("admin.audit.title") }}</h1>
+<p>{{ _("admin.audit.intro") }}</p>
+{% if events %}
+<div class="table-scroll">
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("admin.audit.title") }}</caption>
+  <thead>
+    <tr>
+      <th scope="col">{{ _("admin.audit.when") }}</th>
+      <th scope="col">{{ _("admin.audit.actor") }}</th>
+      <th scope="col">{{ _("admin.audit.action") }}</th>
+      <th scope="col">{{ _("admin.audit.outcome") }}</th>
+      <th scope="col">{{ _("admin.audit.target") }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+    <tr>
+      <td>{{ event.when }}</td>
+      <td>{{ event.actor }}</td>
+      <td>{{ event.action }}</td>
+      <td>{{ event.outcome }}</td>
+      <td>{{ event.target }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="notice">{{ _("admin.audit.empty") }}</p>
+{% endif %}
+{% endblock %}
