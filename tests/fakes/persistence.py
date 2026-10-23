@@ -1,0 +1,112 @@
+"""In-memory UnitOfWork with commit/rollback semantics, for domain service tests."""
+
+import asyncio
+import copy
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime
+
+from app.domain.booking import Booking, BookingStatus, Slot, SlotUsage
+from app.domain.channels import ReminderRule
+from app.domain.job_plan import PlannedJob
+from app.domain.scheduling import Group, ScheduleOverride, ScheduleRule
+
+
+@dataclass
+class State:
+    groups: dict[int, Group] = field(default_factory=dict)
+    rules: dict[int, list[ScheduleRule]] = field(default_factory=dict)
+    overrides: dict[int, list[ScheduleOverride]] = field(default_factory=dict)
+    reminder_rules: dict[int, list[ReminderRule]] = field(default_factory=dict)
+    slots: dict[int, Slot] = field(default_factory=dict)
+    bookings: dict[int, Booking] = field(default_factory=dict)
+    jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
+    next_id: int = 1
+
+
+class InMemoryTransaction:
+    def __init__(self, state: State) -> None:
+        self.state = state
+
+    def _new_id(self) -> int:
+        self.state.next_id += 1
+        return self.state.next_id
+
+    async def get_group(self, slug: str) -> Group | None:
+        return next((g for g in self.state.groups.values() if g.slug == slug), None)
+
+    async def get_group_by_id(self, group_id: int) -> Group | None:
+        return self.state.groups.get(group_id)
+
+    async def get_schedule(
+        self, group_id: int, first_day: date, last_day: date
+    ) -> tuple[list[ScheduleRule], list[ScheduleOverride]]:
+        overrides = [
+            o for o in self.state.overrides.get(group_id, []) if first_day <= o.day <= last_day
+        ]
+        return list(self.state.rules.get(group_id, [])), overrides
+
+    async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:
+        return list(self.state.reminder_rules.get(group_id, []))
+
+    async def get_slot_usage(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[SlotUsage]:
+        return [
+            SlotUsage(s.start, s.capacity_snapshot, await self.count_active_bookings(s.id or 0))
+            for s in self.state.slots.values()
+            if s.group_id == group_id and lower <= s.start < upper
+        ]
+
+    async def get_slot(self, group_id: int, start: datetime) -> Slot | None:
+        return next(
+            (s for s in self.state.slots.values() if s.group_id == group_id and s.start == start),
+            None,
+        )
+
+    async def add_slot(self, slot: Slot) -> Slot:
+        stored = replace(slot, id=self._new_id())
+        self.state.slots[stored.id or 0] = stored
+        return stored
+
+    async def count_active_bookings(self, slot_id: int) -> int:
+        return sum(
+            1
+            for b in self.state.bookings.values()
+            if b.slot_id == slot_id and b.status is BookingStatus.CONFIRMED
+        )
+
+    async def add_booking(self, booking: Booking) -> Booking:
+        stored = replace(booking, id=self._new_id())
+        self.state.bookings[stored.id or 0] = stored
+        return stored
+
+    async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
+        return next((b for b in self.state.bookings.values() if b.token_hash == token_hash), None)
+
+    async def save_booking(self, booking: Booking) -> None:
+        self.state.bookings[booking.id or 0] = booking
+
+    async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
+        self.state.jobs[booking_id] = list(jobs)
+
+
+class InMemoryUnitOfWork:
+    """Locked transactions are serialised; changes are kept only if the block succeeds."""
+
+    def __init__(self, state: State | None = None) -> None:
+        self.state = state or State()
+        self._lock = asyncio.Lock()
+
+    @asynccontextmanager
+    async def read(self) -> AsyncIterator[InMemoryTransaction]:
+        yield InMemoryTransaction(copy.deepcopy(self.state))
+
+    @asynccontextmanager
+    async def locked(self) -> AsyncIterator[InMemoryTransaction]:
+        async with self._lock:
+            working = copy.deepcopy(self.state)
+            yield InMemoryTransaction(working)
+            await asyncio.sleep(0)  # let a competing transaction queue up on the lock
+            self.state = working

@@ -23,7 +23,8 @@ Lightweight group-booking service for a government contact center: embeddable wi
 - `app/domain/` has **no** imports from FastAPI, SQLAlchemy, httpx, or any adapter. Pure Python, fully unit-testable. Domain errors carry codes, never user-facing text.
 - Layers (import-linter): `app.main` → `app.api | app.admin | app.jobs` (never importing each other) → `app.web` (shared HTML plumbing: locale, templates, `render()`) → `app.adapters` → `app.domain`. `app.i18n` is independent of all of them. Every HTML response goes through `app.web.templates.render`.
 - Modular by design (ADR 0005): one home per concern; extract shared behaviour at its second use. Every module, class and public function in `app/`, `migrations/` and `scripts/` has a Google-style docstring stating its responsibility.
-- Every external system is an adapter behind a Protocol in `app/domain/ports.py`: `VideoProvider`, `ContactCenterDispatcher`, `MailSender`, `SmsSender`, `IdentityProvider`, `Clock`. Tests use fakes; contract tests use recorded fixtures.
+- Every external system is an adapter behind a Protocol in `app/domain/ports.py`: `VideoProvider`, `ContactCenterDispatcher` (WxCC Tasks API, ADR 0007), `MessageSender` (one adapter per `ChannelKind`: email, sms, later whatsapp; ADR 0009), `IdentityProvider`, `Clock`. Persistence goes through the `Transaction` Protocol in the same file; its adapter lives in `app/adapters/db/`. Tests use fakes; contract tests use recorded fixtures.
+- Message templates are fixed layouts with editable text blocks from `app/i18n` (catalogue → organisation override → `group_text`), `{placeholder}`s from an allow-list only. Never let admins edit Jinja or HTML (ADR 0009).
 - Authorization is one dependency: `require_scope(org_id=None, group_id=None)`. Every admin query filters by the scope object. Never bypass it "for superuser"; superuser is a scope that matches everything.
 - All time stored as UTC `datetime` with tzinfo; conversion to the group's timezone happens only at the edges (rendering, parsing).
 - A time-based job stores `pinned_start`; on run it re-reads the booking and exits silently if status != confirmed or start != pinned_start. Cancelling or rescheduling a booking deletes its pending jobs in the same transaction.
@@ -72,9 +73,9 @@ Weekly: Renovate updates (security updates immediately), `trivy` on the running 
 ## Security baseline
 - Rate limiting on public endpoints (`slowapi`): 10 bookings/IP/hour, 60 availability reads/IP/minute. Honeypot field on the booking form. Optional Cloudflare Turnstile behind a feature flag; never Google reCAPTCHA.
 - CSP, HSTS, `X-Frame-Options` (admin), CORS allow-list from settings. Widget endpoints allow only configured origins.
-- Webhook calls to Webex Connect carry `X-Signature: t=<ts>,v1=<hmac-sha256>`; inbound webhooks from Connect are verified the same way; reject if |now − ts| > 300 s.
-- Secrets via env/secret store only; `.env.example` has placeholders. `gitleaks` blocks commits.
-- OIDC: `authlib`, PKCE, `state` and `nonce` checked, session cookie `Secure; HttpOnly; SameSite=Lax`, 8 h lifetime.
+- Calls to WxCC use OAuth tokens of a service app (ADR 0007). Every inbound webhook from WxCC is verified (signature or token, per WxCC's mechanism); reject if |now − ts| > 300 s.
+- Bootstrap secrets (settings encryption key, OIDC client secret, session secret) via env/secret store only; `.env.example` has placeholders. Integration secrets (SMTP, WxCC, messaging) are entered in the admin UI, stored AES-256-GCM encrypted, write-only, audited (ADR 0008). `gitleaks` blocks commits.
+- OIDC (admin portal only; citizens never log in): `authlib`, PKCE, `state` and `nonce` checked, session cookie `Secure; HttpOnly; SameSite=Lax`, 8 h lifetime.
 - Dependencies: no package without an active maintainer and a license in {MIT, BSD, Apache-2.0, PSF}. AGPL/GPL packages need an ADR.
 - Threat model lives in `docs/threat-model.md` (STRIDE per flow) together with an abuse-case list per public endpoint (slot exhaustion by bots, token guessing, rescheduling into another group's slot, PII through error messages). Every abuse case has a test. Update both when a flow changes.
 - External penetration test before go-live and yearly; `SECURITY.md` and `/.well-known/security.txt` describe responsible disclosure.

@@ -1,8 +1,208 @@
-"""ORM models. Importing this module registers every table on ``Base.metadata``.
+"""ORM tables. Importing this module registers every table on ``Base.metadata``.
 
-Tables are added from work package 2 onwards.
+Rows are persistence shapes only; ``app.adapters.db.uow`` maps them to domain objects.
+PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
+
+    organisations 1──* groups 1──* schedule_rules
+                         │  └───* schedule_overrides
+                         │  └───* reminder_rules
+                         └──* slots 1──* bookings 1──* jobs
 """
 
-from app.adapters.db.base import Base
+from datetime import date, datetime, time
 
-__all__ = ["Base"]
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Time,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.adapters.db.base import Base
+from app.adapters.db.types import UTCDateTime
+
+__all__ = [
+    "Base",
+    "BookingRow",
+    "GroupRow",
+    "JobRow",
+    "OrganisationRow",
+    "ReminderRuleRow",
+    "ScheduleOverrideRow",
+    "ScheduleRuleRow",
+    "SlotRow",
+]
+
+
+class OrganisationRow(Base):
+    """A client organisation."""
+
+    __tablename__ = "organisations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    slug: Mapped[str] = mapped_column(String(64), unique=True)
+    default_locale: Mapped[str] = mapped_column(String(16), server_default=text("'nl'"))
+
+
+class GroupRow(Base):
+    """A bookable team mapped to a WxCC queue."""
+
+    __tablename__ = "groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="RESTRICT"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    slug: Mapped[str] = mapped_column(String(64), unique=True)
+    timezone: Mapped[str] = mapped_column(String(64))
+    slot_minutes: Mapped[int] = mapped_column(Integer)
+    min_notice_minutes: Mapped[int] = mapped_column(Integer)
+    horizon_days: Mapped[int] = mapped_column(Integer)
+    phone_mode: Mapped[str] = mapped_column(String(16))
+    wxcc_queue_id: Mapped[str | None] = mapped_column(String(128))
+    dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
+
+    __table_args__ = (
+        CheckConstraint("phone_mode IN ('hidden', 'optional', 'required')", name="phone_mode"),
+        CheckConstraint("dispatch_lead_minutes BETWEEN 0 AND 60", name="dispatch_lead"),
+    )
+
+
+class ScheduleRuleRow(Base):
+    """A weekly opening window of a group."""
+
+    __tablename__ = "schedule_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), index=True)
+    weekday: Mapped[int] = mapped_column(Integer)
+    opens: Mapped[time] = mapped_column(Time)
+    closes: Mapped[time] = mapped_column(Time)
+    capacity: Mapped[int] = mapped_column(Integer)
+    valid_from: Mapped[date | None] = mapped_column(Date)
+    valid_to: Mapped[date | None] = mapped_column(Date)
+
+    __table_args__ = (
+        CheckConstraint("weekday BETWEEN 0 AND 6", name="weekday"),
+        CheckConstraint("opens < closes", name="window"),
+        CheckConstraint("capacity >= 1", name="capacity"),
+    )
+
+
+class ScheduleOverrideRow(Base):
+    """One date's opening window, or a closed day when all window columns are NULL."""
+
+    __tablename__ = "schedule_overrides"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    day: Mapped[date] = mapped_column(Date)
+    opens: Mapped[time | None] = mapped_column(Time)
+    closes: Mapped[time | None] = mapped_column(Time)
+    capacity: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        Index("ix_schedule_overrides_group_day", "group_id", "day"),
+        CheckConstraint(
+            "(opens IS NULL AND closes IS NULL AND capacity IS NULL) "
+            "OR (opens < closes AND capacity >= 1)",
+            name="window_or_closed",
+        ),
+    )
+
+
+class ReminderRuleRow(Base):
+    """When and through which channel a group reminds citizens."""
+
+    __tablename__ = "reminder_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    channel: Mapped[str] = mapped_column(String(16))
+    minutes_before: Mapped[int] = mapped_column(Integer)
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "channel", "minutes_before"),
+        CheckConstraint("channel IN ('email', 'sms', 'whatsapp')", name="channel"),
+    )
+
+
+class SlotRow(Base):
+    """A start time with at least one booking; capacity is snapshotted at creation."""
+
+    __tablename__ = "slots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="RESTRICT"))
+    start: Mapped[datetime] = mapped_column(UTCDateTime())
+    end: Mapped[datetime] = mapped_column(UTCDateTime())
+    capacity_snapshot: Mapped[int] = mapped_column(Integer)
+
+    # Backstop for the write lock: one slot row per group and start.
+    __table_args__ = (UniqueConstraint("group_id", "start"),)
+
+
+class BookingRow(Base):
+    """A citizen's appointment. The only table with personal data (nullable for the purge)."""
+
+    __tablename__ = "bookings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slot_id: Mapped[int] = mapped_column(ForeignKey("slots.id", ondelete="RESTRICT"))
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="RESTRICT"), index=True)
+    status: Mapped[str] = mapped_column(String(16))
+    name: Mapped[str | None] = mapped_column(String(100))
+    email: Mapped[str | None] = mapped_column(String(254))
+    phone: Mapped[str | None] = mapped_column(String(16))
+    locale: Mapped[str] = mapped_column(String(16))
+    consents: Mapped[str] = mapped_column(String(64), server_default=text("''"))
+    management_token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    guest_join_url: Mapped[str | None] = mapped_column(String(2048))
+    host_join_url: Mapped[str | None] = mapped_column(String(2048))
+    video_room_id: Mapped[str | None] = mapped_column(String(255))
+    wxcc_task_id: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    pii_purged_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    rescheduled_from_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bookings.id", ondelete="SET NULL")
+    )
+
+    __table_args__ = (
+        Index("ix_bookings_slot_status", "slot_id", "status"),
+        CheckConstraint(
+            "status IN ('confirmed', 'cancelled', 'completed', 'no_show')", name="status"
+        ),
+    )
+
+
+class JobRow(Base):
+    """A background job of a booking. Carries no personal data (CLAUDE.md)."""
+
+    __tablename__ = "jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
+    type: Mapped[str] = mapped_column(String(32))
+    run_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    pinned_start: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    channel: Mapped[str | None] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16), server_default=text("'pending'"))
+    attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    last_error: Mapped[str | None] = mapped_column(String(255))
+
+    __table_args__ = (
+        Index("ix_jobs_status_run_at", "status", "run_at"),
+        Index("ix_jobs_booking_id", "booking_id"),
+        CheckConstraint("status IN ('pending', 'running', 'done', 'failed')", name="status"),
+    )
