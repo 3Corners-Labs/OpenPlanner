@@ -112,6 +112,7 @@ TABS = (
     Tab("admin.tab.settings", "/settings", Permission.GROUP_EDIT, "settings"),
     Tab("admin.tab.hours", "/hours", Permission.SCHEDULE_MANAGE, "clock"),
     Tab("admin.tab.exceptions", "/exceptions", Permission.SCHEDULE_MANAGE, "calendar"),
+    Tab("admin.tab.agenda", "/agenda", Permission.BOOKINGS_VIEW, "agenda"),
 )
 
 
@@ -137,7 +138,7 @@ def _done(request: Request, _: BoundGettext) -> str | None:
     return _(DONE_MESSAGES[key]) if key in DONE_MESSAGES else None
 
 
-def _group_page(
+def group_page(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
@@ -429,7 +430,7 @@ async def group(
     group_rights = [
         _(PERMISSION_LABELS[p]) for p in Permission if LEVELS[p] is Level.GROUP and can(p, summary)
     ]
-    return _group_page(
+    return group_page(
         request,
         locale,
         context,
@@ -534,7 +535,7 @@ def _settings_response(
     """Render the settings form."""
     current = settings_of(context.group.group)
     planning, integrations = _settings_fields(form, current, locale.gettext)
-    return _group_page(
+    return group_page(
         request,
         locale,
         context,
@@ -666,7 +667,7 @@ async def _hours_response(
 ) -> HTMLResponse:
     """Render the weekly hours with the add-window form."""
     schedule = await planning_service(request).schedule(context.principal, context.group.group.slug)
-    return _group_page(
+    return group_page(
         request,
         locale,
         context,
@@ -774,7 +775,7 @@ async def _exceptions_response(
 ) -> HTMLResponse:
     """Render the exceptions with the add-exception form."""
     schedule = await planning_service(request).schedule(context.principal, context.group.group.slug)
-    return _group_page(
+    return group_page(
         request,
         locale,
         context,

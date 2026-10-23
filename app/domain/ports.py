@@ -15,7 +15,13 @@ from typing import Protocol
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
-from app.domain.calls import BookingEvent, CallStatus, MeetingRequest, WorkItem
+from app.domain.calls import (
+    BookingEvent,
+    BookingOverview,
+    CallStatus,
+    MeetingRequest,
+    WorkItem,
+)
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
@@ -262,6 +268,15 @@ class Transaction(Protocol):
 
     async def get_booking_events(self, booking_id: int) -> list[BookingEvent]:
         """Return a booking's timeline, oldest first (access is checked by the caller)."""
+        ...
+
+    async def list_bookings(
+        self, scope: Scope, group_id: int, lower: datetime, upper: datetime
+    ) -> list[BookingOverview]:
+        """Return the group's bookings with lower <= start < upper and their call status.
+
+        The group must lie inside ``scope`` (ADR 0014); otherwise the list is empty.
+        """
         ...
 
     async def get_call_status(self, booking_id: int) -> CallStatus | None:

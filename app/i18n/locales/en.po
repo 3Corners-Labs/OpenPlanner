@@ -1006,3 +1006,180 @@ msgstr "The agent is in the call."
 
 msgid "wait.unavailable"
 msgstr "Unfortunately no agent is available right now. Book an appointment for a moment that suits you."
+
+msgid "call.state.none"
+msgstr "No meeting"
+
+msgid "call.state.scheduled"
+msgstr "Meeting ready"
+
+msgid "call.state.in_progress"
+msgstr "Call in progress"
+
+msgid "call.state.ended"
+msgstr "Ended"
+
+msgid "call.task.none"
+msgstr "No task yet"
+
+msgid "call.task.queued"
+msgstr "In the queue"
+
+msgid "call.task.connected"
+msgstr "Accepted"
+
+msgid "call.task.ended"
+msgstr "Task ended"
+
+msgid "call.task.failed"
+msgstr "Task failed"
+
+msgid "call.event.meeting_created"
+msgstr "Video meeting created"
+
+msgid "call.event.meeting_deleted"
+msgstr "Video meeting deleted"
+
+msgid "call.event.join_page_opened"
+msgstr "Citizen opened the join page"
+
+msgid "call.event.join_clicked"
+msgstr "Citizen clicked join"
+
+msgid "call.event.task_created"
+msgstr "Task placed in the WxCC queue"
+
+msgid "call.event.task_failed"
+msgstr "Task failed"
+
+msgid "call.event.task_connected"
+msgstr "Agent accepted the task"
+
+msgid "call.event.task_ended"
+msgstr "Task ended"
+
+msgid "call.event.meeting_started"
+msgstr "Meeting started"
+
+msgid "call.event.host_joined"
+msgstr "Agent joined"
+
+msgid "call.event.guest_joined"
+msgstr "Participant joined"
+
+msgid "call.event.participant_left"
+msgstr "Participant left"
+
+msgid "call.event.meeting_ended"
+msgstr "Meeting ended"
+
+msgid "call.event.integration_error"
+msgstr "Integration failed"
+
+msgid "call.kind.scheduled"
+msgstr "Appointment"
+
+msgid "call.kind.direct"
+msgstr "Direct"
+
+msgid "admin.tab.agenda"
+msgstr "Agenda"
+
+msgid "admin.agenda.days"
+msgstr "Other day"
+
+msgid "admin.agenda.previous"
+msgstr "Previous day"
+
+msgid "admin.agenda.today"
+msgstr "Today"
+
+msgid "admin.agenda.next"
+msgstr "Next day"
+
+msgid "admin.agenda.caption"
+msgstr "Appointments on {day}"
+
+msgid "admin.agenda.time"
+msgstr "Time"
+
+msgid "admin.agenda.citizen"
+msgstr "Citizen"
+
+msgid "admin.agenda.meeting"
+msgstr "Video meeting"
+
+msgid "admin.agenda.task"
+msgstr "WxCC task"
+
+msgid "admin.agenda.agent"
+msgstr "Agent joined"
+
+msgid "admin.agenda.participants"
+msgstr "Participants"
+
+msgid "admin.agenda.details"
+msgstr "Details"
+
+msgid "admin.agenda.cancelled"
+msgstr "Cancelled"
+
+msgid "admin.agenda.not_picked_up"
+msgstr "Not picked up"
+
+msgid "admin.agenda.empty"
+msgstr "No appointments on this day."
+
+msgid "admin.booking.back"
+msgstr "Back to the agenda"
+
+msgid "admin.booking.timeline"
+msgstr "Timeline"
+
+msgid "admin.booking.no_events"
+msgstr "Nothing has happened yet."
+
+msgid "admin.nav.integrations"
+msgstr "Integrations"
+
+msgid "admin.integrations.title"
+msgstr "Integrations"
+
+msgid "admin.integrations.lead"
+msgstr "Webex meetings and Webex Contact Center for the whole installation. Secrets are stored encrypted and never shown."
+
+msgid "admin.integrations.refresh_warning"
+msgstr "The Webex Service App's refresh token expires on {date}. Generate a new one in time (runbook)."
+
+msgid "admin.integrations.webex"
+msgstr "Webex Service App"
+
+msgid "admin.integrations.service_app"
+msgstr "Service App"
+
+msgid "admin.integrations.access_token"
+msgstr "Access token valid until"
+
+msgid "admin.integrations.refresh_token"
+msgstr "Refresh token valid until"
+
+msgid "admin.integrations.not_used"
+msgstr "Not used yet"
+
+msgid "admin.integrations.wxcc"
+msgstr "Webex Contact Center"
+
+msgid "admin.integrations.webhooks"
+msgstr "Webhooks"
+
+msgid "admin.integrations.webhooks_lead"
+msgstr "These addresses receive the events from Webex and WxCC. Register them with python -m app.cli register-webhooks."
+
+msgid "admin.integrations.secret_set"
+msgstr "Secret set"
+
+msgid "admin.integrations.secret_missing"
+msgstr "No secret set: the address is disabled"
+
+msgid "admin.integrations.groups"
+msgstr "Groups"

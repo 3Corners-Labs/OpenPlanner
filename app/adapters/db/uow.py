@@ -43,7 +43,15 @@ from app.domain.booking import (
     Slot,
     SlotUsage,
 )
-from app.domain.calls import BookingEvent, CallState, CallStatus, EventKind, TaskState
+from app.domain.calls import (
+    BookingEvent,
+    BookingOverview,
+    CallState,
+    CallStatus,
+    EventKind,
+    TaskState,
+    new_status,
+)
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import PlannedJob
@@ -465,6 +473,32 @@ class SqlTransaction:
             .order_by(BookingEventRow.at, BookingEventRow.id)
         )
         return [BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail) for r in rows]
+
+    async def list_bookings(
+        self, scope: Scope, group_id: int, lower: datetime, upper: datetime
+    ) -> list[BookingOverview]:
+        """Return the group's bookings in [lower, upper) with their status, inside ``scope``."""
+        rows = await self._session.execute(
+            select(BookingRow, SlotRow, CallStatusRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .join(GroupRow, GroupRow.id == BookingRow.group_id)
+            .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
+            .outerjoin(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
+            .where(
+                BookingRow.group_id == group_id,
+                SlotRow.start >= lower,
+                SlotRow.start < upper,
+                scope_filter(scope, OrganisationRow.slug, GroupRow.slug),
+            )
+            .order_by(SlotRow.start, BookingRow.id)
+        )
+        return [
+            BookingOverview(
+                _booking(booking, slot),
+                _call_status(status) if status else new_status(booking.id),
+            )
+            for booking, slot, status in rows
+        ]
 
     async def get_call_status(self, booking_id: int) -> CallStatus | None:
         """Return the booking's aggregated call status."""

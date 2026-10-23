@@ -158,6 +158,14 @@ def not_picked_up(status: CallStatus, start: datetime, now: datetime, limit: tim
 
 
 @dataclass(frozen=True)
+class BookingOverview:
+    """A booking with its call status, for the admin agenda."""
+
+    booking: Booking
+    status: CallStatus
+
+
+@dataclass(frozen=True)
 class MeetingRequest:
     """What the video provider needs to schedule a booking's meeting (no citizen data)."""
 

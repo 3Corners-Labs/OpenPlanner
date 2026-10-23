@@ -88,3 +88,31 @@ async def test_timeline_and_status_round_trip(engine: AsyncEngine) -> None:
     assert stored_status.host_joined
     assert stored_status.started_at == NOW
     assert nothing is None
+
+
+async def test_bookings_are_listed_per_day_within_the_scope(engine: AsyncEngine) -> None:
+    from app.domain.authorization import Scope
+
+    booking_id = await _booking_id(engine)
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        await tx.save_call_status(apply_event(new_status(booking_id), EventKind.TASK_CREATED, NOW))
+        group = await tx.get_group("aangifte")
+    assert group is not None
+    lower = SLOT_0900 - timedelta(hours=9)
+    upper = lower + timedelta(days=1)
+
+    async with uow.read() as tx:
+        everything = await tx.list_bookings(Scope(everything=True), group.id, lower, upper)
+        own = await tx.list_bookings(Scope(groups=frozenset({"aangifte"})), group.id, lower, upper)
+        other = await tx.list_bookings(Scope(groups=frozenset({"other"})), group.id, lower, upper)
+        next_day = await tx.list_bookings(
+            Scope(everything=True), group.id, upper, upper + timedelta(days=1)
+        )
+
+    assert [(row.booking.id, row.status.task) for row in everything] == [
+        (booking_id, TaskState.QUEUED)
+    ]
+    assert [row.booking.id for row in own] == [booking_id]
+    assert other == []
+    assert next_day == []

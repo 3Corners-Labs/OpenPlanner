@@ -224,3 +224,18 @@ async def test_status_of_a_booking_for_the_waiting_page(service: IntegrationServ
     status = await service.status(123)
     assert status.task is TaskState.QUEUED
     assert status.call is CallState.NONE
+
+
+async def test_day_overview_lists_the_groups_bookings_with_status(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    await service.record(123, EventKind.TASK_CREATED)
+
+    overview = await service.day_overview(GROUP_ADMIN, "demo", SLOT_0900.date())
+
+    assert [(row.booking.id, row.status.task) for row in overview] == [(123, TaskState.QUEUED)]
+    assert (
+        await service.day_overview(GROUP_ADMIN, "demo", SLOT_0900.date() + timedelta(days=1)) == []
+    )
+    with pytest.raises(DomainError, match="not_permitted"):
+        await service.day_overview(OUTSIDER, "demo", SLOT_0900.date())

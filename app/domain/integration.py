@@ -6,12 +6,19 @@ Admins see a booking's timeline only with ``bookings.view`` on its group (ADR 00
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, date, datetime, time, timedelta
 
 from app.domain.admin import AdminService
-from app.domain.authorization import Permission, Principal
+from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.booking import Booking
-from app.domain.calls import BookingEvent, CallStatus, EventKind, apply_event, new_status
+from app.domain.calls import (
+    BookingEvent,
+    BookingOverview,
+    CallStatus,
+    EventKind,
+    apply_event,
+    new_status,
+)
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, Transaction, UnitOfWork
 
@@ -77,6 +84,24 @@ class IntegrationService:
         """Return a booking's call status (the citizen's waiting page; no admin data)."""
         async with self._uow.read() as tx:
             return await tx.get_call_status(booking_id) or new_status(booking_id)
+
+    async def day_overview(
+        self, principal: Principal, slug: str, day: date
+    ) -> list[BookingOverview]:
+        """Return the group's bookings of ``day`` (group time) with their call status.
+
+        Raises:
+            DomainError: ``group_not_found`` or ``not_permitted``.
+        """
+        permission = Permission.BOOKINGS_VIEW
+        authorization = await self._admin.authorize(principal, permission, group_slug=slug)
+        if not authorization.decision.allowed or authorization.group is None:
+            raise DomainError(ErrorCode.NOT_PERMITTED)
+        group = authorization.group.group
+        lower = datetime.combine(day, time(0), tzinfo=group.tz).astimezone(UTC)
+        upper = lower + timedelta(days=1)
+        async with self._uow.read() as tx:
+            return await tx.list_bookings(scope_for(principal, permission), group.id, lower, upper)
 
     async def timeline(self, principal: Principal, booking_id: int) -> Timeline:
         """Return the booking's timeline if ``principal`` may view its group's bookings.

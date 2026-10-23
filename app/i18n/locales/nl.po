@@ -1006,3 +1006,180 @@ msgstr "De medewerker is in het gesprek."
 
 msgid "wait.unavailable"
 msgstr "Er is nu helaas geen medewerker beschikbaar. Maak een afspraak, dan bellen we op een moment dat u schikt."
+
+msgid "call.state.none"
+msgstr "Geen meeting"
+
+msgid "call.state.scheduled"
+msgstr "Meeting klaar"
+
+msgid "call.state.in_progress"
+msgstr "Gesprek bezig"
+
+msgid "call.state.ended"
+msgstr "Afgelopen"
+
+msgid "call.task.none"
+msgstr "Nog geen taak"
+
+msgid "call.task.queued"
+msgstr "In de wachtrij"
+
+msgid "call.task.connected"
+msgstr "Aangenomen"
+
+msgid "call.task.ended"
+msgstr "Taak beëindigd"
+
+msgid "call.task.failed"
+msgstr "Taak mislukt"
+
+msgid "call.event.meeting_created"
+msgstr "Videomeeting aangemaakt"
+
+msgid "call.event.meeting_deleted"
+msgstr "Videomeeting verwijderd"
+
+msgid "call.event.join_page_opened"
+msgstr "Burger opende de deelnamepagina"
+
+msgid "call.event.join_clicked"
+msgstr "Burger klikte op deelnemen"
+
+msgid "call.event.task_created"
+msgstr "Taak in de WxCC-wachtrij gezet"
+
+msgid "call.event.task_failed"
+msgstr "Taak mislukt"
+
+msgid "call.event.task_connected"
+msgstr "Medewerker nam de taak aan"
+
+msgid "call.event.task_ended"
+msgstr "Taak beëindigd"
+
+msgid "call.event.meeting_started"
+msgstr "Meeting gestart"
+
+msgid "call.event.host_joined"
+msgstr "Medewerker kwam binnen"
+
+msgid "call.event.guest_joined"
+msgstr "Deelnemer kwam binnen"
+
+msgid "call.event.participant_left"
+msgstr "Deelnemer vertrok"
+
+msgid "call.event.meeting_ended"
+msgstr "Meeting beëindigd"
+
+msgid "call.event.integration_error"
+msgstr "Koppeling mislukt"
+
+msgid "call.kind.scheduled"
+msgstr "Afspraak"
+
+msgid "call.kind.direct"
+msgstr "Direct"
+
+msgid "admin.tab.agenda"
+msgstr "Agenda"
+
+msgid "admin.agenda.days"
+msgstr "Andere dag"
+
+msgid "admin.agenda.previous"
+msgstr "Vorige dag"
+
+msgid "admin.agenda.today"
+msgstr "Vandaag"
+
+msgid "admin.agenda.next"
+msgstr "Volgende dag"
+
+msgid "admin.agenda.caption"
+msgstr "Afspraken op {day}"
+
+msgid "admin.agenda.time"
+msgstr "Tijd"
+
+msgid "admin.agenda.citizen"
+msgstr "Burger"
+
+msgid "admin.agenda.meeting"
+msgstr "Videomeeting"
+
+msgid "admin.agenda.task"
+msgstr "WxCC-taak"
+
+msgid "admin.agenda.agent"
+msgstr "Medewerker binnen"
+
+msgid "admin.agenda.participants"
+msgstr "Deelnemers"
+
+msgid "admin.agenda.details"
+msgstr "Details"
+
+msgid "admin.agenda.cancelled"
+msgstr "Geannuleerd"
+
+msgid "admin.agenda.not_picked_up"
+msgstr "Niet opgepakt"
+
+msgid "admin.agenda.empty"
+msgstr "Geen afspraken op deze dag."
+
+msgid "admin.booking.back"
+msgstr "Terug naar de agenda"
+
+msgid "admin.booking.timeline"
+msgstr "Verloop"
+
+msgid "admin.booking.no_events"
+msgstr "Nog niets gebeurd."
+
+msgid "admin.nav.integrations"
+msgstr "Koppelingen"
+
+msgid "admin.integrations.title"
+msgstr "Koppelingen"
+
+msgid "admin.integrations.lead"
+msgstr "Webex-meetings en Webex Contact Center voor de hele installatie. Geheimen staan versleuteld opgeslagen en worden nooit getoond."
+
+msgid "admin.integrations.refresh_warning"
+msgstr "Het verversingstoken van de Webex Service App verloopt op {date}. Genereer tijdig een nieuw token (runbook)."
+
+msgid "admin.integrations.webex"
+msgstr "Webex Service App"
+
+msgid "admin.integrations.service_app"
+msgstr "Service App"
+
+msgid "admin.integrations.access_token"
+msgstr "Toegangstoken geldig tot"
+
+msgid "admin.integrations.refresh_token"
+msgstr "Verversingstoken geldig tot"
+
+msgid "admin.integrations.not_used"
+msgstr "Nog niet gebruikt"
+
+msgid "admin.integrations.wxcc"
+msgstr "Webex Contact Center"
+
+msgid "admin.integrations.webhooks"
+msgstr "Webhooks"
+
+msgid "admin.integrations.webhooks_lead"
+msgstr "Deze adressen ontvangen de meldingen van Webex en WxCC. Registreer ze met python -m app.cli register-webhooks."
+
+msgid "admin.integrations.secret_set"
+msgstr "Geheim ingesteld"
+
+msgid "admin.integrations.secret_missing"
+msgstr "Geen geheim ingesteld: het adres is uitgeschakeld"
+
+msgid "admin.integrations.groups"
+msgstr "Groepen"
