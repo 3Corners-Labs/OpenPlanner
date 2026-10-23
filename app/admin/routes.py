@@ -5,7 +5,7 @@ ones are listed in ``PUBLIC_ADMIN_PATHS`` and the route-coverage test checks bot
 
     GET  /admin/login        → identity provider (state, nonce, PKCE in the session)
     GET  /admin/callback     → verify, start a fresh session, audit the login
-    POST /admin/logout       → end the session, audit the logout
+    POST /admin/logout       → end the session here and at the provider, audit the logout
     GET  /admin/             dashboard.view   groups in scope
     GET  /admin/rights       rights.view      own permissions with their scope
     GET  /admin/matrix       matrix.view      the whole matrix (same data as the docs)
@@ -170,16 +170,28 @@ def _page(
 
 
 def _message(
-    request: Request, locale: RequestLocale, status: int, title_key: str, message_key: str
+    request: Request,
+    locale: RequestLocale,
+    status: int,
+    title_key: str,
+    message_key: str,
+    *,
+    back_link: bool = True,
 ) -> HTMLResponse:
-    """Render a plain message page (login failed, forbidden, not configured, logged out)."""
-    response = render(
-        templates,
-        request,
-        "error.html",
-        locale,
-        {"title": locale.gettext(title_key), "message": locale.gettext(message_key)},
-    )
+    """Render a message page; with a logged-in admin inside the portal layout and menu.
+
+    ``back_link=False`` drops the link to the overview, for visitors it would only loop back.
+    """
+    context: dict[str, object] = {
+        "title": locale.gettext(title_key),
+        "message": locale.gettext(message_key),
+        "back_link": back_link,
+    }
+    principal = session_principal(request)
+    if principal is not None:
+        response = _page(request, locale, "admin/message.html", principal, context)
+    else:
+        response = render(templates, request, "admin/public_message.html", locale, context)
     response.status_code = status
     return response
 
@@ -239,13 +251,22 @@ async def callback(
 
 @router.post("/logout", response_class=HTMLResponse)
 @limiter.limit(read_limit)
-async def logout(request: Request, _: SameOrigin) -> Response:
-    """End the admin session."""
+async def logout(request: Request, locale: Locale, _: SameOrigin) -> Response:
+    """End the admin session here and at the identity provider (no silent re-login)."""
     principal = session_principal(request)
     end_session(request)
     if principal is not None:
         await admin_service(request).record(principal.subject, LOGOUT_EVENT, Outcome.SUCCESS)
-    return RedirectResponse("/admin/logged-out", status_code=303)
+    logged_out = f"{request.app.state.settings.public_base_url.rstrip('/')}/admin/logged-out"
+    provider = _identity_provider(request)
+    provider_logout = await provider.logout_url(logged_out) if provider else None
+    if provider_logout is None:
+        return RedirectResponse("/admin/logged-out", status_code=303)
+    # A redirect from a form POST to the provider would be blocked by CSP form-action 'self';
+    # a page that navigates on (meta refresh, plus a visible link) keeps the CSP strict.
+    return render(
+        templates, request, "admin/logout_redirect.html", locale, {"logout_url": provider_logout}
+    )
 
 
 @router.get("/logged-out", response_class=HTMLResponse)
@@ -422,9 +443,13 @@ def register_admin(app: FastAPI) -> None:
         return RedirectResponse(f"/admin/login?next={target}", status_code=303)
 
     async def access_denied(request: Request, exc: Exception) -> Response:
-        return _message(
-            request, resolve_locale(request), 403, "admin.forbidden.title", "admin.forbidden.text"
-        )
+        locale = resolve_locale(request)
+        principal = session_principal(request)
+        if principal is not None and not permissions_for(principal):
+            return _message(
+                request, locale, 403, "admin.forbidden.title", "admin.no_role.text", back_link=False
+            )
+        return _message(request, locale, 403, "admin.forbidden.title", "admin.forbidden.text")
 
     handlers: dict[type[Exception], Callable[[Request, Exception], object]] = {
         LoginRequired: login_required,

@@ -129,7 +129,15 @@ async def test_logout(site: Site) -> None:
     response = await site.client.post("/admin/logout", headers=SAME_ORIGIN)
 
     assert refused.status_code == 403
-    assert response.headers["location"] == "/admin/logged-out"
+    # Also ends the session at the provider, so single sign-on cannot log the admin back in.
+    # A page navigates on, because CSP form-action 'self' blocks a cross-origin POST redirect.
+    provider_logout = (
+        "https://idp.test/logout?post_logout_redirect_uri=http://127.0.0.1:8000/admin/logged-out"
+    )
+    assert response.status_code == 200
+    assert f'<meta http-equiv="refresh" content="0;url={provider_logout}">' in response.text
+    assert f'href="{provider_logout}"' in response.text
+    assert "form-action 'self'" in response.headers["content-security-policy"]
     assert (await site.client.get("/admin/logged-out")).status_code == 200
     assert (await site.client.get("/admin/")).status_code == 303
     assert ("sub-org", "admin.logout", Outcome.SUCCESS, "") in await audit_events(site)
@@ -219,6 +227,26 @@ async def test_no_role_sees_a_forbidden_page(site: Site) -> None:
 
     assert response.status_code == 403
     assert "Geen toegang" in response.text
+    assert "geen rol in het beheerportaal" in response.text
+    assert 'href="/admin/">' not in response.text  # the overview would only loop back here
+
+
+async def test_forbidden_page_keeps_the_admin_menu_and_logout(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await site.client.get("/admin/groups/andere-team")).text
+
+    assert "<title>Geen toegang – Beheer</title>" in text
+    assert 'href="/admin/rights"' in text
+    assert 'action="/admin/logout"' in text
+    assert 'href="/admin/">Terug naar het overzicht' in text
+
+
+async def test_public_admin_pages_say_beheer(site: Site) -> None:
+    text = (await site.client.get("/admin/logged-out")).text
+
+    assert '<p class="site-name">Beheer</p>' in text
+    assert 'action="/admin/logout"' not in text
 
 
 async def test_unknown_group_is_a_404(site: Site) -> None:

@@ -22,3 +22,6 @@ class FakeIdentityProvider:
             raise IdentityError(self.fail)
         assert self.next_principal is not None
         return self.next_principal
+
+    async def logout_url(self, post_logout_redirect_uri: str) -> str | None:
+        return f"https://idp.test/logout?post_logout_redirect_uri={post_logout_redirect_uri}"

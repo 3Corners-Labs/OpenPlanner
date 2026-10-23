@@ -49,4 +49,7 @@ be actively maintained and the de-facto standard in their field (CLAUDE.md, `doc
   organisations and groups in the ID token. The runbook lists them.
 - Who maintains role and group membership in PingFederate (O3, identity management) is still
   an organisational question.
-- Logout ends the local session; single logout at PingFederate is not required now.
+- Logout ends the local session **and** the session at the provider (OIDC RP-initiated
+  logout via `end_session_endpoint`, with `client_id` and `post_logout_redirect_uri`). Without
+  it, single sign-on logged the admin straight back in, which a walk-through as several roles
+  showed. PingFederate must allow `https://<host>/admin/logged-out` as post-logout redirect.

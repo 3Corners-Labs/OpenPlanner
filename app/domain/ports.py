@@ -97,6 +97,13 @@ class IdentityProvider(Protocol):
         """
         ...
 
+    async def logout_url(self, post_logout_redirect_uri: str) -> str | None:
+        """Return where to end the session at the provider, or ``None`` if it has no logout.
+
+        Without this, the provider's single sign-on would log the admin straight back in.
+        """
+        ...
+
 
 class Transaction(Protocol):
     """Everything the domain reads and writes within one database transaction.
