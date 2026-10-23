@@ -18,3 +18,6 @@ mutants/
 # ZAP writes reports and its generated config next to the rules file.
 .zap/*
 !.zap/rules.tsv
+
+# Local gstack reports (security audits stay on the machine)
+.gstack/

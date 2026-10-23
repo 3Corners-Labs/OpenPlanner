@@ -70,7 +70,17 @@ In PingFederate, create an OIDC client:
 | Role values | `openplanner-superuser`, `openplanner-org-admin`, `openplanner-group-admin` (configurable with `OIDC_ROLE_*`) |
 
 Organisation and group claims carry the slugs shown in the portal (`/g/<group-slug>`). A claim
-without the matching role grants nothing. Check a new set-up by logging in with one account per
+without the matching role grants nothing. Fill these claims only from sources that admins
+manage (directory groups or attributes users cannot edit themselves); a self-editable attribute
+would let anyone grant themselves the superuser role.
+
+Roles are read at login and kept in the session for its lifetime (`ADMIN_SESSION_HOURS`,
+default 8). Revoking a role in PingFederate takes effect at the admin's next login, at the latest
+after that lifetime. For an urgent revocation, rotate `SESSION_SECRET` (logs everyone out).
+
+Logout sends `client_id` and `post_logout_redirect_uri` to the `end_session_endpoint`, without
+`id_token_hint`. Check during set-up that PingFederate accepts this and ends the SSO session;
+otherwise the admin is logged straight back in on the next visit. Check a new set-up by logging in with one account per
 role and comparing "Mijn rechten" with `docs/authorization.md`; denied attempts and logins are
 in the audit log.
 
