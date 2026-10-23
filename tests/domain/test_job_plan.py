@@ -5,6 +5,8 @@ from app.domain.channels import ChannelKind, ReminderRule, reachable
 from app.domain.job_plan import JobType, PlannedJob, plan_for_booking, plan_for_cancellation
 from app.domain.scheduling import PhoneMode
 
+LEAD = timedelta(minutes=5)
+
 NOW = datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
 START = datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
 END = START + timedelta(minutes=30)
@@ -24,6 +26,7 @@ def plan(**kwargs: object) -> list[PlannedJob]:
         "consents": frozenset(),
         "rules": [],
         "now": NOW,
+        "dispatch_lead": LEAD,
     }
     params.update(kwargs)
     return plan_for_booking(**params)  # type: ignore[arg-type]
@@ -82,6 +85,16 @@ def test_reminder_exactly_at_now_is_skipped() -> None:
     ]
 
     assert not [j for j in plan(rules=rules) if j.type is JobType.SEND_REMINDER]
+
+
+def test_dispatch_follows_the_groups_lead() -> None:
+    dispatch = [
+        j for j in plan(dispatch_lead=timedelta(minutes=15)) if j.type is JobType.DISPATCH_WXCC_TASK
+    ]
+
+    assert dispatch == [
+        PlannedJob(JobType.DISPATCH_WXCC_TASK, START - timedelta(minutes=15), START)
+    ]
 
 
 def test_dispatch_is_not_planned_in_the_past() -> None:

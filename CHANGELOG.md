@@ -21,4 +21,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - Persistence: booking schema (migration 0002), SQL unit of work with `BEGIN IMMEDIATE`,
   UTC-safe datetime columns.
 - ADRs 0007 (WxCC Tasks API), 0008 (admin-managed secrets), 0009 (channels and templates).
+- Bookings are read-only from the WxCC dispatch moment (`dispatch_lead_minutes` per group,
+  default 5): cancel and reschedule raise `booking_locked`.
+- ADR 0010: live meeting status (state, participants, host joined) for group admins.
 

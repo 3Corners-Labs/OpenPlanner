@@ -69,9 +69,11 @@ class GroupRow(Base):
     horizon_days: Mapped[int] = mapped_column(Integer)
     phone_mode: Mapped[str] = mapped_column(String(16))
     wxcc_queue_id: Mapped[str | None] = mapped_column(String(128))
+    dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
 
     __table_args__ = (
         CheckConstraint("phone_mode IN ('hidden', 'optional', 'required')", name="phone_mode"),
+        CheckConstraint("dispatch_lead_minutes BETWEEN 0 AND 60", name="dispatch_lead"),
     )
 
 

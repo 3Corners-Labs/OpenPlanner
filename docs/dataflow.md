@@ -31,6 +31,10 @@ Jobs, slots, schedules and audit data carry no personal data.
 
 ## Planned flows
 
+Live meeting status (WP5/WP7, ADR 0010): Webex → service through signed webhook events and
+Meetings API polling. Only aggregates are stored (state, participant count, host joined,
+start/end times); participant names, emails and IP addresses are processed in memory only.
+
 To be added per work package: booking (WP3), mail (WP4), Webex video (WP5), Webex Connect task
 and SMS (WP6), admin/IdP (WP7), purge and backups (WP8). Each flow lists: data items, source,
 destination, legal basis owner, retention.

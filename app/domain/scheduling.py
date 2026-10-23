@@ -16,7 +16,7 @@ time. That is a single number because the WxCC queue assigns the actual agent (H
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import date, time
+from datetime import date, time, timedelta
 from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -26,6 +26,9 @@ _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 MAX_SLUG_LENGTH = 64
 MAX_CAPACITY = 1000
 """Upper bound per window; protects against typos such as 1000000."""
+
+DEFAULT_DISPATCH_LEAD_MINUTES = 5
+MAX_DISPATCH_LEAD_MINUTES = 60
 
 
 def _invalid(field: str) -> DomainError:
@@ -62,7 +65,10 @@ class Group:
         min_notice_minutes: How long before the start booking closes.
         horizon_days: How far ahead citizens can book.
         phone_mode: Whether the form hides, offers or requires a phone number.
-        wxcc_queue_id: Queue that receives the task at T−5 min (ADR 0007).
+        wxcc_queue_id: Queue that receives the task (ADR 0007).
+        dispatch_lead_minutes: How long before the start the WxCC task is created; from
+            that moment the booking is read-only (``job_plan.change_deadline``). At most
+            ``min_notice_minutes``, so no booking is read-only when it is made.
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -78,6 +84,7 @@ class Group:
     horizon_days: int = 60
     phone_mode: PhoneMode = PhoneMode.OPTIONAL
     wxcc_queue_id: str | None = None
+    dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""
@@ -93,11 +100,20 @@ class Group:
             raise _invalid("min_notice_minutes")
         if not 1 <= self.horizon_days <= 366:
             raise _invalid("horizon_days")
+        if not 0 <= self.dispatch_lead_minutes <= MAX_DISPATCH_LEAD_MINUTES:
+            raise _invalid("dispatch_lead_minutes")
+        if self.min_notice_minutes < self.dispatch_lead_minutes:
+            raise _invalid("min_notice_minutes")
 
     @property
     def tz(self) -> ZoneInfo:
         """The group's time zone."""
         return ZoneInfo(self.timezone)
+
+    @property
+    def dispatch_lead(self) -> timedelta:
+        """How long before the start the WxCC task is created."""
+        return timedelta(minutes=self.dispatch_lead_minutes)
 
 
 @dataclass(frozen=True, order=True)

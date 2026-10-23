@@ -6,6 +6,10 @@ booking and its jobs commit together or not at all (CLAUDE.md architecture rules
     book ─► locked tx ─► _place: window ─► offered? ─► slot (create, snapshot capacity)
                                 ─► capacity ─► booking + token ─► replace_jobs
     reschedule ─► locked tx ─► cancel old (jobs: purge only) ─► _place new in the SAME group
+
+A booking is read-only from its change deadline (``job_plan.change_deadline``: the group's
+dispatch lead before the start, T−5 min by default): cancel and reschedule then raise
+``booking_locked``.
 """
 
 from dataclasses import dataclass, field
@@ -22,7 +26,7 @@ from app.domain.availability import (
 from app.domain.booking import Booking, BookingStatus, Contact, Slot
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.job_plan import plan_for_booking, plan_for_cancellation
+from app.domain.job_plan import change_deadline, plan_for_booking, plan_for_cancellation
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group
 from app.domain.tokens import hash_token, new_management_token, token_matches
@@ -121,11 +125,13 @@ class BookingService:
         """Cancel the booking; its pending jobs become a cancellation mail and the purge.
 
         Raises:
-            DomainError: ``booking_not_found`` or ``booking_not_active``.
+            DomainError: ``booking_not_found``, ``booking_locked`` (from the change deadline)
+                or ``booking_not_active``.
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
             now = self._clock.now()
+            _ensure_changeable(booking, await self._group_by_id(tx, booking.group_id), now)
             cancelled = booking.cancel(now)
             await tx.save_booking(cancelled)
             await tx.replace_jobs(_id(booking), plan_for_cancellation(cancelled_at=now))
@@ -138,19 +144,18 @@ class BookingService:
         mail and a new management token. A failure anywhere leaves the old booking untouched.
 
         Raises:
-            DomainError: ``booking_not_found``, ``booking_not_active``, ``same_slot``, or any
-                error of ``book`` for the new start.
+            DomainError: ``booking_not_found``, ``booking_locked``, ``booking_not_active``,
+                ``same_slot``, or any error of ``book`` for the new start.
         """
         async with self._uow.locked() as tx:
             old = await self._booking(tx, management_token)
+            now = self._clock.now()
+            group = await self._group_by_id(tx, old.group_id)
+            _ensure_changeable(old, group, now)
             if not old.is_active or old.contact is None:
                 raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
             if new_start == old.start:
                 raise DomainError(ErrorCode.SAME_SLOT)
-            group = await tx.get_group_by_id(old.group_id)
-            if group is None:
-                raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-            now = self._clock.now()
             await tx.save_booking(old.cancel(now))
             await tx.replace_jobs(_id(old), plan_for_cancellation(cancelled_at=now, notify=False))
             return await self._place(
@@ -160,6 +165,13 @@ class BookingService:
     async def _group(self, tx: Transaction, slug: str) -> Group:
         """Return the group or raise ``group_not_found``."""
         group = await tx.get_group(slug)
+        if group is None:
+            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+        return group
+
+    async def _group_by_id(self, tx: Transaction, group_id: int) -> Group:
+        """Return the booking's group or raise ``group_not_found``."""
+        group = await tx.get_group_by_id(group_id)
         if group is None:
             raise DomainError(ErrorCode.GROUP_NOT_FOUND)
         return group
@@ -224,10 +236,17 @@ class BookingService:
             consents=consents,
             rules=await tx.get_reminder_rules(group.id),
             now=now,
+            dispatch_lead=group.dispatch_lead,
             rescheduled=rescheduled_from is not None,
         )
         await tx.replace_jobs(_id(booking), jobs)
         return BookingReceipt(booking, token)
+
+
+def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse changes from the change deadline on; the booking is read-only from then."""
+    if now >= change_deadline(booking.start, group.dispatch_lead):
+        raise DomainError(ErrorCode.BOOKING_LOCKED)
 
 
 def _id(entity: Booking | Slot) -> int:

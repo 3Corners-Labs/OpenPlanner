@@ -337,3 +337,60 @@ async def test_purged_booking_cannot_be_rescheduled(
 
     with pytest.raises(DomainError, match="booking_not_active"):
         await service.reschedule(old.management_token, SLOT_0930)
+
+
+@pytest.mark.parametrize(
+    "now",
+    [
+        SLOT_0900 - timedelta(minutes=5),  # the WxCC task is dispatched now
+        SLOT_0900,  # the meeting starts
+        SLOT_0900 + timedelta(hours=2),  # long after
+    ],
+)
+async def test_booking_is_read_only_from_the_dispatch_moment(
+    uow: InMemoryUnitOfWork, now: datetime
+) -> None:
+    receipt = await book(BookingService(uow, FixedClock(NOW)))
+    late = BookingService(uow, FixedClock(now))
+
+    for change in (
+        late.cancel(receipt.management_token),
+        late.reschedule(receipt.management_token, SLOT_0930),
+    ):
+        with pytest.raises(DomainError) as excinfo:
+            await change
+        assert excinfo.value.code is ErrorCode.BOOKING_LOCKED
+
+    assert (await late.find(receipt.management_token)).status is BookingStatus.CONFIRMED
+    jobs = uow.state.jobs[receipt.booking.id or 0]
+    assert JobType.DISPATCH_WXCC_TASK in [j.type for j in jobs]
+
+
+async def test_booking_can_change_until_just_before_the_deadline(uow: InMemoryUnitOfWork) -> None:
+    receipt = await book(BookingService(uow, FixedClock(NOW)))
+    just_before = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=5, seconds=1)))
+
+    cancelled = await just_before.cancel(receipt.management_token)
+
+    assert cancelled.status is BookingStatus.CANCELLED
+
+
+def test_change_deadline_is_the_dispatch_moment() -> None:
+    from app.domain.job_plan import change_deadline
+
+    assert change_deadline(SLOT_0900, timedelta(minutes=15)) == SLOT_0900 - timedelta(minutes=15)
+
+
+async def test_read_only_moment_follows_the_groups_dispatch_lead(uow: InMemoryUnitOfWork) -> None:
+    uow.state.groups[1] = make_group(
+        id=1, slug="aangifte", dispatch_lead_minutes=15, min_notice_minutes=60
+    )
+    receipt = await book(BookingService(uow, FixedClock(NOW)))
+    at_lead = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=15)))
+
+    with pytest.raises(DomainError, match="booking_locked"):
+        await at_lead.cancel(receipt.management_token)
+    dispatch = [
+        j for j in uow.state.jobs[receipt.booking.id or 0] if j.type is JobType.DISPATCH_WXCC_TASK
+    ]
+    assert dispatch[0].run_at == SLOT_0900 - timedelta(minutes=15)

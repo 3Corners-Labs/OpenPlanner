@@ -1,12 +1,13 @@
 """Which background jobs a booking needs, and when (HANDOVER §5).
 
-Planning is pure; the worker (WP4) executes the jobs. Time-based jobs carry ``pinned_start``:
+Planning is pure; the worker (WP4) executes the jobs. The dispatch lead (T−5 min by default)
+is a per-group setting (``Group.dispatch_lead_minutes``). Time-based jobs carry ``pinned_start``:
 on run, a job re-reads the booking and does nothing if it is no longer confirmed or its start
 changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
 
     booked ──► create_video_room (now) ─► send_confirmation | send_change (now)
            ──► send_reminder × rules (start − offset, if still ahead and reachable)
-           ──► dispatch_wxcc_task (start − 5 min) ──► purge_pii (end + 24 h)
+           ──► dispatch_wxcc_task (start − dispatch lead) ──► purge_pii (end + 24 h)
     cancelled ──► send_cancellation (now, unless rescheduled) ──► purge_pii (now + 24 h)
 """
 
@@ -18,8 +19,15 @@ from enum import StrEnum
 from app.domain.booking import Contact
 from app.domain.channels import ChannelKind, ReminderRule, reachable
 
-DISPATCH_LEAD = timedelta(minutes=5)
-"""How long before the start the WxCC task is created."""
+
+def change_deadline(start: datetime, dispatch_lead: timedelta) -> datetime:
+    """Return the moment a booking becomes read-only: when its WxCC task is dispatched.
+
+    From then on an agent may pick up the task and join the meeting, so cancelling or
+    rescheduling would leave a task for an appointment that no longer exists.
+    """
+    return start - dispatch_lead
+
 
 PURGE_AFTER = timedelta(hours=24)
 """Personal data retention after the slot end or the cancellation."""
@@ -55,6 +63,7 @@ def plan_for_booking(
     consents: frozenset[ChannelKind],
     rules: Iterable[ReminderRule],
     now: datetime,
+    dispatch_lead: timedelta,
     rescheduled: bool = False,
 ) -> list[PlannedJob]:
     """Return the jobs of a newly confirmed booking, in execution order.
@@ -82,7 +91,8 @@ def plan_for_booking(
         seen.add(key)
         reminders.append(PlannedJob(JobType.SEND_REMINDER, run_at, start, rule.channel))
     jobs.extend(sorted(reminders, key=lambda job: job.run_at))
-    jobs.append(PlannedJob(JobType.DISPATCH_WXCC_TASK, max(now, start - DISPATCH_LEAD), start))
+    dispatch_at = max(now, change_deadline(start, dispatch_lead))
+    jobs.append(PlannedJob(JobType.DISPATCH_WXCC_TASK, dispatch_at, start))
     jobs.append(PlannedJob(JobType.PURGE_PII, end + PURGE_AFTER, None))
     return jobs
 

@@ -1,7 +1,8 @@
 """Ports: Protocols for everything outside the domain.
 
 Adapters in ``app.adapters`` implement them; tests use the fakes in ``tests/fakes``.
-External systems still to come with their work package: ``VideoProvider`` (WP5),
+External systems still to come with their work package: ``VideoProvider`` (WP5, including
+live meeting status per ADR 0010),
 ``ContactCenterDispatcher`` (WP6, ADR 0007), ``MessageSender`` (WP4, ADR 0009),
 ``IdentityProvider`` (WP7).
 """

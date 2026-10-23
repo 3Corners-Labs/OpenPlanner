@@ -187,13 +187,16 @@ def test_validate_schedule_rejects_closed_day_with_windows() -> None:
         ("slug", "a" * 64),
         ("slot_minutes", 5),
         ("slot_minutes", 480),
-        ("min_notice_minutes", 0),
         ("horizon_days", 1),
         ("horizon_days", 366),
     ],
 )
 def test_group_accepts_boundary_values(field: str, value: object) -> None:
     make_group(**{field: value})
+
+
+def test_zero_notice_needs_zero_dispatch_lead() -> None:
+    make_group(min_notice_minutes=0, dispatch_lead_minutes=0)
 
 
 def test_configuration_errors_name_the_field() -> None:
@@ -269,3 +272,31 @@ def test_overrides_on_different_days_never_conflict() -> None:
             ScheduleOverride(day=date(2026, 1, 6), window=window()),
         ],
     )
+
+
+def test_dispatch_lead_defaults_to_five_minutes() -> None:
+    from datetime import timedelta
+
+    assert make_group().dispatch_lead == timedelta(minutes=5)
+
+
+@pytest.mark.parametrize("minutes", [-1, 61])
+def test_dispatch_lead_bounds(minutes: int) -> None:
+    with pytest.raises(DomainError) as excinfo:
+        make_group(dispatch_lead_minutes=minutes, min_notice_minutes=120)
+
+    assert excinfo.value.field == "dispatch_lead_minutes"
+
+
+@pytest.mark.parametrize("minutes", [0, 60])
+def test_dispatch_lead_boundary_values(minutes: int) -> None:
+    make_group(dispatch_lead_minutes=minutes, min_notice_minutes=60)
+
+
+def test_minimum_notice_may_not_be_shorter_than_the_dispatch_lead() -> None:
+    # Otherwise a booking would be read-only the moment it is made.
+    with pytest.raises(DomainError) as excinfo:
+        make_group(dispatch_lead_minutes=15, min_notice_minutes=10)
+
+    assert excinfo.value.field == "min_notice_minutes"
+    make_group(dispatch_lead_minutes=15, min_notice_minutes=15)
