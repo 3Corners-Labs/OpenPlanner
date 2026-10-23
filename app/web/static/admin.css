@@ -225,6 +225,19 @@ body.admin {
 
   .admin-nav ul {
     flex-direction: row;
+    flex-wrap: nowrap;
+  }
+
+  .admin-topbar {
+    padding: 0.6rem 1rem;
+  }
+
+  .admin-topbar__end {
+    gap: 0.25rem 0.75rem;
+  }
+
+  .admin-user__name {
+    font-size: 0.85rem;
   }
 
   .admin-nav a {
@@ -708,14 +721,18 @@ body.admin {
   min-height: 32px;
 }
 
-.choice__option input {
+.admin .choice__option input {
+  flex: none;
   width: 1.15rem;
   height: 1.15rem;
+  min-height: 0;
   margin: 0;
+  padding: 0;
   accent-color: var(--adm-accent);
 }
 
-.choice__option label {
+.admin .choice__option label {
+  margin: 0;
   font-weight: 500;
 }
 
@@ -840,6 +857,7 @@ body.admin {
 }
 
 .window__time {
+  white-space: nowrap;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
