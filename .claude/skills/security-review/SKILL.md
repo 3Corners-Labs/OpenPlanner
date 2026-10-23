@@ -32,8 +32,10 @@ Answer each with file:line references. "None" is a valid answer only after check
 - Datetimes are timezone-aware UTC; conversion only at edges.
 - Booking/slot writes use the write lock; cancel/reschedule deletes pending jobs in the same
   transaction; time-based jobs check `pinned_start`.
-- Management tokens: `secrets.token_urlsafe(32)`, stored as sha256, compared with
-  `hmac.compare_digest`.
+- Management tokens (ADR 0011): HMAC-SHA256 over a 32-byte random per-booking salt under
+  `MANAGEMENT_TOKEN_KEY`; only the salt and `sha256(token)` stored; compared with
+  `hmac.compare_digest`; never in a job payload or log.
+- POST forms on public pages depend on `require_same_origin` and a rate limit.
 - Webhooks: HMAC signature verified, timestamp window 300 s.
 - New user-facing strings use `_()` with nl and en entries.
 - Migrations have a working `downgrade()`; merged migrations untouched.
