@@ -11,6 +11,16 @@ SECURITY_HEADERS: dict[bytes, bytes] = {
     # posts, which breaks the origin fallback in ``app.web.protection``. Other sites still
     # receive no referrer, so management tokens in paths never leak.
     b"referrer-policy": b"same-origin",
+    # Pages need no powerful browser features; the video call itself runs in Webex.
+    b"permissions-policy": (
+        b"camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
+        b"display-capture=(), interest-cohort=()"
+    ),
+    # Process isolation: no cross-origin windows or resources can attach to our pages. The
+    # embeddable widget (later) serves its script with its own Cross-Origin-Resource-Policy.
+    b"cross-origin-opener-policy": b"same-origin",
+    b"cross-origin-embedder-policy": b"require-corp",
+    b"cross-origin-resource-policy": b"same-origin",
 }
 """Strictest defaults. A route that renders HTML sets its own CSP, which is then kept."""
 

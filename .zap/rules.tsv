@@ -1,0 +1,6 @@
+# ZAP baseline rule overrides. Every IGNORE needs a reason; review when the flow changes.
+# Format: <rule id><TAB><IGNORE|WARN|FAIL><TAB><reason>
+10049	IGNORE	Non-Storable Content: HTML pages send Cache-Control no-store on purpose (personal and per-locale content).
+10029	IGNORE	Cookie Poisoning: ?lang= only ever sets the lang cookie to a normalised, enabled locale code (app.i18n.negotiation, tests/api/test_pages.py::test_unsupported_choice_is_ignored).
+10031	IGNORE	User Controllable HTML Element Attribute: only validated values are reflected (lang: enabled locale; week: normalised Monday; start: normalised slot time). Other parameters are dropped (app.web.templates.KEPT_QUERY_PARAMS); output is autoescaped.
+10202	IGNORE	Absence of Anti-CSRF Tokens: forms are protected by Fetch Metadata (Sec-Fetch-Site) with an Origin fallback, OWASP's primary defence; see docs/threat-model.md and tests/api/test_booking_pages.py::test_cross_site_posts_are_refused.
