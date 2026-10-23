@@ -169,7 +169,8 @@ jobs:
       - name: build and start the app
         run: |
           docker build -t openplanner:e2e .
-          scripts/run-app-container.sh openplanner:e2e
+          # Three browsers each book, move and cancel from one IP: raise the write limit.
+          scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour
           docker exec app alembic upgrade head
           docker exec app python -m app.cli seed-demo
       - name: install browsers

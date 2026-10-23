@@ -39,6 +39,10 @@ async def test_security_headers_on_every_response(client: httpx.AsyncClient) -> 
     assert response.headers["referrer-policy"] == "same-origin"
     assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
     assert "max-age=" in response.headers["strict-transport-security"]
+    assert "camera=()" in response.headers["permissions-policy"]
+    assert response.headers["cross-origin-opener-policy"] == "same-origin"
+    assert response.headers["cross-origin-embedder-policy"] == "require-corp"
+    assert response.headers["cross-origin-resource-policy"] == "same-origin"
 
 
 async def test_interactive_docs_are_disabled(client: httpx.AsyncClient) -> None:
