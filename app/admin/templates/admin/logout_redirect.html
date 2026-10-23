@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block site_name %}{{ _("admin.title") }}{% endblock %}
+{% block title %}{{ _("admin.logging_out.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block head_extra %}<meta http-equiv="refresh" content="0;url={{ logout_url }}">{% endblock %}
+{% block content %}
+<h1>{{ _("admin.logging_out.title") }}</h1>
+<p>{{ _("admin.logging_out.text") }}</p>
+<p><a class="button" href="{{ logout_url }}">{{ _("admin.logging_out.continue") }}</a></p>
+{% endblock %}

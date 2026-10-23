@@ -43,6 +43,7 @@ class FakeProvider:
         self.token_status = 200
         self.received: dict[str, Any] = {}
         self.jwks_calls = 0
+        self.extra_metadata: dict[str, Any] = {}
 
     def jwk(self) -> dict[str, Any]:
         public = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(self.key.public_key()))
@@ -75,6 +76,7 @@ class FakeProvider:
                     "authorization_endpoint": f"{ISSUER}/authorize",
                     "token_endpoint": f"{ISSUER}/token",
                     "jwks_uri": f"{ISSUER}/jwks",
+                    **self.extra_metadata,
                 },
             )
         if request.url.path == "/jwks":
@@ -281,3 +283,39 @@ def test_claim_mapping(
 
     assert (principal.roles, principal.organisations, principal.groups) == (roles, orgs, groups)
     assert principal.display_name == "u"
+
+
+async def test_logout_url_uses_the_end_session_endpoint(
+    oidc: OidcIdentityProvider, provider: FakeProvider
+) -> None:
+    provider.extra_metadata = {"end_session_endpoint": f"{ISSUER}/logout"}
+
+    url = await oidc.logout_url("https://afspraak.example.nl/admin/logged-out")
+
+    assert url is not None
+    query = parse_qs(urlsplit(url).query)
+    assert url.startswith(f"{ISSUER}/logout?")
+    assert query == {
+        "client_id": [CLIENT],
+        "post_logout_redirect_uri": ["https://afspraak.example.nl/admin/logged-out"],
+    }
+
+
+async def test_logout_url_is_none_without_end_session_endpoint(
+    oidc: OidcIdentityProvider,
+) -> None:
+    assert await oidc.logout_url("https://x/admin/logged-out") is None
+
+
+async def test_logout_url_is_none_when_discovery_fails() -> None:
+    def down(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(down)) as http:
+        oidc = OidcIdentityProvider(
+            OidcConfig(
+                f"{ISSUER}/.well-known/openid-configuration", CLIENT, "s", "openid", MAPPING
+            ),
+            http,
+        )
+        assert await oidc.logout_url("https://x/admin/logged-out") is None

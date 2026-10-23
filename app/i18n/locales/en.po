@@ -439,6 +439,9 @@ msgstr "No access"
 msgid "admin.forbidden.text"
 msgstr "You have no right to view this page. If you think this is wrong, contact your administrator."
 
+msgid "admin.no_role.text"
+msgstr "You have no role in the admin portal. Contact your administrator if you need access."
+
 msgid "admin.not_configured.title"
 msgstr "Administration unavailable"
 
@@ -546,3 +549,15 @@ msgstr "With the management link from the confirmation"
 
 msgid "authz.condition.management_link_before_deadline"
 msgstr "With the management link, until the task goes to the queue"
+
+msgid "admin.to_portal"
+msgstr "To the administration portal"
+
+msgid "admin.logging_out.title"
+msgstr "Signing you out"
+
+msgid "admin.logging_out.text"
+msgstr "You have signed out of OpenPlanner. You are now also being signed out of your organisation account."
+
+msgid "admin.logging_out.continue"
+msgstr "Continue signing out"

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ _("site.name") }}{% endblock %}</title>
   <link rel="stylesheet" href="/static/site.css">
+  {% block head_extra %}{% endblock %}
 </head>
 <body>
   <a class="skip-link" href="#content">{{ _("site.skip_to_content") }}</a>

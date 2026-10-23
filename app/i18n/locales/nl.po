@@ -439,6 +439,9 @@ msgstr "Geen toegang"
 msgid "admin.forbidden.text"
 msgstr "U heeft geen recht om deze pagina te bekijken. Denkt u dat dit niet klopt? Neem contact op met uw beheerder."
 
+msgid "admin.no_role.text"
+msgstr "U heeft geen rol in het beheerportaal. Neem contact op met uw beheerder als u toegang nodig heeft."
+
 msgid "admin.not_configured.title"
 msgstr "Beheer niet beschikbaar"
 
@@ -546,3 +549,15 @@ msgstr "Met de beheerlink uit de bevestiging"
 
 msgid "authz.condition.management_link_before_deadline"
 msgstr "Met de beheerlink, tot de taak naar de wachtrij gaat"
+
+msgid "admin.to_portal"
+msgstr "Naar het beheerportaal"
+
+msgid "admin.logging_out.title"
+msgstr "U wordt uitgelogd"
+
+msgid "admin.logging_out.text"
+msgstr "U bent uitgelogd bij OpenPlanner. U wordt nu ook uitgelogd bij uw organisatieaccount."
+
+msgid "admin.logging_out.continue"
+msgstr "Doorgaan met uitloggen"

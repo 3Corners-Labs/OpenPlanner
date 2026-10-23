@@ -162,6 +162,23 @@ class OidcIdentityProvider:
             raise IdentityError("nonce_mismatch")
         return principal_from_claims(claims, self._config.mapping)
 
+    async def logout_url(self, post_logout_redirect_uri: str) -> str | None:
+        """Return the RP-initiated logout URL (OIDC ``end_session_endpoint``), if offered."""
+        try:
+            metadata = await self._discover()
+        except IdentityError:
+            return None
+        endpoint = metadata.get("end_session_endpoint")
+        if not isinstance(endpoint, str):
+            return None
+        query = urlencode(
+            {
+                "client_id": self._config.client_id,
+                "post_logout_redirect_uri": post_logout_redirect_uri,
+            }
+        )
+        return f"{endpoint}?{query}"
+
     async def _verify(self, id_token: str, metadata: Mapping[str, Any]) -> dict[str, Any]:
         """Verify signature and standard claims of an ID token."""
         try:
