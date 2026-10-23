@@ -1,36 +1,18 @@
-from datetime import date, time
+from datetime import date
 
 import pytest
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import (
-    Group,
     PhoneMode,
     ScheduleOverride,
     ScheduleRule,
-    TimeWindow,
     validate_schedule,
     windows_on,
 )
+from tests.support.domain import make_group, window
 
 MONDAY = date(2026, 1, 5)
-
-
-def window(opens: str, closes: str, capacity: int = 2) -> TimeWindow:
-    return TimeWindow(time.fromisoformat(opens), time.fromisoformat(closes), capacity)
-
-
-def make_group(**overrides: object) -> Group:
-    fields: dict[str, object] = {
-        "id": 1,
-        "organisation_id": 1,
-        "name": "Aangifte",
-        "slug": "aangifte-2026",
-        "timezone": "Europe/Amsterdam",
-        "slot_minutes": 30,
-    }
-    fields.update(overrides)
-    return Group(**fields)  # type: ignore[arg-type]
 
 
 def test_group_defaults() -> None:
@@ -197,3 +179,93 @@ def test_validate_schedule_rejects_closed_day_with_windows() -> None:
                 ScheduleOverride(day=MONDAY, window=window("09:00", "12:00")),
             ],
         )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("slug", "a" * 64),
+        ("slot_minutes", 5),
+        ("slot_minutes", 480),
+        ("min_notice_minutes", 0),
+        ("horizon_days", 1),
+        ("horizon_days", 366),
+    ],
+)
+def test_group_accepts_boundary_values(field: str, value: object) -> None:
+    make_group(**{field: value})
+
+
+def test_configuration_errors_name_the_field() -> None:
+    cases = [
+        (lambda: window("10:00", "09:00"), "window"),
+        (lambda: window(capacity=0), "capacity"),
+        (lambda: ScheduleRule(weekday=-1, window=window()), "weekday"),
+        (
+            lambda: ScheduleRule(
+                weekday=0, window=window(), valid_from=date(2026, 2, 2), valid_to=date(2026, 2, 1)
+            ),
+            "valid_to",
+        ),
+    ]
+    for build, field in cases:
+        with pytest.raises(DomainError) as excinfo:
+            build()
+        assert excinfo.value.field == field
+
+
+def test_configuration_accepts_boundary_values() -> None:
+    window(capacity=1000)
+    ScheduleRule(weekday=6, window=window())
+    ScheduleRule(weekday=0, window=window(), valid_from=MONDAY, valid_to=MONDAY)
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "overlap"),
+    [
+        ((None, date(2026, 3, 31)), (date(2026, 3, 31), None), True),  # share one day
+        ((None, date(2026, 3, 30)), (date(2026, 3, 31), None), False),
+        ((date(2026, 4, 1), None), (None, date(2026, 4, 1)), True),
+        ((date(2026, 4, 2), None), (None, date(2026, 4, 1)), False),
+        ((None, None), (date(2030, 1, 1), date(2030, 1, 2)), True),
+        ((date(2030, 1, 1), date(2030, 1, 2)), (None, None), True),
+    ],
+)
+def test_validity_period_overlap(
+    first: tuple[date | None, date | None],
+    second: tuple[date | None, date | None],
+    overlap: bool,
+) -> None:
+    rules = [
+        ScheduleRule(
+            weekday=0, window=window("09:00", "12:00"), valid_from=first[0], valid_to=first[1]
+        ),
+        ScheduleRule(
+            weekday=0, window=window("10:00", "13:00"), valid_from=second[0], valid_to=second[1]
+        ),
+    ]
+    if overlap:
+        with pytest.raises(DomainError):
+            validate_schedule(rules, [])
+    else:
+        validate_schedule(rules, [])
+
+
+def test_rules_on_different_weekdays_never_conflict() -> None:
+    validate_schedule(
+        [
+            ScheduleRule(weekday=0, window=window("09:00", "12:00")),
+            ScheduleRule(weekday=1, window=window("09:00", "12:00")),
+        ],
+        [],
+    )
+
+
+def test_overrides_on_different_days_never_conflict() -> None:
+    validate_schedule(
+        [],
+        [
+            ScheduleOverride(day=MONDAY, window=None),
+            ScheduleOverride(day=date(2026, 1, 6), window=window()),
+        ],
+    )

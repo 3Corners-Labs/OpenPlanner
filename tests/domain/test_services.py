@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -7,22 +7,22 @@ from app.domain.booking import BookingStatus
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
-from app.domain.scheduling import PhoneMode, ScheduleOverride, ScheduleRule, TimeWindow
+from app.domain.scheduling import PhoneMode, ScheduleOverride, ScheduleRule
 from app.domain.services import BookingService, ContactInput
 from app.domain.tokens import hash_token
-from tests.domain.test_scheduling import make_group
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-
-NOW = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
-MONDAY = date(2026, 1, 5)
-SLOT_0900 = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)  # 09:00 Amsterdam
-SLOT_0930 = datetime(2026, 1, 5, 8, 30, tzinfo=UTC)
-ADA = ContactInput(name="Ada Lovelace", email="ada@example.org", phone="0612345678")
-
-
-def window(capacity: int) -> TimeWindow:
-    return TimeWindow(time(9), time(10), capacity)
+from tests.support.domain import (
+    ADA,
+    MONDAY,
+    NOW,
+    SLOT_0900,
+    SLOT_0930,
+    TUESDAY_0900,
+    book,
+    make_group,
+    window,
+)
 
 
 @pytest.fixture
@@ -39,10 +39,6 @@ def uow() -> InMemoryUnitOfWork:
 @pytest.fixture
 def service(uow: InMemoryUnitOfWork) -> BookingService:
     return BookingService(uow, FixedClock(NOW))
-
-
-async def book(service: BookingService, start: datetime = SLOT_0900, slug: str = "aangifte"):  # type: ignore[no-untyped-def]
-    return await service.book(group_slug=slug, start=start, contact=ADA, locale="nl")
 
 
 async def test_availability_lists_free_slots(service: BookingService) -> None:
@@ -68,6 +64,8 @@ async def test_book_creates_slot_booking_and_jobs(
     booking = receipt.booking
     assert booking.status is BookingStatus.CONFIRMED
     assert booking.start == SLOT_0900
+    assert booking.end == SLOT_0930
+    assert booking.created_at == NOW
     assert booking.token_hash == hash_token(receipt.management_token)
     assert booking.contact is not None
     assert booking.contact.phone == "0612345678"
@@ -152,12 +150,10 @@ async def test_invalid_contact_stores_nothing(
 
 
 async def test_group_phone_mode_is_applied(service: BookingService) -> None:
-    tuesday = datetime(2026, 1, 6, 8, 0, tzinfo=UTC)
-
     with pytest.raises(DomainError, match="phone"):
         await service.book(
             group_slug="toeslagen",
-            start=tuesday,
+            start=TUESDAY_0900,
             contact=ContactInput(name="Ada", email="ada@example.org"),
             locale="en",
         )
@@ -240,10 +236,9 @@ async def test_reschedule_into_another_groups_slot_is_refused(
 ) -> None:
     # Abuse case: the Tuesday slot exists only for group "toeslagen".
     old = await book(service)
-    tuesday = datetime(2026, 1, 6, 8, 0, tzinfo=UTC)
 
     with pytest.raises(DomainError, match="slot_unavailable"):
-        await service.reschedule(old.management_token, tuesday)
+        await service.reschedule(old.management_token, TUESDAY_0900)
 
     assert uow.state.bookings[old.booking.id or 0].status is BookingStatus.CONFIRMED
     assert all(s.group_id == 1 for s in uow.state.slots.values())
@@ -284,3 +279,61 @@ async def test_receipt_repr_hides_the_token(service: BookingService) -> None:
     receipt = await book(service)
 
     assert receipt.management_token not in repr(receipt)
+
+
+async def test_booking_window_boundaries_are_inclusive(uow: InMemoryUnitOfWork) -> None:
+    earliest = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=60)))
+    latest = BookingService(uow, FixedClock(SLOT_0930 - timedelta(days=60)))
+
+    await book(earliest)
+    await book(latest, SLOT_0930)
+
+
+async def test_slot_day_is_taken_in_the_group_time_zone(uow: InMemoryUnitOfWork) -> None:
+    # Open Tuesday 00:00-01:00 Amsterdam, which is Monday 23:00 UTC.
+    uow.state.rules[1] = [ScheduleRule(weekday=1, window=window("00:00", "01:00", 1))]
+    service = BookingService(uow, FixedClock(NOW))
+
+    receipt = await book(service, datetime(2026, 1, 5, 23, 0, tzinfo=UTC))
+
+    assert receipt.booking.start == datetime(2026, 1, 5, 23, 0, tzinfo=UTC)
+
+
+async def test_availability_applies_overrides_in_range(
+    service: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    uow.state.overrides[1] = [ScheduleOverride(day=MONDAY, window=window("09:30", "10:00", 1))]
+
+    slots = await service.availability("aangifte", MONDAY, MONDAY)
+
+    assert [s.start for s in slots] == [SLOT_0930]
+
+
+async def test_consents_are_stored_and_kept_on_reschedule(
+    service: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    uow.state.reminder_rules[1] = [ReminderRule(ChannelKind.WHATSAPP, minutes_before=60)]
+    consents = frozenset({ChannelKind.WHATSAPP})
+    old = await service.book(
+        group_slug="aangifte", start=SLOT_0900, contact=ADA, locale="nl", consents=consents
+    )
+
+    new = await service.reschedule(old.management_token, SLOT_0930)
+
+    assert old.booking.consents == consents
+    assert new.booking.consents == consents
+    assert ChannelKind.WHATSAPP in [j.channel for j in uow.state.jobs[new.booking.id or 0]]
+    assert uow.state.bookings[old.booking.id or 0].cancelled_at == NOW
+
+
+async def test_purged_booking_cannot_be_rescheduled(
+    service: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    from dataclasses import replace
+
+    old = await book(service)
+    booking_id = old.booking.id or 0
+    uow.state.bookings[booking_id] = replace(uow.state.bookings[booking_id], contact=None)
+
+    with pytest.raises(DomainError, match="booking_not_active"):
+        await service.reschedule(old.management_token, SLOT_0930)

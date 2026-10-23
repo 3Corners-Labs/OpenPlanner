@@ -36,6 +36,10 @@ Deploy by digest, not by tag.
 
 Logs are JSON on stdout: `docker compose logs -f web worker`.
 
+`database_busy` errors mean a booking waited longer than 5 s for SQLite's write lock. At the
+expected volume (peak 20 bookings/min) this indicates a stuck transaction or a slow disk, not
+load: check for long-running admin exports or a full volume.
+
 ## Rollback
 
 Deploy the previous image tag. If the release contained a migration, first run

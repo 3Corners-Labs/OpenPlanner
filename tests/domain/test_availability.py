@@ -11,7 +11,7 @@ from app.domain.availability import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import ScheduleOverride, ScheduleRule, TimeWindow
-from tests.domain.test_scheduling import make_group, window
+from tests.support.domain import make_group, window
 
 MONDAY = date(2026, 1, 5)  # CET, UTC+1
 NOW = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
@@ -180,3 +180,20 @@ def test_offered_slot_requires_an_aware_datetime() -> None:
 
 def test_window_type_is_reexported_for_callers() -> None:
     assert TimeWindow(time(9), time(10), 1).capacity == 1
+
+
+def test_slots_use_the_group_time_zone_not_the_machine_time_zone() -> None:
+    new_york = make_group(timezone="America/New_York")
+
+    slots = slots_on(new_york, MONDAY, [window("09:00", "09:30", 1)])
+
+    assert slots[0].start == utc(2026, 1, 5, 14, 0)
+
+
+def test_utc_bounds_cover_whole_local_days_across_dst() -> None:
+    from app.domain.availability import utc_bounds
+
+    assert utc_bounds(GROUP, date(2026, 3, 28), date(2026, 3, 29)) == (
+        utc(2026, 3, 27, 23, 0),  # Saturday 00:00 CET
+        utc(2026, 3, 29, 22, 0),  # Monday 00:00 CEST
+    )

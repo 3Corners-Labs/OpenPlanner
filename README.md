@@ -6,8 +6,9 @@ embedded as a Web Component. Five minutes before the start, the service dispatch
 a Webex video link to the group's queue via Webex Connect. Personal data is purged 24 hours
 after the appointment.
 
-Status: **work package 1 (skeleton) plus the i18n core**. The service starts, migrates, logs,
-reports health and serves a bilingual home page; there is no booking functionality yet. See `docs/HANDOVER.md` §10 for the work packages.
+Status: **work package 2 (domain and persistence)**. Scheduling, availability, booking,
+cancelling and rescheduling work in the domain and database layers; the public booking pages
+and API follow in work package 3. See `docs/HANDOVER.md` §10 for the work packages.
 
 ## Quick start
 

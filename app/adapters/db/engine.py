@@ -1,40 +1,58 @@
 """Async SQLAlchemy engine factory and database reachability probe.
 
-SQLite (the default, HANDOVER B2) gets its pragmas on every new connection. Postgres works
-through the same ``DATABASE_URL`` without code changes.
+SQLite in WAL mode (HANDOVER B2; Postgres is not a target). The Python driver's implicit
+transaction handling is switched off so that we emit ``BEGIN`` ourselves: a plain ``BEGIN``
+for reads and ``BEGIN IMMEDIATE`` for booking transactions, selected per connection with the
+``sqlite_begin`` execution option (see ``app.adapters.db.uow``).
 """
 
+from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import structlog
-from sqlalchemy import event, make_url, text
+from sqlalchemy import Connection, event, make_url, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 SQLITE_BUSY_TIMEOUT_MS = 5000
 """How long a SQLite writer waits for a lock before failing (milliseconds)."""
 
+BEGIN_MODE_OPTION = "sqlite_begin"
+"""Execution option that selects the ``BEGIN`` variant of the next transaction."""
+
+BeginMode = Literal["DEFERRED", "IMMEDIATE"]
+
 log = structlog.get_logger()
 
 
-def _sqlite_pragmas(dbapi_connection: Any, _record: Any) -> None:
-    """Apply WAL, foreign keys and lock timeout to a fresh SQLite connection."""
+def _sqlite_connect(busy_timeout_ms: int, dbapi_connection: Any, _record: Any) -> None:
+    """Disable implicit transactions and apply WAL, foreign keys and the lock timeout."""
+    dbapi_connection.isolation_level = None
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
+    cursor.execute(f"PRAGMA busy_timeout={int(busy_timeout_ms)}")
     cursor.close()
 
 
-def create_engine(database_url: str) -> AsyncEngine:
+def _sqlite_begin(conn: Connection) -> None:
+    """Emit ``BEGIN`` or ``BEGIN IMMEDIATE`` according to the connection's options."""
+    mode: BeginMode = conn.get_execution_options().get(BEGIN_MODE_OPTION, "DEFERRED")
+    if mode not in ("DEFERRED", "IMMEDIATE"):
+        raise ValueError(f"unsupported {BEGIN_MODE_OPTION}: {mode!r}")
+    conn.exec_driver_sql(f"BEGIN {mode}")
+
+
+def create_engine(database_url: str, busy_timeout_ms: int = SQLITE_BUSY_TIMEOUT_MS) -> AsyncEngine:
     """Create the async engine for ``database_url``.
 
-    For a file-based SQLite URL the parent directory is created, and every connection gets
-    the pragmas from ``_sqlite_pragmas``.
+    For a file-based SQLite URL the parent directory is created; every connection gets the
+    pragmas and explicit transaction control described in the module docstring.
 
     Args:
         database_url: SQLAlchemy URL, e.g. ``sqlite+aiosqlite:///data/booking.db``.
+        busy_timeout_ms: How long a writer waits for the lock (tests use a short value).
 
     Returns:
         A pooled ``AsyncEngine``. The caller owns it and must ``dispose()`` it.
@@ -45,7 +63,8 @@ def create_engine(database_url: str) -> AsyncEngine:
 
     engine = create_async_engine(url, pool_pre_ping=True)
     if engine.dialect.name == "sqlite":
-        event.listen(engine.sync_engine, "connect", _sqlite_pragmas)
+        event.listen(engine.sync_engine, "connect", partial(_sqlite_connect, busy_timeout_ms))
+        event.listen(engine.sync_engine, "begin", _sqlite_begin)
     return engine
 
 
