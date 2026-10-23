@@ -1,0 +1,39 @@
+# Dutch catalogue (default locale). Keys are stable identifiers; see docs/adr/0004.
+msgid ""
+msgstr ""
+"Language: nl\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#. Name of this language in itself, shown in the language switcher.
+msgid "language.autonym"
+msgstr "Nederlands"
+
+msgid "language.switcher.label"
+msgstr "Kies een taal"
+
+msgid "site.name"
+msgstr "Afspraak maken"
+
+msgid "site.skip_to_content"
+msgstr "Naar de inhoud"
+
+msgid "home.title"
+msgstr "Een videogesprek plannen"
+
+msgid "home.intro"
+msgstr "Via de website van uw organisatie komt u op de afspraakpagina van het juiste team. Daar kiest u een moment voor een videogesprek met een medewerker."
+
+msgid "home.how.title"
+msgstr "Zo werkt het"
+
+msgid "home.how.step_choose"
+msgstr "Kies een dag en tijd die u uitkomt."
+
+msgid "home.how.step_details"
+msgstr "Vul uw naam en e-mailadres in."
+
+msgid "home.how.step_confirm"
+msgstr "U krijgt een bevestiging met de link naar het videogesprek. Met die mail kunt u de afspraak ook wijzigen of annuleren."
+
+msgid "home.privacy"
+msgstr "We bewaren uw gegevens tot 24 uur na het gesprek. Daarna verwijderen we ze."

@@ -1,0 +1,108 @@
+"""Jinja2 setup and the one function that renders an HTML page.
+
+Every HTML response goes through ``render``, so locale headers, the language switcher,
+the HTML Content-Security-Policy and caching rules are applied in one place.
+"""
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+
+from fastapi import Request
+from fastapi.templating import Jinja2Templates
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+from starlette.responses import HTMLResponse
+
+from app.web.locale import LANG_PARAM, RequestLocale
+
+SHARED_TEMPLATE_DIR = Path(__file__).parent / "templates"
+"""Layout and partials shared by all entry points."""
+
+STATIC_DIR = Path(__file__).parent / "static"
+"""Stylesheets and images, served under ``/static``."""
+
+HTML_CSP = (
+    "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; "
+    "base-uri 'none'; frame-ancestors 'none'"
+)
+"""No scripts, no inline styles, no framing. Relaxed per page only when a feature needs it."""
+
+
+@dataclass(frozen=True)
+class LanguageOption:
+    """One entry of the language switcher.
+
+    Attributes:
+        code: Locale code, used for the ``lang`` and ``hreflang`` attributes.
+        autonym: The language's name in that language (``"English"``).
+        href: A query-only relative URL (``?lang=en``) that keeps the current path and the
+            other query parameters. It never contains the request path, so a crafted path
+            cannot turn it into a link to another host.
+        current: Whether this is the page's language.
+    """
+
+    code: str
+    autonym: str
+    href: str
+    current: bool
+
+
+def create_templates(page_dirs: Sequence[Path]) -> Jinja2Templates:
+    """Return a template renderer for an entry point.
+
+    Args:
+        page_dirs: The entry point's own template directories; they take precedence over
+            the shared layout in ``SHARED_TEMPLATE_DIR``.
+    """
+    environment = Environment(
+        loader=FileSystemLoader([*page_dirs, SHARED_TEMPLATE_DIR]),
+        autoescape=select_autoescape(["html"]),
+        undefined=StrictUndefined,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    return Jinja2Templates(env=environment)
+
+
+def language_options(request: Request, locale: RequestLocale) -> list[LanguageOption]:
+    """Build the language switcher for ``request``, keeping its other query parameters."""
+    options = []
+    for code in locale.translator.locales:
+        url = request.url.include_query_params(**{LANG_PARAM: code})
+        options.append(
+            LanguageOption(
+                code=code,
+                autonym=locale.translator.gettext(code, "language.autonym"),
+                href=f"?{url.query}",
+                current=code == locale.code,
+            )
+        )
+    return options
+
+
+def render(
+    templates: Jinja2Templates,
+    request: Request,
+    name: str,
+    locale: RequestLocale,
+    context: Mapping[str, object] | None = None,
+) -> HTMLResponse:
+    """Render template ``name`` in the request's locale.
+
+    The template receives ``_`` (bound gettext), ``locale`` and ``languages`` in addition
+    to ``context``.
+    """
+    response = templates.TemplateResponse(
+        request,
+        name,
+        {
+            **(context or {}),
+            "_": locale.gettext,
+            "locale": locale.code,
+            "languages": language_options(request, locale),
+        },
+    )
+    response.headers["content-security-policy"] = HTML_CSP
+    response.headers["cache-control"] = "no-store"
+    locale.apply_to(request, response)
+    return response

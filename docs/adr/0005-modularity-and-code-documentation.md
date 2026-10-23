@@ -17,8 +17,9 @@ generate.
    (napoleon) can all generate reference documentation from this without extra markup. Tests
    are exempt: their names describe the behaviour.
 2. **Layers enforced by import-linter.** `app.main` (composition root) → entry points
-   (`app.api`, `app.admin`, `app.jobs`, never importing each other) → `app.adapters` →
-   `app.domain` (framework-free). `app.i18n` gets its own independence contract (ADR 0004).
+   (`app.api`, `app.admin`, `app.jobs`, never importing each other) → `app.web` (HTML
+   plumbing shared by public pages and admin) → `app.adapters` → `app.domain`
+   (framework-free). `app.i18n` has its own independence contract (ADR 0004).
 3. **One home per concern.** Shared behaviour is extracted at the second use, not the third.
    Examples: `is_reachable()` for database probes, `scripts/run-app-container.sh` for CI,
    `tests/conftest.py::app_client`. A copy-paste detector (jscpd: at least 6 lines or 50

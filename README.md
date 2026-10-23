@@ -6,8 +6,8 @@ embedded as a Web Component. Five minutes before the start, the service dispatch
 a Webex video link to the group's queue via Webex Connect. Personal data is purged 24 hours
 after the appointment.
 
-Status: **work package 1 (skeleton)**. The service starts, migrates, logs and reports health;
-there is no booking functionality yet. See `docs/HANDOVER.md` §10 for the work packages.
+Status: **work package 1 (skeleton) plus the i18n core**. The service starts, migrates, logs,
+reports health and serves a bilingual home page; there is no booking functionality yet. See `docs/HANDOVER.md` §10 for the work packages.
 
 ## Quick start
 
@@ -32,6 +32,7 @@ make check
 
 | Path | Purpose |
 |---|---|
+| `GET /` | Home page (nl/en, language switcher). |
 | `GET /healthz` | Liveness: the process is up. |
 | `GET /readyz` | Readiness: the database answers. `503` otherwise. |
 | `GET /openapi.json` | OpenAPI spec (interactive docs are disabled). |

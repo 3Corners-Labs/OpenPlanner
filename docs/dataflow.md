@@ -8,7 +8,12 @@ Input for the DPIA (HANDOVER §7). Status: work package 1 — no personal data i
 operator ──HTTP──> web (/healthz, /readyz) ──SQL──> SQLite volume (no tables with data)
                    worker ──SQL──> SQLite volume (heartbeat only)
 web, worker ──stdout──> container log (JSON, PII fields masked)
+visitor ──HTTP──> web (GET /, ?lang=) ──> HTML page in the negotiated language
+web ──Set-Cookie: lang=<locale>──> visitor browser (functional preference, 1 year, no PII)
 ```
+
+The `lang` cookie stores only a locale code after an explicit choice in the language switcher.
+It identifies nobody and is strictly functional, so no consent banner is needed.
 
 ## Planned flows
 

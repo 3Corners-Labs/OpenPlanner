@@ -14,6 +14,8 @@ dependencies = [
     "pydantic-settings>=2.6",
     "structlog>=24.4",
     "httpx>=0.28",
+    "babel>=2.16",
+    "jinja2>=3.1",
 ]
 
 [dependency-groups]
@@ -97,6 +99,7 @@ type = "layers"
 layers = [
     "app.main",
     "app.api | app.admin | app.jobs",
+    "app.web",
     "app.adapters",
     "app.domain",
 ]
@@ -109,6 +112,25 @@ type = "independence"
 modules = ["app.api", "app.admin", "app.jobs"]
 
 [[tool.importlinter.contracts]]
+name = "i18n is self-contained (ADR 0004)"
+type = "forbidden"
+source_modules = ["app.i18n"]
+forbidden_modules = [
+    "app.main",
+    "app.api",
+    "app.admin",
+    "app.jobs",
+    "app.web",
+    "app.adapters",
+    "app.domain",
+    "app.config",
+    "fastapi",
+    "starlette",
+    "sqlalchemy",
+    "jinja2",
+]
+
+[[tool.importlinter.contracts]]
 name = "Domain is framework-free and adapter-free"
 type = "forbidden"
 source_modules = ["app.domain"]
@@ -117,6 +139,8 @@ forbidden_modules = [
     "app.api",
     "app.admin",
     "app.jobs",
+    "app.web",
+    "app.i18n",
     "fastapi",
     "starlette",
     "sqlalchemy",
@@ -133,6 +157,7 @@ exclude_dirs = ["tests", "migrations"]
 
 # --- mutmut (on merge to main: mutation score >= 80% on app/domain) ------------
 [tool.mutmut]
-source_paths = ["app/domain/"]
+# The i18n core is pure logic too and is held to the same bar (ADR 0004).
+source_paths = ["app/domain/", "app/i18n/"]
 also_copy = ["app/", "alembic.ini", "migrations/"]
-pytest_add_cli_args_test_selection = ["tests/domain/"]
+pytest_add_cli_args_test_selection = ["tests/domain/", "tests/i18n/"]

@@ -20,7 +20,7 @@ imports:
 
 test:
 	$(UV) pytest --cov --cov-report=term --cov-fail-under=75
-	$(UV) coverage report --include='app/domain/*' --fail-under=90
+	$(UV) coverage report --include='app/domain/*,app/i18n/*' --fail-under=90
 
 security:
 	$(UV) bandit -q -c pyproject.toml -r app/
@@ -46,7 +46,7 @@ semgrep:
 duplication:
 	npx --yes jscpd@4.0.5
 
-# Mutates app/domain; runs once it has tests, then enforces >= 80%.
+# Mutates app/domain and app/i18n; runs once either has tests, then enforces >= 80%.
 mutation:
 	@if ls tests/domain/test_*.py tests/i18n/test_*.py 2>/dev/null | grep -q .; then \
 		$(UV) mutmut run && $(UV) mutmut export-cicd-stats; \

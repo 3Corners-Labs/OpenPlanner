@@ -19,9 +19,9 @@ HANDOVER §3 models translatable group content as fixed columns (`title_nl`, `ti
 
 - **Core (framework-free):** locale negotiation, the lookup chain, placeholder validation and
   safe formatting. Pure Python, unit-tested like the domain.
-- **Integrations:** a FastAPI dependency that resolves the request locale, a Jinja2 `_()`
-  global, and the widget catalogue endpoint. They live next to their entry point
-  (`app/api`, `app/admin`) and call the core.
+- **Integrations:** the request locale dependency and the page renderer live in `app/web/`, a
+  shared layer that both server-rendered entry points (`app/api` pages, `app/admin`) use. The
+  widget catalogue endpoint will live in `app/api`.
 - **Override storage:** the core defines an `OverrideSource` Protocol; the database adapter
   (`app/adapters/db/`) implements it.
 - import-linter: `app.i18n` imports nothing from `app.api`, `app.admin`, `app.jobs` or
@@ -37,12 +37,14 @@ appears in code.
 
 ### 3. Shipped catalogues in gettext format
 
-`app/i18n/locales/<locale>/LC_MESSAGES/messages.po`, compiled to `.mo` when the image is built
-(the root filesystem is read-only). Translators can use any gettext tool (Poedit, Weblate).
-[Babel](https://babel.pocoo.org/) (BSD-3-Clause) handles extraction, compilation, plural rules,
-Accept-Language matching and locale-aware date/time formatting; it is added in the PR that
-introduces the module. A CI check fails when a key is missing from `nl` or `en`, a key is
-unused, or placeholders differ between locales.
+`app/i18n/locales/<locale>.po`, read with [Babel](https://babel.pocoo.org/) (BSD-3-Clause) at
+startup. No compile step and no writable filesystem are needed. Translators can use any gettext
+tool (Poedit, Weblate). Fuzzy and empty entries fall back to Dutch. Babel will also provide
+plural rules and locale-aware date/time formatting. Plural entries are rejected until plural
+support is built (with the first message that needs it). Accept-Language parsing is a small
+pure function of our own, because it must also reject malformed tags.
+`tests/i18n/test_catalogues.py` fails when a key is missing from `nl` or `en`, a key in code
+is not in the catalogues, a catalogue key is unused, or placeholders differ between locales.
 
 ### 4. Lookup chain (first hit wins)
 
@@ -105,8 +107,9 @@ without a restart.
 ## Consequences
 
 - Work package 2 models group texts as `group_text` instead of `*_nl` / `*_en` columns.
-- Work package 3 builds the core, the `nl`/`en` catalogues, negotiation, the switcher and the
-  widget endpoint. Work package 4 uses the booking locale for mail and SMS. Work package 7 adds
+- Built ahead of work package 3 (2026-10-23): the core, the `nl`/`en` catalogues,
+  negotiation, the switcher and the home page `/`. Work package 3 adds the widget endpoint.
+- The i18n core is held to the same bar as the domain: coverage ≥ 90% and mutation testing. Work package 4 uses the booking locale for mail and SMS. Work package 7 adds
   the admin editor.
 - Adding a language needs no code change; making it complete in the shipped catalogues is a
   normal PR.

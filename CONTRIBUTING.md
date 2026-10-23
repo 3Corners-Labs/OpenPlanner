@@ -57,7 +57,14 @@ tests/         mirrors app/; fakes for ports live in tests/fakes/.
 - Start with a failing test. Domain first, adapter second, HTTP last.
 - New migration: `uv run alembic revision --autogenerate -m "..."`, then review it. Every
   migration must have a working `downgrade()`. Never edit a merged migration.
-- New user-facing text gets a dotted key in `app/i18n` with `nl` and `en` entries (ADR 0004).
+- New user-facing text gets a dotted key (`area.thing.detail`) in both
+  `app/i18n/locales/nl.po` and `en.po`, and is used as `_("key")` in templates or
+  `locale.gettext("key")` in code. Placeholders are `{name}`. `tests/i18n/test_catalogues.py`
+  catches missing, unused and inconsistent keys.
+- A new language: add `app/i18n/locales/<code>.po` (start from `nl.po`). Untranslated keys fall
+  back to Dutch; the switcher picks it up automatically. Add the locale to `e2e/pages.json`.
+- Every HTML page is rendered through `app.web.templates.render`, which applies the locale,
+  the language switcher, CSP and caching headers. Do not build HTML responses elsewhere.
 - Never put PII (`name, email, phone, note, guest_join_url, host_join_url`) in logs, errors,
   URLs or job payloads. The semgrep rules in `.semgrep/` and the masking test catch the obvious
   cases, not all of them.
