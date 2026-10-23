@@ -78,6 +78,22 @@ EVENT_LABELS: dict[str, str] = {
     LOGOUT_EVENT: "audit.event.logout",
 }
 
+DETAIL_LABELS: dict[str, str] = {
+    "rule.add": "admin.audit.detail.rule_add",
+    "rule.remove": "admin.audit.detail.rule_remove",
+    "override.add": "admin.audit.detail.override_add",
+    "override.remove": "admin.audit.detail.override_remove",
+    "name": "admin.field.name",
+    "timezone": "admin.field.timezone",
+    "slot_minutes": "admin.field.slot_minutes",
+    "min_notice_minutes": "admin.field.min_notice_minutes",
+    "horizon_days": "admin.field.horizon_days",
+    "phone_mode": "admin.field.phone_mode",
+    "dispatch_lead_minutes": "admin.field.dispatch_lead_minutes",
+    "wxcc_queue_id": "admin.field.wxcc_queue_id",
+}
+"""Readable label per audit detail key (changed field names and schedule actions)."""
+
 OUTCOME_TONES: dict[Outcome, str] = {
     Outcome.SUCCESS: "success",
     Outcome.DENIED: "danger",
@@ -285,6 +301,7 @@ class AuditView:
     outcome: str
     target: str
     tone: str
+    detail: str
 
 
 def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
@@ -292,6 +309,12 @@ def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
     if entry.event.actor == ANONYMOUS:
         return _("audit.actor.anonymous")
     return entry.actor_name or entry.event.actor
+
+
+def _detail_label(detail: str, _: BoundGettext) -> str:
+    """Translate an audit detail such as ``horizon_days,name`` into readable labels."""
+    keys = [key for key in detail.split(",") if key]
+    return ", ".join(_(DETAIL_LABELS[key]) if key in DETAIL_LABELS else key for key in keys)
 
 
 def _moment(at: datetime, tz: ZoneInfo, locale: str) -> str:
@@ -327,6 +350,7 @@ async def audit(
             _(OUTCOME_LABELS[e.outcome]),
             " / ".join(t for t in (e.organisation, e.group) if t) or "–",
             OUTCOME_TONES[e.outcome],
+            _detail_label(e.detail, _),
         )
         for entry in events
         for e in (entry.event,)

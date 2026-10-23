@@ -25,7 +25,7 @@
     <tr>
       <td class="nowrap">{{ event.when }}</td>
       <td>{{ event.actor }}</td>
-      <td>{{ event.action }}</td>
+      <td>{{ event.action }}{% if event.detail %}<br><span class="muted">{{ event.detail }}</span>{% endif %}</td>
       <td><span class="chip chip--{{ event.tone }}">{{ event.outcome }}</span></td>
       <td>{{ event.target }}</td>
     </tr>
