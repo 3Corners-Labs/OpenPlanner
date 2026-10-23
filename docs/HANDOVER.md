@@ -29,7 +29,7 @@ Een lichtgewicht boekingsdienst waarmee burgers op een eigen pagina per groep (b
 | B13 | Widget in shadow DOM met design-tokens: leest `--booking-*` CSS-variabelen van de gastpagina, erft lettertype, stelt onderdelen bloot via `::part()`; NLDS-tokens als standaard | Widget volgt de branding van de website waarop hij staat, zonder dat de CSS van die website de widget kan breken. Mails gebruiken de organisatiebranding uit het beheer. |
 | B14 | Standaard: standalone pagina per groep op eigen (sub)domein in de huisstijl van de organisatie; embed is optie. Geen routeringsstap in deze dienst: de keuzeboom is van de opdrachtgever, wij zijn het eindstation per URL. | Referentie: afspraken.belastingdienst.nl (keuzeboom) → videobellen.belastingdienst.nl/{slug} (agenda, 24sessions; product wordt beëindigd). Geen CSP/CORS-afstemming nodig in de standaardvariant. |
 | B15 | Formulier vraagt alleen e-mail, naam, telefoon (telefoon optioneel per groep). Geen BSN, geen DigiD. | Minimale PII; bevestigd door het referentievoorbeeld. |
-| B16 | Veiligheid wordt geborgd door een niet te omzeilen CI-pijplijn, verplichte menselijke review per PR met vaste checklist, en externe toetsing (pentest, toegankelijkheidsonderzoek). Claude Code mag geen PR mergen. | Gegenereerde code is vlot en ziet er goed uit; het risico is dat niemand hem leest. Zie §12. |
+| B16 | Veiligheid wordt geborgd door een niet te omzeilen CI-pijplijn, verplichte menselijke review per PR met vaste checklist, en externe toetsing (pentest, toegankelijkheidsonderzoek). Claude Code merget alleen op expliciete instructie van de product owner, bij groene CI (ADR 0012). | Gegenereerde code is vlot en ziet er goed uit; het risico is dat niemand hem leest. Zie §12. |
 
 ## 3. Domeinmodel
 
