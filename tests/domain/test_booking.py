@@ -69,6 +69,21 @@ def test_invalid_contact_names_the_field_only(field: str, value: str) -> None:
     assert value.strip() not in str(excinfo.value) or not value.strip()
 
 
+def test_longest_allowed_values_pass() -> None:
+    longest_email = "a" * 242 + "@example.org"  # 254 characters
+
+    c = contact(name="x" * 100, email=longest_email)
+
+    assert c.email == longest_email
+
+
+def test_email_domain_needs_a_dot_between_labels() -> None:
+    with pytest.raises(DomainError, match="email"):
+        contact(email="ada@.org.")
+    with pytest.raises(DomainError, match="email"):
+        contact(email="ada@..")
+
+
 def test_phone_required_by_the_group() -> None:
     with pytest.raises(DomainError) as excinfo:
         contact(phone="  ", phone_mode=PhoneMode.REQUIRED)
