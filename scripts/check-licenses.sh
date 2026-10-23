@@ -3,7 +3,7 @@
 # Exceptions are listed in IGNORED with the ADR that approves them.
 set -eu
 
-ALLOWED="MIT;MIT License;BSD License;BSD-2-Clause;BSD-3-Clause;Apache-2.0;Apache Software License;Apache-2.0 OR BSD-2-Clause;Apache Software License; MIT License;MIT OR Apache-2.0;MIT AND PSF-2.0;PSF-2.0;Python Software Foundation License"
+ALLOWED="MIT;MIT-0;Apache-2.0 OR BSD-3-Clause;MIT License;BSD License;BSD-2-Clause;BSD-3-Clause;Apache-2.0;Apache Software License;Apache-2.0 OR BSD-2-Clause;Apache Software License; MIT License;MIT OR Apache-2.0;MIT AND PSF-2.0;PSF-2.0;Python Software Foundation License"
 IGNORED="certifi"  # MPL-2.0, ADR 0003
 
 venv="$(mktemp -d)/venv"
