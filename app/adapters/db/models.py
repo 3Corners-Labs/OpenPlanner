@@ -167,6 +167,7 @@ class BookingRow(Base):
     locale: Mapped[str] = mapped_column(String(16))
     consents: Mapped[str] = mapped_column(String(64), server_default=text("''"))
     management_token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    management_token_salt: Mapped[str] = mapped_column(String(64), server_default=text("''"))
     guest_join_url: Mapped[str | None] = mapped_column(String(2048))
     host_join_url: Mapped[str | None] = mapped_column(String(2048))
     video_room_id: Mapped[str | None] = mapped_column(String(255))
@@ -200,6 +201,7 @@ class JobRow(Base):
     status: Mapped[str] = mapped_column(String(16), server_default=text("'pending'"))
     attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     last_error: Mapped[str | None] = mapped_column(String(255))
+    claimed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         Index("ix_jobs_status_run_at", "status", "run_at"),

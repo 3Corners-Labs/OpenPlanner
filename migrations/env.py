@@ -5,15 +5,28 @@ The database URL comes from ``DATABASE_URL`` via ``app.config.Settings``, never 
 """
 
 import asyncio
+from typing import Any
 
 from alembic import context
 from sqlalchemy.engine import Connection
 
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import Base
+from app.adapters.db.types import UTCDateTime
 from app.config import Settings
 
 target_metadata = Base.metadata
+
+
+def _render_item(type_: str, obj: Any, autogen_context: Any) -> str | bool:
+    """Render application column types as plain SQLAlchemy types in generated migrations.
+
+    Migrations must not import application code: a later change to ``UTCDateTime`` would
+    otherwise break old migrations. The storage type is the same ``DateTime``.
+    """
+    if type_ == "type" and isinstance(obj, UTCDateTime):
+        return "sa.DateTime()"
+    return False
 
 
 def _run(connection: Connection) -> None:
@@ -23,6 +36,7 @@ def _run(connection: Connection) -> None:
         target_metadata=target_metadata,
         render_as_batch=connection.dialect.name == "sqlite",
         compare_type=True,
+        render_item=_render_item,
     )
     with context.begin_transaction():
         context.run_migrations()

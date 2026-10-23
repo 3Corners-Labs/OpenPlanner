@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ group.name }} – {{ _("site.name") }}{% endblock %}
+{% block content %}
+{% include "_error_summary.html" %}
+<h1>{{ group.name }}</h1>
+<p>{{ _("group.intro", minutes=group.slot_minutes) }}</p>
+{% set action = "/g/" ~ group.slug ~ "/book" %}
+{% set method = "get" %}
+{% set week_base = "/g/" ~ group.slug %}
+{% set submit_label = _("group.choose") %}
+{% include "_slot_picker.html" %}
+{% endblock %}

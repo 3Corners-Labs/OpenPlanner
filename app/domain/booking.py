@@ -146,6 +146,7 @@ class Booking:
     locale: str
     token_hash: str = field(repr=False)
     created_at: datetime
+    token_salt: str = field(default="", repr=False)
     consents: frozenset[ChannelKind] = frozenset()
     cancelled_at: datetime | None = None
     rescheduled_from_id: int | None = None

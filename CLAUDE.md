@@ -30,7 +30,7 @@ Lightweight group-booking service for a government contact center: embeddable wi
 - A time-based job stores `pinned_start`; on run it re-reads the booking and exits silently if status != confirmed or start != pinned_start. Cancelling or rescheduling a booking deletes its pending jobs in the same transaction.
 - Slot creation and booking happen in one transaction with a write lock (`BEGIN IMMEDIATE` on SQLite, `SELECT ... FOR UPDATE` on Postgres). Capacity is snapshotted on the slot at creation.
 - No PII in logs, exceptions, job payloads, audit events, or URLs. The structlog processor in `app/logging.py` masks `name`, `email`, `phone`, `note`; a test asserts this on a fake log stream.
-- Management tokens: 32 random bytes, URL-safe; store only `sha256`. Compare with `hmac.compare_digest`.
+- Management tokens (ADR 0011): HMAC-SHA256 of a 32-byte random per-booking salt under `MANAGEMENT_TOKEN_KEY` (env only); store the salt and `sha256(token)`, never the token. Compare with `hmac.compare_digest`. Never put a token in a job payload or log.
 
 ## Delivery surface
 - Default: a standalone page per group at `/g/{slug}` in the organisation's branding; the client's website links to it after its own decision tree. We are the end station; there is no routing step in this service.
@@ -74,7 +74,7 @@ Weekly: Renovate updates (security updates immediately), `trivy` on the running 
 - Rate limiting on public endpoints (`slowapi`): 10 bookings/IP/hour, 60 availability reads/IP/minute. Honeypot field on the booking form. Optional Cloudflare Turnstile behind a feature flag; never Google reCAPTCHA.
 - CSP, HSTS, `X-Frame-Options` (admin), CORS allow-list from settings. Widget endpoints allow only configured origins.
 - Calls to WxCC use OAuth tokens of a service app (ADR 0007). Every inbound webhook from WxCC is verified (signature or token, per WxCC's mechanism); reject if |now − ts| > 300 s.
-- Bootstrap secrets (settings encryption key, OIDC client secret, session secret) via env/secret store only; `.env.example` has placeholders. Integration secrets (SMTP, WxCC, messaging) are entered in the admin UI, stored AES-256-GCM encrypted, write-only, audited (ADR 0008). `gitleaks` blocks commits.
+- Bootstrap secrets (settings encryption key, management token key, OIDC client secret, session secret) via env/secret store only; `.env.example` has placeholders. Integration secrets (SMTP, WxCC, messaging) are entered in the admin UI, stored AES-256-GCM encrypted, write-only, audited (ADR 0008). `gitleaks` blocks commits.
 - OIDC (admin portal only; citizens never log in): `authlib`, PKCE, `state` and `nonce` checked, session cookie `Secure; HttpOnly; SameSite=Lax`, 8 h lifetime.
 - Dependencies: no package without an active maintainer and a license in {MIT, BSD, Apache-2.0, PSF}. AGPL/GPL packages need an ADR.
 - Threat model lives in `docs/threat-model.md` (STRIDE per flow) together with an abuse-case list per public endpoint (slot exhaustion by bots, token guessing, rescheduling into another group's slot, PII through error messages). Every abuse case has a test. Update both when a flow changes.

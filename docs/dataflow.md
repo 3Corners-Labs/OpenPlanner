@@ -16,6 +16,16 @@ web ──Set-Cookie: lang=<locale>──> visitor browser (functional preferenc
 The `lang` cookie stores only a locale code after an explicit choice in the language switcher.
 It identifies nobody and is strictly functional, so no consent banner is needed.
 
+## Outgoing email (WP3)
+
+```
+worker ──SMTP──> mail provider (per organisation in WP7, ADR 0008) ──> citizen
+   reads booking at send time: first name, email, date, time, team, management link
+```
+
+Jobs carry booking IDs only. Messages and calendar attachments contain no phone number and
+no full name. In development Mailpit (`--profile dev`) catches all mail locally.
+
 ## Stored personal data (WP2 schema)
 
 | Data item | Table.column | Source | Retention | Leaves the system |

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ _("manage.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+{% if notice %}<p class="notice notice--success" role="status">{{ notice }}</p>{% endif %}
+<h1>{{ _("manage.title") }}</h1>
+<dl class="details">
+  <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
+  <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
+  <dt>{{ _("manage.status") }}</dt><dd>{{ status_label }}</dd>
+</dl>
+{% if changeable %}
+<p>{{ _("manage.deadline", deadline=deadline) }}</p>
+<ul class="actions">
+  <li><a class="button" href="/b/{{ token }}/reschedule">{{ _("manage.reschedule") }}</a></li>
+  <li><a class="button button--secondary" href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+</ul>
+{% elif active %}
+<p class="notice">{{ _("manage.locked") }}</p>
+{% else %}
+<p class="notice">{{ _("manage.inactive") }}</p>
+{% endif %}
+{% endblock %}

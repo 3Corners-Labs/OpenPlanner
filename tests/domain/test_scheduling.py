@@ -39,6 +39,10 @@ def test_group_defaults() -> None:
         ("min_notice_minutes", -1),
         ("horizon_days", 0),
         ("horizon_days", 367),
+        ("name", ""),
+        ("name", "   "),
+        ("name", "x" * 201),
+        ("name", "Team\nBcc: x@example.org"),
     ],
 )
 def test_group_rejects_invalid_configuration(field: str, value: object) -> None:

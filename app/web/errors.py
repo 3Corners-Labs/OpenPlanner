@@ -1,0 +1,61 @@
+"""Turn domain error codes into HTTP statuses and translated messages.
+
+The domain only knows codes (``DomainError``); this module is the one place that maps them
+to text. Messages never contain submitted values, so no personal data is echoed back.
+"""
+
+from dataclasses import dataclass
+
+from app.domain.errors import DomainError, ErrorCode
+from app.i18n import BoundGettext
+
+ERROR_KEYS: dict[ErrorCode, str] = {
+    ErrorCode.SLOT_FULL: "error.slot_full",
+    ErrorCode.SLOT_UNAVAILABLE: "error.slot_unavailable",
+    ErrorCode.OUTSIDE_BOOKING_WINDOW: "error.outside_booking_window",
+    ErrorCode.BOOKING_LOCKED: "error.booking_locked",
+    ErrorCode.BOOKING_NOT_ACTIVE: "error.booking_not_active",
+    ErrorCode.SAME_SLOT: "error.same_slot",
+    ErrorCode.DATABASE_BUSY: "error.database_busy",
+    ErrorCode.INVALID_CONTACT: "error.invalid_request",
+    ErrorCode.INVALID_RANGE: "error.invalid_request",
+    ErrorCode.INVALID_CONFIGURATION: "error.invalid_request",
+    ErrorCode.GROUP_NOT_FOUND: "error.not_found.text",
+    ErrorCode.BOOKING_NOT_FOUND: "error.not_found.text",
+}
+
+FIELD_ERROR_KEYS: dict[str, str] = {
+    "name": "error.field.name",
+    "email": "error.field.email",
+    "phone": "error.field.phone",
+}
+
+HTTP_STATUS: dict[ErrorCode, int] = {
+    ErrorCode.INVALID_CONTACT: 422,
+    ErrorCode.INVALID_RANGE: 400,
+    ErrorCode.GROUP_NOT_FOUND: 404,
+    ErrorCode.BOOKING_NOT_FOUND: 404,
+    ErrorCode.DATABASE_BUSY: 503,
+    ErrorCode.INVALID_CONFIGURATION: 500,
+}
+"""Codes not listed here are conflicts with the current state: HTTP 409."""
+
+
+@dataclass(frozen=True)
+class FormError:
+    """One message for the error summary; ``field`` links it to an input (or ``None``)."""
+
+    field: str | None
+    message: str
+
+
+def status_for(error: DomainError) -> int:
+    """Return the HTTP status for a domain error."""
+    return HTTP_STATUS.get(error.code, 409)
+
+
+def form_errors(error: DomainError, _: BoundGettext) -> list[FormError]:
+    """Return the translated messages for ``error``, linked to a field when it names one."""
+    if error.field in FIELD_ERROR_KEYS:
+        return [FormError(error.field, _(FIELD_ERROR_KEYS[error.field]))]
+    return [FormError(None, _(ERROR_KEYS[error.code]))]

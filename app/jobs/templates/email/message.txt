@@ -1,0 +1,13 @@
+{{ greeting }}
+
+{{ intro }}
+
+{{ when_label }}: {{ when }}
+{{ team_label }}: {{ group_name }}
+{% if manage_url %}
+
+{{ manage_text }}
+{{ manage_link }}: {{ manage_url }}
+{% endif %}
+
+{{ signoff }}

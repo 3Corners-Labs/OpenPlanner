@@ -5,8 +5,10 @@
 set -eu
 
 image="$1"
+# Throwaway CI container: development mode (generated token key, http base URL).
 docker run -d --name app --read-only --tmpfs /tmp \
   --cap-drop ALL --security-opt no-new-privileges \
+  -e ENVIRONMENT=dev \
   -p 8000:8000 "$image" >/dev/null
 
 if [ "$(docker exec app id -u)" = "0" ]; then

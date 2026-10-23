@@ -2,18 +2,18 @@
 
 Adapters in ``app.adapters`` implement them; tests use the fakes in ``tests/fakes``.
 External systems still to come with their work package: ``VideoProvider`` (WP5, including
-live meeting status per ADR 0010),
-``ContactCenterDispatcher`` (WP6, ADR 0007), ``MessageSender`` (WP4, ADR 0009),
+live meeting status per ADR 0010), ``ContactCenterDispatcher`` (WP6, ADR 0007),
 ``IdentityProvider`` (WP7).
 """
 
 from collections.abc import Sequence
 from contextlib import AbstractAsyncContextManager
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.booking import Booking, Slot, SlotUsage
-from app.domain.channels import ReminderRule
+from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import Group, ScheduleOverride, ScheduleRule
 
@@ -23,6 +23,35 @@ class Clock(Protocol):
 
     def now(self) -> datetime:
         """Return the current instant as a timezone-aware UTC datetime."""
+        ...
+
+
+@dataclass(frozen=True)
+class Attachment:
+    """A file attached to a message, e.g. the ``.ics`` calendar entry."""
+
+    filename: str
+    content_type: str
+    data: bytes = field(repr=False)
+
+
+@dataclass(frozen=True)
+class OutboundMessage:
+    """A message to one citizen. Contains personal data: keep it in memory only."""
+
+    channel: ChannelKind
+    recipient: str = field(repr=False)
+    subject: str = field(repr=False)
+    text: str = field(repr=False)
+    html: str | None = field(default=None, repr=False)
+    attachments: tuple[Attachment, ...] = ()
+
+
+class MessageSender(Protocol):
+    """Delivers messages on one channel (ADR 0009): SMTP for email, later SMS and WhatsApp."""
+
+    async def send(self, message: OutboundMessage) -> None:
+        """Deliver ``message``; raise on failure so the job is retried."""
         ...
 
 
@@ -67,6 +96,14 @@ class Transaction(Protocol):
 
     async def add_booking(self, booking: Booking) -> Booking:
         """Store a new booking and return it with its ID."""
+        ...
+
+    async def get_booking(self, booking_id: int) -> Booking | None:
+        """Return the booking with ``booking_id``."""
+        ...
+
+    async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
+        """Set every PII column of the booking to NULL and record ``pii_purged_at``."""
         ...
 
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
