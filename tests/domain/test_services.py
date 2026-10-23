@@ -9,7 +9,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
 from app.domain.scheduling import PhoneMode, ScheduleOverride, ScheduleRule
 from app.domain.services import BookingService, ContactInput
-from app.domain.tokens import hash_token
+from app.domain.tokens import derive_token, hash_token
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import (
@@ -18,6 +18,7 @@ from tests.support.domain import (
     NOW,
     SLOT_0900,
     SLOT_0930,
+    TEST_TOKEN_KEY,
     TUESDAY_0900,
     book,
     make_group,
@@ -38,7 +39,7 @@ def uow() -> InMemoryUnitOfWork:
 
 @pytest.fixture
 def service(uow: InMemoryUnitOfWork) -> BookingService:
-    return BookingService(uow, FixedClock(NOW))
+    return BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
 
 
 async def test_availability_lists_free_slots(service: BookingService) -> None:
@@ -67,6 +68,7 @@ async def test_book_creates_slot_booking_and_jobs(
     assert booking.end == SLOT_0930
     assert booking.created_at == NOW
     assert booking.token_hash == hash_token(receipt.management_token)
+    assert receipt.management_token == derive_token(TEST_TOKEN_KEY, booking.token_salt)
     assert booking.contact is not None
     assert booking.contact.phone == "0612345678"
     slot = uow.state.slots[booking.slot_id]
@@ -175,7 +177,7 @@ async def test_concurrent_bookings_for_the_last_place(service: BookingService) -
 async def test_find_and_cancel(service: BookingService, uow: InMemoryUnitOfWork) -> None:
     receipt = await book(service)
 
-    assert (await service.find(receipt.management_token)).id == receipt.booking.id
+    assert (await service.find(receipt.management_token)).booking.id == receipt.booking.id
     cancelled = await service.cancel(receipt.management_token)
 
     assert cancelled.status is BookingStatus.CANCELLED
@@ -282,8 +284,8 @@ async def test_receipt_repr_hides_the_token(service: BookingService) -> None:
 
 
 async def test_booking_window_boundaries_are_inclusive(uow: InMemoryUnitOfWork) -> None:
-    earliest = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=60)))
-    latest = BookingService(uow, FixedClock(SLOT_0930 - timedelta(days=60)))
+    earliest = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=60)), TEST_TOKEN_KEY)
+    latest = BookingService(uow, FixedClock(SLOT_0930 - timedelta(days=60)), TEST_TOKEN_KEY)
 
     await book(earliest)
     await book(latest, SLOT_0930)
@@ -292,7 +294,7 @@ async def test_booking_window_boundaries_are_inclusive(uow: InMemoryUnitOfWork) 
 async def test_slot_day_is_taken_in_the_group_time_zone(uow: InMemoryUnitOfWork) -> None:
     # Open Tuesday 00:00-01:00 Amsterdam, which is Monday 23:00 UTC.
     uow.state.rules[1] = [ScheduleRule(weekday=1, window=window("00:00", "01:00", 1))]
-    service = BookingService(uow, FixedClock(NOW))
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
 
     receipt = await book(service, datetime(2026, 1, 5, 23, 0, tzinfo=UTC))
 
@@ -350,8 +352,8 @@ async def test_purged_booking_cannot_be_rescheduled(
 async def test_booking_is_read_only_from_the_dispatch_moment(
     uow: InMemoryUnitOfWork, now: datetime
 ) -> None:
-    receipt = await book(BookingService(uow, FixedClock(NOW)))
-    late = BookingService(uow, FixedClock(now))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    late = BookingService(uow, FixedClock(now), TEST_TOKEN_KEY)
 
     for change in (
         late.cancel(receipt.management_token),
@@ -361,14 +363,18 @@ async def test_booking_is_read_only_from_the_dispatch_moment(
             await change
         assert excinfo.value.code is ErrorCode.BOOKING_LOCKED
 
-    assert (await late.find(receipt.management_token)).status is BookingStatus.CONFIRMED
+    details = await late.find(receipt.management_token)
+    assert details.booking.status is BookingStatus.CONFIRMED
+    assert details.changeable is False
     jobs = uow.state.jobs[receipt.booking.id or 0]
     assert JobType.DISPATCH_WXCC_TASK in [j.type for j in jobs]
 
 
 async def test_booking_can_change_until_just_before_the_deadline(uow: InMemoryUnitOfWork) -> None:
-    receipt = await book(BookingService(uow, FixedClock(NOW)))
-    just_before = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=5, seconds=1)))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    just_before = BookingService(
+        uow, FixedClock(SLOT_0900 - timedelta(minutes=5, seconds=1)), TEST_TOKEN_KEY
+    )
 
     cancelled = await just_before.cancel(receipt.management_token)
 
@@ -385,8 +391,8 @@ async def test_read_only_moment_follows_the_groups_dispatch_lead(uow: InMemoryUn
     uow.state.groups[1] = make_group(
         id=1, slug="aangifte", dispatch_lead_minutes=15, min_notice_minutes=60
     )
-    receipt = await book(BookingService(uow, FixedClock(NOW)))
-    at_lead = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=15)))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    at_lead = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=15)), TEST_TOKEN_KEY)
 
     with pytest.raises(DomainError, match="booking_locked"):
         await at_lead.cancel(receipt.management_token)
@@ -394,3 +400,31 @@ async def test_read_only_moment_follows_the_groups_dispatch_lead(uow: InMemoryUn
         j for j in uow.state.jobs[receipt.booking.id or 0] if j.type is JobType.DISPATCH_WXCC_TASK
     ]
     assert dispatch[0].run_at == SLOT_0900 - timedelta(minutes=15)
+
+
+async def test_find_returns_group_and_changeability(service: BookingService) -> None:
+    receipt = await book(service)
+
+    details = await service.find(receipt.management_token)
+
+    assert details.group.slug == "aangifte"
+    assert details.changeable is True
+    assert details.change_deadline == SLOT_0900 - timedelta(minutes=5)
+
+
+async def test_find_of_a_cancelled_booking_is_not_changeable(service: BookingService) -> None:
+    receipt = await book(service)
+    await service.cancel(receipt.management_token)
+
+    assert (await service.find(receipt.management_token)).changeable is False
+
+
+async def test_get_group(service: BookingService) -> None:
+    assert (await service.get_group("aangifte")).id == 1
+    with pytest.raises(DomainError, match="group_not_found"):
+        await service.get_group("nope")
+
+
+def test_token_key_must_be_long_enough(uow: InMemoryUnitOfWork) -> None:
+    with pytest.raises(ValueError, match="32 bytes"):
+        BookingService(uow, FixedClock(NOW), b"short")

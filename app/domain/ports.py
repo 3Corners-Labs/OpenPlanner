@@ -69,6 +69,14 @@ class Transaction(Protocol):
         """Store a new booking and return it with its ID."""
         ...
 
+    async def get_booking(self, booking_id: int) -> Booking | None:
+        """Return the booking with ``booking_id``."""
+        ...
+
+    async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
+        """Set every PII column of the booking to NULL and record ``pii_purged_at``."""
+        ...
+
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         """Return the booking whose management token hashes to ``token_hash``."""
         ...

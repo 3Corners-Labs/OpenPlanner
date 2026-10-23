@@ -82,6 +82,12 @@ class InMemoryTransaction:
         self.state.bookings[stored.id or 0] = stored
         return stored
 
+    async def get_booking(self, booking_id: int) -> Booking | None:
+        return self.state.bookings.get(booking_id)
+
+    async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
+        self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], contact=None)
+
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         return next((b for b in self.state.bookings.values() if b.token_hash == token_hash), None)
 

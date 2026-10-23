@@ -29,7 +29,13 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import change_deadline, plan_for_booking, plan_for_cancellation
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group
-from app.domain.tokens import hash_token, new_management_token, token_matches
+from app.domain.tokens import (
+    MIN_KEY_BYTES,
+    derive_token,
+    hash_token,
+    new_token_salt,
+    token_matches,
+)
 
 
 @dataclass(frozen=True)
@@ -39,6 +45,16 @@ class ContactInput:
     name: str = field(repr=False)
     email: str = field(repr=False)
     phone: str | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True)
+class BookingDetails:
+    """What the management page needs: the booking, its group and whether it may change."""
+
+    booking: Booking
+    group: Group
+    change_deadline: datetime
+    changeable: bool
 
 
 @dataclass(frozen=True)
@@ -55,12 +71,28 @@ class BookingService:
     Args:
         uow: Opens database transactions.
         clock: Current time.
+        token_key: Server key for deriving management tokens (ADR 0011).
+
+    Raises:
+        ValueError: If ``token_key`` is shorter than 32 bytes.
     """
 
-    def __init__(self, uow: UnitOfWork, clock: Clock) -> None:
+    def __init__(self, uow: UnitOfWork, clock: Clock, token_key: bytes) -> None:
         """Store the collaborators."""
+        if len(token_key) < MIN_KEY_BYTES:
+            raise ValueError(f"the token key must be at least {MIN_KEY_BYTES} bytes")
         self._uow = uow
         self._clock = clock
+        self._token_key = token_key
+
+    async def get_group(self, group_slug: str) -> Group:
+        """Return the group behind a booking page.
+
+        Raises:
+            DomainError: ``group_not_found``.
+        """
+        async with self._uow.read() as tx:
+            return await self._group(tx, group_slug)
 
     async def availability(
         self, group_slug: str, first_day: date, last_day: date
@@ -112,14 +144,18 @@ class BookingService:
             )
             return await self._place(tx, group, start, details, locale, consents, None)
 
-    async def find(self, management_token: str) -> Booking:
-        """Return the booking behind a management link.
+    async def find(self, management_token: str) -> BookingDetails:
+        """Return the booking behind a management link, with its group and changeability.
 
         Raises:
             DomainError: ``booking_not_found``.
         """
         async with self._uow.read() as tx:
-            return await self._booking(tx, management_token)
+            booking = await self._booking(tx, management_token)
+            group = await self._group_by_id(tx, booking.group_id)
+        deadline = change_deadline(booking.start, group.dispatch_lead)
+        changeable = booking.is_active and self._clock.now() < deadline
+        return BookingDetails(booking, group, deadline, changeable)
 
     async def cancel(self, management_token: str) -> Booking:
         """Cancel the booking; its pending jobs become a cancellation mail and the purge.
@@ -212,7 +248,8 @@ class BookingService:
             )
         if await tx.count_active_bookings(_id(slot)) >= slot.capacity_snapshot:
             raise DomainError(ErrorCode.SLOT_FULL)
-        token, token_hash = new_management_token()
+        salt = new_token_salt()
+        token = derive_token(self._token_key, salt)
         booking = await tx.add_booking(
             Booking(
                 id=None,
@@ -223,8 +260,9 @@ class BookingService:
                 status=BookingStatus.CONFIRMED,
                 contact=contact,
                 locale=locale,
-                token_hash=token_hash,
+                token_hash=hash_token(token),
                 created_at=now,
+                token_salt=salt,
                 consents=consents,
                 rescheduled_from_id=rescheduled_from,
             )
