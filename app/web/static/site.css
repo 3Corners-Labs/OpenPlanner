@@ -1,0 +1,119 @@
+/*
+ * Base stylesheet for server-rendered pages. All design decisions are tokens on :root so an
+ * organisation's branding (open point O5) can override them without touching rules.
+ * Defaults follow NL Design System conventions: system font, high contrast, visible focus.
+ */
+:root {
+  --op-color-text: #1a1a1a;
+  --op-color-background: #ffffff;
+  --op-color-link: #01689b;
+  --op-color-focus: #1a1a1a;
+  --op-color-focus-background: #ffbf47;
+  --op-color-border: #b4b4b4;
+  --op-font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --op-font-size: 1.125rem;
+  --op-line-height: 1.6;
+  --op-space-s: 0.5rem;
+  --op-space-m: 1rem;
+  --op-space-l: 2rem;
+  --op-max-width: 44rem;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --op-color-text: #000000;
+    --op-color-link: #00436b;
+    --op-color-border: #000000;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none;
+    transition: none;
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  color: var(--op-color-text);
+  background: var(--op-color-background);
+  font-family: var(--op-font-family);
+  font-size: var(--op-font-size);
+  line-height: var(--op-line-height);
+}
+
+a {
+  color: var(--op-color-link);
+  text-underline-offset: 0.15em;
+}
+
+a:focus-visible,
+main:focus-visible {
+  outline: 3px solid var(--op-color-focus);
+  outline-offset: 2px;
+  background: var(--op-color-focus-background);
+  color: var(--op-color-text);
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--op-space-m);
+  top: calc(-1 * var(--op-space-l) * 2);
+  padding: var(--op-space-s) var(--op-space-m);
+}
+
+.skip-link:focus-visible {
+  top: var(--op-space-s);
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--op-space-m);
+  max-width: var(--op-max-width);
+  margin: 0 auto;
+  padding: var(--op-space-m);
+  border-bottom: 1px solid var(--op-color-border);
+}
+
+.site-name {
+  margin: 0;
+  font-weight: 700;
+}
+
+.language-switcher ul {
+  display: flex;
+  gap: var(--op-space-s);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Targets at least 24x24 px (WCAG 2.5.8). */
+.language-switcher a {
+  display: inline-block;
+  min-width: 24px;
+  min-height: 24px;
+  padding: var(--op-space-s);
+}
+
+.language-switcher a[aria-current="true"] {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+main {
+  max-width: var(--op-max-width);
+  margin: 0 auto;
+  padding: var(--op-space-m);
+}

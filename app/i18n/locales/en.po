@@ -1,0 +1,39 @@
+# English catalogue. Keys are stable identifiers; see docs/adr/0004.
+msgid ""
+msgstr ""
+"Language: en\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#. Name of this language in itself, shown in the language switcher.
+msgid "language.autonym"
+msgstr "English"
+
+msgid "language.switcher.label"
+msgstr "Choose a language"
+
+msgid "site.name"
+msgstr "Book an appointment"
+
+msgid "site.skip_to_content"
+msgstr "Skip to content"
+
+msgid "home.title"
+msgstr "Schedule a video call"
+
+msgid "home.intro"
+msgstr "The website of your organisation links you to the booking page of the right team. There you choose a time for a video call with an employee."
+
+msgid "home.how.title"
+msgstr "How it works"
+
+msgid "home.how.step_choose"
+msgstr "Choose a day and time that suits you."
+
+msgid "home.how.step_details"
+msgstr "Enter your name and email address."
+
+msgid "home.how.step_confirm"
+msgstr "You receive a confirmation with the link to the video call. You can also use that email to change or cancel the appointment."
+
+msgid "home.privacy"
+msgstr "We keep your details until 24 hours after the call. Then we delete them."
