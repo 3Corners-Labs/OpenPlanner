@@ -1,6 +1,6 @@
 # 0007. Contact-center dispatch through the WxCC Tasks API
 
-Status: accepted (2026-10-23). Supersedes HANDOVER B6 in part.
+Status: accepted (2026-10-23); points 1–2 superseded by ADR 0018. Supersedes HANDOVER B6 in part.
 
 ## Context
 
