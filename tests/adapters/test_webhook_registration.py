@@ -1,28 +1,25 @@
 import json
+from collections.abc import Callable
 
 import httpx
 
-from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTokens
+from app.adapters.webex_auth import AuthorizedClient
 from app.adapters.webhook_registration import register_webex, register_wxcc
-from tests.fakes.clock import FixedClock
-from tests.fakes.tokens import MemoryTokenStore
-from tests.support.domain import NOW
+from tests.fakes.tokens import authorized_client
 
 TARGET = "https://afspraak.example.nl/webhooks/webex"
 
 
-def _client(handler: object) -> tuple[AuthorizedClient, list[httpx.Request]]:
+def _client(
+    handler: Callable[[httpx.Request], httpx.Response],
+) -> tuple[AuthorizedClient, list[httpx.Request]]:
     seen: list[httpx.Request] = []
 
-    def route(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/v1/access_token":
-            return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
+    def record(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return handler(request)  # type: ignore[operator]
+        return handler(request)
 
-    http = httpx.AsyncClient(transport=httpx.MockTransport(route))
-    tokens = WebexTokens(ServiceAppConfig("c", "s", "r"), http, MemoryTokenStore(), FixedClock(NOW))
-    return AuthorizedClient(http, tokens), seen
+    return authorized_client(record), seen
 
 
 async def test_only_missing_webex_webhooks_are_created() -> None:

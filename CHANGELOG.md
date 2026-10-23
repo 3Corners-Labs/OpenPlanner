@@ -41,6 +41,17 @@ All notable changes are listed here, generated from Conventional Commits on rele
   opening hours with capacity, exceptions per date, a preview of the citizen's slots;
   changes audited with the changed fields (migration 0006).
 - Changes need a login of at most 60 minutes (ADR 0015).
+- Webex Meetings (ADR 0017): a meeting per booking on behalf of the group's host, staff as
+  cohost, guests in the lobby, chat on; deleted on cancellation.
+- WxCC work items (ADR 0018): Create Task v2 at T−5 with reference, first name, start, group
+  and meeting link; routing value per group for the flow.
+- Direct video call (ADR 0019): start a call right away while the team is open; waiting page
+  that says honestly when no agent is available.
+- Join page for citizens (link never expires; opens 15 minutes before the start).
+- Signed webhooks from Webex and WxCC; booking timeline and call status; agenda and
+  integrations status in the admin portal; register-webhooks command.
+- Service App tokens refreshed and stored AES-256-GCM encrypted (ADR 0008).
+- Migrations: SQLite table rebuilds work on databases with data.
 - ADR 0011: management tokens derived from a per-booking salt and a server key.
 - `seed-demo` command and a Mailpit `dev` profile for demos.
 

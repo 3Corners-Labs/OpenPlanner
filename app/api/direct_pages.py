@@ -40,6 +40,7 @@ log = structlog.get_logger()
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
 SameOrigin = Annotated[None, Depends(require_same_origin)]
 
+
 def _bookings(request: Request) -> BookingService:
     """Return the booking service."""
     service: BookingService = request.app.state.booking_service

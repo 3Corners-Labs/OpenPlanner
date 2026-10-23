@@ -58,12 +58,27 @@ Admin names are personal data of employees, processed for accountability (who di
 portal). They never appear in logs, exceptions or audit events; the audit log joins them in when
 it is shown.
 
+## Video meetings and WxCC work items (WP5/WP6)
+
+```
+worker/web ──HTTPS (Service App token)──> Webex Meetings API: title "Videogesprek <group>", start, end, time zone, host account
+Webex ──meeting id, join link──> OpenPlanner (bookings.video_room_id, guest_join_url)
+worker/web ──HTTPS──> WxCC Create Task v2: booking reference, first name, start (text), group name, meeting link, kind
+WxCC ──task id──> OpenPlanner (bookings.wxcc_task_id)
+citizen ──GET /b/{token}/join/go──> OpenPlanner ──303──> Webex web app (no data added to the link)
+Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task events → booking_events, call_status
+```
+
+| Data item | Where | Source | Retention | Leaves the system |
+|---|---|---|---|---|
+| Meeting join link | `bookings.guest_join_url`, `host_join_url` | Webex | purged with the contact (PII field) | in the citizen's link (via OpenPlanner) and to WxCC (`meetingLink`) |
+| First name | derived from `bookings.name` at dispatch | booking form | as the contact | to WxCC (`firstName`, `origin.name`) |
+| Meeting and task ids, timeline, call status | `bookings.video_room_id`, `wxcc_task_id`, `booking_events`, `call_status` | Webex, WxCC | kept for statistics (no personal data) | no |
+| Participant names/emails in webhook payloads | processed in memory only | Webex | not stored, not logged | no |
+| Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
+
 ## Planned flows
 
-Live meeting status (WP5/WP7, ADR 0010): Webex → service through signed webhook events and
-Meetings API polling. Only aggregates are stored (state, participant count, host joined,
-start/end times); participant names, emails and IP addresses are processed in memory only.
-
-To be added per work package: booking (WP3), mail (WP4), Webex video (WP5), Webex Connect task
-and SMS (WP6), admin settings (WP7b-d), purge and backups (WP8). Each flow lists: data items, source,
-destination, legal basis owner, retention.
+To be added per work package: SMS reminders (WP4/WP6), integration settings in the admin UI
+(WP7d), purge sweep and backups (WP8). Each flow lists: data items, source, destination, legal
+basis owner, retention.

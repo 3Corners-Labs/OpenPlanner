@@ -1,7 +1,7 @@
 # Threat model
 
 STRIDE per flow, plus abuse cases per public endpoint. Every abuse case has a test.
-Status: work package 7b.
+Status: work packages 5 and 6 (video, WxCC, direct call).
 
 ## Flow: health checks
 
@@ -128,3 +128,26 @@ slug, time zone, numbers, times, dates, queue id), path slugs and item ids.
 | Tampering (XSS) | Markup in a group name or queue id | Jinja2 autoescape; names and queue ids without control characters | `test_names_are_escaped`, `tests/domain/test_scheduling.py::test_group_rejects_invalid_configuration` |
 | Spoofing | A new group takes an admin path as its slug (`/admin/groups/new`) | Reserved slugs | `test_reserved_slugs_cannot_be_taken` |
 | Repudiation | An admin denies a change | Every change is audited in the same transaction, with the changed field names or `rule.add`-style keys (never values) | `test_settings_change_records_the_changed_fields`, `test_group_admin_manages_opening_hours_of_their_group` |
+
+## Flow: video meetings, work items and direct calls (WP5/WP6)
+
+Public: `GET /b/{token}/join`, `GET /b/{token}/join/go`, `GET/POST /g/{slug}/direct`,
+`GET /b/{token}/wait`. Machine: `POST /webhooks/webex`, `POST /webhooks/wxcc`. Outbound:
+Webex Meetings API, WxCC Create Task v2. Inputs from outside: tokens in paths, the contact
+form, webhook bodies and headers, API responses.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Spoofing / tampering | Forged or altered webhook changes a call's status | HMAC over the raw body before parsing (WxCC SHA-256, Webex SHA-1, constant-time); endpoints exist only with a secret; 64 KB cap; rate limit | `tests/adapters/test_webhooks.py::test_wxcc_signature_timestamp_and_window`, `test_webex_signature`, `tests/api/test_webhooks.py::test_forged_or_stale_webhooks_are_refused`, `test_oversized_bodies_are_refused`, `test_without_a_secret_the_endpoints_do_not_exist` |
+| Repudiation / tampering | Replayed WxCC webhook | Header and body timestamp must match and lie within 300 s | `test_wxcc_signature_timestamp_and_window`, `test_forged_or_stale_webhooks_are_refused` |
+| Tampering | Replayed Webex webhook (Webex signs no event time) | Signature still required; status changes are idempotent; participant counts never go below zero; only aggregates are stored | `tests/domain/test_integration.py::test_participants_never_go_below_zero_and_failures_are_kept` |
+| Information disclosure | Personal data to Webex or WxCC | Meeting request: group name and times only; work item: reference, first name, start, group, link, kind | `test_meeting_request_carries_no_personal_data`, `test_work_item_carries_only_first_name_and_meeting_link`, `tests/adapters/test_wxcc.py::test_task_body_matches_the_create_task_v2_contract` |
+| Information disclosure | Participant names or emails from webhooks stored or logged | Parsers read ids, event types, the host flag and reasons only | `test_webex_events_map_to_call_events_without_names` |
+| Spoofing (open redirect) | `/join/go` sends the citizen to an attacker's site | Redirect only to the stored Webex link and only `https://`; only while the join window is open | `tests/api/test_join_pages.py::test_never_redirects_to_a_non_https_link`, `test_page_waits_until_fifteen_minutes_before` |
+| Information disclosure | Meeting link leaks or outlives the booking | Link is a PII field: excluded from `repr`, purged with the contact; the email links to OpenPlanner, not to Webex; `Referrer-Policy: same-origin` | `tests/adapters/db/test_call_queries.py::test_purge_removes_the_join_link_but_keeps_the_ids` |
+| Denial of service | Bots start direct calls and flood the WxCC queue | Same rate limit and honeypot as booking; only while open and switched on per group; WxCC limits active digital contacts | `tests/api/test_direct_pages.py::test_honeypot_and_cross_site_are_refused`, `test_not_offered_when_switched_off`, `tests/domain/test_direct_call.py::test_direct_call_only_when_enabled_and_open` |
+| Tampering (CSRF) | A third-party site starts a direct call in the citizen's browser | Fetch Metadata check on the POST | `test_honeypot_and_cross_site_are_refused` |
+| Elevation (IDOR) | An admin opens another group's booking through their own group's URL | Timeline authorised on the booking's group, and the booking must belong to the URL's group | `tests/admin/test_call_routes.py::test_a_booking_cannot_be_opened_through_another_groups_url` |
+| Information disclosure | Integration secrets readable from the database or logs | Tokens AES-256-GCM with the record name as associated data (ADR 0008); response bodies never logged; the admin page shows expiry only | `tests/adapters/test_crypto.py`, `tests/adapters/db/test_credentials.py`, `tests/adapters/test_webex_auth.py::test_first_use_refreshes_with_the_bootstrap_token` |
+| Denial of service | Webex or WxCC slow or down blocks bookings | Bookings commit first; meetings and work items are idempotent jobs with backoff; direct calls defer to the worker | `tests/jobs/test_call_jobs.py`, `tests/api/test_direct_pages.py::test_platform_failure_defers_to_the_worker` |
+| Tampering | A schema migration fails half-way on production data | SQLite rebuilds run with foreign keys off and must pass `foreign_key_check` | `tests/test_migrations.py::test_upgrade_and_downgrade_with_data` |

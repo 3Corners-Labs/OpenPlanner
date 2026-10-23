@@ -90,6 +90,95 @@ If PingFederate is down, admins cannot log in; booking, reminders and dispatch k
 Rotating `SESSION_SECRET` logs every admin out. Rotating the client secret needs the new value
 in `OIDC_CLIENT_SECRET` and a restart of `web`.
 
+## Webex meetings and Webex Contact Center
+
+Without a Webex Service App OpenPlanner runs without video and WxCC; bookings keep working.
+Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (work items),
+0019 (direct call).
+
+### 1. Webex Service App
+
+1. In the Webex developer portal, create a **Service App** with the scopes listed in
+   `docs/webhooks.md` (meetings on behalf of hosts, participants, `cjp:task_write`,
+   `cjp:task_read`, `cjp:config_read`, `cjp:config_write`). Save the client secret when shown.
+2. A Control Hub administrator authorises it under **Apps → Service Apps**.
+3. Back in the developer portal: select the organisation, paste the client secret and
+   generate the tokens. Put the client id, client secret and **refresh token** in the secret
+   store as `WEBEX_CLIENT_ID`, `WEBEX_CLIENT_SECRET`, `WEBEX_REFRESH_TOKEN`; add
+   `SETTINGS_ENCRYPTION_KEY` (ADR 0008).
+4. OpenPlanner refreshes the access token (14 days) itself and stores rotated tokens encrypted.
+   The refresh token lives 90 days: **Koppelingen** in the admin portal warns two weeks ahead.
+   Renew it by generating new tokens (step 3) and restarting `web` and `worker`.
+
+### 2. Webex site settings (Control Hub)
+
+| Setting | Value |
+|---|---|
+| Guests | may join meetings from the browser without an account |
+| Lobby | guests wait in the lobby until admitted (OpenPlanner sets `allowJoinWithLobby`) |
+| Virtual backgrounds | on; blur is the default start for everyone |
+| Approved backgrounds | upload the central government background (JPG, 1600×900 to 2560×1440); optionally enforce for internal meetings |
+| Host accounts | one licensed account per group (or shared), entered per group under **Instellingen → Koppelingen** |
+
+Staff who join signed in with the organisation's account become cohost automatically; check
+on a phone that the citizen's browser join works with your site settings (mobile browsers may
+offer the Webex app).
+
+### 3. WxCC work items (Control Hub)
+
+Work Items is in beta; the organisation must be enabled by Cisco.
+
+1. **Work Item channel**: e.g. `openplanner-video`. Enter it per group as *WxCC work
+   item-kanaal*.
+2. **Work Item asset** on that channel with a unique **business address** (e.g.
+   `openplanner@<your domain>`; per group as *WxCC business address*) and exactly this schema:
+
+   | Field key | Display name | Required | Viewable |
+   |---|---|---|---|
+   | `bookingReference` | Afspraak | yes | yes |
+   | `firstName` | Voornaam | no | yes |
+   | `startTime` | Starttijd | no | yes |
+   | `groupName` | Team | no | yes |
+   | `meetingLink` | Videogesprek | no | yes |
+   | `kind` | Soort (scheduled/direct) | no | yes |
+
+3. **Entry point and flow** for the asset. The flow reads the flow setting
+   `openplannerGroup` (the group's routing value, by default its web address) and routes with
+   **Queue Contact** to the right queue. Add a **Screen Pop** of `meetingLink` so the agent opens
+   the meeting in one click (in the Webex app, signed in: cohost). Direct calls can get a higher
+   priority with **Set Contact Priority** on `kind = direct`.
+4. **Queues** with channel type Work Item, the **multimedia profile** capacity for work items,
+   and a **RONA** timeout.
+5. Set `WXCC_API_BASE_URL` to your region's API host.
+
+### 4. Webhooks
+
+Set `WEBEX_WEBHOOK_SECRET` and `WXCC_WEBHOOK_SECRET`, deploy, then run once:
+
+```sh
+docker compose exec web python -m app.cli register-webhooks
+```
+
+It registers the Webex webhooks (meetings started/ended, participants joined/left) and the
+WxCC subscription (task events), and skips what exists. WxCC only calls **https on port 443
+with a public domain**: on a laptop use a tunnel (for example `cloudflared tunnel --url
+http://localhost:8000`) and set `PUBLIC_BASE_URL` to the tunnel's https address first.
+
+### 5. Following calls
+
+- **Groep → Agenda** shows today's bookings with meeting and task state, whether the agent
+  joined, participants and a *Niet opgepakt* flag; **Details** shows the timeline.
+- **Koppelingen** shows the Service App, token expiry, WxCC and the webhook addresses.
+
+| Timeline reason | Meaning | Action |
+|---|---|---|
+| `rejected_400` on a task | the work item does not match the asset schema | compare the schema with the table above |
+| `ENTRY_POINT_NOT_FOUND` | the asset has no active entry point | link the entry point and flow to the asset |
+| `CHANNEL_ASSET_UNDEFINED` | the business address matches no asset | fix the group's business address |
+| `ORG_DIGITAL_CONTACT_LIMIT_EXCEEDED` | WxCC's limit of active digital contacts | wait or raise the limit with Cisco |
+| `unauthorized` | the Service App token was refused | renew the tokens (section 1) |
+| `meeting_missing` (retrying) | the work item waits for the meeting | check Webex reachability and the host account |
+
 ## Mail
 
 The worker sends mail when `SMTP_HOST` is set (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`,
@@ -119,6 +208,18 @@ deploy the old image. Every migration is reversible (enforced in CI).
 *TBD.* All secrets come from environment variables / the secret store; none are baked into the
 image.
 
-## Webex Connect is down
+## Webex or WxCC is down
 
-*TBD (work package 6).*
+Bookings keep working: they are stored first, and meetings and work items are jobs.
+
+- **Transient failures** (timeouts, 429, 5xx) are retried after 1, 5 and 15 minutes; after
+  that the job fails and the timeline shows `integration_error` or `task_failed` with the code.
+  The agenda shows the affected bookings.
+- **A work item cannot be created at T−5:** the citizen still has the join link and can wait
+  in the lobby. Pick the booking from the agenda and contact the citizen another way, or
+  re-run the job once WxCC is back (set the job's status to `pending` in the `jobs` table).
+- **Direct calls** during an outage show "no agent available" after the group's
+  not-picked-up limit and offer to book instead.
+- **Webhooks missing** (status not updating while calls happen): check **Koppelingen**, the
+  secrets, and re-run `register-webhooks`; WxCC sets a subscription to `inactive` after
+  repeated delivery errors.
