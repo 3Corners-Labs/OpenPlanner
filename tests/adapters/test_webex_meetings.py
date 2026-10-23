@@ -1,19 +1,18 @@
 """Webex Meetings adapter against recorded responses (contract: docs/webhooks.md)."""
 
 import json
+from collections.abc import Callable
 from datetime import timedelta
 
 import httpx
 import pytest
 
-from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTokens
 from app.adapters.webex_meetings import WebexMeetings
 from app.domain.booking import MeetingRef
 from app.domain.calls import MeetingRequest
 from app.domain.ports import IntegrationError
-from tests.fakes.clock import FixedClock
-from tests.fakes.tokens import MemoryTokenStore
-from tests.support.domain import NOW, SLOT_0900
+from tests.fakes.tokens import authorized_client
+from tests.support.domain import SLOT_0900
 
 REQUEST = MeetingRequest(
     "Videogesprek Demo",
@@ -31,15 +30,8 @@ CREATED = {  # recorded shape of POST /v1/meetings (trimmed)
 }
 
 
-def _meetings(handler: object) -> WebexMeetings:
-    def route(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/v1/access_token":
-            return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
-        return handler(request)  # type: ignore[operator]
-
-    http = httpx.AsyncClient(transport=httpx.MockTransport(route))
-    tokens = WebexTokens(ServiceAppConfig("c", "s", "r"), http, MemoryTokenStore(), FixedClock(NOW))
-    return WebexMeetings(AuthorizedClient(http, tokens), "https://webexapis.com/v1")
+def _meetings(handler: Callable[[httpx.Request], httpx.Response]) -> WebexMeetings:
+    return WebexMeetings(authorized_client(handler), "https://webexapis.com/v1")
 
 
 async def test_meeting_is_created_with_the_agreed_defaults() -> None:

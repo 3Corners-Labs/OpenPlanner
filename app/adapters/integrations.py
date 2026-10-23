@@ -32,15 +32,17 @@ def build_integrations(
     settings: Settings, engine: AsyncEngine, http: httpx.AsyncClient, clock: Clock
 ) -> Integrations:
     """Return the adapters the settings allow."""
-    if not settings.video_configured:
+    client_id, secret, refresh = (
+        settings.webex_client_id,
+        settings.webex_client_secret,
+        settings.webex_refresh_token,
+    )
+    if not client_id or secret is None or refresh is None:
         return Integrations()
-    assert settings.webex_client_id is not None  # noqa: S101 - implied by video_configured
-    assert settings.webex_client_secret is not None  # noqa: S101
-    assert settings.webex_refresh_token is not None  # noqa: S101
     config = ServiceAppConfig(
-        client_id=settings.webex_client_id,
-        client_secret=settings.webex_client_secret.get_secret_value(),
-        bootstrap_refresh_token=settings.webex_refresh_token.get_secret_value(),
+        client_id=client_id,
+        client_secret=secret.get_secret_value(),
+        bootstrap_refresh_token=refresh.get_secret_value(),
         oauth_url=f"{settings.webex_api_base_url.rstrip('/')}/access_token",
     )
     store = CredentialStore(engine, SecretBox(settings_encryption_key(settings)))

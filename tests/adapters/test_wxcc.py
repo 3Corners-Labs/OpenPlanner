@@ -1,16 +1,16 @@
 """WxCC work item adapter: the request body is the contract verified in ADR 0018."""
 
 import json
+from collections.abc import Callable
 
 import httpx
 import pytest
 
-from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTokens
 from app.adapters.wxcc import WxccTasks, task_body
 from app.domain.calls import WorkItem
 from app.domain.ports import IntegrationError
 from tests.fakes.clock import FixedClock
-from tests.fakes.tokens import MemoryTokenStore
+from tests.fakes.tokens import authorized_client
 from tests.support.domain import NOW
 
 ITEM = WorkItem(
@@ -57,17 +57,8 @@ def test_task_body_matches_the_create_task_v2_contract() -> None:
     assert all(len(str(v).encode()) <= 1024 for v in data.values())
 
 
-def _tasks(handler: object) -> WxccTasks:
-    def route(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/v1/access_token":
-            return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
-        return handler(request)  # type: ignore[operator]
-
-    http = httpx.AsyncClient(transport=httpx.MockTransport(route))
-    tokens = WebexTokens(ServiceAppConfig("c", "s", "r"), http, MemoryTokenStore(), FixedClock(NOW))
-    return WxccTasks(
-        AuthorizedClient(http, tokens), "https://api.wxcc-eu1.cisco.com", FixedClock(NOW)
-    )
+def _tasks(handler: Callable[[httpx.Request], httpx.Response]) -> WxccTasks:
+    return WxccTasks(authorized_client(handler), "https://api.wxcc-eu1.cisco.com", FixedClock(NOW))
 
 
 async def test_task_is_created_and_its_id_returned() -> None:

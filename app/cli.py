@@ -47,7 +47,9 @@ async def _register_webhooks(settings: Settings) -> str:
     engine = create_engine(settings.database_url)
     async with httpx.AsyncClient(timeout=15.0) as http:
         integrations = build_integrations(settings, engine, http, SystemClock())
-        assert integrations.tokens is not None  # noqa: S101 - implied by video_configured
+        if integrations.tokens is None:
+            await engine.dispose()
+            return "Webex is not configured; nothing to do.\n"
         client = AuthorizedClient(http, integrations.tokens)
         lines = await register_webex(
             client,
