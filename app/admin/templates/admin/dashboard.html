@@ -1,30 +1,31 @@
 {% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
 {% block title %}{{ _("admin.dashboard.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
-<h1>{{ _("admin.dashboard.title") }}</h1>
-<p>{{ _("admin.dashboard.intro") }}</p>
-<h2>{{ _("admin.dashboard.groups") }}</h2>
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.dashboard.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.dashboard.intro") }}</p>
+  </div>
+</div>
+<h2 id="groups-heading">{{ _("admin.dashboard.groups") }}</h2>
 {% if groups %}
-<table class="data-table">
-  <caption class="visually-hidden">{{ _("admin.dashboard.groups") }}</caption>
-  <thead>
-    <tr>
-      <th scope="col">{{ _("admin.dashboard.organisation") }}</th>
-      <th scope="col">{{ _("admin.dashboard.group") }}</th>
-      <th scope="col">{{ _("admin.dashboard.public_page") }}</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for summary in groups %}
-    <tr>
-      <td>{{ summary.organisation_name }}</td>
-      <td><a href="/admin/groups/{{ summary.group.slug }}">{{ summary.group.name }}</a></td>
-      <td><a href="/g/{{ summary.group.slug }}">/g/{{ summary.group.slug }}</a></td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<ul class="card-grid" aria-labelledby="groups-heading">
+  {% for summary in groups %}
+  <li class="card group-card">
+    <h2><a href="/admin/groups/{{ summary.group.slug }}">{{ summary.group.name }}</a></h2>
+    <div class="group-card__meta">
+      <span class="chip">{{ summary.organisation_name }}</span>
+      <span class="chip chip--accent">{{ icon("clock") }}{{ _("admin.group.minutes", minutes=summary.group.slot_minutes) }}</span>
+    </div>
+    <div class="group-card__footer">
+      <a class="link-with-icon" href="/g/{{ summary.group.slug }}">{{ icon("external") }}<span>/g/{{ summary.group.slug }}</span></a>
+      <a href="/admin/groups/{{ summary.group.slug }}" aria-label="{{ _("admin.dashboard.manage_group", name=summary.group.name) }}">{{ _("admin.dashboard.manage") }}</a>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
 {% else %}
-<p class="notice">{{ _("admin.dashboard.no_groups") }}</p>
+<p class="empty-state">{{ _("admin.dashboard.no_groups") }}</p>
 {% endif %}
 {% endblock %}

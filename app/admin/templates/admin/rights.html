@@ -1,15 +1,23 @@
 {% extends "admin/layout.html" %}
 {% block title %}{{ _("admin.rights.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
-<h1>{{ _("admin.rights.title") }}</h1>
-<p>{{ _("admin.rights.intro") }}</p>
-<h2>{{ _("admin.rights.roles") }}</h2>
-{% if roles %}
-<ul>{% for role in roles %}<li>{{ role }}</li>{% endfor %}</ul>
-{% else %}
-<p class="notice">{{ _("admin.rights.none") }}</p>
-{% endif %}
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.rights.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.rights.intro") }}</p>
+  </div>
+</div>
+<section class="card" aria-labelledby="roles-heading">
+  <h2 id="roles-heading">{{ _("admin.rights.roles") }}</h2>
+  {% if roles %}
+  <ul class="group-card__meta" role="list">{% for role in roles %}<li class="chip chip--accent">{{ role }}</li>{% endfor %}</ul>
+  {% else %}
+  <p class="muted">{{ _("admin.rights.none") }}</p>
+  {% endif %}
+</section>
 {% if rights %}
+<h2 class="section-title">{{ _("admin.rights.title") }}</h2>
+<div class="table-scroll">
 <table class="data-table">
   <caption class="visually-hidden">{{ _("admin.rights.title") }}</caption>
   <thead>
@@ -21,5 +29,6 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 {% endblock %}

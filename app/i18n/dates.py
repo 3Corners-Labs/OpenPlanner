@@ -24,6 +24,11 @@ def format_day_short(day: date, locale: str) -> str:
     return format_date(day, format="EEEE d MMMM", locale=_babel_locale(locale))
 
 
+def format_day_compact(day: date, locale: str) -> str:
+    """Return a short date with year for tables, e.g. ``5 jan 2026`` / ``Jan 5, 2026``."""
+    return format_date(day, format="medium", locale=_babel_locale(locale))
+
+
 def format_clock(moment: datetime, tz: tzinfo, locale: str) -> str:
     """Return the local time of ``moment`` in ``tz``, e.g. ``09:00`` / ``9:00 AM``."""
     return format_time(moment.astimezone(tz), format="short", locale=_babel_locale(locale))

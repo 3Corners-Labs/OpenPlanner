@@ -1,0 +1,4 @@
+{#- Shared frame of every admin page: the admin stylesheet and the portal's name. -#}
+{% extends "base.html" %}
+{% block head_extra %}<link rel="stylesheet" href="/static/admin.css">{% block admin_head %}{% endblock %}{% endblock %}
+{% block body_attributes %} class="admin"{% endblock %}
