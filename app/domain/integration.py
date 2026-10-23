@@ -73,6 +73,11 @@ class IntegrationService:
             await self._record(tx, booking.id, kind, at, detail)
         return True
 
+    async def status(self, booking_id: int) -> CallStatus:
+        """Return a booking's call status (the citizen's waiting page; no admin data)."""
+        async with self._uow.read() as tx:
+            return await tx.get_call_status(booking_id) or new_status(booking_id)
+
     async def timeline(self, principal: Principal, booking_id: int) -> Timeline:
         """Return the booking's timeline if ``principal`` may view its group's bookings.
 

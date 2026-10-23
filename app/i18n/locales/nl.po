@@ -964,3 +964,45 @@ msgstr "Dit gesprek is voorbij."
 
 msgid "join.back"
 msgstr "Terug naar uw afspraak"
+
+msgid "error.direct_call_unavailable"
+msgstr "Nu een gesprek starten kan op dit moment niet. Maak een afspraak."
+
+msgid "direct.title"
+msgstr "Nu een videogesprek starten"
+
+msgid "direct.intro"
+msgstr "Vul uw gegevens in. U komt meteen in de wachtruimte van {group_name}; een medewerker laat u binnen."
+
+msgid "direct.submit"
+msgstr "Gesprek starten"
+
+msgid "direct.unavailable"
+msgstr "Nu een gesprek starten kan op dit moment niet, bijvoorbeeld buiten de openingstijden."
+
+msgid "direct.schedule_instead"
+msgstr "Een afspraak maken"
+
+msgid "direct.card.title"
+msgstr "Liever meteen?"
+
+msgid "direct.card.text"
+msgstr "Het team is nu open. U kunt direct een videogesprek starten."
+
+msgid "direct.card.button"
+msgstr "Nu een gesprek starten"
+
+msgid "wait.title"
+msgstr "Uw videogesprek"
+
+msgid "wait.searching"
+msgstr "We zoeken een medewerker voor u. U kunt alvast naar de wachtruimte. Deze pagina ververst zichzelf."
+
+msgid "wait.accepted"
+msgstr "Een medewerker heeft uw gesprek aangenomen en komt zo naar de wachtruimte."
+
+msgid "wait.in_call"
+msgstr "De medewerker is in het gesprek."
+
+msgid "wait.unavailable"
+msgstr "Er is nu helaas geen medewerker beschikbaar. Maak een afspraak, dan bellen we op een moment dat u schikt."

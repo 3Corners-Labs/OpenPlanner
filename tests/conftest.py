@@ -8,6 +8,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
+from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.ports import Clock
 from app.main import create_app
@@ -35,10 +36,10 @@ def unreachable_db_settings(settings: Settings, tmp_path: Path) -> Settings:
 
 @asynccontextmanager
 async def app_client(
-    settings: Settings, clock: Clock | None = None
+    settings: Settings, clock: Clock | None = None, integrations: Integrations | None = None
 ) -> AsyncIterator[httpx.AsyncClient]:
     """Run the app's lifespan and yield a client that talks to it in-process."""
-    app = create_app(settings, clock)
+    app = create_app(settings, clock, integrations=integrations)
     async with (
         app.router.lifespan_context(app),
         httpx.AsyncClient(

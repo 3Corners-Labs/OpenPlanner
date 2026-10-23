@@ -4,6 +4,13 @@
 {% include "_error_summary.html" %}
 <h1>{{ group.name }}</h1>
 <p>{{ _("group.intro", minutes=group.slot_minutes) }}</p>
+{% if direct_call_available %}
+<section class="summary" aria-labelledby="direct-heading">
+  <h2 id="direct-heading">{{ _("direct.card.title") }}</h2>
+  <p>{{ _("direct.card.text") }}</p>
+  <p><a class="button" href="/g/{{ group.slug }}/direct">{{ _("direct.card.button") }}</a></p>
+</section>
+{% endif %}
 {% set action = "/g/" ~ group.slug ~ "/book" %}
 {% set method = "get" %}
 {% set week_base = "/g/" ~ group.slug %}

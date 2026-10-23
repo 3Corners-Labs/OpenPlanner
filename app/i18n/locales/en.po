@@ -964,3 +964,45 @@ msgstr "This call has ended."
 
 msgid "join.back"
 msgstr "Back to your appointment"
+
+msgid "error.direct_call_unavailable"
+msgstr "Starting a call is not possible right now. Please book an appointment."
+
+msgid "direct.title"
+msgstr "Start a video call now"
+
+msgid "direct.intro"
+msgstr "Enter your details. You go straight to the lobby of {group_name}; an agent lets you in."
+
+msgid "direct.submit"
+msgstr "Start the call"
+
+msgid "direct.unavailable"
+msgstr "Starting a call is not possible right now, for example outside opening hours."
+
+msgid "direct.schedule_instead"
+msgstr "Book an appointment"
+
+msgid "direct.card.title"
+msgstr "Rather right away?"
+
+msgid "direct.card.text"
+msgstr "The team is open now. You can start a video call right away."
+
+msgid "direct.card.button"
+msgstr "Start a call now"
+
+msgid "wait.title"
+msgstr "Your video call"
+
+msgid "wait.searching"
+msgstr "We are looking for an agent. You can go to the lobby already. This page refreshes itself."
+
+msgid "wait.accepted"
+msgstr "An agent has accepted your call and will come to the lobby shortly."
+
+msgid "wait.in_call"
+msgstr "The agent is in the call."
+
+msgid "wait.unavailable"
+msgstr "Unfortunately no agent is available right now. Book an appointment for a moment that suits you."

@@ -179,12 +179,16 @@ class InMemoryTransaction:
         return [
             SlotUsage(s.start, s.capacity_snapshot, await self.count_active_bookings(s.id or 0))
             for s in self.state.slots.values()
-            if s.group_id == group_id and lower <= s.start < upper
+            if s.group_id == group_id and lower <= s.start < upper and s.kind == "scheduled"
         ]
 
     async def get_slot(self, group_id: int, start: datetime) -> Slot | None:
         return next(
-            (s for s in self.state.slots.values() if s.group_id == group_id and s.start == start),
+            (
+                s
+                for s in self.state.slots.values()
+                if s.group_id == group_id and s.start == start and s.kind == "scheduled"
+            ),
             None,
         )
 

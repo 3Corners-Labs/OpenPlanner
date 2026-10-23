@@ -18,6 +18,7 @@ from typing import Protocol
 import structlog
 
 from app.adapters.db.jobs import ClaimedJob
+from app.domain.call_service import CallService
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError
 from app.domain.integration import IntegrationService
@@ -32,6 +33,7 @@ from app.domain.ports import (
 )
 from app.jobs.calls import CALL_JOBS, CallJobs
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
+from app.web.call_labels import agent_start_label
 
 log = structlog.get_logger()
 
@@ -101,7 +103,9 @@ class JobRunner:
         if sender is not None:
             self._types |= set(MESSAGE_KINDS)
         self._calls = (
-            CallJobs(uow, integration, video, dispatcher) if integration is not None else None
+            CallJobs(uow, CallService(uow, integration, video, dispatcher, agent_start_label))
+            if integration is not None
+            else None
         )
         if self._calls is not None:
             self._types |= self._calls.types

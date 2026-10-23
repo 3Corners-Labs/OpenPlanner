@@ -221,7 +221,7 @@ def work_item(booking: Booking, group: Group, *, start_label: str) -> WorkItem:
         start_label=start_label,
         group_name=group.name,
         meeting_link=booking.meeting.link,
-        kind="scheduled",
+        kind=booking.kind.value,
         business_address=group.wxcc_business_address,
         channel=group.wxcc_channel,
         routing_value=group.routing_value,

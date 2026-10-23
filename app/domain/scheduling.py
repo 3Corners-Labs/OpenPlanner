@@ -16,7 +16,7 @@ time. That is a single number because the WxCC queue assigns the actual agent (H
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -292,3 +292,17 @@ def validate_schedule(rules: Sequence[ScheduleRule], overrides: Sequence[Schedul
                 or override.window.overlaps(same_day.window)
             ):
                 raise _invalid("schedule_overrides")
+
+
+def is_open(
+    group: Group,
+    rules: Iterable[ScheduleRule],
+    overrides: Iterable[ScheduleOverride],
+    now: datetime,
+) -> bool:
+    """Return whether ``now`` falls inside one of the group's opening windows (local time)."""
+    local = now.astimezone(group.tz)
+    return any(
+        window.opens <= local.time() < window.closes
+        for window in windows_on(local.date(), rules, overrides)
+    )

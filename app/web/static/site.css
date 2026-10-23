@@ -315,6 +315,10 @@ input:focus-visible {
   background: var(--op-color-surface);
 }
 
+.notice--warning {
+  border-left-color: var(--op-color-error);
+}
+
 .notice--success {
   border-left-color: var(--op-color-success);
 }
