@@ -16,12 +16,20 @@ from app.domain.job_plan import JobType
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import close_day, seed_group
 from tests.fakes.clock import FixedClock
-from tests.support.domain import MONDAY, NOW, SLOT_0900, SLOT_0930, TUESDAY_0900, book
+from tests.support.domain import (
+    MONDAY,
+    NOW,
+    SLOT_0900,
+    SLOT_0930,
+    TEST_TOKEN_KEY,
+    TUESDAY_0900,
+    book,
+)
 
 
 @pytest.fixture
 def service(engine: AsyncEngine) -> BookingService:
-    return BookingService(SqlUnitOfWork(engine), FixedClock(NOW))
+    return BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY)
 
 
 @asynccontextmanager
@@ -47,7 +55,7 @@ async def test_book_persists_slot_booking_and_jobs(
 
     receipt = await book(service)
 
-    found = await service.find(receipt.management_token)
+    found = (await service.find(receipt.management_token)).booking
     assert found.id == receipt.booking.id
     assert found.start == SLOT_0900
     assert found.start.tzinfo is UTC
@@ -104,9 +112,11 @@ async def test_reschedule_and_rollback(engine: AsyncEngine, service: BookingServ
     with pytest.raises(DomainError, match="slot_full"):
         await service.reschedule(second.management_token, SLOT_0930)
 
-    assert (await service.find(second.management_token)).status is BookingStatus.CONFIRMED
-    assert (await service.find(moved.management_token)).rescheduled_from_id == first.booking.id
-    assert (await service.find(first.management_token)).status is BookingStatus.CANCELLED
+    assert (await service.find(second.management_token)).booking.status is BookingStatus.CONFIRMED
+    assert (
+        await service.find(moved.management_token)
+    ).booking.rescheduled_from_id == first.booking.id
+    assert (await service.find(first.management_token)).booking.status is BookingStatus.CANCELLED
 
 
 async def test_reschedule_into_another_groups_slot(
@@ -119,7 +129,7 @@ async def test_reschedule_into_another_groups_slot(
     with pytest.raises(DomainError, match="slot_unavailable"):
         await service.reschedule(receipt.management_token, TUESDAY_0900)
 
-    assert (await service.find(receipt.management_token)).status is BookingStatus.CONFIRMED
+    assert (await service.find(receipt.management_token)).booking.status is BookingStatus.CONFIRMED
 
 
 async def test_closed_day_is_respected(engine: AsyncEngine, service: BookingService) -> None:
@@ -137,8 +147,8 @@ async def test_concurrent_bookings_on_separate_connections(
     await seed_group(engine)
     other_engine = create_engine(database_url, busy_timeout_ms=5000)
     services = [
-        BookingService(SqlUnitOfWork(engine), FixedClock(NOW)),
-        BookingService(SqlUnitOfWork(other_engine), FixedClock(NOW)),
+        BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY),
+        BookingService(SqlUnitOfWork(other_engine), FixedClock(NOW), TEST_TOKEN_KEY),
     ]
     try:
         results = await asyncio.gather(*(book(s) for s in services), return_exceptions=True)
@@ -192,3 +202,41 @@ async def test_slot_uniqueness_is_enforced_by_the_database(engine: AsyncEngine) 
     with pytest.raises(Exception, match="UNIQUE"):
         async with engine.begin() as conn:
             await conn.execute(insert_slot, {"g": group_id})
+
+
+async def test_salt_is_stored_and_purge_clears_personal_data(
+    engine: AsyncEngine, service: BookingService
+) -> None:
+    from app.domain.tokens import derive_token
+
+    await seed_group(engine)
+    receipt = await book(service)
+    uow = SqlUnitOfWork(engine)
+
+    async with uow.read() as tx:
+        stored = await tx.get_booking(receipt.booking.id or 0)
+    assert stored is not None
+    assert derive_token(TEST_TOKEN_KEY, stored.token_salt) == receipt.management_token
+
+    async with uow.locked() as tx:
+        await tx.purge_personal_data(stored.id or 0, NOW)
+    async with uow.read() as tx:
+        purged = await tx.get_booking(stored.id or 0)
+        assert await tx.get_booking(9999) is None
+    assert purged is not None
+    assert purged.contact is None
+    async with engine.connect() as conn:
+        row = (
+            await conn.execute(
+                select(
+                    BookingRow.name,
+                    BookingRow.email,
+                    BookingRow.phone,
+                    BookingRow.guest_join_url,
+                    BookingRow.host_join_url,
+                    BookingRow.pii_purged_at,
+                )
+            )
+        ).one()
+    assert row[:5] == (None, None, None, None, None)
+    assert row[5] == NOW

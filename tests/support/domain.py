@@ -15,6 +15,8 @@ SLOT_0900 = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)  # 09:00 Amsterdam (CET)
 SLOT_0930 = datetime(2026, 1, 5, 8, 30, tzinfo=UTC)
 TUESDAY_0900 = datetime(2026, 1, 6, 8, 0, tzinfo=UTC)
 ADA = ContactInput(name="Ada Lovelace", email="ada@example.org", phone="06 1234 5678")
+TEST_TOKEN_KEY = b"k" * 32
+"""Server key for deriving management tokens in tests (never used outside tests)."""
 
 
 def window(opens: str = "09:00", closes: str = "10:00", capacity: int = 2) -> TimeWindow:

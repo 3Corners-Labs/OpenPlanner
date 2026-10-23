@@ -1,29 +1,48 @@
 import hashlib
+import hmac
 
-from app.domain.tokens import hash_token, new_management_token, token_matches
+import pytest
 
+from app.domain.tokens import derive_token, hash_token, new_token_salt, token_matches
 
-def test_new_token_is_url_safe_and_long_enough() -> None:
-    token, _ = new_management_token()
-
-    assert len(token) >= 43  # 32 bytes, base64url
-    assert set(token) <= set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+KEY = b"k" * 32
 
 
-def test_only_the_sha256_is_kept() -> None:
-    token, token_hash = new_management_token()
+def test_salt_is_32_random_url_safe_bytes() -> None:
+    salt = new_token_salt()
 
-    assert token_hash == hashlib.sha256(token.encode()).hexdigest()
-    assert token not in token_hash
+    assert len(salt) >= 43
+    assert set(salt) <= set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+    assert len({new_token_salt() for _ in range(100)}) == 100
 
 
-def test_tokens_are_unique() -> None:
-    assert len({new_management_token()[0] for _ in range(100)}) == 100
+def test_token_is_derived_from_key_and_salt() -> None:
+    salt = new_token_salt()
+
+    token = derive_token(KEY, salt)
+
+    assert token == derive_token(KEY, salt)
+    assert token != derive_token(b"o" * 32, salt)
+    assert token != derive_token(KEY, new_token_salt())
+    assert len(token) == 43  # 32 bytes, base64url without padding
+    expected = hmac.new(KEY, b"manage:" + salt.encode(), hashlib.sha256).digest()
+    assert token.encode() != expected
+
+
+def test_only_the_sha256_of_the_token_is_kept() -> None:
+    token = derive_token(KEY, new_token_salt())
+
+    assert hash_token(token) == hashlib.sha256(token.encode()).hexdigest()
 
 
 def test_token_matches_in_constant_time() -> None:
-    token, token_hash = new_management_token()
+    token = derive_token(KEY, new_token_salt())
 
-    assert token_matches(token, token_hash)
-    assert not token_matches(token + "x", token_hash)
-    assert hash_token("abc") == hashlib.sha256(b"abc").hexdigest()
+    assert token_matches(token, hash_token(token))
+    assert not token_matches(token + "x", hash_token(token))
+
+
+@pytest.mark.parametrize("key", [b"", b"x" * 31])
+def test_short_keys_are_rejected(key: bytes) -> None:
+    with pytest.raises(ValueError, match="32 bytes"):
+        derive_token(key, new_token_salt())

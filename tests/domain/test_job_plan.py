@@ -137,3 +137,29 @@ def test_reminder_rule_bounds() -> None:
             ReminderRule(ChannelKind.EMAIL, minutes_before=minutes)
     ReminderRule(ChannelKind.EMAIL, minutes_before=5)
     ReminderRule(ChannelKind.EMAIL, minutes_before=30 * 24 * 60)
+
+
+def test_stale_jobs() -> None:
+    from dataclasses import replace
+
+    from app.domain.booking import Booking, BookingStatus
+    from app.domain.job_plan import is_stale
+
+    booking = Booking(
+        id=1,
+        group_id=1,
+        slot_id=1,
+        start=START,
+        end=END,
+        status=BookingStatus.CONFIRMED,
+        contact=WITH_PHONE,
+        locale="nl",
+        token_hash="h",
+        created_at=NOW,
+    )
+
+    assert not is_stale(START, booking)
+    assert not is_stale(None, replace(booking, status=BookingStatus.CANCELLED))
+    assert is_stale(START, replace(booking, status=BookingStatus.CANCELLED))
+    assert is_stale(START - timedelta(days=1), booking)
+    assert is_stale(START, replace(booking, contact=None))
