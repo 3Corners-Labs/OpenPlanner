@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="{{ locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ _("site.name") }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#content">{{ _("site.skip_to_content") }}</a>
+  <header class="site-header">
+    <p class="site-name">{{ _("site.name") }}</p>
+    {% include "_language_switcher.html" %}
+  </header>
+  <main id="content" tabindex="-1">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

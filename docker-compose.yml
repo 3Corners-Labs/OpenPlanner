@@ -1,0 +1,47 @@
+# Same shape for development and production: web + worker sharing one SQLite volume.
+x-app: &app
+  build: .
+  image: openplanner:local
+  env_file:
+    - path: .env
+      required: false
+  volumes:
+    - data:/srv/data
+  read_only: true
+  tmpfs:
+    - /tmp
+  user: "10001:10001"
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+services:
+  web:
+    <<: *app
+    # Only web runs migrations, so web and worker never race on the schema.
+    command:
+      - sh
+      - -c
+      - >-
+        alembic upgrade head &&
+        exec uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000
+        --no-access-log --proxy-headers
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "app.jobs.worker"]
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.jobs.healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  data:
