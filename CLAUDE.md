@@ -21,7 +21,7 @@ Lightweight group-booking service for a government contact center: embeddable wi
 
 ## Architecture rules
 - `app/domain/` has **no** imports from FastAPI, SQLAlchemy, httpx, or any adapter. Pure Python, fully unit-testable. Domain errors carry codes, never user-facing text.
-- Layers (import-linter): `app.main` → `app.api | app.admin | app.jobs` (never importing each other) → `app.adapters` → `app.domain`. `app.i18n` is independent of all of them.
+- Layers (import-linter): `app.main` → `app.api | app.admin | app.jobs` (never importing each other) → `app.web` (shared HTML plumbing: locale, templates, `render()`) → `app.adapters` → `app.domain`. `app.i18n` is independent of all of them. Every HTML response goes through `app.web.templates.render`.
 - Modular by design (ADR 0005): one home per concern; extract shared behaviour at its second use. Every module, class and public function in `app/`, `migrations/` and `scripts/` has a Google-style docstring stating its responsibility.
 - Every external system is an adapter behind a Protocol in `app/domain/ports.py`: `VideoProvider`, `ContactCenterDispatcher`, `MailSender`, `SmsSender`, `IdentityProvider`, `Clock`. Tests use fakes; contract tests use recorded fixtures.
 - Authorization is one dependency: `require_scope(org_id=None, group_id=None)`. Every admin query filters by the scope object. Never bypass it "for superuser"; superuser is a scope that matches everything.
@@ -42,7 +42,7 @@ Per PR:
 - `jscpd` copy-paste detection on `app/`, `tests/` (and `widget/`), threshold 1%.
 - `mypy --strict` on `app/`.
 - `import-linter`: `app/domain` imports nothing from `app/adapters`, `app/api`, `app/admin`, `app/jobs`, nor any framework.
-- `pytest` with coverage ≥ 90% on `app/domain/`, ≥ 75% overall. Tests mirror the source tree. Includes the authorisation matrix (every role × every admin endpoint × own/other group) and the abuse cases from `docs/threat-model.md`.
+- `pytest` with coverage ≥ 90% on `app/domain/` and `app/i18n/`, ≥ 75% overall. Tests mirror the source tree. Includes the authorisation matrix (every role × every admin endpoint × own/other group) and the abuse cases from `docs/threat-model.md`.
 - `bandit -r app/`; `semgrep` with `p/python`, `p/owasp-top-ten`, `p/secrets` and the repo rules in `.semgrep/` (no `print`, no PII field names inside log calls).
 - `pip-audit`, `uv lock --check`, `pip-licenses --allow-only` against the allowed list (exceptions by ADR; certifi: ADR 0003); `npm audit` for the `e2e/` tooling.
 - `gitleaks`.
@@ -53,7 +53,7 @@ Per PR:
 - CycloneDX SBOM generated and scanned with `grype`.
 On merge to `main`:
 - OWASP ZAP baseline scan against the started container.
-- `mutmut` on `app/domain/`, mutation score ≥ 80%.
+- `mutmut` on `app/domain/` and `app/i18n/`, mutation score ≥ 80%.
 - Image pushed to GHCR and signed keyless with `cosign`, SBOM attested; deployment verifies the signature (ADR 0006).
 Weekly: Renovate updates (security updates immediately), `trivy` on the running image, ZAP full scan against staging. Daily: alert if `purge_pii` backlog > 0.
 

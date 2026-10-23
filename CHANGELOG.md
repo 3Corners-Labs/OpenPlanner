@@ -13,4 +13,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
   GHCR publishing with cosign signing and SBOM attestation.
 - ADRs 0004 (i18n module), 0005 (modularity and documentation), 0006 (CI tooling and signing);
   skill map in `docs/skills.md`.
+- i18n core (`app/i18n`): locale negotiation (`?lang=` → cookie → browser → default Dutch),
+  lookup chain with override hook, safe placeholder formatting, nl/en catalogues.
+- Bilingual home page `/` with an accessible language switcher; shared HTML layer `app/web`.
 

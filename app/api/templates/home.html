@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ _("home.title") }} – {{ _("site.name") }}{% endblock %}
+{% block content %}
+<h1>{{ _("home.title") }}</h1>
+<p>{{ _("home.intro") }}</p>
+<h2>{{ _("home.how.title") }}</h2>
+<ol>
+  <li>{{ _("home.how.step_choose") }}</li>
+  <li>{{ _("home.how.step_details") }}</li>
+  <li>{{ _("home.how.step_confirm") }}</li>
+</ol>
+<p>{{ _("home.privacy") }}</p>
+{% endblock %}

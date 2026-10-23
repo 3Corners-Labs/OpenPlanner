@@ -7,12 +7,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.adapters.db.engine import create_engine
-from app.api import health
+from app.api import health, pages
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.config import Settings
+from app.i18n import Translator, load_catalogues
 from app.logging import configure_logging
+from app.web.templates import STATIC_DIR
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -22,8 +25,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings: Explicit settings (tests); defaults to reading the environment.
 
     Returns:
-        The FastAPI app. Its lifespan configures logging, opens the database engine on
-        startup and disposes it on shutdown.
+        The FastAPI app with the translator loaded from the shipped catalogues. Its lifespan
+        configures logging, opens the database engine on startup and disposes it on
+        shutdown.
     """
     settings = settings or Settings()
 
@@ -39,6 +43,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Swagger UI and ReDoc load scripts from a CDN; only the JSON spec is served.
     app = FastAPI(title="OpenPlanner", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.settings = settings
+    # Admin-edited overrides are wired in here once the database adapter exists (WP7).
+    app.state.translator = Translator(load_catalogues())
     app.add_middleware(SecurityHeadersMiddleware)
     app.include_router(health.router)
+    app.include_router(pages.router)
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app

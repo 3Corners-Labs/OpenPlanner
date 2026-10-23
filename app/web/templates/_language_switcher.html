@@ -1,0 +1,7 @@
+<nav aria-label="{{ _("language.switcher.label") }}" class="language-switcher">
+  <ul>
+    {% for option in languages %}
+    <li><a href="{{ option.href }}" hreflang="{{ option.code }}" lang="{{ option.code }}"{% if option.current %} aria-current="true"{% endif %}>{{ option.autonym }}</a></li>
+    {% endfor %}
+  </ul>
+</nav>
