@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -14,11 +14,15 @@ class Settings(BaseSettings):
 
     Secrets never get defaults here; they come from the environment or the secret store.
     ``.env.example`` lists every variable with a placeholder.
+
+    Secure by default: ``ENVIRONMENT`` defaults to ``prod``, which requires
+    ``MANAGEMENT_TOKEN_KEY`` and an ``https`` ``PUBLIC_BASE_URL``. Development sets
+    ``ENVIRONMENT=dev`` explicitly (``.env.example``).
     """
 
     model_config = SettingsConfigDict(extra="ignore", frozen=True)
 
-    environment: Literal["dev", "test", "prod"] = "dev"
+    environment: Literal["dev", "test", "prod"] = "prod"
     database_url: str = "sqlite+aiosqlite:///data/booking.db"
     log_level: LogLevel = "INFO"
 
@@ -48,6 +52,16 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     rate_limit_bookings: str = "10/hour"
     rate_limit_reads: str = "60/minute"
+
+    @model_validator(mode="after")
+    def _production_requirements(self) -> "Settings":
+        """In production, refuse to start with development defaults."""
+        if self.environment == "prod":
+            if self.management_token_key is None:
+                raise ValueError("MANAGEMENT_TOKEN_KEY is required in production")
+            if not self.public_base_url.startswith("https://"):
+                raise ValueError("PUBLIC_BASE_URL must use https in production")
+        return self
 
     @field_validator("log_level", mode="before")
     @classmethod

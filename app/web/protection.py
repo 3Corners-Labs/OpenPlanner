@@ -1,15 +1,22 @@
 """Request protection for public HTML forms: same-origin checks and rate limits.
 
-Forms carry no CSRF token. Browsers send ``Sec-Fetch-Site`` and ``Origin`` with every POST;
-a cross-site POST is refused (``RejectedRequest``). Rate limits use slowapi, keyed by client
-IP (behind a proxy, uvicorn's ``--proxy-headers`` supplies the real address).
+Forms carry no CSRF token. The primary signal is Fetch Metadata: browsers send
+``Sec-Fetch-Site`` with every request and pages cannot forge it. Only when it is missing
+(older browsers) is ``Origin`` compared instead. A cross-site POST is refused
+(``RejectedRequest``).
+
+Rate limits use slowapi, keyed by client IP (behind a proxy, uvicorn's ``--proxy-headers``
+supplies the real address).
 """
 
 from dataclasses import dataclass
 
+import structlog
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
+log = structlog.get_logger()
 
 
 class RejectedRequest(Exception):  # noqa: N818 - reads as an outcome, like HTTPException
@@ -28,14 +35,26 @@ class RejectedRequest(Exception):  # noqa: N818 - reads as an outcome, like HTTP
 def require_same_origin(request: Request) -> None:
     """FastAPI dependency: refuse POSTs that a browser marks as cross-site.
 
+    ``Origin`` is not trusted when ``Sec-Fetch-Site`` is present: some referrer policies make
+    browsers send ``Origin: null`` even for same-origin form posts.
+
     Raises:
-        RejectedRequest: 403 if ``Sec-Fetch-Site`` is cross-site or ``Origin`` differs.
+        RejectedRequest: 403 if ``Sec-Fetch-Site`` is not same-origin/none, or, without it,
+            if ``Origin`` differs from this site.
     """
     site = request.headers.get("sec-fetch-site")
-    if site is not None and site not in ("same-origin", "none"):
+    if site is not None:
+        if site in ("same-origin", "none"):
+            return
+        log.info("request.rejected", reason="cross_site", sec_fetch_site=site[:32])
         raise RejectedRequest(403)
     origin = request.headers.get("origin")
-    if origin is not None and origin != f"{request.url.scheme}://{request.url.netloc}":
+    expected = f"{request.url.scheme}://{request.url.netloc}"
+    if origin is not None and origin != expected:
+        # Origins are not personal data; logging them makes misconfigured proxies visible.
+        log.info(
+            "request.rejected", reason="origin_mismatch", origin=origin[:200], expected=expected
+        )
         raise RejectedRequest(403)
 
 

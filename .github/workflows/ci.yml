@@ -163,6 +163,8 @@ jobs:
         run: |
           docker build -t openplanner:e2e .
           scripts/run-app-container.sh openplanner:e2e
+          docker exec app alembic upgrade head
+          docker exec app python -m app.cli seed-demo
       - name: install browsers
         working-directory: e2e
         run: npm ci && npx playwright install --with-deps
