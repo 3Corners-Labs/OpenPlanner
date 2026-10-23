@@ -8,11 +8,15 @@ cannot disagree.
         ├─ GROUP level: look up the group and its organisation (unknown → group_not_found)
         ├─ decide() ──► allowed  ──► return
         └─────────────► denied   ──► audit event (denied, reason) ──► return
+
+Logins and logouts are recorded once per organisation and group the admin holds a role in,
+so an organisation admin sees the logins of the admins of their own organisation; without
+such a context (superuser, no role) the event is global and only the superuser sees it.
 """
 
 from dataclasses import dataclass
 
-from app.domain.audit import AuditEvent, Outcome
+from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
 from app.domain.authorization import (
     LEVELS,
     Decision,
@@ -20,16 +24,20 @@ from app.domain.authorization import (
     Permission,
     Principal,
     Reason,
+    Role,
     Target,
     decide,
     scope_for,
 )
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.ports import Clock, UnitOfWork
+from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import GroupSummary
 
 ANONYMOUS = "anonymous"
 """Actor recorded for events without a logged-in admin (e.g. a failed login)."""
+
+LOGIN_EVENT = "admin.login"
+LOGOUT_EVENT = "admin.logout"
 
 
 @dataclass(frozen=True)
@@ -127,6 +135,39 @@ class AdminService:
         async with self._uow.locked() as tx:
             await tx.add_audit_event(event)
 
+    async def record_login(self, principal: Principal) -> None:
+        """Audit a successful login and refresh the admin's profile, in one transaction."""
+        async with self._uow.locked() as tx:
+            await self._record_session_event(tx, principal, LOGIN_EVENT)
+            await tx.save_admin_profile(
+                AdminProfile(principal.subject, principal.display_name, self._clock.now())
+            )
+
+    async def record_logout(self, principal: Principal) -> None:
+        """Audit a logout."""
+        async with self._uow.locked() as tx:
+            await self._record_session_event(tx, principal, LOGOUT_EVENT)
+
+    async def _record_session_event(
+        self, tx: Transaction, principal: Principal, action: str
+    ) -> None:
+        """Write ``action`` once per organisation/group context of ``principal``."""
+        contexts: list[tuple[str | None, str | None]] = []
+        if Role.ORG_ADMIN in principal.roles:
+            contexts += [(organisation, None) for organisation in sorted(principal.organisations)]
+        if Role.GROUP_ADMIN in principal.roles:
+            for slug in sorted(principal.groups):
+                summary = await tx.get_group_summary(slug)
+                if summary is not None:  # a claim for a group we do not know grants nothing
+                    contexts.append((summary.organisation_slug, slug))
+        roles = ",".join(sorted(principal.roles))
+        now = self._clock.now()
+        for organisation, group in contexts or [(None, None)]:
+            event = AuditEvent(
+                now, principal.subject, action, Outcome.SUCCESS, roles, organisation, group
+            )
+            await tx.add_audit_event(event)
+
     async def groups(
         self, principal: Principal, permission: Permission = Permission.GROUP_VIEW
     ) -> list[GroupSummary]:
@@ -134,7 +175,7 @@ class AdminService:
         async with self._uow.read() as tx:
             return await tx.list_groups(scope_for(principal, permission))
 
-    async def audit_log(self, principal: Principal, limit: int = 100) -> list[AuditEvent]:
-        """Return the newest audit events ``principal`` may see."""
+    async def audit_log(self, principal: Principal, limit: int = 100) -> list[AuditEntry]:
+        """Return the newest audit events ``principal`` may see, with the actors' names."""
         async with self._uow.read() as tx:
             return await tx.list_audit_events(scope_for(principal, Permission.AUDIT_VIEW), limit)

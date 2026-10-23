@@ -10,6 +10,8 @@ from tests.support.domain import NOW, make_group
 
 GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
 ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+NO_ROLE = Principal("n-1", "N", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
 
 
 @pytest.fixture
@@ -81,7 +83,7 @@ async def test_audit_log_is_scoped(service: AdminService) -> None:
     await service.authorize(GROUP_ADMIN, Permission.GROUP_VIEW, group_slug="andere-team")
     await service.record("o-1", "group.edit", Outcome.SUCCESS, "", "demo", "demo")
 
-    assert [e.action for e in await service.audit_log(ORG_ADMIN)] == ["group.edit"]
+    assert [e.event.action for e in await service.audit_log(ORG_ADMIN)] == ["group.edit"]
     assert await service.audit_log(GROUP_ADMIN) == []  # group admins have no audit.view
 
 
@@ -93,3 +95,68 @@ async def test_authorize_anywhere(service: AdminService, uow: InMemoryUnitOfWork
     denied = await service.authorize_anywhere(GROUP_ADMIN, Permission.AUDIT_VIEW)
     assert denied.decision == Decision(False, Reason.OUT_OF_SCOPE)
     assert [(e.action, e.outcome) for e in uow.state.audit] == [("audit.view", Outcome.DENIED)]
+
+
+def _contexts(uow: InMemoryUnitOfWork) -> list[tuple[str, str, str | None, str | None]]:
+    return [(e.actor, e.action, e.organisation, e.group) for e in uow.state.audit]
+
+
+async def test_login_is_recorded_per_organisation_and_group_in_scope(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    both = Principal(
+        "b-1",
+        "Bea Beide",
+        frozenset({Role.ORG_ADMIN, Role.GROUP_ADMIN}),
+        frozenset({"andere"}),
+        frozenset({"demo", "unknown-group"}),
+    )
+
+    await service.record_login(both)
+
+    assert _contexts(uow) == [
+        ("b-1", "admin.login", "andere", None),
+        ("b-1", "admin.login", "demo", "demo"),
+    ]
+    assert {e.outcome for e in uow.state.audit} == {Outcome.SUCCESS}
+    assert {e.reason for e in uow.state.audit} == {"group_admin,org_admin"}
+
+
+async def test_claims_without_the_matching_role_give_no_context(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    await service.record_login(SUPER)
+    await service.record_logout(NO_ROLE)
+
+    assert _contexts(uow) == [
+        ("s-1", "admin.login", None, None),
+        ("n-1", "admin.logout", None, None),
+    ]
+
+
+async def test_org_admin_sees_logins_of_admins_in_their_organisation(
+    service: AdminService,
+) -> None:
+    await service.record_login(GROUP_ADMIN)
+    await service.record_logout(GROUP_ADMIN)
+    await service.record_login(SUPER)
+
+    entries = await service.audit_log(ORG_ADMIN)
+
+    assert [(e.event.action, e.actor_name) for e in entries] == [
+        ("admin.logout", "G"),
+        ("admin.login", "G"),
+    ]
+
+
+async def test_audit_log_shows_the_latest_known_name(service: AdminService) -> None:
+    await service.record_login(GROUP_ADMIN)
+    renamed = Principal(
+        "g-1", "Gina Groep", GROUP_ADMIN.roles, GROUP_ADMIN.organisations, GROUP_ADMIN.groups
+    )
+    await service.record_login(renamed)
+    await service.record("unknown-subject", "group.edit", Outcome.SUCCESS, "", "demo", "demo")
+
+    names = [e.actor_name for e in await service.audit_log(SUPER)]
+
+    assert names == [None, "Gina Groep", "Gina Groep"]

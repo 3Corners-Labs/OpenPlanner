@@ -454,6 +454,9 @@ msgstr "You have signed out"
 msgid "admin.logged_out.text"
 msgstr "You have signed out of the administration portal."
 
+msgid "audit.actor.anonymous"
+msgstr "Not signed in"
+
 msgid "audit.event.login"
 msgstr "Sign in"
 
