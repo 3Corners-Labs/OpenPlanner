@@ -7,10 +7,12 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
+from app.domain.audit import AuditEvent
+from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, Slot, SlotUsage
 from app.domain.channels import ReminderRule
 from app.domain.job_plan import PlannedJob
-from app.domain.scheduling import Group, ScheduleOverride, ScheduleRule
+from app.domain.scheduling import Group, GroupSummary, ScheduleOverride, ScheduleRule
 
 
 @dataclass
@@ -22,6 +24,8 @@ class State:
     slots: dict[int, Slot] = field(default_factory=dict)
     bookings: dict[int, Booking] = field(default_factory=dict)
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
+    organisation_slugs: dict[int, str] = field(default_factory=dict)
+    audit: list[AuditEvent] = field(default_factory=list)
     next_id: int = 1
 
 
@@ -32,6 +36,25 @@ class InMemoryTransaction:
     def _new_id(self) -> int:
         self.state.next_id += 1
         return self.state.next_id
+
+    def _summary(self, group: Group) -> GroupSummary:
+        slug = self.state.organisation_slugs.get(group.organisation_id, "org")
+        return GroupSummary(group, slug, slug.title())
+
+    async def list_groups(self, scope: Scope) -> list[GroupSummary]:
+        summaries = [self._summary(g) for g in self.state.groups.values()]
+        return [s for s in summaries if scope.contains(s.organisation_slug, s.group.slug)]
+
+    async def get_group_summary(self, slug: str) -> GroupSummary | None:
+        group = await self.get_group(slug)
+        return self._summary(group) if group else None
+
+    async def add_audit_event(self, event: AuditEvent) -> None:
+        self.state.audit.append(event)
+
+    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEvent]:
+        events = [e for e in self.state.audit if scope.contains(e.organisation, e.group)]
+        return list(reversed(events))[:limit]
 
     async def get_group(self, slug: str) -> Group | None:
         return next((g for g in self.state.groups.values() if g.slug == slug), None)
