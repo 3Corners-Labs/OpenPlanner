@@ -2,7 +2,8 @@
 
 Which skill to use when. "Repo" means `.claude/skills/`; the others come from gstack or the
 engineering plugin. Claude Code names the skill it is about to use. Skills that merge or deploy
-are excluded, because Claude Code opens PRs and never merges them (`CLAUDE.md`).
+are excluded: Claude Code merges only on an explicit instruction of the product owner, with
+green CI, and never through a skill (ADR 0012).
 
 ## Every work package
 
