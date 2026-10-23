@@ -13,7 +13,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.audit import AuditEvent
-from app.domain.authorization import Scope
+from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, Slot, SlotUsage
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.job_plan import PlannedJob
@@ -54,6 +54,47 @@ class MessageSender(Protocol):
 
     async def send(self, message: OutboundMessage) -> None:
         """Deliver ``message``; raise on failure so the job is retried."""
+        ...
+
+
+@dataclass(frozen=True)
+class LoginStart:
+    """Where to send an admin to log in, and the secrets to check the answer with.
+
+    ``state``, ``nonce`` and ``code_verifier`` are kept in the signed session until the
+    identity provider redirects back; they are never logged.
+    """
+
+    url: str
+    state: str = field(repr=False)
+    nonce: str = field(repr=False)
+    code_verifier: str = field(repr=False)
+
+
+class IdentityError(Exception):
+    """Login failed; ``code`` says why (``token_exchange_failed``, ``invalid_token``, …)."""
+
+    def __init__(self, code: str) -> None:
+        """Store the code; it is also the message."""
+        super().__init__(code)
+        self.code = code
+
+
+class IdentityProvider(Protocol):
+    """The admin portal's identity provider (OIDC; PingFederate in production, ADR 0013)."""
+
+    async def start_login(self, redirect_uri: str) -> LoginStart:
+        """Prepare an authorisation request with fresh ``state``, ``nonce`` and PKCE."""
+        ...
+
+    async def finish_login(
+        self, *, code: str, redirect_uri: str, code_verifier: str, nonce: str
+    ) -> Principal:
+        """Exchange the code, verify the ID token and return the admin it describes.
+
+        Raises:
+            IdentityError: If the exchange or any token check fails.
+        """
         ...
 
 
