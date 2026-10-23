@@ -28,6 +28,7 @@ class ErrorCode(StrEnum):
     SLUG_TAKEN = "slug_taken"
     GROUP_HAS_FUTURE_BOOKINGS = "group_has_future_bookings"
     SCHEDULE_ITEM_NOT_FOUND = "schedule_item_not_found"
+    INTEGRATION_NOT_READY = "integration_not_ready"
 
 
 class DomainError(Exception):

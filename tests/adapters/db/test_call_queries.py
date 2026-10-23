@@ -1,0 +1,90 @@
+"""Meetings, tasks, timeline and call status in SQLite (ADR 0010, 0017, 0018)."""
+
+from datetime import timedelta
+
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from app.adapters.db.uow import SqlUnitOfWork
+from app.domain.booking import MeetingRef
+from app.domain.calls import BookingEvent, CallState, EventKind, TaskState, apply_event, new_status
+from app.domain.services import BookingService
+from tests.adapters.db.conftest import seed_group
+from tests.fakes.clock import FixedClock
+from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book
+
+
+async def _booking_id(engine: AsyncEngine) -> int:
+    await seed_group(engine, slug="aangifte")
+    service = BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY)
+    receipt = await book(service, SLOT_0900)
+    assert receipt.booking.id is not None
+    return receipt.booking.id
+
+
+async def test_meeting_and_task_are_stored_and_found(engine: AsyncEngine) -> None:
+    booking_id = await _booking_id(engine)
+    uow = SqlUnitOfWork(engine)
+
+    async with uow.locked() as tx:
+        await tx.save_meeting(booking_id, MeetingRef("meeting-1", "https://site.webex.com/m/1"))
+        await tx.save_task_id(booking_id, "task-1")
+    async with uow.read() as tx:
+        by_meeting = await tx.get_booking_by_meeting("meeting-1")
+        by_task = await tx.get_booking_by_task("task-1")
+        missing = await tx.get_booking_by_task("nope")
+
+    assert by_meeting is not None
+    assert by_meeting.meeting == MeetingRef("meeting-1", "https://site.webex.com/m/1")
+    assert by_meeting.meeting.link == "https://site.webex.com/m/1"
+    assert by_task is not None
+    assert by_task.id == booking_id
+    assert by_task.wxcc_task_id == "task-1"
+    assert missing is None
+
+
+async def test_purge_removes_the_join_link_but_keeps_the_ids(engine: AsyncEngine) -> None:
+    booking_id = await _booking_id(engine)
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        await tx.save_meeting(booking_id, MeetingRef("meeting-1", "https://site.webex.com/m/1"))
+        await tx.purge_personal_data(booking_id, NOW + timedelta(days=2))
+    async with uow.read() as tx:
+        booking = await tx.get_booking(booking_id)
+
+    assert booking is not None
+    assert booking.meeting == MeetingRef("meeting-1", None)
+    assert booking.meeting.link is None
+
+
+async def test_timeline_and_status_round_trip(engine: AsyncEngine) -> None:
+    booking_id = await _booking_id(engine)
+    uow = SqlUnitOfWork(engine)
+    events = [
+        BookingEvent(booking_id, NOW, EventKind.TASK_CREATED),
+        BookingEvent(
+            booking_id, NOW + timedelta(minutes=1), EventKind.TASK_FAILED, "ENTRY_POINT_NOT_FOUND"
+        ),
+    ]
+    status = apply_event(
+        apply_event(new_status(booking_id), EventKind.MEETING_STARTED, NOW),
+        EventKind.TASK_CREATED,
+        NOW,
+    )
+
+    async with uow.locked() as tx:
+        for event in events:
+            await tx.add_booking_event(event)
+        await tx.save_call_status(status)
+    async with uow.locked() as tx:
+        await tx.save_call_status(apply_event(status, EventKind.HOST_JOINED, NOW))
+    async with uow.read() as tx:
+        stored_events = await tx.get_booking_events(booking_id)
+        stored_status = await tx.get_call_status(booking_id)
+        nothing = await tx.get_call_status(booking_id + 1)
+
+    assert stored_events == events
+    assert stored_status is not None
+    assert (stored_status.call, stored_status.task) == (CallState.IN_PROGRESS, TaskState.QUEUED)
+    assert stored_status.host_joined
+    assert stored_status.started_at == NOW
+    assert nothing is None

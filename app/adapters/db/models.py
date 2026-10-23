@@ -4,6 +4,7 @@ Rows are persistence shapes only; ``app.adapters.db.uow`` maps them to domain ob
 PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
 
     audit_events (no foreign keys: events outlive what they describe)
+    booking_events, call_status (per booking; no personal data, kept after the purge)
     admin_profiles (name per identity-provider subject; joined into the audit log)
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
@@ -32,6 +33,8 @@ from app.adapters.db.types import UTCDateTime
 
 __all__ = [
     "AdminProfileRow",
+    "BookingEventRow",
+    "CallStatusRow",
     "AuditEventRow",
     "Base",
     "BookingRow",
@@ -190,6 +193,8 @@ class BookingRow(Base):
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),
+        Index("ix_bookings_video_room_id", "video_room_id"),
+        Index("ix_bookings_wxcc_task_id", "wxcc_task_id"),
         CheckConstraint(
             "status IN ('confirmed', 'cancelled', 'completed', 'no_show')", name="status"
         ),
@@ -249,3 +254,37 @@ class AdminProfileRow(Base):
     subject: Mapped[str] = mapped_column(String(255), primary_key=True)
     display_name: Mapped[str] = mapped_column(String(255))
     last_login_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class BookingEventRow(Base):
+    """One entry of a booking's timeline (ADR 0010); the detail is a reason code."""
+
+    __tablename__ = "booking_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
+    at: Mapped[datetime] = mapped_column(UTCDateTime())
+    kind: Mapped[str] = mapped_column(String(32))
+    detail: Mapped[str] = mapped_column(String(128), server_default=text("''"))
+
+    __table_args__ = (Index("ix_booking_events_booking_id", "booking_id"),)
+
+
+class CallStatusRow(Base):
+    """The aggregated meeting and work item state of a booking (ADR 0010)."""
+
+    __tablename__ = "call_status"
+
+    booking_id: Mapped[int] = mapped_column(
+        ForeignKey("bookings.id", ondelete="CASCADE"), primary_key=True
+    )
+    call: Mapped[str] = mapped_column(String(16))
+    task: Mapped[str] = mapped_column(String(16))
+    participants: Mapped[int] = mapped_column(Integer)
+    host_joined: Mapped[bool] = mapped_column(Boolean)
+    host_joined_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    task_created_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
