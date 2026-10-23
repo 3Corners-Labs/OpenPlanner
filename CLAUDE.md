@@ -106,6 +106,7 @@ Weekly: Renovate updates (security updates immediately), `trivy` on the running 
 - `CONTRIBUTING.md` — dev setup, running tests, PR checklist.
 - `SECURITY.md` — how to report, supported versions, scanning in CI.
 - `docs/HANDOVER.md` — stakeholder design (Dutch).
+- `docs/architecture.md` — architecture with Mermaid diagrams; update the diagrams in the same PR as the change they show.
 - `docs/adr/` — decisions.
 - `docs/runbook.md` — deploy, rollback, backup/restore, rotating secrets, what to do when Connect is down.
 - `docs/dataflow.md`, `docs/threat-model.md` — privacy and security inputs.
