@@ -29,6 +29,14 @@ Public, unauthenticated: `GET /` (more pages from WP3), `GET /static/*`. Inputs 
 | Information disclosure | Cached page served in the wrong language or to another visitor | `Vary: Accept-Language, Cookie`, `Cache-Control: no-store` | `test_html_pages_get_a_csp_allowing_own_stylesheets` |
 | Tampering | Injected script or inline style on HTML pages | CSP without `script-src`; only `style-src 'self'`; no inline styles | same |
 
+## Dynamic scan (OWASP ZAP baseline, on merge to `main`)
+
+ZAP scans the seeded booking page `/g/demo` and everything it links to. Accepted alerts are
+listed with their reason in `.zap/rules.tsv`: non-storable content (deliberate `no-store`),
+cookie poisoning and user-controllable attributes (only validated values are reflected), and
+absent anti-CSRF tokens (Fetch Metadata is the CSRF defence, see above). Any other warning
+fails the build.
+
 ## Cross-cutting
 
 | Threat | Mitigation | Test |
@@ -66,6 +74,8 @@ Public, unauthenticated: `GET /g/{slug}`, `GET/POST /g/{slug}/book`, `GET /b/{to
 | Information disclosure | Leaked management link shows personal data | The management page shows date, team and status only, never name, email or phone; old links of moved bookings show only "cancelled" | `test_full_booking_flow`, `test_reschedule_flow` |
 | Spoofing | Token guessing at `/b/{token}` | 256-bit tokens (HMAC, ADR 0011); lookup by SHA-256, constant-time compare; same 404 for every unknown token; rate-limited | `test_unknown_token_is_a_404_page`, `tests/domain/test_tokens.py` |
 | Tampering | Changing a booking after the WxCC task is dispatched | Read-only from the change deadline; cancel/reschedule pages redirect, POSTs return 409 | `test_booking_is_read_only_from_the_dispatch_moment` |
+| Tampering / information disclosure | Cross-origin windows or resources attach to our pages; pages use browser features they do not need | `Permissions-Policy` (camera, microphone, location … off), `Cross-Origin-Opener-Policy`, `-Embedder-Policy`, `-Resource-Policy` | `tests/api/test_health.py::test_security_headers_on_every_response`, ZAP baseline on `main` |
+| Tampering (XSS) | Arbitrary query parameters reflected into links | The language switcher keeps only `week` and `start`; output is autoescaped | `tests/api/test_pages.py::test_switcher_keeps_only_known_query_parameters` |
 | Information disclosure | Management token leaks through Referer or logs | `Referrer-Policy: same-origin`; uvicorn access log off; rejections log origins only | `test_security_headers_on_every_response`, `test_uvicorn_logs_are_json_and_access_log_is_off` |
 
 ## Flow: outgoing email (WP3, worker)

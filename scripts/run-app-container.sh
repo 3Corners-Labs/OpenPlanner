@@ -1,14 +1,16 @@
 #!/usr/bin/env sh
 # Start IMAGE hardened (read-only rootfs, non-root, no capabilities) on port 8000 as
 # container "app", then wait until /readyz answers. Used by every CI job that needs a
-# running app. Usage: scripts/run-app-container.sh <image>
+# running app. Usage: scripts/run-app-container.sh <image> [extra docker run options...]
 set -eu
 
 image="$1"
+shift
 # Throwaway CI container: development mode (generated token key, http base URL).
 docker run -d --name app --read-only --tmpfs /tmp \
   --cap-drop ALL --security-opt no-new-privileges \
   -e ENVIRONMENT=dev \
+  "$@" \
   -p 8000:8000 "$image" >/dev/null
 
 if [ "$(docker exec app id -u)" = "0" ]; then

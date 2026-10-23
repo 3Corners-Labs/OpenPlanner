@@ -70,10 +70,12 @@ async def test_language_switcher_offers_every_locale_in_its_own_language(
     assert '<nav aria-label="Kies een taal"' in text
 
 
-async def test_switcher_keeps_other_query_parameters(client: httpx.AsyncClient) -> None:
-    text = (await client.get("/?from=2026-01-05")).text
+async def test_switcher_keeps_only_known_query_parameters(client: httpx.AsyncClient) -> None:
+    text = (await client.get("/?week=2026-01-05&evil=%22onmouseover%3D")).text
 
-    assert 'href="?from=2026-01-05&amp;lang=en"' in text
+    assert 'href="?week=2026-01-05&amp;lang=en"' in text
+    assert "evil" not in text
+    assert "onmouseover" not in text
 
 
 async def test_switcher_links_never_contain_the_request_path(client: httpx.AsyncClient) -> None:
