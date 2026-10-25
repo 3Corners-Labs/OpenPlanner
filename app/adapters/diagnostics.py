@@ -1,9 +1,10 @@
 """``wxcc-check``: try every kind of call OpenPlanner makes to Webex and WxCC, harmlessly.
 
 Each probe is a read, or a write that cannot change anything (an empty work item that fails
-validation, ending a task id that does not exist). What a probe proves is its status: a 400 or
-404 on a harmless write means the token was accepted for that API; a 401 or 403 means a scope
-or an authorisation is missing, and the probe names the likely one (docs/webhooks.md).
+validation, ending a task id that does not exist). What a probe proves is its status: a 400,
+404 or (End Task, asynchronous) 202 on a harmless write means the token was accepted for that
+API; a 401 or 403 means a scope or an authorisation is missing, and the probe names the likely
+one (docs/webhooks.md).
 
 The work item API is v2 (beta) and v2 is primary: Webex and the v2 probes decide whether the
 check passes. v1 probes (End Task, which has no v2 form, event types, task search) are
