@@ -33,15 +33,22 @@ async def register_webex(
 ) -> list[str]:
     """Create the missing Webex webhooks; return ``resource/event: created|exists`` per event."""
     base = base_url.rstrip("/")
-    listed = (
-        await client.request("GET", f"{base}/webhooks", params={"max": "100", "ownedBy": "org"})
-    ).json()
+    report = []
+    try:
+        listed = (
+            await client.request("GET", f"{base}/webhooks", params={"max": "100", "ownedBy": "org"})
+        ).json()
+    except IntegrationError as error:
+        if error.retryable:
+            raise
+        # Without the listing every webhook is created; Webex answers 409 for existing ones.
+        report.append(f"webhook listing: refused ({error.code}): {_webex_hint('meetings', error)}")
+        listed = {}
     existing = {
         (item.get("resource"), item.get("event"))
         for item in listed.get("items", [])
         if item.get("targetUrl") == target_url
     }
-    report = []
     for resource, event in WEBEX_EVENTS:
         if (resource, event) in existing:
             report.append(f"{resource}/{event}: exists")
@@ -65,15 +72,19 @@ async def register_webex(
             if error.code == "rejected_409":  # Webex: the same webhook exists already
                 report.append(f"{resource}/{event}: exists")
                 continue
-            needs = (
-                f"needs {WEBEX_SCOPES[resource]}, {ORG_WEBHOOK_ROLE}"
-                if error.code in ("unauthorized", "rejected_403")
-                else "Webex refused the request (target must be a public https URL)"
+            report.append(
+                f"{resource}/{event}: refused ({error.code}): {_webex_hint(resource, error)}"
             )
-            report.append(f"{resource}/{event}: refused ({error.code}): {needs}")
             continue
         report.append(f"{resource}/{event}: created")
     return report
+
+
+def _webex_hint(resource: str, error: IntegrationError) -> str:
+    """Return what a refused org-owned webhook call most likely needs."""
+    if error.code in ("unauthorized", "rejected_403"):
+        return f"needs {WEBEX_SCOPES[resource]}, {ORG_WEBHOOK_ROLE}"
+    return "Webex refused the request (target must be a public https URL)"
 
 
 async def register_wxcc(

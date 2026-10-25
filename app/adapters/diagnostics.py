@@ -74,11 +74,12 @@ def probes(webex_base_url: str, wxcc_base_url: str | None) -> list[Probe]:
             params={"max": "1"},
         ),
         Probe(
-            "GET /webhooks",
+            "GET /webhooks (org-owned)",
             "GET",
             f"{webex}/webhooks",
-            "meeting:admin_schedule_read and meeting:admin_participants_read (org webhooks)",
-            params={"max": "1"},
+            "meeting:admin_schedule_read and meeting:admin_participants_read, authorised by a "
+            "Webex site admin or Compliance Officer (org-owned webhooks, register-webhooks)",
+            params={"max": "1", "ownedBy": "org"},
         ),
     ]
     if not wxcc_base_url:
