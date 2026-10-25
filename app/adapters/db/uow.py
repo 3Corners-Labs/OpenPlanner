@@ -18,6 +18,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.sql.elements import SQLCoreOperations
 
+from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.models import (
     AdminProfileRow,
@@ -208,8 +209,11 @@ def _call_status(row: CallStatusRow) -> CallStatus:
     )
 
 
-class SqlTransaction:
-    """``Transaction`` on an ``AsyncSession`` whose transaction is already open."""
+class SqlTransaction(ApiClientQueries):
+    """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
+
+    The machine API's queries come from ``ApiClientQueries`` (ADR 0023).
+    """
 
     def __init__(self, session: AsyncSession) -> None:
         """Wrap ``session``."""

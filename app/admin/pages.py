@@ -44,6 +44,7 @@ NAVIGATION = (
         "admin.nav.integrations", "/admin/integrations", Permission.INTEGRATIONS_MANAGE, "settings"
     ),
     NavItem("admin.nav.branding", "/admin/branding", Permission.BRANDING_MANAGE, "palette"),
+    NavItem("admin.nav.api", "/admin/api", Permission.API_CLIENTS_MANAGE, "key"),
 )
 
 
@@ -64,6 +65,7 @@ def _is_current(request: Request, item: NavItem) -> bool:
         path == item.href
         or (item.href == "/admin/" and path.startswith("/admin/groups"))
         or (item.href == "/admin/branding" and path.startswith("/admin/organisations/"))
+        or (item.href == "/admin/api" and path.startswith("/admin/api/"))
     )
 
 

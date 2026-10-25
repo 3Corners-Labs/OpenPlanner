@@ -27,7 +27,7 @@ from fastapi import APIRouter, Depends, FastAPI, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.integrations import Integrations
-from app.admin import branding_routes, call_routes, group_routes
+from app.admin import api_routes, branding_routes, call_routes, group_routes
 from app.admin.authz import (
     AccessDenied,
     AdminContext,
@@ -42,9 +42,12 @@ from app.admin.pages import message as _message
 from app.admin.pages import page as _page
 from app.admin.session import end_session, pop_login_start, save_login_start, start_session
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT, LOGOUT_EVENT
+from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
 from app.domain.audit import AuditEntry, Outcome
 from app.domain.authorization import (
+    API_SCOPES,
     CITIZEN_ACTIONS,
+    ApiScope,
     Permission,
     Role,
     Scope,
@@ -54,6 +57,7 @@ from app.domain.ports import Clock, IdentityError, IdentityProvider
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock, format_day_compact, local_day
 from app.web.authz_labels import (
+    API_SCOPE_LABELS,
     CITIZEN_LABELS,
     CONDITION_LABELS,
     LEVEL_LABELS,
@@ -77,6 +81,8 @@ PUBLIC_ADMIN_PATHS = frozenset(
 EVENT_LABELS: dict[str, str] = {
     LOGIN_EVENT: "audit.event.login",
     LOGOUT_EVENT: "audit.event.logout",
+    TOKEN_EVENT: "audit.event.api_token",
+    CALL_EVENT: "audit.event.api_call",
 }
 
 DETAIL_LABELS: dict[str, str] = {
@@ -101,6 +107,16 @@ DETAIL_LABELS: dict[str, str] = {
     "accent_color": "admin.branding.accent_color",
     "logo": "admin.branding.logo",
     "logo.remove": "admin.audit.detail.logo_remove",
+    "client.create": "admin.audit.detail.client_create",
+    "client.rotate": "admin.audit.detail.client_rotate",
+    "client.enable": "admin.audit.detail.client_enable",
+    "client.disable": "admin.audit.detail.client_disable",
+    "client.revoke_tokens": "admin.audit.detail.client_revoke_tokens",
+    "groups": "admin.api.groups",
+    "scopes": "admin.api.scopes",
+    "networks": "admin.api.networks",
+    "api.enabled": "admin.api.enabled",
+    "api.docs_public": "admin.api.docs_public",
 }
 """Readable label per audit detail key (changed field names and schedule actions)."""
 
@@ -297,7 +313,15 @@ async def matrix(
         locale,
         "admin/matrix.html",
         context.principal,
-        {"rows": rows, "role_columns": [_(ROLE_LABELS[r]) for r in Role], "citizen": citizen},
+        {
+            "rows": rows,
+            "role_columns": [_(ROLE_LABELS[r]) for r in Role],
+            "citizen": citizen,
+            "api_scopes": [
+                (f"{_(API_SCOPE_LABELS[scope])} ({scope})", _(LEVEL_LABELS[level]))
+                for scope, level in API_SCOPES.items()
+            ],
+        },
     )
 
 
@@ -336,6 +360,8 @@ def _action_label(action: str, _: BoundGettext) -> str:
     """Translate a permission; event keys such as ``admin.login`` have their own labels."""
     if action in EVENT_LABELS:
         return _(EVENT_LABELS[action])
+    if action in API_SCOPES:
+        return _(API_SCOPE_LABELS[ApiScope(action)])
     try:
         return _(PERMISSION_LABELS[Permission(action)])
     except ValueError:
@@ -452,3 +478,4 @@ def register_admin(app: FastAPI) -> None:
     app.include_router(group_routes.router)
     app.include_router(call_routes.router)
     app.include_router(branding_routes.router)
+    app.include_router(api_routes.router)

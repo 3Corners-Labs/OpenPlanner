@@ -26,9 +26,11 @@ from app.api import (
     pages,
     webhooks,
 )
+from app.api.agent import create_agent_api
 from app.api.security_headers import SecurityHeadersMiddleware
-from app.config import Settings
+from app.config import AGENT_API_PREFIX, Settings
 from app.domain.admin import AdminService
+from app.domain.api_access import ApiAccessService
 from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
 from app.domain.call_service import CallService
@@ -99,7 +101,11 @@ def create_app(
         enabled=settings.rate_limit_enabled,
         bookings=settings.rate_limit_bookings,
         reads=settings.rate_limit_reads,
+        agent_tokens=settings.rate_limit_agent_tokens,
+        agent_calls=settings.rate_limit_agent_calls,
     )
+    # Machine API (ADR 0023): only mounted when the deployment switches it on.
+    agent_api = create_agent_api() if settings.agent_api_enabled else None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -111,6 +117,12 @@ def create_app(
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
+        app.state.api_access = ApiAccessService(
+            uow, clock, app.state.admin_service, available=settings.agent_api_enabled
+        )
+        if agent_api is not None:
+            for name in ("api_access", "booking_service", "translator", "limiter", "clock"):
+                setattr(agent_api.state, name, getattr(app.state, name))
         wired = integrations or build_integrations(settings, app.state.engine, http, clock)
         app.state.integrations = wired
         app.state.call_service = CallService(
@@ -150,5 +162,7 @@ def create_app(
     app.include_router(direct_pages.router)
     app.include_router(brand_assets.router)
     app.include_router(webhooks.router)
+    if agent_api is not None:
+        app.mount(AGENT_API_PREFIX, agent_api)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
