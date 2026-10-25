@@ -753,7 +753,7 @@ msgid "admin.field.timezone"
 msgstr "Time zone"
 
 msgid "admin.field.timezone_hint"
-msgstr "IANA name, for example Europe/Amsterdam."
+msgstr "This group's times apply in this zone. Summer and winter time are handled automatically."
 
 msgid "admin.field.slot_minutes"
 msgstr "Length of a call (minutes)"
@@ -827,7 +827,7 @@ msgid "admin.form.error.organisation"
 msgstr "Choose an organisation you may create groups for."
 
 msgid "admin.form.error.timezone"
-msgstr "Enter a valid time zone, for example Europe/Amsterdam."
+msgstr "Choose a time zone from the list."
 
 msgid "admin.form.error.slot_minutes"
 msgstr "Enter a length of 5 to 480 minutes, in steps of 5."

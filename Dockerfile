@@ -23,8 +23,11 @@ COPY migrations ./migrations
 COPY app ./app
 # The data volume (SQLite database, worker heartbeat) is the only writable path.
 RUN mkdir /srv/data && chown app:app /srv/data
+# Summer and winter time come from the pinned `tzdata` package (uv.lock, Renovate), not from
+# whatever the base image happens to ship: an empty PYTHONTZPATH makes zoneinfo use only it.
 ENV PATH=/srv/.venv/bin:$PATH \
     PYTHONPATH=/srv \
+    PYTHONTZPATH="" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 USER 10001:10001
