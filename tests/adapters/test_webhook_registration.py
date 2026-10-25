@@ -71,3 +71,35 @@ async def test_wxcc_subscription_is_created_once() -> None:
         "task:ended",
         "task:failed",
     ]
+
+
+async def test_a_refused_webex_webhook_is_reported_and_the_rest_still_tried() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json={"items": []})
+        resource = json.loads(request.content)["resource"]
+        return httpx.Response(403 if resource == "meetings" else 200, json={"id": "w"})
+
+    client, seen = _client(handler)
+    report = await register_webex(client, "https://webexapis.com/v1", TARGET, "secret")
+
+    assert report[0] == (
+        "meetings/started: refused (rejected_403): needs meeting:admin_schedule_read, "
+        "authorised by a Webex site admin or Compliance Officer"
+    )
+    assert report[2] == "meetingParticipants/joined: created"
+    assert len([r for r in seen if r.method == "POST"]) == 4
+    assert all("secret" not in line for line in report)
+
+
+async def test_a_refused_wxcc_subscription_is_reported() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200 if request.method == "GET" else 403, json={"data": []})
+
+    client, _ = _client(handler)
+
+    report = await register_wxcc(
+        client, "https://api.wxcc-eu1.cisco.com", "https://x.nl/webhooks/wxcc", "secret"
+    )
+
+    assert report == "wxcc subscription: refused (rejected_403): needs cjp:config_write"

@@ -3,9 +3,12 @@
 Webex: one org-owned webhook per resource and event, signed with the webhook secret. WxCC: one
 v2 subscription for the task events, signed with the subscription secret. Existing
 registrations for the same target URL are left alone, so running it twice changes nothing.
+A refused registration is reported with the scope it most likely needs and the others are
+still tried; the report never contains the secret.
 """
 
 from app.adapters.webex_auth import AuthorizedClient
+from app.domain.ports import IntegrationError
 
 WEBEX_EVENTS = (
     ("meetings", "started"),
@@ -14,6 +17,13 @@ WEBEX_EVENTS = (
     ("meetingParticipants", "left"),
 )
 WXCC_EVENT_TYPES = ["task:new", "task:connected", "task:ended", "task:failed"]
+
+WEBEX_SCOPES = {
+    "meetings": "meeting:admin_schedule_read",
+    "meetingParticipants": "meeting:admin_participants_read",
+}
+"""Admin read scope per resource that an org-owned webhook needs (Webex webhooks guide)."""
+ORG_WEBHOOK_ROLE = "authorised by a Webex site admin or Compliance Officer"
 
 
 async def register_webex(
@@ -32,18 +42,25 @@ async def register_webex(
         if (resource, event) in existing:
             report.append(f"{resource}/{event}: exists")
             continue
-        await client.request(
-            "POST",
-            f"{base}/webhooks",
-            json={
-                "name": f"OpenPlanner {resource} {event}",
-                "targetUrl": target_url,
-                "resource": resource,
-                "event": event,
-                "secret": secret,
-                "ownedBy": "org",
-            },
-        )
+        try:
+            await client.request(
+                "POST",
+                f"{base}/webhooks",
+                json={
+                    "name": f"OpenPlanner {resource} {event}",
+                    "targetUrl": target_url,
+                    "resource": resource,
+                    "event": event,
+                    "secret": secret,
+                    "ownedBy": "org",
+                },
+            )
+        except IntegrationError as error:
+            if error.retryable:
+                raise
+            needs = f"needs {WEBEX_SCOPES[resource]}, {ORG_WEBHOOK_ROLE}"
+            report.append(f"{resource}/{event}: refused ({error.code}): {needs}")
+            continue
         report.append(f"{resource}/{event}: created")
     return report
 
@@ -56,15 +73,20 @@ async def register_wxcc(
     listed = (await client.request("GET", f"{base}/v2/subscriptions")).json()
     if any(item.get("destinationUrl") == target_url for item in listed.get("data", [])):
         return "wxcc subscription: exists"
-    await client.request(
-        "POST",
-        f"{base}/v2/subscriptions",
-        json={
-            "name": "OpenPlanner task events",
-            "description": "Work item lifecycle for OpenPlanner bookings",
-            "eventTypes": WXCC_EVENT_TYPES,
-            "destinationUrl": target_url,
-            "secret": secret,
-        },
-    )
+    try:
+        await client.request(
+            "POST",
+            f"{base}/v2/subscriptions",
+            json={
+                "name": "OpenPlanner task events",
+                "description": "Work item lifecycle for OpenPlanner bookings",
+                "eventTypes": WXCC_EVENT_TYPES,
+                "destinationUrl": target_url,
+                "secret": secret,
+            },
+        )
+    except IntegrationError as error:
+        if error.retryable:
+            raise
+        return f"wxcc subscription: refused ({error.code}): needs cjp:config_write"
     return "wxcc subscription: created"

@@ -126,8 +126,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stdout.write(report)
         return 0 if passed else 1
     if args.command == "register-webhooks":
-        sys.stdout.write(asyncio.run(_register_webhooks(Settings())))
-        return 0
+        report = asyncio.run(_register_webhooks(Settings()))
+        sys.stdout.write(report)
+        return 1 if ": refused" in report else 0
     sys.stdout.write(asyncio.run(_seed_demo(Settings())))
     return 0
 
