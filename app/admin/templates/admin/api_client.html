@@ -1,0 +1,106 @@
+{% extends "admin/layout.html" %}
+{% block title %}{% if client %}{{ client.client.name }}{% else %}{{ _("admin.api.new_client") }}{% endif %} – {{ _("admin.api.title") }} – {{ _("admin.title") }}{% endblock %}
+{% macro error_text(name) -%}{% set message = error_for(name) %}{% if message %}<p class="error-message" id="{{ name }}-error">{{ message }}</p>{% endif %}{%- endmacro %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="page-header__lead"><a href="/admin/api">{{ _("admin.api.title") }}</a></p>
+    <h1>{% if client %}{{ client.client.name }}{% else %}{{ _("admin.api.new_client") }}{% endif %}</h1>
+    {% if client %}<p class="page-header__lead"><code>{{ client.client.client_id }}</code></p>{% endif %}
+  </div>
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+{% if client %}
+<section class="card" aria-labelledby="state-heading">
+  <h2 id="state-heading">{{ _("admin.api.state") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("admin.api.organisation") }}</dt><dd>{{ client.organisation_name }}</dd></div>
+    <div><dt>{{ _("admin.api.status") }}</dt><dd>{% if client.client.enabled %}<span class="chip chip--success">{{ _("admin.api.client_on") }}</span>{% else %}<span class="chip chip--danger">{{ _("admin.api.client_off") }}</span>{% endif %}</dd></div>
+    <div><dt>{{ _("admin.api.secret_expires") }}</dt><dd>{{ client.secret_expires }}{% if client.secret_expiring %} <span class="chip chip--warning">{{ _("admin.api.expiring") }}</span>{% endif %}</dd></div>
+    <div><dt>{{ _("admin.api.last_token") }}</dt><dd>{{ client.last_token or _("admin.api.never") }}</dd></div>
+  </dl>
+  <div class="inline-forms">
+    <form method="post" action="/admin/api/clients/{{ client.client.client_id }}/enable">
+      {% if client.client.enabled %}
+      <button type="submit" class="button button--danger">{{ _("admin.api.disable") }}</button>
+      {% else %}
+      <input type="hidden" name="enabled" value="on">
+      <button type="submit" class="button">{{ _("admin.api.enable") }}</button>
+      {% endif %}
+    </form>
+    <form method="post" action="/admin/api/clients/{{ client.client.client_id }}/revoke">
+      <button type="submit" class="button button--secondary">{{ _("admin.api.revoke") }}</button>
+    </form>
+    <form method="post" action="/admin/api/clients/{{ client.client.client_id }}/rotate" class="inline-forms">
+      <div class="field">
+        <label for="rotate-days">{{ _("admin.api.lifetime_days") }}</label>
+        <select id="rotate-days" name="lifetime_days">
+          {% for days in lifetime_days %}<option value="{{ days }}"{% if days == default_days %} selected{% endif %}>{{ _("admin.api.days", days=days) }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="button button--secondary">{{ _("admin.api.rotate") }}</button>
+    </form>
+  </div>
+  <p class="hint">{{ _("admin.api.actions_hint") }}</p>
+</section>
+{% endif %}
+<form class="card" method="post" action="{% if client %}/admin/api/clients/{{ client.client.client_id }}{% else %}/admin/api/clients{% endif %}" novalidate aria-labelledby="grant-heading">
+  <div class="card__header">
+    <h2 id="grant-heading">{{ _("admin.api.grant") }}</h2>
+    <p class="card__lead">{{ _("admin.api.grant_lead") }}</p>
+  </div>
+  <div class="form-grid">
+    <div class="field{% if error_for('name') %} field--error{% endif %}">
+      <label for="name">{{ _("admin.api.name") }}</label>
+      <input id="name" name="name" type="text" value="{{ name }}" required maxlength="80" aria-describedby="name-hint{% if error_for('name') %} name-error{% endif %}"{% if error_for('name') %} aria-invalid="true"{% endif %}>
+      <p class="hint" id="name-hint">{{ _("admin.api.name_hint") }}</p>
+      {{ error_text("name") }}
+    </div>
+    {% if not client %}
+    <div class="field{% if error_for('organisation') %} field--error{% endif %}">
+      <label for="organisation">{{ _("admin.api.organisation") }}</label>
+      <select id="organisation" name="organisation" required aria-describedby="organisation-hint{% if error_for('organisation') %} organisation-error{% endif %}"{% if error_for('organisation') %} aria-invalid="true"{% endif %}>
+        {% for o in organisations %}<option value="{{ o.slug }}"{% if o.slug == organisation %} selected{% endif %}>{{ o.name }}</option>{% endfor %}
+      </select>
+      <p class="hint" id="organisation-hint">{{ _("admin.api.organisation_hint") }}</p>
+      {{ error_text("organisation") }}
+    </div>
+    <div class="field{% if error_for('lifetime_days') %} field--error{% endif %}">
+      <label for="lifetime_days">{{ _("admin.api.lifetime_days") }}</label>
+      <select id="lifetime_days" name="lifetime_days" aria-describedby="lifetime_days-hint">
+        {% for days in lifetime_days %}<option value="{{ days }}"{% if days == default_days %} selected{% endif %}>{{ _("admin.api.days", days=days) }}</option>{% endfor %}
+      </select>
+      <p class="hint" id="lifetime_days-hint">{{ _("admin.api.lifetime_days_hint") }}</p>
+      {{ error_text("lifetime_days") }}
+    </div>
+    {% endif %}
+  </div>
+  <fieldset class="field choice{% if error_for('scopes') %} field--error{% endif %}" id="scopes" aria-describedby="scopes-hint{% if error_for('scopes') %} scopes-error{% endif %}">
+    <legend>{{ _("admin.api.scopes") }}</legend>
+    {% for choice in scopes %}
+    <div class="choice__option"><input type="checkbox" id="{{ choice.name }}" name="{{ choice.name }}"{% if choice.checked %} checked{% endif %}><label for="{{ choice.name }}">{{ choice.label }} (<code>{{ choice.hint }}</code>)</label></div>
+    {% endfor %}
+    <p class="hint" id="scopes-hint">{{ _("admin.api.scopes_hint") }}</p>
+    {{ error_text("scopes") }}
+  </fieldset>
+  <fieldset class="field choice{% if error_for('groups') %} field--error{% endif %}" id="groups" aria-describedby="groups-hint{% if error_for('groups') %} groups-error{% endif %}">
+    <legend>{{ _("admin.api.groups") }} <span class="optional">{{ _("form.optional") }}</span></legend>
+    {% for choice in groups %}
+    <div class="choice__option"><input type="checkbox" id="{{ choice.name }}" name="{{ choice.name }}"{% if choice.checked %} checked{% endif %}><label for="{{ choice.name }}">{{ choice.label }}</label></div>
+    {% endfor %}
+    <p class="hint" id="groups-hint">{{ _("admin.api.groups_hint") }}</p>
+    {{ error_text("groups") }}
+  </fieldset>
+  <div class="field{% if error_for('networks') %} field--error{% endif %}">
+    <label for="networks">{{ _("admin.api.networks") }} <span class="optional">{{ _("form.optional") }}</span></label>
+    <textarea id="networks" name="networks" rows="4" aria-describedby="networks-hint{% if error_for('networks') %} networks-error{% endif %}"{% if error_for('networks') %} aria-invalid="true"{% endif %}>{{ networks }}</textarea>
+    <p class="hint" id="networks-hint">{{ _("admin.api.networks_hint") }}</p>
+    {{ error_text("networks") }}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{% if client %}{{ _("admin.save") }}{% else %}{{ _("admin.api.create") }}{% endif %}</button>
+    <a href="/admin/api">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

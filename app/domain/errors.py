@@ -30,6 +30,7 @@ class ErrorCode(StrEnum):
     SCHEDULE_ITEM_NOT_FOUND = "schedule_item_not_found"
     INTEGRATION_NOT_READY = "integration_not_ready"
     DIRECT_CALL_UNAVAILABLE = "direct_call_unavailable"
+    API_CLIENT_NOT_FOUND = "api_client_not_found"
 
 
 class DomainError(Exception):

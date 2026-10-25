@@ -91,6 +91,25 @@ visitor browser ──fetch same page (?day=)──> web   (calendar.js, same or
 Branding is organisation data, not personal data. The calendar script sends nothing the page
 link does not already send, and stores nothing in the browser.
 
+## Machine API for contact-center bots (ADR 0023)
+
+```
+superuser ──POST name, organisation, groups, scopes, networks──> web ──SQL──> api_clients (secret: SHA-256 only)
+WxCC AI Agent ──POST /api/agent/v1/oauth/token (client id + secret)──> web ──> api_access_tokens (SHA-256 only)
+WxCC AI Agent ──GET groups, availability (bearer token)──> web: group names, free times, places left
+```
+
+| Data item | Where | Source | Retention | Leaves the system |
+|---|---|---|---|---|
+| Client name, organisation, groups, scopes, networks | `api_clients`, `api_client_groups` | superuser | until removed (configuration, no personal data) | no |
+| Client secret | SHA-256 in `api_clients`; shown once on screen | OpenPlanner | until rotated | only to the superuser's screen, once |
+| Access tokens | SHA-256 in `api_access_tokens` | OpenPlanner | 10 minutes; expired rows removed on the next issue | to the bot |
+| Caller IP address | compared in memory, not stored | bot | not stored | no |
+| Free times | computed | schedule | not stored | to the bot (no personal data) |
+
+No personal data flows through this API. The next step (change requests, ADR 0023) adds the
+phone number from the bot; it will be compared in memory and never stored outside `bookings`.
+
 ## Planned flows
 
 To be added per work package: SMS reminders (WP4/WP6), integration settings in the admin UI

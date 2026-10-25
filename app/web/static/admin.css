@@ -664,7 +664,8 @@ body.admin {
 }
 
 .admin .field input,
-.admin .field select {
+.admin .field select,
+.admin .field textarea {
   width: 100%;
   max-width: none;
   min-height: 40px;
@@ -677,7 +678,8 @@ body.admin {
 }
 
 .admin .field input:hover,
-.admin .field select:hover {
+.admin .field select:hover,
+.admin .field textarea:hover {
   border-color: var(--adm-text);
 }
 
@@ -693,7 +695,8 @@ body.admin {
 }
 
 .admin .field--error input,
-.admin .field--error select {
+.admin .field--error select,
+.admin .field--error textarea {
   border: 2px solid var(--adm-danger);
 }
 
@@ -1074,4 +1077,24 @@ body.admin {
 .brand-preview__link {
   color: var(--booking-color-accent);
   text-decoration: underline;
+}
+
+/* Machine API (ADR 0023): a new secret, shown once, selectable as one word. */
+.secret-value {
+  display: block;
+  padding: 0.75rem 1rem;
+  border: 2px dashed var(--adm-border-strong);
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-surface-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.inline-forms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
 }
