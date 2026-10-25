@@ -4,7 +4,7 @@ Every runtime dependency must be **actively maintained** and the **de-facto stan
 field, with a license in {MIT, BSD, Apache-2.0, PSF} (exceptions by ADR). This table is the
 review record; update it in the PR that adds, removes or re-evaluates a package.
 
-Checked on 2026-10-23 against PyPI release history and GitHub activity.
+Checked on 2026-10-23 against PyPI release history and GitHub activity (tzdata: 2026-10-25).
 
 ## Runtime (Python)
 
@@ -26,6 +26,7 @@ Checked on 2026-10-23 against PyPI release history and GitHub activity.
 | pyjwt[crypto] | ID-token verification (OIDC) | MIT | very active | De facto JWT library (ADR 0013) |
 | cryptography | AES-256-GCM for integration secrets at rest (ADR 0008); also used by PyJWT | Apache-2.0/BSD-3 | very active (PyCA) | De facto Python crypto library; direct dependency since WP5/6 |
 | itsdangerous | Signed session cookie (Starlette `SessionMiddleware`) | BSD-3 | maintained (Pallets), feature-complete | Starlette's own choice |
+| tzdata | IANA time-zone database for `zoneinfo` (summer/winter time rules) | Apache-2.0 | active (CPython core devs, follows every IANA release) | PEP 615's official fallback; pinned in `uv.lock` and the only source in the image (`PYTHONTZPATH=""`), so DST rules change only through a reviewed Renovate PR |
 | certifi | CA bundle (via httpx) | MPL-2.0 | active | Exception: ADR 0003 |
 
 Rejected: **authlib** (its httpx integration is deprecated and cannot be imported under

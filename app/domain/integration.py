@@ -6,10 +6,11 @@ Admins see a booking's timeline only with ``bookings.view`` on its group (ADR 00
 """
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime
 
 from app.domain.admin import AdminService
 from app.domain.authorization import Permission, Principal, scope_for
+from app.domain.availability import utc_bounds
 from app.domain.booking import Booking
 from app.domain.calls import (
     BookingEvent,
@@ -98,8 +99,8 @@ class IntegrationService:
         if not authorization.decision.allowed or authorization.group is None:
             raise DomainError(ErrorCode.NOT_PERMITTED)
         group = authorization.group.group
-        lower = datetime.combine(day, time(0), tzinfo=group.tz).astimezone(UTC)
-        upper = lower + timedelta(days=1)
+        # A local day lasts 23 or 25 hours when summer or winter time starts.
+        lower, upper = utc_bounds(group, day, day)
         async with self._uow.read() as tx:
             return await tx.list_bookings(scope_for(principal, permission), group.id, lower, upper)
 
