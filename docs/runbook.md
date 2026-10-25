@@ -153,16 +153,34 @@ Work Items is in beta; the organisation must be enabled by Cisco.
 
 ### 4. Webhooks
 
-Set `WEBEX_WEBHOOK_SECRET` and `WXCC_WEBHOOK_SECRET`, deploy, then run once:
+Set `WEBEX_WEBHOOK_SECRET` and `WXCC_WEBHOOK_SECRET` (random, at least 32 characters, from the
+secret store), deploy, check the scopes (section 6), then run once:
 
 ```sh
 docker compose exec web python -m app.cli register-webhooks
 ```
 
 It registers the Webex webhooks (meetings started/ended, participants joined/left) and the
-WxCC subscription (task events), and skips what exists. WxCC only calls **https on port 443
-with a public domain**: on a laptop use a tunnel (for example `cloudflared tunnel --url
-http://localhost:8000`) and set `PUBLIC_BASE_URL` to the tunnel's https address first.
+WxCC subscription (task events) on `WEBHOOK_BASE_URL` (or `PUBLIC_BASE_URL` when that is not
+set), and skips what exists. Webex and WxCC only call **https on port 443 with a public
+domain**; in production `WEBHOOK_BASE_URL` must be https.
+
+**On a laptop (tunnel).** Keep `PUBLIC_BASE_URL=http://127.0.0.1:8000`, so the Keycloak login
+redirect and the links in mails keep working, and give the webhooks their own address:
+
+1. Start a tunnel to the web container: `cloudflared tunnel --url http://localhost:8000`
+   (or `ngrok http 8000`). Note the `https://…` address it prints.
+2. Set `WEBHOOK_BASE_URL=https://<that address>` in `.env` and restart `web`
+   (`docker compose up -d web`). **Koppelingen** now shows the tunnel's webhook addresses.
+3. Run `register-webhooks`. A quick tunnel gets a new address on every start: run it again
+   after a restart; the registrations on the old address stay until you delete them in the
+   developer portal (Webex) or with `DELETE /v2/subscriptions/{id}` (WxCC).
+4. Check delivery: a test meeting's start and the participant counts appear on the
+   booking's timeline; `docker compose logs web | grep webhook` shows `webhook.webex` lines
+   (`webhook.rejected` means a wrong secret).
+
+Only `/webhooks/*` needs to be reachable through the tunnel; the admin portal is behind OIDC
+anyway, but a named tunnel with an ingress rule for that path alone is the tidier option.
 
 ### 5. Following calls
 

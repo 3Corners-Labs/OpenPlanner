@@ -81,6 +81,14 @@ tuples (key ≤ 200, value ≤ 512 bytes). Only first name and the meeting link 
 `cloud-contact-center:pod_conv`). Whether a Service App may end a work item is open: to be
 confirmed with the Cisco beta team before direct calls rely on it (ADR 0019).
 
+## Webhook addresses
+
+Both platforms call `<WEBHOOK_BASE_URL>/webhooks/webex` and `<WEBHOOK_BASE_URL>/webhooks/wxcc`.
+`WEBHOOK_BASE_URL` is optional and defaults to `PUBLIC_BASE_URL`; it exists so that an https
+tunnel or staging host can receive webhooks while the admin login (OIDC redirect) and the
+links in messages stay on `PUBLIC_BASE_URL`. It must be https in production, and
+`register-webhooks` refuses anything but https. **Koppelingen** shows the addresses in use.
+
 ## Inbound: Webex webhooks (`POST /webhooks/webex`)
 
 Registered once per installation (org-owned) for `meetings` (`started`, `ended`) and
