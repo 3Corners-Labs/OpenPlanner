@@ -253,6 +253,13 @@ stale one with `DELETE /v2/subscriptions/{id}`, or events may arrive twice. Webe
 org-owned webhooks only with `ownedBy=org`; `register-webhooks` asks for that and treats a
 `409` (already exists) as `exists`.
 
+**Webex quirk (seen 2026-10-25):** a create that Webex answers with `403` can still leave an
+active org-owned webhook behind, which the Service App then cannot delete (`403` from the
+webhook engine), and which does not show up for an admin's own token in **List Webhooks**.
+Register only after `wxcc-check` shows `GET /webhooks (org-owned)` as `OK`. A left-over
+webhook does no harm beyond extra events (unknown meetings are ignored); it goes inactive once
+its target stops answering, or Cisco developer support can remove it by id.
+
 Only `/webhooks/*` needs to be reachable through the tunnel; the admin portal is behind OIDC
 anyway, but a named tunnel with an ingress rule for that path alone is the tidier option.
 
