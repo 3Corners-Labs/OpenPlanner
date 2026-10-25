@@ -797,7 +797,7 @@ msgid "admin.field.capacity"
 msgstr "Gelijktijdige gesprekken"
 
 msgid "admin.field.capacity_hint"
-msgstr "Hoeveel deelnemers op hetzelfde moment kunnen beginnen."
+msgstr "Hoeveel deelnemers in hetzelfde tijdslot kunnen boeken."
 
 msgid "admin.field.valid_from"
 msgstr "Geldig vanaf"
@@ -870,7 +870,7 @@ msgid "admin.form.error.day"
 msgstr "Kies een datum vanaf vandaag."
 
 msgid "admin.form.error.overlap"
-msgstr "Deze tijden overlappen met een bestaand blok op die dag."
+msgstr "Deze tijden overlappen met een bestaande openingstijd op die dag."
 
 msgid "admin.form.error.override_conflict"
 msgstr "Voor deze datum bestaat al een uitzondering die hiermee botst."
@@ -879,7 +879,7 @@ msgid "admin.hours.title"
 msgstr "Openingstijden per week"
 
 msgid "admin.hours.lead"
-msgstr "Per dag één of meer blokken. Deelnemers zien alleen tijdsloten die helemaal in een blok passen."
+msgstr "Per dag één of meer openingstijden. Elke openingstijd wordt verdeeld in tijdsloten van de gespreksduur; deelnemers boeken een tijdslot."
 
 msgid "admin.hours.manage"
 msgstr "Openingstijden beheren"
@@ -894,16 +894,22 @@ msgid "admin.hours.validity"
 msgstr "{start} t/m {end}"
 
 msgid "admin.hours.add"
-msgstr "Blok toevoegen"
+msgstr "Openingstijd toevoegen"
 
 msgid "admin.hours.add_lead"
-msgstr "Bestaande afspraken blijven staan; het nieuwe blok geldt voor nieuwe afspraken."
+msgstr "Bestaande afspraken blijven staan; de nieuwe openingstijd geldt voor nieuwe afspraken."
 
 msgid "admin.hours.add_button"
-msgstr "Blok toevoegen"
+msgstr "Openingstijd toevoegen"
+
+msgid "admin.hours.add_link"
+msgstr "Toevoegen"
+
+msgid "admin.hours.add_label"
+msgstr "Openingstijd op {day} toevoegen"
 
 msgid "admin.hours.remove_label"
-msgstr "Blok {day} {time} verwijderen"
+msgstr "Openingstijd {day} {time} verwijderen"
 
 msgid "admin.exceptions.upcoming"
 msgstr "Komende uitzonderingen"
