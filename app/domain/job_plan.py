@@ -116,7 +116,7 @@ def plan_for_cancellation(*, cancelled_at: datetime, notify: bool = True) -> lis
 
     ``notify=False`` for the old booking of a reschedule: the citizen gets a change message
     for the new booking instead of a cancellation. The work item is ended and the meeting
-    removed first (ADR 0020); those jobs do nothing when the booking never got them.
+    removed first (ADR 0021); those jobs do nothing when the booking never got them.
     """
     end = PlannedJob(JobType.END_WXCC_TASK, cancelled_at, None)
     delete = PlannedJob(JobType.DELETE_VIDEO_ROOM, cancelled_at, None)

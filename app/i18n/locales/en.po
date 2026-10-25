@@ -1188,7 +1188,7 @@ msgid "join.refresh"
 msgstr "Refresh status"
 
 
-# --- WxCC work item lifecycle (ADR 0020) ---
+# --- WxCC work item lifecycle (ADR 0021) ---
 
 msgid "call.task.cancelled"
 msgstr "Task cancelled"

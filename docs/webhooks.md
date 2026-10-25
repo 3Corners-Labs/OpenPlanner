@@ -17,7 +17,7 @@ stores the tokens encrypted (ADR 0008). Scopes:
 | `meeting:admin_participants_read` | live status (participants) |
 | read scope of `meetings` and `meetingParticipants` at admin level (org-owned webhooks; exact scope names to be confirmed when registering) | live status events |
 | `cjp:task_write`, `cjp:task_read` | Create Task v2, Task Messages |
-| `cjp:user` | optional, secondary: End Task v1 for cancelled bookings (ADR 0020); without it the task stays marked cancelled through v2 |
+| `cjp:user` | optional, secondary: End Task v1 for cancelled bookings (ADR 0021); without it the task stays marked cancelled through v2 |
 | `cjp:config_read`, `cjp:config_write` | register and list the WxCC subscription, event types, task search in `wxcc-check`, the routing configuration in `wxcc-config-check` (administrator role) |
 
 ## Outbound: Webex Meetings
@@ -78,7 +78,7 @@ Limits: `workItemData` ≤ 50 keys (≤ 100 bytes), values ≤ 1024 bytes; `flow
 tuples (key ≤ 200, value ≤ 512 bytes). Only first name and the meeting link leave OpenPlanner
 (CLAUDE.md).
 
-**Ending a cancelled booking's task** (ADR 0020), v2 first. **Primary:** a Task Messages v2
+**Ending a cancelled booking's task** (ADR 0021), v2 first. **Primary:** a Task Messages v2
 snapshot, `POST /v2/tasks/{taskId}/messages` (`cjp:task_write`, beta, `202`), marks the task
 cancelled. **Secondary:** End Task, `POST /v1/tasks/{taskId}/end` without a body (v1 only;
 `cjp:user`; `202`); a refusal is recorded as `end_not_possible` with the code.

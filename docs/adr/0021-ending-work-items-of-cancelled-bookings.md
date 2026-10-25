@@ -1,4 +1,4 @@
-# 0020. Ending the work item of a cancelled booking
+# 0021. Ending the work item of a cancelled booking
 
 Status: accepted (2026-10-25). Supersedes ADR 0018 point 5.
 

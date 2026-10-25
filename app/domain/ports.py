@@ -124,7 +124,7 @@ class VideoProvider(Protocol):
 
 
 class ContactCenterDispatcher(Protocol):
-    """Creates and ends work items in Webex Contact Center (ADR 0018, 0020)."""
+    """Creates and ends work items in Webex Contact Center (ADR 0018, 0021)."""
 
     async def create_task(self, item: WorkItem) -> str:
         """Create the work item and return the task id.
