@@ -64,6 +64,7 @@ class RateLimits:
 
     bookings: str = "10/hour"
     reads: str = "60/minute"
+    assets: str = "600/minute"
 
 
 LIMITS = RateLimits()
@@ -86,3 +87,8 @@ def booking_limit() -> str:
 def read_limit() -> str:
     """Limit for availability pages."""
     return LIMITS.reads
+
+
+def asset_limit() -> str:
+    """Limit for branding assets (theme stylesheet, logo); cached by browsers, so generous."""
+    return LIMITS.assets

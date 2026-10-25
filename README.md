@@ -52,12 +52,13 @@ make check
 | Path | Purpose |
 |---|---|
 | `GET /` | Home page (nl/en, language switcher). |
-| `GET /g/{slug}` | Booking page of a group: slot picker per week. |
+| `GET /g/{slug}` | Booking page of a group: month calendar and the free times of a day. |
 | `GET/POST /g/{slug}/book` | Contact form and booking. |
 | `GET /b/{token}` | Management page; read-only from the dispatch moment. |
 | `GET/POST /b/{token}/cancel`, `/b/{token}/reschedule` | Cancel or move the appointment. |
 | `GET /b/{token}/join` | Join page for the video call (opens 15 minutes before the start). |
 | `GET/POST /g/{slug}/direct`, `GET /b/{token}/wait` | Start a video call right away; waiting page. |
+| `GET /o/{slug}/theme.css`, `GET /o/{slug}/logo` | Branding of an organisation (accent colour, logo). |
 | `POST /webhooks/webex`, `POST /webhooks/wxcc` | Signed events from Webex and WxCC (only with a secret configured). |
 | `GET /admin/` and below | Admin portal (OIDC login, every route bound to one permission of the matrix). |
 | `GET /healthz` | Liveness: the process is up. |

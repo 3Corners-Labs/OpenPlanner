@@ -21,16 +21,23 @@ The domain (``PlanningService``) authorises again, validates and audits.
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Annotated
-from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, RedirectResponse, Response
+from starlette.responses import HTMLResponse, Response
 
-from app.admin.authz import AccessDenied, AdminContext, RequirePermission, can_function
-from app.admin.forms import Field, FormData, Option
+from app.admin.authz import AdminContext, RequirePermission, can_function
+from app.admin.forms import (
+    Field,
+    FormData,
+    Option,
+    done_message,
+    raise_refusal,
+    read_form,
+    redirect_done,
+)
 from app.admin.pages import Locale, SameOrigin, page
 from app.domain.authorization import LEVELS, Level, Permission
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import DomainError
 from app.domain.planning import (
     GroupSettings,
     NewGroup,
@@ -50,7 +57,6 @@ from app.i18n import BoundGettext
 from app.i18n.dates import format_clock, format_day, format_day_short, weekday_names
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.locale import RequestLocale
-from app.web.protection import RejectedRequest
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -60,19 +66,8 @@ PHONE_LABELS: dict[PhoneMode, str] = {
     PhoneMode.REQUIRED: "admin.group.phone_required",
 }
 
-DONE_MESSAGES: dict[str, str] = {
-    "created": "admin.done.created",
-    "saved": "admin.done.saved",
-    "unchanged": "admin.done.unchanged",
-    "added": "admin.done.added",
-    "removed": "admin.done.removed",
-}
-"""Confirmations after a change; only these keys are read from ``?done=``."""
-
 TIMEZONE_HINT_ZONES = "Europe/Amsterdam"
 
-MAX_FORM_BYTES = 16 * 1024
-"""Admin forms are small; anything larger is refused before parsing."""
 
 NUMBER_LABELS: dict[str, tuple[str, str]] = {
     "slot_minutes": ("admin.field.slot_minutes", "admin.field.slot_minutes_hint"),
@@ -132,12 +127,6 @@ def planning_service(request: Request) -> PlanningService:
     return service
 
 
-def _done(request: Request, _: BoundGettext) -> str | None:
-    """Return the confirmation named by ``?done=``, if it is a known one."""
-    key = request.query_params.get("done", "")
-    return _(DONE_MESSAGES[key]) if key in DONE_MESSAGES else None
-
-
 def group_page(
     request: Request,
     locale: RequestLocale,
@@ -165,37 +154,10 @@ def group_page(
         locale,
         template,
         context.principal,
-        {"summary": summary, "tabs": tabs, "done": _done(request, locale.gettext), **extra},
+        {"summary": summary, "tabs": tabs, "done": done_message(request, locale.gettext), **extra},
     )
     response.status_code = status
     return response
-
-
-def _redirect(url: str, done: str) -> RedirectResponse:
-    """Answer a successful change with a redirect to ``url`` and its confirmation."""
-    return RedirectResponse(f"{url}?done={done}", status_code=303)
-
-
-async def _form(request: Request, locale: RequestLocale) -> FormData:
-    """Read a urlencoded form body (only the first value of every name).
-
-    Raises:
-        RejectedRequest: 413 for bodies above ``MAX_FORM_BYTES``.
-    """
-    raw = await request.body()
-    if len(raw) > MAX_FORM_BYTES:
-        raise RejectedRequest(413)
-    body = raw.decode("utf-8", errors="replace")
-    values: dict[str, str] = {}
-    for key, value in parse_qsl(body, keep_blank_values=True):
-        values.setdefault(key, value)
-    return FormData(values, locale.gettext)
-
-
-def _refused(error: DomainError) -> None:
-    """Turn refusals that are not form errors into the portal's responses."""
-    if error.code is ErrorCode.NOT_PERMITTED:
-        raise AccessDenied from error
 
 
 # --- new group ------------------------------------------------------------------------------
@@ -281,7 +243,7 @@ async def create_group(
     ],
 ) -> Response:
     """Create a group, then continue with its opening hours."""
-    form = await _form(request, locale)
+    form = await read_form(request, locale)
     minutes = form.integer("slot_minutes")
     if not form.errors and minutes is not None:
         new = NewGroup(
@@ -294,10 +256,10 @@ async def create_group(
         try:
             group = await planning_service(request).create_group(context.principal, new)
         except DomainError as error:
-            _refused(error)
+            raise_refusal(error)
             form.refusal(error)
         else:
-            return _redirect(f"/admin/groups/{group.slug}", "created")
+            return redirect_done(f"/admin/groups/{group.slug}", "created")
     return await _new_group_response(request, locale, context, form, 422)
 
 
@@ -575,7 +537,7 @@ async def save_settings(
     ],
 ) -> Response:
     """Save the group's settings."""
-    form = await _form(request, locale)
+    form = await read_form(request, locale)
     numbers = {name: form.integer(name) for name in NUMBER_LABELS}
     phone = form.choice("phone_mode", {mode.value for mode in PhoneMode})
     direct = form.choice("direct_call_enabled", {"yes", "no"})
@@ -594,10 +556,12 @@ async def save_settings(
         try:
             changed = await planning_service(request).update_settings(context.principal, slug, new)
         except DomainError as error:
-            _refused(error)
+            raise_refusal(error)
             form.refusal(error)
         else:
-            return _redirect(f"/admin/groups/{slug}/settings", "saved" if changed else "unchanged")
+            return redirect_done(
+                f"/admin/groups/{slug}/settings", "saved" if changed else "unchanged"
+            )
     return _settings_response(request, locale, context, form, 422)
 
 
@@ -698,7 +662,7 @@ async def add_hours(
     request: Request, locale: Locale, slug: str, _: SameOrigin, context: ManageGroup
 ) -> Response:
     """Add a weekly opening window."""
-    form = await _form(request, locale)
+    form = await read_form(request, locale)
     weekday = form.choice("weekday", {str(i) for i in range(7)})
     opens, closes = form.clock("opens"), form.clock("closes")
     capacity = form.integer("capacity")
@@ -710,10 +674,10 @@ async def add_hours(
             )
             await planning_service(request).add_rule(context.principal, slug, rule)
         except DomainError as error:
-            _refused(error)
+            raise_refusal(error)
             form.refusal(error)
         else:
-            return _redirect(f"/admin/groups/{slug}/hours", "added")
+            return redirect_done(f"/admin/groups/{slug}/hours", "added")
     return await _hours_response(request, locale, context, form, 422)
 
 
@@ -725,9 +689,9 @@ async def remove_hours(
     try:
         await planning_service(request).remove_rule(context.principal, slug, rule_id)
     except DomainError as error:
-        _refused(error)
+        raise_refusal(error)
         raise
-    return _redirect(f"/admin/groups/{slug}/hours", "removed")
+    return redirect_done(f"/admin/groups/{slug}/hours", "removed")
 
 
 # --- exceptions -----------------------------------------------------------------------------
@@ -804,7 +768,7 @@ async def add_exception(
     request: Request, locale: Locale, slug: str, _: SameOrigin, context: ManageGroup
 ) -> Response:
     """Close a date or give it its own hours."""
-    form = await _form(request, locale)
+    form = await read_form(request, locale)
     day = form.day("day")
     kind = form.choice("kind", {"closed", "hours"})
     window = None
@@ -825,10 +789,10 @@ async def add_exception(
                 context.principal, slug, ScheduleOverride(day, window)
             )
         except DomainError as error:
-            _refused(error)
+            raise_refusal(error)
             form.refusal(error)
         else:
-            return _redirect(f"/admin/groups/{slug}/exceptions", "added")
+            return redirect_done(f"/admin/groups/{slug}/exceptions", "added")
     return await _exceptions_response(request, locale, context, form, 422)
 
 
@@ -840,6 +804,6 @@ async def remove_exception(
     try:
         await planning_service(request).remove_override(context.principal, slug, override_id)
     except DomainError as error:
-        _refused(error)
+        raise_refusal(error)
         raise
-    return _redirect(f"/admin/groups/{slug}/exceptions", "removed")
+    return redirect_done(f"/admin/groups/{slug}/exceptions", "removed")

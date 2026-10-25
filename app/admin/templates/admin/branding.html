@@ -1,0 +1,59 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field, form_body with context %}
+{% block title %}{{ _("admin.branding.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="{{ brand.theme_href }}">{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="page-header__lead"><a href="/admin/branding">{{ _("admin.branding.title") }}</a></p>
+    <h1>{{ organisation.name }}</h1>
+    <p class="page-header__lead">{{ _("admin.branding.page_lead") }}</p>
+  </div>
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="preview-heading">
+  <div class="card__header">
+    <h2 id="preview-heading">{{ _("admin.branding.preview") }}</h2>
+    <p class="card__lead">{{ _("admin.branding.preview_lead") }}</p>
+  </div>
+  <div class="brand-preview">
+    <div class="brand-preview__header">
+      {% if brand.logo_href %}<img class="brand-preview__logo" src="{{ brand.logo_href }}" alt="{{ _("admin.branding.logo_alt", name=organisation.name) }}">{% endif %}
+      <span>{{ brand.name }}</span>
+    </div>
+    <div class="brand-preview__body">
+      <span class="brand-preview__button">{{ _("picker.first_choose") }}</span>
+      <span class="brand-preview__day">26</span>
+      <span class="brand-preview__link">{{ _("book.change_slot") }}</span>
+    </div>
+  </div>
+</section>
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/branding" novalidate>
+  <div class="card__header">
+    <h2>{{ _("admin.branding.name_colour") }}</h2>
+  </div>
+  {{ form_body(fields, _("admin.save")) }}
+</form>
+<section class="card" aria-labelledby="logo-heading">
+  <div class="card__header">
+    <h2 id="logo-heading">{{ _("admin.branding.logo") }}</h2>
+    <p class="card__lead">{{ _("admin.branding.logo_lead", kb=max_logo_kb) }}</p>
+  </div>
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/branding/logo" enctype="multipart/form-data" novalidate>
+    <div class="field">
+      <label for="logo">{{ _("admin.branding.logo_file") }}</label>
+      <input id="logo" name="logo" type="file" accept="{{ logo_types }}" required aria-describedby="logo-hint">
+      <p class="hint" id="logo-hint">{{ _("admin.branding.logo_hint", kb=max_logo_kb) }}</p>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.branding.logo_upload") }}</button>
+    </div>
+  </form>
+  {% if brand.logo_href %}
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/branding/logo/remove">
+    <button type="submit" class="button button--secondary">{{ _("admin.branding.logo_remove") }}</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

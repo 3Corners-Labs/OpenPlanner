@@ -1,13 +1,17 @@
 {% extends "base.html" %}
 {% block title %}{{ _("cancel.title") }} – {{ group.name }}{% endblock %}
 {% block content %}
+<p class="eyebrow">{{ group.name }}</p>
 <h1>{{ _("cancel.title") }}</h1>
-<p>{{ group.name }}<br>{{ slot_label }}</p>
+<dl class="details">
+  <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
+  <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
+</dl>
 <p>{{ _("cancel.question") }}</p>
 <form method="post" action="/b/{{ token }}/cancel">
   <ul class="actions">
     <li><button type="submit" class="button button--danger">{{ _("cancel.confirm") }}</button></li>
-    <li><a class="button button--secondary" href="/b/{{ token }}">{{ _("cancel.back") }}</a></li>
+    <li><a href="/b/{{ token }}">{{ _("cancel.back") }}</a></li>
   </ul>
 </form>
 {% endblock %}
