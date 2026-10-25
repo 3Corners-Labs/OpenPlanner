@@ -33,7 +33,9 @@ async def register_webex(
 ) -> list[str]:
     """Create the missing Webex webhooks; return ``resource/event: created|exists`` per event."""
     base = base_url.rstrip("/")
-    listed = (await client.request("GET", f"{base}/webhooks", params={"max": "100"})).json()
+    listed = (
+        await client.request("GET", f"{base}/webhooks", params={"max": "100", "ownedBy": "org"})
+    ).json()
     existing = {
         (item.get("resource"), item.get("event"))
         for item in listed.get("items", [])
@@ -60,6 +62,9 @@ async def register_webex(
         except IntegrationError as error:
             if error.retryable:
                 raise
+            if error.code == "rejected_409":  # Webex: the same webhook exists already
+                report.append(f"{resource}/{event}: exists")
+                continue
             needs = (
                 f"needs {WEBEX_SCOPES[resource]}, {ORG_WEBHOOK_ROLE}"
                 if error.code in ("unauthorized", "rejected_403")

@@ -120,3 +120,16 @@ async def test_a_wxcc_validation_error_is_not_blamed_on_a_scope() -> None:
         "wxcc subscription: refused (rejected_400): WxCC refused the request "
         "(destination must be https on port 443 with a public domain; secret 32+ characters)"
     )
+
+
+async def test_org_owned_webhooks_are_listed_with_owned_by_org_and_409_means_exists() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            assert request.url.params["ownedBy"] == "org"  # org webhooks are not listed otherwise
+            return httpx.Response(200, json={"items": []})
+        return httpx.Response(409, json={"message": "already exists"})
+
+    client, _ = _client(handler)
+    report = await register_webex(client, "https://webexapis.com/v1", TARGET, "secret")
+
+    assert report[0] == "meetings/started: exists"
