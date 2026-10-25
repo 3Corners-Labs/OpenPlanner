@@ -15,6 +15,9 @@
     <div><dt>{{ _("admin.agenda.participants") }}</dt><dd>{{ status.participants }}</dd></div>
   </dl>
 </section>
+{% if end_not_possible %}
+<div class="alert alert--info"><p>{{ _("admin.booking.end_not_possible") }}</p></div>
+{% endif %}
 <section class="card" aria-labelledby="timeline-heading">
   <h2 id="timeline-heading">{{ _("admin.booking.timeline") }}</h2>
   {% if events %}

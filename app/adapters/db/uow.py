@@ -13,6 +13,7 @@ from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import ColumnElement, case, delete, false, func, insert, or_, select, true, update
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.sql.elements import SQLCoreOperations
@@ -32,6 +33,7 @@ from app.adapters.db.models import (
     ScheduleOverrideRow,
     ScheduleRuleRow,
     SlotRow,
+    WebhookEventRow,
 )
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
 from app.domain.authorization import Scope
@@ -526,6 +528,22 @@ class SqlTransaction:
             )
         ).one_or_none()
         return _booking(*found) if found else None
+
+    async def claim_webhook_event(self, source: str, key: str, at: datetime) -> bool:
+        """Insert the event key unless it exists; ``True`` when it was new."""
+        result = await self._session.execute(
+            sqlite_insert(WebhookEventRow)
+            .values(source=source, event_key=key, seen_at=at)
+            .on_conflict_do_nothing()
+        )
+        return bool(getattr(result, "rowcount", 0))
+
+    async def forget_webhook_events(self, before: datetime) -> int:
+        """Delete event keys seen before ``before``."""
+        result = await self._session.execute(
+            delete(WebhookEventRow).where(WebhookEventRow.seen_at < before)
+        )
+        return int(getattr(result, "rowcount", 0))
 
     async def add_booking_event(self, event: BookingEvent) -> None:
         """Append an event to a booking's timeline."""

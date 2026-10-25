@@ -192,3 +192,91 @@ async def test_only_configured_integrations_are_claimed(setup: Setup) -> None:
 
     assert JobType.CREATE_VIDEO_ROOM in queue.requested_types
     assert JobType.DISPATCH_WXCC_TASK not in queue.requested_types
+
+
+async def _dispatched(setup: Setup) -> int:
+    bid = await setup.booking()
+    await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
+    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK)])).run_due()
+    return bid
+
+
+async def test_a_cancelled_work_item_is_marked_by_v2_then_ended(setup: Setup) -> None:
+    bid = await _dispatched(setup)
+
+    await setup.runner(FakeQueue([job(bid, JobType.END_WXCC_TASK, pinned=None)])).run_due()
+
+    reference = setup.uow.state.bookings[bid].reference
+    assert setup.dispatcher.marked == [("task-1", reference)]
+    assert setup.dispatcher.ended == ["task-1"]
+    assert setup.events(bid)[-2:] == [EventKind.TASK_MARKED_CANCELLED, EventKind.TASK_END_REQUESTED]
+    assert setup.uow.state.call_status[bid].task is TaskState.CANCELLED
+
+
+@pytest.mark.parametrize(
+    ("mark_error", "first"),
+    [
+        (None, (EventKind.TASK_MARKED_CANCELLED, "")),  # the v2 mark stands
+        ("rejected_400", (EventKind.INTEGRATION_ERROR, "rejected_400")),  # v1 is still tried
+    ],
+)
+async def test_a_refused_v1_end_is_recorded_after_the_v2_step(
+    setup: Setup, mark_error: str | None, first: tuple[EventKind, str]
+) -> None:
+    bid = await _dispatched(setup)
+    if mark_error:
+        setup.dispatcher.mark_error = IntegrationError(mark_error, retryable=False)
+    setup.dispatcher.end_error = IntegrationError("rejected_403", retryable=False)
+    queue = FakeQueue([job(bid, JobType.END_WXCC_TASK, pinned=None)])
+
+    await setup.runner(queue).run_due()
+
+    assert queue.done == [1]
+    events = setup.uow.state.booking_events[bid][-2:]
+    assert [(e.kind, e.detail) for e in events] == [
+        first,
+        (EventKind.END_NOT_POSSIBLE, "rejected_403"),
+    ]
+
+
+async def test_a_retry_after_the_mark_does_not_mark_twice(setup: Setup) -> None:
+    bid = await _dispatched(setup)
+    setup.dispatcher.end_error = IntegrationError("server_error", retryable=True)
+    end = job(bid, JobType.END_WXCC_TASK, pinned=None)
+    queue = FakeQueue([end])
+
+    await setup.runner(queue).run_due()
+    setup.dispatcher.end_error = None
+    await setup.runner(FakeQueue([end])).run_due()
+
+    assert [error for _, _, error in queue.retried] == ["server_error"]
+    assert len(setup.dispatcher.marked) == 1
+    assert setup.dispatcher.ended == ["task-1"]
+    assert EventKind.END_NOT_POSSIBLE not in setup.events(bid)
+
+
+async def test_a_retryable_v2_failure_is_retried_before_v1(setup: Setup) -> None:
+    bid = await _dispatched(setup)
+    setup.dispatcher.mark_error = IntegrationError("server_error", retryable=True)
+    queue = FakeQueue([job(bid, JobType.END_WXCC_TASK, pinned=None, attempts=4)])
+
+    await setup.runner(queue).run_due()
+
+    assert setup.dispatcher.ended == []
+    events = setup.uow.state.booking_events[bid]
+    assert (events[-1].kind, events[-1].detail) == (EventKind.INTEGRATION_ERROR, "server_error")
+    assert setup.uow.state.call_status[bid].task is TaskState.QUEUED
+
+
+async def test_nothing_to_end_without_a_task_or_after_it_ended(setup: Setup) -> None:
+    bid = await setup.booking()
+    end = job(bid, JobType.END_WXCC_TASK, pinned=None)
+    await setup.runner(FakeQueue([end])).run_due()  # no task yet
+    await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
+    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK)])).run_due()
+    await setup.integration.record(bid, EventKind.TASK_ENDED)
+
+    await setup.runner(FakeQueue([end])).run_due()  # the agent already ended it
+
+    assert setup.dispatcher.ended == []
+    assert setup.dispatcher.marked == []

@@ -3,7 +3,8 @@
 Authenticated by signature, not by an admin session: the secret is configured per
 installation (``WEBEX_WEBHOOK_SECRET``, ``WXCC_WEBHOOK_SECRET``); without it the endpoint
 does not exist (404). The body is size-capped and verified before it is parsed. Unknown
-meetings, tasks and event types are acknowledged and ignored, so the platforms do not retry.
+meetings, tasks and event types, and Webex events seen before (replays), are acknowledged and
+ignored, so the platforms do not retry.
 
     POST /webhooks/webex   meetings started/ended, participants joined/left
     POST /webhooks/wxcc    task:connected, task:ended, task:failed
@@ -68,10 +69,10 @@ async def webex(request: Request) -> Response:
     event = parse_webex(payload)
     if event is not None:
         clock: Clock = request.app.state.clock
-        known = await _service(request).record_meeting_event(
-            event.target_id, event.kind, clock.now()
+        outcome = await _service(request).record_meeting_event(
+            event.target_id, event.kind, clock.now(), event_key=event.event_key
         )
-        log.info("webhook.webex", kind=event.kind.value, known=known)
+        log.info("webhook.webex", kind=event.kind.value, outcome=outcome.value)
     return Response(status_code=204)
 
 
@@ -100,8 +101,8 @@ async def wxcc(request: Request) -> Response:
         return Response(status_code=400)
     event = parse_wxcc(payload)
     if event is not None:
-        known = await _service(request).record_task_event(
+        outcome = await _service(request).record_task_event(
             event.target_id, event.kind, clock.now(), event.detail
         )
-        log.info("webhook.wxcc", kind=event.kind.value, known=known)
+        log.info("webhook.wxcc", kind=event.kind.value, outcome=outcome.value)
     return Response(status_code=204)
