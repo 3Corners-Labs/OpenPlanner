@@ -6,11 +6,12 @@ embedded as a Web Component. Five minutes before the start, the service dispatch
 a Webex video link to the group's queue via Webex Connect. Personal data is purged 24 hours
 after the appointment.
 
-Status: **work package 7a**. Citizens can book, view, move and cancel an appointment on the
+Status: **work package 7b**. Citizens can book, view, move and cancel an appointment on the
 group page; confirmation, change, reminder and cancellation emails are sent by the worker.
 Admins log in to the admin portal through OIDC; what they see and may do follows the
-authorisation matrix (`docs/authorization.md`). Editing groups and settings (WP7b–d), video
-links (WP5) and WxCC dispatch (WP6) follow. See `docs/HANDOVER.md` §10 for the work packages.
+authorisation matrix (`docs/authorization.md`). They create groups and manage settings, opening
+hours, exceptions and capacity per group. Texts and reminders (WP7c), integration settings
+(WP7d), video links (WP5) and WxCC dispatch (WP6) follow. See `docs/HANDOVER.md` §10 for the work packages.
 
 ## Quick start (demo)
 

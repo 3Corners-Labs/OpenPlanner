@@ -1,0 +1,27 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.new_group.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
+  <ol>
+    <li><a href="/admin/">{{ _("admin.nav.dashboard") }}</a></li>
+    <li><span aria-current="page">{{ _("admin.new_group.title") }}</span></li>
+  </ol>
+</nav>
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.new_group.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.new_group.lead") }}</p>
+  </div>
+</div>
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups" novalidate>
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.new_group.create") }}</button>
+    <a href="/admin/">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

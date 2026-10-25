@@ -6,7 +6,7 @@ Times are stored in UTC; this is the edge where they become local text (CLAUDE.m
 from datetime import date, datetime, tzinfo
 
 from babel import Locale
-from babel.dates import format_date, format_time
+from babel.dates import format_date, format_time, get_day_names
 
 
 def _babel_locale(locale: str) -> Locale:
@@ -24,9 +24,20 @@ def format_day_short(day: date, locale: str) -> str:
     return format_date(day, format="EEEE d MMMM", locale=_babel_locale(locale))
 
 
+def format_day_compact(day: date, locale: str) -> str:
+    """Return a short date with year for tables, e.g. ``5 jan 2026`` / ``Jan 5, 2026``."""
+    return format_date(day, format="medium", locale=_babel_locale(locale))
+
+
 def format_clock(moment: datetime, tz: tzinfo, locale: str) -> str:
     """Return the local time of ``moment`` in ``tz``, e.g. ``09:00`` / ``9:00 AM``."""
     return format_time(moment.astimezone(tz), format="short", locale=_babel_locale(locale))
+
+
+def weekday_names(locale: str) -> list[str]:
+    """Return the weekday names Monday first, e.g. ``maandag`` … ``zondag``."""
+    names = get_day_names("wide", locale=_babel_locale(locale))
+    return [str(names[index]) for index in range(7)]
 
 
 def local_day(moment: datetime, tz: tzinfo) -> date:

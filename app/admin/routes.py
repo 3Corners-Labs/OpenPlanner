@@ -10,14 +10,14 @@ ones are listed in ``PUBLIC_ADMIN_PATHS`` and the route-coverage test checks bot
     GET  /admin/rights       rights.view      own permissions with their scope
     GET  /admin/matrix       matrix.view      the whole matrix (same data as the docs)
     GET  /admin/audit        audit.view       audit events in scope
-    GET  /admin/groups/{slug} group.view      one group
+
+Groups and their planning live in ``group_routes``.
 """
 
 import hmac
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
@@ -26,32 +26,32 @@ import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.admin import group_routes
 from app.admin.authz import (
     AccessDenied,
     AdminContext,
     LoginRequired,
+    ReauthRequired,
     RequirePermission,
     admin_service,
-    can_function,
     session_principal,
 )
+from app.admin.pages import Locale, SameOrigin, templates
+from app.admin.pages import message as _message
+from app.admin.pages import page as _page
 from app.admin.session import end_session, pop_login_start, save_login_start, start_session
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT, LOGOUT_EVENT
 from app.domain.audit import AuditEntry, Outcome
 from app.domain.authorization import (
     CITIZEN_ACTIONS,
-    LEVELS,
-    Level,
     Permission,
-    Principal,
     Role,
     Scope,
     permissions_for,
 )
 from app.domain.ports import Clock, IdentityError, IdentityProvider
-from app.domain.scheduling import PhoneMode
 from app.i18n import BoundGettext
-from app.i18n.dates import format_clock, format_day, local_day
+from app.i18n.dates import format_clock, format_day_compact, local_day
 from app.web.authz_labels import (
     CITIZEN_LABELS,
     CONDITION_LABELS,
@@ -61,12 +61,11 @@ from app.web.authz_labels import (
     ROLE_LABELS,
 )
 from app.web.authz_report import matrix_rows
-from app.web.locale import RequestLocale, resolve_locale
-from app.web.protection import limiter, read_limit, require_same_origin
-from app.web.templates import create_templates, render
+from app.web.locale import resolve_locale
+from app.web.protection import limiter, read_limit
+from app.web.templates import render
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
-templates = create_templates([Path(__file__).parent / "templates"])
 log = structlog.get_logger()
 
 PUBLIC_ADMIN_PATHS = frozenset(
@@ -79,40 +78,28 @@ EVENT_LABELS: dict[str, str] = {
     LOGOUT_EVENT: "audit.event.logout",
 }
 
-PHONE_LABELS: dict[PhoneMode, str] = {
-    PhoneMode.HIDDEN: "admin.group.phone_hidden",
-    PhoneMode.OPTIONAL: "admin.group.phone_optional",
-    PhoneMode.REQUIRED: "admin.group.phone_required",
+DETAIL_LABELS: dict[str, str] = {
+    "rule.add": "admin.audit.detail.rule_add",
+    "rule.remove": "admin.audit.detail.rule_remove",
+    "override.add": "admin.audit.detail.override_add",
+    "override.remove": "admin.audit.detail.override_remove",
+    "name": "admin.field.name",
+    "timezone": "admin.field.timezone",
+    "slot_minutes": "admin.field.slot_minutes",
+    "min_notice_minutes": "admin.field.min_notice_minutes",
+    "horizon_days": "admin.field.horizon_days",
+    "phone_mode": "admin.field.phone_mode",
+    "dispatch_lead_minutes": "admin.field.dispatch_lead_minutes",
+    "wxcc_queue_id": "admin.field.wxcc_queue_id",
 }
+"""Readable label per audit detail key (changed field names and schedule actions)."""
 
-Locale = Annotated[RequestLocale, Depends(resolve_locale)]
-SameOrigin = Annotated[None, Depends(require_same_origin)]
-
-
-@dataclass(frozen=True)
-class NavItem:
-    """One entry of the admin navigation, shown only if the matrix allows it."""
-
-    label_key: str
-    href: str
-    permission: Permission
-
-
-NAVIGATION = (
-    NavItem("admin.nav.dashboard", "/admin/", Permission.DASHBOARD_VIEW),
-    NavItem("admin.nav.audit", "/admin/audit", Permission.AUDIT_VIEW),
-    NavItem("admin.nav.rights", "/admin/rights", Permission.RIGHTS_VIEW),
-    NavItem("admin.nav.matrix", "/admin/matrix", Permission.MATRIX_VIEW),
-)
-
-
-@dataclass(frozen=True)
-class NavView:
-    """A visible navigation entry."""
-
-    label: str
-    href: str
-    current: bool
+OUTCOME_TONES: dict[Outcome, str] = {
+    Outcome.SUCCESS: "success",
+    Outcome.DENIED: "danger",
+    Outcome.FAILURE: "warning",
+}
+"""Chip colour per audit outcome; the outcome is always also written out (WCAG 1.4.1)."""
 
 
 def _identity_provider(request: Request) -> IdentityProvider | None:
@@ -143,56 +130,6 @@ def _safe_next(value: str | None) -> str:
     ):
         return value
     return "/admin/"
-
-
-def _page(
-    request: Request,
-    locale: RequestLocale,
-    name: str,
-    principal: Principal,
-    context: dict[str, object],
-) -> HTMLResponse:
-    """Render an admin page with navigation and ``can()`` from the matrix."""
-    can = can_function(principal)
-    nav = [
-        NavView(locale.gettext(item.label_key), item.href, request.url.path == item.href)
-        for item in NAVIGATION
-        if can(item.permission)
-    ]
-    return render(
-        templates,
-        request,
-        name,
-        locale,
-        {**context, "principal": principal, "nav": nav, "can": can},
-    )
-
-
-def _message(
-    request: Request,
-    locale: RequestLocale,
-    status: int,
-    title_key: str,
-    message_key: str,
-    *,
-    back_link: bool = True,
-) -> HTMLResponse:
-    """Render a message page; with a logged-in admin inside the portal layout and menu.
-
-    ``back_link=False`` drops the link to the overview, for visitors it would only loop back.
-    """
-    context: dict[str, object] = {
-        "title": locale.gettext(title_key),
-        "message": locale.gettext(message_key),
-        "back_link": back_link,
-    }
-    principal = session_principal(request)
-    if principal is not None:
-        response = _page(request, locale, "admin/message.html", principal, context)
-    else:
-        response = render(templates, request, "admin/public_message.html", locale, context)
-    response.status_code = status
-    return response
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -363,6 +300,8 @@ class AuditView:
     action: str
     outcome: str
     target: str
+    tone: str
+    detail: str
 
 
 def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
@@ -372,9 +311,15 @@ def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
     return entry.actor_name or entry.event.actor
 
 
+def _detail_label(detail: str, _: BoundGettext) -> str:
+    """Translate an audit detail such as ``horizon_days,name`` into readable labels."""
+    keys = [key for key in detail.split(",") if key]
+    return ", ".join(_(DETAIL_LABELS[key]) if key in DETAIL_LABELS else key for key in keys)
+
+
 def _moment(at: datetime, tz: ZoneInfo, locale: str) -> str:
-    """Return a local date and time, e.g. ``maandag 5 januari 2026, 09:00``."""
-    return f"{format_day(local_day(at, tz), locale)}, {format_clock(at, tz, locale)}"
+    """Return a compact local date and time, e.g. ``5 jan 2026, 09:00``."""
+    return f"{format_day_compact(local_day(at, tz), locale)}, {format_clock(at, tz, locale)}"
 
 
 def _action_label(action: str, _: BoundGettext) -> str:
@@ -404,40 +349,13 @@ async def audit(
             _action_label(e.action, _),
             _(OUTCOME_LABELS[e.outcome]),
             " / ".join(t for t in (e.organisation, e.group) if t) or "–",
+            OUTCOME_TONES[e.outcome],
+            _detail_label(e.detail, _),
         )
         for entry in events
         for e in (entry.event,)
     ]
     return _page(request, locale, "admin/audit.html", context.principal, {"events": views})
-
-
-@router.get("/groups/{slug}", response_class=HTMLResponse)
-async def group(
-    request: Request,
-    locale: Locale,
-    slug: str,
-    context: Annotated[
-        AdminContext, Depends(RequirePermission(Permission.GROUP_VIEW, group_param="slug"))
-    ],
-) -> HTMLResponse:
-    """Show one group and what the admin may do with it."""
-    _ = locale.gettext
-    summary = context.group
-    can = can_function(context.principal)
-    group_rights = [
-        _(PERMISSION_LABELS[p]) for p in Permission if LEVELS[p] is Level.GROUP and can(p, summary)
-    ]
-    return _page(
-        request,
-        locale,
-        "admin/group.html",
-        context.principal,
-        {
-            "summary": summary,
-            "phone_label": _(PHONE_LABELS[summary.group.phone_mode]),
-            "group_rights": group_rights,
-        },
-    )
 
 
 def register_admin(app: FastAPI) -> None:
@@ -456,10 +374,17 @@ def register_admin(app: FastAPI) -> None:
             )
         return _message(request, locale, 403, "admin.forbidden.title", "admin.forbidden.text")
 
+    async def reauth_required(request: Request, exc: Exception) -> Response:
+        next_path = exc.next_path if isinstance(exc, ReauthRequired) else "/admin/"
+        target = quote(_safe_next(next_path), safe="/")
+        return RedirectResponse(f"/admin/login?next={target}", status_code=303)
+
     handlers: dict[type[Exception], Callable[[Request, Exception], object]] = {
         LoginRequired: login_required,
         AccessDenied: access_denied,
+        ReauthRequired: reauth_required,
     }
     for exc_type, handler in handlers.items():
         app.add_exception_handler(exc_type, handler)  # type: ignore[arg-type]
     app.include_router(router)
+    app.include_router(group_routes.router)

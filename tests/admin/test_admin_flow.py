@@ -266,7 +266,8 @@ async def test_forbidden_page_keeps_the_admin_menu_and_logout(site: Site) -> Non
 async def test_public_admin_pages_say_beheer(site: Site) -> None:
     text = (await site.client.get("/admin/logged-out")).text
 
-    assert '<p class="site-name">Beheer</p>' in text
+    assert '<span class="admin-brand">' in text
+    assert "<span>Beheer</span>" in text
     assert 'action="/admin/logout"' not in text
 
 

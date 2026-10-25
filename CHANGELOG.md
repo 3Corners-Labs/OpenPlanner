@@ -36,6 +36,11 @@ All notable changes are listed here, generated from Conventional Commits on rele
   admins see the logins of their own admins.
 - Development Keycloak with one test user per role; Playwright specs walk the portal as every
   role, with axe on every admin page, also in CI.
+- Modern admin layout: side navigation, cards, one fixed look, no JavaScript (ADR 0016).
+- Groups and planning in the admin portal: create groups, settings (incl. WxCC queue), weekly
+  opening hours with capacity, exceptions per date, a preview of the citizen's slots;
+  changes audited with the changed fields (migration 0006).
+- Changes need a login of at most 60 minutes (ADR 0015).
 - ADR 0011: management tokens derived from a per-booking salt and a server key.
 - `seed-demo` command and a Mailpit `dev` profile for demos.
 

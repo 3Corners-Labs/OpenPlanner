@@ -1,22 +1,64 @@
 {% extends "admin/layout.html" %}
 {% block title %}{{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
-<p><a href="/admin/">{{ _("admin.back_to_dashboard") }}</a></p>
-<h1>{{ summary.group.name }}</h1>
-<p>{{ summary.organisation_name }}</p>
-<h2>{{ _("admin.group.settings") }}</h2>
-<dl class="details">
-  <dt>{{ _("admin.group.slot_minutes") }}</dt><dd>{{ _("admin.group.minutes", minutes=summary.group.slot_minutes) }}</dd>
-  <dt>{{ _("admin.group.notice") }}</dt><dd>{{ _("admin.group.minutes", minutes=summary.group.min_notice_minutes) }}</dd>
-  <dt>{{ _("admin.group.horizon") }}</dt><dd>{{ _("admin.group.days", days=summary.group.horizon_days) }}</dd>
-  <dt>{{ _("admin.group.dispatch") }}</dt><dd>{{ _("admin.group.dispatch_value", minutes=summary.group.dispatch_lead_minutes) }}</dd>
-  <dt>{{ _("admin.group.phone") }}</dt><dd>{{ phone_label }}</dd>
-  <dt>{{ _("admin.group.queue") }}</dt><dd>{{ summary.group.wxcc_queue_id or "–" }}</dd>
-</dl>
-<h2>{{ _("admin.group.your_rights") }}</h2>
-<ul>
-  {% for label in group_rights %}
-  <li>{{ label }}</li>
-  {% endfor %}
-</ul>
+{% include "admin/_group_header.html" %}
+<section class="card" aria-labelledby="settings-heading">
+  <div class="card__header">
+    <h2 id="settings-heading">{{ _("admin.group.settings") }}</h2>
+    {% if can("group.edit", summary) %}<a href="/admin/groups/{{ summary.group.slug }}/settings">{{ _("admin.group.edit_settings") }}</a>{% endif %}
+  </div>
+  <dl class="facts">
+    <div><dt>{{ _("admin.group.slot_minutes") }}</dt><dd>{{ _("admin.group.minutes", minutes=summary.group.slot_minutes) }}</dd></div>
+    <div><dt>{{ _("admin.group.notice") }}</dt><dd>{{ _("admin.group.minutes", minutes=summary.group.min_notice_minutes) }}</dd></div>
+    <div><dt>{{ _("admin.group.horizon") }}</dt><dd>{{ _("admin.group.days", days=summary.group.horizon_days) }}</dd></div>
+    <div><dt>{{ _("admin.group.dispatch") }}</dt><dd>{{ _("admin.group.dispatch_value", minutes=summary.group.dispatch_lead_minutes) }}</dd></div>
+    <div><dt>{{ _("admin.group.phone") }}</dt><dd>{{ phone_label }}</dd></div>
+    <div><dt>{{ _("admin.group.queue") }}</dt><dd>{{ summary.group.wxcc_queue_id or "–" }}</dd></div>
+  </dl>
+</section>
+<section class="card" aria-labelledby="week-heading">
+  <div class="card__header">
+    <h2 id="week-heading">{{ _("admin.hours.title") }}</h2>
+    {% if can("schedule.manage", summary) %}<a href="/admin/groups/{{ summary.group.slug }}/hours">{{ _("admin.hours.manage") }}</a>{% endif %}
+  </div>
+  {% include "admin/_week.html" %}
+</section>
+<section class="card" aria-labelledby="exceptions-heading">
+  <div class="card__header">
+    <h2 id="exceptions-heading">{{ _("admin.exceptions.upcoming") }}</h2>
+    {% if can("schedule.manage", summary) %}<a href="/admin/groups/{{ summary.group.slug }}/exceptions">{{ _("admin.exceptions.manage") }}</a>{% endif %}
+  </div>
+  {% if exceptions %}
+  <ul class="windows">
+    {% for item in exceptions %}
+    <li class="window{% if item.closed %} window--closed{% endif %}"><span class="window__time">{{ item.day }}</span><span class="window__capacity">{% if item.closed %}{{ _("admin.exceptions.closed") }}{% else %}{{ item.time }} · {{ item.capacity }}{% endif %}</span></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">{{ _("admin.exceptions.none") }}</p>
+  {% endif %}
+</section>
+<section class="card" aria-labelledby="preview-heading">
+  <div class="card__header">
+    <h2 id="preview-heading">{{ _("admin.preview.title") }}</h2>
+    <p class="card__lead">{{ _("admin.preview.lead") }}</p>
+  </div>
+  {% if preview %}
+  <ul class="preview-days">
+    {% for day in preview %}
+    <li><strong>{{ day.day }}</strong> <span class="muted">{{ day.summary }}</span></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty-state">{{ _("admin.preview.empty") }}</p>
+  {% endif %}
+</section>
+<section class="card" aria-labelledby="rights-heading">
+  <h2 id="rights-heading">{{ _("admin.group.your_rights") }}</h2>
+  <ul class="group-card__meta" role="list">
+    {% for label in group_rights %}
+    <li class="chip">{{ label }}</li>
+    {% endfor %}
+  </ul>
+</section>
 {% endblock %}

@@ -22,6 +22,11 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.INVALID_CONFIGURATION: "error.invalid_request",
     ErrorCode.GROUP_NOT_FOUND: "error.not_found.text",
     ErrorCode.BOOKING_NOT_FOUND: "error.not_found.text",
+    ErrorCode.SCHEDULE_ITEM_NOT_FOUND: "error.not_found.text",
+    ErrorCode.ORGANISATION_NOT_FOUND: "error.not_found.text",
+    ErrorCode.NOT_PERMITTED: "admin.forbidden.text",
+    ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
+    ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {
@@ -35,6 +40,9 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.INVALID_RANGE: 400,
     ErrorCode.GROUP_NOT_FOUND: 404,
     ErrorCode.BOOKING_NOT_FOUND: 404,
+    ErrorCode.SCHEDULE_ITEM_NOT_FOUND: 404,
+    ErrorCode.ORGANISATION_NOT_FOUND: 404,
+    ErrorCode.NOT_PERMITTED: 403,
     ErrorCode.DATABASE_BUSY: 503,
     ErrorCode.INVALID_CONFIGURATION: 500,
 }

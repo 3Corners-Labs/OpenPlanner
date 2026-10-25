@@ -227,6 +227,7 @@ class AuditEventRow(Base):
     reason: Mapped[str] = mapped_column(String(64), server_default=text("''"))
     organisation: Mapped[str | None] = mapped_column(String(64))
     group: Mapped[str | None] = mapped_column(String(64))
+    detail: Mapped[str] = mapped_column(String(255), server_default=text("''"))
 
     __table_args__ = (
         Index("ix_audit_events_at", "at"),

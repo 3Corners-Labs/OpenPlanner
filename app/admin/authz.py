@@ -16,7 +16,7 @@ from datetime import timedelta
 import structlog
 from fastapi import Request
 
-from app.admin.session import current_principal
+from app.admin.session import current_principal, login_age
 from app.domain.admin import AdminService, Authorization
 from app.domain.authorization import (
     LEVELS,
@@ -39,6 +39,19 @@ class LoginRequired(Exception):  # noqa: N818 - control flow, rendered as a redi
 
 class AccessDenied(Exception):  # noqa: N818 - control flow, rendered as a 403 page
     """The matrix refused the request."""
+
+
+class ReauthRequired(Exception):  # noqa: N818 - control flow, rendered as a redirect
+    """A change needs a recent login; the admin is sent to the IdP and back to ``next_path``.
+
+    Args:
+        next_path: The page to return to (a form page, never a POST target).
+    """
+
+    def __init__(self, next_path: str) -> None:
+        """Store where to return after the fresh login."""
+        super().__init__(next_path)
+        self.next_path = next_path
 
 
 @dataclass(frozen=True)
@@ -84,6 +97,19 @@ def can_function(principal: Principal) -> Callable[..., bool]:
     return can
 
 
+def _return_path(request: Request) -> str:
+    """Return the page to come back to after a fresh login.
+
+    A GET returns to itself. A POST returns to the page that sent the form (the referer
+    path); the login only accepts admin paths, so a forged referer cannot leave the portal.
+    """
+    if request.method == "GET":
+        return request.url.path
+    referer = request.headers.get("referer", "")
+    path = referer.split("://", 1)[-1].partition("/")[2]
+    return f"/{path.split('?', 1)[0]}" if path else "/admin/"
+
+
 class RequirePermission:
     """FastAPI dependency: allow the request only if the matrix grants ``permission``.
 
@@ -91,12 +117,17 @@ class RequirePermission:
         permission: The one permission this route needs.
         group_param: Name of the path parameter with the group slug (group-level routes).
             Without it, a non-global permission must be held for at least one target.
+        fresh: For changes and their forms: the login may be at most
+            ``ADMIN_REAUTH_MINUTES`` old, so revoked roles stop working within that time.
     """
 
-    def __init__(self, permission: Permission, group_param: str | None = None) -> None:
+    def __init__(
+        self, permission: Permission, group_param: str | None = None, *, fresh: bool = False
+    ) -> None:
         """Store the declaration; it is also read by the route-coverage test."""
         self.permission = permission
         self.group_param = group_param
+        self.fresh = fresh
 
     async def __call__(self, request: Request) -> AdminContext:
         """Resolve the principal and decide.
@@ -108,6 +139,8 @@ class RequirePermission:
         principal = session_principal(request)
         if principal is None:
             raise LoginRequired
+        if self.fresh:
+            self._require_recent_login(request)
         service = admin_service(request)
         if self.group_param is not None:
             slug = str(request.path_params[self.group_param])
@@ -126,3 +159,12 @@ class RequirePermission:
         if not authorization.decision.allowed:
             raise AccessDenied
         return AdminContext(principal, authorization)
+
+    @staticmethod
+    def _require_recent_login(request: Request) -> None:
+        """Raise ``ReauthRequired`` when the login is older than the re-login limit."""
+        clock: Clock = request.app.state.clock
+        limit = timedelta(minutes=request.app.state.settings.admin_reauth_minutes)
+        age = login_age(request, clock.now())
+        if age is None or age > limit:
+            raise ReauthRequired(_return_path(request))

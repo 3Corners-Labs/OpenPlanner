@@ -192,8 +192,11 @@ same commit and rollback behaviour as the SQL one.
 | Error codes | `app/domain/errors.py` |
 | Authorisation matrix, scopes (ADR 0014) | `app/domain/authorization.py` |
 | Admin use cases, audit events | `app/domain/admin.py`, `app/domain/audit.py` |
+| Groups, opening hours, exceptions, preview (admin) | `app/domain/planning.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
+| Group and planning screens, admin forms, shared page plumbing | `app/admin/group_routes.py`, `app/admin/forms.py`, `app/admin/pages.py` |
+| Admin design (fixed look, no JavaScript, ADR 0016) | `app/web/static/admin.css`, `app/admin/templates/admin/` |
 | Generated matrix document | `app/web/authz_report.py`, `app/cli.py` (`authz-matrix`) |
 | Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |
 | Transactions, write lock | `app/adapters/db/uow.py`, `app/adapters/db/engine.py` |
@@ -363,6 +366,10 @@ Listings never ask "may I see this row?" one by one: the matrix turns the permis
 `Scope`, and the SQL adapter filters with it. A test checks exhaustively that the scope and the
 single decision never disagree.
 
+A change (WP7b) adds two steps to the authorised request: the route needs a login of at most
+60 minutes (ADR 0015), and `PlanningService` authorises again before it validates the whole
+schedule, writes and audits in one locked transaction.
+
 ### What happens to one booking over time
 
 ```mermaid
@@ -512,6 +519,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0012 | Claude Code merges only on explicit instruction of the product owner, with green CI |
 | 0013 | Admin login with OIDC (PingFederate; Keycloak in development), httpx + PyJWT |
 | 0014 | The authorisation matrix as the single source of rights |
+| 0015 | Admin changes need a recent login (60 minutes) |
+| 0016 | Admin forms without JavaScript; HTMX only where it adds something |
 
 ## 12. Status and roadmap
 
@@ -526,7 +535,9 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP5 | Video adapter, live meeting status (O1) | planned |
 | WP6 | WxCC Tasks API dispatch, task events (O2, O6) | planned |
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
-| WP7b–d | Groups and planning, texts and reminders, encrypted integration settings (O3) | planned |
+| WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
+| WP7c–d | Texts and reminders, encrypted integration settings (O3) | planned |
+| Direct call (O9) | Start a video call now, per group, into its WxCC queue | planned after WP5/WP6 |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 

@@ -1,8 +1,7 @@
-{% extends "base.html" %}
-{% block site_name %}{{ _("admin.title") }}{% endblock %}
+{% extends "admin/_public.html" %}
 {% block title %}{{ title }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <h1>{{ title }}</h1>
 <p>{{ message }}</p>
-<p><a href="/admin/">{{ _("admin.to_portal") }}</a></p>
+<p><a class="button" href="/admin/">{{ _("admin.to_portal") }}</a></p>
 {% endblock %}
