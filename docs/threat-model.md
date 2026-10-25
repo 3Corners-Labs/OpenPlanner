@@ -96,6 +96,20 @@ Admin: `GET /admin/branding`, `GET/POST /admin/organisations/{org}/branding`,
 | Repudiation | Who changed the branding | Audit event `branding.manage` with field names (never values) | `test_superuser_changes_name_and_colour_and_it_is_audited`, `tests/admin/test_branding_routes.py::test_name_and_colour_are_saved_shown_and_audited` |
 | Tampering (CSRF) | A third-party site changes branding in a superuser's browser | Fetch Metadata check on every POST | `test_cross_site_branding_posts_are_refused` |
 
+## Flow: organisation management
+
+Admin: `GET /admin/organisations`, `GET /admin/organisations/new`, `POST /admin/organisations`,
+`GET/POST /admin/organisations/{org}`. Inputs from outside: name, slug and default language
+(form fields), `org` (path).
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation of privilege | An organisation admin creates organisations or renames their own | `organisation.manage` is a global permission of the superuser only (HANDOVER §6); `RequirePermission` and `OrganisationService` both decide; denials audited | `tests/admin/test_authorization_matrix.py`, `tests/domain/test_organisations.py::test_org_admin_may_not_create_or_edit_organisations` |
+| Elevation of privilege | A changed slug moves an organisation under another identity-provider claim | The slug is fixed after creation; the form does not offer it and a submitted value is ignored; taken and reserved slugs (`new`) are refused | `tests/admin/test_organisation_routes.py::test_edit_saves_name_and_language_but_never_the_slug`, `tests/domain/test_organisations.py::test_a_taken_or_reserved_slug_is_refused` |
+| Tampering | Control characters or unknown languages in stored settings | Name and slug validated in the domain (shared with groups); the default language must have a catalogue | `tests/domain/test_organisations.py::test_invalid_input_is_refused_with_its_field` |
+| Repudiation | Who created or renamed an organisation | Audit event `organisation.manage` with `create` or the field names (never values) | `test_superuser_creates_an_organisation_and_it_is_audited`, `test_update_changes_name_and_locale_and_names_the_fields` |
+| Tampering (CSRF) | A third-party site creates an organisation in a superuser's browser | Fetch Metadata check on every POST | `tests/admin/test_organisation_routes.py::test_cross_site_posts_are_refused` |
+
 ## Flow: outgoing email (WP3, worker)
 
 | STRIDE | Threat | Mitigation | Test |

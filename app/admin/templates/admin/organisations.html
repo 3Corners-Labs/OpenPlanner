@@ -1,0 +1,37 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
+{% block title %}{{ _("admin.organisations.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.organisations.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.organisations.lead") }}</p>
+  </div>
+  <div class="page-header__actions">
+    <a class="button" href="/admin/organisations/new">{{ icon("plus") }}<span>{{ _("admin.new_organisation.title") }}</span></a>
+  </div>
+</div>
+<section class="card" aria-labelledby="organisations-heading">
+  <h2 id="organisations-heading">{{ _("admin.organisations.list") }}</h2>
+  {% if organisations %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.organisations.list") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.field.name") }}</th><th scope="col">{{ _("admin.organisation.slug") }}</th><th scope="col">{{ _("admin.field.default_locale") }}</th><th scope="col">{{ _("admin.nav.branding") }}</th></tr></thead>
+    <tbody>
+      {% for organisation in organisations %}
+      <tr>
+        <th scope="row"><a href="/admin/organisations/{{ organisation.slug }}">{{ organisation.name }}</a></th>
+        <td>{{ organisation.slug }}</td>
+        <td>{{ language_names.get(organisation.default_locale, organisation.default_locale) }}</td>
+        <td><a href="/admin/organisations/{{ organisation.slug }}/branding" aria-label="{{ _("admin.organisations.branding_of", name=organisation.name) }}">{{ _("admin.organisations.branding") }}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.organisations.none") }}</p>
+  {% endif %}
+</section>
+{% endblock %}
