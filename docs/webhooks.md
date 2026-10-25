@@ -122,7 +122,7 @@ stored: only counts, whether a host/cohost joined, and times (ADR 0010).
 
 ## Inbound: WxCC subscription (`POST /webhooks/wxcc`)
 
-Registered with `POST /v2/subscriptions` (`name`, `eventTypes`, `destinationUrl`, `secret`).
+Registered with `POST /v2/subscriptions` (`name`, `eventTypes`, `resourceVersion: task:1.0.0` (required in v2; current versions in `GET /v2/event-types`), `destinationUrl`, `secret` of 32 to 256 characters).
 `destinationUrl` must be HTTPS on port 443 with a public domain: local development needs a
 tunnel or a staging host. Event types: `task:new`, `task:connected`, `task:ended`,
 `task:failed`, `task-message:appended`, `task-message:append-failed`.

@@ -7,16 +7,16 @@ API; a 401 or 403 means a scope or an authorisation is missing, and the probe na
 one (docs/webhooks.md).
 
 The work item API is v2 (beta) and v2 is primary: Webex and the v2 probes decide whether the
-check passes. v1 probes (End Task, which has no v2 form, event types, task search) are
+check passes. v1 probes (End Task, which has no v2 form, and the task search) are
 secondary: OpenPlanner works without them, so they print ``WARN`` instead of ``FAIL``.
 
 Only the status and a hint are reported. Tokens, secrets and response bodies (which can hold
 names and email addresses of the organisation's users) are never printed or logged.
 
     token refresh ─► GET /meetings ─► GET /webhooks
-                  └► v2: GET /v2/subscriptions ─► POST /v2/tasks {}
+                  └► v2: GET /v2/subscriptions ─► GET /v2/event-types ─► POST /v2/tasks {}
                          ─► POST /v2/tasks/{nil}/messages {}
-                     v1 (secondary): POST /v1/tasks/{nil}/end ─► event types ─► task search
+                     v1 (secondary): POST /v1/tasks/{nil}/end ─► task search
 """
 
 from dataclasses import dataclass, field
@@ -94,6 +94,12 @@ def probes(webex_base_url: str, wxcc_base_url: str | None) -> list[Probe]:
             f"{AUTHORISED_HINT} with an administrator role for Contact Center",
         ),
         Probe(
+            "GET /v2/event-types",
+            "GET",
+            f"{wxcc}/v2/event-types",
+            "cjp:config_read",
+        ),
+        Probe(
             "POST /v2/tasks (empty body)",
             "POST",
             f"{wxcc}/v2/tasks",
@@ -118,18 +124,11 @@ def probes(webex_base_url: str, wxcc_base_url: str | None) -> list[Probe]:
             required=False,
         ),
         Probe(
-            "GET /v1/subscriptions/event-types",
-            "GET",
-            f"{wxcc}/v1/subscriptions/event-types",
-            "cjp:config_read",
-            required=False,
-        ),
-        Probe(
             "GET /v1/tasks",
             "GET",
             f"{wxcc}/v1/tasks",
             "cjp:config_read (task search)",
-            params={"channelTypes": "workitem", "pageSize": "1"},
+            params={"pageSize": "1"},
             last_hour=True,
             required=False,
         ),

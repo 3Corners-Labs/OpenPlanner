@@ -72,7 +72,8 @@ async def test_todays_environment_reports_the_missing_wxcc_scopes() -> None:
     subscriptions = by_name["GET /v2/subscriptions"]
     assert (subscriptions.status, subscriptions.ok) == (403, False)
     assert "cjp:config_read" in subscriptions.hint
-    assert "cjp:config_read" in by_name["GET /v1/subscriptions/event-types"].hint
+    assert "cjp:config_read" in by_name["GET /v2/event-types"].hint
+    assert by_name["GET /v2/event-types"].required
     assert "cjp:task_write" in by_name["POST /v2/tasks (empty body)"].hint
     assert "cjp:user" in by_name["POST /v1/tasks/{nil}/end"].hint
 
@@ -99,7 +100,7 @@ async def test_harmless_probes_count_validation_errors_as_authorised() -> None:
     assert all(p.content in (b"{}", b"") for p in posts)  # nothing is created or ended
     search = next(r for r in seen if r.url.path == "/v1/tasks")
     assert search.url.params["pageSize"] == "1"
-    assert search.url.params["channelTypes"] == "workitem"
+    assert "channelTypes" not in search.url.params  # workitem is not a searchable type
 
 
 async def test_refused_refresh_token_skips_the_api_calls() -> None:

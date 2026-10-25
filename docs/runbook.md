@@ -105,14 +105,16 @@ Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (w
    |---|---|---|
    | `meeting:admin_schedule_write` | create and delete meetings on behalf of the group's host | no meetings |
    | `meeting:admin_schedule_read` | `GET /meetings`, org-owned `meetings` webhooks | no live meeting status |
-   | `meeting:admin_participants_read` | org-owned `meetingParticipants` webhooks | no participant counts |
+   | `meeting:admin_participants_read` | org-owned `meetingParticipants` webhooks | no participant counts (`register-webhooks`: `meetingParticipants/…: refused (rejected_403)`) |
    | `cjp:task_write` | Create Task v2 (work items), Task Messages (mark cancelled) | no work items |
    | `cjp:task_read` | task access the Work Items guide lists with `cjp:task_write` | – |
    | `cjp:user` (optional) | End Task v1 for cancelled bookings, after the v2 mark (ADR 0020) | cancelled tasks are marked cancelled (v2) but stay open until an agent ends them |
-   | `cjp:config_read` | list subscriptions and event types, task search (`wxcc-check`) | `register-webhooks` and `wxcc-check` fail with 403 |
+   | `cjp:config_read` | list subscriptions and event types (`GET /v2/event-types`), task search (`wxcc-check`) | `register-webhooks` and `wxcc-check` fail with 403 |
    | `cjp:config_write` | create the WxCC subscription (`register-webhooks`) | no WxCC events |
 
-2. A Control Hub administrator authorises it under **Apps → Service Apps**. The WxCC calls
+2. A Control Hub administrator authorises it under **Apps → Service Apps**. Org-owned meeting
+   webhooks also need that administrator to be a **Webex site admin** of the meeting sites or a
+   **Compliance Officer**. The WxCC calls
    need the authorising administrator to hold a **Contact Center administrator** role and the
    organisation to have Work Items (beta) enabled: a 403 on every WxCC probe of `wxcc-check`
    while Webex works means this step or a `cjp:` scope is missing.
@@ -237,11 +239,11 @@ secondary and print `WARN`. It never prints tokens, secrets or response bodies.
 |---|---|---|
 | token refresh | ok | (refused: generate new tokens, section 1 step 3) |
 | `GET /meetings`, `GET /webhooks` | 200 | `meeting:admin_schedule_read`, `meeting:admin_participants_read` |
-| `GET /v2/subscriptions` | 200 | `cjp:config_read`, and the Contact Center administrator authorisation (step 2) |
+| `GET /v2/subscriptions`, `GET /v2/event-types` | 200 | `cjp:config_read`, and the Contact Center administrator authorisation (step 2) |
 | `POST /v2/tasks (empty body)` | 400 | `cjp:task_write`, Work Items enabled |
 | `POST /v2/tasks/{nil}/messages` | 400 | `cjp:task_write` |
 | v1, `WARN` only: `POST /v1/tasks/{nil}/end` | 202 | `cjp:user` (optional) |
-| v1, `WARN` only: `GET /v1/subscriptions/event-types`, `GET /v1/tasks` | 200 | `cjp:config_read` |
+| v1, `WARN` only: `GET /v1/tasks` (task search) | 200 | `cjp:config_read` |
 
 A 404 on the WxCC reads means `WXCC_API_BASE_URL` points at the wrong region. Once all lines
 are `OK`, run `register-webhooks` (section 4).
