@@ -17,6 +17,8 @@ WEBEX_EVENTS = (
     ("meetingParticipants", "left"),
 )
 WXCC_EVENT_TYPES = ["task:new", "task:connected", "task:ended", "task:failed"]
+WXCC_RESOURCE_VERSION = "task:1.0.0"
+"""Subscriptions v2 require one ``resource:version``; see ``GET /v2/event-types``."""
 
 WEBEX_SCOPES = {
     "meetings": "meeting:admin_schedule_read",
@@ -58,7 +60,11 @@ async def register_webex(
         except IntegrationError as error:
             if error.retryable:
                 raise
-            needs = f"needs {WEBEX_SCOPES[resource]}, {ORG_WEBHOOK_ROLE}"
+            needs = (
+                f"needs {WEBEX_SCOPES[resource]}, {ORG_WEBHOOK_ROLE}"
+                if error.code in ("unauthorized", "rejected_403")
+                else "Webex refused the request (target must be a public https URL)"
+            )
             report.append(f"{resource}/{event}: refused ({error.code}): {needs}")
             continue
         report.append(f"{resource}/{event}: created")
@@ -81,6 +87,7 @@ async def register_wxcc(
                 "name": "OpenPlanner task events",
                 "description": "Work item lifecycle for OpenPlanner bookings",
                 "eventTypes": WXCC_EVENT_TYPES,
+                "resourceVersion": WXCC_RESOURCE_VERSION,
                 "destinationUrl": target_url,
                 "secret": secret,
             },
@@ -88,5 +95,11 @@ async def register_wxcc(
     except IntegrationError as error:
         if error.retryable:
             raise
-        return f"wxcc subscription: refused ({error.code}): needs cjp:config_write"
+        reason = (
+            "needs cjp:config_write"
+            if error.code in ("unauthorized", "rejected_403")
+            else "WxCC refused the request (destination must be https on port 443 with a public "
+            "domain; secret 32+ characters)"
+        )
+        return f"wxcc subscription: refused ({error.code}): {reason}"
     return "wxcc subscription: created"

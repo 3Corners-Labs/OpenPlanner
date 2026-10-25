@@ -65,6 +65,7 @@ async def test_wxcc_subscription_is_created_once() -> None:
     second = await register_wxcc(client, "https://api.wxcc-eu1.cisco.com", target, "secret")
 
     assert (first, second) == ("wxcc subscription: created", "wxcc subscription: exists")
+    assert subscriptions[0]["resourceVersion"] == "task:1.0.0"  # required by Subscriptions v2
     assert subscriptions[0]["eventTypes"] == [
         "task:new",
         "task:connected",
@@ -103,3 +104,19 @@ async def test_a_refused_wxcc_subscription_is_reported() -> None:
     )
 
     assert report == "wxcc subscription: refused (rejected_403): needs cjp:config_write"
+
+
+async def test_a_wxcc_validation_error_is_not_blamed_on_a_scope() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200 if request.method == "GET" else 400, json={"data": []})
+
+    client, _ = _client(handler)
+
+    report = await register_wxcc(
+        client, "https://api.wxcc-eu1.cisco.com", "https://x.nl/webhooks/wxcc", "secret"
+    )
+
+    assert report == (
+        "wxcc subscription: refused (rejected_400): WxCC refused the request "
+        "(destination must be https on port 443 with a public domain; secret 32+ characters)"
+    )
