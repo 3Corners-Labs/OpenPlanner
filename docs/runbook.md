@@ -223,9 +223,13 @@ secret store), deploy, check the scopes with `wxcc-check` (section 6), then run 
 docker compose exec web python -m app.cli register-webhooks
 ```
 
-It registers the Webex webhooks (meetings started/ended, participants joined/left) and the
-WxCC subscription (task events) on `WEBHOOK_BASE_URL` (or `PUBLIC_BASE_URL` when that is not
-set), and skips what exists. Webex and WxCC only call **https on port 443 with a public
+It registers the Webex webhooks (meetings started/ended, participants joined/left) **per
+group host account** (`hostEmail` filter, from each group's *Video host e-mail*) and the WxCC
+subscription (task events) on `WEBHOOK_BASE_URL` (or `PUBLIC_BASE_URL` when that is not set),
+and skips what exists. **Run it again after giving a group a new host account.** Unfiltered
+webhooks from earlier versions are listed as `stale`: delete them in the developer portal or
+with `DELETE /v1/webhooks/{id}`, or OpenPlanner keeps receiving every meeting of the
+organisation. Webex and WxCC only call **https on port 443 with a public
 domain**; in production `WEBHOOK_BASE_URL` must be https.
 
 **On a laptop (tunnel).** Keep `PUBLIC_BASE_URL=http://127.0.0.1:8000`, so the Keycloak login

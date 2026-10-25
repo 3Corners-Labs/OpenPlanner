@@ -83,6 +83,7 @@ async def test_wxcc_check_without_a_service_app_does_nothing(settings: Settings)
 
 
 async def test_register_webhooks_uses_the_webhook_base_url(configured: Settings) -> None:
+    await _wired_group(configured)
     seen: list[httpx.Request] = []
     tunnel = configured.model_copy(
         update={
@@ -93,7 +94,7 @@ async def test_register_webhooks_uses_the_webhook_base_url(configured: Settings)
 
     report = await _register_webhooks(tunnel, _transport(seen, 200))
 
-    assert "meetings/started: created" in report
+    assert "meetings/started [host-demo@example.nl]: created" in report
     assert "wxcc subscription: created" in report
     targets = {
         r.content.decode()
@@ -118,6 +119,7 @@ async def _wired_group(settings: Settings) -> None:
             update(GroupRow).values(
                 wxcc_channel="videoafspraak-prototype",
                 wxcc_business_address="videoafspraak@rijks.video",
+                video_host_email="host-demo@example.nl",
             )
         )
     await engine.dispose()
