@@ -2,14 +2,17 @@
 
 The first refresh uses the bootstrap refresh token from the environment
 (``WEBEX_REFRESH_TOKEN``); after that the rotated tokens live encrypted in the database
-(``CredentialStore``), shared by web and worker. A token is refreshed five minutes before it
-expires, or at once after the API answered 401.
+(``CredentialStore``), shared by web and worker. The stored record keeps a fingerprint of the
+bootstrap token: putting a new one in the environment (after renewing the tokens or adding
+scopes) makes OpenPlanner start from it instead of the stored tokens. A token is refreshed
+five minutes before it expires, or at once after the API answered 401.
 
     access_token() ─► stored and valid? ─► use it
                    └► POST /access_token (grant_type=refresh_token) ─► store ─► use it
 """
 
 import asyncio
+import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Protocol
@@ -77,6 +80,9 @@ class WebexTokens:
         self._store = store
         self._clock = clock
         self._lock = asyncio.Lock()
+        # Identifies the bootstrap token without storing it (first 16 hex of SHA-256).
+        bootstrap = config.bootstrap_refresh_token.encode()
+        self._fingerprint = hashlib.sha256(bootstrap).hexdigest()[:16]
 
     async def access_token(self, *, refresh: bool = False) -> str:
         """Return a valid access token, refreshing it when needed or when ``refresh`` is set.
@@ -88,6 +94,8 @@ class WebexTokens:
         async with self._lock:
             now = self._clock.now()
             stored = await self._store.get(CREDENTIAL_NAME)
+            if stored and stored.get("bootstrap") != self._fingerprint:
+                stored = None  # a new bootstrap token in the environment wins
             if (
                 stored
                 and not refresh
@@ -98,6 +106,7 @@ class WebexTokens:
                 stored["refresh_token"] if stored else self._config.bootstrap_refresh_token
             )
             tokens = await self._refresh(str(refresh_token), now)
+            tokens["bootstrap"] = self._fingerprint
             await self._store.put(CREDENTIAL_NAME, tokens, now)
             if _expires(tokens, "refresh_expires_at") - now < EXPIRY_WARNING:
                 log.warning("webex.refresh_token_expiring")

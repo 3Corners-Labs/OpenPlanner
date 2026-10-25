@@ -134,3 +134,16 @@ async def test_failures_map_to_codes(
     with pytest.raises(IntegrationError) as error:
         await client.request("POST", "https://webexapis.com/v1/meetings", json={})
     assert (error.value.code, error.value.retryable) == (code, retryable)
+
+
+async def test_a_new_bootstrap_token_replaces_the_stored_tokens(webex: FakeWebex) -> None:
+    store, clock = MemoryTokenStore(), FixedClock(NOW)
+    http = httpx.AsyncClient(transport=httpx.MockTransport(webex.handler))
+    await WebexTokens(CONFIG, http, store, clock).access_token()
+
+    renewed = ServiceAppConfig("client-1", "client-secret", "new-bootstrap-refresh")
+    token = await WebexTokens(renewed, http, store, clock).access_token()
+
+    assert token == "access-2"
+    assert webex.refreshes[1]["refresh_token"] == ["new-bootstrap-refresh"]
+    assert "new-bootstrap-refresh" not in json.dumps(store.values[CREDENTIAL_NAME])
