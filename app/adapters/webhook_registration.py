@@ -3,7 +3,7 @@
 Webex: org-owned webhooks per resource, event and **host account** (``hostEmail`` filter, one
 set per distinct group host), signed with the webhook secret. Without the filter an org-owned
 webhook reports every meeting of the organisation; with it only OpenPlanner's host accounts.
-Unfiltered webhooks on the same target are reported as stale, never deleted automatically.
+Unfiltered webhooks on the same target are reported as stale; ``webhooks-reset`` removes them.
 WxCC: one v2 subscription for the task events, signed with the subscription secret. Existing
 registrations for the same target URL are left alone, so running it twice changes nothing.
 A refused registration is reported with the scope it most likely needs and the others are
@@ -72,7 +72,7 @@ async def register_webex(
             )
     report.extend(
         f"{i.get('resource')}/{i.get('event')} [all meetings]: stale (no hostEmail filter, "
-        f"every meeting of the organisation): delete webhook {i.get('id')}"
+        f"every meeting of the organisation): webhook {i.get('id')}, remove with webhooks-reset"
         for i in ours
         if not i.get("filter")
     )

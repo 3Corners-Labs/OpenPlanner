@@ -6,6 +6,13 @@ Usage:
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
+    ``python -m app.cli webhooks-list``  list every registration: current, stale or foreign
+    ``python -m app.cli webhooks-reset [--yes] [--reregister]``  delete stale registrations
+    ``python -m app.cli webhooks-health``  token expiry and a signed delivery self-test
+
+Run them inside the ``web`` container (``docker compose exec web ...``): they share its
+database (one token store) and its secrets. The webhook commands store their last result for
+the admin portal's integrations page.
 """
 
 import argparse
@@ -18,12 +25,22 @@ import httpx
 
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
+from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.db.seed import DEMO_SLUG, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.diagnostics import CheckResult, format_report, passed, probes, run_checks
 from app.adapters.integrations import build_integrations
-from app.adapters.webex_auth import AuthorizedClient, WebexTokens
+from app.adapters.registrations import (
+    Expected,
+    Listing,
+    delete_stale,
+    format_listing,
+    list_registrations,
+    listing_to_report,
+)
+from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
+from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.config import Settings
 from app.domain.authorization import Scope
@@ -68,15 +85,32 @@ async def _groups(settings: Settings) -> list[Group]:
         await engine.dispose()
 
 
+def _hosts(groups: list[Group]) -> list[str]:
+    """Return the groups' video host accounts (one Webex webhook set per account)."""
+    return [g.video_host_email for g in groups if g.video_host_email]
+
+
+async def _store(settings: Settings, name: str, body: dict[str, object]) -> None:
+    """Store a check report for the admin portal."""
+    engine = create_engine(settings.database_url)
+    try:
+        await ReportStore(engine).put(name, body, SystemClock().now())
+    finally:
+        await engine.dispose()
+
+
+NOT_CONFIGURED = (
+    "Webex is not configured (WEBEX_CLIENT_ID and WEBEX_WEBHOOK_SECRET); nothing to do.\n"
+)
+
+
 async def _register_webhooks(
     settings: Settings, transport: httpx.AsyncBaseTransport | None = None
 ) -> str:
     """Register the webhooks the configured integrations need; return a report."""
     base = settings.webhook_base
     if not settings.video_configured or settings.webex_webhook_secret is None:
-        return (
-            "Webex is not configured (WEBEX_CLIENT_ID and WEBEX_WEBHOOK_SECRET); nothing to do.\n"
-        )
+        return NOT_CONFIGURED
     if not base.startswith("https://"):
         return (
             "WEBHOOK_BASE_URL (or PUBLIC_BASE_URL) must be https: Webex and WxCC only call "
@@ -91,7 +125,7 @@ async def _register_webhooks(
             settings.webex_api_base_url,
             f"{base}/webhooks/webex",
             settings.webex_webhook_secret.get_secret_value(),
-            hosts=[g.video_host_email for g in await _groups(settings) if g.video_host_email],
+            hosts=_hosts(await _groups(settings)),
         )
         if settings.wxcc_api_base_url and settings.wxcc_webhook_secret is not None:
             lines.append(
@@ -159,6 +193,135 @@ async def _wxcc_config_check(
     return format_report(results), passed(results)
 
 
+async def _listing(settings: Settings, client: AuthorizedClient) -> Listing:
+    """List and classify every registration and store the result for the admin portal."""
+    base = settings.webhook_base
+    wxcc_wired = settings.wxcc_api_base_url and settings.wxcc_webhook_secret is not None
+    expected = Expected(
+        webex_target=f"{base}/webhooks/webex",
+        wxcc_target=f"{base}/webhooks/wxcc" if wxcc_wired else None,
+        hosts=tuple(_hosts(await _groups(settings))),
+    )
+    listing = await list_registrations(
+        client, settings.webex_api_base_url, settings.wxcc_api_base_url, expected
+    )
+    await _store(settings, REGISTRATIONS_REPORT, listing_to_report(listing) | {"base": base})
+    return listing
+
+
+async def _webhooks_list(
+    settings: Settings, transport: httpx.AsyncBaseTransport | None = None
+) -> tuple[str, bool]:
+    """List every registration; the verdict is whether all are current and none is missing."""
+    if not settings.video_configured or settings.webex_webhook_secret is None:
+        return NOT_CONFIGURED, False
+    async with _service_app(settings, transport) as (http, tokens):
+        if tokens is None:  # pragma: no cover - video_configured implies tokens
+            return NOT_CONFIGURED, False
+        listing = await _listing(settings, AuthorizedClient(http, tokens))
+    header = f"Compared with WEBHOOK_BASE_URL {settings.webhook_base}\n"
+    ok = listing.complete and not listing.stale and not listing.missing
+    return header + format_listing(listing), ok
+
+
+async def _webhooks_reset(
+    settings: Settings,
+    transport: httpx.AsyncBaseTransport | None = None,
+    *,
+    confirmed: bool,
+    reregister: bool = False,
+) -> tuple[str, bool]:
+    """Delete stale registrations (a dry run unless ``confirmed``), then maybe register anew.
+
+    Foreign and current registrations are never deleted. The verdict is whether nothing was
+    refused or failed.
+    """
+    if not settings.video_configured or settings.webex_webhook_secret is None:
+        return NOT_CONFIGURED, False
+    async with _service_app(settings, transport) as (http, tokens):
+        if tokens is None:  # pragma: no cover - video_configured implies tokens
+            return NOT_CONFIGURED, False
+        client = AuthorizedClient(http, tokens)
+        listing = await _listing(settings, client)
+        lines = [f"{len(listing.stale)} stale registration(s)."]
+        lines += [f"{e.platform} listing: refused ({e.code})" for e in listing.errors]
+        lines += await delete_stale(
+            client,
+            settings.webex_api_base_url,
+            settings.wxcc_api_base_url,
+            listing,
+            confirmed=confirmed,
+        )
+        if confirmed:
+            await _listing(settings, client)
+    ok = not any(": refused" in line or ": failed" in line for line in lines)
+    if not confirmed:
+        lines.append("Dry run: nothing deleted. Run again with --yes to delete.")
+        if reregister:
+            lines.append("--reregister runs register-webhooks only together with --yes.")
+    report = "".join(f"{line}\n" for line in lines)
+    if confirmed and reregister:
+        registered = await _register_webhooks(settings, transport)
+        ok = ok and ": refused" not in registered
+        report += registered
+    return report, ok
+
+
+async def _webhooks_health(
+    settings: Settings, transport: httpx.AsyncBaseTransport | None = None
+) -> tuple[str, bool]:
+    """Report token health and send signed test events through ``WEBHOOK_BASE_URL``."""
+    base = settings.webhook_base
+    results: list[CheckResult] = []
+    if not base.startswith("https://"):
+        results.append(
+            CheckResult("WEBHOOK_BASE_URL", None, False, "not https: Webex and WxCC cannot deliver")
+        )
+    clock = SystemClock()
+    async with _service_app(settings, transport) as (http, tokens):
+        if tokens is not None:
+            results += await run_checks(http, tokens, [], clock)
+            results += _token_expiry(await tokens.health())
+        webex, wxcc = settings.webex_webhook_secret, settings.wxcc_webhook_secret
+        deliveries = await self_test(
+            http,
+            base,
+            webex_secret=webex.get_secret_value() if webex else None,
+            wxcc_secret=wxcc.get_secret_value() if wxcc else None,
+            now=clock.now(),
+        )
+    await _store(settings, HEALTH_REPORT, deliveries_to_report(deliveries) | {"base": base})
+    results += delivery_checks(deliveries)
+    if not deliveries:
+        results.append(
+            CheckResult("delivery self-test", None, False, "no webhook secret is configured")
+        )
+    return f"Delivery through {base}\n" + format_report(results), passed(results)
+
+
+def _token_expiry(health: TokenHealth) -> list[CheckResult]:
+    """Return when the access and refresh tokens expire (``WARN`` within 14 days)."""
+    if health.access_expires_at is None or health.refresh_expires_at is None:
+        return []
+    refresh = health.refresh_expires_at.strftime("%Y-%m-%d %H:%M UTC")
+    return [
+        CheckResult(
+            "access token",
+            None,
+            True,
+            f"expires {health.access_expires_at.strftime('%Y-%m-%d %H:%M UTC')}",
+        ),
+        CheckResult(
+            "refresh token",
+            None,
+            not health.refresh_expiring_soon,
+            f"expires {refresh}"
+            + (": generate new tokens soon (runbook)" if health.refresh_expiring_soon else ""),
+            required=False,
+        ),
+    ]
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse the command line and run the chosen command; return the exit code."""
     parser = argparse.ArgumentParser(prog="python -m app.cli")
@@ -168,7 +331,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
+    commands.add_parser("webhooks-list", help="list registrations: current, stale or foreign")
+    reset = commands.add_parser("webhooks-reset", help="delete stale registrations (dry run)")
+    reset.add_argument("--yes", action="store_true", help="really delete them")
+    reset.add_argument(
+        "--reregister", action="store_true", help="with --yes: run register-webhooks afterwards"
+    )
+    commands.add_parser("webhooks-health", help="token expiry and a signed delivery self-test")
     args = parser.parse_args(argv)
+    if args.command == "webhooks-list":
+        return _write(asyncio.run(_webhooks_list(Settings())))
+    if args.command == "webhooks-reset":
+        return _write(
+            asyncio.run(_webhooks_reset(Settings(), confirmed=args.yes, reregister=args.reregister))
+        )
+    if args.command == "webhooks-health":
+        return _write(asyncio.run(_webhooks_health(Settings())))
     if args.command == "authz-matrix":
         sys.stdout.write(render_markdown(Translator(load_catalogues())))
         return 0
@@ -186,6 +364,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1 if ": refused" in report or "no webhooks registered" in report else 0
     sys.stdout.write(asyncio.run(_seed_demo(Settings())))
     return 0
+
+
+def _write(outcome: tuple[str, bool]) -> int:
+    """Print a report; return exit code 0 when it passed, else 1."""
+    report, ok = outcome
+    sys.stdout.write(report)
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
