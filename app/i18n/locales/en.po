@@ -1203,4 +1203,4 @@ msgid "call.event.task_marked_cancelled"
 msgstr "Task marked as cancelled"
 
 msgid "admin.booking.end_not_possible"
-msgstr "The booking was cancelled, but WxCC did not let OpenPlanner end the task. The task was marked as cancelled (Kind: cancelled). End the task in Agent Desktop if it is still open."
+msgstr "The booking was cancelled and the task was marked as cancelled through the v2 API (Kind: cancelled; see the timeline), but WxCC did not let OpenPlanner end the task. End the task in Agent Desktop if it is still open."

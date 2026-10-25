@@ -5,9 +5,10 @@ point chooses the queue from ``flowSettings.openplannerGroup``. ``workItemData``
 booking reference, first name, start time, group name, meeting link and kind; nothing else
 (CLAUDE.md). The asset's schema in Control Hub must define exactly these keys (runbook).
 
-A cancelled booking's task is ended with End Task (``cjp:user``); when WxCC refuses, a Task
-Messages append (``cjp:task_write``) sets ``kind`` to ``cancelled`` with only the booking
-reference, so the agent sees it without the first name or the meeting link (ADR 0020).
+A cancelled booking's task is first marked with a Task Messages v2 append
+(``cjp:task_write``) that sets ``kind`` to ``cancelled`` with only the booking reference, so
+the agent sees it without the first name or the meeting link; then End Task v1 (``cjp:user``;
+there is no v2 End Task) is tried as a secondary step (ADR 0020).
 """
 
 import uuid

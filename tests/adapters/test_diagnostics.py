@@ -13,6 +13,7 @@ from app.adapters.diagnostics import (
     NIL_TASK_ID,
     CheckResult,
     format_report,
+    passed,
     probes,
     run_checks,
 )
@@ -81,7 +82,11 @@ async def test_harmless_probes_count_validation_errors_as_authorised() -> None:
 
     assert all(r.ok for r in results), [r for r in results if not r.ok]
     posts = [r for r in seen if r.method == "POST"]
-    assert {p.url.path for p in posts} == {"/v2/tasks", f"/v1/tasks/{NIL_TASK_ID}/end"}
+    assert {p.url.path for p in posts} == {
+        "/v2/tasks",
+        f"/v2/tasks/{NIL_TASK_ID}/messages",
+        f"/v1/tasks/{NIL_TASK_ID}/end",
+    }
     assert all(p.content in (b"{}", b"") for p in posts)  # nothing is created or ended
     search = next(r for r in seen if r.url.path == "/v1/tasks")
     assert search.url.params["pageSize"] == "1"
@@ -152,3 +157,23 @@ def test_report_has_status_and_hint_but_no_token_or_body() -> None:
     assert SECRET_TOKEN not in report
     assert "Ada" not in report
     assert "host@" not in report
+
+
+async def test_v2_is_primary_and_v1_probes_only_warn() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/v1/") and request.url.host != "webexapis.com":
+            return httpx.Response(403)
+        if request.method == "POST":
+            return httpx.Response(400)
+        return httpx.Response(200, json={"data": []})
+
+    tokens, http = _tokens(handler)
+
+    results = await run_checks(http, tokens, probes(WEBEX, WXCC), FixedClock(datetime.now(UTC)))
+
+    names = [r.name for r in results]
+    assert names.index("POST /v2/tasks (empty body)") < names.index("POST /v1/tasks/{nil}/end")
+    assert passed(results)
+    report = format_report(results)
+    assert "WARN  POST /v1/tasks/{nil}/end" in report
+    assert "FAIL" not in report
