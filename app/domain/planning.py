@@ -24,6 +24,7 @@ from app.domain.availability import SlotTime, slots_on
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import (
+    RESERVED_SLUGS,
     Group,
     Organisation,
     PhoneMode,
@@ -32,9 +33,6 @@ from app.domain.scheduling import (
     validate_schedule,
     windows_on,
 )
-
-RESERVED_SLUGS = frozenset({"new"})
-"""Slugs that are admin paths (``/admin/groups/new``), so no group may use them."""
 
 TIME_GRID_FIELDS = ("slot_minutes", "timezone")
 """Settings that move existing slots; frozen while confirmed bookings lie ahead."""

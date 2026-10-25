@@ -105,6 +105,18 @@ class InMemoryTransaction:
     async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
         return self.state.organisations.get(organisation_id)
 
+    async def add_organisation(self, organisation: Organisation) -> Organisation:
+        stored = replace(organisation, id=self._new_id())
+        self.state.organisations[stored.id] = stored
+        self.state.organisation_slugs[stored.id] = stored.slug
+        return stored
+
+    async def save_organisation(self, organisation: Organisation) -> None:
+        current = self.state.organisations[organisation.id]
+        self.state.organisations[organisation.id] = replace(
+            current, name=organisation.name, default_locale=organisation.default_locale
+        )
+
     async def save_branding(self, organisation_id: int, branding: Branding) -> None:
         organisation = self.state.organisations[organisation_id]
         self.state.organisations[organisation_id] = replace(organisation, branding=branding)

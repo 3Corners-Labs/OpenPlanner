@@ -342,6 +342,26 @@ class SqlTransaction(ApiClientQueries):
         row = await self._session.get(OrganisationRow, organisation_id)
         return _organisation(row) if row else None
 
+    async def add_organisation(self, organisation: Organisation) -> Organisation:
+        """Insert an organisation with default branding and return it with its ID."""
+        row = OrganisationRow(
+            name=organisation.name,
+            slug=organisation.slug,
+            default_locale=organisation.default_locale,
+        )
+        self._session.add(row)
+        await self._session.flush()
+        await self._session.refresh(row)
+        return _organisation(row)
+
+    async def save_organisation(self, organisation: Organisation) -> None:
+        """Store name and default locale; slug and branding columns are left alone."""
+        await self._session.execute(
+            update(OrganisationRow)
+            .where(OrganisationRow.id == organisation.id)
+            .values(name=organisation.name, default_locale=organisation.default_locale)
+        )
+
     async def save_branding(self, organisation_id: int, branding: Branding) -> None:
         """Store display name and accent colour; the logo columns are left alone."""
         await self._session.execute(

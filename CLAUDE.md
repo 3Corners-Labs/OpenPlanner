@@ -83,7 +83,7 @@ Weekly: Renovate updates (security updates immediately), `trivy` on the running 
 ## Privacy rules
 - PII fields: `name, email, phone, note, guest_join_url, host_join_url`. Only on `Booking`. Nowhere else.
 - `purge_pii` job runs at `slot.end + 24h` or `cancelled_at + 24h`; sets fields to NULL and `pii_purged_at`. A nightly sweep re-checks for stragglers and alerts if any booking older than 48 h still has PII.
-- Outbound payloads to Webex Contact Center contain only first name and the host join URL.
+- Outbound payloads to any contact-center provider (Webex Contact Center today, ADR 0021) contain only first name and the host join URL.
 - Data flow diagram in `docs/dataflow.md` is the input for the DPIA; keep it current.
 
 ## Git and process
