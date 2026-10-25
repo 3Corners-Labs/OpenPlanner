@@ -1,0 +1,56 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.tab.exceptions") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="list-heading">
+  <div class="card__header">
+    <h2 id="list-heading">{{ _("admin.exceptions.upcoming") }}</h2>
+    <p class="card__lead">{{ _("admin.exceptions.lead") }}</p>
+  </div>
+  {% if exceptions %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.exceptions.upcoming") }}</caption>
+    <thead>
+      <tr><th scope="col">{{ _("admin.field.day") }}</th><th scope="col">{{ _("admin.exceptions.what") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th></tr>
+    </thead>
+    <tbody>
+      {% for item in exceptions %}
+      <tr>
+        <th scope="row">{{ item.day }}</th>
+        <td>{% if item.closed %}<span class="chip chip--warning">{{ _("admin.exceptions.closed") }}</span>{% else %}<span class="chip chip--accent">{{ item.time }}</span> {{ item.capacity }}{% endif %}</td>
+        <td>
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/exceptions/{{ item.id }}/delete">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.exceptions.remove_label", day=item.day) }}">{{ _("admin.remove") }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.exceptions.none") }}</p>
+  {% endif %}
+</section>
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/exceptions" novalidate aria-labelledby="add-heading">
+  <div class="card__header">
+    <h2 id="add-heading">{{ _("admin.exceptions.add") }}</h2>
+  </div>
+  <div class="form-grid">
+    {{ field(fields[0]) }}
+    <fieldset class="field choice{% if kind_error %} field--error{% endif %}" id="kind">
+      <legend>{{ _("admin.exceptions.kind") }}</legend>
+      <div class="choice__option"><input type="radio" id="kind-closed" name="kind" value="closed"{% if kind == "closed" %} checked{% endif %}><label for="kind-closed">{{ _("admin.exceptions.kind_closed") }}</label></div>
+      <div class="choice__option"><input type="radio" id="kind-hours" name="kind" value="hours"{% if kind == "hours" %} checked{% endif %}><label for="kind-hours">{{ _("admin.exceptions.kind_hours") }}</label></div>
+      {% if kind_error %}<p class="error-message">{{ kind_error }}</p>{% endif %}
+    </fieldset>
+    {% for f in fields[1:] %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.exceptions.add_button") }}</button>
+  </div>
+</form>
+{% endblock %}

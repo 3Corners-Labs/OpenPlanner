@@ -7,66 +7,24 @@
  * Needs Keycloak (`docker compose --profile dev up`, or the CI e2e job) and the demo seed.
  * Outside CI the spec is skipped when Keycloak is not reachable; in CI that is a failure.
  */
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-import { expectNoAxeViolations, tabTo } from '../helpers';
+import { expectNoAxeViolations } from '../helpers';
+import { adminMenu, expectForbidden, loginAs, logout, requireKeycloak } from '../keycloak';
 
-const KEYCLOAK_URL = process.env.KEYCLOAK_URL ?? 'http://127.0.0.1:8080';
-// Test users exist only in the development realm (dev/keycloak/openplanner-realm.json).
-const PASSWORD = process.env.KEYCLOAK_TEST_PASSWORD ?? 'dev-only-password';
-
-type TestUser = 'super' | 'orgadmin' | 'groupadmin' | 'outsider' | 'norole';
-
-test.beforeAll(async ({ request }) => {
-  const discovery = `${KEYCLOAK_URL}/realms/openplanner/.well-known/openid-configuration`;
-  const reachable = await request
-    .get(discovery)
-    .then((response) => response.ok())
-    .catch(() => false);
-  if (!reachable && process.env.CI) throw new Error(`Keycloak not reachable at ${discovery}`);
-  test.skip(!reachable, 'Keycloak not running; start it with docker compose --profile dev up');
-});
-
-/** Open `path`, sign in at Keycloak as `user` and wait until the portal answers. */
-async function loginAs(page: Page, user: TestUser, path = '/admin/'): Promise<void> {
-  await page.goto(path);
-  await expect(page).toHaveURL(new RegExp(`^${KEYCLOAK_URL}/`));
-  await page.locator('#username').fill(user);
-  await page.locator('#password').fill(PASSWORD);
-  await page.locator('#password').press('Enter');
-  await page.waitForURL((url) => url.pathname.startsWith('/admin'));
-}
-
-/** Log out with the keyboard, confirm at Keycloak and land on the logged-out page. */
-async function logout(page: Page): Promise<void> {
-  await tabTo(page, page.getByRole('button', { name: 'Uitloggen' }));
-  await page.keyboard.press('Enter');
-  await page.waitForURL(new RegExp(`^${KEYCLOAK_URL}/.*/logout`));
-  await page.locator('#kc-logout').click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('U bent uitgelogd');
-}
-
-function adminMenu(page: Page) {
-  return page.getByRole('navigation', { name: 'Beheermenu' });
-}
-
-async function expectForbidden(page: Page, path: string): Promise<void> {
-  const response = await page.goto(path);
-  expect(response?.status()).toBe(403);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Geen toegang');
-}
+requireKeycloak();
 
 test('group admin sees only their own group and no audit log', async ({ page }) => {
   await loginAs(page, 'groupadmin');
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Overzicht');
-  const groups = page.getByRole('table', { name: 'Uw groepen' }).locator('tbody tr');
+  const groups = page.getByRole('list', { name: 'Uw groepen' }).getByRole('listitem');
   await expect(groups).toHaveCount(1);
   await expect(groups.first()).toContainText('Demo: videogesprek');
   await expect(adminMenu(page).getByRole('link', { name: 'Auditlog' })).toHaveCount(0);
   await expectNoAxeViolations(page);
 
-  await page.getByRole('link', { name: 'Demo: videogesprek' }).click();
+  await page.getByRole('link', { name: 'Demo: videogesprek', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/groups\/demo$/);
   await expectNoAxeViolations(page);
 
@@ -122,7 +80,10 @@ test("an outsider's refusal shows up in the superuser's audit log", async ({ pag
   await expectNoAxeViolations(page);
 
   await page.goto('/admin/');
-  await expect(page.getByRole('table', { name: 'Uw groepen' }).locator('tbody tr')).toHaveCount(2);
+  // Both seeded groups, in both organisations (other specs may have added more).
+  const groups = page.getByRole('list', { name: 'Uw groepen' });
+  await expect(groups.getByRole('link', { name: 'Demo: videogesprek', exact: true })).toBeVisible();
+  await expect(groups.getByRole('link', { name: 'Andere: team', exact: true })).toBeVisible();
   await page.goto('/admin/?lang=en');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Overview');
   await expectNoAxeViolations(page);

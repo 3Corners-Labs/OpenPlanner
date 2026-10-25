@@ -31,6 +31,8 @@ class AuditEvent:
         reason: Machine-readable reason (an authorisation ``Reason`` or an error code).
         organisation: Slug of the organisation concerned, if any.
         group: Slug of the group concerned, if any.
+        detail: What changed, as machine keys (changed field names, ``rule.add``); never
+            values, so no personal data.
     """
 
     at: datetime
@@ -40,6 +42,7 @@ class AuditEvent:
     reason: str = ""
     organisation: str | None = None
     group: str | None = None
+    detail: str = ""
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,27 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.tab.hours") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="week-heading">
+  <div class="card__header">
+    <h2 id="week-heading">{{ _("admin.hours.title") }}</h2>
+    <p class="card__lead">{{ _("admin.hours.lead") }}</p>
+  </div>
+  {% set removable = true %}
+  {% include "admin/_week.html" %}
+</section>
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/hours" novalidate aria-labelledby="add-heading">
+  <div class="card__header">
+    <h2 id="add-heading">{{ _("admin.hours.add") }}</h2>
+    <p class="card__lead">{{ _("admin.hours.add_lead") }}</p>
+  </div>
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.hours.add_button") }}</button>
+  </div>
+</form>
+{% endblock %}

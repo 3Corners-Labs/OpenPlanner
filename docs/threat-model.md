@@ -1,7 +1,7 @@
 # Threat model
 
 STRIDE per flow, plus abuse cases per public endpoint. Every abuse case has a test.
-Status: work package 7a.
+Status: work package 7b.
 
 ## Flow: health checks
 
@@ -110,3 +110,21 @@ other `/admin` route declares one permission of the matrix (ADR 0014). Inputs fr
 | Repudiation | An admin denies a login, a refused attempt or a change | Logins, logouts, failed logins and denials go to `audit_events`, per organisation/group in the admin's scope; the audit log shows names from `admin_profiles` | `test_denials_are_audited`, `test_identity_errors_are_audited`, `test_audit_log_shows_names_and_logins_within_the_organisation` |
 | Information disclosure | Personal data in logs or audit events | Logs and audit events carry the subject identifier only; the display name is stored once in `admin_profiles` and hidden from `repr` | `tests/domain/test_authorization.py::test_principal_repr_hides_the_display_name`, `tests/test_logging.py` |
 | Elevation | A development shortcut reaches production (login bypass, role switcher, test users) | No bypass or switcher exists in code; test users exist only in the Keycloak dev realm; production requires an `https` discovery URL and a client secret | `tests/test_config.py::test_production_is_the_default_and_refuses_development_defaults`, `e2e/tests/admin-roles.spec.ts` logs in through the real provider |
+
+## Flow: groups and planning in the admin portal (WP7b)
+
+Admins only. `GET/POST /admin/groups/new`, `/admin/groups`, `/admin/groups/{slug}/settings`,
+`/hours`, `/exceptions` and their `/delete` actions. Inputs from outside: form fields (names,
+slug, time zone, numbers, times, dates, queue id), path slugs and item ids.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation | A group admin changes routing or settings of their group, or anyone acts on another group | One `RequirePermission` per route (route level) and `PlanningService` authorises again (domain level); the matrix test covers every role × route × method × own/other group | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_planning.py::test_group_admin_may_not_change_group_settings`, `test_schedule_of_another_group_is_out_of_reach` |
+| Elevation | An org admin creates a group in another organisation by editing the form's organisation field | The chosen organisation is authorised in the domain (`group.create` at organisation level); the form only offers organisations in scope | `test_creating_outside_the_scope_is_refused_and_audited`, `tests/admin/test_group_routes.py::test_outsider_cannot_create_a_group_in_another_organisation` |
+| Tampering (IDOR) | Removing another group's opening hours by guessing an item id under one's own group | Deletes are bound to the group (`WHERE id = ? AND group_id = ?`); a miss is `schedule_item_not_found` | `test_schedule_of_another_group_is_out_of_reach`, `tests/adapters/db/test_planning_queries.py::test_schedule_items_carry_ids_and_stay_within_their_group` |
+| Tampering (CSRF) | A third-party site submits a change in an admin's browser | Fetch Metadata check on every POST; session cookie `SameSite=Lax` on `/admin` | `test_cross_site_changes_are_refused` |
+| Elevation | A role revoked in the IdP keeps granting changes for the rest of the session | Changes and their forms need a login of at most 60 minutes (ADR 0015); a POST returns only to admin paths | `test_changes_need_a_recent_login`, `test_forged_referer_cannot_leave_the_portal` |
+| Tampering | A change breaks existing appointments (capacity lowered, time grid moved) | Capacity is snapshotted per slot; time zone and slot length are frozen while confirmed bookings lie ahead; overlapping windows are refused for the whole schedule | `test_capacity_change_never_touches_existing_slots`, `test_time_grid_is_frozen_while_future_bookings_exist`, `test_overlapping_opening_hours_are_refused` |
+| Tampering (XSS) | Markup in a group name or queue id | Jinja2 autoescape; names and queue ids without control characters | `test_names_are_escaped`, `tests/domain/test_scheduling.py::test_group_rejects_invalid_configuration` |
+| Spoofing | A new group takes an admin path as its slug (`/admin/groups/new`) | Reserved slugs | `test_reserved_slugs_cannot_be_taken` |
+| Repudiation | An admin denies a change | Every change is audited in the same transaction, with the changed field names or `rule.add`-style keys (never values) | `test_settings_change_records_the_changed_fields`, `test_group_admin_manages_opening_hours_of_their_group` |

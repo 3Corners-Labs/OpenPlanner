@@ -10,7 +10,15 @@ from fastapi.routing import APIRoute
 from app.admin.authz import RequirePermission
 from app.admin.routes import PUBLIC_ADMIN_PATHS
 from app.domain.authorization import Principal
-from tests.admin.conftest import GROUP_ADMIN, NO_ROLE, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.admin.conftest import (
+    GROUP_ADMIN,
+    NO_ROLE,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+)
 
 ROLES = {
     "superuser": SUPER,
@@ -20,80 +28,89 @@ ROLES = {
     "no role": NO_ROLE,
 }
 
-# route template -> concrete paths -> expected status per role (HANDOVER §6)
+ROLE_ORDER = list(ROLES)
+
+
+def statuses(*codes: int) -> dict[str, int]:
+    """Expected status per role, in the order of ``ROLES``."""
+    return dict(zip(ROLE_ORDER, codes, strict=True))
+
+
+# Allowed POSTs answer 422 (empty form) or 404 (unknown item id); refused ones 403.
+# "METHOD route template" -> concrete paths -> expected status per role (HANDOVER §6):
+#   superuser · org_admin (demo) · group_admin (demo) · org_admin (andere) · no role
 EXPECTED: dict[str, dict[str, dict[str, int]]] = {
-    "/admin/": {
-        "/admin/": {
-            "superuser": 200,
-            "org_admin (demo)": 200,
-            "group_admin (demo)": 200,
-            "org_admin (andere)": 200,
-            "no role": 403,
-        }
+    "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 403)},
+    "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 403)},
+    "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 403)},
+    "GET /admin/audit": {"/admin/audit": statuses(200, 200, 403, 200, 403)},
+    # Group creation: organisation admins (in their own organisation) and the superuser.
+    "GET /admin/groups/new": {"/admin/groups/new": statuses(200, 200, 403, 200, 403)},
+    "POST /admin/groups": {"/admin/groups": statuses(422, 422, 403, 422, 403)},
+    "GET /admin/groups/{slug}": {
+        "/admin/groups/demo": statuses(200, 200, 200, 403, 403),
+        "/admin/groups/andere-team": statuses(200, 403, 403, 200, 403),
     },
-    "/admin/rights": {
-        "/admin/rights": {
-            "superuser": 200,
-            "org_admin (demo)": 200,
-            "group_admin (demo)": 200,
-            "org_admin (andere)": 200,
-            "no role": 403,
-        }
+    # Group settings (incl. routing to the WxCC queue): not for group admins.
+    "GET /admin/groups/{slug}/settings": {
+        "/admin/groups/demo/settings": statuses(200, 200, 403, 403, 403),
+        "/admin/groups/andere-team/settings": statuses(200, 403, 403, 200, 403),
     },
-    "/admin/matrix": {
-        "/admin/matrix": {
-            "superuser": 200,
-            "org_admin (demo)": 200,
-            "group_admin (demo)": 200,
-            "org_admin (andere)": 200,
-            "no role": 403,
-        }
+    "POST /admin/groups/{slug}/settings": {
+        "/admin/groups/demo/settings": statuses(422, 422, 403, 403, 403),
+        "/admin/groups/andere-team/settings": statuses(422, 403, 403, 422, 403),
     },
-    "/admin/audit": {
-        "/admin/audit": {
-            "superuser": 200,
-            "org_admin (demo)": 200,
-            "group_admin (demo)": 403,
-            "org_admin (andere)": 200,
-            "no role": 403,
-        }
+    # Opening hours, exceptions and capacity: group admins too, for their own groups.
+    "GET /admin/groups/{slug}/hours": {
+        "/admin/groups/demo/hours": statuses(200, 200, 200, 403, 403),
+        "/admin/groups/andere-team/hours": statuses(200, 403, 403, 200, 403),
     },
-    "/admin/groups/{slug}": {
-        "/admin/groups/demo": {
-            "superuser": 200,
-            "org_admin (demo)": 200,
-            "group_admin (demo)": 200,
-            "org_admin (andere)": 403,
-            "no role": 403,
-        },
-        "/admin/groups/andere-team": {
-            "superuser": 200,
-            "org_admin (demo)": 403,
-            "group_admin (demo)": 403,
-            "org_admin (andere)": 200,
-            "no role": 403,
-        },
+    "POST /admin/groups/{slug}/hours": {
+        "/admin/groups/demo/hours": statuses(422, 422, 422, 403, 403),
+        "/admin/groups/andere-team/hours": statuses(422, 403, 403, 422, 403),
+    },
+    "POST /admin/groups/{slug}/hours/{rule_id}/delete": {
+        "/admin/groups/demo/hours/999999/delete": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/hours/999999/delete": statuses(404, 403, 403, 404, 403),
+    },
+    "GET /admin/groups/{slug}/exceptions": {
+        "/admin/groups/demo/exceptions": statuses(200, 200, 200, 403, 403),
+        "/admin/groups/andere-team/exceptions": statuses(200, 403, 403, 200, 403),
+    },
+    "POST /admin/groups/{slug}/exceptions": {
+        "/admin/groups/demo/exceptions": statuses(422, 422, 422, 403, 403),
+        "/admin/groups/andere-team/exceptions": statuses(422, 403, 403, 422, 403),
+    },
+    "POST /admin/groups/{slug}/exceptions/{override_id}/delete": {
+        "/admin/groups/demo/exceptions/999999/delete": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/exceptions/999999/delete": statuses(404, 403, 403, 404, 403),
     },
 }
 
 CASES = [
-    (role, path, status)
-    for routes in EXPECTED.values()
+    (role, key.split(" ", 1)[0], path, status)
+    for key, routes in EXPECTED.items()
     for path, by_role in routes.items()
     for role, status in by_role.items()
 ]
 
 
-@pytest.mark.parametrize(("role", "path", "status"), CASES)
-async def test_matrix(site: Site, role: str, path: str, status: int) -> None:
+@pytest.mark.parametrize(("role", "method", "path", "status"), CASES)
+async def test_matrix(site: Site, role: str, method: str, path: str, status: int) -> None:
     await site.login_as(ROLES[role])
 
-    response = await site.client.get(path)
+    if method == "GET":
+        response = await site.client.get(path)
+    else:
+        response = await site.client.post(path, headers=SAME_ORIGIN)
 
-    assert response.status_code == status, (role, path)
+    assert response.status_code == status, (role, method, path)
 
 
-@pytest.mark.parametrize("path", [p for routes in EXPECTED.values() for p in routes])
+GET_PATHS = [p for key, routes in EXPECTED.items() if key.startswith("GET ") for p in routes]
+
+
+@pytest.mark.parametrize("path", GET_PATHS)
 async def test_anonymous_visitors_are_sent_to_the_login(site: Site, path: str) -> None:
     response = await site.client.get(path)
 
@@ -127,7 +144,12 @@ def _all_routes(routes: list[object]) -> list[APIRoute]:
 def test_every_admin_route_declares_one_permission_and_is_in_the_table(site: Site) -> None:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     routes = [r for r in _all_routes(app.routes) if r.path.startswith("/admin")]
-    protected = {r.path: r for r in routes if r.path not in PUBLIC_ADMIN_PATHS}
+    protected = {
+        f"{method} {r.path}": r
+        for r in routes
+        if r.path not in PUBLIC_ADMIN_PATHS
+        for method in r.methods
+    }
 
     assert set(protected) == set(EXPECTED), "admin route missing from the matrix test"
     for path, route in protected.items():

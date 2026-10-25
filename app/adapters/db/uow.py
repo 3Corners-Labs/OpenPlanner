@@ -39,6 +39,7 @@ from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
     Group,
     GroupSummary,
+    Organisation,
     PhoneMode,
     ScheduleOverride,
     ScheduleRule,
@@ -46,6 +47,11 @@ from app.domain.scheduling import (
 )
 
 _PENDING = "pending"
+
+
+def _organisation(row: OrganisationRow) -> Organisation:
+    """Map an organisation row to the domain."""
+    return Organisation(row.id, row.name, row.slug, row.default_locale)
 
 
 def _group(row: GroupRow) -> Group:
@@ -87,8 +93,35 @@ def scope_filter(
 def _override(row: ScheduleOverrideRow) -> ScheduleOverride:
     """Map an override row; NULL window columns mean a closed day."""
     if row.opens is None or row.closes is None or row.capacity is None:
-        return ScheduleOverride(day=row.day, window=None)
-    return ScheduleOverride(day=row.day, window=TimeWindow(row.opens, row.closes, row.capacity))
+        return ScheduleOverride(day=row.day, window=None, id=row.id)
+    return ScheduleOverride(
+        day=row.day, window=TimeWindow(row.opens, row.closes, row.capacity), id=row.id
+    )
+
+
+def _rule(row: ScheduleRuleRow) -> ScheduleRule:
+    """Map a weekly rule row."""
+    return ScheduleRule(
+        weekday=row.weekday,
+        window=TimeWindow(row.opens, row.closes, row.capacity),
+        valid_from=row.valid_from,
+        valid_to=row.valid_to,
+        id=row.id,
+    )
+
+
+def _group_columns(group: Group) -> dict[str, Any]:
+    """Return the stored columns of a group's settings."""
+    return {
+        "name": group.name,
+        "timezone": group.timezone,
+        "slot_minutes": group.slot_minutes,
+        "min_notice_minutes": group.min_notice_minutes,
+        "horizon_days": group.horizon_days,
+        "phone_mode": group.phone_mode.value,
+        "wxcc_queue_id": group.wxcc_queue_id,
+        "dispatch_lead_minutes": group.dispatch_lead_minutes,
+    }
 
 
 def _booking(row: BookingRow, slot: SlotRow) -> Booking:
@@ -158,6 +191,7 @@ class SqlTransaction:
                 reason=event.reason[:64],
                 organisation=event.organisation,
                 group=event.group,
+                detail=event.detail[:255],
             )
         )
         await self._session.flush()
@@ -181,6 +215,7 @@ class SqlTransaction:
                     reason=row.reason,
                     organisation=row.organisation,
                     group=row.group,
+                    detail=row.detail,
                 ),
                 name,
             )
@@ -221,18 +256,115 @@ class SqlTransaction:
                 ScheduleOverrideRow.day.between(first_day, last_day),
             )
         )
-        return (
-            [
-                ScheduleRule(
-                    weekday=r.weekday,
-                    window=TimeWindow(r.opens, r.closes, r.capacity),
-                    valid_from=r.valid_from,
-                    valid_to=r.valid_to,
-                )
-                for r in rules
-            ],
-            [_override(o) for o in overrides],
+        return [_rule(r) for r in rules], [_override(o) for o in overrides]
+
+    async def list_organisations(self, scope: Scope) -> list[Organisation]:
+        """Return the organisations inside ``scope`` (organisation scope only), by slug."""
+        rows = await self._session.scalars(
+            select(OrganisationRow)
+            .where(scope_filter(scope, OrganisationRow.slug, None))
+            .order_by(OrganisationRow.slug)
         )
+        return [_organisation(row) for row in rows]
+
+    async def get_organisation(self, slug: str) -> Organisation | None:
+        """Return the organisation with ``slug``."""
+        row = await self._session.scalar(
+            select(OrganisationRow).where(OrganisationRow.slug == slug)
+        )
+        return _organisation(row) if row else None
+
+    async def add_group(self, group: Group) -> Group:
+        """Insert a group and return it with its ID."""
+        row = GroupRow(
+            organisation_id=group.organisation_id, slug=group.slug, **_group_columns(group)
+        )
+        self._session.add(row)
+        await self._session.flush()
+        return _group(row)
+
+    async def save_group(self, group: Group) -> None:
+        """Store the settings of an existing group; slug and organisation never change."""
+        await self._session.execute(
+            update(GroupRow).where(GroupRow.id == group.id).values(**_group_columns(group))
+        )
+
+    async def count_future_bookings(self, group_id: int, now: datetime) -> int:
+        """Return how many confirmed bookings of the group start after ``now``."""
+        count = await self._session.scalar(
+            select(func.count(BookingRow.id))
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(
+                BookingRow.group_id == group_id,
+                BookingRow.status == BookingStatus.CONFIRMED.value,
+                SlotRow.start > now,
+            )
+        )
+        return int(count or 0)
+
+    async def get_schedule_items(
+        self, group_id: int, from_day: date | None = None
+    ) -> tuple[list[ScheduleRule], list[ScheduleOverride]]:
+        """Return the group's rules and overrides (from ``from_day`` on), each with its id."""
+        rules = await self._session.scalars(
+            select(ScheduleRuleRow)
+            .where(ScheduleRuleRow.group_id == group_id)
+            .order_by(ScheduleRuleRow.weekday, ScheduleRuleRow.opens)
+        )
+        query = select(ScheduleOverrideRow).where(ScheduleOverrideRow.group_id == group_id)
+        if from_day is not None:
+            query = query.where(ScheduleOverrideRow.day >= from_day)
+        overrides = await self._session.scalars(
+            query.order_by(ScheduleOverrideRow.day, ScheduleOverrideRow.opens)
+        )
+        return [_rule(r) for r in rules], [_override(o) for o in overrides]
+
+    async def add_schedule_rule(self, group_id: int, rule: ScheduleRule) -> int:
+        """Insert a weekly rule and return its ID."""
+        row = ScheduleRuleRow(
+            group_id=group_id,
+            weekday=rule.weekday,
+            opens=rule.window.opens,
+            closes=rule.window.closes,
+            capacity=rule.window.capacity,
+            valid_from=rule.valid_from,
+            valid_to=rule.valid_to,
+        )
+        self._session.add(row)
+        await self._session.flush()
+        return row.id
+
+    async def delete_schedule_rule(self, group_id: int, rule_id: int) -> bool:
+        """Delete the group's rule; the group condition keeps other groups' rules out of reach."""
+        result = await self._session.execute(
+            delete(ScheduleRuleRow).where(
+                ScheduleRuleRow.id == rule_id, ScheduleRuleRow.group_id == group_id
+            )
+        )
+        return bool(getattr(result, "rowcount", 0))
+
+    async def add_schedule_override(self, group_id: int, override: ScheduleOverride) -> int:
+        """Insert an override (a closed day when it has no window) and return its ID."""
+        window = override.window
+        row = ScheduleOverrideRow(
+            group_id=group_id,
+            day=override.day,
+            opens=window.opens if window else None,
+            closes=window.closes if window else None,
+            capacity=window.capacity if window else None,
+        )
+        self._session.add(row)
+        await self._session.flush()
+        return row.id
+
+    async def delete_schedule_override(self, group_id: int, override_id: int) -> bool:
+        """Delete the group's override; the group condition keeps others out of reach."""
+        result = await self._session.execute(
+            delete(ScheduleOverrideRow).where(
+                ScheduleOverrideRow.id == override_id, ScheduleOverrideRow.group_id == group_id
+            )
+        )
+        return bool(getattr(result, "rowcount", 0))
 
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:
         """Return the group's reminder rules."""
