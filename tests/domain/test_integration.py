@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -281,3 +281,17 @@ async def test_remembered_events_are_forgotten_after_the_retention(
     await service.record_meeting_event("meeting-1", EventKind.GUEST_JOINED, later, event_key="new")
 
     assert set(uow.state.webhook_events) == {("webex", "new")}
+
+
+async def test_day_overview_covers_the_25_hour_day_when_clocks_go_back(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    # 25 October 2026 lasts 25 hours in Europe/Amsterdam; 23:30 local is 22:30 UTC.
+    late = datetime(2026, 10, 25, 22, 30, tzinfo=UTC)
+    uow.state.bookings[123] = _booking(start=late, end=late + timedelta(minutes=30))
+
+    on_the_day = await service.day_overview(GROUP_ADMIN, "demo", date(2026, 10, 25))
+    next_day = await service.day_overview(GROUP_ADMIN, "demo", date(2026, 10, 26))
+
+    assert [row.booking.id for row in on_the_day] == [123]
+    assert next_day == []
