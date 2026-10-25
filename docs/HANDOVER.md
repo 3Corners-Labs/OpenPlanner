@@ -157,6 +157,7 @@ Totaal ca. 30 werkdagen voor één ontwikkelaar, plus reviewtijd van een tweede 
 | O8 | Toegankelijkheid van het videogesprek: Nederlandse live-ondertiteling in Webex beschikbaar? Tolk NGT als derde deelnemer (extra gastlink) en een vinkje daarvoor op het formulier? | dienstverlening + contactcenterbeheer |
 | O9 | "Nu direct een gesprek starten" naast inplannen (zoals 24sessions bood): technisch een directe taak in de wachtrij zonder slot, maar vraagt realtime zicht op bezetting en wachttijd uit WxCC. Fase 2 of helemaal niet? | dienstverlening |
 | O10 | Wie is de menselijke reviewer per PR (§12), en wie voert de externe pentest en het toegankelijkheidsonderzoek uit? Zonder antwoord geen livegang. | opdrachtgever |
+| O11 | Idee, niet voor nu: een API waarmee de WxCC AI Agent (bot, chat én spraak) afspraken kan zoeken, boeken, verzetten en annuleren. Domein en flows bestaan al; de vragen zitten in identificatie van de burger zonder DigiD (referentie + e-mail/telefoonnummer, of sms-code), welke PII naar het AI-platform mag (DPIA), service-authenticatie van de bot, en slots die uitspreekbaar zijn ("dinsdag 10.00 of 14.30"). Eerst haalbaarheid van WxCC AI Agent-acties en licentie (O6) uitzoeken. | dienstverlening + technisch |
 
 ## 12. Borging van kwaliteit en veiligheid bij AI-ondersteund bouwen
 

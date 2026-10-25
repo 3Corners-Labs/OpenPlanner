@@ -584,5 +584,6 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7c–d | Texts and reminders, encrypted integration settings (O3) | planned |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
+| idea | Booking API for the WxCC AI Agent (chat and voice bots): find, book, reschedule, cancel (O11) | not planned |
 
 The open decisions (O1–O10) are listed in `docs/HANDOVER.md` §11.
