@@ -991,3 +991,87 @@ body.admin {
 .admin-public__card h1 {
   margin-bottom: 0.75rem;
 }
+
+/* --- Branding (WP3b): list and preview with the organisation's theme ---------------------- */
+.link-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link-list li + li {
+  border-top: 1px solid var(--adm-border);
+}
+
+.link-list a {
+  display: block;
+  padding: 0.75rem 0;
+  font-weight: 600;
+}
+
+.admin .field input[type="color"] {
+  width: 6rem;
+  min-height: 2.75rem;
+  padding: 0.25rem;
+  cursor: pointer;
+}
+
+.admin .field input[type="file"] {
+  padding: 0.5rem;
+}
+
+/* The preview reads --booking-color-accent from the organisation's theme stylesheet. */
+.brand-preview {
+  overflow: hidden;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius-s);
+  background: #ffffff;
+}
+
+.brand-preview__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 4px solid var(--booking-color-accent);
+  font-weight: 700;
+}
+
+.brand-preview__logo {
+  width: auto;
+  max-width: 10rem;
+  height: 2.5rem;
+  object-fit: contain;
+}
+
+.brand-preview__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.brand-preview__button {
+  padding: 0.5rem 1.25rem;
+  border-radius: 6px;
+  background: var(--booking-color-accent);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.brand-preview__day {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 2px solid var(--booking-color-accent);
+  border-radius: 6px;
+  color: var(--booking-color-accent);
+  font-weight: 700;
+}
+
+.brand-preview__link {
+  color: var(--booking-color-accent);
+  text-decoration: underline;
+}

@@ -10,6 +10,7 @@ from datetime import date, datetime
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsage
+from app.domain.branding import Branding, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channels import ReminderRule
 from app.domain.job_plan import PlannedJob
@@ -38,6 +39,7 @@ class State:
     webhook_events: dict[tuple[str, str], datetime] = field(default_factory=dict)
     audit: list[AuditEvent] = field(default_factory=list)
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
+    logos: dict[int, Logo] = field(default_factory=dict)
     next_id: int = 1
 
 
@@ -95,6 +97,26 @@ class InMemoryTransaction:
 
     async def get_organisation(self, slug: str) -> Organisation | None:
         return next((o for o in self.state.organisations.values() if o.slug == slug), None)
+
+    async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
+        return self.state.organisations.get(organisation_id)
+
+    async def save_branding(self, organisation_id: int, branding: Branding) -> None:
+        organisation = self.state.organisations[organisation_id]
+        self.state.organisations[organisation_id] = replace(organisation, branding=branding)
+
+    async def get_logo(self, organisation_slug: str) -> Logo | None:
+        organisation = await self.get_organisation(organisation_slug)
+        return self.state.logos.get(organisation.id) if organisation else None
+
+    async def save_logo(self, organisation_id: int, logo: Logo | None) -> None:
+        organisation = self.state.organisations[organisation_id]
+        if logo is None:
+            self.state.logos.pop(organisation_id, None)
+        else:
+            self.state.logos[organisation_id] = logo
+        branding = replace(organisation.branding, logo=logo.ref if logo else None)
+        self.state.organisations[organisation_id] = replace(organisation, branding=branding)
 
     async def add_group(self, group: Group) -> Group:
         stored = replace(group, id=self._new_id())

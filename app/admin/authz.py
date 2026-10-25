@@ -116,17 +116,25 @@ class RequirePermission:
     Args:
         permission: The one permission this route needs.
         group_param: Name of the path parameter with the group slug (group-level routes).
-            Without it, a non-global permission must be held for at least one target.
+        organisation_param: Name of the path parameter with the organisation slug
+            (organisation-level routes). Without either, a non-global permission must be
+            held for at least one target.
         fresh: For changes and their forms: the login may be at most
             ``ADMIN_REAUTH_MINUTES`` old, so revoked roles stop working within that time.
     """
 
     def __init__(
-        self, permission: Permission, group_param: str | None = None, *, fresh: bool = False
+        self,
+        permission: Permission,
+        group_param: str | None = None,
+        *,
+        organisation_param: str | None = None,
+        fresh: bool = False,
     ) -> None:
         """Store the declaration; it is also read by the route-coverage test."""
         self.permission = permission
         self.group_param = group_param
+        self.organisation_param = organisation_param
         self.fresh = fresh
 
     async def __call__(self, request: Request) -> AdminContext:
@@ -145,6 +153,11 @@ class RequirePermission:
         if self.group_param is not None:
             slug = str(request.path_params[self.group_param])
             authorization = await service.authorize(principal, self.permission, group_slug=slug)
+        elif self.organisation_param is not None:
+            slug = str(request.path_params[self.organisation_param])
+            authorization = await service.authorize(
+                principal, self.permission, organisation_slug=slug
+            )
         else:
             authorization = await service.authorize_anywhere(principal, self.permission)
         log.info(

@@ -17,6 +17,7 @@ their claim and those organisations' groups, group admin in the groups of their 
 | Manage organisations (`organisation.manage`) | Portal | yes | – | – |
 | View audit log (`audit.view`) | Organisation | yes | yes | – |
 | Manage integrations and secrets (`integrations.manage`) | Organisation | yes | – | – |
+| Manage an organisation's branding (`branding.manage`) | Organisation | yes | – | – |
 | Create groups (`group.create`) | Organisation | yes | yes | – |
 | View group (`group.view`) | Group | yes | yes | yes |
 | Change group settings (`group.edit`) | Group | yes | yes | – |

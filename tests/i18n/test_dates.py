@@ -6,7 +6,9 @@ from app.i18n.dates import (
     format_day,
     format_day_compact,
     format_day_short,
+    format_month,
     local_day,
+    weekday_abbreviations,
     weekday_names,
 )
 
@@ -51,3 +53,13 @@ def test_weekday_names_start_on_monday() -> None:
     assert weekday_names("nl")[0] == "maandag"
     assert weekday_names("nl")[6] == "zondag"
     assert weekday_names("en")[2] == "Wednesday"
+
+
+def test_month_heading() -> None:
+    assert format_month(date(2026, 10, 26), "nl") == "oktober 2026"
+    assert format_month(date(2026, 10, 26), "en") == "October 2026"
+
+
+def test_weekday_abbreviations_start_on_monday() -> None:
+    assert weekday_abbreviations("nl") == ["ma", "di", "wo", "do", "vr", "za", "zo"]
+    assert weekday_abbreviations("en")[0] == "Mo"

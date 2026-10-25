@@ -20,6 +20,7 @@ from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from app.domain.branding import Branding
 from app.domain.errors import DomainError, ErrorCode
 
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -66,6 +67,7 @@ class Organisation:
     name: str
     slug: str
     default_locale: str = "nl"
+    branding: Branding = Branding()
 
 
 @dataclass(frozen=True)

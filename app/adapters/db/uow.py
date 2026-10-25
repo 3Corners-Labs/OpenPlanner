@@ -27,6 +27,7 @@ from app.adapters.db.models import (
     CallStatusRow,
     GroupRow,
     JobRow,
+    OrganisationLogoRow,
     OrganisationRow,
     ReminderRuleRow,
     ScheduleOverrideRow,
@@ -45,6 +46,7 @@ from app.domain.booking import (
     Slot,
     SlotUsage,
 )
+from app.domain.branding import Branding, Logo, LogoRef
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
@@ -71,8 +73,14 @@ _PENDING = "pending"
 
 
 def _organisation(row: OrganisationRow) -> Organisation:
-    """Map an organisation row to the domain."""
-    return Organisation(row.id, row.name, row.slug, row.default_locale)
+    """Map an organisation row, with its branding, to the domain."""
+    logo = (
+        LogoRef(row.logo_media_type, row.logo_digest)
+        if row.logo_media_type and row.logo_digest
+        else None
+    )
+    branding = Branding(row.display_name, row.accent_color, logo)
+    return Organisation(row.id, row.name, row.slug, row.default_locale, branding)
 
 
 def _group(row: GroupRow) -> Group:
@@ -324,6 +332,52 @@ class SqlTransaction:
             select(OrganisationRow).where(OrganisationRow.slug == slug)
         )
         return _organisation(row) if row else None
+
+    async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
+        """Return the organisation with ``organisation_id``."""
+        row = await self._session.get(OrganisationRow, organisation_id)
+        return _organisation(row) if row else None
+
+    async def save_branding(self, organisation_id: int, branding: Branding) -> None:
+        """Store display name and accent colour; the logo columns are left alone."""
+        await self._session.execute(
+            update(OrganisationRow)
+            .where(OrganisationRow.id == organisation_id)
+            .values(display_name=branding.display_name, accent_color=branding.accent_color)
+        )
+
+    async def get_logo(self, organisation_slug: str) -> Logo | None:
+        """Return the organisation's logo, if it has one."""
+        found = (
+            await self._session.execute(
+                select(OrganisationRow.logo_media_type, OrganisationLogoRow.data)
+                .join(
+                    OrganisationLogoRow, OrganisationLogoRow.organisation_id == OrganisationRow.id
+                )
+                .where(OrganisationRow.slug == organisation_slug)
+            )
+        ).first()
+        if found is None or found[0] is None:
+            return None
+        return Logo(found[0], found[1])
+
+    async def save_logo(self, organisation_id: int, logo: Logo | None) -> None:
+        """Replace or remove the logo and keep its type and digest on the organisation."""
+        await self._session.execute(
+            delete(OrganisationLogoRow).where(
+                OrganisationLogoRow.organisation_id == organisation_id
+            )
+        )
+        if logo is not None:
+            self._session.add(OrganisationLogoRow(organisation_id=organisation_id, data=logo.data))
+        await self._session.execute(
+            update(OrganisationRow)
+            .where(OrganisationRow.id == organisation_id)
+            .values(
+                logo_media_type=logo.media_type if logo else None,
+                logo_digest=logo.digest if logo else None,
+            )
+        )
 
     async def add_group(self, group: Group) -> Group:
         """Insert a group and return it with its ID."""

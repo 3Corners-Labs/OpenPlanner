@@ -46,6 +46,23 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/audit": {"/admin/audit": statuses(200, 200, 403, 200, 403)},
     # Integrations and secrets: superuser only.
     "GET /admin/integrations": {"/admin/integrations": statuses(200, 403, 403, 403, 403)},
+    # Branding per organisation: superuser only (HANDOVER §6), also for the own organisation.
+    "GET /admin/branding": {"/admin/branding": statuses(200, 403, 403, 403, 403)},
+    "GET /admin/organisations/{org}/branding": {
+        "/admin/organisations/demo/branding": statuses(200, 403, 403, 403, 403),
+        "/admin/organisations/andere/branding": statuses(200, 403, 403, 403, 403),
+        "/admin/organisations/nope/branding": statuses(404, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/branding": {
+        "/admin/organisations/demo/branding": statuses(422, 403, 403, 403, 403),
+        "/admin/organisations/andere/branding": statuses(422, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/branding/logo": {
+        "/admin/organisations/demo/branding/logo": statuses(422, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/branding/logo/remove": {
+        "/admin/organisations/demo/branding/logo/remove": statuses(303, 403, 403, 403, 403),
+    },
     # Group creation: organisation admins (in their own organisation) and the superuser.
     "GET /admin/groups/new": {"/admin/groups/new": statuses(200, 200, 403, 200, 403)},
     "POST /admin/groups": {"/admin/groups": statuses(422, 422, 403, 422, 403)},
