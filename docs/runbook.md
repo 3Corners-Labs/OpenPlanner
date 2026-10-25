@@ -128,6 +128,11 @@ Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (w
 4. OpenPlanner refreshes the access token (14 days) itself and stores rotated tokens encrypted.
    The refresh token lives 90 days: **Koppelingen** in the admin portal warns two weeks ahead.
    Renew it by generating new tokens (step 3) and restarting `web` and `worker`.
+   **One token store only.** A refresh may hand out a new refresh token and retire the old one.
+   Run the CLI commands inside the `web` container (same database as `web` and `worker`), never
+   with another `DATABASE_URL`: a second database that refreshes from the same
+   `WEBEX_REFRESH_TOKEN` leaves the first with a refused token (`webex.token_refresh_refused`),
+   and only generating new tokens (step 3) repairs it.
 5. Check everything with section 6 (`wxcc-check`).
 
 ### 2. Webex site settings (Control Hub)
@@ -283,8 +288,46 @@ secondary and print `WARN`. It never prints tokens, secrets or response bodies.
 | v1, `WARN` only: `POST /v1/tasks/{nil}/end` | 202 | `cjp:user` (optional) |
 | v1, `WARN` only: `GET /v1/tasks` (task search) | 200 | `cjp:config_read` |
 
-A 404 on the WxCC reads means `WXCC_API_BASE_URL` points at the wrong region. Once all lines
-are `OK`, run `register-webhooks` (section 4).
+A 404 on the WxCC reads means `WXCC_API_BASE_URL` points at the wrong region; the last line,
+**WxCC region**, checks it against the configuration service and names the right host (the
+task and subscription APIs answer on every regional host, the configuration only on the
+organisation's own). Once all lines are `OK`, run `wxcc-config-check` (section 7) and then
+`register-webhooks` (section 4).
+
+### 7. Checking the WxCC routing configuration (`wxcc-config-check`)
+
+Before the first live work item, and after any change in Control Hub or in a group's WxCC
+fields, run:
+
+```sh
+docker compose exec web python -m app.cli wxcc-config-check
+```
+
+It reads the configuration (`cjp:config_read`; read-only) and walks, for every group with a
+WxCC channel and business address, the chain from section 3 ("Matching a group to its queue").
+It prints names, ids, business addresses and schema keys only; asset webhook secrets and queue
+agents are never requested. `FAIL` lines block routing, `WARN` lines are advice; the exit code
+is 1 while a `FAIL` remains.
+
+| Line | `FAIL` when | Fix |
+|---|---|---|
+| WxCC region | the configuration lives in another region | set `WXCC_API_BASE_URL` to the host it names |
+| channel | no Work Item channel with the group's channel name | fix the group field or create the channel |
+| asset | no asset with the group's business address, or on another channel | fix the group field or the asset |
+| asset schema | an OpenPlanner key is missing, or the asset requires a key other than `bookingReference` | make the schema the table in section 3 (`WARN`: a key is not viewable) |
+| entry point | no active Work Item entry point with a flow for the asset | link entry point and flow |
+| flow | the flow cannot be exported | check the flow is published |
+| flow routing | the flow has no `openplannerGroup` variable while several groups share the asset (`WARN` for one group) | add the variable and a Case on it |
+| flow branch (`WARN`) | no Case branch with the group's routing value | add the branch, or work items take the default branch |
+| flow queues | the flow queues to no known queue, or to a non-Work Item queue | fix Queue Contact |
+| queue naming (`WARN`) | no queue in the flow is named after the routing value | rename, or accept the default |
+| screen pop (`WARN`) | the flow has no Screen Pop | add one with `meetingLink` |
+
+**Naming rule (advice).** Name each team's queue so that it contains the group's routing value
+as a name part; `-`, `_`, spaces and case count as the same. With routing value `aangifte`,
+`FIN-BLD_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
+per group which queue it will use, and a wrong Case branch stands out. Prefer routing values
+without spaces (the web address of the group is a good default).
 
 ## Mail
 
