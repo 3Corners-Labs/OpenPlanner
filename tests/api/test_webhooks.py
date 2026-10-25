@@ -168,3 +168,33 @@ async def test_signed_but_malformed_bodies_are_a_400(client: httpx.AsyncClient) 
         },
     )
     assert wxcc.status_code == 401  # not an object: never authentic
+
+
+async def test_a_replayed_participant_event_counts_once(
+    client: httpx.AsyncClient, booking_id: int, database_url: str
+) -> None:
+    body = json.dumps(
+        {
+            "resource": "meetingParticipants",
+            "event": "joined",
+            "data": {
+                "id": "meeting-1_I_1_p-1",
+                "meetingId": "meeting-1",
+                "joinedTime": "2026-01-05T08:01:00Z",
+            },
+        }
+    ).encode()
+    headers = {"x-spark-signature": sign(body, "sha1")}
+
+    first = await client.post("/webhooks/webex", content=body, headers=headers)
+    replay = await client.post("/webhooks/webex", content=body, headers=headers)
+
+    assert (first.status_code, replay.status_code) == (204, 204)
+    engine = create_engine(database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        status = await tx.get_call_status(booking_id)
+        events = await tx.get_booking_events(booking_id)
+    await engine.dispose()
+    assert status is not None
+    assert status.participants == 1
+    assert len(events) == 1

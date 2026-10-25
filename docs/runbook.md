@@ -110,17 +110,42 @@ Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (w
 
 ### 1. Webex Service App
 
-1. In the Webex developer portal, create a **Service App** with the scopes listed in
-   `docs/webhooks.md` (meetings on behalf of hosts, participants, `cjp:task_write`,
-   `cjp:task_read`, `cjp:config_read`, `cjp:config_write`). Save the client secret when shown.
-2. A Control Hub administrator authorises it under **Apps → Service Apps**.
+1. In the Webex developer portal, create a **Service App** with exactly these scopes (what
+   the code calls; `docs/webhooks.md` has the payloads). Save the client secret when shown.
+
+   | Scope | Used by | Without it |
+   |---|---|---|
+   | `meeting:admin_schedule_write` | create and delete meetings on behalf of the group's host | no meetings |
+   | `meeting:admin_schedule_read` | `GET /meetings`, org-owned `meetings` webhooks | no live meeting status |
+   | `meeting:admin_participants_read` | org-owned `meetingParticipants` webhooks | no participant counts (`register-webhooks`: `meetingParticipants/…: refused (rejected_403)`) |
+   | `cjp:task_write` | Create Task v2 (work items), Task Messages (mark cancelled) | no work items |
+   | `cjp:task_read` | task access the Work Items guide lists with `cjp:task_write` | – |
+   | `cjp:user` (optional) | End Task v1 for cancelled bookings, after the v2 mark (ADR 0021) | cancelled tasks are marked cancelled (v2) but stay open until an agent ends them |
+   | `cjp:config_read` | list subscriptions and event types (`GET /v2/event-types`), task search (`wxcc-check`) | `register-webhooks` and `wxcc-check` fail with 403 |
+   | `cjp:config_write` | create the WxCC subscription (`register-webhooks`) | no WxCC events |
+
+2. A Control Hub administrator authorises it under **Apps → Service Apps**. Org-owned meeting
+   webhooks also need that administrator to be a **Webex site admin** of the meeting sites or a
+   **Compliance Officer**. The WxCC calls
+   need the authorising administrator to hold a **Contact Center administrator** role and the
+   organisation to have Work Items (beta) enabled: a 403 on every WxCC probe of `wxcc-check`
+   while Webex works means this step or a `cjp:` scope is missing.
 3. Back in the developer portal: select the organisation, paste the client secret and
    generate the tokens. Put the client id, client secret and **refresh token** in the secret
    store as `WEBEX_CLIENT_ID`, `WEBEX_CLIENT_SECRET`, `WEBEX_REFRESH_TOKEN`; add
-   `SETTINGS_ENCRYPTION_KEY` (ADR 0008).
+   `SETTINGS_ENCRYPTION_KEY` (ADR 0008). **Adding a scope later** means: add it to the app,
+   have it authorised again, generate new tokens and put the new `WEBEX_REFRESH_TOKEN` in the
+   secret store; OpenPlanner notices the new token and starts from it (restart `web` and
+   `worker`). Old tokens keep their old scopes.
 4. OpenPlanner refreshes the access token (14 days) itself and stores rotated tokens encrypted.
    The refresh token lives 90 days: **Koppelingen** in the admin portal warns two weeks ahead.
    Renew it by generating new tokens (step 3) and restarting `web` and `worker`.
+   **One token store only.** A refresh may hand out a new refresh token and retire the old one.
+   Run the CLI commands inside the `web` container (same database as `web` and `worker`), never
+   with another `DATABASE_URL`: a second database that refreshes from the same
+   `WEBEX_REFRESH_TOKEN` leaves the first with a refused token (`webex.token_refresh_refused`),
+   and only generating new tokens (step 3) repairs it.
+5. Check everything with section 6 (`wxcc-check`).
 
 ### 2. Webex site settings (Control Hub)
 
@@ -152,7 +177,7 @@ Work Items is in beta; the organisation must be enabled by Cisco.
    | `startTime` | Starttijd | no | yes |
    | `groupName` | Team | no | yes |
    | `meetingLink` | Videogesprek | no | yes |
-   | `kind` | Soort (scheduled/direct) | no | yes |
+   | `kind` | Soort (scheduled/direct/cancelled) | no | yes |
 
 3. **Entry point and flow** for the asset. The flow reads the flow setting
    `openplannerGroup` (the group's routing value, by default its web address) and routes with
@@ -163,18 +188,92 @@ Work Items is in beta; the organisation must be enabled by Cisco.
    and a **RONA** timeout.
 5. Set `WXCC_API_BASE_URL` to your region's API host.
 
+#### Matching a group to its queue
+
+OpenPlanner never names a queue: Create Task v2 has no queue field for work items. Three
+values per group (**Instellingen → Koppelingen**) select the asset and tell the flow which
+queue to use; the meeting link travels inside the work item, so it always reaches the agent who
+picks up that booking.
+
+```text
+group: WxCC business address ─► destination.id ─► Work Item asset ─► entry point ─► flow
+group: WxCC work item-kanaal ─► channel ────────► custom channel (the asset's)
+group: Routeringswaarde ─────► flowSettings.openplannerGroup ─► Case ─► Queue Contact ─► queue
+                               (empty: the group's web address, e.g. aangifte)
+booking: meeting webLink ────► workItemData.meetingLink ─► viewable field + Screen Pop
+```
+
+| OpenPlanner group field | Sent as | WxCC item (Control Hub / Flow Designer) | Must match |
+|---|---|---|---|
+| *WxCC work item-kanaal* | `channel` | Work Item custom channel name | exactly, case included |
+| *WxCC business address* | `destination.id` | business address of the Work Item asset on that channel | exactly; unique across assets |
+| *Routeringswaarde* (default: web address) | `flowSettings.openplannerGroup` | flow variable `openplannerGroup` (String, settable from outside) and a **Case** branch with that value → **Queue Contact** | one Case branch per value, plus a default branch to a fallback queue |
+| – | entry point | Work Item entry point linked to the asset, with the flow active | – |
+| – | queue | queue of channel type Work Item, agents' team assigned, multimedia profile with work item capacity | – |
+
+Two layouts:
+
+- **One asset, entry point and flow for all groups** (recommended): every group gets the same
+  business address and channel; only the routing value differs. A new group is one Case branch
+  and a queue. Groups that share a queue may share a routing value.
+- **One asset per group**: each group its own business address, entry point and flow; routing
+  happens by address and the routing value is ignored. More configuration, fully separate teams.
+
+How a mismatch shows on the booking's timeline: `CHANNEL_ASSET_UNDEFINED` (business address
+matches no asset), `ENTRY_POINT_NOT_FOUND` (no active entry point or flow), `rejected_400` at
+creation (schema differs from the table above). A routing value without a Case branch ends in
+the default branch: check that queue first. **To verify on the first live test:** that
+`openplannerGroup` arrives in the flow variable; Flow Designer may need the variable marked as
+overridable by flow settings.
+
 ### 4. Webhooks
 
-Set `WEBEX_WEBHOOK_SECRET` and `WXCC_WEBHOOK_SECRET`, deploy, then run once:
+Set `WEBEX_WEBHOOK_SECRET` and `WXCC_WEBHOOK_SECRET` (random, at least 32 characters, from the
+secret store), deploy, check the scopes with `wxcc-check` (section 6), then run once:
 
 ```sh
 docker compose exec web python -m app.cli register-webhooks
 ```
 
-It registers the Webex webhooks (meetings started/ended, participants joined/left) and the
-WxCC subscription (task events), and skips what exists. WxCC only calls **https on port 443
-with a public domain**: on a laptop use a tunnel (for example `cloudflared tunnel --url
-http://localhost:8000`) and set `PUBLIC_BASE_URL` to the tunnel's https address first.
+It registers the Webex webhooks (meetings started/ended, participants joined/left) **per
+group host account** (`hostEmail` filter, from each group's *Video host e-mail*) and the WxCC
+subscription (task events) on `WEBHOOK_BASE_URL` (or `PUBLIC_BASE_URL` when that is not set),
+and skips what exists. **Run it again after giving a group a new host account.** Unfiltered
+webhooks from earlier versions are listed as `stale`: delete them in the developer portal or
+with `DELETE /v1/webhooks/{id}`, or OpenPlanner keeps receiving every meeting of the
+organisation. Webex and WxCC only call **https on port 443 with a public
+domain**; in production `WEBHOOK_BASE_URL` must be https.
+
+**On a laptop (tunnel).** Keep `PUBLIC_BASE_URL=http://127.0.0.1:8000`, so the Keycloak login
+redirect and the links in mails keep working, and give the webhooks their own address:
+
+1. Start a tunnel to the web container: `cloudflared tunnel --url http://localhost:8000`
+   (or `ngrok http 8000`). Note the `https://…` address it prints.
+2. Set `WEBHOOK_BASE_URL=https://<that address>` in `.env` and restart `web`
+   (`docker compose up -d web`). **Koppelingen** now shows the tunnel's webhook addresses.
+3. Run `register-webhooks`. A quick tunnel gets a new address on every start: run it again
+   after a restart; the registrations on the old address stay until you delete them in the
+   developer portal (Webex) or with `DELETE /v2/subscriptions/{id}` (WxCC).
+4. Check delivery: a test meeting's start and the participant counts appear on the
+   booking's timeline; `docker compose logs web | grep webhook` shows `webhook.webex` lines
+   (`webhook.rejected` means a wrong secret).
+
+**After changing `WXCC_API_BASE_URL`** (for example to the right region), `register-webhooks`
+lists subscriptions on the new host only and creates one there; a subscription made earlier
+through another host stays. List both (`GET /v2/subscriptions` on each host) and delete the
+stale one with `DELETE /v2/subscriptions/{id}`, or events may arrive twice. Webex lists
+org-owned webhooks only with `ownedBy=org`; `register-webhooks` asks for that and treats a
+`409` (already exists) as `exists`.
+
+**Webex quirk (seen 2026-10-25):** a create that Webex answers with `403` can still leave an
+active org-owned webhook behind, which the Service App then cannot delete (`403` from the
+webhook engine), and which does not show up for an admin's own token in **List Webhooks**.
+Register only after `wxcc-check` shows `GET /webhooks (org-owned)` as `OK`. A left-over
+webhook does no harm beyond extra events (unknown meetings are ignored); it goes inactive once
+its target stops answering, or Cisco developer support can remove it by id.
+
+Only `/webhooks/*` needs to be reachable through the tunnel; the admin portal is behind OIDC
+anyway, but a named tunnel with an ingress rule for that path alone is the tidier option.
 
 ### 5. Following calls
 
@@ -190,6 +289,75 @@ http://localhost:8000`) and set `PUBLIC_BASE_URL` to the tunnel's https address 
 | `ORG_DIGITAL_CONTACT_LIMIT_EXCEEDED` | WxCC's limit of active digital contacts | wait or raise the limit with Cisco |
 | `unauthorized` | the Service App token was refused | renew the tokens (section 1) |
 | `meeting_missing` (retrying) | the work item waits for the meeting | check Webex reachability and the host account |
+| `end_not_possible` `rejected_403` | End Task v1 refused: no `cjp:user` | the task was marked cancelled through v2; end it in Agent Desktop, or add `cjp:user` (section 1) |
+| `end_not_possible` other code | WxCC refused End Task (e.g. the task already ended) | check the task in Agent Desktop |
+
+### 6. Checking the Service App (`wxcc-check`)
+
+After creating the Service App, after changing its scopes or authorisation in Control Hub, and
+whenever calls fail with `unauthorized` or `rejected_403`, run:
+
+```sh
+docker compose exec web python -m app.cli wxcc-check
+```
+
+It refreshes the token and makes every kind of call OpenPlanner makes, harmlessly: reads, an
+empty work item and an empty task message (WxCC answers 400) and End Task on a task id that
+cannot exist (WxCC answers 202: it accepts the request and processes it asynchronously). Per call it prints the verdict, the HTTP status and, on 401/403,
+the scope that is probably missing. Work items are v2 (beta) and v2 is primary: Webex and the
+v2 probes print `OK`/`FAIL` and decide the exit code (1 while one fails); the v1 probes are
+secondary and print `WARN`. It never prints tokens, secrets or response bodies.
+
+| Probe | Expected | On 403 add |
+|---|---|---|
+| token refresh | ok | (refused: generate new tokens, section 1 step 3) |
+| `GET /meetings`, `GET /webhooks (org-owned)` | 200 | `meeting:admin_schedule_read`, `meeting:admin_participants_read`; org-owned webhooks also need the authorising admin to be a Webex site admin or Compliance Officer |
+| `GET /v2/subscriptions`, `GET /v2/event-types` | 200 | `cjp:config_read`, and the Contact Center administrator authorisation (step 2) |
+| `POST /v2/tasks (empty body)` | 400 | `cjp:task_write`, Work Items enabled |
+| `POST /v2/tasks/{nil}/messages` | 400 | `cjp:task_write` |
+| v1, `WARN` only: `POST /v1/tasks/{nil}/end` | 202 | `cjp:user` (optional) |
+| v1, `WARN` only: `GET /v1/tasks` (task search) | 200 | `cjp:config_read` |
+
+A 404 on the WxCC reads means `WXCC_API_BASE_URL` points at the wrong region; the last line,
+**WxCC region**, checks it against the configuration service and names the right host (the
+task and subscription APIs answer on every regional host, the configuration only on the
+organisation's own). Once all lines are `OK`, run `wxcc-config-check` (section 7) and then
+`register-webhooks` (section 4).
+
+### 7. Checking the WxCC routing configuration (`wxcc-config-check`)
+
+Before the first live work item, and after any change in Control Hub or in a group's WxCC
+fields, run:
+
+```sh
+docker compose exec web python -m app.cli wxcc-config-check
+```
+
+It reads the configuration (`cjp:config_read`; read-only) and walks, for every group with a
+WxCC channel and business address, the chain from section 3 ("Matching a group to its queue").
+It prints names, ids, business addresses and schema keys only; asset webhook secrets and queue
+agents are never requested. `FAIL` lines block routing, `WARN` lines are advice; the exit code
+is 1 while a `FAIL` remains.
+
+| Line | `FAIL` when | Fix |
+|---|---|---|
+| WxCC region | the configuration lives in another region | set `WXCC_API_BASE_URL` to the host it names |
+| channel | no Work Item channel with the group's channel name | fix the group field or create the channel |
+| asset | no asset with the group's business address, or on another channel | fix the group field or the asset |
+| asset schema | an OpenPlanner key is missing, or the asset requires a key other than `bookingReference` | make the schema the table in section 3 (`WARN`: a key is not viewable) |
+| entry point | no active Work Item entry point with a flow for the asset | link entry point and flow |
+| flow | the flow cannot be exported | check the flow is published |
+| flow routing | the flow has no `openplannerGroup` variable while several groups share the asset (`WARN` for one group) | add the variable and a Case on it |
+| flow branch (`WARN`) | no Case branch with the group's routing value | add the branch, or work items take the default branch |
+| flow queues | the flow queues to no known queue, or to a non-Work Item queue | fix Queue Contact |
+| queue naming (`WARN`) | no queue in the flow is named after the routing value | rename, or accept the default |
+| screen pop (`WARN`) | the flow has no Screen Pop | add one with `meetingLink` |
+
+**Naming rule (advice).** Name each team's queue so that it contains the group's routing value
+as a name part; `-`, `_`, spaces and case count as the same. With routing value `aangifte`,
+`FIN-BLD_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
+per group which queue it will use, and a wrong Case branch stands out. Prefer routing values
+without spaces (the web address of the group is a good default).
 
 ## Mail
 

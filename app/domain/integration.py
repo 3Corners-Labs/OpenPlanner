@@ -2,11 +2,14 @@
 
 Webhook handlers call ``record_meeting_event`` and ``record_task_event``; jobs call
 ``record``. Each call writes the event and the updated ``CallStatus`` in one transaction.
+Webex events carry an ``event_key``: it is remembered for ``WEBHOOK_MEMORY`` in the same
+transaction, so a replayed or redelivered event changes nothing the second time.
 Admins see a booking's timeline only with ``bookings.view`` on its group (ADR 0014).
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from enum import StrEnum
 
 from app.domain.admin import AdminService
 from app.domain.authorization import Permission, Principal, scope_for
@@ -22,6 +25,21 @@ from app.domain.calls import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, Transaction, UnitOfWork
+
+WEBHOOK_MEMORY = timedelta(days=30)
+"""How long a Webex event key is remembered; older keys are forgotten on the next event."""
+
+WEBEX_SOURCE = "webex"
+
+
+class EventOutcome(StrEnum):
+    """What happened to a reported event."""
+
+    RECORDED = "recorded"
+    UNKNOWN = "unknown"
+    """The meeting or task is not OpenPlanner's; nothing is stored."""
+    DUPLICATE = "duplicate"
+    """The same event was recorded before (replay or redelivery)."""
 
 
 @dataclass(frozen=True)
@@ -56,30 +74,42 @@ class IntegrationService:
             await self._record(tx, booking_id, kind, at or self._clock.now(), detail)
 
     async def record_meeting_event(
-        self, meeting_id: str, kind: EventKind, at: datetime, detail: str = ""
-    ) -> bool:
-        """Record a meeting event; ``False`` for meetings OpenPlanner does not know.
+        self,
+        meeting_id: str,
+        kind: EventKind,
+        at: datetime,
+        detail: str = "",
+        *,
+        event_key: str = "",
+    ) -> EventOutcome:
+        """Record a meeting event once per ``event_key`` (none: always).
 
         Webex may report an instance id (``<meetingId>_I_<n>``); it is matched on the series.
+        Keys are only remembered for OpenPlanner's meetings: org-owned webhooks also report
+        every other meeting of the organisation.
         """
         series = meeting_id.split("_I_", 1)[0]
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_meeting(series)
             if booking is None or booking.id is None:
-                return False
+                return EventOutcome.UNKNOWN
+            if event_key:
+                await tx.forget_webhook_events(at - WEBHOOK_MEMORY)
+                if not await tx.claim_webhook_event(WEBEX_SOURCE, event_key, at):
+                    return EventOutcome.DUPLICATE
             await self._record(tx, booking.id, kind, at, detail)
-        return True
+        return EventOutcome.RECORDED
 
     async def record_task_event(
         self, task_id: str, kind: EventKind, at: datetime, detail: str = ""
-    ) -> bool:
-        """Record a work item event; ``False`` for tasks OpenPlanner does not know."""
+    ) -> EventOutcome:
+        """Record a work item event; ``UNKNOWN`` for tasks OpenPlanner does not know."""
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_task(task_id)
             if booking is None or booking.id is None:
-                return False
+                return EventOutcome.UNKNOWN
             await self._record(tx, booking.id, kind, at, detail)
-        return True
+        return EventOutcome.RECORDED
 
     async def status(self, booking_id: int) -> CallStatus:
         """Return a booking's call status (the citizen's waiting page; no admin data)."""
@@ -99,7 +129,7 @@ class IntegrationService:
         if not authorization.decision.allowed or authorization.group is None:
             raise DomainError(ErrorCode.NOT_PERMITTED)
         group = authorization.group.group
-        # A local day lasts 23 or 25 hours when summer or winter time starts.
+        # Midnight to midnight in group time: a day can last 23 or 25 hours (DST).
         lower, upper = utc_bounds(group, day, day)
         async with self._uow.read() as tx:
             return await tx.list_bookings(scope_for(principal, permission), group.id, lower, upper)
