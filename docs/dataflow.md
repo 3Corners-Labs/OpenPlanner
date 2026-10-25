@@ -65,6 +65,7 @@ worker/web ──HTTPS (Service App token)──> Webex Meetings API: title "Vid
 Webex ──meeting id, join link──> OpenPlanner (bookings.video_room_id, guest_join_url)
 worker/web ──HTTPS──> WxCC Create Task v2: booking reference, first name, start (text), group name, meeting link, kind
 WxCC ──task id──> OpenPlanner (bookings.wxcc_task_id)
+worker ──HTTPS──> WxCC End Task v1 (task id only) or Task Messages v2: booking reference, kind=cancelled
 citizen ──GET /b/{token}/join/go──> OpenPlanner ──303──> Webex web app (no data added to the link)
 Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task events → booking_events, call_status
 ```

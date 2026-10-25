@@ -197,6 +197,7 @@ same commit and rollback behaviour as the SQL one.
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
+| Operator commands: `register-webhooks`, `wxcc-check` probes | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda, booking timeline, integrations page | `app/admin/call_routes.py`, `app/admin/routes.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
@@ -386,7 +387,7 @@ flowchart LR
     dispatch --> meeting(["call<br/>from start to finish"])
     meeting --> purge["slot end + 24h<br/>purge PII"]
 
-    cancel(["cancelled"]) --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
+    cancel(["cancelled"]) --> cend["end WxCC task<br/>(or mark cancelled, ADR 0020)<br/>delete meeting"] --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
 
 ```
 

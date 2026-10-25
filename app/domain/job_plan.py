@@ -8,7 +8,8 @@ changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
     booked ──► create_video_room (now) ─► send_confirmation | send_change (now)
            ──► send_reminder × rules (start − offset, if still ahead and reachable)
            ──► dispatch_wxcc_task (start − dispatch lead) ──► purge_pii (end + 24 h)
-    cancelled ──► send_cancellation (now, unless rescheduled) ──► purge_pii (now + 24 h)
+    cancelled ──► end_wxcc_task, delete_video_room (now) ─► send_cancellation (now, unless
+                  rescheduled) ──► purge_pii (now + 24 h)
 """
 
 from collections.abc import Iterable
@@ -43,6 +44,7 @@ class JobType(StrEnum):
     SEND_REMINDER = "send_reminder"
     SEND_CANCELLATION = "send_cancellation"
     DISPATCH_WXCC_TASK = "dispatch_wxcc_task"
+    END_WXCC_TASK = "end_wxcc_task"
     PURGE_PII = "purge_pii"
 
 
@@ -113,13 +115,14 @@ def plan_for_cancellation(*, cancelled_at: datetime, notify: bool = True) -> lis
     """Return the jobs that replace all pending jobs of a cancelled booking.
 
     ``notify=False`` for the old booking of a reschedule: the citizen gets a change message
-    for the new booking instead of a cancellation. The meeting is always removed; the job does
-    nothing when the booking never got one.
+    for the new booking instead of a cancellation. The work item is ended and the meeting
+    removed first (ADR 0020); those jobs do nothing when the booking never got them.
     """
+    end = PlannedJob(JobType.END_WXCC_TASK, cancelled_at, None)
     delete = PlannedJob(JobType.DELETE_VIDEO_ROOM, cancelled_at, None)
     message = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.EMAIL)
     purge = PlannedJob(JobType.PURGE_PII, cancelled_at + PURGE_AFTER, None)
-    return [delete, message, purge] if notify else [delete, purge]
+    return [end, delete, message, purge] if notify else [end, delete, purge]
 
 
 def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:

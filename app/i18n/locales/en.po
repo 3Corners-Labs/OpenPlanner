@@ -1186,3 +1186,21 @@ msgstr "Groups"
 
 msgid "join.refresh"
 msgstr "Refresh status"
+
+
+# --- WxCC work item lifecycle (ADR 0020) ---
+
+msgid "call.task.cancelled"
+msgstr "Task cancelled"
+
+msgid "call.event.task_end_requested"
+msgstr "Asked WxCC to end the task"
+
+msgid "call.event.end_not_possible"
+msgstr "Task could not be ended"
+
+msgid "call.event.task_marked_cancelled"
+msgstr "Task marked as cancelled"
+
+msgid "admin.booking.end_not_possible"
+msgstr "The booking was cancelled, but WxCC did not let OpenPlanner end the task. The task was marked as cancelled (Kind: cancelled). End the task in Agent Desktop if it is still open."

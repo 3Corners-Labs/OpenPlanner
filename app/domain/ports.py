@@ -124,10 +124,27 @@ class VideoProvider(Protocol):
 
 
 class ContactCenterDispatcher(Protocol):
-    """Creates work items in Webex Contact Center (Create Task API v2, ADR 0018)."""
+    """Creates and ends work items in Webex Contact Center (ADR 0018, 0020)."""
 
     async def create_task(self, item: WorkItem) -> str:
         """Create the work item and return the task id.
+
+        Raises:
+            IntegrationError: If WxCC refuses or cannot be reached.
+        """
+        ...
+
+    async def end_task(self, task_id: str) -> None:
+        """End the task (End Task API; needs ``cjp:user``).
+
+        Raises:
+            IntegrationError: If WxCC refuses (``rejected_403`` without the scope) or cannot be
+                reached.
+        """
+        ...
+
+    async def mark_cancelled(self, task_id: str, reference: str) -> None:
+        """Tell the agent the booking was cancelled (Task Messages API, ``cjp:task_write``).
 
         Raises:
             IntegrationError: If WxCC refuses or cannot be reached.
