@@ -6,6 +6,7 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
     audit_events (no foreign keys: events outlive what they describe)
     booking_events, call_status (per booking; no personal data, kept after the purge)
     integration_credentials (encrypted tokens, ADR 0008)
+    integration_reports (last webhook listing and delivery test; no secrets)
     admin_profiles (name per identity-provider subject; joined into the audit log)
     organisations 1──1 organisation_logos (branding, WP3b)
     organisations 1──* groups 1──* schedule_rules
@@ -25,6 +26,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
+    Text,
     Time,
     UniqueConstraint,
     text,
@@ -37,6 +39,7 @@ from app.adapters.db.types import UTCDateTime
 __all__ = [
     "AdminProfileRow",
     "IntegrationCredentialRow",
+    "IntegrationReportRow",
     "BookingEventRow",
     "CallStatusRow",
     "AuditEventRow",
@@ -330,6 +333,16 @@ class IntegrationCredentialRow(Base):
     nonce: Mapped[bytes] = mapped_column(LargeBinary)
     ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class IntegrationReportRow(Base):
+    """The last result of an operator check (JSON), shown read-only in the admin portal."""
+
+    __tablename__ = "integration_reports"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    body: Mapped[str] = mapped_column(Text)
+    checked_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
 class WebhookEventRow(Base):
