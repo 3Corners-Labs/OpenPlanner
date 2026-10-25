@@ -5,13 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ _("site.name") }}{% endblock %}</title>
   <link rel="stylesheet" href="/static/site.css">
+  {% if brand is defined %}<link rel="stylesheet" href="{{ brand.theme_href }}">{% endif %}
   {% block head_extra %}{% endblock %}
 </head>
 <body{% block body_attributes %}{% endblock %}>
   <a class="skip-link" href="#content">{{ _("site.skip_to_content") }}</a>
   {% block page %}
   <header class="site-header">
-    <p class="site-name">{% block site_name %}{{ _("site.name") }}{% endblock %}</p>
+    <p class="site-name">{% block site_name %}
+      {%- if brand is defined -%}
+      {% if brand.logo_href %}<img class="site-logo" src="{{ brand.logo_href }}" alt="">{% endif %}<span>{{ brand.name }}</span>
+      {%- else -%}
+      {{ _("site.name") }}
+      {%- endif -%}
+    {% endblock %}</p>
     {% include "_language_switcher.html" %}
     {% block header_extra %}{% endblock %}
   </header>
@@ -19,5 +26,6 @@
     {% block content %}{% endblock %}
   </main>
   {% endblock %}
+  {% block scripts %}{% endblock %}
 </body>
 </html>

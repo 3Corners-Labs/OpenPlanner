@@ -15,7 +15,7 @@ from starlette.responses import HTMLResponse
 
 from app.web.locale import LANG_PARAM, RequestLocale
 
-KEPT_QUERY_PARAMS = ("week", "start")
+KEPT_QUERY_PARAMS = ("week", "start", "month", "day")
 """Query parameters the language switcher carries over; anything else is dropped so that
 arbitrary input is never reflected into links."""
 
@@ -30,6 +30,13 @@ HTML_CSP = (
     "base-uri 'none'; frame-ancestors 'none'"
 )
 """No scripts, no inline styles, no framing. Relaxed per page only when a feature needs it."""
+
+SCRIPT_CSP = (
+    "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; "
+    "img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+)
+"""Citizen pages (ADR 0020): own scripts only, which may fetch the same pages; still no
+inline scripts or styles, so injected markup cannot run."""
 
 
 @dataclass(frozen=True)
@@ -99,11 +106,13 @@ def render(
     name: str,
     locale: RequestLocale,
     context: Mapping[str, object] | None = None,
+    *,
+    scripts: bool = False,
 ) -> HTMLResponse:
     """Render template ``name`` in the request's locale.
 
     The template receives ``_`` (bound gettext), ``locale`` and ``languages`` in addition
-    to ``context``.
+    to ``context``. ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``).
     """
     response = templates.TemplateResponse(
         request,
@@ -115,7 +124,7 @@ def render(
             "languages": language_options(request, locale),
         },
     )
-    response.headers["content-security-policy"] = HTML_CSP
+    response.headers["content-security-policy"] = SCRIPT_CSP if scripts else HTML_CSP
     response.headers["cache-control"] = "no-store"
     locale.apply_to(request, response)
     return response

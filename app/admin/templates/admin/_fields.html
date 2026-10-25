@@ -24,3 +24,13 @@
   {%- endif %}
 </div>
 {%- endmacro %}
+
+{#- The inputs of a simple card form and its submit button. -#}
+{% macro form_body(fields, button_label) -%}
+<div class="form-grid">
+  {% for f in fields %}{{ field(f) }}{% endfor %}
+</div>
+<div class="form-actions">
+  <button type="submit" class="button">{{ button_label }}</button>
+</div>
+{%- endmacro %}

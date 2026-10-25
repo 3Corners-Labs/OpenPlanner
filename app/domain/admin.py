@@ -15,6 +15,7 @@ such a context (superuser, no role) the event is global and only the superuser s
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
 from app.domain.authorization import (
@@ -179,3 +180,33 @@ class AdminService:
         """Return the newest audit events ``principal`` may see, with the actors' names."""
         async with self._uow.read() as tx:
             return await tx.list_audit_events(scope_for(principal, Permission.AUDIT_VIEW), limit)
+
+
+def require(authorization: Authorization) -> Authorization:
+    """Raise ``not_permitted`` unless the matrix allowed it (the denial is already audited).
+
+    Use cases call this after ``AdminService.authorize``, so the route's check is never the
+    only line of defence.
+    """
+    if not authorization.decision.allowed:
+        raise DomainError(ErrorCode.NOT_PERMITTED)
+    return authorization
+
+
+async def record_change(
+    tx: Transaction,
+    at: datetime,
+    principal: Principal,
+    permission: Permission,
+    organisation: str | None,
+    group: str | None,
+    detail: str = "",
+) -> None:
+    """Record a successful change in the same transaction as the change itself.
+
+    ``detail`` names what changed (field names, ``rule.add``-style keys), never values.
+    """
+    event = AuditEvent(
+        at, principal.subject, permission.value, Outcome.SUCCESS, "", organisation, group, detail
+    )
+    await tx.add_audit_event(event)

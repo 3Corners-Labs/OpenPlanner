@@ -18,8 +18,7 @@ slots would overlap and capacity could no longer be counted per slot.
 from dataclasses import dataclass, fields, replace
 from datetime import date, timedelta
 
-from app.domain.admin import AdminService, Authorization
-from app.domain.audit import AuditEvent, Outcome
+from app.domain.admin import AdminService, Authorization, record_change, require
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.availability import SlotTime, slots_on
 from app.domain.errors import DomainError, ErrorCode
@@ -127,7 +126,7 @@ class PlanningService:
         authorization = await self._admin.authorize(
             principal, permission, organisation_slug=new.organisation_slug
         )
-        _require(authorization)
+        require(authorization)
         async with self._uow.locked() as tx:
             organisation = await tx.get_organisation(new.organisation_slug)
             if organisation is None:
@@ -156,9 +155,7 @@ class PlanningService:
                 ``group_has_future_bookings`` with the field.
         """
         permission = Permission.GROUP_EDIT
-        authorization = _require(
-            await self._admin.authorize(principal, permission, group_slug=slug)
-        )
+        authorization = require(await self._admin.authorize(principal, permission, group_slug=slug))
         async with self._uow.locked() as tx:
             group = await _group(tx, slug)
             updated = replace(
@@ -188,7 +185,7 @@ class PlanningService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        _require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
+        require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
         async with self._uow.read() as tx:
             group = await _group(tx, slug)
             rules, overrides = await tx.get_schedule_items(group.id, self._today(group))
@@ -203,7 +200,7 @@ class PlanningService:
         Only days with slots are returned. Bookings, notice and horizon are left out: this
         shows what the opening hours produce, not what is still free.
         """
-        _require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
+        require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
         days = max(1, min(days, MAX_PREVIEW_DAYS))
         async with self._uow.read() as tx:
             group = await _group(tx, slug)
@@ -282,7 +279,7 @@ class PlanningService:
 
     async def _manage(self, principal: Principal, slug: str) -> Authorization:
         """Authorise ``schedule.manage`` on the group."""
-        return _require(
+        return require(
             await self._admin.authorize(principal, Permission.SCHEDULE_MANAGE, group_slug=slug)
         )
 
@@ -313,25 +310,9 @@ class PlanningService:
         detail: str = "",
     ) -> None:
         """Record a successful change in the same transaction as the change itself."""
-        await tx.add_audit_event(
-            AuditEvent(
-                self._clock.now(),
-                principal.subject,
-                permission.value,
-                Outcome.SUCCESS,
-                "",
-                organisation,
-                group,
-                detail,
-            )
+        await record_change(
+            tx, self._clock.now(), principal, permission, organisation, group, detail
         )
-
-
-def _require(authorization: Authorization) -> Authorization:
-    """Raise ``not_permitted`` unless the matrix allowed it (the denial is already audited)."""
-    if not authorization.decision.allowed:
-        raise DomainError(ErrorCode.NOT_PERMITTED)
-    return authorization
 
 
 def _organisation(authorization: Authorization) -> str | None:

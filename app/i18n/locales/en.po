@@ -89,23 +89,68 @@ msgstr "Your video call with {group_name} on {date} at {time} has been cancelled
 msgid "group.intro"
 msgstr "Choose a day and time for a video call. A call takes {minutes} minutes."
 
-msgid "group.week_heading"
-msgstr "Week of {date}"
+msgid "group.kind"
+msgstr "Video call · {minutes} minutes"
 
-msgid "group.weeks_label"
-msgstr "Weeks"
+msgid "steps.label"
+msgstr "Steps"
 
-msgid "group.previous_week"
-msgstr "Previous week"
+msgid "steps.time"
+msgstr "Day and time"
 
-msgid "group.next_week"
-msgstr "Next week"
+msgid "steps.details"
+msgstr "Your details"
 
-msgid "group.no_slots"
-msgstr "There are no times available in this week. Choose another week."
+msgid "steps.done"
+msgstr "Confirmed"
 
-msgid "group.choose"
-msgstr "Continue"
+msgid "steps.completed"
+msgstr "Done"
+
+msgid "picker.first"
+msgstr "First available:"
+
+msgid "picker.first_choose"
+msgstr "Choose this time"
+
+msgid "picker.previous_month"
+msgstr "Previous month"
+
+msgid "picker.next_month"
+msgstr "Next month"
+
+msgid "picker.today"
+msgstr "today"
+
+msgid "picker.day_free"
+msgstr "times available"
+
+msgid "picker.day_full"
+msgstr "no times available"
+
+msgid "picker.legend"
+msgstr "Days with a border and a dot have free times. Use the arrow keys to move through the calendar."
+
+msgid "picker.no_times_title"
+msgstr "No times this month"
+
+msgid "picker.no_times"
+msgstr "There are no free times this month. Choose another month."
+
+msgid "picker.morning"
+msgstr "Morning"
+
+msgid "picker.afternoon"
+msgstr "Afternoon"
+
+msgid "picker.evening"
+msgstr "Evening"
+
+msgid "picker.count"
+msgstr "{n} times available"
+
+msgid "picker.count_one"
+msgstr "1 time available"
 
 msgid "book.title"
 msgstr "Your details"
@@ -256,6 +301,21 @@ msgstr "Choose a new time. Your details stay the same."
 
 msgid "reschedule.submit"
 msgstr "Move"
+
+msgid "reschedule.confirm_title"
+msgstr "Confirm the new time"
+
+msgid "reschedule.from"
+msgstr "Now"
+
+msgid "reschedule.to"
+msgstr "New"
+
+msgid "reschedule.other_time"
+msgstr "Choose another time"
+
+msgid "book.privacy"
+msgstr "We use your details only for this appointment and delete them one day after the call."
 
 #. Admin portal and authorisation matrix (ADR 0014).
 
@@ -1186,3 +1246,86 @@ msgstr "Groups"
 
 msgid "join.refresh"
 msgstr "Refresh status"
+
+#. Branding per organisation (WP3b).
+
+msgid "authz.permission.branding_manage"
+msgstr "Manage an organisation's branding"
+
+msgid "admin.nav.branding"
+msgstr "Branding"
+
+msgid "admin.done.logo_saved"
+msgstr "The logo has been saved."
+
+msgid "admin.done.logo_removed"
+msgstr "The logo has been removed."
+
+msgid "admin.form.error.display_name"
+msgstr "Enter a name of at most 200 characters, without line breaks."
+
+msgid "admin.form.error.accent_color"
+msgstr "Choose a darker colour: white text on this colour needs a contrast of at least 4.5:1."
+
+msgid "admin.form.error.logo"
+msgstr "Choose a PNG, JPEG or WebP image of at most 200 kB. SVG is not possible."
+
+msgid "admin.audit.detail.logo_remove"
+msgstr "Logo removed"
+
+msgid "admin.branding.title"
+msgstr "Branding"
+
+msgid "admin.branding.lead"
+msgstr "Logo, name and accent colour on an organisation's booking pages."
+
+msgid "admin.branding.organisations"
+msgstr "Organisations"
+
+msgid "admin.branding.none"
+msgstr "You do not manage the branding of any organisation."
+
+msgid "admin.branding.page_lead"
+msgstr "This is how citizens see this organisation's booking pages. The admin portal itself keeps one fixed style."
+
+msgid "admin.branding.preview"
+msgstr "Preview"
+
+msgid "admin.branding.preview_lead"
+msgstr "As currently saved."
+
+msgid "admin.branding.logo_alt"
+msgstr "Logo of {name}"
+
+msgid "admin.branding.name_colour"
+msgstr "Name and colour"
+
+msgid "admin.branding.display_name"
+msgstr "Name in the header"
+
+msgid "admin.branding.display_name_hint"
+msgstr "Leave empty to show the organisation name: {name}."
+
+msgid "admin.branding.accent_color"
+msgstr "Accent colour"
+
+msgid "admin.branding.accent_color_hint"
+msgstr "For buttons, links and the chosen day. White text on this colour needs a contrast of at least 4.5:1 (WCAG)."
+
+msgid "admin.branding.logo"
+msgstr "Logo"
+
+msgid "admin.branding.logo_lead"
+msgstr "Shown on the left of the header, next to the name. PNG, JPEG or WebP, at most {kb} kB."
+
+msgid "admin.branding.logo_file"
+msgstr "Image"
+
+msgid "admin.branding.logo_hint"
+msgstr "PNG, JPEG or WebP, at most {kb} kB. A landscape logo about 80 pixels high works best."
+
+msgid "admin.branding.logo_upload"
+msgstr "Upload logo"
+
+msgid "admin.branding.logo_remove"
+msgstr "Remove logo"

@@ -40,51 +40,78 @@ def token_of(response: httpx.Response) -> str:
     return match.group(1)
 
 
-async def test_group_page_lists_slots_per_day(site: httpx.AsyncClient) -> None:
+async def test_group_page_shows_the_month_and_the_first_free_day(
+    site: httpx.AsyncClient,
+) -> None:
     response = await site.get("/g/demo")
 
     assert response.status_code == 200
     text = response.text
     assert "<h1>Demo: videogesprek</h1>" in text
-    assert "<legend>vrijdag 2 januari</legend>" in text
-    assert f'value="{FRIDAY_0900}"' in text
+    assert '<h2 id="month-heading">januari 2026</h2>' in text
     # Today 09:00 local + 60 minutes notice: the first bookable slot today is 10:00.
+    assert "<strong>Eerst mogelijk:</strong> donderdag 1 januari, 10:00" in text
     assert 'value="2026-01-01T08:30:00Z"' not in text
     assert 'value="2026-01-01T09:00:00Z"' in text
-    assert "Vorige week" not in text  # current week
-    assert "?week=2026-01-05" in text
+    assert '<h2 id="times-heading" tabindex="-1">donderdag 1 januari</h2>' in text
+    assert "<legend>Ochtend</legend>" in text
+    assert "<legend>Middag</legend>" in text
+    # Free days are links with a full label; weekends are not.
+    assert 'href="/g/demo?day=2026-01-02#times"' in text
+    assert "vrijdag 2 januari, tijden vrij" in text
+    assert "zaterdag 3 januari, geen tijden vrij" in text
+    assert 'href="/g/demo?day=2026-01-03' not in text
+    assert 'aria-current="true"' in text  # the day whose times are shown
+    assert "Vorige maand" not in text  # current month
+    assert 'href="/g/demo?month=2026-02"' in text
+    assert '<script src="/static/calendar.js" defer>' in text
+    assert "script-src 'self'" in response.headers["content-security-policy"]
 
 
-async def test_week_navigation_is_clamped(site: httpx.AsyncClient) -> None:
-    past = await site.get("/g/demo", params={"week": "2020-01-01"})
-    garbage = await site.get("/g/demo", params={"week": "not-a-date"})
-    future = await site.get("/g/demo", params={"week": "2030-01-01"})
+async def test_a_day_link_shows_that_days_times(site: httpx.AsyncClient) -> None:
+    text = (await site.get("/g/demo", params={"day": "2026-01-02"})).text
 
-    assert "Week van maandag 29 december" in past.text
-    assert "Week van maandag 29 december" in garbage.text
-    assert "Volgende week" not in future.text
-    assert "Vorige week" in future.text
+    assert '<h2 id="times-heading" tabindex="-1">vrijdag 2 januari</h2>' in text
+    assert f'name="start" value="{FRIDAY_0900}"' in text
+    assert "14 tijden vrij" in text
+    assert 'class="time-button" name="start" value="2026-01-01T09:00:00Z"' not in text
 
 
-async def test_first_visit_skips_weeks_without_free_slots(demo_settings: Settings) -> None:
-    friday_evening = FixedClock(NOW + timedelta(days=1, hours=10))  # Fri 2 Jan 18:00 UTC
+async def test_month_navigation_is_clamped_and_ignores_garbage(site: httpx.AsyncClient) -> None:
+    past = await site.get("/g/demo", params={"month": "2020-01"})
+    garbage = await site.get("/g/demo", params={"month": "not-a-month", "day": "2026-99-01"})
+    future = await site.get("/g/demo", params={"month": "2030-01"})
+    closed_day = await site.get("/g/demo", params={"day": "2026-01-03"})
 
-    async with app_client(demo_settings, friday_evening) as client:
+    assert "januari 2026</h2>" in past.text
+    assert "januari 2026</h2>" in garbage.text
+    assert "maart 2026</h2>" in future.text  # horizon: 60 days
+    assert "Volgende maand" not in future.text
+    assert "Vorige maand" in future.text
+    # A day without times falls back to the first free day of its month.
+    assert '<h2 id="times-heading" tabindex="-1">donderdag 1 januari</h2>' in closed_day.text
+
+
+async def test_first_visit_skips_months_without_free_slots(demo_settings: Settings) -> None:
+    new_years_eve = FixedClock(NOW - timedelta(days=1, hours=-10))  # Wed 31 Dec 18:00 UTC
+
+    async with app_client(demo_settings, new_years_eve) as client:
         first_visit = await client.get("/g/demo")
-        chosen_week = await client.get("/g/demo", params={"week": "2026-01-02"})
+        december = await client.get("/g/demo", params={"month": "2025-12"})
 
-    assert "Week van maandag 5 januari" in first_visit.text
-    assert "Vorige week" in first_visit.text
-    assert "geen tijden beschikbaar" in chosen_week.text
+    assert "januari 2026</h2>" in first_visit.text
+    assert "Vorige maand" in first_visit.text
+    assert "Geen tijden in deze maand" in december.text
 
 
 async def test_group_page_in_english(site: httpx.AsyncClient) -> None:
-    text = (await site.get("/g/demo", params={"lang": "en"})).text
+    text = (await site.get("/g/demo", params={"lang": "en", "day": "2026-01-02"})).text
 
-    assert (
-        "<legend>Friday 2 January</legend>" in text or "<legend>Friday January 2</legend>" in text
-    )
-    assert "Continue" in text
+    assert "January 2026</h2>" in text
+    assert "<legend>Morning</legend>" in text
+    assert "Choose this time" in text
+    assert 'href="?month=' not in text  # the language switcher keeps only known parameters
+    assert "?day=2026-01-02&amp;lang=nl" in text
 
 
 async def test_unknown_group_is_a_404_page(site: httpx.AsyncClient) -> None:
@@ -181,7 +208,8 @@ async def test_cross_site_posts_are_refused(
     response = await site.post("/g/demo/book", data={"start": FRIDAY_0900, **ADA}, headers=headers)
 
     assert response.status_code == 403
-    assert (await site.get("/g/demo")).text.count(f'value="{FRIDAY_0900}"') == 1
+    friday = await site.get("/g/demo", params={"day": "2026-01-02"})
+    assert friday.text.count(f'value="{FRIDAY_0900}"') == 1
 
 
 @pytest.mark.parametrize(
@@ -219,14 +247,20 @@ async def test_cancel_flow(site: httpx.AsyncClient) -> None:
 async def test_reschedule_flow(site: httpx.AsyncClient) -> None:
     old = token_of(await book(site))
 
-    picker = await site.get(f"/b/{old}/reschedule")
+    picker = await site.get(f"/b/{old}/reschedule", params={"day": "2026-01-02"})
+    confirm = await site.get(f"/b/{old}/reschedule", params={"start": FRIDAY_0930})
     response = await site.post(
         f"/b/{old}/reschedule", data={"start": FRIDAY_0930}, headers=SAME_ORIGIN
     )
 
     assert "Uw huidige afspraak: vrijdag 2 januari 2026, 09:00–09:30." in picker.text
     assert f'value="{FRIDAY_0900}"' not in picker.text  # the current slot is not offered
+    assert f'value="{FRIDAY_0930}"' in picker.text
     assert f'action="/b/{old}/reschedule"' in picker.text
+    # A chosen time is confirmed first (from → to), so one click never moves a booking.
+    assert "Nieuw moment bevestigen" in confirm.text
+    assert "vrijdag 2 januari 2026, 09:30–10:00" in confirm.text
+    assert f'<form method="post" action="/b/{old}/reschedule">' in confirm.text
     new = token_of(response)
     assert new != old
     assert "09:30–10:00" in (await site.get(f"/b/{new}")).text
@@ -242,6 +276,17 @@ async def test_reschedule_errors_are_shown_on_the_picker(site: httpx.AsyncClient
 
     assert response.status_code == 409
     assert "huidige afspraak. Kies een ander moment" in response.text
+
+
+async def test_reschedule_confirmation_needs_a_free_other_time(site: httpx.AsyncClient) -> None:
+    token = token_of(await book(site))
+
+    same = await site.get(f"/b/{token}/reschedule", params={"start": FRIDAY_0900})
+    garbage = await site.get(f"/b/{token}/reschedule", params={"start": "2026-01-02T08:07:00Z"})
+
+    for response in (same, garbage):
+        assert "Nieuw moment bevestigen" not in response.text
+        assert 'id="month-heading"' in response.text  # back on the picker
 
 
 async def test_booking_is_read_only_from_the_dispatch_moment(demo_settings: Settings) -> None:

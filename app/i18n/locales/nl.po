@@ -89,23 +89,68 @@ msgstr "Uw videogesprek met {group_name} op {date} om {time} is geannuleerd. U k
 msgid "group.intro"
 msgstr "Kies een dag en tijd voor een videogesprek. Een gesprek duurt {minutes} minuten."
 
-msgid "group.week_heading"
-msgstr "Week van {date}"
+msgid "group.kind"
+msgstr "Videogesprek · {minutes} minuten"
 
-msgid "group.weeks_label"
-msgstr "Weken"
+msgid "steps.label"
+msgstr "Stappen"
 
-msgid "group.previous_week"
-msgstr "Vorige week"
+msgid "steps.time"
+msgstr "Dag en tijd"
 
-msgid "group.next_week"
-msgstr "Volgende week"
+msgid "steps.details"
+msgstr "Uw gegevens"
 
-msgid "group.no_slots"
-msgstr "In deze week zijn geen tijden beschikbaar. Kies een andere week."
+msgid "steps.done"
+msgstr "Bevestigd"
 
-msgid "group.choose"
-msgstr "Verder"
+msgid "steps.completed"
+msgstr "Klaar"
+
+msgid "picker.first"
+msgstr "Eerst mogelijk:"
+
+msgid "picker.first_choose"
+msgstr "Kies dit moment"
+
+msgid "picker.previous_month"
+msgstr "Vorige maand"
+
+msgid "picker.next_month"
+msgstr "Volgende maand"
+
+msgid "picker.today"
+msgstr "vandaag"
+
+msgid "picker.day_free"
+msgstr "tijden vrij"
+
+msgid "picker.day_full"
+msgstr "geen tijden vrij"
+
+msgid "picker.legend"
+msgstr "Dagen met een rand en een stip hebben vrije tijden. Gebruik de pijltjestoetsen om door de kalender te gaan."
+
+msgid "picker.no_times_title"
+msgstr "Geen tijden in deze maand"
+
+msgid "picker.no_times"
+msgstr "In deze maand zijn geen tijden vrij. Kies een andere maand."
+
+msgid "picker.morning"
+msgstr "Ochtend"
+
+msgid "picker.afternoon"
+msgstr "Middag"
+
+msgid "picker.evening"
+msgstr "Avond"
+
+msgid "picker.count"
+msgstr "{n} tijden vrij"
+
+msgid "picker.count_one"
+msgstr "1 tijd vrij"
 
 msgid "book.title"
 msgstr "Uw gegevens"
@@ -256,6 +301,21 @@ msgstr "Kies een nieuw moment. Uw gegevens blijven hetzelfde."
 
 msgid "reschedule.submit"
 msgstr "Verplaatsen"
+
+msgid "reschedule.confirm_title"
+msgstr "Nieuw moment bevestigen"
+
+msgid "reschedule.from"
+msgstr "Nu"
+
+msgid "reschedule.to"
+msgstr "Wordt"
+
+msgid "reschedule.other_time"
+msgstr "Ander moment kiezen"
+
+msgid "book.privacy"
+msgstr "We gebruiken uw gegevens alleen voor deze afspraak en verwijderen ze een dag na het gesprek."
 
 #. Admin portal and authorisation matrix (ADR 0014).
 
@@ -1186,3 +1246,86 @@ msgstr "Groepen"
 
 msgid "join.refresh"
 msgstr "Status verversen"
+
+#. Branding per organisation (WP3b).
+
+msgid "authz.permission.branding_manage"
+msgstr "Huisstijl van een organisatie beheren"
+
+msgid "admin.nav.branding"
+msgstr "Huisstijl"
+
+msgid "admin.done.logo_saved"
+msgstr "Het logo is opgeslagen."
+
+msgid "admin.done.logo_removed"
+msgstr "Het logo is verwijderd."
+
+msgid "admin.form.error.display_name"
+msgstr "Vul een naam in van hoogstens 200 tekens, zonder regeleinden."
+
+msgid "admin.form.error.accent_color"
+msgstr "Kies een donkerdere kleur: witte tekst op deze kleur moet een contrast van minstens 4,5:1 hebben."
+
+msgid "admin.form.error.logo"
+msgstr "Kies een PNG-, JPEG- of WebP-afbeelding van hoogstens 200 kB. SVG kan niet."
+
+msgid "admin.audit.detail.logo_remove"
+msgstr "Logo verwijderd"
+
+msgid "admin.branding.title"
+msgstr "Huisstijl"
+
+msgid "admin.branding.lead"
+msgstr "Logo, naam en accentkleur op de afspraakpagina's van een organisatie."
+
+msgid "admin.branding.organisations"
+msgstr "Organisaties"
+
+msgid "admin.branding.none"
+msgstr "U beheert geen huisstijl van een organisatie."
+
+msgid "admin.branding.page_lead"
+msgstr "Zo zien burgers de afspraakpagina's van deze organisatie. Het beheerportaal zelf houdt één vaste stijl."
+
+msgid "admin.branding.preview"
+msgstr "Voorbeeld"
+
+msgid "admin.branding.preview_lead"
+msgstr "Zoals nu opgeslagen."
+
+msgid "admin.branding.logo_alt"
+msgstr "Logo van {name}"
+
+msgid "admin.branding.name_colour"
+msgstr "Naam en kleur"
+
+msgid "admin.branding.display_name"
+msgstr "Naam in de kop"
+
+msgid "admin.branding.display_name_hint"
+msgstr "Leeg laten om de organisatienaam te tonen: {name}."
+
+msgid "admin.branding.accent_color"
+msgstr "Accentkleur"
+
+msgid "admin.branding.accent_color_hint"
+msgstr "Voor knoppen, links en de gekozen dag. Witte tekst op deze kleur moet een contrast van minstens 4,5:1 hebben (WCAG)."
+
+msgid "admin.branding.logo"
+msgstr "Logo"
+
+msgid "admin.branding.logo_lead"
+msgstr "Staat links in de kop, naast de naam. PNG, JPEG of WebP, hoogstens {kb} kB."
+
+msgid "admin.branding.logo_file"
+msgstr "Afbeelding"
+
+msgid "admin.branding.logo_hint"
+msgstr "PNG, JPEG of WebP, hoogstens {kb} kB. Een liggend logo van ongeveer 80 pixels hoog werkt het best."
+
+msgid "admin.branding.logo_upload"
+msgstr "Logo uploaden"
+
+msgid "admin.branding.logo_remove"
+msgstr "Logo verwijderen"

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ _("reschedule.confirm_title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+{% include "_error_summary.html" %}
+<p class="eyebrow">{{ group.name }}</p>
+<h1>{{ _("reschedule.confirm_title") }}</h1>
+<dl class="details">
+  <dt>{{ _("reschedule.from") }}</dt><dd>{{ slot_label }}</dd>
+  <dt>{{ _("reschedule.to") }}</dt><dd>{{ new_label }}</dd>
+</dl>
+<form method="post" action="/b/{{ token }}/reschedule">
+  <input type="hidden" name="start" value="{{ new_start }}">
+  <ul class="actions">
+    <li><button type="submit" class="button button--large">{{ _("reschedule.submit") }}</button></li>
+    <li><a href="/b/{{ token }}/reschedule">{{ _("reschedule.other_time") }}</a></li>
+  </ul>
+</form>
+{% endblock %}

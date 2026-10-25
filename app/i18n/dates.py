@@ -34,6 +34,17 @@ def format_clock(moment: datetime, tz: tzinfo, locale: str) -> str:
     return format_time(moment.astimezone(tz), format="short", locale=_babel_locale(locale))
 
 
+def format_month(day: date, locale: str) -> str:
+    """Return the month and year of ``day`` as a heading, e.g. ``oktober 2026``."""
+    return format_date(day, format="LLLL y", locale=_babel_locale(locale))
+
+
+def weekday_abbreviations(locale: str) -> list[str]:
+    """Return short weekday names Monday first for calendar columns, e.g. ``ma`` … ``zo``."""
+    names = get_day_names("short", locale=_babel_locale(locale))
+    return [str(names[index]) for index in range(7)]
+
+
 def weekday_names(locale: str) -> list[str]:
     """Return the weekday names Monday first, e.g. ``maandag`` … ``zondag``."""
     names = get_day_names("wide", locale=_babel_locale(locale))
