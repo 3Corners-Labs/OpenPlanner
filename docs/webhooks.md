@@ -17,7 +17,8 @@ stores the tokens encrypted (ADR 0008). Scopes:
 | `meeting:admin_participants_read` | live status (participants) |
 | read scope of `meetings` and `meetingParticipants` at admin level (org-owned webhooks; exact scope names to be confirmed when registering) | live status events |
 | `cjp:task_write`, `cjp:task_read` | Create Task v2, Task Messages |
-| `cjp:config_read`, `cjp:config_write` | register the WxCC subscription (administrator role) |
+| `cjp:user` | End Task for cancelled bookings (ADR 0020); without it the task is only marked cancelled |
+| `cjp:config_read`, `cjp:config_write` | register and list the WxCC subscription, event types, task search in `wxcc-check` (administrator role) |
 
 ## Outbound: Webex Meetings
 
@@ -77,9 +78,26 @@ Limits: `workItemData` ≤ 50 keys (≤ 100 bytes), values ≤ 1024 bytes; `flow
 tuples (key ≤ 200, value ≤ 512 bytes). Only first name and the meeting link leave OpenPlanner
 (CLAUDE.md).
 
-**End Task** (`POST /v1/tasks/{taskId}/end`) documents agent scopes (`cjp:user` or
-`cloud-contact-center:pod_conv`). Whether a Service App may end a work item is open: to be
-confirmed with the Cisco beta team before direct calls rely on it (ADR 0019).
+**Ending a cancelled booking's task** (ADR 0020). First End Task,
+`POST /v1/tasks/{taskId}/end` without a body (`cjp:user`; `202` on success). If WxCC refuses,
+the timeline records `end_not_possible` with the code and OpenPlanner appends a Task Messages
+snapshot, `POST /v2/tasks/{taskId}/messages` (`cjp:task_write`, beta, `202`):
+
+```json
+{
+  "mediaType": "workItem",
+  "channelParams": {
+    "type": "work-item-form",
+    "message": {
+      "aliasId": "<uuid>",
+      "workItemData": {"bookingReference": "OP-000123", "kind": "cancelled"},
+      "timestamp": 1792998000000
+    }
+  }
+}
+```
+
+Only the booking reference goes out: no first name, no meeting link.
 
 ## Webhook addresses
 

@@ -8,6 +8,8 @@ a ``BookingEvent`` and updates one aggregated ``CallStatus`` per booking.
     booked ─► meeting_created ─► task_created ─► task_connected ─► host_joined
                                      │                                 guest_joined …
                                      └► task_failed (reason)        ─► meeting_ended
+    cancelled ─► task_end_requested ─► task_ended
+             └► end_not_possible (reason) ─► task_marked_cancelled   (ADR 0020)
 
 No names, email addresses or IP addresses of participants are stored: only counts, whether a
 host joined, and times. Pure Python, no I/O; ``app.domain.integration`` records and shows them.
@@ -33,6 +35,10 @@ class EventKind(StrEnum):
     TASK_FAILED = "task_failed"
     TASK_CONNECTED = "task_connected"
     TASK_ENDED = "task_ended"
+    TASK_END_REQUESTED = "task_end_requested"
+    END_NOT_POSSIBLE = "end_not_possible"
+    """WxCC refused to end the task (detail: the code, e.g. ``rejected_403``)."""
+    TASK_MARKED_CANCELLED = "task_marked_cancelled"
     MEETING_STARTED = "meeting_started"
     HOST_JOINED = "host_joined"
     GUEST_JOINED = "guest_joined"
@@ -88,6 +94,8 @@ class TaskState(StrEnum):
     CONNECTED = "connected"
     ENDED = "ended"
     FAILED = "failed"
+    CANCELLED = "cancelled"
+    """Marked cancelled by a task message; an agent still has to end it (ADR 0020)."""
 
 
 @dataclass(frozen=True)
@@ -145,6 +153,8 @@ def apply_event(status: CallStatus, kind: EventKind, at: datetime) -> CallStatus
         changes["task"] = TaskState.ENDED
     elif kind is EventKind.TASK_FAILED:
         changes["task"] = TaskState.FAILED
+    elif kind is EventKind.TASK_MARKED_CANCELLED:
+        changes["task"] = TaskState.CANCELLED
     return replace(status, **changes)  # type: ignore[arg-type]
 
 

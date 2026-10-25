@@ -6,7 +6,7 @@ from collections.abc import Callable
 import httpx
 import pytest
 
-from app.adapters.wxcc import WxccTasks, task_body
+from app.adapters.wxcc import WxccTasks, cancellation_body, task_body
 from app.domain.calls import WorkItem
 from app.domain.ports import IntegrationError
 from tests.fakes.clock import FixedClock
@@ -88,3 +88,69 @@ async def test_schema_violation_is_not_retried() -> None:
     with pytest.raises(IntegrationError) as error:
         await tasks.create_task(ITEM)
     assert (error.value.code, error.value.retryable) == ("rejected_400", False)
+
+
+async def test_end_task_calls_the_end_task_api() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(202, json={"data": {"id": "141897a0"}})
+
+    await _tasks(handler).end_task("141897a0-6212-49be-be9d-4823ab1e4dc7")
+
+    assert (seen[0].method, seen[0].url.path) == (
+        "POST",
+        "/v1/tasks/141897a0-6212-49be-be9d-4823ab1e4dc7/end",
+    )
+
+
+async def test_end_task_without_the_agent_scope_is_not_retried() -> None:
+    # Recorded: a Service App token without cjp:user gets 403 from End Task.
+    tasks = _tasks(lambda request: httpx.Response(403, json={"error": {"key": "403"}}))
+
+    with pytest.raises(IntegrationError) as error:
+        await tasks.end_task("141897a0-6212-49be-be9d-4823ab1e4dc7")
+    assert (error.value.code, error.value.retryable) == ("rejected_403", False)
+
+
+async def test_a_task_id_cannot_change_the_path() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(202)
+
+    await _tasks(handler).end_task("../v2/subscriptions")
+
+    assert seen[0].url.raw_path == b"/v1/tasks/..%2Fv2%2Fsubscriptions/end"
+
+
+def test_cancellation_message_carries_the_reference_only() -> None:
+    body = cancellation_body("OP-000123", "alias-2", 1767600000000)
+
+    assert body == {
+        "mediaType": "workItem",
+        "channelParams": {
+            "type": "work-item-form",
+            "message": {
+                "aliasId": "alias-2",
+                "workItemData": {"bookingReference": "OP-000123", "kind": "cancelled"},
+                "timestamp": 1767600000000,
+            },
+        },
+    }
+
+
+async def test_mark_cancelled_appends_a_task_message() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(202, json={"data": {"id": "event-1"}})
+
+    await _tasks(handler).mark_cancelled("141897a0", "OP-000123")
+
+    assert seen[0].url.path == "/v2/tasks/141897a0/messages"
+    message = json.loads(seen[0].content)["channelParams"]["message"]
+    assert message["workItemData"] == {"bookingReference": "OP-000123", "kind": "cancelled"}

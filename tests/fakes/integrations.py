@@ -29,9 +29,23 @@ class FakeDispatcher:
     def __init__(self) -> None:
         self.items: list[WorkItem] = []
         self.error: IntegrationError | None = None
+        self.ended: list[str] = []
+        self.end_error: IntegrationError | None = None
+        self.marked: list[tuple[str, str]] = []
+        self.mark_error: IntegrationError | None = None
 
     async def create_task(self, item: WorkItem) -> str:
         if self.error:
             raise self.error
         self.items.append(item)
         return f"task-{len(self.items)}"
+
+    async def end_task(self, task_id: str) -> None:
+        if self.end_error:
+            raise self.end_error
+        self.ended.append(task_id)
+
+    async def mark_cancelled(self, task_id: str, reference: str) -> None:
+        if self.mark_error:
+            raise self.mark_error
+        self.marked.append((task_id, reference))
