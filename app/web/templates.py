@@ -7,6 +7,7 @@ the HTML Content-Security-Policy and caching rules are applied in one place.
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
@@ -15,7 +16,7 @@ from starlette.responses import HTMLResponse
 
 from app.web.locale import LANG_PARAM, RequestLocale
 
-KEPT_QUERY_PARAMS = ("week", "start", "month", "day")
+KEPT_QUERY_PARAMS = ("start", "month", "day", "days", "from", "until")
 """Query parameters the language switcher carries over; anything else is dropped so that
 arbitrary input is never reflected into links."""
 
@@ -85,15 +86,19 @@ def create_templates(page_dirs: Sequence[Path]) -> Jinja2Templates:
 
 def language_options(request: Request, locale: RequestLocale) -> list[LanguageOption]:
     """Build the language switcher for ``request``, keeping only ``KEPT_QUERY_PARAMS``."""
-    kept = {key: value for key, value in request.query_params.items() if key in KEPT_QUERY_PARAMS}
+    kept = [
+        (key, value)
+        for key, value in request.query_params.multi_items()
+        if key in KEPT_QUERY_PARAMS
+    ]
     options = []
     for code in locale.translator.locales:
-        url = request.url.replace_query_params(**kept, **{LANG_PARAM: code})
+        query = urlencode([*kept, (LANG_PARAM, code)])
         options.append(
             LanguageOption(
                 code=code,
                 autonym=locale.translator.gettext(code, "language.autonym"),
-                href=f"?{url.query}",
+                href=f"?{query}",
                 current=code == locale.code,
             )
         )

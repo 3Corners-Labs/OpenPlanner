@@ -1,13 +1,50 @@
 {#- Slot picker (ADR 0020): month calendar of links plus the times of the chosen day.
     Works without JavaScript; static/calendar.js adds the ARIA grid and arrow keys.
     Expects: picker (PickerView), action and method (where a time button submits to). -#}
+{% set f = picker.filter %}
+<details class="filter"{% if f.active or f.invalid_range %} open{% endif %}>
+  <summary>{{ _("picker.filter.title") }}</summary>
+  <form method="get" action="{{ f.action }}" class="filter__form">
+    <fieldset class="filter__days">
+      <legend>{{ _("picker.filter.days") }}</legend>
+      <div class="filter__options">
+        {% for option in f.days %}
+        <label class="filter__day" for="days-{{ option.value }}"><input type="checkbox" name="days" value="{{ option.value }}" id="days-{{ option.value }}"{% if option.selected %} checked{% endif %}>{{ option.label }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <div class="filter__hours">
+      <div class="field">
+        <label for="filter-from">{{ _("picker.filter.from") }}</label>
+        <select id="filter-from" name="from">
+          <option value="">{{ _("picker.filter.any") }}</option>
+          {% for option in f.starts %}<option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field{% if f.invalid_range %} field--error{% endif %}">
+        <label for="filter-until">{{ _("picker.filter.until") }}</label>
+        {% if f.invalid_range %}<p class="error-message" id="filter-until-error">{{ _("picker.filter.error_range") }}</p>{% endif %}
+        <select id="filter-until" name="until"{% if f.invalid_range %} aria-invalid="true" aria-describedby="filter-until-error"{% endif %}>
+          <option value="">{{ _("picker.filter.any") }}</option>
+          {% for option in f.ends %}<option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="filter__actions">
+      <button type="submit" class="button">{{ _("picker.filter.apply") }}</button>
+      {% if f.active %}<a href="{{ f.clear_href }}">{{ _("picker.filter.clear") }}</a>{% endif %}
+    </div>
+  </form>
+</details>
 {% if picker.first %}
 <div class="quick-pick">
-  <p><strong>{{ _("picker.first") }}</strong> {{ picker.first.label }}</p>
+  <p><strong>{% if f.active %}{{ _("picker.first_fitting") }}{% else %}{{ _("picker.first") }}{% endif %}</strong> {{ picker.first.label }}</p>
   <form method="{{ method }}" action="{{ action }}">
     <button type="submit" class="button" name="start" value="{{ picker.first.value }}">{{ _("picker.first_choose") }}</button>
   </form>
 </div>
+{% elif f.active %}
+<div class="notice notice--warning" role="status"><p><strong>{{ _("picker.filter.none_title") }}</strong> {{ _("picker.filter.none") }}</p></div>
 {% endif %}
 <div class="picker" data-picker>
   <section class="card calendar" aria-labelledby="month-heading">

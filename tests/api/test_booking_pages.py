@@ -365,3 +365,62 @@ async def test_first_free_moment_is_found_beyond_two_months(demo_settings: Setti
     assert "<strong>Eerst mogelijk:</strong> woensdag 1 april, 09:00" in text
     assert '<h2 id="month-heading">april 2026</h2>' in text
     assert '<h2 id="times-heading" tabindex="-1">woensdag 1 april</h2>' in text
+
+
+async def test_filter_finds_the_first_slot_that_fits(site: httpx.AsyncClient) -> None:
+    # "Friday from 13:00": the first fitting slot is Friday 2 January 13:00.
+    text = (await site.get("/g/demo", params=[("days", "4"), ("from", "13")])).text
+
+    assert "<strong>Eerst passend:</strong> vrijdag 2 januari, 13:00" in text
+    assert '<details class="filter" open>' in text
+    assert '<input type="checkbox" name="days" value="4" id="days-4" checked>' in text
+    assert '<option value="13" selected>13:00</option>' in text
+    # Only Fridays are free days now, and links keep the filter.
+    assert 'href="/g/demo?days=4&amp;from=13&amp;day=2026-01-09#times"' in text
+    assert 'href="/g/demo?days=4&amp;from=13&amp;day=2026-01-08' not in text
+    assert "donderdag 8 januari, geen tijden vrij" in text
+    assert 'href="/g/demo?days=4&amp;from=13&amp;month=2026-02"' in text
+    assert '<h2 id="times-heading" tabindex="-1">vrijdag 2 januari</h2>' in text
+    assert "<legend>Ochtend</legend>" not in text
+    assert "8 tijden vrij" in text
+    assert 'href="/g/demo">Filter wissen</a>' in text
+
+
+async def test_filter_until_keeps_slots_that_end_in_time(site: httpx.AsyncClient) -> None:
+    text = (
+        await site.get("/g/demo", params=[("day", "2026-01-02"), ("from", "9"), ("until", "10")])
+    ).text
+
+    assert f'name="start" value="{FRIDAY_0900}"' in text
+    assert f'name="start" value="{FRIDAY_0930}"' in text
+    assert 'value="2026-01-02T09:00:00Z"' not in text  # 10:00 ends at 10:30
+    assert "2 tijden vrij" in text
+
+
+async def test_filter_without_a_fit_says_so(site: httpx.AsyncClient) -> None:
+    text = (await site.get("/g/demo", params=[("days", "5"), ("days", "6")])).text
+
+    assert "Geen tijden die passen" in text
+    assert "Eerst passend" not in text
+    assert 'id="times-heading"' in text
+
+
+async def test_filter_rejects_an_end_before_the_start(site: httpx.AsyncClient) -> None:
+    response = await site.get("/g/demo", params=[("from", "15"), ("until", "10")])
+
+    assert response.status_code == 200
+    assert 'id="filter-until-error"' in response.text
+    assert "De eindtijd moet na de begintijd liggen." in response.text
+    assert 'aria-describedby="filter-until-error"' in response.text
+
+
+async def test_filter_ignores_garbage_and_the_switcher_keeps_it(site: httpx.AsyncClient) -> None:
+    garbage = await site.get(
+        "/g/demo", params=[("days", "9"), ("days", "x"), ("from", "abc"), ("until", "99")]
+    )
+    kept = (await site.get("/g/demo", params=[("days", "1"), ("days", "4"), ("from", "13")])).text
+
+    assert garbage.status_code == 200
+    assert "<strong>Eerst mogelijk:</strong>" in garbage.text
+    assert '<details class="filter">' in garbage.text
+    assert "?days=1&amp;days=4&amp;from=13&amp;lang=en" in kept

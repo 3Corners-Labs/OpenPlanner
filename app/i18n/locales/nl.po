@@ -113,6 +113,39 @@ msgstr "Eerst mogelijk:"
 msgid "picker.first_choose"
 msgstr "Kies dit moment"
 
+msgid "picker.first_fitting"
+msgstr "Eerst passend:"
+
+msgid "picker.filter.title"
+msgstr "Wanneer past het u?"
+
+msgid "picker.filter.days"
+msgstr "Dagen"
+
+msgid "picker.filter.from"
+msgstr "Vanaf"
+
+msgid "picker.filter.until"
+msgstr "Klaar vóór"
+
+msgid "picker.filter.any"
+msgstr "Maakt niet uit"
+
+msgid "picker.filter.apply"
+msgstr "Toon passende tijden"
+
+msgid "picker.filter.clear"
+msgstr "Filter wissen"
+
+msgid "picker.filter.error_range"
+msgstr "De eindtijd moet na de begintijd liggen."
+
+msgid "picker.filter.none_title"
+msgstr "Geen tijden die passen."
+
+msgid "picker.filter.none"
+msgstr "Probeer andere dagen of tijden, of wis het filter."
+
 msgid "picker.previous_month"
 msgstr "Vorige maand"
 

@@ -99,3 +99,21 @@ test('the calendar works without JavaScript', async ({ browser }) => {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Uw gegevens');
   await context.close();
 });
+
+test('"Wanneer past het u?" narrows the times, with the keyboard', async ({ page }) => {
+  await page.goto('/g/demo');
+  const summary = page.locator('details.filter summary');
+  await tabTo(page, summary);
+  await page.keyboard.press('Enter');
+  await tabTo(page, page.getByRole('checkbox', { name: 'vrijdag' }));
+  await page.keyboard.press('Space');
+  await page.getByLabel('Vanaf').selectOption('13');
+  await tabTo(page, page.getByRole('button', { name: 'Toon passende tijden' }));
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(/days=4&from=13/);
+  await expect(page.locator('.quick-pick')).toContainText(/Eerst passend: vrijdag/);
+  await expect(page.locator('#times-heading')).toContainText('vrijdag');
+  await expect(page.locator('#times').getByText('Ochtend')).toHaveCount(0);
+  await expectNoAxeViolations(page);
+});
