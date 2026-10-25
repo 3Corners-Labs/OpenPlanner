@@ -75,8 +75,26 @@ Public, unauthenticated: `GET /g/{slug}`, `GET/POST /g/{slug}/book`, `GET /b/{to
 | Spoofing | Token guessing at `/b/{token}` | 256-bit tokens (HMAC, ADR 0011); lookup by SHA-256, constant-time compare; same 404 for every unknown token; rate-limited | `test_unknown_token_is_a_404_page`, `tests/domain/test_tokens.py` |
 | Tampering | Changing a booking after the WxCC task is dispatched | Read-only from the change deadline; cancel/reschedule pages redirect, POSTs return 409 | `test_booking_is_read_only_from_the_dispatch_moment` |
 | Tampering / information disclosure | Cross-origin windows or resources attach to our pages; pages use browser features they do not need | `Permissions-Policy` (camera, microphone, location … off), `Cross-Origin-Opener-Policy`, `-Embedder-Policy`, `-Resource-Policy` | `tests/api/test_health.py::test_security_headers_on_every_response`, ZAP baseline on `main` |
-| Tampering (XSS) | Arbitrary query parameters reflected into links | The language switcher keeps only `week` and `start`; output is autoescaped | `tests/api/test_pages.py::test_switcher_keeps_only_known_query_parameters` |
+| Tampering (XSS) | Arbitrary query parameters reflected into links | The language switcher keeps only `start`, `month`, `day`, `days`, `from` and `until`; picker and filter parameters are parsed as dates, weekday digits and whole hours, and garbage falls back to defaults; output is autoescaped | `tests/api/test_pages.py::test_switcher_keeps_only_known_query_parameters`, `tests/api/test_booking_pages.py::test_month_navigation_is_clamped_and_ignores_garbage`, `test_filter_ignores_garbage_and_the_switcher_keeps_it`, `tests/api/test_slot_picker.py::test_parse_filter` |
+| Tampering (XSS) | The calendar script (ADR 0020) is abused to run injected code | CSP allows only same-origin script files, no inline scripts or styles; the script inserts only markup fetched from the same page, which is autoescaped server-side | `tests/api/test_booking_pages.py::test_group_page_shows_the_month_and_the_first_free_day` (CSP), `e2e/tests/booking-flow.spec.ts` |
+| Tampering | One click moves a booking to a wrong time | A chosen new time is confirmed first (from → to); only the POST moves it | `test_reschedule_flow`, `test_reschedule_confirmation_needs_a_free_other_time` |
 | Information disclosure | Management token leaks through Referer or logs | `Referrer-Policy: same-origin`; uvicorn access log off; rejections log origins only | `test_security_headers_on_every_response`, `test_uvicorn_logs_are_json_and_access_log_is_off` |
+
+## Flow: organisation branding (WP3b)
+
+Admin: `GET /admin/branding`, `GET/POST /admin/organisations/{org}/branding`,
+`POST …/branding/logo`, `POST …/branding/logo/remove`. Public: `GET /o/{slug}/theme.css`,
+`GET /o/{slug}/logo`.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation of privilege | An organisation admin changes branding (or another organisation's) | `branding.manage` is superuser only (HANDOVER §6); `RequirePermission(..., organisation_param=)` and the domain both decide; denials audited | `tests/admin/test_authorization_matrix.py`, `tests/domain/test_branding_service.py::test_org_admin_may_not_change_branding_handover_section_6` |
+| Tampering (XSS / CSS injection) | A colour value breaks out of the theme stylesheet | Only `#RRGGBB` is accepted (domain); the stylesheet is generated from the validated value | `tests/domain/test_branding.py::test_only_six_digit_hex_colours_are_accepted`, `tests/api/test_brand_assets.py::test_theme_contains_only_the_validated_colour` |
+| Tampering (stored XSS) | An uploaded SVG or HTML "logo" runs script | Type recognised from magic bytes (PNG, JPEG, WebP only); served with its own media type, `nosniff` and `default-src 'none'` | `tests/domain/test_branding.py::test_svg_html_gif_and_empty_files_are_refused`, `tests/admin/test_branding_routes.py::test_svg_and_oversized_logos_are_refused` |
+| Denial of service | Huge uploads fill the disk or memory | `Content-Length` above 200 kB + 16 kB refused unread (413); at most one file is read, up to the limit | `test_svg_and_oversized_logos_are_refused` |
+| Information disclosure | Branding unreadable for citizens (contrast) | Accent must reach 4.5:1 against white | `test_accents_without_4_5_to_1_against_white_are_refused` |
+| Repudiation | Who changed the branding | Audit event `branding.manage` with field names (never values) | `test_superuser_changes_name_and_colour_and_it_is_audited`, `tests/admin/test_branding_routes.py::test_name_and_colour_are_saved_shown_and_audited` |
+| Tampering (CSRF) | A third-party site changes branding in a superuser's browser | Fetch Metadata check on every POST | `test_cross_site_branding_posts_are_refused` |
 
 ## Flow: outgoing email (WP3, worker)
 

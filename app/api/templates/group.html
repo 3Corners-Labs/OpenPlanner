@@ -1,19 +1,21 @@
 {% extends "base.html" %}
-{% block title %}{{ group.name }} – {{ _("site.name") }}{% endblock %}
+{% from "_steps.html" import steps with context %}
+{% block title %}{{ group.name }} – {{ brand.name }}{% endblock %}
 {% block content %}
 {% include "_error_summary.html" %}
+<p class="eyebrow">{{ _("group.kind", minutes=group.slot_minutes) }}</p>
 <h1>{{ group.name }}</h1>
-<p>{{ _("group.intro", minutes=group.slot_minutes) }}</p>
+<p class="lead">{{ _("group.intro", minutes=group.slot_minutes) }}</p>
+{{ steps(1) }}
 {% if direct_call_available %}
-<section class="summary" aria-labelledby="direct-heading">
+<section class="notice" aria-labelledby="direct-heading">
   <h2 id="direct-heading">{{ _("direct.card.title") }}</h2>
   <p>{{ _("direct.card.text") }}</p>
-  <p><a class="button" href="/g/{{ group.slug }}/direct">{{ _("direct.card.button") }}</a></p>
+  <p><a class="button button--secondary" href="/g/{{ group.slug }}/direct">{{ _("direct.card.button") }}</a></p>
 </section>
 {% endif %}
 {% set action = "/g/" ~ group.slug ~ "/book" %}
 {% set method = "get" %}
-{% set week_base = "/g/" ~ group.slug %}
-{% set submit_label = _("group.choose") %}
 {% include "_slot_picker.html" %}
 {% endblock %}
+{% block scripts %}<script src="/static/calendar.js" defer></script>{% endblock %}

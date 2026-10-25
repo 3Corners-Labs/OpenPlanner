@@ -1,29 +1,106 @@
-{# Slot picker: one fieldset per day, one radio per start time. Works without JavaScript.
-   Expects: week (WeekView), action, method, week_base (URL for week navigation). #}
-<nav class="week-nav" aria-label="{{ _("group.weeks_label") }}">
-  <h2 id="week-heading">{{ week.heading }}</h2>
-  <ul>
-    {% if week.previous %}<li><a href="{{ week_base }}?week={{ week.previous }}">{{ _("group.previous_week") }}</a></li>{% endif %}
-    {% if week.next %}<li><a href="{{ week_base }}?week={{ week.next }}">{{ _("group.next_week") }}</a></li>{% endif %}
-  </ul>
-</nav>
-{% if week.days %}
-<form method="{{ method }}" action="{{ action }}" class="slot-picker" aria-labelledby="week-heading">
-  {% for day in week.days %}
-  <fieldset>
-    <legend>{{ day.label }}</legend>
-    <div class="slots">
-      {% for slot in day.slots %}
-      <div class="slot">
-        <input type="radio" id="{{ slot.id }}" name="start" value="{{ slot.value }}" required>
-        <label for="{{ slot.id }}">{{ slot.label }}</label>
+{#- Slot picker (ADR 0020): month calendar of links plus the times of the chosen day.
+    Works without JavaScript; static/calendar.js adds the ARIA grid and arrow keys.
+    Expects: picker (PickerView), action and method (where a time button submits to). -#}
+{% set f = picker.filter %}
+<details class="filter"{% if f.active or f.invalid_range %} open{% endif %}>
+  <summary>{{ _("picker.filter.title") }}</summary>
+  <form method="get" action="{{ f.action }}" class="filter__form">
+    <fieldset class="filter__days">
+      <legend>{{ _("picker.filter.days") }}</legend>
+      <div class="filter__options">
+        {% for option in f.days %}
+        <label class="filter__day" for="days-{{ option.value }}"><input type="checkbox" name="days" value="{{ option.value }}" id="days-{{ option.value }}"{% if option.selected %} checked{% endif %}>{{ option.label }}</label>
+        {% endfor %}
       </div>
-      {% endfor %}
+    </fieldset>
+    <div class="filter__hours">
+      <div class="field">
+        <label for="filter-from">{{ _("picker.filter.from") }}</label>
+        <select id="filter-from" name="from">
+          <option value="">{{ _("picker.filter.any") }}</option>
+          {% for option in f.starts %}<option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field{% if f.invalid_range %} field--error{% endif %}">
+        <label for="filter-until">{{ _("picker.filter.until") }}</label>
+        {% if f.invalid_range %}<p class="error-message" id="filter-until-error">{{ _("picker.filter.error_range") }}</p>{% endif %}
+        <select id="filter-until" name="until"{% if f.invalid_range %} aria-invalid="true" aria-describedby="filter-until-error"{% endif %}>
+          <option value="">{{ _("picker.filter.any") }}</option>
+          {% for option in f.ends %}<option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
+        </select>
+      </div>
     </div>
-  </fieldset>
-  {% endfor %}
-  <button type="submit" class="button">{{ submit_label }}</button>
-</form>
-{% else %}
-<p class="notice">{{ _("group.no_slots") }}</p>
+    <div class="filter__actions">
+      <button type="submit" class="button">{{ _("picker.filter.apply") }}</button>
+      {% if f.active %}<a href="{{ f.clear_href }}">{{ _("picker.filter.clear") }}</a>{% endif %}
+    </div>
+  </form>
+</details>
+{% if picker.first %}
+<div class="quick-pick">
+  <p><strong>{% if f.active %}{{ _("picker.first_fitting") }}{% else %}{{ _("picker.first") }}{% endif %}</strong> {{ picker.first.label }}</p>
+  <form method="{{ method }}" action="{{ action }}">
+    <button type="submit" class="button" name="start" value="{{ picker.first.value }}">{{ _("picker.first_choose") }}</button>
+  </form>
+</div>
+{% elif f.active %}
+<div class="notice notice--warning" role="status"><p><strong>{{ _("picker.filter.none_title") }}</strong> {{ _("picker.filter.none") }}</p></div>
 {% endif %}
+<div class="picker" data-picker>
+  <section class="card calendar" aria-labelledby="month-heading">
+    <div class="calendar__nav">
+      {% if picker.month.previous %}<a class="calendar__step" href="{{ picker.month.previous }}" rel="prev"><span aria-hidden="true">‹</span><span class="visually-hidden">{{ _("picker.previous_month") }}</span></a>{% else %}<span class="calendar__step calendar__step--off" aria-hidden="true">‹</span>{% endif %}
+      <h2 id="month-heading">{{ picker.month.heading }}</h2>
+      {% if picker.month.next %}<a class="calendar__step" href="{{ picker.month.next }}" rel="next"><span aria-hidden="true">›</span><span class="visually-hidden">{{ _("picker.next_month") }}</span></a>{% else %}<span class="calendar__step calendar__step--off" aria-hidden="true">›</span>{% endif %}
+    </div>
+    <table class="calendar__grid" aria-labelledby="month-heading" aria-describedby="calendar-legend" data-calendar>
+      <thead>
+        <tr>{% for short, full in picker.month.weekdays %}<th scope="col"><abbr title="{{ full }}">{{ short }}</abbr></th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for week in picker.month.weeks %}
+        <tr>
+          {% for cell in week %}
+          <td>
+            {%- if not cell.number -%}
+            {%- elif cell.href -%}
+            <a class="calendar__day{% if cell.today %} calendar__day--today{% endif %}" href="{{ cell.href }}" data-day="{{ cell.iso }}"{% if cell.selected %} aria-current="true"{% endif %}><span aria-hidden="true">{{ cell.number }}</span><span class="visually-hidden">{{ cell.label }}{% if cell.today %}, {{ _("picker.today") }}{% endif %}, {{ _("picker.day_free") }}</span></a>
+            {%- else -%}
+            <span class="calendar__day {% if cell.later %}calendar__day--later{% else %}calendar__day--none{% endif %}{% if cell.today %} calendar__day--today{% endif %}" data-day="{{ cell.iso }}"><span aria-hidden="true">{{ cell.number }}</span><span class="visually-hidden">{{ cell.label }}{% if cell.today %}, {{ _("picker.today") }}{% endif %}, {% if cell.later %}{{ _("picker.day_later") }}{% else %}{{ _("picker.day_full") }}{% endif %}</span></span>
+            {%- endif -%}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="calendar__legend" id="calendar-legend">
+      <ul class="legend">
+        <li><span class="legend__swatch legend__swatch--free" aria-hidden="true"></span>{{ _("picker.legend_free") }}</li>
+        <li><span class="legend__swatch legend__swatch--selected" aria-hidden="true"></span>{{ _("picker.legend_selected") }}</li>
+        {% if picker.month.has_later %}<li><span class="legend__swatch legend__swatch--later" aria-hidden="true"></span>{{ _("picker.legend_later") }}</li>{% endif %}
+      </ul>
+      <p>{{ _("picker.horizon", days=picker.month.horizon_days) }} {{ _("picker.legend") }}</p>
+    </div>
+  </section>
+  <section class="card times" id="times" aria-labelledby="times-heading" data-times>
+    {% if picker.times %}
+    <h2 id="times-heading" tabindex="-1">{{ picker.times.heading }}</h2>
+    <p class="times__count">{{ picker.times.count }}</p>
+    <form method="{{ method }}" action="{{ action }}">
+      {% for part in picker.times.groups %}
+      <fieldset>
+        <legend>{{ part.heading }}</legend>
+        <div class="times__list">
+          {% for slot in part.slots %}<button type="submit" class="time-button" name="start" value="{{ slot.value }}">{{ slot.label }}</button>{% endfor %}
+        </div>
+      </fieldset>
+      {% endfor %}
+    </form>
+    {% else %}
+    <h2 id="times-heading" tabindex="-1">{{ _("picker.no_times_title") }}</h2>
+    <p>{{ _("picker.no_times") }}</p>
+    {% endif %}
+  </section>
+</div>
+<p class="visually-hidden" aria-live="polite" data-announce></p>

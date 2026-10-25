@@ -3,31 +3,32 @@
 Server-rendered and usable without JavaScript. Every response goes through
 ``app.web.templates.render``; every write is a same-origin, rate-limited POST.
 
-    GET  /g/{slug}?week=           slot picker per week
+    GET  /g/{slug}?month=&day=     slot picker: month calendar + times of one day (ADR 0020)
     GET  /g/{slug}/book?start=     contact form for one slot
     POST /g/{slug}/book            book ─► 303 /b/{token}?status=booked
     GET  /b/{token}                booking (read-only from the change deadline)
     GET  /b/{token}/cancel         confirm ─► POST ─► 303 /b/{token}?status=cancelled
-    GET  /b/{token}/reschedule     slot picker ─► POST ─► 303 /b/{new token}?status=rescheduled
+    GET  /b/{token}/reschedule     slot picker ─► ?start= confirm ─► POST
+                                   ─► 303 /b/{new token}?status=rescheduled
 """
 
-from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.api.citizen import citizen_page
 from app.api.contact_form import HONEYPOT_FIELD, contact_fields, read_contact
 from app.api.labels import slot_label
+from app.api.slot_picker import parse_filter, picker, slot_value
 from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService, ContactInput
-from app.i18n.dates import format_clock, format_day, format_day_short, local_day
+from app.i18n.dates import format_clock, format_day, local_day
 from app.web.errors import FormError, form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.protection import (
@@ -37,12 +38,8 @@ from app.web.protection import (
     read_limit,
     require_same_origin,
 )
-from app.web.templates import create_templates, render
 
 router = APIRouter(include_in_schema=False)
-templates = create_templates([Path(__file__).parent / "templates"])
-
-"""Hidden field that people never fill in; bots that fill every field are refused."""
 
 STATUS_NOTICES: dict[str, str] = {
     "booked": "manage.notice.booked",
@@ -73,39 +70,6 @@ def _clock(request: Request) -> Clock:
     return clock
 
 
-@dataclass(frozen=True)
-class SlotView:
-    """One radio button of the slot picker."""
-
-    id: str
-    value: str
-    label: str
-
-
-@dataclass(frozen=True)
-class DayView:
-    """One fieldset of the slot picker."""
-
-    label: str
-    slots: list[SlotView]
-
-
-@dataclass(frozen=True)
-class WeekView:
-    """The week shown by a slot picker, with navigation."""
-
-    monday: date
-    heading: str
-    previous: str | None
-    next: str | None
-    days: list[DayView]
-
-
-def _slot_value(start: datetime) -> str:
-    """Return the form value of a slot: its start in UTC, ISO 8601 with ``Z``."""
-    return start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def _parse_start(value: str | None) -> datetime | None:
     """Parse a slot value; anything but an aware ISO timestamp is ``None``."""
     if not value or len(value) > 32:
@@ -115,62 +79,6 @@ def _parse_start(value: str | None) -> datetime | None:
     except ValueError:
         return None
     return start if start.tzinfo is not None else None
-
-
-def _monday(day: date) -> date:
-    """Return the Monday of ``day``'s week."""
-    return day - timedelta(days=day.weekday())
-
-
-async def _week(
-    service: BookingService,
-    group: Group,
-    now: datetime,
-    requested: str | None,
-    locale: RequestLocale,
-    exclude: datetime | None = None,
-) -> WeekView:
-    """Build the slot picker for a week, clamped to today … horizon.
-
-    Without a requested week the first week that still has free slots is shown, so a visitor
-    never lands on an empty week (for example on a Friday evening).
-    """
-    first = _monday(local_day(now, group.tz))
-    last = _monday(local_day(now + timedelta(days=group.horizon_days), group.tz))
-    try:
-        monday = _monday(date.fromisoformat(requested)) if requested else first
-    except ValueError:
-        monday = first
-    monday = min(max(monday, first), last)
-    slots = await service.availability(group.slug, monday, monday + timedelta(days=6))
-    while requested is None and not slots and monday < last:
-        monday += timedelta(days=7)
-        slots = await service.availability(group.slug, monday, monday + timedelta(days=6))
-    by_day: dict[date, list[AvailableSlot]] = {}
-    for slot in slots:
-        if slot.start != exclude:  # e.g. the booking that is being moved
-            by_day.setdefault(local_day(slot.start, group.tz), []).append(slot)
-    days = [
-        DayView(
-            label=format_day_short(day, locale.code),
-            slots=[
-                SlotView(
-                    id=f"slot-{slot.start.strftime('%Y%m%d%H%M')}",
-                    value=_slot_value(slot.start),
-                    label=format_clock(slot.start, group.tz, locale.code),
-                )
-                for slot in day_slots
-            ],
-        )
-        for day, day_slots in sorted(by_day.items())
-    ]
-    return WeekView(
-        monday=monday,
-        heading=locale.gettext("group.week_heading", date=format_day_short(monday, locale.code)),
-        previous=(monday - timedelta(days=7)).isoformat() if monday > first else None,
-        next=(monday + timedelta(days=7)).isoformat() if monday < last else None,
-        days=days,
-    )
 
 
 def _manage_url(token: str, status: str) -> str:
@@ -195,25 +103,34 @@ async def group_page(
     request: Request,
     slug: str,
     locale: Locale,
-    week: str | None = None,
+    month: str | None = None,
+    day: str | None = None,
     status: str | None = None,
 ) -> HTMLResponse:
-    """Show the group's bookable slots for one week."""
+    """Show the group's month calendar and the free times of one day."""
     service = _service(request)
     group = await service.get_group(slug)
-    view = await _week(service, group, _clock(request).now(), week, locale)
+    view = await picker(
+        service,
+        group,
+        _clock(request).now(),
+        locale,
+        f"/g/{group.slug}",
+        month=month,
+        day=day,
+        slot_filter=parse_filter(request.query_params.multi_items()),
+    )
     errors = (
         [FormError(None, locale.gettext("error.slot_unavailable"))]
         if status == "unavailable"
         else []
     )
     context = {
-        "group": group,
-        "week": view,
+        "picker": view,
         "errors": errors,
         "direct_call_available": await service.direct_call_available(slug),
     }
-    return render(templates, request, "group.html", locale, context)
+    return await citizen_page(request, locale, "group.html", group, context)
 
 
 def _book_context(
@@ -227,7 +144,7 @@ def _book_context(
     """Context of the contact form."""
     return {
         "group": group,
-        "start": _slot_value(start),
+        "start": slot_value(start),
         "slot_label": slot_label(start, slot.end, group, locale) if slot else "",
         "fields": contact_fields(group, locale, errors, values),
         "errors": errors,
@@ -247,9 +164,8 @@ async def booking_form(
     slot = await _available(service, group, parsed) if parsed else None
     if parsed is None or slot is None:
         return RedirectResponse(f"/g/{group.slug}?status=unavailable", status_code=303)
-    return render(
-        templates, request, "book.html", locale, _book_context(group, parsed, slot, locale, [], {})
-    )
+    context = _book_context(group, parsed, slot, locale, [], {})
+    return await citizen_page(request, locale, "book.html", group, context)
 
 
 @router.post("/g/{slug}/book", response_class=HTMLResponse)
@@ -275,9 +191,7 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
         context = _book_context(
             group, start, slot, locale, form_errors(error, locale.gettext), values
         )
-        response = render(templates, request, "book.html", locale, context)
-        response.status_code = status_for(error)
-        return response
+        return await citizen_page(request, locale, "book.html", group, context, status_for(error))
     return RedirectResponse(_manage_url(receipt.management_token, "booked"), status_code=303)
 
 
@@ -309,7 +223,7 @@ async def manage_page(
     """Show a booking; read-only once its change deadline has passed."""
     details = await _service(request).find(token)
     context = {**_manage_context(details, locale, status), "token": token}
-    return render(templates, request, "manage.html", locale, context)
+    return await citizen_page(request, locale, "manage.html", details.group, context)
 
 
 @router.get("/b/{token}/cancel", response_class=HTMLResponse)
@@ -320,7 +234,7 @@ async def cancel_page(request: Request, token: str, locale: Locale) -> Response:
     if not details.changeable:
         return RedirectResponse(f"/b/{token}", status_code=303)
     context = {**_manage_context(details, locale, None), "token": token}
-    return render(templates, request, "cancel.html", locale, context)
+    return await citizen_page(request, locale, "cancel.html", details.group, context)
 
 
 @router.post("/b/{token}/cancel", response_class=HTMLResponse)
@@ -335,36 +249,61 @@ async def _reschedule_response(
     request: Request,
     token: str,
     locale: RequestLocale,
-    week: str | None,
-    errors: list[FormError],
+    *,
+    month: str | None = None,
+    day: str | None = None,
+    start: str | None = None,
+    errors: list[FormError] | None = None,
     status_code: int = 200,
 ) -> Response:
-    """Render the slot picker for moving a booking, or go back if it cannot change."""
+    """Render the picker for moving a booking, or the confirmation of a chosen time.
+
+    Goes back to the booking page when it can no longer change.
+    """
     service = _service(request)
     details = await service.find(token)
+    group = details.group
     if not details.changeable:
         return RedirectResponse(f"/b/{token}", status_code=303)
-    view = await _week(
-        service, details.group, _clock(request).now(), week, locale, details.booking.start
-    )
-    context = {
+    context: dict[str, object] = {
         **_manage_context(details, locale, None),
         "token": token,
-        "week": view,
-        "errors": errors,
+        "errors": errors or [],
     }
-    response = render(templates, request, "reschedule.html", locale, context)
-    response.status_code = status_code
-    return response
+    chosen = _parse_start(start)
+    slot = await _available(service, group, chosen) if chosen else None
+    if chosen is not None and slot is not None and chosen != details.booking.start:
+        context["new_start"] = slot_value(chosen)
+        context["new_label"] = slot_label(chosen, slot.end, group, locale)
+        name = "reschedule_confirm.html"
+    else:
+        context["picker"] = await picker(
+            service,
+            group,
+            _clock(request).now(),
+            locale,
+            f"/b/{token}/reschedule",
+            month=month,
+            day=day,
+            exclude=details.booking.start,
+            slot_filter=parse_filter(request.query_params.multi_items()),
+        )
+        name = "reschedule.html"
+    return await citizen_page(request, locale, name, group, context, status_code)
 
 
 @router.get("/b/{token}/reschedule", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def reschedule_page(
-    request: Request, token: str, locale: Locale, week: str | None = None
+    request: Request,
+    token: str,
+    locale: Locale,
+    month: str | None = None,
+    day: str | None = None,
+    start: str | None = None,
 ) -> Response:
-    """Show the slot picker for a new time."""
-    return await _reschedule_response(request, token, locale, week, [])
+    """Show the picker for a new time, or confirm the chosen one (``?start=``)."""
+    return await _reschedule_response(request, token, locale, month=month, day=day, start=start)
 
 
 @router.post("/b/{token}/reschedule", response_class=HTMLResponse)
@@ -378,7 +317,12 @@ async def reschedule(request: Request, token: str, locale: Locale, _: SameOrigin
     try:
         receipt = await _service(request).reschedule(token, start)
     except DomainError as error:
-        errors = form_errors(error, locale.gettext)
-        week = _monday(start.date()).isoformat()
-        return await _reschedule_response(request, token, locale, week, errors, status_for(error))
+        return await _reschedule_response(
+            request,
+            token,
+            locale,
+            day=start.date().isoformat(),
+            errors=form_errors(error, locale.gettext),
+            status_code=status_for(error),
+        )
     return RedirectResponse(_manage_url(receipt.management_token, "rescheduled"), status_code=303)

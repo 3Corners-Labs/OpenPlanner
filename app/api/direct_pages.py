@@ -12,13 +12,13 @@ status, and the citizen can wait in the Webex lobby meanwhile.
 """
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.api.citizen import citizen_page
 from app.api.contact_form import HONEYPOT_FIELD, contact_fields, read_contact
 from app.domain.booking import BookingKind
 from app.domain.call_service import CallService
@@ -31,10 +31,8 @@ from app.domain.services import BookingService, ContactInput
 from app.web.errors import FormError, form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.protection import booking_limit, limiter, read_limit, require_same_origin
-from app.web.templates import create_templates, render
 
 router = APIRouter(include_in_schema=False)
-templates = create_templates([Path(__file__).parent / "templates"])
 log = structlog.get_logger()
 
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
@@ -47,7 +45,7 @@ def _bookings(request: Request) -> BookingService:
     return service
 
 
-def _form_page(
+async def _form_page(
     request: Request,
     locale: RequestLocale,
     group: Group,
@@ -66,9 +64,7 @@ def _form_page(
         "errors": errors,
         "honeypot": HONEYPOT_FIELD,
     }
-    response = render(templates, request, "direct.html", locale, context)
-    response.status_code = status
-    return response
+    return await citizen_page(request, locale, "direct.html", group, context, status)
 
 
 @router.get("/g/{slug}/direct", response_class=HTMLResponse)
@@ -77,7 +73,9 @@ async def direct_form(request: Request, slug: str, locale: Locale) -> HTMLRespon
     """Show the form to start a call now."""
     service = _bookings(request)
     group = await service.get_group(slug)
-    return _form_page(request, locale, group, available=await service.direct_call_available(slug))
+    return await _form_page(
+        request, locale, group, available=await service.direct_call_available(slug)
+    )
 
 
 @router.post("/g/{slug}/direct", response_class=HTMLResponse)
@@ -95,7 +93,7 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
         )
     except DomainError as error:
         available = await service.direct_call_available(slug)
-        return _form_page(
+        return await _form_page(
             request,
             locale,
             group,
@@ -146,4 +144,4 @@ async def wait_page(request: Request, token: str, locale: Locale) -> Response:
         "joinable": joinable,
         "refresh": state in ("searching", "accepted"),
     }
-    return render(templates, request, "wait.html", locale, context)
+    return await citizen_page(request, locale, "wait.html", group, context)

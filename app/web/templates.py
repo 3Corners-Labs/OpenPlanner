@@ -7,6 +7,7 @@ the HTML Content-Security-Policy and caching rules are applied in one place.
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
@@ -15,7 +16,7 @@ from starlette.responses import HTMLResponse
 
 from app.web.locale import LANG_PARAM, RequestLocale
 
-KEPT_QUERY_PARAMS = ("week", "start")
+KEPT_QUERY_PARAMS = ("start", "month", "day", "days", "from", "until")
 """Query parameters the language switcher carries over; anything else is dropped so that
 arbitrary input is never reflected into links."""
 
@@ -30,6 +31,13 @@ HTML_CSP = (
     "base-uri 'none'; frame-ancestors 'none'"
 )
 """No scripts, no inline styles, no framing. Relaxed per page only when a feature needs it."""
+
+SCRIPT_CSP = (
+    "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; "
+    "img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+)
+"""Citizen pages (ADR 0020): own scripts only, which may fetch the same pages; still no
+inline scripts or styles, so injected markup cannot run."""
 
 
 @dataclass(frozen=True)
@@ -78,15 +86,19 @@ def create_templates(page_dirs: Sequence[Path]) -> Jinja2Templates:
 
 def language_options(request: Request, locale: RequestLocale) -> list[LanguageOption]:
     """Build the language switcher for ``request``, keeping only ``KEPT_QUERY_PARAMS``."""
-    kept = {key: value for key, value in request.query_params.items() if key in KEPT_QUERY_PARAMS}
+    kept = [
+        (key, value)
+        for key, value in request.query_params.multi_items()
+        if key in KEPT_QUERY_PARAMS
+    ]
     options = []
     for code in locale.translator.locales:
-        url = request.url.replace_query_params(**kept, **{LANG_PARAM: code})
+        query = urlencode([*kept, (LANG_PARAM, code)])
         options.append(
             LanguageOption(
                 code=code,
                 autonym=locale.translator.gettext(code, "language.autonym"),
-                href=f"?{url.query}",
+                href=f"?{query}",
                 current=code == locale.code,
             )
         )
@@ -99,11 +111,13 @@ def render(
     name: str,
     locale: RequestLocale,
     context: Mapping[str, object] | None = None,
+    *,
+    scripts: bool = False,
 ) -> HTMLResponse:
     """Render template ``name`` in the request's locale.
 
     The template receives ``_`` (bound gettext), ``locale`` and ``languages`` in addition
-    to ``context``.
+    to ``context``. ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``).
     """
     response = templates.TemplateResponse(
         request,
@@ -115,7 +129,7 @@ def render(
             "languages": language_options(request, locale),
         },
     )
-    response.headers["content-security-policy"] = HTML_CSP
+    response.headers["content-security-policy"] = SCRIPT_CSP if scripts else HTML_CSP
     response.headers["cache-control"] = "no-store"
     locale.apply_to(request, response)
     return response

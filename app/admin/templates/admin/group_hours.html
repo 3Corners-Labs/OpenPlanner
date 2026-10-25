@@ -1,5 +1,5 @@
 {% extends "admin/layout.html" %}
-{% from "admin/_fields.html" import field with context %}
+{% from "admin/_fields.html" import field, form_body with context %}
 {% block title %}{{ _("admin.tab.hours") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
@@ -17,11 +17,6 @@
     <h2 id="add-heading">{{ _("admin.hours.add") }}</h2>
     <p class="card__lead">{{ _("admin.hours.add_lead") }}</p>
   </div>
-  <div class="form-grid">
-    {% for f in fields %}{{ field(f) }}{% endfor %}
-  </div>
-  <div class="form-actions">
-    <button type="submit" class="button">{{ _("admin.hours.add_button") }}</button>
-  </div>
+  {{ form_body(fields, _("admin.hours.add_button")) }}
 </form>
 {% endblock %}

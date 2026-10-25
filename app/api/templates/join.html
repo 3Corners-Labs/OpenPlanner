@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ _("join.title") }} – {{ group.name }}{% endblock %}
 {% block content %}
+<p class="eyebrow">{{ group.name }}</p>
 <h1>{{ _("join.title") }}</h1>
 <dl class="details">
   <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
@@ -15,13 +16,13 @@
   <li>{{ _("join.tips.lobby") }}</li>
 </ul>
 {% elif state == "too_early" %}
-<p class="notice" role="status">{{ _("join.too_early", time=opens_at) }}</p>
+<div class="notice" role="status"><p>{{ _("join.too_early", time=opens_at) }}</p></div>
 {% elif state == "no_meeting" %}
-<p class="notice" role="status">{{ _("join.preparing") }}</p>
+<div class="notice" role="status"><p>{{ _("join.preparing") }}</p></div>
 {% elif state == "closed" %}
-<p class="notice">{{ _("join.closed") }}</p>
+<div class="notice"><p>{{ _("join.closed") }}</p></div>
 {% else %}
-<p class="notice">{{ _("manage.inactive") }}</p>
+<div class="notice"><p>{{ _("manage.inactive") }}</p></div>
 {% endif %}
 {% if refresh %}<p><a class="button button--secondary" href="/b/{{ token }}/join">{{ _("join.refresh") }}</a></p>{% endif %}
 <p><a href="/b/{{ token }}">{{ _("join.back") }}</a></p>

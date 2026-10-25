@@ -9,11 +9,10 @@ shows the time and a button to check again. It never reloads by itself (WCAG 2.2
     GET /b/{token}/join/go   record the click, 303 to the meeting's Webex link
 """
 
-from pathlib import Path
-
 from fastapi import APIRouter, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.api.citizen import citizen_page
 from app.api.labels import slot_label
 from app.domain.calls import JOIN_OPENS_BEFORE, EventKind, JoinState, join_state
 from app.domain.integration import IntegrationService
@@ -22,10 +21,8 @@ from app.domain.services import BookingService
 from app.i18n.dates import format_clock
 from app.web.locale import resolve_locale
 from app.web.protection import limiter, read_limit
-from app.web.templates import create_templates, render
 
 router = APIRouter(include_in_schema=False)
-templates = create_templates([Path(__file__).parent / "templates"])
 
 REFRESHING = frozenset({JoinState.TOO_EARLY, JoinState.NO_MEETING})
 """States in which the page offers a button to check again."""
@@ -56,7 +53,7 @@ async def join_page(request: Request, token: str) -> HTMLResponse:
         "slot_label": slot_label(booking.start, booking.end, group, locale),
         "opens_at": format_clock(booking.start - JOIN_OPENS_BEFORE, group.tz, locale.code),
     }
-    return render(templates, request, "join.html", locale, context)
+    return await citizen_page(request, locale, "join.html", group, context)
 
 
 @router.get("/b/{token}/join/go")

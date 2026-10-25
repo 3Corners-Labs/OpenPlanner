@@ -54,4 +54,12 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - Migrations: SQLite table rebuilds work on databases with data.
 - ADR 0011: management tokens derived from a per-booking salt and a server key.
 - `seed-demo` command and a Mailpit `dev` profile for demos.
+- Citizen pages (WP3b, ADR 0020): month calendar with "first available", times grouped by
+  part of the day, steps indicator, confirmation before moving a booking, a modern layout on
+  `--booking-*` tokens, and an ARIA grid with arrow keys as progressive enhancement; days
+  beyond the booking horizon are marked "nog niet te boeken"; a filter "Wanneer past het u?"
+  (weekdays, from/until) finds the first slot that fits.
+- Branding per organisation (O5): display name, accent colour (at least 4.5:1 against white)
+  and logo (PNG/JPEG/WebP) on every citizen page; Admin → Branding for the superuser
+  (`branding.manage`, migration 0011).
 
