@@ -394,7 +394,7 @@ async def integrations(
     def moment(value: datetime | None) -> str | None:
         return _moment(value, tz, locale.code) if value else None
 
-    base = settings.public_base_url.rstrip("/")
+    base = settings.webhook_base
     view = IntegrationView(
         service_app=wired.video is not None,
         access_expires=moment(health.access_expires_at) if health else None,
