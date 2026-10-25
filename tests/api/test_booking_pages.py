@@ -6,11 +6,15 @@ Calendar: "now" is Thursday 1 January 2026 08:00 UTC; the demo group is open on 
 
 import re
 from collections.abc import AsyncIterator
-from datetime import timedelta
+from datetime import date, timedelta
 
 import httpx
 import pytest
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.db.engine import create_engine
+from app.adapters.db.models import GroupRow, ScheduleRuleRow
 from app.config import Settings
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
@@ -334,3 +338,30 @@ async def test_pages_carry_the_html_security_headers(site: httpx.AsyncClient) ->
 
     assert "form-action 'self'" in response.headers["content-security-policy"]
     assert response.headers["cache-control"] == "no-store"
+
+
+async def test_days_after_the_horizon_are_not_yet_bookable(site: httpx.AsyncClient) -> None:
+    # Horizon 60 days from Thursday 1 January: bookable up to and including 2 March.
+    text = (await site.get("/g/demo", params={"month": "2026-03"})).text
+
+    assert 'href="/g/demo?day=2026-03-02#times"' in text
+    assert "maandag 2 maart, tijden vrij" in text
+    assert "dinsdag 3 maart, nog niet te boeken" in text
+    assert "zondag 1 maart, geen tijden vrij" in text  # closed, not beyond the horizon
+    assert 'calendar__day--later" data-day="2026-03-03"' in text
+    assert "U kunt tot 60 dagen vooruit boeken." in text
+
+
+async def test_first_free_moment_is_found_beyond_two_months(demo_settings: Settings) -> None:
+    engine = create_engine(demo_settings.database_url)
+    async with AsyncSession(engine) as session, session.begin():
+        await session.execute(update(GroupRow).values(horizon_days=150))
+        await session.execute(update(ScheduleRuleRow).values(valid_from=date(2026, 4, 1)))
+    await engine.dispose()
+
+    async with app_client(demo_settings, FixedClock(NOW)) as client:
+        text = (await client.get("/g/demo")).text
+
+    assert "<strong>Eerst mogelijk:</strong> woensdag 1 april, 09:00" in text
+    assert '<h2 id="month-heading">april 2026</h2>' in text
+    assert '<h2 id="times-heading" tabindex="-1">woensdag 1 april</h2>' in text

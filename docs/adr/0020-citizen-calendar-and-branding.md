@@ -17,8 +17,11 @@ the role may only be there while the script runs.
 
 1. **Month calendar plus the times of one day.** `GET /g/{slug}?month=&day=` shows a month
    table and the free times of the chosen day, grouped into morning, afternoon and evening,
-   plus a "first available" choice. A time button opens the form; when moving a booking it opens
-   a confirmation (from → to), so one click never moves an appointment.
+   plus a "first available" choice, searched up to the group's booking horizon. Days beyond
+   the horizon are marked "nog niet te boeken" (stripes, dashed border, text label and legend),
+   so they are not mistaken for full days; the legend states the horizon in days. A time
+   button opens the form; when moving a booking it opens a confirmation (from → to), so one
+   click never moves an appointment.
 2. **Progressive enhancement.** Without JavaScript the calendar is a table of links and every
    choice loads a page. `static/calendar.js` (vanilla, no build step, about 200 lines) turns
    the table into an ARIA grid with one tab stop. Arrow keys, Home/End and Page Up/Down move

@@ -129,7 +129,22 @@ msgid "picker.day_full"
 msgstr "no times available"
 
 msgid "picker.legend"
-msgstr "Days with a border and a dot have free times. Use the arrow keys to move through the calendar."
+msgstr "Use the arrow keys to move through the calendar."
+
+msgid "picker.day_later"
+msgstr "not yet bookable"
+
+msgid "picker.legend_free"
+msgstr "Free times"
+
+msgid "picker.legend_selected"
+msgstr "Chosen day"
+
+msgid "picker.legend_later"
+msgstr "Not yet bookable"
+
+msgid "picker.horizon"
+msgstr "You can book up to {days} days ahead."
 
 msgid "picker.no_times_title"
 msgstr "No times this month"

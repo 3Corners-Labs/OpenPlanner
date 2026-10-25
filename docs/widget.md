@@ -25,6 +25,7 @@ properties (`app/web/static/site.css`). Defaults follow NL Design System convent
 | `--booking-color-focus` / `-focus-background` | `#1a1a1a` / `#ffbf47` | Focus ring and halo |
 | `--booking-color-error`, `-success` (+ `-subtle`) | `#c22a1e`, `#2f7210` | Messages |
 | `--booking-color-unavailable` | `#6b7178` | Days without free times |
+| `--booking-color-later`, `-later-background`, `-later-stripe` | `#545454`, `#eceef0`, `#dadde1` | Days beyond the booking horizon ("nog niet te boeken") |
 | `--booking-font-family` | system UI stack | Text (the widget will use `inherit`) |
 | `--booking-font-size`, `--booking-line-height` | `1.0625rem`, `1.6` | Text |
 | `--booking-space-xs` … `--booking-space-xl` | `0.25rem` … `2.5rem` | Spacing |
