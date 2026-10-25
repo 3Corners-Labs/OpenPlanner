@@ -28,6 +28,7 @@ from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, r
 from app.config import Settings
 from app.domain.authorization import Scope
 from app.domain.ports import IntegrationError
+from app.domain.scheduling import Group
 from app.i18n import Translator, load_catalogues
 from app.web.authz_report import render_markdown
 
@@ -57,6 +58,16 @@ async def _service_app(
         await engine.dispose()
 
 
+async def _groups(settings: Settings) -> list[Group]:
+    """Return every group (operator commands see all organisations)."""
+    engine = create_engine(settings.database_url)
+    try:
+        async with SqlUnitOfWork(engine).read() as tx:
+            return [summary.group for summary in await tx.list_groups(Scope(everything=True))]
+    finally:
+        await engine.dispose()
+
+
 async def _register_webhooks(
     settings: Settings, transport: httpx.AsyncBaseTransport | None = None
 ) -> str:
@@ -80,6 +91,7 @@ async def _register_webhooks(
             settings.webex_api_base_url,
             f"{base}/webhooks/webex",
             settings.webex_webhook_secret.get_secret_value(),
+            hosts=[g.video_host_email for g in await _groups(settings) if g.video_host_email],
         )
         if settings.wxcc_api_base_url and settings.wxcc_webhook_secret is not None:
             lines.append(
@@ -127,15 +139,9 @@ async def _wxcc_config_check(
             False,
         )
     async with _service_app(settings, transport) as (http, tokens):
-        engine = create_engine(settings.database_url)
-        try:
-            async with SqlUnitOfWork(engine).read() as tx:
-                summaries = await tx.list_groups(Scope(everything=True))
-        finally:
-            await engine.dispose()
         groups = [
             GroupRouting(g.slug, g.wxcc_channel, g.wxcc_business_address, g.routing_value)
-            for g in (s.group for s in summaries)
+            for g in await _groups(settings)
             if g.wxcc_channel and g.wxcc_business_address
         ]
         if not groups:
@@ -177,7 +183,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "register-webhooks":
         report = asyncio.run(_register_webhooks(Settings()))
         sys.stdout.write(report)
-        return 1 if ": refused" in report else 0
+        return 1 if ": refused" in report or "no webhooks registered" in report else 0
     sys.stdout.write(asyncio.run(_seed_demo(Settings())))
     return 0
 

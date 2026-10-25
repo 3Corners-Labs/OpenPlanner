@@ -109,8 +109,14 @@ links in messages stay on `PUBLIC_BASE_URL`. It must be https in production, and
 
 ## Inbound: Webex webhooks (`POST /webhooks/webex`)
 
-Registered once per installation (org-owned) for `meetings` (`started`, `ended`) and
-`meetingParticipants` (`joined`, `left`) with a secret. Verification: HMAC-SHA1 of the raw body
+Registered org-owned for `meetings` (`started`, `ended`) and `meetingParticipants` (`joined`,
+`left`), **one set per group host account** with the filter `hostEmail=<host>` and a secret.
+The meeting host is the group's licensed host account (known at booking); the agent WxCC
+assigns joins as cohost and is never the host (ADR 0017). Without the filter an org-owned
+webhook reports every meeting of the organisation; with it only meetings of OpenPlanner's host
+accounts reach OpenPlanner. Org-owned webhooks need `meeting:admin_schedule_read` (meetings) and
+`meeting:admin_participants_read` (participants) and an authorising admin who is a Webex site
+admin or Compliance Officer. Verification: HMAC-SHA1 of the raw body
 with the secret, hex, compared in constant time with `X-Spark-Signature`. Events for unknown
 meetings are ignored. Webex signs no event time, so replays are caught by **deduplication**:
 each event's key, a SHA-256 of `resource`, `event`, `data.id` and `data.joinedTime`/`leftTime`
