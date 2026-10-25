@@ -210,6 +210,7 @@ same commit and rollback behaviour as the SQL one.
 | Job queue | `app/adapters/db/jobs.py` |
 | Citizen pages | `app/api/booking_pages.py`, `app/api/citizen.py`, `app/api/templates/` |
 | Slot picker: month calendar and times (ADR 0020) | `app/api/slot_picker.py`, `app/web/static/calendar.js` |
+| Organisations (superuser) | `app/domain/organisations.py`, `app/admin/organisation_routes.py` |
 | Branding per organisation (O5) | `app/domain/branding.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
 | CSRF and rate limits | `app/web/protection.py` |
 | Rendering and security headers | `app/web/templates.py`, `app/api/security_headers.py` |
@@ -566,6 +567,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0018 | Dispatch to WxCC as work items (Create Task API v2) |
 | 0019 | Direct video call ("now") per group |
 | 0020 | Citizen calendar as progressive enhancement; branding through tokens |
+| 0021 | Provider-neutral contact-center integration (proposed) |
 
 ## 12. Status and roadmap
 
@@ -582,6 +584,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
+| WP7b+ | Organisations (create, rename, default language) for the superuser | done |
+| ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
 | WP7c–d | Texts and reminders, encrypted integration settings (O3) | planned |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |

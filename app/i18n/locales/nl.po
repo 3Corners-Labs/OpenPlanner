@@ -729,7 +729,7 @@ msgid "admin.new_group.title"
 msgstr "Nieuwe groep"
 
 msgid "admin.new_group.lead"
-msgstr "Een groep is een team met één wachtrij in Webex Contact Center. Na het aanmaken stelt u de openingstijden in."
+msgstr "Een groep is een team met één wachtrij in het contactcenter. Na het aanmaken stelt u de openingstijden in."
 
 msgid "admin.new_group.create"
 msgstr "Groep aanmaken"
@@ -972,7 +972,7 @@ msgid "admin.no"
 msgstr "Nee"
 
 msgid "admin.settings.integrations"
-msgstr "Koppelingen: Webex en Webex Contact Center"
+msgstr "Koppelingen: video en contactcenter"
 
 msgid "admin.settings.integrations_lead"
 msgstr "Leeg laten zolang de koppeling niet is ingericht; afspraken werken dan zonder videogesprek of taak."
@@ -1023,7 +1023,7 @@ msgid "admin.group.video"
 msgstr "Videogesprek (Webex)"
 
 msgid "admin.group.wxcc"
-msgstr "Webex Contact Center"
+msgstr "Contactcenter"
 
 msgid "admin.group.direct_call"
 msgstr "Direct gesprek"
@@ -1155,7 +1155,7 @@ msgid "call.event.join_clicked"
 msgstr "Burger klikte op deelnemen"
 
 msgid "call.event.task_created"
-msgstr "Taak in de WxCC-wachtrij gezet"
+msgstr "Taak in de wachtrij van het contactcenter gezet"
 
 msgid "call.event.task_failed"
 msgstr "Taak mislukt"
@@ -1218,7 +1218,7 @@ msgid "admin.agenda.meeting"
 msgstr "Videomeeting"
 
 msgid "admin.agenda.task"
-msgstr "WxCC-taak"
+msgstr "Contactcentertaak"
 
 msgid "admin.agenda.agent"
 msgstr "Medewerker binnen"
@@ -1395,3 +1395,54 @@ msgstr "Logo uploaden"
 
 msgid "admin.branding.logo_remove"
 msgstr "Logo verwijderen"
+
+msgid "admin.nav.organisations"
+msgstr "Organisaties"
+
+msgid "admin.organisations.title"
+msgstr "Organisaties"
+
+msgid "admin.organisations.lead"
+msgstr "De klantorganisaties in deze installatie. Een organisatie heeft eigen groepen, een eigen huisstijl en eigen beheerders."
+
+msgid "admin.organisations.list"
+msgstr "Alle organisaties"
+
+msgid "admin.organisations.none"
+msgstr "Er zijn nog geen organisaties."
+
+msgid "admin.organisations.branding"
+msgstr "Huisstijl"
+
+msgid "admin.organisations.branding_of"
+msgstr "Huisstijl van {name}"
+
+msgid "admin.new_organisation.title"
+msgstr "Nieuwe organisatie"
+
+msgid "admin.new_organisation.lead"
+msgstr "Na het aanmaken stelt u de huisstijl in en maken organisatiebeheerders de groepen aan."
+
+msgid "admin.new_organisation.create"
+msgstr "Organisatie aanmaken"
+
+msgid "admin.organisation.lead"
+msgstr "Naam en standaardtaal van de organisatie."
+
+msgid "admin.organisation.slug"
+msgstr "Code"
+
+msgid "admin.organisation.slug_hint"
+msgstr "Vaste code in beheeradressen en in de organisatieclaim van de inlogdienst. Kleine letters, cijfers en streepjes, bijvoorbeeld gemeente-noord."
+
+msgid "admin.organisation.slug_fixed"
+msgstr "De code verandert niet: beheeradressen en de rollen in de inlogdienst verwijzen ernaar."
+
+msgid "admin.field.default_locale"
+msgstr "Standaardtaal"
+
+msgid "admin.field.default_locale_hint"
+msgstr "De taal van pagina's en berichten als de bezoeker geen andere taal kiest."
+
+msgid "admin.form.error.default_locale"
+msgstr "Kies een van de beschikbare talen."

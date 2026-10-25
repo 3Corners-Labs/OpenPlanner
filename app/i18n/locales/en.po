@@ -729,7 +729,7 @@ msgid "admin.new_group.title"
 msgstr "New group"
 
 msgid "admin.new_group.lead"
-msgstr "A group is a team with one queue in Webex Contact Center. After creating it you set its opening hours."
+msgstr "A group is a team with one queue in the contact centre. After creating it you set its opening hours."
 
 msgid "admin.new_group.create"
 msgstr "Create group"
@@ -972,7 +972,7 @@ msgid "admin.no"
 msgstr "No"
 
 msgid "admin.settings.integrations"
-msgstr "Integrations: Webex and Webex Contact Center"
+msgstr "Integrations: video and contact centre"
 
 msgid "admin.settings.integrations_lead"
 msgstr "Leave empty while the integration is not set up; appointments then work without a video meeting or task."
@@ -1023,7 +1023,7 @@ msgid "admin.group.video"
 msgstr "Video call (Webex)"
 
 msgid "admin.group.wxcc"
-msgstr "Webex Contact Center"
+msgstr "Contact centre"
 
 msgid "admin.group.direct_call"
 msgstr "Direct call"
@@ -1155,7 +1155,7 @@ msgid "call.event.join_clicked"
 msgstr "Citizen clicked join"
 
 msgid "call.event.task_created"
-msgstr "Task placed in the WxCC queue"
+msgstr "Task placed in the contact centre queue"
 
 msgid "call.event.task_failed"
 msgstr "Task failed"
@@ -1218,7 +1218,7 @@ msgid "admin.agenda.meeting"
 msgstr "Video meeting"
 
 msgid "admin.agenda.task"
-msgstr "WxCC task"
+msgstr "Contact centre task"
 
 msgid "admin.agenda.agent"
 msgstr "Agent joined"
@@ -1395,3 +1395,54 @@ msgstr "Upload logo"
 
 msgid "admin.branding.logo_remove"
 msgstr "Remove logo"
+
+msgid "admin.nav.organisations"
+msgstr "Organisations"
+
+msgid "admin.organisations.title"
+msgstr "Organisations"
+
+msgid "admin.organisations.lead"
+msgstr "The client organisations in this installation. An organisation has its own groups, branding and admins."
+
+msgid "admin.organisations.list"
+msgstr "All organisations"
+
+msgid "admin.organisations.none"
+msgstr "There are no organisations yet."
+
+msgid "admin.organisations.branding"
+msgstr "Branding"
+
+msgid "admin.organisations.branding_of"
+msgstr "Branding of {name}"
+
+msgid "admin.new_organisation.title"
+msgstr "New organisation"
+
+msgid "admin.new_organisation.lead"
+msgstr "After creating it you set its branding, and organisation admins create its groups."
+
+msgid "admin.new_organisation.create"
+msgstr "Create organisation"
+
+msgid "admin.organisation.lead"
+msgstr "Name and default language of the organisation."
+
+msgid "admin.organisation.slug"
+msgstr "Code"
+
+msgid "admin.organisation.slug_hint"
+msgstr "Fixed code in admin addresses and in the organisation claim of the sign-in service. Lower-case letters, digits and hyphens, for example north-council."
+
+msgid "admin.organisation.slug_fixed"
+msgstr "The code does not change: admin addresses and the roles in the sign-in service refer to it."
+
+msgid "admin.field.default_locale"
+msgstr "Default language"
+
+msgid "admin.field.default_locale_hint"
+msgstr "The language of pages and messages when the visitor chooses no other."
+
+msgid "admin.form.error.default_locale"
+msgstr "Choose one of the available languages."

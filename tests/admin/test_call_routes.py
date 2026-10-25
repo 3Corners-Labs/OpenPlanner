@@ -50,7 +50,7 @@ async def test_timeline_lists_events_with_reason_codes(site: Site) -> None:
 
     assert f"OP-{booking_id:06d}" in text
     assert "Videomeeting aangemaakt" in text
-    assert "Taak in de WxCC-wachtrij gezet" in text
+    assert "Taak in de wachtrij van het contactcenter gezet" in text
     assert "<code>ENTRY_POINT_NOT_FOUND</code>" in text
 
 
