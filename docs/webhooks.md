@@ -17,7 +17,8 @@ stores the tokens encrypted (ADR 0008). Scopes:
 | `meeting:admin_participants_read` | live status (participants) |
 | read scope of `meetings` and `meetingParticipants` at admin level (org-owned webhooks; exact scope names to be confirmed when registering) | live status events |
 | `cjp:task_write`, `cjp:task_read` | Create Task v2, Task Messages |
-| `cjp:config_read`, `cjp:config_write` | register the WxCC subscription (administrator role) |
+| `cjp:user` | optional, secondary: End Task v1 for cancelled bookings (ADR 0021); without it the task stays marked cancelled through v2 |
+| `cjp:config_read`, `cjp:config_write` | register and list the WxCC subscription, event types, task search in `wxcc-check`, the routing configuration in `wxcc-config-check` (administrator role) |
 
 ## Outbound: Webex Meetings
 
@@ -77,22 +78,57 @@ Limits: `workItemData` ≤ 50 keys (≤ 100 bytes), values ≤ 1024 bytes; `flow
 tuples (key ≤ 200, value ≤ 512 bytes). Only first name and the meeting link leave OpenPlanner
 (CLAUDE.md).
 
-**End Task** (`POST /v1/tasks/{taskId}/end`) documents agent scopes (`cjp:user` or
-`cloud-contact-center:pod_conv`). Whether a Service App may end a work item is open: to be
-confirmed with the Cisco beta team before direct calls rely on it (ADR 0019).
+**Ending a cancelled booking's task** (ADR 0021), v2 first. **Primary:** a Task Messages v2
+snapshot, `POST /v2/tasks/{taskId}/messages` (`cjp:task_write`, beta, `202`), marks the task
+cancelled. **Secondary:** End Task, `POST /v1/tasks/{taskId}/end` without a body (v1 only;
+`cjp:user`; `202`); a refusal is recorded as `end_not_possible` with the code.
+
+```json
+{
+  "mediaType": "workItem",
+  "channelParams": {
+    "type": "work-item-form",
+    "message": {
+      "aliasId": "<uuid>",
+      "workItemData": {"bookingReference": "OP-000123", "kind": "cancelled"},
+      "timestamp": 1792998000000
+    }
+  }
+}
+```
+
+Only the booking reference goes out: no first name, no meeting link.
+
+## Webhook addresses
+
+Both platforms call `<WEBHOOK_BASE_URL>/webhooks/webex` and `<WEBHOOK_BASE_URL>/webhooks/wxcc`.
+`WEBHOOK_BASE_URL` is optional and defaults to `PUBLIC_BASE_URL`; it exists so that an https
+tunnel or staging host can receive webhooks while the admin login (OIDC redirect) and the
+links in messages stay on `PUBLIC_BASE_URL`. It must be https in production, and
+`register-webhooks` refuses anything but https. **Koppelingen** shows the addresses in use.
 
 ## Inbound: Webex webhooks (`POST /webhooks/webex`)
 
-Registered once per installation (org-owned) for `meetings` (`started`, `ended`) and
-`meetingParticipants` (`joined`, `left`) with a secret. Verification: HMAC-SHA1 of the raw body
+Registered org-owned for `meetings` (`started`, `ended`) and `meetingParticipants` (`joined`,
+`left`), **one set per group host account** with the filter `hostEmail=<host>` and a secret.
+The meeting host is the group's licensed host account (known at booking); the agent WxCC
+assigns joins as cohost and is never the host (ADR 0017). Without the filter an org-owned
+webhook reports every meeting of the organisation; with it only meetings of OpenPlanner's host
+accounts reach OpenPlanner. Org-owned webhooks need `meeting:admin_schedule_read` (meetings) and
+`meeting:admin_participants_read` (participants) and an authorising admin who is a Webex site
+admin or Compliance Officer. Verification: HMAC-SHA1 of the raw body
 with the secret, hex, compared in constant time with `X-Spark-Signature`. Events for unknown
-meetings are ignored. The payload's meeting id can be an instance id
+meetings are ignored. Webex signs no event time, so replays are caught by **deduplication**:
+each event's key, a SHA-256 of `resource`, `event`, `data.id` and `data.joinedTime`/`leftTime`
+(a participant keeps its `data.id` across leave and rejoin), is stored in `webhook_events` in
+the same transaction as the event; a key seen before is acknowledged (204) and ignored. Keys
+are kept 30 days and only for OpenPlanner's own meetings. The payload's meeting id can be an instance id
 (`<meetingId>_I_<…>`); it is matched on the series id. Participant names and emails are never
 stored: only counts, whether a host/cohost joined, and times (ADR 0010).
 
 ## Inbound: WxCC subscription (`POST /webhooks/wxcc`)
 
-Registered with `POST /v2/subscriptions` (`name`, `eventTypes`, `destinationUrl`, `secret`).
+Registered with `POST /v2/subscriptions` (`name`, `eventTypes`, `resourceVersion: task:1.0.0` (required in v2; current versions in `GET /v2/event-types`), `destinationUrl`, `secret` of 32 to 256 characters).
 `destinationUrl` must be HTTPS on port 443 with a public domain: local development needs a
 tunnel or a staging host. Event types: `task:new`, `task:connected`, `task:ended`,
 `task:failed`, `task-message:appended`, `task-message:append-failed`.

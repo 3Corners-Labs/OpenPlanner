@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -17,7 +17,7 @@ from app.domain.calls import (
     work_item,
 )
 from app.domain.errors import DomainError
-from app.domain.integration import IntegrationService
+from app.domain.integration import WEBHOOK_MEMORY, EventOutcome, IntegrationService
 from app.domain.scheduling import PhoneMode
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
@@ -167,10 +167,12 @@ def service(uow: InMemoryUnitOfWork) -> IntegrationService:
 async def test_events_are_correlated_by_meeting_and_task(
     service: IntegrationService, uow: InMemoryUnitOfWork
 ) -> None:
-    assert await service.record_meeting_event("meeting-1_I_42", EventKind.MEETING_STARTED, NOW)
-    assert await service.record_task_event("task-1", EventKind.TASK_CONNECTED, NOW)
-    assert not await service.record_meeting_event("unknown", EventKind.MEETING_STARTED, NOW)
-    assert not await service.record_task_event("unknown", EventKind.TASK_ENDED, NOW)
+    recorded, unknown = EventOutcome.RECORDED, EventOutcome.UNKNOWN
+    started = EventKind.MEETING_STARTED
+    assert await service.record_meeting_event("meeting-1_I_42", started, NOW) is recorded
+    assert await service.record_task_event("task-1", EventKind.TASK_CONNECTED, NOW) is recorded
+    assert await service.record_meeting_event("unknown", started, NOW) is unknown
+    assert await service.record_task_event("unknown", EventKind.TASK_ENDED, NOW) is unknown
 
     assert [e.kind for e in uow.state.booking_events[123]] == [
         EventKind.MEETING_STARTED,
@@ -239,3 +241,57 @@ async def test_day_overview_lists_the_groups_bookings_with_status(
     )
     with pytest.raises(DomainError, match="not_permitted"):
         await service.day_overview(OUTSIDER, "demo", SLOT_0900.date())
+
+
+async def test_a_replayed_webex_event_changes_the_counts_once(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    joined = EventKind.GUEST_JOINED
+
+    first = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k1")
+    replay = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k1")
+    other = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k2")
+
+    assert (first, replay, other) == (
+        EventOutcome.RECORDED,
+        EventOutcome.DUPLICATE,
+        EventOutcome.RECORDED,
+    )
+    assert uow.state.call_status[123].participants == 2
+    assert len(uow.state.booking_events[123]) == 2
+
+
+async def test_events_of_unknown_meetings_are_not_remembered(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    outcome = await service.record_meeting_event(
+        "someone-elses-meeting", EventKind.GUEST_JOINED, NOW, event_key="k1"
+    )
+
+    assert outcome is EventOutcome.UNKNOWN
+    assert uow.state.webhook_events == {}
+
+
+async def test_remembered_events_are_forgotten_after_the_retention(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    later = NOW + WEBHOOK_MEMORY + timedelta(minutes=1)
+    await service.record_meeting_event("meeting-1", EventKind.GUEST_JOINED, NOW, event_key="old")
+
+    await service.record_meeting_event("meeting-1", EventKind.GUEST_JOINED, later, event_key="new")
+
+    assert set(uow.state.webhook_events) == {("webex", "new")}
+
+
+async def test_day_overview_covers_the_25_hour_day_when_clocks_go_back(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    # 25 October 2026 lasts 25 hours in Europe/Amsterdam; 23:30 local is 22:30 UTC.
+    late = datetime(2026, 10, 25, 22, 30, tzinfo=UTC)
+    uow.state.bookings[123] = _booking(start=late, end=late + timedelta(minutes=30))
+
+    on_the_day = await service.day_overview(GROUP_ADMIN, "demo", date(2026, 10, 25))
+    next_day = await service.day_overview(GROUP_ADMIN, "demo", date(2026, 10, 26))
+
+    assert [row.booking.id for row in on_the_day] == [123]
+    assert next_day == []
