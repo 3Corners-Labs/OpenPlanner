@@ -1395,3 +1395,146 @@ msgstr "Logo uploaden"
 
 msgid "admin.branding.logo_remove"
 msgstr "Logo verwijderen"
+
+#. Webhook registrations and delivery self-test (integrations page).
+
+msgid "admin.integrations.registrations"
+msgstr "Registraties bij Webex en WxCC"
+
+msgid "admin.integrations.registrations_lead"
+msgstr "Alle webhooks en abonnementen die naar OpenPlanner verwijzen, met hun staat bij de laatste controle. Bijwerken met python -m app.cli webhooks-list; verouderde registraties opruimen met python -m app.cli webhooks-reset (runbook, hoofdstuk 6)."
+
+msgid "admin.integrations.checked_at"
+msgstr "Laatste controle: {date}, vergeleken met {base}."
+
+msgid "admin.integrations.not_checked"
+msgstr "Nog niet gecontroleerd. Voer {command} uit in de web-container."
+
+msgid "admin.integrations.none_found"
+msgstr "Geen registraties gevonden."
+
+msgid "admin.integrations.missing"
+msgstr "Ontbreekt"
+
+msgid "admin.integrations.listing_failed"
+msgstr "De lijst van {platform} kon niet worden opgehaald ({code})."
+
+msgid "admin.integrations.col.state"
+msgstr "Staat"
+
+msgid "admin.integrations.col.platform"
+msgstr "Platform"
+
+msgid "admin.integrations.col.event"
+msgstr "Gebeurtenis"
+
+msgid "admin.integrations.col.filter"
+msgstr "Filter"
+
+msgid "admin.integrations.col.status"
+msgstr "Status"
+
+msgid "admin.integrations.col.secret"
+msgstr "Geheim"
+
+msgid "admin.integrations.col.target"
+msgstr "Adres"
+
+msgid "admin.integrations.state.current"
+msgstr "Actueel"
+
+msgid "admin.integrations.state.stale"
+msgstr "Verouderd"
+
+msgid "admin.integrations.state.foreign"
+msgstr "Niet van OpenPlanner"
+
+msgid "admin.integrations.reason.foreign"
+msgstr "Hoort bij een andere toepassing en blijft ongemoeid."
+
+msgid "admin.integrations.reason.other_target"
+msgstr "Verwijst naar een ander adres (oude tunnel of basis-URL)."
+
+msgid "admin.integrations.reason.unfiltered"
+msgstr "Zonder hostEmail-filter: meldt elke meeting van de organisatie."
+
+msgid "admin.integrations.reason.unknown_host"
+msgstr "Hostaccount dat geen groep meer gebruikt."
+
+msgid "admin.integrations.reason.unused_event"
+msgstr "Gebeurtenis die OpenPlanner niet gebruikt."
+
+msgid "admin.integrations.reason.inactive"
+msgstr "Inactief: het platform levert niet meer af."
+
+msgid "admin.integrations.reason.duplicate"
+msgstr "Dubbel: een andere registratie doet hetzelfde."
+
+msgid "admin.integrations.secret.yes"
+msgstr "Ingesteld"
+
+msgid "admin.integrations.secret.no"
+msgstr "Niet ingesteld"
+
+msgid "admin.integrations.secret.unknown"
+msgstr "Onbekend"
+
+msgid "admin.integrations.delivery"
+msgstr "Afleveringstest"
+
+msgid "admin.integrations.delivery_lead"
+msgstr "Ondertekende testberichten via het webhookadres naar OpenPlanner zelf, met onbekende ids zodat geen afspraak verandert. Bijwerken met python -m app.cli webhooks-health."
+
+msgid "admin.integrations.no_secrets"
+msgstr "Er is geen webhookgeheim ingesteld; er is niets getest."
+
+msgid "admin.integrations.col.endpoint"
+msgstr "Adres"
+
+msgid "admin.integrations.col.test"
+msgstr "Test"
+
+msgid "admin.integrations.col.http"
+msgstr "HTTP-status"
+
+msgid "admin.integrations.col.result"
+msgstr "Resultaat"
+
+msgid "admin.integrations.delivery.signed"
+msgstr "Correct ondertekend bericht"
+
+msgid "admin.integrations.delivery.unsigned"
+msgstr "Bericht met verkeerde handtekening"
+
+msgid "admin.integrations.ok"
+msgstr "In orde"
+
+msgid "admin.integrations.failed"
+msgstr "Mislukt"
+
+msgid "admin.integrations.outcome.delivered"
+msgstr "Afgeleverd en geverifieerd."
+
+msgid "admin.integrations.outcome.refused"
+msgstr "Geweigerd, zoals het hoort."
+
+msgid "admin.integrations.outcome.signature_refused"
+msgstr "Handtekening geweigerd: het geheim verschilt van dat van de web-container."
+
+msgid "admin.integrations.outcome.unsigned_accepted"
+msgstr "Geaccepteerd terwijl de handtekening fout is: de controle staat uit."
+
+msgid "admin.integrations.outcome.not_found"
+msgstr "Niet gevonden: geen geheim ingesteld, of het webhookadres bereikt OpenPlanner niet."
+
+msgid "admin.integrations.outcome.rate_limited"
+msgstr "Te veel verzoeken; probeer het over een minuut opnieuw."
+
+msgid "admin.integrations.outcome.proxy_error"
+msgstr "Fout in proxy of tunnel: draait de tunnel nog?"
+
+msgid "admin.integrations.outcome.unreachable"
+msgstr "Onbereikbaar: controleer DNS en de tunnel."
+
+msgid "admin.integrations.outcome.unexpected"
+msgstr "Onverwachte status: controleer wat er op het webhookadres antwoordt."

@@ -26,6 +26,7 @@ import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.integrations import Integrations
 from app.admin import branding_routes, call_routes, group_routes
 from app.admin.authz import (
@@ -37,6 +38,7 @@ from app.admin.authz import (
     admin_service,
     session_principal,
 )
+from app.admin.integration_views import check_view
 from app.admin.pages import Locale, SameOrigin, templates
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
@@ -389,7 +391,11 @@ async def integrations(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.INTEGRATIONS_MANAGE))],
 ) -> HTMLResponse:
-    """Show whether Webex and WxCC are connected, token expiry and the webhook URLs."""
+    """Show whether Webex and WxCC are connected, token expiry, the webhook URLs and checks.
+
+    The last ``webhooks-list`` and ``webhooks-health`` results are shown read-only; cleaning
+    up registrations stays on the command line.
+    """
     settings = request.app.state.settings
     wired: Integrations = request.app.state.integrations
     health = await wired.tokens.health() if wired.tokens else None
@@ -411,12 +417,19 @@ async def integrations(
         wxcc_secret=settings.wxcc_webhook_secret is not None,
     )
     groups = await admin_service(request).groups(context.principal)
+    reports = ReportStore(request.app.state.engine)
+    checks = check_view(
+        await reports.get(REGISTRATIONS_REPORT),
+        await reports.get(HEALTH_REPORT),
+        locale.gettext,
+        lambda at: _moment(at, tz, locale.code),
+    )
     return _page(
         request,
         locale,
         "admin/integrations.html",
         context.principal,
-        {"view": view, "groups": groups},
+        {"view": view, "groups": groups, "checks": checks},
     )
 
 

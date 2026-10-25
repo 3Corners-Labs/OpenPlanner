@@ -29,6 +29,76 @@
     <div><dt>WxCC</dt><dd><code>{{ view.wxcc_webhook }}</code><br>{% if view.wxcc_secret %}{{ _("admin.integrations.secret_set") }}{% else %}{{ _("admin.integrations.secret_missing") }}{% endif %}</dd></div>
   </dl>
 </section>
+<section class="card" aria-labelledby="registrations-heading">
+  <div class="card__header">
+    <h2 id="registrations-heading">{{ _("admin.integrations.registrations") }}</h2>
+    <p class="card__lead">{{ _("admin.integrations.registrations_lead") }}</p>
+  </div>
+  {% if checks.listed_at %}
+  <p>{{ _("admin.integrations.checked_at", date=checks.listed_at, base=checks.listed_base) }}</p>
+  {% for line in checks.failed %}<div class="alert alert--error"><p>{{ line }}</p></div>{% endfor %}
+  {% if checks.registrations %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.integrations.registrations") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.integrations.col.state") }}</th><th scope="col">{{ _("admin.integrations.col.platform") }}</th><th scope="col">{{ _("admin.integrations.col.event") }}</th><th scope="col">{{ _("admin.integrations.col.filter") }}</th><th scope="col">{{ _("admin.integrations.col.status") }}</th><th scope="col">{{ _("admin.integrations.col.secret") }}</th><th scope="col">{{ _("admin.integrations.col.target") }}</th></tr></thead>
+    <tbody>
+      {% for row in checks.registrations %}
+      <tr>
+        <td><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %}">{{ row.state }}</span>{% if row.reason %}<br>{{ row.reason }}{% endif %}</td>
+        <td>{{ row.platform }}</td>
+        <th scope="row">{{ row.label }}</th>
+        <td>{% if row.filter %}<code>{{ row.filter }}</code>{% else %}–{% endif %}</td>
+        <td>{{ row.status }}</td>
+        <td>{{ row.secret }}</td>
+        <td><code>{{ row.target }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>{{ _("admin.integrations.none_found") }}</p>
+  {% endif %}
+  {% if checks.missing %}
+  <h3>{{ _("admin.integrations.missing") }}</h3>
+  <ul>{% for item in checks.missing %}<li><code>{{ item }}</code></li>{% endfor %}</ul>
+  {% endif %}
+  {% else %}
+  <p>{{ _("admin.integrations.not_checked", command="python -m app.cli webhooks-list") }}</p>
+  {% endif %}
+</section>
+<section class="card" aria-labelledby="delivery-heading">
+  <div class="card__header">
+    <h2 id="delivery-heading">{{ _("admin.integrations.delivery") }}</h2>
+    <p class="card__lead">{{ _("admin.integrations.delivery_lead") }}</p>
+  </div>
+  {% if checks.tested_at %}
+  <p>{{ _("admin.integrations.checked_at", date=checks.tested_at, base=checks.tested_base) }}</p>
+  {% if checks.deliveries %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.integrations.delivery") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.integrations.col.endpoint") }}</th><th scope="col">{{ _("admin.integrations.col.test") }}</th><th scope="col">{{ _("admin.integrations.col.http") }}</th><th scope="col">{{ _("admin.integrations.col.result") }}</th></tr></thead>
+    <tbody>
+      {% for row in checks.deliveries %}
+      <tr>
+        <th scope="row"><code>{{ row.endpoint }}</code></th>
+        <td>{{ row.kind }}</td>
+        <td>{{ row.status }}</td>
+        <td>{% if row.ok %}<span class="chip chip--success">{{ _("admin.integrations.ok") }}</span>{% else %}<span class="chip chip--danger">{{ _("admin.integrations.failed") }}</span>{% endif %} {{ row.outcome }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>{{ _("admin.integrations.no_secrets") }}</p>
+  {% endif %}
+  {% else %}
+  <p>{{ _("admin.integrations.not_checked", command="python -m app.cli webhooks-health") }}</p>
+  {% endif %}
+</section>
 <section class="card" aria-labelledby="groups-heading">
   <h2 id="groups-heading">{{ _("admin.integrations.groups") }}</h2>
   <div class="table-scroll">
