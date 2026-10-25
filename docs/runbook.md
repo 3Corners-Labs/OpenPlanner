@@ -242,6 +242,13 @@ redirect and the links in mails keep working, and give the webhooks their own ad
    booking's timeline; `docker compose logs web | grep webhook` shows `webhook.webex` lines
    (`webhook.rejected` means a wrong secret).
 
+**After changing `WXCC_API_BASE_URL`** (for example to the right region), `register-webhooks`
+lists subscriptions on the new host only and creates one there; a subscription made earlier
+through another host stays. List both (`GET /v2/subscriptions` on each host) and delete the
+stale one with `DELETE /v2/subscriptions/{id}`, or events may arrive twice. Webex lists
+org-owned webhooks only with `ownedBy=org`; `register-webhooks` asks for that and treats a
+`409` (already exists) as `exists`.
+
 Only `/webhooks/*` needs to be reachable through the tunnel; the admin portal is behind OIDC
 anyway, but a named tunnel with an ingress rule for that path alone is the tidier option.
 
