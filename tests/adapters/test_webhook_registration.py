@@ -82,7 +82,7 @@ async def test_unfiltered_org_wide_webhooks_are_reported_as_stale() -> None:
 
     assert report[-1] == (
         "meetings/ended [all meetings]: stale (no hostEmail filter, every meeting of the "
-        "organisation): delete webhook w-old"
+        "organisation): webhook w-old, remove with webhooks-reset"
     )
 
 
