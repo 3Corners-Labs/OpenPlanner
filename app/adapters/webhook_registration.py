@@ -48,9 +48,9 @@ async def register_webex(
     """
     base = base_url.rstrip("/")
     accounts = sorted({h.strip().lower() for h in hosts if h.strip()})
-    if not accounts:
-        return ["webex: no group has a video host account; no webhooks registered"]
     report = []
+    if not accounts:
+        report.append("webex: no group has a video host account; no webhooks registered")
     try:
         listed = (
             await client.request("GET", f"{base}/webhooks", params={"max": "100", "ownedBy": "org"})
