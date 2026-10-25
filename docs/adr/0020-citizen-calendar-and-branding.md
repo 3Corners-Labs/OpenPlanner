@@ -21,7 +21,11 @@ the role may only be there while the script runs.
    the horizon are marked "nog niet te boeken" (stripes, dashed border, text label and legend),
    so they are not mistaken for full days; the legend states the horizon in days. A time
    button opens the form; when moving a booking it opens a confirmation (from → to), so one
-   click never moves an appointment.
+   click never moves an appointment. A filter "Wanneer past het u?" (weekdays, from and
+   "finished by" a full hour) narrows "first available", the free days and the times; it is
+   a plain GET form whose choice travels in every link (`?days=&from=&until=`), so it works
+   without JavaScript and can be shared. Free text ("vrijdag na vijf") was rejected: hard to
+   parse in two languages and poor for accessibility.
 2. **Progressive enhancement.** Without JavaScript the calendar is a table of links and every
    choice loads a page. `static/calendar.js` (vanilla, no build step, about 200 lines) turns
    the table into an ARIA grid with one tab stop. Arrow keys, Home/End and Page Up/Down move

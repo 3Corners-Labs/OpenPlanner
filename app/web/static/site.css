@@ -422,6 +422,104 @@ main > .notice {
   margin: 0;
 }
 
+/* --- "Wanneer past het u?": filter on weekdays and hours ---------------------------------- */
+.filter {
+  margin: 0 0 var(--booking-space-m);
+  border: 1px solid var(--booking-color-border);
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-surface);
+}
+
+.filter summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--booking-target);
+  padding: var(--booking-space-s) var(--booking-space-l);
+  border-radius: var(--booking-radius);
+  color: var(--booking-color-accent);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filter summary:hover {
+  background: var(--booking-color-accent-subtle);
+}
+
+.filter__form {
+  padding: 0 var(--booking-space-l) var(--booking-space-l);
+}
+
+.filter__days {
+  margin: 0 0 var(--booking-space-m);
+  padding: 0;
+  border: 0;
+}
+
+.filter__days legend {
+  margin-bottom: var(--booking-space-xs);
+  padding: 0;
+  font-weight: 700;
+}
+
+.filter__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--booking-space-s);
+}
+
+/* Each weekday is a large target: the whole chip is the label. */
+.filter__day {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--booking-space-xs);
+  min-height: var(--booking-target);
+  padding: var(--booking-space-xs) var(--booking-space-m);
+  border: 2px solid var(--booking-color-border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.filter__day:has(input:checked) {
+  border-color: var(--booking-color-accent);
+  background: var(--booking-color-accent-subtle);
+  font-weight: 700;
+}
+
+.filter__day input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--booking-color-accent);
+}
+
+.filter__hours {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--booking-space-m);
+}
+
+.filter__hours .field {
+  margin-bottom: var(--booking-space-m);
+}
+
+.filter select {
+  min-width: 9rem;
+  min-height: var(--booking-target);
+  padding: var(--booking-space-xs) var(--booking-space-s);
+  border: 2px solid var(--booking-color-border-strong);
+  border-radius: var(--booking-radius-small);
+  background: var(--booking-color-background);
+  color: inherit;
+  font: inherit;
+}
+
+.filter__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--booking-space-m);
+}
+
 /* --- Slot picker: month calendar and times (ADR 0020) ----------------------------------- */
 .picker {
   display: grid;
@@ -710,7 +808,8 @@ a.calendar__day:focus-visible {
   border-left: 4px solid var(--booking-color-error);
 }
 
-.field--error input {
+.field--error input,
+.field--error select {
   border-color: var(--booking-color-error);
 }
 

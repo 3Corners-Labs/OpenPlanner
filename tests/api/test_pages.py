@@ -71,9 +71,9 @@ async def test_language_switcher_offers_every_locale_in_its_own_language(
 
 
 async def test_switcher_keeps_only_known_query_parameters(client: httpx.AsyncClient) -> None:
-    text = (await client.get("/?week=2026-01-05&evil=%22onmouseover%3D")).text
+    text = (await client.get("/?month=2026-01&days=1&days=4&evil=%22onmouseover%3D")).text
 
-    assert 'href="?week=2026-01-05&amp;lang=en"' in text
+    assert 'href="?month=2026-01&amp;days=1&amp;days=4&amp;lang=en"' in text
     assert "evil" not in text
     assert "onmouseover" not in text
 

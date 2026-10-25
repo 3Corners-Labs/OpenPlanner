@@ -21,7 +21,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 from app.api.citizen import citizen_page
 from app.api.contact_form import HONEYPOT_FIELD, contact_fields, read_contact
 from app.api.labels import slot_label
-from app.api.slot_picker import picker, slot_value
+from app.api.slot_picker import parse_filter, picker, slot_value
 from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError
@@ -111,7 +111,14 @@ async def group_page(
     service = _service(request)
     group = await service.get_group(slug)
     view = await picker(
-        service, group, _clock(request).now(), locale, f"/g/{group.slug}", month=month, day=day
+        service,
+        group,
+        _clock(request).now(),
+        locale,
+        f"/g/{group.slug}",
+        month=month,
+        day=day,
+        slot_filter=parse_filter(request.query_params.multi_items()),
     )
     errors = (
         [FormError(None, locale.gettext("error.slot_unavailable"))]
@@ -279,6 +286,7 @@ async def _reschedule_response(
             month=month,
             day=day,
             exclude=details.booking.start,
+            slot_filter=parse_filter(request.query_params.multi_items()),
         )
         name = "reschedule.html"
     return await citizen_page(request, locale, name, group, context, status_code)
