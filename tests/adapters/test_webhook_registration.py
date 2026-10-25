@@ -4,7 +4,7 @@ from collections.abc import Callable
 import httpx
 
 from app.adapters.webex_auth import AuthorizedClient
-from app.adapters.webhook_registration import register_webex, register_wxcc
+from app.adapters.webhook_registration import WEBEX_EVENTS, register_webex, register_wxcc
 from tests.fakes.tokens import authorized_client
 
 TARGET = "https://afspraak.example.nl/webhooks/webex"
@@ -133,3 +133,19 @@ async def test_org_owned_webhooks_are_listed_with_owned_by_org_and_409_means_exi
     report = await register_webex(client, "https://webexapis.com/v1", TARGET, "secret")
 
     assert report[0] == "meetings/started: exists"
+
+
+async def test_a_refused_listing_is_reported_and_registration_still_tried() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(403)
+        return httpx.Response(409)
+
+    client, _ = _client(handler)
+    report = await register_webex(client, "https://webexapis.com/v1", TARGET, "secret")
+
+    assert report[0] == (
+        "webhook listing: refused (rejected_403): needs meeting:admin_schedule_read, "
+        "authorised by a Webex site admin or Compliance Officer"
+    )
+    assert report[1:] == [f"{r}/{e}: exists" for r, e in WEBEX_EVENTS]

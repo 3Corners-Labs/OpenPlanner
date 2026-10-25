@@ -288,7 +288,7 @@ secondary and print `WARN`. It never prints tokens, secrets or response bodies.
 | Probe | Expected | On 403 add |
 |---|---|---|
 | token refresh | ok | (refused: generate new tokens, section 1 step 3) |
-| `GET /meetings`, `GET /webhooks` | 200 | `meeting:admin_schedule_read`, `meeting:admin_participants_read` |
+| `GET /meetings`, `GET /webhooks (org-owned)` | 200 | `meeting:admin_schedule_read`, `meeting:admin_participants_read`; org-owned webhooks also need the authorising admin to be a Webex site admin or Compliance Officer |
 | `GET /v2/subscriptions`, `GET /v2/event-types` | 200 | `cjp:config_read`, and the Contact Center administrator authorisation (step 2) |
 | `POST /v2/tasks (empty body)` | 400 | `cjp:task_write`, Work Items enabled |
 | `POST /v2/tasks/{nil}/messages` | 400 | `cjp:task_write` |
