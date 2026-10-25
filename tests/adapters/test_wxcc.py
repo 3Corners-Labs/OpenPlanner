@@ -6,7 +6,7 @@ from collections.abc import Callable
 import httpx
 import pytest
 
-from app.adapters.wxcc import WxccTasks, cancellation_body, task_body
+from app.adapters.wxcc import WORK_ITEM_FIELDS, WxccTasks, cancellation_body, task_body
 from app.domain.calls import WorkItem
 from app.domain.ports import IntegrationError
 from tests.fakes.clock import FixedClock
@@ -53,6 +53,7 @@ def test_task_body_matches_the_create_task_v2_contract() -> None:
     }
     # Limits from the spec: at most 50 fields, values up to 1024 bytes.
     data = body["channelParams"]["message"]["workItemData"]  # type: ignore[index]
+    assert tuple(data) == WORK_ITEM_FIELDS  # the schema check in wxcc-config-check uses these
     assert len(data) <= 50
     assert all(len(str(v).encode()) <= 1024 for v in data.values())
 

@@ -21,6 +21,19 @@ from app.domain.ports import Clock, IntegrationError
 
 ROUTING_KEY = "openplannerGroup"
 
+WORK_ITEM_FIELDS = (
+    "bookingReference",
+    "firstName",
+    "startTime",
+    "groupName",
+    "meetingLink",
+    "kind",
+)
+"""The ``workItemData`` keys OpenPlanner sends; the asset schema must define exactly these."""
+REQUIRED_FIELDS = frozenset({"bookingReference"})
+"""Keys that may be required in the asset schema: a cancellation message carries only these
+and ``kind``."""
+
 
 def task_body(item: WorkItem, alias_id: str, timestamp_ms: int) -> dict[str, Any]:
     """Return the Create Task v2 request for ``item``."""

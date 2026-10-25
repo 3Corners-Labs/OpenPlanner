@@ -18,7 +18,7 @@ stores the tokens encrypted (ADR 0008). Scopes:
 | read scope of `meetings` and `meetingParticipants` at admin level (org-owned webhooks; exact scope names to be confirmed when registering) | live status events |
 | `cjp:task_write`, `cjp:task_read` | Create Task v2, Task Messages |
 | `cjp:user` | optional, secondary: End Task v1 for cancelled bookings (ADR 0020); without it the task stays marked cancelled through v2 |
-| `cjp:config_read`, `cjp:config_write` | register and list the WxCC subscription, event types, task search in `wxcc-check` (administrator role) |
+| `cjp:config_read`, `cjp:config_write` | register and list the WxCC subscription, event types, task search in `wxcc-check`, the routing configuration in `wxcc-config-check` (administrator role) |
 
 ## Outbound: Webex Meetings
 
