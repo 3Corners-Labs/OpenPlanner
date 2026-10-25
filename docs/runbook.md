@@ -227,8 +227,8 @@ docker compose exec web python -m app.cli wxcc-check
 ```
 
 It refreshes the token and makes every kind of call OpenPlanner makes, harmlessly: reads, an
-empty work item and an empty task message (WxCC must answer 400 or 404) and End Task on a task
-id that cannot exist (404). Per call it prints the verdict, the HTTP status and, on 401/403,
+empty work item and an empty task message (WxCC answers 400) and End Task on a task id that
+cannot exist (WxCC answers 202: it accepts the request and processes it asynchronously). Per call it prints the verdict, the HTTP status and, on 401/403,
 the scope that is probably missing. Work items are v2 (beta) and v2 is primary: Webex and the
 v2 probes print `OK`/`FAIL` and decide the exit code (1 while one fails); the v1 probes are
 secondary and print `WARN`. It never prints tokens, secrets or response bodies.
@@ -239,8 +239,8 @@ secondary and print `WARN`. It never prints tokens, secrets or response bodies.
 | `GET /meetings`, `GET /webhooks` | 200 | `meeting:admin_schedule_read`, `meeting:admin_participants_read` |
 | `GET /v2/subscriptions` | 200 | `cjp:config_read`, and the Contact Center administrator authorisation (step 2) |
 | `POST /v2/tasks (empty body)` | 400 | `cjp:task_write`, Work Items enabled |
-| `POST /v2/tasks/{nil}/messages` | 400/404 | `cjp:task_write` |
-| v1, `WARN` only: `POST /v1/tasks/{nil}/end` | 404 | `cjp:user` (optional) |
+| `POST /v2/tasks/{nil}/messages` | 400 | `cjp:task_write` |
+| v1, `WARN` only: `POST /v1/tasks/{nil}/end` | 202 | `cjp:user` (optional) |
 | v1, `WARN` only: `GET /v1/subscriptions/event-types`, `GET /v1/tasks` | 200 | `cjp:config_read` |
 
 A 404 on the WxCC reads means `WXCC_API_BASE_URL` points at the wrong region. Once all lines

@@ -16,7 +16,11 @@ guide, Tasks Call Control reference and the integration scope list):
   (`CONVERSATION_ALREADY_OPEN` recovery). Whether End Task accepts a Service App token for a
   task no agent has accepted is not documented; the beta team has not confirmed it.
 - **Append Task Message** (`POST /v2/tasks/{taskId}/messages`, beta) needs `cjp:task_write`
-  only, the scope OpenPlanner already has. For work items it appends a snapshot of the work
+  only, the scope OpenPlanner already has.
+- Measured on 2026-10-25 with `wxcc-check` in the product owner's organisation: End Task
+  accepts the Service App's token (`202` for a task id that does not exist; the request is
+  processed asynchronously), and the empty Create Task v2 and Task Messages v2 calls get `400`
+  (authorised, invalid body). For work items it appends a snapshot of the work
   item data; it does not end the task.
 - A task can be cancelled after its work item exists when a booking is cancelled or moved
   after dispatch (for example after a group shortened its dispatch lead), and, once the
