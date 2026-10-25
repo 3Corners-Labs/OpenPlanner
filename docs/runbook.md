@@ -108,7 +108,7 @@ Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (w
    | `meeting:admin_participants_read` | org-owned `meetingParticipants` webhooks | no participant counts (`register-webhooks`: `meetingParticipants/…: refused (rejected_403)`) |
    | `cjp:task_write` | Create Task v2 (work items), Task Messages (mark cancelled) | no work items |
    | `cjp:task_read` | task access the Work Items guide lists with `cjp:task_write` | – |
-   | `cjp:user` (optional) | End Task v1 for cancelled bookings, after the v2 mark (ADR 0020) | cancelled tasks are marked cancelled (v2) but stay open until an agent ends them |
+   | `cjp:user` (optional) | End Task v1 for cancelled bookings, after the v2 mark (ADR 0021) | cancelled tasks are marked cancelled (v2) but stay open until an agent ends them |
    | `cjp:config_read` | list subscriptions and event types (`GET /v2/event-types`), task search (`wxcc-check`) | `register-webhooks` and `wxcc-check` fail with 403 |
    | `cjp:config_write` | create the WxCC subscription (`register-webhooks`) | no WxCC events |
 

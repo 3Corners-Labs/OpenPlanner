@@ -9,7 +9,7 @@ a ``BookingEvent`` and updates one aggregated ``CallStatus`` per booking.
                                      │                                 guest_joined …
                                      └► task_failed (reason)        ─► meeting_ended
     cancelled ─► task_marked_cancelled (v2) ─► task_end_requested (v1) ─► task_ended
-                                            └► end_not_possible (reason)       (ADR 0020)
+                                            └► end_not_possible (reason)       (ADR 0021)
 
 No names, email addresses or IP addresses of participants are stored: only counts, whether a
 host joined, and times. Pure Python, no I/O; ``app.domain.integration`` records and shows them.
@@ -95,7 +95,7 @@ class TaskState(StrEnum):
     ENDED = "ended"
     FAILED = "failed"
     CANCELLED = "cancelled"
-    """Marked cancelled by a v2 task message; ended once WxCC reports it (ADR 0020)."""
+    """Marked cancelled by a v2 task message; ended once WxCC reports it (ADR 0021)."""
 
 
 @dataclass(frozen=True)

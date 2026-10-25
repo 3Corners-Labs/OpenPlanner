@@ -4,7 +4,7 @@ Every step is idempotent: a booking that already has its meeting or task is left
 a group without the integration is skipped. Each success is recorded on the booking's
 timeline. How the start time reads for agents is decided at the edge (``start_label``).
 
-Ending a cancelled booking's work item (ADR 0020), v2 first:
+Ending a cancelled booking's work item (ADR 0021), v2 first:
 
     end_task ─► Task Messages v2 ─► task_marked_cancelled   (refused: integration_error)
              ─► End Task v1     ─► task_end_requested      (refused: end_not_possible, code)

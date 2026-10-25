@@ -1,4 +1,4 @@
-"""``ContactCenterDispatcher`` on the WxCC Create Task API v2, work items (ADR 0018, 0020).
+"""``ContactCenterDispatcher`` on the WxCC Create Task API v2, work items (ADR 0018, 0021).
 
 The work item goes to the group's business address and channel; the flow behind the entry
 point chooses the queue from ``flowSettings.openplannerGroup``. ``workItemData`` carries the
@@ -8,7 +8,7 @@ booking reference, first name, start time, group name, meeting link and kind; no
 A cancelled booking's task is first marked with a Task Messages v2 append
 (``cjp:task_write``) that sets ``kind`` to ``cancelled`` with only the booking reference, so
 the agent sees it without the first name or the meeting link; then End Task v1 (``cjp:user``;
-there is no v2 End Task) is tried as a secondary step (ADR 0020).
+there is no v2 End Task) is tried as a secondary step (ADR 0021).
 """
 
 import uuid

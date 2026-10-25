@@ -387,7 +387,7 @@ flowchart LR
     dispatch --> meeting(["call<br/>from start to finish"])
     meeting --> purge["slot end + 24h<br/>purge PII"]
 
-    cancel(["cancelled"]) --> cend["mark WxCC task cancelled (v2)<br/>then End Task (v1), ADR 0020<br/>delete meeting"] --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
+    cancel(["cancelled"]) --> cend["mark WxCC task cancelled (v2)<br/>then End Task (v1), ADR 0021<br/>delete meeting"] --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
 
 ```
 
