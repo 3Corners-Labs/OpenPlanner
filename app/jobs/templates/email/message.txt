@@ -4,6 +4,11 @@
 
 {{ when_label }}: {{ when }}
 {{ team_label }}: {{ group_name }}
+{% if join_url %}
+
+{{ join_text }}
+{{ join_link }}: {{ join_url }}
+{% endif %}
 {% if manage_url %}
 
 {{ manage_text }}

@@ -91,7 +91,12 @@ async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None
         "horizon_days": "30",
         "dispatch_lead_minutes": "5",
         "phone_mode": "required",
-        "wxcc_queue_id": "queue-42",
+        "video_host_email": "host-demo@example.nl",
+        "wxcc_business_address": "openplanner@example.biz",
+        "wxcc_channel": "openplanner-video",
+        "wxcc_routing_value": "team-42",
+        "direct_call_enabled": "yes",
+        "not_picked_up_minutes": "10",
     }
 
     saved = await _post(site, f"{GROUP}/settings", form)
@@ -101,7 +106,7 @@ async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None
     assert again.headers["location"] == f"{GROUP}/settings?done=unchanged"  # type: ignore[attr-defined]
     overview = (await site.client.get(GROUP)).text
     assert "Demo-team" in overview
-    assert "queue-42" in overview
+    assert "Gekoppeld · team-42" in overview
     events = await audit_events(site)
     assert any(e[1] == "group.edit" for e in events)
 
@@ -120,7 +125,8 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "horizon_days": "60",
             "dispatch_lead_minutes": "5",
             "phone_mode": "optional",
-            "wxcc_queue_id": "",
+            "direct_call_enabled": "no",
+            "not_picked_up_minutes": "10",
         },
     )
 
@@ -297,7 +303,8 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "horizon_days": "45",
             "dispatch_lead_minutes": "5",
             "phone_mode": "optional",
-            "wxcc_queue_id": "demo-queue",
+            "direct_call_enabled": "no",
+            "not_picked_up_minutes": "10",
         },
     )
 

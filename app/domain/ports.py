@@ -14,7 +14,14 @@ from typing import Protocol
 
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Principal, Scope
-from app.domain.booking import Booking, Slot, SlotUsage
+from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
+from app.domain.calls import (
+    BookingEvent,
+    BookingOverview,
+    CallStatus,
+    MeetingRequest,
+    WorkItem,
+)
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
@@ -84,6 +91,48 @@ class IdentityError(Exception):
         """Store the code; it is also the message."""
         super().__init__(code)
         self.code = code
+
+
+class IntegrationError(Exception):
+    """A call to Webex or WxCC failed; ``code`` says why, ``retryable`` whether to try again.
+
+    The code is a short machine key (``unauthorized``, ``rate_limited``, ``server_error``,
+    ``rejected``); it never contains response bodies, which could hold personal data.
+    """
+
+    def __init__(self, code: str, *, retryable: bool) -> None:
+        """Store the code and whether a retry can help."""
+        super().__init__(code)
+        self.code = code
+        self.retryable = retryable
+
+
+class VideoProvider(Protocol):
+    """Schedules and removes video meetings (Webex Meetings API, ADR 0017)."""
+
+    async def create_meeting(self, request: MeetingRequest) -> MeetingRef:
+        """Schedule a meeting and return its id and join link.
+
+        Raises:
+            IntegrationError: If the provider refuses or cannot be reached.
+        """
+        ...
+
+    async def delete_meeting(self, meeting_id: str, host_email: str) -> None:
+        """Delete a meeting; deleting one that no longer exists is not an error."""
+        ...
+
+
+class ContactCenterDispatcher(Protocol):
+    """Creates work items in Webex Contact Center (Create Task API v2, ADR 0018)."""
+
+    async def create_task(self, item: WorkItem) -> str:
+        """Create the work item and return the task id.
+
+        Raises:
+            IntegrationError: If WxCC refuses or cannot be reached.
+        """
+        ...
 
 
 class IdentityProvider(Protocol):
@@ -195,6 +244,47 @@ class Transaction(Protocol):
 
     async def delete_schedule_override(self, group_id: int, override_id: int) -> bool:
         """Delete the group's override ``override_id``; ``False`` if it has no such override."""
+        ...
+
+    async def save_meeting(self, booking_id: int, meeting: MeetingRef) -> None:
+        """Store the booking's meeting id and join link."""
+        ...
+
+    async def save_task_id(self, booking_id: int, task_id: str) -> None:
+        """Store the booking's WxCC task id."""
+        ...
+
+    async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
+        """Return the booking whose meeting has ``meeting_id``."""
+        ...
+
+    async def get_booking_by_task(self, task_id: str) -> Booking | None:
+        """Return the booking whose WxCC task has ``task_id``."""
+        ...
+
+    async def add_booking_event(self, event: BookingEvent) -> None:
+        """Append an event to a booking's timeline."""
+        ...
+
+    async def get_booking_events(self, booking_id: int) -> list[BookingEvent]:
+        """Return a booking's timeline, oldest first (access is checked by the caller)."""
+        ...
+
+    async def list_bookings(
+        self, scope: Scope, group_id: int, lower: datetime, upper: datetime
+    ) -> list[BookingOverview]:
+        """Return the group's bookings with lower <= start < upper and their call status.
+
+        The group must lie inside ``scope`` (ADR 0014); otherwise the list is empty.
+        """
+        ...
+
+    async def get_call_status(self, booking_id: int) -> CallStatus | None:
+        """Return the booking's aggregated call status, if anything happened yet."""
+        ...
+
+    async def save_call_status(self, status: CallStatus) -> None:
+        """Create or replace the booking's aggregated call status."""
         ...
 
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:

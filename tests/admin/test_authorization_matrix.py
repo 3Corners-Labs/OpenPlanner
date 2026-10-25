@@ -44,6 +44,8 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 403)},
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 403)},
     "GET /admin/audit": {"/admin/audit": statuses(200, 200, 403, 200, 403)},
+    # Integrations and secrets: superuser only.
+    "GET /admin/integrations": {"/admin/integrations": statuses(200, 403, 403, 403, 403)},
     # Group creation: organisation admins (in their own organisation) and the superuser.
     "GET /admin/groups/new": {"/admin/groups/new": statuses(200, 200, 403, 200, 403)},
     "POST /admin/groups": {"/admin/groups": statuses(422, 422, 403, 422, 403)},
@@ -80,6 +82,15 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/groups/{slug}/exceptions": {
         "/admin/groups/demo/exceptions": statuses(422, 422, 422, 403, 403),
         "/admin/groups/andere-team/exceptions": statuses(422, 403, 403, 422, 403),
+    },
+    # Agenda and timeline: bookings.view, also for group admins on their own groups.
+    "GET /admin/groups/{slug}/agenda": {
+        "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403),
+        "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403),
+    },
+    "GET /admin/groups/{slug}/bookings/{booking_id}": {
+        "/admin/groups/demo/bookings/999999": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/bookings/999999": statuses(404, 403, 403, 404, 403),
     },
     "POST /admin/groups/{slug}/exceptions/{override_id}/delete": {
         "/admin/groups/demo/exceptions/999999/delete": statuses(404, 404, 404, 403, 403),

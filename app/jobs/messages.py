@@ -88,6 +88,7 @@ class MessageComposer:
         deadline = change_deadline(booking.start, group.dispatch_lead)
         params = {"date": date, "time": start_time, "group_name": group.name}
         manage_url = self.manage_url(booking) if kind.includes_manage_link else None
+        join_url = f"{manage_url}/join" if manage_url and group.video_enabled else None
         context = {
             "locale": locale,
             "subject": _(kind.subject_key, **params),
@@ -104,6 +105,9 @@ class MessageComposer:
                 f"{format_clock(deadline, tz, locale)}",
             ),
             "manage_link": _("message.manage_link"),
+            "join_url": join_url,
+            "join_text": _("message.join"),
+            "join_link": _("message.join_link"),
             "signoff": _("message.signoff", group_name=group.name),
         }
         calendar = build_ics(

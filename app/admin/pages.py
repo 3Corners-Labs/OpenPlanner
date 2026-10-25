@@ -40,6 +40,9 @@ NAVIGATION = (
     NavItem("admin.nav.audit", "/admin/audit", Permission.AUDIT_VIEW, "audit"),
     NavItem("admin.nav.rights", "/admin/rights", Permission.RIGHTS_VIEW, "rights"),
     NavItem("admin.nav.matrix", "/admin/matrix", Permission.MATRIX_VIEW, "matrix"),
+    NavItem(
+        "admin.nav.integrations", "/admin/integrations", Permission.INTEGRATIONS_MANAGE, "settings"
+    ),
 )
 
 

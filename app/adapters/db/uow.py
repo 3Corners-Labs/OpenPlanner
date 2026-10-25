@@ -21,7 +21,9 @@ from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.models import (
     AdminProfileRow,
     AuditEventRow,
+    BookingEventRow,
     BookingRow,
+    CallStatusRow,
     GroupRow,
     JobRow,
     OrganisationRow,
@@ -32,7 +34,24 @@ from app.adapters.db.models import (
 )
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
 from app.domain.authorization import Scope
-from app.domain.booking import Booking, BookingStatus, Contact, Slot, SlotUsage
+from app.domain.booking import (
+    Booking,
+    BookingKind,
+    BookingStatus,
+    Contact,
+    MeetingRef,
+    Slot,
+    SlotUsage,
+)
+from app.domain.calls import (
+    BookingEvent,
+    BookingOverview,
+    CallState,
+    CallStatus,
+    EventKind,
+    TaskState,
+    new_status,
+)
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import PlannedJob
@@ -66,7 +85,12 @@ def _group(row: GroupRow) -> Group:
         min_notice_minutes=row.min_notice_minutes,
         horizon_days=row.horizon_days,
         phone_mode=PhoneMode(row.phone_mode),
-        wxcc_queue_id=row.wxcc_queue_id,
+        video_host_email=row.video_host_email,
+        wxcc_business_address=row.wxcc_business_address,
+        wxcc_channel=row.wxcc_channel,
+        wxcc_routing_value=row.wxcc_routing_value,
+        direct_call_enabled=row.direct_call_enabled,
+        not_picked_up_minutes=row.not_picked_up_minutes,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
     )
 
@@ -119,7 +143,12 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "min_notice_minutes": group.min_notice_minutes,
         "horizon_days": group.horizon_days,
         "phone_mode": group.phone_mode.value,
-        "wxcc_queue_id": group.wxcc_queue_id,
+        "video_host_email": group.video_host_email,
+        "wxcc_business_address": group.wxcc_business_address,
+        "wxcc_channel": group.wxcc_channel,
+        "wxcc_routing_value": group.wxcc_routing_value,
+        "direct_call_enabled": group.direct_call_enabled,
+        "not_picked_up_minutes": group.not_picked_up_minutes,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
     }
 
@@ -146,6 +175,26 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         consents=frozenset(ChannelKind(c) for c in row.consents.split(",") if c),
         cancelled_at=row.cancelled_at,
         rescheduled_from_id=row.rescheduled_from_id,
+        meeting=MeetingRef(row.video_room_id, row.guest_join_url) if row.video_room_id else None,
+        wxcc_task_id=row.wxcc_task_id,
+        kind=BookingKind(slot.kind),
+    )
+
+
+def _call_status(row: CallStatusRow) -> CallStatus:
+    """Map a call status row."""
+    return CallStatus(
+        booking_id=row.booking_id,
+        call=CallState(row.call),
+        task=TaskState(row.task),
+        participants=row.participants,
+        host_joined=row.host_joined,
+        host_joined_at=row.host_joined_at,
+        started_at=row.started_at,
+        ended_at=row.ended_at,
+        task_created_at=row.task_created_at,
+        connected_at=row.connected_at,
+        updated_at=row.updated_at,
     )
 
 
@@ -366,6 +415,115 @@ class SqlTransaction:
         )
         return bool(getattr(result, "rowcount", 0))
 
+    async def save_meeting(self, booking_id: int, meeting: MeetingRef) -> None:
+        """Store the booking's meeting id and join link (one link; roles follow the account)."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(
+                video_room_id=meeting.id,
+                guest_join_url=meeting.link,
+                host_join_url=meeting.link,
+            )
+        )
+
+    async def save_task_id(self, booking_id: int, task_id: str) -> None:
+        """Store the booking's WxCC task id."""
+        await self._session.execute(
+            update(BookingRow).where(BookingRow.id == booking_id).values(wxcc_task_id=task_id)
+        )
+
+    async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
+        """Return the booking whose meeting has ``meeting_id``."""
+        return await self._booking_where(BookingRow.video_room_id == meeting_id)
+
+    async def get_booking_by_task(self, task_id: str) -> Booking | None:
+        """Return the booking whose WxCC task has ``task_id``."""
+        return await self._booking_where(BookingRow.wxcc_task_id == task_id)
+
+    async def _booking_where(self, condition: ColumnElement[bool]) -> Booking | None:
+        """Return the one booking matching ``condition``, with its slot."""
+        found = (
+            await self._session.execute(
+                select(BookingRow, SlotRow)
+                .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+                .where(condition)
+                .limit(1)
+            )
+        ).one_or_none()
+        return _booking(*found) if found else None
+
+    async def add_booking_event(self, event: BookingEvent) -> None:
+        """Append an event to a booking's timeline."""
+        self._session.add(
+            BookingEventRow(
+                booking_id=event.booking_id,
+                at=event.at,
+                kind=event.kind.value,
+                detail=event.detail[:128],
+            )
+        )
+        await self._session.flush()
+
+    async def get_booking_events(self, booking_id: int) -> list[BookingEvent]:
+        """Return a booking's timeline, oldest first."""
+        rows = await self._session.scalars(
+            select(BookingEventRow)
+            .where(BookingEventRow.booking_id == booking_id)
+            .order_by(BookingEventRow.at, BookingEventRow.id)
+        )
+        return [BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail) for r in rows]
+
+    async def list_bookings(
+        self, scope: Scope, group_id: int, lower: datetime, upper: datetime
+    ) -> list[BookingOverview]:
+        """Return the group's bookings in [lower, upper) with their status, inside ``scope``."""
+        rows = await self._session.execute(
+            select(BookingRow, SlotRow, CallStatusRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .join(GroupRow, GroupRow.id == BookingRow.group_id)
+            .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
+            .outerjoin(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
+            .where(
+                BookingRow.group_id == group_id,
+                SlotRow.start >= lower,
+                SlotRow.start < upper,
+                scope_filter(scope, OrganisationRow.slug, GroupRow.slug),
+            )
+            .order_by(SlotRow.start, BookingRow.id)
+        )
+        return [
+            BookingOverview(
+                _booking(booking, slot),
+                _call_status(status) if status else new_status(booking.id),
+            )
+            for booking, slot, status in rows
+        ]
+
+    async def get_call_status(self, booking_id: int) -> CallStatus | None:
+        """Return the booking's aggregated call status."""
+        row = await self._session.get(CallStatusRow, booking_id)
+        return _call_status(row) if row else None
+
+    async def save_call_status(self, status: CallStatus) -> None:
+        """Create or replace the booking's aggregated call status."""
+        await self._session.merge(
+            CallStatusRow(
+                booking_id=status.booking_id,
+                call=status.call.value,
+                task=status.task.value,
+                participants=status.participants,
+                host_joined=status.host_joined,
+                host_joined_at=status.host_joined_at,
+                started_at=status.started_at,
+                ended_at=status.ended_at,
+                task_created_at=status.task_created_at,
+                connected_at=status.connected_at,
+                updated_at=status.updated_at,
+            )
+        )
+        await self._session.flush()
+
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:
         """Return the group's reminder rules."""
         rows = await self._session.scalars(
@@ -381,7 +539,12 @@ class SqlTransaction:
         rows = await self._session.execute(
             select(SlotRow.start, SlotRow.capacity_snapshot, active)
             .outerjoin(BookingRow, BookingRow.slot_id == SlotRow.id)
-            .where(SlotRow.group_id == group_id, SlotRow.start >= lower, SlotRow.start < upper)
+            .where(
+                SlotRow.group_id == group_id,
+                SlotRow.start >= lower,
+                SlotRow.start < upper,
+                SlotRow.kind == BookingKind.SCHEDULED.value,
+            )
             .group_by(SlotRow.id)
         )
         return [SlotUsage(start, capacity, int(count)) for start, capacity, count in rows]
@@ -389,7 +552,11 @@ class SqlTransaction:
     async def get_slot(self, group_id: int, start: datetime) -> Slot | None:
         """Return the existing slot of the group at ``start``."""
         row = await self._session.scalar(
-            select(SlotRow).where(SlotRow.group_id == group_id, SlotRow.start == start)
+            select(SlotRow).where(
+                SlotRow.group_id == group_id,
+                SlotRow.start == start,
+                SlotRow.kind == BookingKind.SCHEDULED.value,
+            )
         )
         if row is None:
             return None
@@ -402,10 +569,11 @@ class SqlTransaction:
             start=slot.start,
             end=slot.end,
             capacity_snapshot=slot.capacity_snapshot,
+            kind=slot.kind.value,
         )
         self._session.add(row)
         await self._session.flush()
-        return Slot(row.id, slot.group_id, slot.start, slot.end, slot.capacity_snapshot)
+        return Slot(row.id, slot.group_id, slot.start, slot.end, slot.capacity_snapshot, slot.kind)
 
     async def count_active_bookings(self, slot_id: int) -> int:
         """Return the number of confirmed bookings in the slot."""

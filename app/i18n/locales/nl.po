@@ -337,8 +337,6 @@ msgstr "Optioneel"
 msgid "admin.group.phone_required"
 msgstr "Verplicht"
 
-msgid "admin.group.queue"
-msgstr "WxCC-wachtrij"
 
 msgid "admin.group.your_rights"
 msgstr "Uw rechten voor deze groep"
@@ -676,11 +674,7 @@ msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de burger. 0 tot 60."
 msgid "admin.field.phone_mode"
 msgstr "Telefoonnummer op het formulier"
 
-msgid "admin.field.wxcc_queue_id"
-msgstr "Webex Contact Center-wachtrij"
 
-msgid "admin.field.wxcc_queue_id_hint"
-msgstr "Het ID van de wachtrij die de taak ontvangt. Later kiest u hier uit de wachtrijen van uw omgeving."
 
 msgid "admin.field.weekday"
 msgstr "Dag"
@@ -742,8 +736,6 @@ msgstr "Vul een aantal minuten in van 0 tot 60."
 msgid "admin.form.error.phone_mode"
 msgstr "Kies of het telefoonnummer verborgen, optioneel of verplicht is."
 
-msgid "admin.form.error.wxcc_queue_id"
-msgstr "Vul een geldig wachtrij-ID in van hoogstens 128 tekens."
 
 msgid "admin.form.error.future_bookings"
 msgstr "Dit kan niet zolang er afspraken in de toekomst staan. Wijzig het nadat die zijn geweest of geannuleerd."
@@ -864,3 +856,333 @@ msgstr "Uitzondering toegevoegd"
 
 msgid "admin.audit.detail.override_remove"
 msgstr "Uitzondering verwijderd"
+
+msgid "admin.yes"
+msgstr "Ja"
+
+msgid "admin.no"
+msgstr "Nee"
+
+msgid "admin.settings.integrations"
+msgstr "Koppelingen: Webex en Webex Contact Center"
+
+msgid "admin.settings.integrations_lead"
+msgstr "Leeg laten zolang de koppeling niet is ingericht; afspraken werken dan zonder videogesprek of taak."
+
+msgid "admin.field.video_host_email"
+msgstr "Webex-host (e-mailadres)"
+
+msgid "admin.field.video_host_email_hint"
+msgstr "Gelicentieerd account waarop de meetings worden ingepland. Medewerkers met een account van de organisatie worden cohost."
+
+msgid "admin.field.wxcc_business_address"
+msgstr "WxCC business address"
+
+msgid "admin.field.wxcc_channel"
+msgstr "WxCC work item-kanaal"
+
+msgid "admin.field.wxcc_routing_value"
+msgstr "Routeringswaarde voor de WxCC-flow"
+
+msgid "admin.field.wxcc_routing_value_hint"
+msgstr "De flow kiest hiermee de wachtrij. Leeg: het webadres van de groep."
+
+msgid "admin.field.direct_call_enabled"
+msgstr "Direct gesprek starten"
+
+msgid "admin.field.direct_call_enabled_hint"
+msgstr "Burgers kunnen binnen de openingstijden meteen een gesprek starten."
+
+msgid "admin.field.not_picked_up_minutes"
+msgstr "Niet opgepakt na (minuten)"
+
+msgid "admin.field.not_picked_up_minutes_hint"
+msgstr "Zo lang mag een gesprek zonder medewerker blijven voordat het opvalt. 1 tot 120."
+
+msgid "admin.form.error.video_host_email"
+msgstr "Vul een geldig e-mailadres in."
+
+msgid "admin.form.error.integration_text"
+msgstr "Vul een waarde in zonder speciale tekens, of laat het veld leeg."
+
+msgid "admin.form.error.choice"
+msgstr "Maak een keuze."
+
+msgid "admin.form.error.not_picked_up_minutes"
+msgstr "Vul een aantal minuten in van 1 tot 120."
+
+msgid "admin.group.video"
+msgstr "Videogesprek (Webex)"
+
+msgid "admin.group.wxcc"
+msgstr "Webex Contact Center"
+
+msgid "admin.group.direct_call"
+msgstr "Direct gesprek"
+
+msgid "admin.group.connected"
+msgstr "Gekoppeld"
+
+msgid "admin.group.not_connected"
+msgstr "Niet gekoppeld"
+
+msgid "message.join"
+msgstr "U neemt deel via uw browser; u hoeft niets te installeren. De link werkt vanaf 15 minuten voor de start."
+
+msgid "message.join_link"
+msgstr "Deelnemen aan het videogesprek"
+
+msgid "join.title"
+msgstr "Uw videogesprek"
+
+msgid "join.button"
+msgstr "Deelnemen aan het videogesprek"
+
+msgid "join.from_manage"
+msgstr "Naar het videogesprek"
+
+msgid "join.tips.title"
+msgstr "Goed om te weten"
+
+msgid "join.tips.browser"
+msgstr "Het gesprek opent in uw browser. U hoeft niets te installeren."
+
+msgid "join.tips.devices"
+msgstr "Geef uw browser toestemming voor camera en microfoon als daarom wordt gevraagd."
+
+msgid "join.tips.lobby"
+msgstr "U wacht eerst in een wachtruimte. De medewerker laat u binnen."
+
+msgid "join.too_early"
+msgstr "U kunt deelnemen vanaf {time}."
+
+msgid "join.preparing"
+msgstr "Het videogesprek wordt klaargezet. Probeer het over een paar minuten opnieuw."
+
+msgid "join.closed"
+msgstr "Dit gesprek is voorbij."
+
+msgid "join.back"
+msgstr "Terug naar uw afspraak"
+
+msgid "error.direct_call_unavailable"
+msgstr "Nu een gesprek starten kan op dit moment niet. Maak een afspraak."
+
+msgid "direct.title"
+msgstr "Nu een videogesprek starten"
+
+msgid "direct.intro"
+msgstr "Vul uw gegevens in. U komt meteen in de wachtruimte van {group_name}; een medewerker laat u binnen."
+
+msgid "direct.submit"
+msgstr "Gesprek starten"
+
+msgid "direct.unavailable"
+msgstr "Nu een gesprek starten kan op dit moment niet, bijvoorbeeld buiten de openingstijden."
+
+msgid "direct.schedule_instead"
+msgstr "Een afspraak maken"
+
+msgid "direct.card.title"
+msgstr "Liever meteen?"
+
+msgid "direct.card.text"
+msgstr "Het team is nu open. U kunt direct een videogesprek starten."
+
+msgid "direct.card.button"
+msgstr "Nu een gesprek starten"
+
+msgid "wait.title"
+msgstr "Uw videogesprek"
+
+msgid "wait.searching"
+msgstr "We zoeken een medewerker voor u. U kunt alvast naar de wachtruimte gaan."
+
+msgid "wait.accepted"
+msgstr "Een medewerker heeft uw gesprek aangenomen en komt zo naar de wachtruimte."
+
+msgid "wait.in_call"
+msgstr "De medewerker is in het gesprek."
+
+msgid "wait.unavailable"
+msgstr "Er is nu helaas geen medewerker beschikbaar. Maak een afspraak, dan bellen we op een moment dat u schikt."
+
+msgid "call.state.none"
+msgstr "Geen meeting"
+
+msgid "call.state.scheduled"
+msgstr "Meeting klaar"
+
+msgid "call.state.in_progress"
+msgstr "Gesprek bezig"
+
+msgid "call.state.ended"
+msgstr "Afgelopen"
+
+msgid "call.task.none"
+msgstr "Nog geen taak"
+
+msgid "call.task.queued"
+msgstr "In de wachtrij"
+
+msgid "call.task.connected"
+msgstr "Aangenomen"
+
+msgid "call.task.ended"
+msgstr "Taak beëindigd"
+
+msgid "call.task.failed"
+msgstr "Taak mislukt"
+
+msgid "call.event.meeting_created"
+msgstr "Videomeeting aangemaakt"
+
+msgid "call.event.meeting_deleted"
+msgstr "Videomeeting verwijderd"
+
+msgid "call.event.join_page_opened"
+msgstr "Burger opende de deelnamepagina"
+
+msgid "call.event.join_clicked"
+msgstr "Burger klikte op deelnemen"
+
+msgid "call.event.task_created"
+msgstr "Taak in de WxCC-wachtrij gezet"
+
+msgid "call.event.task_failed"
+msgstr "Taak mislukt"
+
+msgid "call.event.task_connected"
+msgstr "Medewerker nam de taak aan"
+
+msgid "call.event.task_ended"
+msgstr "Taak beëindigd"
+
+msgid "call.event.meeting_started"
+msgstr "Meeting gestart"
+
+msgid "call.event.host_joined"
+msgstr "Medewerker kwam binnen"
+
+msgid "call.event.guest_joined"
+msgstr "Deelnemer kwam binnen"
+
+msgid "call.event.participant_left"
+msgstr "Deelnemer vertrok"
+
+msgid "call.event.meeting_ended"
+msgstr "Meeting beëindigd"
+
+msgid "call.event.integration_error"
+msgstr "Koppeling mislukt"
+
+msgid "call.kind.scheduled"
+msgstr "Afspraak"
+
+msgid "call.kind.direct"
+msgstr "Direct"
+
+msgid "admin.tab.agenda"
+msgstr "Agenda"
+
+msgid "admin.agenda.days"
+msgstr "Andere dag"
+
+msgid "admin.agenda.previous"
+msgstr "Vorige dag"
+
+msgid "admin.agenda.today"
+msgstr "Vandaag"
+
+msgid "admin.agenda.next"
+msgstr "Volgende dag"
+
+msgid "admin.agenda.caption"
+msgstr "Afspraken op {day}"
+
+msgid "admin.agenda.time"
+msgstr "Tijd"
+
+msgid "admin.agenda.citizen"
+msgstr "Burger"
+
+msgid "admin.agenda.meeting"
+msgstr "Videomeeting"
+
+msgid "admin.agenda.task"
+msgstr "WxCC-taak"
+
+msgid "admin.agenda.agent"
+msgstr "Medewerker binnen"
+
+msgid "admin.agenda.participants"
+msgstr "Deelnemers"
+
+msgid "admin.agenda.details"
+msgstr "Details"
+
+msgid "admin.agenda.cancelled"
+msgstr "Geannuleerd"
+
+msgid "admin.agenda.not_picked_up"
+msgstr "Niet opgepakt"
+
+msgid "admin.agenda.empty"
+msgstr "Geen afspraken op deze dag."
+
+msgid "admin.booking.back"
+msgstr "Terug naar de agenda"
+
+msgid "admin.booking.timeline"
+msgstr "Verloop"
+
+msgid "admin.booking.no_events"
+msgstr "Nog niets gebeurd."
+
+msgid "admin.nav.integrations"
+msgstr "Koppelingen"
+
+msgid "admin.integrations.title"
+msgstr "Koppelingen"
+
+msgid "admin.integrations.lead"
+msgstr "Webex-meetings en Webex Contact Center voor de hele installatie. Geheimen staan versleuteld opgeslagen en worden nooit getoond."
+
+msgid "admin.integrations.refresh_warning"
+msgstr "Het verversingstoken van de Webex Service App verloopt op {date}. Genereer tijdig een nieuw token (runbook)."
+
+msgid "admin.integrations.webex"
+msgstr "Webex Service App"
+
+msgid "admin.integrations.service_app"
+msgstr "Service App"
+
+msgid "admin.integrations.access_token"
+msgstr "Toegangstoken geldig tot"
+
+msgid "admin.integrations.refresh_token"
+msgstr "Verversingstoken geldig tot"
+
+msgid "admin.integrations.not_used"
+msgstr "Nog niet gebruikt"
+
+msgid "admin.integrations.wxcc"
+msgstr "Webex Contact Center"
+
+msgid "admin.integrations.webhooks"
+msgstr "Webhooks"
+
+msgid "admin.integrations.webhooks_lead"
+msgstr "Deze adressen ontvangen de meldingen van Webex en WxCC. Registreer ze met python -m app.cli register-webhooks."
+
+msgid "admin.integrations.secret_set"
+msgstr "Geheim ingesteld"
+
+msgid "admin.integrations.secret_missing"
+msgstr "Geen geheim ingesteld: het adres is uitgeschakeld"
+
+msgid "admin.integrations.groups"
+msgstr "Groepen"
+
+msgid "join.refresh"
+msgstr "Status verversen"

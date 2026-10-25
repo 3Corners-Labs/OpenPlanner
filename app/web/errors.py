@@ -27,6 +27,8 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.NOT_PERMITTED: "admin.forbidden.text",
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
+    ErrorCode.INTEGRATION_NOT_READY: "error.invalid_request",
+    ErrorCode.DIRECT_CALL_UNAVAILABLE: "error.direct_call_unavailable",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {

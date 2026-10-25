@@ -41,8 +41,8 @@ flowchart LR
     end
 
     smtp[Mail provider<br/>SMTP]
-    wxcc[Webex Contact Center<br/>Tasks API]
-    video[Webex video<br/>Instant Connect or Meetings API]
+    wxcc[Webex Contact Center<br/>work items, Create Task v2]
+    video[Webex Meetings API]
     idp[Identity provider<br/>OIDC]
     sms[SMS route]
     whatsapp[WhatsApp]
@@ -51,22 +51,24 @@ flowchart LR
     citizen -- books, changes, cancels --> service
     service -- confirmation, reminders --> smtp --> citizen
     admin -. manages groups, texts, settings .-> service
-    service -. task with host link at T-5 .-> wxcc
-    wxcc -. offers task .-> agent
-    service -. creates meeting, reads status .-> video
+    service -- work item with meeting link at T-5 or now --> wxcc
+    wxcc -- offers work item --> agent
+    service -- creates meeting, webhooks back --> video
+    citizen -- joins in the browser --> video
+    agent -- joins as cohost, Webex app --> video
     admin -. login .-> idp
     service -. reminders .-> sms
     service -. roadmap .-> whatsapp
 
     classDef planned stroke-dasharray: 5 5
-    class wxcc,video,sms,whatsapp planned
+    class sms,whatsapp planned
 ```
 
 | External system | Direction | Purpose | Decision |
 |---|---|---|---|
 | Mail provider (SMTP) | out | Confirmation, change, reminder, cancellation | ADR 0009; per organisation in the admin UI (ADR 0008) |
-| Webex Contact Center | out, in | Create a task in the group's queue; task events | ADR 0007 (Tasks API) |
-| Webex video | out, in | Host and guest links; live meeting status | HANDOVER B7, O1; ADR 0010 |
+| Webex Contact Center | out, in | Work item per booking or direct call; task events by signed webhook | ADR 0018 (supersedes 0007 in part) |
+| Webex Meetings | out, in | Meeting per booking on behalf of the group's host; status by signed webhook | ADR 0017, 0010 |
 | Identity provider | in | Admin login with roles | HANDOVER B8, O3 |
 | SMS route / WhatsApp | out | Reminders | ADR 0009 (WhatsApp on the roadmap) |
 
@@ -160,8 +162,8 @@ flowchart LR
     clock[adapters.clock<br/>SystemClock]
     uow[adapters.db.uow<br/>SqlUnitOfWork]
     smtp[adapters.smtp<br/>SmtpMailSender]
-    videoad[video adapter<br/>WP5]
-    wxccad[WxCC adapter<br/>WP6]
+    videoad[adapters.webex_meetings<br/>WebexMeetings]
+    wxccad[adapters.wxcc<br/>WxccTasks]
     idpad[adapters.oidc<br/>OidcIdentityProvider]
 
     clock -.implements.-> ports
@@ -171,8 +173,6 @@ flowchart LR
     wxccad -.implements.-> ports
     idpad -.implements.-> ports
 
-    classDef planned stroke-dasharray: 5 5
-    class videoad,wxccad planned
 ```
 
 Tests replace every adapter with a fake from `tests/fakes/`. The in-memory unit of work has the
@@ -193,6 +193,12 @@ same commit and rollback behaviour as the SQL one.
 | Authorisation matrix, scopes (ADR 0014) | `app/domain/authorization.py` |
 | Admin use cases, audit events | `app/domain/admin.py`, `app/domain/audit.py` |
 | Groups, opening hours, exceptions, preview (admin) | `app/domain/planning.py` |
+| What leaves for Webex/WxCC, timeline, call status, join window | `app/domain/calls.py` |
+| Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
+| Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
+| Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
+| Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
+| Agenda, booking timeline, integrations page | `app/admin/call_routes.py`, `app/admin/routes.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
 | Group and planning screens, admin forms, shared page plumbing | `app/admin/group_routes.py`, `app/admin/forms.py`, `app/admin/pages.py` |
@@ -382,15 +388,43 @@ flowchart LR
 
     cancel(["cancelled"]) --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
 
-    classDef planned stroke-dasharray: 5 5
-    class dispatch planned
 ```
 
 Every job that is tied to a start time stores that start (`pinned_start`). On run it does
 nothing if the booking is no longer confirmed, its start changed, or its data was purged.
-Cancelling or moving a booking replaces its pending jobs in the same transaction. The video
-room and the WxCC task are planned today but only executed from WP5 and WP6; the read-only
-moment already applies.
+Cancelling or moving a booking replaces its pending jobs in the same transaction, including
+deleting its meeting.
+
+### A call: meeting, work item, agent and citizen
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Citizen
+    participant O as OpenPlanner
+    participant W as Webex Meetings
+    participant X as WxCC
+    actor A as Agent
+
+    O->>W: create meeting on behalf of the group's host (job, or at once for a direct call)
+    W-->>O: meeting id, join link
+    O-->>C: email with OpenPlanner join link
+    O->>X: work item: reference, first name, start, meeting link (T-5, or now)
+    X-->>O: task id
+    X->>A: offer work item (flow routes on openplannerGroup)
+    A->>X: accept
+    X-->>O: webhook task:connected (signed)
+    A->>W: open meeting link in the Webex app, cohost
+    C->>O: GET /b/{token}/join/go
+    O-->>C: 303 to the Webex link
+    C->>W: join in the browser, waits in the lobby
+    W-->>O: webhooks: started, host joined, guest joined (signed)
+    A->>W: admit citizen
+    W-->>O: webhook: meeting ended
+```
+
+Every arrow back into OpenPlanner becomes a timeline event and updates the booking's call
+status; the agenda in the admin portal shows it per day.
 
 ### Booking status
 
@@ -443,15 +477,19 @@ flowchart LR
     subgraph ext [Third parties]
         smtp[Mail provider]
         wxcc[WxCC]
+        webex[Webex Meetings]
     end
 
     browser --> proxy --> mw --> prot --> pages --> domain --> db
     bot -. blocked .-> prot
     domain -. via worker .-> smtp
-    domain -. first name + host link only .-> wxcc
+    domain -- first name + meeting link only --> wxcc
+    domain -- group name + times only --> webex
+    wxcc -- signed webhooks --> pages
+    webex -- signed webhooks --> pages
 
     classDef planned stroke-dasharray: 5 5
-    class proxy,wxcc planned
+    class proxy planned
 ```
 
 | Control | Where | Reference |
@@ -521,6 +559,9 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0014 | The authorisation matrix as the single source of rights |
 | 0015 | Admin changes need a recent login (60 minutes) |
 | 0016 | Admin forms without JavaScript; HTMX only where it adds something |
+| 0017 | Video calls through the Webex Meetings API (cohost for staff, lobby for guests) |
+| 0018 | Dispatch to WxCC as work items (Create Task API v2) |
+| 0019 | Direct video call ("now") per group |
 
 ## 12. Status and roadmap
 
@@ -532,12 +573,11 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP3 (slice 1) | Citizen pages, mail, worker, demo | done |
 | WP3 (rest) | Embeddable widget (grid calendar), branding (O5) | planned |
 | WP4 | SMS reminders, message editors | planned |
-| WP5 | Video adapter, live meeting status (O1) | planned |
-| WP6 | WxCC Tasks API dispatch, task events (O2, O6) | planned |
+| WP5 | Webex Meetings, join page, live status (O1: Meetings API) | done |
+| WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
 | WP7c–d | Texts and reminders, encrypted integration settings (O3) | planned |
-| Direct call (O9) | Start a video call now, per group, into its WxCC queue | planned after WP5/WP6 |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 

@@ -82,8 +82,19 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
         "admin.field.dispatch_lead_minutes",
         "admin.field.dispatch_lead_minutes_hint",
     ),
+    "not_picked_up_minutes": (
+        "admin.field.not_picked_up_minutes",
+        "admin.field.not_picked_up_minutes_hint",
+    ),
 }
 """Label and hint key per numeric setting (literal keys, so the catalogue test sees them)."""
+
+INTEGRATION_LABELS: dict[str, str] = {
+    "video_host_email": "admin.field.video_host_email",
+    "wxcc_business_address": "admin.field.wxcc_business_address",
+    "wxcc_channel": "admin.field.wxcc_channel",
+    "wxcc_routing_value": "admin.field.wxcc_routing_value",
+}
 
 
 @dataclass(frozen=True)
@@ -101,6 +112,7 @@ TABS = (
     Tab("admin.tab.settings", "/settings", Permission.GROUP_EDIT, "settings"),
     Tab("admin.tab.hours", "/hours", Permission.SCHEDULE_MANAGE, "clock"),
     Tab("admin.tab.exceptions", "/exceptions", Permission.SCHEDULE_MANAGE, "calendar"),
+    Tab("admin.tab.agenda", "/agenda", Permission.BOOKINGS_VIEW, "agenda"),
 )
 
 
@@ -126,7 +138,7 @@ def _done(request: Request, _: BoundGettext) -> str | None:
     return _(DONE_MESSAGES[key]) if key in DONE_MESSAGES else None
 
 
-def _group_page(
+def group_page(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
@@ -418,7 +430,7 @@ async def group(
     group_rights = [
         _(PERMISSION_LABELS[p]) for p in Permission if LEVELS[p] is Level.GROUP and can(p, summary)
     ]
-    return _group_page(
+    return group_page(
         request,
         locale,
         context,
@@ -436,8 +448,10 @@ async def group(
 # --- settings -------------------------------------------------------------------------------
 
 
-def _settings_fields(form: FormData, current: GroupSettings, _: BoundGettext) -> list[Field]:
-    """Return the inputs of the settings form, pre-filled with the current values."""
+def _settings_fields(
+    form: FormData, current: GroupSettings, _: BoundGettext
+) -> tuple[list[Field], list[Field]]:
+    """Return the planning and the integration inputs, pre-filled with the current values."""
 
     def value(name: str, fallback: object) -> str:
         return form.values.get(name, "" if fallback is None else str(fallback))
@@ -454,8 +468,19 @@ def _settings_fields(form: FormData, current: GroupSettings, _: BoundGettext) ->
             attributes={"inputmode": "numeric", **attributes},
         )
 
+    def text(name: str, fallback: str | None, hint_key: str | None = None) -> Field:
+        return Field(
+            name,
+            _(INTEGRATION_LABELS[name]),
+            value=value(name, fallback),
+            hint=_(hint_key) if hint_key else None,
+            error=form.error_for(name),
+            required=False,
+            attributes={"spellcheck": "false", "autocapitalize": "none"},
+        )
+
     phone_options = tuple(Option(mode.value, _(PHONE_LABELS[mode])) for mode in PhoneMode)
-    return [
+    planning = [
         Field(
             "name",
             _("admin.field.name"),
@@ -481,16 +506,27 @@ def _settings_fields(form: FormData, current: GroupSettings, _: BoundGettext) ->
             error=form.error_for("phone_mode"),
             options=phone_options,
         ),
-        Field(
-            "wxcc_queue_id",
-            _("admin.field.wxcc_queue_id"),
-            value=value("wxcc_queue_id", current.wxcc_queue_id),
-            hint=_("admin.field.wxcc_queue_id_hint"),
-            error=form.error_for("wxcc_queue_id"),
-            required=False,
-            attributes={"spellcheck": "false"},
-        ),
     ]
+    yes_no = (Option("yes", _("admin.yes")), Option("no", _("admin.no")))
+    integrations = [
+        text("video_host_email", current.video_host_email, "admin.field.video_host_email_hint"),
+        text("wxcc_business_address", current.wxcc_business_address),
+        text("wxcc_channel", current.wxcc_channel),
+        text(
+            "wxcc_routing_value", current.wxcc_routing_value, "admin.field.wxcc_routing_value_hint"
+        ),
+        Field(
+            "direct_call_enabled",
+            _("admin.field.direct_call_enabled"),
+            "select",
+            value("direct_call_enabled", "yes" if current.direct_call_enabled else "no"),
+            hint=_("admin.field.direct_call_enabled_hint"),
+            error=form.error_for("direct_call_enabled"),
+            options=yes_no,
+        ),
+        number("not_picked_up_minutes", current.not_picked_up_minutes, {"min": "1", "max": "120"}),
+    ]
+    return planning, integrations
 
 
 def _settings_response(
@@ -498,12 +534,17 @@ def _settings_response(
 ) -> HTMLResponse:
     """Render the settings form."""
     current = settings_of(context.group.group)
-    return _group_page(
+    planning, integrations = _settings_fields(form, current, locale.gettext)
+    return group_page(
         request,
         locale,
         context,
         "admin/group_settings.html",
-        {"fields": _settings_fields(form, current, locale.gettext), "errors": form.errors},
+        {
+            "fields": planning,
+            "integration_fields": integrations,
+            "errors": form.errors,
+        },
         status,
     )
 
@@ -535,17 +576,19 @@ async def save_settings(
 ) -> Response:
     """Save the group's settings."""
     form = await _form(request, locale)
-    numbers = {
-        name: form.integer(name)
-        for name in ("slot_minutes", "min_notice_minutes", "horizon_days", "dispatch_lead_minutes")
-    }
+    numbers = {name: form.integer(name) for name in NUMBER_LABELS}
     phone = form.choice("phone_mode", {mode.value for mode in PhoneMode})
-    if not form.errors and phone is not None:
+    direct = form.choice("direct_call_enabled", {"yes", "no"})
+    if not form.errors and phone is not None and direct is not None:
         new = GroupSettings(
             name=form.text("name"),
             timezone=form.text("timezone"),
             phone_mode=PhoneMode(phone),
-            wxcc_queue_id=form.optional_text("wxcc_queue_id"),
+            video_host_email=form.optional_text("video_host_email"),
+            wxcc_business_address=form.optional_text("wxcc_business_address"),
+            wxcc_channel=form.optional_text("wxcc_channel"),
+            wxcc_routing_value=form.optional_text("wxcc_routing_value"),
+            direct_call_enabled=direct == "yes",
             **{name: value for name, value in numbers.items() if value is not None},
         )
         try:
@@ -624,7 +667,7 @@ async def _hours_response(
 ) -> HTMLResponse:
     """Render the weekly hours with the add-window form."""
     schedule = await planning_service(request).schedule(context.principal, context.group.group.slug)
-    return _group_page(
+    return group_page(
         request,
         locale,
         context,
@@ -732,7 +775,7 @@ async def _exceptions_response(
 ) -> HTMLResponse:
     """Render the exceptions with the add-exception form."""
     schedule = await planning_service(request).schedule(context.principal, context.group.group.slug)
-    return _group_page(
+    return group_page(
         request,
         locale,
         context,

@@ -9,7 +9,8 @@ from datetime import date, datetime
 
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Scope
-from app.domain.booking import Booking, BookingStatus, Slot, SlotUsage
+from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsage
+from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channels import ReminderRule
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
@@ -32,6 +33,8 @@ class State:
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
     organisation_slugs: dict[int, str] = field(default_factory=dict)
     organisations: dict[int, Organisation] = field(default_factory=dict)
+    booking_events: dict[int, list[BookingEvent]] = field(default_factory=dict)
+    call_status: dict[int, CallStatus] = field(default_factory=dict)
     audit: list[AuditEvent] = field(default_factory=list)
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     next_id: int = 1
@@ -139,6 +142,50 @@ class InMemoryTransaction:
         self.state.overrides[group_id] = kept
         return len(kept) != len(overrides)
 
+    async def save_meeting(self, booking_id: int, meeting: MeetingRef) -> None:
+        self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], meeting=meeting)
+
+    async def save_task_id(self, booking_id: int, task_id: str) -> None:
+        booking = self.state.bookings[booking_id]
+        self.state.bookings[booking_id] = replace(booking, wxcc_task_id=task_id)
+
+    async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
+        return next(
+            (b for b in self.state.bookings.values() if b.meeting and b.meeting.id == meeting_id),
+            None,
+        )
+
+    async def get_booking_by_task(self, task_id: str) -> Booking | None:
+        return next((b for b in self.state.bookings.values() if b.wxcc_task_id == task_id), None)
+
+    async def add_booking_event(self, event: BookingEvent) -> None:
+        self.state.booking_events.setdefault(event.booking_id, []).append(event)
+
+    async def get_booking_events(self, booking_id: int) -> list[BookingEvent]:
+        return list(self.state.booking_events.get(booking_id, []))
+
+    async def list_bookings(
+        self, scope: Scope, group_id: int, lower: datetime, upper: datetime
+    ) -> list[BookingOverview]:
+        group = self.state.groups.get(group_id)
+        if group is None or not scope.contains(self._summary(group).organisation_slug, group.slug):
+            return []
+        found = [
+            b
+            for b in self.state.bookings.values()
+            if b.group_id == group_id and lower <= b.start < upper
+        ]
+        return [
+            BookingOverview(b, self.state.call_status.get(b.id or 0) or new_status(b.id or 0))
+            for b in sorted(found, key=lambda b: (b.start, b.id or 0))
+        ]
+
+    async def get_call_status(self, booking_id: int) -> CallStatus | None:
+        return self.state.call_status.get(booking_id)
+
+    async def save_call_status(self, status: CallStatus) -> None:
+        self.state.call_status[status.booking_id] = status
+
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:
         return list(self.state.reminder_rules.get(group_id, []))
 
@@ -148,12 +195,16 @@ class InMemoryTransaction:
         return [
             SlotUsage(s.start, s.capacity_snapshot, await self.count_active_bookings(s.id or 0))
             for s in self.state.slots.values()
-            if s.group_id == group_id and lower <= s.start < upper
+            if s.group_id == group_id and lower <= s.start < upper and s.kind == "scheduled"
         ]
 
     async def get_slot(self, group_id: int, start: datetime) -> Slot | None:
         return next(
-            (s for s in self.state.slots.values() if s.group_id == group_id and s.start == start),
+            (
+                s
+                for s in self.state.slots.values()
+                if s.group_id == group_id and s.start == start and s.kind == "scheduled"
+            ),
             None,
         )
 

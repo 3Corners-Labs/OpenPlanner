@@ -183,6 +183,7 @@ async def test_find_and_cancel(service: BookingService, uow: InMemoryUnitOfWork)
     assert cancelled.status is BookingStatus.CANCELLED
     assert cancelled.cancelled_at == NOW
     assert [j.type for j in uow.state.jobs[cancelled.id or 0]] == [
+        JobType.DELETE_VIDEO_ROOM,
         JobType.SEND_CANCELLATION,
         JobType.PURGE_PII,
     ]
@@ -221,7 +222,10 @@ async def test_reschedule_moves_the_booking(
     assert new.booking.locale == "nl"
     assert new.management_token != old.management_token
     assert uow.state.bookings[old.booking.id or 0].status is BookingStatus.CANCELLED
-    assert [j.type for j in uow.state.jobs[old.booking.id or 0]] == [JobType.PURGE_PII]
+    assert [j.type for j in uow.state.jobs[old.booking.id or 0]] == [
+        JobType.DELETE_VIDEO_ROOM,
+        JobType.PURGE_PII,
+    ]
     assert JobType.SEND_CHANGE in [j.type for j in uow.state.jobs[new.booking.id or 0]]
     await book(service)  # the old place is free again
 

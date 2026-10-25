@@ -97,6 +97,25 @@ class Contact:
         return self.name.split()[0]
 
 
+class BookingKind(StrEnum):
+    """A booked slot, or a call started right away (ADR 0019)."""
+
+    SCHEDULED = "scheduled"
+    DIRECT = "direct"
+
+
+@dataclass(frozen=True)
+class MeetingRef:
+    """The video meeting of a booking: the provider's id and its join link.
+
+    The link is personal data while the booking lives (CLAUDE.md privacy rules: it gives access
+    to the citizen's call), so it is excluded from ``repr`` and purged with the contact.
+    """
+
+    id: str
+    link: str | None = field(default=None, repr=False)
+
+
 class BookingStatus(StrEnum):
     """Lifecycle of a booking."""
 
@@ -111,6 +130,7 @@ class Slot:
     """A start time of a group that has at least one booking; created by the first one.
 
     ``capacity_snapshot`` is the capacity at creation; later schedule edits do not change it.
+    A direct call has its own slot (``kind`` direct) that takes no scheduled capacity.
     """
 
     id: int | None
@@ -118,6 +138,7 @@ class Slot:
     start: datetime
     end: datetime
     capacity_snapshot: int
+    kind: BookingKind = BookingKind.SCHEDULED
 
 
 @dataclass(frozen=True)
@@ -150,6 +171,14 @@ class Booking:
     consents: frozenset[ChannelKind] = frozenset()
     cancelled_at: datetime | None = None
     rescheduled_from_id: int | None = None
+    meeting: MeetingRef | None = None
+    wxcc_task_id: str | None = None
+    kind: BookingKind = BookingKind.SCHEDULED
+
+    @property
+    def reference(self) -> str:
+        """Human-readable booking reference for agents and reports, e.g. ``OP-000123``."""
+        return f"OP-{self.id or 0:06d}"
 
     @property
     def is_active(self) -> bool:

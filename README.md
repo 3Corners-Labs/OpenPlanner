@@ -6,12 +6,13 @@ embedded as a Web Component. Five minutes before the start, the service dispatch
 a Webex video link to the group's queue via Webex Connect. Personal data is purged 24 hours
 after the appointment.
 
-Status: **work package 7b**. Citizens can book, view, move and cancel an appointment on the
-group page; confirmation, change, reminder and cancellation emails are sent by the worker.
-Admins log in to the admin portal through OIDC; what they see and may do follows the
-authorisation matrix (`docs/authorization.md`). They create groups and manage settings, opening
-hours, exceptions and capacity per group. Texts and reminders (WP7c), integration settings
-(WP7d), video links (WP5) and WxCC dispatch (WP6) follow. See `docs/HANDOVER.md` §10 for the work packages.
+Status: **work packages 5 and 6**. Citizens book, move and cancel appointments on the group
+page, or start a video call right away when the team is open. Each appointment gets a Webex
+meeting; at T−5 (or at once for a direct call) a work item goes to the group's queue in Webex
+Contact Center. The citizen joins from the browser; the agent joins as cohost. Admins log in
+through OIDC and manage groups, opening hours, exceptions and integrations, and follow every
+call in the agenda (authorisation matrix: `docs/authorization.md`). Texts and reminders (WP7c)
+follow. See `docs/HANDOVER.md` §10.
 
 ## Quick start (demo)
 
@@ -55,6 +56,9 @@ make check
 | `GET/POST /g/{slug}/book` | Contact form and booking. |
 | `GET /b/{token}` | Management page; read-only from the dispatch moment. |
 | `GET/POST /b/{token}/cancel`, `/b/{token}/reschedule` | Cancel or move the appointment. |
+| `GET /b/{token}/join` | Join page for the video call (opens 15 minutes before the start). |
+| `GET/POST /g/{slug}/direct`, `GET /b/{token}/wait` | Start a video call right away; waiting page. |
+| `POST /webhooks/webex`, `POST /webhooks/wxcc` | Signed events from Webex and WxCC (only with a secret configured). |
 | `GET /admin/` and below | Admin portal (OIDC login, every route bound to one permission of the matrix). |
 | `GET /healthz` | Liveness: the process is up. |
 | `GET /readyz` | Readiness: the database answers. `503` otherwise. |
