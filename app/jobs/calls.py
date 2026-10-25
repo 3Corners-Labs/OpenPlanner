@@ -6,6 +6,7 @@ cancelled) and logging. Failures are classified by the runner (``IntegrationErro
     create_video_room  ─► CallService.ensure_meeting
     dispatch_wxcc_task ─► CallService.ensure_task   (waits for the meeting)
     delete_video_room  ─► CallService.delete_meeting
+    end_wxcc_task      ─► CallService.end_task      (cancelled bookings, ADR 0021)
 """
 
 import structlog
@@ -18,7 +19,12 @@ from app.domain.ports import UnitOfWork
 log = structlog.get_logger()
 
 CALL_JOBS = frozenset(
-    {JobType.CREATE_VIDEO_ROOM, JobType.DELETE_VIDEO_ROOM, JobType.DISPATCH_WXCC_TASK}
+    {
+        JobType.CREATE_VIDEO_ROOM,
+        JobType.DELETE_VIDEO_ROOM,
+        JobType.DISPATCH_WXCC_TASK,
+        JobType.END_WXCC_TASK,
+    }
 )
 
 
@@ -43,6 +49,8 @@ class CallJobs:
             types |= {JobType.CREATE_VIDEO_ROOM, JobType.DELETE_VIDEO_ROOM}
         if self._calls.dispatch_available:
             types.add(JobType.DISPATCH_WXCC_TASK)
+        if self._calls.end_available:
+            types.add(JobType.END_WXCC_TASK)
         return types
 
     async def run(self, job: ClaimedJob) -> None:
@@ -55,6 +63,8 @@ class CallJobs:
             return
         if job.type is JobType.DELETE_VIDEO_ROOM:
             await self._calls.delete_meeting(booking, group)
+        elif job.type is JobType.END_WXCC_TASK:
+            await self._calls.end_task(booking)
         elif is_stale(job.pinned_start, booking):
             log.info("job.skipped", job_id=job.id, reason="stale")
         elif job.type is JobType.CREATE_VIDEO_ROOM:

@@ -90,3 +90,33 @@ async def test_integrations_page_shows_status_without_secrets(site: Site) -> Non
     assert "/webhooks/webex" in text
     assert "Geen geheim ingesteld" in text
     assert "Niet gekoppeld" in text
+
+
+async def test_integrations_page_shows_the_webhook_base_url(site: Site) -> None:
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app.state.settings = app.state.settings.model_copy(
+        update={"webhook_base_url": "https://abc.trycloudflare.com"}
+    )
+    await site.login_as(SUPER)
+
+    text = (await site.client.get("/admin/integrations")).text
+
+    assert "https://abc.trycloudflare.com/webhooks/webex" in text
+    assert "https://abc.trycloudflare.com/webhooks/wxcc" in text
+
+
+async def test_timeline_explains_a_work_item_that_could_not_be_ended(site: Site) -> None:
+    booking_id = await _book(site, "demo")
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    uow = SqlUnitOfWork(app.state.engine)
+    integration = IntegrationService(uow, site.clock, AdminService(uow, site.clock))
+    await integration.record(booking_id, EventKind.END_NOT_POSSIBLE, detail="rejected_403")
+    await integration.record(booking_id, EventKind.TASK_MARKED_CANCELLED)
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
+
+    assert "Taak kon niet worden beëindigd" in text
+    assert "<code>rejected_403</code>" in text
+    assert "Taak als geannuleerd gemarkeerd" in text
+    assert "Beëindig de taak in Agent Desktop" in text

@@ -1295,6 +1295,24 @@ msgstr "Groepen"
 msgid "join.refresh"
 msgstr "Status verversen"
 
+
+# --- WxCC work item lifecycle (ADR 0021) ---
+
+msgid "call.task.cancelled"
+msgstr "Taak geannuleerd"
+
+msgid "call.event.task_end_requested"
+msgstr "Taak beëindigen gevraagd aan WxCC"
+
+msgid "call.event.end_not_possible"
+msgstr "Taak kon niet worden beëindigd"
+
+msgid "call.event.task_marked_cancelled"
+msgstr "Taak als geannuleerd gemarkeerd"
+
+msgid "admin.booking.end_not_possible"
+msgstr "De afspraak is geannuleerd en de taak is via de v2-API als geannuleerd gemarkeerd (Soort: cancelled; zie de tijdlijn), maar WxCC liet OpenPlanner de taak niet beëindigen. Beëindig de taak in Agent Desktop als die nog openstaat."
+
 #. Branding per organisation (WP3b).
 
 msgid "authz.permission.branding_manage"
