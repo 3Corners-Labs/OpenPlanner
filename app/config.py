@@ -33,6 +33,9 @@ class Settings(BaseSettings):
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
+    # Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL: an https tunnel or staging
+    # host, while the OIDC redirect and the links stay on PUBLIC_BASE_URL (runbook, Webhooks).
+    webhook_base_url: str | None = None
 
     # ADR 0011. Required in production; in development a shared key is generated in the data
     # volume (see app.keys).
@@ -97,6 +100,10 @@ class Settings(BaseSettings):
                 raise ValueError("PUBLIC_BASE_URL must use https in production")
             if self.session_secret is None:
                 raise ValueError("SESSION_SECRET is required in production")
+            if self.webhook_base_url is not None and not self.webhook_base_url.startswith(
+                "https://"
+            ):
+                raise ValueError("WEBHOOK_BASE_URL must use https in production")
             if self.webex_client_id is not None and (
                 self.webex_client_secret is None
                 or self.webex_refresh_token is None
@@ -112,6 +119,11 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("OIDC needs an https discovery URL and a client secret")
         return self
+
+    @property
+    def webhook_base(self) -> str:
+        """Base URL the platforms call back on: ``WEBHOOK_BASE_URL`` or ``PUBLIC_BASE_URL``."""
+        return (self.webhook_base_url or self.public_base_url).rstrip("/")
 
     @property
     def video_configured(self) -> bool:
