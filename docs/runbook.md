@@ -171,6 +171,44 @@ Work Items is in beta; the organisation must be enabled by Cisco.
    and a **RONA** timeout.
 5. Set `WXCC_API_BASE_URL` to your region's API host.
 
+#### Matching a group to its queue
+
+OpenPlanner never names a queue: Create Task v2 has no queue field for work items. Three
+values per group (**Instellingen → Koppelingen**) select the asset and tell the flow which
+queue to use; the meeting link travels inside the work item, so it always reaches the agent who
+picks up that booking.
+
+```text
+group: WxCC business address ─► destination.id ─► Work Item asset ─► entry point ─► flow
+group: WxCC work item-kanaal ─► channel ────────► custom channel (the asset's)
+group: Routeringswaarde ─────► flowSettings.openplannerGroup ─► Case ─► Queue Contact ─► queue
+                               (empty: the group's web address, e.g. aangifte)
+booking: meeting webLink ────► workItemData.meetingLink ─► viewable field + Screen Pop
+```
+
+| OpenPlanner group field | Sent as | WxCC item (Control Hub / Flow Designer) | Must match |
+|---|---|---|---|
+| *WxCC work item-kanaal* | `channel` | Work Item custom channel name | exactly, case included |
+| *WxCC business address* | `destination.id` | business address of the Work Item asset on that channel | exactly; unique across assets |
+| *Routeringswaarde* (default: web address) | `flowSettings.openplannerGroup` | flow variable `openplannerGroup` (String, settable from outside) and a **Case** branch with that value → **Queue Contact** | one Case branch per value, plus a default branch to a fallback queue |
+| – | entry point | Work Item entry point linked to the asset, with the flow active | – |
+| – | queue | queue of channel type Work Item, agents' team assigned, multimedia profile with work item capacity | – |
+
+Two layouts:
+
+- **One asset, entry point and flow for all groups** (recommended): every group gets the same
+  business address and channel; only the routing value differs. A new group is one Case branch
+  and a queue. Groups that share a queue may share a routing value.
+- **One asset per group**: each group its own business address, entry point and flow; routing
+  happens by address and the routing value is ignored. More configuration, fully separate teams.
+
+How a mismatch shows on the booking's timeline: `CHANNEL_ASSET_UNDEFINED` (business address
+matches no asset), `ENTRY_POINT_NOT_FOUND` (no active entry point or flow), `rejected_400` at
+creation (schema differs from the table above). A routing value without a Case branch ends in
+the default branch: check that queue first. **To verify on the first live test:** that
+`openplannerGroup` arrives in the flow variable; Flow Designer may need the variable marked as
+overridable by flow settings.
+
 ### 4. Webhooks
 
 Set `WEBEX_WEBHOOK_SECRET` and `WXCC_WEBHOOK_SECRET` (random, at least 32 characters, from the
