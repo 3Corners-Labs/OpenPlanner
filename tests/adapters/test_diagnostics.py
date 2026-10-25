@@ -27,6 +27,17 @@ SECRET_TOKEN = "access-token-value-never-printed"  # noqa: S105 - test value
 BODY_WITH_PII = {"items": [{"hostEmail": "host@example.nl", "title": "Ada Lovelace"}]}
 
 
+CLOCK = FixedClock(datetime(2026, 10, 24, 12, 0, tzinfo=UTC))
+
+
+def _client(
+    route: Callable[[httpx.Request], httpx.Response],
+) -> tuple[WebexTokens, httpx.AsyncClient]:
+    http = httpx.AsyncClient(transport=httpx.MockTransport(route))
+    tokens = WebexTokens(ServiceAppConfig("c", "s", "r"), http, MemoryTokenStore(), CLOCK)
+    return tokens, http
+
+
 def _tokens(
     handler: Callable[[httpx.Request], httpx.Response],
 ) -> tuple[WebexTokens, httpx.AsyncClient]:
@@ -36,10 +47,12 @@ def _tokens(
         assert request.headers["authorization"] == f"Bearer {SECRET_TOKEN}"
         return handler(request)
 
-    http = httpx.AsyncClient(transport=httpx.MockTransport(route))
-    clock = FixedClock(datetime(2026, 10, 24, 12, 0, tzinfo=UTC))
-    tokens = WebexTokens(ServiceAppConfig("c", "s", "r"), http, MemoryTokenStore(), clock)
-    return tokens, http
+    return _client(route)
+
+
+async def _check(handler: Callable[[httpx.Request], httpx.Response]) -> list[CheckResult]:
+    tokens, http = _tokens(handler)
+    return await run_checks(http, tokens, probes(WEBEX, WXCC), CLOCK)
 
 
 def _today(request: httpx.Request) -> httpx.Response:
@@ -50,9 +63,7 @@ def _today(request: httpx.Request) -> httpx.Response:
 
 
 async def test_todays_environment_reports_the_missing_wxcc_scopes() -> None:
-    tokens, http = _tokens(_today)
-
-    results = await run_checks(http, tokens, probes(WEBEX, WXCC), FixedClock(datetime.now(UTC)))
+    results = await _check(_today)
 
     by_name = {r.name: r for r in results}
     assert by_name["token refresh"].ok
@@ -76,9 +87,7 @@ async def test_harmless_probes_count_validation_errors_as_authorised() -> None:
             return httpx.Response(400 if request.url.path == "/v2/tasks" else 404)
         return httpx.Response(200, json={"data": []})
 
-    tokens, http = _tokens(handler)
-
-    results = await run_checks(http, tokens, probes(WEBEX, WXCC), FixedClock(datetime.now(UTC)))
+    results = await _check(handler)
 
     assert all(r.ok for r in results), [r for r in results if not r.ok]
     posts = [r for r in seen if r.method == "POST"]
@@ -98,11 +107,9 @@ async def test_refused_refresh_token_skips_the_api_calls() -> None:
         assert request.url.path == "/v1/access_token", "no API call without a token"
         return httpx.Response(400, json={"error": "invalid_grant"})
 
-    http = httpx.AsyncClient(transport=httpx.MockTransport(route))
-    clock = FixedClock(datetime(2026, 10, 24, 12, 0, tzinfo=UTC))
-    tokens = WebexTokens(ServiceAppConfig("c", "s", "r"), http, MemoryTokenStore(), clock)
+    tokens, http = _client(route)
 
-    results = await run_checks(http, tokens, probes(WEBEX, WXCC), clock)
+    results = await run_checks(http, tokens, probes(WEBEX, WXCC), CLOCK)
 
     assert [(r.name, r.ok) for r in results] == [("token refresh", False)]
     assert "WEBEX_REFRESH_TOKEN" in results[0].hint
@@ -167,9 +174,7 @@ async def test_v2_is_primary_and_v1_probes_only_warn() -> None:
             return httpx.Response(400)
         return httpx.Response(200, json={"data": []})
 
-    tokens, http = _tokens(handler)
-
-    results = await run_checks(http, tokens, probes(WEBEX, WXCC), FixedClock(datetime.now(UTC)))
+    results = await _check(handler)
 
     names = [r.name for r in results]
     assert names.index("POST /v2/tasks (empty body)") < names.index("POST /v1/tasks/{nil}/end")

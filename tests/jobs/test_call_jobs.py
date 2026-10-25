@@ -213,8 +213,19 @@ async def test_a_cancelled_work_item_is_marked_by_v2_then_ended(setup: Setup) ->
     assert setup.uow.state.call_status[bid].task is TaskState.CANCELLED
 
 
-async def test_without_the_v1_end_scope_the_v2_mark_stands(setup: Setup) -> None:
+@pytest.mark.parametrize(
+    ("mark_error", "first"),
+    [
+        (None, (EventKind.TASK_MARKED_CANCELLED, "")),  # the v2 mark stands
+        ("rejected_400", (EventKind.INTEGRATION_ERROR, "rejected_400")),  # v1 is still tried
+    ],
+)
+async def test_a_refused_v1_end_is_recorded_after_the_v2_step(
+    setup: Setup, mark_error: str | None, first: tuple[EventKind, str]
+) -> None:
     bid = await _dispatched(setup)
+    if mark_error:
+        setup.dispatcher.mark_error = IntegrationError(mark_error, retryable=False)
     setup.dispatcher.end_error = IntegrationError("rejected_403", retryable=False)
     queue = FakeQueue([job(bid, JobType.END_WXCC_TASK, pinned=None)])
 
@@ -223,23 +234,7 @@ async def test_without_the_v1_end_scope_the_v2_mark_stands(setup: Setup) -> None
     assert queue.done == [1]
     events = setup.uow.state.booking_events[bid][-2:]
     assert [(e.kind, e.detail) for e in events] == [
-        (EventKind.TASK_MARKED_CANCELLED, ""),
-        (EventKind.END_NOT_POSSIBLE, "rejected_403"),
-    ]
-
-
-async def test_a_refused_v2_mark_still_tries_v1(setup: Setup) -> None:
-    bid = await _dispatched(setup)
-    setup.dispatcher.mark_error = IntegrationError("rejected_400", retryable=False)
-    setup.dispatcher.end_error = IntegrationError("rejected_403", retryable=False)
-    queue = FakeQueue([job(bid, JobType.END_WXCC_TASK, pinned=None)])
-
-    await setup.runner(queue).run_due()
-
-    assert queue.done == [1]
-    events = setup.uow.state.booking_events[bid][-2:]
-    assert [(e.kind, e.detail) for e in events] == [
-        (EventKind.INTEGRATION_ERROR, "rejected_400"),
+        first,
         (EventKind.END_NOT_POSSIBLE, "rejected_403"),
     ]
 
