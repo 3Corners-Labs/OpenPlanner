@@ -1,7 +1,29 @@
 {
   "$comment": "Public pages under test. Single source for axe (tests/a11y.spec.ts) and Lighthouse (scripts/lighthouse.mjs). Each page is checked in every listed locale via ?lang=. /g/demo needs the demo seed (python -m app.cli seed-demo).",
   "pages": [
-    { "name": "home", "path": "/", "locales": ["nl", "en"] },
-    { "name": "group page", "path": "/g/demo", "locales": ["nl", "en"] }
+    {
+      "name": "home",
+      "path": "/",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "group page",
+      "path": "/g/demo",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "direct call",
+      "path": "/g/demo/direct",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    }
   ]
 }

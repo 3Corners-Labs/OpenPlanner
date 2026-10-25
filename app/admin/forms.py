@@ -12,10 +12,31 @@ input (``aria-describedby``, error summary with anchors) and never repeats the v
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, time
+from urllib.parse import parse_qsl
 
+from fastapi import Request
+from starlette.responses import RedirectResponse
+
+from app.admin.authz import AccessDenied
 from app.domain.errors import DomainError, ErrorCode
 from app.i18n import BoundGettext
 from app.web.errors import FormError
+from app.web.locale import RequestLocale
+from app.web.protection import RejectedRequest
+
+MAX_FORM_BYTES = 16 * 1024
+"""Admin forms are small; anything larger is refused before parsing."""
+
+DONE_MESSAGES: dict[str, str] = {
+    "created": "admin.done.created",
+    "saved": "admin.done.saved",
+    "unchanged": "admin.done.unchanged",
+    "added": "admin.done.added",
+    "removed": "admin.done.removed",
+    "logo_saved": "admin.done.logo_saved",
+    "logo_removed": "admin.done.logo_removed",
+}
+"""Confirmations after a change; only these keys are read from ``?done=``."""
 
 FIELD_MESSAGES: dict[str, str] = {
     "name": "admin.form.error.name",
@@ -33,6 +54,9 @@ FIELD_MESSAGES: dict[str, str] = {
     "wxcc_routing_value": "admin.form.error.integration_text",
     "direct_call_enabled": "admin.form.error.choice",
     "not_picked_up_minutes": "admin.form.error.not_picked_up_minutes",
+    "display_name": "admin.form.error.display_name",
+    "accent_color": "admin.form.error.accent_color",
+    "logo": "admin.form.error.logo",
     "weekday": "admin.form.error.weekday",
     "opens": "admin.form.error.time",
     "closes": "admin.form.error.time",
@@ -182,3 +206,40 @@ class FormData:
         """Record that ``name`` could not be read."""
         key = FIELD_MESSAGES.get(name, "error.invalid_request")
         self.errors.append(FormError(name, self._(key)))
+
+
+def done_message(request: Request, _: BoundGettext) -> str | None:
+    """Return the confirmation named by ``?done=``, if it is a known one."""
+    key = request.query_params.get("done", "")
+    return _(DONE_MESSAGES[key]) if key in DONE_MESSAGES else None
+
+
+def redirect_done(url: str, done: str) -> RedirectResponse:
+    """Answer a successful change with a redirect to ``url`` and its confirmation."""
+    return RedirectResponse(f"{url}?done={done}", status_code=303)
+
+
+async def read_form(request: Request, locale: RequestLocale) -> FormData:
+    """Read a urlencoded form body (only the first value of every name).
+
+    Raises:
+        RejectedRequest: 413 for bodies above ``MAX_FORM_BYTES``.
+    """
+    raw = await request.body()
+    if len(raw) > MAX_FORM_BYTES:
+        raise RejectedRequest(413)
+    body = raw.decode("utf-8", errors="replace")
+    values: dict[str, str] = {}
+    for key, value in parse_qsl(body, keep_blank_values=True):
+        values.setdefault(key, value)
+    return FormData(values, locale.gettext)
+
+
+def raise_refusal(error: DomainError) -> None:
+    """Turn refusals that are not form errors into the portal's responses.
+
+    Raises:
+        AccessDenied: For ``not_permitted`` (the domain re-checked the matrix).
+    """
+    if error.code is ErrorCode.NOT_PERMITTED:
+        raise AccessDenied from error

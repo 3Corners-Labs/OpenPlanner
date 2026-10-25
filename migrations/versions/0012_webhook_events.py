@@ -1,11 +1,9 @@
 """Webex webhook deduplication: recently seen event keys (no personal data).
 
-Numbered 0012 because ``feat/wp3b-citizen-pages`` adds 0011. Until that branch is merged this
-revises 0010; when it is, set ``down_revision`` to ``"0011"`` (``test_single_head`` fails
-otherwise).
+Follows 0011 (organisation branding, WP3b).
 
 Revision ID: 0012
-Revises: 0010
+Revises: 0011
 Create Date: 2026-10-25 21:00:00.000000
 """
 
@@ -15,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0012"
-down_revision: str | None = "0010"
+down_revision: str | None = "0011"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -50,6 +50,7 @@ class Permission(StrEnum):
     ORGANISATION_MANAGE = "organisation.manage"
     AUDIT_VIEW = "audit.view"
     INTEGRATIONS_MANAGE = "integrations.manage"
+    BRANDING_MANAGE = "branding.manage"
     GROUP_CREATE = "group.create"
     GROUP_VIEW = "group.view"
     GROUP_EDIT = "group.edit"
@@ -66,6 +67,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.ORGANISATION_MANAGE: Level.GLOBAL,
     Permission.AUDIT_VIEW: Level.ORGANISATION,
     Permission.INTEGRATIONS_MANAGE: Level.ORGANISATION,
+    Permission.BRANDING_MANAGE: Level.ORGANISATION,
     Permission.GROUP_CREATE: Level.ORGANISATION,
     Permission.GROUP_VIEW: Level.GROUP,
     Permission.GROUP_EDIT: Level.GROUP,

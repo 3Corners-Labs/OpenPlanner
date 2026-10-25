@@ -80,6 +80,17 @@ Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task e
 | Webex event keys (SHA-256 of resource, event, event id, join/leave time) | `webhook_events` | OpenPlanner | 30 days, removed on a later event | no |
 | Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
 
+## Branding and the calendar script (WP3b)
+
+```
+superuser ──POST name, colour, logo──> web ──SQL──> organisations, organisation_logos
+visitor ──GET /o/{slug}/theme.css, /o/{slug}/logo──> web (organisation data, no PII)
+visitor browser ──fetch same page (?day=)──> web   (calendar.js, same origin, no new data)
+```
+
+Branding is organisation data, not personal data. The calendar script sends nothing the page
+link does not already send, and stores nothing in the browser.
+
 ## Planned flows
 
 To be added per work package: SMS reminders (WP4/WP6), integration settings in the admin UI

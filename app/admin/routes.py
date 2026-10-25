@@ -27,7 +27,7 @@ from fastapi import APIRouter, Depends, FastAPI, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.integrations import Integrations
-from app.admin import call_routes, group_routes
+from app.admin import branding_routes, call_routes, group_routes
 from app.admin.authz import (
     AccessDenied,
     AdminContext,
@@ -97,6 +97,10 @@ DETAIL_LABELS: dict[str, str] = {
     "wxcc_routing_value": "admin.field.wxcc_routing_value",
     "direct_call_enabled": "admin.field.direct_call_enabled",
     "not_picked_up_minutes": "admin.field.not_picked_up_minutes",
+    "display_name": "admin.branding.display_name",
+    "accent_color": "admin.branding.accent_color",
+    "logo": "admin.branding.logo",
+    "logo.remove": "admin.audit.detail.logo_remove",
 }
 """Readable label per audit detail key (changed field names and schedule actions)."""
 
@@ -447,3 +451,4 @@ def register_admin(app: FastAPI) -> None:
     app.include_router(router)
     app.include_router(group_routes.router)
     app.include_router(call_routes.router)
+    app.include_router(branding_routes.router)

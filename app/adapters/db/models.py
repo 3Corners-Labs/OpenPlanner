@@ -7,6 +7,7 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
     booking_events, call_status (per booking; no personal data, kept after the purge)
     integration_credentials (encrypted tokens, ADR 0008)
     admin_profiles (name per identity-provider subject; joined into the audit log)
+    organisations 1──1 organisation_logos (branding, WP3b)
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
@@ -43,6 +44,7 @@ __all__ = [
     "BookingRow",
     "GroupRow",
     "JobRow",
+    "OrganisationLogoRow",
     "OrganisationRow",
     "ReminderRuleRow",
     "ScheduleOverrideRow",
@@ -60,6 +62,21 @@ class OrganisationRow(Base):
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str] = mapped_column(String(64), unique=True)
     default_locale: Mapped[str] = mapped_column(String(16), server_default=text("'nl'"))
+    display_name: Mapped[str | None] = mapped_column(String(200))
+    accent_color: Mapped[str] = mapped_column(String(7), server_default=text("'#01689B'"))
+    logo_media_type: Mapped[str | None] = mapped_column(String(32))
+    logo_digest: Mapped[str | None] = mapped_column(String(16))
+
+
+class OrganisationLogoRow(Base):
+    """The logo image of an organisation; its type and digest live on ``organisations``."""
+
+    __tablename__ = "organisation_logos"
+
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), primary_key=True
+    )
+    data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
 class GroupRow(Base):

@@ -208,7 +208,9 @@ same commit and rollback behaviour as the SQL one.
 | Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |
 | Transactions, write lock | `app/adapters/db/uow.py`, `app/adapters/db/engine.py` |
 | Job queue | `app/adapters/db/jobs.py` |
-| Citizen pages | `app/api/booking_pages.py`, `app/api/templates/` |
+| Citizen pages | `app/api/booking_pages.py`, `app/api/citizen.py`, `app/api/templates/` |
+| Slot picker: month calendar and times (ADR 0020) | `app/api/slot_picker.py`, `app/web/static/calendar.js` |
+| Branding per organisation (O5) | `app/domain/branding.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
 | CSRF and rate limits | `app/web/protection.py` |
 | Rendering and security headers | `app/web/templates.py`, `app/api/security_headers.py` |
 | Translations and locale | `app/i18n/` |
@@ -563,6 +565,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0017 | Video calls through the Webex Meetings API (cohost for staff, lobby for guests) |
 | 0018 | Dispatch to WxCC as work items (Create Task API v2) |
 | 0019 | Direct video call ("now") per group |
+| 0020 | Citizen calendar as progressive enhancement; branding through tokens |
 
 ## 12. Status and roadmap
 
@@ -572,7 +575,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | i18n core | Language module, home page | done |
 | WP2 | Domain, persistence, write lock | done |
 | WP3 (slice 1) | Citizen pages, mail, worker, demo | done |
-| WP3 (rest) | Embeddable widget (grid calendar), branding (O5) | planned |
+| WP3b | Citizen pages: month calendar grid, modern layout, branding (O5) | done |
+| WP3c | Embeddable widget (Web Component, same tokens) | planned |
 | WP4 | SMS reminders, message editors | planned |
 | WP5 | Webex Meetings, join page, live status (O1: Meetings API) | done |
 | WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |

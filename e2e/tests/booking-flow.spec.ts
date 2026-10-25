@@ -1,7 +1,8 @@
 /**
  * The citizen's booking flow with the keyboard only (no mouse), checked with axe at every
- * step: choose a slot, fill in the form, book, view, move and cancel the appointment.
- * Needs the demo group (python -m app.cli seed-demo).
+ * step: choose a day in the calendar grid (arrow keys, ADR 0020) and a time, fill in the form,
+ * book, view, move and cancel the appointment. A second test runs the same pages without
+ * JavaScript. Needs the demo group (python -m app.cli seed-demo).
  */
 import { expect, test } from '@playwright/test';
 
@@ -11,12 +12,23 @@ test('book, move and cancel with the keyboard only', async ({ page }) => {
   await page.goto('/g/demo');
   await expectNoAxeViolations(page);
 
-  // Choose the first free slot: Tab into the radio group, Space selects it.
-  const firstSlot = page.locator('input[name="start"]').first();
-  await tabTo(page, firstSlot);
-  await page.keyboard.press('Space');
-  await expect(firstSlot).toBeChecked();
-  await tabTo(page, page.getByRole('button', { name: 'Verder' }));
+  // The calendar is one tab stop (an ARIA grid); arrow keys move between days.
+  const grid = page.getByRole('grid');
+  const selected = grid.locator('a.calendar__day[tabindex="0"]');
+  const day = await selected.getAttribute('data-day');
+  await tabTo(page, selected);
+  await page.keyboard.press('ArrowRight');
+  await expect(selected).not.toHaveAttribute('data-day', day ?? '');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator(`[data-day="${day}"]`)).toBeFocused();
+  // Enter loads that day's times; focus moves to their heading and the result is announced.
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#times-heading')).toBeFocused();
+  await expect(page.locator('[data-announce]')).toContainText('vrij');
+  await expectNoAxeViolations(page);
+
+  // A time button takes the citizen to the form.
+  await tabTo(page, page.locator('#times .time-button').first());
   await page.keyboard.press('Enter');
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Uw gegevens');
@@ -48,8 +60,11 @@ test('book, move and cancel with the keyboard only', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Afspraak verplaatsen');
   await expectNoAxeViolations(page);
-  await tabTo(page, page.locator('input[name="start"]').first());
-  await page.keyboard.press('Space');
+  await tabTo(page, page.locator('#times .time-button').first());
+  await page.keyboard.press('Enter');
+  // A new time is confirmed first: from → to.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nieuw moment bevestigen');
+  await expectNoAxeViolations(page);
   await tabTo(page, page.getByRole('button', { name: 'Verplaatsen' }));
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status')).toContainText('Uw afspraak is verplaatst');
@@ -62,5 +77,43 @@ test('book, move and cancel with the keyboard only', async ({ page }) => {
   await tabTo(page, page.getByRole('button', { name: 'Ja, annuleren' }));
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status')).toContainText('Uw afspraak is geannuleerd');
+  await expectNoAxeViolations(page);
+});
+
+test('the calendar works without JavaScript', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, locale: 'nl-NL' });
+  const page = await context.newPage();
+  await page.goto('/g/demo');
+
+  // Without the script the calendar is a plain table of links, not a grid.
+  await expect(page.getByRole('grid')).toHaveCount(0);
+  const days = page.locator('a.calendar__day');
+  const second = days.nth(1);
+  const label = await second.getAttribute('data-day');
+  await second.click();
+  await expect(page).toHaveURL(new RegExp(`day=${label}`));
+  await expect(page.locator(`a[data-day="${label}"]`)).toHaveAttribute('aria-current', 'true');
+  // No axe here: axe runs as a script. The same markup is scanned in the other tests.
+
+  await page.locator('#times .time-button').first().click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Uw gegevens');
+  await context.close();
+});
+
+test('"Wanneer past het u?" narrows the times, with the keyboard', async ({ page }) => {
+  await page.goto('/g/demo');
+  const summary = page.locator('details.filter summary');
+  await tabTo(page, summary);
+  await page.keyboard.press('Enter');
+  await tabTo(page, page.getByRole('checkbox', { name: 'vrijdag' }));
+  await page.keyboard.press('Space');
+  await page.getByLabel('Vanaf').selectOption('13');
+  await tabTo(page, page.getByRole('button', { name: 'Toon passende tijden' }));
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(/days=4&from=13/);
+  await expect(page.locator('.quick-pick')).toContainText(/Eerst passend: vrijdag/);
+  await expect(page.locator('#times-heading')).toContainText('vrijdag');
+  await expect(page.locator('#times').getByText('Ochtend')).toHaveCount(0);
   await expectNoAxeViolations(page);
 });

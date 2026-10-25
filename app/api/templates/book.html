@@ -1,16 +1,22 @@
 {% extends "base.html" %}
+{% from "_steps.html" import steps with context %}
 {% block title %}{{ _("book.title") }} – {{ group.name }}{% endblock %}
 {% block content %}
 {% include "_error_summary.html" %}
+<p class="eyebrow">{{ group.name }}</p>
 <h1>{{ _("book.title") }}</h1>
-<section class="summary" aria-labelledby="selected-heading">
-  <h2 id="selected-heading">{{ _("book.selected") }}</h2>
-  <p>{{ group.name }}<br>{{ slot_label }}</p>
-  <p><a href="/g/{{ group.slug }}">{{ _("book.change_slot") }}</a></p>
-</section>
-<form method="post" action="/g/{{ group.slug }}/book" novalidate>
-  <input type="hidden" name="start" value="{{ start }}">
-  {% include "_contact_fields.html" %}
-  <button type="submit" class="button">{{ _("form.submit") }}</button>
-</form>
+{{ steps(2) }}
+<div class="form-layout">
+  <section class="summary" aria-labelledby="selected-heading">
+    <h2 id="selected-heading">{{ _("book.selected") }}</h2>
+    <p>{{ slot_label }}</p>
+    <p><a href="/g/{{ group.slug }}">{{ _("book.change_slot") }}</a></p>
+  </section>
+  <form class="card" method="post" action="/g/{{ group.slug }}/book" novalidate>
+    <input type="hidden" name="start" value="{{ start }}">
+    {% include "_contact_fields.html" %}
+    <p class="hint">{{ _("book.privacy") }}</p>
+    <button type="submit" class="button button--large">{{ _("form.submit") }}</button>
+  </form>
+</div>
 {% endblock %}
