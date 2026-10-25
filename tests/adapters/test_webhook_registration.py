@@ -59,12 +59,14 @@ async def test_host_accounts_are_deduplicated_case_insensitively() -> None:
     assert len([r for r in seen if r.method == "POST"]) == 4
 
 
-async def test_without_host_accounts_nothing_is_registered() -> None:
-    client, seen = _client(lambda r: httpx.Response(200, json={"items": []}))
+async def test_without_host_accounts_nothing_is_registered_but_stale_ones_are_shown() -> None:
+    stale = {"id": "w-old", "targetUrl": TARGET, "resource": "meetings", "event": "started"}
+    client, seen = _client(lambda r: httpx.Response(200, json={"items": [stale]}))
 
     report = await register_webex(client, BASE, TARGET, "secret", hosts=[])
 
-    assert report == ["webex: no group has a video host account; no webhooks registered"]
+    assert report[0] == "webex: no group has a video host account; no webhooks registered"
+    assert report[1].startswith("meetings/started [all meetings]: stale")
     assert [r for r in seen if r.method == "POST"] == []
 
 
