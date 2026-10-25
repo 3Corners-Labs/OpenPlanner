@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ _("wait.title") }} – {{ group.name }}{% endblock %}
 {% block content %}
+<p class="eyebrow">{{ group.name }}</p>
 <h1>{{ _("wait.title") }}</h1>
 <div role="status" class="notice{% if state == 'unavailable' %} notice--warning{% endif %}">
   {% if state == "searching" %}<p>{{ _("wait.searching") }}</p>

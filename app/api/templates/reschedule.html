@@ -2,13 +2,12 @@
 {% block title %}{{ _("reschedule.title") }} – {{ group.name }}{% endblock %}
 {% block content %}
 {% include "_error_summary.html" %}
+<p class="eyebrow">{{ group.name }}</p>
 <h1>{{ _("reschedule.title") }}</h1>
-<p>{{ _("reschedule.current", slot=slot_label) }}</p>
-<p>{{ _("reschedule.intro") }}</p>
+<p class="lead">{{ _("reschedule.current", slot=slot_label) }} {{ _("reschedule.intro") }}</p>
 {% set action = "/b/" ~ token ~ "/reschedule" %}
-{% set method = "post" %}
-{% set week_base = "/b/" ~ token ~ "/reschedule" %}
-{% set submit_label = _("reschedule.submit") %}
+{% set method = "get" %}
 {% include "_slot_picker.html" %}
 <p><a href="/b/{{ token }}">{{ _("cancel.back") }}</a></p>
 {% endblock %}
+{% block scripts %}<script src="/static/calendar.js" defer></script>{% endblock %}

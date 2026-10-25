@@ -15,6 +15,7 @@ from typing import Protocol
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
+from app.domain.branding import Branding, Logo
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
@@ -209,7 +210,23 @@ class Transaction(Protocol):
         ...
 
     async def get_organisation(self, slug: str) -> Organisation | None:
-        """Return the organisation with ``slug``."""
+        """Return the organisation with ``slug``, with its branding."""
+        ...
+
+    async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
+        """Return the organisation with ``organisation_id``, with its branding."""
+        ...
+
+    async def save_branding(self, organisation_id: int, branding: Branding) -> None:
+        """Store display name and accent colour (the logo is stored by ``save_logo``)."""
+        ...
+
+    async def get_logo(self, organisation_slug: str) -> Logo | None:
+        """Return the organisation's logo, if it has one."""
+        ...
+
+    async def save_logo(self, organisation_id: int, logo: Logo | None) -> None:
+        """Store or, with ``None``, remove the organisation's logo."""
         ...
 
     async def add_group(self, group: Group) -> Group:

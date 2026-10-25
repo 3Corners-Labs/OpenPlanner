@@ -1,0 +1,9 @@
+{#- Progress of the booking flow; ``current`` is 1, 2 or 3. Shown as text, not by colour only. -#}
+{% macro steps(current) -%}
+<ol class="steps" aria-label="{{ _("steps.label") }}">
+  {% for key in ["steps.time", "steps.details", "steps.done"] %}
+  <li{% if loop.index == current %} aria-current="step"{% elif loop.index < current %} class="step--done"{% endif %}>
+    {%- if loop.index < current %}<span class="visually-hidden">{{ _("steps.completed") }}: </span>{% endif %}{{ _(key) }}</li>
+  {% endfor %}
+</ol>
+{%- endmacro %}
