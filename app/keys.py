@@ -49,6 +49,16 @@ def session_secret(settings: Settings) -> str:
     ).decode()
 
 
+def settings_encryption_key(settings: Settings) -> bytes:
+    """Return the key that encrypts integration secrets at rest (ADR 0008)."""
+    return _bootstrap_key(
+        settings,
+        settings.settings_encryption_key,
+        "SETTINGS_ENCRYPTION_KEY",
+        settings.dev_settings_key_path,
+    )
+
+
 def _shared_dev_key(path: Path) -> bytes:
     """Return the development key in ``path``, creating it atomically on first use."""
     path.parent.mkdir(parents=True, exist_ok=True)

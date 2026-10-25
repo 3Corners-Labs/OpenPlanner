@@ -4,6 +4,8 @@ Rows are persistence shapes only; ``app.adapters.db.uow`` maps them to domain ob
 PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
 
     audit_events (no foreign keys: events outlive what they describe)
+    booking_events, call_status (per booking; no personal data, kept after the purge)
+    integration_credentials (encrypted tokens, ADR 0008)
     admin_profiles (name per identity-provider subject; joined into the audit log)
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
@@ -20,6 +22,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Time,
     UniqueConstraint,
@@ -32,6 +35,9 @@ from app.adapters.db.types import UTCDateTime
 
 __all__ = [
     "AdminProfileRow",
+    "IntegrationCredentialRow",
+    "BookingEventRow",
+    "CallStatusRow",
     "AuditEventRow",
     "Base",
     "BookingRow",
@@ -72,7 +78,12 @@ class GroupRow(Base):
     min_notice_minutes: Mapped[int] = mapped_column(Integer)
     horizon_days: Mapped[int] = mapped_column(Integer)
     phone_mode: Mapped[str] = mapped_column(String(16))
-    wxcc_queue_id: Mapped[str | None] = mapped_column(String(128))
+    video_host_email: Mapped[str | None] = mapped_column(String(254))
+    wxcc_business_address: Mapped[str | None] = mapped_column(String(255))
+    wxcc_channel: Mapped[str | None] = mapped_column(String(255))
+    wxcc_routing_value: Mapped[str | None] = mapped_column(String(512))
+    direct_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
 
     __table_args__ = (
@@ -151,9 +162,20 @@ class SlotRow(Base):
     start: Mapped[datetime] = mapped_column(UTCDateTime())
     end: Mapped[datetime] = mapped_column(UTCDateTime())
     capacity_snapshot: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(16), server_default=text("'scheduled'"))
 
-    # Backstop for the write lock: one slot row per group and start.
-    __table_args__ = (UniqueConstraint("group_id", "start"),)
+    # Backstop for the write lock: one scheduled slot per group and start. Direct calls
+    # (ADR 0019) each have their own slot and are not part of it.
+    __table_args__ = (
+        Index(
+            "uq_slots_group_start_scheduled",
+            "group_id",
+            "start",
+            unique=True,
+            sqlite_where=text("kind = 'scheduled'"),
+        ),
+        CheckConstraint("kind IN ('scheduled', 'direct')", name="kind"),
+    )
 
 
 class BookingRow(Base):
@@ -185,6 +207,8 @@ class BookingRow(Base):
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),
+        Index("ix_bookings_video_room_id", "video_room_id"),
+        Index("ix_bookings_wxcc_task_id", "wxcc_task_id"),
         CheckConstraint(
             "status IN ('confirmed', 'cancelled', 'completed', 'no_show')", name="status"
         ),
@@ -244,3 +268,48 @@ class AdminProfileRow(Base):
     subject: Mapped[str] = mapped_column(String(255), primary_key=True)
     display_name: Mapped[str] = mapped_column(String(255))
     last_login_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class BookingEventRow(Base):
+    """One entry of a booking's timeline (ADR 0010); the detail is a reason code."""
+
+    __tablename__ = "booking_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
+    at: Mapped[datetime] = mapped_column(UTCDateTime())
+    kind: Mapped[str] = mapped_column(String(32))
+    detail: Mapped[str] = mapped_column(String(128), server_default=text("''"))
+
+    __table_args__ = (Index("ix_booking_events_booking_id", "booking_id"),)
+
+
+class CallStatusRow(Base):
+    """The aggregated meeting and work item state of a booking (ADR 0010)."""
+
+    __tablename__ = "call_status"
+
+    booking_id: Mapped[int] = mapped_column(
+        ForeignKey("bookings.id", ondelete="CASCADE"), primary_key=True
+    )
+    call: Mapped[str] = mapped_column(String(16))
+    task: Mapped[str] = mapped_column(String(16))
+    participants: Mapped[int] = mapped_column(Integer)
+    host_joined: Mapped[bool] = mapped_column(Boolean)
+    host_joined_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    task_created_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+
+class IntegrationCredentialRow(Base):
+    """An encrypted integration secret (AES-256-GCM, ADR 0008); never readable in plain text."""
+
+    __tablename__ = "integration_credentials"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())

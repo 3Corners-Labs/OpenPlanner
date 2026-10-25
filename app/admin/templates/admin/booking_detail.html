@@ -1,0 +1,30 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ reference }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+<p><a href="{{ back }}">{{ _("admin.booking.back") }}</a></p>
+<section class="card" aria-labelledby="booking-heading">
+  <div class="card__header">
+    <h2 id="booking-heading">{{ reference }}</h2>
+    <p class="card__lead">{{ when }} · {{ kind }}</p>
+  </div>
+  <dl class="facts">
+    <div><dt>{{ _("admin.agenda.meeting") }}</dt><dd><span class="chip{% if call.tone %} chip--{{ call.tone }}{% endif %}">{{ call.label }}</span></dd></div>
+    <div><dt>{{ _("admin.agenda.task") }}</dt><dd><span class="chip{% if task.tone %} chip--{{ task.tone }}{% endif %}">{{ task.label }}</span></dd></div>
+    <div><dt>{{ _("admin.agenda.agent") }}</dt><dd>{% if status.host_joined %}{{ _("admin.yes") }}{% else %}{{ _("admin.no") }}{% endif %}</dd></div>
+    <div><dt>{{ _("admin.agenda.participants") }}</dt><dd>{{ status.participants }}</dd></div>
+  </dl>
+</section>
+<section class="card" aria-labelledby="timeline-heading">
+  <h2 id="timeline-heading">{{ _("admin.booking.timeline") }}</h2>
+  {% if events %}
+  <ol class="timeline">
+    {% for event in events %}
+    <li><span class="timeline__time">{{ event.time }}</span> <span class="timeline__label">{{ event.label }}</span>{% if event.detail %} <code>{{ event.detail }}</code>{% endif %}</li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="empty-state">{{ _("admin.booking.no_events") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

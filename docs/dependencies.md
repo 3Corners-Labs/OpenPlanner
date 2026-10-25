@@ -23,7 +23,8 @@ Checked on 2026-10-23 against PyPI release history and GitHub activity.
 | jinja2 | Templates | BSD-3 | maintained (Pallets), feature-complete | De facto standard |
 | python-multipart | Form parsing for Starlette | Apache-2.0 | active | Required by Starlette forms |
 | slowapi (+ limits) | Rate limiting | MIT | active | Named in CLAUDE.md; `limits` is well maintained |
-| pyjwt[crypto] (+ cryptography) | ID-token verification (OIDC) | MIT; cryptography Apache-2.0/BSD-3 | very active | De facto JWT library (ADR 0013) |
+| pyjwt[crypto] | ID-token verification (OIDC) | MIT | very active | De facto JWT library (ADR 0013) |
+| cryptography | AES-256-GCM for integration secrets at rest (ADR 0008); also used by PyJWT | Apache-2.0/BSD-3 | very active (PyCA) | De facto Python crypto library; direct dependency since WP5/6 |
 | itsdangerous | Signed session cookie (Starlette `SessionMiddleware`) | BSD-3 | maintained (Pallets), feature-complete | Starlette's own choice |
 | certifi | CA bundle (via httpx) | MPL-2.0 | active | Exception: ADR 0003 |
 

@@ -17,6 +17,13 @@
     </div>
     {% for f in fields %}{{ field(f) }}{% endfor %}
   </div>
+  <div class="form-section">
+    <h3>{{ _("admin.settings.integrations") }}</h3>
+    <p class="card__lead">{{ _("admin.settings.integrations_lead") }}</p>
+    <div class="form-grid">
+      {% for f in integration_fields %}{{ field(f) }}{% endfor %}
+    </div>
+  </div>
   <div class="form-actions">
     <button type="submit" class="button">{{ _("admin.save") }}</button>
     <a href="/admin/groups/{{ summary.group.slug }}">{{ _("admin.cancel") }}</a>

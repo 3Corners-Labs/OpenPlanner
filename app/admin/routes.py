@@ -26,7 +26,8 @@ import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.admin import group_routes
+from app.adapters.integrations import Integrations
+from app.admin import call_routes, group_routes
 from app.admin.authz import (
     AccessDenied,
     AdminContext,
@@ -90,7 +91,12 @@ DETAIL_LABELS: dict[str, str] = {
     "horizon_days": "admin.field.horizon_days",
     "phone_mode": "admin.field.phone_mode",
     "dispatch_lead_minutes": "admin.field.dispatch_lead_minutes",
-    "wxcc_queue_id": "admin.field.wxcc_queue_id",
+    "video_host_email": "admin.field.video_host_email",
+    "wxcc_business_address": "admin.field.wxcc_business_address",
+    "wxcc_channel": "admin.field.wxcc_channel",
+    "wxcc_routing_value": "admin.field.wxcc_routing_value",
+    "direct_call_enabled": "admin.field.direct_call_enabled",
+    "not_picked_up_minutes": "admin.field.not_picked_up_minutes",
 }
 """Readable label per audit detail key (changed field names and schedule actions)."""
 
@@ -358,6 +364,58 @@ async def audit(
     return _page(request, locale, "admin/audit.html", context.principal, {"events": views})
 
 
+@dataclass(frozen=True)
+class IntegrationView:
+    """What the integrations page shows; never a secret or token value."""
+
+    service_app: bool
+    access_expires: str | None
+    refresh_expires: str | None
+    refresh_expiring_soon: bool
+    wxcc: bool
+    webex_webhook: str
+    webex_secret: bool
+    wxcc_webhook: str
+    wxcc_secret: bool
+
+
+@router.get("/integrations", response_class=HTMLResponse)
+async def integrations(
+    request: Request,
+    locale: Locale,
+    context: Annotated[AdminContext, Depends(RequirePermission(Permission.INTEGRATIONS_MANAGE))],
+) -> HTMLResponse:
+    """Show whether Webex and WxCC are connected, token expiry and the webhook URLs."""
+    settings = request.app.state.settings
+    wired: Integrations = request.app.state.integrations
+    health = await wired.tokens.health() if wired.tokens else None
+    tz = ZoneInfo(settings.admin_timezone)
+
+    def moment(value: datetime | None) -> str | None:
+        return _moment(value, tz, locale.code) if value else None
+
+    base = settings.public_base_url.rstrip("/")
+    view = IntegrationView(
+        service_app=wired.video is not None,
+        access_expires=moment(health.access_expires_at) if health else None,
+        refresh_expires=moment(health.refresh_expires_at) if health else None,
+        refresh_expiring_soon=bool(health and health.refresh_expiring_soon),
+        wxcc=wired.dispatcher is not None,
+        webex_webhook=f"{base}/webhooks/webex",
+        webex_secret=settings.webex_webhook_secret is not None,
+        wxcc_webhook=f"{base}/webhooks/wxcc",
+        wxcc_secret=settings.wxcc_webhook_secret is not None,
+    )
+    groups = await admin_service(request).groups(context.principal)
+    return _page(
+        request,
+        locale,
+        "admin/integrations.html",
+        context.principal,
+        {"view": view, "groups": groups},
+    )
+
+
 def register_admin(app: FastAPI) -> None:
     """Install the admin routes and turn ``LoginRequired``/``AccessDenied`` into responses."""
 
@@ -388,3 +446,4 @@ def register_admin(app: FastAPI) -> None:
         app.add_exception_handler(exc_type, handler)  # type: ignore[arg-type]
     app.include_router(router)
     app.include_router(group_routes.router)
+    app.include_router(call_routes.router)

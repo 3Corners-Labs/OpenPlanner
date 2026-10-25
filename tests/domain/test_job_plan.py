@@ -107,6 +107,7 @@ def test_dispatch_is_not_planned_in_the_past() -> None:
 
 def test_cancellation_plan() -> None:
     assert plan_for_cancellation(cancelled_at=NOW) == [
+        PlannedJob(JobType.DELETE_VIDEO_ROOM, NOW, None),
         PlannedJob(JobType.SEND_CANCELLATION, NOW, None, ChannelKind.EMAIL),
         PlannedJob(JobType.PURGE_PII, NOW + timedelta(hours=24), None),
     ]
@@ -114,7 +115,8 @@ def test_cancellation_plan() -> None:
 
 def test_reschedule_cancellation_plan_sends_nothing() -> None:
     assert plan_for_cancellation(cancelled_at=NOW, notify=False) == [
-        PlannedJob(JobType.PURGE_PII, NOW + timedelta(hours=24), None)
+        PlannedJob(JobType.DELETE_VIDEO_ROOM, NOW, None),
+        PlannedJob(JobType.PURGE_PII, NOW + timedelta(hours=24), None),
     ]
 
 

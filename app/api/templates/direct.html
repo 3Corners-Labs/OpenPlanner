@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ _("direct.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+{% include "_error_summary.html" %}
+<h1>{{ _("direct.title") }}</h1>
+{% if available %}
+<p>{{ _("direct.intro", group_name=group.name) }}</p>
+<form method="post" action="/g/{{ group.slug }}/direct" novalidate>
+  {% include "_contact_fields.html" %}
+  <button type="submit" class="button button--large">{{ _("direct.submit") }}</button>
+</form>
+{% else %}
+<p class="notice">{{ _("direct.unavailable") }}</p>
+{% endif %}
+<p><a href="/g/{{ group.slug }}">{{ _("direct.schedule_instead") }}</a></p>
+{% endblock %}
