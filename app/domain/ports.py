@@ -262,6 +262,14 @@ class Transaction(Protocol):
         """Return the booking whose WxCC task has ``task_id``."""
         ...
 
+    async def claim_webhook_event(self, source: str, key: str, at: datetime) -> bool:
+        """Remember that the event ``key`` from ``source`` was seen; ``False`` if it was before."""
+        ...
+
+    async def forget_webhook_events(self, before: datetime) -> int:
+        """Forget event keys seen before ``before``; return how many."""
+        ...
+
     async def add_booking_event(self, event: BookingEvent) -> None:
         """Append an event to a booking's timeline."""
         ...

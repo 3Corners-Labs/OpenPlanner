@@ -94,7 +94,11 @@ links in messages stay on `PUBLIC_BASE_URL`. It must be https in production, and
 Registered once per installation (org-owned) for `meetings` (`started`, `ended`) and
 `meetingParticipants` (`joined`, `left`) with a secret. Verification: HMAC-SHA1 of the raw body
 with the secret, hex, compared in constant time with `X-Spark-Signature`. Events for unknown
-meetings are ignored. The payload's meeting id can be an instance id
+meetings are ignored. Webex signs no event time, so replays are caught by **deduplication**:
+each event's key, a SHA-256 of `resource`, `event`, `data.id` and `data.joinedTime`/`leftTime`
+(a participant keeps its `data.id` across leave and rejoin), is stored in `webhook_events` in
+the same transaction as the event; a key seen before is acknowledged (204) and ignored. Keys
+are kept 30 days and only for OpenPlanner's own meetings. The payload's meeting id can be an instance id
 (`<meetingId>_I_<…>`); it is matched on the series id. Participant names and emails are never
 stored: only counts, whether a host/cohost joined, and times (ADR 0010).
 

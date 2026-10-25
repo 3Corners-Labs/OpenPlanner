@@ -313,3 +313,15 @@ class IntegrationCredentialRow(Base):
     nonce: Mapped[bytes] = mapped_column(LargeBinary)
     ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class WebhookEventRow(Base):
+    """A Webex event key seen recently, so a replay is recorded once; no personal data."""
+
+    __tablename__ = "webhook_events"
+
+    source: Mapped[str] = mapped_column(String(16), primary_key=True)
+    event_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (Index("ix_webhook_events_seen_at", "seen_at"),)

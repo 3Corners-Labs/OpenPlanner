@@ -116,3 +116,20 @@ async def test_bookings_are_listed_per_day_within_the_scope(engine: AsyncEngine)
     assert [row.booking.id for row in own] == [booking_id]
     assert other == []
     assert next_day == []
+
+
+async def test_webhook_events_are_claimed_once_and_forgotten(engine: AsyncEngine) -> None:
+    uow = SqlUnitOfWork(engine)
+
+    async with uow.locked() as tx:
+        first = await tx.claim_webhook_event("webex", "a" * 64, NOW)
+        again = await tx.claim_webhook_event("webex", "a" * 64, NOW)
+        other_source = await tx.claim_webhook_event("wxcc", "a" * 64, NOW)
+    async with uow.locked() as tx:
+        await tx.claim_webhook_event("webex", "b" * 64, NOW + timedelta(days=2))
+        forgotten = await tx.forget_webhook_events(NOW + timedelta(days=1))
+        after = await tx.claim_webhook_event("webex", "a" * 64, NOW + timedelta(days=2))
+
+    assert (first, again, other_source) == (True, False, True)
+    assert forgotten == 2
+    assert after is True
