@@ -217,6 +217,14 @@ class Transaction(Protocol):
         """Return the organisation with ``organisation_id``, with its branding."""
         ...
 
+    async def add_organisation(self, organisation: Organisation) -> Organisation:
+        """Insert an organisation (default branding) and return it with its ID."""
+        ...
+
+    async def save_organisation(self, organisation: Organisation) -> None:
+        """Store name and default locale; slug and branding are left alone."""
+        ...
+
     async def save_branding(self, organisation_id: int, branding: Branding) -> None:
         """Store display name and accent colour (the logo is stored by ``save_logo``)."""
         ...
