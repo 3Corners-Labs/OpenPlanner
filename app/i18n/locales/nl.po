@@ -129,7 +129,22 @@ msgid "picker.day_full"
 msgstr "geen tijden vrij"
 
 msgid "picker.legend"
-msgstr "Dagen met een rand en een stip hebben vrije tijden. Gebruik de pijltjestoetsen om door de kalender te gaan."
+msgstr "Gebruik de pijltjestoetsen om door de kalender te gaan."
+
+msgid "picker.day_later"
+msgstr "nog niet te boeken"
+
+msgid "picker.legend_free"
+msgstr "Vrije tijden"
+
+msgid "picker.legend_selected"
+msgstr "Gekozen dag"
+
+msgid "picker.legend_later"
+msgstr "Nog niet te boeken"
+
+msgid "picker.horizon"
+msgstr "U kunt tot {days} dagen vooruit boeken."
 
 msgid "picker.no_times_title"
 msgstr "Geen tijden in deze maand"

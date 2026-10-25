@@ -54,6 +54,8 @@ class DayCell:
         iso: The date as ``YYYY-MM-DD`` (for the grid script).
         selected: Whether this day's times are shown.
         today: Whether this is today in the group's time zone.
+        later: Whether the day lies beyond the booking horizon ("nog niet te boeken"),
+            as opposed to a day that is closed or full.
     """
 
     number: str
@@ -62,6 +64,7 @@ class DayCell:
     iso: str = ""
     selected: bool = False
     today: bool = False
+    later: bool = False
 
 
 @dataclass(frozen=True)
@@ -73,6 +76,8 @@ class MonthView:
     weeks: list[list[DayCell]]
     previous: str | None
     next: str | None
+    horizon_days: int
+    has_later: bool
 
 
 @dataclass(frozen=True)
@@ -185,6 +190,28 @@ async def _free(
     return [slot for slot in slots if slot.start != exclude]
 
 
+async def _first_free(
+    service: BookingService,
+    group: Group,
+    today: date,
+    last: date,
+    exclude: datetime | None,
+) -> AvailableSlot | None:
+    """Return the first free slot from today to the horizon.
+
+    Availability is read at most ``MAX_RANGE_DAYS`` at a time, so a long horizon is searched
+    in windows until a free slot turns up.
+    """
+    start = today
+    while start <= last:
+        end = min(last, start + timedelta(days=MAX_RANGE_DAYS - 1))
+        slots = await _free(service, group, start, end, exclude)
+        if slots:
+            return slots[0]
+        start = end + timedelta(days=1)
+    return None
+
+
 async def picker(
     service: BookingService,
     group: Group,
@@ -212,10 +239,7 @@ async def picker(
     last = local_day(now + timedelta(days=group.horizon_days), group.tz)
     first_month, last_month = today.replace(day=1), last.replace(day=1)
 
-    upcoming = await _free(
-        service, group, today, min(last, today + timedelta(days=MAX_RANGE_DAYS - 1)), exclude
-    )
-    first_slot = upcoming[0] if upcoming else None
+    first_slot = await _first_free(service, group, today, last, exclude)
     requested_day = _parse_day(day)
     requested_month = _parse_month(month)
     if requested_day is not None and today <= requested_day <= last:
@@ -242,6 +266,7 @@ async def picker(
                 iso=d.isoformat(),
                 selected=d == selected,
                 today=d == today,
+                later=d > last,
             )
             if d is not None
             else DayCell("")
@@ -256,6 +281,8 @@ async def picker(
         weeks=weeks,
         previous=f"{base}?month={previous:%Y-%m}" if shown > first_month else None,
         next=f"{base}?month={following:%Y-%m}" if shown < last_month else None,
+        horizon_days=group.horizon_days,
+        has_later=month_end > last,
     )
     times = _times(group, selected, by_day[selected], locale) if selected else None
     first = (

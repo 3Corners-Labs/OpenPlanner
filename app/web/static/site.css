@@ -25,6 +25,9 @@
   --booking-color-success: #2f7210;
   --booking-color-success-subtle: #edf6e8;
   --booking-color-unavailable: #6b7178;
+  --booking-color-later: #545454;
+  --booking-color-later-background: #eceef0;
+  --booking-color-later-stripe: #dadde1;
   --booking-font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --booking-font-size: 1.0625rem;
   --booking-line-height: 1.6;
@@ -549,15 +552,74 @@ a.calendar__day:focus-visible {
   text-underline-offset: 0.2em;
 }
 
+/* Beyond the booking horizon: grey stripes, a dashed border and the label "nog niet te
+   boeken" for screen readers and in the legend, so colour is not the only signal. */
+.calendar__day--later {
+  border: 2px dashed var(--booking-color-border-strong);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--booking-color-later-background) 0 6px,
+    var(--booking-color-later-stripe) 6px 9px
+  );
+  color: var(--booking-color-later);
+}
+
 .calendar__legend {
-  margin: var(--booking-space-s) 0 0;
+  margin: var(--booking-space-m) 0 0;
   color: var(--booking-color-text-muted);
   font-size: 0.9rem;
+}
+
+.calendar__legend p {
+  margin: var(--booking-space-s) 0 0;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--booking-space-xs) var(--booking-space-m);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--booking-space-xs);
+}
+
+.legend__swatch {
+  display: inline-block;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid var(--booking-color-accent);
+  border-radius: 4px;
+}
+
+.legend__swatch--selected {
+  background: var(--booking-color-accent);
+}
+
+.legend__swatch--later {
+  border: 2px dashed var(--booking-color-border-strong);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--booking-color-later-background) 0 3px,
+    var(--booking-color-later-stripe) 3px 5px
+  );
 }
 
 @media (forced-colors: active) {
   a.calendar__day[aria-current="true"] {
     outline: 3px solid Highlight;
+  }
+
+  .calendar__day--later,
+  .legend__swatch--later {
+    border-style: dashed;
+    border-color: GrayText;
+    color: GrayText;
   }
 }
 
