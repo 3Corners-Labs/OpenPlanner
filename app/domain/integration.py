@@ -128,8 +128,9 @@ class IntegrationService:
         if not authorization.decision.allowed or authorization.group is None:
             raise DomainError(ErrorCode.NOT_PERMITTED)
         group = authorization.group.group
+        # Midnight to midnight in group time: a day can last 23 or 25 hours (DST).
         lower = datetime.combine(day, time(0), tzinfo=group.tz).astimezone(UTC)
-        upper = lower + timedelta(days=1)
+        upper = datetime.combine(day + timedelta(days=1), time(0), tzinfo=group.tz).astimezone(UTC)
         async with self._uow.read() as tx:
             return await tx.list_bookings(scope_for(principal, permission), group.id, lower, upper)
 
