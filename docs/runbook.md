@@ -108,7 +108,7 @@ Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (w
    | `meeting:admin_participants_read` | org-owned `meetingParticipants` webhooks | no participant counts |
    | `cjp:task_write` | Create Task v2 (work items), Task Messages (mark cancelled) | no work items |
    | `cjp:task_read` | task access the Work Items guide lists with `cjp:task_write` | – |
-   | `cjp:user` | End Task for cancelled bookings (ADR 0020) | cancelled tasks are only marked cancelled |
+   | `cjp:user` (optional) | End Task v1 for cancelled bookings, after the v2 mark (ADR 0020) | cancelled tasks are marked cancelled (v2) but stay open until an agent ends them |
    | `cjp:config_read` | list subscriptions and event types, task search (`wxcc-check`) | `register-webhooks` and `wxcc-check` fail with 403 |
    | `cjp:config_write` | create the WxCC subscription (`register-webhooks`) | no WxCC events |
 
@@ -214,7 +214,7 @@ anyway, but a named tunnel with an ingress rule for that path alone is the tidie
 | `ORG_DIGITAL_CONTACT_LIMIT_EXCEEDED` | WxCC's limit of active digital contacts | wait or raise the limit with Cisco |
 | `unauthorized` | the Service App token was refused | renew the tokens (section 1) |
 | `meeting_missing` (retrying) | the work item waits for the meeting | check Webex reachability and the host account |
-| `end_not_possible` `rejected_403` | a cancelled booking's task could not be ended: no `cjp:user` | the task was marked cancelled; end it in Agent Desktop, add `cjp:user` (section 1) |
+| `end_not_possible` `rejected_403` | End Task v1 refused: no `cjp:user` | the task was marked cancelled through v2; end it in Agent Desktop, or add `cjp:user` (section 1) |
 | `end_not_possible` other code | WxCC refused End Task (e.g. the task already ended) | check the task in Agent Desktop |
 
 ### 6. Checking the Service App (`wxcc-check`)
@@ -227,18 +227,21 @@ docker compose exec web python -m app.cli wxcc-check
 ```
 
 It refreshes the token and makes every kind of call OpenPlanner makes, harmlessly: reads, an
-empty work item (WxCC must answer 400) and End Task on a task id that cannot exist (WxCC must
-answer 404). Per call it prints `OK`/`FAIL`, the HTTP status and, on 401/403, the scope that is
-probably missing. It never prints tokens, secrets or response bodies, and exits with 1 while
-anything fails.
+empty work item and an empty task message (WxCC must answer 400 or 404) and End Task on a task
+id that cannot exist (404). Per call it prints the verdict, the HTTP status and, on 401/403,
+the scope that is probably missing. Work items are v2 (beta) and v2 is primary: Webex and the
+v2 probes print `OK`/`FAIL` and decide the exit code (1 while one fails); the v1 probes are
+secondary and print `WARN`. It never prints tokens, secrets or response bodies.
 
 | Probe | Expected | On 403 add |
 |---|---|---|
 | token refresh | ok | (refused: generate new tokens, section 1 step 3) |
 | `GET /meetings`, `GET /webhooks` | 200 | `meeting:admin_schedule_read`, `meeting:admin_participants_read` |
-| `GET /v2/subscriptions`, `GET /v1/subscriptions/event-types`, `GET /v1/tasks` | 200 | `cjp:config_read`, and the Contact Center administrator authorisation (step 2) |
+| `GET /v2/subscriptions` | 200 | `cjp:config_read`, and the Contact Center administrator authorisation (step 2) |
 | `POST /v2/tasks (empty body)` | 400 | `cjp:task_write`, Work Items enabled |
-| `POST /v1/tasks/{nil}/end` | 404 | `cjp:user` |
+| `POST /v2/tasks/{nil}/messages` | 400/404 | `cjp:task_write` |
+| v1, `WARN` only: `POST /v1/tasks/{nil}/end` | 404 | `cjp:user` (optional) |
+| v1, `WARN` only: `GET /v1/subscriptions/event-types`, `GET /v1/tasks` | 200 | `cjp:config_read` |
 
 A 404 on the WxCC reads means `WXCC_API_BASE_URL` points at the wrong region. Once all lines
 are `OK`, run `register-webhooks` (section 4).

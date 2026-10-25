@@ -18,7 +18,7 @@ import httpx
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
 from app.adapters.db.seed import DEMO_SLUG, seed_demo
-from app.adapters.diagnostics import format_report, probes, run_checks
+from app.adapters.diagnostics import format_report, passed, probes, run_checks
 from app.adapters.integrations import build_integrations
 from app.adapters.webex_auth import AuthorizedClient, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
@@ -106,7 +106,7 @@ async def _wxcc_check(
     report = format_report(results)
     if not settings.wxcc_api_base_url:
         report += "WXCC_API_BASE_URL is not set: WxCC was not checked.\n"
-    return report, all(r.ok for r in results)
+    return report, passed(results)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

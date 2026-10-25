@@ -201,38 +201,21 @@ async def _dispatched(setup: Setup) -> int:
     return bid
 
 
-async def test_a_cancelled_work_item_is_ended(setup: Setup) -> None:
+async def test_a_cancelled_work_item_is_marked_by_v2_then_ended(setup: Setup) -> None:
     bid = await _dispatched(setup)
 
     await setup.runner(FakeQueue([job(bid, JobType.END_WXCC_TASK, pinned=None)])).run_due()
 
-    assert setup.dispatcher.ended == ["task-1"]
-    assert setup.dispatcher.marked == []
-    assert setup.events(bid)[-1] is EventKind.TASK_END_REQUESTED
-
-
-async def test_without_the_end_scope_the_work_item_is_marked_cancelled(setup: Setup) -> None:
-    bid = await _dispatched(setup)
-    setup.dispatcher.end_error = IntegrationError("rejected_403", retryable=False)
-    queue = FakeQueue([job(bid, JobType.END_WXCC_TASK, pinned=None)])
-
-    await setup.runner(queue).run_due()
-
-    assert queue.done == [1]
     reference = setup.uow.state.bookings[bid].reference
     assert setup.dispatcher.marked == [("task-1", reference)]
-    events = setup.uow.state.booking_events[bid][-2:]
-    assert [(e.kind, e.detail) for e in events] == [
-        (EventKind.END_NOT_POSSIBLE, "rejected_403"),
-        (EventKind.TASK_MARKED_CANCELLED, ""),
-    ]
+    assert setup.dispatcher.ended == ["task-1"]
+    assert setup.events(bid)[-2:] == [EventKind.TASK_MARKED_CANCELLED, EventKind.TASK_END_REQUESTED]
     assert setup.uow.state.call_status[bid].task is TaskState.CANCELLED
 
 
-async def test_when_marking_fails_too_both_reasons_are_on_the_timeline(setup: Setup) -> None:
+async def test_without_the_v1_end_scope_the_v2_mark_stands(setup: Setup) -> None:
     bid = await _dispatched(setup)
     setup.dispatcher.end_error = IntegrationError("rejected_403", retryable=False)
-    setup.dispatcher.mark_error = IntegrationError("rejected_400", retryable=False)
     queue = FakeQueue([job(bid, JobType.END_WXCC_TASK, pinned=None)])
 
     await setup.runner(queue).run_due()
@@ -240,32 +223,51 @@ async def test_when_marking_fails_too_both_reasons_are_on_the_timeline(setup: Se
     assert queue.done == [1]
     events = setup.uow.state.booking_events[bid][-2:]
     assert [(e.kind, e.detail) for e in events] == [
+        (EventKind.TASK_MARKED_CANCELLED, ""),
         (EventKind.END_NOT_POSSIBLE, "rejected_403"),
-        (EventKind.INTEGRATION_ERROR, "rejected_400"),
     ]
 
 
-async def test_ending_is_retried_on_transient_failures(setup: Setup) -> None:
+async def test_a_refused_v2_mark_still_tries_v1(setup: Setup) -> None:
     bid = await _dispatched(setup)
-    setup.dispatcher.end_error = IntegrationError("server_error", retryable=True)
+    setup.dispatcher.mark_error = IntegrationError("rejected_400", retryable=False)
+    setup.dispatcher.end_error = IntegrationError("rejected_403", retryable=False)
     queue = FakeQueue([job(bid, JobType.END_WXCC_TASK, pinned=None)])
 
     await setup.runner(queue).run_due()
 
+    assert queue.done == [1]
+    events = setup.uow.state.booking_events[bid][-2:]
+    assert [(e.kind, e.detail) for e in events] == [
+        (EventKind.INTEGRATION_ERROR, "rejected_400"),
+        (EventKind.END_NOT_POSSIBLE, "rejected_403"),
+    ]
+
+
+async def test_a_retry_after_the_mark_does_not_mark_twice(setup: Setup) -> None:
+    bid = await _dispatched(setup)
+    setup.dispatcher.end_error = IntegrationError("server_error", retryable=True)
+    end = job(bid, JobType.END_WXCC_TASK, pinned=None)
+    queue = FakeQueue([end])
+
+    await setup.runner(queue).run_due()
+    setup.dispatcher.end_error = None
+    await setup.runner(FakeQueue([end])).run_due()
+
     assert [error for _, _, error in queue.retried] == ["server_error"]
-    assert setup.dispatcher.marked == []
+    assert len(setup.dispatcher.marked) == 1
+    assert setup.dispatcher.ended == ["task-1"]
     assert EventKind.END_NOT_POSSIBLE not in setup.events(bid)
 
 
-async def test_a_final_end_failure_is_an_integration_error_not_a_failed_task(
-    setup: Setup,
-) -> None:
+async def test_a_retryable_v2_failure_is_retried_before_v1(setup: Setup) -> None:
     bid = await _dispatched(setup)
-    setup.dispatcher.end_error = IntegrationError("server_error", retryable=True)
+    setup.dispatcher.mark_error = IntegrationError("server_error", retryable=True)
     queue = FakeQueue([job(bid, JobType.END_WXCC_TASK, pinned=None, attempts=4)])
 
     await setup.runner(queue).run_due()
 
+    assert setup.dispatcher.ended == []
     events = setup.uow.state.booking_events[bid]
     assert (events[-1].kind, events[-1].detail) == (EventKind.INTEGRATION_ERROR, "server_error")
     assert setup.uow.state.call_status[bid].task is TaskState.QUEUED

@@ -5,12 +5,17 @@ validation, ending a task id that does not exist). What a probe proves is its st
 404 on a harmless write means the token was accepted for that API; a 401 or 403 means a scope
 or an authorisation is missing, and the probe names the likely one (docs/webhooks.md).
 
+The work item API is v2 (beta) and v2 is primary: Webex and the v2 probes decide whether the
+check passes. v1 probes (End Task, which has no v2 form, event types, task search) are
+secondary: OpenPlanner works without them, so they print ``WARN`` instead of ``FAIL``.
+
 Only the status and a hint are reported. Tokens, secrets and response bodies (which can hold
 names and email addresses of the organisation's users) are never printed or logged.
 
     token refresh ─► GET /meetings ─► GET /webhooks
-                  └► GET /v2/subscriptions ─► GET /v1/subscriptions/event-types
-                     GET /v1/tasks ─► POST /v2/tasks {} ─► POST /v1/tasks/{nil}/end
+                  └► v2: GET /v2/subscriptions ─► POST /v2/tasks {}
+                         ─► POST /v2/tasks/{nil}/messages {}
+                     v1 (secondary): POST /v1/tasks/{nil}/end ─► event types ─► task search
 """
 
 from dataclasses import dataclass, field
@@ -41,6 +46,8 @@ class Probe:
     ok: tuple[int, ...] = (200,)
     last_hour: bool = False
     """Add ``from``/``to`` (epoch ms) for the last hour, as the task search requires."""
+    required: bool = True
+    """Whether a failure fails the check (v1 probes are secondary)."""
 
 
 @dataclass(frozen=True)
@@ -51,6 +58,7 @@ class CheckResult:
     status: int | None
     ok: bool
     hint: str
+    required: bool = True
 
 
 def probes(webex_base_url: str, wxcc_base_url: str | None) -> list[Probe]:
@@ -85,20 +93,6 @@ def probes(webex_base_url: str, wxcc_base_url: str | None) -> list[Probe]:
             f"{AUTHORISED_HINT} with an administrator role for Contact Center",
         ),
         Probe(
-            "GET /v1/subscriptions/event-types",
-            "GET",
-            f"{wxcc}/v1/subscriptions/event-types",
-            "cjp:config_read",
-        ),
-        Probe(
-            "GET /v1/tasks",
-            "GET",
-            f"{wxcc}/v1/tasks",
-            "cjp:config_read (task search)",
-            params={"channelTypes": "workitem", "pageSize": "1"},
-            last_hour=True,
-        ),
-        Probe(
             "POST /v2/tasks (empty body)",
             "POST",
             f"{wxcc}/v2/tasks",
@@ -107,11 +101,36 @@ def probes(webex_base_url: str, wxcc_base_url: str | None) -> list[Probe]:
             ok=(400, 422),
         ),
         Probe(
+            "POST /v2/tasks/{nil}/messages",
+            "POST",
+            f"{wxcc}/v2/tasks/{NIL_TASK_ID}/messages",
+            "cjp:task_write (Task Messages v2: marking cancelled work items)",
+            json={},
+            ok=(400, 404, 422),
+        ),
+        Probe(
             "POST /v1/tasks/{nil}/end",
             "POST",
             f"{wxcc}/v1/tasks/{NIL_TASK_ID}/end",
-            "cjp:user (End Task); without it a cancelled work item is only marked cancelled",
+            "cjp:user (End Task, v1 only); without it cancelled work items stay marked cancelled",
             ok=(202, 400, 404),
+            required=False,
+        ),
+        Probe(
+            "GET /v1/subscriptions/event-types",
+            "GET",
+            f"{wxcc}/v1/subscriptions/event-types",
+            "cjp:config_read",
+            required=False,
+        ),
+        Probe(
+            "GET /v1/tasks",
+            "GET",
+            f"{wxcc}/v1/tasks",
+            "cjp:config_read (task search)",
+            params={"channelTypes": "workitem", "pageSize": "1"},
+            last_hour=True,
+            required=False,
         ),
     ]
 
@@ -157,11 +176,12 @@ async def _run(
                 headers={"Authorization": f"Bearer {token}"},
             )
         except httpx.HTTPError as error:
-            return CheckResult(probe.name, None, False, f"unreachable ({type(error).__name__})")
+            hint = f"unreachable ({type(error).__name__})"
+            return CheckResult(probe.name, None, False, hint, probe.required)
         status = response.status_code
         if status != 401:
             break
-    return CheckResult(probe.name, status, status in probe.ok, _hint(probe, status))
+    return CheckResult(probe.name, status, status in probe.ok, _hint(probe, status), probe.required)
 
 
 def _hint(probe: Probe, status: int) -> str:
@@ -179,11 +199,20 @@ def _hint(probe: Probe, status: int) -> str:
     return f"unexpected status for this probe (expected {', '.join(map(str, probe.ok))})"
 
 
+def passed(results: list[CheckResult]) -> bool:
+    """Return whether every required probe succeeded (secondary v1 probes may fail)."""
+    return all(r.ok or not r.required for r in results)
+
+
 def format_report(results: list[CheckResult]) -> str:
-    """Return one line per result: OK/FAIL, name, status and hint."""
+    """Return one line per result: OK/FAIL/WARN, name, status and hint."""
     width = max(len(r.name) for r in results)
-    lines = [
-        f"{'OK  ' if r.ok else 'FAIL'}  {r.name:<{width}}  {r.status or '-':>3}  {r.hint}"
-        for r in results
-    ]
+    lines = [f"{_verdict(r)}  {r.name:<{width}}  {r.status or '-':>3}  {r.hint}" for r in results]
     return "".join(f"{line}\n" for line in lines)
+
+
+def _verdict(result: CheckResult) -> str:
+    """Return ``OK``, ``FAIL`` (required) or ``WARN`` (secondary), padded to four characters."""
+    if result.ok:
+        return "OK  "
+    return "FAIL" if result.required else "WARN"

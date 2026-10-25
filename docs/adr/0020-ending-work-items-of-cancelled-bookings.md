@@ -24,27 +24,34 @@ guide, Tasks Call Control reference and the integration scope list):
 
 ## Decision
 
+The work item API is v2 (beta); **v2 is primary**, v1 is used only where v2 has no
+equivalent, as a secondary step (product owner, 2026-10-25).
+
 1. Cancelling (or moving) a booking plans an `end_wxcc_task` job next to `delete_video_room`.
    It carries the booking id only. It does nothing without a task id, or once WxCC reported
-   the task ended or failed, or after it was marked cancelled.
-2. The job first calls **End Task**. The Service App requests `cjp:user` for it. Success is
-   recorded as `task_end_requested`; WxCC's `task:ended` event follows through the webhook.
-3. If WxCC refuses (`rejected_403` without the scope, or any other non-retryable code), the
-   refusal is recorded as **`end_not_possible`** with the code. OpenPlanner then appends a
-   **Task Messages** snapshot with only `bookingReference` and `kind: cancelled`, so the agent
-   sees that the booking was cancelled, without the first name or the meeting link, and
-   records `task_marked_cancelled` (task state *Taak geannuleerd*).
-4. If the message is refused too, both reasons go on the timeline (`end_not_possible`,
-   `integration_error`). Transient failures (timeouts, 429, 5xx) are retried like every call
-   job. A final failure is an `integration_error`, never a failed task.
+   the task ended or failed.
+2. **Primary, v2:** the job appends a **Task Messages v2** snapshot with only
+   `bookingReference` and `kind: cancelled` (`cjp:task_write`, the scope OpenPlanner already
+   has), so the agent sees that the booking was cancelled, without the first name or the
+   meeting link. Recorded as `task_marked_cancelled` (task state *Taak geannuleerd*). A retry
+   after a successful mark does not mark again.
+3. **Secondary, v1:** the job then calls **End Task v1** (there is no v2 End Task); the
+   Service App requests `cjp:user` for it. Success is recorded as `task_end_requested`;
+   WxCC's `task:ended` event follows through the webhook. A refusal (`rejected_403` without
+   the scope, or any other non-retryable code) is recorded as **`end_not_possible`** with the
+   code; the v2 mark stands.
+4. A refused v2 mark is an `integration_error` on the timeline, and End Task is still tried.
+   Transient failures (timeouts, 429, 5xx) are retried like every call job. A final failure is
+   an `integration_error`, never a failed task.
 5. The admin booking detail explains an `end_not_possible`: the task may still be open and an
-   agent or supervisor ends it in Agent Desktop. `python -m app.cli wxcc-check` probes End Task
-   with a task id that cannot exist (404 means the scope works, 403 means it does not).
+   agent or supervisor ends it in Agent Desktop. `python -m app.cli wxcc-check` probes the v2
+   calls as required and the v1 calls (End Task with a task id that cannot exist, event types,
+   task search) as secondary: they print `WARN` and do not fail the check.
 
 ## Consequences
 
-- The Control Hub checklist (runbook) adds `cjp:user` to the Service App. Without it,
-  cancellation still works: OpenPlanner only marks the task cancelled.
+- The Control Hub checklist (runbook) adds `cjp:user` to the Service App as optional. Without
+  it, cancellation still reaches WxCC: the task is marked cancelled through v2.
 - **Gap:** without `cjp:user`, or while End Task refuses Service App tokens, a cancelled work
   item stays in the queue until an agent picks it up and ends it. The WxCC flow can shorten
   that by acting on `kind = cancelled` (for example a short queue timeout). To be confirmed
