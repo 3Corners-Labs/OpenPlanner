@@ -1,0 +1,17 @@
+{#- Update banner (ADR 0028): a newer release, a running request or the latest outcome. -#}
+{% from "admin/_icons.html" import icon %}
+<div class="alert update-banner update-banner--{{ update_banner.kind }}" role="status">
+  {{ icon("refresh") }}
+  <div class="update-banner__body">
+    <p>{{ update_banner.text }}</p>
+    <div class="update-banner__actions">
+      <a href="/admin/updates">{{ _("admin.updates.banner.open") }}</a>
+      {% if update_banner.snooze %}
+      <form method="post" action="/admin/updates/snooze">
+        <input type="hidden" name="next" value="{{ update_banner.next_path }}">
+        <button type="submit" class="button button--ghost">{{ _("admin.updates.banner.snooze") }}</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>

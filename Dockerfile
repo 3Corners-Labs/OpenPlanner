@@ -14,6 +14,8 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
 FROM python:3.12-slim-bookworm AS runtime
+# Release version (ADR 0028), set by main.yml on a v*.*.* tag; anything else is no release.
+ARG APP_VERSION=""
 # CVE-2026-84782 (OpenSSL, HIGH): the base tag still ships libssl3 3.0.22-1~deb12u1.
 # Remove this layer once the python:3.12-slim-bookworm image carries deb12u2 or later.
 RUN apt-get update \
@@ -30,7 +32,8 @@ COPY app ./app
 RUN mkdir /srv/data && chown app:app /srv/data
 # Summer and winter time come from the pinned `tzdata` package (uv.lock, Renovate), not from
 # whatever the base image happens to ship: an empty PYTHONTZPATH makes zoneinfo use only it.
-ENV PATH=/srv/.venv/bin:$PATH \
+ENV APP_VERSION=${APP_VERSION} \
+    PATH=/srv/.venv/bin:$PATH \
     PYTHONPATH=/srv \
     PYTHONTZPATH="" \
     PYTHONDONTWRITEBYTECODE=1 \

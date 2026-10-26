@@ -1,5 +1,6 @@
 """Application settings, read from the environment only."""
 
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -15,6 +16,8 @@ AGENT_API_PREFIX = "/api/agent/v1"
 
 SMTPS_PORT = 465
 """Mail submission over implicit TLS (RFC 8314); STARTTLS is never offered there."""
+
+_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 
 
 class Settings(BaseSettings):
@@ -117,6 +120,13 @@ class Settings(BaseSettings):
     rate_limit_agent_tokens: str = "10/minute"
     rate_limit_agent_calls: str = "120/minute"
 
+    # Updates from the admin portal (ADR 0028). APP_VERSION is baked into release images by
+    # main.yml; UPDATE_REPOSITORY (owner/name) switches the hourly release check on. The token
+    # is only needed for a private repository and needs read access to its contents only.
+    app_version: str = ""
+    update_repository: str | None = None
+    update_check_token: SecretStr | None = None
+
     @model_validator(mode="after")
     def _smtp_login_is_encrypted(self) -> "Settings":
         """Refuse an SMTP login that would send the password in clear text."""
@@ -177,6 +187,16 @@ class Settings(BaseSettings):
     def dispatch_configured(self) -> bool:
         """Whether WxCC work items can be created (Service App plus the WxCC API host)."""
         return self.video_configured and bool(self.wxcc_api_base_url)
+
+    @field_validator("update_repository")
+    @classmethod
+    def _repository_is_owner_and_name(cls, value: str | None) -> str | None:
+        """Accept only ``owner/name``: it becomes part of an API URL."""
+        if value is not None and (
+            not _REPOSITORY.fullmatch(value) or {".", ".."} & set(value.split("/"))
+        ):
+            raise ValueError("UPDATE_REPOSITORY must be owner/name")
+        return value
 
     @field_validator("log_level", mode="before")
     @classmethod

@@ -6,13 +6,16 @@ overview and reports, ``group_routes`` for groups and planning) import from here
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, Request
 from starlette.responses import HTMLResponse
 
 from app.admin.authz import can_function, session_principal
+from app.admin.forms import moment_label
 from app.domain.authorization import Permission, Principal, Role
 from app.web.authz_labels import ROLE_LABELS
 from app.web.locale import RequestLocale, resolve_locale
@@ -53,6 +56,7 @@ NAVIGATION = (
     NavItem("admin.nav.holidays", "/admin/holidays", Permission.HOLIDAYS_ASSIGN, "holiday"),
     NavItem("admin.nav.closures", "/admin/closures", Permission.ORGANISATION_CLOSURE, "alert"),
     NavItem("admin.nav.api", "/admin/api", Permission.API_CLIENTS_MANAGE, "key"),
+    NavItem("admin.nav.updates", "/admin/updates", Permission.SYSTEM_UPDATE, "refresh"),
 )
 
 
@@ -95,6 +99,11 @@ def _is_current(request: Request, item: NavItem) -> bool:
     )
 
 
+def admin_moment(request: Request, locale: RequestLocale, at: datetime) -> str:
+    """Return a compact local date and time in the admin time zone (``ADMIN_TIMEZONE``)."""
+    return moment_label(at, ZoneInfo(request.app.state.settings.admin_timezone), locale.code)
+
+
 def page(
     request: Request,
     locale: RequestLocale,
@@ -115,7 +124,15 @@ def page(
         request,
         name,
         locale,
-        {**context, "principal": principal, "nav": nav, "can": can, "role_labels": role_labels},
+        {
+            **context,
+            "principal": principal,
+            "nav": nav,
+            "can": can,
+            "role_labels": role_labels,
+            # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0028).
+            "update_banner": getattr(request.state, "update_notice", None),
+        },
     )
 
 
