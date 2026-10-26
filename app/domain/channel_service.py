@@ -7,6 +7,7 @@ with the names of what changed, never the values (ADR 0008).
     organisations   integrations.manage   organisations in scope
     overview        integrations.manage   stored settings, whether a secret is set
     save / remove   integrations.manage   change or remove one channel
+    send_test_email integrations.manage   one email through the server the worker would use
 """
 
 from dataclasses import dataclass, fields
@@ -19,11 +20,19 @@ from app.domain.channel_settings import (
     ChannelSettings,
     secret_field,
     validate_secret,
+    validate_test_recipient,
 )
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.organisations import organisation_by_slug
-from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.ports import (
+    Clock,
+    IntegrationError,
+    OutboundMessage,
+    SenderDirectory,
+    Transaction,
+    UnitOfWork,
+)
 from app.domain.scheduling import Organisation
 
 AUDIT_PREFIX = {ChannelKind.EMAIL: "smtp", ChannelKind.SMS: "sms"}
@@ -45,13 +54,21 @@ class ChannelSettingsService:
         uow: Opens database transactions.
         clock: Current time, for ``updated_at`` and audit events.
         admin: Authorises changes and audits refusals.
+        senders: The senders the worker uses, for test emails; ``None`` has nothing to test.
     """
 
-    def __init__(self, uow: UnitOfWork, clock: Clock, admin: AdminService) -> None:
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        admin: AdminService,
+        senders: SenderDirectory | None = None,
+    ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
+        self._senders = senders
 
     async def organisations(self, principal: Principal) -> list[Organisation]:
         """Return the organisations whose channels ``principal`` may configure."""
@@ -125,6 +142,44 @@ class ChannelSettingsService:
             if not await tx.delete_channel_settings(organisation.id, channel):
                 raise DomainError(ErrorCode.CHANNEL_NOT_CONFIGURED)
             await self._audit(tx, principal, slug, f"{AUDIT_PREFIX[channel]}.remove")
+
+    async def send_test_email(
+        self, principal: Principal, slug: str, recipient: str, subject: str, text: str
+    ) -> str | None:
+        """Send one email to ``recipient`` exactly as the worker would for this organisation.
+
+        Uses the organisation's own SMTP server, else the installation's fallback. The audit
+        event names the outcome (``smtp.test.ok`` or ``smtp.test.<code>``), never the address.
+
+        Returns:
+            ``None`` when the server accepted the message, else the failure code of the
+            sender (``unauthorized``, ``unreachable``, ``tls_failed``, …).
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found``, ``invalid_configuration``
+                (``test_recipient``) or ``channel_not_configured`` (no mail server at all).
+        """
+        validate_test_recipient(recipient)
+        await self._authorize(principal, slug)
+        async with self._uow.read() as tx:
+            organisation = await organisation_by_slug(tx, slug)
+        sender = (
+            await self._senders.sender(organisation.id, ChannelKind.EMAIL)
+            if self._senders is not None
+            else None
+        )
+        if sender is None:
+            raise DomainError(ErrorCode.CHANNEL_NOT_CONFIGURED)
+        message = OutboundMessage(ChannelKind.EMAIL, recipient, subject, text)
+        try:
+            await sender.send(message)
+        except IntegrationError as error:
+            failure: str | None = error.code
+        else:
+            failure = None
+        async with self._uow.locked() as tx:
+            await self._audit(tx, principal, slug, f"smtp.test.{failure or 'ok'}")
+        return failure
 
     async def _authorize(self, principal: Principal, slug: str) -> None:
         """Raise ``not_permitted`` unless the matrix grants ``integrations.manage``."""

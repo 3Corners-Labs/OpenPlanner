@@ -75,6 +75,17 @@ class MessageSender(Protocol):
         ...
 
 
+class SenderDirectory(Protocol):
+    """Finds the sender of an organisation's channel (ADR 0022).
+
+    The organisation's own settings come first, else the installation's fallback for email.
+    """
+
+    async def sender(self, organisation_id: int, channel: ChannelKind) -> MessageSender | None:
+        """Return the sender, or ``None`` when the organisation has none on ``channel``."""
+        ...
+
+
 @dataclass(frozen=True)
 class LoginStart:
     """Where to send an admin to log in, and the secrets to check the answer with.

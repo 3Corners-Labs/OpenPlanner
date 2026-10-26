@@ -2544,3 +2544,57 @@ msgstr "Eerste Kerstdag"
 
 msgid "holiday.nl.boxing_day"
 msgstr "Tweede Kerstdag"
+
+msgid "admin.channels.test_heading"
+msgstr "Testbericht versturen"
+
+msgid "admin.channels.test_lead"
+msgstr "Controleer of de mail werkt: OpenPlanner verstuurt één bericht via de mailserver die het nu voor deze organisatie gebruikt, met de opgeslagen instellingen hierboven of anders de standaardserver van de installatie. Sla wijzigingen eerst op."
+
+msgid "admin.channels.test_recipient"
+msgstr "Versturen naar"
+
+msgid "admin.channels.test_recipient_hint"
+msgstr "Een adres waar u zelf bij kunt. Het adres wordt niet opgeslagen."
+
+msgid "admin.channels.test_send"
+msgstr "Testbericht versturen"
+
+msgid "admin.channels.test_subject"
+msgstr "OpenPlanner: testbericht"
+
+msgid "admin.channels.test_text"
+msgstr "Dit is een testbericht van OpenPlanner. Komt het aan, dan werkt de mailserver. U hoeft niets te doen."
+
+msgid "admin.done.test_sent"
+msgstr "Testbericht verstuurd: de mailserver heeft het aangenomen. Controleer of het is aangekomen; kijk ook in de map met ongewenste mail."
+
+msgid "admin.form.error.test_recipient"
+msgstr "Vul een geldig e-mailadres in, bijvoorbeeld naam@voorbeeld.nl."
+
+msgid "admin.channels.test_failed.no_server"
+msgstr "Er is geen mailserver ingesteld voor deze organisatie en de installatie heeft geen standaardserver. Vul de instellingen hierboven in."
+
+msgid "admin.channels.test_failed.unreachable"
+msgstr "De mailserver is niet bereikbaar. Controleer de server en de poort, en of de server verbindingen van OpenPlanner toestaat."
+
+msgid "admin.channels.test_failed.tls_failed"
+msgstr "De beveiligde verbinding is mislukt. Controleer de beveiliging: STARTTLS hoort meestal bij poort 587, TLS bij poort 465. Of het certificaat van de server is niet geldig."
+
+msgid "admin.channels.test_failed.not_supported"
+msgstr "De mailserver biedt de gekozen beveiliging of het inloggen niet aan. Controleer de beveiliging en de poort."
+
+msgid "admin.channels.test_failed.unauthorized"
+msgstr "De mailserver weigert de inlog. Controleer gebruikersnaam of wachtwoord."
+
+msgid "admin.channels.test_failed.sender_refused"
+msgstr "De mailserver weigert het afzenderadres. Gebruik een adres waarvandaan dit account mag versturen."
+
+msgid "admin.channels.test_failed.recipient_refused"
+msgstr "De mailserver weigert het adres waarnaar u het testbericht stuurt."
+
+msgid "admin.channels.test_failed.rejected"
+msgstr "De mailserver weigerde het bericht (code {status})."
+
+msgid "admin.channels.test_failed.other"
+msgstr "Het versturen is mislukt door een onverwachte fout van de mailserver. Probeer het later opnieuw."

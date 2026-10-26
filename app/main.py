@@ -16,6 +16,7 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.integrations import Integrations, build_integrations, secret_box
 from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider
+from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.admin.routes import register_admin
 from app.api import (
     booking_pages,
@@ -125,7 +126,11 @@ def create_app(
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
-        app.state.channel_service = ChannelSettingsService(uow, clock, app.state.admin_service)
+        # Test emails go through exactly the senders the worker uses (ADR 0022).
+        senders = ConfiguredSenders(uow, http, fallback_mail(settings))
+        app.state.channel_service = ChannelSettingsService(
+            uow, clock, app.state.admin_service, senders
+        )
         app.state.messaging_service = MessagingService(
             uow, clock, app.state.admin_service, app.state.translator.locales
         )

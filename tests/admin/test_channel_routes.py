@@ -1,7 +1,13 @@
 """Channel screens (ADR 0022): SMTP and SMS per organisation, write-only secrets, audit."""
 
-import httpx
+import smtplib
+from email.message import EmailMessage
+from typing import Any
 
+import httpx
+import pytest
+
+from app.adapters import smtp as smtp_module
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
 from tests.admin.test_admin_flow import audit_events
 
@@ -99,3 +105,100 @@ async def test_an_http_gateway_is_refused(site: Site) -> None:
 
     assert response.status_code == 422
     assert 'href="#sms_api_base_url"' in response.text
+
+
+class FakeSMTP:
+    """Stands in for ``smtplib.SMTP``; ``refuse_login`` makes the server reject the login."""
+
+    sent: list[EmailMessage] = []
+    calls: list[str] = []
+    refuse_login = False
+
+    def __init__(self, host: str, port: int, timeout: float) -> None:
+        FakeSMTP.calls.append(f"connect:{host}:{port}")
+
+    def __enter__(self) -> "FakeSMTP":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        pass
+
+    def starttls(self, context: Any) -> None:
+        FakeSMTP.calls.append("starttls")
+
+    def login(self, username: str, password: str) -> None:
+        if FakeSMTP.refuse_login:
+            raise smtplib.SMTPAuthenticationError(535, b"5.7.8 bad credentials")
+        FakeSMTP.calls.append(f"login:{username}")
+
+    def send_message(self, message: EmailMessage) -> None:
+        FakeSMTP.sent.append(message)
+
+
+@pytest.fixture
+def fake_smtp(monkeypatch: pytest.MonkeyPatch) -> type[FakeSMTP]:
+    FakeSMTP.sent, FakeSMTP.calls, FakeSMTP.refuse_login = [], [], False
+    monkeypatch.setattr(smtp_module.smtplib, "SMTP", FakeSMTP)
+    return FakeSMTP
+
+
+TEST_MAIL = {"test_recipient": "beheer@demo.nl"}
+
+
+async def test_a_test_email_is_sent_with_the_stored_settings(
+    site: Site, fake_smtp: type[FakeSMTP]
+) -> None:
+    await site.login_as(SUPER)
+    await _post(site, "email", SMTP)
+    page = (await site.client.get(PAGE)).text
+    assert 'action="/admin/organisations/demo/channels/email/test"' in page
+
+    response = await _post(site, "email/test", TEST_MAIL)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{PAGE}?done=test_sent"
+    assert fake_smtp.calls == ["connect:smtp.demo.nl:587", "starttls", "login:afspraak"]
+    mail = fake_smtp.sent[0]
+    assert mail["To"] == "beheer@demo.nl"
+    assert mail["From"] == "Gemeente Demo <afspraak@demo.nl>"
+    assert "OpenPlanner" in mail["Subject"]
+    assert "Testbericht verstuurd" in (await site.client.get(response.headers["location"])).text
+    actions = [b for _, b, _, _ in await audit_events(site)]
+    assert actions.count("integrations.manage") == 2  # the save and the test (detail: domain test)
+
+
+async def test_a_failed_test_email_says_why(site: Site, fake_smtp: type[FakeSMTP]) -> None:
+    await site.login_as(SUPER)
+    await _post(site, "email", SMTP)
+    fake_smtp.refuse_login = True
+
+    response = await _post(site, "email/test", TEST_MAIL)
+
+    assert response.status_code == 422
+    assert 'href="#test_recipient"' in response.text
+    assert "gebruikersnaam of wachtwoord" in response.text
+    assert "bad credentials" not in response.text  # the server's own answer is never shown
+    assert "Geheim-wachtwoord-123" not in response.text
+    assert 'value="beheer@demo.nl"' in response.text  # the address is kept for a retry
+    assert fake_smtp.sent == []
+
+
+async def test_a_test_email_needs_a_mail_server(site: Site, fake_smtp: type[FakeSMTP]) -> None:
+    await site.login_as(SUPER)
+
+    response = await _post(site, "email/test", TEST_MAIL)
+
+    assert response.status_code == 422
+    assert "Er is geen mailserver ingesteld" in response.text
+    assert fake_smtp.calls == []
+
+
+async def test_a_test_email_needs_a_valid_address(site: Site, fake_smtp: type[FakeSMTP]) -> None:
+    await site.login_as(SUPER)
+    await _post(site, "email", SMTP)
+
+    response = await _post(site, "email/test", {"test_recipient": "a@b.nl\r\nBcc: x@evil.nl"})
+
+    assert response.status_code == 422
+    assert 'href="#test_recipient"' in response.text
+    assert fake_smtp.calls == []
