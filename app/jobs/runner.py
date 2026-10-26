@@ -1,7 +1,8 @@
 """Run due jobs: message jobs through a ``MessageSender``, and the PII purge.
 
-Handled: confirmation, change, reminder (email), cancellation, purge, and, when Webex and
-WxCC are configured, meetings and work items (``app.jobs.calls``). Jobs of an unconfigured
+Handled: confirmation, change, reminder (email), cancellation, the emergency closure messages
+(suspension, update, reinstatement; ADR 0021), purge, and, when Webex and WxCC are
+configured, meetings and work items (``app.jobs.calls``). Jobs of an unconfigured
 integration are not claimed; they wait.
 
     claim due ─► stale? (pinned start changed / not confirmed / purged) ─► done, nothing sent
@@ -140,15 +141,20 @@ class JobRunner:
         async with self._uow.read() as tx:
             booking = await tx.get_booking(job.booking_id)
             group = await tx.get_group_by_id(booking.group_id) if booking else None
+            closure = (
+                await tx.get_closure(booking.closure_id)
+                if booking and booking.closure_id is not None
+                else None
+            )
         if booking is None or group is None or booking.contact is None:
             log.info("job.skipped", job_id=job.id, reason="no_recipient")
             return
-        if is_stale(job.pinned_start, booking):
+        if is_stale(job.pinned_start, booking, job.type):
             log.info("job.skipped", job_id=job.id, reason="stale")
             return
         if self._sender is None:  # pragma: no cover - message jobs are not claimed then
             raise RuntimeError("no sender configured")
-        await self._sender.send(self._composer.compose(job.type, booking, group, now))
+        await self._sender.send(self._composer.compose(job.type, booking, group, now, closure))
         log.info("job.sent", job_id=job.id, type=job.type.value)
 
     async def _handle_failure(

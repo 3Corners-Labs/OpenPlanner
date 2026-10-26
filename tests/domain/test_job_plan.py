@@ -42,7 +42,7 @@ def test_base_plan() -> None:
 
 
 def test_rescheduled_booking_gets_a_change_message() -> None:
-    types = [job.type for job in plan(rescheduled=True)]
+    types = [job.type for job in plan(message=JobType.SEND_CHANGE)]
 
     assert JobType.SEND_CHANGE in types
     assert JobType.SEND_CONFIRMATION not in types

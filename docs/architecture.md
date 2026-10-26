@@ -186,6 +186,7 @@ same commit and rollback behaviour as the SQL one.
 | Slot calculation (time zones, daylight saving) | `app/domain/availability.py` |
 | Bookings, contact validation | `app/domain/booking.py` |
 | Book, cancel, reschedule (use cases) | `app/domain/services.py` |
+| Emergency closure, bookings on hold (ADR 0021) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/web/closure_labels.py` |
 | Which jobs, when | `app/domain/job_plan.py` |
 | Channels, reminder rules | `app/domain/channels.py` |
 | Management tokens | `app/domain/tokens.py` |
@@ -227,6 +228,8 @@ erDiagram
     GROUP ||--o{ SLOT : "has booked"
     SLOT ||--o{ BOOKING : holds
     BOOKING ||--o{ JOB : schedules
+    GROUP ||--o{ CLOSURE : "closed in an emergency"
+    CLOSURE |o--o{ BOOKING : "put on hold"
     BOOKING |o--o| BOOKING : "rescheduled from"
 
     ORGANISATION {
@@ -390,6 +393,11 @@ flowchart LR
 
     cancel(["cancelled"]) --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
 
+    hold(["suspended<br/>(emergency closure)"]) --> hmail["notice mail<br/>now"]
+    hmail --> resolve{"moved, reinstated<br/>or cancelled?"}
+    resolve -->|yes| book
+    resolve -->|no| hpurge["closure end + 30 days<br/>purge PII"]
+
 ```
 
 Every job that is tied to a start time stores that start (`pinned_start`). On run it does
@@ -437,6 +445,9 @@ stateDiagram-v2
     confirmed --> cancelled: reschedule (old booking; a new one is confirmed)
     confirmed --> completed: after the call (WP6)
     confirmed --> no_show: task not picked up (O2)
+    confirmed --> suspended: emergency closure (ADR 0021)
+    suspended --> confirmed: reinstate (closure over, before the dispatch lead)
+    suspended --> cancelled: cancel, or move (a new booking is confirmed)
     cancelled --> [*]
     completed --> [*]
     no_show --> [*]
@@ -514,7 +525,8 @@ The STRIDE analysis per flow, with a test for every abuse case, is in
 - **Personal data:** name, email, phone, guest and host join URL. These live only in
   `bookings`; jobs, slots and logs hold IDs.
 - **Purge:** the `purge_pii` job sets them to NULL at slot end + 24 h, or 24 h after a
-  cancellation. The nightly sweep and alert follow in WP8.
+  cancellation. A booking on hold by an emergency closure keeps them until it is resolved, at
+  most 30 days after the closure ends (ADR 0021). The nightly sweep and alert follow in WP8.
 - **What leaves the system:** mails carry the first name, date, team and the management link;
   the calendar file carries no personal data. WxCC will receive only the first name and the
   host link.
@@ -565,6 +577,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0018 | Dispatch to WxCC as work items (Create Task API v2) |
 | 0019 | Direct video call ("now") per group |
 | 0020 | Citizen calendar as progressive enhancement; branding through tokens |
+| 0021 | Emergency closure: appointments on hold, citizens informed, no deletion |
 
 ## 12. Status and roadmap
 

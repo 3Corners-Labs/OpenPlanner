@@ -39,6 +39,13 @@ no full name. In development Mailpit (`--profile dev`) catches all mail locally.
 
 Jobs, slots, schedules and audit events carry no personal data of citizens.
 
+**Exception: emergency closure (ADR 0021).** A booking suspended by an emergency closure keeps
+the data above until it is moved, reinstated or cancelled (then the rules above apply again),
+and at most until 30 days after the closure ends (`purge_pii` planned at the closure's end +
+30 days; none while the closure is open-ended). Decided by the product owner on 2026-10-25; to
+be confirmed in the DPIA (O7). The closure notice is admin text without personal data
+(`closure_notices`); it goes to the citizen by mail and on the public group page.
+
 ## Admin login and audit (WP7a)
 
 ```

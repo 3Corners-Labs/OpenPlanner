@@ -9,7 +9,9 @@ booking and its jobs commit together or not at all (CLAUDE.md architecture rules
 
 A booking is read-only from its change deadline (``job_plan.change_deadline``: the group's
 dispatch lead before the start, T−5 min by default): cancel and reschedule then raise
-``booking_locked``.
+``booking_locked``. A booking suspended by an emergency closure (ADR 0021) has no deadline:
+the citizen can move or cancel it until it is resolved. No slot inside a closure is offered
+or booked (``group_closed``), and no direct call starts while one is active.
 """
 
 from dataclasses import dataclass, field
@@ -25,8 +27,10 @@ from app.domain.availability import (
 )
 from app.domain.booking import Booking, BookingKind, BookingStatus, Contact, Slot
 from app.domain.channels import ChannelKind
+from app.domain.closure import Closure, covering
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import (
+    JobType,
     change_deadline,
     plan_for_booking,
     plan_for_cancellation,
@@ -54,12 +58,16 @@ class ContactInput:
 
 @dataclass(frozen=True)
 class BookingDetails:
-    """What the management page needs: the booking, its group and whether it may change."""
+    """What the management page needs: the booking, its group and whether it may change.
+
+    ``closure`` is the closure that suspended the booking, for its notice.
+    """
 
     booking: Booking
     group: Group
     change_deadline: datetime
     changeable: bool
+    closure: Closure | None = None
 
 
 @dataclass(frozen=True)
@@ -99,6 +107,12 @@ class BookingService:
         async with self._uow.read() as tx:
             return await self._group(tx, group_slug)
 
+    async def closure_notice(self, group: Group) -> Closure | None:
+        """Return the closure citizens of ``group`` must see now (active or upcoming)."""
+        async with self._uow.read() as tx:
+            closures = await tx.get_closures(group.id, self._clock.now())
+        return closures[0] if closures else None
+
     async def availability(
         self, group_slug: str, first_day: date, last_day: date
     ) -> list[AvailableSlot]:
@@ -112,7 +126,8 @@ class BookingService:
             group = await self._group(tx, group_slug)
             rules, overrides = await tx.get_schedule(group.id, first_day, last_day)
             usage = await tx.get_slot_usage(group.id, *utc_bounds(group, first_day, last_day))
-        return available_slots(
+            closures = await tx.get_closures(group.id, self._clock.now())
+        slots = available_slots(
             group=group,
             rules=rules,
             overrides=overrides,
@@ -122,6 +137,7 @@ class BookingService:
             booked={u.start: u.active for u in usage},
             snapshots={u.start: u.capacity_snapshot for u in usage},
         )
+        return [slot for slot in slots if covering(closures, slot.start) is None]
 
     async def book(
         self,
@@ -159,10 +175,7 @@ class BookingService:
             group = await self._group(tx, group_slug)
             if not group.direct_call_enabled:
                 return False
-            now = self._clock.now()
-            today = now.astimezone(group.tz).date()
-            rules, overrides = await tx.get_schedule(group.id, today, today)
-        return is_open(group, rules, overrides, now)
+            return await self._direct_open(tx, group, self._clock.now())
 
     async def start_direct(
         self, *, group_slug: str, contact: ContactInput, locale: str
@@ -176,9 +189,7 @@ class BookingService:
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
             now = self._clock.now()
-            today = now.astimezone(group.tz).date()
-            rules, overrides = await tx.get_schedule(group.id, today, today)
-            if not group.direct_call_enabled or not is_open(group, rules, overrides, now):
+            if not group.direct_call_enabled or not await self._direct_open(tx, group, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_UNAVAILABLE)
             details = Contact.create(
                 name=contact.name,
@@ -218,9 +229,14 @@ class BookingService:
         async with self._uow.read() as tx:
             booking = await self._booking(tx, management_token)
             group = await self._group_by_id(tx, booking.group_id)
+            closure = (
+                await tx.get_closure(booking.closure_id)
+                if booking.is_suspended and booking.closure_id is not None
+                else None
+            )
         deadline = change_deadline(booking.start, group.dispatch_lead)
-        changeable = booking.is_active and self._clock.now() < deadline
-        return BookingDetails(booking, group, deadline, changeable)
+        changeable = booking.is_suspended or (booking.is_active and self._clock.now() < deadline)
+        return BookingDetails(booking, group, deadline, changeable, closure)
 
     async def cancel(self, management_token: str) -> Booking:
         """Cancel the booking; its pending jobs become a cancellation mail and the purge.
@@ -250,18 +266,39 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             old = await self._booking(tx, management_token)
-            now = self._clock.now()
             group = await self._group_by_id(tx, old.group_id)
-            _ensure_changeable(old, group, now)
-            if not old.is_active or old.contact is None:
-                raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
-            if new_start == old.start:
-                raise DomainError(ErrorCode.SAME_SLOT)
-            await tx.save_booking(old.cancel(now))
-            await tx.replace_jobs(_id(old), plan_for_cancellation(cancelled_at=now, notify=False))
-            return await self._place(
-                tx, group, new_start, old.contact, old.locale, old.consents, _id(old)
-            )
+            _ensure_changeable(old, group, self._clock.now())
+            return await self.relocate(tx, old, group, new_start)
+
+    async def relocate(
+        self, tx: Transaction, old: Booking, group: Group, new_start: datetime
+    ) -> BookingReceipt:
+        """Move ``old`` to ``new_start`` inside the caller's locked transaction.
+
+        Shared by the citizen's reschedule and an admin moving a suspended booking
+        (``ClosureService.move``); the caller checks who may do it.
+
+        Raises:
+            DomainError: ``booking_not_active``, ``same_slot`` or any error of ``book``.
+        """
+        if not old.holds_place or old.contact is None:
+            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        if new_start == old.start:
+            raise DomainError(ErrorCode.SAME_SLOT)
+        now = self._clock.now()
+        await tx.save_booking(old.cancel(now))
+        await tx.replace_jobs(_id(old), plan_for_cancellation(cancelled_at=now, notify=False))
+        return await self._place(
+            tx, group, new_start, old.contact, old.locale, old.consents, _id(old)
+        )
+
+    async def _direct_open(self, tx: Transaction, group: Group, now: datetime) -> bool:
+        """Return whether the group is open for a direct call at ``now`` (and not closed)."""
+        today = now.astimezone(group.tz).date()
+        rules, overrides = await tx.get_schedule(group.id, today, today)
+        if any(c.is_active(now) for c in await tx.get_closures(group.id, now)):
+            return False
+        return is_open(group, rules, overrides, now)
 
     async def _group(self, tx: Transaction, slug: str) -> Group:
         """Return the group or raise ``group_not_found``."""
@@ -306,6 +343,8 @@ class BookingService:
         offered = offered_slot(group, rules, overrides, start)
         if offered is None:
             raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
+        if covering(await tx.get_closures(group.id, now), offered.start) is not None:
+            raise DomainError(ErrorCode.GROUP_CLOSED)
         slot = await tx.get_slot(group.id, offered.start)
         if slot is None:
             slot = await tx.add_slot(
@@ -340,14 +379,19 @@ class BookingService:
             rules=await tx.get_reminder_rules(group.id),
             now=now,
             dispatch_lead=group.dispatch_lead,
-            rescheduled=rescheduled_from is not None,
+            message=JobType.SEND_CHANGE if rescheduled_from else JobType.SEND_CONFIRMATION,
         )
         await tx.replace_jobs(_id(booking), jobs)
         return BookingReceipt(booking, token)
 
 
 def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
-    """Refuse changes from the change deadline on; the booking is read-only from then."""
+    """Refuse changes from the change deadline on; the booking is read-only from then.
+
+    A suspended booking has no deadline: it does not go ahead at its time anyway.
+    """
+    if booking.is_suspended:
+        return
     if now >= change_deadline(booking.start, group.dispatch_lead):
         raise DomainError(ErrorCode.BOOKING_LOCKED)
 

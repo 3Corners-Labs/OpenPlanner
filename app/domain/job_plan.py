@@ -9,6 +9,12 @@ changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
            ──► send_reminder × rules (start − offset, if still ahead and reachable)
            ──► dispatch_wxcc_task (start − dispatch lead) ──► purge_pii (end + 24 h)
     cancelled ──► send_cancellation (now, unless rescheduled) ──► purge_pii (now + 24 h)
+    suspended ──► send_suspension (now) ──► purge_pii (closure end + 30 days, once known)
+              ──► send_closure_update (when an admin sends an update)
+    reinstated ──► as booked, with send_reinstatement instead of the confirmation
+
+Closure notices are not pinned (the booking is no longer confirmed); they only run while the
+booking is still suspended (``is_stale``).
 """
 
 from collections.abc import Iterable
@@ -44,6 +50,13 @@ class JobType(StrEnum):
     SEND_CANCELLATION = "send_cancellation"
     DISPATCH_WXCC_TASK = "dispatch_wxcc_task"
     PURGE_PII = "purge_pii"
+    SEND_SUSPENSION = "send_suspension"
+    SEND_CLOSURE_UPDATE = "send_closure_update"
+    SEND_REINSTATEMENT = "send_reinstatement"
+
+
+CLOSURE_NOTICES = frozenset({JobType.SEND_SUSPENSION, JobType.SEND_CLOSURE_UPDATE})
+"""Messages about an emergency closure; sent only while the booking is suspended."""
 
 
 @dataclass(frozen=True)
@@ -65,14 +78,15 @@ def plan_for_booking(
     rules: Iterable[ReminderRule],
     now: datetime,
     dispatch_lead: timedelta,
-    rescheduled: bool = False,
+    message: JobType = JobType.SEND_CONFIRMATION,
 ) -> list[PlannedJob]:
     """Return the jobs of a newly confirmed booking, in execution order.
 
-    Reminders are skipped when disabled, duplicated, not strictly in the future, or when the
-    booking is not reachable on the channel.
+    ``message`` is the first email: the confirmation, ``send_change`` after a reschedule or
+    ``send_reinstatement`` when a suspended booking goes ahead after all. Reminders are skipped
+    when disabled, duplicated, not strictly in the future, or when the booking is not reachable
+    on the channel.
     """
-    message = JobType.SEND_CHANGE if rescheduled else JobType.SEND_CONFIRMATION
     jobs = [
         PlannedJob(JobType.CREATE_VIDEO_ROOM, now, start),
         PlannedJob(message, now, start, ChannelKind.EMAIL),
@@ -98,12 +112,17 @@ def plan_for_booking(
     return jobs
 
 
-def is_stale(pinned_start: datetime | None, booking: Booking) -> bool:
+def is_stale(
+    pinned_start: datetime | None, booking: Booking, job_type: JobType | None = None
+) -> bool:
     """Return whether a job pinned to ``pinned_start`` must do nothing for ``booking``.
 
     Pinned jobs only act on a confirmed booking whose start is unchanged and whose personal
-    data still exists (CLAUDE.md). Unpinned jobs (cancellation mail, purge) always run.
+    data still exists (CLAUDE.md). Closure notices only act on a booking that is still
+    suspended. Other unpinned jobs (cancellation mail, purge) always run.
     """
+    if job_type in CLOSURE_NOTICES:
+        return not booking.is_suspended or booking.contact is None
     if pinned_start is None:
         return False
     return not booking.is_active or booking.start != pinned_start or booking.contact is None
@@ -134,3 +153,24 @@ def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:
         PlannedJob(JobType.DISPATCH_WXCC_TASK, start, start),
         PlannedJob(JobType.PURGE_PII, end + PURGE_AFTER, None),
     ]
+
+
+def plan_for_suspension(*, now: datetime, purge_at: datetime | None) -> list[PlannedJob]:
+    """Return the jobs that replace all pending jobs of a booking put on hold (ADR 0021).
+
+    Reminders and the WxCC task go; the meeting stays, so a reinstated booking keeps its
+    link. The purge waits for the end of the closure (``Closure.purge_at``); while the closure
+    is open-ended there is none, and ``plan_purge`` adds it once the end is known.
+    """
+    jobs = [PlannedJob(JobType.SEND_SUSPENSION, now, None, ChannelKind.EMAIL)]
+    return jobs + plan_purge(purge_at)
+
+
+def plan_purge(purge_at: datetime | None) -> list[PlannedJob]:
+    """Return the purge of a suspended booking at ``purge_at`` (none while it is unknown)."""
+    return [PlannedJob(JobType.PURGE_PII, purge_at, None)] if purge_at else []
+
+
+def plan_closure_update(*, now: datetime) -> list[PlannedJob]:
+    """Return the job that mails a suspended booking the closure's updated notice."""
+    return [PlannedJob(JobType.SEND_CLOSURE_UPDATE, now, None, ChannelKind.EMAIL)]

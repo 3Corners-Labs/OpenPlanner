@@ -1,0 +1,5 @@
+{#- What citizens see on the group page about a closure (ADR 0021). -#}
+<div class="alert alert--info">
+  <p><strong>{{ preview.title }}</strong> – {{ preview.period }}</p>
+  {% for paragraph in preview.paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
+</div>
