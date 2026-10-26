@@ -282,3 +282,26 @@ address; in the admin portal the client form.
 | Elevation / tampering | Someone other than the superuser registers or changes a client, or a third-party site does it in their browser | `api_clients.manage` is superuser-only, with a fresh login; Fetch Metadata check on every POST; the service authorises again | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_api_access.py::test_only_the_superuser_manages_clients`, `tests/admin/test_api_routes.py::test_cross_site_posts_are_refused` |
 | Repudiation | Who issued a client, who used it, what was refused | Client changes, token issues, refused tokens and refused calls are audit events (actor = admin subject or client id) | `test_superuser_registers_a_client_and_only_the_hash_is_stored`, `test_valid_credentials_get_a_short_lived_token` |
 
+## Flow: updates from the admin portal (ADR 0029)
+
+Worker: `GET https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest` (hourly).
+Admin (superuser): `GET /admin/updates`, `POST /admin/updates/update`, `/restore`,
+`/requests/{id}/cancel`, `/snooze`. Host updater: `python -m app.cli update-claim`,
+`update-report`, `backup-db`, `restore-db` inside the web container. Inputs from outside: the
+release body from GitHub (tag, page), the snooze's return path, a request id in the path, and
+the updater's status and reason. No personal data, except in the database backups.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation | A compromised web process replaces its own image or runs any image | The containers have no Docker socket; the application only stores requests; the host updater installs only images of this repository's release tags that pass `cosign verify` | `scripts/updater/openplanner-update.sh` (`signature_invalid`); `tests/domain/test_update_service.py::test_superuser_requests_the_available_update_and_it_is_audited` |
+| Elevation | A compromised container feeds shell code to the host updater (claim line, Alembic revision) | The updater checks every value from the container against a strict pattern (id, versions, revision, image references) and reads its state file with `sed`, never sourcing it | `scripts/updater/openplanner-update.sh` (`VERSION_RE`, `REVISION_RE`, `IMAGE_RE`); no automated test yet |
+| Elevation | An organisation or group admin updates or restores the installation | `system.update` is global and superuser only; route and `UpdateService` both decide; requests need a fresh login | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_update_service.py::test_org_admin_cannot_request_an_update`, `tests/admin/test_update_routes.py::test_requests_need_a_fresh_login` |
+| Tampering | A downgrade disguised as an update, or two requests racing | Update targets must be newer than the running release build; at most one open request, checked under the write lock; a restore only to the version the latest update replaced, within 24 hours | `test_no_update_request_without_a_newer_release`, `test_only_one_open_request`, `test_no_restore_after_the_window` |
+| Spoofing | A forged release (other repository, foreign release page, odd tag) | `UPDATE_REPOSITORY` must be `owner/name`; tags must be `vX.Y.Z`; the release page must be this repository's GitHub page, else the release is ignored | `tests/adapters/test_releases.py::test_a_release_that_is_no_version_or_has_a_foreign_page_is_none`, `tests/test_config.py::test_update_repository_must_be_owner_and_name` |
+| Tampering | The updater (or anyone with a shell in the container) reports success for the wrong version | "succeeded" is only accepted from the target version; otherwise recorded as `failed`/`version_mismatch`; reasons must be short codes | `test_success_reported_by_the_wrong_version_is_recorded_as_failed`, `tests/domain/test_updates.py::test_finish_refuses_reasons_that_are_not_codes` |
+| Tampering (CSRF, open redirect) | A third-party site requests an update in an admin's browser; the snooze sends the admin elsewhere | Fetch Metadata check on every POST; the snooze's return path must be an admin path | `test_requests_need_the_same_origin`, `test_snooze_never_redirects_off_the_portal` |
+| Denial of service | A broken release takes the booking pages down | Backup before the switch; health wait of `HEALTH_TIMEOUT`; automatic return to the previous digest and the backup | `scripts/updater/openplanner-update.sh` (`rolled_back`); runbook "Updates" |
+| Information disclosure | Database backups (personal data) outlive the retention rules | Backups only in the data volume, mode 600, deleted after 24 hours on every updater run | `tests/adapters/db/test_backup.py::test_backup_is_a_private_consistent_copy`, `test_prune_deletes_backups_older_than_a_day` |
+| Tampering | A backup name used as a path | Backup names are plain words (`[A-Za-z0-9_-]{1,64}`) | `test_backup_name_is_a_plain_word` |
+| Repudiation | Who started an update and what the updater did | Requests and cancellations audited (`system.update`, `update.request`, `restore.request`, `request.cancel`); every updater step audited as `host-updater` with its reason | `test_cancel_a_waiting_request`, `test_updater_claims_the_waiting_request_once` |
+

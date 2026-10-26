@@ -91,11 +91,16 @@ flowchart TB
     end
 
     smtp[Mail provider]
+    github[GitHub releases<br/>GHCR images]
+    updater["host updater<br/>systemd timer, cosign"]
 
     browser --> proxy --> web
     web <--> volume
     worker <--> volume
     worker -- SMTP --> smtp
+    worker -- hourly release check --> github
+    updater -- "app.cli: claim, report, backup" --> web
+    updater -- "pull, verify, pin digest" --> github
     worker -. dev .-> mailpit
 
     classDef planned stroke-dasharray: 5 5
@@ -113,6 +118,10 @@ flowchart TB
   requires `MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`.
 - **Images** are built in CI, pushed to GHCR, signed keyless with cosign and carry an SBOM
   attestation (ADR 0006). Hosting and backups: open point O7.
+- **Updates** (ADR 0029): the worker checks the latest release hourly; a superuser requests an
+  update or a restore in the portal; the host updater (outside the containers, with the Docker
+  socket) verifies the signature, backs up, switches the pinned digest and rolls back on its
+  own when the new version does not become healthy.
 
 ## 5. Code structure
 
@@ -158,8 +167,8 @@ import-linter enforces these arrows in CI (ADR 0005):
 ```mermaid
 flowchart LR
     subgraph domain [app.domain]
-        service[BookingService · AdminService · ApiAccessService]
-        ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider"}}
+        service[BookingService · AdminService · ApiAccessService · UpdateService]
+        ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider ·<br/>ReleaseSource"}}
         service --> ports
     end
 
@@ -170,6 +179,7 @@ flowchart LR
     videoad[adapters.webex_meetings<br/>WebexMeetings]
     wxccad[adapters.wxcc<br/>WxccTasks]
     idpad[adapters.oidc<br/>OidcIdentityProvider]
+    releasead[adapters.releases<br/>GitHubReleases]
 
     clock -.implements.-> ports
     uow -.implements.-> ports
@@ -178,6 +188,7 @@ flowchart LR
     videoad -.implements.-> ports
     wxccad -.implements.-> ports
     idpad -.implements.-> ports
+    releasead -.implements.-> ports
 
 ```
 
@@ -205,6 +216,7 @@ same commit and rollback behaviour as the SQL one.
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
 | Cap on open direct calls, place in line, usual wait (ADR 0026) | `app/domain/direct_queue.py` |
+| Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/cli.py`, `scripts/updater/` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
@@ -629,6 +641,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0026 | Cap on open direct calls per group; queue feedback from our own data |
 | 0027 | Staffing blocks with an agent count, including zero, instead of opening hours |
 | 0028 | Provider-neutral SMS gateway; Webex Connect as one adapter |
+| 0029 | Updates started from the admin portal, carried out by a signed-image host updater with rollback |
 
 ## 12. Status and roadmap
 
@@ -648,6 +661,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |
 | ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
+| ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |

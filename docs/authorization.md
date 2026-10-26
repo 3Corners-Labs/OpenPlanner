@@ -17,6 +17,7 @@ their claim and those organisations' groups, group admin in the groups of their 
 | Manage organisations (`organisation.manage`) | Portal | yes | – | – |
 | Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | yes | – | – |
 | Manage API clients (`api_clients.manage`) | Portal | yes | – | – |
+| Update the installation (`system.update`) | Portal | yes | – | – |
 | View audit log (`audit.view`) | Organisation | yes | yes | – |
 | Manage integrations and secrets (`integrations.manage`) | Organisation | yes | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | yes | – | – |
