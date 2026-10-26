@@ -1,7 +1,8 @@
 # 0027. Staffing blocks with an agent count, including zero, instead of opening hours
 
-Status: proposed (2026-10-26), requested by the product owner. Builds on HANDOVER B5 ("capacity
-is a counter") and ADR 0025; related to ADR 0026 (direct-call cap).
+Status: accepted (2026-10-26) by the product owner, who chose labels per block, the terms
+*bezetting / tijdblok / aantal medewerkers* and the full rename (phase C). Builds on HANDOVER
+B5 ("capacity is a counter") and ADR 0025; related to ADR 0026 (direct-call cap).
 
 ## Context
 
@@ -99,10 +100,11 @@ The current model works against that view:
 - Phase C touches many files without changing behaviour. Merging it while other PRs are open
   causes conflicts, so it is planned for a quiet moment on main.
 
-## Open points for the product owner
+## Choices made on acceptance
 
-1. Labels per block (decision 3): wanted, or are 0-blocks without a name enough?
-2. Terms: *bezetting / tijdblok / aantal medewerkers*, or the team's own words (for example
-   *agentslots*, *dienstblok*)?
-3. Phase C (renaming code and tables): do it, or keep the old code names behind the new
-   screen texts?
+The proposal listed three open points; the product owner decided on 2026-10-26:
+
+1. **Labels per block: yes** (decision 3), delivered in phase A (column) and B (screens).
+2. **Terms: *bezetting / tijdblok / aantal medewerkers*** (en: *staffing / block / number of
+   agents*), as in the table of decision 1, not the alternative "agentslots".
+3. **Rename code and tables: yes** (phase C), as in the table of decision 1.
