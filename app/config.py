@@ -10,6 +10,9 @@ from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
+AGENT_API_PREFIX = "/api/agent/v1"
+"""Where the machine API for contact-center bots is mounted (ADR 0023)."""
+
 
 class Settings(BaseSettings):
     """Typed configuration. Each field maps to the upper-case environment variable.
@@ -95,6 +98,12 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     rate_limit_bookings: str = "10/hour"
     rate_limit_reads: str = "60/minute"
+
+    # Machine API for contact-center bots (ADR 0023). Off: the routes do not exist. On: the
+    # superuser still switches it on in the admin portal and registers each client there.
+    agent_api_enabled: bool = False
+    rate_limit_agent_tokens: str = "10/minute"
+    rate_limit_agent_calls: str = "120/minute"
 
     @model_validator(mode="after")
     def _production_requirements(self) -> "Settings":

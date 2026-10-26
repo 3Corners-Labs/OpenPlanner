@@ -8,6 +8,7 @@ code (ADR 0014).
 from dataclasses import dataclass
 
 from app.domain.authorization import (
+    API_SCOPES,
     CITIZEN_ACTIONS,
     LEVELS,
     MATRIX,
@@ -17,6 +18,7 @@ from app.domain.authorization import (
 )
 from app.i18n import Translator
 from app.web.authz_labels import (
+    API_SCOPE_LABELS,
     CITIZEN_LABELS,
     CONDITION_LABELS,
     LEVEL_LABELS,
@@ -42,7 +44,7 @@ def matrix_rows() -> list[MatrixRow]:
 
 
 def render_markdown(translator: Translator, locale: str = "en") -> str:
-    """Return ``docs/authorization.md``: the admin matrix and the citizen actions."""
+    """Return ``docs/authorization.md``: the admin matrix, citizen actions and API scopes."""
     _ = translator.bind(locale)
     roles = list(Role)
     lines = [
@@ -81,4 +83,17 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
             f"| {_(CITIZEN_LABELS[action.key])} (`{action.key}`) "
             f"| {_(CONDITION_LABELS[action.condition])} |"
         )
+    lines += [
+        "",
+        "## Machines (API clients)",
+        "",
+        "Contact-center bots never get a role (ADR 0023). The superuser registers each one as",
+        "an API client of one organisation, optionally narrowed to some of its groups, with",
+        "the scopes below. There is no superuser equivalent for machines.",
+        "",
+        "| Scope | Level |",
+        "|---|---|",
+    ]
+    for scope, level in API_SCOPES.items():
+        lines.append(f"| {_(API_SCOPE_LABELS[scope])} (`{scope}`) | {_(LEVEL_LABELS[level])} |")
     return "\n".join(lines) + "\n"

@@ -16,6 +16,7 @@ their claim and those organisations' groups, group admin in the groups of their 
 | View rights matrix (`matrix.view`) | Portal | yes | yes | yes |
 | Manage organisations (`organisation.manage`) | Portal | yes | – | – |
 | Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | yes | – | – |
+| Manage API clients (`api_clients.manage`) | Portal | yes | – | – |
 | View audit log (`audit.view`) | Organisation | yes | yes | – |
 | Manage integrations and secrets (`integrations.manage`) | Organisation | yes | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | yes | – | – |
@@ -40,3 +41,13 @@ confirmation email and on the change deadline (the group's dispatch lead).
 | View own appointment (`citizen.booking_view`) | With the management link from the confirmation |
 | Move own appointment (`citizen.booking_change`) | With the management link, until the task goes to the queue |
 | Cancel own appointment (`citizen.booking_cancel`) | With the management link, until the task goes to the queue |
+
+## Machines (API clients)
+
+Contact-center bots never get a role (ADR 0023). The superuser registers each one as
+an API client of one organisation, optionally narrowed to some of its groups, with
+the scopes below. There is no superuser equivalent for machines.
+
+| Scope | Level |
+|---|---|
+| Read free times (`availability:read`) | Group |

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} – {{ _("agent_docs.title") }}{% endblock %}
+{% block content %}
+<h1>{{ _("agent_docs.title") }}</h1>
+<p>{{ _("agent_docs.lead", version=version) }}</p>
+
+<section aria-labelledby="auth-heading">
+  <h2 id="auth-heading">{{ _("agent_docs.auth.title") }}</h2>
+  <p>{{ _("agent_docs.auth.text") }}</p>
+  <pre><code>POST {{ token_url }}
+Authorization: Basic base64(client_id:client_secret)
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials</code></pre>
+  <p>{{ _("agent_docs.auth.use") }}</p>
+  <pre><code>Authorization: Bearer opa_…</code></pre>
+</section>
+
+<section aria-labelledby="scopes-heading">
+  <h2 id="scopes-heading">{{ _("agent_docs.scopes.title") }}</h2>
+  <dl>
+    {% for name, description in scopes %}
+    <dt><code>{{ name }}</code></dt>
+    <dd>{{ description }}</dd>
+    {% endfor %}
+  </dl>
+</section>
+
+<section aria-labelledby="endpoints-heading">
+  <h2 id="endpoints-heading">{{ _("agent_docs.endpoints.title") }}</h2>
+  {% for operation in operations %}
+  <article aria-labelledby="op-{{ loop.index }}">
+    <h3 id="op-{{ loop.index }}"><code>{{ operation.method }} {{ operation.path }}</code></h3>
+    <p><strong>{{ operation.summary }}</strong></p>
+    {% if operation.description %}<p>{{ operation.description }}</p>{% endif %}
+    {% if operation.secured %}<p>{{ _("agent_docs.endpoints.bearer") }}</p>{% endif %}
+    {% if operation.parameters %}
+    <table>
+      <caption>{{ _("agent_docs.endpoints.parameters") }}</caption>
+      <thead><tr><th scope="col">{{ _("agent_docs.endpoints.name") }}</th><th scope="col">{{ _("agent_docs.endpoints.in") }}</th><th scope="col">{{ _("agent_docs.endpoints.required") }}</th><th scope="col">{{ _("agent_docs.endpoints.description") }}</th></tr></thead>
+      <tbody>
+        {% for parameter in operation.parameters %}
+        <tr><th scope="row"><code>{{ parameter.name }}</code></th><td>{{ parameter.where }}</td><td>{% if parameter.required %}{{ _("agent_docs.yes") }}{% else %}{{ _("agent_docs.no") }}{% endif %}</td><td>{{ parameter.description }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    <table>
+      <caption>{{ _("agent_docs.endpoints.responses") }}</caption>
+      <thead><tr><th scope="col">{{ _("agent_docs.endpoints.status") }}</th><th scope="col">{{ _("agent_docs.endpoints.description") }}</th></tr></thead>
+      <tbody>
+        {% for status, description in operation.responses %}
+        <tr><th scope="row">{{ status }}</th><td>{{ description }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+  {% endfor %}
+</section>
+
+<p><a href="openapi.json">{{ _("agent_docs.spec_link") }}</a></p>
+{% endblock %}

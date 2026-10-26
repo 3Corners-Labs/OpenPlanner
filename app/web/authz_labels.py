@@ -5,7 +5,7 @@ check that every one exists in Dutch and English.
 """
 
 from app.domain.audit import Outcome
-from app.domain.authorization import Level, Permission, Role
+from app.domain.authorization import ApiScope, Level, Permission, Role
 
 ROLE_LABELS: dict[Role, str] = {
     Role.SUPERUSER: "authz.role.superuser",
@@ -36,6 +36,11 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.TEXTS_MANAGE: "authz.permission.texts_manage",
     Permission.REMINDERS_MANAGE: "authz.permission.reminders_manage",
     Permission.BOOKINGS_VIEW: "authz.permission.bookings_view",
+    Permission.API_CLIENTS_MANAGE: "authz.permission.api_clients_manage",
+}
+
+API_SCOPE_LABELS: dict[ApiScope, str] = {
+    ApiScope.AVAILABILITY_READ: "authz.api_scope.availability_read",
 }
 
 CITIZEN_LABELS: dict[str, str] = {

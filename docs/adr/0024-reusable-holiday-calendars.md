@@ -48,7 +48,7 @@ the possibility to override.
 - One action per year by the superuser keeps every inheriting group correct; the group
   page lists the coming year's holidays with their state, so a group admin sees what
   citizens will get.
-- Existing data does not change: no organisation has a calendar after migration 0014, and
+- Existing data does not change: no organisation has a calendar after migration 0015, and
   existing exceptions keep working. Groups that closed holidays by hand can remove those
   exceptions once their organisation follows a calendar (both together do no harm).
 - Global calendar changes are audited with organisation and group empty, so only the

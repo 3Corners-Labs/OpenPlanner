@@ -19,6 +19,10 @@ so what a list shows is exactly what a route allows.
 
 Citizens never log in. Their rights depend on holding a management link and on the change
 deadline; ``CITIZEN_ACTIONS`` documents them next to the admin matrix.
+
+Machines (contact-center bots, ADR 0023) never get a role either. An API client holds OAuth
+scopes (``API_SCOPES``) within one organisation, optionally narrowed to some of its groups;
+``decide_client`` is its counterpart of ``decide``.
 """
 
 from collections.abc import Iterable
@@ -61,6 +65,7 @@ class Permission(StrEnum):
     TEXTS_MANAGE = "texts.manage"
     REMINDERS_MANAGE = "reminders.manage"
     BOOKINGS_VIEW = "bookings.view"
+    API_CLIENTS_MANAGE = "api_clients.manage"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -80,6 +85,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.TEXTS_MANAGE: Level.GROUP,
     Permission.REMINDERS_MANAGE: Level.GROUP,
     Permission.BOOKINGS_VIEW: Level.GROUP,
+    Permission.API_CLIENTS_MANAGE: Level.GLOBAL,
 }
 
 _EVERY_ADMIN = frozenset(
@@ -131,6 +137,18 @@ CITIZEN_ACTIONS: tuple[CitizenAction, ...] = (
 )
 
 
+class ApiScope(StrEnum):
+    """OAuth scopes of the machine API (ADR 0023), granted per API client by the superuser."""
+
+    AVAILABILITY_READ = "availability:read"
+
+
+API_SCOPES: dict[ApiScope, Level] = {
+    ApiScope.AVAILABILITY_READ: Level.GROUP,
+}
+"""Every API scope with the level it applies to; documented next to the admin matrix."""
+
+
 class Reason(StrEnum):
     """Why a decision was made; logged and audited, never shown with internal detail."""
 
@@ -168,6 +186,24 @@ class Principal:
     roles: frozenset[Role]
     organisations: frozenset[str]
     groups: frozenset[str]
+
+
+@dataclass(frozen=True)
+class ClientGrant:
+    """What an API client may reach (ADR 0023).
+
+    Attributes:
+        client_id: Public identifier of the client; used in logs and audit.
+        organisation: Slug of the one organisation the client belongs to.
+        groups: Slugs of the groups it is narrowed to; empty means every group of the
+            organisation.
+        scopes: The OAuth scopes it holds.
+    """
+
+    client_id: str
+    organisation: str
+    groups: frozenset[str]
+    scopes: frozenset[ApiScope]
 
 
 @dataclass(frozen=True)
@@ -245,6 +281,28 @@ def decide(principal: Principal, permission: Permission, target: Target) -> Deci
         and Role.GROUP_ADMIN in roles
         and target.group in principal.groups
     ):
+        return Decision(True, Reason.GROUP)
+    return Decision(False, Reason.OUT_OF_SCOPE)
+
+
+def decide_client(grant: ClientGrant, api_scope: ApiScope, target: Target) -> Decision:
+    """Decide whether an API client may use ``api_scope`` on ``target``.
+
+    The organisation must match; a group must also be one of the client's groups when it is
+    narrowed to some. There is no superuser equivalent for machines.
+
+    Raises:
+        ValueError: If the target's level does not match the scope (a programming error).
+    """
+    if target.level is not API_SCOPES[api_scope]:
+        raise ValueError(f"{api_scope} needs a {API_SCOPES[api_scope]} level target")
+    if api_scope not in grant.scopes:
+        return Decision(False, Reason.NOT_PERMITTED)
+    if target.organisation != grant.organisation:
+        return Decision(False, Reason.OUT_OF_SCOPE)
+    if not grant.groups:
+        return Decision(True, Reason.ORGANISATION)
+    if target.group in grant.groups:
         return Decision(True, Reason.GROUP)
     return Decision(False, Reason.OUT_OF_SCOPE)
 
