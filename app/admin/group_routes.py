@@ -636,7 +636,6 @@ def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
             "time",
             form.text("opens") or "09:00",
             error=form.error_for("opens"),
-            attributes={"step": "300"},
         ),
         Field(
             "closes",
@@ -644,7 +643,6 @@ def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
             "time",
             form.text("closes") or "12:00",
             error=form.error_for("closes"),
-            attributes={"step": "300"},
         ),
         Field(
             "capacity",
@@ -840,7 +838,6 @@ def _exception_fields(form: FormData, locale: RequestLocale) -> list[Field]:
             hint=_("admin.field.only_with_hours"),
             error=form.error_for("opens"),
             required=False,
-            attributes={"step": "300"},
         ),
         Field(
             "closes",
@@ -849,7 +846,6 @@ def _exception_fields(form: FormData, locale: RequestLocale) -> list[Field]:
             form.text("closes"),
             error=form.error_for("closes"),
             required=False,
-            attributes={"step": "300"},
         ),
         Field(
             "capacity",

@@ -19,8 +19,8 @@ const WEEKDAYS = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zat
 async function addAllDayHours(page: Page): Promise<void> {
   for (const day of WEEKDAYS) {
     await page.getByLabel('Dag', { exact: true }).selectOption({ label: day });
-    await page.getByLabel('Van', { exact: true }).fill('00:00');
-    await page.getByLabel('Tot', { exact: true }).fill('23:55');
+    await page.getByLabel('Van uu:mm', { exact: true }).fill('00:00');
+    await page.getByLabel('Tot uu:mm', { exact: true }).fill('23:55');
     await page.getByLabel('Gelijktijdige gesprekken').fill('1');
     await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
     await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
