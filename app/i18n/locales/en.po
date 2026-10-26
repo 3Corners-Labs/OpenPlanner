@@ -1568,13 +1568,13 @@ msgid "admin.holidays.keep_open"
 msgstr "Open anyway"
 
 msgid "admin.holidays.keep_open_label"
-msgstr "Open as usual on {name} ({day})"
+msgstr "Open anyway on {name} ({day})"
 
 msgid "admin.holidays.close"
 msgstr "Close again"
 
 msgid "admin.holidays.close_label"
-msgstr "Closed again on {name} ({day})"
+msgstr "Close again on {name} ({day})"
 
 msgid "admin.holidays.see_exceptions"
 msgstr "See exceptions"

@@ -1,6 +1,7 @@
 """Holiday screens (ADR 0022): superuser calendars, organisation choice, group override."""
 
 import re
+from html import unescape
 
 import httpx
 
@@ -199,3 +200,22 @@ async def test_cross_site_holiday_changes_are_refused(site: Site) -> None:
 
     assert response.status_code == 403
     assert "<td>Koningsdag</td>" not in (await site.client.get(CALENDAR)).text
+
+
+_LABELLED_BUTTON = re.compile(r'<button[^>]*aria-label="([^"]+)"[^>]*>([^<]+)</button>')
+
+
+async def test_button_labels_contain_their_visible_text(site: Site) -> None:
+    # WCAG 2.5.3 (label in name): speech users say what they see ("Toch open").
+    await _fill_and_assign(site)
+    await site.client.post(f"{GROUP}/2026-01-01/open", headers=SAME_ORIGIN)
+    pages = [(await site.client.get(path)).text for path in (GROUP, f"{CALENDAR}?year=2026")]
+
+    buttons = [match for page in pages for match in _LABELLED_BUTTON.findall(page)]
+    assert {visible.strip() for _, visible in buttons} >= {
+        "Toch open",
+        "Weer sluiten",
+        "Verwijderen",
+    }
+    for label, visible in buttons:
+        assert unescape(visible).strip().lower() in unescape(label).lower(), (label, visible)
