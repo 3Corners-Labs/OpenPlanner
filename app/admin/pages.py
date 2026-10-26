@@ -43,6 +43,12 @@ NAVIGATION = (
     NavItem(
         "admin.nav.integrations", "/admin/integrations", Permission.INTEGRATIONS_MANAGE, "settings"
     ),
+    NavItem(
+        "admin.nav.organisations",
+        "/admin/organisations",
+        Permission.ORGANISATION_MANAGE,
+        "organisation",
+    ),
     NavItem("admin.nav.branding", "/admin/branding", Permission.BRANDING_MANAGE, "palette"),
     NavItem("admin.nav.closures", "/admin/closures", Permission.ORGANISATION_CLOSURE, "alert"),
 )
@@ -59,14 +65,21 @@ class NavView:
 
 
 def _is_current(request: Request, item: NavItem) -> bool:
-    """Return whether ``item`` is the current section; group pages belong to the overview."""
+    """Return whether ``item`` is the current section.
+
+    Group pages belong to the overview; an organisation's branding page to branding, its
+    other pages to organisations.
+    """
     path = request.url.path
     organisation_page = path.startswith("/admin/organisations/")
+    branding = organisation_page and path.endswith("/branding")
+    closure = organisation_page and path.endswith("/closure")
     return (
         path == item.href
         or (item.href == "/admin/" and path.startswith("/admin/groups"))
-        or (item.href == "/admin/branding" and organisation_page and path.endswith("/branding"))
-        or (item.href == "/admin/closures" and organisation_page and path.endswith("/closure"))
+        or (item.href == "/admin/branding" and branding)
+        or (item.href == "/admin/closures" and closure)
+        or (item.href == "/admin/organisations" and organisation_page and not (branding or closure))
     )
 
 

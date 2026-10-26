@@ -3,7 +3,7 @@
 Every message uses one fixed layout (HTML plus plain text); only text blocks come from the
 i18n catalogues. Placeholders are filled by the safe formatter in ``app.i18n``. The message
 carries the first name, date, time, team and the management link; nothing else. Messages
-about an emergency closure (ADR 0021) add the closure's notice: plain text an admin wrote,
+about an emergency closure (ADR 0022) add the closure's notice: plain text an admin wrote,
 escaped like every other value and never a template.
 """
 

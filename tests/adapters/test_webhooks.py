@@ -103,3 +103,33 @@ def test_webex_events_map_to_call_events_without_names() -> None:
     assert "Agent" not in repr(host)
     assert parse_webex({"resource": "recordings", "event": "created", "data": {}}) is None
     assert parse_webex({"resource": "meetings", "event": "started", "data": "x"}) is None
+
+
+def _participant(event: str, **data: object) -> dict[str, object]:
+    return {
+        "id": "webhook-1",
+        "resource": "meetingParticipants",
+        "event": event,
+        "data": {"id": "m-1_I_7_p-9", "meetingId": "m-1", **data},
+    }
+
+
+def test_webex_event_key_identifies_one_event_without_personal_data() -> None:
+    joined = parse_webex(_participant("joined", joinedTime="2026-01-05T08:01:00Z", email="a@x.nl"))
+    replay = parse_webex(_participant("joined", joinedTime="2026-01-05T08:01:00Z", email="a@x.nl"))
+    left = parse_webex(_participant("left", leftTime="2026-01-05T08:20:00Z"))
+    rejoined = parse_webex(_participant("joined", joinedTime="2026-01-05T08:21:00Z"))
+    no_id = parse_webex(
+        {"resource": "meetingParticipants", "event": "joined", "data": {"meetingId": "m-1"}}
+    )
+
+    assert joined is not None
+    assert replay is not None
+    assert left is not None
+    assert rejoined is not None
+    assert no_id is not None
+    assert joined.event_key == replay.event_key
+    assert len({joined.event_key, left.event_key, rejoined.event_key}) == 3
+    assert len(joined.event_key) == 64
+    assert "a@x.nl" not in joined.event_key
+    assert no_id.event_key == ""  # nothing to deduplicate on

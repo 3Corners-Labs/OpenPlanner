@@ -842,6 +842,13 @@ body.admin {
   background: var(--adm-surface-muted);
 }
 
+.day__add {
+  display: inline-block;
+  min-height: 24px;
+  margin-top: 0.6rem;
+  padding: 0.25rem 0;
+}
+
 .windows {
   display: flex;
   flex-direction: column;
@@ -1079,7 +1086,7 @@ body.admin {
   text-decoration: underline;
 }
 
-/* --- Emergency closure (ADR 0021) --------------------------------------------------------- */
+/* --- Emergency closure (ADR 0022) --------------------------------------------------------- */
 
 .admin .form-grid .field:has(> textarea) {
   grid-column: 1 / -1;

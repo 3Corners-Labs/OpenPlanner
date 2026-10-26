@@ -27,6 +27,8 @@ _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 MAX_NAME_LENGTH = 200
 MAX_SLUG_LENGTH = 64
+RESERVED_SLUGS = frozenset({"new"})
+"""Slugs that are admin paths (``/admin/groups/new``, ``/admin/organisations/new``)."""
 MAX_CAPACITY = 1000
 """Upper bound per window; protects against typos such as 1000000."""
 
@@ -51,6 +53,19 @@ def _invalid(field: str) -> DomainError:
     return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
 
 
+def _check_name_and_slug(name: str, slug: str) -> None:
+    """Validate the display name and URL slug shared by organisations and groups.
+
+    Raises:
+        DomainError: ``invalid_configuration`` for ``name`` (empty, too long, control
+            characters) or ``slug`` (not lowercase words joined by hyphens, too long).
+    """
+    if not name.strip() or len(name) > MAX_NAME_LENGTH or _CONTROL_CHARS.search(name):
+        raise _invalid("name")
+    if len(slug) > MAX_SLUG_LENGTH or not _SLUG.fullmatch(slug):
+        raise _invalid("slug")
+
+
 class PhoneMode(StrEnum):
     """Whether the booking form asks for a phone number (per group, HANDOVER B15)."""
 
@@ -61,13 +76,21 @@ class PhoneMode(StrEnum):
 
 @dataclass(frozen=True)
 class Organisation:
-    """A client organisation; owns groups, branding and integration settings."""
+    """A client organisation; owns groups, branding and integration settings.
+
+    The slug never changes once created: admin URLs and the organisation claim of the
+    identity provider (ADR 0013) refer to it.
+    """
 
     id: int
     name: str
     slug: str
     default_locale: str = "nl"
     branding: Branding = Branding()
+
+    def __post_init__(self) -> None:
+        """Validate name and slug; the locale is checked against the catalogues by the service."""
+        _check_name_and_slug(self.name, self.slug)
 
 
 @dataclass(frozen=True)
@@ -116,14 +139,7 @@ class Group:
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""
-        if (
-            not self.name.strip()
-            or len(self.name) > MAX_NAME_LENGTH
-            or _CONTROL_CHARS.search(self.name)
-        ):
-            raise _invalid("name")
-        if len(self.slug) > MAX_SLUG_LENGTH or not _SLUG.fullmatch(self.slug):
-            raise _invalid("slug")
+        _check_name_and_slug(self.name, self.slug)
         try:
             ZoneInfo(self.timezone)
         except (ZoneInfoNotFoundError, ValueError) as exc:

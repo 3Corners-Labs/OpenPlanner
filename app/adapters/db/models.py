@@ -11,7 +11,7 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
-                         │  └───* closures 1──* closure_notices (ADR 0021)
+                         │  └───* closures 1──* closure_notices (ADR 0022)
                          └──* slots 1──* bookings 1──* jobs
                                          └──? closure (the one that suspended it)
 """
@@ -239,7 +239,7 @@ class BookingRow(Base):
 
 
 class ClosureRow(Base):
-    """An emergency closure of a group (ADR 0021); ``ends_at`` NULL until it is lifted."""
+    """An emergency closure of a group (ADR 0022); ``ends_at`` NULL until it is lifted."""
 
     __tablename__ = "closures"
 
@@ -360,3 +360,15 @@ class IntegrationCredentialRow(Base):
     nonce: Mapped[bytes] = mapped_column(LargeBinary)
     ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class WebhookEventRow(Base):
+    """A Webex event key seen recently, so a replay is recorded once; no personal data."""
+
+    __tablename__ = "webhook_events"
+
+    source: Mapped[str] = mapped_column(String(16), primary_key=True)
+    event_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (Index("ix_webhook_events_seen_at", "seen_at"),)

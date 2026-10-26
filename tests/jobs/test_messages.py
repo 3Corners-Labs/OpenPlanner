@@ -114,7 +114,7 @@ def test_join_link_only_for_groups_with_video(composer: MessageComposer) -> None
     assert "/join" not in cancelled.text
 
 
-# --- emergency closure (ADR 0021) ----------------------------------------------------------
+# --- emergency closure (ADR 0022) ----------------------------------------------------------
 
 CLOSURE = Closure(
     1,
