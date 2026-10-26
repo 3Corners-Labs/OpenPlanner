@@ -1,0 +1,6 @@
+# Reviewed false positives (gitleaks fingerprint per line). Only test values belong here;
+# a real secret is rotated and removed from history instead. Each entry names its reason.
+# Test SMTP password "secret" and test form value; marked gitleaks:allow in 6dbc599 (PR #19),
+# but the earlier commit stays in history and is scanned by `gitleaks git --all`.
+436c23bcea2c5ddf86de1ac32716a0941926591e:tests/adapters/test_smtp.py:generic-api-key:100
+436c23bcea2c5ddf86de1ac32716a0941926591e:tests/admin/test_channel_routes.py:generic-api-key:14
