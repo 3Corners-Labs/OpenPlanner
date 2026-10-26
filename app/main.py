@@ -34,6 +34,7 @@ from app.domain.branding_service import BrandingService
 from app.domain.call_service import CallService
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
+from app.domain.organisations import OrganisationService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.services import BookingService
@@ -113,6 +114,9 @@ def create_app(
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
+        app.state.organisation_service = OrganisationService(
+            uow, clock, app.state.admin_service, app.state.translator.locales
+        )
         wired = integrations or build_integrations(settings, app.state.engine, http, clock)
         app.state.integrations = wired
         app.state.call_service = CallService(

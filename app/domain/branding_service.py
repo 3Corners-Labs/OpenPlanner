@@ -14,7 +14,7 @@ from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.branding import Branding, Logo
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.lookups import organisation_by_slug
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, Organisation
 

@@ -37,6 +37,7 @@ class State:
     organisations: dict[int, Organisation] = field(default_factory=dict)
     booking_events: dict[int, list[BookingEvent]] = field(default_factory=dict)
     call_status: dict[int, CallStatus] = field(default_factory=dict)
+    webhook_events: dict[tuple[str, str], datetime] = field(default_factory=dict)
     audit: list[AuditEvent] = field(default_factory=list)
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
@@ -104,6 +105,18 @@ class InMemoryTransaction:
 
     async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
         return self.state.organisations.get(organisation_id)
+
+    async def add_organisation(self, organisation: Organisation) -> Organisation:
+        stored = replace(organisation, id=self._new_id())
+        self.state.organisations[stored.id] = stored
+        self.state.organisation_slugs[stored.id] = stored.slug
+        return stored
+
+    async def save_organisation(self, organisation: Organisation) -> None:
+        current = self.state.organisations[organisation.id]
+        self.state.organisations[organisation.id] = replace(
+            current, name=organisation.name, default_locale=organisation.default_locale
+        )
 
     async def save_branding(self, organisation_id: int, branding: Branding) -> None:
         organisation = self.state.organisations[organisation_id]
@@ -242,6 +255,18 @@ class InMemoryTransaction:
 
     async def get_booking_by_task(self, task_id: str) -> Booking | None:
         return next((b for b in self.state.bookings.values() if b.wxcc_task_id == task_id), None)
+
+    async def claim_webhook_event(self, source: str, key: str, at: datetime) -> bool:
+        if (source, key) in self.state.webhook_events:
+            return False
+        self.state.webhook_events[(source, key)] = at
+        return True
+
+    async def forget_webhook_events(self, before: datetime) -> int:
+        old = [k for k, at in self.state.webhook_events.items() if at < before]
+        for key in old:
+            del self.state.webhook_events[key]
+        return len(old)
 
     async def add_booking_event(self, event: BookingEvent) -> None:
         self.state.booking_events.setdefault(event.booking_id, []).append(event)

@@ -61,28 +61,29 @@ test('group admin manages opening hours and exceptions, not the settings', async
   await expectNoAxeViolations(page);
   await expectForbidden(page, `${GROUP}/settings`);
 
-  // Opening hours: add this browser's Saturday block, see it, remove it again.
+  // Opening hours: Saturday's own add link preselects the day; add, see and remove it again.
   await page.goto(`${GROUP}/hours`);
   await expectNoAxeViolations(page);
-  await page.getByLabel('Dag', { exact: true }).selectOption({ label: 'zaterdag' });
+  await page.getByRole('link', { name: 'Openingstijd op zaterdag toevoegen' }).press('Enter');
+  await expect(page.getByLabel('Dag', { exact: true })).toHaveValue('5');
   await page.getByLabel('Van', { exact: true }).fill(mine.opens);
   await page.getByLabel('Tot', { exact: true }).fill(mine.closes);
   await page.getByLabel('Gelijktijdige gesprekken').fill('2');
-  await page.getByRole('button', { name: 'Blok toevoegen' }).press('Enter');
+  await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
   const block = `${mine.opens}–${mine.closes}`;
   const saturday = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'zaterdag' }) });
   await expect(saturday).toContainText(block);
   await expectNoAxeViolations(page);
-  await page.getByRole('button', { name: `Blok zaterdag ${block} verwijderen` }).press('Enter');
+  await page.getByRole('button', { name: `Openingstijd zaterdag ${block} verwijderen` }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Verwijderd.');
   await expect(saturday).not.toContainText(block);
 
-  // An overlapping block is explained and linked to its field.
+  // Overlapping opening hours are explained and linked to its field.
   await page.getByLabel('Dag', { exact: true }).selectOption({ label: 'maandag' });
   await page.getByLabel('Van', { exact: true }).fill('10:00');
   await page.getByLabel('Tot', { exact: true }).fill('11:00');
-  await page.getByRole('button', { name: 'Blok toevoegen' }).press('Enter');
+  await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
   const summary = page.getByRole('alert');
   await expect(summary).toContainText('Deze tijden overlappen');
   await expectNoAxeViolations(page);
@@ -130,7 +131,7 @@ test('organisation admin creates a group and gives it opening hours', async ({ p
   await page.getByLabel('Van', { exact: true }).fill('09:00');
   await page.getByLabel('Tot', { exact: true }).fill('10:00');
   await page.getByLabel('Gelijktijdige gesprekken').fill('3');
-  await page.getByRole('button', { name: 'Blok toevoegen' }).press('Enter');
+  await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
 
   await tabs(page).getByRole('link', { name: 'Overzicht' }).click();

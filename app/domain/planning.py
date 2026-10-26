@@ -26,6 +26,7 @@ from app.domain.holiday_service import effective_schedule
 from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import (
+    RESERVED_SLUGS,
     Group,
     Organisation,
     PhoneMode,
@@ -34,9 +35,6 @@ from app.domain.scheduling import (
     validate_schedule,
     windows_on,
 )
-
-RESERVED_SLUGS = frozenset({"new"})
-"""Slugs that are admin paths (``/admin/groups/new``), so no group may use them."""
 
 TIME_GRID_FIELDS = ("slot_minutes", "timezone")
 """Settings that move existing slots; frozen while confirmed bookings lie ahead."""
@@ -199,7 +197,7 @@ class PlanningService:
     async def preview(self, principal: Principal, slug: str, days: int = 14) -> list[PreviewDay]:
         """Return the slots the schedule offers from today on, for ``days`` days.
 
-        Only days with slots are returned. Holidays count (ADR 0021); bookings, notice and
+        Only days with slots are returned. Holidays count (ADR 0022); bookings, notice and
         horizon are left out: this shows what the opening hours produce, not what is free.
         """
         require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))

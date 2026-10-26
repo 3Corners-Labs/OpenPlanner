@@ -76,3 +76,23 @@ def test_production_webex_needs_secrets_and_the_encryption_key() -> None:
     )
     assert configured.video_configured
     assert not configured.dispatch_configured
+
+
+def test_webhooks_can_use_their_own_https_base_url() -> None:
+    production = {
+        "environment": "prod",
+        "management_token_key": "m" * 40,
+        "session_secret": "s" * 40,
+        "public_base_url": "https://afspraak.example.nl",
+    }
+    with pytest.raises(ValueError, match="WEBHOOK_BASE_URL"):
+        Settings(**production, webhook_base_url="http://tunnel.example.nl")  # type: ignore[arg-type]
+
+    assert Settings(**production).webhook_base == "https://afspraak.example.nl"  # type: ignore[arg-type]
+    dev = Settings(
+        environment="dev",
+        public_base_url="http://127.0.0.1:8000",
+        webhook_base_url="https://abc.trycloudflare.com/",
+    )
+    assert dev.webhook_base == "https://abc.trycloudflare.com"
+    assert dev.public_base_url == "http://127.0.0.1:8000"  # OIDC redirect and links unchanged

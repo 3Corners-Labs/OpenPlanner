@@ -1,4 +1,4 @@
-"""Holiday calendars: closed days configured once by the superuser, reused everywhere (ADR 0021).
+"""Holiday calendars: closed days configured once by the superuser, reused everywhere (ADR 0022).
 
 A ``HolidayCalendar`` (for example "Nationale feestdagen") holds ``Holiday`` dates. Who uses
 which calendar is decided at two levels, and the most specific choice wins:
@@ -24,7 +24,7 @@ from datetime import date, timedelta
 from enum import StrEnum
 
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.scheduling import ScheduleOverride, is_valid_name, is_valid_slug
+from app.domain.scheduling import ScheduleOverride, check_name, check_name_and_slug
 
 MIN_YEAR = 2000
 MAX_YEAR = 2100
@@ -50,10 +50,7 @@ class HolidayCalendar:
 
     def __post_init__(self) -> None:
         """Validate slug and name."""
-        if not is_valid_slug(self.slug):
-            raise _invalid("slug")
-        if not is_valid_name(self.name):
-            raise _invalid("name")
+        check_name_and_slug(self.name, self.slug)
 
 
 @dataclass(frozen=True)
@@ -73,8 +70,7 @@ class Holiday:
 
     def __post_init__(self) -> None:
         """Validate the name."""
-        if not is_valid_name(self.name):
-            raise _invalid("name")
+        check_name(self.name)
 
 
 class HolidaySource(StrEnum):

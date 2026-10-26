@@ -1,4 +1,4 @@
-"""Holiday use cases: maintain calendars, choose them per organisation and group (ADR 0021).
+"""Holiday use cases: maintain calendars, choose them per organisation and group (ADR 0022).
 
 Every operation asks ``AdminService.authorize`` first and is audited in the same transaction,
 with keys of what changed (``calendar.add``, ``holiday.open``), never names or dates.
@@ -30,7 +30,8 @@ from app.domain.holidays import (
     closures,
     with_holidays,
 )
-from app.domain.lookups import group_by_slug, organisation_by_slug
+from app.domain.lookups import group_by_slug
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, Organisation, ScheduleOverride, ScheduleRule
 

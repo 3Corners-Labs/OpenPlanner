@@ -1,19 +1,38 @@
-"""``ContactCenterDispatcher`` on the WxCC Create Task API v2, work items (ADR 0018).
+"""``ContactCenterDispatcher`` on the WxCC Create Task API v2, work items (ADR 0018, 0021).
 
 The work item goes to the group's business address and channel; the flow behind the entry
 point chooses the queue from ``flowSettings.openplannerGroup``. ``workItemData`` carries the
 booking reference, first name, start time, group name, meeting link and kind; nothing else
 (CLAUDE.md). The asset's schema in Control Hub must define exactly these keys (runbook).
+
+A cancelled booking's task is first marked with a Task Messages v2 append
+(``cjp:task_write``) that sets ``kind`` to ``cancelled`` with only the booking reference, so
+the agent sees it without the first name or the meeting link; then End Task v1 (``cjp:user``;
+there is no v2 End Task) is tried as a secondary step (ADR 0021).
 """
 
 import uuid
 from typing import Any
+from urllib.parse import quote
 
 from app.adapters.webex_auth import AuthorizedClient
 from app.domain.calls import WorkItem
 from app.domain.ports import Clock, IntegrationError
 
 ROUTING_KEY = "openplannerGroup"
+
+WORK_ITEM_FIELDS = (
+    "bookingReference",
+    "firstName",
+    "startTime",
+    "groupName",
+    "meetingLink",
+    "kind",
+)
+"""The ``workItemData`` keys OpenPlanner sends; the asset schema must define exactly these."""
+REQUIRED_FIELDS = frozenset({"bookingReference"})
+"""Keys that may be required in the asset schema: a cancellation message carries only these
+and ``kind``."""
 
 
 def task_body(item: WorkItem, alias_id: str, timestamp_ms: int) -> dict[str, Any]:
@@ -42,8 +61,23 @@ def task_body(item: WorkItem, alias_id: str, timestamp_ms: int) -> dict[str, Any
     }
 
 
+def cancellation_body(reference: str, alias_id: str, timestamp_ms: int) -> dict[str, Any]:
+    """Return the Task Messages v2 request that marks a work item cancelled."""
+    return {
+        "mediaType": "workItem",
+        "channelParams": {
+            "type": "work-item-form",
+            "message": {
+                "aliasId": alias_id,
+                "workItemData": {"bookingReference": reference, "kind": "cancelled"},
+                "timestamp": timestamp_ms,
+            },
+        },
+    }
+
+
 class WxccTasks:
-    """Creates work items.
+    """Creates, ends and annotates work items.
 
     Args:
         client: Authorised API client.
@@ -68,3 +102,21 @@ class WxccTasks:
         if not isinstance(task_id, str):
             raise IntegrationError("unexpected_response", retryable=False)
         return task_id
+
+    async def end_task(self, task_id: str) -> None:
+        """End the task (``POST /v1/tasks/{taskId}/end``)."""
+        await self._client.request("POST", self._task_url("v1", task_id, "end"), ok=(200, 202, 204))
+
+    async def mark_cancelled(self, task_id: str, reference: str) -> None:
+        """Append the cancellation to the task (``POST /v2/tasks/{taskId}/messages``)."""
+        timestamp = int(self._clock.now().timestamp() * 1000)
+        await self._client.request(
+            "POST",
+            self._task_url("v2", task_id, "messages"),
+            json=cancellation_body(reference, str(uuid.uuid4()), timestamp),
+            ok=(200, 202),
+        )
+
+    def _task_url(self, version: str, task_id: str, action: str) -> str:
+        """Return a task action URL; the id is escaped so it cannot change the path."""
+        return f"{self._base}/{version}/tasks/{quote(task_id, safe='')}/{action}"

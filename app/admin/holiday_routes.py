@@ -1,4 +1,4 @@
-"""Admin routes for holiday calendars (ADR 0021).
+"""Admin routes for holiday calendars (ADR 0022).
 
 Every route depends on exactly one ``RequirePermission``; forms and changes are ``fresh``.
 Changes are POST forms with the Fetch Metadata check, answered with a redirect and a
