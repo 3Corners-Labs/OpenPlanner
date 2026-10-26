@@ -119,9 +119,9 @@ Admin: `GET /admin/organisations`, `GET /admin/organisations/new`, `POST /admin/
 | Injection | Group name or text with HTML in emails | Jinja2 autoescape for the HTML part; plain-text part separate | `tests/jobs/test_messages.py::test_html_is_escaped_and_semantic` |
 | Information disclosure | Personal data in calendar files | `.ics` contains team, times and the management link only | `test_calendar_attachment` |
 
-## Flow: message channels, SMS reminders and message texts (ADR 0022)
+## Flow: message channels, SMS reminders and message texts (ADR 0022, 0028)
 
-Superusers configure SMTP and the Webex Connect SMS service per organisation at
+Superusers configure SMTP and the SMS gateway (provider, today Webex Connect) per organisation at
 `/admin/organisations/{org}/channels`; organisation admins add reminder rules per group at
 `/admin/groups/{slug}/reminders`; group admins edit message texts at
 `/admin/groups/{slug}/messages/{locale}`. The worker sends through the organisation's sender.
@@ -129,7 +129,7 @@ Superusers can send a test email through that same sender to an address they typ
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
-| Information disclosure | SMTP password or Connect service key leaks through the UI, logs or the database | Write-only fields (always empty, `autocomplete=new-password`); sealed with AES-256-GCM under a per-record name; never returned by the `Transaction` port; audit names fields only | `tests/admin/test_channel_routes.py::test_smtp_is_saved_and_the_password_never_shown`, `tests/adapters/db/test_messaging_queries.py::test_channel_settings_round_trip_with_sealed_secret` |
+| Information disclosure | SMTP password or SMS API key leaks through the UI, logs or the database | Write-only fields (always empty, `autocomplete=new-password`); sealed with AES-256-GCM under a per-record name; never returned by the `Transaction` port; audit names fields only | `tests/admin/test_channel_routes.py::test_smtp_is_saved_and_the_password_never_shown`, `tests/adapters/db/test_messaging_queries.py::test_channel_settings_round_trip_with_sealed_secret` |
 | Information disclosure | SMTP password sent unencrypted | A username requires STARTTLS or TLS, in the admin portal and for the `SMTP_*` fallback (the services refuse to start) | `tests/domain/test_channel_settings.py::test_invalid_smtp_settings_name_the_field`, `tests/adapters/test_senders.py::test_fallback_mail_refuses_a_login_in_clear_text` |
 | Tampering | A sealed secret copied to another organisation or channel | The record name is the associated data; a moved ciphertext fails to open | `test_a_secret_cannot_be_moved_to_another_channel` |
 | Elevation of privilege | An organisation admin changes where mail or SMS of the organisation goes | `integrations.manage` is superuser only; route and service both check | `tests/admin/test_authorization_matrix.py`, `test_org_admin_may_not_configure_channels_handover_section_6` |
@@ -138,8 +138,10 @@ Superusers can send a test email through that same sender to an address they typ
 | Spoofing / injection | Header injection through the test recipient | Same address check as sender addresses (no line breaks or `<>",;`) | `test_a_test_email_needs_a_valid_address`, `test_a_test_email_needs_a_valid_recipient` |
 | Information disclosure | The SMTP server's answer (which can name the recipient) reaches a log, job error or page | The adapter raises only a code (`unauthorized`, `unreachable`, …) without the original exception; the portal explains each code in its own words; the audit names the code, never the address | `tests/adapters/test_smtp.py::test_failures_are_reported_as_codes_without_details`, `test_a_failed_test_email_says_why`, `test_a_failed_test_email_returns_and_audits_only_the_code` |
 | Tampering | SSRF or downgrade through the SMS API host | https only, host name check, no credentials, query or fragment | `tests/domain/test_channel_settings.py::test_invalid_sms_settings_name_the_field` |
+| Information disclosure | A stored SMS API key or SMTP password is sent to a new provider or host after a settings change | The stored secret is kept only for the same provider and host (`secret_binding`); otherwise it must be entered again (ADR 0028) | `tests/domain/test_channel_service.py::test_a_stored_secret_never_follows_a_new_host` |
+| Tampering | An unknown SMS provider is posted to route messages elsewhere | The provider must be a value of `SmsProvider`; each value has exactly one adapter | `tests/admin/test_channel_routes.py::test_an_unknown_sms_provider_is_refused`, `tests/adapters/test_senders.py::test_every_sms_provider_has_an_adapter` |
 | Information disclosure | A group text pulls in other data (`{x.__class__}`, `{email}`) | Only placeholders from the block's allow-list; the formatter has no attribute access | `test_an_unknown_placeholder_is_refused_and_kept_in_the_form`, `test_used_placeholders` |
-| Information disclosure | Phone number or text in logs or errors | The adapter logs a random correlation ID; response bodies are neither logged nor raised | `tests/adapters/test_webex_connect_sms.py::test_refusals_map_to_integration_errors` |
+| Information disclosure | Phone number or text in logs or errors | Every SMS adapter logs a random correlation ID only; response bodies are neither logged nor raised | `tests/adapters/test_webex_connect_sms.py::test_refusals_map_to_integration_errors` |
 | Denial of service | Reminder spam to citizens | At most five rules per group, 5 minutes to 30 days, one per channel and offset | `tests/domain/test_messaging_service.py::test_at_most_five_reminders` |
 | Repudiation | Who changed channels, reminders or texts | Audit events with field names or rule keys, never values or texts | `test_saving_smtp_with_password_is_audited_without_values`, `test_add_and_remove_an_sms_reminder_is_audited` |
 | Elevation of privilege | Texts or reminders of another organisation's group | Group-level permission on the group slug; the service authorises again | `test_texts_of_another_organisation_are_out_of_reach`, `test_reminders_need_reminders_manage_on_the_group` |

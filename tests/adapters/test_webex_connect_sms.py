@@ -1,4 +1,4 @@
-"""Webex Connect SMS adapter: the request is the SMS API v1 contract (HANDOVER B6, ADR 0022)."""
+"""Webex Connect SMS adapter: the request is the SMS API v1 contract (ADR 0022, 0028)."""
 
 import json
 from collections.abc import Callable
@@ -6,8 +6,8 @@ from collections.abc import Callable
 import httpx
 import pytest
 
+from app.adapters.sms import SmsGatewayConfig
 from app.adapters.webex_connect_sms import (
-    ConnectSmsConfig,
     WebexConnectSmsSender,
     content_type,
     sms_body,
@@ -15,7 +15,7 @@ from app.adapters.webex_connect_sms import (
 from app.domain.channels import ChannelKind
 from app.domain.ports import IntegrationError, OutboundMessage
 
-CONFIG = ConnectSmsConfig("https://api.us.webexconnect.io/", "service-key", "GemDemo", "31")
+CONFIG = SmsGatewayConfig("https://api.us.webexconnect.io/", "service-key", "GemDemo", "31")
 MESSAGE = OutboundMessage(ChannelKind.SMS, "0612345678", "", "Herinnering: maandag om 09:00")
 
 
