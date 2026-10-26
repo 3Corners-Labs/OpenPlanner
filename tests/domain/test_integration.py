@@ -203,6 +203,31 @@ async def test_timeline_needs_bookings_view_on_the_group(service: IntegrationSer
         await service.timeline(GROUP_ADMIN, 999)
 
 
+@pytest.mark.parametrize(
+    ("day", "first", "last"),
+    [
+        # 25 October 2026 has 25 hours: 00:00 CEST is 22:00 UTC, 23:30 CET is 22:30 UTC.
+        (date(2026, 10, 25), datetime(2026, 10, 24, 22, 0), datetime(2026, 10, 25, 22, 30)),
+        # 29 March 2026 has 23 hours: 00:00 CET is 23:00 UTC, 23:30 CEST is 21:30 UTC.
+        (date(2026, 3, 29), datetime(2026, 3, 28, 23, 0), datetime(2026, 3, 29, 21, 30)),
+    ],
+)
+async def test_day_overview_covers_the_whole_local_day_across_dst(
+    service: IntegrationService,
+    uow: InMemoryUnitOfWork,
+    day: date,
+    first: datetime,
+    last: datetime,
+) -> None:
+    before, after = first - timedelta(minutes=30), last + timedelta(minutes=30)
+    for booking_id, start in enumerate((before, first, last, after), start=200):
+        uow.state.bookings[booking_id] = _booking(id=booking_id, start=start.replace(tzinfo=UTC))
+
+    overview = await service.day_overview(GROUP_ADMIN, "demo", day)
+
+    assert [row.booking.id for row in overview] == [201, 202]
+
+
 def test_join_window_opens_fifteen_minutes_before_and_closes_after_the_end() -> None:
     from app.domain.calls import JoinState, join_state
 

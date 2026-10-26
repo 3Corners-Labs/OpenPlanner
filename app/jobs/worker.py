@@ -22,6 +22,7 @@ from app.domain.admin import AdminService
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, MessageSender
 from app.i18n import Translator, load_catalogues
+from app.i18n.dates import configure_clock
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from app.keys import management_token_key
@@ -60,6 +61,7 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
         stop: Set by a signal handler (or a test) to end the loop after the current iteration.
         clock: Source of the current time.
     """
+    configure_clock(settings.time_format)
     engine = create_engine(settings.database_url)
     sender = mail_sender(settings)
     http = httpx.AsyncClient(timeout=15.0)

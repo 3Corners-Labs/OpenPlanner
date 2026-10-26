@@ -50,6 +50,18 @@ The image refuses to start in production (`ENVIRONMENT` defaults to `prod`) with
   for everyone.
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 
+## Time zones and clock format
+
+Each group has an IANA time zone (default `Europe/Amsterdam`), chosen from a list in the
+group settings. Times are stored in UTC and converted only for display, so summer and winter
+time need no action: the rules come from the pinned `tzdata` package, which Renovate updates
+when IANA publishes a change. A day in the agenda runs from local midnight to local midnight
+(23 hours in March, 25 hours in October).
+
+`TIME_FORMAT` sets how clock times are written in the admin portal, booking pages and messages:
+`24h` (default, `15:05`), `12h` (`3:05 PM`) or `locale` (24 hours in Dutch, 12 hours in English).
+Restart `web` and `worker` after changing it.
+
 ## Admin portal login (PingFederate)
 
 Without `OIDC_DISCOVERY_URL` the admin portal is disabled; citizens' pages work regardless.

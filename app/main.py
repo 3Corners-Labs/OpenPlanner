@@ -38,6 +38,7 @@ from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.services import BookingService
 from app.i18n import Translator, load_catalogues
+from app.i18n.dates import configure_clock
 from app.keys import management_token_key, session_secret
 from app.logging import configure_logging
 from app.web.call_labels import agent_start_label
@@ -96,6 +97,7 @@ def create_app(
     clock = clock or SystemClock()
     token_key = management_token_key(settings)
     http = httpx.AsyncClient(timeout=10.0)
+    configure_clock(settings.time_format)
     configure_rate_limits(
         enabled=settings.rate_limit_enabled,
         bookings=settings.rate_limit_bookings,
