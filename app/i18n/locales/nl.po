@@ -1568,13 +1568,13 @@ msgid "admin.holidays.keep_open"
 msgstr "Toch open"
 
 msgid "admin.holidays.keep_open_label"
-msgstr "Op {name} ({day}) gewoon open"
+msgstr "Toch open op {name} ({day})"
 
 msgid "admin.holidays.close"
 msgstr "Weer sluiten"
 
 msgid "admin.holidays.close_label"
-msgstr "Op {name} ({day}) weer gesloten"
+msgstr "Weer sluiten op {name} ({day})"
 
 msgid "admin.holidays.see_exceptions"
 msgstr "Bekijk uitzonderingen"
