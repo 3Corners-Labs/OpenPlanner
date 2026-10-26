@@ -269,8 +269,9 @@ async def create_group(
 
 @dataclass(frozen=True)
 class DayView:
-    """One weekday with its opening windows."""
+    """One weekday (0 = Monday) with its opening windows."""
 
+    weekday: int
     name: str
     windows: list["WindowView"]
 
@@ -334,7 +335,7 @@ def _week(schedule: Schedule, locale: RequestLocale) -> list[DayView]:
                     validity,
                 )
             )
-        days.append(DayView(name, windows))
+        days.append(DayView(weekday, name, windows))
     return days
 
 
@@ -568,6 +569,8 @@ async def save_settings(
 
 # --- opening hours --------------------------------------------------------------------------
 
+WEEKDAYS = frozenset(str(i) for i in range(7))
+
 
 def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
     """Return the inputs of the add-window form."""
@@ -654,8 +657,10 @@ ManageGroup = Annotated[
 
 @router.get("/groups/{slug}/hours", response_class=HTMLResponse)
 async def hours(request: Request, locale: Locale, slug: str, context: ManageGroup) -> HTMLResponse:
-    """Show the weekly opening hours."""
-    return await _hours_response(request, locale, context, FormData({}, locale.gettext), 200)
+    """Show the weekly opening hours; ``?weekday=`` preselects the day of the add form."""
+    weekday = request.query_params.get("weekday", "")
+    values = {"weekday": weekday} if weekday in WEEKDAYS else {}
+    return await _hours_response(request, locale, context, FormData(values, locale.gettext), 200)
 
 
 @router.post("/groups/{slug}/hours", response_class=HTMLResponse)
@@ -664,7 +669,7 @@ async def add_hours(
 ) -> Response:
     """Add a weekly opening window."""
     form = await read_form(request, locale)
-    weekday = form.choice("weekday", {str(i) for i in range(7)})
+    weekday = form.choice("weekday", WEEKDAYS)
     opens, closes = form.clock("opens"), form.clock("closes")
     capacity = form.integer("capacity")
     valid_from, valid_to = form.optional_day("valid_from"), form.optional_day("valid_to")

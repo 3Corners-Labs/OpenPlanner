@@ -46,6 +46,21 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/audit": {"/admin/audit": statuses(200, 200, 403, 200, 403)},
     # Integrations and secrets: superuser only.
     "GET /admin/integrations": {"/admin/integrations": statuses(200, 403, 403, 403, 403)},
+    # Organisations: create and edit, superuser only (HANDOVER §6).
+    "GET /admin/organisations": {"/admin/organisations": statuses(200, 403, 403, 403, 403)},
+    "GET /admin/organisations/new": {
+        "/admin/organisations/new": statuses(200, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations": {"/admin/organisations": statuses(422, 403, 403, 403, 403)},
+    "GET /admin/organisations/{org}": {
+        "/admin/organisations/demo": statuses(200, 403, 403, 403, 403),
+        "/admin/organisations/andere": statuses(200, 403, 403, 403, 403),
+        "/admin/organisations/nope": statuses(404, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}": {
+        "/admin/organisations/demo": statuses(422, 403, 403, 403, 403),
+        "/admin/organisations/nope": statuses(404, 403, 403, 403, 403),
+    },
     # Branding per organisation: superuser only (HANDOVER §6), also for the own organisation.
     "GET /admin/branding": {"/admin/branding": statuses(200, 403, 403, 403, 403)},
     "GET /admin/organisations/{org}/branding": {
@@ -113,7 +128,7 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/exceptions/999999/delete": statuses(404, 404, 404, 403, 403),
         "/admin/groups/andere-team/exceptions/999999/delete": statuses(404, 403, 403, 404, 403),
     },
-    # Emergency closure of one group (ADR 0021): the team's own admins and organisation admins.
+    # Emergency closure of one group (ADR 0022): the team's own admins and organisation admins.
     "GET /admin/groups/{slug}/closure": {
         "/admin/groups/demo/closure": statuses(200, 200, 200, 403, 403),
         "/admin/groups/andere-team/closure": statuses(200, 403, 403, 200, 403),

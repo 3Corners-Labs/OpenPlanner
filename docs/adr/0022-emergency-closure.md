@@ -1,4 +1,4 @@
-# 0021. Emergency closure: appointments on hold, citizens informed
+# 0022. Emergency closure: appointments on hold, citizens informed
 
 Status: accepted (2026-10-25), decided by the product owner. The retention exception needs
 confirmation by the privacy officer in the DPIA (open point O7).
@@ -23,7 +23,8 @@ nor personal data are deleted, so citizens do not have to book and fill in every
    once (`organisation.closure`); groups that are already closed are left as they are. Each
    group gets its own closure, so it can be handled and lifted separately afterwards.
 3. **Suspend, never delete.** Confirmed bookings inside the closure get status `suspended`:
-   reminders and the WxCC task are removed, the meeting stays (so a reinstated booking keeps
+   reminders and the WxCC task are removed (an already created work item is ended, as for a
+   cancellation), the meeting stays (so a reinstated booking keeps
    its link), the place in the slot stays taken, and the citizen gets an email with the notice
    and the management link. A suspended booking has no change deadline: the citizen can choose
    a new time or cancel it, without entering their details again.
@@ -43,9 +44,9 @@ nor personal data are deleted, so citizens do not have to book and fill in every
 
 - The retention exception is visible in `docs/dataflow.md` and must be confirmed in the DPIA.
   An open-ended closure keeps personal data until it is lifted; the closure page says so.
-- A booking within its dispatch lead when the closure starts may already have a WxCC task;
-  the booking is suspended anyway and the agent sees it as not going ahead in the timeline.
+- A booking within its dispatch lead when the closure starts may already have a WxCC work
+  item; it is ended like the work item of a cancelled booking (`end_wxcc_task`).
 - Mail is the only channel for now (SMS follows with ADR 0009's SMS adapter); the notice on the
   group page and the management page reaches those who do not read their mail.
-- Downgrading migration 0012 turns suspended bookings into cancelled ones and purges them at
+- Downgrading migration 0013 turns suspended bookings into cancelled ones and purges them at
   once, so no personal data outlives the closure that kept it.

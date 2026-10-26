@@ -11,7 +11,8 @@ ones are listed in ``PUBLIC_ADMIN_PATHS`` and the route-coverage test checks bot
     GET  /admin/matrix       matrix.view      the whole matrix (same data as the docs)
     GET  /admin/audit        audit.view       audit events in scope
 
-Groups and their planning live in ``group_routes``.
+Groups and their planning live in ``group_routes``, organisations in
+``organisation_routes`` and their branding in ``branding_routes``.
 """
 
 import hmac
@@ -27,7 +28,13 @@ from fastapi import APIRouter, Depends, FastAPI, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.integrations import Integrations
-from app.admin import branding_routes, call_routes, closure_routes, group_routes
+from app.admin import (
+    branding_routes,
+    call_routes,
+    closure_routes,
+    group_routes,
+    organisation_routes,
+)
 from app.admin.authz import (
     AccessDenied,
     AdminContext,
@@ -116,7 +123,7 @@ COUNT_LABELS: dict[str, str] = {
     "bookings": "admin.audit.detail.bookings",
     "notified": "admin.audit.detail.notified",
 }
-"""Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0021)."""
+"""Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0022)."""
 
 OUTCOME_TONES: dict[Outcome, str] = {
     Outcome.SUCCESS: "success",
@@ -418,7 +425,7 @@ async def integrations(
     def moment(value: datetime | None) -> str | None:
         return _moment(value, tz, locale.code) if value else None
 
-    base = settings.public_base_url.rstrip("/")
+    base = settings.webhook_base
     view = IntegrationView(
         service_app=wired.video is not None,
         access_expires=moment(health.access_expires_at) if health else None,
@@ -472,4 +479,5 @@ def register_admin(app: FastAPI) -> None:
     app.include_router(group_routes.router)
     app.include_router(call_routes.router)
     app.include_router(branding_routes.router)
+    app.include_router(organisation_routes.router)
     app.include_router(closure_routes.router)

@@ -1,4 +1,4 @@
-"""Closure wording shared by citizen and admin pages: the banner as people read it (ADR 0021)."""
+"""Closure wording shared by citizen and admin pages: the banner as people read it (ADR 0022)."""
 
 from dataclasses import dataclass
 from datetime import datetime

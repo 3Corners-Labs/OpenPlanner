@@ -1,4 +1,4 @@
-"""Emergency closures and suspended bookings in SQLite (ADR 0021)."""
+"""Emergency closures and suspended bookings in SQLite (ADR 0022)."""
 
 from datetime import timedelta
 
@@ -123,4 +123,4 @@ async def test_add_and_delete_pending_jobs_by_type(engine: AsyncEngine) -> None:
         )
         types = [row[0] for row in rows]
 
-    assert types == ["send_suspension", "send_closure_update", "purge_pii"]
+    assert types == ["end_wxcc_task", "send_suspension", "send_closure_update", "purge_pii"]

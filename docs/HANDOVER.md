@@ -78,7 +78,7 @@ Regels:
 
 **Wijzigen/annuleren.** `GET /b/{token}` → toont boeking → `POST /b/{token}/cancel` of `/reschedule` → jobs opnieuw → mail.
 
-**Noodsluiting (ADR 0021, besluit product owner 2026-10-25).** Beheer sluit een groep (of alle groepen van een organisatie) per direct of vanaf een moment, met of zonder einde, met een toelichting in NL en EN → geen boekingen of direct bellen in die periode, melding op `/g/{slug}` → bevestigde afspraken in de periode worden `suspended` (niet verwijderd): herinneringen en WxCC-taak vervallen, burger krijgt mail met toelichting en link om zelf een nieuwe tijd te kiezen of te annuleren → beheer kan updates mailen, afspraken verzetten, weer bevestigen of annuleren (ook in bulk) → gegevens van nog opgeschorte afspraken worden uiterlijk 30 dagen na het einde van de sluiting gepurged (afwijking op §7, bevestigen in DPIA).
+**Noodsluiting (ADR 0022, besluit product owner 2026-10-25).** Beheer sluit een groep (of alle groepen van een organisatie) per direct of vanaf een moment, met of zonder einde, met een toelichting in NL en EN → geen boekingen of direct bellen in die periode, melding op `/g/{slug}` → bevestigde afspraken in de periode worden `suspended` (niet verwijderd): herinneringen en WxCC-taak vervallen, burger krijgt mail met toelichting en link om zelf een nieuwe tijd te kiezen of te annuleren → beheer kan updates mailen, afspraken verzetten, weer bevestigen of annuleren (ook in bulk) → gegevens van nog opgeschorte afspraken worden uiterlijk 30 dagen na het einde van de sluiting gepurged (afwijking op §7, bevestigen in DPIA).
 
 **Niet opgepakt na X minuten (open punt O2).** Voorstel: Connect meldt via webhook `task.abandoned` terug; dienst stuurt sms/mail "we bellen u terug" en zet status `no_show_agent`. X per groep instelbaar, standaard 10 minuten.
 
@@ -159,6 +159,7 @@ Totaal ca. 30 werkdagen voor één ontwikkelaar, plus reviewtijd van een tweede 
 | O8 | Toegankelijkheid van het videogesprek: Nederlandse live-ondertiteling in Webex beschikbaar? Tolk NGT als derde deelnemer (extra gastlink) en een vinkje daarvoor op het formulier? | dienstverlening + contactcenterbeheer |
 | O9 | "Nu direct een gesprek starten" naast inplannen (zoals 24sessions bood): technisch een directe taak in de wachtrij zonder slot, maar vraagt realtime zicht op bezetting en wachttijd uit WxCC. Fase 2 of helemaal niet? | dienstverlening |
 | O10 | Wie is de menselijke reviewer per PR (§12), en wie voert de externe pentest en het toegankelijkheidsonderzoek uit? Zonder antwoord geen livegang. | opdrachtgever |
+| O11 | Idee, niet voor nu: een API op de planning waarmee de WxCC AI Agent (chat en spraak) afspraken kan opvragen, boeken, verzetten en annuleren. Bot, spraakherkenning en tekst-naar-spraak doet Webex CC; wij leveren alleen de API. De burger identificeert zich met het telefoonnummer uit de boeking en bevestigt via een code of link per e-mail/sms, die doorverwijst naar de bestaande beheerpagina. Zo hoeft er geen PII naar het AI-platform. Open: service-authenticatie van de bot, rate limiting op telefoonnummer (raden), en of WxCC AI Agent-acties en de licentie (O6) dit toelaten. | dienstverlening + technisch |
 
 ## 12. Borging van kwaliteit en veiligheid bij AI-ondersteund bouwen
 

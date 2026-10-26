@@ -495,7 +495,7 @@ msgid "admin.matrix.no"
 msgstr "Nee"
 
 msgid "admin.matrix.citizen"
-msgstr "Burgers (zonder inloggen)"
+msgstr "Deelnemers (zonder inloggen)"
 
 msgid "admin.matrix.action"
 msgstr "Handeling"
@@ -729,7 +729,7 @@ msgid "admin.new_group.title"
 msgstr "Nieuwe groep"
 
 msgid "admin.new_group.lead"
-msgstr "Een groep is een team met één wachtrij in Webex Contact Center. Na het aanmaken stelt u de openingstijden in."
+msgstr "Een groep is een team met één wachtrij in het contactcenter. Na het aanmaken stelt u de openingstijden in."
 
 msgid "admin.new_group.create"
 msgstr "Groep aanmaken"
@@ -771,13 +771,13 @@ msgid "admin.field.horizon_days"
 msgstr "Vooruit boeken (dagen)"
 
 msgid "admin.field.horizon_days_hint"
-msgstr "Hoe ver vooruit burgers kunnen boeken, 1 tot 366 dagen."
+msgstr "Hoe ver vooruit deelnemers kunnen boeken, 1 tot 366 dagen."
 
 msgid "admin.field.dispatch_lead_minutes"
 msgstr "Doorzetten naar de wachtrij (minuten vooraf)"
 
 msgid "admin.field.dispatch_lead_minutes_hint"
-msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de burger. 0 tot 60."
+msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de deelnemer. 0 tot 60."
 
 msgid "admin.field.phone_mode"
 msgstr "Telefoonnummer op het formulier"
@@ -797,7 +797,7 @@ msgid "admin.field.capacity"
 msgstr "Gelijktijdige gesprekken"
 
 msgid "admin.field.capacity_hint"
-msgstr "Hoeveel burgers op hetzelfde moment kunnen beginnen."
+msgstr "Hoeveel deelnemers in hetzelfde tijdslot kunnen boeken."
 
 msgid "admin.field.valid_from"
 msgstr "Geldig vanaf"
@@ -870,7 +870,7 @@ msgid "admin.form.error.day"
 msgstr "Kies een datum vanaf vandaag."
 
 msgid "admin.form.error.overlap"
-msgstr "Deze tijden overlappen met een bestaand blok op die dag."
+msgstr "Deze tijden overlappen met een bestaande openingstijd op die dag."
 
 msgid "admin.form.error.override_conflict"
 msgstr "Voor deze datum bestaat al een uitzondering die hiermee botst."
@@ -879,7 +879,7 @@ msgid "admin.hours.title"
 msgstr "Openingstijden per week"
 
 msgid "admin.hours.lead"
-msgstr "Per dag één of meer blokken. Burgers zien alleen tijdsloten die helemaal in een blok passen."
+msgstr "Per dag één of meer openingstijden. Elke openingstijd wordt verdeeld in tijdsloten van de gespreksduur; deelnemers boeken een tijdslot."
 
 msgid "admin.hours.manage"
 msgstr "Openingstijden beheren"
@@ -894,16 +894,22 @@ msgid "admin.hours.validity"
 msgstr "{start} t/m {end}"
 
 msgid "admin.hours.add"
-msgstr "Blok toevoegen"
+msgstr "Openingstijd toevoegen"
 
 msgid "admin.hours.add_lead"
-msgstr "Bestaande afspraken blijven staan; het nieuwe blok geldt voor nieuwe afspraken."
+msgstr "Bestaande afspraken blijven staan; de nieuwe openingstijd geldt voor nieuwe afspraken."
 
 msgid "admin.hours.add_button"
-msgstr "Blok toevoegen"
+msgstr "Openingstijd toevoegen"
+
+msgid "admin.hours.add_link"
+msgstr "Toevoegen"
+
+msgid "admin.hours.add_label"
+msgstr "Openingstijd op {day} toevoegen"
 
 msgid "admin.hours.remove_label"
-msgstr "Blok {day} {time} verwijderen"
+msgstr "Openingstijd {day} {time} verwijderen"
 
 msgid "admin.exceptions.upcoming"
 msgstr "Komende uitzonderingen"
@@ -942,7 +948,7 @@ msgid "admin.exceptions.remove_label"
 msgstr "Uitzondering op {day} verwijderen"
 
 msgid "admin.preview.title"
-msgstr "Zo zien burgers het"
+msgstr "Zo zien deelnemers het"
 
 msgid "admin.preview.lead"
 msgstr "De komende twee weken, vóór boekingen en aanlooptijd."
@@ -972,7 +978,7 @@ msgid "admin.no"
 msgstr "Nee"
 
 msgid "admin.settings.integrations"
-msgstr "Koppelingen: Webex en Webex Contact Center"
+msgstr "Koppelingen: video en contactcenter"
 
 msgid "admin.settings.integrations_lead"
 msgstr "Leeg laten zolang de koppeling niet is ingericht; afspraken werken dan zonder videogesprek of taak."
@@ -999,7 +1005,7 @@ msgid "admin.field.direct_call_enabled"
 msgstr "Direct gesprek starten"
 
 msgid "admin.field.direct_call_enabled_hint"
-msgstr "Burgers kunnen binnen de openingstijden meteen een gesprek starten."
+msgstr "Deelnemers kunnen binnen de openingstijden meteen een gesprek starten."
 
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Niet opgepakt na (minuten)"
@@ -1023,7 +1029,7 @@ msgid "admin.group.video"
 msgstr "Videogesprek (Webex)"
 
 msgid "admin.group.wxcc"
-msgstr "Webex Contact Center"
+msgstr "Contactcenter"
 
 msgid "admin.group.direct_call"
 msgstr "Direct gesprek"
@@ -1149,13 +1155,13 @@ msgid "call.event.meeting_deleted"
 msgstr "Videomeeting verwijderd"
 
 msgid "call.event.join_page_opened"
-msgstr "Burger opende de deelnamepagina"
+msgstr "Deelnemer opende de deelnamepagina"
 
 msgid "call.event.join_clicked"
-msgstr "Burger klikte op deelnemen"
+msgstr "Deelnemer klikte op deelnemen"
 
 msgid "call.event.task_created"
-msgstr "Taak in de WxCC-wachtrij gezet"
+msgstr "Taak in de wachtrij van het contactcenter gezet"
 
 msgid "call.event.task_failed"
 msgstr "Taak mislukt"
@@ -1212,13 +1218,13 @@ msgid "admin.agenda.time"
 msgstr "Tijd"
 
 msgid "admin.agenda.citizen"
-msgstr "Burger"
+msgstr "Deelnemer"
 
 msgid "admin.agenda.meeting"
 msgstr "Videomeeting"
 
 msgid "admin.agenda.task"
-msgstr "WxCC-taak"
+msgstr "Contactcentertaak"
 
 msgid "admin.agenda.agent"
 msgstr "Medewerker binnen"
@@ -1295,6 +1301,24 @@ msgstr "Groepen"
 msgid "join.refresh"
 msgstr "Status verversen"
 
+
+# --- WxCC work item lifecycle (ADR 0021) ---
+
+msgid "call.task.cancelled"
+msgstr "Taak geannuleerd"
+
+msgid "call.event.task_end_requested"
+msgstr "Taak beëindigen gevraagd aan WxCC"
+
+msgid "call.event.end_not_possible"
+msgstr "Taak kon niet worden beëindigd"
+
+msgid "call.event.task_marked_cancelled"
+msgstr "Taak als geannuleerd gemarkeerd"
+
+msgid "admin.booking.end_not_possible"
+msgstr "De afspraak is geannuleerd en de taak is via de v2-API als geannuleerd gemarkeerd (Soort: cancelled; zie de tijdlijn), maar WxCC liet OpenPlanner de taak niet beëindigen. Beëindig de taak in Agent Desktop als die nog openstaat."
+
 #. Branding per organisation (WP3b).
 
 msgid "authz.permission.branding_manage"
@@ -1334,7 +1358,7 @@ msgid "admin.branding.none"
 msgstr "U beheert geen huisstijl van een organisatie."
 
 msgid "admin.branding.page_lead"
-msgstr "Zo zien burgers de afspraakpagina's van deze organisatie. Het beheerportaal zelf houdt één vaste stijl."
+msgstr "Zo zien deelnemers de afspraakpagina's van deze organisatie. Het beheerportaal zelf houdt één vaste stijl."
 
 msgid "admin.branding.preview"
 msgstr "Voorbeeld"
@@ -1378,7 +1402,7 @@ msgstr "Logo uploaden"
 msgid "admin.branding.logo_remove"
 msgstr "Logo verwijderen"
 
-# Emergency closure (ADR 0021)
+# Emergency closure (ADR 0022)
 msgid "closure.banner.title_active"
 msgstr "Tijdelijk gesloten"
 
@@ -1687,3 +1711,54 @@ msgstr "Noodsluiting opheffen voor alle teams"
 
 msgid "admin.closures.lift_button"
 msgstr "Alles opheffen"
+
+msgid "admin.nav.organisations"
+msgstr "Organisaties"
+
+msgid "admin.organisations.title"
+msgstr "Organisaties"
+
+msgid "admin.organisations.lead"
+msgstr "De klantorganisaties in deze installatie. Een organisatie heeft eigen groepen, een eigen huisstijl en eigen beheerders."
+
+msgid "admin.organisations.list"
+msgstr "Alle organisaties"
+
+msgid "admin.organisations.none"
+msgstr "Er zijn nog geen organisaties."
+
+msgid "admin.organisations.branding"
+msgstr "Huisstijl"
+
+msgid "admin.organisations.branding_of"
+msgstr "Huisstijl van {name}"
+
+msgid "admin.new_organisation.title"
+msgstr "Nieuwe organisatie"
+
+msgid "admin.new_organisation.lead"
+msgstr "Na het aanmaken stelt u de huisstijl in en maken organisatiebeheerders de groepen aan."
+
+msgid "admin.new_organisation.create"
+msgstr "Organisatie aanmaken"
+
+msgid "admin.organisation.lead"
+msgstr "Naam en standaardtaal van de organisatie."
+
+msgid "admin.organisation.slug"
+msgstr "Code"
+
+msgid "admin.organisation.slug_hint"
+msgstr "Vaste code in beheeradressen en in de organisatieclaim van de inlogdienst. Kleine letters, cijfers en streepjes, bijvoorbeeld gemeente-noord."
+
+msgid "admin.organisation.slug_fixed"
+msgstr "De code verandert niet: beheeradressen en de rollen in de inlogdienst verwijzen ernaar."
+
+msgid "admin.field.default_locale"
+msgstr "Standaardtaal"
+
+msgid "admin.field.default_locale_hint"
+msgstr "De taal van pagina's en berichten als de bezoeker geen andere taal kiest."
+
+msgid "admin.form.error.default_locale"
+msgstr "Kies een van de beschikbare talen."

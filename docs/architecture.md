@@ -186,7 +186,7 @@ same commit and rollback behaviour as the SQL one.
 | Slot calculation (time zones, daylight saving) | `app/domain/availability.py` |
 | Bookings, contact validation | `app/domain/booking.py` |
 | Book, cancel, reschedule (use cases) | `app/domain/services.py` |
-| Emergency closure, bookings on hold (ADR 0021) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/web/closure_labels.py` |
+| Emergency closure, bookings on hold (ADR 0022) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/web/closure_labels.py` |
 | Which jobs, when | `app/domain/job_plan.py` |
 | Channels, reminder rules | `app/domain/channels.py` |
 | Management tokens | `app/domain/tokens.py` |
@@ -198,6 +198,7 @@ same commit and rollback behaviour as the SQL one.
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
+| Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda, booking timeline, integrations page | `app/admin/call_routes.py`, `app/admin/routes.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
@@ -210,6 +211,7 @@ same commit and rollback behaviour as the SQL one.
 | Job queue | `app/adapters/db/jobs.py` |
 | Citizen pages | `app/api/booking_pages.py`, `app/api/citizen.py`, `app/api/templates/` |
 | Slot picker: month calendar and times (ADR 0020) | `app/api/slot_picker.py`, `app/web/static/calendar.js` |
+| Organisations (superuser) | `app/domain/organisations.py`, `app/admin/organisation_routes.py` |
 | Branding per organisation (O5) | `app/domain/branding.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
 | CSRF and rate limits | `app/web/protection.py` |
 | Rendering and security headers | `app/web/templates.py`, `app/api/security_headers.py` |
@@ -391,7 +393,7 @@ flowchart LR
     dispatch --> meeting(["call<br/>from start to finish"])
     meeting --> purge["slot end + 24h<br/>purge PII"]
 
-    cancel(["cancelled"]) --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
+    cancel(["cancelled"]) --> cend["mark WxCC task cancelled (v2)<br/>then End Task (v1), ADR 0021<br/>delete meeting"] --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
 
     hold(["suspended<br/>(emergency closure)"]) --> hmail["notice mail<br/>now"]
     hmail --> resolve{"moved, reinstated<br/>or cancelled?"}
@@ -445,7 +447,7 @@ stateDiagram-v2
     confirmed --> cancelled: reschedule (old booking; a new one is confirmed)
     confirmed --> completed: after the call (WP6)
     confirmed --> no_show: task not picked up (O2)
-    confirmed --> suspended: emergency closure (ADR 0021)
+    confirmed --> suspended: emergency closure (ADR 0022)
     suspended --> confirmed: reinstate (closure over, before the dispatch lead)
     suspended --> cancelled: cancel, or move (a new booking is confirmed)
     cancelled --> [*]
@@ -526,7 +528,7 @@ The STRIDE analysis per flow, with a test for every abuse case, is in
   `bookings`; jobs, slots and logs hold IDs.
 - **Purge:** the `purge_pii` job sets them to NULL at slot end + 24 h, or 24 h after a
   cancellation. A booking on hold by an emergency closure keeps them until it is resolved, at
-  most 30 days after the closure ends (ADR 0021). The nightly sweep and alert follow in WP8.
+  most 30 days after the closure ends (ADR 0022). The nightly sweep and alert follow in WP8.
 - **What leaves the system:** mails carry the first name, date, team and the management link;
   the calendar file carries no personal data. WxCC will receive only the first name and the
   host link.
@@ -577,7 +579,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0018 | Dispatch to WxCC as work items (Create Task API v2) |
 | 0019 | Direct video call ("now") per group |
 | 0020 | Citizen calendar as progressive enhancement; branding through tokens |
-| 0021 | Emergency closure: appointments on hold, citizens informed, no deletion |
+| 0021 | Provider-neutral contact-center integration (proposed) |
+| 0022 | Emergency closure: appointments on hold, citizens informed, no deletion |
 
 ## 12. Status and roadmap
 
@@ -594,8 +597,11 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
+| WP7b+ | Organisations (create, rename, default language) for the superuser | done |
+| ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
 | WP7c–d | Texts and reminders, encrypted integration settings (O3) | planned |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
+| idea | Booking API for the WxCC AI Agent (chat and voice bots): find, book, reschedule, cancel (O11) | not planned |
 
 The open decisions (O1–O10) are listed in `docs/HANDOVER.md` §11.

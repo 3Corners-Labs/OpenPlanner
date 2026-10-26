@@ -1,4 +1,4 @@
-"""Emergency closure use cases for admins (ADR 0021).
+"""Emergency closure use cases for admins (ADR 0022).
 
 Every operation asks ``AdminService.authorize`` first (``closure.manage`` on a group,
 ``organisation.closure`` on an organisation) and records an audit event in the same locked

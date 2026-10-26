@@ -9,7 +9,7 @@ input (``aria-describedby``, error summary with anchors) and never repeats the v
     ... domain call ...  except DomainError as error: form.refusal(error)
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, tzinfo
 from urllib.parse import parse_qsl
@@ -20,6 +20,7 @@ from starlette.responses import RedirectResponse
 from app.admin.authz import AccessDenied
 from app.domain.errors import DomainError, ErrorCode
 from app.i18n import BoundGettext
+from app.i18n.dates import format_clock, format_day_compact, local_day
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
@@ -50,6 +51,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "name": "admin.form.error.name",
     "slug": "admin.form.error.slug",
     "organisation": "admin.form.error.organisation",
+    "default_locale": "admin.form.error.default_locale",
     "timezone": "admin.form.error.timezone",
     "slot_minutes": "admin.form.error.slot_minutes",
     "min_notice_minutes": "admin.form.error.min_notice_minutes",
@@ -113,6 +115,18 @@ class Option:
 
     value: str
     label: str
+
+
+def slot_options(starts: Sequence[datetime], tz: tzinfo, locale: str) -> tuple[Option, ...]:
+    """Return free start times as select options: the ISO value and ``5 jan 2026, 09:00``."""
+    return tuple(
+        Option(
+            start.isoformat(),
+            f"{format_day_compact(local_day(start, tz), locale)}, "
+            f"{format_clock(start, tz, locale)}",
+        )
+        for start in starts
+    )
 
 
 @dataclass(frozen=True)
@@ -223,7 +237,7 @@ class FormData:
         """Return whether the checkbox ``name`` was ticked."""
         return self.text(name) == "yes"
 
-    def choice(self, name: str, allowed: set[str]) -> str | None:
+    def choice(self, name: str, allowed: Set[str]) -> str | None:
         """Return the submitted value if it is one of ``allowed``; else ``None`` with an error."""
         value = self.text(name)
         if value in allowed:

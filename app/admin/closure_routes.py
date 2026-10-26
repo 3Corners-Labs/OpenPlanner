@@ -1,4 +1,4 @@
-"""Admin routes for emergency closures (ADR 0021).
+"""Admin routes for emergency closures (ADR 0022).
 
 Every route depends on exactly one ``RequirePermission``, always ``fresh``: closing a team is
 a change with impact on citizens. Changes are POST forms with the Fetch Metadata check,
@@ -33,11 +33,11 @@ from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import (
     Field,
     FormData,
-    Option,
     done_message,
     raise_refusal,
     read_form,
     redirect_done,
+    slot_options,
 )
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin, page
@@ -49,7 +49,7 @@ from app.domain.errors import DomainError
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
-from app.i18n.dates import format_clock, format_day_compact, local_day
+from app.i18n.dates import local_day
 from app.web.closure_labels import ClosureView, closure_view, moment_label
 from app.web.errors import status_for
 from app.web.locale import RequestLocale
@@ -377,14 +377,7 @@ async def _move_response(
         group.slug, today, today + timedelta(days=MOVE_DAYS)
     )
     _ = locale.gettext
-    options = tuple(
-        Option(
-            slot.start.isoformat(),
-            f"{format_day_compact(local_day(slot.start, group.tz), locale.code)}, "
-            f"{format_clock(slot.start, group.tz, locale.code)}",
-        )
-        for slot in free
-    )
+    options = slot_options([slot.start for slot in free], group.tz, locale.code)
     field = Field(
         "start",
         _("admin.closure.move_start"),
