@@ -1,6 +1,7 @@
 import pytest
 
 from app.config import Settings
+from app.i18n.dates import ClockStyle
 
 
 def test_defaults_use_sqlite_in_data_dir(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -20,6 +21,25 @@ def test_reads_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert settings.database_url == "postgresql+asyncpg://db/booking"
     assert settings.log_level == "DEBUG"
+
+
+def test_clock_times_default_to_24_hours(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TIME_FORMAT", raising=False)
+
+    assert Settings(environment="dev").time_format is ClockStyle.H24
+
+
+def test_time_format_is_read_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TIME_FORMAT", "12h")
+
+    assert Settings(environment="dev").time_format is ClockStyle.H12
+
+
+def test_rejects_unknown_time_format(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TIME_FORMAT", "am-pm")
+
+    with pytest.raises(ValueError, match="time_format"):
+        Settings(environment="dev")
 
 
 def test_rejects_unknown_log_level(monkeypatch: pytest.MonkeyPatch) -> None:

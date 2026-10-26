@@ -14,10 +14,10 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
 FROM python:3.12-slim-bookworm AS runtime
-# Debian security fix not yet in the base image (CVE-2026-84782); drop once the tag carries it.
+# CVE-2026-84782 (OpenSSL, HIGH): the base tag still ships libssl3 3.0.22-1~deb12u1.
+# Remove this layer once the python:3.12-slim-bookworm image carries deb12u2 or later.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends --only-upgrade \
-      libssl3=3.0.22-1~deb12u2 openssl=3.0.22-1~deb12u2 \
+ && apt-get install -y --no-install-recommends libssl3=3.0.22-1~deb12u2 \
  && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 app \
  && useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
@@ -28,8 +28,11 @@ COPY migrations ./migrations
 COPY app ./app
 # The data volume (SQLite database, worker heartbeat) is the only writable path.
 RUN mkdir /srv/data && chown app:app /srv/data
+# Summer and winter time come from the pinned `tzdata` package (uv.lock, Renovate), not from
+# whatever the base image happens to ship: an empty PYTHONTZPATH makes zoneinfo use only it.
 ENV PATH=/srv/.venv/bin:$PATH \
     PYTHONPATH=/srv \
+    PYTHONTZPATH="" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 USER 10001:10001

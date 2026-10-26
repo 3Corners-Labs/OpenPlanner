@@ -32,7 +32,9 @@ from app.admin import (
     api_routes,
     branding_routes,
     call_routes,
+    channel_routes,
     group_routes,
+    message_routes,
     organisation_routes,
 )
 from app.admin.authz import (
@@ -444,12 +446,17 @@ async def integrations(
         wxcc_secret=settings.wxcc_webhook_secret is not None,
     )
     groups = await admin_service(request).groups(context.principal)
+    service = channel_routes.channel_service(request)
+    channels = [
+        await service.overview(context.principal, organisation.slug)
+        for organisation in await service.organisations(context.principal)
+    ]
     return _page(
         request,
         locale,
         "admin/integrations.html",
         context.principal,
-        {"view": view, "groups": groups},
+        {"view": view, "groups": groups, "channels": channels},
     )
 
 
@@ -485,5 +492,7 @@ def register_admin(app: FastAPI) -> None:
     app.include_router(group_routes.router)
     app.include_router(call_routes.router)
     app.include_router(branding_routes.router)
+    app.include_router(channel_routes.router)
+    app.include_router(message_routes.router)
     app.include_router(organisation_routes.router)
     app.include_router(api_routes.router)
