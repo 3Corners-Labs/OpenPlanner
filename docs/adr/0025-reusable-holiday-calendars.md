@@ -57,5 +57,8 @@ the possibility to override.
 - Organisation-level "keep open" is not offered: an organisation that wants different days
   chooses another calendar (or the superuser makes one). If that turns out too coarse, an
   `organisation_holiday_open_days` table mirrors the group one.
+- An emergency closure (ADR 0024) is applied on top: availability and direct calls first take
+  the group's schedule with its holidays (`effective_schedule`), then leave out everything an
+  active closure covers. A holiday never lifts a closure, and a closure needs no holiday.
 - Holiday names are not shown to citizens yet; a closed day simply has no times. Showing
   "gesloten: Koningsdag" in the citizen calendar is a later, separate change.
