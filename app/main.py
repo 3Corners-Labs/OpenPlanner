@@ -32,6 +32,7 @@ from app.domain.admin import AdminService
 from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
 from app.domain.call_service import CallService
+from app.domain.closure_service import ClosureService
 from app.domain.integration import IntegrationService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
@@ -111,6 +112,9 @@ def create_app(
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
+        app.state.closure_service = ClosureService(
+            uow, clock, app.state.admin_service, app.state.booking_service
+        )
         wired = integrations or build_integrations(settings, app.state.engine, http, clock)
         app.state.integrations = wired
         app.state.call_service = CallService(

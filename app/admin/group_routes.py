@@ -108,6 +108,7 @@ TABS = (
     Tab("admin.tab.hours", "/hours", Permission.SCHEDULE_MANAGE, "clock"),
     Tab("admin.tab.exceptions", "/exceptions", Permission.SCHEDULE_MANAGE, "calendar"),
     Tab("admin.tab.agenda", "/agenda", Permission.BOOKINGS_VIEW, "agenda"),
+    Tab("admin.tab.closure", "/closure", Permission.CLOSURE_MANAGE, "alert"),
 )
 
 

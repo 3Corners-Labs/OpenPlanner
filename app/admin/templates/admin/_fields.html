@@ -8,6 +8,12 @@
     <option value="{{ option.value }}"{% if option.value == f.value %} selected{% endif %}>{{ option.label }}</option>
     {%- endfor %}
   </select>
+  {%- elif f.kind == "textarea" %}
+  <textarea id="{{ f.name }}" name="{{ f.name }}" rows="4"
+    {%- if f.required %} required{% endif %}
+    {%- if f.error %} aria-invalid="true"{% endif %}
+    {%- if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}
+    {%- for key, value in f.attributes.items() %} {{ key }}="{{ value }}"{% endfor %}>{{ f.value }}</textarea>
   {%- else %}
   <input id="{{ f.name }}" name="{{ f.name }}" type="{{ f.kind }}" value="{{ f.value }}"
     {%- if f.required and not f.readonly %} required{% endif %}

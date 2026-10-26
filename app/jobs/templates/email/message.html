@@ -15,6 +15,11 @@
       <dt>{{ team_label }}</dt>
       <dd>{{ group_name }}</dd>
     </dl>
+    {% if notice %}
+    <h2>{{ notice_label }}</h2>
+    {% for paragraph in notice.split("\n") if paragraph %}<p>{{ paragraph }}</p>
+    {% endfor %}
+    {% endif %}
     {% if join_url %}
     <p>{{ join_text }}</p>
     <p><a href="{{ join_url }}">{{ join_link }}</a></p>

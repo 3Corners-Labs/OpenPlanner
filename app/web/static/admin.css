@@ -664,7 +664,8 @@ body.admin {
 }
 
 .admin .field input,
-.admin .field select {
+.admin .field select,
+.admin .field textarea {
   width: 100%;
   max-width: none;
   min-height: 40px;
@@ -677,7 +678,8 @@ body.admin {
 }
 
 .admin .field input:hover,
-.admin .field select:hover {
+.admin .field select:hover,
+.admin .field textarea:hover {
   border-color: var(--adm-text);
 }
 
@@ -693,7 +695,8 @@ body.admin {
 }
 
 .admin .field--error input,
-.admin .field--error select {
+.admin .field--error select,
+.admin .field--error textarea {
   border: 2px solid var(--adm-danger);
 }
 
@@ -1074,4 +1077,21 @@ body.admin {
 .brand-preview__link {
   color: var(--booking-color-accent);
   text-decoration: underline;
+}
+
+/* --- Emergency closure (ADR 0021) --------------------------------------------------------- */
+
+.admin .form-grid .field:has(> textarea) {
+  grid-column: 1 / -1;
+}
+
+.admin .field textarea {
+  resize: vertical;
+}
+
+.admin .closure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
 }

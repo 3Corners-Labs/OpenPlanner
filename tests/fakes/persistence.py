@@ -2,7 +2,7 @@
 
 import asyncio
 import copy
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
@@ -13,7 +13,8 @@ from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsa
 from app.domain.branding import Branding, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channels import ReminderRule
-from app.domain.job_plan import PlannedJob
+from app.domain.closure import Closure
+from app.domain.job_plan import JobType, PlannedJob
 from app.domain.scheduling import (
     Group,
     GroupSummary,
@@ -39,6 +40,7 @@ class State:
     audit: list[AuditEvent] = field(default_factory=list)
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
+    closures: dict[int, Closure] = field(default_factory=dict)
     next_id: int = 1
 
 
@@ -49,6 +51,12 @@ class InMemoryTransaction:
     def _new_id(self) -> int:
         self.state.next_id += 1
         return self.state.next_id
+
+    def _in_scope(self, scope: Scope, group_id: int) -> bool:
+        group = self.state.groups.get(group_id)
+        return group is not None and scope.contains(
+            self._summary(group).organisation_slug, group.slug
+        )
 
     def _summary(self, group: Group) -> GroupSummary:
         slug = self.state.organisation_slugs.get(group.organisation_id, "org")
@@ -129,7 +137,7 @@ class InMemoryTransaction:
         return sum(
             1
             for b in self.state.bookings.values()
-            if b.group_id == group_id and b.status is BookingStatus.CONFIRMED and b.start > now
+            if b.group_id == group_id and b.holds_place and b.start > now
         )
 
     async def get_schedule_items(
@@ -189,8 +197,7 @@ class InMemoryTransaction:
     async def list_bookings(
         self, scope: Scope, group_id: int, lower: datetime, upper: datetime
     ) -> list[BookingOverview]:
-        group = self.state.groups.get(group_id)
-        if group is None or not scope.contains(self._summary(group).organisation_slug, group.slug):
+        if not self._in_scope(scope, group_id):
             return []
         found = [
             b
@@ -237,9 +244,7 @@ class InMemoryTransaction:
 
     async def count_active_bookings(self, slot_id: int) -> int:
         return sum(
-            1
-            for b in self.state.bookings.values()
-            if b.slot_id == slot_id and b.status is BookingStatus.CONFIRMED
+            1 for b in self.state.bookings.values() if b.slot_id == slot_id and b.holds_place
         )
 
     async def add_booking(self, booking: Booking) -> Booking:
@@ -261,6 +266,56 @@ class InMemoryTransaction:
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
         self.state.jobs[booking_id] = list(jobs)
+
+    async def add_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
+        self.state.jobs.setdefault(booking_id, []).extend(jobs)
+
+    async def delete_pending_jobs(self, booking_id: int, types: Collection[JobType]) -> None:
+        jobs = self.state.jobs.get(booking_id, [])
+        self.state.jobs[booking_id] = [j for j in jobs if j.type not in types]
+
+    async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
+        found = [
+            c
+            for c in self.state.closures.values()
+            if c.group_id == group_id and (c.ends_at is None or c.ends_at > now)
+        ]
+        return sorted(found, key=lambda c: c.starts_at)
+
+    async def get_closure(self, closure_id: int) -> Closure | None:
+        return self.state.closures.get(closure_id)
+
+    async def add_closure(self, closure: Closure) -> Closure:
+        stored = replace(closure, id=self._new_id())
+        self.state.closures[stored.id or 0] = stored
+        return stored
+
+    async def save_closure(self, closure: Closure) -> None:
+        self.state.closures[closure.id or 0] = closure
+
+    async def find_confirmed_bookings(
+        self, group_id: int, lower: datetime, upper: datetime | None
+    ) -> list[Booking]:
+        found = [
+            b
+            for b in self.state.bookings.values()
+            if b.group_id == group_id
+            and b.status is BookingStatus.CONFIRMED
+            and b.kind == "scheduled"
+            and lower <= b.start
+            and (upper is None or b.start < upper)
+        ]
+        return sorted(found, key=lambda b: (b.start, b.id or 0))
+
+    async def list_suspended_bookings(self, scope: Scope, group_id: int) -> list[Booking]:
+        if not self._in_scope(scope, group_id):
+            return []
+        found = [
+            b
+            for b in self.state.bookings.values()
+            if b.group_id == group_id and b.status is BookingStatus.SUSPENDED
+        ]
+        return sorted(found, key=lambda b: (b.start, b.id or 0))
 
 
 class InMemoryUnitOfWork:
