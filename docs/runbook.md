@@ -367,9 +367,11 @@ stored encrypted with `SETTINGS_ENCRYPTION_KEY`; without that key they cannot be
 (the form says so). Changes apply to the next message, no restart needed.
 
 - **Mail.** An organisation without its own SMTP settings uses the installation's server from
-  `SMTP_HOST` (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`);
-  Mailpit in development. Use STARTTLS on 587 or TLS on 465; "none" only for a relay on a
-  trusted network.
+  `SMTP_HOST` (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_TLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
+  `MAIL_FROM`; `SMTP_USER` and `SMTP_USER_PASSWORD` are accepted as aliases); Mailpit in
+  development. Use STARTTLS on 587 or TLS on 465 (port 465 always means TLS); plain only for a
+  relay on a trusted network. The services refuse to start with a login but neither STARTTLS
+  nor TLS.
 - **SMS.** In Webex Connect, create a service with an SMS number or alphanumeric sender, copy
   the service key (service → Messaging API) and the tenant's API host (for example
   `https://api.us.webexconnect.io`). Enter both with the sender and the country code for
