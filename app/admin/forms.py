@@ -35,6 +35,7 @@ DONE_MESSAGES: dict[str, str] = {
     "removed": "admin.done.removed",
     "logo_saved": "admin.done.logo_saved",
     "logo_removed": "admin.done.logo_removed",
+    "texts_saved": "admin.done.texts_saved",
 }
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
@@ -67,6 +68,20 @@ FIELD_MESSAGES: dict[str, str] = {
     "day": "admin.form.error.day",
     "schedule_rules": "admin.form.error.overlap",
     "schedule_overrides": "admin.form.error.override_conflict",
+    "smtp_host": "admin.form.error.smtp_host",
+    "smtp_port": "admin.form.error.smtp_port",
+    "smtp_security": "admin.form.error.smtp_security",
+    "smtp_username": "admin.form.error.integration_text",
+    "smtp_credential": "admin.form.error.smtp_credential",
+    "sender_address": "admin.form.error.sender_address",
+    "sender_name": "admin.form.error.sender_name",
+    "sms_api_base_url": "admin.form.error.sms_api_base_url",
+    "sms_service_key": "admin.form.error.sms_service_key",
+    "sms_sender_id": "admin.form.error.sms_sender_id",
+    "sms_country_code": "admin.form.error.sms_country_code",
+    "channel": "admin.form.error.reminder_channel",
+    "minutes_before": "admin.form.error.reminder_offset",
+    "reminders": "admin.form.error.reminder_limit",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -82,6 +97,8 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.ORGANISATION_NOT_FOUND: "admin.form.error.organisation",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
     ErrorCode.DATABASE_BUSY: "error.database_busy",
+    ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",
+    ErrorCode.INTEGRATION_NOT_READY: "admin.form.error.settings_key",
 }
 
 

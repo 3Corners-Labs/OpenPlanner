@@ -1,12 +1,14 @@
-"""Build the Webex and WxCC adapters from the settings (one place for web and worker).
+"""Build the integration adapters from the settings (one place for web and worker).
 
-Without a configured Service App everything is ``None`` and OpenPlanner runs without video
-meetings and work items; bookings keep working.
+Without a configured Service App the Webex adapters are ``None`` and OpenPlanner runs without
+video meetings and work items; bookings keep working. Without a settings key there is no
+``SecretBox``, so channel secrets (ADR 0021) can be neither stored nor read.
 """
 
 from dataclasses import dataclass
 
 import httpx
+import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.crypto import SecretBox
@@ -18,6 +20,8 @@ from app.config import Settings
 from app.domain.ports import Clock, ContactCenterDispatcher, VideoProvider
 from app.keys import settings_encryption_key
 
+log = structlog.get_logger()
+
 
 @dataclass(frozen=True)
 class Integrations:
@@ -26,6 +30,19 @@ class Integrations:
     tokens: WebexTokens | None = None
     video: VideoProvider | None = None
     dispatcher: ContactCenterDispatcher | None = None
+
+
+def secret_box(settings: Settings) -> SecretBox | None:
+    """Return the box for integration secrets, or ``None`` when no settings key is available.
+
+    In production that means ``SETTINGS_ENCRYPTION_KEY`` is unset; organisations can then only
+    use channels without a secret (and the environment's SMTP fallback).
+    """
+    try:
+        return SecretBox(settings_encryption_key(settings))
+    except RuntimeError:
+        log.warning("settings_key.missing")
+        return None
 
 
 def build_integrations(

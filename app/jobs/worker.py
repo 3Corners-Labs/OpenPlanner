@@ -15,12 +15,13 @@ from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.uow import SqlUnitOfWork
-from app.adapters.integrations import build_integrations
-from app.adapters.smtp import SmtpConfig, SmtpMailSender
+from app.adapters.integrations import build_integrations, secret_box
+from app.adapters.senders import ConfiguredSenders
+from app.adapters.smtp import SmtpConfig
 from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.integration import IntegrationService
-from app.domain.ports import Clock, MessageSender
+from app.domain.ports import Clock
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
@@ -30,21 +31,20 @@ from app.logging import configure_logging
 log = structlog.get_logger()
 
 
-def mail_sender(settings: Settings) -> MessageSender | None:
-    """Return the SMTP sender, or ``None`` when ``SMTP_HOST`` is not set."""
+def fallback_mail(settings: Settings) -> SmtpConfig | None:
+    """Return the SMTP server from the environment, or ``None`` when ``SMTP_HOST`` is not set.
+
+    Used for organisations without their own SMTP settings (ADR 0021).
+    """
     if not settings.smtp_host:
         return None
-    return SmtpMailSender(
-        SmtpConfig(
-            host=settings.smtp_host,
-            port=settings.smtp_port,
-            sender=settings.mail_from,
-            starttls=settings.smtp_starttls,
-            username=settings.smtp_username,
-            password=(
-                settings.smtp_password.get_secret_value() if settings.smtp_password else None
-            ),
-        )
+    return SmtpConfig(
+        host=settings.smtp_host,
+        port=settings.smtp_port,
+        sender=settings.mail_from,
+        starttls=settings.smtp_starttls,
+        username=settings.smtp_username,
+        password=settings.smtp_password.get_secret_value() if settings.smtp_password else None,
     )
 
 
@@ -61,15 +61,15 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
         clock: Source of the current time.
     """
     engine = create_engine(settings.database_url)
-    sender = mail_sender(settings)
     http = httpx.AsyncClient(timeout=15.0)
     integrations = build_integrations(settings, engine, http, clock)
-    uow = SqlUnitOfWork(engine)
+    uow = SqlUnitOfWork(engine, secret_box(settings))
+    fallback = fallback_mail(settings)
     runner = JobRunner(
         SqlJobQueue(engine),
         uow,
         clock,
-        sender,
+        ConfiguredSenders(uow, http, fallback),
         MessageComposer(
             Translator(load_catalogues()),
             management_token_key(settings),
@@ -82,7 +82,7 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
     log.info(
         "worker.started",
         poll_seconds=settings.worker_poll_seconds,
-        mail_enabled=bool(sender),
+        fallback_mail=fallback is not None,
         video_enabled=integrations.video is not None,
         dispatch_enabled=integrations.dispatcher is not None,
     )

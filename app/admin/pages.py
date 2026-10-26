@@ -63,7 +63,16 @@ def _is_current(request: Request, item: NavItem) -> bool:
     return (
         path == item.href
         or (item.href == "/admin/" and path.startswith("/admin/groups"))
-        or (item.href == "/admin/branding" and path.startswith("/admin/organisations/"))
+        or (
+            item.href == "/admin/branding"
+            and path.startswith("/admin/organisations/")
+            and path.endswith("/branding")
+        )
+        or (
+            item.href == "/admin/integrations"
+            and path.startswith("/admin/organisations/")
+            and "/channels" in path
+        )
     )
 
 

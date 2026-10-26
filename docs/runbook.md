@@ -179,12 +179,29 @@ http://localhost:8000`) and set `PUBLIC_BASE_URL` to the tunnel's https address 
 | `unauthorized` | the Service App token was refused | renew the tokens (section 1) |
 | `meeting_missing` (retrying) | the work item waits for the meeting | check Webex reachability and the host account |
 
-## Mail
+## Mail and SMS (ADR 0021)
 
-The worker sends mail when `SMTP_HOST` is set (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`,
-`SMTP_PASSWORD`, `MAIL_FROM`). Failed deliveries are retried after 1, 5 and 15 minutes and then
-marked `failed` in the `jobs` table (`last_error` holds the exception type). Without
-`SMTP_HOST`, message jobs stay pending until mail is configured.
+Each organisation's mail server and SMS service are set by a superuser under **Koppelingen →
+Berichtkanalen** (`/admin/organisations/{org}/channels`). Passwords and service keys are
+stored encrypted with `SETTINGS_ENCRYPTION_KEY`; without that key they cannot be saved
+(the form says so). Changes apply to the next message, no restart needed.
+
+- **Mail.** An organisation without its own SMTP settings uses the installation's server from
+  `SMTP_HOST` (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`);
+  Mailpit in development. Use STARTTLS on 587 or TLS on 465; "none" only for a relay on a
+  trusted network.
+- **SMS.** In Webex Connect, create a service with an SMS number or alphanumeric sender, copy
+  the service key (service → Messaging API) and the tenant's API host (for example
+  `https://api.us.webexconnect.io`). Enter both with the sender and the country code for
+  national numbers (31). Organisation admins then add SMS reminders per group under
+  **Herinneringen**; the group's form must ask for a phone number.
+
+Failed deliveries are retried after 1, 5 and 15 minutes (timeouts, 429, 5xx) and then marked
+`failed` in the `jobs` table (`last_error` holds the exception type or code). Refusals fail at
+once: `unauthorized` (wrong service key or SMTP login), `rejected_<status>` (for example an
+invalid number), `channel_not_configured` (the organisation has no sender on that channel) or
+`integration_not_ready` (the settings key is missing). The reminders page of a group warns
+when a rule's channel is not configured.
 
 ## Management token key
 
@@ -205,8 +222,11 @@ deploy the old image. Every migration is reversible (enforced in CI).
 
 ## Rotating secrets
 
-*TBD.* All secrets come from environment variables / the secret store; none are baked into the
-image.
+Bootstrap secrets come from environment variables / the secret store; none are baked into the
+image. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
+value on the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` makes every
+stored channel secret and Webex token unreadable: re-enter the channel secrets afterwards
+(ADR 0008).
 
 ## Webex or WxCC is down
 

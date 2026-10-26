@@ -10,7 +10,7 @@ with the names of what changed, never the values.
 
 from dataclasses import replace
 
-from app.domain.admin import AdminService, record_change, require
+from app.domain.admin import AdminService, organisation_by_slug, record_change, require
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.branding import Branding, Logo
 from app.domain.errors import DomainError, ErrorCode
@@ -42,7 +42,7 @@ class BrandingService:
             DomainError: ``organisation_not_found``.
         """
         async with self._uow.read() as tx:
-            return await _organisation(tx, slug)
+            return await organisation_by_slug(tx, slug)
 
     async def for_group(self, group: Group) -> Organisation:
         """Return the organisation a group belongs to, with its branding.
@@ -76,7 +76,7 @@ class BrandingService:
         """
         await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            organisation = await _organisation(tx, slug)
+            organisation = await organisation_by_slug(tx, slug)
             current = organisation.branding
             changed = [n for n in sorted(_EDITABLE) if getattr(current, n) != getattr(branding, n)]
             if changed:
@@ -106,7 +106,7 @@ class BrandingService:
         """Authorise, store or remove the logo, and audit it."""
         await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            organisation = await _organisation(tx, slug)
+            organisation = await organisation_by_slug(tx, slug)
             await tx.save_logo(organisation.id, logo)
             await self._audit(tx, principal, slug, detail)
 
@@ -123,15 +123,3 @@ class BrandingService:
         await record_change(
             tx, self._clock.now(), principal, Permission.BRANDING_MANAGE, slug, None, detail
         )
-
-
-async def _organisation(tx: Transaction, slug: str) -> Organisation:
-    """Return the organisation with ``slug``.
-
-    Raises:
-        DomainError: ``organisation_not_found``.
-    """
-    organisation = await tx.get_organisation(slug)
-    if organisation is None:
-        raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
-    return organisation
