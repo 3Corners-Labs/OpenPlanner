@@ -34,6 +34,8 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.TEXTS_MANAGE: "authz.permission.texts_manage",
     Permission.REMINDERS_MANAGE: "authz.permission.reminders_manage",
     Permission.BOOKINGS_VIEW: "authz.permission.bookings_view",
+    Permission.CLOSURE_MANAGE: "authz.permission.closure_manage",
+    Permission.ORGANISATION_CLOSURE: "authz.permission.organisation_closure",
     Permission.API_CLIENTS_MANAGE: "authz.permission.api_clients_manage",
 }
 
@@ -47,12 +49,14 @@ CITIZEN_LABELS: dict[str, str] = {
     "citizen.booking_view": "authz.citizen.booking_view",
     "citizen.booking_change": "authz.citizen.booking_change",
     "citizen.booking_cancel": "authz.citizen.booking_cancel",
+    "citizen.suspended_booking_change": "authz.citizen.suspended_booking_change",
 }
 
 CONDITION_LABELS: dict[str, str] = {
     "public": "authz.condition.public",
     "management_link": "authz.condition.management_link",
     "management_link_before_deadline": "authz.condition.management_link_before_deadline",
+    "management_link_while_suspended": "authz.condition.management_link_while_suspended",
 }
 
 OUTCOME_LABELS: dict[Outcome, str] = {

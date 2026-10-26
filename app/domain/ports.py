@@ -6,7 +6,7 @@ live meeting status per ADR 0010), ``ContactCenterDispatcher`` (WP6, ADR 0007),
 ``IdentityProvider`` (WP7).
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -26,7 +26,8 @@ from app.domain.calls import (
 )
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
-from app.domain.job_plan import PlannedJob
+from app.domain.closure import Closure
+from app.domain.job_plan import JobType, PlannedJob
 from app.domain.scheduling import (
     Group,
     GroupSummary,
@@ -418,6 +419,46 @@ class Transaction(Protocol):
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
         """Delete the booking's pending jobs and store ``jobs`` instead (CLAUDE.md)."""
+        ...
+
+    async def add_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
+        """Store ``jobs`` next to the booking's pending jobs."""
+        ...
+
+    async def delete_pending_jobs(self, booking_id: int, types: Collection[JobType]) -> None:
+        """Delete the booking's pending jobs of the given types."""
+        ...
+
+    async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
+        """Return the group's closures that have not ended at ``now``, earliest first."""
+        ...
+
+    async def get_closure(self, closure_id: int) -> Closure | None:
+        """Return the closure with ``closure_id``."""
+        ...
+
+    async def add_closure(self, closure: Closure) -> Closure:
+        """Store a new closure with its notices and return it with its id."""
+        ...
+
+    async def save_closure(self, closure: Closure) -> None:
+        """Store the end and the notices of an existing closure."""
+        ...
+
+    async def find_confirmed_bookings(
+        self, group_id: int, lower: datetime, upper: datetime | None
+    ) -> list[Booking]:
+        """Return the group's confirmed scheduled bookings with lower <= start < upper.
+
+        ``upper=None`` means no upper bound. For the domain's own use, not for listings.
+        """
+        ...
+
+    async def list_suspended_bookings(self, scope: Scope, group_id: int) -> list[Booking]:
+        """Return the group's suspended bookings, earliest first.
+
+        The group must lie inside ``scope`` (ADR 0014); otherwise the list is empty.
+        """
         ...
 
     async def get_api_settings(self) -> ApiSettings:

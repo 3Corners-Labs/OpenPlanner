@@ -9,9 +9,9 @@ input (``aria-describedby``, error summary with anchors) and never repeats the v
     ... domain call ...  except DomainError as error: form.refusal(error)
 """
 
-from collections.abc import Mapping, Set
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, field
-from datetime import date, time
+from datetime import UTC, date, datetime, time, tzinfo
 from urllib.parse import parse_qsl
 
 from fastapi import Request
@@ -20,6 +20,7 @@ from starlette.responses import RedirectResponse
 from app.admin.authz import AccessDenied
 from app.domain.errors import DomainError, ErrorCode
 from app.i18n import BoundGettext
+from app.i18n.dates import format_clock, format_day_compact, local_day
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
@@ -35,6 +36,14 @@ DONE_MESSAGES: dict[str, str] = {
     "removed": "admin.done.removed",
     "logo_saved": "admin.done.logo_saved",
     "logo_removed": "admin.done.logo_removed",
+    "closure_started": "admin.done.closure_started",
+    "closure_updated": "admin.done.closure_updated",
+    "closure_lifted": "admin.done.closure_lifted",
+    "reinstated": "admin.done.reinstated",
+    "cancelled": "admin.done.cancelled",
+    "moved": "admin.done.moved",
+    "organisation_closed": "admin.done.organisation_closed",
+    "organisation_lifted": "admin.done.organisation_lifted",
     "client_enabled": "admin.done.client_enabled",
     "client_disabled": "admin.done.client_disabled",
     "tokens_revoked": "admin.done.tokens_revoked",
@@ -72,6 +81,11 @@ FIELD_MESSAGES: dict[str, str] = {
     "day": "admin.form.error.day",
     "schedule_rules": "admin.form.error.overlap",
     "schedule_overrides": "admin.form.error.override_conflict",
+    "starts_at": "admin.form.error.moment",
+    "ends_at": "admin.form.error.ends_at",
+    "notice_nl": "admin.form.error.notice",
+    "notice_en": "admin.form.error.notice",
+    "start": "admin.form.error.start",
     "scopes": "admin.form.error.scopes",
     "groups": "admin.form.error.groups",
     "networks": "admin.form.error.networks",
@@ -105,6 +119,15 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.ORGANISATION_NOT_FOUND: "admin.form.error.organisation",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
     ErrorCode.DATABASE_BUSY: "error.database_busy",
+    ErrorCode.CLOSURE_EXISTS: "admin.form.error.closure_exists",
+    ErrorCode.CLOSURE_NOT_FOUND: "admin.form.error.closure_not_found",
+    ErrorCode.BOOKING_NOT_ACTIVE: "error.booking_not_active",
+    ErrorCode.BOOKING_LOCKED: "error.booking_locked",
+    ErrorCode.GROUP_CLOSED: "error.group_closed",
+    ErrorCode.SLOT_FULL: "error.slot_full",
+    ErrorCode.SLOT_UNAVAILABLE: "error.slot_unavailable",
+    ErrorCode.OUTSIDE_BOOKING_WINDOW: "error.outside_booking_window",
+    ErrorCode.SAME_SLOT: "error.same_slot",
     ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",
     ErrorCode.INTEGRATION_NOT_READY: "admin.form.error.settings_key",
 }
@@ -118,6 +141,18 @@ class Option:
     label: str
 
 
+def slot_options(starts: Sequence[datetime], tz: tzinfo, locale: str) -> tuple[Option, ...]:
+    """Return free start times as select options: the ISO value and ``5 jan 2026, 09:00``."""
+    return tuple(
+        Option(
+            start.isoformat(),
+            f"{format_day_compact(local_day(start, tz), locale)}, "
+            f"{format_clock(start, tz, locale)}",
+        )
+        for start in starts
+    )
+
+
 @dataclass(frozen=True)
 class Field:
     """Everything a template needs to render one labelled input accessibly.
@@ -125,7 +160,8 @@ class Field:
     Attributes:
         name: Input name and id.
         label: Visible label.
-        kind: ``text``, ``number``, ``time``, ``date`` or ``select``.
+        kind: ``text``, ``number``, ``time``, ``date``, ``datetime-local``, ``textarea`` or
+            ``select``.
         value: Current or submitted value.
         hint: Help text, linked with ``aria-describedby``.
         error: Message for this field, linked the same way.
@@ -203,6 +239,28 @@ class FormData:
         """Return a date, ``None`` when empty, or ``None`` with an error when malformed."""
         return self.day(name) if self.text(name) else None
 
+    def optional_moment(self, name: str, tz: tzinfo) -> datetime | None:
+        """Return a local ``YYYY-MM-DDTHH:MM`` in ``tz`` as UTC; ``None`` when empty or malformed.
+
+        Parsing happens here, at the edge, so the domain only sees UTC (CLAUDE.md).
+        """
+        raw = self.text(name)
+        if not raw:
+            return None
+        try:
+            local = datetime.fromisoformat(raw)
+        except ValueError:
+            self._fail(name)
+            return None
+        if local.tzinfo is not None:
+            self._fail(name)
+            return None
+        return local.replace(tzinfo=tz).astimezone(UTC)
+
+    def checked(self, name: str) -> bool:
+        """Return whether the checkbox ``name`` was ticked."""
+        return self.text(name) == "yes"
+
     def choice(self, name: str, allowed: Set[str]) -> str | None:
         """Return the submitted value if it is one of ``allowed``; else ``None`` with an error."""
         value = self.text(name)
@@ -234,14 +292,21 @@ class FormData:
 
 
 def done_message(request: Request, _: BoundGettext) -> str | None:
-    """Return the confirmation named by ``?done=``, if it is a known one."""
+    """Return the confirmation named by ``?done=``, if it is a known one.
+
+    ``?count=`` (digits only) fills a ``{count}`` in the confirmation, e.g. how many
+    bookings an emergency closure suspended.
+    """
     key = request.query_params.get("done", "")
-    return _(DONE_MESSAGES[key]) if key in DONE_MESSAGES else None
+    raw = request.query_params.get("count", "")
+    count = int(raw) if raw.isdigit() and len(raw) <= 6 else 0
+    return _(DONE_MESSAGES[key], count=count) if key in DONE_MESSAGES else None
 
 
-def redirect_done(url: str, done: str) -> RedirectResponse:
+def redirect_done(url: str, done: str, count: int | None = None) -> RedirectResponse:
     """Answer a successful change with a redirect to ``url`` and its confirmation."""
-    return RedirectResponse(f"{url}?done={done}", status_code=303)
+    suffix = f"&count={count}" if count is not None else ""
+    return RedirectResponse(f"{url}?done={done}{suffix}", status_code=303)
 
 
 async def read_form(request: Request, locale: RequestLocale) -> FormData:

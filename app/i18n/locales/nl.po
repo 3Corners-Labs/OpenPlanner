@@ -1402,6 +1402,316 @@ msgstr "Logo uploaden"
 msgid "admin.branding.logo_remove"
 msgstr "Logo verwijderen"
 
+# Emergency closure (ADR 0024)
+msgid "closure.banner.title_active"
+msgstr "Tijdelijk gesloten"
+
+msgid "closure.banner.title_upcoming"
+msgstr "Let op: binnenkort tijdelijk gesloten"
+
+msgid "closure.banner.period"
+msgstr "Gesloten van {start} tot {end}."
+
+msgid "closure.banner.period_open"
+msgstr "Gesloten vanaf {start}, tot nader bericht."
+
+msgid "manage.status.suspended"
+msgstr "Opgeschort"
+
+msgid "manage.suspended.title"
+msgstr "Uw afspraak kan niet doorgaan op dit moment"
+
+msgid "manage.suspended.text"
+msgstr "Kies hieronder een nieuwe tijd of annuleer de afspraak. Uw gegevens zijn bewaard, u hoeft niets opnieuw in te vullen."
+
+msgid "manage.suspended.reschedule"
+msgstr "Kies een nieuwe tijd"
+
+msgid "error.group_closed"
+msgstr "Dit team is op dit moment tijdelijk gesloten. Kies een ander moment."
+
+msgid "message.suspension.subject"
+msgstr "Uw videogesprek op {date} kan niet doorgaan"
+
+msgid "message.suspension.intro"
+msgstr "Door een onvoorziene situatie kan uw videogesprek met {group_name} op {date} om {time} niet doorgaan. Uw afspraak staat in de wacht; we hebben uw gegevens bewaard."
+
+msgid "message.closure_update.subject"
+msgstr "Nieuws over uw videogesprek op {date}"
+
+msgid "message.closure_update.intro"
+msgstr "Er is nieuws over de tijdelijke sluiting van {group_name}. Uw afspraak op {date} om {time} staat nog in de wacht."
+
+msgid "message.reinstatement.subject"
+msgstr "Uw videogesprek op {date} gaat toch door"
+
+msgid "message.reinstatement.intro"
+msgstr "Goed nieuws: uw videogesprek met {group_name} op {date} om {time} gaat toch door, op het oorspronkelijke tijdstip."
+
+msgid "message.manage_suspended"
+msgstr "Via de link hieronder kiest u een nieuwe tijd of annuleert u de afspraak. U hoeft uw gegevens niet opnieuw in te vullen."
+
+msgid "message.closure_notice"
+msgstr "Toelichting"
+
+msgid "authz.permission.closure_manage"
+msgstr "Noodsluiting van een team en opgeschorte afspraken afhandelen"
+
+msgid "authz.permission.organisation_closure"
+msgstr "Alle teams van een organisatie tegelijk noodsluiten"
+
+msgid "authz.citizen.suspended_booking_change"
+msgstr "Opgeschorte afspraak verzetten of annuleren"
+
+msgid "authz.condition.management_link_while_suspended"
+msgstr "met de beheerlink, zolang de afspraak opgeschort is"
+
+msgid "admin.tab.closure"
+msgstr "Noodsluiting"
+
+msgid "admin.nav.closures"
+msgstr "Noodsluiting"
+
+msgid "admin.done.closure_started"
+msgstr "De noodsluiting is ingesteld. Opgeschorte afspraken: {count}. De burgers krijgen een e-mail."
+
+msgid "admin.done.closure_updated"
+msgstr "De noodsluiting is bijgewerkt. E-mails met de update: {count}."
+
+msgid "admin.done.closure_lifted"
+msgstr "De noodsluiting is opgeheven. Weer bevestigde afspraken: {count}."
+
+msgid "admin.done.reinstated"
+msgstr "Weer bevestigde afspraken: {count}. De burgers krijgen bericht."
+
+msgid "admin.done.cancelled"
+msgstr "Geannuleerde afspraken: {count}. De burgers krijgen bericht."
+
+msgid "admin.done.moved"
+msgstr "De afspraak is verzet. De burger krijgt een e-mail met de nieuwe tijd."
+
+msgid "admin.done.organisation_closed"
+msgstr "Teams gesloten: {count}. Teams die al gesloten waren, zijn ongewijzigd."
+
+msgid "admin.done.organisation_lifted"
+msgstr "Noodsluiting opgeheven voor teams: {count}."
+
+msgid "admin.form.error.moment"
+msgstr "Vul een datum en tijd in."
+
+msgid "admin.form.error.ends_at"
+msgstr "Het einde moet na het begin en in de toekomst liggen."
+
+msgid "admin.form.error.notice"
+msgstr "Vul een toelichting in van hooguit 1000 tekens, zonder speciale tekens."
+
+msgid "admin.form.error.start"
+msgstr "Kies een vrij tijdstip."
+
+msgid "admin.form.error.closure_exists"
+msgstr "Dit team heeft al een noodsluiting. Pas die aan of hef hem eerst op."
+
+msgid "admin.form.error.closure_not_found"
+msgstr "Dit team heeft geen lopende noodsluiting."
+
+msgid "admin.audit.detail.closure_start"
+msgstr "noodsluiting ingesteld"
+
+msgid "admin.audit.detail.closure_update"
+msgstr "noodsluiting bijgewerkt"
+
+msgid "admin.audit.detail.closure_lift"
+msgstr "noodsluiting opgeheven"
+
+msgid "admin.audit.detail.booking_reinstate"
+msgstr "afspraak weer bevestigd"
+
+msgid "admin.audit.detail.booking_reinstate_all"
+msgstr "opgeschorte afspraken weer bevestigd"
+
+msgid "admin.audit.detail.booking_cancel"
+msgstr "opgeschorte afspraak geannuleerd"
+
+msgid "admin.audit.detail.booking_cancel_all"
+msgstr "alle opgeschorte afspraken geannuleerd"
+
+msgid "admin.audit.detail.booking_move"
+msgstr "opgeschorte afspraak verzet"
+
+msgid "admin.audit.detail.bookings"
+msgstr "afspraken: {count}"
+
+msgid "admin.audit.detail.notified"
+msgstr "e-mails: {count}"
+
+msgid "admin.closure.starts_at"
+msgstr "Begin"
+
+msgid "admin.closure.starts_at_hint"
+msgstr "Leeg laten om direct te sluiten. Tijd van het team."
+
+msgid "admin.closure.ends_at"
+msgstr "Einde"
+
+msgid "admin.closure.ends_at_hint"
+msgstr "Leeg laten voor tot nader bericht. Tijd van het team."
+
+msgid "admin.closure.notice_nl"
+msgstr "Toelichting voor burgers (Nederlands)"
+
+msgid "admin.closure.notice_en"
+msgstr "Toelichting voor burgers (Engels)"
+
+msgid "admin.closure.notice_hint"
+msgstr "Getoond op de afspraakpagina en in de e-mail. Gewone tekst, hooguit {limit} tekens; geen persoonsgegevens."
+
+msgid "admin.closure.current"
+msgstr "Huidige noodsluiting"
+
+msgid "admin.closure.current_lead"
+msgstr "Zo zien burgers de melding op de afspraakpagina."
+
+msgid "admin.closure.update"
+msgstr "Noodsluiting aanpassen"
+
+msgid "admin.closure.update_lead"
+msgstr "Verleng of verkort de sluiting en werk de toelichting bij. Afspraken die door een later einde in de sluiting vallen, worden opgeschort."
+
+msgid "admin.closure.notify"
+msgstr "Stuur de nieuwe toelichting per e-mail naar alle burgers met een opgeschorte afspraak ({count})"
+
+msgid "admin.closure.update_button"
+msgstr "Opslaan"
+
+msgid "admin.closure.lift"
+msgstr "Noodsluiting opheffen"
+
+msgid "admin.closure.lift_lead"
+msgstr "Het team is direct weer te boeken. Opgeschorte afspraken blijven staan tot ze verzet, bevestigd of geannuleerd zijn."
+
+msgid "admin.closure.lift_reinstate"
+msgstr "Afspraken die nog kunnen doorgaan weer bevestigen (de burger krijgt bericht)"
+
+msgid "admin.closure.lift_button"
+msgstr "Opheffen"
+
+msgid "admin.closure.start"
+msgstr "Team noodsluiten"
+
+msgid "admin.closure.start_lead"
+msgstr "Er staan {count} bevestigde afspraken gepland. Afspraken in de sluiting worden opgeschort, niet verwijderd: de burger krijgt een e-mail met uw toelichting en kan zelf een nieuwe tijd kiezen."
+
+msgid "admin.closure.start_button"
+msgstr "Team sluiten"
+
+msgid "admin.closure.suspended"
+msgstr "Opgeschorte afspraken"
+
+msgid "admin.closure.suspended_lead"
+msgstr "Gegevens blijven bewaard tot de afspraak is afgehandeld, uiterlijk 30 dagen na het einde van de sluiting."
+
+msgid "admin.closure.reference"
+msgstr "Kenmerk"
+
+msgid "admin.closure.original_time"
+msgstr "Oorspronkelijke tijd"
+
+msgid "admin.closure.purged"
+msgstr "Gegevens verwijderd"
+
+msgid "admin.closure.move"
+msgstr "Verzetten"
+
+msgid "admin.closure.move_label"
+msgstr "Afspraak {reference} verzetten"
+
+msgid "admin.closure.reinstate"
+msgstr "Weer bevestigen"
+
+msgid "admin.closure.reinstate_label"
+msgstr "Afspraak {reference} weer bevestigen"
+
+msgid "admin.closure.cancel"
+msgstr "Annuleren"
+
+msgid "admin.closure.cancel_label"
+msgstr "Afspraak {reference} annuleren"
+
+msgid "admin.closure.reinstate_all"
+msgstr "Alles bevestigen wat kan"
+
+msgid "admin.closure.cancel_all"
+msgstr "Alle opgeschorte afspraken annuleren"
+
+msgid "admin.closure.none_suspended"
+msgstr "Er zijn geen opgeschorte afspraken."
+
+msgid "admin.closure.move_title"
+msgstr "Afspraak {reference} verzetten"
+
+msgid "admin.closure.move_lead"
+msgstr "Oorspronkelijke tijd: {when}. De burger krijgt een e-mail met de nieuwe tijd en een nieuwe beheerlink."
+
+msgid "admin.closure.move_start"
+msgstr "Nieuwe tijd"
+
+msgid "admin.closure.move_hint"
+msgstr "Vrije tijden in de komende {days} dagen."
+
+msgid "admin.closure.move_button"
+msgstr "Verzetten"
+
+msgid "admin.closure.move_none"
+msgstr "Er zijn geen vrije tijden in de komende weken."
+
+msgid "admin.closure.back"
+msgstr "Terug naar de noodsluiting"
+
+msgid "admin.closures.title"
+msgstr "Noodsluiting"
+
+msgid "admin.closures.lead"
+msgstr "Sluit alle teams van een organisatie tegelijk, bijvoorbeeld bij een storing of een gesloten gebouw."
+
+msgid "admin.closures.organisations"
+msgstr "Organisaties"
+
+msgid "admin.closures.none"
+msgstr "U kunt geen organisatie als geheel sluiten."
+
+msgid "admin.closures.organisation_title"
+msgstr "Noodsluiting {name}"
+
+msgid "admin.closures.organisation_lead"
+msgstr "Per team ziet u of het gesloten is. Een team dat al gesloten is, blijft ongewijzigd."
+
+msgid "admin.closures.groups"
+msgstr "Teams"
+
+msgid "admin.closures.state"
+msgstr "Status"
+
+msgid "admin.closures.open"
+msgstr "Open"
+
+msgid "admin.closures.no_groups"
+msgstr "Deze organisatie heeft nog geen teams."
+
+msgid "admin.closures.start"
+msgstr "Alle teams noodsluiten"
+
+msgid "admin.closures.start_lead"
+msgstr "Afspraken in de sluiting worden opgeschort, niet verwijderd; elke burger krijgt een e-mail met uw toelichting. Tijden gelden in de tijdzone van de teams."
+
+msgid "admin.closures.start_button"
+msgstr "Alle teams sluiten"
+
+msgid "admin.closures.lift"
+msgstr "Noodsluiting opheffen voor alle teams"
+
+msgid "admin.closures.lift_button"
+msgstr "Alles opheffen"
+
 msgid "message.reminder.sms"
 msgstr "Beste {first_name}, herinnering: videogesprek met {group_name} op {date} om {time}. Wijzigen of annuleren: {manage_url}"
 

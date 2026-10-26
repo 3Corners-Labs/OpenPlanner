@@ -20,12 +20,14 @@ their claim and those organisations' groups, group admin in the groups of their 
 | Manage integrations and secrets (`integrations.manage`) | Organisation | yes | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | yes | – | – |
 | Create groups (`group.create`) | Organisation | yes | yes | – |
+| Close every team of an organisation at once (`organisation.closure`) | Organisation | yes | yes | – |
 | View group (`group.view`) | Group | yes | yes | yes |
 | Change group settings (`group.edit`) | Group | yes | yes | – |
 | Manage opening hours and exceptions (`schedule.manage`) | Group | yes | yes | yes |
 | Manage texts (`texts.manage`) | Group | yes | yes | yes |
 | Manage reminders (`reminders.manage`) | Group | yes | yes | – |
 | View bookings (`bookings.view`) | Group | yes | yes | yes |
+| Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | yes | yes | yes |
 
 ## Citizens
 
@@ -39,6 +41,7 @@ confirmation email and on the change deadline (the group's dispatch lead).
 | View own appointment (`citizen.booking_view`) | With the management link from the confirmation |
 | Move own appointment (`citizen.booking_change`) | With the management link, until the task goes to the queue |
 | Cancel own appointment (`citizen.booking_cancel`) | With the management link, until the task goes to the queue |
+| Move or cancel an appointment on hold (`citizen.suspended_booking_change`) | with the management link, while the appointment is on hold |
 
 ## Machines (API clients)
 

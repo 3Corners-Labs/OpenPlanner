@@ -6,7 +6,8 @@ Server-rendered and usable without JavaScript. Every response goes through
     GET  /g/{slug}?month=&day=     slot picker: month calendar + times of one day (ADR 0020)
     GET  /g/{slug}/book?start=     contact form for one slot
     POST /g/{slug}/book            book ─► 303 /b/{token}?status=booked
-    GET  /b/{token}                booking (read-only from the change deadline)
+    GET  /b/{token}                booking (read-only from the change deadline; a booking on
+                                   hold by an emergency closure shows its notice, ADR 0024)
     GET  /b/{token}/cancel         confirm ─► POST ─► 303 /b/{token}?status=cancelled
     GET  /b/{token}/reschedule     slot picker ─► ?start= confirm ─► POST
                                    ─► 303 /b/{new token}?status=rescheduled
@@ -29,6 +30,7 @@ from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService, ContactInput
 from app.i18n.dates import format_clock, format_day, local_day
+from app.web.closure_labels import closure_view
 from app.web.errors import FormError, form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.protection import (
@@ -38,6 +40,7 @@ from app.web.protection import (
     read_limit,
     require_same_origin,
 )
+from app.web.slot_values import parse_start
 
 router = APIRouter(include_in_schema=False)
 
@@ -52,6 +55,7 @@ STATUS_LABELS: dict[BookingStatus, str] = {
     BookingStatus.CANCELLED: "manage.status.cancelled",
     BookingStatus.COMPLETED: "manage.status.completed",
     BookingStatus.NO_SHOW: "manage.status.no_show",
+    BookingStatus.SUSPENDED: "manage.status.suspended",
 }
 
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
@@ -68,17 +72,6 @@ def _clock(request: Request) -> Clock:
     """Return the application's clock."""
     clock: Clock = request.app.state.clock
     return clock
-
-
-def _parse_start(value: str | None) -> datetime | None:
-    """Parse a slot value; anything but an aware ISO timestamp is ``None``."""
-    if not value or len(value) > 32:
-        return None
-    try:
-        start = datetime.fromisoformat(value)
-    except ValueError:
-        return None
-    return start if start.tzinfo is not None else None
 
 
 def _manage_url(token: str, status: str) -> str:
@@ -125,10 +118,13 @@ async def group_page(
         if status == "unavailable"
         else []
     )
+    closure = await service.closure_notice(group)
+    now = _clock(request).now()
     context = {
         "picker": view,
         "errors": errors,
         "direct_call_available": await service.direct_call_available(slug),
+        "closure": closure_view(closure, group, locale, now) if closure else None,
     }
     return await citizen_page(request, locale, "group.html", group, context)
 
@@ -160,7 +156,7 @@ async def booking_form(
     """Show the contact form for one slot, or send the visitor back to choose one."""
     service = _service(request)
     group = await service.get_group(slug)
-    parsed = _parse_start(start)
+    parsed = parse_start(start)
     slot = await _available(service, group, parsed) if parsed else None
     if parsed is None or slot is None:
         return RedirectResponse(f"/g/{group.slug}?status=unavailable", status_code=303)
@@ -176,7 +172,7 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
     group = await service.get_group(slug)
     form = await request.form()
     values = read_contact(form)
-    start = _parse_start(str(form.get("start", "")))
+    start = parse_start(str(form.get("start", "")))
     if start is None:
         raise RejectedRequest(400)
     try:
@@ -196,12 +192,15 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
 
 
 def _manage_context(
-    details: BookingDetails, locale: RequestLocale, status: str | None
+    details: BookingDetails, locale: RequestLocale, status: str | None, now: datetime
 ) -> dict[str, object]:
     """Context of the management page. Shows no contact details, only the appointment."""
     booking, group = details.booking, details.group
     deadline = details.change_deadline
+    closure = details.closure
     return {
+        "suspended": booking.is_suspended,
+        "closure": closure_view(closure, group, locale, now) if closure else None,
         "group": group,
         "slot_label": slot_label(booking.start, booking.end, group, locale),
         "status_label": locale.gettext(STATUS_LABELS[booking.status]),
@@ -222,7 +221,7 @@ async def manage_page(
 ) -> HTMLResponse:
     """Show a booking; read-only once its change deadline has passed."""
     details = await _service(request).find(token)
-    context = {**_manage_context(details, locale, status), "token": token}
+    context = {**_manage_context(details, locale, status, _clock(request).now()), "token": token}
     return await citizen_page(request, locale, "manage.html", details.group, context)
 
 
@@ -233,7 +232,7 @@ async def cancel_page(request: Request, token: str, locale: Locale) -> Response:
     details = await _service(request).find(token)
     if not details.changeable:
         return RedirectResponse(f"/b/{token}", status_code=303)
-    context = {**_manage_context(details, locale, None), "token": token}
+    context = {**_manage_context(details, locale, None, _clock(request).now()), "token": token}
     return await citizen_page(request, locale, "cancel.html", details.group, context)
 
 
@@ -266,11 +265,11 @@ async def _reschedule_response(
     if not details.changeable:
         return RedirectResponse(f"/b/{token}", status_code=303)
     context: dict[str, object] = {
-        **_manage_context(details, locale, None),
+        **_manage_context(details, locale, None, _clock(request).now()),
         "token": token,
         "errors": errors or [],
     }
-    chosen = _parse_start(start)
+    chosen = parse_start(start)
     slot = await _available(service, group, chosen) if chosen else None
     if chosen is not None and slot is not None and chosen != details.booking.start:
         context["new_start"] = slot_value(chosen)
@@ -311,7 +310,7 @@ async def reschedule_page(
 async def reschedule(request: Request, token: str, locale: Locale, _: SameOrigin) -> Response:
     """Move the booking; the new booking gets a new management link."""
     form = await request.form()
-    start = _parse_start(str(form.get("start", "")))
+    start = parse_start(str(form.get("start", "")))
     if start is None:
         raise RejectedRequest(400)
     try:

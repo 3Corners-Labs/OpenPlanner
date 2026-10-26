@@ -8,7 +8,7 @@ All mapping between rows and domain objects lives in this module.
 """
 
 import json
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import date, datetime
@@ -30,6 +30,8 @@ from app.adapters.db.models import (
     BookingRow,
     CallStatusRow,
     ChannelSettingsRow,
+    ClosureNoticeRow,
+    ClosureRow,
     GroupRow,
     GroupTextRow,
     JobRow,
@@ -44,6 +46,7 @@ from app.adapters.db.models import (
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
 from app.domain.authorization import Scope
 from app.domain.booking import (
+    HOLDS_PLACE,
     Booking,
     BookingKind,
     BookingStatus,
@@ -70,8 +73,9 @@ from app.domain.channel_settings import (
     SmtpSettings,
 )
 from app.domain.channels import ChannelKind, ReminderRule
+from app.domain.closure import Closure
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.job_plan import PlannedJob
+from app.domain.job_plan import JobType, PlannedJob
 from app.domain.scheduling import (
     Group,
     GroupSummary,
@@ -83,6 +87,7 @@ from app.domain.scheduling import (
 )
 
 _PENDING = "pending"
+_HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
 
 
 def _organisation(row: OrganisationRow) -> Organisation:
@@ -201,6 +206,19 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         meeting=MeetingRef(row.video_room_id, row.guest_join_url) if row.video_room_id else None,
         wxcc_task_id=row.wxcc_task_id,
         kind=BookingKind(slot.kind),
+        closure_id=row.closure_id,
+    )
+
+
+def _closure(row: ClosureRow, notices: Sequence[ClosureNoticeRow]) -> Closure:
+    """Map a closure row with its notices."""
+    return Closure(
+        id=row.id,
+        group_id=row.group_id,
+        starts_at=row.starts_at,
+        ends_at=row.ends_at,
+        notices={n.locale: n.text for n in notices},
+        created_at=row.created_at,
     )
 
 
@@ -449,13 +467,13 @@ class SqlTransaction(ApiClientQueries):
         )
 
     async def count_future_bookings(self, group_id: int, now: datetime) -> int:
-        """Return how many confirmed bookings of the group start after ``now``."""
+        """Return how many bookings of the group that hold a place start after ``now``."""
         count = await self._session.scalar(
             select(func.count(BookingRow.id))
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
             .where(
                 BookingRow.group_id == group_id,
-                BookingRow.status == BookingStatus.CONFIRMED.value,
+                BookingRow.status.in_(_HOLDS_PLACE),
                 SlotRow.start > now,
             )
         )
@@ -773,8 +791,8 @@ class SqlTransaction(ApiClientQueries):
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[SlotUsage]:
-        """Return capacity and active bookings of existing slots, in one query."""
-        active = func.count(case((BookingRow.status == BookingStatus.CONFIRMED.value, 1)))
+        """Return capacity and the bookings holding a place in existing slots, in one query."""
+        active = func.count(case((BookingRow.status.in_(_HOLDS_PLACE), 1)))
         rows = await self._session.execute(
             select(SlotRow.start, SlotRow.capacity_snapshot, active)
             .outerjoin(BookingRow, BookingRow.slot_id == SlotRow.id)
@@ -815,11 +833,11 @@ class SqlTransaction(ApiClientQueries):
         return Slot(row.id, slot.group_id, slot.start, slot.end, slot.capacity_snapshot, slot.kind)
 
     async def count_active_bookings(self, slot_id: int) -> int:
-        """Return the number of confirmed bookings in the slot."""
+        """Return the number of bookings holding a place in the slot (confirmed or on hold)."""
         count = await self._session.scalar(
             select(func.count()).where(
                 BookingRow.slot_id == slot_id,
-                BookingRow.status == BookingStatus.CONFIRMED.value,
+                BookingRow.status.in_(_HOLDS_PLACE),
             )
         )
         return int(count or 0)
@@ -882,11 +900,15 @@ class SqlTransaction(ApiClientQueries):
         return _booking(*found) if found else None
 
     async def save_booking(self, booking: Booking) -> None:
-        """Persist the mutable fields of a booking (status and cancellation time)."""
+        """Persist the mutable fields of a booking (status, cancellation time, closure)."""
         await self._session.execute(
             update(BookingRow)
             .where(BookingRow.id == booking.id)
-            .values(status=booking.status.value, cancelled_at=booking.cancelled_at)
+            .values(
+                status=booking.status.value,
+                cancelled_at=booking.cancelled_at,
+                closure_id=booking.closure_id,
+            )
         )
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
@@ -894,6 +916,10 @@ class SqlTransaction(ApiClientQueries):
         await self._session.execute(
             delete(JobRow).where(JobRow.booking_id == booking_id, JobRow.status == _PENDING)
         )
+        await self.add_jobs(booking_id, jobs)
+
+    async def add_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
+        """Insert ``jobs`` for the booking next to its pending jobs."""
         if jobs:
             await self._session.execute(
                 insert(JobRow),
@@ -908,6 +934,109 @@ class SqlTransaction(ApiClientQueries):
                     for job in jobs
                 ],
             )
+
+    async def delete_pending_jobs(self, booking_id: int, types: Collection[JobType]) -> None:
+        """Delete the booking's pending jobs of the given types."""
+        await self._session.execute(
+            delete(JobRow).where(
+                JobRow.booking_id == booking_id,
+                JobRow.status == _PENDING,
+                JobRow.type.in_(sorted(t.value for t in types)),
+            )
+        )
+
+    async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
+        """Return the group's closures that have not ended at ``now``, earliest first."""
+        rows = await self._session.scalars(
+            select(ClosureRow)
+            .where(
+                ClosureRow.group_id == group_id,
+                or_(ClosureRow.ends_at.is_(None), ClosureRow.ends_at > now),
+            )
+            .order_by(ClosureRow.starts_at, ClosureRow.id)
+        )
+        return [await self._with_notices(row) for row in rows]
+
+    async def get_closure(self, closure_id: int) -> Closure | None:
+        """Return the closure with ``closure_id``."""
+        row = await self._session.get(ClosureRow, closure_id)
+        return await self._with_notices(row) if row else None
+
+    async def add_closure(self, closure: Closure) -> Closure:
+        """Insert a closure with its notices and return it with its id."""
+        row = ClosureRow(
+            group_id=closure.group_id,
+            starts_at=closure.starts_at,
+            ends_at=closure.ends_at,
+            created_at=closure.created_at,
+        )
+        self._session.add(row)
+        await self._session.flush()
+        await self._save_notices(row.id, closure)
+        return await self._with_notices(row)
+
+    async def save_closure(self, closure: Closure) -> None:
+        """Store the window and the notices of an existing closure."""
+        await self._session.execute(
+            update(ClosureRow)
+            .where(ClosureRow.id == closure.id)
+            .values(starts_at=closure.starts_at, ends_at=closure.ends_at)
+        )
+        if closure.id is not None:
+            await self._save_notices(closure.id, closure)
+
+    async def find_confirmed_bookings(
+        self, group_id: int, lower: datetime, upper: datetime | None
+    ) -> list[Booking]:
+        """Return the group's confirmed scheduled bookings with lower <= start < upper."""
+        query = (
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(
+                BookingRow.group_id == group_id,
+                BookingRow.status == BookingStatus.CONFIRMED.value,
+                SlotRow.kind == BookingKind.SCHEDULED.value,
+                SlotRow.start >= lower,
+            )
+        )
+        if upper is not None:
+            query = query.where(SlotRow.start < upper)
+        rows = await self._session.execute(query.order_by(SlotRow.start, BookingRow.id))
+        return [_booking(booking, slot) for booking, slot in rows]
+
+    async def list_suspended_bookings(self, scope: Scope, group_id: int) -> list[Booking]:
+        """Return the group's suspended bookings, earliest first, inside ``scope``."""
+        rows = await self._session.execute(
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .join(GroupRow, GroupRow.id == BookingRow.group_id)
+            .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
+            .where(
+                BookingRow.group_id == group_id,
+                BookingRow.status == BookingStatus.SUSPENDED.value,
+                scope_filter(scope, OrganisationRow.slug, GroupRow.slug),
+            )
+            .order_by(SlotRow.start, BookingRow.id)
+        )
+        return [_booking(booking, slot) for booking, slot in rows]
+
+    async def _with_notices(self, row: ClosureRow) -> Closure:
+        """Return the closure of ``row`` with its notices."""
+        notices = await self._session.scalars(
+            select(ClosureNoticeRow).where(ClosureNoticeRow.closure_id == row.id)
+        )
+        return _closure(row, list(notices))
+
+    async def _save_notices(self, closure_id: int, closure: Closure) -> None:
+        """Replace the notices of ``closure_id`` with those of ``closure``."""
+        await self._session.execute(
+            delete(ClosureNoticeRow).where(ClosureNoticeRow.closure_id == closure_id)
+        )
+        self._session.add_all(
+            ClosureNoticeRow(closure_id=closure_id, locale=locale, text=text)
+            for locale, text in closure.notices.items()
+        )
+        await self._session.flush()
 
     async def _slot_row(self, slot_id: int) -> SlotRow:
         """Return the slot row of a booking (it always exists: foreign key)."""

@@ -1,0 +1,8 @@
+{#- The notice of an emergency closure (ADR 0024): a warning, never only a colour. -#}
+{% if closure %}
+<section class="notice notice--warning" aria-labelledby="closure-heading">
+  <h2 id="closure-heading">{{ closure.title }}</h2>
+  <p><strong>{{ closure.period }}</strong></p>
+  {% for paragraph in closure.paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
+</section>
+{% endif %}

@@ -1,0 +1,23 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field as render_field with context %}
+{% block title %}{{ _("admin.closure.move_title", reference=booking.reference) }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/bookings/{{ booking.id }}/move" novalidate aria-labelledby="move-heading">
+  <div class="card__header">
+    <h2 id="move-heading">{{ _("admin.closure.move_title", reference=booking.reference) }}</h2>
+    <p class="card__lead">{{ _("admin.closure.move_lead", when=booking.when) }}</p>
+  </div>
+  {% if has_slots %}
+  <div class="form-grid">{{ render_field(field) }}</div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.closure.move_button") }}</button>
+    <a href="/admin/groups/{{ summary.group.slug }}/closure">{{ _("admin.cancel") }}</a>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.closure.move_none") }}</p>
+  <p><a href="/admin/groups/{{ summary.group.slug }}/closure">{{ _("admin.closure.back") }}</a></p>
+  {% endif %}
+</form>
+{% endblock %}

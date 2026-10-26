@@ -4,7 +4,9 @@
 are excluded from ``repr`` so they cannot end up in logs or tracebacks by accident.
 
     confirmed ──cancel()──► cancelled
-        │
+        │  ▲
+        │  └──reinstate()── suspended ──cancel()──► cancelled
+        ├──suspend()──────────►┘   (emergency closure, ADR 0024)
         └──(after the call, WP4/WP6)──► completed | no_show
 """
 
@@ -123,6 +125,7 @@ class BookingStatus(StrEnum):
     CANCELLED = "cancelled"
     COMPLETED = "completed"
     NO_SHOW = "no_show"
+    SUSPENDED = "suspended"
 
 
 @dataclass(frozen=True)
@@ -174,6 +177,7 @@ class Booking:
     meeting: MeetingRef | None = None
     wxcc_task_id: str | None = None
     kind: BookingKind = BookingKind.SCHEDULED
+    closure_id: int | None = None
 
     @property
     def reference(self) -> str:
@@ -182,15 +186,53 @@ class Booking:
 
     @property
     def is_active(self) -> bool:
-        """Whether the booking still takes a place in its slot."""
+        """Whether the appointment goes ahead (reminders, meeting, WxCC task)."""
         return self.status is BookingStatus.CONFIRMED
+
+    @property
+    def is_suspended(self) -> bool:
+        """Whether an emergency closure put the appointment on hold (ADR 0024)."""
+        return self.status is BookingStatus.SUSPENDED
+
+    @property
+    def holds_place(self) -> bool:
+        """Whether the booking takes a place in its slot: confirmed, or on hold.
+
+        A suspended booking keeps its place, so it can be reinstated when the closure ends
+        early without competing with new bookings.
+        """
+        return self.status in HOLDS_PLACE
 
     def cancel(self, now: datetime) -> "Booking":
         """Return the cancelled booking.
+
+        Raises:
+            DomainError: ``booking_not_active`` if it is neither confirmed nor suspended.
+        """
+        if not self.holds_place:
+            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        return replace(self, status=BookingStatus.CANCELLED, cancelled_at=now)
+
+    def suspend(self, closure_id: int) -> "Booking":
+        """Return the booking put on hold by closure ``closure_id``.
 
         Raises:
             DomainError: ``booking_not_active`` if it is not confirmed.
         """
         if not self.is_active:
             raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
-        return replace(self, status=BookingStatus.CANCELLED, cancelled_at=now)
+        return replace(self, status=BookingStatus.SUSPENDED, closure_id=closure_id)
+
+    def reinstate(self) -> "Booking":
+        """Return the suspended booking confirmed again at its original time.
+
+        Raises:
+            DomainError: ``booking_not_active`` if it is not suspended.
+        """
+        if not self.is_suspended:
+            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        return replace(self, status=BookingStatus.CONFIRMED)
+
+
+HOLDS_PLACE = frozenset({BookingStatus.CONFIRMED, BookingStatus.SUSPENDED})
+"""Statuses that take a place in their slot (counted against its capacity)."""
