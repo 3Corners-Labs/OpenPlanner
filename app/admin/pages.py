@@ -50,6 +50,7 @@ NAVIGATION = (
         "organisation",
     ),
     NavItem("admin.nav.branding", "/admin/branding", Permission.BRANDING_MANAGE, "palette"),
+    NavItem("admin.nav.api", "/admin/api", Permission.API_CLIENTS_MANAGE, "key"),
 )
 
 
@@ -83,6 +84,7 @@ def _is_current(request: Request, item: NavItem) -> bool:
             and not branding
             and not channels
         )
+        or (item.href == "/admin/api" and path.startswith("/admin/api/"))
     )
 
 

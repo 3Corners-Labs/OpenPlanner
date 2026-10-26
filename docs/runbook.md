@@ -408,6 +408,25 @@ value on the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` ma
 stored channel secret and Webex token unreadable: re-enter the channel secrets afterwards
 (ADR 0008).
 
+### API clients of contact-center bots (ADR 0023)
+
+Client secrets live only in the contact center's vault; OpenPlanner keeps their hash.
+
+- **Rotate** before the date in **API-koppelingen** (a warning shows 30 days ahead): open the
+  client, choose a lifetime, **Nieuw secret maken**, copy the new secret into the WxCC
+  configuration. The old secret and every token stop working at once, so do it in a quiet
+  moment or coordinate with the contact center.
+- **Suspected leak:** open the client and **Uitzetten** (its tokens are revoked at once), then
+  rotate and switch it on again.
+- **Emergency stop for every bot:** **API-koppelingen** → untick **API aan** → save. Tokens are
+  refused immediately. To remove the API from a deployment entirely, unset
+  `AGENT_API_ENABLED` and redeploy.
+- **Network allow-lists** compare the address uvicorn reports. Behind the reverse proxy that
+  is only the caller's address when `FORWARDED_ALLOW_IPS` names the proxy alone (see
+  *Production settings*); never set it to `*`, or a forged `X-Forwarded-For` passes the list.
+- **Who did what:** the audit log shows client changes (`API-koppelingen beheren`), token
+  requests and refused calls, with the client id as actor.
+
 ## Webex or WxCC is down
 
 Bookings keep working: they are stored first, and meetings and work items are jobs.
