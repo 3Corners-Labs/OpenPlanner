@@ -20,7 +20,9 @@ trap cleanup EXIT
 pebble_container="$(docker create ghcr.io/letsencrypt/pebble:2.8.0)"
 docker cp "$pebble_container:/test/certs/pebble.minica.pem" "$certs/"
 docker rm "$pebble_container" >/dev/null
-chmod a+r "$certs/pebble.minica.pem"
+# The proxy runs as uid 10001: mktemp -d makes a 0700 directory it could not enter on Linux.
+chmod 755 "$certs"
+chmod 644 "$certs/pebble.minica.pem"
 
 compose up -d --build --wait proxy
 
