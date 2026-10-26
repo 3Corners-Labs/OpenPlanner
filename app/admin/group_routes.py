@@ -53,6 +53,7 @@ from app.domain.planning import (
 )
 from app.domain.scheduling import (
     MAX_DIRECT_CALLS,
+    MAX_LABEL_LENGTH,
     GroupSummary,
     PhoneMode,
     ScheduleOverride,
@@ -601,6 +602,21 @@ async def save_settings(
 WEEKDAYS = frozenset(str(i) for i in range(7))
 
 
+def _label_field(form: FormData, locale: RequestLocale) -> Field:
+    """Return the optional label input of a window (ADR 0027): admin content only."""
+    _ = locale.gettext
+    return Field(
+        "label",
+        _("admin.field.label"),
+        "text",
+        form.text("label"),
+        hint=_("admin.field.label_hint"),
+        error=form.error_for("label"),
+        required=False,
+        attributes={"maxlength": str(MAX_LABEL_LENGTH)},
+    )
+
+
 def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
     """Return the inputs of the add-window form."""
     _ = locale.gettext
@@ -637,8 +653,9 @@ def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
             form.text("capacity") or "1",
             hint=_("admin.field.capacity_hint"),
             error=form.error_for("capacity"),
-            attributes={"min": "1", "max": "1000", "inputmode": "numeric"},
+            attributes={"min": "0", "max": "1000", "inputmode": "numeric"},
         ),
+        _label_field(form, locale),
         Field(
             "valid_from",
             _("admin.field.valid_from"),
@@ -668,7 +685,8 @@ def _read_rule(form: FormData) -> ScheduleRule | None:
     if form.errors or not (weekday and opens and closes and capacity is not None):
         return None
     try:
-        return ScheduleRule(int(weekday), TimeWindow(opens, closes, capacity), valid_from, valid_to)
+        window = TimeWindow(opens, closes, capacity, form.optional_text("label"))
+        return ScheduleRule(int(weekday), window, valid_from, valid_to)
     except DomainError as error:
         form.refusal(error)
         return None
@@ -681,6 +699,7 @@ def _rule_values(rule: ScheduleRule) -> dict[str, str]:
         "opens": rule.window.opens.strftime("%H:%M"),
         "closes": rule.window.closes.strftime("%H:%M"),
         "capacity": str(rule.window.capacity),
+        "label": rule.window.label or "",
         "valid_from": rule.valid_from.isoformat() if rule.valid_from else "",
         "valid_to": rule.valid_to.isoformat() if rule.valid_to else "",
     }
@@ -840,8 +859,9 @@ def _exception_fields(form: FormData, locale: RequestLocale) -> list[Field]:
             hint=_("admin.field.capacity_hint"),
             error=form.error_for("capacity"),
             required=False,
-            attributes={"min": "1", "max": "1000", "inputmode": "numeric"},
+            attributes={"min": "0", "max": "1000", "inputmode": "numeric"},
         ),
+        _label_field(form, locale),
     ]
 
 
@@ -891,7 +911,7 @@ async def add_exception(
         )
         if opens and closes and capacity is not None:
             try:
-                window = TimeWindow(opens, closes, capacity)
+                window = TimeWindow(opens, closes, capacity, form.optional_text("label"))
             except DomainError as error:
                 form.refusal(error)
     if not form.errors and day is not None:

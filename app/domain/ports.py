@@ -289,7 +289,7 @@ class Transaction(Protocol):
         ...
 
     async def add_schedule_rule(self, group_id: int, rule: ScheduleRule) -> int:
-        """Store a rule for the group and return its id."""
+        """Store a rule (window with its agent count and label) for the group; return its id."""
         ...
 
     async def update_schedule_rule(self, group_id: int, rule_id: int, rule: ScheduleRule) -> bool:
