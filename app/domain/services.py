@@ -26,6 +26,7 @@ from app.domain.availability import (
 from app.domain.booking import Booking, BookingKind, BookingStatus, Contact, Slot
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.holiday_service import effective_schedule
 from app.domain.job_plan import (
     change_deadline,
     plan_for_booking,
@@ -110,7 +111,7 @@ class BookingService:
         validate_range(first_day, last_day)
         async with self._uow.read() as tx:
             group = await self._group(tx, group_slug)
-            rules, overrides = await tx.get_schedule(group.id, first_day, last_day)
+            rules, overrides = await effective_schedule(tx, group, first_day, last_day)
             usage = await tx.get_slot_usage(group.id, *utc_bounds(group, first_day, last_day))
         return available_slots(
             group=group,
@@ -161,7 +162,7 @@ class BookingService:
                 return False
             now = self._clock.now()
             today = now.astimezone(group.tz).date()
-            rules, overrides = await tx.get_schedule(group.id, today, today)
+            rules, overrides = await effective_schedule(tx, group, today, today)
         return is_open(group, rules, overrides, now)
 
     async def start_direct(
@@ -177,7 +178,7 @@ class BookingService:
             group = await self._group(tx, group_slug)
             now = self._clock.now()
             today = now.astimezone(group.tz).date()
-            rules, overrides = await tx.get_schedule(group.id, today, today)
+            rules, overrides = await effective_schedule(tx, group, today, today)
             if not group.direct_call_enabled or not is_open(group, rules, overrides, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_UNAVAILABLE)
             details = Contact.create(
@@ -302,7 +303,7 @@ class BookingService:
         if not earliest <= start <= latest:
             raise DomainError(ErrorCode.OUTSIDE_BOOKING_WINDOW)
         day = start.astimezone(group.tz).date()
-        rules, overrides = await tx.get_schedule(group.id, day, day)
+        rules, overrides = await effective_schedule(tx, group, day, day)
         offered = offered_slot(group, rules, overrides, start)
         if offered is None:
             raise DomainError(ErrorCode.SLOT_UNAVAILABLE)

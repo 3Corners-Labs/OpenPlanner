@@ -45,6 +45,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.RIGHTS_VIEW,
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
+        Permission.HOLIDAYS_ASSIGN,  # ADR 0021
         Permission.GROUP_CREATE,
         Permission.GROUP_VIEW,
         Permission.GROUP_EDIT,

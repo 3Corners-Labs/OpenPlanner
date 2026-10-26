@@ -2,7 +2,8 @@
 
 Roles come from the identity provider (ADR 0013). Each permission applies at one level:
 
-    GLOBAL        something about the admin portal itself (dashboard, own rights)
+    GLOBAL        something about the admin portal itself (dashboard, own rights, the
+                  holiday calendars every organisation can reuse)
     ORGANISATION  something of one organisation (audit log, new groups, integrations)
     GROUP         something of one group (settings, opening hours, texts, bookings)
 
@@ -51,6 +52,8 @@ class Permission(StrEnum):
     AUDIT_VIEW = "audit.view"
     INTEGRATIONS_MANAGE = "integrations.manage"
     BRANDING_MANAGE = "branding.manage"
+    HOLIDAYS_MANAGE = "holidays.manage"
+    HOLIDAYS_ASSIGN = "holidays.assign"
     GROUP_CREATE = "group.create"
     GROUP_VIEW = "group.view"
     GROUP_EDIT = "group.edit"
@@ -65,9 +68,11 @@ LEVELS: dict[Permission, Level] = {
     Permission.RIGHTS_VIEW: Level.GLOBAL,
     Permission.MATRIX_VIEW: Level.GLOBAL,
     Permission.ORGANISATION_MANAGE: Level.GLOBAL,
+    Permission.HOLIDAYS_MANAGE: Level.GLOBAL,
     Permission.AUDIT_VIEW: Level.ORGANISATION,
     Permission.INTEGRATIONS_MANAGE: Level.ORGANISATION,
     Permission.BRANDING_MANAGE: Level.ORGANISATION,
+    Permission.HOLIDAYS_ASSIGN: Level.ORGANISATION,
     Permission.GROUP_CREATE: Level.ORGANISATION,
     Permission.GROUP_VIEW: Level.GROUP,
     Permission.GROUP_EDIT: Level.GROUP,
@@ -84,10 +89,12 @@ _EVERY_ADMIN = frozenset(
 MATRIX: dict[Role, frozenset[Permission]] = {
     # HANDOVER §6: everything, including organisations, IdP, SMTP and WxCC credentials.
     Role.SUPERUSER: frozenset(Permission),
-    # HANDOVER §6: own organisation: groups, rules, overrides, texts, bookings of its groups.
+    # HANDOVER §6: own organisation: groups, rules, overrides, texts, bookings of its groups;
+    # ADR 0021: which of the superuser's holiday calendars its groups follow.
     Role.ORG_ADMIN: _EVERY_ADMIN
     | {
         Permission.AUDIT_VIEW,
+        Permission.HOLIDAYS_ASSIGN,
         Permission.GROUP_CREATE,
         Permission.GROUP_VIEW,
         Permission.GROUP_EDIT,

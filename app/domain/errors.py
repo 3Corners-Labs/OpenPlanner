@@ -30,6 +30,9 @@ class ErrorCode(StrEnum):
     SCHEDULE_ITEM_NOT_FOUND = "schedule_item_not_found"
     INTEGRATION_NOT_READY = "integration_not_ready"
     DIRECT_CALL_UNAVAILABLE = "direct_call_unavailable"
+    HOLIDAY_CALENDAR_NOT_FOUND = "holiday_calendar_not_found"
+    HOLIDAY_CALENDAR_IN_USE = "holiday_calendar_in_use"
+    HOLIDAY_NOT_FOUND = "holiday_not_found"
 
 
 class DomainError(Exception):

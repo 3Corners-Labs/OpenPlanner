@@ -1,0 +1,6 @@
+{#- Checkboxes for holiday calendars, named calendar-<id> (one value per name, ADR 0016). -#}
+{% for option in options %}
+<div class="choice__option"><input type="checkbox" id="calendar-{{ option.id }}" name="calendar-{{ option.id }}" value="on"{% if option.checked %} checked{% endif %}><label for="calendar-{{ option.id }}">{{ option.name }}</label></div>
+{% else %}
+<p class="empty-state">{{ _("admin.holidays.no_calendars") }}</p>
+{% endfor %}

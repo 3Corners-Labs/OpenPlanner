@@ -2,7 +2,7 @@
 
 import asyncio
 import copy
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
@@ -13,6 +13,7 @@ from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsa
 from app.domain.branding import Branding, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channels import ReminderRule
+from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
     Group,
@@ -39,6 +40,10 @@ class State:
     audit: list[AuditEvent] = field(default_factory=list)
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
+    holiday_calendars: dict[int, HolidayCalendar] = field(default_factory=dict)
+    holidays: dict[int, Holiday] = field(default_factory=dict)
+    organisation_holidays: dict[int, frozenset[int]] = field(default_factory=dict)
+    group_holidays: dict[int, GroupHolidays] = field(default_factory=dict)
     next_id: int = 1
 
 
@@ -163,6 +168,64 @@ class InMemoryTransaction:
         kept = [o for o in overrides if o.id != override_id]
         self.state.overrides[group_id] = kept
         return len(kept) != len(overrides)
+
+    async def get_holiday_calendars(self) -> list[HolidayCalendar]:
+        return sorted(self.state.holiday_calendars.values(), key=lambda c: c.name)
+
+    async def get_holiday_calendar(self, slug: str) -> HolidayCalendar | None:
+        return next((c for c in self.state.holiday_calendars.values() if c.slug == slug), None)
+
+    async def add_holiday_calendar(self, calendar: HolidayCalendar) -> HolidayCalendar:
+        stored = replace(calendar, id=self._new_id())
+        self.state.holiday_calendars[stored.id] = stored
+        return stored
+
+    async def delete_holiday_calendar(self, calendar_id: int) -> None:
+        del self.state.holiday_calendars[calendar_id]
+        self.state.holidays = {
+            k: h for k, h in self.state.holidays.items() if h.calendar_id != calendar_id
+        }
+
+    async def count_holiday_calendar_users(self, calendar_id: int) -> int:
+        organisations = sum(calendar_id in ids for ids in self.state.organisation_holidays.values())
+        groups = sum(calendar_id in g.calendar_ids for g in self.state.group_holidays.values())
+        return organisations + groups
+
+    async def get_holidays(
+        self, calendar_ids: Collection[int], first_day: date, last_day: date
+    ) -> list[Holiday]:
+        found = [
+            h
+            for h in self.state.holidays.values()
+            if h.calendar_id in calendar_ids and first_day <= h.day <= last_day
+        ]
+        return sorted(found, key=lambda h: (h.day, h.calendar_id))
+
+    async def add_holiday(self, holiday: Holiday) -> int:
+        stored = replace(holiday, id=self._new_id())
+        self.state.holidays[stored.id or 0] = stored
+        return stored.id or 0
+
+    async def delete_holiday(self, calendar_id: int, holiday_id: int) -> bool:
+        holiday = self.state.holidays.get(holiday_id)
+        if holiday is None or holiday.calendar_id != calendar_id:
+            return False
+        del self.state.holidays[holiday_id]
+        return True
+
+    async def get_organisation_holiday_calendars(self, organisation_id: int) -> frozenset[int]:
+        return self.state.organisation_holidays.get(organisation_id, frozenset())
+
+    async def save_organisation_holiday_calendars(
+        self, organisation_id: int, calendar_ids: frozenset[int]
+    ) -> None:
+        self.state.organisation_holidays[organisation_id] = calendar_ids
+
+    async def get_group_holidays(self, group_id: int) -> GroupHolidays:
+        return self.state.group_holidays.get(group_id, GroupHolidays())
+
+    async def save_group_holidays(self, group_id: int, holidays: GroupHolidays) -> None:
+        self.state.group_holidays[group_id] = holidays
 
     async def save_meeting(self, booking_id: int, meeting: MeetingRef) -> None:
         self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], meeting=meeting)
