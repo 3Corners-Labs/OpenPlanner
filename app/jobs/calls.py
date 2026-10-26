@@ -13,10 +13,17 @@ import structlog
 
 from app.adapters.db.jobs import ClaimedJob
 from app.domain.call_service import CallService
+from app.domain.calls import EventKind
 from app.domain.job_plan import JobType, is_stale
 from app.domain.ports import UnitOfWork
 
 log = structlog.get_logger()
+
+FAILURE_EVENTS = {
+    JobType.CREATE_VIDEO_ROOM: EventKind.MEETING_FAILED,
+    JobType.DISPATCH_WXCC_TASK: EventKind.TASK_FAILED,
+}
+"""Timeline event of a job's final failure; other call jobs record ``integration_error``."""
 
 CALL_JOBS = frozenset(
     {
@@ -74,5 +81,5 @@ class CallJobs:
 
     async def record_failure(self, job: ClaimedJob, code: str) -> None:
         """Put a job's final failure on the booking's timeline."""
-        dispatch = job.type is JobType.DISPATCH_WXCC_TASK
-        await self._calls.record_failure(job.booking_id, code, dispatch=dispatch)
+        kind = FAILURE_EVENTS.get(job.type, EventKind.INTEGRATION_ERROR)
+        await self._calls.record_failure(job.booking_id, code, kind)

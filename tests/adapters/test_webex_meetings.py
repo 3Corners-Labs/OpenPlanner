@@ -6,6 +6,7 @@ from datetime import timedelta
 
 import httpx
 import pytest
+from structlog.testing import capture_logs
 
 from app.adapters.webex_meetings import WebexMeetings
 from app.domain.booking import MeetingRef
@@ -77,3 +78,14 @@ async def test_unexpected_answer_is_not_retried() -> None:
 
     with pytest.raises(IntegrationError, match="unexpected_response"):
         await meetings.create_meeting(REQUEST)
+
+
+async def test_a_refused_meeting_logs_webexs_reason() -> None:
+    body = {"message": "Invalid hostEmail.", "trackingId": "ROUTER_789"}
+    meetings = _meetings(lambda request: httpx.Response(400, json=body))
+
+    with capture_logs() as logs, pytest.raises(IntegrationError, match="rejected_400"):
+        await meetings.create_meeting(REQUEST)
+
+    refused = next(entry for entry in logs if entry["event"] == "integration.refused")
+    assert (refused["reason"], refused["tracking_id"]) == ("Invalid hostEmail.", "ROUTER_789")

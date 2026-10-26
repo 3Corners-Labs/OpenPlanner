@@ -67,6 +67,7 @@ def picked_up(booking_id: int, wait_minutes: int) -> DirectCall:
         (call(1, task=TaskState.FAILED), QueuePhase.DONE),
         (call(1, task=TaskState.CANCELLED), QueuePhase.DONE),
         (call(1, task=TaskState.CONNECTED, call=CallState.ENDED), QueuePhase.DONE),
+        (call(1, task=TaskState.NONE, call=CallState.FAILED), QueuePhase.DONE),  # no meeting
         (call(1, active=False), QueuePhase.DONE),  # cancelled booking
     ],
 )

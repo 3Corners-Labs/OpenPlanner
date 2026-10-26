@@ -1193,6 +1193,9 @@ msgstr "Call in progress"
 msgid "call.state.ended"
 msgstr "Ended"
 
+msgid "call.state.failed"
+msgstr "Failed"
+
 msgid "call.task.none"
 msgstr "No task yet"
 
@@ -1249,6 +1252,39 @@ msgstr "Meeting ended"
 
 msgid "call.event.integration_error"
 msgstr "Integration failed"
+
+msgid "call.event.meeting_failed"
+msgstr "Creating the video meeting failed"
+
+msgid "call.hint.meeting.rejected_400"
+msgstr "Webex refused the meeting. Usually this group's Webex host (Settings) is not a user with a Meetings licence in the Service App's Webex organisation, or the Service App may not schedule on that host's behalf. Webex's reason is in the worker log at integration.refused, with a trackingId. A new or rescheduled booking tries again."
+
+msgid "call.hint.meeting.rejected_403"
+msgstr "Webex denied access: the Service App lacks the scope to schedule meetings or has not been authorised by an administrator of the Webex organisation. Fix that in Control Hub, then put a new refresh token in WEBEX_REFRESH_TOKEN."
+
+msgid "call.hint.meeting.rejected_404"
+msgstr "Webex does not know this group's Webex host. Check the email address under Settings."
+
+msgid "call.hint.meeting.other"
+msgstr "The video meeting could not be created. The code is the reason; the worker log has more at integration.refused and job.failed."
+
+msgid "call.hint.task.meeting_missing"
+msgstr "The task waited for the video meeting, but it never came. Fix the meeting failure first."
+
+msgid "call.hint.task.other"
+msgstr "Webex Contact Center did not accept the task. Check the group's entry point and channel under Settings and the WxCC setup under Integrations; the code is WxCC's reason."
+
+msgid "call.hint.integration.other"
+msgstr "Webex refused a request. Webex's reason is in the worker log at integration.refused, with a trackingId."
+
+msgid "call.hint.unauthorized"
+msgstr "Webex did not accept the Service App's token. Check the status under Integrations and, if needed, put a new refresh token in WEBEX_REFRESH_TOKEN."
+
+msgid "call.hint.unavailable"
+msgstr "Webex was unreachable or overloaded after every retry. This is usually temporary; if it repeats, check status.webex.com."
+
+msgid "call.hint.unexpected_response"
+msgstr "Webex sent an answer OpenPlanner does not recognise. Report the time to the OpenPlanner administrator."
 
 msgid "call.kind.scheduled"
 msgstr "Appointment"

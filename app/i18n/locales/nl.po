@@ -1193,6 +1193,9 @@ msgstr "Gesprek bezig"
 msgid "call.state.ended"
 msgstr "Afgelopen"
 
+msgid "call.state.failed"
+msgstr "Mislukt"
+
 msgid "call.task.none"
 msgstr "Nog geen taak"
 
@@ -1249,6 +1252,39 @@ msgstr "Meeting beëindigd"
 
 msgid "call.event.integration_error"
 msgstr "Koppeling mislukt"
+
+msgid "call.event.meeting_failed"
+msgstr "Videomeeting aanmaken mislukt"
+
+msgid "call.hint.meeting.rejected_400"
+msgstr "Webex weigerde de meeting. Meestal is de Webex-host van deze groep (Instellingen) geen gebruiker met een Meetings-licentie in de Webex-organisatie van de Service App, of mag de Service App niet namens die host plannen. De reden van Webex staat in het worker-log bij integration.refused, met een trackingId. Een nieuwe of verplaatste afspraak probeert het opnieuw."
+
+msgid "call.hint.meeting.rejected_403"
+msgstr "Webex weigerde de toegang: de Service App mist de scope om meetings te plannen of is niet geautoriseerd door een beheerder van de Webex-organisatie. Pas dat aan in Control Hub en zet daarna een nieuw refresh-token in WEBEX_REFRESH_TOKEN."
+
+msgid "call.hint.meeting.rejected_404"
+msgstr "Webex kent de Webex-host van deze groep niet. Controleer het e-mailadres onder Instellingen."
+
+msgid "call.hint.meeting.other"
+msgstr "De videomeeting kon niet worden aangemaakt. De code is de reden; meer staat in het worker-log bij integration.refused en job.failed."
+
+msgid "call.hint.task.meeting_missing"
+msgstr "De taak wachtte op de videomeeting, maar die kwam er niet. Los eerst de fout bij de meeting op."
+
+msgid "call.hint.task.other"
+msgstr "Webex Contact Center nam de taak niet aan. Controleer het entry point en kanaal van de groep onder Instellingen en de WxCC-inrichting onder Koppelingen; de code is de reden van WxCC."
+
+msgid "call.hint.integration.other"
+msgstr "Webex weigerde een aanroep. De reden van Webex staat in het worker-log bij integration.refused, met een trackingId."
+
+msgid "call.hint.unauthorized"
+msgstr "Webex accepteerde het token van de Service App niet. Bekijk de status onder Koppelingen en zet zo nodig een nieuw refresh-token in WEBEX_REFRESH_TOKEN."
+
+msgid "call.hint.unavailable"
+msgstr "Webex was na alle nieuwe pogingen niet bereikbaar of overbelast. Dit is meestal tijdelijk; kijk bij herhaling op status.webex.com."
+
+msgid "call.hint.unexpected_response"
+msgstr "Webex gaf een antwoord dat OpenPlanner niet herkent. Meld het tijdstip aan de beheerder van OpenPlanner."
 
 msgid "call.kind.scheduled"
 msgstr "Afspraak"
