@@ -495,7 +495,7 @@ msgid "admin.matrix.no"
 msgstr "Nee"
 
 msgid "admin.matrix.citizen"
-msgstr "Burgers (zonder inloggen)"
+msgstr "Deelnemers (zonder inloggen)"
 
 msgid "admin.matrix.action"
 msgstr "Handeling"
@@ -771,13 +771,13 @@ msgid "admin.field.horizon_days"
 msgstr "Vooruit boeken (dagen)"
 
 msgid "admin.field.horizon_days_hint"
-msgstr "Hoe ver vooruit burgers kunnen boeken, 1 tot 366 dagen."
+msgstr "Hoe ver vooruit deelnemers kunnen boeken, 1 tot 366 dagen."
 
 msgid "admin.field.dispatch_lead_minutes"
 msgstr "Doorzetten naar de wachtrij (minuten vooraf)"
 
 msgid "admin.field.dispatch_lead_minutes_hint"
-msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de burger. 0 tot 60."
+msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de deelnemer. 0 tot 60."
 
 msgid "admin.field.phone_mode"
 msgstr "Telefoonnummer op het formulier"
@@ -797,7 +797,7 @@ msgid "admin.field.capacity"
 msgstr "Gelijktijdige gesprekken"
 
 msgid "admin.field.capacity_hint"
-msgstr "Hoeveel burgers op hetzelfde moment kunnen beginnen."
+msgstr "Hoeveel deelnemers in hetzelfde tijdslot kunnen boeken."
 
 msgid "admin.field.valid_from"
 msgstr "Geldig vanaf"
@@ -870,7 +870,7 @@ msgid "admin.form.error.day"
 msgstr "Kies een datum vanaf vandaag."
 
 msgid "admin.form.error.overlap"
-msgstr "Deze tijden overlappen met een bestaand blok op die dag."
+msgstr "Deze tijden overlappen met een bestaande openingstijd op die dag."
 
 msgid "admin.form.error.override_conflict"
 msgstr "Voor deze datum bestaat al een uitzondering die hiermee botst."
@@ -879,7 +879,7 @@ msgid "admin.hours.title"
 msgstr "Openingstijden per week"
 
 msgid "admin.hours.lead"
-msgstr "Per dag één of meer blokken. Burgers zien alleen tijdsloten die helemaal in een blok passen."
+msgstr "Per dag één of meer openingstijden. Elke openingstijd wordt verdeeld in tijdsloten van de gespreksduur; deelnemers boeken een tijdslot."
 
 msgid "admin.hours.manage"
 msgstr "Openingstijden beheren"
@@ -894,16 +894,22 @@ msgid "admin.hours.validity"
 msgstr "{start} t/m {end}"
 
 msgid "admin.hours.add"
-msgstr "Blok toevoegen"
+msgstr "Openingstijd toevoegen"
 
 msgid "admin.hours.add_lead"
-msgstr "Bestaande afspraken blijven staan; het nieuwe blok geldt voor nieuwe afspraken."
+msgstr "Bestaande afspraken blijven staan; de nieuwe openingstijd geldt voor nieuwe afspraken."
 
 msgid "admin.hours.add_button"
-msgstr "Blok toevoegen"
+msgstr "Openingstijd toevoegen"
+
+msgid "admin.hours.add_link"
+msgstr "Toevoegen"
+
+msgid "admin.hours.add_label"
+msgstr "Openingstijd op {day} toevoegen"
 
 msgid "admin.hours.remove_label"
-msgstr "Blok {day} {time} verwijderen"
+msgstr "Openingstijd {day} {time} verwijderen"
 
 msgid "admin.exceptions.upcoming"
 msgstr "Komende uitzonderingen"
@@ -942,7 +948,7 @@ msgid "admin.exceptions.remove_label"
 msgstr "Uitzondering op {day} verwijderen"
 
 msgid "admin.preview.title"
-msgstr "Zo zien burgers het"
+msgstr "Zo zien deelnemers het"
 
 msgid "admin.preview.lead"
 msgstr "De komende twee weken, vóór boekingen en aanlooptijd."
@@ -999,7 +1005,7 @@ msgid "admin.field.direct_call_enabled"
 msgstr "Direct gesprek starten"
 
 msgid "admin.field.direct_call_enabled_hint"
-msgstr "Burgers kunnen binnen de openingstijden meteen een gesprek starten."
+msgstr "Deelnemers kunnen binnen de openingstijden meteen een gesprek starten."
 
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Niet opgepakt na (minuten)"
@@ -1149,10 +1155,10 @@ msgid "call.event.meeting_deleted"
 msgstr "Videomeeting verwijderd"
 
 msgid "call.event.join_page_opened"
-msgstr "Burger opende de deelnamepagina"
+msgstr "Deelnemer opende de deelnamepagina"
 
 msgid "call.event.join_clicked"
-msgstr "Burger klikte op deelnemen"
+msgstr "Deelnemer klikte op deelnemen"
 
 msgid "call.event.task_created"
 msgstr "Taak in de wachtrij van het contactcenter gezet"
@@ -1212,7 +1218,7 @@ msgid "admin.agenda.time"
 msgstr "Tijd"
 
 msgid "admin.agenda.citizen"
-msgstr "Burger"
+msgstr "Deelnemer"
 
 msgid "admin.agenda.meeting"
 msgstr "Videomeeting"
@@ -1352,7 +1358,7 @@ msgid "admin.branding.none"
 msgstr "U beheert geen huisstijl van een organisatie."
 
 msgid "admin.branding.page_lead"
-msgstr "Zo zien burgers de afspraakpagina's van deze organisatie. Het beheerportaal zelf houdt één vaste stijl."
+msgstr "Zo zien deelnemers de afspraakpagina's van deze organisatie. Het beheerportaal zelf houdt één vaste stijl."
 
 msgid "admin.branding.preview"
 msgstr "Voorbeeld"
