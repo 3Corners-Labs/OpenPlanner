@@ -1,7 +1,21 @@
+{#- A 24-hour time ("clock") or dd-mm-yyyy date ("day") as text: native type="time" and
+    type="date" follow the browser locale (AM/PM, mm/dd/yyyy), not the page language. -#}
+{% macro typed_input(f, name, value, kind) -%}
+<input id="{{ name }}" name="{{ name }}" type="text" inputmode="numeric" value="{{ value }}" class="input--{{ kind }}"
+    autocomplete="off"
+    {%- if kind == "clock" %} maxlength="5" pattern="{{ f.clock_pattern }}"{% else %} maxlength="10" pattern="{{ f.day_pattern }}"{% endif %}
+    {%- if f.required and not f.readonly and f.kind in ("time", "date") %} required{% endif %}
+    {%- if f.error %} aria-invalid="true"{% endif %}
+    {%- if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}>
+{%- endmacro %}
+
 {#- One accessible input: visible label, hint and error linked with aria-describedby. -#}
 {% macro field(f) -%}
 <div class="field{% if f.kind == "textarea" %} field--wide{% endif %}{% if f.error %} field--error{% endif %}">
-  <label for="{{ f.name }}">{{ f.label }}{% if not f.required and not f.readonly %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</label>
+  <label for="{{ f.name }}">{{ f.label }}
+    {%- if f.kind == "time" %} <span class="field__format">{{ _("form.time_format") }}</span>
+    {%- elif f.kind in ("date", "datetime") %} <span class="field__format">{{ _("form.date_format") }}</span>{% endif %}
+    {%- if not f.required and not f.readonly %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</label>
   {%- if f.kind == "select" %}
   <select id="{{ f.name }}" name="{{ f.name }}"{% if f.required %} required{% endif %}{% if f.error %} aria-invalid="true"{% endif %}{% if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}>
     {%- for option in f.options %}
@@ -14,6 +28,16 @@
     {%- if f.error %} aria-invalid="true"{% endif %}
     {%- if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}
     {%- for key, value in f.attributes.items() if key != "rows" %} {{ key }}="{{ value }}"{% endfor %}>{{ f.value }}</textarea>
+  {%- elif f.kind == "time" %}
+  {{ typed_input(f, f.name, f.value, "clock") }}
+  {%- elif f.kind == "date" %}
+  {{ typed_input(f, f.name, f.date_text, "day") }}
+  {%- elif f.kind == "datetime" %}
+  <div class="field__pair">
+    {{ typed_input(f, f.name, f.moment_parts[0], "day") }}
+    <label for="{{ f.name }}_time" class="field__sublabel">{{ _("form.time") }} <span class="field__format">{{ _("form.time_format") }}</span></label>
+    {{ typed_input(f, f.name ~ "_time", f.moment_parts[1], "clock") }}
+  </div>
   {%- else %}
   <input id="{{ f.name }}" name="{{ f.name }}" type="{{ f.kind }}" value="{{ f.value }}"
     {%- if f.required and not f.readonly %} required{% endif %}

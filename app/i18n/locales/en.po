@@ -221,6 +221,15 @@ msgstr "We send the confirmation and the link to change the appointment here."
 msgid "form.phone"
 msgstr "Phone number"
 
+msgid "form.time"
+msgstr "Time"
+
+msgid "form.date_format"
+msgstr "dd-mm-yyyy"
+
+msgid "form.time_format"
+msgstr "hh:mm"
+
 msgid "form.optional"
 msgstr "(optional)"
 
@@ -861,7 +870,7 @@ msgid "admin.form.error.capacity"
 msgstr "Enter a number from 1 to 1000."
 
 msgid "admin.form.error.date"
-msgstr "Enter a valid date."
+msgstr "Enter a date as dd-mm-yyyy."
 
 msgid "admin.form.error.valid_to"
 msgstr "The end date must be on or after the start date."
@@ -1497,7 +1506,7 @@ msgid "admin.done.organisation_lifted"
 msgstr "Emergency closure lifted for teams: {count}."
 
 msgid "admin.form.error.moment"
-msgstr "Enter a date and time."
+msgstr "Enter a date (dd-mm-yyyy) and time (hh:mm)."
 
 msgid "admin.form.error.ends_at"
 msgstr "The end must be after the start and in the future."
