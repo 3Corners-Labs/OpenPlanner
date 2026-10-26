@@ -206,7 +206,7 @@ async def test_rights_page_shows_scope_per_permission(site: Site) -> None:
     text = (await site.client.get("/admin/rights")).text
 
     assert "Groepsbeheerder" in text
-    assert "Openingstijden en uitzonderingen beheren" in text
+    assert "Bezetting en afwijkende bezetting beheren" in text
     assert "Groepen: demo" in text
     assert "Groepsinstellingen wijzigen" not in text
 
@@ -217,7 +217,7 @@ async def test_group_page_lists_the_admins_rights_for_that_group(site: Site) -> 
 
     assert "Demo: videogesprek" in text
     assert "5 minuten voor de start" in text
-    assert "Openingstijden en uitzonderingen beheren" in text
+    assert "Bezetting en afwijkende bezetting beheren" in text
     assert "Groepsinstellingen wijzigen" not in text
 
 
