@@ -49,7 +49,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.RIGHTS_VIEW,
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
-        Permission.HOLIDAYS_ASSIGN,  # ADR 0024
+        Permission.HOLIDAYS_ASSIGN,  # ADR 0025
         Permission.GROUP_CREATE,
         Permission.GROUP_VIEW,
         Permission.GROUP_EDIT,
@@ -57,6 +57,8 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.TEXTS_MANAGE,
         Permission.REMINDERS_MANAGE,
         Permission.BOOKINGS_VIEW,
+        Permission.CLOSURE_MANAGE,
+        Permission.ORGANISATION_CLOSURE,
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -66,6 +68,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.SCHEDULE_MANAGE,
         Permission.TEXTS_MANAGE,
         Permission.BOOKINGS_VIEW,
+        Permission.CLOSURE_MANAGE,
     }
 
 
@@ -184,6 +187,7 @@ def test_citizen_actions_are_part_of_the_matrix() -> None:
         "citizen.booking_view": "management_link",
         "citizen.booking_change": "management_link_before_deadline",
         "citizen.booking_cancel": "management_link_before_deadline",
+        "citizen.suspended_booking_change": "management_link_while_suspended",
     }
 
 

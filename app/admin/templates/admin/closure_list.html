@@ -1,0 +1,22 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.closures.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.closures.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.closures.lead") }}</p>
+  </div>
+</div>
+<section class="card" aria-labelledby="organisations-heading">
+  <h2 id="organisations-heading">{{ _("admin.closures.organisations") }}</h2>
+  {% if organisations %}
+  <ul class="link-list">
+    {% for organisation in organisations %}
+    <li><a href="/admin/organisations/{{ organisation.slug }}/closure">{{ organisation.name }}</a></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>{{ _("admin.closures.none") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

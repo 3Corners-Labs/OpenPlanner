@@ -185,7 +185,7 @@ slug, time zone, numbers, times, dates, queue id), path slugs, item ids and the
 | Spoofing | A new group takes an admin path as its slug (`/admin/groups/new`) | Reserved slugs | `test_reserved_slugs_cannot_be_taken` |
 | Repudiation | An admin denies a change | Every change is audited in the same transaction, with the changed field names or `rule.add`-style keys (never values) | `test_settings_change_records_the_changed_fields`, `test_group_admin_manages_opening_hours_of_their_group` |
 
-## Flow: holiday calendars (ADR 0024)
+## Flow: holiday calendars (ADR 0025)
 
 Admins only. `GET/POST /admin/holidays`, `/admin/holidays/{calendar}` with `/days`,
 `/national`, `/days/{id}/delete` and `/delete`; `GET/POST /admin/organisations/{org}/holidays`;
@@ -203,6 +203,24 @@ outside: calendar name and slug, holiday date and name, a year, ticked calendar 
 | Tampering (XSS) | Markup in a calendar or holiday name | Jinja2 autoescape; names without control characters | `tests/domain/test_holidays.py::test_calendar_validates_slug_and_name` |
 | Tampering (CSRF) | A third-party site changes holidays in an admin's browser | Fetch Metadata check on every POST; changes need a recent login | `tests/admin/test_holiday_routes.py::test_cross_site_holiday_changes_are_refused` |
 | Repudiation | Who changed a calendar or a group's choice | Audit events `holidays.manage` (`<calendar>:holiday.add`), `holidays.assign` (`calendars`) and `schedule.manage` (`holidays.calendars`, `holiday.open`), never names or dates | `test_superuser_creates_and_fills_a_calendar`, `test_org_admin_chooses_calendars_for_their_organisation` |
+
+## Flow: emergency closure (ADR 0024)
+
+Admins: `GET/POST /admin/groups/{slug}/closure` and its `update`, `lift`, `reinstate`,
+`cancel`, `bookings/{id}/…` actions; `/admin/closures`, `/admin/organisations/{org}/closure`
+and `/lift`. Citizens: the notice on `/g/{slug}`, and `/b/{token}` for a booking on hold.
+Inputs from outside: notice texts, date-times, booking ids in paths, a chosen slot.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation | An admin closes, or handles the bookings of, a group or organisation outside their scope | One `RequirePermission` per route and `ClosureService` authorises again; `closure.manage` (group) and `organisation.closure` (organisation, not for group admins) in the matrix | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_closure_service.py::test_other_groups_admin_cannot_close_or_touch_bookings`, `test_group_admin_cannot_close_the_organisation` |
+| Tampering (IDOR) | Moving or cancelling another group's booking by putting its id under one's own group | The booking must belong to the authorised group, else `booking_not_found` (no hint it exists); only suspended bookings can be handled | `test_other_groups_admin_cannot_close_or_touch_bookings`, `test_reinstate_one_booking` |
+| Tampering (XSS) | Markup or scripts in the notice, shown on public pages and in mail | Plain text only, no control characters, at most 1000 characters; Jinja2 autoescape on pages and in the HTML mail; never a template (ADR 0009) | `tests/domain/test_closure.py::test_invalid_notice_texts_are_refused`, `tests/admin/test_closure_routes.py::test_group_admin_closes_the_team_and_citizens_see_why`, `tests/jobs/test_messages.py::test_suspension_carries_the_notice_and_no_join_link_or_calendar` |
+| Information disclosure | Personal data kept longer than needed while bookings are on hold | Purge at closure end + 30 days (ADR 0024); the admin list shows references and times only; the audit keeps keys and counts | `test_closing_suspends_covered_bookings_and_keeps_their_data`, `test_open_ended_closure_has_no_purge_until_it_ends`, `test_update_mails_everyone_on_hold_and_suspends_newly_covered` |
+| Denial of service | Bots book into a closed team, or start direct calls while it is closed | No slot inside a closure is offered or accepted (`group_closed`); direct calls off while active | `test_closed_group_offers_and_accepts_no_slots`, `test_no_direct_call_while_closed`, `tests/admin/test_closure_routes.py::test_closed_team_cannot_be_booked` |
+| Tampering | An update mail reaches citizens whose booking was already moved or cancelled | Closure mails only run while the booking is still suspended | `tests/domain/test_closure.py::test_closure_notices_only_go_to_bookings_still_on_hold`, `tests/jobs/test_runner.py::test_closure_notice_goes_only_to_bookings_on_hold` |
+| Tampering (CSRF) | A third-party site closes a team in an admin's browser | Fetch Metadata check on every POST; changes need a recent login (ADR 0015) | `tests/admin/test_group_routes.py::test_cross_site_changes_are_refused` (same dependency) |
+| Repudiation | An admin denies closing a team or cancelling appointments | Audited in the same transaction, per group, with counts | `test_closing_suspends_covered_bookings_and_keeps_their_data`, `test_org_admin_closes_and_lifts_every_group_of_the_organisation` |
 
 ## Flow: video meetings, work items and direct calls (WP5/WP6)
 

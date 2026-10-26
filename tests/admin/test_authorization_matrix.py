@@ -79,7 +79,7 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/organisations/{org}/branding/logo/remove": {
         "/admin/organisations/demo/branding/logo/remove": statuses(303, 403, 403, 403, 403),
     },
-    # Holiday calendars (ADR 0024): the superuser maintains them; organisation admins choose
+    # Holiday calendars (ADR 0025): the superuser maintains them; organisation admins choose
     # them for their own organisation; group admins choose for their own groups (below).
     "GET /admin/holidays": {"/admin/holidays": statuses(200, 200, 403, 200, 403)},
     "POST /admin/holidays": {"/admin/holidays": statuses(422, 403, 403, 403, 403)},
@@ -236,6 +236,60 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/groups/{slug}/exceptions/{override_id}/delete": {
         "/admin/groups/demo/exceptions/999999/delete": statuses(404, 404, 404, 403, 403),
         "/admin/groups/andere-team/exceptions/999999/delete": statuses(404, 403, 403, 404, 403),
+    },
+    # Emergency closure of one group (ADR 0024): the team's own admins and organisation admins.
+    "GET /admin/groups/{slug}/closure": {
+        "/admin/groups/demo/closure": statuses(200, 200, 200, 403, 403),
+        "/admin/groups/andere-team/closure": statuses(200, 403, 403, 200, 403),
+    },
+    "POST /admin/groups/{slug}/closure": {
+        "/admin/groups/demo/closure": statuses(422, 422, 422, 403, 403),
+        "/admin/groups/andere-team/closure": statuses(422, 403, 403, 422, 403),
+    },
+    # Without a closure there is nothing to update (422) or lift (404).
+    "POST /admin/groups/{slug}/closure/update": {
+        "/admin/groups/demo/closure/update": statuses(422, 422, 422, 403, 403),
+    },
+    "POST /admin/groups/{slug}/closure/lift": {
+        "/admin/groups/demo/closure/lift": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/closure/lift": statuses(404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/closure/reinstate": {
+        "/admin/groups/demo/closure/reinstate": statuses(303, 303, 303, 403, 403),
+    },
+    "POST /admin/groups/{slug}/closure/cancel": {
+        "/admin/groups/demo/closure/cancel": statuses(303, 303, 303, 403, 403),
+        "/admin/groups/andere-team/closure/cancel": statuses(303, 403, 403, 303, 403),
+    },
+    "POST /admin/groups/{slug}/closure/bookings/{booking_id}/reinstate": {
+        "/admin/groups/demo/closure/bookings/999999/reinstate": statuses(404, 404, 404, 403, 403),
+    },
+    "POST /admin/groups/{slug}/closure/bookings/{booking_id}/cancel": {
+        "/admin/groups/demo/closure/bookings/999999/cancel": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/closure/bookings/999999/cancel": statuses(
+            404, 403, 403, 404, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/closure/bookings/{booking_id}/move": {
+        "/admin/groups/demo/closure/bookings/999999/move": statuses(404, 404, 404, 403, 403),
+    },
+    # An empty move form has no slot: 400 before anything is looked up.
+    "POST /admin/groups/{slug}/closure/bookings/{booking_id}/move": {
+        "/admin/groups/demo/closure/bookings/999999/move": statuses(400, 400, 400, 403, 403),
+    },
+    # Emergency closure of a whole organisation: organisation admins and the superuser.
+    "GET /admin/closures": {"/admin/closures": statuses(200, 200, 403, 200, 403)},
+    "GET /admin/organisations/{org}/closure": {
+        "/admin/organisations/demo/closure": statuses(200, 200, 403, 403, 403),
+        "/admin/organisations/andere/closure": statuses(200, 403, 403, 200, 403),
+        "/admin/organisations/nope/closure": statuses(404, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/closure": {
+        "/admin/organisations/demo/closure": statuses(422, 422, 403, 403, 403),
+        "/admin/organisations/andere/closure": statuses(422, 403, 403, 422, 403),
+    },
+    "POST /admin/organisations/{org}/closure/lift": {
+        "/admin/organisations/demo/closure/lift": statuses(303, 303, 403, 403, 403),
     },
 }
 

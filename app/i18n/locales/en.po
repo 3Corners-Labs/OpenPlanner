@@ -1402,6 +1402,316 @@ msgstr "Upload logo"
 msgid "admin.branding.logo_remove"
 msgstr "Remove logo"
 
+# Emergency closure (ADR 0024)
+msgid "closure.banner.title_active"
+msgstr "Temporarily closed"
+
+msgid "closure.banner.title_upcoming"
+msgstr "Please note: temporarily closed soon"
+
+msgid "closure.banner.period"
+msgstr "Closed from {start} until {end}."
+
+msgid "closure.banner.period_open"
+msgstr "Closed from {start} until further notice."
+
+msgid "manage.status.suspended"
+msgstr "On hold"
+
+msgid "manage.suspended.title"
+msgstr "Your appointment cannot go ahead at this time"
+
+msgid "manage.suspended.text"
+msgstr "Choose a new time below or cancel the appointment. Your details have been kept, so you do not need to fill anything in again."
+
+msgid "manage.suspended.reschedule"
+msgstr "Choose a new time"
+
+msgid "error.group_closed"
+msgstr "This team is temporarily closed. Please choose another time."
+
+msgid "message.suspension.subject"
+msgstr "Your video call on {date} cannot go ahead"
+
+msgid "message.suspension.intro"
+msgstr "Because of an unforeseen situation, your video call with {group_name} on {date} at {time} cannot go ahead. Your appointment is on hold; we have kept your details."
+
+msgid "message.closure_update.subject"
+msgstr "News about your video call on {date}"
+
+msgid "message.closure_update.intro"
+msgstr "There is news about the temporary closure of {group_name}. Your appointment on {date} at {time} is still on hold."
+
+msgid "message.reinstatement.subject"
+msgstr "Your video call on {date} will go ahead after all"
+
+msgid "message.reinstatement.intro"
+msgstr "Good news: your video call with {group_name} on {date} at {time} will go ahead after all, at the original time."
+
+msgid "message.manage_suspended"
+msgstr "Use the link below to choose a new time or cancel the appointment. You do not need to enter your details again."
+
+msgid "message.closure_notice"
+msgstr "What is going on"
+
+msgid "authz.permission.closure_manage"
+msgstr "Close a team in an emergency and handle appointments on hold"
+
+msgid "authz.permission.organisation_closure"
+msgstr "Close every team of an organisation at once"
+
+msgid "authz.citizen.suspended_booking_change"
+msgstr "Move or cancel an appointment on hold"
+
+msgid "authz.condition.management_link_while_suspended"
+msgstr "with the management link, while the appointment is on hold"
+
+msgid "admin.tab.closure"
+msgstr "Emergency closure"
+
+msgid "admin.nav.closures"
+msgstr "Emergency closure"
+
+msgid "admin.done.closure_started"
+msgstr "The emergency closure is in place. Appointments on hold: {count}. The citizens receive an email."
+
+msgid "admin.done.closure_updated"
+msgstr "The emergency closure has been updated. Update emails: {count}."
+
+msgid "admin.done.closure_lifted"
+msgstr "The emergency closure has been lifted. Appointments confirmed again: {count}."
+
+msgid "admin.done.reinstated"
+msgstr "Appointments confirmed again: {count}. The citizens are informed."
+
+msgid "admin.done.cancelled"
+msgstr "Appointments cancelled: {count}. The citizens are informed."
+
+msgid "admin.done.moved"
+msgstr "The appointment has been moved. The citizen receives an email with the new time."
+
+msgid "admin.done.organisation_closed"
+msgstr "Teams closed: {count}. Teams that were already closed are unchanged."
+
+msgid "admin.done.organisation_lifted"
+msgstr "Emergency closure lifted for teams: {count}."
+
+msgid "admin.form.error.moment"
+msgstr "Enter a date and time."
+
+msgid "admin.form.error.ends_at"
+msgstr "The end must be after the start and in the future."
+
+msgid "admin.form.error.notice"
+msgstr "Enter an explanation of at most 1000 characters, without special characters."
+
+msgid "admin.form.error.start"
+msgstr "Choose a free time."
+
+msgid "admin.form.error.closure_exists"
+msgstr "This team already has an emergency closure. Change it, or lift it first."
+
+msgid "admin.form.error.closure_not_found"
+msgstr "This team has no current emergency closure."
+
+msgid "admin.audit.detail.closure_start"
+msgstr "emergency closure started"
+
+msgid "admin.audit.detail.closure_update"
+msgstr "emergency closure updated"
+
+msgid "admin.audit.detail.closure_lift"
+msgstr "emergency closure lifted"
+
+msgid "admin.audit.detail.booking_reinstate"
+msgstr "appointment confirmed again"
+
+msgid "admin.audit.detail.booking_reinstate_all"
+msgstr "appointments on hold confirmed again"
+
+msgid "admin.audit.detail.booking_cancel"
+msgstr "appointment on hold cancelled"
+
+msgid "admin.audit.detail.booking_cancel_all"
+msgstr "all appointments on hold cancelled"
+
+msgid "admin.audit.detail.booking_move"
+msgstr "appointment on hold moved"
+
+msgid "admin.audit.detail.bookings"
+msgstr "appointments: {count}"
+
+msgid "admin.audit.detail.notified"
+msgstr "emails: {count}"
+
+msgid "admin.closure.starts_at"
+msgstr "Start"
+
+msgid "admin.closure.starts_at_hint"
+msgstr "Leave empty to close right away. Team time."
+
+msgid "admin.closure.ends_at"
+msgstr "End"
+
+msgid "admin.closure.ends_at_hint"
+msgstr "Leave empty for until further notice. Team time."
+
+msgid "admin.closure.notice_nl"
+msgstr "Explanation for citizens (Dutch)"
+
+msgid "admin.closure.notice_en"
+msgstr "Explanation for citizens (English)"
+
+msgid "admin.closure.notice_hint"
+msgstr "Shown on the booking page and in the email. Plain text, at most {limit} characters; no personal data."
+
+msgid "admin.closure.current"
+msgstr "Current emergency closure"
+
+msgid "admin.closure.current_lead"
+msgstr "This is how citizens see the notice on the booking page."
+
+msgid "admin.closure.update"
+msgstr "Change the emergency closure"
+
+msgid "admin.closure.update_lead"
+msgstr "Extend or shorten the closure and update the explanation. Appointments that a later end brings inside the closure are put on hold."
+
+msgid "admin.closure.notify"
+msgstr "Email the new explanation to every citizen with an appointment on hold ({count})"
+
+msgid "admin.closure.update_button"
+msgstr "Save"
+
+msgid "admin.closure.lift"
+msgstr "Lift the emergency closure"
+
+msgid "admin.closure.lift_lead"
+msgstr "The team can be booked again right away. Appointments on hold stay until they are moved, confirmed or cancelled."
+
+msgid "admin.closure.lift_reinstate"
+msgstr "Confirm again the appointments that can still go ahead (the citizen is informed)"
+
+msgid "admin.closure.lift_button"
+msgstr "Lift"
+
+msgid "admin.closure.start"
+msgstr "Close the team in an emergency"
+
+msgid "admin.closure.start_lead"
+msgstr "{count} confirmed appointments lie ahead. Appointments inside the closure are put on hold, not deleted: the citizen gets an email with your explanation and can choose a new time."
+
+msgid "admin.closure.start_button"
+msgstr "Close the team"
+
+msgid "admin.closure.suspended"
+msgstr "Appointments on hold"
+
+msgid "admin.closure.suspended_lead"
+msgstr "Details are kept until the appointment is resolved, at the latest 30 days after the closure ends."
+
+msgid "admin.closure.reference"
+msgstr "Reference"
+
+msgid "admin.closure.original_time"
+msgstr "Original time"
+
+msgid "admin.closure.purged"
+msgstr "Details removed"
+
+msgid "admin.closure.move"
+msgstr "Move"
+
+msgid "admin.closure.move_label"
+msgstr "Move appointment {reference}"
+
+msgid "admin.closure.reinstate"
+msgstr "Confirm again"
+
+msgid "admin.closure.reinstate_label"
+msgstr "Confirm appointment {reference} again"
+
+msgid "admin.closure.cancel"
+msgstr "Cancel"
+
+msgid "admin.closure.cancel_label"
+msgstr "Cancel appointment {reference}"
+
+msgid "admin.closure.reinstate_all"
+msgstr "Confirm everything that can go ahead"
+
+msgid "admin.closure.cancel_all"
+msgstr "Cancel every appointment on hold"
+
+msgid "admin.closure.none_suspended"
+msgstr "There are no appointments on hold."
+
+msgid "admin.closure.move_title"
+msgstr "Move appointment {reference}"
+
+msgid "admin.closure.move_lead"
+msgstr "Original time: {when}. The citizen gets an email with the new time and a new management link."
+
+msgid "admin.closure.move_start"
+msgstr "New time"
+
+msgid "admin.closure.move_hint"
+msgstr "Free times in the next {days} days."
+
+msgid "admin.closure.move_button"
+msgstr "Move"
+
+msgid "admin.closure.move_none"
+msgstr "There are no free times in the coming weeks."
+
+msgid "admin.closure.back"
+msgstr "Back to the emergency closure"
+
+msgid "admin.closures.title"
+msgstr "Emergency closure"
+
+msgid "admin.closures.lead"
+msgstr "Close every team of an organisation at once, for example during an outage or when a building is closed."
+
+msgid "admin.closures.organisations"
+msgstr "Organisations"
+
+msgid "admin.closures.none"
+msgstr "You cannot close an organisation as a whole."
+
+msgid "admin.closures.organisation_title"
+msgstr "Emergency closure {name}"
+
+msgid "admin.closures.organisation_lead"
+msgstr "For each team you see whether it is closed. A team that is already closed stays unchanged."
+
+msgid "admin.closures.groups"
+msgstr "Teams"
+
+msgid "admin.closures.state"
+msgstr "Status"
+
+msgid "admin.closures.open"
+msgstr "Open"
+
+msgid "admin.closures.no_groups"
+msgstr "This organisation has no teams yet."
+
+msgid "admin.closures.start"
+msgstr "Close every team"
+
+msgid "admin.closures.start_lead"
+msgstr "Appointments inside the closure are put on hold, not deleted; every citizen gets an email with your explanation. Times are in the teams' time zone."
+
+msgid "admin.closures.start_button"
+msgstr "Close every team"
+
+msgid "admin.closures.lift"
+msgstr "Lift the emergency closure for every team"
+
+msgid "admin.closures.lift_button"
+msgstr "Lift everything"
+
 msgid "message.reminder.sms"
 msgstr "Dear {first_name}, reminder: video call with {group_name} on {date} at {time}. Change or cancel: {manage_url}"
 

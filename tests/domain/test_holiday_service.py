@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -85,6 +86,19 @@ async def test_holidays_close_citizen_availability(uow: InMemoryUnitOfWork) -> N
     with pytest.raises(DomainError) as caught:
         await book(service, SLOT_0900, slug="demo")
     assert caught.value.code is ErrorCode.SLOT_UNAVAILABLE
+
+
+async def test_no_direct_call_on_a_holiday(uow: InMemoryUnitOfWork) -> None:
+    # Now is Thursday 1 January 2026, 09:00 in Amsterdam: inside the opening hours.
+    uow.state.groups[1] = replace(uow.state.groups[1], direct_call_enabled=True)
+    uow.state.rules[1].append(ScheduleRule(3, window("09:00", "10:00")))
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    open_before = await service.direct_call_available("demo")
+
+    uow.state.holidays[64] = Holiday(NATIONAL, NOW.date(), "Nieuwjaarsdag", id=64)
+
+    assert open_before
+    assert not await service.direct_call_available("demo")
 
 
 async def test_the_group_exception_on_a_holiday_wins(uow: InMemoryUnitOfWork) -> None:

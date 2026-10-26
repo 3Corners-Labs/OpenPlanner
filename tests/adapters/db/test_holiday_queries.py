@@ -1,4 +1,4 @@
-"""Holiday calendars (ADR 0024): storage, choices per organisation and group, availability."""
+"""Holiday calendars (ADR 0025): storage, choices per organisation and group, availability."""
 
 from datetime import date
 

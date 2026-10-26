@@ -35,6 +35,7 @@ from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
 from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
+from app.domain.closure_service import ClosureService
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
 from app.domain.messaging_service import MessagingService
@@ -130,6 +131,9 @@ def create_app(
         )
         app.state.organisation_service = OrganisationService(
             uow, clock, app.state.admin_service, app.state.translator.locales
+        )
+        app.state.closure_service = ClosureService(
+            uow, clock, app.state.admin_service, app.state.booking_service
         )
         app.state.api_access = ApiAccessService(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled

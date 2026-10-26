@@ -1128,6 +1128,23 @@ fieldset.card {
   text-decoration: underline;
 }
 
+/* --- Emergency closure (ADR 0024) --------------------------------------------------------- */
+
+.admin .form-grid .field:has(> textarea) {
+  grid-column: 1 / -1;
+}
+
+.admin .field textarea {
+  resize: vertical;
+}
+
+.admin .closure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 /* Machine API (ADR 0023): a new secret, shown once, selectable as one word. */
 .secret-value {
   display: block;

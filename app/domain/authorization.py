@@ -65,6 +65,8 @@ class Permission(StrEnum):
     TEXTS_MANAGE = "texts.manage"
     REMINDERS_MANAGE = "reminders.manage"
     BOOKINGS_VIEW = "bookings.view"
+    CLOSURE_MANAGE = "closure.manage"
+    ORGANISATION_CLOSURE = "organisation.closure"
     API_CLIENTS_MANAGE = "api_clients.manage"
 
 
@@ -85,6 +87,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.TEXTS_MANAGE: Level.GROUP,
     Permission.REMINDERS_MANAGE: Level.GROUP,
     Permission.BOOKINGS_VIEW: Level.GROUP,
+    Permission.CLOSURE_MANAGE: Level.GROUP,
+    Permission.ORGANISATION_CLOSURE: Level.ORGANISATION,
     Permission.API_CLIENTS_MANAGE: Level.GLOBAL,
 }
 
@@ -96,7 +100,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     # HANDOVER §6: everything, including organisations, IdP, SMTP and WxCC credentials.
     Role.SUPERUSER: frozenset(Permission),
     # HANDOVER §6: own organisation: groups, rules, overrides, texts, bookings of its groups;
-    # ADR 0024: which of the superuser's holiday calendars its groups follow.
+    # ADR 0025: which of the superuser's holiday calendars its groups follow.
     Role.ORG_ADMIN: _EVERY_ADMIN
     | {
         Permission.AUDIT_VIEW,
@@ -108,6 +112,9 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.TEXTS_MANAGE,
         Permission.REMINDERS_MANAGE,
         Permission.BOOKINGS_VIEW,
+        # ADR 0024: close one group or every group of the organisation at once.
+        Permission.CLOSURE_MANAGE,
+        Permission.ORGANISATION_CLOSURE,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: _EVERY_ADMIN
@@ -116,6 +123,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.SCHEDULE_MANAGE,
         Permission.TEXTS_MANAGE,
         Permission.BOOKINGS_VIEW,
+        # ADR 0024: the team itself can close in an emergency and handle its bookings.
+        Permission.CLOSURE_MANAGE,
     },
 }
 
@@ -134,6 +143,8 @@ CITIZEN_ACTIONS: tuple[CitizenAction, ...] = (
     CitizenAction("citizen.booking_view", "management_link"),
     CitizenAction("citizen.booking_change", "management_link_before_deadline"),
     CitizenAction("citizen.booking_cancel", "management_link_before_deadline"),
+    # ADR 0024: a booking on hold can be moved or cancelled until it is resolved.
+    CitizenAction("citizen.suspended_booking_change", "management_link_while_suspended"),
 )
 
 

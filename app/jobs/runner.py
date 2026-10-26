@@ -1,9 +1,10 @@
 """Run due jobs: message jobs through a ``MessageSender``, and the PII purge.
 
-Handled: confirmation, change, reminder (email and SMS), cancellation, purge, and, when Webex
-and WxCC are configured, meetings and work items (``app.jobs.calls``). Jobs of an
-unconfigured integration are not claimed; they wait. A message for an organisation without
-a sender on its channel fails at once as ``channel_not_configured`` (ADR 0022).
+Handled: confirmation, change, reminder (email and SMS), cancellation, the emergency closure
+messages (suspension, update, reinstatement; ADR 0024), purge, and, when Webex and WxCC are
+configured, meetings and work items (``app.jobs.calls``). Jobs of an unconfigured
+integration are not claimed; they wait. A message for an organisation without a sender on
+its channel fails at once as ``channel_not_configured`` (ADR 0022).
 
     claim due ─► stale? (pinned start changed / not confirmed / purged) ─► done, nothing sent
              ─► purge ─► NULL PII
@@ -155,6 +156,11 @@ class JobRunner:
         async with self._uow.read() as tx:
             booking = await tx.get_booking(job.booking_id)
             group = await tx.get_group_by_id(booking.group_id) if booking else None
+            closure = (
+                await tx.get_closure(booking.closure_id)
+                if booking and booking.closure_id is not None
+                else None
+            )
             texts = await tx.get_group_texts(group.id) if group else {}
         contact = booking.contact if booking else None
         if (
@@ -165,7 +171,7 @@ class JobRunner:
         ):
             log.info("job.skipped", job_id=job.id, reason="no_recipient")
             return
-        if is_stale(job.pinned_start, booking):
+        if is_stale(job.pinned_start, booking, job.type):
             log.info("job.skipped", job_id=job.id, reason="stale")
             return
         if self._senders is None:  # pragma: no cover - message jobs are not claimed then
@@ -174,7 +180,7 @@ class JobRunner:
         if sender is None:
             raise DomainError(ErrorCode.CHANNEL_NOT_CONFIGURED)
         message = self._composer.compose(
-            job.type, booking, group, now, channel=channel, texts=texts
+            job.type, booking, group, now, channel=channel, texts=texts, closure=closure
         )
         await sender.send(message)
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)

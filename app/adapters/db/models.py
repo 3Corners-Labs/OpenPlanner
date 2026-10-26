@@ -11,13 +11,15 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
     organisations 1──* channel_settings (SMTP and SMS per organisation, secret encrypted)
     admin_profiles (name per identity-provider subject; joined into the audit log)
     organisations 1──1 organisation_logos (branding, WP3b)
-    holiday_calendars 1──* holidays (ADR 0024; chosen through organisation_holiday_calendars
+    holiday_calendars 1──* holidays (ADR 0025; chosen through organisation_holiday_calendars
                          and group_holiday_calendars; group_holiday_open_days keep one open)
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
+                         │  └───* closures 1──* closure_notices (ADR 0024)
                          │  └───* group_texts (message texts per locale and block)
                          └──* slots 1──* bookings 1──* jobs
+                                         └──? closure (the one that suspended it)
 """
 
 from datetime import date, datetime, time
@@ -56,6 +58,8 @@ __all__ = [
     "BookingRow",
     "GroupHolidayCalendarRow",
     "GroupHolidayOpenDayRow",
+    "ClosureNoticeRow",
+    "ClosureRow",
     "GroupRow",
     "HolidayCalendarRow",
     "HolidayRow",
@@ -316,15 +320,41 @@ class BookingRow(Base):
     rescheduled_from_id: Mapped[int | None] = mapped_column(
         ForeignKey("bookings.id", ondelete="SET NULL")
     )
+    closure_id: Mapped[int | None] = mapped_column(ForeignKey("closures.id", ondelete="SET NULL"))
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),
         Index("ix_bookings_video_room_id", "video_room_id"),
         Index("ix_bookings_wxcc_task_id", "wxcc_task_id"),
         CheckConstraint(
-            "status IN ('confirmed', 'cancelled', 'completed', 'no_show')", name="status"
+            "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended')",
+            name="status",
         ),
     )
+
+
+class ClosureRow(Base):
+    """An emergency closure of a group (ADR 0024); ``ends_at`` NULL until it is lifted."""
+
+    __tablename__ = "closures"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="RESTRICT"), index=True)
+    starts_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    ends_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class ClosureNoticeRow(Base):
+    """The text citizens see about a closure, in one locale. Written by an admin; no PII."""
+
+    __tablename__ = "closure_notices"
+
+    closure_id: Mapped[int] = mapped_column(
+        ForeignKey("closures.id", ondelete="CASCADE"), primary_key=True
+    )
+    locale: Mapped[str] = mapped_column(String(16), primary_key=True)
+    text: Mapped[str] = mapped_column(String(1000))
 
 
 class JobRow(Base):

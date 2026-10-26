@@ -4,6 +4,7 @@ import pytest
 
 from app.domain.booking import Booking, BookingStatus, Contact
 from app.domain.channels import ChannelKind
+from app.domain.closure import Closure
 from app.domain.job_plan import JobType
 from app.domain.scheduling import PhoneMode
 from app.domain.tokens import derive_token, new_token_salt
@@ -171,3 +172,53 @@ def test_group_texts_replace_blocks_in_their_locale_only(composer: MessageCompos
     assert english.subject.startswith("Reminder:")
     assert "Kind regards, the Aangifte <Inkomstenbelasting> team" in english.text
     assert "the Aangifte &lt;Inkomstenbelasting&gt; team" in (english.html or "")
+
+
+# --- emergency closure (ADR 0024) ----------------------------------------------------------
+
+CLOSURE = Closure(
+    1,
+    1,
+    SLOT_0900,
+    None,
+    {"nl": "Storing.\nWe bellen <niet>.", "en": "Outage."},
+    NOW,
+)
+
+
+def test_suspension_carries_the_notice_and_no_join_link_or_calendar(
+    composer: MessageComposer,
+) -> None:
+    booking = replace(BOOKING, status=BookingStatus.SUSPENDED, closure_id=1)
+    video = replace(GROUP, video_host_email="host@example.org")
+
+    message = composer.compose(JobType.SEND_SUSPENSION, booking, video, NOW, closure=CLOSURE)
+
+    assert message.subject == "Uw videogesprek op maandag 5 januari 2026 kan niet doorgaan"
+    assert "Toelichting:\nStoring.\nWe bellen <niet>." in message.text
+    assert "<p>We bellen &lt;niet&gt;.</p>" in (message.html or "")
+    assert "/join" not in message.text
+    assert "kiest u een nieuwe tijd" in message.text
+    assert message.attachments == ()
+
+
+def test_closure_update_in_english(composer: MessageComposer) -> None:
+    booking = replace(BOOKING, status=BookingStatus.SUSPENDED, closure_id=1, locale="en")
+
+    message = composer.compose(JobType.SEND_CLOSURE_UPDATE, booking, GROUP, NOW, closure=CLOSURE)
+
+    assert message.subject.startswith("News about your video call")
+    assert "Outage." in message.text
+
+
+def test_closure_message_needs_the_closure(composer: MessageComposer) -> None:
+    with pytest.raises(ValueError, match="closure"):
+        composer.compose(JobType.SEND_SUSPENSION, BOOKING, GROUP, NOW)
+
+
+def test_reinstatement_has_the_calendar_and_no_notice(composer: MessageComposer) -> None:
+    message = composer.compose(JobType.SEND_REINSTATEMENT, BOOKING, GROUP, NOW, closure=CLOSURE)
+
+    assert "gaat toch door" in message.subject
+    assert "Storing." not in message.text
+    assert [a.filename for a in message.attachments] == ["afspraak.ics"]

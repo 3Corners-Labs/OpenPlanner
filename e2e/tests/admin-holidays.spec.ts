@@ -1,5 +1,5 @@
 /**
- * Holiday calendars (ADR 0024) through the real identity provider: the superuser fills the
+ * Holiday calendars (ADR 0025) through the real identity provider: the superuser fills the
  * national calendar with the keyboard and lets an organisation follow it; an organisation admin
  * may choose calendars but not maintain them. Every page passes axe (WCAG 2.2 AA).
  *

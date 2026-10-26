@@ -427,6 +427,28 @@ Client secrets live only in the contact center's vault; OpenPlanner keeps their 
 - **Who did what:** the audit log shows client changes (`API-koppelingen beheren`), token
   requests and refused calls, with the client id as actor.
 
+## Emergency closure of a team (ADR 0024)
+
+When a team cannot hold its appointments (outage, illness, closed building):
+
+1. **Close.** Admin portal → the group → tab *Noodsluiting*. Leave *Begin* empty to close now;
+   leave *Einde* empty for "until further notice". Write the notice in Dutch and English (plain
+   text; no names or other personal data). For every team of an organisation at once:
+   *Noodsluiting* in the main menu (organisation admins).
+2. **What happens.** Nothing can be booked inside the closure and direct calls are off. Every
+   confirmed appointment inside it is put on hold: reminders and the WxCC task are cancelled and
+   the citizen gets an email with the notice and a link to choose a new time or cancel. The
+   group page shows the notice. Nothing is deleted.
+3. **Keep citizens informed.** Change the notice or the end on the same tab and tick *Stuur de
+   nieuwe toelichting…* to mail everyone still on hold.
+4. **Handle appointments.** In *Opgeschorte afspraken*: move one to a free time (the citizen
+   gets the new time and a new link), confirm it again, or cancel it; or do this for all at
+   once.
+5. **Reopen.** *Opheffen*, optionally confirming again every appointment that can still go
+   ahead (before its dispatch lead and outside any closure).
+6. **Retention.** Appointments still on hold lose their personal data 30 days after the end of
+   the closure. An open-ended closure keeps it until it is lifted, so lift or end it promptly.
+
 ## Webex or WxCC is down
 
 Bookings keep working: they are stored first, and meetings and work items are jobs.

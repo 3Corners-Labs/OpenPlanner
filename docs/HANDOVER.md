@@ -40,7 +40,7 @@ Group             (id, organisation_id, name, slug, wxcc_queue_id, slot_minutes,
 ScheduleRule      (id, group_id, weekday, opens, closes, capacity, valid_from, valid_to)
 ScheduleOverride  (id, group_id, date, opens, closes, capacity | closed=true)   # ziekte, afwijkende uren
 HolidayCalendar   (id, slug, name) + Holiday (calendar_id, date, name)   # superuser, herbruikbaar
-                   organisatie kiest kalenders; groep erft, kiest zelf of houdt een feestdag open (ADR 0024)
+                   organisatie kiest kalenders; groep erft, kiest zelf of houdt een feestdag open (ADR 0025)
 GroupPage         (group_id, title_nl/en, intro_nl/en, duration_label, phone_required: bool)
 Slot              (id, group_id, start, end, capacity_snapshot)   # ontstaat bij eerste boeking
 Booking           (id, slot_id, status[confirmed|cancelled|completed|no_show],
@@ -79,6 +79,8 @@ Regels:
 **T-5 naar WxCC.** `dispatch_wxcc_task` → check boeking nog geldig → POST naar Connect-webhook → sla `wxcc_task_id` op uit antwoord → bij fout: retry met backoff (3x) en daarna alert naar beheer.
 
 **Wijzigen/annuleren.** `GET /b/{token}` → toont boeking → `POST /b/{token}/cancel` of `/reschedule` → jobs opnieuw → mail.
+
+**Noodsluiting (ADR 0024, besluit product owner 2026-10-25).** Beheer sluit een groep (of alle groepen van een organisatie) per direct of vanaf een moment, met of zonder einde, met een toelichting in NL en EN → geen boekingen of direct bellen in die periode, melding op `/g/{slug}` → bevestigde afspraken in de periode worden `suspended` (niet verwijderd): herinneringen en WxCC-taak vervallen, burger krijgt mail met toelichting en link om zelf een nieuwe tijd te kiezen of te annuleren → beheer kan updates mailen, afspraken verzetten, weer bevestigen of annuleren (ook in bulk) → gegevens van nog opgeschorte afspraken worden uiterlijk 30 dagen na het einde van de sluiting gepurged (afwijking op §7, bevestigen in DPIA).
 
 **Niet opgepakt na X minuten (open punt O2).** Voorstel: Connect meldt via webhook `task.abandoned` terug; dienst stuurt sms/mail "we bellen u terug" en zet status `no_show_agent`. X per groep instelbaar, standaard 10 minuten.
 

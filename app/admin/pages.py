@@ -51,6 +51,7 @@ NAVIGATION = (
     ),
     NavItem("admin.nav.branding", "/admin/branding", Permission.BRANDING_MANAGE, "palette"),
     NavItem("admin.nav.holidays", "/admin/holidays", Permission.HOLIDAYS_ASSIGN, "holiday"),
+    NavItem("admin.nav.closures", "/admin/closures", Permission.ORGANISATION_CLOSURE, "alert"),
     NavItem("admin.nav.api", "/admin/api", Permission.API_CLIENTS_MANAGE, "key"),
 )
 
@@ -68,25 +69,26 @@ class NavView:
 def _is_current(request: Request, item: NavItem) -> bool:
     """Return whether ``item`` is the current section.
 
-    Group pages belong to the overview. An organisation's branding and holiday pages belong
-    to their own section (``/admin/organisations/{org}/branding`` to branding,
-    ``.../holidays`` to holidays), its channel pages to integrations, its other pages to
-    organisations.
+    Group pages belong to the overview. An organisation's branding, holiday and closure pages
+    belong to their own section (``/admin/organisations/{org}/branding`` to branding,
+    ``.../holidays`` to holidays, ``.../closure`` to closures), its channel pages to
+    integrations, its other pages to organisations.
     """
     path = request.url.path
-    section = path.rsplit("/", 1)[-1] if path.startswith("/admin/organisations/") else ""
-    own_section = section in {"branding", "holidays"}
-    channels = path.startswith("/admin/organisations/") and "/channels" in path
+    organisation_page = path.startswith("/admin/organisations/")
+    section = path.rsplit("/", 1)[-1] if organisation_page else ""
+    sections = {"branding": "branding", "holidays": "holidays", "closure": "closures"}
+    channels = organisation_page and "/channels" in path
     return (
         path == item.href
         or (item.href == "/admin/" and path.startswith("/admin/groups"))
         or (item.href == "/admin/holidays" and path.startswith("/admin/holidays/"))
-        or (own_section and item.href == f"/admin/{section}")
+        or (section in sections and item.href == f"/admin/{sections[section]}")
         or (item.href == "/admin/integrations" and channels)
         or (
             item.href == "/admin/organisations"
-            and bool(section)
-            and not own_section
+            and organisation_page
+            and section not in sections
             and not channels
         )
         or (item.href == "/admin/api" and path.startswith("/admin/api/"))
