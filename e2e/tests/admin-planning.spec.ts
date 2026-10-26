@@ -45,7 +45,8 @@ function dayAhead(days: number): { value: string; label: string } {
     year: 'numeric',
     timeZone: 'Europe/Amsterdam',
   }).format(date);
-  return { value: date.toISOString().slice(0, 10), label };
+  const [year, month, day] = date.toISOString().slice(0, 10).split('-');
+  return { value: `${day}-${month}-${year}`, label }; // typed as an admin would: dd-mm-jjjj
 }
 
 function tabs(page: Page) {
@@ -66,8 +67,8 @@ test('group admin manages opening hours and exceptions, not the settings', async
   await expectNoAxeViolations(page);
   await page.getByRole('link', { name: 'Openingstijd op zaterdag toevoegen' }).press('Enter');
   await expect(page.getByLabel('Dag', { exact: true })).toHaveValue('5');
-  await page.getByLabel('Van', { exact: true }).fill(mine.opens);
-  await page.getByLabel('Tot', { exact: true }).fill(mine.closes);
+  await page.getByLabel('Van uu:mm', { exact: true }).fill(mine.opens);
+  await page.getByLabel('Tot uu:mm', { exact: true }).fill(mine.closes);
   await page.getByLabel('Gelijktijdige gesprekken').fill('2');
   await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
@@ -81,8 +82,8 @@ test('group admin manages opening hours and exceptions, not the settings', async
 
   // Overlapping opening hours are explained and linked to its field.
   await page.getByLabel('Dag', { exact: true }).selectOption({ label: 'maandag' });
-  await page.getByLabel('Van', { exact: true }).fill('10:00');
-  await page.getByLabel('Tot', { exact: true }).fill('11:00');
+  await page.getByLabel('Van uu:mm', { exact: true }).fill('10:00');
+  await page.getByLabel('Tot uu:mm', { exact: true }).fill('11:00');
   await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
   const summary = page.getByRole('alert');
   await expect(summary).toContainText('Deze tijden overlappen');
@@ -92,7 +93,7 @@ test('group admin manages opening hours and exceptions, not the settings', async
   const day = dayAhead(mine.daysAhead);
   await tabs(page).getByRole('link', { name: 'Uitzonderingen' }).click();
   await expectNoAxeViolations(page);
-  await page.getByLabel('Datum', { exact: true }).fill(day.value);
+  await page.getByLabel('Datum dd-mm-jjjj', { exact: true }).fill(day.value);
   await page.getByLabel('Hele dag gesloten').check();
   await page.getByRole('button', { name: 'Uitzondering toevoegen' }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
@@ -128,8 +129,8 @@ test('organisation admin creates a group and gives it opening hours', async ({ p
 
   await tabs(page).getByRole('link', { name: 'Openingstijden' }).click();
   await page.getByLabel('Dag', { exact: true }).selectOption({ label: 'dinsdag' });
-  await page.getByLabel('Van', { exact: true }).fill('09:00');
-  await page.getByLabel('Tot', { exact: true }).fill('10:00');
+  await page.getByLabel('Van uu:mm', { exact: true }).fill('09:00');
+  await page.getByLabel('Tot uu:mm', { exact: true }).fill('10:00');
   await page.getByLabel('Gelijktijdige gesprekken').fill('3');
   await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
