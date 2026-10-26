@@ -7,7 +7,7 @@ names or ``rule.add``-style keys, never values).
 
     create_group     group.create     organisation level (the chosen organisation)
     update_settings  group.edit       group level
-    add/remove rule, add/remove override, schedule, preview
+    add/change/remove rule, add/remove override, schedule, preview
                      schedule.manage / group.view   group level
 
 Existing bookings are never touched: their capacity is snapshotted on the slot. The time grid
@@ -231,6 +231,42 @@ class PlanningService:
             await self._schedule_audit(tx, principal, authorization, slug, "rule.add")
         return rule_id
 
+    async def rule(self, principal: Principal, slug: str, rule_id: int) -> ScheduleRule:
+        """Return the group's weekly opening window ``rule_id``, to change it.
+
+        Raises:
+            DomainError: ``not_permitted`` or ``schedule_item_not_found``.
+        """
+        await self._manage(principal, slug)
+        async with self._uow.read() as tx:
+            group = await group_by_slug(tx, slug)
+            rules, _ = await tx.get_schedule_items(group.id)
+        return _rule_by_id(rules, rule_id)
+
+    async def update_rule(
+        self, principal: Principal, slug: str, rule_id: int, rule: ScheduleRule
+    ) -> bool:
+        """Replace weekly opening window ``rule_id``; ``False`` if nothing changed.
+
+        The new window is validated against the other windows only, so it may overlap its own
+        old times. Existing bookings keep their slots (capacity is snapshotted).
+
+        Raises:
+            DomainError: ``not_permitted``, ``schedule_item_not_found`` or
+                ``invalid_configuration`` (``schedule_rules``).
+        """
+        authorization = await self._manage(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            rules, overrides = await tx.get_schedule_items(group.id)
+            if _rule_by_id(rules, rule_id) == rule:
+                return False
+            others = [r for r in rules if r.id != rule_id]
+            validate_schedule([*others, rule], overrides)
+            await tx.update_schedule_rule(group.id, rule_id, rule)
+            await self._schedule_audit(tx, principal, authorization, slug, "rule.edit")
+        return True
+
     async def remove_rule(self, principal: Principal, slug: str, rule_id: int) -> None:
         """Remove a weekly opening window of the group.
 
@@ -311,6 +347,18 @@ class PlanningService:
         await record_change(
             tx, self._clock.now(), principal, permission, organisation, group, detail
         )
+
+
+def _rule_by_id(rules: list[ScheduleRule], rule_id: int) -> ScheduleRule:
+    """Return the rule with ``rule_id`` from the group's own rules.
+
+    Raises:
+        DomainError: ``schedule_item_not_found`` (also for another group's rule).
+    """
+    for rule in rules:
+        if rule.id == rule_id:
+            return rule
+    raise DomainError(ErrorCode.SCHEDULE_ITEM_NOT_FOUND)
 
 
 def _organisation(authorization: Authorization) -> str | None:

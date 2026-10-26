@@ -98,6 +98,7 @@ EVENT_LABELS: dict[str, str] = {
 
 DETAIL_LABELS: dict[str, str] = {
     "rule.add": "admin.audit.detail.rule_add",
+    "rule.edit": "admin.audit.detail.rule_edit",
     "rule.remove": "admin.audit.detail.rule_remove",
     "override.add": "admin.audit.detail.override_add",
     "override.remove": "admin.audit.detail.override_remove",

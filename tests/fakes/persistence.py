@@ -182,6 +182,14 @@ class InMemoryTransaction:
         self.state.rules.setdefault(group_id, []).append(stored)
         return stored.id or 0
 
+    async def update_schedule_rule(self, group_id: int, rule_id: int, rule: ScheduleRule) -> bool:
+        rules = self.state.rules.get(group_id, [])
+        found = any(r.id == rule_id for r in rules)
+        self.state.rules[group_id] = [
+            replace(rule, id=rule_id) if r.id == rule_id else r for r in rules
+        ]
+        return found
+
     async def delete_schedule_rule(self, group_id: int, rule_id: int) -> bool:
         rules = self.state.rules.get(group_id, [])
         kept = [r for r in rules if r.id != rule_id]
