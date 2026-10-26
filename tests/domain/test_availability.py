@@ -7,6 +7,7 @@ from app.domain.availability import (
     AvailableSlot,
     available_slots,
     offered_slot,
+    overlapping_active,
     slots_on,
 )
 from app.domain.errors import DomainError, ErrorCode
@@ -276,3 +277,56 @@ def test_an_override_day_forms_runs_too() -> None:
     )
 
     assert [(s.start, s.capacity) for s in slots][2] == (utc(2026, 1, 5, 9, 0), 2)
+
+
+# --- bookings on an old slot grid ---------------------------------------------------------
+
+OLD_GRID_0915 = utc(2026, 1, 5, 8, 15)  # 09:15 Amsterdam, off the 09:00/09:30 grid
+
+
+def test_bookings_on_an_old_grid_take_places_in_overlapping_slots() -> None:
+    slots = available(booked={OLD_GRID_0915: 1}, snapshots={OLD_GRID_0915: 2})
+
+    # 09:15–09:45 overlaps 09:00 and 09:30, not 10:00.
+    assert [(s.start, s.remaining) for s in slots] == [
+        (utc(2026, 1, 5, 8, 0), 1),
+        (utc(2026, 1, 5, 8, 30), 1),
+        (utc(2026, 1, 5, 9, 0), 2),
+    ]
+
+
+def test_a_full_old_grid_slot_blocks_the_slots_it_overlaps() -> None:
+    slots = available(booked={OLD_GRID_0915: 2}, snapshots={OLD_GRID_0915: 2})
+
+    assert [s.start for s in slots] == [utc(2026, 1, 5, 9, 0)]
+
+
+def test_overlap_counts_both_own_and_old_grid_bookings() -> None:
+    booked = {utc(2026, 1, 5, 8, 0): 1, OLD_GRID_0915: 1}
+
+    slots = available(booked=booked, snapshots=dict.fromkeys(booked, 2))
+
+    assert utc(2026, 1, 5, 8, 0) not in [s.start for s in slots]
+
+
+def test_overlap_counts_the_busiest_moment_not_every_overlapping_slot() -> None:
+    # 08:45–09:15 and 09:15–09:45 both overlap 09:00–09:30, but never at the same moment.
+    booked = {utc(2026, 1, 5, 7, 45): 1, utc(2026, 1, 5, 8, 15): 1}
+    slot, length = utc(2026, 1, 5, 8, 0), timedelta(minutes=30)
+
+    assert overlapping_active(slot, length, booked) == 1
+    assert overlapping_active(slot, length, {**booked, utc(2026, 1, 5, 8, 20): 2}) == 3
+
+
+@pytest.mark.parametrize(
+    ("other", "expected"),
+    [
+        (utc(2026, 1, 5, 7, 30), 0),  # 08:30–09:00 only touches 09:00–09:30
+        (utc(2026, 1, 5, 7, 31), 1),
+        (utc(2026, 1, 5, 8, 0), 0),  # the slot itself
+        (utc(2026, 1, 5, 8, 29), 1),
+        (utc(2026, 1, 5, 8, 30), 0),  # touches at the end
+    ],
+)
+def test_overlapping_active(other: datetime, expected: int) -> None:
+    assert overlapping_active(utc(2026, 1, 5, 8, 0), timedelta(minutes=30), {other: 1}) == expected
