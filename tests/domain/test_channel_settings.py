@@ -1,4 +1,4 @@
-"""Channel settings: what an SMTP server and an SMS gateway must look like (ADR 0022)."""
+"""Channel settings: what an SMTP server and an SMS gateway must look like (ADR 0022, 0028)."""
 
 from datetime import UTC, datetime
 
@@ -6,6 +6,7 @@ import pytest
 
 from app.domain.channel_settings import (
     ChannelSettings,
+    SmsProvider,
     SmsSettings,
     SmtpSecurity,
     SmtpSettings,
@@ -33,6 +34,7 @@ def smtp(**overrides: object) -> SmtpSettings:
 
 def sms(**overrides: object) -> SmsSettings:
     values: dict[str, object] = {
+        "provider": SmsProvider.WEBEX_CONNECT,
         "api_base_url": "https://api.us.webexconnect.io",
         "sender_id": "GemDemo",
         "country_code": "31",
@@ -92,6 +94,7 @@ def test_valid_sms_settings() -> None:
 @pytest.mark.parametrize(
     ("overrides", "field"),
     [
+        ({"provider": "twilio"}, "sms_provider"),
         ({"api_base_url": "http://api.us.webexconnect.io"}, "sms_api_base_url"),
         ({"api_base_url": "https://user:pw@api.us.webexconnect.io"}, "sms_api_base_url"),
         ({"api_base_url": "https://api.us.webexconnect.io/?x=1"}, "sms_api_base_url"),
@@ -123,8 +126,8 @@ def test_ready_needs_the_secret_only_where_it_is_required() -> None:
     ("secret", "channel", "field"),
     [
         ("   ", ChannelKind.EMAIL, "smtp_credential"),
-        ("x" * 513, ChannelKind.SMS, "sms_service_key"),
-        ("key\n", ChannelKind.SMS, "sms_service_key"),
+        ("x" * 513, ChannelKind.SMS, "sms_api_key"),
+        ("key\n", ChannelKind.SMS, "sms_api_key"),
     ],
 )
 def test_invalid_secrets(secret: str, channel: ChannelKind, field: str) -> None:

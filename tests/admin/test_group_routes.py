@@ -221,7 +221,7 @@ async def test_group_admin_changes_existing_opening_hours(site: Site) -> None:
 
     form = (await site.client.get(link)).text
     assert '<option value="5" selected>' in form
-    assert 'id="opens" name="opens" type="time" value="10:00"' in form
+    assert 'id="opens" name="opens" type="text" inputmode="numeric" value="10:00"' in form
     assert 'id="capacity" name="capacity" type="number" value="3"' in form
 
     saved = await _post(

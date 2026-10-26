@@ -7,7 +7,7 @@ import pytest
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Principal, Role
-from app.domain.channel_settings import ChannelSettings, SmsSettings
+from app.domain.channel_settings import ChannelSettings, SmsProvider, SmsSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.messaging_service import MAX_REMINDER_RULES, MessagingService
@@ -42,7 +42,7 @@ async def test_reminders_show_rules_and_ready_channels(
     service: MessagingService, uow: InMemoryUnitOfWork
 ) -> None:
     uow.state.channel_settings[(1, ChannelKind.SMS)] = ChannelSettings(
-        SmsSettings("https://api.us.webexconnect.io", "Demo"),
+        SmsSettings(SmsProvider.WEBEX_CONNECT, "https://api.us.webexconnect.io", "Demo"),
         secret_set=True,
         updated_at=datetime(2026, 1, 1, tzinfo=UTC),
     )

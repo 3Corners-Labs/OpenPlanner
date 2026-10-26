@@ -1839,10 +1839,10 @@ msgid "admin.channels.fallback_mail"
 msgstr "Until this is configured, OpenPlanner uses the installation's default server."
 
 msgid "admin.channels.sms"
-msgstr "SMS (Webex Connect)"
+msgstr "SMS"
 
 msgid "admin.channels.sms_lead"
-msgstr "SMS reminders go through an SMS service in Webex Connect. The service key is shown with the service under Messaging API."
+msgstr "SMS reminders go through an SMS provider's service. The API address, API key and sender are shown in that provider's portal."
 
 msgid "admin.channels.ready"
 msgstr "Configured"
@@ -1907,17 +1907,26 @@ msgstr "Sender name"
 msgid "admin.channels.sender_name_hint"
 msgstr "For example the organisation's name."
 
+msgid "admin.channels.sms_provider"
+msgstr "Provider"
+
+msgid "admin.channels.sms_provider_hint"
+msgstr "The provider that sends the SMS messages."
+
+msgid "admin.channels.sms_provider_webex_connect"
+msgstr "Webex Connect"
+
 msgid "admin.channels.sms_api_base_url"
 msgstr "API address"
 
 msgid "admin.channels.sms_api_base_url_hint"
-msgstr "The API address of your Webex Connect tenant, for example https://api.us.webexconnect.io."
+msgstr "The API address of your environment at the provider, for example https://api.us.webexconnect.io for Webex Connect."
 
-msgid "admin.channels.sms_service_key"
-msgstr "Service key"
+msgid "admin.channels.sms_api_key"
+msgstr "API key"
 
-msgid "admin.channels.sms_service_key_hint"
-msgstr "The SMS service's key. It is stored encrypted and never shown again."
+msgid "admin.channels.sms_api_key_hint"
+msgstr "The SMS service's API key (for Webex Connect: the service key). It is stored encrypted and never shown again."
 
 msgid "admin.channels.sms_sender_id"
 msgstr "Sender"
@@ -1938,7 +1947,7 @@ msgid "admin.channels.remove_email"
 msgstr "Remove mail server"
 
 msgid "admin.channels.remove_sms_lead"
-msgstr "Removes the SMS service and its key. SMS reminders are no longer sent."
+msgstr "Removes the SMS service and its API key. SMS reminders are no longer sent."
 
 msgid "admin.channels.remove_sms"
 msgstr "Remove SMS service"
@@ -1958,11 +1967,14 @@ msgstr "Enter a valid email address, without a name or angle brackets."
 msgid "admin.form.error.sender_name"
 msgstr "Enter a name of at most 100 characters, without line breaks."
 
+msgid "admin.form.error.sms_provider"
+msgstr "Choose a provider from the list."
+
 msgid "admin.form.error.sms_api_base_url"
 msgstr "Enter an https address without a username, query or fragment."
 
-msgid "admin.form.error.sms_service_key"
-msgstr "Enter the service key, at most 512 characters."
+msgid "admin.form.error.sms_api_key"
+msgstr "Enter the API key, at most 512 characters."
 
 msgid "admin.form.error.sms_sender_id"
 msgstr "Use at most 11 letters, digits or spaces with at least one letter, or a phone number."
