@@ -23,6 +23,7 @@ def settings(tmp_path: Path) -> Settings:
         worker_poll_seconds=0.01,
         management_token_key=SecretStr("t" * 32),
         dev_token_key_path=tmp_path / "dev-token.key",
+        dev_settings_key_path=tmp_path / "dev-settings.key",
         session_secret=SecretStr("x" * 32),
         rate_limit_enabled=False,
     )

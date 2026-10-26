@@ -14,6 +14,11 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
 FROM python:3.12-slim-bookworm AS runtime
+# CVE-2026-84782 (OpenSSL, HIGH): the base tag still ships libssl3 3.0.22-1~deb12u1.
+# Remove this layer once the python:3.12-slim-bookworm image carries deb12u2 or later.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libssl3=3.0.22-1~deb12u2 \
+ && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 app \
  && useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
 WORKDIR /srv
