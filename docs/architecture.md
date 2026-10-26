@@ -335,7 +335,9 @@ Rules that matter for the rest of the system:
   0 agents (lunch) offers no slots and no direct calls, like a gap. Touching blocks with
   agents form one *run*: the slot grid continues across their borders and a slot straddling
   a border gets the lowest agent count. A slot row is created by the first booking and
-  snapshots that capacity. Later schedule edits change new slots only.
+  snapshots that capacity. Later schedule edits change new slots only. When an edit moves
+  the grid while bookings on the old grid lie ahead, those bookings take a place in every
+  new slot they overlap, so no moment has more appointments than agents.
 - **An override replaces every rule on its date.** A closed override blocks new bookings,
   even in slots that already exist.
 - **Holidays come from reusable calendars** (ADR 0025): the superuser maintains them, an
