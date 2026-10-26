@@ -160,7 +160,7 @@ def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:
 
 
 def plan_for_suspension(*, now: datetime, purge_at: datetime | None) -> list[PlannedJob]:
-    """Return the jobs that replace all pending jobs of a booking put on hold (ADR 0022).
+    """Return the jobs that replace all pending jobs of a booking put on hold (ADR 0023).
 
     Reminders and the planned WxCC task go, and a work item that already exists is ended;
     the meeting stays, so a reinstated booking keeps its link. The purge waits for the end of

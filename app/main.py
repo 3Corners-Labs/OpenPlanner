@@ -14,7 +14,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
-from app.adapters.integrations import Integrations, build_integrations
+from app.adapters.integrations import Integrations, build_integrations, secret_box
 from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider
 from app.admin.routes import register_admin
 from app.api import (
@@ -32,13 +32,16 @@ from app.domain.admin import AdminService
 from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
 from app.domain.call_service import CallService
+from app.domain.channel_service import ChannelSettingsService
 from app.domain.closure_service import ClosureService
 from app.domain.integration import IntegrationService
+from app.domain.messaging_service import MessagingService
 from app.domain.organisations import OrganisationService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.services import BookingService
 from app.i18n import Translator, load_catalogues
+from app.i18n.dates import configure_clock
 from app.keys import management_token_key, session_secret
 from app.logging import configure_logging
 from app.web.call_labels import agent_start_label
@@ -97,6 +100,7 @@ def create_app(
     clock = clock or SystemClock()
     token_key = management_token_key(settings)
     http = httpx.AsyncClient(timeout=10.0)
+    configure_clock(settings.time_format)
     configure_rate_limits(
         enabled=settings.rate_limit_enabled,
         bookings=settings.rate_limit_bookings,
@@ -107,12 +111,16 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         configure_logging(settings.log_level)
         app.state.engine = create_engine(settings.database_url)
-        uow = SqlUnitOfWork(app.state.engine)
+        uow = SqlUnitOfWork(app.state.engine, secret_box(settings))
         app.state.booking_service = BookingService(uow, clock, token_key)
         app.state.admin_service = AdminService(uow, clock)
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
+        app.state.channel_service = ChannelSettingsService(uow, clock, app.state.admin_service)
+        app.state.messaging_service = MessagingService(
+            uow, clock, app.state.admin_service, app.state.translator.locales
+        )
         app.state.organisation_service = OrganisationService(
             uow, clock, app.state.admin_service, app.state.translator.locales
         )

@@ -33,6 +33,9 @@ class ErrorCode(StrEnum):
     GROUP_CLOSED = "group_closed"
     CLOSURE_EXISTS = "closure_exists"
     CLOSURE_NOT_FOUND = "closure_not_found"
+    CHANNEL_NOT_CONFIGURED = "channel_not_configured"
+    REMINDER_EXISTS = "reminder_exists"
+    REMINDER_NOT_FOUND = "reminder_not_found"
 
 
 class DomainError(Exception):
