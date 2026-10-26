@@ -1,8 +1,11 @@
-"""Look-ups that refuse with a domain error when nothing is found, shared by the use cases."""
+"""Group look-up that refuses with ``group_not_found``, shared by the group-level use cases.
+
+The organisation counterpart is ``app.domain.organisations.organisation_by_slug``.
+"""
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Transaction
-from app.domain.scheduling import Group, Organisation
+from app.domain.scheduling import Group
 
 
 async def group_by_slug(tx: Transaction, slug: str) -> Group:
@@ -15,15 +18,3 @@ async def group_by_slug(tx: Transaction, slug: str) -> Group:
     if group is None:
         raise DomainError(ErrorCode.GROUP_NOT_FOUND)
     return group
-
-
-async def organisation_by_slug(tx: Transaction, slug: str) -> Organisation:
-    """Return the organisation with ``slug``.
-
-    Raises:
-        DomainError: ``organisation_not_found``.
-    """
-    organisation = await tx.get_organisation(slug)
-    if organisation is None:
-        raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
-    return organisation

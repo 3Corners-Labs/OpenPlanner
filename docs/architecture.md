@@ -193,11 +193,12 @@ same commit and rollback behaviour as the SQL one.
 | Authorisation matrix, scopes (ADR 0014) | `app/domain/authorization.py` |
 | Admin use cases, audit events | `app/domain/admin.py`, `app/domain/audit.py` |
 | Groups, opening hours, exceptions, preview (admin) | `app/domain/planning.py` |
-| Holiday calendars and their resolution per group (ADR 0021) | `app/domain/holidays.py`, `app/domain/holiday_service.py`, `app/admin/holiday_routes.py` |
+| Holiday calendars and their resolution per group (ADR 0022) | `app/domain/holidays.py`, `app/domain/holiday_service.py`, `app/admin/holiday_routes.py` |
 | What leaves for Webex/WxCC, timeline, call status, join window | `app/domain/calls.py` |
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
+| Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda, booking timeline, integrations page | `app/admin/call_routes.py`, `app/admin/routes.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
@@ -210,6 +211,7 @@ same commit and rollback behaviour as the SQL one.
 | Job queue | `app/adapters/db/jobs.py` |
 | Citizen pages | `app/api/booking_pages.py`, `app/api/citizen.py`, `app/api/templates/` |
 | Slot picker: month calendar and times (ADR 0020) | `app/api/slot_picker.py`, `app/web/static/calendar.js` |
+| Organisations (superuser) | `app/domain/organisations.py`, `app/admin/organisation_routes.py` |
 | Branding per organisation (O5) | `app/domain/branding.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
 | CSRF and rate limits | `app/web/protection.py` |
 | Rendering and security headers | `app/web/templates.py`, `app/api/security_headers.py` |
@@ -315,7 +317,7 @@ Rules that matter for the rest of the system:
   Later schedule edits change new slots only.
 - **An override replaces every rule on its date.** A closed override blocks new bookings,
   even in slots that already exist.
-- **Holidays come from reusable calendars** (ADR 0021): the superuser maintains them, an
+- **Holidays come from reusable calendars** (ADR 0022): the superuser maintains them, an
   organisation chooses the ones its groups follow, a group inherits or picks its own (or
   none) and may keep single holidays open. On a date the group's own override wins, then a
   holiday closes the day, then the weekly rules apply (`app/domain/holidays.py`).
@@ -409,7 +411,7 @@ flowchart LR
     dispatch --> meeting(["call<br/>from start to finish"])
     meeting --> purge["slot end + 24h<br/>purge PII"]
 
-    cancel(["cancelled"]) --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
+    cancel(["cancelled"]) --> cend["mark WxCC task cancelled (v2)<br/>then End Task (v1), ADR 0021<br/>delete meeting"] --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
 
 ```
 
@@ -586,7 +588,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0018 | Dispatch to WxCC as work items (Create Task API v2) |
 | 0019 | Direct video call ("now") per group |
 | 0020 | Citizen calendar as progressive enhancement; branding through tokens |
-| 0021 | Reusable holiday calendars with overrides per organisation and group |
+| 0021 | Provider-neutral contact-center integration (proposed) |
+| 0022 | Reusable holiday calendars with overrides per organisation and group |
 
 ## 12. Status and roadmap
 
@@ -603,9 +606,12 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
+| WP7b+ | Organisations (create, rename, default language) for the superuser | done |
+| ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted integration settings (O3) | planned |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
+| idea | Booking API for the WxCC AI Agent (chat and voice bots): find, book, reschedule, cancel (O11) | not planned |
 
 The open decisions (O1–O10) are listed in `docs/HANDOVER.md` §11.

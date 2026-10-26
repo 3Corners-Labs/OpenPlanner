@@ -1,4 +1,4 @@
-{#- The weekly opening hours; with remove buttons when ``removable`` is set. -#}
+{#- The weekly opening hours; with add links and remove buttons when ``removable`` is set. -#}
 <ul class="week">
   {% for day in week %}
   <li class="day{% if not day.windows %} day--closed{% endif %}">
@@ -20,6 +20,9 @@
     </ul>
     {% else %}
     <p class="muted">{{ _("admin.hours.closed") }}</p>
+    {% endif %}
+    {% if removable | default(false) %}
+    <a class="day__add" href="/admin/groups/{{ summary.group.slug }}/hours?weekday={{ day.weekday }}#weekday" aria-label="{{ _("admin.hours.add_label", day=day.name) }}">{{ _("admin.hours.add_link") }}</a>
     {% endif %}
   </li>
   {% endfor %}

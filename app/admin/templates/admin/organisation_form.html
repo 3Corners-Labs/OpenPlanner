@@ -1,0 +1,41 @@
+{#- New organisation (organisation is none) or the settings of an existing one. -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ heading }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
+  <ol>
+    <li><a href="/admin/organisations">{{ _("admin.organisations.title") }}</a></li>
+    <li><span aria-current="page">{{ heading }}</span></li>
+  </ol>
+</nav>
+<div class="page-header">
+  <div>
+    <h1>{{ heading }}</h1>
+    <p class="page-header__lead">{% if organisation %}{{ _("admin.organisation.lead") }}{% else %}{{ _("admin.new_organisation.lead") }}{% endif %}</p>
+  </div>
+  {% if organisation %}
+  <div class="page-header__actions">
+    <a class="button button--ghost" href="/admin/organisations/{{ organisation.slug }}/branding">{{ _("admin.organisations.branding") }}</a>
+  </div>
+  {% endif %}
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/organisations{% if organisation %}/{{ organisation.slug }}{% endif %}" novalidate>
+  <div class="form-grid">
+    {% if organisation %}
+    <div class="field">
+      <label for="slug">{{ _("admin.organisation.slug") }}</label>
+      <input id="slug" type="text" value="{{ organisation.slug }}" readonly aria-describedby="slug-hint">
+      <p class="hint" id="slug-hint">{{ _("admin.organisation.slug_fixed") }}</p>
+    </div>
+    {% endif %}
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{% if organisation %}{{ _("admin.save") }}{% else %}{{ _("admin.new_organisation.create") }}{% endif %}</button>
+    <a href="/admin/organisations">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

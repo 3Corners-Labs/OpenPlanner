@@ -1,4 +1,4 @@
-"""Holiday screens (ADR 0021): superuser calendars, organisation choice, group override."""
+"""Holiday screens (ADR 0022): superuser calendars, organisation choice, group override."""
 
 import re
 

@@ -155,6 +155,20 @@ async def test_group_admin_adds_and_removes_opening_hours(site: Site) -> None:
     assert "10:00–12:00" not in (await site.client.get(f"{GROUP}/hours")).text
 
 
+async def test_every_day_links_to_the_form_with_that_day_chosen(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    week = (await site.client.get(f"{GROUP}/hours")).text
+    form = (await site.client.get(f"{GROUP}/hours?weekday=6")).text
+    bogus = (await site.client.get(f"{GROUP}/hours?weekday=9")).text
+
+    assert f'href="{GROUP}/hours?weekday=5#weekday"' in week
+    assert 'aria-label="Openingstijd op zaterdag toevoegen"' in week
+    assert '<option value="6" selected>' in form
+    assert '<option value="0" selected>' in bogus
+    assert "blok" not in week.lower()
+
+
 async def test_overlapping_hours_are_explained(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
@@ -281,7 +295,7 @@ async def test_overview_shows_week_preview_and_exceptions(site: Site) -> None:
     text = (await site.client.get(GROUP)).text
 
     assert "Openingstijden per week" in text
-    assert "Zo zien burgers het" in text
+    assert "Zo zien deelnemers het" in text
     assert "tijdsloten" in text
 
 

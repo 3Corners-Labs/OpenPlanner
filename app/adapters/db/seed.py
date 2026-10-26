@@ -2,7 +2,7 @@
 
 ``demo`` is the organisation of the development test admins; ``andere`` exists so that every
 role can be tested against an organisation and group that are *not* theirs (ADR 0014).
-An empty holiday calendar ``nationaal`` is ready for the superuser to fill (ADR 0021); no
+An empty holiday calendar ``nationaal`` is ready for the superuser to fill (ADR 0022); no
 organisation has chosen it, so it changes no opening hours.
 
 Used by ``python -m app.cli seed-demo`` and by tests. Idempotent: existing groups are left

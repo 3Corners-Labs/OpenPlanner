@@ -40,7 +40,7 @@ Group             (id, organisation_id, name, slug, wxcc_queue_id, slot_minutes,
 ScheduleRule      (id, group_id, weekday, opens, closes, capacity, valid_from, valid_to)
 ScheduleOverride  (id, group_id, date, opens, closes, capacity | closed=true)   # ziekte, afwijkende uren
 HolidayCalendar   (id, slug, name) + Holiday (calendar_id, date, name)   # superuser, herbruikbaar
-                   organisatie kiest kalenders; groep erft, kiest zelf of houdt een feestdag open (ADR 0021)
+                   organisatie kiest kalenders; groep erft, kiest zelf of houdt een feestdag open (ADR 0022)
 GroupPage         (group_id, title_nl/en, intro_nl/en, duration_label, phone_required: bool)
 Slot              (id, group_id, start, end, capacity_snapshot)   # ontstaat bij eerste boeking
 Booking           (id, slot_id, status[confirmed|cancelled|completed|no_show],
@@ -159,6 +159,7 @@ Totaal ca. 30 werkdagen voor één ontwikkelaar, plus reviewtijd van een tweede 
 | O8 | Toegankelijkheid van het videogesprek: Nederlandse live-ondertiteling in Webex beschikbaar? Tolk NGT als derde deelnemer (extra gastlink) en een vinkje daarvoor op het formulier? | dienstverlening + contactcenterbeheer |
 | O9 | "Nu direct een gesprek starten" naast inplannen (zoals 24sessions bood): technisch een directe taak in de wachtrij zonder slot, maar vraagt realtime zicht op bezetting en wachttijd uit WxCC. Fase 2 of helemaal niet? | dienstverlening |
 | O10 | Wie is de menselijke reviewer per PR (§12), en wie voert de externe pentest en het toegankelijkheidsonderzoek uit? Zonder antwoord geen livegang. | opdrachtgever |
+| O11 | Idee, niet voor nu: een API op de planning waarmee de WxCC AI Agent (chat en spraak) afspraken kan opvragen, boeken, verzetten en annuleren. Bot, spraakherkenning en tekst-naar-spraak doet Webex CC; wij leveren alleen de API. De burger identificeert zich met het telefoonnummer uit de boeking en bevestigt via een code of link per e-mail/sms, die doorverwijst naar de bestaande beheerpagina. Zo hoeft er geen PII naar het AI-platform. Open: service-authenticatie van de bot, rate limiting op telefoonnummer (raden), en of WxCC AI Agent-acties en de licentie (O6) dit toelaten. | dienstverlening + technisch |
 
 ## 12. Borging van kwaliteit en veiligheid bij AI-ondersteund bouwen
 

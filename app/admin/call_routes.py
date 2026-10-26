@@ -20,7 +20,7 @@ from app.admin.authz import AccessDenied, AdminContext, RequirePermission
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale
 from app.domain.authorization import Permission
-from app.domain.calls import BookingOverview, CallStatus, not_picked_up
+from app.domain.calls import BookingOverview, CallStatus, EventKind, not_picked_up
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock
@@ -173,6 +173,7 @@ async def booking_detail(
             "task": task,
             "status": status,
             "events": events,
+            "end_not_possible": any(e.kind is EventKind.END_NOT_POSSIBLE for e in timeline.events),
             "back": f"/admin/groups/{slug}/agenda?day={booking.start.astimezone(tz).date()}",
         },
     )

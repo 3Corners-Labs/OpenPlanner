@@ -126,10 +126,27 @@ class VideoProvider(Protocol):
 
 
 class ContactCenterDispatcher(Protocol):
-    """Creates work items in Webex Contact Center (Create Task API v2, ADR 0018)."""
+    """Creates and ends work items in Webex Contact Center (ADR 0018, 0021)."""
 
     async def create_task(self, item: WorkItem) -> str:
         """Create the work item and return the task id.
+
+        Raises:
+            IntegrationError: If WxCC refuses or cannot be reached.
+        """
+        ...
+
+    async def end_task(self, task_id: str) -> None:
+        """End the task (End Task API; needs ``cjp:user``).
+
+        Raises:
+            IntegrationError: If WxCC refuses (``rejected_403`` without the scope) or cannot be
+                reached.
+        """
+        ...
+
+    async def mark_cancelled(self, task_id: str, reference: str) -> None:
+        """Tell the agent the booking was cancelled (Task Messages API, ``cjp:task_write``).
 
         Raises:
             IntegrationError: If WxCC refuses or cannot be reached.
@@ -216,6 +233,14 @@ class Transaction(Protocol):
 
     async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
         """Return the organisation with ``organisation_id``, with its branding."""
+        ...
+
+    async def add_organisation(self, organisation: Organisation) -> Organisation:
+        """Insert an organisation (default branding) and return it with its ID."""
+        ...
+
+    async def save_organisation(self, organisation: Organisation) -> None:
+        """Store name and default locale; slug and branding are left alone."""
         ...
 
     async def save_branding(self, organisation_id: int, branding: Branding) -> None:
@@ -334,6 +359,14 @@ class Transaction(Protocol):
 
     async def get_booking_by_task(self, task_id: str) -> Booking | None:
         """Return the booking whose WxCC task has ``task_id``."""
+        ...
+
+    async def claim_webhook_event(self, source: str, key: str, at: datetime) -> bool:
+        """Remember that the event ``key`` from ``source`` was seen; ``False`` if it was before."""
+        ...
+
+    async def forget_webhook_events(self, before: datetime) -> int:
+        """Forget event keys seen before ``before``; return how many."""
         ...
 
     async def add_booking_event(self, event: BookingEvent) -> None:

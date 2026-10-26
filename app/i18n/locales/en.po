@@ -495,7 +495,7 @@ msgid "admin.matrix.no"
 msgstr "No"
 
 msgid "admin.matrix.citizen"
-msgstr "Citizens (without logging in)"
+msgstr "Participants (without logging in)"
 
 msgid "admin.matrix.action"
 msgstr "Action"
@@ -729,7 +729,7 @@ msgid "admin.new_group.title"
 msgstr "New group"
 
 msgid "admin.new_group.lead"
-msgstr "A group is a team with one queue in Webex Contact Center. After creating it you set its opening hours."
+msgstr "A group is a team with one queue in the contact centre. After creating it you set its opening hours."
 
 msgid "admin.new_group.create"
 msgstr "Create group"
@@ -771,13 +771,13 @@ msgid "admin.field.horizon_days"
 msgstr "Book ahead (days)"
 
 msgid "admin.field.horizon_days_hint"
-msgstr "How far ahead citizens can book, 1 to 366 days."
+msgstr "How far ahead participants can book, 1 to 366 days."
 
 msgid "admin.field.dispatch_lead_minutes"
 msgstr "Send to the queue (minutes before)"
 
 msgid "admin.field.dispatch_lead_minutes_hint"
-msgstr "From this moment the citizen can no longer change the appointment. 0 to 60."
+msgstr "From this moment the participant can no longer change the appointment. 0 to 60."
 
 msgid "admin.field.phone_mode"
 msgstr "Phone number on the form"
@@ -797,7 +797,7 @@ msgid "admin.field.capacity"
 msgstr "Simultaneous calls"
 
 msgid "admin.field.capacity_hint"
-msgstr "How many citizens can start at the same time."
+msgstr "How many participants can book the same time slot."
 
 msgid "admin.field.valid_from"
 msgstr "Valid from"
@@ -870,7 +870,7 @@ msgid "admin.form.error.day"
 msgstr "Choose a date from today on."
 
 msgid "admin.form.error.overlap"
-msgstr "These times overlap an existing block on that day."
+msgstr "These times overlap existing opening hours on that day."
 
 msgid "admin.form.error.override_conflict"
 msgstr "This date already has an exception that conflicts with this one."
@@ -879,7 +879,7 @@ msgid "admin.hours.title"
 msgstr "Weekly opening hours"
 
 msgid "admin.hours.lead"
-msgstr "One or more blocks per day. Citizens only see slots that fit completely inside a block."
+msgstr "One or more opening hours per day. Each is divided into time slots of the call duration; participants book a time slot."
 
 msgid "admin.hours.manage"
 msgstr "Manage opening hours"
@@ -894,16 +894,22 @@ msgid "admin.hours.validity"
 msgstr "{start} to {end}"
 
 msgid "admin.hours.add"
-msgstr "Add a block"
+msgstr "Add opening hours"
 
 msgid "admin.hours.add_lead"
-msgstr "Existing appointments stay; the new block applies to new appointments."
+msgstr "Existing appointments stay; the new opening hours apply to new appointments."
 
 msgid "admin.hours.add_button"
-msgstr "Add block"
+msgstr "Add opening hours"
+
+msgid "admin.hours.add_link"
+msgstr "Add"
+
+msgid "admin.hours.add_label"
+msgstr "Add opening hours on {day}"
 
 msgid "admin.hours.remove_label"
-msgstr "Remove block {day} {time}"
+msgstr "Remove opening hours {day} {time}"
 
 msgid "admin.exceptions.upcoming"
 msgstr "Upcoming exceptions"
@@ -942,7 +948,7 @@ msgid "admin.exceptions.remove_label"
 msgstr "Remove exception on {day}"
 
 msgid "admin.preview.title"
-msgstr "What citizens see"
+msgstr "What participants see"
 
 msgid "admin.preview.lead"
 msgstr "The next two weeks, before bookings and notice."
@@ -972,7 +978,7 @@ msgid "admin.no"
 msgstr "No"
 
 msgid "admin.settings.integrations"
-msgstr "Integrations: Webex and Webex Contact Center"
+msgstr "Integrations: video and contact centre"
 
 msgid "admin.settings.integrations_lead"
 msgstr "Leave empty while the integration is not set up; appointments then work without a video meeting or task."
@@ -999,7 +1005,7 @@ msgid "admin.field.direct_call_enabled"
 msgstr "Start a call right away"
 
 msgid "admin.field.direct_call_enabled_hint"
-msgstr "Citizens can start a call right away within opening hours."
+msgstr "Participants can start a call right away within opening hours."
 
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Not picked up after (minutes)"
@@ -1023,7 +1029,7 @@ msgid "admin.group.video"
 msgstr "Video call (Webex)"
 
 msgid "admin.group.wxcc"
-msgstr "Webex Contact Center"
+msgstr "Contact centre"
 
 msgid "admin.group.direct_call"
 msgstr "Direct call"
@@ -1149,13 +1155,13 @@ msgid "call.event.meeting_deleted"
 msgstr "Video meeting deleted"
 
 msgid "call.event.join_page_opened"
-msgstr "Citizen opened the join page"
+msgstr "Participant opened the join page"
 
 msgid "call.event.join_clicked"
-msgstr "Citizen clicked join"
+msgstr "Participant clicked join"
 
 msgid "call.event.task_created"
-msgstr "Task placed in the WxCC queue"
+msgstr "Task placed in the contact centre queue"
 
 msgid "call.event.task_failed"
 msgstr "Task failed"
@@ -1212,13 +1218,13 @@ msgid "admin.agenda.time"
 msgstr "Time"
 
 msgid "admin.agenda.citizen"
-msgstr "Citizen"
+msgstr "Participant"
 
 msgid "admin.agenda.meeting"
 msgstr "Video meeting"
 
 msgid "admin.agenda.task"
-msgstr "WxCC task"
+msgstr "Contact centre task"
 
 msgid "admin.agenda.agent"
 msgstr "Agent joined"
@@ -1295,6 +1301,24 @@ msgstr "Groups"
 msgid "join.refresh"
 msgstr "Refresh status"
 
+
+# --- WxCC work item lifecycle (ADR 0021) ---
+
+msgid "call.task.cancelled"
+msgstr "Task cancelled"
+
+msgid "call.event.task_end_requested"
+msgstr "Asked WxCC to end the task"
+
+msgid "call.event.end_not_possible"
+msgstr "Task could not be ended"
+
+msgid "call.event.task_marked_cancelled"
+msgstr "Task marked as cancelled"
+
+msgid "admin.booking.end_not_possible"
+msgstr "The booking was cancelled and the task was marked as cancelled through the v2 API (Kind: cancelled; see the timeline), but WxCC did not let OpenPlanner end the task. End the task in Agent Desktop if it is still open."
+
 #. Branding per organisation (WP3b).
 
 msgid "authz.permission.branding_manage"
@@ -1334,7 +1358,7 @@ msgid "admin.branding.none"
 msgstr "You do not manage the branding of any organisation."
 
 msgid "admin.branding.page_lead"
-msgstr "This is how citizens see this organisation's booking pages. The admin portal itself keeps one fixed style."
+msgstr "This is how participants see this organisation's booking pages. The admin portal itself keeps one fixed style."
 
 msgid "admin.branding.preview"
 msgstr "Preview"
@@ -1377,6 +1401,57 @@ msgstr "Upload logo"
 
 msgid "admin.branding.logo_remove"
 msgstr "Remove logo"
+
+msgid "admin.nav.organisations"
+msgstr "Organisations"
+
+msgid "admin.organisations.title"
+msgstr "Organisations"
+
+msgid "admin.organisations.lead"
+msgstr "The client organisations in this installation. An organisation has its own groups, branding and admins."
+
+msgid "admin.organisations.list"
+msgstr "All organisations"
+
+msgid "admin.organisations.none"
+msgstr "There are no organisations yet."
+
+msgid "admin.organisations.branding"
+msgstr "Branding"
+
+msgid "admin.organisations.branding_of"
+msgstr "Branding of {name}"
+
+msgid "admin.new_organisation.title"
+msgstr "New organisation"
+
+msgid "admin.new_organisation.lead"
+msgstr "After creating it you set its branding, and organisation admins create its groups."
+
+msgid "admin.new_organisation.create"
+msgstr "Create organisation"
+
+msgid "admin.organisation.lead"
+msgstr "Name and default language of the organisation."
+
+msgid "admin.organisation.slug"
+msgstr "Code"
+
+msgid "admin.organisation.slug_hint"
+msgstr "Fixed code in admin addresses and in the organisation claim of the sign-in service. Lower-case letters, digits and hyphens, for example north-council."
+
+msgid "admin.organisation.slug_fixed"
+msgstr "The code does not change: admin addresses and the roles in the sign-in service refer to it."
+
+msgid "admin.field.default_locale"
+msgstr "Default language"
+
+msgid "admin.field.default_locale_hint"
+msgstr "The language of pages and messages when the visitor chooses no other."
+
+msgid "admin.form.error.default_locale"
+msgstr "Choose one of the available languages."
 
 msgid "admin.nav.holidays"
 msgstr "Holidays"

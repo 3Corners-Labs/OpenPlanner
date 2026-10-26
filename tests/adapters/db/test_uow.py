@@ -100,7 +100,12 @@ async def test_full_slot_and_cancel_frees_it(engine: AsyncEngine, service: Booki
             await conn.execute(select(JobRow.type).where(JobRow.booking_id == receipt.booking.id))
         ).scalars()
         assert sorted(jobs) == sorted(
-            [JobType.DELETE_VIDEO_ROOM, JobType.SEND_CANCELLATION, JobType.PURGE_PII]
+            [
+                JobType.END_WXCC_TASK,
+                JobType.DELETE_VIDEO_ROOM,
+                JobType.SEND_CANCELLATION,
+                JobType.PURGE_PII,
+            ]
         )
     assert await count(engine, select(func.count()).select_from(SlotRow)) == 1
 

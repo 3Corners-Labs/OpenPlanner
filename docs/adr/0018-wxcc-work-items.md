@@ -1,6 +1,6 @@
 # 0018. Dispatch to WxCC as work items (Create Task API v2)
 
-Status: accepted (2026-10-23). Supersedes ADR 0007 points 1–2.
+Status: accepted (2026-10-23). Supersedes ADR 0007 points 1–2. Point 5 superseded by ADR 0021.
 
 ## Context
 
