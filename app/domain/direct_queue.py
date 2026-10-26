@@ -88,7 +88,7 @@ def phase(call: DirectCall, group: Group, now: datetime) -> QueuePhase:
     """Return where ``call`` is in ``group``'s queue at ``now``."""
     status = call.status
     finished = status.task in (TaskState.ENDED, TaskState.FAILED, TaskState.CANCELLED)
-    if not call.active or finished or status.call is CallState.ENDED:
+    if not call.active or finished or status.call in (CallState.ENDED, CallState.FAILED):
         return QueuePhase.DONE
     if status.task is TaskState.CONNECTED or status.host_joined:
         return QueuePhase.CONNECTED if now <= call.end + JOIN_CLOSES_AFTER else QueuePhase.DONE

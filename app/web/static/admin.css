@@ -1080,6 +1080,12 @@ fieldset.card {
   font-weight: 600;
 }
 
+.timeline__hint {
+  max-width: 70ch;
+  margin: 0.25rem 0 0;
+  color: var(--adm-text-muted);
+}
+
 .muted {
   color: var(--adm-text-muted);
 }

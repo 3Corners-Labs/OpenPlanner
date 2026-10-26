@@ -27,7 +27,13 @@ from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock, format_day
-from app.web.call_labels import CALL_STATE_LABELS, EVENT_LABELS, KIND_LABELS, TASK_STATE_LABELS
+from app.web.call_labels import (
+    CALL_STATE_LABELS,
+    EVENT_LABELS,
+    KIND_LABELS,
+    TASK_STATE_LABELS,
+    failure_hint,
+)
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -126,11 +132,12 @@ async def agenda(
 
 @dataclass(frozen=True)
 class EventView:
-    """One timeline entry."""
+    """One timeline entry; ``hint`` says what to check after a failure."""
 
     time: str
     label: str
     detail: str
+    hint: str
 
 
 @router.get("/groups/{slug}/bookings/{booking_id}", response_class=HTMLResponse)
@@ -156,6 +163,7 @@ async def booking_detail(
             f"{format_day(e.at.astimezone(tz).date(), code)}, {format_clock(e.at, tz, code)}",
             _(EVENT_LABELS[e.kind]),
             e.detail,
+            _(hint) if (hint := failure_hint(e.kind, e.detail)) else "",
         )
         for e in timeline.events
     ]

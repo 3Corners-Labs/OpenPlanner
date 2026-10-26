@@ -47,7 +47,9 @@ class WebexMeetings:
             "hostEmail": request.host_email,
             **MEETING_OPTIONS,
         }
-        response = await self._client.request("POST", f"{self._base}/meetings", json=body)
+        response = await self._client.request(
+            "POST", f"{self._base}/meetings", json=body, explain=True
+        )
         data = response.json()
         if not isinstance(data.get("id"), str) or not isinstance(data.get("webLink"), str):
             raise IntegrationError("unexpected_response", retryable=False)

@@ -4,12 +4,14 @@ from urllib.parse import parse_qs
 
 import httpx
 import pytest
+from structlog.testing import capture_logs
 
 from app.adapters.webex_auth import (
     CREDENTIAL_NAME,
     AuthorizedClient,
     ServiceAppConfig,
     WebexTokens,
+    http_failure,
 )
 from app.domain.ports import IntegrationError
 from tests.fakes.clock import FixedClock
@@ -134,6 +136,46 @@ async def test_failures_map_to_codes(
     with pytest.raises(IntegrationError) as error:
         await client.request("POST", "https://webexapis.com/v1/meetings", json={})
     assert (error.value.code, error.value.retryable) == (code, retryable)
+
+
+def test_a_refusal_logs_webexs_reason_and_tracking_id_without_addresses() -> None:
+    request = httpx.Request("POST", "https://webexapis.com/v1/meetings")
+    body = {
+        "message": "Host host@example.org is not a valid user.",
+        "errors": [{"description": "Host host@example.org is not a valid user."}],
+        "trackingId": "ROUTER_123",
+    }
+    response = httpx.Response(400, json=body, request=request)
+
+    with capture_logs() as logs:
+        error = http_failure(response, explain=True)
+
+    assert error.code == "rejected_400"
+    assert logs[0]["tracking_id"] == "ROUTER_123"
+    assert logs[0]["reason"] == "Host *** is not a valid user."
+    assert "example.org" not in str(logs)
+
+
+def test_without_explain_only_the_tracking_id_is_logged() -> None:
+    request = httpx.Request("POST", "https://webexapis.com/v1/tasks")
+    body = {"message": "Invalid value Ada for firstName", "trackingId": "ROUTER_456"}
+    response = httpx.Response(400, json=body, request=request)
+
+    with capture_logs() as logs:
+        http_failure(response)
+
+    assert (logs[0]["reason"], logs[0]["tracking_id"]) == ("", "ROUTER_456")
+    assert "Ada" not in str(logs)
+
+
+def test_a_refusal_without_a_json_body_still_logs_the_status() -> None:
+    request = httpx.Request("POST", "https://webexapis.com/v1/meetings")
+    response = httpx.Response(400, text="<html>bad</html>", request=request)
+
+    with capture_logs() as logs:
+        http_failure(response, explain=True)
+
+    assert (logs[0]["status"], logs[0]["reason"], logs[0]["tracking_id"]) == (400, "", "")
 
 
 async def test_a_new_bootstrap_token_replaces_the_stored_tokens(webex: FakeWebex) -> None:
