@@ -217,7 +217,7 @@ class AuthorizedClient:
 def http_failure(response: httpx.Response) -> IntegrationError:
     """Map an unexpected status to an ``IntegrationError`` (status logged, body not).
 
-    Shared by every Webex API adapter (Meetings, WxCC, Connect SMS).
+    Shared by every HTTP adapter (Webex Meetings, WxCC, Connect SMS, GitHub releases).
     """
     status = response.status_code
     log.warning("integration.refused", status=status, path=response.request.url.path)

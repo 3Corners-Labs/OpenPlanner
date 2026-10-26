@@ -2658,3 +2658,180 @@ msgstr "De mailserver weigerde het bericht (code {status})."
 
 msgid "admin.channels.test_failed.other"
 msgstr "Het versturen is mislukt door een onverwachte fout van de mailserver. Probeer het later opnieuw."
+
+msgid "authz.permission.system_update"
+msgstr "Updates van de installatie uitvoeren"
+
+msgid "admin.nav.updates"
+msgstr "Updates"
+
+msgid "admin.form.error.update_not_available"
+msgstr "Er is geen nieuwere versie of geen vorige versie om naar terug te gaan."
+
+msgid "admin.form.error.update_in_progress"
+msgstr "Er loopt al een updateverzoek. Wacht tot het klaar is of trek het in."
+
+msgid "admin.done.update_requested"
+msgstr "De update is aangevraagd. De updater op de server voert hem binnen een minuut uit."
+
+msgid "admin.done.restore_requested"
+msgstr "Terugzetten is aangevraagd. De updater op de server voert het binnen een minuut uit."
+
+msgid "admin.done.request_cancelled"
+msgstr "Het verzoek is ingetrokken."
+
+msgid "admin.updates.title"
+msgstr "Updates"
+
+msgid "admin.updates.lead"
+msgstr "Installeer een nieuwe versie van OpenPlanner of ga terug naar de vorige. De updater op de server controleert de handtekening, maakt eerst een back-up en zet bij problemen zelf de vorige versie terug."
+
+msgid "admin.updates.not_enabled"
+msgstr "Deze installatie zoekt niet naar nieuwe versies: UPDATE_REPOSITORY is niet ingesteld."
+
+msgid "admin.updates.version"
+msgstr "Versie"
+
+msgid "admin.updates.running"
+msgstr "Draait nu"
+
+msgid "admin.updates.no_release_build"
+msgstr "Geen releaseversie (ontwikkelversie); updates worden niet aangeboden."
+
+msgid "admin.updates.latest"
+msgstr "Nieuwste versie"
+
+msgid "admin.updates.unknown"
+msgstr "Onbekend"
+
+msgid "admin.updates.checked_at"
+msgstr "Laatst gecontroleerd"
+
+msgid "admin.updates.never"
+msgstr "Nog niet"
+
+msgid "admin.updates.check_failed"
+msgstr "Controle mislukt ({code})"
+
+msgid "admin.updates.open"
+msgstr "Lopend verzoek"
+
+msgid "admin.updates.open_lead"
+msgstr "Naar versie {version}. De pagina toont de uitkomst zodra de updater die meldt."
+
+msgid "admin.updates.unclaimed"
+msgstr "Geen updater heeft dit verzoek na 10 minuten opgepakt. Controleer of de updater op de server is geïnstalleerd (zie het runbook)."
+
+msgid "admin.updates.cancel"
+msgstr "Verzoek intrekken"
+
+msgid "admin.updates.update_heading"
+msgstr "Versie {version} is beschikbaar"
+
+msgid "admin.updates.update_lead"
+msgstr "De boekingspagina's zijn tijdens de update enkele seconden niet bereikbaar. Kies een rustig moment."
+
+msgid "admin.updates.release_notes"
+msgstr "Wat is er nieuw (release notes)"
+
+msgid "admin.updates.update_now"
+msgstr "Nu bijwerken naar {version}"
+
+msgid "admin.updates.restore_heading"
+msgstr "Vorige versie terugzetten"
+
+msgid "admin.updates.restore_lead"
+msgstr "Gaat terug naar versie {version}. Gegevens die sinds de update zijn ingevoerd blijven bewaard. Kan tot 24 uur na de update."
+
+msgid "admin.updates.restore_now"
+msgstr "Terugzetten naar {version}"
+
+msgid "admin.updates.history"
+msgstr "Geschiedenis"
+
+msgid "admin.updates.requested_at"
+msgstr "Aangevraagd"
+
+msgid "admin.updates.action"
+msgstr "Actie"
+
+msgid "admin.updates.versions"
+msgstr "Van → naar"
+
+msgid "admin.updates.status"
+msgstr "Status"
+
+msgid "admin.updates.finished_at"
+msgstr "Klaar"
+
+msgid "admin.updates.none"
+msgstr "Nog geen updates aangevraagd."
+
+msgid "admin.updates.action.update"
+msgstr "Bijwerken"
+
+msgid "admin.updates.action.restore"
+msgstr "Terugzetten"
+
+msgid "admin.updates.status.requested"
+msgstr "Aangevraagd"
+
+msgid "admin.updates.status.running"
+msgstr "Bezig"
+
+msgid "admin.updates.status.succeeded"
+msgstr "Gelukt"
+
+msgid "admin.updates.status.rolled_back"
+msgstr "Teruggedraaid"
+
+msgid "admin.updates.status.failed"
+msgstr "Mislukt"
+
+msgid "admin.updates.status.cancelled"
+msgstr "Ingetrokken"
+
+msgid "admin.updates.reason.signature_invalid"
+msgstr "De handtekening van de image klopt niet; er is niets gewijzigd."
+
+msgid "admin.updates.reason.image_not_found"
+msgstr "De image van deze versie is niet gevonden; er is niets gewijzigd."
+
+msgid "admin.updates.reason.backup_failed"
+msgstr "De back-up is mislukt; er is niets gewijzigd."
+
+msgid "admin.updates.reason.migration_failed"
+msgstr "De database kon niet worden teruggezet naar de vorige versie."
+
+msgid "admin.updates.reason.health_check_failed"
+msgstr "De nieuwe versie werd niet gezond; de vorige versie en de back-up zijn teruggezet."
+
+msgid "admin.updates.reason.restore_failed"
+msgstr "Ook het terugzetten is mislukt. Volg het runbook."
+
+msgid "admin.updates.reason.version_mismatch"
+msgstr "Na de update draait niet de gevraagde versie."
+
+msgid "admin.updates.reason.updater_error"
+msgstr "Onverwachte fout in de updater. Bekijk het log van de updater op de server."
+
+msgid "admin.updates.reason.other"
+msgstr "De updater meldde een onbekende reden."
+
+msgid "admin.updates.banner.available"
+msgstr "Versie {version} van OpenPlanner is beschikbaar (nu {current})."
+
+msgid "admin.updates.banner.progress"
+msgstr "Update naar versie {version} is aangevraagd of bezig."
+
+msgid "admin.updates.banner.problem"
+msgstr "Update naar versie {version}: {status}."
+
+msgid "admin.updates.banner.done"
+msgstr "OpenPlanner is bijgewerkt; nu draait versie {version}."
+
+msgid "admin.updates.banner.open"
+msgstr "Naar updates"
+
+msgid "admin.updates.banner.snooze"
+msgstr "Herinner me over 60 minuten"

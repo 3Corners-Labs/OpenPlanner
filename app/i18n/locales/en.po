@@ -2658,3 +2658,180 @@ msgstr "The mail server rejected the message (code {status})."
 
 msgid "admin.channels.test_failed.other"
 msgstr "Sending failed because of an unexpected mail server error. Try again later."
+
+msgid "authz.permission.system_update"
+msgstr "Update the installation"
+
+msgid "admin.nav.updates"
+msgstr "Updates"
+
+msgid "admin.form.error.update_not_available"
+msgstr "There is no newer version, or no previous version to go back to."
+
+msgid "admin.form.error.update_in_progress"
+msgstr "An update request is already open. Wait until it is done or withdraw it."
+
+msgid "admin.done.update_requested"
+msgstr "The update has been requested. The updater on the server carries it out within a minute."
+
+msgid "admin.done.restore_requested"
+msgstr "The restore has been requested. The updater on the server carries it out within a minute."
+
+msgid "admin.done.request_cancelled"
+msgstr "The request has been withdrawn."
+
+msgid "admin.updates.title"
+msgstr "Updates"
+
+msgid "admin.updates.lead"
+msgstr "Install a new version of OpenPlanner or go back to the previous one. The updater on the server checks the signature, makes a backup first and restores the previous version itself if something goes wrong."
+
+msgid "admin.updates.not_enabled"
+msgstr "This installation does not look for new versions: UPDATE_REPOSITORY is not set."
+
+msgid "admin.updates.version"
+msgstr "Version"
+
+msgid "admin.updates.running"
+msgstr "Running now"
+
+msgid "admin.updates.no_release_build"
+msgstr "Not a release (development build); no updates are offered."
+
+msgid "admin.updates.latest"
+msgstr "Latest version"
+
+msgid "admin.updates.unknown"
+msgstr "Unknown"
+
+msgid "admin.updates.checked_at"
+msgstr "Last checked"
+
+msgid "admin.updates.never"
+msgstr "Not yet"
+
+msgid "admin.updates.check_failed"
+msgstr "Check failed ({code})"
+
+msgid "admin.updates.open"
+msgstr "Open request"
+
+msgid "admin.updates.open_lead"
+msgstr "To version {version}. The page shows the outcome as soon as the updater reports it."
+
+msgid "admin.updates.unclaimed"
+msgstr "No updater has picked up this request after 10 minutes. Check that the updater is installed on the server (see the runbook)."
+
+msgid "admin.updates.cancel"
+msgstr "Withdraw request"
+
+msgid "admin.updates.update_heading"
+msgstr "Version {version} is available"
+
+msgid "admin.updates.update_lead"
+msgstr "The booking pages are unavailable for a few seconds during the update. Choose a quiet moment."
+
+msgid "admin.updates.release_notes"
+msgstr "What is new (release notes)"
+
+msgid "admin.updates.update_now"
+msgstr "Update to {version} now"
+
+msgid "admin.updates.restore_heading"
+msgstr "Restore the previous version"
+
+msgid "admin.updates.restore_lead"
+msgstr "Goes back to version {version}. Data entered since the update is kept. Possible until 24 hours after the update."
+
+msgid "admin.updates.restore_now"
+msgstr "Restore {version}"
+
+msgid "admin.updates.history"
+msgstr "History"
+
+msgid "admin.updates.requested_at"
+msgstr "Requested"
+
+msgid "admin.updates.action"
+msgstr "Action"
+
+msgid "admin.updates.versions"
+msgstr "From → to"
+
+msgid "admin.updates.status"
+msgstr "Status"
+
+msgid "admin.updates.finished_at"
+msgstr "Finished"
+
+msgid "admin.updates.none"
+msgstr "No updates requested yet."
+
+msgid "admin.updates.action.update"
+msgstr "Update"
+
+msgid "admin.updates.action.restore"
+msgstr "Restore"
+
+msgid "admin.updates.status.requested"
+msgstr "Requested"
+
+msgid "admin.updates.status.running"
+msgstr "Running"
+
+msgid "admin.updates.status.succeeded"
+msgstr "Succeeded"
+
+msgid "admin.updates.status.rolled_back"
+msgstr "Rolled back"
+
+msgid "admin.updates.status.failed"
+msgstr "Failed"
+
+msgid "admin.updates.status.cancelled"
+msgstr "Withdrawn"
+
+msgid "admin.updates.reason.signature_invalid"
+msgstr "The image signature is not valid; nothing was changed."
+
+msgid "admin.updates.reason.image_not_found"
+msgstr "The image of this version was not found; nothing was changed."
+
+msgid "admin.updates.reason.backup_failed"
+msgstr "The backup failed; nothing was changed."
+
+msgid "admin.updates.reason.migration_failed"
+msgstr "The database could not be taken back to the previous version."
+
+msgid "admin.updates.reason.health_check_failed"
+msgstr "The new version did not become healthy; the previous version and the backup were restored."
+
+msgid "admin.updates.reason.restore_failed"
+msgstr "Restoring failed as well. Follow the runbook."
+
+msgid "admin.updates.reason.version_mismatch"
+msgstr "After the update, the requested version is not running."
+
+msgid "admin.updates.reason.updater_error"
+msgstr "Unexpected error in the updater. Check the updater's log on the server."
+
+msgid "admin.updates.reason.other"
+msgstr "The updater reported an unknown reason."
+
+msgid "admin.updates.banner.available"
+msgstr "Version {version} of OpenPlanner is available (running {current})."
+
+msgid "admin.updates.banner.progress"
+msgstr "The update to version {version} is requested or running."
+
+msgid "admin.updates.banner.problem"
+msgstr "Update to version {version}: {status}."
+
+msgid "admin.updates.banner.done"
+msgstr "OpenPlanner has been updated; version {version} is running now."
+
+msgid "admin.updates.banner.open"
+msgstr "Go to updates"
+
+msgid "admin.updates.banner.snooze"
+msgstr "Remind me in 60 minutes"

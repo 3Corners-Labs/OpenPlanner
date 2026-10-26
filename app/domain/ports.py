@@ -37,6 +37,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
+from app.domain.updates import Release, ReleaseCheck, UpdateRequest
 
 
 class Clock(Protocol):
@@ -165,6 +166,18 @@ class ContactCenterDispatcher(Protocol):
 
         Raises:
             IntegrationError: If WxCC refuses or cannot be reached.
+        """
+        ...
+
+
+class ReleaseSource(Protocol):
+    """Where the latest published release is looked up (GitHub releases, ADR 0028)."""
+
+    async def latest(self) -> Release | None:
+        """Return the latest published release; ``None`` when there is none or it is no version.
+
+        Raises:
+            IntegrationError: If the source refuses or cannot be reached.
         """
         ...
 
@@ -576,6 +589,30 @@ class Transaction(Protocol):
 
     async def prune_access_tokens(self, client_id: str, now: datetime, keep: int) -> None:
         """Delete expired tokens of every client, and all but the newest ``keep`` of this one."""
+        ...
+
+    async def get_release_check(self) -> ReleaseCheck | None:
+        """Return the outcome of the latest release check (ADR 0028), if there was one."""
+        ...
+
+    async def save_release_check(self, check: ReleaseCheck) -> None:
+        """Replace the outcome of the latest release check."""
+        ...
+
+    async def get_update_requests(self, limit: int = 20) -> list[UpdateRequest]:
+        """Return the newest update requests, newest first.
+
+        Updates concern the installation, not an organisation or group (``system.update`` is
+        a global permission), so there is no scope.
+        """
+        ...
+
+    async def add_update_request(self, request: UpdateRequest) -> UpdateRequest:
+        """Store a new request and return it with its id."""
+        ...
+
+    async def save_update_request(self, request: UpdateRequest) -> None:
+        """Store the status, times and reason of an existing request."""
         ...
 
 

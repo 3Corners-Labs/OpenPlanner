@@ -3,7 +3,7 @@
 Roles come from the identity provider (ADR 0013). Each permission applies at one level:
 
     GLOBAL        something about the admin portal itself (dashboard, own rights, the
-                  holiday calendars every organisation can reuse)
+                  holiday calendars every organisation can reuse, updates of the installation)
     ORGANISATION  something of one organisation (audit log, new groups, integrations)
     GROUP         something of one group (settings, opening hours, texts, bookings)
 
@@ -68,6 +68,7 @@ class Permission(StrEnum):
     CLOSURE_MANAGE = "closure.manage"
     ORGANISATION_CLOSURE = "organisation.closure"
     API_CLIENTS_MANAGE = "api_clients.manage"
+    SYSTEM_UPDATE = "system.update"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -90,6 +91,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.CLOSURE_MANAGE: Level.GROUP,
     Permission.ORGANISATION_CLOSURE: Level.ORGANISATION,
     Permission.API_CLIENTS_MANAGE: Level.GLOBAL,
+    # ADR 0028: update or restore the installation itself.
+    Permission.SYSTEM_UPDATE: Level.GLOBAL,
 }
 
 _EVERY_ADMIN = frozenset(

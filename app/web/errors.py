@@ -40,6 +40,9 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.CHANNEL_NOT_CONFIGURED: "error.invalid_request",
     ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",
     ErrorCode.REMINDER_NOT_FOUND: "error.not_found.text",
+    ErrorCode.UPDATE_NOT_AVAILABLE: "admin.form.error.update_not_available",
+    ErrorCode.UPDATE_IN_PROGRESS: "admin.form.error.update_in_progress",
+    ErrorCode.UPDATE_REQUEST_NOT_FOUND: "error.not_found.text",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {
@@ -60,6 +63,7 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.HOLIDAY_NOT_FOUND: 404,
     ErrorCode.CLOSURE_NOT_FOUND: 404,
     ErrorCode.API_CLIENT_NOT_FOUND: 404,
+    ErrorCode.UPDATE_REQUEST_NOT_FOUND: 404,
     ErrorCode.NOT_PERMITTED: 403,
     ErrorCode.DATABASE_BUSY: 503,
     ErrorCode.INVALID_CONFIGURATION: 500,

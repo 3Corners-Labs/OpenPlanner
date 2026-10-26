@@ -10,6 +10,7 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
                                                  └──* api_client_groups *──1 groups (ADR 0023)
     organisations 1──* channel_settings (SMTP and SMS per organisation, secret encrypted)
     admin_profiles (name per identity-provider subject; joined into the audit log)
+    release_checks (one row), update_requests (ADR 0028; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
     holiday_calendars 1──* holidays (ADR 0025; chosen through organisation_holiday_calendars
                          and group_holiday_calendars; group_holiday_open_days keep one open)
@@ -67,10 +68,12 @@ __all__ = [
     "OrganisationHolidayCalendarRow",
     "OrganisationLogoRow",
     "OrganisationRow",
+    "ReleaseCheckRow",
     "ReminderRuleRow",
     "ScheduleOverrideRow",
     "ScheduleRuleRow",
     "SlotRow",
+    "UpdateRequestRow",
 ]
 
 
@@ -556,4 +559,44 @@ class ApiAccessTokenRow(Base):
     __table_args__ = (
         Index("ix_api_access_tokens_client_pk", "client_pk"),
         Index("ix_api_access_tokens_expires_at", "expires_at"),
+    )
+
+
+class ReleaseCheckRow(Base):
+    """The outcome of the latest release check (ADR 0028); at most one row."""
+
+    __tablename__ = "release_checks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    checked_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    latest_version: Mapped[str | None] = mapped_column(String(20))
+    release_url: Mapped[str | None] = mapped_column(String(300))
+    error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class UpdateRequestRow(Base):
+    """A superuser's request to update or restore the installation (ADR 0028)."""
+
+    __tablename__ = "update_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    action: Mapped[str] = mapped_column(String(16))
+    target_version: Mapped[str] = mapped_column(String(20))
+    from_version: Mapped[str] = mapped_column(String(20))
+    requested_by: Mapped[str] = mapped_column(String(255))
+    requested_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    status: Mapped[str] = mapped_column(String(16))
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    reason: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+
+    __table_args__ = (
+        Index("ix_update_requests_status", "status"),
+        CheckConstraint("action IN ('update', 'restore')", name="action"),
+        CheckConstraint(
+            "status IN ('requested', 'running', 'succeeded', 'rolled_back', 'failed', 'cancelled')",
+            name="status",
+        ),
     )

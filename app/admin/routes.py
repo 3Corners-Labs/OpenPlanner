@@ -38,6 +38,7 @@ from app.admin import (
     holiday_routes,
     message_routes,
     organisation_routes,
+    update_routes,
 )
 from app.admin.authz import (
     AccessDenied,
@@ -48,6 +49,7 @@ from app.admin.authz import (
     admin_service,
     session_principal,
 )
+from app.admin.forms import safe_next
 from app.admin.pages import Locale, SameOrigin, templates
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
@@ -172,19 +174,6 @@ def _callback_url(request: Request) -> str:
     return f"{request.app.state.settings.public_base_url.rstrip('/')}/admin/callback"
 
 
-def _safe_next(value: str | None) -> str:
-    """Return ``value`` if it is an admin path on this site; otherwise the dashboard."""
-    if (
-        value
-        and value.startswith("/admin")
-        and not value.startswith("//")
-        and "\\" not in value
-        and "://" not in value
-    ):
-        return value
-    return "/admin/"
-
-
 @router.get("/login", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def login(request: Request, locale: Locale, next: str | None = None) -> Response:  # noqa: A002
@@ -198,7 +187,7 @@ async def login(request: Request, locale: Locale, next: str | None = None) -> Re
         start = await provider.start_login(_callback_url(request))
     except IdentityError:
         return _message(request, locale, 503, "admin.login_failed.title", "admin.login_failed.text")
-    save_login_start(request, start, _safe_next(next))
+    save_login_start(request, start, safe_next(next))
     return RedirectResponse(start.url, status_code=303)
 
 
@@ -233,7 +222,7 @@ async def callback(
     start_session(request, principal, _clock(request).now())
     await service.record_login(principal)
     log.info("admin.login", actor=principal.subject, roles=sorted(principal.roles))
-    return RedirectResponse(_safe_next(pending.get("next")), status_code=303)
+    return RedirectResponse(safe_next(pending.get("next")), status_code=303)
 
 
 @router.post("/logout", response_class=HTMLResponse)
@@ -502,7 +491,7 @@ def register_admin(app: FastAPI) -> None:
 
     async def reauth_required(request: Request, exc: Exception) -> Response:
         next_path = exc.next_path if isinstance(exc, ReauthRequired) else "/admin/"
-        target = quote(_safe_next(next_path), safe="/")
+        target = quote(safe_next(next_path), safe="/")
         return RedirectResponse(f"/admin/login?next={target}", status_code=303)
 
     handlers: dict[type[Exception], Callable[[Request, Exception], object]] = {
@@ -512,13 +501,19 @@ def register_admin(app: FastAPI) -> None:
     }
     for exc_type, handler in handlers.items():
         app.add_exception_handler(exc_type, handler)  # type: ignore[arg-type]
-    app.include_router(router)
-    app.include_router(group_routes.router)
-    app.include_router(call_routes.router)
-    app.include_router(branding_routes.router)
-    app.include_router(holiday_routes.router)
-    app.include_router(channel_routes.router)
-    app.include_router(message_routes.router)
-    app.include_router(organisation_routes.router)
-    app.include_router(closure_routes.router)
-    app.include_router(api_routes.router)
+    # The update banner (ADR 0028) is loaded for every admin page in one place.
+    banner = [Depends(update_routes.load_update_notice)]
+    for module_router in (
+        router,
+        group_routes.router,
+        call_routes.router,
+        branding_routes.router,
+        holiday_routes.router,
+        channel_routes.router,
+        message_routes.router,
+        organisation_routes.router,
+        closure_routes.router,
+        api_routes.router,
+        update_routes.router,
+    ):
+        app.include_router(module_router, dependencies=banner)
