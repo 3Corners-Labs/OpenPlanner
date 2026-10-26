@@ -1,4 +1,4 @@
-"""Admin routes for holiday calendars (ADR 0024).
+"""Admin routes for holiday calendars (ADR 0025).
 
 Every route depends on exactly one ``RequirePermission``; forms and changes are ``fresh``.
 Changes are POST forms with the Fetch Metadata check, answered with a redirect and a
@@ -28,14 +28,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission
-from app.admin.forms import (
-    Field,
-    FormData,
-    done_message,
-    raise_refusal,
-    read_form,
-    redirect_done,
-)
+from app.admin.forms import Field, FormData, done_message, raise_refusal, read_form, redirect_done
 from app.admin.group_routes import ManageGroup, group_page
 from app.admin.pages import Locale, SameOrigin, page
 from app.domain.authorization import Permission

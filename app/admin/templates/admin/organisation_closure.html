@@ -1,0 +1,49 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_closure_forms.html" import start_form, lift_form with context %}
+{% block title %}{{ _("admin.closures.title") }} · {{ organisation_name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
+  <ol>
+    <li><a href="/admin/closures">{{ _("admin.closures.title") }}</a></li>
+    <li><span aria-current="page">{{ organisation_name }}</span></li>
+  </ol>
+</nav>
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.closures.organisation_title", name=organisation_name) }}</h1>
+    <p class="page-header__lead">{{ _("admin.closures.organisation_lead") }}</p>
+  </div>
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="groups-heading">
+  <h2 id="groups-heading">{{ _("admin.closures.groups") }}</h2>
+  {% if groups %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.closures.groups") }}</caption>
+    <thead>
+      <tr><th scope="col">{{ _("admin.field.name") }}</th><th scope="col">{{ _("admin.closures.state") }}</th><th scope="col">{{ _("admin.closure.suspended") }}</th></tr>
+    </thead>
+    <tbody>
+      {% for g in groups %}
+      <tr>
+        <th scope="row"><a href="/admin/groups/{{ g.slug }}/closure">{{ g.name }}</a></th>
+        <td>{% if g.closure %}<span class="chip chip--warning">{{ g.closure.title }}</span> {{ g.closure.period }}{% else %}<span class="chip chip--success">{{ _("admin.closures.open") }}</span>{% endif %}</td>
+        <td>{{ g.suspended }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.closures.no_groups") }}</p>
+  {% endif %}
+</section>
+{% if fields %}
+{{ start_form("/admin/organisations/" ~ organisation_slug ~ "/closure", _("admin.closures.start"), _("admin.closures.start_lead"), _("admin.closures.start_button"), fields) }}
+{% endif %}
+{% if any_closed %}
+{{ lift_form("/admin/organisations/" ~ organisation_slug ~ "/closure/lift", _("admin.closures.lift"), _("admin.closures.lift_button")) }}
+{% endif %}
+{% endblock %}

@@ -33,6 +33,7 @@ from app.admin import (
     branding_routes,
     call_routes,
     channel_routes,
+    closure_routes,
     group_routes,
     holiday_routes,
     message_routes,
@@ -117,6 +118,14 @@ DETAIL_LABELS: dict[str, str] = {
     "accent_color": "admin.branding.accent_color",
     "logo": "admin.branding.logo",
     "logo.remove": "admin.audit.detail.logo_remove",
+    "closure.start": "admin.audit.detail.closure_start",
+    "closure.update": "admin.audit.detail.closure_update",
+    "closure.lift": "admin.audit.detail.closure_lift",
+    "booking.reinstate": "admin.audit.detail.booking_reinstate",
+    "booking.reinstate_all": "admin.audit.detail.booking_reinstate_all",
+    "booking.cancel": "admin.audit.detail.booking_cancel",
+    "booking.cancel_all": "admin.audit.detail.booking_cancel_all",
+    "booking.move": "admin.audit.detail.booking_move",
     "client.create": "admin.audit.detail.client_create",
     "client.rotate": "admin.audit.detail.client_rotate",
     "client.enable": "admin.audit.detail.client_enable",
@@ -129,6 +138,12 @@ DETAIL_LABELS: dict[str, str] = {
     "api.docs_public": "admin.api.docs_public",
 }
 """Readable label per audit detail key (changed field names and schedule actions)."""
+
+COUNT_LABELS: dict[str, str] = {
+    "bookings": "admin.audit.detail.bookings",
+    "notified": "admin.audit.detail.notified",
+}
+"""Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0024)."""
 
 OUTCOME_TONES: dict[Outcome, str] = {
     Outcome.SUCCESS: "success",
@@ -357,8 +372,14 @@ def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
 
 def _detail_label(detail: str, _: BoundGettext) -> str:
     """Translate an audit detail such as ``horizon_days,name`` into readable labels."""
-    keys = [key for key in detail.split(",") if key]
-    return ", ".join(_(DETAIL_LABELS[key]) if key in DETAIL_LABELS else key for key in keys)
+    labels = []
+    for key in (key for key in detail.split(",") if key):
+        name, _sep, count = key.partition(":")
+        if name in COUNT_LABELS and count.isdigit():
+            labels.append(_(COUNT_LABELS[name], count=int(count)))
+        else:
+            labels.append(_(DETAIL_LABELS[key]) if key in DETAIL_LABELS else key)
+    return ", ".join(labels)
 
 
 def _moment(at: datetime, tz: ZoneInfo, locale: str) -> str:
@@ -497,4 +518,5 @@ def register_admin(app: FastAPI) -> None:
     app.include_router(channel_routes.router)
     app.include_router(message_routes.router)
     app.include_router(organisation_routes.router)
+    app.include_router(closure_routes.router)
     app.include_router(api_routes.router)
