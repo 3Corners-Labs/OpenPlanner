@@ -14,11 +14,12 @@ windows it covers. A window with 0 agents or a gap ends the run.
     windows_on(day) ──► slots_on(day) ──► filter: notice ≤ start ≤ horizon
                                           capacity = existing slot snapshot or window
                                           remaining = capacity − active bookings
-                                                      − bookings of overlapping slots > 0
+                                                      − overlapping bookings at the
+                                                        busiest moment > 0
 
 Overlapping slots exist only after the grid moved (a window changed, or touching windows
 became one run, ADR 0027) while bookings on the old grid lie ahead. Their bookings occupy
-agents too, so they take places in every new slot they overlap.
+agents too, so at the busiest moment of a new slot they take places in it.
 """
 
 from bisect import bisect_left, bisect_right
@@ -99,10 +100,13 @@ def overlapping_active(
     booked: Mapping[datetime, int],
     starts: Sequence[datetime] | None = None,
 ) -> int:
-    """Return the active bookings of other slots that overlap ``start``–``start + length``.
+    """Return the most bookings of other slots that are active at one moment of this slot.
 
     All slots of a group have the same length (it is frozen while bookings lie ahead), so a
     slot overlaps when its start lies less than ``length`` away; touching slots do not count.
+    Two old slots that overlap this slot at different moments (08:45 and 09:15 around 09:00)
+    never occupy the same agent time, so only the busiest moment counts. That moment is this
+    slot's start or the start of one of the overlapping slots.
 
     Args:
         start: Start of the slot to check.
@@ -112,7 +116,12 @@ def overlapping_active(
     """
     keys = sorted(booked) if starts is None else starts
     lower, upper = bisect_right(keys, start - length), bisect_left(keys, start + length)
-    return sum(booked[other] for other in keys[lower:upper] if other != start)
+    others = [other for other in keys[lower:upper] if other != start]
+    moments = [start, *(other for other in others if other > start)]
+    return max(
+        sum(booked[other] for other in others if other <= moment < other + length)
+        for moment in moments
+    )
 
 
 def offered_slot(
