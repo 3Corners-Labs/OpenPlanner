@@ -1,5 +1,6 @@
 """Meetings, tasks, timeline and call status in SQLite (ADR 0010, 0017, 0018)."""
 
+from dataclasses import replace
 from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -10,7 +11,7 @@ from app.domain.calls import BookingEvent, CallState, EventKind, TaskState, appl
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
-from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book
+from tests.support.domain import ADA, NOW, SLOT_0900, TEST_TOKEN_KEY, book
 
 
 async def _booking_id(engine: AsyncEngine) -> int:
@@ -133,3 +134,38 @@ async def test_webhook_events_are_claimed_once_and_forgotten(engine: AsyncEngine
     assert (first, again, other_source) == (True, False, True)
     assert forgotten == 2
     assert after is True
+
+
+async def test_direct_calls_are_listed_with_their_status_and_cap(engine: AsyncEngine) -> None:
+    await seed_group(engine, slug="aangifte", capacity=2)
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        group = await tx.get_group("aangifte")
+        assert group is not None
+        await tx.save_group(replace(group, direct_call_enabled=True, direct_call_max_concurrent=3))
+    clock = FixedClock(NOW)
+    service = BookingService(uow, clock, TEST_TOKEN_KEY)
+    await book(service, SLOT_0900)  # scheduled: not a direct call
+    clock.advance(SLOT_0900 + timedelta(minutes=5) - NOW)
+    first = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    second = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    first_id, second_id = first.booking.id or 0, second.booking.id or 0
+    connected = apply_event(new_status(first_id), EventKind.TASK_CONNECTED, clock.now())
+    async with uow.locked() as tx:
+        await tx.save_call_status(connected)
+        await tx.save_booking(second.booking.cancel(clock.now()))
+
+    async with uow.read() as tx:
+        calls = await tx.get_direct_calls(group.id, SLOT_0900)
+        later = await tx.get_direct_calls(group.id, clock.now() + timedelta(minutes=1))
+        stored = await tx.get_group("aangifte")
+
+    assert [(c.booking_id, c.active, c.status.task) for c in calls] == [
+        (first_id, True, TaskState.CONNECTED),
+        (second_id, False, TaskState.NONE),
+    ]
+    assert calls[0].start == SLOT_0900 + timedelta(minutes=5)
+    assert calls[0].end == calls[0].start + timedelta(minutes=30)
+    assert later == []
+    assert stored is not None
+    assert stored.direct_call_max_concurrent == 3
