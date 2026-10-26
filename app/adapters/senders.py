@@ -5,19 +5,27 @@ time, so a change in the admin portal applies to the next message without a rest
 
     email  stored SMTP settings      → SmtpMailSender
            none stored, SMTP_HOST set → SmtpMailSender with the environment fallback
-    sms    stored Connect settings    → WebexConnectSmsSender
+    sms    stored SMS settings        → the adapter of their provider (SMS_GATEWAYS)
     otherwise                         → None (the job fails as ``channel_not_configured``)
 """
+
+from collections.abc import Callable
 
 import httpx
 
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.sms import SmsGatewayConfig
 from app.adapters.smtp import SmtpConfig, SmtpMailSender
-from app.adapters.webex_connect_sms import ConnectSmsConfig, WebexConnectSmsSender
+from app.adapters.webex_connect_sms import WebexConnectSmsSender
 from app.config import Settings
-from app.domain.channel_settings import SmsSettings, SmtpSecurity, SmtpSettings
+from app.domain.channel_settings import SmsProvider, SmsSettings, SmtpSecurity, SmtpSettings
 from app.domain.channels import ChannelKind
 from app.domain.ports import MessageSender
+
+SMS_GATEWAYS: dict[SmsProvider, Callable[[SmsGatewayConfig, httpx.AsyncClient], MessageSender]] = {
+    SmsProvider.WEBEX_CONNECT: WebexConnectSmsSender,
+}
+"""The adapter per SMS provider (ADR 0028); a test checks that every provider has one."""
 
 
 class ConfiguredSenders:
@@ -54,7 +62,7 @@ class ConfiguredSenders:
         config = stored.config
         if isinstance(config, SmtpSettings):
             return SmtpMailSender(smtp_config(config, secret))
-        return WebexConnectSmsSender(connect_config(config, secret or ""), self._http)
+        return SMS_GATEWAYS[config.provider](sms_config(config, secret or ""), self._http)
 
 
 def fallback_mail(settings: Settings) -> SmtpConfig | None:
@@ -88,11 +96,11 @@ def smtp_config(settings: SmtpSettings, password: str | None) -> SmtpConfig:
     )
 
 
-def connect_config(settings: SmsSettings, service_key: str) -> ConnectSmsConfig:
-    """Return the adapter configuration for an organisation's Connect settings."""
-    return ConnectSmsConfig(
+def sms_config(settings: SmsSettings, api_key: str) -> SmsGatewayConfig:
+    """Return the adapter configuration for an organisation's SMS settings."""
+    return SmsGatewayConfig(
         api_base_url=settings.api_base_url,
-        service_key=service_key,
+        api_key=api_key,
         sender_id=settings.sender_id,
         country_code=settings.country_code,
     )

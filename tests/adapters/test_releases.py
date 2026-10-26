@@ -1,4 +1,4 @@
-"""GitHub releases adapter (ADR 0028) against recorded responses."""
+"""GitHub releases adapter (ADR 0029) against recorded responses."""
 
 from collections.abc import Callable
 

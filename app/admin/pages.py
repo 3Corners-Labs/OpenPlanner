@@ -130,7 +130,7 @@ def page(
             "nav": nav,
             "can": can,
             "role_labels": role_labels,
-            # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0028).
+            # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
             "update_banner": getattr(request.state, "update_notice", None),
         },
     )

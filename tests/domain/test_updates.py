@@ -1,4 +1,4 @@
-"""Update rules (ADR 0028): versions, the hourly check, the request queue and the restore window."""
+"""Update rules (ADR 0029): versions, the hourly check, the request queue and the restore window."""
 
 from dataclasses import replace
 from datetime import timedelta

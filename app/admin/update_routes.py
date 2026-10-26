@@ -1,4 +1,4 @@
-"""Admin routes for updates of the installation (ADR 0028), superuser only.
+"""Admin routes for updates of the installation (ADR 0029), superuser only.
 
 Every route depends on exactly one ``RequirePermission(system.update)``; requests need a fresh
 login and the Fetch Metadata check. The routes only store requests: the host updater carries

@@ -1,4 +1,4 @@
-"""Storage of updates (ADR 0028): the single release-check row and the request history."""
+"""Storage of updates (ADR 0029): the single release-check row and the request history."""
 
 from dataclasses import replace
 from datetime import timedelta

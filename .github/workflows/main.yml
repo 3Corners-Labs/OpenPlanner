@@ -82,7 +82,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # ADR 0028: "1.4.0" on a v1.4.0 tag; "main" on a branch, which is no release.
+          # ADR 0029: "1.4.0" on a v1.4.0 tag; "main" on a branch, which is no release.
           build-args: APP_VERSION=${{ steps.meta.outputs.version }}
           provenance: mode=max
       - uses: sigstore/cosign-installer@v3

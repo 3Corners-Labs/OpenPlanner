@@ -120,7 +120,7 @@ class Settings(BaseSettings):
     rate_limit_agent_tokens: str = "10/minute"
     rate_limit_agent_calls: str = "120/minute"
 
-    # Updates from the admin portal (ADR 0028). APP_VERSION is baked into release images by
+    # Updates from the admin portal (ADR 0029). APP_VERSION is baked into release images by
     # main.yml; UPDATE_REPOSITORY (owner/name) switches the hourly release check on. The token
     # is only needed for a private repository and needs read access to its contents only.
     app_version: str = ""

@@ -26,25 +26,26 @@ worker ──SMTP──> mail provider of the organisation (admin portal; else S
 Jobs carry booking IDs only. Messages and calendar attachments contain no phone number and
 no full name. In development Mailpit (`--profile dev`) catches all mail locally.
 
-## SMS reminders (ADR 0022)
+## SMS reminders (ADR 0022, 0028)
 
 ```
-worker ──HTTPS──> Webex Connect SMS API of the organisation ──> mobile network ──> citizen
+worker ──HTTPS──> SMS API of the organisation's provider ──> mobile network ──> citizen
    body: phone number (E.164), text with first name, date, time, team, management link
 ```
 
 | Data item | Destination | When | Legal basis owner | Retention at the processor |
 |---|---|---|---|---|
-| Phone number | Webex Connect (Cisco), mobile operators | per SMS reminder rule of the group, only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
+| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
 | First name, date, time, team, management link | as above (message text) | as above | as above | as above |
 
 Only groups whose booking form asks for a phone number can have SMS reminders. The text is
 built from the allow-listed placeholders only (ADR 0009); group admins cannot add other data.
-OpenPlanner logs a random correlation ID per SMS, never the number or the text.
+OpenPlanner logs a random correlation ID per SMS, never the number or the text. Adding an SMS
+provider (ADR 0028) adds a processor: add its row to the table above in the same PR.
 
 ## Channel settings and message texts (ADR 0022)
 
-SMTP and SMS settings per organisation are organisation data; their password and service key
+SMTP and SMS settings per organisation are organisation data; their password and SMS API key
 are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data.
 Neither leaves the system except as part of the messages above.
 
@@ -54,7 +55,7 @@ Neither leaves the system except as part of the messages above.
 |---|---|---|---|---|
 | Name | `bookings.name` | booking form | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
 | Email | `bookings.email` | booking form | as above | mail provider (WP4) |
-| Phone (optional per group) | `bookings.phone` | booking form | as above | Webex Connect, for SMS reminders (ADR 0022) |
+| Phone (optional per group) | `bookings.phone` | booking form | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
 | Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the citizen, host URL to WxCC |
 | Management token | `bookings.management_token_hash` (SHA-256 only) | generated | kept (not personal data once the booking is purged) | token itself only in the confirmation mail |
@@ -152,7 +153,7 @@ citizen ──GET /g/{slug}──> web (holidays are closed days: no times, no h
 Holiday calendars are configuration, not personal data; nothing leaves the system. Changes are
 audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
 
-## Updates from the admin portal (ADR 0028)
+## Updates from the admin portal (ADR 0029)
 
 ```
 worker ──GET releases/latest (no data sent; optional read-only token)──> api.github.com

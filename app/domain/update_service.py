@@ -1,4 +1,4 @@
-"""Use cases of updates started from the admin portal (ADR 0028).
+"""Use cases of updates started from the admin portal (ADR 0029).
 
 Three callers, three paths:
 

@@ -1,4 +1,4 @@
-"""Operator commands of the host updater (ADR 0028): claim, report, backup and restore."""
+"""Operator commands of the host updater (ADR 0029): claim, report, backup and restore."""
 
 from pathlib import Path
 

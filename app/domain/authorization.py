@@ -91,7 +91,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.CLOSURE_MANAGE: Level.GROUP,
     Permission.ORGANISATION_CLOSURE: Level.ORGANISATION,
     Permission.API_CLIENTS_MANAGE: Level.GLOBAL,
-    # ADR 0028: update or restore the installation itself.
+    # ADR 0029: update or restore the installation itself.
     Permission.SYSTEM_UPDATE: Level.GLOBAL,
 }
 

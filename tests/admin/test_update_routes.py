@@ -1,4 +1,4 @@
-"""The updates page and banner (ADR 0028): superuser only, snooze per session, audited requests."""
+"""The updates page and banner (ADR 0029): superuser only, snooze per session, audited requests."""
 
 from datetime import timedelta
 

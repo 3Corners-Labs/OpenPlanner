@@ -1,4 +1,4 @@
-# 0028. Updates started from the admin portal, carried out by a host updater
+# 0029. Updates started from the admin portal, carried out by a host updater
 
 Status: accepted (2026-10-26), requested by the product owner. Builds on ADR 0006 (signed
 images) and ADR 0014 (authorisation matrix).

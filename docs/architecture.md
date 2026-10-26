@@ -45,7 +45,7 @@ flowchart LR
     wxcc[Webex Contact Center<br/>work items, Create Task v2]
     video[Webex Meetings API]
     idp[Identity provider<br/>OIDC]
-    sms[Webex Connect<br/>SMS API]
+    sms[SMS provider<br/>today Webex Connect]
     whatsapp[WhatsApp]
 
     website -- links to /g/slug --> service
@@ -72,7 +72,7 @@ flowchart LR
 | Webex Contact Center | out, in | Work item per booking or direct call; task events by signed webhook | ADR 0018 (supersedes 0007 in part) |
 | Webex Meetings | out, in | Meeting per booking on behalf of the group's host; status by signed webhook | ADR 0017, 0010 |
 | Identity provider | in | Admin login with roles | HANDOVER B8, O3 |
-| Webex Connect SMS API | out | SMS reminders, per organisation | ADR 0022 |
+| SMS provider (Webex Connect) | out | SMS reminders, per organisation and provider | ADR 0022, 0028 |
 | WhatsApp | out | Reminders | ADR 0009 (roadmap) |
 | Contact-center bot (WxCC AI Agent) | in | Free times through `/api/agent/v1`; changes through the citizen's confirmation (next step) | ADR 0023 |
 
@@ -118,7 +118,7 @@ flowchart TB
   requires `MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`.
 - **Images** are built in CI, pushed to GHCR, signed keyless with cosign and carry an SBOM
   attestation (ADR 0006). Hosting and backups: open point O7.
-- **Updates** (ADR 0028): the worker checks the latest release hourly; a superuser requests an
+- **Updates** (ADR 0029): the worker checks the latest release hourly; a superuser requests an
   update or a restore in the portal; the host updater (outside the containers, with the Docker
   socket) verifies the signature, backs up, switches the pinned digest and rolls back on its
   own when the new version does not become healthy.
@@ -175,7 +175,7 @@ flowchart LR
     clock[adapters.clock<br/>SystemClock]
     uow[adapters.db.uow<br/>SqlUnitOfWork]
     smtp[adapters.smtp<br/>SmtpMailSender]
-    smsad[adapters.webex_connect_sms<br/>WebexConnectSmsSender]
+    smsad[adapters.senders · SMS_GATEWAYS<br/>webex_connect → WebexConnectSmsSender]
     videoad[adapters.webex_meetings<br/>WebexMeetings]
     wxccad[adapters.wxcc<br/>WxccTasks]
     idpad[adapters.oidc<br/>OidcIdentityProvider]
@@ -216,7 +216,7 @@ same commit and rollback behaviour as the SQL one.
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
 | Cap on open direct calls, place in line, usual wait (ADR 0026) | `app/domain/direct_queue.py` |
-| Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0028) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/cli.py`, `scripts/updater/` |
+| Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/cli.py`, `scripts/updater/` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
@@ -242,7 +242,7 @@ same commit and rollback behaviour as the SQL one.
 | Messages and calendar files | `app/jobs/messages.py`, `app/jobs/calendar.py` |
 | Channel settings per organisation (SMTP, SMS; ADR 0022) | `app/domain/channel_settings.py`, `app/domain/channel_service.py`, `app/admin/channel_routes.py` |
 | Reminder rules and group texts (ADR 0022) | `app/domain/messaging_service.py`, `app/domain/message_texts.py`, `app/admin/message_routes.py` |
-| Senders per organisation, SMS adapter | `app/adapters/senders.py`, `app/adapters/webex_connect_sms.py`, `app/adapters/smtp.py` |
+| Senders per organisation, SMS adapters per provider (ADR 0028) | `app/adapters/senders.py`, `app/adapters/sms.py`, `app/adapters/webex_connect_sms.py`, `app/adapters/smtp.py` |
 | Job execution | `app/jobs/runner.py`, `app/jobs/worker.py` |
 
 ## 6. Domain model
@@ -347,7 +347,9 @@ Rules that matter for the rest of the system:
   0 agents (lunch) offers no slots and no direct calls, like a gap. Touching blocks with
   agents form one *run*: the slot grid continues across their borders and a slot straddling
   a border gets the lowest agent count. A slot row is created by the first booking and
-  snapshots that capacity. Later schedule edits change new slots only.
+  snapshots that capacity. Later schedule edits change new slots only. When an edit moves
+  the grid while bookings on the old grid lie ahead, those bookings take a place in every
+  new slot they overlap, so no moment has more appointments than agents.
 - **An override replaces every rule on its date.** A closed override blocks new bookings,
   even in slots that already exist.
 - **Holidays come from reusable calendars** (ADR 0025): the superuser maintains them, an
@@ -637,8 +639,9 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0024 | Emergency closure: appointments on hold, citizens informed, no deletion |
 | 0025 | Reusable holiday calendars with overrides per organisation and group |
 | 0026 | Cap on open direct calls per group; queue feedback from our own data |
-| 0027 | Staffing blocks instead of opening hours |
-| 0028 | Updates started from the admin portal, carried out by a signed-image host updater with rollback |
+| 0027 | Staffing blocks with an agent count, including zero, instead of opening hours |
+| 0028 | Provider-neutral SMS gateway; Webex Connect as one adapter |
+| 0029 | Updates started from the admin portal, carried out by a signed-image host updater with rollback |
 
 ## 12. Status and roadmap
 
@@ -658,7 +661,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |
 | ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
-| ADR 0028 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
+| ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |

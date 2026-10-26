@@ -1,4 +1,4 @@
-# OpenPlanner host updater (ADR 0028): carries out update requests from the admin portal.
+# OpenPlanner host updater (ADR 0029): carries out update requests from the admin portal.
 # Install: docs/runbook.md, section Updates. Runs as root because it drives Docker.
 [Unit]
 Description=OpenPlanner host updater

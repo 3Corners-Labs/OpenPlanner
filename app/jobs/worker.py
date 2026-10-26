@@ -1,7 +1,7 @@
 """Worker process: runs due jobs and proves liveness with a heartbeat file.
 
 Run with ``python -m app.jobs.worker``. Each iteration checks the database, runs due jobs
-(``app.jobs.runner``), looks up the latest release when that is due (hourly, ADR 0028) and
+(``app.jobs.runner``), looks up the latest release when that is due (hourly, ADR 0029) and
 writes the heartbeat.
 """
 

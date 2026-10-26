@@ -144,7 +144,7 @@ def create_app(
         app.state.api_access = ApiAccessService(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled
         )
-        # ADR 0028: the web process only reads checks and stores requests; no release lookup.
+        # ADR 0029: the web process only reads checks and stores requests; no release lookup.
         app.state.update_service = update_service(
             settings.model_copy(update={"update_repository": None}), uow, clock, http
         )

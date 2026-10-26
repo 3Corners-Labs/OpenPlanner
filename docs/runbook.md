@@ -362,7 +362,7 @@ without spaces (the web address of the group is a good default).
 ## Mail and SMS (ADR 0022)
 
 Each organisation's mail server and SMS service are set by a superuser under **Koppelingen →
-Berichtkanalen** (`/admin/organisations/{org}/channels`). Passwords and service keys are
+Berichtkanalen** (`/admin/organisations/{org}/channels`). Passwords and SMS API keys are
 stored encrypted with `SETTINGS_ENCRYPTION_KEY`; without that key they cannot be saved
 (the form says so). Changes apply to the next message, no restart needed.
 
@@ -372,10 +372,10 @@ stored encrypted with `SETTINGS_ENCRYPTION_KEY`; without that key they cannot be
   development. Use STARTTLS on 587 or TLS on 465 (port 465 always means TLS); plain only for a
   relay on a trusted network. The services refuse to start with a login but neither STARTTLS
   nor TLS.
-- **SMS.** In Webex Connect, create a service with an SMS number or alphanumeric sender, copy
-  the service key (service → Messaging API) and the tenant's API host (for example
-  `https://api.us.webexconnect.io`). Enter both with the sender and the country code for
-  national numbers (31). Organisation admins then add SMS reminders per group under
+- **SMS.** Choose the provider (ADR 0028), then enter its API address, API key, the sender
+  and the country code for national numbers (31). For **Webex Connect**: create a service
+  with an SMS number or alphanumeric sender, copy the service key (service → Messaging API)
+  as the API key and the tenant's API host (for example `https://api.us.webexconnect.io`). Organisation admins then add SMS reminders per group under
   **Herinneringen**; the group's form must ask for a phone number.
 
 **Testing mail.** Under **Berichtkanalen**, *Testbericht versturen* sends one message through
@@ -385,7 +385,7 @@ the test uses the saved settings. Each test is audited (`smtp.test.ok` or `smtp.
 
 Failed deliveries are retried after 1, 5 and 15 minutes (timeouts, 429, 5xx, SMTP 4xx,
 `unreachable`) and then marked `failed` in the `jobs` table (`last_error` holds the exception
-type or code). Refusals fail at once: `unauthorized` (wrong service key or SMTP login),
+type or code). Refusals fail at once: `unauthorized` (wrong SMS API key or SMTP login),
 `tls_failed` (wrong security setting for the port, or an invalid certificate), `not_supported`
 (the server offers no STARTTLS or login), `sender_refused` (the account may not send from the
 sender address), `recipient_refused`, `rejected_<status>` (for example an invalid number or
@@ -399,7 +399,7 @@ when a rule's channel is not configured.
 link in mails already sent; bookings are unaffected. Rotate only after an incident, and tell the
 contact center that citizens may call about broken links.
 
-## Updates from the admin portal (ADR 0028)
+## Updates from the admin portal (ADR 0029)
 
 With `UPDATE_REPOSITORY=<owner>/<repo>` the worker looks up the latest GitHub release once an
 hour, and the superuser sees a banner on every admin page when it is newer than the running

@@ -70,7 +70,7 @@ class OutboundMessage:
 
 
 class MessageSender(Protocol):
-    """Delivers messages on one channel (ADR 0009): SMTP for email, Webex Connect for SMS."""
+    """Delivers messages on one channel (ADR 0009): SMTP for email, an SMS gateway for SMS."""
 
     async def send(self, message: OutboundMessage) -> None:
         """Deliver ``message``; raise on failure so the job is retried."""
@@ -171,7 +171,7 @@ class ContactCenterDispatcher(Protocol):
 
 
 class ReleaseSource(Protocol):
-    """Where the latest published release is looked up (GitHub releases, ADR 0028)."""
+    """Where the latest published release is looked up (GitHub releases, ADR 0029)."""
 
     async def latest(self) -> Release | None:
         """Return the latest published release; ``None`` when there is none or it is no version.
@@ -592,7 +592,7 @@ class Transaction(Protocol):
         ...
 
     async def get_release_check(self) -> ReleaseCheck | None:
-        """Return the outcome of the latest release check (ADR 0028), if there was one."""
+        """Return the outcome of the latest release check (ADR 0029), if there was one."""
         ...
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
