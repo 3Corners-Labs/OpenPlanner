@@ -24,7 +24,10 @@ uv run python -m app.jobs.worker                         # worker
 import-linter, pytest with coverage (≥ 90% on `app/domain/`, ≥ 75% overall), bandit,
 pip-audit and `uv lock --check`.
 
-`make check` also runs the copy-paste detector (`make duplication`, jscpd; needs Node).
+`make check` also runs the copy-paste detector (`make duplication`, jscpd; needs Node) and
+shellcheck on `scripts/` (`make shellcheck`; a local `shellcheck`, otherwise its Docker image).
+The host updater script is tested by `tests/scripts/test_updater.py` against fake `docker`,
+`cosign`, `curl` and `flock` executables (`tests/fakes/updater_host.py`).
 
 Further targets: `make migrations` (Alembic up/down/up on a fresh database), `make licenses`
 (runtime dependency licenses against the allow-list), `make semgrep` (repo rules self-test

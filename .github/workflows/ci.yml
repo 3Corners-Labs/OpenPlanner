@@ -31,6 +31,8 @@ jobs:
       - run: uv sync --locked
       - name: ruff
         run: make lint
+      - name: shellcheck (host scripts, updater)
+        run: make shellcheck
       - name: mypy --strict
         run: make type
       - name: import-linter
