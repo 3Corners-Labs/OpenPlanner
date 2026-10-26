@@ -13,6 +13,7 @@ five minutes before it expires, or at once after the API answered 401.
 
 import asyncio
 import hashlib
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Protocol
@@ -27,6 +28,9 @@ log = structlog.get_logger()
 CREDENTIAL_NAME = "webex_service_app"
 REFRESH_MARGIN = timedelta(minutes=5)
 EXPIRY_WARNING = timedelta(days=14)
+ADDRESS = re.compile(r"[^\s@'\"]+@[^\s@'\"]+")
+"""An email address in Webex's error text (the group's host); masked before logging."""
+REASON_LIMIT = 300
 
 
 class TokenStore(Protocol):
@@ -186,8 +190,12 @@ class AuthorizedClient:
         json: dict[str, Any] | None = None,
         params: dict[str, str] | None = None,
         ok: tuple[int, ...] = (200, 201, 204),
+        explain: bool = False,
     ) -> httpx.Response:
         """Send the request and return the response if its status is in ``ok``.
+
+        ``explain`` logs Webex's error message on a refusal; pass it only for requests that
+        carry no citizen data, since Webex may echo submitted values.
 
         Raises:
             IntegrationError: ``unauthorized``, ``rejected`` (4xx; not retryable),
@@ -210,17 +218,28 @@ class AuthorizedClient:
                 continue
             if response.status_code in ok:
                 return response
-            raise http_failure(response)
+            raise http_failure(response, explain=explain)
         raise IntegrationError("unauthorized", retryable=False)  # pragma: no cover - loop ends
 
 
-def http_failure(response: httpx.Response) -> IntegrationError:
-    """Map an unexpected status to an ``IntegrationError`` (status logged, body not).
+def http_failure(response: httpx.Response, *, explain: bool = False) -> IntegrationError:
+    """Map an unexpected status to an ``IntegrationError`` and log why Webex refused.
 
-    Shared by every Webex API adapter (Meetings, WxCC, Connect SMS).
+    Shared by every Webex API adapter (Meetings, WxCC, Connect SMS). The log line carries the
+    status and Webex's ``trackingId`` for Webex support; with ``explain`` (requests without
+    citizen data only) also Webex's ``message`` with email addresses masked. Never the rest
+    of the body.
     """
     status = response.status_code
-    log.warning("integration.refused", status=status, path=response.request.url.path)
+    reason, tracking_id = _refusal(response)
+    reason = reason if explain else ""
+    log.warning(
+        "integration.refused",
+        status=status,
+        path=response.request.url.path,
+        reason=reason,
+        tracking_id=tracking_id,
+    )
     if status == 401:
         return IntegrationError("unauthorized", retryable=False)
     if status == 429:
@@ -228,3 +247,16 @@ def http_failure(response: httpx.Response) -> IntegrationError:
     if status >= 500:
         return IntegrationError("server_error", retryable=True)
     return IntegrationError(f"rejected_{status}", retryable=False)
+
+
+def _refusal(response: httpx.Response) -> tuple[str, str]:
+    """Return Webex's error message (addresses masked, shortened) and tracking id, if any."""
+    try:
+        body = response.json()
+    except ValueError:
+        return "", ""
+    if not isinstance(body, dict):
+        return "", ""
+    message, tracking_id = body.get("message"), body.get("trackingId")
+    reason = ADDRESS.sub("***", message)[:REASON_LIMIT] if isinstance(message, str) else ""
+    return reason, tracking_id if isinstance(tracking_id, str) else ""

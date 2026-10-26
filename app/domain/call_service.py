@@ -137,9 +137,8 @@ class CallService:
         await self._video.delete_meeting(booking.meeting.id, group.video_host_email)
         await self._integration.record(_id(booking), EventKind.MEETING_DELETED)
 
-    async def record_failure(self, booking_id: int, code: str, *, dispatch: bool) -> None:
-        """Put a final failure on the booking's timeline."""
-        kind = EventKind.TASK_FAILED if dispatch else EventKind.INTEGRATION_ERROR
+    async def record_failure(self, booking_id: int, code: str, kind: EventKind) -> None:
+        """Put a final failure of kind ``kind`` with reason ``code`` on the booking's timeline."""
         await self._integration.record(booking_id, kind, detail=code)
 
 

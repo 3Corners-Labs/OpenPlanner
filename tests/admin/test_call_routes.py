@@ -54,6 +54,31 @@ async def test_timeline_lists_events_with_reason_codes(site: Site) -> None:
     assert "<code>ENTRY_POINT_NOT_FOUND</code>" in text
 
 
+async def test_a_failed_meeting_explains_what_to_check(site: Site) -> None:
+    booking_id = await _book(site, "demo")
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    uow = SqlUnitOfWork(app.state.engine)
+    integration = IntegrationService(uow, site.clock, AdminService(uow, site.clock))
+    await integration.record(booking_id, EventKind.MEETING_FAILED, detail="rejected_400")
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
+
+    assert "Videomeeting aanmaken mislukt" in text
+    assert "<code>rejected_400</code>" in text
+    assert "Webex-host" in text  # the hint names the field to check
+
+
+async def test_an_unknown_code_still_gets_a_hint(site: Site) -> None:
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}?lang=en")).text
+
+    assert "<code>ENTRY_POINT_NOT_FOUND</code>" in text
+    assert "Webex Contact Center did not accept the task" in text
+
+
 async def test_a_booking_cannot_be_opened_through_another_groups_url(site: Site) -> None:
     other = await _book(site, "andere-team")
     await site.login_as(SUPER)

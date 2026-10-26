@@ -23,7 +23,7 @@
   {% if events %}
   <ol class="timeline">
     {% for event in events %}
-    <li><span class="timeline__time">{{ event.time }}</span> <span class="timeline__label">{{ event.label }}</span>{% if event.detail %} <code>{{ event.detail }}</code>{% endif %}</li>
+    <li><span class="timeline__time">{{ event.time }}</span> <span class="timeline__label">{{ event.label }}</span>{% if event.detail %} <code>{{ event.detail }}</code>{% endif %}{% if event.hint %}<p class="timeline__hint">{{ event.hint }}</p>{% endif %}</li>
     {% endfor %}
   </ol>
   {% else %}
