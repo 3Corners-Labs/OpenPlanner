@@ -1765,6 +1765,281 @@ msgstr "De taal van pagina's en berichten als de bezoeker geen andere taal kiest
 msgid "admin.form.error.default_locale"
 msgstr "Kies een van de beschikbare talen."
 
+# Machine-API voor contactcenter-bots (ADR 0023).
+
+msgid "authz.permission.api_clients_manage"
+msgstr "API-koppelingen beheren"
+
+msgid "authz.api_scope.availability_read"
+msgstr "Vrije tijden lezen"
+
+msgid "admin.nav.api"
+msgstr "API-koppelingen"
+
+msgid "admin.matrix.machines"
+msgstr "Koppelingen (API-clients)"
+
+msgid "admin.matrix.machines_intro"
+msgstr "Bots van het contactcenter krijgen nooit een rol. De superuser registreert elke bot als API-client van één organisatie, eventueel beperkt tot enkele teams, met deze rechten."
+
+msgid "admin.api.scope"
+msgstr "Recht (scope)"
+
+msgid "admin.audit.detail.client_create"
+msgstr "API-client aangemaakt"
+
+msgid "admin.audit.detail.client_rotate"
+msgstr "Nieuw secret uitgegeven"
+
+msgid "admin.audit.detail.client_enable"
+msgstr "API-client aangezet"
+
+msgid "admin.audit.detail.client_disable"
+msgstr "API-client uitgezet"
+
+msgid "admin.audit.detail.client_revoke_tokens"
+msgstr "Tokens ingetrokken"
+
+msgid "audit.event.api_token"
+msgstr "API-token aangevraagd"
+
+msgid "audit.event.api_call"
+msgstr "API-aanroep"
+
+msgid "admin.done.client_enabled"
+msgstr "De API-client staat aan."
+
+msgid "admin.done.client_disabled"
+msgstr "De API-client staat uit. Zijn tokens zijn ingetrokken."
+
+msgid "admin.done.tokens_revoked"
+msgstr "Alle tokens van deze client zijn ingetrokken."
+
+msgid "admin.form.error.scopes"
+msgstr "Kies minstens één recht."
+
+msgid "admin.form.error.groups"
+msgstr "Kies alleen teams van de organisatie van deze client."
+
+msgid "admin.form.error.networks"
+msgstr "Vul per regel een IP-adres of netwerk in, bijvoorbeeld 198.51.100.0/24 (hoogstens 20)."
+
+msgid "admin.form.error.lifetime_days"
+msgstr "Kies een geldigheidsduur uit de lijst."
+
+msgid "admin.api.title"
+msgstr "API-koppelingen"
+
+msgid "admin.api.lead"
+msgstr "Bots van het contactcenter, zoals de Webex AI Agent, gebruiken deze API om vrije tijden op te vragen. Ze zien nooit persoonsgegevens."
+
+msgid "admin.api.new_client"
+msgstr "Nieuwe API-client"
+
+msgid "admin.api.not_available"
+msgstr "De API is in deze omgeving niet ingeschakeld (AGENT_API_ENABLED). U kunt clients al klaarzetten; ze werken pas als de beheerder van de omgeving de API inschakelt."
+
+msgid "admin.api.switches"
+msgstr "Schakelaars"
+
+msgid "admin.api.switches_lead"
+msgstr "Uitzetten werkt direct: er worden geen tokens meer uitgegeven en bestaande tokens (hoogstens {minutes} minuten geldig) worden geweigerd."
+
+msgid "admin.api.state"
+msgstr "Status"
+
+msgid "admin.api.on"
+msgstr "Aan"
+
+msgid "admin.api.off"
+msgstr "Uit"
+
+msgid "admin.api.enabled"
+msgstr "API aan"
+
+msgid "admin.api.enabled_hint"
+msgstr "Noodstop: zet dit uit om alle bots meteen te stoppen."
+
+msgid "admin.api.docs_public"
+msgstr "Documentatie publiceren"
+
+msgid "admin.api.docs_hint"
+msgstr "De OpenAPI-specificatie en de documentatiepagina zijn alleen bereikbaar als dit aan staat:"
+
+msgid "admin.api.clients"
+msgstr "API-clients"
+
+msgid "admin.api.clients_lead"
+msgstr "Elke bot krijgt een eigen client met alleen de rechten en teams die hij nodig heeft."
+
+msgid "admin.api.name"
+msgstr "Naam"
+
+msgid "admin.api.organisation"
+msgstr "Organisatie"
+
+msgid "admin.api.scopes"
+msgstr "Rechten"
+
+msgid "admin.api.groups"
+msgstr "Teams"
+
+msgid "admin.api.networks"
+msgstr "Toegestane netwerken"
+
+msgid "admin.api.status"
+msgstr "Status"
+
+msgid "admin.api.secret_expires"
+msgstr "Secret geldig tot"
+
+msgid "admin.api.last_token"
+msgstr "Laatste token"
+
+msgid "admin.api.client_on"
+msgstr "Aan"
+
+msgid "admin.api.client_off"
+msgstr "Uit"
+
+msgid "admin.api.expiring"
+msgstr "Verloopt binnenkort"
+
+msgid "admin.api.never"
+msgstr "Nog nooit"
+
+msgid "admin.api.none"
+msgstr "Er zijn nog geen API-clients."
+
+msgid "admin.api.all_groups"
+msgstr "Alle teams"
+
+msgid "admin.api.disable"
+msgstr "Uitzetten"
+
+msgid "admin.api.enable"
+msgstr "Aanzetten"
+
+msgid "admin.api.revoke"
+msgstr "Tokens intrekken"
+
+msgid "admin.api.lifetime_days"
+msgstr "Geldigheid van het secret"
+
+msgid "admin.api.days"
+msgstr "{days} dagen"
+
+msgid "admin.api.rotate"
+msgstr "Nieuw secret maken"
+
+msgid "admin.api.actions_hint"
+msgstr "Uitzetten en een nieuw secret maken trekken alle tokens van deze client meteen in. Het oude secret werkt daarna niet meer."
+
+msgid "admin.api.grant"
+msgstr "Rechten van de client"
+
+msgid "admin.api.grant_lead"
+msgstr "Geef alleen wat de bot nodig heeft. Een wijziging van rechten, teams of netwerken trekt de tokens in."
+
+msgid "admin.api.name_hint"
+msgstr "Voor uzelf, bijvoorbeeld de naam van de bot in Webex."
+
+msgid "admin.api.organisation_hint"
+msgstr "Een client hoort bij één organisatie; dat kan later niet meer veranderen."
+
+msgid "admin.api.lifetime_days_hint"
+msgstr "Maak voor het einde een nieuw secret; daarna geeft de API geen tokens meer."
+
+msgid "admin.api.scopes_hint"
+msgstr "Wat de client mag doen."
+
+msgid "admin.api.groups_hint"
+msgstr "Niets aangevinkt: alle teams van de organisatie."
+
+msgid "admin.api.networks_hint"
+msgstr "Eén IP-adres of netwerk per regel, bijvoorbeeld de uitgaande adressen van uw WxCC-regio. Leeg: elk adres."
+
+msgid "admin.api.create"
+msgstr "Client aanmaken"
+
+msgid "admin.api.secret_title"
+msgstr "Gegevens voor de koppeling"
+
+msgid "admin.api.secret_once"
+msgstr "Dit secret ziet u alleen nu. Kopieer het naar de kluis van het contactcenter. Kwijt? Maak dan een nieuw secret."
+
+msgid "admin.api.credentials"
+msgstr "Client credentials"
+
+msgid "admin.api.client_id"
+msgstr "Client-ID"
+
+msgid "admin.api.client_secret"
+msgstr "Client-secret"
+
+msgid "admin.api.token_url"
+msgstr "Token-URL"
+
+msgid "admin.api.secret_store"
+msgstr "OpenPlanner bewaart alleen een hash van het secret. Zet het nooit in een e-mail, chat of ticket."
+
+msgid "admin.api.secret_done"
+msgstr "Ik heb het secret opgeslagen"
+
+msgid "agent_docs.title"
+msgstr "API voor contactcenter-bots"
+
+msgid "agent_docs.lead"
+msgstr "Versie {version}. Voor bots van het contactcenter, zoals de Webex AI Agent. Verzoeken en antwoorden bevatten geen persoonsgegevens."
+
+msgid "agent_docs.auth.title"
+msgstr "Aanmelden"
+
+msgid "agent_docs.auth.text"
+msgstr "OAuth 2.0 client credentials. Vraag met het client-ID en het secret uit het beheerportaal een token aan. Een token is 10 minuten geldig."
+
+msgid "agent_docs.auth.use"
+msgstr "Stuur het token mee met elke aanroep:"
+
+msgid "agent_docs.scopes.title"
+msgstr "Rechten"
+
+msgid "agent_docs.endpoints.title"
+msgstr "Endpoints"
+
+msgid "agent_docs.endpoints.bearer"
+msgstr "Vereist een geldig token."
+
+msgid "agent_docs.endpoints.parameters"
+msgstr "Parameters"
+
+msgid "agent_docs.endpoints.name"
+msgstr "Naam"
+
+msgid "agent_docs.endpoints.in"
+msgstr "Plaats"
+
+msgid "agent_docs.endpoints.required"
+msgstr "Verplicht"
+
+msgid "agent_docs.endpoints.description"
+msgstr "Omschrijving"
+
+msgid "agent_docs.endpoints.responses"
+msgstr "Antwoorden"
+
+msgid "agent_docs.endpoints.status"
+msgstr "Status"
+
+msgid "agent_docs.yes"
+msgstr "ja"
+
+msgid "agent_docs.no"
+msgstr "nee"
+
+msgid "agent_docs.spec_link"
+msgstr "OpenAPI-specificatie (JSON)"
+
 msgid "admin.nav.holidays"
 msgstr "Feestdagen"
 

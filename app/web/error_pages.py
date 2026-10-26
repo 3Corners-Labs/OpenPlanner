@@ -21,6 +21,7 @@ _NOT_FOUND = {
     ErrorCode.BOOKING_NOT_FOUND,
     ErrorCode.SCHEDULE_ITEM_NOT_FOUND,
     ErrorCode.ORGANISATION_NOT_FOUND,
+    ErrorCode.API_CLIENT_NOT_FOUND,
 }
 
 

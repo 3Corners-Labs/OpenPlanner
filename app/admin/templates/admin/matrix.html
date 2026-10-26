@@ -42,4 +42,19 @@
   </tbody>
 </table>
 </div>
+<h2 class="section-title">{{ _("admin.matrix.machines") }}</h2>
+<p>{{ _("admin.matrix.machines_intro") }}</p>
+<div class="table-scroll">
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("admin.matrix.machines") }}</caption>
+  <thead>
+    <tr><th scope="col">{{ _("admin.api.scope") }}</th><th scope="col">{{ _("admin.matrix.level") }}</th></tr>
+  </thead>
+  <tbody>
+    {% for label, level in api_scopes %}
+    <tr><th scope="row">{{ label }}</th><td>{{ level }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
 {% endblock %}
