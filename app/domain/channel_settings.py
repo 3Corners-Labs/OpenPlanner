@@ -218,6 +218,15 @@ def secret_field(channel: ChannelKind) -> str:
     return "smtp_credential" if channel is ChannelKind.EMAIL else "sms_service_key"
 
 
+def validate_test_recipient(address: str) -> None:
+    """Check the address a test email goes to.
+
+    Raises:
+        DomainError: ``invalid_configuration`` for field ``test_recipient``.
+    """
+    _check_email(address, "test_recipient")
+
+
 def validate_secret(secret: str, channel: ChannelKind) -> None:
     """Check a password or service key before it is stored.
 

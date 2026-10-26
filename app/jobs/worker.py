@@ -16,8 +16,7 @@ from app.adapters.db.engine import create_engine, is_reachable
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.integrations import build_integrations, secret_box
-from app.adapters.senders import ConfiguredSenders
-from app.adapters.smtp import SmtpConfig
+from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.integration import IntegrationService
@@ -30,23 +29,6 @@ from app.keys import management_token_key
 from app.logging import configure_logging
 
 log = structlog.get_logger()
-
-
-def fallback_mail(settings: Settings) -> SmtpConfig | None:
-    """Return the SMTP server from the environment, or ``None`` when ``SMTP_HOST`` is not set.
-
-    Used for organisations without their own SMTP settings (ADR 0022).
-    """
-    if not settings.smtp_host:
-        return None
-    return SmtpConfig(
-        host=settings.smtp_host,
-        port=settings.smtp_port,
-        sender=settings.mail_from,
-        starttls=settings.smtp_starttls,
-        username=settings.smtp_username,
-        password=settings.smtp_password.get_secret_value() if settings.smtp_password else None,
-    )
 
 
 async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> None:

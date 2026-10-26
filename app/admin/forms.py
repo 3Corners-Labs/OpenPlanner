@@ -48,6 +48,7 @@ DONE_MESSAGES: dict[str, str] = {
     "client_disabled": "admin.done.client_disabled",
     "tokens_revoked": "admin.done.tokens_revoked",
     "texts_saved": "admin.done.texts_saved",
+    "test_sent": "admin.done.test_sent",
 }
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
@@ -106,6 +107,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "sms_service_key": "admin.form.error.sms_service_key",
     "sms_sender_id": "admin.form.error.sms_sender_id",
     "sms_country_code": "admin.form.error.sms_country_code",
+    "test_recipient": "admin.form.error.test_recipient",
     "channel": "admin.form.error.reminder_channel",
     "minutes_before": "admin.form.error.reminder_offset",
     "reminders": "admin.form.error.reminder_limit",

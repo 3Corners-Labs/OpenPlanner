@@ -10,12 +10,14 @@ from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import Organisation
 from tests.fakes.clock import FixedClock
+from tests.fakes.messaging import RecordingSender, RefusingSender
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import DEMO_ORG_ADMIN, DEMO_SUPERUSER, NOW
 
 SUPER, ORG_ADMIN = DEMO_SUPERUSER, DEMO_ORG_ADMIN
 SMTP = SmtpSettings("smtp.demo.nl", 587, SmtpSecurity.STARTTLS, "afspraak", "afspraak@demo.nl")
 SMS = SmsSettings("https://api.us.webexconnect.io", "GemDemo")
+TEST_RECIPIENT = "beheer@demo.nl"
 
 
 @pytest.fixture
@@ -133,11 +135,13 @@ async def _as_org_admin(service: ChannelSettingsService, action: str) -> None:
         await service.overview(ORG_ADMIN, "demo")
     elif action == "save":
         await service.save(ORG_ADMIN, "demo", SMS, "service-key")
+    elif action == "test":
+        await service.send_test_email(ORG_ADMIN, "demo", TEST_RECIPIENT, "Test", "Tekst")
     else:
         await service.remove(ORG_ADMIN, "demo", ChannelKind.SMS)
 
 
-@pytest.mark.parametrize("action", ["overview", "save", "remove"])
+@pytest.mark.parametrize("action", ["overview", "save", "remove", "test"])
 async def test_org_admin_may_not_configure_channels_handover_section_6(
     service: ChannelSettingsService, uow: InMemoryUnitOfWork, action: str
 ) -> None:
@@ -153,3 +157,78 @@ async def test_unknown_organisation(service: ChannelSettingsService) -> None:
     with pytest.raises(DomainError) as error:
         await service.overview(SUPER, "nope")
     assert error.value.code is ErrorCode.ORGANISATION_NOT_FOUND
+
+
+def _with_senders(uow: InMemoryUnitOfWork, senders: object) -> ChannelSettingsService:
+    clock = FixedClock(NOW)
+    return ChannelSettingsService(uow, clock, AdminService(uow, clock), senders)  # type: ignore[arg-type]
+
+
+async def test_a_test_email_goes_through_the_organisations_sender_and_is_audited(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    sender = RecordingSender()
+    service = _with_senders(uow, sender)
+
+    failure = await service.send_test_email(SUPER, "demo", TEST_RECIPIENT, "Test", "Tekst")
+
+    assert failure is None
+    assert sender.asked == [(1, ChannelKind.EMAIL)]
+    message = sender.sent[0]
+    assert (message.channel, message.recipient, message.subject, message.text) == (
+        ChannelKind.EMAIL,
+        TEST_RECIPIENT,
+        "Test",
+        "Tekst",
+    )
+    event = uow.state.audit[-1]
+    assert (event.action, event.outcome, event.detail) == (
+        "integrations.manage",
+        Outcome.SUCCESS,
+        "smtp.test.ok",
+    )
+    assert TEST_RECIPIENT not in repr(uow.state.audit)
+
+
+async def test_a_failed_test_email_returns_and_audits_only_the_code(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    service = _with_senders(uow, RefusingSender("unauthorized"))
+
+    failure = await service.send_test_email(SUPER, "demo", TEST_RECIPIENT, "Test", "Tekst")
+
+    assert failure == "unauthorized"
+    assert uow.state.audit[-1].detail == "smtp.test.unauthorized"
+
+
+async def test_a_test_email_needs_a_mail_server(uow: InMemoryUnitOfWork) -> None:
+    service = _with_senders(uow, RecordingSender(unconfigured=frozenset({ChannelKind.EMAIL})))
+
+    with pytest.raises(DomainError) as error:
+        await service.send_test_email(SUPER, "demo", TEST_RECIPIENT, "Test", "Tekst")
+
+    assert error.value.code is ErrorCode.CHANNEL_NOT_CONFIGURED
+
+
+@pytest.mark.parametrize("recipient", ["", "geen-adres", "a@b.nl\r\nBcc: x@evil.nl", "a@b"])
+async def test_a_test_email_needs_a_valid_recipient(
+    uow: InMemoryUnitOfWork, recipient: str
+) -> None:
+    sender = RecordingSender()
+    service = _with_senders(uow, sender)
+
+    with pytest.raises(DomainError) as error:
+        await service.send_test_email(SUPER, "demo", recipient, "Test", "Tekst")
+
+    assert (error.value.code, error.value.field) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "test_recipient",
+    )
+    assert sender.sent == []
+
+
+async def test_without_senders_there_is_nothing_to_test(service: ChannelSettingsService) -> None:
+    with pytest.raises(DomainError) as error:
+        await service.send_test_email(SUPER, "demo", TEST_RECIPIENT, "Test", "Tekst")
+
+    assert error.value.code is ErrorCode.CHANNEL_NOT_CONFIGURED

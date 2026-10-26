@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.i18n.dates import ClockStyle
@@ -12,6 +12,9 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 AGENT_API_PREFIX = "/api/agent/v1"
 """Where the machine API for contact-center bots is mounted (ADR 0023)."""
+
+SMTPS_PORT = 465
+"""Mail submission over implicit TLS (RFC 8314); STARTTLS is never offered there."""
 
 
 class Settings(BaseSettings):
@@ -25,7 +28,9 @@ class Settings(BaseSettings):
     ``ENVIRONMENT=dev`` explicitly (``.env.example``).
     """
 
-    model_config = SettingsConfigDict(extra="ignore", frozen=True)
+    # Validation error messages never echo the input: it holds the secrets from the environment.
+    # ``errors()`` still returns it; callers that inspect errors pass ``include_input=False``.
+    model_config = SettingsConfigDict(extra="ignore", frozen=True, hide_input_in_errors=True)
 
     environment: Literal["dev", "test", "prod"] = "prod"
     database_url: str = "sqlite+aiosqlite:///data/booking.db"
@@ -51,13 +56,20 @@ class Settings(BaseSettings):
     management_token_key: SecretStr | None = None
     dev_token_key_path: Path = Path("data/dev-token.key")
 
-    # Outgoing mail. Without SMTP_HOST the worker sends no mail (jobs stay pending).
-    # Per-organisation SMTP settings in the admin UI follow in WP7 (ADR 0008).
+    # Outgoing mail: the fallback for organisations without their own SMTP server in the admin
+    # portal (ADR 0022). Without SMTP_HOST the worker sends no such mail (jobs stay pending).
+    # SMTP_TLS (or port 465) means implicit TLS; SMTP_STARTTLS upgrades a plain connection.
+    # A login needs one of the two. SMTP_USER / SMTP_USER_PASSWORD are accepted as aliases.
     smtp_host: str | None = None
     smtp_port: int = 25
     smtp_starttls: bool = False
-    smtp_username: str | None = None
-    smtp_password: SecretStr | None = None
+    smtp_tls: bool = False
+    smtp_username: str | None = Field(
+        default=None, validation_alias=AliasChoices("smtp_username", "smtp_user")
+    )
+    smtp_password: SecretStr | None = Field(
+        default=None, validation_alias=AliasChoices("smtp_password", "smtp_user_password")
+    )
     mail_from: str = "OpenPlanner <noreply@openplanner.invalid>"
 
     # Admin portal (ADR 0013). Without OIDC_DISCOVERY_URL the admin portal is disabled.
@@ -106,6 +118,17 @@ class Settings(BaseSettings):
     rate_limit_agent_calls: str = "120/minute"
 
     @model_validator(mode="after")
+    def _smtp_login_is_encrypted(self) -> "Settings":
+        """Refuse an SMTP login that would send the password in clear text."""
+        if (
+            self.smtp_host
+            and self.smtp_username
+            and not (self.smtp_starttls or self.smtp_implicit_tls)
+        ):
+            raise ValueError("SMTP_USERNAME needs SMTP_STARTTLS or SMTP_TLS")
+        return self
+
+    @model_validator(mode="after")
     def _production_requirements(self) -> "Settings":
         """In production, refuse to start with development defaults."""
         if self.environment == "prod":
@@ -134,6 +157,11 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("OIDC needs an https discovery URL and a client secret")
         return self
+
+    @property
+    def smtp_implicit_tls(self) -> bool:
+        """Whether the mail fallback opens a TLS connection: ``SMTP_TLS`` or port 465."""
+        return self.smtp_tls or self.smtp_port == SMTPS_PORT
 
     @property
     def webhook_base(self) -> str:

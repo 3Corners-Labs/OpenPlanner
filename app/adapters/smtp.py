@@ -3,6 +3,18 @@
 Uses the standard library in a worker thread; no extra dependency. Each organisation's server
 comes from its channel settings in the admin portal (ADR 0022); ``SMTP_HOST`` in the
 environment is the fallback for organisations without one (development: Mailpit).
+
+Failures are raised as ``IntegrationError`` with a short code, never the server's answer
+(which can name the recipient):
+
+    unreachable        DNS, refused, timeout, dropped connection        retried
+    tls_failed         TLS handshake or certificate
+    not_supported      server lacks STARTTLS or AUTH
+    unauthorized       login refused
+    sender_refused     MAIL FROM refused
+    recipient_refused  every recipient refused
+    rejected_<status>  any other SMTP reply                             retried if 4xx
+    server_error       any other SMTP failure                           retried
 """
 
 import asyncio
@@ -13,9 +25,11 @@ from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 
 from app.domain.channels import ChannelKind
-from app.domain.ports import OutboundMessage
+from app.domain.ports import IntegrationError, OutboundMessage
 
 DEFAULT_TIMEOUT_SECONDS = 15.0
+TRANSIENT, PERMANENT = 400, 500
+"""SMTP reply classes: 4xx may succeed later, 5xx will not."""
 
 
 @dataclass(frozen=True)
@@ -63,11 +77,14 @@ class SmtpMailSender:
 
         Raises:
             ValueError: If the message is not for the email channel.
-            smtplib.SMTPException, OSError: On delivery failure (the job retries).
+            IntegrationError: On delivery failure; ``retryable`` says whether a retry can help.
         """
         if message.channel is not ChannelKind.EMAIL:
             raise ValueError("SmtpMailSender only sends email")
-        await asyncio.to_thread(self._deliver, build_email(message, self._config.sender))
+        try:
+            await asyncio.to_thread(self._deliver, build_email(message, self._config.sender))
+        except (smtplib.SMTPException, OSError) as error:
+            raise classify(error) from None  # the server's answer may name the recipient
 
     def _deliver(self, email: EmailMessage) -> None:
         """Open a connection, secure and authenticate it if configured, and send."""
@@ -84,3 +101,28 @@ class SmtpMailSender:
             if config.username and config.password:
                 smtp.login(config.username, config.password)
             smtp.send_message(email)
+
+
+def classify(error: smtplib.SMTPException | OSError) -> IntegrationError:
+    """Return the ``IntegrationError`` for an SMTP failure (see the module docstring).
+
+    The order matters: ``SMTPException`` is an ``OSError`` and ``SSLError`` too.
+    """
+    if isinstance(error, ssl.SSLError):
+        return IntegrationError("tls_failed", retryable=False)
+    if isinstance(error, smtplib.SMTPNotSupportedError):
+        return IntegrationError("not_supported", retryable=False)
+    if isinstance(error, smtplib.SMTPAuthenticationError):
+        return IntegrationError("unauthorized", retryable=False)
+    if isinstance(error, smtplib.SMTPSenderRefused):
+        return IntegrationError("sender_refused", retryable=False)
+    if isinstance(error, smtplib.SMTPRecipientsRefused):
+        return IntegrationError("recipient_refused", retryable=False)
+    if isinstance(error, smtplib.SMTPServerDisconnected | smtplib.SMTPConnectError):
+        return IntegrationError("unreachable", retryable=True)
+    if isinstance(error, smtplib.SMTPResponseException):
+        status = error.smtp_code
+        return IntegrationError(f"rejected_{status}", retryable=TRANSIENT <= status < PERMANENT)
+    if isinstance(error, smtplib.SMTPException):
+        return IntegrationError("server_error", retryable=True)
+    return IntegrationError("unreachable", retryable=True)
