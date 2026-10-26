@@ -1,7 +1,8 @@
 """SMTP adapter for the ``MessageSender`` port (email channel).
 
-Uses the standard library in a worker thread; no extra dependency. Credentials come from the
-environment for now; per-organisation settings follow with the admin UI (ADR 0008).
+Uses the standard library in a worker thread; no extra dependency. Each organisation's server
+comes from its channel settings in the admin portal (ADR 0022); ``SMTP_HOST`` in the
+environment is the fallback for organisations without one (development: Mailpit).
 """
 
 import asyncio
@@ -28,6 +29,7 @@ class SmtpConfig:
     username: str | None = None
     password: str | None = field(default=None, repr=False)
     timeout: float = DEFAULT_TIMEOUT_SECONDS
+    implicit_tls: bool = False
 
 
 def build_email(message: OutboundMessage, sender: str) -> EmailMessage:
@@ -70,9 +72,15 @@ class SmtpMailSender:
     def _deliver(self, email: EmailMessage) -> None:
         """Open a connection, secure and authenticate it if configured, and send."""
         config = self._config
-        with smtplib.SMTP(config.host, config.port, timeout=config.timeout) as smtp:
-            if config.starttls:
-                smtp.starttls(context=ssl.create_default_context())
+        context = ssl.create_default_context()
+        connection = (
+            smtplib.SMTP_SSL(config.host, config.port, timeout=config.timeout, context=context)
+            if config.implicit_tls
+            else smtplib.SMTP(config.host, config.port, timeout=config.timeout)
+        )
+        with connection as smtp:
+            if config.starttls and not config.implicit_tls:
+                smtp.starttls(context=context)
             if config.username and config.password:
                 smtp.login(config.username, config.password)
             smtp.send_message(email)
