@@ -1,0 +1,97 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
+{% block title %}{{ _("admin.updates.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.updates.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.updates.lead") }}</p>
+  </div>
+</div>
+{% include "_error_summary.html" %}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if not overview.enabled %}
+<div class="alert alert--info" role="status"><p>{{ _("admin.updates.not_enabled") }}</p></div>
+{% endif %}
+<section class="card" aria-labelledby="version-heading">
+  <div class="card__header">
+    <h2 id="version-heading">{{ _("admin.updates.version") }}</h2>
+  </div>
+  <dl class="facts">
+    <div><dt>{{ _("admin.updates.running") }}</dt><dd>{% if overview.current %}<code>{{ overview.current }}</code>{% else %}{{ _("admin.updates.no_release_build") }}{% endif %}</dd></div>
+    <div><dt>{{ _("admin.updates.latest") }}</dt><dd>{% if overview.check and overview.check.latest %}<a href="{{ overview.check.latest.url }}">{{ overview.check.latest.version }}</a>{% else %}{{ _("admin.updates.unknown") }}{% endif %}</dd></div>
+    <div><dt>{{ _("admin.updates.checked_at") }}</dt><dd>{{ checked_at or _("admin.updates.never") }}{% if check_error %} <span class="chip chip--warning">{{ _("admin.updates.check_failed", code=check_error) }}</span>{% endif %}</dd></div>
+  </dl>
+</section>
+{% if overview.open %}
+<section class="card" aria-labelledby="open-heading">
+  <div class="card__header">
+    <h2 id="open-heading">{{ _("admin.updates.open") }}</h2>
+    <p class="card__lead">{{ _("admin.updates.open_lead", version=overview.open.target) }}</p>
+  </div>
+  {% if overview.unclaimed %}
+  <div class="alert alert--error" role="status"><p>{{ _("admin.updates.unclaimed") }}</p></div>
+  {% endif %}
+  {% if overview.open.status == "requested" %}
+  <form method="post" action="/admin/updates/requests/{{ overview.open.id }}/cancel" class="form-actions">
+    <button type="submit" class="button button--secondary">{{ _("admin.updates.cancel") }}</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+{% if overview.available %}
+<form class="card" method="post" action="/admin/updates/update" aria-labelledby="update-heading">
+  <div class="card__header">
+    <h2 id="update-heading">{{ _("admin.updates.update_heading", version=overview.available.version) }}</h2>
+    <p class="card__lead">{{ _("admin.updates.update_lead") }}</p>
+  </div>
+  <p><a href="{{ overview.available.url }}">{{ icon("external") }}<span>{{ _("admin.updates.release_notes") }}</span></a></p>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.updates.update_now", version=overview.available.version) }}</button>
+  </div>
+</form>
+{% endif %}
+{% if overview.restore %}
+<form class="card" method="post" action="/admin/updates/restore" aria-labelledby="restore-heading">
+  <div class="card__header">
+    <h2 id="restore-heading">{{ _("admin.updates.restore_heading") }}</h2>
+    <p class="card__lead">{{ _("admin.updates.restore_lead", version=overview.restore.from_version) }}</p>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button button--danger">{{ _("admin.updates.restore_now", version=overview.restore.from_version) }}</button>
+  </div>
+</form>
+{% endif %}
+<section class="card" aria-labelledby="history-heading">
+  <div class="card__header">
+    <h2 id="history-heading">{{ _("admin.updates.history") }}</h2>
+  </div>
+  {% if history %}
+  <div class="table-scroll" role="region" aria-labelledby="history-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.updates.history") }}</caption>
+    <thead><tr>
+      <th scope="col">{{ _("admin.updates.requested_at") }}</th>
+      <th scope="col">{{ _("admin.updates.action") }}</th>
+      <th scope="col">{{ _("admin.updates.versions") }}</th>
+      <th scope="col">{{ _("admin.updates.status") }}</th>
+      <th scope="col">{{ _("admin.updates.finished_at") }}</th>
+    </tr></thead>
+    <tbody>
+      {% for view in history %}
+      <tr>
+        <th scope="row">{{ view.requested_at }}</th>
+        <td>{{ view.action }}</td>
+        <td><code>{{ view.request.from_version }}</code> → <code>{{ view.request.target }}</code></td>
+        <td>{{ view.status }}{% if view.reason %}<br><span class="hint">{{ view.reason }}</span>{% endif %}</td>
+        <td>{{ view.finished_at or "–" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.updates.none") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,4 +1,4 @@
-# Test overlay for scripts/check-proxy.sh (ADR 0029): Let's Encrypt's test CA (Pebble) instead
+# Test overlay for scripts/check-proxy.sh (ADR 0030): Let's Encrypt's test CA (Pebble) instead
 # of the real one, on loopback ports, with the app in development mode. Never for production.
 services:
   web:

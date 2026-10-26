@@ -21,8 +21,8 @@ async function addAllDayHours(page: Page): Promise<void> {
     await page.getByLabel('Dag', { exact: true }).selectOption({ label: day });
     await page.getByLabel('Van uu:mm', { exact: true }).fill('00:00');
     await page.getByLabel('Tot uu:mm', { exact: true }).fill('23:55');
-    await page.getByLabel('Gelijktijdige gesprekken').fill('1');
-    await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
+    await page.getByLabel('Aantal medewerkers').fill('1');
+    await page.getByRole('button', { name: 'Tijdblok toevoegen' }).press('Enter');
     await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
   }
 }
@@ -37,7 +37,7 @@ test('a citizen starts a call right away and the admin sees it', async ({ page, 
   await page.getByLabel('Webadres', { exact: true }).fill(slug);
   await page.getByRole('button', { name: 'Groep aanmaken' }).press('Enter');
   await expect(page.getByRole('status')).toContainText('De groep is aangemaakt');
-  await tabs.getByRole('link', { name: 'Openingstijden' }).click();
+  await tabs.getByRole('link', { name: 'Bezetting', exact: true }).click();
   await addAllDayHours(page);
   await tabs.getByRole('link', { name: 'Instellingen' }).click();
   await page.getByLabel('Direct gesprek starten').selectOption({ label: 'Ja' });

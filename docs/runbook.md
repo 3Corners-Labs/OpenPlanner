@@ -52,7 +52,7 @@ section) nothing else is needed. Behind a reverse proxy of your own also set:
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 - No access log on the proxy: paths carry management tokens.
 
-## HTTPS certificate (ADR 0029)
+## HTTPS certificate (ADR 0030)
 
 The `proxy` service (Caddy, profile `tls`) gets a certificate from Let's Encrypt over ACME and
 renews it on its own; nobody has to install or renew a certificate by hand.
@@ -63,10 +63,12 @@ First start:
    record, it must allow `letsencrypt.org`.
 2. Open ports 80 and 443 from the internet. Port 80 is needed for the ACME challenge and
    redirects everything else to https.
-3. In `.env`: `TLS_DOMAIN=<host name>`, `ACME_EMAIL=<operations mailbox>`,
-   `PUBLIC_BASE_URL=https://<host name>`. Leave `FORWARDED_ALLOW_IPS` unset: compose sets it to
-   the proxy's address.
-4. Trial run first, to stay clear of Let's Encrypt's rate limits:
+3. `cp proxy.env.example proxy.env` and fill in `TLS_DOMAIN=<host name>` and
+   `ACME_EMAIL=<operations mailbox>`. The proxy reads only this file, not `.env`, so it never
+   holds the app's secrets and works with `--env-file .env.update` (updater, ADR 0029) too.
+   In `.env`: `PUBLIC_BASE_URL=https://<host name>`; leave `FORWARDED_ALLOW_IPS` unset, its
+   default is the proxy's fixed address.
+4. Trial run first, to stay clear of Let's Encrypt's rate limits: in `proxy.env`
    `ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory`, then
    `docker compose --profile tls up -d` and look for `certificate obtained successfully` in
    `docker compose logs proxy`. Browsers will not trust the staging certificate; that is
@@ -87,8 +89,11 @@ Day to day:
   private key and the ACME account; without it every start requests a new certificate, and
   more than 5 per week for the same name are refused.
 - **Another ACME CA** (for example ZeroSSL, or a government CA that speaks ACME): set `ACME_CA`
-  to its directory URL and restart the proxy. An organisation-validated (PKIoverheid)
-  certificate without ACME is not supported by this profile (ADR 0029).
+  in `proxy.env` to its directory URL and restart the proxy.
+- **Updates from the admin portal** (ADR 0029) restart only `web` and `worker`; the proxy keeps
+  running and answers 502 for the seconds `web` is down. Add `--profile tls` to your own
+  `docker compose --env-file .env.update up -d` so the proxy stays part of the stack. An organisation-validated (PKIoverheid)
+  certificate without ACME is not supported by this profile (ADR 0030).
 - **Webhooks**: with a public domain, `WEBHOOK_BASE_URL` can stay empty; Webex and WxCC use
   `PUBLIC_BASE_URL`.
 - `web` stays reachable on `127.0.0.1:8000` of the host itself, without the proxy's limits;
@@ -444,9 +449,60 @@ when a rule's channel is not configured.
 link in mails already sent; bookings are unaffected. Rotate only after an incident, and tell the
 contact center that citizens may call about broken links.
 
+## Updates from the admin portal (ADR 0029)
+
+With `UPDATE_REPOSITORY=<owner>/<repo>` the worker looks up the latest GitHub release once an
+hour, and the superuser sees a banner on every admin page when it is newer than the running
+version (`APP_VERSION`, baked into release images). "Update now" and "Restore previous
+version" on `/admin/updates` only store a request; the **host updater** carries it out. Without
+the updater, requests stay "requested" and the page says so after 10 minutes; deploy by hand as
+above.
+
+### Installing the host updater (once per host)
+
+```sh
+install -m 755 scripts/updater/openplanner-update.sh /usr/local/sbin/openplanner-update
+install -m 644 scripts/updater/openplanner-updater.service scripts/updater/openplanner-updater.timer /etc/systemd/system/
+install -d -m 700 /etc/openplanner
+install -m 600 scripts/updater/updater.env.example /etc/openplanner/updater.env   # then edit it
+# Pin the image that runs now, by digest (after `cosign verify`, see above):
+echo "OPENPLANNER_IMAGE=ghcr.io/<owner>/<repo>@sha256:<digest>" > /opt/openplanner/.env.update
+systemctl daemon-reload && systemctl enable --now openplanner-updater.timer
+```
+
+The host needs `docker` (with compose), `cosign`, `curl` and `flock`. From now on every compose
+command on the host passes `--env-file .env.update`, so the pinned digest is what runs.
+
+### What the updater does
+
+| Request | Steps | When something fails |
+|---|---|---|
+| Update | pull `<image>:<version>`, take its digest, `cosign verify` it (release tag of this repository), note the current digest and Alembic revision in `/var/lib/openplanner-updater/previous.env`, back up the database (`data/backups/request-<id>.db`), pin the new digest, `up -d`, wait up to `HEALTH_TIMEOUT` for `/readyz` and a healthy worker | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digest, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
+| Restore previous version (≤ 24 h after an update) | back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digest, start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
+
+Every step is reported to the portal (`python -m app.cli update-report`) and audited as actor
+`host-updater`; the updater's own log is in the journal: `journalctl -u openplanner-updater`.
+
+### When the portal shows `failed` with `restore_failed`
+
+Neither version came up. Stop the timer (`systemctl stop openplanner-updater.timer`), look at
+`docker compose --env-file .env.update logs web worker`, then put the backup back by hand with
+the image from `previous.env`:
+
+```sh
+docker compose --env-file .env.update stop web worker
+docker compose --env-file .env.update run --rm --no-deps web python -m app.cli restore-db request-<id>
+echo "OPENPLANNER_IMAGE=<PREVIOUS_IMAGE>" > .env.update
+docker compose --env-file .env.update up -d
+```
+
+Backups hold personal data: they stay in the data volume (mode 600) and every updater run
+deletes those older than 24 hours (`backup-db --prune`). Never copy them off the host.
+
 ## Rollback
 
-Deploy the previous image tag. If the release contained a migration, first run
+Prefer "Restore previous version" in the portal (above) within 24 hours of an update. By hand:
+deploy the previous image tag. If the release contained a migration, first run
 `docker compose run --rm web alembic downgrade <previous-revision>` with the *new* image, then
 deploy the old image. Every migration is reversible (enforced in CI).
 

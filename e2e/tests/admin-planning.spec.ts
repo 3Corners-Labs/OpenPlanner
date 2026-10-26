@@ -1,7 +1,7 @@
 /**
  * Groups and planning (WP7b) walked per role through the real identity provider: the org
- * admin creates a group and sets its hours; the group admin manages opening hours and
- * exceptions of their own group but not its settings; the outsider is refused; the
+ * admin creates a group and sets its staffing; the group admin manages staffing blocks and
+ * staffing exceptions of their own group but not its settings; the outsider is refused; the
  * superuser sees the changes in the audit log. axe (WCAG 2.2 AA) on every page and form.
  *
  * The three browsers run in parallel against one database, so every browser uses its own
@@ -53,60 +53,66 @@ function tabs(page: Page) {
   return page.getByRole('navigation', { name: 'Onderdelen van de groep' });
 }
 
-test('group admin manages opening hours and exceptions, not the settings', async ({ page }, testInfo) => {
+test('group admin manages staffing and staffing exceptions, not the settings', async ({ page }, testInfo) => {
   const mine = plan(testInfo);
   await loginAs(page, 'groupadmin', GROUP);
 
-  await expect(tabs(page).getByRole('link', { name: 'Openingstijden' })).toBeVisible();
+  await expect(tabs(page).getByRole('link', { name: 'Bezetting', exact: true })).toBeVisible();
   await expect(tabs(page).getByRole('link', { name: 'Instellingen' })).toHaveCount(0);
   await expectNoAxeViolations(page);
   await expectForbidden(page, `${GROUP}/settings`);
 
-  // Opening hours: Saturday's own add link preselects the day; add, see and remove it again.
-  await page.goto(`${GROUP}/hours`);
+  // Staffing: Saturday's own add link preselects the day; add, see and remove it again.
+  await page.goto(`${GROUP}/staffing`);
   await expectNoAxeViolations(page);
-  await page.getByRole('link', { name: 'Openingstijd op zaterdag toevoegen' }).press('Enter');
+  await page.getByRole('link', { name: 'Tijdblok op zaterdag toevoegen' }).press('Enter');
   await expect(page.getByLabel('Dag', { exact: true })).toHaveValue('5');
   await page.getByLabel('Van uu:mm', { exact: true }).fill(mine.opens);
   await page.getByLabel('Tot uu:mm', { exact: true }).fill(mine.closes);
-  await page.getByLabel('Gelijktijdige gesprekken').fill('2');
-  await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
+  await page.getByLabel('Aantal medewerkers').fill('2');
+  await page.getByRole('button', { name: 'Tijdblok toevoegen' }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
   const block = `${mine.opens}–${mine.closes}`;
   const saturday = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'zaterdag' }) });
   await expect(saturday).toContainText(block);
   await expectNoAxeViolations(page);
-  await page.getByRole('button', { name: `Openingstijd zaterdag ${block} verwijderen` }).press('Enter');
+  // The split form (ADR 0027) is reachable by keyboard and passes axe; cancel it.
+  await page.getByRole('link', { name: `Tijdblok zaterdag ${block} splitsen` }).press('Enter');
+  await expect(page.getByRole('heading', { level: 2, name: 'Tijdblok splitsen' })).toBeVisible();
+  await expect(page.getByLabel('Splitsen om uu:mm', { exact: true })).toBeVisible();
+  await expectNoAxeViolations(page);
+  await page.getByRole('link', { name: 'Annuleren' }).press('Enter');
+  await page.getByRole('button', { name: `Tijdblok zaterdag ${block} verwijderen` }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Verwijderd.');
   await expect(saturday).not.toContainText(block);
 
-  // Overlapping opening hours are explained and linked to its field.
+  // Overlapping blocks are explained and linked to its field.
   await page.getByLabel('Dag', { exact: true }).selectOption({ label: 'maandag' });
   await page.getByLabel('Van uu:mm', { exact: true }).fill('10:00');
   await page.getByLabel('Tot uu:mm', { exact: true }).fill('11:00');
-  await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
+  await page.getByRole('button', { name: 'Tijdblok toevoegen' }).press('Enter');
   const summary = page.getByRole('alert');
   await expect(summary).toContainText('Deze tijden overlappen');
   await expectNoAxeViolations(page);
 
   // Exceptions: close this browser's day, see it, remove it again.
   const day = dayAhead(mine.daysAhead);
-  await tabs(page).getByRole('link', { name: 'Uitzonderingen' }).click();
+  await tabs(page).getByRole('link', { name: 'Afwijkende bezetting', exact: true }).click();
   await expectNoAxeViolations(page);
   await page.getByLabel('Datum dd-mm-jjjj', { exact: true }).fill(day.value);
-  await page.getByLabel('Hele dag gesloten').check();
-  await page.getByRole('button', { name: 'Uitzondering toevoegen' }).press('Enter');
+  await page.getByLabel('Hele dag geen bezetting').check();
+  await page.getByRole('button', { name: 'Afwijkende bezetting toevoegen' }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
-  await expect(page.getByRole('row', { name: new RegExp(day.label) })).toContainText('Gesloten');
+  await expect(page.getByRole('row', { name: new RegExp(day.label) })).toContainText('Geen bezetting');
   await expectNoAxeViolations(page);
-  await page.getByRole('button', { name: `Uitzondering op ${day.label} verwijderen` }).press('Enter');
+  await page.getByRole('button', { name: `Afwijkende bezetting op ${day.label} verwijderen` }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Verwijderd.');
   await expect(page.getByRole('row', { name: new RegExp(day.label) })).toHaveCount(0);
 
   await logout(page);
 });
 
-test('organisation admin creates a group and gives it opening hours', async ({ page }, testInfo) => {
+test('organisation admin creates a group and gives it staffing blocks', async ({ page }, testInfo) => {
   const slug = `e2e-${testInfo.project.name}-${Date.now().toString(36)}`;
   await loginAs(page, 'orgadmin');
 
@@ -127,12 +133,12 @@ test('organisation admin creates a group and gives it opening hours', async ({ p
   await expect(page.getByLabel('Webadres', { exact: true })).toHaveAttribute('readonly', '');
   await expectNoAxeViolations(page);
 
-  await tabs(page).getByRole('link', { name: 'Openingstijden' }).click();
+  await tabs(page).getByRole('link', { name: 'Bezetting', exact: true }).click();
   await page.getByLabel('Dag', { exact: true }).selectOption({ label: 'dinsdag' });
   await page.getByLabel('Van uu:mm', { exact: true }).fill('09:00');
   await page.getByLabel('Tot uu:mm', { exact: true }).fill('10:00');
-  await page.getByLabel('Gelijktijdige gesprekken').fill('3');
-  await page.getByRole('button', { name: 'Openingstijd toevoegen' }).press('Enter');
+  await page.getByLabel('Aantal medewerkers').fill('3');
+  await page.getByRole('button', { name: 'Tijdblok toevoegen' }).press('Enter');
   await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
 
   await tabs(page).getByRole('link', { name: 'Overzicht' }).click();
@@ -140,7 +146,7 @@ test('organisation admin creates a group and gives it opening hours', async ({ p
 });
 
 test('an organisation admin of another organisation cannot touch the planning', async ({ page }) => {
-  await loginAs(page, 'outsider', `${GROUP}/hours`);
+  await loginAs(page, 'outsider', `${GROUP}/staffing`);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Geen toegang');
   await expectForbidden(page, `${GROUP}/exceptions`);
   await expectForbidden(page, `${GROUP}/settings`);
@@ -150,7 +156,7 @@ test('the superuser sees planning changes in the audit log', async ({ page }) =>
   await loginAs(page, 'super', '/admin/audit');
   const change = page
     .getByRole('row')
-    .filter({ hasText: 'Openingstijden en uitzonderingen beheren' })
+    .filter({ hasText: 'Bezetting en afwijkende bezetting beheren' })
     .filter({ hasText: 'demo / demo' });
   await expect(change.first()).toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: 'Groepen aanmaken' }).first()).toBeVisible();

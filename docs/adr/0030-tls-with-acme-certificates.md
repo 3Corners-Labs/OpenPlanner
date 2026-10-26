@@ -1,4 +1,4 @@
-# 0029. HTTPS with free, automatically renewed certificates from a public CA
+# 0030. HTTPS with free, automatically renewed certificates from a public CA
 
 Status: accepted (2026-10-26), requested by the product owner.
 
@@ -21,7 +21,9 @@ from a public CA. The product owner asked for a free one with automatic renewal.
    certificate for `TLS_DOMAIN` over ACME, renews it on its own when a third of its lifetime
    remains, retries with back-off and staples OCSP. `ACME_CA` selects another ACME CA
    (Let's Encrypt staging for a trial run; ZeroSSL or a government CA that speaks ACME later)
-   without a code change. `ACME_EMAIL` receives the CA's notices.
+   without a code change. `ACME_EMAIL` receives the CA's notices. These settings live in
+   `proxy.env`, the proxy's own file: it never receives the app's secrets from `.env`, and it
+   keeps its settings when compose runs with `--env-file .env.update` (ADR 0029).
 2. **Caddy over the alternatives.** Caddy is the de-facto standard for automatic HTTPS and
    needs no companion process. Traefik (MIT) is container-label driven and larger than one
    route needs; nginx with certbot needs a second container, a shared webroot and a reload hook,
@@ -40,8 +42,9 @@ from a public CA. The product owner asked for a free one with automatic renewal.
    capped at 64 KB (1 MB elsewhere), read and write timeouts against slow clients, no access log (paths carry management tokens), and an
    `X-Forwarded-For` that Caddy sets itself and never takes from the client.
 6. **The app trusts exactly the proxy.** `proxy` and `web` share an `edge` network with a fixed
-   subnet; the proxy has a fixed address and `web` sets `FORWARDED_ALLOW_IPS` to it, so rate
-   limits see the visitor's address and nobody else can forge it.
+   subnet; the proxy has a fixed address and `web` trusts `X-Forwarded-For` from it alone
+   (`--forwarded-allow-ips`, overridable with `FORWARDED_ALLOW_IPS` in `.env` behind another
+   proxy), so rate limits see the visitor's address and nobody else can forge it.
 7. **Opt-in profile.** Without `--profile tls` nothing changes: development keeps
    `http://127.0.0.1:8000`, and an installation with its own load balancer (O7) keeps it.
    The proxy refuses to start without `TLS_DOMAIN` and `ACME_EMAIL`, because Caddy would then

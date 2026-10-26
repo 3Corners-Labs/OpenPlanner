@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# TLS-terminating reverse proxy (ADR 0029): Caddy with certificates from a public ACME CA.
+# TLS-terminating reverse proxy (ADR 0030): Caddy with certificates from a public ACME CA.
 # Base image pinned by tag; Renovate pins and updates its digest.
 # The release binary of the official image lags behind Go security fixes, so Caddy is rebuilt
 # with the builder image's current Go toolchain and a patched golang.org/x/net. Drop the
