@@ -199,7 +199,7 @@ same commit and rollback behaviour as the SQL one.
 
 | Concern | Module |
 |---|---|
-| Opening hours, groups | `app/domain/scheduling.py` |
+| Staffing blocks (formerly opening hours, ADR 0027), groups | `app/domain/scheduling.py` |
 | Slot calculation (time zones, daylight saving) | `app/domain/availability.py` |
 | Bookings, contact validation | `app/domain/booking.py` |
 | Book, cancel, reschedule (use cases) | `app/domain/services.py` |
@@ -210,7 +210,7 @@ same commit and rollback behaviour as the SQL one.
 | Error codes | `app/domain/errors.py` |
 | Authorisation matrix, scopes (ADR 0014) | `app/domain/authorization.py` |
 | Admin use cases, audit events | `app/domain/admin.py`, `app/domain/audit.py` |
-| Groups, opening hours, exceptions, preview (admin) | `app/domain/planning.py` |
+| Groups, staffing blocks (add, change, split, remove), staffing exceptions, preview (admin) | `app/domain/planning.py` |
 | Holiday calendars and their resolution per group (ADR 0025) | `app/domain/holidays.py`, `app/domain/holiday_service.py`, `app/admin/holiday_routes.py` |
 | What leaves for Webex/WxCC, timeline, call status, join window | `app/domain/calls.py` |
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |

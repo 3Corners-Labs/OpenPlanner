@@ -10,14 +10,21 @@ The domain (``PlanningService``) authorises again, validates and audits.
     GET  /admin/groups/{slug}                      group.view        overview and preview
     GET  /admin/groups/{slug}/settings             group.edit        form
     POST /admin/groups/{slug}/settings             group.edit        save
-    GET  /admin/groups/{slug}/hours                schedule.manage   weekly hours
-    POST /admin/groups/{slug}/hours                schedule.manage   add a window
-    GET  /admin/groups/{slug}/hours/{id}           schedule.manage   change-window form
-    POST /admin/groups/{slug}/hours/{id}           schedule.manage   change a window
-    POST /admin/groups/{slug}/hours/{id}/delete    schedule.manage   remove a window
-    GET  /admin/groups/{slug}/exceptions           schedule.manage   exceptions
+    GET  /admin/groups/{slug}/staffing             schedule.manage   weekly staffing blocks
+    POST /admin/groups/{slug}/staffing             schedule.manage   add a block
+    GET  /admin/groups/{slug}/staffing/{id}        schedule.manage   change-block form
+    POST /admin/groups/{slug}/staffing/{id}        schedule.manage   change a block
+    GET  /admin/groups/{slug}/staffing/{id}/split  schedule.manage   split-block form
+    POST /admin/groups/{slug}/staffing/{id}/split  schedule.manage   split a block in two
+    POST /admin/groups/{slug}/staffing/{id}/delete schedule.manage   remove a block
+    GET  /admin/groups/{slug}/hours[/{id}]         schedule.manage   301 to /staffing[/{id}]
+    GET  /admin/groups/{slug}/exceptions           schedule.manage   staffing exceptions
     POST /admin/groups/{slug}/exceptions           schedule.manage   add an exception
     POST /admin/groups/{slug}/exceptions/{id}/delete schedule.manage remove an exception
+
+The staffing pages lived at ``/hours`` before ADR 0027; the old GET paths redirect
+permanently so bookmarks keep working. Python names still say "hours" and "rule" until the
+rename of phase C.
 
 The group's holiday tab (``/admin/groups/{slug}/holidays``) lives in ``holiday_routes``.
 """
@@ -27,7 +34,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, Response
+from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.forms import (
@@ -122,7 +129,7 @@ class Tab:
 TABS = (
     Tab("admin.tab.overview", "", Permission.GROUP_VIEW, "dashboard"),
     Tab("admin.tab.settings", "/settings", Permission.GROUP_EDIT, "settings"),
-    Tab("admin.tab.hours", "/hours", Permission.SCHEDULE_MANAGE, "clock"),
+    Tab("admin.tab.hours", "/staffing", Permission.SCHEDULE_MANAGE, "clock"),
     Tab("admin.tab.exceptions", "/exceptions", Permission.SCHEDULE_MANAGE, "calendar"),
     Tab("admin.tab.holidays", "/holidays", Permission.SCHEDULE_MANAGE, "holiday"),
     Tab("admin.tab.reminders", "/reminders", Permission.REMINDERS_MANAGE, "bell"),
@@ -271,7 +278,7 @@ async def create_group(
         AdminContext, Depends(RequirePermission(Permission.GROUP_CREATE, fresh=True))
     ],
 ) -> Response:
-    """Create a group, then continue with its opening hours."""
+    """Create a group, then continue with its staffing."""
     form = await read_form(request, locale)
     minutes = form.integer("slot_minutes")
     if not form.errors and minutes is not None:
@@ -297,7 +304,7 @@ async def create_group(
 
 @dataclass(frozen=True)
 class DayView:
-    """One weekday (0 = Monday) with its opening windows."""
+    """One weekday (0 = Monday) with its staffing blocks."""
 
     weekday: int
     name: str
@@ -306,12 +313,18 @@ class DayView:
 
 @dataclass(frozen=True)
 class WindowView:
-    """An opening window as shown in the schedule."""
+    """A staffing block as shown in the week: times, agents in words, label, validity.
+
+    ``staffed`` is false for a 0-agent block; the template marks it with a class, and the
+    agent text ("geen medewerkers") says the same in words, so colour is never the only signal.
+    """
 
     id: int | None
     time: str
     capacity: str
     validity: str | None
+    label: str | None
+    staffed: bool
 
 
 @dataclass(frozen=True)
@@ -338,6 +351,15 @@ def _clock_text(window: TimeWindow, locale: str) -> str:
     return f"{format_time_of_day(window.opens, locale)}–{format_time_of_day(window.closes, locale)}"
 
 
+def _agents_text(count: int, _: BoundGettext) -> str:
+    """Return "3 medewerkers", "1 medewerker" or "geen medewerkers" (no plural forms yet)."""
+    if count == 0:
+        return _("admin.hours.capacity_none")
+    if count == 1:
+        return _("admin.hours.capacity_one")
+    return _("admin.hours.capacity", count=count)
+
+
 def _week(schedule: Schedule, locale: RequestLocale) -> list[DayView]:
     """Group the weekly rules per weekday, Monday first."""
     _ = locale.gettext
@@ -359,8 +381,10 @@ def _week(schedule: Schedule, locale: RequestLocale) -> list[DayView]:
                 WindowView(
                     rule.id,
                     _clock_text(rule.window, locale.code),
-                    _("admin.hours.capacity", count=rule.window.capacity),
+                    _agents_text(rule.window.capacity, _),
                     validity,
+                    rule.window.label,
+                    rule.window.staffed,
                 )
             )
         days.append(DayView(weekday, name, windows))
@@ -376,7 +400,7 @@ def _exceptions(schedule: Schedule, locale: RequestLocale) -> list[ExceptionView
             format_day(o.day, locale.code),
             o.window is None,
             _clock_text(o.window, locale.code) if o.window else None,
-            _("admin.hours.capacity", count=o.window.capacity) if o.window else None,
+            _agents_text(o.window.capacity, _) if o.window else None,
         )
         for o in schedule.overrides
     ]
@@ -597,13 +621,13 @@ async def save_settings(
     return _settings_response(request, locale, context, form, 422)
 
 
-# --- opening hours --------------------------------------------------------------------------
+# --- staffing blocks ------------------------------------------------------------------------
 
 WEEKDAYS = frozenset(str(i) for i in range(7))
 
 
 def _label_field(form: FormData, locale: RequestLocale) -> Field:
-    """Return the optional label input of a window (ADR 0027): admin content only."""
+    """Return the optional label input of a block (ADR 0027): admin content only."""
     _ = locale.gettext
     return Field(
         "label",
@@ -617,8 +641,25 @@ def _label_field(form: FormData, locale: RequestLocale) -> Field:
     )
 
 
+def _capacity_field(
+    form: FormData, locale: RequestLocale, default: str, required: bool = True
+) -> Field:
+    """Return the agent-count input of a block, 0 to 1000 (0 for lunch, ADR 0027)."""
+    _ = locale.gettext
+    return Field(
+        "capacity",
+        _("admin.field.capacity"),
+        "number",
+        form.text("capacity") or default,
+        hint=_("admin.field.capacity_hint"),
+        error=form.error_for("capacity"),
+        required=required,
+        attributes={"min": "0", "max": "1000", "inputmode": "numeric"},
+    )
+
+
 def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
-    """Return the inputs of the add-window form."""
+    """Return the inputs of the add-block and change-block forms."""
     _ = locale.gettext
     days = tuple(Option(str(i), name) for i, name in enumerate(weekday_names(locale.code)))
     return [
@@ -644,15 +685,7 @@ def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
             form.text("closes") or "12:00",
             error=form.error_for("closes"),
         ),
-        Field(
-            "capacity",
-            _("admin.field.capacity"),
-            "number",
-            form.text("capacity") or "1",
-            hint=_("admin.field.capacity_hint"),
-            error=form.error_for("capacity"),
-            attributes={"min": "0", "max": "1000", "inputmode": "numeric"},
-        ),
+        _capacity_field(form, locale, "1"),
         _label_field(form, locale),
         Field(
             "valid_from",
@@ -706,7 +739,7 @@ def _rule_values(rule: ScheduleRule) -> dict[str, str]:
 async def _hours_response(
     request: Request, locale: RequestLocale, context: AdminContext, form: FormData, status: int
 ) -> HTMLResponse:
-    """Render the weekly hours with the add-window form."""
+    """Render the weekly staffing blocks with the add-block form."""
     schedule = await planning_service(request).schedule(context.principal, context.group.group.slug)
     return group_page(
         request,
@@ -728,19 +761,24 @@ ManageGroup = Annotated[
 ]
 
 
-@router.get("/groups/{slug}/hours", response_class=HTMLResponse)
+def _staffing_path(slug: str) -> str:
+    """Return the path of the group's staffing page (``/hours`` before ADR 0027)."""
+    return f"/admin/groups/{slug}/staffing"
+
+
+@router.get("/groups/{slug}/staffing", response_class=HTMLResponse)
 async def hours(request: Request, locale: Locale, slug: str, context: ManageGroup) -> HTMLResponse:
-    """Show the weekly opening hours; ``?weekday=`` preselects the day of the add form."""
+    """Show the weekly staffing; ``?weekday=`` preselects the day of the add form."""
     weekday = request.query_params.get("weekday", "")
     values = {"weekday": weekday} if weekday in WEEKDAYS else {}
     return await _hours_response(request, locale, context, FormData(values, locale.gettext), 200)
 
 
-@router.post("/groups/{slug}/hours", response_class=HTMLResponse)
+@router.post("/groups/{slug}/staffing", response_class=HTMLResponse)
 async def add_hours(
     request: Request, locale: Locale, slug: str, _: SameOrigin, context: ManageGroup
 ) -> Response:
-    """Add a weekly opening window."""
+    """Add a weekly staffing block."""
     form = await read_form(request, locale)
     rule = _read_rule(form)
     if rule is not None:
@@ -750,7 +788,7 @@ async def add_hours(
             raise_refusal(error)
             form.refusal(error)
         else:
-            return redirect_done(f"/admin/groups/{slug}/hours", "added")
+            return redirect_done(_staffing_path(slug), "added")
     return await _hours_response(request, locale, context, form, 422)
 
 
@@ -762,7 +800,7 @@ def _edit_hours_response(
     form: FormData,
     status: int,
 ) -> HTMLResponse:
-    """Render the change form of one weekly window."""
+    """Render the change form of one weekly block."""
     return group_page(
         request,
         locale,
@@ -773,25 +811,32 @@ def _edit_hours_response(
     )
 
 
-@router.get("/groups/{slug}/hours/{rule_id}", response_class=HTMLResponse)
-async def edit_hours(
-    request: Request, locale: Locale, slug: str, rule_id: int, context: ManageGroup
-) -> HTMLResponse:
-    """Show the change form of a weekly opening window, pre-filled with its values."""
+async def _stored_rule(
+    request: Request, context: AdminContext, slug: str, rule_id: int
+) -> ScheduleRule:
+    """Return the group's block ``rule_id``; a refusal or unknown id becomes the HTTP error."""
     try:
-        rule = await planning_service(request).rule(context.principal, slug, rule_id)
+        return await planning_service(request).rule(context.principal, slug, rule_id)
     except DomainError as error:
         raise_refusal(error)
         raise
+
+
+@router.get("/groups/{slug}/staffing/{rule_id}", response_class=HTMLResponse)
+async def edit_hours(
+    request: Request, locale: Locale, slug: str, rule_id: int, context: ManageGroup
+) -> HTMLResponse:
+    """Show the change form of a weekly block, pre-filled with its values."""
+    rule = await _stored_rule(request, context, slug, rule_id)
     form = FormData(_rule_values(rule), locale.gettext)
     return _edit_hours_response(request, locale, context, rule_id, form, 200)
 
 
-@router.post("/groups/{slug}/hours/{rule_id}", response_class=HTMLResponse)
+@router.post("/groups/{slug}/staffing/{rule_id}", response_class=HTMLResponse)
 async def update_hours(
     request: Request, locale: Locale, slug: str, rule_id: int, _: SameOrigin, context: ManageGroup
 ) -> Response:
-    """Change a weekly opening window; existing bookings keep their slots."""
+    """Change a weekly block; existing bookings keep their slots."""
     form = await read_form(request, locale)
     rule = _read_rule(form)
     if rule is not None:
@@ -805,21 +850,123 @@ async def update_hours(
                 raise
             form.refusal(error)
         else:
-            return redirect_done(f"/admin/groups/{slug}/hours", "saved" if changed else "unchanged")
+            return redirect_done(_staffing_path(slug), "saved" if changed else "unchanged")
     return _edit_hours_response(request, locale, context, rule_id, form, 422)
 
 
-@router.post("/groups/{slug}/hours/{rule_id}/delete", response_class=HTMLResponse)
+def _split_fields(form: FormData, locale: RequestLocale) -> list[Field]:
+    """Return the inputs of the split form: the split time, agents and label of part two."""
+    _ = locale.gettext
+    return [
+        Field(
+            "split_at",
+            _("admin.field.split_at"),
+            "time",
+            form.text("split_at"),
+            hint=_("admin.field.split_at_hint"),
+            error=form.error_for("split_at"),
+        ),
+        _capacity_field(form, locale, "0"),
+        _label_field(form, locale),
+    ]
+
+
+def _split_response(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    rule: ScheduleRule,
+    form: FormData,
+    status: int,
+) -> HTMLResponse:
+    """Render the split form of one weekly block, described in words above the inputs."""
+    _ = locale.gettext
+    day = weekday_names(locale.code)[rule.weekday]
+    parts = [
+        f"{day} {_clock_text(rule.window, locale.code)}",
+        _agents_text(rule.window.capacity, _),
+    ]
+    block = " · ".join([*parts, rule.window.label] if rule.window.label else parts)
+    return group_page(
+        request,
+        locale,
+        context,
+        "admin/group_hours_split.html",
+        {
+            "rule_id": rule.id,
+            "lead": _("admin.hours.split_lead", block=block),
+            "fields": _split_fields(form, locale),
+            "errors": form.errors,
+        },
+        status,
+    )
+
+
+@router.get("/groups/{slug}/staffing/{rule_id}/split", response_class=HTMLResponse)
+async def split_hours_form(
+    request: Request, locale: Locale, slug: str, rule_id: int, context: ManageGroup
+) -> HTMLResponse:
+    """Show the form that splits a weekly block in two (ADR 0027)."""
+    rule = await _stored_rule(request, context, slug, rule_id)
+    return _split_response(request, locale, context, rule, FormData({}, locale.gettext), 200)
+
+
+@router.post("/groups/{slug}/staffing/{rule_id}/split", response_class=HTMLResponse)
+async def split_hours(
+    request: Request, locale: Locale, slug: str, rule_id: int, _: SameOrigin, context: ManageGroup
+) -> Response:
+    """Split a weekly block in two touching blocks; the domain validates and audits."""
+    form = await read_form(request, locale)
+    at, capacity = form.clock("split_at"), form.integer("capacity")
+    label = form.optional_text("label")
+    if not form.errors and at is not None and capacity is not None:
+        try:
+            await planning_service(request).split_rule(
+                context.principal, slug, rule_id, at, capacity, label
+            )
+        except DomainError as error:
+            raise_refusal(error)
+            if error.code is ErrorCode.SCHEDULE_ITEM_NOT_FOUND:
+                raise
+            form.refusal(error)
+        else:
+            return redirect_done(_staffing_path(slug), "saved")
+    rule = await _stored_rule(request, context, slug, rule_id)
+    return _split_response(request, locale, context, rule, form, 422)
+
+
+@router.post("/groups/{slug}/staffing/{rule_id}/delete", response_class=HTMLResponse)
 async def remove_hours(
     request: Request, slug: str, rule_id: int, _: SameOrigin, context: ManageGroup
 ) -> Response:
-    """Remove a weekly opening window."""
+    """Remove a weekly block."""
     try:
         await planning_service(request).remove_rule(context.principal, slug, rule_id)
     except DomainError as error:
         raise_refusal(error)
         raise
-    return redirect_done(f"/admin/groups/{slug}/hours", "removed")
+    return redirect_done(_staffing_path(slug), "removed")
+
+
+OldStaffingPath = Annotated[
+    AdminContext,
+    Depends(RequirePermission(Permission.SCHEDULE_MANAGE, group_param="slug")),
+]
+"""The redirects check the same permission (not ``fresh``: the target page asks for that)."""
+
+
+@router.get("/groups/{slug}/hours")
+async def old_hours(request: Request, slug: str, context: OldStaffingPath) -> Response:
+    """Redirect permanently to the staffing page, keeping only a valid ``?weekday=``."""
+    weekday = request.query_params.get("weekday", "")
+    query = f"?weekday={weekday}" if weekday in WEEKDAYS else ""
+    return RedirectResponse(_staffing_path(slug) + query, status_code=301)
+
+
+@router.get("/groups/{slug}/hours/{rule_id}")
+async def old_edit_hours(slug: str, rule_id: int, context: OldStaffingPath) -> Response:
+    """Redirect permanently to the change form of the block at its staffing path."""
+    return RedirectResponse(f"{_staffing_path(slug)}/{rule_id}", status_code=301)
 
 
 # --- exceptions -----------------------------------------------------------------------------
@@ -847,16 +994,7 @@ def _exception_fields(form: FormData, locale: RequestLocale) -> list[Field]:
             error=form.error_for("closes"),
             required=False,
         ),
-        Field(
-            "capacity",
-            _("admin.field.capacity"),
-            "number",
-            form.text("capacity"),
-            hint=_("admin.field.capacity_hint"),
-            error=form.error_for("capacity"),
-            required=False,
-            attributes={"min": "0", "max": "1000", "inputmode": "numeric"},
-        ),
+        _capacity_field(form, locale, "", required=False),
         _label_field(form, locale),
     ]
 

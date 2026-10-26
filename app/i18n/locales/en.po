@@ -627,7 +627,7 @@ msgid "authz.permission.group_edit"
 msgstr "Change group settings"
 
 msgid "authz.permission.schedule_manage"
-msgstr "Manage opening hours and exceptions"
+msgstr "Manage staffing and staffing exceptions"
 
 msgid "authz.permission.texts_manage"
 msgstr "Manage texts"
@@ -702,7 +702,7 @@ msgid "admin.done.added"
 msgstr "Added."
 
 msgid "admin.done.created"
-msgstr "The group has been created. Now set its opening hours."
+msgstr "The group has been created. Now set its staffing."
 
 msgid "admin.done.removed"
 msgstr "Removed."
@@ -720,10 +720,10 @@ msgid "admin.tab.settings"
 msgstr "Settings"
 
 msgid "admin.tab.hours"
-msgstr "Opening hours"
+msgstr "Staffing"
 
 msgid "admin.tab.exceptions"
-msgstr "Exceptions"
+msgstr "Staffing exceptions"
 
 msgid "admin.group.sections"
 msgstr "Group sections"
@@ -741,7 +741,7 @@ msgid "admin.new_group.title"
 msgstr "New group"
 
 msgid "admin.new_group.lead"
-msgstr "A group is a team with one queue in the contact centre. After creating it you set its opening hours."
+msgstr "A group is a team with one queue in the contact centre. After creating it you set its staffing: the number of agents per block."
 
 msgid "admin.new_group.create"
 msgstr "Create group"
@@ -806,10 +806,10 @@ msgid "admin.field.closes"
 msgstr "Until"
 
 msgid "admin.field.capacity"
-msgstr "Simultaneous calls"
+msgstr "Number of agents"
 
 msgid "admin.field.capacity_hint"
-msgstr "How many participants can book the same time slot."
+msgstr "That many participants can book the same time slot. Enter 0 for lunch, for example: then there are no time slots."
 
 msgid "admin.field.label"
 msgstr "Label"
@@ -891,91 +891,121 @@ msgid "admin.form.error.day"
 msgstr "Choose a date from today on."
 
 msgid "admin.form.error.overlap"
-msgstr "These times overlap existing opening hours on that day."
+msgstr "These times overlap an existing block on that day."
 
 msgid "admin.form.error.override_conflict"
-msgstr "This date already has an exception that conflicts with this one."
+msgstr "This date already has a staffing exception that conflicts with this one."
 
 msgid "admin.hours.title"
-msgstr "Weekly opening hours"
+msgstr "Weekly staffing"
 
 msgid "admin.hours.lead"
-msgstr "One or more opening hours per day. Each is divided into time slots of the call duration; participants book a time slot."
+msgstr "One or more blocks per day, each with a number of agents; 0 for lunch, for example. Touching blocks with agents are divided together into time slots of the call duration; participants book a time slot."
 
 msgid "admin.hours.manage"
-msgstr "Manage opening hours"
+msgstr "Manage staffing"
 
 msgid "admin.hours.closed"
-msgstr "Closed"
+msgstr "No staff"
 
 msgid "admin.hours.capacity"
-msgstr "up to {count} at once"
+msgstr "{count} agents"
+
+msgid "admin.hours.capacity_one"
+msgstr "1 agent"
+
+msgid "admin.hours.capacity_none"
+msgstr "no agents"
 
 msgid "admin.hours.validity"
 msgstr "{start} to {end}"
 
 msgid "admin.hours.add"
-msgstr "Add opening hours"
+msgstr "Add a block"
 
 msgid "admin.hours.add_lead"
-msgstr "Existing appointments stay; the new opening hours apply to new appointments."
+msgstr "Existing appointments stay; the new block applies to new appointments."
 
 msgid "admin.hours.add_button"
-msgstr "Add opening hours"
+msgstr "Add block"
 
 msgid "admin.hours.add_link"
 msgstr "Add"
 
 msgid "admin.hours.add_label"
-msgstr "Add opening hours on {day}"
+msgstr "Add a block on {day}"
 
 msgid "admin.hours.edit"
-msgstr "Change opening hours"
+msgstr "Change block"
 
 msgid "admin.hours.edit_lead"
-msgstr "Existing appointments stay; the changed opening hours apply to new appointments."
+msgstr "Existing appointments stay; the changed block applies to new appointments."
 
 msgid "admin.hours.edit_label"
-msgstr "Change opening hours {day} {time}"
+msgstr "Change block {day} {time}"
 
 msgid "admin.hours.remove_label"
-msgstr "Remove opening hours {day} {time}"
+msgstr "Remove block {day} {time}"
+
+msgid "admin.hours.split"
+msgstr "Split"
+
+msgid "admin.hours.split_label"
+msgstr "Split block {day} {time}"
+
+msgid "admin.hours.split_title"
+msgstr "Split a block"
+
+msgid "admin.hours.split_lead"
+msgstr "{block}. The block becomes two touching blocks: the first part keeps its number of agents and label; choose them for the second part here, for example 0 and Lunch."
+
+msgid "admin.hours.split_button"
+msgstr "Split"
+
+msgid "admin.field.split_at"
+msgstr "Split at"
+
+msgid "admin.field.split_at_hint"
+msgstr "The second part starts at this time."
+
+msgid "admin.form.error.split_at"
+msgstr "Choose a time after the start and before the end of the block."
 
 msgid "admin.exceptions.upcoming"
-msgstr "Upcoming exceptions"
+msgstr "Upcoming staffing exceptions"
 
 msgid "admin.exceptions.lead"
-msgstr "An exception replaces the opening hours of that one date: closed, or different hours."
+msgstr "A staffing exception replaces the blocks of that one date: no staff, or other blocks."
 
 msgid "admin.exceptions.manage"
-msgstr "Manage exceptions"
+msgstr "Manage staffing exceptions"
 
 msgid "admin.exceptions.none"
-msgstr "No exceptions planned."
+msgstr "No staffing exceptions planned."
 
 msgid "admin.exceptions.closed"
-msgstr "Closed"
+msgstr "No staff"
 
 msgid "admin.exceptions.what"
 msgstr "What"
 
 msgid "admin.exceptions.add"
-msgstr "Add an exception"
+msgstr "Add a staffing exception"
 
 msgid "admin.exceptions.add_button"
-msgstr "Add exception"
+msgstr "Add staffing exception"
 
 msgid "admin.exceptions.kind"
 msgstr "Kind"
 
 msgid "admin.exceptions.kind_closed"
-msgstr "Closed all day"
+msgstr "No staff all day"
 
 msgid "admin.exceptions.kind_hours"
-msgstr "Different hours"
+msgstr "Own block"
 
 msgid "admin.exceptions.remove_label"
-msgstr "Remove exception on {day}"
+msgstr "Remove staffing exception on {day}"
 
 msgid "admin.preview.title"
 msgstr "What participants see"
@@ -987,22 +1017,25 @@ msgid "admin.preview.day"
 msgstr "{count} slots, {first} to {last}, up to {capacity} at once"
 
 msgid "admin.preview.empty"
-msgstr "No slots yet: set opening hours first."
+msgstr "No slots yet: set the staffing first."
 
 msgid "admin.audit.detail.rule_add"
-msgstr "Opening hours added"
+msgstr "Block added"
 
 msgid "admin.audit.detail.rule_edit"
-msgstr "Opening hours changed"
+msgstr "Block changed"
 
 msgid "admin.audit.detail.rule_remove"
-msgstr "Opening hours removed"
+msgstr "Block removed"
+
+msgid "admin.audit.detail.rule_split"
+msgstr "Block split"
 
 msgid "admin.audit.detail.override_add"
-msgstr "Exception added"
+msgstr "Staffing exception added"
 
 msgid "admin.audit.detail.override_remove"
-msgstr "Exception removed"
+msgstr "Staffing exception removed"
 
 msgid "admin.yes"
 msgstr "Yes"
@@ -1038,7 +1071,7 @@ msgid "admin.field.direct_call_enabled"
 msgstr "Start a call right away"
 
 msgid "admin.field.direct_call_enabled_hint"
-msgstr "Participants can start a call right away within opening hours."
+msgstr "Participants can start a call right away during a block with agents."
 
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Not picked up after (minutes)"
@@ -2531,7 +2564,7 @@ msgid "admin.holidays.state_open"
 msgstr "Open as usual"
 
 msgid "admin.holidays.state_exception"
-msgstr "Own exception"
+msgstr "Own staffing exception"
 
 msgid "admin.holidays.keep_open"
 msgstr "Open anyway"
@@ -2546,7 +2579,7 @@ msgid "admin.holidays.close_label"
 msgstr "Close again on {name} ({day})"
 
 msgid "admin.holidays.see_exceptions"
-msgstr "See exceptions"
+msgstr "See staffing exceptions"
 
 msgid "admin.holidays.none_upcoming"
 msgstr "No holidays apply to this group in the coming year."
@@ -2555,7 +2588,7 @@ msgid "admin.holidays.group_choice"
 msgstr "Which calendars apply"
 
 msgid "admin.holidays.group_choice_lead"
-msgstr "An exception of the group's own on a holiday always wins; that way a holiday can also open with other hours."
+msgstr "A staffing exception of the group's own on a holiday always wins; that way agents can still be scheduled on a holiday."
 
 msgid "admin.holidays.source"
 msgstr "Calendars for this group"

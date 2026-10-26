@@ -102,6 +102,7 @@ DETAIL_LABELS: dict[str, str] = {
     "rule.add": "admin.audit.detail.rule_add",
     "rule.edit": "admin.audit.detail.rule_edit",
     "rule.remove": "admin.audit.detail.rule_remove",
+    "rule.split": "admin.audit.detail.rule_split",
     "override.add": "admin.audit.detail.override_add",
     "override.remove": "admin.audit.detail.override_remove",
     "name": "admin.field.name",

@@ -986,8 +986,27 @@ fieldset.card {
   color: var(--adm-warning);
 }
 
-.window .inline-form {
+.window--unstaffed {
+  border: 1px dashed var(--adm-text-muted);
+  background: var(--adm-surface-muted);
+}
+
+.window--unstaffed .window__capacity {
+  color: var(--adm-text-muted);
+}
+
+.window__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
   margin-left: auto;
+}
+
+.window__actions a {
+  display: inline-block;
+  min-height: 24px;
+  padding: 0.25rem 0;
 }
 
 .window__time {
@@ -999,6 +1018,11 @@ fieldset.card {
 .window__capacity {
   color: var(--adm-accent-strong);
   font-size: 0.875rem;
+}
+
+.window__label {
+  font-size: 0.875rem;
+  font-style: italic;
 }
 
 .window__validity {

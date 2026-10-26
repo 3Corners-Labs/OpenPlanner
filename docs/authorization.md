@@ -26,7 +26,7 @@ their claim and those organisations' groups, group admin in the groups of their 
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | yes | yes | – |
 | View group (`group.view`) | Group | yes | yes | yes |
 | Change group settings (`group.edit`) | Group | yes | yes | – |
-| Manage opening hours and exceptions (`schedule.manage`) | Group | yes | yes | yes |
+| Manage staffing and staffing exceptions (`schedule.manage`) | Group | yes | yes | yes |
 | Manage texts (`texts.manage`) | Group | yes | yes | yes |
 | Manage reminders (`reminders.manage`) | Group | yes | yes | – |
 | View bookings (`bookings.view`) | Group | yes | yes | yes |
