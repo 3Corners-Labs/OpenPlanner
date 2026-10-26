@@ -155,7 +155,7 @@ def _override(row: ScheduleOverrideRow) -> ScheduleOverride:
     if row.opens is None or row.closes is None or row.capacity is None:
         return ScheduleOverride(day=row.day, window=None, id=row.id)
     return ScheduleOverride(
-        day=row.day, window=TimeWindow(row.opens, row.closes, row.capacity), id=row.id
+        day=row.day, window=TimeWindow(row.opens, row.closes, row.capacity, row.label), id=row.id
     )
 
 
@@ -173,7 +173,7 @@ def _rule(row: ScheduleRuleRow) -> ScheduleRule:
     """Map a weekly rule row."""
     return ScheduleRule(
         weekday=row.weekday,
-        window=TimeWindow(row.opens, row.closes, row.capacity),
+        window=TimeWindow(row.opens, row.closes, row.capacity, row.label),
         valid_from=row.valid_from,
         valid_to=row.valid_to,
         id=row.id,
@@ -187,6 +187,7 @@ def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
         "opens": rule.window.opens,
         "closes": rule.window.closes,
         "capacity": rule.window.capacity,
+        "label": rule.window.label,
         "valid_from": rule.valid_from,
         "valid_to": rule.valid_to,
     }
@@ -561,6 +562,7 @@ class SqlTransaction(ApiClientQueries):
             opens=window.opens if window else None,
             closes=window.closes if window else None,
             capacity=window.capacity if window else None,
+            label=window.label if window else None,
         )
         self._session.add(row)
         await self._session.flush()

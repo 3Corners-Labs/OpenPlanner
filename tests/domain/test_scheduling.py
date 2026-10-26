@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, time
 
 import pytest
 
@@ -7,6 +7,7 @@ from app.domain.scheduling import (
     PhoneMode,
     ScheduleOverride,
     ScheduleRule,
+    TimeWindow,
     validate_schedule,
     windows_on,
 )
@@ -65,7 +66,12 @@ def test_group_rejects_invalid_configuration(field: str, value: object) -> None:
 
 @pytest.mark.parametrize(
     ("opens", "closes", "capacity"),
-    [("10:00", "09:00", 1), ("09:00", "09:00", 1), ("09:00", "10:00", 0), ("09:00", "10:00", 1001)],
+    [
+        ("10:00", "09:00", 1),
+        ("09:00", "09:00", 1),
+        ("09:00", "10:00", -1),
+        ("09:00", "10:00", 1001),
+    ],
 )
 def test_time_window_rejects_invalid_values(opens: str, closes: str, capacity: int) -> None:
     with pytest.raises(DomainError) as excinfo:
@@ -216,7 +222,7 @@ def test_zero_notice_needs_zero_dispatch_lead() -> None:
 def test_configuration_errors_name_the_field() -> None:
     cases = [
         (lambda: window("10:00", "09:00"), "window"),
-        (lambda: window(capacity=0), "capacity"),
+        (lambda: window(capacity=-1), "capacity"),
         (lambda: ScheduleRule(weekday=-1, window=window()), "weekday"),
         (
             lambda: ScheduleRule(
@@ -232,6 +238,7 @@ def test_configuration_errors_name_the_field() -> None:
 
 
 def test_configuration_accepts_boundary_values() -> None:
+    window(capacity=0)
     window(capacity=1000)
     ScheduleRule(weekday=6, window=window())
     ScheduleRule(weekday=0, window=window(), valid_from=MONDAY, valid_to=MONDAY)
@@ -330,3 +337,32 @@ def test_integrations_are_enabled_per_group() -> None:
     assert make_group(wxcc_routing_value="team-7").routing_value == "team-7"
     # Dispatch needs both the business address and the channel.
     assert not make_group(wxcc_business_address="a@example.biz").dispatch_enabled
+
+
+def test_a_block_may_have_zero_agents() -> None:
+    lunch = window("12:00", "12:30", 0)
+
+    assert lunch.capacity == 0
+    assert not lunch.staffed
+    assert window("09:00", "12:00", 1).staffed
+
+
+@pytest.mark.parametrize("label", ["Lunch", "Teamoverleg", "x" * 50, "Pauze 12:00–12:30"])
+def test_a_block_accepts_a_short_label(label: str) -> None:
+    assert TimeWindow(time(12), time(13), 0, label).label == label
+
+
+@pytest.mark.parametrize(
+    "label", ["", "   ", "x" * 51, "Lunch\nBcc: x", "Lunch\r", "tab\there", "a\u2028b", "\x7f"]
+)
+def test_a_block_rejects_an_invalid_label(label: str) -> None:
+    with pytest.raises(DomainError) as excinfo:
+        TimeWindow(time(12), time(13), 0, label)
+
+    assert excinfo.value.field == "label"
+
+
+def test_the_label_takes_no_part_in_equality_or_ordering() -> None:
+    assert TimeWindow(time(9), time(10), 1, "Ochtend") == TimeWindow(time(9), time(10), 1)
+    later, earlier = TimeWindow(time(10), time(11), 1, "B"), TimeWindow(time(9), time(10), 1, "A")
+    assert sorted([later, earlier])[0].label == "A"

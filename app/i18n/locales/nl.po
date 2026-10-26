@@ -802,6 +802,12 @@ msgstr "Gelijktijdige gesprekken"
 msgid "admin.field.capacity_hint"
 msgstr "Hoeveel deelnemers in hetzelfde tijdslot kunnen boeken."
 
+msgid "admin.field.label"
+msgstr "Label"
+
+msgid "admin.field.label_hint"
+msgstr "Bijvoorbeeld Lunch of Teamoverleg. Alleen zichtbaar voor beheerders."
+
 msgid "admin.field.valid_from"
 msgstr "Geldig vanaf"
 
@@ -861,7 +867,10 @@ msgid "admin.form.error.window"
 msgstr "De eindtijd moet na de begintijd liggen."
 
 msgid "admin.form.error.capacity"
-msgstr "Vul een aantal in van 1 tot 1000."
+msgstr "Vul een aantal in van 0 tot 1000."
+
+msgid "admin.form.error.label"
+msgstr "Gebruik hoogstens 50 tekens, op één regel, of laat het veld leeg."
 
 msgid "admin.form.error.date"
 msgstr "Vul een geldige datum in."

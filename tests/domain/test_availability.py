@@ -197,3 +197,82 @@ def test_utc_bounds_cover_whole_local_days_across_dst() -> None:
         utc(2026, 3, 27, 23, 0),  # Saturday 00:00 CET
         utc(2026, 3, 29, 22, 0),  # Monday 00:00 CEST
     )
+
+
+# --- staffing runs (ADR 0027) ---------------------------------------------------------------
+
+STRADDLING = [window("09:00", "10:15", 3), window("10:15", "12:00", 2)]
+
+
+def test_a_block_without_agents_offers_no_slots() -> None:
+    assert slots_on(GROUP, MONDAY, [window("12:00", "13:00", 0)]) == []
+
+
+def test_the_slot_grid_continues_across_touching_blocks() -> None:
+    slots = slots_on(GROUP, MONDAY, STRADDLING)
+
+    starts = [s.start.astimezone(GROUP.tz).time() for s in slots]
+    assert starts == [time(9), time(9, 30), time(10), time(10, 30), time(11), time(11, 30)]
+    assert [s.capacity for s in slots] == [3, 3, 2, 2, 2, 2]
+
+
+def test_a_straddling_slot_gets_the_lowest_agent_count() -> None:
+    # 10:00–10:30 covers 10:00–10:15 (3 agents) and 10:15–10:30 (2 agents).
+    slot = offered_slot(
+        GROUP,
+        [ScheduleRule(weekday=0, window=w) for w in STRADDLING],
+        [],
+        utc(2026, 1, 5, 9, 0),
+    )
+
+    assert slot is not None
+    assert slot.capacity == 2
+
+
+def test_a_block_without_agents_ends_the_run() -> None:
+    blocks = [window("09:00", "10:15", 2), window("10:15", "10:45", 0), window("10:45", "12:00", 2)]
+
+    starts = [s.start.astimezone(GROUP.tz).time() for s in slots_on(GROUP, MONDAY, blocks)]
+
+    # 10:00 would run into the lunch block; the afternoon grid starts again at 10:45.
+    assert starts == [time(9), time(9, 30), time(10, 45), time(11, 15)]
+
+
+def test_a_gap_ends_the_run() -> None:
+    blocks = [window("09:00", "10:15", 2), window("10:20", "11:20", 2)]
+
+    starts = [s.start.astimezone(GROUP.tz).time() for s in slots_on(GROUP, MONDAY, blocks)]
+
+    assert starts == [time(9), time(9, 30), time(10, 20), time(10, 50)]
+
+
+def test_a_lunch_split_offers_the_same_slots_as_two_separate_blocks() -> None:
+    split = [window("09:00", "12:00", 3), window("12:00", "12:30", 0), window("12:30", "14:00", 3)]
+    gap = [window("09:00", "12:00", 3), window("12:30", "14:00", 3)]
+
+    assert slots_on(GROUP, MONDAY, split) == slots_on(GROUP, MONDAY, gap)
+
+
+def test_offered_slot_agrees_with_slots_on_across_borders() -> None:
+    rules = [ScheduleRule(weekday=0, window=w) for w in STRADDLING]
+    for slot in slots_on(GROUP, MONDAY, STRADDLING):
+        assert offered_slot(GROUP, rules, [], slot.start) == slot
+    # The old grid of the second block (10:15, 10:45, ...) is no longer offered.
+    assert offered_slot(GROUP, rules, [], utc(2026, 1, 5, 9, 15)) is None
+
+
+def test_an_override_day_forms_runs_too() -> None:
+    overrides = [ScheduleOverride(day=MONDAY, window=w) for w in STRADDLING]
+
+    slots = available_slots(
+        group=GROUP,
+        rules=[],
+        overrides=overrides,
+        first_day=MONDAY,
+        last_day=MONDAY,
+        now=NOW,
+        booked={},
+        snapshots={},
+    )
+
+    assert [(s.start, s.capacity) for s in slots][2] == (utc(2026, 1, 5, 9, 0), 2)

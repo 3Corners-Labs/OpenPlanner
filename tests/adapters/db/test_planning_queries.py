@@ -1,7 +1,7 @@
 """Planning writes (WP7b): groups, rules and overrides with ids, audit detail."""
 
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -10,7 +10,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Scope
 from app.domain.booking import BookingStatus
-from app.domain.scheduling import Group, PhoneMode, ScheduleOverride, ScheduleRule
+from app.domain.scheduling import Group, PhoneMode, ScheduleOverride, ScheduleRule, TimeWindow
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
@@ -109,6 +109,31 @@ async def test_schedule_items_carry_ids_and_stay_within_their_group(engine: Asyn
     assert rule_id not in {r.id for r in rules}
     assert [o.id for o in overrides] == [changed]
     assert other_rule in {r.id for r in other_rules}
+
+
+async def test_blocks_without_agents_and_labels_are_stored(engine: AsyncEngine) -> None:
+    group_id = await seed_group(engine, slug="lunch")
+    uow = SqlUnitOfWork(engine)
+    lunch = TimeWindow(time(12), time(12, 30), 0, "Lunch")
+
+    async with uow.locked() as tx:
+        rule_id = await tx.add_schedule_rule(group_id, ScheduleRule(0, lunch))
+        await tx.add_schedule_override(
+            group_id, ScheduleOverride(date(2026, 1, 7), TimeWindow(time(9), time(10), 0, "Hei"))
+        )
+    async with uow.read() as tx:
+        rules, overrides = await tx.get_schedule_items(group_id)
+
+    stored = next(r.window for r in rules if r.id == rule_id)
+    assert (stored.capacity, stored.label) == (0, "Lunch")
+    assert [(o.window.capacity, o.window.label) for o in overrides if o.window] == [(0, "Hei")]
+
+    async with uow.locked() as tx:
+        unlabelled = ScheduleRule(0, TimeWindow(time(12), time(12, 30), 2))
+        assert await tx.update_schedule_rule(group_id, rule_id, unlabelled)
+    async with uow.read() as tx:
+        rules, _ = await tx.get_schedule_items(group_id)
+    assert next(r.window.label for r in rules if r.id == rule_id) is None
 
 
 async def test_future_bookings_are_counted_per_group(engine: AsyncEngine) -> None:

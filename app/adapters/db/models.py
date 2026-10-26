@@ -134,7 +134,7 @@ class GroupRow(Base):
 
 
 class ScheduleRuleRow(Base):
-    """A weekly opening window of a group."""
+    """A weekly staffing block of a group; capacity 0 is a block without agents (ADR 0027)."""
 
     __tablename__ = "schedule_rules"
 
@@ -144,13 +144,14 @@ class ScheduleRuleRow(Base):
     opens: Mapped[time] = mapped_column(Time)
     closes: Mapped[time] = mapped_column(Time)
     capacity: Mapped[int] = mapped_column(Integer)
+    label: Mapped[str | None] = mapped_column(String(50))
     valid_from: Mapped[date | None] = mapped_column(Date)
     valid_to: Mapped[date | None] = mapped_column(Date)
 
     __table_args__ = (
         CheckConstraint("weekday BETWEEN 0 AND 6", name="weekday"),
         CheckConstraint("opens < closes", name="window"),
-        CheckConstraint("capacity >= 1", name="capacity"),
+        CheckConstraint("capacity >= 0", name="capacity"),
     )
 
 
@@ -165,12 +166,13 @@ class ScheduleOverrideRow(Base):
     opens: Mapped[time | None] = mapped_column(Time)
     closes: Mapped[time | None] = mapped_column(Time)
     capacity: Mapped[int | None] = mapped_column(Integer)
+    label: Mapped[str | None] = mapped_column(String(50))
 
     __table_args__ = (
         Index("ix_schedule_overrides_group_day", "group_id", "day"),
         CheckConstraint(
             "(opens IS NULL AND closes IS NULL AND capacity IS NULL) "
-            "OR (opens < closes AND capacity >= 1)",
+            "OR (opens < closes AND capacity >= 0)",
             name="window_or_closed",
         ),
     )
