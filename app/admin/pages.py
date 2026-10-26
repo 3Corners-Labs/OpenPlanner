@@ -44,6 +44,7 @@ NAVIGATION = (
         "admin.nav.integrations", "/admin/integrations", Permission.INTEGRATIONS_MANAGE, "settings"
     ),
     NavItem("admin.nav.branding", "/admin/branding", Permission.BRANDING_MANAGE, "palette"),
+    NavItem("admin.nav.holidays", "/admin/holidays", Permission.HOLIDAYS_ASSIGN, "holiday"),
 )
 
 
@@ -58,12 +59,18 @@ class NavView:
 
 
 def _is_current(request: Request, item: NavItem) -> bool:
-    """Return whether ``item`` is the current section; group pages belong to the overview."""
+    """Return whether ``item`` is the current section; group pages belong to the overview.
+
+    Organisation pages belong to their section by their last path segment
+    (``/admin/organisations/{org}/branding`` to branding, ``.../holidays`` to holidays).
+    """
     path = request.url.path
+    section = path.rsplit("/", 1)[-1]
     return (
         path == item.href
         or (item.href == "/admin/" and path.startswith("/admin/groups"))
-        or (item.href == "/admin/branding" and path.startswith("/admin/organisations/"))
+        or (item.href == "/admin/holidays" and path.startswith("/admin/holidays/"))
+        or (path.startswith("/admin/organisations/") and item.href == f"/admin/{section}")
     )
 
 

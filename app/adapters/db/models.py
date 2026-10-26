@@ -8,6 +8,8 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
     integration_credentials (encrypted tokens, ADR 0008)
     admin_profiles (name per identity-provider subject; joined into the audit log)
     organisations 1──1 organisation_logos (branding, WP3b)
+    holiday_calendars 1──* holidays (ADR 0021; chosen through organisation_holiday_calendars
+                         and group_holiday_calendars; group_holiday_open_days keep one open)
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
@@ -42,8 +44,13 @@ __all__ = [
     "AuditEventRow",
     "Base",
     "BookingRow",
+    "GroupHolidayCalendarRow",
+    "GroupHolidayOpenDayRow",
     "GroupRow",
+    "HolidayCalendarRow",
+    "HolidayRow",
     "JobRow",
+    "OrganisationHolidayCalendarRow",
     "OrganisationLogoRow",
     "OrganisationRow",
     "ReminderRuleRow",
@@ -102,10 +109,12 @@ class GroupRow(Base):
     direct_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
+    holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
 
     __table_args__ = (
         CheckConstraint("phone_mode IN ('hidden', 'optional', 'required')", name="phone_mode"),
         CheckConstraint("dispatch_lead_minutes BETWEEN 0 AND 60", name="dispatch_lead"),
+        CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
     )
 
 
@@ -150,6 +159,69 @@ class ScheduleOverrideRow(Base):
             name="window_or_closed",
         ),
     )
+
+
+class HolidayCalendarRow(Base):
+    """A reusable set of closed days, maintained by the superuser (ADR 0021)."""
+
+    __tablename__ = "holiday_calendars"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str] = mapped_column(String(200))
+
+
+class HolidayRow(Base):
+    """One closed date of a holiday calendar."""
+
+    __tablename__ = "holidays"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    calendar_id: Mapped[int] = mapped_column(ForeignKey("holiday_calendars.id", ondelete="CASCADE"))
+    day: Mapped[date] = mapped_column(Date)
+    name: Mapped[str] = mapped_column(String(200))
+
+    __table_args__ = (UniqueConstraint("calendar_id", "day"),)
+
+
+class OrganisationHolidayCalendarRow(Base):
+    """A calendar an organisation chose for its groups.
+
+    ``RESTRICT``: a calendar in use cannot disappear under an organisation.
+    """
+
+    __tablename__ = "organisation_holiday_calendars"
+
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), primary_key=True
+    )
+    calendar_id: Mapped[int] = mapped_column(
+        ForeignKey("holiday_calendars.id", ondelete="RESTRICT"), primary_key=True
+    )
+
+
+class GroupHolidayCalendarRow(Base):
+    """A calendar of a group's own choice (used when ``groups.holiday_source = 'own'``)."""
+
+    __tablename__ = "group_holiday_calendars"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    calendar_id: Mapped[int] = mapped_column(
+        ForeignKey("holiday_calendars.id", ondelete="RESTRICT"), primary_key=True
+    )
+
+
+class GroupHolidayOpenDayRow(Base):
+    """A holiday on which the group is open as usual."""
+
+    __tablename__ = "group_holiday_open_days"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
 
 
 class ReminderRuleRow(Base):

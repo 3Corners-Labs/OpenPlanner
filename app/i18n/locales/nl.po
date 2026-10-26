@@ -1377,3 +1377,198 @@ msgstr "Logo uploaden"
 
 msgid "admin.branding.logo_remove"
 msgstr "Logo verwijderen"
+
+msgid "admin.nav.holidays"
+msgstr "Feestdagen"
+
+msgid "admin.tab.holidays"
+msgstr "Feestdagen"
+
+msgid "authz.permission.holidays_manage"
+msgstr "Feestdagenkalenders beheren (voor alle organisaties)"
+
+msgid "authz.permission.holidays_assign"
+msgstr "Feestdagenkalenders kiezen voor een organisatie"
+
+msgid "admin.holidays.title"
+msgstr "Feestdagen"
+
+msgid "admin.holidays.lead"
+msgstr "Kalenders met sluitingsdagen, één keer ingesteld en hergebruikt door organisaties en groepen."
+
+msgid "admin.holidays.calendars"
+msgstr "Kalenders"
+
+msgid "admin.holidays.calendars_lead"
+msgstr "De superuser beheert de kalenders en hun datums. Organisaties kiezen welke kalenders voor hun groepen gelden."
+
+msgid "admin.holidays.no_calendars"
+msgstr "Er zijn nog geen feestdagenkalenders."
+
+msgid "admin.holidays.new"
+msgstr "Nieuwe kalender"
+
+msgid "admin.holidays.new_lead"
+msgstr "Bijvoorbeeld “Nationale feestdagen”. Datums voegt u daarna toe."
+
+msgid "admin.holidays.new_button"
+msgstr "Kalender maken"
+
+msgid "admin.holidays.slug_hint"
+msgstr "Korte naam voor in de adresbalk, bijvoorbeeld nationaal. Kan later niet meer veranderen."
+
+msgid "admin.holidays.organisations"
+msgstr "Keuze per organisatie"
+
+msgid "admin.holidays.organisations_lead"
+msgstr "Groepen volgen de kalenders van hun organisatie, tenzij een groep zelf iets anders kiest."
+
+msgid "admin.holidays.holiday_name"
+msgstr "Naam"
+
+msgid "admin.holidays.used_by"
+msgstr "Gekozen door organisaties en groepen: {count}"
+
+msgid "admin.holidays.days_of_year"
+msgstr "Datums in {year}"
+
+msgid "admin.holidays.other_years"
+msgstr "Andere jaren"
+
+msgid "admin.holidays.remove_label"
+msgstr "{name} op {day} verwijderen"
+
+msgid "admin.holidays.no_days"
+msgstr "Deze kalender heeft nog geen datums in dit jaar."
+
+msgid "admin.holidays.national"
+msgstr "Nederlandse feestdagen toevoegen"
+
+msgid "admin.holidays.national_lead"
+msgstr "Voegt Nieuwjaarsdag, Pasen, Koningsdag, Bevrijdingsdag, Hemelvaart, Pinksteren en Kerst toe. Datums die er al staan, blijven ongewijzigd. Goede Vrijdag voegt u zelf toe als die geldt."
+
+msgid "admin.holidays.national_button"
+msgstr "Feestdagen van {year} toevoegen"
+
+msgid "admin.holidays.add"
+msgstr "Datum toevoegen"
+
+msgid "admin.holidays.add_button"
+msgstr "Datum toevoegen"
+
+msgid "admin.holidays.delete"
+msgstr "Kalender verwijderen"
+
+msgid "admin.holidays.delete_lead"
+msgstr "Kan alleen zolang geen organisatie of groep deze kalender gekozen heeft. Alle datums verdwijnen mee."
+
+msgid "admin.holidays.delete_button"
+msgstr "{name} verwijderen"
+
+msgid "admin.holidays.organisation_lead"
+msgstr "Kies welke feestdagenkalenders gelden voor de groepen van deze organisatie. Groepen die zelf kiezen, veranderen niet mee."
+
+msgid "admin.holidays.choose"
+msgstr "Kalenders"
+
+msgid "admin.holidays.upcoming"
+msgstr "Komende feestdagen"
+
+msgid "admin.holidays.upcoming_lead"
+msgstr "De feestdagen van het komende jaar uit de kalenders die voor deze groep gelden. Op een gesloten dag kunnen burgers geen afspraak maken."
+
+msgid "admin.holidays.state"
+msgstr "Deze groep"
+
+msgid "admin.holidays.state_closed"
+msgstr "Gesloten"
+
+msgid "admin.holidays.state_open"
+msgstr "Gewoon open"
+
+msgid "admin.holidays.state_exception"
+msgstr "Eigen uitzondering"
+
+msgid "admin.holidays.keep_open"
+msgstr "Toch open"
+
+msgid "admin.holidays.keep_open_label"
+msgstr "Op {name} ({day}) gewoon open"
+
+msgid "admin.holidays.close"
+msgstr "Weer sluiten"
+
+msgid "admin.holidays.close_label"
+msgstr "Op {name} ({day}) weer gesloten"
+
+msgid "admin.holidays.see_exceptions"
+msgstr "Bekijk uitzonderingen"
+
+msgid "admin.holidays.none_upcoming"
+msgstr "Er gelden geen feestdagen voor deze groep in het komende jaar."
+
+msgid "admin.holidays.group_choice"
+msgstr "Welke kalenders gelden"
+
+msgid "admin.holidays.group_choice_lead"
+msgstr "Een eigen uitzondering op een feestdag gaat altijd voor; zo kunt u een feestdag ook met andere tijden openen."
+
+msgid "admin.holidays.source"
+msgstr "Kalenders voor deze groep"
+
+msgid "admin.holidays.source_inherit"
+msgstr "Volg de organisatie"
+
+msgid "admin.holidays.inherited"
+msgstr "Nu: {calendars}"
+
+msgid "admin.holidays.inherited_none"
+msgstr "De organisatie heeft nog geen kalender gekozen."
+
+msgid "admin.holidays.source_own"
+msgstr "Eigen keuze (hieronder; niets aangevinkt is geen feestdagen)"
+
+msgid "admin.holidays.own_calendars"
+msgstr "Eigen keuze"
+
+msgid "admin.form.error.holiday_day"
+msgstr "Deze kalender heeft al een feestdag op die datum."
+
+msgid "admin.form.error.year"
+msgstr "Kies een jaar tussen 2000 en 2100."
+
+msgid "admin.form.error.calendars"
+msgstr "Kies alleen bestaande kalenders."
+
+msgid "admin.form.error.calendar_in_use"
+msgstr "Deze kalender is nog gekozen door een organisatie of groep en kan niet worden verwijderd."
+
+msgid "holiday.nl.new_year"
+msgstr "Nieuwjaarsdag"
+
+msgid "holiday.nl.easter_sunday"
+msgstr "Eerste Paasdag"
+
+msgid "holiday.nl.easter_monday"
+msgstr "Tweede Paasdag"
+
+msgid "holiday.nl.kings_day"
+msgstr "Koningsdag"
+
+msgid "holiday.nl.liberation_day"
+msgstr "Bevrijdingsdag"
+
+msgid "holiday.nl.ascension_day"
+msgstr "Hemelvaartsdag"
+
+msgid "holiday.nl.whit_sunday"
+msgstr "Eerste Pinksterdag"
+
+msgid "holiday.nl.whit_monday"
+msgstr "Tweede Pinksterdag"
+
+msgid "holiday.nl.christmas_day"
+msgstr "Eerste Kerstdag"
+
+msgid "holiday.nl.boxing_day"
+msgstr "Tweede Kerstdag"

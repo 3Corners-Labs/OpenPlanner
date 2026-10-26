@@ -67,6 +67,10 @@ FIELD_MESSAGES: dict[str, str] = {
     "day": "admin.form.error.day",
     "schedule_rules": "admin.form.error.overlap",
     "schedule_overrides": "admin.form.error.override_conflict",
+    "holiday_day": "admin.form.error.holiday_day",
+    "year": "admin.form.error.year",
+    "calendars": "admin.form.error.calendars",
+    "source": "admin.form.error.choice",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -82,6 +86,7 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.ORGANISATION_NOT_FOUND: "admin.form.error.organisation",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
     ErrorCode.DATABASE_BUSY: "error.database_busy",
+    ErrorCode.HOLIDAY_CALENDAR_IN_USE: "admin.form.error.calendar_in_use",
 }
 
 
@@ -215,8 +220,12 @@ def done_message(request: Request, _: BoundGettext) -> str | None:
 
 
 def redirect_done(url: str, done: str) -> RedirectResponse:
-    """Answer a successful change with a redirect to ``url`` and its confirmation."""
-    return RedirectResponse(f"{url}?done={done}", status_code=303)
+    """Answer a successful change with a redirect to ``url`` and its confirmation.
+
+    ``url`` may carry a query of its own (``?year=2027``); ``done`` is appended to it.
+    """
+    separator = "&" if "?" in url else "?"
+    return RedirectResponse(f"{url}{separator}done={done}", status_code=303)
 
 
 async def read_form(request: Request, locale: RequestLocale) -> FormData:

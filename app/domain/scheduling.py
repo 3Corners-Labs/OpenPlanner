@@ -51,6 +51,18 @@ def _invalid(field: str) -> DomainError:
     return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
 
 
+def is_valid_name(value: str) -> bool:
+    """Return whether ``value`` is a usable display name (not blank, short, no control chars)."""
+    return (
+        bool(value.strip()) and len(value) <= MAX_NAME_LENGTH and not _CONTROL_CHARS.search(value)
+    )
+
+
+def is_valid_slug(value: str) -> bool:
+    """Return whether ``value`` is a URL identifier: lowercase words joined by hyphens."""
+    return len(value) <= MAX_SLUG_LENGTH and _SLUG.fullmatch(value) is not None
+
+
 class PhoneMode(StrEnum):
     """Whether the booking form asks for a phone number (per group, HANDOVER B15)."""
 
@@ -116,13 +128,9 @@ class Group:
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""
-        if (
-            not self.name.strip()
-            or len(self.name) > MAX_NAME_LENGTH
-            or _CONTROL_CHARS.search(self.name)
-        ):
+        if not is_valid_name(self.name):
             raise _invalid("name")
-        if len(self.slug) > MAX_SLUG_LENGTH or not _SLUG.fullmatch(self.slug):
+        if not is_valid_slug(self.slug):
             raise _invalid("slug")
         try:
             ZoneInfo(self.timezone)
@@ -168,6 +176,10 @@ class Group:
     def tz(self) -> ZoneInfo:
         """The group's time zone."""
         return ZoneInfo(self.timezone)
+
+    def today(self, now: datetime) -> date:
+        """Return the date of ``now`` in the group's time zone."""
+        return now.astimezone(self.tz).date()
 
     @property
     def dispatch_lead(self) -> timedelta:

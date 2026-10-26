@@ -147,6 +147,25 @@ slug, time zone, numbers, times, dates, queue id), path slugs and item ids.
 | Spoofing | A new group takes an admin path as its slug (`/admin/groups/new`) | Reserved slugs | `test_reserved_slugs_cannot_be_taken` |
 | Repudiation | An admin denies a change | Every change is audited in the same transaction, with the changed field names or `rule.add`-style keys (never values) | `test_settings_change_records_the_changed_fields`, `test_group_admin_manages_opening_hours_of_their_group` |
 
+## Flow: holiday calendars (ADR 0021)
+
+Admins only. `GET/POST /admin/holidays`, `/admin/holidays/{calendar}` with `/days`,
+`/national`, `/days/{id}/delete` and `/delete`; `GET/POST /admin/organisations/{org}/holidays`;
+`GET/POST /admin/groups/{slug}/holidays` with `/{day}/open` and `/{day}/close`. Inputs from
+outside: calendar name and slug, holiday date and name, a year, ticked calendar ids
+(`calendar-<id>`), the source choice, path slugs, ids and dates. No personal data.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation | An organisation or group admin changes a calendar that every organisation uses | `holidays.manage` is global and superuser only; route and `HolidayService` both decide | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_holiday_service.py::test_only_the_superuser_maintains_calendars` |
+| Elevation | An organisation admin sets the calendars of another organisation, or a group admin those of another group | `holidays.assign` at organisation level and `schedule.manage` at group level, decided on the path's target | `test_org_admin_cannot_choose_for_another_organisation`, `test_group_admin_cannot_touch_another_group` |
+| Tampering (IDOR) | Removing another calendar's holiday by guessing its id; choosing a calendar id that does not exist | Deletes are bound to the calendar (`WHERE id = ? AND calendar_id = ?`); chosen ids must exist | `test_remove_a_holiday_only_from_its_own_calendar`, `test_unknown_calendars_are_refused`, `tests/admin/test_holiday_routes.py::test_unknown_source_and_calendar_are_refused` |
+| Denial of service (of the service to citizens) | Deleting a calendar in use silently reopens every holiday | Refused in the domain (`holiday_calendar_in_use`) and by `ON DELETE RESTRICT` | `test_a_calendar_in_use_cannot_be_deleted`, `tests/adapters/db/test_holiday_queries.py::test_a_calendar_in_use_is_protected_by_the_database` |
+| Tampering | A typo year (20026) or a malformed date creates junk | Years 2000–2100 only; dates parsed strictly; "keep open" only for an upcoming holiday of the group's own calendars | `test_generator_refuses_implausible_years`, `test_only_upcoming_holidays_of_the_group_can_be_kept_open`, `test_a_malformed_day_is_not_found` |
+| Tampering (XSS) | Markup in a calendar or holiday name | Jinja2 autoescape; names without control characters | `tests/domain/test_holidays.py::test_calendar_validates_slug_and_name` |
+| Tampering (CSRF) | A third-party site changes holidays in an admin's browser | Fetch Metadata check on every POST; changes need a recent login | `tests/admin/test_holiday_routes.py::test_cross_site_holiday_changes_are_refused` |
+| Repudiation | Who changed a calendar or a group's choice | Audit events `holidays.manage` (`<calendar>:holiday.add`), `holidays.assign` (`calendars`) and `schedule.manage` (`holidays.calendars`, `holiday.open`), never names or dates | `test_superuser_creates_and_fills_a_calendar`, `test_org_admin_chooses_calendars_for_their_organisation` |
+
 ## Flow: video meetings, work items and direct calls (WP5/WP6)
 
 Public: `GET /b/{token}/join`, `GET /b/{token}/join/go`, `GET/POST /g/{slug}/direct`,

@@ -1377,3 +1377,198 @@ msgstr "Upload logo"
 
 msgid "admin.branding.logo_remove"
 msgstr "Remove logo"
+
+msgid "admin.nav.holidays"
+msgstr "Holidays"
+
+msgid "admin.tab.holidays"
+msgstr "Holidays"
+
+msgid "authz.permission.holidays_manage"
+msgstr "Maintain holiday calendars (for every organisation)"
+
+msgid "authz.permission.holidays_assign"
+msgstr "Choose holiday calendars for an organisation"
+
+msgid "admin.holidays.title"
+msgstr "Holidays"
+
+msgid "admin.holidays.lead"
+msgstr "Calendars of closed days, set up once and reused by organisations and groups."
+
+msgid "admin.holidays.calendars"
+msgstr "Calendars"
+
+msgid "admin.holidays.calendars_lead"
+msgstr "The superuser maintains the calendars and their dates. Organisations choose which calendars apply to their groups."
+
+msgid "admin.holidays.no_calendars"
+msgstr "There are no holiday calendars yet."
+
+msgid "admin.holidays.new"
+msgstr "New calendar"
+
+msgid "admin.holidays.new_lead"
+msgstr "For example “National holidays”. You add the dates next."
+
+msgid "admin.holidays.new_button"
+msgstr "Create calendar"
+
+msgid "admin.holidays.slug_hint"
+msgstr "Short name for the address bar, for example national. Cannot be changed later."
+
+msgid "admin.holidays.organisations"
+msgstr "Choice per organisation"
+
+msgid "admin.holidays.organisations_lead"
+msgstr "Groups follow the calendars of their organisation unless a group chooses otherwise."
+
+msgid "admin.holidays.holiday_name"
+msgstr "Name"
+
+msgid "admin.holidays.used_by"
+msgstr "Chosen by organisations and groups: {count}"
+
+msgid "admin.holidays.days_of_year"
+msgstr "Dates in {year}"
+
+msgid "admin.holidays.other_years"
+msgstr "Other years"
+
+msgid "admin.holidays.remove_label"
+msgstr "Remove {name} on {day}"
+
+msgid "admin.holidays.no_days"
+msgstr "This calendar has no dates in this year yet."
+
+msgid "admin.holidays.national"
+msgstr "Add Dutch national holidays"
+
+msgid "admin.holidays.national_lead"
+msgstr "Adds New Year's Day, Easter, King's Day, Liberation Day, Ascension Day, Whitsun and Christmas. Dates already present stay as they are. Add Good Friday yourself where it applies."
+
+msgid "admin.holidays.national_button"
+msgstr "Add the holidays of {year}"
+
+msgid "admin.holidays.add"
+msgstr "Add a date"
+
+msgid "admin.holidays.add_button"
+msgstr "Add date"
+
+msgid "admin.holidays.delete"
+msgstr "Delete calendar"
+
+msgid "admin.holidays.delete_lead"
+msgstr "Only possible while no organisation or group has chosen this calendar. All its dates go with it."
+
+msgid "admin.holidays.delete_button"
+msgstr "Delete {name}"
+
+msgid "admin.holidays.organisation_lead"
+msgstr "Choose which holiday calendars apply to this organisation's groups. Groups with their own choice do not change."
+
+msgid "admin.holidays.choose"
+msgstr "Calendars"
+
+msgid "admin.holidays.upcoming"
+msgstr "Upcoming holidays"
+
+msgid "admin.holidays.upcoming_lead"
+msgstr "The holidays of the coming year from the calendars that apply to this group. Citizens cannot book on a closed day."
+
+msgid "admin.holidays.state"
+msgstr "This group"
+
+msgid "admin.holidays.state_closed"
+msgstr "Closed"
+
+msgid "admin.holidays.state_open"
+msgstr "Open as usual"
+
+msgid "admin.holidays.state_exception"
+msgstr "Own exception"
+
+msgid "admin.holidays.keep_open"
+msgstr "Open anyway"
+
+msgid "admin.holidays.keep_open_label"
+msgstr "Open as usual on {name} ({day})"
+
+msgid "admin.holidays.close"
+msgstr "Close again"
+
+msgid "admin.holidays.close_label"
+msgstr "Closed again on {name} ({day})"
+
+msgid "admin.holidays.see_exceptions"
+msgstr "See exceptions"
+
+msgid "admin.holidays.none_upcoming"
+msgstr "No holidays apply to this group in the coming year."
+
+msgid "admin.holidays.group_choice"
+msgstr "Which calendars apply"
+
+msgid "admin.holidays.group_choice_lead"
+msgstr "An exception of the group's own on a holiday always wins; that way a holiday can also open with other hours."
+
+msgid "admin.holidays.source"
+msgstr "Calendars for this group"
+
+msgid "admin.holidays.source_inherit"
+msgstr "Follow the organisation"
+
+msgid "admin.holidays.inherited"
+msgstr "Now: {calendars}"
+
+msgid "admin.holidays.inherited_none"
+msgstr "The organisation has not chosen a calendar yet."
+
+msgid "admin.holidays.source_own"
+msgstr "Own choice (below; nothing ticked means no holidays)"
+
+msgid "admin.holidays.own_calendars"
+msgstr "Own choice"
+
+msgid "admin.form.error.holiday_day"
+msgstr "This calendar already has a holiday on that date."
+
+msgid "admin.form.error.year"
+msgstr "Choose a year between 2000 and 2100."
+
+msgid "admin.form.error.calendars"
+msgstr "Choose existing calendars only."
+
+msgid "admin.form.error.calendar_in_use"
+msgstr "This calendar is still chosen by an organisation or group and cannot be deleted."
+
+msgid "holiday.nl.new_year"
+msgstr "New Year's Day"
+
+msgid "holiday.nl.easter_sunday"
+msgstr "Easter Sunday"
+
+msgid "holiday.nl.easter_monday"
+msgstr "Easter Monday"
+
+msgid "holiday.nl.kings_day"
+msgstr "King's Day"
+
+msgid "holiday.nl.liberation_day"
+msgstr "Liberation Day"
+
+msgid "holiday.nl.ascension_day"
+msgstr "Ascension Day"
+
+msgid "holiday.nl.whit_sunday"
+msgstr "Whit Sunday"
+
+msgid "holiday.nl.whit_monday"
+msgstr "Whit Monday"
+
+msgid "holiday.nl.christmas_day"
+msgstr "Christmas Day"
+
+msgid "holiday.nl.boxing_day"
+msgstr "Boxing Day"

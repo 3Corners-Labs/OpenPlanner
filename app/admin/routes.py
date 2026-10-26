@@ -27,7 +27,7 @@ from fastapi import APIRouter, Depends, FastAPI, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.integrations import Integrations
-from app.admin import branding_routes, call_routes, group_routes
+from app.admin import branding_routes, call_routes, group_routes, holiday_routes
 from app.admin.authz import (
     AccessDenied,
     AdminContext,
@@ -452,3 +452,4 @@ def register_admin(app: FastAPI) -> None:
     app.include_router(group_routes.router)
     app.include_router(call_routes.router)
     app.include_router(branding_routes.router)
+    app.include_router(holiday_routes.router)

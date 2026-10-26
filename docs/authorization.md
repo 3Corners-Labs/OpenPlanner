@@ -15,9 +15,11 @@ their claim and those organisations' groups, group admin in the groups of their 
 | View own rights (`rights.view`) | Portal | yes | yes | yes |
 | View rights matrix (`matrix.view`) | Portal | yes | yes | yes |
 | Manage organisations (`organisation.manage`) | Portal | yes | – | – |
+| Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | yes | – | – |
 | View audit log (`audit.view`) | Organisation | yes | yes | – |
 | Manage integrations and secrets (`integrations.manage`) | Organisation | yes | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | yes | – | – |
+| Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | yes | yes | – |
 | Create groups (`group.create`) | Organisation | yes | yes | – |
 | View group (`group.view`) | Group | yes | yes | yes |
 | Change group settings (`group.edit`) | Group | yes | yes | – |
