@@ -1,4 +1,4 @@
-"""System events: what the platform did on its own, for troubleshooting per level (ADR 0030).
+"""System events: what the platform did on its own, for troubleshooting per level (ADR 0031).
 
 The worker records every job it runs (message, meeting, work item, purge) as a system event
 in the audit log. An event about a booking is placed at that booking's group, so the

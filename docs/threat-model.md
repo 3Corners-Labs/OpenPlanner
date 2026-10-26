@@ -14,6 +14,20 @@ Public, unauthenticated: `GET /healthz`, `GET /readyz`.
 | Denial of service | `/readyz` flooded to exhaust database connections | Cheap `SELECT 1` on a pooled connection; rate limiting at the reverse proxy *(TBD, O7)* | — |
 | Tampering | Clickjacking / MIME sniffing on any response | Security headers middleware | `test_security_headers_on_every_response` |
 
+## Flow: TLS termination (ADR 0030)
+
+Public: ports 80 and 443 of the `proxy` service (`--profile tls`).
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure | Traffic, session cookies or management tokens read on the network | HTTPS only: port 80 answers ACME challenges and otherwise redirects (308); HSTS from the app | `scripts/check-proxy.sh` (CI step "proxy check") |
+| Denial of service | Certificate expires unnoticed: bookings, admin login and webhooks stop together | Caddy renews at a third of the lifetime with retries; certificates kept in `proxy-data`; expiry check in the runbook | — (operational) |
+| Spoofing | Client forges `X-Forwarded-For` to dodge or exhaust per-IP rate limits | Caddy sets the header itself (no `trusted_proxies`); `web` trusts it only from the proxy's fixed address on the `edge` network | — (configuration in `docker-compose.yml`) |
+| Denial of service | Oversized bodies on public forms | 64 KB on `/g/*` and `/b/*`, 1 MB elsewhere (HTTP 413) | `scripts/check-proxy.sh` |
+| Denial of service | Slow-loris clients hold connections open | Header 10 s, body 30 s, write 60 s, idle 2 min in the Caddyfile | — |
+| Information disclosure | Booking paths with tokens in proxy logs | No access log in the Caddyfile | — |
+| Elevation | Compromised proxy gains host rights | uid 10001, read-only filesystem, `cap_drop: ALL`, `no-new-privileges`, unprivileged ports | `trivy` misconfiguration scan |
+
 ## Flow: public pages and language choice
 
 Public, unauthenticated: `GET /` (more pages from WP3), `GET /static/*`. Inputs from outside:
@@ -167,7 +181,7 @@ other `/admin` route declares one permission of the matrix (ADR 0014). Inputs fr
 | Tampering (CSRF) | A third-party site logs an admin out | Logout is a POST with the Fetch Metadata check | `test_logout` |
 | Spoofing (open redirect) | `next` sends the admin to another site after login | `next` must be a path under `/admin/` | `test_next_cannot_leave_the_admin_portal` |
 | Repudiation | An admin denies a login, a refused attempt or a change | Logins, logouts, failed logins and denials go to `audit_events`, per organisation/group in the admin's scope; the audit log shows names from `admin_profiles` | `test_denials_are_audited`, `test_identity_errors_are_audited`, `test_audit_log_shows_names_and_logins_within_the_organisation` |
-| Information disclosure | A group admin reads the organisation's own events, or any admin reads another organisation's or group's events in the audit log (ADR 0030) | `audit.view` is a group-level permission; the scope from the matrix is applied in SQL and is exact per level (a group admin's scope has no organisations, so events with an empty group never match); the page's filters are ANDed with the scope and an out-of-scope group is ignored | `tests/adapters/db/test_admin_queries.py::test_audit_scope_is_exact_per_level`, `test_audit_filter_narrows_within_the_scope`, `tests/admin/test_audit_routes.py::test_each_role_sees_its_own_level_and_nothing_above_or_beside`, `test_a_filter_cannot_reach_outside_the_scope` |
+| Information disclosure | A group admin reads the organisation's own events, or any admin reads another organisation's or group's events in the audit log (ADR 0031) | `audit.view` is a group-level permission; the scope from the matrix is applied in SQL and is exact per level (a group admin's scope has no organisations, so events with an empty group never match); the page's filters are ANDed with the scope and an out-of-scope group is ignored | `tests/adapters/db/test_admin_queries.py::test_audit_scope_is_exact_per_level`, `test_audit_filter_narrows_within_the_scope`, `tests/admin/test_audit_routes.py::test_each_role_sees_its_own_level_and_nothing_above_or_beside`, `test_a_filter_cannot_reach_outside_the_scope` |
 | Information disclosure | Personal data of citizens in system events | The worker records only the job type, outcome, error code (never exception text), attempt, channel and booking id | `tests/jobs/test_runner.py::test_a_sent_message_is_a_system_event_of_the_group`, `test_retries_and_the_final_failure_are_recorded_with_the_error_code` |
 | Information disclosure | Personal data in logs or audit events | Logs and audit events carry the subject identifier only; the display name is stored once in `admin_profiles` and hidden from `repr` | `tests/domain/test_authorization.py::test_principal_repr_hides_the_display_name`, `tests/test_logging.py` |
 | Elevation | A development shortcut reaches production (login bypass, role switcher, test users) | No bypass or switcher exists in code; test users exist only in the Keycloak dev realm; production requires an `https` discovery URL and a client secret | `tests/test_config.py::test_production_is_the_default_and_refuses_development_defaults`, `e2e/tests/admin-roles.spec.ts` logs in through the real provider |

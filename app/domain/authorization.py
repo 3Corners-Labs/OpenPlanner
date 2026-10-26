@@ -82,7 +82,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.BRANDING_MANAGE: Level.ORGANISATION,
     Permission.HOLIDAYS_ASSIGN: Level.ORGANISATION,
     Permission.GROUP_CREATE: Level.ORGANISATION,
-    Permission.AUDIT_VIEW: Level.GROUP,  # ADR 0030: one log, exact per level
+    Permission.AUDIT_VIEW: Level.GROUP,  # ADR 0031: one log, exact per level
     Permission.GROUP_VIEW: Level.GROUP,
     Permission.GROUP_EDIT: Level.GROUP,
     Permission.SCHEDULE_MANAGE: Level.GROUP,
@@ -123,7 +123,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: _EVERY_ADMIN
     | {
-        # ADR 0030: the audit and system events of the own groups, for troubleshooting.
+        # ADR 0031: the audit and system events of the own groups, for troubleshooting.
         Permission.AUDIT_VIEW,
         Permission.GROUP_VIEW,
         Permission.SCHEDULE_MANAGE,

@@ -43,12 +43,62 @@ load: check for long-running admin exports or a full volume.
 ## Production settings
 
 The image refuses to start in production (`ENVIRONMENT` defaults to `prod`) without
-`MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`. Behind a reverse proxy also set:
+`MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`. With the bundled TLS proxy (next
+section) nothing else is needed. Behind a reverse proxy of your own also set:
 
 - `FORWARDED_ALLOW_IPS=<proxy address>` (read by uvicorn), so rate limits see the visitor's IP
   instead of one shared proxy address. Without it, a single bot can exhaust the booking limit
   for everyone.
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
+- No access log on the proxy: paths carry management tokens.
+
+## HTTPS certificate (ADR 0030)
+
+The `proxy` service (Caddy, profile `tls`) gets a certificate from Let's Encrypt over ACME and
+renews it on its own; nobody has to install or renew a certificate by hand.
+
+First start:
+
+1. Point DNS for the host name (an `A`/`AAAA` record) at this server. If the domain has a `CAA`
+   record, it must allow `letsencrypt.org`.
+2. Open ports 80 and 443 from the internet. Port 80 is needed for the ACME challenge and
+   redirects everything else to https.
+3. `cp proxy.env.example proxy.env` and fill in `TLS_DOMAIN=<host name>` and
+   `ACME_EMAIL=<operations mailbox>`. The proxy reads only this file, not `.env`, so it never
+   holds the app's secrets and works with `--env-file .env.update` (updater, ADR 0029) too.
+   In `.env`: `PUBLIC_BASE_URL=https://<host name>`; leave `FORWARDED_ALLOW_IPS` unset, its
+   default is the proxy's fixed address.
+4. Trial run first, to stay clear of Let's Encrypt's rate limits: in `proxy.env`
+   `ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory`, then
+   `docker compose --profile tls up -d` and look for `certificate obtained successfully` in
+   `docker compose logs proxy`. Browsers will not trust the staging certificate; that is
+   expected.
+5. Remove `ACME_CA` (default: Let's Encrypt production), delete the staging certificate with
+   `docker compose --profile tls down && docker volume rm <project>_proxy-data`, and start
+   again with `docker compose --profile tls up -d`.
+
+Day to day:
+
+- **Renewal** happens inside the running proxy when a third of the lifetime is left (about 30
+  days before expiry for 90-day certificates), with retries. A restart is not needed.
+- **Check the expiry date** (monthly, or in monitoring; Let's Encrypt sends no expiry mail):
+  `echo | openssl s_client -connect <host>:443 -servername <host> 2>/dev/null | openssl x509 -noout -enddate`.
+  Less than 20 days left means renewal is failing: read `docker compose logs proxy` (`tls.obtain`
+  / `tls.renew`). Usual causes: port 80 or 443 closed, DNS changed, a `CAA` record.
+- **Keep the `proxy-data` volume** and include it in the backup. It holds the certificate, its
+  private key and the ACME account; without it every start requests a new certificate, and
+  more than 5 per week for the same name are refused.
+- **Another ACME CA** (for example ZeroSSL, or a government CA that speaks ACME): set `ACME_CA`
+  in `proxy.env` to its directory URL and restart the proxy.
+- **Updates from the admin portal** (ADR 0029) restart only `web` and `worker`; the proxy keeps
+  running and answers 502 for the seconds `web` is down. Add `--profile tls` to your own
+  `docker compose --env-file .env.update up -d` so the proxy stays part of the stack. An organisation-validated (PKIoverheid)
+  certificate without ACME is not supported by this profile (ADR 0030).
+- **Webhooks**: with a public domain, `WEBHOOK_BASE_URL` can stay empty; Webex and WxCC use
+  `PUBLIC_BASE_URL`.
+- `web` stays reachable on `127.0.0.1:8000` of the host itself, without the proxy's limits;
+  keep shell access to the host restricted.
+- `make proxy-check` (also in CI) runs the whole flow against Pebble, Let's Encrypt's test CA.
 
 ## Time zones and clock format
 
@@ -510,7 +560,7 @@ When a team cannot hold its appointments (outage, illness, closed building):
 6. **Retention.** Appointments still on hold lose their personal data 30 days after the end of
    the closure. An open-ended closure keeps it until it is lifted, so lift or end it promptly.
 
-## Troubleshooting with the audit log (ADR 0030)
+## Troubleshooting with the audit log (ADR 0031)
 
 Every admin has an audit log under **Audit log** that lists only their own level: a group admin
 sees their groups, an organisation admin sees the organisation and its groups, and the superuser

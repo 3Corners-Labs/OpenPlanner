@@ -389,7 +389,7 @@ class JobRow(Base):
 
 
 class AuditEventRow(Base):
-    """An audited admin action (ADR 0014) or system event (ADR 0030).
+    """An audited admin action (ADR 0014) or system event (ADR 0031).
 
     Never holds personal data of citizens; ``booking_id`` is a plain id without a foreign key,
     so an event outlives what it describes.

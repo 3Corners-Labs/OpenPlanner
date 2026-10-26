@@ -237,7 +237,7 @@ class Transaction(Protocol):
         ...
 
     async def delete_audit_events(self, source: Source, before: datetime) -> int:
-        """Delete the events of ``source`` older than ``before``; return how many (ADR 0030)."""
+        """Delete the events of ``source`` older than ``before``; return how many (ADR 0031)."""
         ...
 
     async def save_admin_profile(self, profile: AdminProfile) -> None:

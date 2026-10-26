@@ -39,7 +39,7 @@ test('group admin sees only their own group and its own audit log', async ({ pag
   await expect(adminMenu(page)).toBeVisible(); // the refusal stays inside the portal
   await expectNoAxeViolations(page);
 
-  // ADR 0030: the group admin's log holds the own group only, never the organisation or others.
+  // ADR 0031: the group admin's log holds the own group only, never the organisation or others.
   await adminMenu(page).getByRole('link', { name: 'Auditlog' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Auditlog');
   await expect(page.getByRole('row').filter({ hasText: 'andere-team' })).toHaveCount(0);

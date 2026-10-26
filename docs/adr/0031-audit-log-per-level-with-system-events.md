@@ -1,4 +1,4 @@
-# 0030. Audit log per level, with system events for troubleshooting
+# 0031. Audit log per level, with system events for troubleshooting
 
 Status: accepted (2026-10-26), requested by the product owner. Amends ADR 0014 (level of
 `audit.view`, roles that hold it).

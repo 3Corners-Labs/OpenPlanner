@@ -1,4 +1,4 @@
-"""The audit log page: admin actions and system events, exact per level (ADR 0014, 0030).
+"""The audit log page: admin actions and system events, exact per level (ADR 0014, 0031).
 
 Every admin with ``audit.view`` gets the same page; what it lists is their scope and nothing
 above it: a group admin sees the events of their own groups, an organisation admin also the
@@ -43,7 +43,7 @@ EVENT_LABELS: dict[str, str] = {
     LOGOUT_EVENT: "audit.event.logout",
     TOKEN_EVENT: "audit.event.api_token",
     CALL_EVENT: "audit.event.api_call",
-    # System events (ADR 0030): one per job type.
+    # System events (ADR 0031): one per job type.
     "job.create_video_room": "audit.job.create_video_room",
     "job.delete_video_room": "audit.job.delete_video_room",
     "job.send_confirmation": "audit.job.send_confirmation",

@@ -76,7 +76,7 @@ admin ──browser──> web /admin/login ──redirect──> identity provi
 identity provider ──ID token (sub, name, roles, organisations, groups)──> web /admin/callback
 web ──signed session cookie op_admin (sub, name, roles, scope; 8 h)──> admin browser
 web ──SQL──> audit_events (sub, action, outcome, organisation, group)
-worker ──SQL──> audit_events (source=system: job type, outcome, error code, booking id; ADR 0030)
+worker ──SQL──> audit_events (source=system: job type, outcome, error code, booking id; ADR 0031)
 web ──SQL──> admin_profiles (sub, display name, last login)
 ```
 
@@ -174,6 +174,19 @@ backups the updater takes before every change contain the PII of `bookings`; the
 data volume with mode 600 and are deleted after 24 hours (`backup-db --prune` on every updater
 run). A backup that is put back is minutes old: purge jobs that ran after it are still pending
 in it and run again on the next worker cycle.
+
+## HTTPS certificate (ADR 0030)
+
+```
+proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
+Let's Encrypt ──HTTP-01 / TLS-ALPN-01──> proxy (ports 80/443): challenge token only
+visitor ──https──> proxy ──http, edge network──> web (X-Forwarded-For set by the proxy)
+```
+
+The CA learns the domain name and the operator's e-mail address; no citizen data leaves through
+this flow. The proxy keeps no access log, so booking paths with management tokens are not
+written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
+name only).
 
 ## Planned flows
 

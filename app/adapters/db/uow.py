@@ -355,7 +355,7 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
     async def list_audit_events(
         self, scope: Scope, limit: int = 100, narrow: AuditFilter | None = None
     ) -> list[AuditEntry]:
-        """Return the newest audit events inside ``scope``, narrowed by ``narrow`` (ADR 0030)."""
+        """Return the newest audit events inside ``scope``, narrowed by ``narrow`` (ADR 0031)."""
         query = (
             select(AuditEventRow, AdminProfileRow.display_name)
             .outerjoin(AdminProfileRow, AdminProfileRow.subject == AuditEventRow.actor)

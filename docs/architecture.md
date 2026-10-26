@@ -81,9 +81,10 @@ flowchart LR
 ```mermaid
 flowchart TB
     browser([Browser])
-    proxy[Reverse proxy<br/>TLS, body limit, forwarded IPs]
+    acme[Let's Encrypt<br/>ACME CA]
 
     subgraph host [One VM]
+        proxy["proxy (profile tls)<br/>Caddy: TLS, auto-renewal,<br/>body limit, forwarded IPs"]
         web["web<br/>FastAPI + uvicorn<br/>pages, migrations on start"]
         worker["worker<br/>job loop, heartbeat"]
         volume[("data volume<br/>SQLite (WAL)")]
@@ -94,7 +95,8 @@ flowchart TB
     github[GitHub releases<br/>GHCR images]
     updater["host updater<br/>systemd timer, cosign"]
 
-    browser --> proxy --> web
+    browser -- "https :443" --> proxy -- edge network --> web
+    proxy -. "ACME, renewal" .-> acme
     web <--> volume
     worker <--> volume
     worker -- SMTP --> smtp
@@ -103,10 +105,13 @@ flowchart TB
     updater -- "pull, verify, pin digest" --> github
     worker -. dev .-> mailpit
 
-    classDef planned stroke-dasharray: 5 5
-    class proxy planned
 ```
 
+- **TLS at the edge (ADR 0030).** With `--profile tls` the `proxy` service (Caddy) gets a
+  certificate for `TLS_DOMAIN` from Let's Encrypt and renews it on its own; port 80 only
+  redirects. It runs as uid 10001 on a read-only filesystem, keeps certificates in the
+  `proxy-data` volume and has a fixed address on the `edge` network, the only address `web`
+  accepts `X-Forwarded-For` from. Without the profile, a load balancer of the host does this.
 - **One image, two roles.** `web` runs `alembic upgrade head` and then uvicorn; `worker` runs
   `python -m app.jobs.worker` and starts only when `web` is healthy. Both run as uid 10001
   with a read-only root filesystem, no capabilities and `no-new-privileges`.
@@ -210,7 +215,7 @@ same commit and rollback behaviour as the SQL one.
 | Error codes | `app/domain/errors.py` |
 | Authorisation matrix, scopes (ADR 0014) | `app/domain/authorization.py` |
 | Admin use cases, audit events | `app/domain/admin.py`, `app/domain/audit.py` |
-| System events of the worker, exact per level, and their retention (ADR 0030) | `app/domain/system_log.py`, `app/jobs/runner.py`, `app/admin/audit_routes.py` |
+| System events of the worker, exact per level, and their retention (ADR 0031) | `app/domain/system_log.py`, `app/jobs/runner.py`, `app/admin/audit_routes.py` |
 | Groups, staffing blocks (add, change, split, remove), staffing exceptions, preview (admin) | `app/domain/planning.py` |
 | Holiday calendars and their resolution per group (ADR 0025) | `app/domain/holidays.py`, `app/domain/holiday_service.py`, `app/admin/holiday_routes.py` |
 | What leaves for Webex/WxCC, timeline, call status, join window | `app/domain/calls.py` |
@@ -532,7 +537,7 @@ flowchart LR
     end
 
     subgraph edge [Edge]
-        proxy[Reverse proxy<br/>TLS, body limit]
+        proxy[Caddy proxy<br/>TLS, auto-renewal, body limit]
     end
 
     subgraph app [Application, trusted]
@@ -557,8 +562,6 @@ flowchart LR
     wxcc -- signed webhooks --> pages
     webex -- signed webhooks --> pages
 
-    classDef planned stroke-dasharray: 5 5
-    class proxy planned
 ```
 
 | Control | Where | Reference |
@@ -643,7 +646,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0027 | Staffing blocks with an agent count, including zero, instead of opening hours |
 | 0028 | Provider-neutral SMS gateway; Webex Connect as one adapter |
 | 0029 | Updates started from the admin portal, carried out by a signed-image host updater with rollback |
-| 0030 | Audit log exact per role level, with system events of the worker for troubleshooting |
+| 0030 | HTTPS with free, automatically renewed certificates (Caddy, Let's Encrypt) |
+| 0031 | Audit log exact per role level, with system events of the worker for troubleshooting |
 
 ## 12. Status and roadmap
 
@@ -664,7 +668,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |
 | ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
 | ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
-| ADR 0030 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
+| ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |

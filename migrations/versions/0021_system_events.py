@@ -1,4 +1,4 @@
-"""System events in the audit log (ADR 0030): source, booking id, retry and skipped outcomes.
+"""System events in the audit log (ADR 0031): source, booking id, retry and skipped outcomes.
 
 Adds ``source`` (``admin`` for every existing row) and a nullable ``booking_id`` (no foreign
 key: events outlive bookings), widens the outcome check with ``retry`` and ``skipped``, and
