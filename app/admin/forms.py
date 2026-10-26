@@ -65,6 +65,9 @@ DONE_MESSAGES: dict[str, str] = {
     "client_enabled": "admin.done.client_enabled",
     "client_disabled": "admin.done.client_disabled",
     "tokens_revoked": "admin.done.tokens_revoked",
+    "update_requested": "admin.done.update_requested",
+    "restore_requested": "admin.done.restore_requested",
+    "request_cancelled": "admin.done.request_cancelled",
     "texts_saved": "admin.done.texts_saved",
     "test_sent": "admin.done.test_sent",
 }
@@ -169,16 +172,14 @@ class Option:
     label: str
 
 
+def moment_label(at: datetime, tz: tzinfo, locale: str) -> str:
+    """Return a compact local date and time: ``5 jan 2026, 09:00``."""
+    return f"{format_day_compact(local_day(at, tz), locale)}, {format_clock(at, tz, locale)}"
+
+
 def slot_options(starts: Sequence[datetime], tz: tzinfo, locale: str) -> tuple[Option, ...]:
     """Return free start times as select options: the ISO value and ``5 jan 2026, 09:00``."""
-    return tuple(
-        Option(
-            start.isoformat(),
-            f"{format_day_compact(local_day(start, tz), locale)}, "
-            f"{format_clock(start, tz, locale)}",
-        )
-        for start in starts
-    )
+    return tuple(Option(start.isoformat(), moment_label(start, tz, locale)) for start in starts)
 
 
 @dataclass(frozen=True)
@@ -387,6 +388,23 @@ def done_message(request: Request, _: BoundGettext) -> str | None:
     raw = request.query_params.get("count", "")
     count = int(raw) if raw.isdigit() and len(raw) <= 6 else 0
     return _(DONE_MESSAGES[key], count=count) if key in DONE_MESSAGES else None
+
+
+def safe_next(value: str | None) -> str:
+    """Return ``value`` if it is an admin path on this site; otherwise the dashboard.
+
+    For every "return to" target that arrives with a request (login, re-login, the update
+    banner's snooze), so none can send the admin off the portal.
+    """
+    if (
+        value
+        and value.startswith("/admin")
+        and not value.startswith("//")
+        and "\\" not in value
+        and "://" not in value
+    ):
+        return value
+    return "/admin/"
 
 
 def redirect_done(url: str, done: str, count: int | None = None) -> RedirectResponse:

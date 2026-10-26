@@ -134,3 +134,10 @@ def test_validation_errors_never_contain_the_input(monkeypatch: pytest.MonkeyPat
     assert test_pw not in str(caught.value)
     assert test_pw not in repr(caught.value)
     assert "input_value" not in str(caught.value)
+
+
+def test_update_repository_must_be_owner_and_name() -> None:
+    assert Settings(environment="dev", update_repository="acme/open-planner").update_repository
+    for bad in ("acme", "acme/x/y", "../etc", "acme/x?y=1"):
+        with pytest.raises(ValidationError):
+            Settings(environment="dev", update_repository=bad)
