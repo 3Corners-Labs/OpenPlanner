@@ -111,6 +111,8 @@ TABS = (
     Tab("admin.tab.settings", "/settings", Permission.GROUP_EDIT, "settings"),
     Tab("admin.tab.hours", "/hours", Permission.SCHEDULE_MANAGE, "clock"),
     Tab("admin.tab.exceptions", "/exceptions", Permission.SCHEDULE_MANAGE, "calendar"),
+    Tab("admin.tab.reminders", "/reminders", Permission.REMINDERS_MANAGE, "bell"),
+    Tab("admin.tab.messages", "/messages", Permission.TEXTS_MANAGE, "mail"),
     Tab("admin.tab.agenda", "/agenda", Permission.BOOKINGS_VIEW, "agenda"),
 )
 
@@ -147,7 +149,8 @@ def group_page(
         TabView(
             locale.gettext(t.label_key),
             base + t.suffix,
-            request.url.path == base + t.suffix,
+            request.url.path == base + t.suffix
+            or bool(t.suffix and request.url.path.startswith(f"{base}{t.suffix}/")),
             t.icon,
         )
         for t in TABS

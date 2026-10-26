@@ -23,6 +23,7 @@ from app.domain.calls import (
     MeetingRequest,
     WorkItem,
 )
+from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
@@ -64,7 +65,7 @@ class OutboundMessage:
 
 
 class MessageSender(Protocol):
-    """Delivers messages on one channel (ADR 0009): SMTP for email, later SMS and WhatsApp."""
+    """Delivers messages on one channel (ADR 0009): SMTP for email, Webex Connect for SMS."""
 
     async def send(self, message: OutboundMessage) -> None:
         """Deliver ``message``; raise on failure so the job is retried."""
@@ -339,6 +340,41 @@ class Transaction(Protocol):
 
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:
         """Return the group's reminder rules."""
+        ...
+
+    async def add_reminder_rule(self, group_id: int, rule: ReminderRule) -> None:
+        """Store a reminder rule; its channel and offset must be new for the group."""
+        ...
+
+    async def delete_reminder_rule(
+        self, group_id: int, channel: ChannelKind, minutes_before: int
+    ) -> bool:
+        """Delete the group's rule; ``False`` if the group has no such rule."""
+        ...
+
+    async def get_channel_settings(self, organisation_id: int) -> list[ChannelSettings]:
+        """Return the organisation's configured channels (never a secret value)."""
+        ...
+
+    async def save_channel_settings(
+        self, organisation_id: int, config: ChannelConfig, secret: str | None, now: datetime
+    ) -> None:
+        """Create or replace the channel's settings.
+
+        ``secret=None`` keeps the stored secret; a value replaces it, encrypted (ADR 0008).
+        """
+        ...
+
+    async def delete_channel_settings(self, organisation_id: int, channel: ChannelKind) -> bool:
+        """Remove the channel's settings and secret; ``False`` if none were stored."""
+        ...
+
+    async def get_group_texts(self, group_id: int) -> dict[tuple[str, str], str]:
+        """Return the group's own message texts by ``(locale, block key)``."""
+        ...
+
+    async def save_group_text(self, group_id: int, locale: str, key: str, text: str | None) -> None:
+        """Store the group's text of a block in a locale; ``None`` removes it."""
         ...
 
     async def get_slot_usage(
