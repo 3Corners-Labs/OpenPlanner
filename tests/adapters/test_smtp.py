@@ -96,9 +96,8 @@ async def test_implicit_tls_connects_securely_and_skips_starttls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(smtp_module.smtplib, "SMTP_SSL", FakeSMTPSSL)
-    config = SmtpConfig(
-        "smtp", 465, "noreply@example.nl", True, "user", "secret", implicit_tls=True
-    )
+    test_pw = "secret"  # gitleaks:allow (test value)
+    config = SmtpConfig("smtp", 465, "noreply@example.nl", True, "user", test_pw, implicit_tls=True)
 
     await SmtpMailSender(config).send(MESSAGE)
 
