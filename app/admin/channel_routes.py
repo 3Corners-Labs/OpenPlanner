@@ -34,6 +34,7 @@ from app.domain.channel_service import ChannelOverview, ChannelSettingsService
 from app.domain.channel_settings import (
     ChannelConfig,
     ChannelSettings,
+    SmsProvider,
     SmsSettings,
     SmtpSecurity,
     SmtpSettings,
@@ -53,6 +54,11 @@ SECURITY_LABELS: dict[SmtpSecurity, str] = {
     SmtpSecurity.TLS: "admin.channels.security_tls",
     SmtpSecurity.NONE: "admin.channels.security_none",
 }
+
+SMS_PROVIDER_LABELS: dict[SmsProvider, str] = {
+    SmsProvider.WEBEX_CONNECT: "admin.channels.sms_provider_webex_connect",
+}
+"""Label per SMS provider (ADR 0028); a test checks that every provider has one."""
 
 TEST_FAILURES: dict[str, str] = {
     "unreachable": "admin.channels.test_failed.unreachable",
@@ -179,9 +185,21 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
 
 
 def _sms_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext) -> list[Field]:
-    """Return the Webex Connect inputs, pre-filled with the stored settings."""
+    """Return the SMS gateway inputs, pre-filled with the stored settings."""
     config = stored.config if stored and isinstance(stored.config, SmsSettings) else None
+    provider = config.provider.value if config else SmsProvider.WEBEX_CONNECT.value
     return [
+        Field(
+            "sms_provider",
+            _("admin.channels.sms_provider"),
+            "select",
+            form.values.get("sms_provider", provider),
+            hint=_("admin.channels.sms_provider_hint"),
+            error=form.error_for("sms_provider"),
+            options=tuple(
+                forms.Option(p.value, _(label)) for p, label in SMS_PROVIDER_LABELS.items()
+            ),
+        ),
         Field(
             "sms_api_base_url",
             _("admin.channels.sms_api_base_url"),
@@ -192,11 +210,11 @@ def _sms_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext)
             attributes={"autocapitalize": "none", "spellcheck": "false"},
         ),
         _secret_field(
-            "sms_service_key",
-            _("admin.channels.sms_service_key"),
+            "sms_api_key",
+            _("admin.channels.sms_api_key"),
             _("admin.channels.secret_hint_set")
             if stored and stored.secret_set
-            else _("admin.channels.sms_service_key_hint"),
+            else _("admin.channels.sms_api_key_hint"),
             form,
             required=not (stored and stored.secret_set),
         ),
@@ -385,18 +403,21 @@ async def send_test_email(
 async def save_sms(
     request: Request, locale: Locale, org: str, _: SameOrigin, context: Manage
 ) -> Response:
-    """Save the organisation's Webex Connect SMS service; a blank key keeps the stored one."""
+    """Save the organisation's SMS gateway; a blank API key keeps the stored one."""
     form = await forms.read_form(request, locale)
+    provider = form.choice("sms_provider", {p.value for p in SmsProvider})
     config: SmsSettings | None = None
-    try:
-        config = SmsSettings(
-            api_base_url=form.text("sms_api_base_url"),
-            sender_id=form.text("sms_sender_id"),
-            country_code=form.text("sms_country_code").lstrip("+"),
-        )
-    except DomainError as error:
-        form.refusal(error)
-    secret = form.values.get("sms_service_key") or None
+    if provider is not None:
+        try:
+            config = SmsSettings(
+                provider=SmsProvider(provider),
+                api_base_url=form.text("sms_api_base_url"),
+                sender_id=form.text("sms_sender_id"),
+                country_code=form.text("sms_country_code").lstrip("+"),
+            )
+        except DomainError as error:
+            form.refusal(error)
+    secret = form.values.get("sms_api_key") or None
     return await _save(request, locale, context, org, ChannelKind.SMS, form, config, secret)
 
 
