@@ -28,7 +28,9 @@ class Settings(BaseSettings):
     ``ENVIRONMENT=dev`` explicitly (``.env.example``).
     """
 
-    model_config = SettingsConfigDict(extra="ignore", frozen=True)
+    # Validation error messages never echo the input: it holds the secrets from the environment.
+    # ``errors()`` still returns it; callers that inspect errors pass ``include_input=False``.
+    model_config = SettingsConfigDict(extra="ignore", frozen=True, hide_input_in_errors=True)
 
     environment: Literal["dev", "test", "prod"] = "prod"
     database_url: str = "sqlite+aiosqlite:///data/booking.db"
