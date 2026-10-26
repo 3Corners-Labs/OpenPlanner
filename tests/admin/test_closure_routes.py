@@ -19,7 +19,7 @@ NOTICES = {
     "notice_nl": "Door een stroomstoring zijn wij gesloten.\nWe excuseren ons <b>hiervoor</b>.",
     "notice_en": "We are closed because of a power cut.",
 }
-UNTIL_SATURDAY = {"ends_at": "2026-01-03T00:00", **NOTICES}
+UNTIL_SATURDAY = {"ends_at": "2026-01-03", "ends_at_time": "00:00", **NOTICES}
 
 
 async def _book(site: Site, start: str = FRIDAY_0900) -> str:
@@ -94,6 +94,7 @@ async def test_closing_errors_are_linked_to_their_fields(site: Site) -> None:
 
     assert response.status_code == 422
     assert '<a href="#ends_at">' in response.text
+    assert 'id="ends_at_time" name="ends_at_time" type="text" inputmode="numeric"' in response.text
     response = await _post(site, CLOSURE, {"notice_nl": "Dicht", "notice_en": ""})
     assert response.status_code == 422
     assert '<a href="#notice_en">' in response.text

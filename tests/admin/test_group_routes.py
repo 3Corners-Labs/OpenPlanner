@@ -191,6 +191,12 @@ async def test_group_admin_adds_and_removes_opening_hours(site: Site) -> None:
     assert "Toegevoegd." in page
     assert "10:00–12:00" in page
     assert "tot 3 tegelijk" in page
+    # Native time and date inputs follow the browser locale (AM/PM, mm/dd/yyyy).
+    assert 'type="time"' not in page
+    assert 'type="date"' not in page
+    assert 'id="valid_from" name="valid_from" type="text" inputmode="numeric"' in page
+    assert "dd-mm-jjjj" in page
+    assert 'id="opens" name="opens" type="text" inputmode="numeric" value="09:00"' in page
     action = page.split("10:00–12:00", 1)[1].split('action="', 1)[1].split('"', 1)[0]
     removed = await site.client.post(action, headers=SAME_ORIGIN)
     assert removed.headers["location"] == f"{GROUP}/hours?done=removed"
@@ -306,7 +312,7 @@ async def test_overlapping_hours_are_explained(site: Site) -> None:
 
 async def test_exceptions_close_a_day_or_change_hours(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
-    day = (site.clock.now() + timedelta(days=3)).date().isoformat()
+    day = (site.clock.now() + timedelta(days=3)).strftime("%d-%m-%Y")  # as typed by an admin
     other = (site.clock.now() + timedelta(days=4)).date().isoformat()
 
     closed = await _post(site, f"{GROUP}/exceptions", {"day": day, "kind": "closed"})
