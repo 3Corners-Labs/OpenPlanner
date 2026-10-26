@@ -797,7 +797,7 @@ msgid "admin.field.capacity"
 msgstr "Simultaneous calls"
 
 msgid "admin.field.capacity_hint"
-msgstr "How many participants can start at the same time."
+msgstr "How many participants can book the same time slot."
 
 msgid "admin.field.valid_from"
 msgstr "Valid from"
@@ -870,7 +870,7 @@ msgid "admin.form.error.day"
 msgstr "Choose a date from today on."
 
 msgid "admin.form.error.overlap"
-msgstr "These times overlap an existing block on that day."
+msgstr "These times overlap existing opening hours on that day."
 
 msgid "admin.form.error.override_conflict"
 msgstr "This date already has an exception that conflicts with this one."
@@ -879,7 +879,7 @@ msgid "admin.hours.title"
 msgstr "Weekly opening hours"
 
 msgid "admin.hours.lead"
-msgstr "One or more blocks per day. Participants only see slots that fit completely inside a block."
+msgstr "One or more opening hours per day. Each is divided into time slots of the call duration; participants book a time slot."
 
 msgid "admin.hours.manage"
 msgstr "Manage opening hours"
@@ -894,16 +894,22 @@ msgid "admin.hours.validity"
 msgstr "{start} to {end}"
 
 msgid "admin.hours.add"
-msgstr "Add a block"
+msgstr "Add opening hours"
 
 msgid "admin.hours.add_lead"
-msgstr "Existing appointments stay; the new block applies to new appointments."
+msgstr "Existing appointments stay; the new opening hours apply to new appointments."
 
 msgid "admin.hours.add_button"
-msgstr "Add block"
+msgstr "Add opening hours"
+
+msgid "admin.hours.add_link"
+msgstr "Add"
+
+msgid "admin.hours.add_label"
+msgstr "Add opening hours on {day}"
 
 msgid "admin.hours.remove_label"
-msgstr "Remove block {day} {time}"
+msgstr "Remove opening hours {day} {time}"
 
 msgid "admin.exceptions.upcoming"
 msgstr "Upcoming exceptions"

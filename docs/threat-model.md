@@ -147,7 +147,8 @@ other `/admin` route declares one permission of the matrix (ADR 0014). Inputs fr
 
 Admins only. `GET/POST /admin/groups/new`, `/admin/groups`, `/admin/groups/{slug}/settings`,
 `/hours`, `/exceptions` and their `/delete` actions. Inputs from outside: form fields (names,
-slug, time zone, numbers, times, dates, queue id), path slugs and item ids.
+slug, time zone, numbers, times, dates, queue id), path slugs, item ids and the
+`?weekday=` query parameter that preselects the day of the opening-hours form.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -157,6 +158,7 @@ slug, time zone, numbers, times, dates, queue id), path slugs and item ids.
 | Tampering (CSRF) | A third-party site submits a change in an admin's browser | Fetch Metadata check on every POST; session cookie `SameSite=Lax` on `/admin` | `test_cross_site_changes_are_refused` |
 | Elevation | A role revoked in the IdP keeps granting changes for the rest of the session | Changes and their forms need a login of at most 60 minutes (ADR 0015); a POST returns only to admin paths | `test_changes_need_a_recent_login`, `test_forged_referer_cannot_leave_the_portal` |
 | Tampering | A change breaks existing appointments (capacity lowered, time grid moved) | Capacity is snapshotted per slot; time zone and slot length are frozen while confirmed bookings lie ahead; overlapping windows are refused for the whole schedule | `test_capacity_change_never_touches_existing_slots`, `test_time_grid_is_frozen_while_future_bookings_exist`, `test_overlapping_opening_hours_are_refused` |
+| Tampering (XSS) | A crafted `?weekday=` value reflected into the opening-hours form | Only the digits 0–6 are kept; anything else falls back to Monday; output is autoescaped | `tests/admin/test_group_routes.py::test_every_day_links_to_the_form_with_that_day_chosen` |
 | Tampering (XSS) | Markup in a group name or queue id | Jinja2 autoescape; names and queue ids without control characters | `test_names_are_escaped`, `tests/domain/test_scheduling.py::test_group_rejects_invalid_configuration` |
 | Spoofing | A new group takes an admin path as its slug (`/admin/groups/new`) | Reserved slugs | `test_reserved_slugs_cannot_be_taken` |
 | Repudiation | An admin denies a change | Every change is audited in the same transaction, with the changed field names or `rule.add`-style keys (never values) | `test_settings_change_records_the_changed_fields`, `test_group_admin_manages_opening_hours_of_their_group` |
