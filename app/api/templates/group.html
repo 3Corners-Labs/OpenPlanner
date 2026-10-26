@@ -8,11 +8,15 @@
 <p class="lead">{{ _("group.intro", minutes=group.slot_minutes) }}</p>
 {% include "_closure_notice.html" %}
 {{ steps(1) }}
-{% if direct_call_available %}
+{% if direct_call != "unavailable" %}
 <section class="notice" aria-labelledby="direct-heading">
   <h2 id="direct-heading">{{ _("direct.card.title") }}</h2>
+  {% if direct_call == "full" %}
+  <p>{{ _("direct.full") }}</p>
+  {% else %}
   <p>{{ _("direct.card.text") }}</p>
   <p><a class="button button--secondary" href="/g/{{ group.slug }}/direct">{{ _("direct.card.button") }}</a></p>
+  {% endif %}
 </section>
 {% endif %}
 {% set action = "/g/" ~ group.slug ~ "/book" %}

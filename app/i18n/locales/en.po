@@ -1013,6 +1013,12 @@ msgstr "Not picked up after (minutes)"
 msgid "admin.field.not_picked_up_minutes_hint"
 msgstr "How long a call may stay without an agent before it is flagged. 1 to 120."
 
+msgid "admin.field.direct_call_max_concurrent"
+msgstr "Maximum number of direct calls at once"
+
+msgid "admin.field.direct_call_max_concurrent_hint"
+msgstr "Usually the number of agents for direct calls. Counts calls that wait and calls with an agent. Empty: no limit, WxCC distributes."
+
 msgid "admin.form.error.video_host_email"
 msgstr "Enter a valid email address."
 
@@ -1024,6 +1030,9 @@ msgstr "Make a choice."
 
 msgid "admin.form.error.not_picked_up_minutes"
 msgstr "Enter a number of minutes from 1 to 120."
+
+msgid "admin.form.error.direct_call_max_concurrent"
+msgstr "Enter a whole number from 1 to 1000, or leave the field empty."
 
 msgid "admin.group.video"
 msgstr "Video call (Webex)"
@@ -1082,6 +1091,9 @@ msgstr "Back to your appointment"
 msgid "error.direct_call_unavailable"
 msgstr "Starting a call is not possible right now. Please book an appointment."
 
+msgid "error.direct_call_full"
+msgstr "All agents have just become busy. Please try again in a few minutes or book an appointment."
+
 msgid "direct.title"
 msgstr "Start a video call now"
 
@@ -1105,6 +1117,21 @@ msgstr "The team is open now. You can start a video call right away."
 
 msgid "direct.card.button"
 msgstr "Start a call now"
+
+msgid "direct.full"
+msgstr "All agents are busy right now. Please try again in a few minutes or book an appointment."
+
+msgid "queue.position"
+msgstr "Your place in line: {position}."
+
+msgid "queue.waiting"
+msgstr "Number of people waiting now: {count}."
+
+msgid "queue.nobody"
+msgstr "Nobody is waiting right now."
+
+msgid "queue.typical_wait"
+msgstr "An agent usually answers within about {minutes} min."
 
 msgid "wait.title"
 msgstr "Your video call"

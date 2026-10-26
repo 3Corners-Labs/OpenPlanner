@@ -6,6 +6,7 @@ import pytest
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Principal
+from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import DayState, HolidayService, effective_schedule
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
@@ -93,12 +94,12 @@ async def test_no_direct_call_on_a_holiday(uow: InMemoryUnitOfWork) -> None:
     uow.state.groups[1] = replace(uow.state.groups[1], direct_call_enabled=True)
     uow.state.rules[1].append(ScheduleRule(3, window("09:00", "10:00")))
     service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
-    open_before = await service.direct_call_available("demo")
+    open_before = await service.direct_call_availability("demo") is DirectAvailability.AVAILABLE
 
     uow.state.holidays[64] = Holiday(NATIONAL, NOW.date(), "Nieuwjaarsdag", id=64)
 
     assert open_before
-    assert not await service.direct_call_available("demo")
+    assert await service.direct_call_availability("demo") is DirectAvailability.UNAVAILABLE
 
 
 async def test_the_group_exception_on_a_holiday_wins(uow: InMemoryUnitOfWork) -> None:
