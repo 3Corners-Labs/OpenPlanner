@@ -220,6 +220,51 @@ async def test_group_admin_manages_opening_hours_of_their_group(
     ]
 
 
+async def test_group_admin_changes_an_opening_window_in_place(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    rule_id = await planning.add_rule(GROUP_ADMIN, "demo", _rule(opens="09:00", closes="12:00"))
+
+    changed = await planning.update_rule(
+        GROUP_ADMIN, "demo", rule_id, _rule(opens="08:30", closes="12:30", capacity=5)
+    )
+    unchanged = await planning.update_rule(
+        GROUP_ADMIN, "demo", rule_id, _rule(opens="08:30", closes="12:30", capacity=5)
+    )
+
+    assert changed
+    assert not unchanged
+    rules = (await planning.schedule(GROUP_ADMIN, "demo")).rules
+    assert [(r.id, r.window) for r in rules] == [(rule_id, window("08:30", "12:30", 5))]
+    assert [e.detail for e in uow.state.audit] == ["rule.add", "rule.edit"]
+
+
+async def test_a_changed_window_may_overlap_only_its_own_old_times(
+    planning: PlanningService,
+) -> None:
+    morning = await planning.add_rule(SUPER, "demo", _rule(opens="09:00", closes="12:00"))
+    await planning.add_rule(SUPER, "demo", _rule(opens="13:00", closes="16:00"))
+
+    # Growing into its own old times is fine; growing into the afternoon is not.
+    await planning.update_rule(SUPER, "demo", morning, _rule(opens="10:00", closes="13:00"))
+    with pytest.raises(DomainError, match="schedule_rules"):
+        await planning.update_rule(SUPER, "demo", morning, _rule(opens="10:00", closes="14:00"))
+
+
+async def test_changing_a_window_of_another_group_is_refused(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    rule_id = await planning.add_rule(SUPER, "andere-team", _rule())
+
+    with pytest.raises(DomainError, match="not_permitted"):
+        await planning.update_rule(GROUP_ADMIN, "andere-team", rule_id, _rule(capacity=9))
+    with pytest.raises(DomainError, match="schedule_item_not_found"):
+        await planning.update_rule(GROUP_ADMIN, "demo", rule_id, _rule(capacity=9))
+    with pytest.raises(DomainError, match="schedule_item_not_found"):
+        await planning.rule(GROUP_ADMIN, "demo", rule_id)
+    assert uow.state.rules[2][0].window.capacity == 2
+
+
 async def test_overlapping_opening_hours_are_refused(planning: PlanningService) -> None:
     await planning.add_rule(SUPER, "demo", _rule(opens="09:00", closes="12:00"))
 

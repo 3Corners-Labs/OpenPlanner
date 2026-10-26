@@ -31,12 +31,15 @@
 </div>
 {%- endmacro %}
 
-{#- The inputs of a simple card form and its submit button. -#}
-{% macro form_body(fields, button_label) -%}
+{#- The inputs of a simple card form, its submit button and an optional cancel link. -#}
+{% macro form_body(fields, button_label, cancel_url=none) -%}
 <div class="form-grid">
   {% for f in fields %}{{ field(f) }}{% endfor %}
 </div>
 <div class="form-actions">
   <button type="submit" class="button">{{ button_label }}</button>
+  {%- if cancel_url %}
+  <a href="{{ cancel_url }}">{{ _("admin.cancel") }}</a>
+  {%- endif %}
 </div>
 {%- endmacro %}
