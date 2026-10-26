@@ -68,18 +68,21 @@ def _is_current(request: Request, item: NavItem) -> bool:
     """Return whether ``item`` is the current section.
 
     Group pages belong to the overview; an organisation's branding page to branding, its
-    other pages to organisations.
+    channel pages to integrations, its other pages to organisations.
     """
     path = request.url.path
     branding = path.startswith("/admin/organisations/") and path.endswith("/branding")
+    channels = path.startswith("/admin/organisations/") and "/channels" in path
     return (
         path == item.href
         or (item.href == "/admin/" and path.startswith("/admin/groups"))
         or (item.href == "/admin/branding" and branding)
+        or (item.href == "/admin/integrations" and channels)
         or (
             item.href == "/admin/organisations"
             and path.startswith("/admin/organisations/")
             and not branding
+            and not channels
         )
         or (item.href == "/admin/api" and path.startswith("/admin/api/"))
     )

@@ -40,6 +40,48 @@ async def test_org_admin_creates_a_group_and_lands_on_it(site: Site) -> None:
     ]
 
 
+async def test_time_zone_is_a_select_with_amsterdam_preselected(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    form = (await site.client.get("/admin/groups/new")).text
+
+    assert (
+        '<select id="timezone" name="timezone" required aria-describedby="timezone-hint">' in form
+    )
+    assert '<option value="Europe/Amsterdam" selected>Europe/Amsterdam</option>' in form
+    assert '<option value="America/New_York">America/New York</option>' in form
+    assert 'value="Etc/GMT+1"' not in form  # fixed offsets ignore summer time
+    assert form.index("Europe/Amsterdam") < form.index("Africa/Abidjan")
+
+
+async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    form = (await site.client.get(f"{GROUP}/settings")).text
+
+    assert '<option value="Europe/Amsterdam" selected>' in form
+    assert form.count(" selected>") == 3  # time zone, phone mode, direct call
+
+
+async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    response = await _post(
+        site,
+        "/admin/groups",
+        {
+            "organisation": "demo",
+            "name": "Mars",
+            "slug": "mars",
+            "timezone": "Mars/Olympus_Mons",
+            "slot_minutes": "30",
+        },
+    )
+
+    assert response.status_code == 422  # type: ignore[attr-defined]
+    assert '<a href="#timezone">Kies een tijdzone uit de lijst.' in response.text  # type: ignore[attr-defined]
+
+
 async def test_new_group_errors_are_linked_to_their_fields(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
@@ -153,6 +195,20 @@ async def test_group_admin_adds_and_removes_opening_hours(site: Site) -> None:
     removed = await site.client.post(action, headers=SAME_ORIGIN)
     assert removed.headers["location"] == f"{GROUP}/hours?done=removed"
     assert "10:00–12:00" not in (await site.client.get(f"{GROUP}/hours")).text
+
+
+async def test_every_day_links_to_the_form_with_that_day_chosen(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    week = (await site.client.get(f"{GROUP}/hours")).text
+    form = (await site.client.get(f"{GROUP}/hours?weekday=6")).text
+    bogus = (await site.client.get(f"{GROUP}/hours?weekday=9")).text
+
+    assert f'href="{GROUP}/hours?weekday=5#weekday"' in week
+    assert 'aria-label="Openingstijd op zaterdag toevoegen"' in week
+    assert '<option value="6" selected>' in form
+    assert '<option value="0" selected>' in bogus
+    assert "blok" not in week.lower()
 
 
 async def test_overlapping_hours_are_explained(site: Site) -> None:
@@ -281,7 +337,7 @@ async def test_overview_shows_week_preview_and_exceptions(site: Site) -> None:
     text = (await site.client.get(GROUP)).text
 
     assert "Openingstijden per week" in text
-    assert "Zo zien burgers het" in text
+    assert "Zo zien deelnemers het" in text
     assert "tijdsloten" in text
 
 

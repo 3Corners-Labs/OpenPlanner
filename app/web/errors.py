@@ -30,6 +30,9 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.INTEGRATION_NOT_READY: "error.invalid_request",
     ErrorCode.DIRECT_CALL_UNAVAILABLE: "error.direct_call_unavailable",
     ErrorCode.API_CLIENT_NOT_FOUND: "error.not_found.text",
+    ErrorCode.CHANNEL_NOT_CONFIGURED: "error.invalid_request",
+    ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",
+    ErrorCode.REMINDER_NOT_FOUND: "error.not_found.text",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {
@@ -44,6 +47,7 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.GROUP_NOT_FOUND: 404,
     ErrorCode.BOOKING_NOT_FOUND: 404,
     ErrorCode.SCHEDULE_ITEM_NOT_FOUND: 404,
+    ErrorCode.REMINDER_NOT_FOUND: 404,
     ErrorCode.ORGANISATION_NOT_FOUND: 404,
     ErrorCode.API_CLIENT_NOT_FOUND: 404,
     ErrorCode.NOT_PERMITTED: 403,

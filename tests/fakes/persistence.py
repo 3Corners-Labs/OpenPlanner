@@ -13,7 +13,8 @@ from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
-from app.domain.channels import ReminderRule
+from app.domain.channel_settings import ChannelConfig, ChannelSettings
+from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
     Group,
@@ -44,6 +45,9 @@ class State:
     api_settings: ApiSettings = field(default_factory=ApiSettings)
     api_clients: dict[str, ApiClient] = field(default_factory=dict)
     access_tokens: dict[str, AccessToken] = field(default_factory=dict)
+    channel_settings: dict[tuple[int, ChannelKind], ChannelSettings] = field(default_factory=dict)
+    channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
+    group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     next_id: int = 1
 
 
@@ -239,6 +243,44 @@ class InMemoryTransaction:
 
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:
         return list(self.state.reminder_rules.get(group_id, []))
+
+    async def add_reminder_rule(self, group_id: int, rule: ReminderRule) -> None:
+        self.state.reminder_rules.setdefault(group_id, []).append(rule)
+
+    async def delete_reminder_rule(
+        self, group_id: int, channel: ChannelKind, minutes_before: int
+    ) -> bool:
+        rules = self.state.reminder_rules.get(group_id, [])
+        kept = [r for r in rules if (r.channel, r.minutes_before) != (channel, minutes_before)]
+        self.state.reminder_rules[group_id] = kept
+        return len(kept) != len(rules)
+
+    async def get_channel_settings(self, organisation_id: int) -> list[ChannelSettings]:
+        return [s for (org, _), s in self.state.channel_settings.items() if org == organisation_id]
+
+    async def save_channel_settings(
+        self, organisation_id: int, config: ChannelConfig, secret: str | None, now: datetime
+    ) -> None:
+        key = (organisation_id, config.channel)
+        if secret is not None:
+            self.state.channel_secrets[key] = secret
+        self.state.channel_settings[key] = ChannelSettings(
+            config, key in self.state.channel_secrets, now
+        )
+
+    async def delete_channel_settings(self, organisation_id: int, channel: ChannelKind) -> bool:
+        self.state.channel_secrets.pop((organisation_id, channel), None)
+        return self.state.channel_settings.pop((organisation_id, channel), None) is not None
+
+    async def get_group_texts(self, group_id: int) -> dict[tuple[str, str], str]:
+        return dict(self.state.group_texts.get(group_id, {}))
+
+    async def save_group_text(self, group_id: int, locale: str, key: str, text: str | None) -> None:
+        texts = self.state.group_texts.setdefault(group_id, {})
+        if text is None:
+            texts.pop((locale, key), None)
+        else:
+            texts[(locale, key)] = text
 
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime

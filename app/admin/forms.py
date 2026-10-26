@@ -9,7 +9,7 @@ input (``aria-describedby``, error summary with anchors) and never repeats the v
     ... domain call ...  except DomainError as error: form.refusal(error)
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
 from datetime import date, time
 from urllib.parse import parse_qsl
@@ -38,6 +38,7 @@ DONE_MESSAGES: dict[str, str] = {
     "client_enabled": "admin.done.client_enabled",
     "client_disabled": "admin.done.client_disabled",
     "tokens_revoked": "admin.done.tokens_revoked",
+    "texts_saved": "admin.done.texts_saved",
 }
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
@@ -75,6 +76,20 @@ FIELD_MESSAGES: dict[str, str] = {
     "groups": "admin.form.error.groups",
     "networks": "admin.form.error.networks",
     "lifetime_days": "admin.form.error.lifetime_days",
+    "smtp_host": "admin.form.error.smtp_host",
+    "smtp_port": "admin.form.error.smtp_port",
+    "smtp_security": "admin.form.error.smtp_security",
+    "smtp_username": "admin.form.error.integration_text",
+    "smtp_credential": "admin.form.error.smtp_credential",
+    "sender_address": "admin.form.error.sender_address",
+    "sender_name": "admin.form.error.sender_name",
+    "sms_api_base_url": "admin.form.error.sms_api_base_url",
+    "sms_service_key": "admin.form.error.sms_service_key",
+    "sms_sender_id": "admin.form.error.sms_sender_id",
+    "sms_country_code": "admin.form.error.sms_country_code",
+    "channel": "admin.form.error.reminder_channel",
+    "minutes_before": "admin.form.error.reminder_offset",
+    "reminders": "admin.form.error.reminder_limit",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -90,6 +105,8 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.ORGANISATION_NOT_FOUND: "admin.form.error.organisation",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
     ErrorCode.DATABASE_BUSY: "error.database_busy",
+    ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",
+    ErrorCode.INTEGRATION_NOT_READY: "admin.form.error.settings_key",
 }
 
 
@@ -186,7 +203,7 @@ class FormData:
         """Return a date, ``None`` when empty, or ``None`` with an error when malformed."""
         return self.day(name) if self.text(name) else None
 
-    def choice(self, name: str, allowed: set[str]) -> str | None:
+    def choice(self, name: str, allowed: Set[str]) -> str | None:
         """Return the submitted value if it is one of ``allowed``; else ``None`` with an error."""
         value = self.text(name)
         if value in allowed:

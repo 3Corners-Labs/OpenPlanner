@@ -1,0 +1,36 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.tab.messages") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="texts-heading">
+  <div class="card__header">
+    <h2 id="texts-heading">{{ _("admin.messages.title") }}</h2>
+    <p class="card__lead">{{ _("admin.messages.lead") }}</p>
+  </div>
+  <nav class="tabs tabs--sub" aria-label="{{ _("admin.messages.languages") }}">
+    <ul>
+      {% for tab in locale_tabs %}
+      <li><a href="/admin/groups/{{ summary.group.slug }}/messages/{{ tab.code }}" hreflang="{{ tab.code }}" lang="{{ tab.code }}"{% if tab.current %} aria-current="page"{% endif %}><span>{{ tab.label }}</span></a></li>
+      {% endfor %}
+    </ul>
+  </nav>
+</section>
+<form method="post" action="/admin/groups/{{ summary.group.slug }}/messages/{{ text_locale }}" novalidate lang="{{ text_locale }}">
+  {% for section in sections %}
+  <fieldset class="card">
+    <legend class="card__legend">{{ section.title }}</legend>
+    <div class="form-grid form-grid--single">
+      {% for f in section.fields %}{{ field(f) }}{% endfor %}
+    </div>
+  </fieldset>
+  {% endfor %}
+  <div class="card">
+    <p class="hint">{{ _("admin.messages.save_hint") }}</p>
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.save") }}</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

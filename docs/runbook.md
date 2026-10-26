@@ -50,6 +50,18 @@ The image refuses to start in production (`ENVIRONMENT` defaults to `prod`) with
   for everyone.
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 
+## Time zones and clock format
+
+Each group has an IANA time zone (default `Europe/Amsterdam`), chosen from a list in the
+group settings. Times are stored in UTC and converted only for display, so summer and winter
+time need no action: the rules come from the pinned `tzdata` package, which Renovate updates
+when IANA publishes a change. A day in the agenda runs from local midnight to local midnight
+(23 hours in March, 25 hours in October).
+
+`TIME_FORMAT` sets how clock times are written in the admin portal, booking pages and messages:
+`24h` (default, `15:05`), `12h` (`3:05 PM`) or `locale` (24 hours in Dutch, 12 hours in English).
+Restart `web` and `worker` after changing it.
+
 ## Admin portal login (PingFederate)
 
 Without `OIDC_DISCOVERY_URL` the admin portal is disabled; citizens' pages work regardless.
@@ -347,12 +359,29 @@ as a name part; `-`, `_`, spaces and case count as the same. With routing value 
 per group which queue it will use, and a wrong Case branch stands out. Prefer routing values
 without spaces (the web address of the group is a good default).
 
-## Mail
+## Mail and SMS (ADR 0022)
 
-The worker sends mail when `SMTP_HOST` is set (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`,
-`SMTP_PASSWORD`, `MAIL_FROM`). Failed deliveries are retried after 1, 5 and 15 minutes and then
-marked `failed` in the `jobs` table (`last_error` holds the exception type). Without
-`SMTP_HOST`, message jobs stay pending until mail is configured.
+Each organisation's mail server and SMS service are set by a superuser under **Koppelingen →
+Berichtkanalen** (`/admin/organisations/{org}/channels`). Passwords and service keys are
+stored encrypted with `SETTINGS_ENCRYPTION_KEY`; without that key they cannot be saved
+(the form says so). Changes apply to the next message, no restart needed.
+
+- **Mail.** An organisation without its own SMTP settings uses the installation's server from
+  `SMTP_HOST` (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`);
+  Mailpit in development. Use STARTTLS on 587 or TLS on 465; "none" only for a relay on a
+  trusted network.
+- **SMS.** In Webex Connect, create a service with an SMS number or alphanumeric sender, copy
+  the service key (service → Messaging API) and the tenant's API host (for example
+  `https://api.us.webexconnect.io`). Enter both with the sender and the country code for
+  national numbers (31). Organisation admins then add SMS reminders per group under
+  **Herinneringen**; the group's form must ask for a phone number.
+
+Failed deliveries are retried after 1, 5 and 15 minutes (timeouts, 429, 5xx) and then marked
+`failed` in the `jobs` table (`last_error` holds the exception type or code). Refusals fail at
+once: `unauthorized` (wrong service key or SMTP login), `rejected_<status>` (for example an
+invalid number), `channel_not_configured` (the organisation has no sender on that channel) or
+`integration_not_ready` (the settings key is missing). The reminders page of a group warns
+when a rule's channel is not configured.
 
 ## Management token key
 
@@ -373,8 +402,11 @@ deploy the old image. Every migration is reversible (enforced in CI).
 
 ## Rotating secrets
 
-*TBD.* All secrets come from environment variables / the secret store; none are baked into the
-image.
+Bootstrap secrets come from environment variables / the secret store; none are baked into the
+image. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
+value on the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` makes every
+stored channel secret and Webex token unreadable: re-enter the channel secrets afterwards
+(ADR 0008).
 
 ### API clients of contact-center bots (ADR 0023)
 

@@ -8,11 +8,13 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
     integration_credentials (encrypted tokens, ADR 0008)
     api_settings (one row); organisations 1──* api_clients 1──* api_access_tokens
                                                  └──* api_client_groups *──1 groups (ADR 0023)
+    organisations 1──* channel_settings (SMTP and SMS per organisation, secret encrypted)
     admin_profiles (name per identity-provider subject; joined into the audit log)
     organisations 1──1 organisation_logos (branding, WP3b)
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
+                         │  └───* group_texts (message texts per locale and block)
                          └──* slots 1──* bookings 1──* jobs
 """
 
@@ -45,6 +47,8 @@ __all__ = [
     "IntegrationCredentialRow",
     "BookingEventRow",
     "CallStatusRow",
+    "ChannelSettingsRow",
+    "GroupTextRow",
     "AuditEventRow",
     "Base",
     "BookingRow",
@@ -173,6 +177,19 @@ class ReminderRuleRow(Base):
         UniqueConstraint("group_id", "channel", "minutes_before"),
         CheckConstraint("channel IN ('email', 'sms', 'whatsapp')", name="channel"),
     )
+
+
+class GroupTextRow(Base):
+    """A group's own text of one message block in one locale (ADR 0022)."""
+
+    __tablename__ = "group_texts"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    locale: Mapped[str] = mapped_column(String(8), primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    text: Mapped[str] = mapped_column(String(2000))
 
 
 class SlotRow(Base):
@@ -336,6 +353,27 @@ class IntegrationCredentialRow(Base):
     nonce: Mapped[bytes] = mapped_column(LargeBinary)
     ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class ChannelSettingsRow(Base):
+    """An organisation's SMTP server or SMS gateway (ADR 0022).
+
+    ``settings`` holds the non-secret fields as JSON; the password or service key is sealed
+    with AES-256-GCM under ``channel:<organisation id>:<channel>`` (ADR 0008).
+    """
+
+    __tablename__ = "channel_settings"
+
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), primary_key=True
+    )
+    channel: Mapped[str] = mapped_column(String(16), primary_key=True)
+    settings: Mapped[str] = mapped_column(String(2000))
+    secret_nonce: Mapped[bytes | None] = mapped_column(LargeBinary)
+    secret_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (CheckConstraint("channel IN ('email', 'sms')", name="channel"),)
 
 
 class WebhookEventRow(Base):

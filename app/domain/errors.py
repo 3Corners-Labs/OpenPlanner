@@ -31,6 +31,9 @@ class ErrorCode(StrEnum):
     INTEGRATION_NOT_READY = "integration_not_ready"
     DIRECT_CALL_UNAVAILABLE = "direct_call_unavailable"
     API_CLIENT_NOT_FOUND = "api_client_not_found"
+    CHANNEL_NOT_CONFIGURED = "channel_not_configured"
+    REMINDER_EXISTS = "reminder_exists"
+    REMINDER_NOT_FOUND = "reminder_not_found"
 
 
 class DomainError(Exception):
