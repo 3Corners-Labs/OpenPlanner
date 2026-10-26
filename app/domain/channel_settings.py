@@ -1,15 +1,16 @@
 """How an organisation delivers messages: its SMTP server and its SMS gateway (ADR 0022).
 
 Each organisation configures its own channels, so mail comes from its own sender (HANDOVER
-§4) and SMS goes through its own Webex Connect service (HANDOVER B6). Only the superuser may
-change them (``integrations.manage``, HANDOVER §6).
+§4) and SMS goes through its own SMS provider (HANDOVER B6). Which provider is data: the
+domain knows the kinds (``SmsProvider``), not their APIs; each kind has one adapter (ADR
+0028). Only the superuser may change them (``integrations.manage``, HANDOVER §6).
 
-The settings here are the non-secret part. The secret (SMTP password, Connect service key) is
-passed alongside on save, stored encrypted by the adapter (ADR 0008), never read back into the
+The settings here are the non-secret part. The secret (SMTP password, SMS API key) is passed
+alongside on save, stored encrypted by the adapter (ADR 0008), never read back into the
 domain and never shown again: the domain only learns *whether* one is set.
 
-    SmtpSettings   host, port, security, username, sender      secret: password (optional)
-    SmsSettings    API base URL, sender ID, country code       secret: service key (required)
+    SmtpSettings   host, port, security, username, sender                secret: password (optional)
+    SmsSettings    provider, API base URL, sender ID, country code      secret: API key (required)
 """
 
 import re
@@ -130,14 +131,27 @@ class SmtpSettings:
         """Whether a password must be stored: only when logging in."""
         return self.username is not None
 
+    @property
+    def secret_binding(self) -> tuple[str, ...]:
+        """What the stored password belongs to: the server it is sent to."""
+        return (self.host.lower(),)
+
+
+class SmsProvider(StrEnum):
+    """The SMS gateways messages can go through; one adapter per value (ADR 0028)."""
+
+    WEBEX_CONNECT = "webex_connect"
+
 
 @dataclass(frozen=True)
 class SmsSettings:
-    """The organisation's Webex Connect SMS service (HANDOVER B6).
+    """The organisation's SMS gateway (HANDOVER B6).
 
     Attributes:
-        api_base_url: The tenant's API host, e.g. ``https://api.us.webexconnect.io``; https
-            only, without credentials, query or fragment.
+        provider: Which gateway, and so which adapter, sends the messages.
+        api_base_url: The provider's API host for this organisation, e.g.
+            ``https://api.us.webexconnect.io``; https only, without credentials, query or
+            fragment.
         sender_id: Alphanumeric sender (at most 11 letters, digits or spaces, at least one
             letter) or a phone number registered for the service.
         country_code: Calling code for numbers entered without one (``31`` for 06-numbers).
@@ -146,12 +160,15 @@ class SmsSettings:
         DomainError: ``invalid_configuration`` naming the offending field.
     """
 
+    provider: SmsProvider
     api_base_url: str
     sender_id: str
     country_code: str = "31"
 
     def __post_init__(self) -> None:
         """Validate every field."""
+        if not isinstance(self.provider, SmsProvider):
+            raise _invalid("sms_provider")
         parts = urlsplit(self.api_base_url)
         if (
             len(self.api_base_url) > MAX_URL_LENGTH
@@ -180,8 +197,13 @@ class SmsSettings:
 
     @property
     def needs_secret(self) -> bool:
-        """The service key is always required."""
+        """The API key is always required."""
         return True
+
+    @property
+    def secret_binding(self) -> tuple[str, ...]:
+        """What the stored API key belongs to: the provider and the host it is sent to."""
+        return (self.provider.value, (urlsplit(self.api_base_url).hostname or "").lower())
 
 
 ChannelConfig = SmtpSettings | SmsSettings
@@ -194,7 +216,7 @@ class ChannelSettings:
 
     Attributes:
         config: The non-secret settings.
-        secret_set: Whether a password or service key is stored (its value never is here).
+        secret_set: Whether a password or API key is stored (its value never is here).
         updated_at: When the settings or the secret last changed.
     """
 
@@ -214,8 +236,8 @@ class ChannelSettings:
 
 
 def secret_field(channel: ChannelKind) -> str:
-    """Return the name of the channel's secret: ``smtp_credential`` or ``sms_service_key``."""
-    return "smtp_credential" if channel is ChannelKind.EMAIL else "sms_service_key"
+    """Return the name of the channel's secret: ``smtp_credential`` or ``sms_api_key``."""
+    return "smtp_credential" if channel is ChannelKind.EMAIL else "sms_api_key"
 
 
 def validate_test_recipient(address: str) -> None:
@@ -228,7 +250,7 @@ def validate_test_recipient(address: str) -> None:
 
 
 def validate_secret(secret: str, channel: ChannelKind) -> None:
-    """Check a password or service key before it is stored.
+    """Check a password or API key before it is stored.
 
     Raises:
         DomainError: ``invalid_configuration`` with ``secret_field(channel)``.
