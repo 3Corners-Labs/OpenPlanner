@@ -1,4 +1,4 @@
-# Looks for update requests from the admin portal every minute (ADR 0028).
+# Looks for update requests from the admin portal every minute (ADR 0029).
 [Unit]
 Description=Check for OpenPlanner update requests every minute
 

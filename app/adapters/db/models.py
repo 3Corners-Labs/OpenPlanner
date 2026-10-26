@@ -10,7 +10,7 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
                                                  └──* api_client_groups *──1 groups (ADR 0023)
     organisations 1──* channel_settings (SMTP and SMS per organisation, secret encrypted)
     admin_profiles (name per identity-provider subject; joined into the audit log)
-    release_checks (one row), update_requests (ADR 0028; the installation, no personal data)
+    release_checks (one row), update_requests (ADR 0029; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
     holiday_calendars 1──* holidays (ADR 0025; chosen through organisation_holiday_calendars
                          and group_holiday_calendars; group_holiday_open_days keep one open)
@@ -563,7 +563,7 @@ class ApiAccessTokenRow(Base):
 
 
 class ReleaseCheckRow(Base):
-    """The outcome of the latest release check (ADR 0028); at most one row."""
+    """The outcome of the latest release check (ADR 0029); at most one row."""
 
     __tablename__ = "release_checks"
 
@@ -577,7 +577,7 @@ class ReleaseCheckRow(Base):
 
 
 class UpdateRequestRow(Base):
-    """A superuser's request to update or restore the installation (ADR 0028)."""
+    """A superuser's request to update or restore the installation (ADR 0029)."""
 
     __tablename__ = "update_requests"
 

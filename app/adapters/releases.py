@@ -1,4 +1,4 @@
-"""``ReleaseSource`` on the GitHub releases API (ADR 0028).
+"""``ReleaseSource`` on the GitHub releases API (ADR 0029).
 
 Asks for the latest published release of one repository; GitHub leaves drafts and
 pre-releases out of ``/releases/latest``. Only the tag and the release page are used: the tag

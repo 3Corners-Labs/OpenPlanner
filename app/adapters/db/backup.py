@@ -1,4 +1,4 @@
-"""SQLite backups for the host updater (ADR 0028).
+"""SQLite backups for the host updater (ADR 0029).
 
 The updater backs up the database before it changes anything, and puts the backup back when
 the new version does not become healthy. Backups hold personal data: they are written with

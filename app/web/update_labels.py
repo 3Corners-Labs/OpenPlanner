@@ -1,4 +1,4 @@
-"""Catalogue keys for update actions, statuses and the host updater's reasons (ADR 0028).
+"""Catalogue keys for update actions, statuses and the host updater's reasons (ADR 0029).
 
 Written out literally so the catalogue test can check that every one exists in Dutch and
 English. A reason the portal does not know (a newer updater) is shown as "other".

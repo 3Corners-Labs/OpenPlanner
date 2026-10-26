@@ -501,7 +501,7 @@ def register_admin(app: FastAPI) -> None:
     }
     for exc_type, handler in handlers.items():
         app.add_exception_handler(exc_type, handler)  # type: ignore[arg-type]
-    # The update banner (ADR 0028) is loaded for every admin page in one place.
+    # The update banner (ADR 0029) is loaded for every admin page in one place.
     banner = [Depends(update_routes.load_update_notice)]
     for module_router in (
         router,

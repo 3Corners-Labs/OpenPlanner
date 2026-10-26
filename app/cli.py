@@ -7,7 +7,7 @@ Usage:
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
 
-Host updater (ADR 0028; run inside the ``web`` container by ``scripts/updater``):
+Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
     ``python -m app.cli update-claim``  claim the waiting request: ``id action target from``
     ``python -m app.cli update-report ID STATUS [REASON]``  record the outcome
     ``python -m app.cli backup-db [NAME] [--prune]``  back up the database, delete old backups

@@ -143,7 +143,7 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/api/clients/{client_id}/revoke": {
         "/admin/api/clients/opc_unknown-client-0000/revoke": statuses(404, 403, 403, 403, 403),
     },
-    # Updates of the installation (ADR 0028): superuser only. Without a release there is
+    # Updates of the installation (ADR 0029): superuser only. Without a release there is
     # nothing to update or restore (409); an unknown request is 404.
     "GET /admin/updates": {"/admin/updates": statuses(200, 403, 403, 403, 403)},
     "POST /admin/updates/update": {"/admin/updates/update": statuses(409, 403, 403, 403, 403)},

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OpenPlanner host updater (ADR 0028). Run every minute by openplanner-updater.timer.
+# OpenPlanner host updater (ADR 0029). Run every minute by openplanner-updater.timer.
 #
 # Carries out the update requests a superuser makes in the admin portal. The application never
 # touches Docker: it only stores requests, and this script talks to it through

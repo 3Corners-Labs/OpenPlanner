@@ -74,6 +74,7 @@ from app.domain.calls import (
 from app.domain.channel_settings import (
     ChannelConfig,
     ChannelSettings,
+    SmsProvider,
     SmsSettings,
     SmtpSecurity,
     SmtpSettings,
@@ -277,7 +278,7 @@ def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
     values = json.loads(settings)
     if channel is ChannelKind.EMAIL:
         return SmtpSettings(**{**values, "security": SmtpSecurity(values["security"])})
-    return SmsSettings(**values)
+    return SmsSettings(**{**values, "provider": SmsProvider(values["provider"])})
 
 
 def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
@@ -289,7 +290,7 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
-    from ``UpdateQueries`` (ADR 0028).
+    from ``UpdateQueries`` (ADR 0029).
 
     Args:
         session: The open session.

@@ -1,4 +1,4 @@
-"""UpdateService (ADR 0028): hourly check, superuser requests, host updater claim and report.
+"""UpdateService (ADR 0029): hourly check, superuser requests, host updater claim and report.
 
 Abuse cases from docs/threat-model.md: an organisation admin requesting an update, a second
 request while one is open, a downgrade disguised as an update, a restore outside its window,

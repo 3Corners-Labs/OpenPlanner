@@ -1,12 +1,12 @@
-"""Updates started from the admin portal (ADR 0028): release checks and update requests.
+"""Updates started from the admin portal (ADR 0029): release checks and update requests.
 
 ``release_checks`` holds one row with the outcome of the worker's hourly check;
 ``update_requests`` the superuser's requests and what the host updater reported. Neither holds
 personal data. The downgrade drops both; an update in progress is then forgotten, which is what
 a restore to a version without this feature means.
 
-Revision ID: 0019
-Revises: 0018
+Revision ID: 0020
+Revises: 0019
 Create Date: 2026-10-26 23:00:00.000000
 """
 
@@ -15,8 +15,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0019"
-down_revision: str | None = "0018"
+revision: str = "0020"
+down_revision: str | None = "0019"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

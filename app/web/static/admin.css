@@ -872,7 +872,7 @@ fieldset.card {
   background: var(--adm-accent-soft);
 }
 
-/* Update banner (ADR 0028): colour follows the kind; the text always says it too. */
+/* Update banner (ADR 0029): colour follows the kind; the text always says it too. */
 .update-banner {
   align-items: flex-start;
 }

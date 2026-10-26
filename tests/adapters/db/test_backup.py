@@ -1,4 +1,4 @@
-"""SQLite backups for the host updater (ADR 0028): consistent copy, private, pruned, restorable."""
+"""SQLite backups for the host updater (ADR 0029): consistent copy, private, pruned, restorable."""
 
 import os
 import sqlite3

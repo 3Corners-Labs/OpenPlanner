@@ -1,4 +1,4 @@
-"""SQL queries of updates started from the admin portal (ADR 0028).
+"""SQL queries of updates started from the admin portal (ADR 0029).
 
 A mixin of ``SqlTransaction``, so these queries run in the caller's transaction like every
 other one. Versions are stored as ``MAJOR.MINOR.PATCH`` text; a stored value that no longer

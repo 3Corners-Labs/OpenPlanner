@@ -1,4 +1,4 @@
-"""Updates started from the admin portal (ADR 0028): versions, the release check and requests.
+"""Updates started from the admin portal (ADR 0029): versions, the release check and requests.
 
 The worker checks the latest release at most once per ``CHECK_INTERVAL``. A superuser turns
 an available release into a request; the host updater claims it, carries it out and reports

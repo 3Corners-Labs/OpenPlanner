@@ -14,7 +14,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
 FROM python:3.12-slim-bookworm AS runtime
-# Release version (ADR 0028), set by main.yml on a v*.*.* tag; anything else is no release.
+# Release version (ADR 0029), set by main.yml on a v*.*.* tag; anything else is no release.
 ARG APP_VERSION=""
 # CVE-2026-84782 (OpenSSL, HIGH): the base tag still ships libssl3 3.0.22-1~deb12u1.
 # Remove this layer once the python:3.12-slim-bookworm image carries deb12u2 or later.
