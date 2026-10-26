@@ -1,10 +1,10 @@
-"""Holiday calendars maintained by the superuser, chosen per organisation and group (ADR 0022).
+"""Holiday calendars maintained by the superuser, chosen per organisation and group (ADR 0024).
 
 Existing groups start with ``holiday_source = 'inherit'`` and no organisation has chosen a
 calendar yet, so nothing changes for citizens until an admin makes a choice.
 
-Revision ID: 0013
-Revises: 0012
+Revision ID: 0014
+Revises: 0013
 Create Date: 2026-10-25 23:30:00.000000
 """
 
@@ -13,8 +13,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0013"
-down_revision: str | None = "0012"
+revision: str = "0014"
+down_revision: str | None = "0013"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

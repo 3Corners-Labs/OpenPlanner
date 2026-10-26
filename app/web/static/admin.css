@@ -303,10 +303,10 @@ body.admin {
 
 .tabs ul {
   display: flex;
-  gap: 0.25rem;
+  flex-wrap: wrap;
+  gap: 0 0.25rem;
   margin: 0;
   padding: 0;
-  overflow-x: auto;
   list-style: none;
 }
 
@@ -350,6 +350,34 @@ body.admin {
 .card-grid > .card,
 .week > .card {
   margin-top: 0;
+}
+
+/* A form of several cards (the message editor): each block of fields is a fieldset card. */
+.card + form,
+form > .card {
+  margin-top: 1.25rem;
+}
+
+fieldset.card {
+  min-width: 0;
+  margin-inline: 0;
+}
+
+.card__legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.card__legend + * {
+  clear: both;
+}
+
+.tabs--sub {
+  margin: 0;
 }
 
 .card__header {
@@ -651,6 +679,10 @@ body.admin {
   gap: 1rem 1.5rem;
 }
 
+.form-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .admin .field {
   margin: 0;
 }
@@ -664,7 +696,8 @@ body.admin {
 }
 
 .admin .field input,
-.admin .field select {
+.admin .field select,
+.admin .field textarea {
   width: 100%;
   max-width: none;
   min-height: 40px;
@@ -676,8 +709,19 @@ body.admin {
   font: inherit;
 }
 
+.admin .field textarea {
+  min-height: 5rem;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.admin .field--wide {
+  grid-column: 1 / -1;
+}
+
 .admin .field input:hover,
-.admin .field select:hover {
+.admin .field select:hover,
+.admin .field textarea:hover {
   border-color: var(--adm-text);
 }
 
@@ -693,7 +737,8 @@ body.admin {
 }
 
 .admin .field--error input,
-.admin .field--error select {
+.admin .field--error select,
+.admin .field--error textarea {
   border: 2px solid var(--adm-danger);
 }
 

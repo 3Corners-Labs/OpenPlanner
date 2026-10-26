@@ -38,6 +38,7 @@ from app.admin.forms import (
     redirect_done,
 )
 from app.admin.pages import Locale, SameOrigin, page
+from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
 from app.domain.errors import DomainError
 from app.domain.planning import (
@@ -56,7 +57,13 @@ from app.domain.scheduling import (
     TimeWindow,
 )
 from app.i18n import BoundGettext
-from app.i18n.dates import format_clock, format_day, format_day_short, weekday_names
+from app.i18n.dates import (
+    format_clock,
+    format_day,
+    format_day_short,
+    format_time_of_day,
+    weekday_names,
+)
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.locale import RequestLocale
 
@@ -67,9 +74,6 @@ PHONE_LABELS: dict[PhoneMode, str] = {
     PhoneMode.OPTIONAL: "admin.group.phone_optional",
     PhoneMode.REQUIRED: "admin.group.phone_required",
 }
-
-TIMEZONE_HINT_ZONES = "Europe/Amsterdam"
-
 
 NUMBER_LABELS: dict[str, tuple[str, str]] = {
     "slot_minutes": ("admin.field.slot_minutes", "admin.field.slot_minutes_hint"),
@@ -110,6 +114,8 @@ TABS = (
     Tab("admin.tab.hours", "/hours", Permission.SCHEDULE_MANAGE, "clock"),
     Tab("admin.tab.exceptions", "/exceptions", Permission.SCHEDULE_MANAGE, "calendar"),
     Tab("admin.tab.holidays", "/holidays", Permission.SCHEDULE_MANAGE, "holiday"),
+    Tab("admin.tab.reminders", "/reminders", Permission.REMINDERS_MANAGE, "bell"),
+    Tab("admin.tab.messages", "/messages", Permission.TEXTS_MANAGE, "mail"),
     Tab("admin.tab.agenda", "/agenda", Permission.BOOKINGS_VIEW, "agenda"),
 )
 
@@ -146,7 +152,8 @@ def group_page(
         TabView(
             locale.gettext(t.label_key),
             base + t.suffix,
-            request.url.path == base + t.suffix,
+            request.url.path == base + t.suffix
+            or bool(t.suffix and request.url.path.startswith(f"{base}{t.suffix}/")),
             t.icon,
         )
         for t in TABS
@@ -164,6 +171,19 @@ def group_page(
 
 
 # --- new group ------------------------------------------------------------------------------
+
+
+def _timezone_field(zone: str, form: FormData, _: BoundGettext) -> Field:
+    """Return the time-zone select with ``zone`` selected."""
+    return Field(
+        "timezone",
+        _("admin.field.timezone"),
+        "select",
+        zone,
+        hint=_("admin.field.timezone_hint"),
+        error=form.error_for("timezone"),
+        options=timezone_options(zone),
+    )
 
 
 def _new_group_fields(
@@ -188,13 +208,7 @@ def _new_group_fields(
             error=form.error_for("slug"),
             attributes={"autocapitalize": "none", "spellcheck": "false"},
         ),
-        Field(
-            "timezone",
-            _("admin.field.timezone"),
-            value=form.text("timezone") or TIMEZONE_HINT_ZONES,
-            hint=_("admin.field.timezone_hint"),
-            error=form.error_for("timezone"),
-        ),
+        _timezone_field(form.text("timezone") or DEFAULT_TIMEZONE, form, _),
         Field(
             "slot_minutes",
             _("admin.field.slot_minutes"),
@@ -307,9 +321,9 @@ class PreviewView:
     summary: str
 
 
-def _clock_text(window: TimeWindow) -> str:
-    """Return ``09:00–12:00``."""
-    return f"{window.opens:%H:%M}–{window.closes:%H:%M}"
+def _clock_text(window: TimeWindow, locale: str) -> str:
+    """Return ``09:00–12:00`` in the system clock style."""
+    return f"{format_time_of_day(window.opens, locale)}–{format_time_of_day(window.closes, locale)}"
 
 
 def _week(schedule: Schedule, locale: RequestLocale) -> list[DayView]:
@@ -332,7 +346,7 @@ def _week(schedule: Schedule, locale: RequestLocale) -> list[DayView]:
             windows.append(
                 WindowView(
                     rule.id,
-                    _clock_text(rule.window),
+                    _clock_text(rule.window, locale.code),
                     _("admin.hours.capacity", count=rule.window.capacity),
                     validity,
                 )
@@ -349,7 +363,7 @@ def _exceptions(schedule: Schedule, locale: RequestLocale) -> list[ExceptionView
             o.id,
             format_day(o.day, locale.code),
             o.window is None,
-            _clock_text(o.window) if o.window else None,
+            _clock_text(o.window, locale.code) if o.window else None,
             _("admin.hours.capacity", count=o.window.capacity) if o.window else None,
         )
         for o in schedule.overrides
@@ -453,13 +467,7 @@ def _settings_fields(
             value=value("name", current.name),
             error=form.error_for("name"),
         ),
-        Field(
-            "timezone",
-            _("admin.field.timezone"),
-            value=value("timezone", current.timezone),
-            hint=_("admin.field.timezone_hint"),
-            error=form.error_for("timezone"),
-        ),
+        _timezone_field(value("timezone", current.timezone), form, _),
         number("slot_minutes", current.slot_minutes, {"min": "5", "max": "480", "step": "5"}),
         number("min_notice_minutes", current.min_notice_minutes, {"min": "0", "step": "5"}),
         number("horizon_days", current.horizon_days, {"min": "1", "max": "366"}),

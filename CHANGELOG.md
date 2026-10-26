@@ -63,3 +63,12 @@ All notable changes are listed here, generated from Conventional Commits on rele
   and logo (PNG/JPEG/WebP) on every citizen page; Admin → Branding for the superuser
   (`branding.manage`, migration 0011).
 
+- Message channels per organisation (ADR 0022): SMTP server and sender (STARTTLS, TLS or
+  none) and a Webex Connect SMS service under Koppelingen → Berichtkanalen, superuser only;
+  password and service key encrypted and write-only (migration 0013). `SMTP_HOST` stays the
+  fallback.
+- SMS reminders through the Webex Connect SMS API; the worker chooses the sender per
+  organisation and channel and fails `channel_not_configured` jobs visibly.
+- Admin tabs per group: Herinneringen (reminder rules: email or SMS, 5 minutes to 30 days,
+  at most five) and Berichtteksten (subject, introduction, closing and SMS text per locale,
+  with allow-listed placeholders).

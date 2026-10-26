@@ -44,7 +44,7 @@ flowchart LR
     wxcc[Webex Contact Center<br/>work items, Create Task v2]
     video[Webex Meetings API]
     idp[Identity provider<br/>OIDC]
-    sms[SMS route]
+    sms[Webex Connect<br/>SMS API]
     whatsapp[WhatsApp]
 
     website -- links to /g/slug --> service
@@ -57,20 +57,21 @@ flowchart LR
     citizen -- joins in the browser --> video
     agent -- joins as cohost, Webex app --> video
     admin -. login .-> idp
-    service -. reminders .-> sms
+    service -- SMS reminders --> sms --> citizen
     service -. roadmap .-> whatsapp
 
     classDef planned stroke-dasharray: 5 5
-    class sms,whatsapp planned
+    class whatsapp planned
 ```
 
 | External system | Direction | Purpose | Decision |
 |---|---|---|---|
-| Mail provider (SMTP) | out | Confirmation, change, reminder, cancellation | ADR 0009; per organisation in the admin UI (ADR 0008) |
+| Mail provider (SMTP) | out | Confirmation, change, reminder, cancellation | ADR 0009; per organisation in the admin UI (ADR 0008, 0022) |
 | Webex Contact Center | out, in | Work item per booking or direct call; task events by signed webhook | ADR 0018 (supersedes 0007 in part) |
 | Webex Meetings | out, in | Meeting per booking on behalf of the group's host; status by signed webhook | ADR 0017, 0010 |
 | Identity provider | in | Admin login with roles | HANDOVER B8, O3 |
-| SMS route / WhatsApp | out | Reminders | ADR 0009 (WhatsApp on the roadmap) |
+| Webex Connect SMS API | out | SMS reminders, per organisation | ADR 0022 |
+| WhatsApp | out | Reminders | ADR 0009 (roadmap) |
 
 ## 4. Containers and deployment
 
@@ -162,6 +163,7 @@ flowchart LR
     clock[adapters.clock<br/>SystemClock]
     uow[adapters.db.uow<br/>SqlUnitOfWork]
     smtp[adapters.smtp<br/>SmtpMailSender]
+    smsad[adapters.webex_connect_sms<br/>WebexConnectSmsSender]
     videoad[adapters.webex_meetings<br/>WebexMeetings]
     wxccad[adapters.wxcc<br/>WxccTasks]
     idpad[adapters.oidc<br/>OidcIdentityProvider]
@@ -169,6 +171,7 @@ flowchart LR
     clock -.implements.-> ports
     uow -.implements.-> ports
     smtp -.implements.-> ports
+    smsad -.implements.-> ports
     videoad -.implements.-> ports
     wxccad -.implements.-> ports
     idpad -.implements.-> ports
@@ -193,7 +196,7 @@ same commit and rollback behaviour as the SQL one.
 | Authorisation matrix, scopes (ADR 0014) | `app/domain/authorization.py` |
 | Admin use cases, audit events | `app/domain/admin.py`, `app/domain/audit.py` |
 | Groups, opening hours, exceptions, preview (admin) | `app/domain/planning.py` |
-| Holiday calendars and their resolution per group (ADR 0022) | `app/domain/holidays.py`, `app/domain/holiday_service.py`, `app/admin/holiday_routes.py` |
+| Holiday calendars and their resolution per group (ADR 0024) | `app/domain/holidays.py`, `app/domain/holiday_service.py`, `app/admin/holiday_routes.py` |
 | What leaves for Webex/WxCC, timeline, call status, join window | `app/domain/calls.py` |
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
@@ -217,6 +220,9 @@ same commit and rollback behaviour as the SQL one.
 | Rendering and security headers | `app/web/templates.py`, `app/api/security_headers.py` |
 | Translations and locale | `app/i18n/` |
 | Messages and calendar files | `app/jobs/messages.py`, `app/jobs/calendar.py` |
+| Channel settings per organisation (SMTP, SMS; ADR 0022) | `app/domain/channel_settings.py`, `app/domain/channel_service.py`, `app/admin/channel_routes.py` |
+| Reminder rules and group texts (ADR 0022) | `app/domain/messaging_service.py`, `app/domain/message_texts.py`, `app/admin/message_routes.py` |
+| Senders per organisation, SMS adapter | `app/adapters/senders.py`, `app/adapters/webex_connect_sms.py`, `app/adapters/smtp.py` |
 | Job execution | `app/jobs/runner.py`, `app/jobs/worker.py` |
 
 ## 6. Domain model
@@ -317,7 +323,7 @@ Rules that matter for the rest of the system:
   Later schedule edits change new slots only.
 - **An override replaces every rule on its date.** A closed override blocks new bookings,
   even in slots that already exist.
-- **Holidays come from reusable calendars** (ADR 0022): the superuser maintains them, an
+- **Holidays come from reusable calendars** (ADR 0024): the superuser maintains them, an
   organisation chooses the ones its groups follow, a group inherits or picks its own (or
   none) and may keep single holidays open. On a date the group's own override wins, then a
   holiday closes the day, then the weekly rules apply (`app/domain/holidays.py`).
@@ -589,7 +595,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0019 | Direct video call ("now") per group |
 | 0020 | Citizen calendar as progressive enhancement; branding through tokens |
 | 0021 | Provider-neutral contact-center integration (proposed) |
-| 0022 | Reusable holiday calendars with overrides per organisation and group |
+| 0022 | Message channels per organisation, SMS through Webex Connect, editable texts |
+| 0024 | Reusable holiday calendars with overrides per organisation and group |
 
 ## 12. Status and roadmap
 
@@ -601,7 +608,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP3 (slice 1) | Citizen pages, mail, worker, demo | done |
 | WP3b | Citizen pages: month calendar grid, modern layout, branding (O5) | done |
 | WP3c | Embeddable widget (Web Component, same tokens) | planned |
-| WP4 | SMS reminders, message editors | planned |
+| WP4 | SMS reminders, message editors | done (ADR 0022) |
 | WP5 | Webex Meetings, join page, live status (O1: Meetings API) | done |
 | WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
@@ -609,7 +616,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |
 | ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
-| WP7c–d | Texts and reminders, encrypted integration settings (O3) | planned |
+| WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 | idea | Booking API for the WxCC AI Agent (chat and voice bots): find, book, reschedule, cancel (O11) | not planned |

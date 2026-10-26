@@ -7,13 +7,14 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
+from app.domain import holidays as holiday_model
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
-from app.domain.channels import ReminderRule
-from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
+from app.domain.channel_settings import ChannelConfig, ChannelSettings
+from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
     Group,
@@ -41,10 +42,13 @@ class State:
     audit: list[AuditEvent] = field(default_factory=list)
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
-    holiday_calendars: dict[int, HolidayCalendar] = field(default_factory=dict)
-    holidays: dict[int, Holiday] = field(default_factory=dict)
+    holiday_calendars: dict[int, holiday_model.HolidayCalendar] = field(default_factory=dict)
+    holidays: dict[int, holiday_model.Holiday] = field(default_factory=dict)
     organisation_holidays: dict[int, frozenset[int]] = field(default_factory=dict)
-    group_holidays: dict[int, GroupHolidays] = field(default_factory=dict)
+    group_holidays: dict[int, holiday_model.GroupHolidays] = field(default_factory=dict)
+    channel_settings: dict[tuple[int, ChannelKind], ChannelSettings] = field(default_factory=dict)
+    channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
+    group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     next_id: int = 1
 
 
@@ -182,13 +186,15 @@ class InMemoryTransaction:
         self.state.overrides[group_id] = kept
         return len(kept) != len(overrides)
 
-    async def get_holiday_calendars(self) -> list[HolidayCalendar]:
+    async def get_holiday_calendars(self) -> list[holiday_model.HolidayCalendar]:
         return sorted(self.state.holiday_calendars.values(), key=lambda c: c.name)
 
-    async def get_holiday_calendar(self, slug: str) -> HolidayCalendar | None:
+    async def get_holiday_calendar(self, slug: str) -> holiday_model.HolidayCalendar | None:
         return next((c for c in self.state.holiday_calendars.values() if c.slug == slug), None)
 
-    async def add_holiday_calendar(self, calendar: HolidayCalendar) -> HolidayCalendar:
+    async def add_holiday_calendar(
+        self, calendar: holiday_model.HolidayCalendar
+    ) -> holiday_model.HolidayCalendar:
         stored = replace(calendar, id=self._new_id())
         self.state.holiday_calendars[stored.id] = stored
         return stored
@@ -206,7 +212,7 @@ class InMemoryTransaction:
 
     async def get_holidays(
         self, calendar_ids: Collection[int], first_day: date, last_day: date
-    ) -> list[Holiday]:
+    ) -> list[holiday_model.Holiday]:
         found = [
             h
             for h in self.state.holidays.values()
@@ -214,7 +220,7 @@ class InMemoryTransaction:
         ]
         return sorted(found, key=lambda h: (h.day, h.calendar_id))
 
-    async def add_holiday(self, holiday: Holiday) -> int:
+    async def add_holiday(self, holiday: holiday_model.Holiday) -> int:
         stored = replace(holiday, id=self._new_id())
         self.state.holidays[stored.id or 0] = stored
         return stored.id or 0
@@ -234,10 +240,12 @@ class InMemoryTransaction:
     ) -> None:
         self.state.organisation_holidays[organisation_id] = calendar_ids
 
-    async def get_group_holidays(self, group_id: int) -> GroupHolidays:
-        return self.state.group_holidays.get(group_id, GroupHolidays())
+    async def get_group_holidays(self, group_id: int) -> holiday_model.GroupHolidays:
+        return self.state.group_holidays.get(group_id, holiday_model.GroupHolidays())
 
-    async def save_group_holidays(self, group_id: int, holidays: GroupHolidays) -> None:
+    async def save_group_holidays(
+        self, group_id: int, holidays: holiday_model.GroupHolidays
+    ) -> None:
         self.state.group_holidays[group_id] = holidays
 
     async def save_meeting(self, booking_id: int, meeting: MeetingRef) -> None:
@@ -298,6 +306,44 @@ class InMemoryTransaction:
 
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:
         return list(self.state.reminder_rules.get(group_id, []))
+
+    async def add_reminder_rule(self, group_id: int, rule: ReminderRule) -> None:
+        self.state.reminder_rules.setdefault(group_id, []).append(rule)
+
+    async def delete_reminder_rule(
+        self, group_id: int, channel: ChannelKind, minutes_before: int
+    ) -> bool:
+        rules = self.state.reminder_rules.get(group_id, [])
+        kept = [r for r in rules if (r.channel, r.minutes_before) != (channel, minutes_before)]
+        self.state.reminder_rules[group_id] = kept
+        return len(kept) != len(rules)
+
+    async def get_channel_settings(self, organisation_id: int) -> list[ChannelSettings]:
+        return [s for (org, _), s in self.state.channel_settings.items() if org == organisation_id]
+
+    async def save_channel_settings(
+        self, organisation_id: int, config: ChannelConfig, secret: str | None, now: datetime
+    ) -> None:
+        key = (organisation_id, config.channel)
+        if secret is not None:
+            self.state.channel_secrets[key] = secret
+        self.state.channel_settings[key] = ChannelSettings(
+            config, key in self.state.channel_secrets, now
+        )
+
+    async def delete_channel_settings(self, organisation_id: int, channel: ChannelKind) -> bool:
+        self.state.channel_secrets.pop((organisation_id, channel), None)
+        return self.state.channel_settings.pop((organisation_id, channel), None) is not None
+
+    async def get_group_texts(self, group_id: int) -> dict[tuple[str, str], str]:
+        return dict(self.state.group_texts.get(group_id, {}))
+
+    async def save_group_text(self, group_id: int, locale: str, key: str, text: str | None) -> None:
+        texts = self.state.group_texts.setdefault(group_id, {})
+        if text is None:
+            texts.pop((locale, key), None)
+        else:
+            texts[(locale, key)] = text
 
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime

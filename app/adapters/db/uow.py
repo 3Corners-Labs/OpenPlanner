@@ -7,8 +7,10 @@ writer. ``read()`` uses a deferred ``BEGIN``; in WAL mode readers never wait for
 All mapping between rows and domain objects lives in this module.
 """
 
+import json
 from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from datetime import date, datetime
 from typing import Any
 
@@ -18,6 +20,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.sql.elements import SQLCoreOperations
 
+from app.adapters.crypto import SecretBox
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.models import (
     AdminProfileRow,
@@ -25,9 +28,11 @@ from app.adapters.db.models import (
     BookingEventRow,
     BookingRow,
     CallStatusRow,
+    ChannelSettingsRow,
     GroupHolidayCalendarRow,
     GroupHolidayOpenDayRow,
     GroupRow,
+    GroupTextRow,
     HolidayCalendarRow,
     HolidayRow,
     JobRow,
@@ -60,6 +65,13 @@ from app.domain.calls import (
     EventKind,
     TaskState,
     new_status,
+)
+from app.domain.channel_settings import (
+    ChannelConfig,
+    ChannelSettings,
+    SmsSettings,
+    SmtpSecurity,
+    SmtpSettings,
 )
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
@@ -224,12 +236,31 @@ def _call_status(row: CallStatusRow) -> CallStatus:
     )
 
 
-class SqlTransaction:
-    """``Transaction`` on an ``AsyncSession`` whose transaction is already open."""
+def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
+    """Map the JSON of a channel settings row back to the domain (validating it again)."""
+    values = json.loads(settings)
+    if channel is ChannelKind.EMAIL:
+        return SmtpSettings(**{**values, "security": SmtpSecurity(values["security"])})
+    return SmsSettings(**values)
 
-    def __init__(self, session: AsyncSession) -> None:
+
+def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
+    """Return the record name a channel secret is sealed under (associated data, ADR 0008)."""
+    return f"channel:{organisation_id}:{channel.value}"
+
+
+class SqlTransaction:
+    """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
+
+    Args:
+        session: The open session.
+        box: Seals and opens channel secrets; ``None`` when no settings key is configured.
+    """
+
+    def __init__(self, session: AsyncSession, box: SecretBox | None = None) -> None:
         """Wrap ``session``."""
         self._session = session
+        self._box = box
 
     async def list_groups(self, scope: Scope) -> list[GroupSummary]:
         """Return the groups inside ``scope``, ordered by organisation and name."""
@@ -508,7 +539,7 @@ class SqlTransaction:
         return bool(getattr(result, "rowcount", 0))
 
     async def get_holiday_calendars(self) -> list[HolidayCalendar]:
-        """Return every holiday calendar, by name (global reference data, ADR 0022)."""
+        """Return every holiday calendar, by name (global reference data, ADR 0024)."""
         rows = await self._session.scalars(
             select(HolidayCalendarRow).order_by(HolidayCalendarRow.name, HolidayCalendarRow.slug)
         )
@@ -767,6 +798,119 @@ class SqlTransaction:
         )
         return [ReminderRule(ChannelKind(r.channel), r.minutes_before, r.enabled) for r in rows]
 
+    async def add_reminder_rule(self, group_id: int, rule: ReminderRule) -> None:
+        """Insert a reminder rule (the unique constraint backs the domain's duplicate check)."""
+        self._session.add(
+            ReminderRuleRow(
+                group_id=group_id,
+                channel=rule.channel.value,
+                minutes_before=rule.minutes_before,
+                enabled=rule.enabled,
+            )
+        )
+        await self._session.flush()
+
+    async def delete_reminder_rule(
+        self, group_id: int, channel: ChannelKind, minutes_before: int
+    ) -> bool:
+        """Delete the group's rule with this channel and offset."""
+        result = await self._session.execute(
+            delete(ReminderRuleRow).where(
+                ReminderRuleRow.group_id == group_id,
+                ReminderRuleRow.channel == channel.value,
+                ReminderRuleRow.minutes_before == minutes_before,
+            )
+        )
+        return bool(getattr(result, "rowcount", 0))
+
+    async def get_channel_settings(self, organisation_id: int) -> list[ChannelSettings]:
+        """Return the organisation's channels; only whether a secret is set, never its value."""
+        rows = await self._session.scalars(
+            select(ChannelSettingsRow)
+            .where(ChannelSettingsRow.organisation_id == organisation_id)
+            .order_by(ChannelSettingsRow.channel)
+        )
+        return [
+            ChannelSettings(
+                _channel_config(ChannelKind(row.channel), row.settings),
+                row.secret_ciphertext is not None,
+                row.updated_at,
+            )
+            for row in rows
+        ]
+
+    async def save_channel_settings(
+        self, organisation_id: int, config: ChannelConfig, secret: str | None, now: datetime
+    ) -> None:
+        """Create or replace the channel's settings; seal a new secret, else keep the old one.
+
+        Raises:
+            DomainError: ``integration_not_ready`` when a secret is given but no settings key
+                is configured (``SETTINGS_ENCRYPTION_KEY``).
+        """
+        row = await self._session.get(ChannelSettingsRow, (organisation_id, config.channel.value))
+        if row is None:
+            row = ChannelSettingsRow(organisation_id=organisation_id, channel=config.channel.value)
+            self._session.add(row)
+        row.settings = json.dumps(asdict(config), sort_keys=True)
+        row.updated_at = now
+        if secret is not None:
+            if self._box is None:
+                raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
+            row.secret_nonce, row.secret_ciphertext = self._box.seal(
+                _secret_name(organisation_id, config.channel), secret.encode()
+            )
+        await self._session.flush()
+
+    async def delete_channel_settings(self, organisation_id: int, channel: ChannelKind) -> bool:
+        """Delete the channel's settings and its sealed secret."""
+        result = await self._session.execute(
+            delete(ChannelSettingsRow).where(
+                ChannelSettingsRow.organisation_id == organisation_id,
+                ChannelSettingsRow.channel == channel.value,
+            )
+        )
+        return bool(getattr(result, "rowcount", 0))
+
+    async def get_channel_secret(self, organisation_id: int, channel: ChannelKind) -> str | None:
+        """Return the channel's decrypted secret, for building its sender in the worker.
+
+        Not part of the ``Transaction`` port: the domain never reads a secret back (ADR 0008).
+
+        Raises:
+            DomainError: ``integration_not_ready`` without a settings key.
+        """
+        row = await self._session.get(ChannelSettingsRow, (organisation_id, channel.value))
+        if row is None or row.secret_nonce is None or row.secret_ciphertext is None:
+            return None
+        if self._box is None:
+            raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
+        name = _secret_name(organisation_id, channel)
+        return self._box.open(name, row.secret_nonce, row.secret_ciphertext).decode()
+
+    async def get_group_texts(self, group_id: int) -> dict[tuple[str, str], str]:
+        """Return the group's own message texts by ``(locale, block key)``."""
+        rows = await self._session.scalars(
+            select(GroupTextRow).where(GroupTextRow.group_id == group_id)
+        )
+        return {(row.locale, row.key): row.text for row in rows}
+
+    async def save_group_text(self, group_id: int, locale: str, key: str, text: str | None) -> None:
+        """Store or, with ``None``, delete the group's text of a block in a locale."""
+        if text is None:
+            await self._session.execute(
+                delete(GroupTextRow).where(
+                    GroupTextRow.group_id == group_id,
+                    GroupTextRow.locale == locale,
+                    GroupTextRow.key == key,
+                )
+            )
+            return
+        await self._session.merge(
+            GroupTextRow(group_id=group_id, locale=locale, key=key, text=text)
+        )
+        await self._session.flush()
+
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[SlotUsage]:
@@ -925,18 +1069,20 @@ class SqlUnitOfWork:
 
     Args:
         engine: Engine created by ``app.adapters.db.engine.create_engine``.
+        box: Seals channel secrets (ADR 0008); without it they cannot be stored or read.
     """
 
-    def __init__(self, engine: AsyncEngine) -> None:
-        """Store the engine."""
+    def __init__(self, engine: AsyncEngine, box: SecretBox | None = None) -> None:
+        """Store the engine and the secret box."""
         self._engine = engine
+        self._box = box
 
     @asynccontextmanager
     async def read(self) -> AsyncIterator[SqlTransaction]:
         """Open a read transaction (deferred ``BEGIN``)."""
         async with AsyncSession(self._engine, expire_on_commit=False) as session:
             async with session.begin():
-                yield SqlTransaction(session)
+                yield SqlTransaction(session, self._box)
 
     @asynccontextmanager
     async def locked(self) -> AsyncIterator[SqlTransaction]:
@@ -946,7 +1092,7 @@ class SqlUnitOfWork:
             DomainError: ``database_busy`` if the write lock is not obtained in time.
         """
         async with locked_session(self._engine) as session:
-            yield SqlTransaction(session)
+            yield SqlTransaction(session, self._box)
 
 
 @asynccontextmanager

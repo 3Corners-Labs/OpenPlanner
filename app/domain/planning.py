@@ -197,7 +197,7 @@ class PlanningService:
     async def preview(self, principal: Principal, slug: str, days: int = 14) -> list[PreviewDay]:
         """Return the slots the schedule offers from today on, for ``days`` days.
 
-        Only days with slots are returned. Holidays count (ADR 0022); bookings, notice and
+        Only days with slots are returned. Holidays count (ADR 0024); bookings, notice and
         horizon are left out: this shows what the opening hours produce, not what is free.
         """
         require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
