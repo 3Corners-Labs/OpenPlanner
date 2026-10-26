@@ -1,4 +1,4 @@
-"""The audit log page: admin actions and system events, exact per level (ADR 0014, 0029).
+"""The audit log page: admin actions and system events, exact per level (ADR 0014, 0030).
 
 Every admin with ``audit.view`` gets the same page; what it lists is their scope and nothing
 above it: a group admin sees the events of their own groups, an organisation admin also the
@@ -13,14 +13,13 @@ the admin may view it.
 
 from dataclasses import dataclass
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service
 from app.admin.forms import Option
-from app.admin.pages import Locale
+from app.admin.pages import Locale, admin_moment
 from app.admin.pages import page as _page
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT, LOGOUT_EVENT
 from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
@@ -35,7 +34,6 @@ from app.domain.authorization import (
     decide,
 )
 from app.i18n import BoundGettext
-from app.i18n.dates import format_moment_compact
 from app.web.authz_labels import API_SCOPE_LABELS, OUTCOME_LABELS, PERMISSION_LABELS
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -45,7 +43,7 @@ EVENT_LABELS: dict[str, str] = {
     LOGOUT_EVENT: "audit.event.logout",
     TOKEN_EVENT: "audit.event.api_token",
     CALL_EVENT: "audit.event.api_call",
-    # System events (ADR 0029): one per job type.
+    # System events (ADR 0030): one per job type.
     "job.create_video_room": "audit.job.create_video_room",
     "job.delete_video_room": "audit.job.delete_video_room",
     "job.send_confirmation": "audit.job.send_confirmation",
@@ -65,6 +63,7 @@ DETAIL_LABELS: dict[str, str] = {
     "rule.add": "admin.audit.detail.rule_add",
     "rule.edit": "admin.audit.detail.rule_edit",
     "rule.remove": "admin.audit.detail.rule_remove",
+    "rule.split": "admin.audit.detail.rule_split",
     "override.add": "admin.audit.detail.override_add",
     "override.remove": "admin.audit.detail.override_remove",
     "name": "admin.field.name",
@@ -251,11 +250,10 @@ async def audit(
     service = admin_service(request)
     in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
     narrow = _narrow(source, problems, group, booking, {g.group.slug for g in in_scope})
-    tz = ZoneInfo(request.app.state.settings.admin_timezone)
     events = await service.audit_log(context.principal, narrow)
     views = [
         AuditView(
-            format_moment_compact(e.at, tz, locale.code),
+            admin_moment(request, locale, e.at),
             _actor_label(entry, _),
             _action_label(e.action, _),
             _(OUTCOME_LABELS[e.outcome]),

@@ -130,7 +130,7 @@ def _system(at_offset: int, outcome: Outcome, org: str | None, group: str | None
 
 
 async def test_audit_scope_is_exact_per_level(engine: AsyncEngine) -> None:
-    # ADR 0029: global, organisation and group events; each admin sees their level and below.
+    # ADR 0030: global, organisation and group events; each admin sees their level and below.
     uow = SqlUnitOfWork(engine)
     global_event = _system(0, Outcome.FAILURE, None, None)
     org_event = AuditEvent(

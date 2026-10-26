@@ -1,4 +1,4 @@
-"""System events (ADR 0029): what the platform did on its own, at the level it happened."""
+"""System events (ADR 0030): what the platform did on its own, at the level it happened."""
 
 from datetime import timedelta
 

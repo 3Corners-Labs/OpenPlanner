@@ -48,6 +48,7 @@ from app.adapters.db.models import (
     SlotRow,
     WebhookEventRow,
 )
+from app.adapters.db.updates import UpdateQueries
 from app.domain.audit import (
     PROBLEMS,
     AdminProfile,
@@ -293,10 +294,11 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
     return f"channel:{organisation_id}:{channel.value}"
 
 
-class SqlTransaction(ApiClientQueries):
+class SqlTransaction(ApiClientQueries, UpdateQueries):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
-    The machine API's queries come from ``ApiClientQueries`` (ADR 0023).
+    The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
+    from ``UpdateQueries`` (ADR 0029).
 
     Args:
         session: The open session.
@@ -353,7 +355,7 @@ class SqlTransaction(ApiClientQueries):
     async def list_audit_events(
         self, scope: Scope, limit: int = 100, narrow: AuditFilter | None = None
     ) -> list[AuditEntry]:
-        """Return the newest audit events inside ``scope``, narrowed by ``narrow`` (ADR 0029)."""
+        """Return the newest audit events inside ``scope``, narrowed by ``narrow`` (ADR 0030)."""
         query = (
             select(AuditEventRow, AdminProfileRow.display_name)
             .outerjoin(AdminProfileRow, AdminProfileRow.subject == AuditEventRow.actor)

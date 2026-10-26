@@ -2,7 +2,7 @@
 
 Written for every login, every denied authorisation decision and every change (ADR 0014),
 and, as system events, for what the platform did on its own: every message, meeting, work
-item and purge job with its result (ADR 0029). An event never contains personal data of
+item and purge job with its result (ADR 0030). An event never contains personal data of
 citizens; the actor is the subject identifier from the identity provider, or ``system``. The
 admin's display name lives once in ``AdminProfile`` and is joined in when the log is read, so
 events stay immutable and a name is stored in one place only.

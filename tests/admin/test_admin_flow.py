@@ -194,7 +194,7 @@ async def test_navigation_follows_the_matrix(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     org_admin_page = (await site.client.get("/admin/")).text
 
-    assert 'href="/admin/audit"' in group_admin_page  # ADR 0029: the own groups' log
+    assert 'href="/admin/audit"' in group_admin_page  # ADR 0030: the own groups' log
     assert 'href="/admin/audit"' in org_admin_page
     assert 'href="/admin/integrations"' not in group_admin_page
     assert 'href="/admin/integrations"' not in org_admin_page
@@ -208,7 +208,7 @@ async def test_rights_page_shows_scope_per_permission(site: Site) -> None:
     text = (await site.client.get("/admin/rights")).text
 
     assert "Groepsbeheerder" in text
-    assert "Openingstijden en uitzonderingen beheren" in text
+    assert "Bezetting en afwijkende bezetting beheren" in text
     assert "Groepen: demo" in text
     assert "Groepsinstellingen wijzigen" not in text
 
@@ -219,7 +219,7 @@ async def test_group_page_lists_the_admins_rights_for_that_group(site: Site) -> 
 
     assert "Demo: videogesprek" in text
     assert "5 minuten voor de start" in text
-    assert "Openingstijden en uitzonderingen beheren" in text
+    assert "Bezetting en afwijkende bezetting beheren" in text
     assert "Groepsinstellingen wijzigen" not in text
 
 

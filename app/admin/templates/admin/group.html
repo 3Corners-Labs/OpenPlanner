@@ -21,7 +21,7 @@
 <section class="card" aria-labelledby="week-heading">
   <div class="card__header">
     <h2 id="week-heading">{{ _("admin.hours.title") }}</h2>
-    {% if can("schedule.manage", summary) %}<a href="/admin/groups/{{ summary.group.slug }}/hours">{{ _("admin.hours.manage") }}</a>{% endif %}
+    {% if can("schedule.manage", summary) %}<a href="/admin/groups/{{ summary.group.slug }}/staffing">{{ _("admin.hours.manage") }}</a>{% endif %}
   </div>
   {% include "admin/_week.html" %}
 </section>

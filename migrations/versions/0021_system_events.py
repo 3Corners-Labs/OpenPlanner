@@ -1,12 +1,12 @@
-"""System events in the audit log (ADR 0029): source, booking id, retry and skipped outcomes.
+"""System events in the audit log (ADR 0030): source, booking id, retry and skipped outcomes.
 
 Adds ``source`` (``admin`` for every existing row) and a nullable ``booking_id`` (no foreign
 key: events outlive bookings), widens the outcome check with ``retry`` and ``skipped``, and
 indexes the group column (the group admin's view) and source plus time (pruning). The
 downgrade deletes the system events, which the old table cannot describe.
 
-Revision ID: 0020
-Revises: 0019
+Revision ID: 0021
+Revises: 0020
 Create Date: 2026-10-26 22:00:00.000000
 """
 
@@ -15,8 +15,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0020"
-down_revision: str | None = "0019"
+revision: str = "0021"
+down_revision: str | None = "0020"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

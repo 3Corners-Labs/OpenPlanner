@@ -1,7 +1,8 @@
 """Worker process: runs due jobs and proves liveness with a heartbeat file.
 
 Run with ``python -m app.jobs.worker``. Each iteration checks the database, runs due jobs
-(``app.jobs.runner``) and writes the heartbeat.
+(``app.jobs.runner``), looks up the latest release when that is due (hourly, ADR 0029) and
+writes the heartbeat.
 """
 
 import asyncio
@@ -17,11 +18,13 @@ from app.adapters.db.engine import create_engine, is_reachable
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.integrations import build_integrations, secret_box
+from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock
+from app.domain.update_service import UpdateService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.jobs.messages import MessageComposer
@@ -32,7 +35,12 @@ from app.logging import configure_logging
 log = structlog.get_logger()
 
 
-async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> None:
+async def run_worker(
+    settings: Settings,
+    stop: asyncio.Event,
+    clock: Clock,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> None:
     """Run the poll loop until ``stop`` is set.
 
     After every iteration in which the database answered, the current time is written to
@@ -43,10 +51,11 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
         settings: Database, mail and worker settings.
         stop: Set by a signal handler (or a test) to end the loop after the current iteration.
         clock: Source of the current time.
+        transport: HTTP transport for outgoing calls (tests); defaults to the network.
     """
     configure_clock(settings.time_format)
     engine = create_engine(settings.database_url)
-    http = httpx.AsyncClient(timeout=15.0)
+    http = httpx.AsyncClient(timeout=15.0, transport=transport)
     integrations = build_integrations(settings, engine, http, clock)
     uow = SqlUnitOfWork(engine, secret_box(settings))
     fallback = fallback_mail(settings)
@@ -65,12 +74,14 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
         integration=IntegrationService(uow, clock, AdminService(uow, clock)),
         retention=timedelta(days=settings.system_event_retention_days),
     )
+    updates = update_service(settings, uow, clock, http)
     log.info(
         "worker.started",
         poll_seconds=settings.worker_poll_seconds,
         fallback_mail=fallback is not None,
         video_enabled=integrations.video is not None,
         dispatch_enabled=integrations.dispatcher is not None,
+        release_check=settings.update_repository is not None,
     )
     try:
         while not stop.is_set():
@@ -79,6 +90,7 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
                     await runner.run_due()
                 except Exception as exc:  # e.g. schema not migrated yet; keep the loop alive
                     log.warning("worker.run_failed", error=type(exc).__name__)
+                await _check_releases(updates)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=settings.worker_poll_seconds)
@@ -86,6 +98,15 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
         await http.aclose()
         await engine.dispose()
         log.info("worker.stopped")
+
+
+async def _check_releases(updates: UpdateService) -> None:
+    """Look up the latest release when due; a failure is logged and never stops the loop."""
+    try:
+        if await updates.check_if_due():
+            log.info("updates.checked", current=str(updates.current or "none"))
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("updates.check_failed", error=type(exc).__name__)
 
 
 async def _main() -> None:

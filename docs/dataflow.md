@@ -76,7 +76,7 @@ admin ──browser──> web /admin/login ──redirect──> identity provi
 identity provider ──ID token (sub, name, roles, organisations, groups)──> web /admin/callback
 web ──signed session cookie op_admin (sub, name, roles, scope; 8 h)──> admin browser
 web ──SQL──> audit_events (sub, action, outcome, organisation, group)
-worker ──SQL──> audit_events (source=system: job type, outcome, error code, booking id; ADR 0029)
+worker ──SQL──> audit_events (source=system: job type, outcome, error code, booking id; ADR 0030)
 web ──SQL──> admin_profiles (sub, display name, last login)
 ```
 
@@ -158,6 +158,22 @@ citizen ──GET /g/{slug}──> web (holidays are closed days: no times, no h
 
 Holiday calendars are configuration, not personal data; nothing leaves the system. Changes are
 audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
+
+## Updates from the admin portal (ADR 0029)
+
+```
+worker ──GET releases/latest (no data sent; optional read-only token)──> api.github.com
+        <── tag and release page ── stored in release_checks
+superuser ──POST update / restore / cancel──> web ──SQL──> update_requests (versions, subject id)
+host updater ──docker exec python -m app.cli──> web ──SQL──> update_requests, audit_events
+             ──backup-db──> data/backups/request-<id>.db (copy of the whole database: PII)
+```
+
+Nothing about citizens leaves the system: the release lookup sends no data. The database
+backups the updater takes before every change contain the PII of `bookings`; they stay in the
+data volume with mode 600 and are deleted after 24 hours (`backup-db --prune` on every updater
+run). A backup that is put back is minutes old: purge jobs that ran after it are still pending
+in it and run again on the next worker cycle.
 
 ## Planned flows
 
