@@ -6,6 +6,8 @@ from typing import Literal
 from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.i18n.dates import ClockStyle
+
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
@@ -25,6 +27,10 @@ class Settings(BaseSettings):
     environment: Literal["dev", "test", "prod"] = "prod"
     database_url: str = "sqlite+aiosqlite:///data/booking.db"
     log_level: LogLevel = "INFO"
+
+    # How clock times are written everywhere (admin agenda, booking pages, messages):
+    # ``24h`` (default), ``12h`` or ``locale`` (per language). Dates always follow the locale.
+    time_format: ClockStyle = ClockStyle.H24
 
     # Worker loop: poll interval and the heartbeat file its container healthcheck reads.
     worker_poll_seconds: float = 30.0
