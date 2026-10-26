@@ -1836,10 +1836,10 @@ msgid "admin.channels.fallback_mail"
 msgstr "Zolang hier niets is ingesteld, gebruikt OpenPlanner de standaardserver uit de installatie."
 
 msgid "admin.channels.sms"
-msgstr "Sms (Webex Connect)"
+msgstr "Sms"
 
 msgid "admin.channels.sms_lead"
-msgstr "Sms-herinneringen gaan via een sms-dienst in Webex Connect. De service key staat bij de dienst onder Messaging API."
+msgstr "Sms-herinneringen gaan via de sms-dienst van een aanbieder. Het API-adres, de API-sleutel en de afzender vindt u in het beheerportaal van die aanbieder."
 
 msgid "admin.channels.ready"
 msgstr "Ingesteld"
@@ -1904,17 +1904,26 @@ msgstr "Afzendernaam"
 msgid "admin.channels.sender_name_hint"
 msgstr "Bijvoorbeeld de naam van de organisatie."
 
+msgid "admin.channels.sms_provider"
+msgstr "Aanbieder"
+
+msgid "admin.channels.sms_provider_hint"
+msgstr "Via welke aanbieder de sms-berichten worden verstuurd."
+
+msgid "admin.channels.sms_provider_webex_connect"
+msgstr "Webex Connect"
+
 msgid "admin.channels.sms_api_base_url"
 msgstr "API-adres"
 
 msgid "admin.channels.sms_api_base_url_hint"
-msgstr "Het API-adres van uw Webex Connect-omgeving, bijvoorbeeld https://api.us.webexconnect.io."
+msgstr "Het API-adres van uw omgeving bij de aanbieder, bijvoorbeeld https://api.us.webexconnect.io voor Webex Connect."
 
-msgid "admin.channels.sms_service_key"
-msgstr "Service key"
+msgid "admin.channels.sms_api_key"
+msgstr "API-sleutel"
 
-msgid "admin.channels.sms_service_key_hint"
-msgstr "De sleutel van de sms-dienst. Hij wordt versleuteld opgeslagen en nooit meer getoond."
+msgid "admin.channels.sms_api_key_hint"
+msgstr "De API-sleutel van de sms-dienst (bij Webex Connect: de service key). Hij wordt versleuteld opgeslagen en nooit meer getoond."
 
 msgid "admin.channels.sms_sender_id"
 msgstr "Afzender"
@@ -1935,7 +1944,7 @@ msgid "admin.channels.remove_email"
 msgstr "Mailserver verwijderen"
 
 msgid "admin.channels.remove_sms_lead"
-msgstr "Verwijdert de sms-dienst en de service key. Sms-herinneringen worden dan niet meer verstuurd."
+msgstr "Verwijdert de sms-dienst en de API-sleutel. Sms-herinneringen worden dan niet meer verstuurd."
 
 msgid "admin.channels.remove_sms"
 msgstr "Sms-dienst verwijderen"
@@ -1955,11 +1964,14 @@ msgstr "Vul een geldig e-mailadres in, zonder naam of punthaken."
 msgid "admin.form.error.sender_name"
 msgstr "Vul een naam in van hoogstens 100 tekens, zonder regeleinden."
 
+msgid "admin.form.error.sms_provider"
+msgstr "Kies een aanbieder uit de lijst."
+
 msgid "admin.form.error.sms_api_base_url"
 msgstr "Vul een https-adres in zonder gebruikersnaam, query of anker."
 
-msgid "admin.form.error.sms_service_key"
-msgstr "Vul de service key in van hoogstens 512 tekens."
+msgid "admin.form.error.sms_api_key"
+msgstr "Vul de API-sleutel in van hoogstens 512 tekens."
 
 msgid "admin.form.error.sms_sender_id"
 msgstr "Gebruik hoogstens 11 letters, cijfers of spaties met minstens één letter, of een telefoonnummer."

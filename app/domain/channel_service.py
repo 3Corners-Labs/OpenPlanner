@@ -94,12 +94,14 @@ class ChannelSettingsService:
     ) -> list[str]:
         """Store the channel's settings; return the names of what changed.
 
-        ``secret=None`` keeps the stored secret. A channel that needs a secret (SMTP with a
-        username, every SMS gateway) cannot be saved without one.
+        ``secret=None`` keeps the stored secret, but only for the same server and provider
+        (``secret_binding``): a password or API key is never sent to a host it was not entered
+        for (ADR 0028). A channel that needs a secret (SMTP with a username, every SMS
+        gateway) cannot be saved without one.
 
         Raises:
             DomainError: ``not_permitted``, ``organisation_not_found`` or
-                ``invalid_configuration`` (``smtp_credential`` / ``sms_service_key``).
+                ``invalid_configuration`` (``smtp_credential`` / ``sms_api_key``).
         """
         if secret is not None:
             validate_secret(secret, config.channel)
@@ -114,7 +116,12 @@ class ChannelSettingsService:
                 ),
                 None,
             )
-            if config.needs_secret and secret is None and not (current and current.secret_set):
+            keeps_secret = (
+                current is not None
+                and current.secret_set
+                and current.config.secret_binding == config.secret_binding
+            )
+            if config.needs_secret and secret is None and not keeps_secret:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, secret_field(config.channel))
             changed = [
                 f.name
