@@ -378,3 +378,33 @@ async def test_oversized_forms_are_refused(site: Site) -> None:
     )
 
     assert response.status_code == 413
+
+
+async def test_the_direct_call_cap_is_optional(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    form = {
+        "name": "Demo",
+        "timezone": "Europe/Amsterdam",
+        "slot_minutes": "30",
+        "min_notice_minutes": "60",
+        "horizon_days": "60",
+        "dispatch_lead_minutes": "5",
+        "phone_mode": "optional",
+        "direct_call_enabled": "yes",
+        "not_picked_up_minutes": "10",
+    }
+    field = 'id="direct_call_max_concurrent" name="direct_call_max_concurrent" type="number"'
+
+    capped = await _post(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "4"})
+    page = (await site.client.get(f"{GROUP}/settings")).text
+    zero = await _post(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "0"})
+    text = await _post(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "veel"})
+    cleared = await _post(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": ""})
+
+    assert capped.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
+    assert f'{field} value="4"' in page
+    for refused in (zero, text):
+        assert refused.status_code == 422  # type: ignore[attr-defined]
+        assert "Vul een geheel getal van 1 tot en met 1000 in" in refused.text  # type: ignore[attr-defined]
+    assert cleared.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
+    assert f'{field} value=""' in (await site.client.get(f"{GROUP}/settings")).text

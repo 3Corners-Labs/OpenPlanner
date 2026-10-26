@@ -1013,6 +1013,12 @@ msgstr "Niet opgepakt na (minuten)"
 msgid "admin.field.not_picked_up_minutes_hint"
 msgstr "Zo lang mag een gesprek zonder medewerker blijven voordat het opvalt. 1 tot 120."
 
+msgid "admin.field.direct_call_max_concurrent"
+msgstr "Maximaal aantal directe gesprekken tegelijk"
+
+msgid "admin.field.direct_call_max_concurrent_hint"
+msgstr "Meestal het aantal medewerkers voor directe gesprekken. Telt wachtende gesprekken en gesprekken met een medewerker. Leeg: geen grens, WxCC verdeelt."
+
 msgid "admin.form.error.video_host_email"
 msgstr "Vul een geldig e-mailadres in."
 
@@ -1024,6 +1030,9 @@ msgstr "Maak een keuze."
 
 msgid "admin.form.error.not_picked_up_minutes"
 msgstr "Vul een aantal minuten in van 1 tot 120."
+
+msgid "admin.form.error.direct_call_max_concurrent"
+msgstr "Vul een geheel getal van 1 tot en met 1000 in, of laat het veld leeg."
 
 msgid "admin.group.video"
 msgstr "Videogesprek (Webex)"
@@ -1082,6 +1091,9 @@ msgstr "Terug naar uw afspraak"
 msgid "error.direct_call_unavailable"
 msgstr "Nu een gesprek starten kan op dit moment niet. Maak een afspraak."
 
+msgid "error.direct_call_full"
+msgstr "Alle medewerkers zijn net in gesprek. Probeer het over een paar minuten opnieuw of maak een afspraak."
+
 msgid "direct.title"
 msgstr "Nu een videogesprek starten"
 
@@ -1105,6 +1117,21 @@ msgstr "Het team is nu open. U kunt direct een videogesprek starten."
 
 msgid "direct.card.button"
 msgstr "Nu een gesprek starten"
+
+msgid "direct.full"
+msgstr "Alle medewerkers zijn nu in gesprek. Probeer het over een paar minuten opnieuw of maak een afspraak."
+
+msgid "queue.position"
+msgstr "Uw plaats in de rij: {position}."
+
+msgid "queue.waiting"
+msgstr "Aantal mensen dat nu wacht: {count}."
+
+msgid "queue.nobody"
+msgstr "Er wacht op dit moment niemand."
+
+msgid "queue.typical_wait"
+msgstr "Meestal neemt een medewerker binnen ongeveer {minutes} min. op."
 
 msgid "wait.title"
 msgstr "Uw videogesprek"

@@ -1,0 +1,7 @@
+{#- The group's own queue of direct calls (ADR 0026): place in line and the usual wait. -#}
+{% if queue %}
+{% if queue.position %}<p>{{ _("queue.position", position=queue.position) }}</p>
+{% elif queue.waiting %}<p>{{ _("queue.waiting", count=queue.waiting) }}</p>
+{% else %}<p>{{ _("queue.nobody") }}</p>{% endif %}
+{% if queue.typical_wait_minutes %}<p>{{ _("queue.typical_wait", minutes=queue.typical_wait_minutes) }}</p>{% endif %}
+{% endif %}

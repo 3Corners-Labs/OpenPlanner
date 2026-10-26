@@ -6,6 +6,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.domain.booking import BookingKind
+from app.domain.calls import CallStatus, TaskState
+from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError
 from app.domain.job_plan import JobType
 from app.domain.scheduling import ScheduleOverride, ScheduleRule, is_open
@@ -87,6 +89,61 @@ async def test_availability_of_direct_calls_for_the_group_page() -> None:
     closed, _ = _service(now=MONDAY_0915 + timedelta(hours=2))
     off, _ = _service(group=replace(GROUP, direct_call_enabled=False))
 
-    assert await service.direct_call_available("aangifte")
-    assert not await closed.direct_call_available("aangifte")
-    assert not await off.direct_call_available("aangifte")
+    assert await service.direct_call_availability("aangifte") is DirectAvailability.AVAILABLE
+    assert await closed.direct_call_availability("aangifte") is DirectAvailability.UNAVAILABLE
+    assert await off.direct_call_availability("aangifte") is DirectAvailability.UNAVAILABLE
+
+
+CAPPED = replace(GROUP, direct_call_max_concurrent=1)
+
+
+async def test_direct_call_is_refused_when_every_agent_is_taken() -> None:
+    service, uow = _service(CAPPED)
+    first = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+
+    assert await service.direct_call_availability("aangifte") is DirectAvailability.FULL
+    with pytest.raises(DomainError, match="direct_call_full"):
+        await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    assert list(uow.state.bookings) == [first.booking.id]
+
+
+async def test_an_ended_call_frees_its_place() -> None:
+    service, uow = _service(CAPPED)
+    first = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    booking_id = first.booking.id or 0
+    uow.state.call_status[booking_id] = CallStatus(booking_id, task=TaskState.ENDED)
+
+    assert await service.direct_call_availability("aangifte") is DirectAvailability.AVAILABLE
+    await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+
+
+async def test_a_cancelled_call_frees_its_place() -> None:
+    service, uow = _service(CAPPED)
+    first = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+
+    uow.state.bookings[first.booking.id or 0] = first.booking.cancel(MONDAY_0915)
+
+    assert await service.direct_call_availability("aangifte") is DirectAvailability.AVAILABLE
+
+
+async def test_closed_wins_over_full() -> None:
+    service, _ = _service(CAPPED)
+    await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    later = BookingService(
+        service._uow, FixedClock(MONDAY_0915 + timedelta(hours=2)), TEST_TOKEN_KEY
+    )
+
+    assert await later.direct_call_availability("aangifte") is DirectAvailability.UNAVAILABLE
+
+
+async def test_queue_info_gives_the_place_in_line() -> None:
+    service, _ = _service()
+    first = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    second = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+
+    info = await service.direct_queue(GROUP, second.booking.id)
+
+    assert info.waiting == 2
+    assert info.position == 2
+    assert (await service.direct_queue(GROUP, first.booking.id)).position == 1
+    assert info.typical_wait_minutes is None  # no pickups yet

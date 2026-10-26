@@ -70,6 +70,7 @@ class GroupSettings:
     wxcc_routing_value: str | None
     direct_call_enabled: bool
     not_picked_up_minutes: int
+    direct_call_max_concurrent: int | None
 
 
 def settings_of(group: Group) -> GroupSettings:

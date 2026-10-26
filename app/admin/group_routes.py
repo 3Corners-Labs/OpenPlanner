@@ -50,6 +50,7 @@ from app.domain.planning import (
     settings_of,
 )
 from app.domain.scheduling import (
+    MAX_DIRECT_CALLS,
     GroupSummary,
     PhoneMode,
     ScheduleOverride,
@@ -87,8 +88,15 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
         "admin.field.not_picked_up_minutes",
         "admin.field.not_picked_up_minutes_hint",
     ),
+    "direct_call_max_concurrent": (
+        "admin.field.direct_call_max_concurrent",
+        "admin.field.direct_call_max_concurrent_hint",
+    ),
 }
 """Label and hint key per numeric setting (literal keys, so the catalogue test sees them)."""
+
+OPTIONAL_NUMBERS = frozenset({"direct_call_max_concurrent"})
+"""Numeric settings that may be left empty (no cap, ADR 0026)."""
 
 INTEGRATION_LABELS: dict[str, str] = {
     "video_host_email": "admin.field.video_host_email",
@@ -437,7 +445,7 @@ def _settings_fields(
     def value(name: str, fallback: object) -> str:
         return form.values.get(name, "" if fallback is None else str(fallback))
 
-    def number(name: str, fallback: int, attributes: dict[str, str]) -> Field:
+    def number(name: str, fallback: int | None, attributes: dict[str, str]) -> Field:
         label_key, hint_key = NUMBER_LABELS[name]
         return Field(
             name,
@@ -446,6 +454,7 @@ def _settings_fields(
             value(name, fallback),
             hint=_(hint_key),
             error=form.error_for(name),
+            required=name not in OPTIONAL_NUMBERS,
             attributes={"inputmode": "numeric", **attributes},
         )
 
@@ -500,6 +509,11 @@ def _settings_fields(
             options=yes_no,
         ),
         number("not_picked_up_minutes", current.not_picked_up_minutes, {"min": "1", "max": "120"}),
+        number(
+            "direct_call_max_concurrent",
+            current.direct_call_max_concurrent,
+            {"min": "1", "max": str(MAX_DIRECT_CALLS)},
+        ),
     ]
     return planning, integrations
 
@@ -551,7 +565,8 @@ async def save_settings(
 ) -> Response:
     """Save the group's settings."""
     form = await read_form(request, locale)
-    numbers = {name: form.integer(name) for name in NUMBER_LABELS}
+    numbers = {name: form.integer(name) for name in NUMBER_LABELS if name not in OPTIONAL_NUMBERS}
+    cap = form.optional_integer("direct_call_max_concurrent")
     phone = form.choice("phone_mode", {mode.value for mode in PhoneMode})
     direct = form.choice("direct_call_enabled", {"yes", "no"})
     if not form.errors and phone is not None and direct is not None:
@@ -564,6 +579,7 @@ async def save_settings(
             wxcc_channel=form.optional_text("wxcc_channel"),
             wxcc_routing_value=form.optional_text("wxcc_routing_value"),
             direct_call_enabled=direct == "yes",
+            direct_call_max_concurrent=cap,
             **{name: value for name, value in numbers.items() if value is not None},
         )
         try:
