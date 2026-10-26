@@ -27,6 +27,7 @@ from app.domain.calls import (
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.closure import Closure
+from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.scheduling import (
     Group,
@@ -289,6 +290,62 @@ class Transaction(Protocol):
 
     async def delete_schedule_override(self, group_id: int, override_id: int) -> bool:
         """Delete the group's override ``override_id``; ``False`` if it has no such override."""
+        ...
+
+    async def get_holiday_calendars(self) -> list[HolidayCalendar]:
+        """Return every holiday calendar, by name.
+
+        Calendars are global reference data (``holidays.manage`` is a global permission,
+        ADR 0025): every admin who chooses calendars sees all of them, so there is no scope.
+        """
+        ...
+
+    async def get_holiday_calendar(self, slug: str) -> HolidayCalendar | None:
+        """Return the holiday calendar with ``slug``."""
+        ...
+
+    async def add_holiday_calendar(self, calendar: HolidayCalendar) -> HolidayCalendar:
+        """Store a new calendar and return it with its id; the slug must be free."""
+        ...
+
+    async def delete_holiday_calendar(self, calendar_id: int) -> None:
+        """Delete the calendar and its holidays (the caller checks it is not in use)."""
+        ...
+
+    async def count_holiday_calendar_users(self, calendar_id: int) -> int:
+        """Return how many organisations and groups chose the calendar."""
+        ...
+
+    async def get_holidays(
+        self, calendar_ids: Collection[int], first_day: date, last_day: date
+    ) -> list[Holiday]:
+        """Return the holidays of the calendars between the two dates, by date."""
+        ...
+
+    async def add_holiday(self, holiday: Holiday) -> int:
+        """Store a holiday and return its id; its calendar has no holiday on that date yet."""
+        ...
+
+    async def delete_holiday(self, calendar_id: int, holiday_id: int) -> bool:
+        """Delete the calendar's holiday; ``False`` if the calendar has no such holiday."""
+        ...
+
+    async def get_organisation_holiday_calendars(self, organisation_id: int) -> frozenset[int]:
+        """Return the ids of the calendars the organisation chose."""
+        ...
+
+    async def save_organisation_holiday_calendars(
+        self, organisation_id: int, calendar_ids: frozenset[int]
+    ) -> None:
+        """Replace the organisation's calendar choice."""
+        ...
+
+    async def get_group_holidays(self, group_id: int) -> GroupHolidays:
+        """Return the group's holiday choice (inherit, own calendars, days kept open)."""
+        ...
+
+    async def save_group_holidays(self, group_id: int, holidays: GroupHolidays) -> None:
+        """Replace the group's holiday choice."""
         ...
 
     async def save_meeting(self, booking_id: int, meeting: MeetingRef) -> None:

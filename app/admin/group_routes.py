@@ -16,6 +16,8 @@ The domain (``PlanningService``) authorises again, validates and audits.
     GET  /admin/groups/{slug}/exceptions           schedule.manage   exceptions
     POST /admin/groups/{slug}/exceptions           schedule.manage   add an exception
     POST /admin/groups/{slug}/exceptions/{id}/delete schedule.manage remove an exception
+
+The group's holiday tab (``/admin/groups/{slug}/holidays``) lives in ``holiday_routes``.
 """
 
 from collections.abc import Sequence
@@ -111,6 +113,7 @@ TABS = (
     Tab("admin.tab.settings", "/settings", Permission.GROUP_EDIT, "settings"),
     Tab("admin.tab.hours", "/hours", Permission.SCHEDULE_MANAGE, "clock"),
     Tab("admin.tab.exceptions", "/exceptions", Permission.SCHEDULE_MANAGE, "calendar"),
+    Tab("admin.tab.holidays", "/holidays", Permission.SCHEDULE_MANAGE, "holiday"),
     Tab("admin.tab.reminders", "/reminders", Permission.REMINDERS_MANAGE, "bell"),
     Tab("admin.tab.messages", "/messages", Permission.TEXTS_MANAGE, "mail"),
     Tab("admin.tab.agenda", "/agenda", Permission.BOOKINGS_VIEW, "agenda"),

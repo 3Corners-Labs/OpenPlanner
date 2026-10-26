@@ -81,6 +81,10 @@ FIELD_MESSAGES: dict[str, str] = {
     "day": "admin.form.error.day",
     "schedule_rules": "admin.form.error.overlap",
     "schedule_overrides": "admin.form.error.override_conflict",
+    "holiday_day": "admin.form.error.holiday_day",
+    "year": "admin.form.error.year",
+    "calendars": "admin.form.error.calendars",
+    "source": "admin.form.error.choice",
     "starts_at": "admin.form.error.moment",
     "ends_at": "admin.form.error.ends_at",
     "notice_nl": "admin.form.error.notice",
@@ -119,6 +123,7 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.ORGANISATION_NOT_FOUND: "admin.form.error.organisation",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
     ErrorCode.DATABASE_BUSY: "error.database_busy",
+    ErrorCode.HOLIDAY_CALENDAR_IN_USE: "admin.form.error.calendar_in_use",
     ErrorCode.CLOSURE_EXISTS: "admin.form.error.closure_exists",
     ErrorCode.CLOSURE_NOT_FOUND: "admin.form.error.closure_not_found",
     ErrorCode.BOOKING_NOT_ACTIVE: "error.booking_not_active",
@@ -304,9 +309,14 @@ def done_message(request: Request, _: BoundGettext) -> str | None:
 
 
 def redirect_done(url: str, done: str, count: int | None = None) -> RedirectResponse:
-    """Answer a successful change with a redirect to ``url`` and its confirmation."""
+    """Answer a successful change with a redirect to ``url`` and its confirmation.
+
+    ``url`` may carry a query of its own (``?year=2027``); ``done`` (and ``count``, for
+    confirmations that state a number) are appended to it.
+    """
+    separator = "&" if "?" in url else "?"
     suffix = f"&count={count}" if count is not None else ""
-    return RedirectResponse(f"{url}?done={done}{suffix}", status_code=303)
+    return RedirectResponse(f"{url}{separator}done={done}{suffix}", status_code=303)
 
 
 async def read_form(request: Request, locale: RequestLocale) -> FormData:

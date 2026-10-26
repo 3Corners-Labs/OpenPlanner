@@ -1,0 +1,66 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.tab.holidays") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="upcoming-heading">
+  <div class="card__header">
+    <h2 id="upcoming-heading">{{ _("admin.holidays.upcoming") }}</h2>
+    <p class="card__lead">{{ _("admin.holidays.upcoming_lead") }}</p>
+  </div>
+  {% if upcoming %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.holidays.upcoming") }}</caption>
+    <thead>
+      <tr><th scope="col">{{ _("admin.field.day") }}</th><th scope="col">{{ _("admin.holidays.holiday_name") }}</th><th scope="col">{{ _("admin.holidays.state") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th></tr>
+    </thead>
+    <tbody>
+      {% for item in upcoming %}
+      <tr>
+        <th scope="row">{{ item.day }}</th>
+        <td>{{ item.name }}</td>
+        <td><span class="chip {% if item.state == "closed" %}chip--warning{% elif item.state == "open" %}chip--success{% else %}chip--accent{% endif %}">{{ item.label }}</span></td>
+        <td>
+          {% if item.state == "closed" %}
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/holidays/{{ item.iso }}/open">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.holidays.keep_open_label", name=item.name, day=item.day) }}">{{ _("admin.holidays.keep_open") }}</button>
+          </form>
+          {% elif item.state == "open" %}
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/holidays/{{ item.iso }}/close">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.holidays.close_label", name=item.name, day=item.day) }}">{{ _("admin.holidays.close") }}</button>
+          </form>
+          {% else %}
+          <a href="/admin/groups/{{ summary.group.slug }}/exceptions">{{ _("admin.holidays.see_exceptions") }}</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.holidays.none_upcoming") }}</p>
+  {% endif %}
+</section>
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/holidays" novalidate aria-labelledby="choice-heading">
+  <div class="card__header">
+    <h2 id="choice-heading">{{ _("admin.holidays.group_choice") }}</h2>
+    <p class="card__lead">{{ _("admin.holidays.group_choice_lead") }}</p>
+  </div>
+  <fieldset class="field choice{% if source_error %} field--error{% endif %}" id="source">
+    <legend>{{ _("admin.holidays.source") }}</legend>
+    <div class="choice__option"><input type="radio" id="source-inherit" name="source" value="inherit"{% if source == "inherit" %} checked{% endif %} aria-describedby="source-inherit-hint"><label for="source-inherit">{{ _("admin.holidays.source_inherit") }}</label></div>
+    <p class="hint" id="source-inherit-hint">{% if inherited %}{{ _("admin.holidays.inherited", calendars=inherited|join(", ")) }}{% else %}{{ _("admin.holidays.inherited_none") }}{% endif %}</p>
+    <div class="choice__option"><input type="radio" id="source-own" name="source" value="own"{% if source == "own" %} checked{% endif %}><label for="source-own">{{ _("admin.holidays.source_own") }}</label></div>
+    {% if source_error %}<p class="error-message">{{ source_error }}</p>{% endif %}
+  </fieldset>
+  <fieldset class="field choice" id="calendars">
+    <legend>{{ _("admin.holidays.own_calendars") }}</legend>
+    {% include "admin/_calendar_choice.html" %}
+  </fieldset>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") }}</button>
+  </div>
+</form>
+{% endblock %}

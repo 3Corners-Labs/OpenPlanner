@@ -1,0 +1,52 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import form_body with context %}
+{% block title %}{{ _("admin.holidays.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.holidays.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.holidays.lead") }}</p>
+  </div>
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="calendars-heading">
+  <div class="card__header">
+    <h2 id="calendars-heading">{{ _("admin.holidays.calendars") }}</h2>
+    <p class="card__lead">{{ _("admin.holidays.calendars_lead") }}</p>
+  </div>
+  {% if calendars %}
+  <ul class="link-list">
+    {% for calendar in calendars %}
+    <li>{% if can("holidays.manage") %}<a href="/admin/holidays/{{ calendar.slug }}">{{ calendar.name }}</a>{% else %}{{ calendar.name }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty-state">{{ _("admin.holidays.no_calendars") }}</p>
+  {% endif %}
+</section>
+{% if can("holidays.manage") %}
+<form class="card" method="post" action="/admin/holidays" novalidate aria-labelledby="new-heading">
+  <div class="card__header">
+    <h2 id="new-heading">{{ _("admin.holidays.new") }}</h2>
+    <p class="card__lead">{{ _("admin.holidays.new_lead") }}</p>
+  </div>
+  {{ form_body(fields, _("admin.holidays.new_button")) }}
+</form>
+{% endif %}
+<section class="card" aria-labelledby="organisations-heading">
+  <div class="card__header">
+    <h2 id="organisations-heading">{{ _("admin.holidays.organisations") }}</h2>
+    <p class="card__lead">{{ _("admin.holidays.organisations_lead") }}</p>
+  </div>
+  {% if organisations %}
+  <ul class="link-list">
+    {% for organisation in organisations %}
+    <li><a href="/admin/organisations/{{ organisation.slug }}/holidays">{{ organisation.name }}</a></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty-state">{{ _("admin.branding.none") }}</p>
+  {% endif %}
+</section>
+{% endblock %}
