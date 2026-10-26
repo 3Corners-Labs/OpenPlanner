@@ -1,0 +1,37 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_page_header.html" import page_header with context %}
+{% from "admin/_fields.html" import field, form_body with context %}
+{% block title %}{{ _("admin.channels.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{{ page_header('/admin/integrations', _("admin.integrations.title"), organisation.name, _("admin.channels.title"), organisation.name ~ ' · ' ~ _("admin.channels.lead")) }}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/channels/email" novalidate aria-labelledby="email-heading">
+  <div class="card__header">
+    <h2 id="email-heading">{{ _("admin.channels.email") }} <span class="chip{% if email_status.tone %} chip--{{ email_status.tone }}{% endif %}">{{ email_status.label }}</span></h2>
+    <p class="card__lead">{{ _("admin.channels.email_lead") }}{% if not email_stored and fallback_mail %} {{ _("admin.channels.fallback_mail") }}{% endif %}</p>
+    {% if email_status.changed %}<p class="hint">{{ _("admin.channels.changed", at=email_status.changed) }}</p>{% endif %}
+  </div>
+  {{ form_body(email_fields, _("admin.save")) }}
+</form>
+{% if email_stored %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/channels/email/remove">
+  <p>{{ _("admin.channels.remove_email_lead") }}</p>
+  <button type="submit" class="button button--secondary">{{ _("admin.channels.remove_email") }}</button>
+</form>
+{% endif %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/channels/sms" novalidate aria-labelledby="sms-heading">
+  <div class="card__header">
+    <h2 id="sms-heading">{{ _("admin.channels.sms") }} <span class="chip{% if sms_status.tone %} chip--{{ sms_status.tone }}{% endif %}">{{ sms_status.label }}</span></h2>
+    <p class="card__lead">{{ _("admin.channels.sms_lead") }}</p>
+    {% if sms_status.changed %}<p class="hint">{{ _("admin.channels.changed", at=sms_status.changed) }}</p>{% endif %}
+  </div>
+  {{ form_body(sms_fields, _("admin.save")) }}
+</form>
+{% if sms_stored %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/channels/sms/remove">
+  <p>{{ _("admin.channels.remove_sms_lead") }}</p>
+  <button type="submit" class="button button--secondary">{{ _("admin.channels.remove_sms") }}</button>
+</form>
+{% endif %}
+{% endblock %}

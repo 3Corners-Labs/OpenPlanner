@@ -90,7 +90,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     # HANDOVER §6: everything, including organisations, IdP, SMTP and WxCC credentials.
     Role.SUPERUSER: frozenset(Permission),
     # HANDOVER §6: own organisation: groups, rules, overrides, texts, bookings of its groups;
-    # ADR 0022: which of the superuser's holiday calendars its groups follow.
+    # ADR 0024: which of the superuser's holiday calendars its groups follow.
     Role.ORG_ADMIN: _EVERY_ADMIN
     | {
         Permission.AUDIT_VIEW,

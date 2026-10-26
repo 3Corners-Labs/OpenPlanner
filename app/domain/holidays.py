@@ -1,4 +1,4 @@
-"""Holiday calendars: closed days configured once by the superuser, reused everywhere (ADR 0022).
+"""Holiday calendars: closed days configured once by the superuser, reused everywhere (ADR 0024).
 
 A ``HolidayCalendar`` (for example "Nationale feestdagen") holds ``Holiday`` dates. Who uses
 which calendar is decided at two levels, and the most specific choice wins:

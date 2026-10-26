@@ -1,4 +1,4 @@
-"""Holiday use cases: maintain calendars, choose them per organisation and group (ADR 0022).
+"""Holiday use cases: maintain calendars, choose them per organisation and group (ADR 0024).
 
 Every operation asks ``AdminService.authorize`` first and is audited in the same transaction,
 with keys of what changed (``calendar.add``, ``holiday.open``), never names or dates.

@@ -69,17 +69,25 @@ def _is_current(request: Request, item: NavItem) -> bool:
 
     Group pages belong to the overview. An organisation's branding and holiday pages belong
     to their own section (``/admin/organisations/{org}/branding`` to branding,
-    ``.../holidays`` to holidays); its other pages to organisations.
+    ``.../holidays`` to holidays), its channel pages to integrations, its other pages to
+    organisations.
     """
     path = request.url.path
     section = path.rsplit("/", 1)[-1] if path.startswith("/admin/organisations/") else ""
     own_section = section in {"branding", "holidays"}
+    channels = path.startswith("/admin/organisations/") and "/channels" in path
     return (
         path == item.href
         or (item.href == "/admin/" and path.startswith("/admin/groups"))
         or (item.href == "/admin/holidays" and path.startswith("/admin/holidays/"))
         or (own_section and item.href == f"/admin/{section}")
-        or (item.href == "/admin/organisations" and bool(section) and not own_section)
+        or (item.href == "/admin/integrations" and channels)
+        or (
+            item.href == "/admin/organisations"
+            and bool(section)
+            and not own_section
+            and not channels
+        )
     )
 
 

@@ -40,6 +40,48 @@ async def test_org_admin_creates_a_group_and_lands_on_it(site: Site) -> None:
     ]
 
 
+async def test_time_zone_is_a_select_with_amsterdam_preselected(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    form = (await site.client.get("/admin/groups/new")).text
+
+    assert (
+        '<select id="timezone" name="timezone" required aria-describedby="timezone-hint">' in form
+    )
+    assert '<option value="Europe/Amsterdam" selected>Europe/Amsterdam</option>' in form
+    assert '<option value="America/New_York">America/New York</option>' in form
+    assert 'value="Etc/GMT+1"' not in form  # fixed offsets ignore summer time
+    assert form.index("Europe/Amsterdam") < form.index("Africa/Abidjan")
+
+
+async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    form = (await site.client.get(f"{GROUP}/settings")).text
+
+    assert '<option value="Europe/Amsterdam" selected>' in form
+    assert form.count(" selected>") == 3  # time zone, phone mode, direct call
+
+
+async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    response = await _post(
+        site,
+        "/admin/groups",
+        {
+            "organisation": "demo",
+            "name": "Mars",
+            "slug": "mars",
+            "timezone": "Mars/Olympus_Mons",
+            "slot_minutes": "30",
+        },
+    )
+
+    assert response.status_code == 422  # type: ignore[attr-defined]
+    assert '<a href="#timezone">Kies een tijdzone uit de lijst.' in response.text  # type: ignore[attr-defined]
+
+
 async def test_new_group_errors_are_linked_to_their_fields(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 

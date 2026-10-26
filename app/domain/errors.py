@@ -33,6 +33,9 @@ class ErrorCode(StrEnum):
     HOLIDAY_CALENDAR_NOT_FOUND = "holiday_calendar_not_found"
     HOLIDAY_CALENDAR_IN_USE = "holiday_calendar_in_use"
     HOLIDAY_NOT_FOUND = "holiday_not_found"
+    CHANNEL_NOT_CONFIGURED = "channel_not_configured"
+    REMINDER_EXISTS = "reminder_exists"
+    REMINDER_NOT_FOUND = "reminder_not_found"
 
 
 class DomainError(Exception):

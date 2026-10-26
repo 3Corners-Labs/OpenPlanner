@@ -1,0 +1,49 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field, form_body with context %}
+{% block title %}{{ _("admin.tab.reminders") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+{% if not_ready %}
+<div class="alert alert--error" role="alert"><p>{{ _("admin.reminders.not_ready") }}</p></div>
+{% endif %}
+<section class="card" aria-labelledby="rules-heading">
+  <div class="card__header">
+    <h2 id="rules-heading">{{ _("admin.reminders.title") }}</h2>
+    <p class="card__lead">{{ _("admin.reminders.lead") }}</p>
+  </div>
+  {% if rules %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.reminders.title") }}</caption>
+    <thead>
+      <tr><th scope="col">{{ _("admin.reminders.channel") }}</th><th scope="col">{{ _("admin.reminders.when") }}</th><th scope="col">{{ _("admin.reminders.status") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th></tr>
+    </thead>
+    <tbody>
+      {% for rule in rules %}
+      <tr>
+        <th scope="row">{{ rule.channel_label }}</th>
+        <td>{{ rule.offset }}</td>
+        <td>{% if rule.ready %}<span class="chip chip--success">{{ _("admin.channels.ready") }}</span>{% else %}<span class="chip chip--warning">{{ _("admin.channels.not_configured") }}</span>{% endif %}</td>
+        <td>
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/reminders/{{ rule.channel }}/{{ rule.minutes_before }}/delete">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.reminders.remove_label", channel=rule.channel_label, when=rule.offset) }}">{{ _("admin.remove") }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.reminders.none") }}</p>
+  {% endif %}
+</section>
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/reminders" novalidate aria-labelledby="add-heading">
+  <div class="card__header">
+    <h2 id="add-heading">{{ _("admin.reminders.add") }}</h2>
+    <p class="card__lead">{{ _("admin.reminders.add_lead") }}{% if not asks_phone %} {{ _("admin.reminders.no_phone") }}{% endif %}</p>
+  </div>
+  {{ form_body(fields, _("admin.reminders.add_button")) }}
+</form>
+{% endblock %}

@@ -40,7 +40,7 @@ Group             (id, organisation_id, name, slug, wxcc_queue_id, slot_minutes,
 ScheduleRule      (id, group_id, weekday, opens, closes, capacity, valid_from, valid_to)
 ScheduleOverride  (id, group_id, date, opens, closes, capacity | closed=true)   # ziekte, afwijkende uren
 HolidayCalendar   (id, slug, name) + Holiday (calendar_id, date, name)   # superuser, herbruikbaar
-                   organisatie kiest kalenders; groep erft, kiest zelf of houdt een feestdag open (ADR 0022)
+                   organisatie kiest kalenders; groep erft, kiest zelf of houdt een feestdag open (ADR 0024)
 GroupPage         (group_id, title_nl/en, intro_nl/en, duration_label, phone_required: bool)
 Slot              (id, group_id, start, end, capacity_snapshot)   # ontstaat bij eerste boeking
 Booking           (id, slot_id, status[confirmed|cancelled|completed|no_show],

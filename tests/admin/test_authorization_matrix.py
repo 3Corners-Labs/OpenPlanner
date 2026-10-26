@@ -78,7 +78,7 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/organisations/{org}/branding/logo/remove": {
         "/admin/organisations/demo/branding/logo/remove": statuses(303, 403, 403, 403, 403),
     },
-    # Holiday calendars (ADR 0022): the superuser maintains them; organisation admins choose
+    # Holiday calendars (ADR 0024): the superuser maintains them; organisation admins choose
     # them for their own organisation; group admins choose for their own groups (below).
     "GET /admin/holidays": {"/admin/holidays": statuses(200, 200, 403, 200, 403)},
     "POST /admin/holidays": {"/admin/holidays": statuses(422, 403, 403, 403, 403)},
@@ -122,6 +122,22 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/holidays/2026-12-25/close": statuses(404, 404, 404, 403, 403),
         "/admin/groups/andere-team/holidays/2026-12-25/close": statuses(404, 403, 403, 404, 403),
     },
+    # Message channels (SMTP, SMS gateway) per organisation: secrets, so superuser only.
+    "GET /admin/organisations/{org}/channels": {
+        "/admin/organisations/demo/channels": statuses(200, 403, 403, 403, 403),
+        "/admin/organisations/andere/channels": statuses(200, 403, 403, 403, 403),
+        "/admin/organisations/nope/channels": statuses(404, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/channels/email": {
+        "/admin/organisations/demo/channels/email": statuses(422, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/channels/sms": {
+        "/admin/organisations/demo/channels/sms": statuses(422, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/channels/{channel}/remove": {
+        "/admin/organisations/demo/channels/sms/remove": statuses(409, 403, 403, 403, 403),
+        "/admin/organisations/demo/channels/fax/remove": statuses(404, 403, 403, 403, 403),
+    },
     # Group creation: organisation admins (in their own organisation) and the superuser.
     "GET /admin/groups/new": {"/admin/groups/new": statuses(200, 200, 403, 200, 403)},
     "POST /admin/groups": {"/admin/groups": statuses(422, 422, 403, 422, 403)},
@@ -158,6 +174,34 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/groups/{slug}/exceptions": {
         "/admin/groups/demo/exceptions": statuses(422, 422, 422, 403, 403),
         "/admin/groups/andere-team/exceptions": statuses(422, 403, 403, 422, 403),
+    },
+    # Reminder rules: organisation admins and the superuser, not group admins (HANDOVER §6).
+    "GET /admin/groups/{slug}/reminders": {
+        "/admin/groups/demo/reminders": statuses(200, 200, 403, 403, 403),
+        "/admin/groups/andere-team/reminders": statuses(200, 403, 403, 200, 403),
+    },
+    "POST /admin/groups/{slug}/reminders": {
+        "/admin/groups/demo/reminders": statuses(422, 422, 403, 403, 403),
+        "/admin/groups/andere-team/reminders": statuses(422, 403, 403, 422, 403),
+    },
+    "POST /admin/groups/{slug}/reminders/{channel}/{minutes}/delete": {
+        "/admin/groups/demo/reminders/sms/999/delete": statuses(404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/reminders/sms/999/delete": statuses(404, 403, 403, 404, 403),
+    },
+    # Message texts: group admins too, for their own groups ("mail texts", HANDOVER §6).
+    "GET /admin/groups/{slug}/messages": {
+        "/admin/groups/demo/messages": statuses(303, 303, 303, 403, 403),
+        "/admin/groups/andere-team/messages": statuses(303, 403, 403, 303, 403),
+    },
+    "GET /admin/groups/{slug}/messages/{text_locale}": {
+        "/admin/groups/demo/messages/nl": statuses(200, 200, 200, 403, 403),
+        "/admin/groups/demo/messages/en": statuses(200, 200, 200, 403, 403),
+        "/admin/groups/demo/messages/de": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/messages/nl": statuses(200, 403, 403, 200, 403),
+    },
+    "POST /admin/groups/{slug}/messages/{text_locale}": {
+        "/admin/groups/demo/messages/nl": statuses(303, 303, 303, 403, 403),
+        "/admin/groups/andere-team/messages/nl": statuses(303, 403, 403, 303, 403),
     },
     # Agenda and timeline: bookings.view, also for group admins on their own groups.
     "GET /admin/groups/{slug}/agenda": {
