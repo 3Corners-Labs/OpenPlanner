@@ -309,6 +309,15 @@ def test_overlap_counts_both_own_and_old_grid_bookings() -> None:
     assert utc(2026, 1, 5, 8, 0) not in [s.start for s in slots]
 
 
+def test_overlap_counts_the_busiest_moment_not_every_overlapping_slot() -> None:
+    # 08:45–09:15 and 09:15–09:45 both overlap 09:00–09:30, but never at the same moment.
+    booked = {utc(2026, 1, 5, 7, 45): 1, utc(2026, 1, 5, 8, 15): 1}
+    slot, length = utc(2026, 1, 5, 8, 0), timedelta(minutes=30)
+
+    assert overlapping_active(slot, length, booked) == 1
+    assert overlapping_active(slot, length, {**booked, utc(2026, 1, 5, 8, 20): 2}) == 3
+
+
 @pytest.mark.parametrize(
     ("other", "expected"),
     [
