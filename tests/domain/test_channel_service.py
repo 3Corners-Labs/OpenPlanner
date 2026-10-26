@@ -1,11 +1,19 @@
 """ChannelSettingsService: only the superuser configures channels; secrets stay write-only."""
 
+from dataclasses import replace
+
 import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.channel_service import ChannelSettingsService
-from app.domain.channel_settings import SmsSettings, SmtpSecurity, SmtpSettings
+from app.domain.channel_settings import (
+    ChannelConfig,
+    SmsProvider,
+    SmsSettings,
+    SmtpSecurity,
+    SmtpSettings,
+)
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import Organisation
@@ -16,7 +24,7 @@ from tests.support.domain import DEMO_ORG_ADMIN, DEMO_SUPERUSER, NOW
 
 SUPER, ORG_ADMIN = DEMO_SUPERUSER, DEMO_ORG_ADMIN
 SMTP = SmtpSettings("smtp.demo.nl", 587, SmtpSecurity.STARTTLS, "afspraak", "afspraak@demo.nl")
-SMS = SmsSettings("https://api.us.webexconnect.io", "GemDemo")
+SMS = SmsSettings(SmsProvider.WEBEX_CONNECT, "https://api.us.webexconnect.io", "GemDemo")
 TEST_RECIPIENT = "beheer@demo.nl"
 
 
@@ -98,15 +106,48 @@ async def test_smtp_without_login_needs_no_password(service: ChannelSettingsServ
     assert not stored.secret_set
 
 
-async def test_sms_needs_a_service_key(service: ChannelSettingsService) -> None:
+async def test_sms_needs_an_api_key(service: ChannelSettingsService) -> None:
     with pytest.raises(DomainError) as error:
         await service.save(SUPER, "demo", SMS, None)
-    assert error.value.field == "sms_service_key"
+    assert error.value.field == "sms_api_key"
 
     await service.save(SUPER, "demo", SMS, "service-key")
     stored = (await service.overview(SUPER, "demo")).channels[ChannelKind.SMS]
     assert stored is not None
     assert stored.ready
+
+
+@pytest.mark.parametrize(
+    ("first", "same_host", "moved", "field"),
+    [
+        (
+            SMS,
+            replace(SMS, sender_id="Ander"),
+            replace(SMS, api_base_url="https://sms.elsewhere.example"),
+            "sms_api_key",
+        ),
+        (
+            SMTP,
+            replace(SMTP, sender_name="Ander"),
+            replace(SMTP, host="smtp.elsewhere.example"),
+            "smtp_credential",
+        ),
+    ],
+)
+async def test_a_stored_secret_never_follows_a_new_host(
+    service: ChannelSettingsService,
+    first: ChannelConfig,
+    same_host: ChannelConfig,
+    moved: ChannelConfig,
+    field: str,
+) -> None:
+    await service.save(SUPER, "demo", first, "secret-1")
+    assert await service.save(SUPER, "demo", same_host, None)  # the stored secret stays
+
+    with pytest.raises(DomainError) as error:
+        await service.save(SUPER, "demo", moved, None)
+    assert error.value.field == field
+    assert await service.save(SUPER, "demo", moved, "secret-2")
 
 
 async def test_an_invalid_secret_is_refused_before_anything_is_stored(
