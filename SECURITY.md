@@ -15,7 +15,7 @@ Only the latest released version receives security fixes until the first product
 
 Every pull request: ruff (incl. bandit rules), mypy `--strict`, import-linter, bandit,
 semgrep (`p/python`, `p/owasp-top-ten`, `p/secrets` and repo rules), pip-audit,
-license allow-list, gitleaks, hadolint, trivy (image CVEs and misconfiguration), schemathesis
+license allow-list, gitleaks, shellcheck (host scripts), hadolint, trivy (image CVEs and misconfiguration), schemathesis
 against the OpenAPI spec, CycloneDX SBOM scanned with grype, Alembic up/down.
 
 Also on every pull request: copy-paste detection (jscpd), `npm audit` on the test tooling,
