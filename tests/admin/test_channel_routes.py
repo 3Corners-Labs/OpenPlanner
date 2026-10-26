@@ -8,6 +8,8 @@ import httpx
 import pytest
 
 from app.adapters import smtp as smtp_module
+from app.admin.channel_routes import SMS_PROVIDER_LABELS
+from app.domain.channel_settings import SmsProvider
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
 from tests.admin.test_admin_flow import audit_events
 
@@ -22,8 +24,9 @@ SMTP = {
     "sender_name": "Gemeente Demo",
 }
 SMS = {
+    "sms_provider": "webex_connect",
     "sms_api_base_url": "https://api.us.webexconnect.io",
-    "sms_service_key": "service-key-abc",
+    "sms_api_key": "service-key-abc",
     "sms_sender_id": "GemDemo",
     "sms_country_code": "31",
 }
@@ -105,6 +108,19 @@ async def test_an_http_gateway_is_refused(site: Site) -> None:
 
     assert response.status_code == 422
     assert 'href="#sms_api_base_url"' in response.text
+
+
+async def test_an_unknown_sms_provider_is_refused(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    response = await _post(site, "sms", {**SMS, "sms_provider": "unknown"})
+
+    assert response.status_code == 422
+    assert 'href="#sms_provider"' in response.text
+
+
+def test_every_sms_provider_has_a_label() -> None:
+    assert set(SMS_PROVIDER_LABELS) == set(SmsProvider)
 
 
 class FakeSMTP:

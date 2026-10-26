@@ -127,3 +127,56 @@ def test_blocks_without_agents_survive_upgrade_and_are_removed_on_downgrade(
     database.close()
     assert rules == [(3,)]
     assert sorted(overrides) == [("2026-01-07", 2), ("2026-01-09", None)]
+
+
+def test_stored_sms_settings_become_webex_connect_and_back(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    import json
+    import sqlite3
+
+    command.upgrade(alembic_config, "0018")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    database.executescript(
+        """
+        INSERT INTO organisations (id, name, slug) VALUES (1, 'Gemeente', 'gemeente');
+        INSERT INTO organisations (id, name, slug) VALUES (2, 'Andere', 'andere');
+        INSERT INTO channel_settings (organisation_id, channel, settings, updated_at)
+            VALUES (1, 'sms', '{"api_base_url": "https://api.us.webexconnect.io",
+                "country_code": "31", "sender_id": "Demo"}', '2026-01-01 08:00:00');
+        INSERT INTO channel_settings (organisation_id, channel, settings, updated_at)
+            VALUES (1, 'email', '{"host": "smtp.demo.nl"}', '2026-01-01 08:00:00');
+        """
+    )
+    database.commit()
+    database.close()
+
+    command.upgrade(alembic_config, "0019")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    sms = json.loads(
+        database.execute("SELECT settings FROM channel_settings WHERE channel = 'sms'").fetchone()[
+            0
+        ]
+    )
+    email = json.loads(
+        database.execute(
+            "SELECT settings FROM channel_settings WHERE channel = 'email'"
+        ).fetchone()[0]
+    )
+    database.execute(
+        "INSERT INTO channel_settings (organisation_id, channel, settings, updated_at) VALUES"
+        ' (2, \'sms\', \'{"provider": "other", "sender_id": "X"}\', \'2026-01-01 08:00:00\')'
+    )
+    database.commit()
+    database.close()
+    assert sms["provider"] == "webex_connect"
+    assert "provider" not in email
+
+    command.downgrade(alembic_config, "0018")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    rows = database.execute(
+        "SELECT organisation_id, settings FROM channel_settings WHERE channel = 'sms'"
+    ).fetchall()
+    database.close()
+    assert [org for org, _ in rows] == [1]  # another provider would go through Connect
+    assert "provider" not in json.loads(rows[0][1])
