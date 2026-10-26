@@ -225,10 +225,10 @@ class AuthorizedClient:
 def http_failure(response: httpx.Response, *, explain: bool = False) -> IntegrationError:
     """Map an unexpected status to an ``IntegrationError`` and log why Webex refused.
 
-    Shared by every Webex API adapter (Meetings, WxCC, Webex Connect SMS). The log line
-    carries the status and Webex's ``trackingId`` for Webex support; with ``explain``
-    (requests without citizen data only) also Webex's ``message`` with email addresses
-    masked. Never the rest of the body.
+    Shared by every HTTP adapter (Webex Meetings, WxCC, Webex Connect SMS, GitHub releases).
+    The log line carries the status and the ``trackingId``, if any; with ``explain``
+    (requests without citizen data only) also the ``message`` with email addresses masked.
+    Never the rest of the body.
     """
     status = response.status_code
     reason, tracking_id = _refusal(response)

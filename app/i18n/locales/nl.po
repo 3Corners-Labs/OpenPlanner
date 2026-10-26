@@ -627,7 +627,7 @@ msgid "authz.permission.group_edit"
 msgstr "Groepsinstellingen wijzigen"
 
 msgid "authz.permission.schedule_manage"
-msgstr "Openingstijden en uitzonderingen beheren"
+msgstr "Bezetting en afwijkende bezetting beheren"
 
 msgid "authz.permission.texts_manage"
 msgstr "Teksten beheren"
@@ -702,7 +702,7 @@ msgid "admin.done.added"
 msgstr "Toegevoegd."
 
 msgid "admin.done.created"
-msgstr "De groep is aangemaakt. Stel nu de openingstijden in."
+msgstr "De groep is aangemaakt. Stel nu de bezetting in."
 
 msgid "admin.done.removed"
 msgstr "Verwijderd."
@@ -720,10 +720,10 @@ msgid "admin.tab.settings"
 msgstr "Instellingen"
 
 msgid "admin.tab.hours"
-msgstr "Openingstijden"
+msgstr "Bezetting"
 
 msgid "admin.tab.exceptions"
-msgstr "Uitzonderingen"
+msgstr "Afwijkende bezetting"
 
 msgid "admin.group.sections"
 msgstr "Onderdelen van de groep"
@@ -741,7 +741,7 @@ msgid "admin.new_group.title"
 msgstr "Nieuwe groep"
 
 msgid "admin.new_group.lead"
-msgstr "Een groep is een team met één wachtrij in het contactcenter. Na het aanmaken stelt u de openingstijden in."
+msgstr "Een groep is een team met één wachtrij in het contactcenter. Na het aanmaken stelt u de bezetting in: per tijdblok het aantal medewerkers."
 
 msgid "admin.new_group.create"
 msgstr "Groep aanmaken"
@@ -806,10 +806,10 @@ msgid "admin.field.closes"
 msgstr "Tot"
 
 msgid "admin.field.capacity"
-msgstr "Gelijktijdige gesprekken"
+msgstr "Aantal medewerkers"
 
 msgid "admin.field.capacity_hint"
-msgstr "Hoeveel deelnemers in hetzelfde tijdslot kunnen boeken."
+msgstr "Zoveel deelnemers kunnen in hetzelfde tijdslot boeken. Vul 0 in voor bijvoorbeeld lunch: dan zijn er geen tijdsloten."
 
 msgid "admin.field.label"
 msgstr "Label"
@@ -891,91 +891,121 @@ msgid "admin.form.error.day"
 msgstr "Kies een datum vanaf vandaag."
 
 msgid "admin.form.error.overlap"
-msgstr "Deze tijden overlappen met een bestaande openingstijd op die dag."
+msgstr "Deze tijden overlappen met een bestaand tijdblok op die dag."
 
 msgid "admin.form.error.override_conflict"
-msgstr "Voor deze datum bestaat al een uitzondering die hiermee botst."
+msgstr "Voor deze datum bestaat al een afwijkende bezetting die hiermee botst."
 
 msgid "admin.hours.title"
-msgstr "Openingstijden per week"
+msgstr "Bezetting per week"
 
 msgid "admin.hours.lead"
-msgstr "Per dag één of meer openingstijden. Elke openingstijd wordt verdeeld in tijdsloten van de gespreksduur; deelnemers boeken een tijdslot."
+msgstr "Per dag één of meer tijdblokken, elk met een aantal medewerkers; 0 voor bijvoorbeeld lunch. Aansluitende tijdblokken met medewerkers worden samen verdeeld in tijdsloten van de gespreksduur; deelnemers boeken een tijdslot."
 
 msgid "admin.hours.manage"
-msgstr "Openingstijden beheren"
+msgstr "Bezetting beheren"
 
 msgid "admin.hours.closed"
-msgstr "Gesloten"
+msgstr "Geen bezetting"
 
 msgid "admin.hours.capacity"
-msgstr "tot {count} tegelijk"
+msgstr "{count} medewerkers"
+
+msgid "admin.hours.capacity_one"
+msgstr "1 medewerker"
+
+msgid "admin.hours.capacity_none"
+msgstr "geen medewerkers"
 
 msgid "admin.hours.validity"
 msgstr "{start} t/m {end}"
 
 msgid "admin.hours.add"
-msgstr "Openingstijd toevoegen"
+msgstr "Tijdblok toevoegen"
 
 msgid "admin.hours.add_lead"
-msgstr "Bestaande afspraken blijven staan; de nieuwe openingstijd geldt voor nieuwe afspraken."
+msgstr "Bestaande afspraken blijven staan; het nieuwe tijdblok geldt voor nieuwe afspraken."
 
 msgid "admin.hours.add_button"
-msgstr "Openingstijd toevoegen"
+msgstr "Tijdblok toevoegen"
 
 msgid "admin.hours.add_link"
 msgstr "Toevoegen"
 
 msgid "admin.hours.add_label"
-msgstr "Openingstijd op {day} toevoegen"
+msgstr "Tijdblok op {day} toevoegen"
 
 msgid "admin.hours.edit"
-msgstr "Openingstijd wijzigen"
+msgstr "Tijdblok wijzigen"
 
 msgid "admin.hours.edit_lead"
-msgstr "Bestaande afspraken blijven staan; de gewijzigde openingstijd geldt voor nieuwe afspraken."
+msgstr "Bestaande afspraken blijven staan; het gewijzigde tijdblok geldt voor nieuwe afspraken."
 
 msgid "admin.hours.edit_label"
-msgstr "Openingstijd {day} {time} wijzigen"
+msgstr "Tijdblok {day} {time} wijzigen"
 
 msgid "admin.hours.remove_label"
-msgstr "Openingstijd {day} {time} verwijderen"
+msgstr "Tijdblok {day} {time} verwijderen"
+
+msgid "admin.hours.split"
+msgstr "Splitsen"
+
+msgid "admin.hours.split_label"
+msgstr "Tijdblok {day} {time} splitsen"
+
+msgid "admin.hours.split_title"
+msgstr "Tijdblok splitsen"
+
+msgid "admin.hours.split_lead"
+msgstr "{block}. Het tijdblok wordt twee aansluitende tijdblokken: het eerste deel houdt het aantal medewerkers en het label, voor het tweede deel kiest u ze hier, bijvoorbeeld 0 en Lunch."
+
+msgid "admin.hours.split_button"
+msgstr "Splitsen"
+
+msgid "admin.field.split_at"
+msgstr "Splitsen om"
+
+msgid "admin.field.split_at_hint"
+msgstr "Het tweede deel begint op dit tijdstip."
+
+msgid "admin.form.error.split_at"
+msgstr "Kies een tijd na het begin en vóór het einde van het tijdblok."
 
 msgid "admin.exceptions.upcoming"
-msgstr "Komende uitzonderingen"
+msgstr "Komende afwijkende bezetting"
 
 msgid "admin.exceptions.lead"
-msgstr "Een uitzondering vervangt de openingstijden van die ene datum: gesloten, of andere tijden."
+msgstr "Een afwijkende bezetting vervangt de tijdblokken van die ene datum: geen bezetting, of andere tijdblokken."
 
 msgid "admin.exceptions.manage"
-msgstr "Uitzonderingen beheren"
+msgstr "Afwijkende bezetting beheren"
 
 msgid "admin.exceptions.none"
-msgstr "Geen uitzonderingen gepland."
+msgstr "Geen afwijkende bezetting gepland."
 
 msgid "admin.exceptions.closed"
-msgstr "Gesloten"
+msgstr "Geen bezetting"
 
 msgid "admin.exceptions.what"
 msgstr "Wat"
 
 msgid "admin.exceptions.add"
-msgstr "Uitzondering toevoegen"
+msgstr "Afwijkende bezetting toevoegen"
 
 msgid "admin.exceptions.add_button"
-msgstr "Uitzondering toevoegen"
+msgstr "Afwijkende bezetting toevoegen"
 
 msgid "admin.exceptions.kind"
 msgstr "Soort"
 
 msgid "admin.exceptions.kind_closed"
-msgstr "Hele dag gesloten"
+msgstr "Hele dag geen bezetting"
 
 msgid "admin.exceptions.kind_hours"
-msgstr "Afwijkende tijden"
+msgstr "Eigen tijdblok"
 
 msgid "admin.exceptions.remove_label"
-msgstr "Uitzondering op {day} verwijderen"
+msgstr "Afwijkende bezetting op {day} verwijderen"
 
 msgid "admin.preview.title"
 msgstr "Zo zien deelnemers het"
@@ -987,22 +1017,25 @@ msgid "admin.preview.day"
 msgstr "{count} tijdsloten, {first} tot {last}, tot {capacity} tegelijk"
 
 msgid "admin.preview.empty"
-msgstr "Nog geen tijdsloten: stel eerst openingstijden in."
+msgstr "Nog geen tijdsloten: stel eerst de bezetting in."
 
 msgid "admin.audit.detail.rule_add"
-msgstr "Openingstijd toegevoegd"
+msgstr "Tijdblok toegevoegd"
 
 msgid "admin.audit.detail.rule_edit"
-msgstr "Openingstijd gewijzigd"
+msgstr "Tijdblok gewijzigd"
 
 msgid "admin.audit.detail.rule_remove"
-msgstr "Openingstijd verwijderd"
+msgstr "Tijdblok verwijderd"
+
+msgid "admin.audit.detail.rule_split"
+msgstr "Tijdblok gesplitst"
 
 msgid "admin.audit.detail.override_add"
-msgstr "Uitzondering toegevoegd"
+msgstr "Afwijkende bezetting toegevoegd"
 
 msgid "admin.audit.detail.override_remove"
-msgstr "Uitzondering verwijderd"
+msgstr "Afwijkende bezetting verwijderd"
 
 msgid "admin.yes"
 msgstr "Ja"
@@ -1038,7 +1071,7 @@ msgid "admin.field.direct_call_enabled"
 msgstr "Direct gesprek starten"
 
 msgid "admin.field.direct_call_enabled_hint"
-msgstr "Deelnemers kunnen binnen de openingstijden meteen een gesprek starten."
+msgstr "Deelnemers kunnen meteen een gesprek starten tijdens een tijdblok met medewerkers."
 
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Niet opgepakt na (minuten)"
@@ -2567,7 +2600,7 @@ msgid "admin.holidays.state_open"
 msgstr "Gewoon open"
 
 msgid "admin.holidays.state_exception"
-msgstr "Eigen uitzondering"
+msgstr "Eigen afwijkende bezetting"
 
 msgid "admin.holidays.keep_open"
 msgstr "Toch open"
@@ -2582,7 +2615,7 @@ msgid "admin.holidays.close_label"
 msgstr "Weer sluiten op {name} ({day})"
 
 msgid "admin.holidays.see_exceptions"
-msgstr "Bekijk uitzonderingen"
+msgstr "Bekijk afwijkende bezetting"
 
 msgid "admin.holidays.none_upcoming"
 msgstr "Er gelden geen feestdagen voor deze groep in het komende jaar."
@@ -2591,7 +2624,7 @@ msgid "admin.holidays.group_choice"
 msgstr "Welke kalenders gelden"
 
 msgid "admin.holidays.group_choice_lead"
-msgstr "Een eigen uitzondering op een feestdag gaat altijd voor; zo kunt u een feestdag ook met andere tijden openen."
+msgstr "Een eigen afwijkende bezetting op een feestdag gaat altijd voor; zo kunt u op een feestdag toch medewerkers inplannen."
 
 msgid "admin.holidays.source"
 msgstr "Kalenders voor deze groep"
@@ -2706,3 +2739,180 @@ msgstr "De mailserver weigerde het bericht (code {status})."
 
 msgid "admin.channels.test_failed.other"
 msgstr "Het versturen is mislukt door een onverwachte fout van de mailserver. Probeer het later opnieuw."
+
+msgid "authz.permission.system_update"
+msgstr "Updates van de installatie uitvoeren"
+
+msgid "admin.nav.updates"
+msgstr "Updates"
+
+msgid "admin.form.error.update_not_available"
+msgstr "Er is geen nieuwere versie of geen vorige versie om naar terug te gaan."
+
+msgid "admin.form.error.update_in_progress"
+msgstr "Er loopt al een updateverzoek. Wacht tot het klaar is of trek het in."
+
+msgid "admin.done.update_requested"
+msgstr "De update is aangevraagd. De updater op de server voert hem binnen een minuut uit."
+
+msgid "admin.done.restore_requested"
+msgstr "Terugzetten is aangevraagd. De updater op de server voert het binnen een minuut uit."
+
+msgid "admin.done.request_cancelled"
+msgstr "Het verzoek is ingetrokken."
+
+msgid "admin.updates.title"
+msgstr "Updates"
+
+msgid "admin.updates.lead"
+msgstr "Installeer een nieuwe versie van OpenPlanner of ga terug naar de vorige. De updater op de server controleert de handtekening, maakt eerst een back-up en zet bij problemen zelf de vorige versie terug."
+
+msgid "admin.updates.not_enabled"
+msgstr "Deze installatie zoekt niet naar nieuwe versies: UPDATE_REPOSITORY is niet ingesteld."
+
+msgid "admin.updates.version"
+msgstr "Versie"
+
+msgid "admin.updates.running"
+msgstr "Draait nu"
+
+msgid "admin.updates.no_release_build"
+msgstr "Geen releaseversie (ontwikkelversie); updates worden niet aangeboden."
+
+msgid "admin.updates.latest"
+msgstr "Nieuwste versie"
+
+msgid "admin.updates.unknown"
+msgstr "Onbekend"
+
+msgid "admin.updates.checked_at"
+msgstr "Laatst gecontroleerd"
+
+msgid "admin.updates.never"
+msgstr "Nog niet"
+
+msgid "admin.updates.check_failed"
+msgstr "Controle mislukt ({code})"
+
+msgid "admin.updates.open"
+msgstr "Lopend verzoek"
+
+msgid "admin.updates.open_lead"
+msgstr "Naar versie {version}. De pagina toont de uitkomst zodra de updater die meldt."
+
+msgid "admin.updates.unclaimed"
+msgstr "Geen updater heeft dit verzoek na 10 minuten opgepakt. Controleer of de updater op de server is geïnstalleerd (zie het runbook)."
+
+msgid "admin.updates.cancel"
+msgstr "Verzoek intrekken"
+
+msgid "admin.updates.update_heading"
+msgstr "Versie {version} is beschikbaar"
+
+msgid "admin.updates.update_lead"
+msgstr "De boekingspagina's zijn tijdens de update enkele seconden niet bereikbaar. Kies een rustig moment."
+
+msgid "admin.updates.release_notes"
+msgstr "Wat is er nieuw (release notes)"
+
+msgid "admin.updates.update_now"
+msgstr "Nu bijwerken naar {version}"
+
+msgid "admin.updates.restore_heading"
+msgstr "Vorige versie terugzetten"
+
+msgid "admin.updates.restore_lead"
+msgstr "Gaat terug naar versie {version}. Gegevens die sinds de update zijn ingevoerd blijven bewaard. Kan tot 24 uur na de update."
+
+msgid "admin.updates.restore_now"
+msgstr "Terugzetten naar {version}"
+
+msgid "admin.updates.history"
+msgstr "Geschiedenis"
+
+msgid "admin.updates.requested_at"
+msgstr "Aangevraagd"
+
+msgid "admin.updates.action"
+msgstr "Actie"
+
+msgid "admin.updates.versions"
+msgstr "Van → naar"
+
+msgid "admin.updates.status"
+msgstr "Status"
+
+msgid "admin.updates.finished_at"
+msgstr "Klaar"
+
+msgid "admin.updates.none"
+msgstr "Nog geen updates aangevraagd."
+
+msgid "admin.updates.action.update"
+msgstr "Bijwerken"
+
+msgid "admin.updates.action.restore"
+msgstr "Terugzetten"
+
+msgid "admin.updates.status.requested"
+msgstr "Aangevraagd"
+
+msgid "admin.updates.status.running"
+msgstr "Bezig"
+
+msgid "admin.updates.status.succeeded"
+msgstr "Gelukt"
+
+msgid "admin.updates.status.rolled_back"
+msgstr "Teruggedraaid"
+
+msgid "admin.updates.status.failed"
+msgstr "Mislukt"
+
+msgid "admin.updates.status.cancelled"
+msgstr "Ingetrokken"
+
+msgid "admin.updates.reason.signature_invalid"
+msgstr "De handtekening van de image klopt niet; er is niets gewijzigd."
+
+msgid "admin.updates.reason.image_not_found"
+msgstr "De image van deze versie is niet gevonden; er is niets gewijzigd."
+
+msgid "admin.updates.reason.backup_failed"
+msgstr "De back-up is mislukt; er is niets gewijzigd."
+
+msgid "admin.updates.reason.migration_failed"
+msgstr "De database kon niet worden teruggezet naar de vorige versie."
+
+msgid "admin.updates.reason.health_check_failed"
+msgstr "De nieuwe versie werd niet gezond; de vorige versie en de back-up zijn teruggezet."
+
+msgid "admin.updates.reason.restore_failed"
+msgstr "Ook het terugzetten is mislukt. Volg het runbook."
+
+msgid "admin.updates.reason.version_mismatch"
+msgstr "Na de update draait niet de gevraagde versie."
+
+msgid "admin.updates.reason.updater_error"
+msgstr "Onverwachte fout in de updater. Bekijk het log van de updater op de server."
+
+msgid "admin.updates.reason.other"
+msgstr "De updater meldde een onbekende reden."
+
+msgid "admin.updates.banner.available"
+msgstr "Versie {version} van OpenPlanner is beschikbaar (nu {current})."
+
+msgid "admin.updates.banner.progress"
+msgstr "Update naar versie {version} is aangevraagd of bezig."
+
+msgid "admin.updates.banner.problem"
+msgstr "Update naar versie {version}: {status}."
+
+msgid "admin.updates.banner.done"
+msgstr "OpenPlanner is bijgewerkt; nu draait versie {version}."
+
+msgid "admin.updates.banner.open"
+msgstr "Naar updates"
+
+msgid "admin.updates.banner.snooze"
+msgstr "Herinner me over 60 minuten"

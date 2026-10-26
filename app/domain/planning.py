@@ -7,7 +7,7 @@ names or ``rule.add``-style keys, never values).
 
     create_group     group.create     organisation level (the chosen organisation)
     update_settings  group.edit       group level
-    add/change/remove rule, add/remove override, schedule, preview
+    add/change/split/remove rule, add/remove override, schedule, preview
                      schedule.manage / group.view   group level
 
 Existing bookings are never touched: their capacity is snapshotted on the slot. The time grid
@@ -16,7 +16,7 @@ slots would overlap and capacity could no longer be counted per slot.
 """
 
 from dataclasses import dataclass, fields, replace
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 from app.domain.admin import AdminService, Authorization, record_change, require
 from app.domain.authorization import Permission, Principal, scope_for
@@ -32,6 +32,7 @@ from app.domain.scheduling import (
     PhoneMode,
     ScheduleOverride,
     ScheduleRule,
+    TimeWindow,
     validate_schedule,
     windows_on,
 )
@@ -266,6 +267,45 @@ class PlanningService:
             await tx.update_schedule_rule(group.id, rule_id, rule)
             await self._schedule_audit(tx, principal, authorization, slug, "rule.edit")
         return True
+
+    async def split_rule(
+        self,
+        principal: Principal,
+        slug: str,
+        rule_id: int,
+        at: time,
+        capacity: int,
+        label: str | None = None,
+    ) -> int:
+        """Split weekly block ``rule_id`` at ``at`` into two touching blocks (ADR 0027).
+
+        The first part keeps the block's id, agent count and label; the second part runs from
+        ``at`` to the old end with ``capacity`` agents and ``label``. Both keep the weekday and
+        validity period. One locked transaction replaces the one rule with the two and
+        validates the whole schedule, like a change. Returns the id of the second part.
+
+        Raises:
+            DomainError: ``not_permitted``, ``schedule_item_not_found`` or
+                ``invalid_configuration`` (``split_at``, ``capacity``, ``label`` or
+                ``schedule_rules``).
+        """
+        authorization = await self._manage(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            rules, overrides = await tx.get_schedule_items(group.id)
+            old = _rule_by_id(rules, rule_id)
+            if not old.window.opens < at < old.window.closes:
+                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "split_at")
+            first = replace(old, window=replace(old.window, closes=at), id=None)
+            second = replace(
+                old, window=TimeWindow(at, old.window.closes, capacity, label), id=None
+            )
+            others = [r for r in rules if r.id != rule_id]
+            validate_schedule([*others, first, second], overrides)
+            await tx.update_schedule_rule(group.id, rule_id, first)
+            second_id = await tx.add_schedule_rule(group.id, second)
+            await self._schedule_audit(tx, principal, authorization, slug, "rule.split")
+        return second_id
 
     async def remove_rule(self, principal: Principal, slug: str, rule_id: int) -> None:
         """Remove a weekly opening window of the group.
