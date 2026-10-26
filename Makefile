@@ -1,8 +1,8 @@
-.PHONY: check fmt lint type imports test security audit lock licenses migrations semgrep duplication mutation e2e proxy-check up down
+.PHONY: check fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation e2e proxy-check up down
 
 UV := uv run
 
-check: lint type imports test security audit lock duplication ## Everything a PR must pass locally
+check: lint shellcheck type imports test security audit lock duplication ## Everything a PR must pass locally
 
 fmt:
 	$(UV) ruff format .
@@ -11,6 +11,13 @@ fmt:
 lint:
 	$(UV) ruff format --check .
 	$(UV) ruff check .
+
+# The host's shell scripts, the root-run updater among them. Uses a local shellcheck when there
+# is one (CI runners have it), otherwise the pinned image.
+SHELLCHECK_IMAGE := koalaman/shellcheck:v0.10.0
+shellcheck:
+	@if command -v shellcheck >/dev/null; then shellcheck scripts/*.sh scripts/updater/*.sh; \
+	else docker run --rm -v "$$PWD:/mnt:ro" -w /mnt $(SHELLCHECK_IMAGE) scripts/*.sh scripts/updater/*.sh; fi
 
 type:
 	$(UV) mypy
