@@ -10,7 +10,7 @@ from app.domain.authorization import Principal
 from app.domain.booking import Booking, BookingStatus, Slot
 from app.domain.errors import DomainError
 from app.domain.planning import NewGroup, PlanningService, settings_of
-from app.domain.scheduling import PhoneMode, ScheduleOverride, ScheduleRule
+from app.domain.scheduling import PhoneMode, ScheduleOverride, ScheduleRule, TimeWindow
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import (
@@ -263,6 +263,78 @@ async def test_changing_a_window_of_another_group_is_refused(
     with pytest.raises(DomainError, match="schedule_item_not_found"):
         await planning.rule(GROUP_ADMIN, "demo", rule_id)
     assert uow.state.rules[2][0].window.capacity == 2
+
+
+async def test_splitting_a_block_replaces_it_with_two_touching_blocks(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    rule = ScheduleRule(
+        2, TimeWindow(time(9), time(17), 3, "Dag"), date(2026, 1, 1), date(2026, 6, 30)
+    )
+    rule_id = await planning.add_rule(GROUP_ADMIN, "demo", rule)
+
+    second_id = await planning.split_rule(GROUP_ADMIN, "demo", rule_id, time(12), 0, "Lunch")
+
+    rules = (await planning.schedule(GROUP_ADMIN, "demo")).rules
+    assert [(r.id, r.window, r.window.label) for r in rules] == [
+        (rule_id, window("09:00", "12:00", 3), "Dag"),
+        (second_id, window("12:00", "17:00", 0), "Lunch"),
+    ]
+    # The second part keeps the weekday and validity period of the original.
+    assert {(r.weekday, r.valid_from, r.valid_to) for r in rules} == {
+        (2, date(2026, 1, 1), date(2026, 6, 30))
+    }
+    assert [e.detail for e in uow.state.audit] == ["rule.add", "rule.split"]
+
+
+@pytest.mark.parametrize("at", [time(9), time(8), time(12), time(13)])
+async def test_a_block_is_split_strictly_inside_it(
+    planning: PlanningService, uow: InMemoryUnitOfWork, at: time
+) -> None:
+    rule_id = await planning.add_rule(SUPER, "demo", _rule(opens="09:00", closes="12:00"))
+
+    with pytest.raises(DomainError, match="split_at"):
+        await planning.split_rule(SUPER, "demo", rule_id, at, 1)
+
+    assert [r.window for r in uow.state.rules[1]] == [window("09:00", "12:00", 2)]
+    assert [e.detail for e in uow.state.audit] == ["rule.add"]
+
+
+@pytest.mark.parametrize(
+    ("capacity", "label", "field"),
+    [
+        (-1, None, "capacity"),
+        (1001, None, "capacity"),
+        (1, "x" * 51, "label"),
+        (1, "a\nb", "label"),
+    ],
+)
+async def test_the_second_part_is_validated_like_a_new_block(
+    planning: PlanningService,
+    uow: InMemoryUnitOfWork,
+    capacity: int,
+    label: str | None,
+    field: str,
+) -> None:
+    rule_id = await planning.add_rule(SUPER, "demo", _rule(opens="09:00", closes="12:00"))
+
+    with pytest.raises(DomainError, match=field):
+        await planning.split_rule(SUPER, "demo", rule_id, time(10), capacity, label)
+
+    assert [r.window for r in uow.state.rules[1]] == [window("09:00", "12:00", 2)]
+
+
+async def test_splitting_a_block_of_another_group_is_refused(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    rule_id = await planning.add_rule(SUPER, "andere-team", _rule())
+
+    with pytest.raises(DomainError, match="not_permitted"):
+        await planning.split_rule(GROUP_ADMIN, "andere-team", rule_id, time(10), 1)
+    with pytest.raises(DomainError, match="schedule_item_not_found"):
+        await planning.split_rule(GROUP_ADMIN, "demo", rule_id, time(10), 1)
+    assert [r.window for r in uow.state.rules[2]] == [window("09:00", "12:00", 2)]
+    assert (await planning.schedule(GROUP_ADMIN, "demo")).rules == []
 
 
 async def test_overlapping_opening_hours_are_refused(planning: PlanningService) -> None:

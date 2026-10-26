@@ -4,11 +4,11 @@
 {% block content %}
 {% include "admin/_group_header.html" %}
 {% include "_error_summary.html" %}
-<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/hours/{{ rule_id }}" novalidate aria-labelledby="edit-heading">
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/staffing/{{ rule_id }}" novalidate aria-labelledby="edit-heading">
   <div class="card__header">
     <h2 id="edit-heading">{{ _("admin.hours.edit") }}</h2>
     <p class="card__lead">{{ _("admin.hours.edit_lead") }}</p>
   </div>
-  {{ form_body(fields, _("admin.save"), "/admin/groups/" ~ summary.group.slug ~ "/hours") }}
+  {{ form_body(fields, _("admin.save"), "/admin/groups/" ~ summary.group.slug ~ "/staffing") }}
 </form>
 {% endblock %}

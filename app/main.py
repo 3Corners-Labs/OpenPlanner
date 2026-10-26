@@ -16,6 +16,7 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.integrations import Integrations, build_integrations, secret_box
 from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider
+from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.admin.routes import register_admin
 from app.api import (
@@ -142,6 +143,10 @@ def create_app(
         )
         app.state.api_access = ApiAccessService(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled
+        )
+        # ADR 0029: the web process only reads checks and stores requests; no release lookup.
+        app.state.update_service = update_service(
+            settings.model_copy(update={"update_repository": None}), uow, clock, http
         )
         if agent_api is not None:
             for name in ("api_access", "booking_service", "translator", "limiter", "clock"):

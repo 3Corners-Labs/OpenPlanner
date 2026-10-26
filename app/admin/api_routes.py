@@ -17,9 +17,7 @@ is visible. ``ApiAccessService`` authorises again, validates and audits.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
@@ -32,7 +30,7 @@ from app.admin.forms import (
     read_form,
     redirect_done,
 )
-from app.admin.pages import Locale, SameOrigin
+from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.config import AGENT_API_PREFIX as PREFIX
 from app.domain.api_access import ApiAccessService
@@ -46,7 +44,6 @@ from app.domain.api_clients import (
 from app.domain.authorization import API_SCOPES, Permission
 from app.domain.errors import DomainError
 from app.domain.scheduling import GroupSummary
-from app.i18n.dates import format_clock, format_day_compact, local_day
 from app.web.authz_labels import API_SCOPE_LABELS
 from app.web.locale import RequestLocale
 
@@ -91,14 +88,6 @@ class ClientView:
     last_token: str | None
 
 
-def _moment(request: Request, locale: RequestLocale, at: datetime) -> str:
-    """Return a compact local date and time in the admin time zone."""
-    tz = ZoneInfo(request.app.state.settings.admin_timezone)
-    return (
-        f"{format_day_compact(local_day(at, tz), locale.code)}, {format_clock(at, tz, locale.code)}"
-    )
-
-
 def _view(
     request: Request, locale: RequestLocale, client: ApiClient, names: dict[str, str]
 ) -> ClientView:
@@ -110,9 +99,11 @@ def _view(
         organisation_name=names.get(client.organisation, client.organisation),
         scopes=", ".join(_(API_SCOPE_LABELS[s]) for s in sorted(client.scopes)),
         groups=", ".join(sorted(client.groups)) or _("admin.api.all_groups"),
-        secret_expires=_moment(request, locale, client.secret_expires_at),
+        secret_expires=admin_moment(request, locale, client.secret_expires_at),
         secret_expiring=client.secret_expiring(now),
-        last_token=_moment(request, locale, client.last_token_at) if client.last_token_at else None,
+        last_token=admin_moment(request, locale, client.last_token_at)
+        if client.last_token_at
+        else None,
     )
 
 
@@ -216,7 +207,7 @@ def _secret_page(
         {
             "client": issued.client,
             "secret": issued.secret,
-            "expires": _moment(request, locale, issued.client.secret_expires_at),
+            "expires": admin_moment(request, locale, issued.client.secret_expires_at),
             "token_url": f"{request.app.state.settings.public_base_url.rstrip('/')}"
             f"{PREFIX}/oauth/token",
         },
