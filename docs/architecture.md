@@ -200,6 +200,7 @@ same commit and rollback behaviour as the SQL one.
 | Authorisation matrix, scopes (ADR 0014) | `app/domain/authorization.py` |
 | Admin use cases, audit events | `app/domain/admin.py`, `app/domain/audit.py` |
 | Groups, opening hours, exceptions, preview (admin) | `app/domain/planning.py` |
+| Holiday calendars and their resolution per group (ADR 0025) | `app/domain/holidays.py`, `app/domain/holiday_service.py`, `app/admin/holiday_routes.py` |
 | What leaves for Webex/WxCC, timeline, call status, join window | `app/domain/calls.py` |
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
@@ -236,6 +237,10 @@ same commit and rollback behaviour as the SQL one.
 ```mermaid
 erDiagram
     ORGANISATION ||--o{ GROUP : owns
+    HOLIDAY_CALENDAR ||--o{ HOLIDAY : "closes a date"
+    ORGANISATION }o--o{ HOLIDAY_CALENDAR : "chooses for its groups"
+    GROUP }o--o{ HOLIDAY_CALENDAR : "chooses itself (instead)"
+    GROUP ||--o{ HOLIDAY_OPEN_DAY : "keeps a holiday open"
     GROUP ||--o{ SCHEDULE_RULE : "opens weekly"
     GROUP ||--o{ SCHEDULE_OVERRIDE : "changes a date"
     GROUP ||--o{ REMINDER_RULE : reminds
@@ -261,6 +266,18 @@ erDiagram
         int dispatch_lead_minutes
         string phone_mode
         string wxcc_queue_id
+        string holiday_source "inherit | own"
+    }
+    HOLIDAY_CALENDAR {
+        string slug
+        string name
+    }
+    HOLIDAY {
+        date day
+        string name
+    }
+    HOLIDAY_OPEN_DAY {
+        date day
     }
     SCHEDULE_RULE {
         int weekday
@@ -315,6 +332,10 @@ Rules that matter for the rest of the system:
   Later schedule edits change new slots only.
 - **An override replaces every rule on its date.** A closed override blocks new bookings,
   even in slots that already exist.
+- **Holidays come from reusable calendars** (ADR 0025): the superuser maintains them, an
+  organisation chooses the ones its groups follow, a group inherits or picks its own (or
+  none) and may keep single holidays open. On a date the group's own override wins, then a
+  holiday closes the day, then the weekly rules apply (`app/domain/holidays.py`).
 - **The dispatch lead** (`dispatch_lead_minutes`, default 5) sets two moments: when the WxCC
   task is created, and when the booking becomes read-only. The minimum notice can never be
   shorter than it.
@@ -596,6 +617,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0022 | Message channels per organisation, SMS through Webex Connect, editable texts |
 | 0023 | Machine API for contact-center bots: OAuth client credentials, off by default, no personal data |
 | 0024 | Emergency closure: appointments on hold, citizens informed, no deletion |
+| 0025 | Reusable holiday calendars with overrides per organisation and group |
 
 ## 12. Status and roadmap
 
@@ -614,6 +636,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |
 | ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
+| WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |

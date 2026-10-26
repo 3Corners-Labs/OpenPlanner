@@ -1,19 +1,9 @@
 {% extends "admin/layout.html" %}
+{% from "admin/_page_header.html" import page_header with context %}
 {% from "admin/_fields.html" import field, form_body with context %}
 {% block title %}{{ _("admin.channels.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
-<nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
-  <ol>
-    <li><a href="/admin/integrations">{{ _("admin.integrations.title") }}</a></li>
-    <li><span aria-current="page">{{ organisation.name }}</span></li>
-  </ol>
-</nav>
-<div class="page-header">
-  <div>
-    <h1>{{ _("admin.channels.title") }}</h1>
-    <p class="page-header__lead">{{ organisation.name }} · {{ _("admin.channels.lead") }}</p>
-  </div>
-</div>
+{{ page_header('/admin/integrations', _("admin.integrations.title"), organisation.name, _("admin.channels.title"), organisation.name ~ ' · ' ~ _("admin.channels.lead")) }}
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
 <form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/channels/email" novalidate aria-labelledby="email-heading">

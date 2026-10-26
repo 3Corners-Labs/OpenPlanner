@@ -35,6 +35,7 @@ from app.admin import (
     channel_routes,
     closure_routes,
     group_routes,
+    holiday_routes,
     message_routes,
     organisation_routes,
 )
@@ -513,6 +514,7 @@ def register_admin(app: FastAPI) -> None:
     app.include_router(group_routes.router)
     app.include_router(call_routes.router)
     app.include_router(branding_routes.router)
+    app.include_router(holiday_routes.router)
     app.include_router(channel_routes.router)
     app.include_router(message_routes.router)
     app.include_router(organisation_routes.router)

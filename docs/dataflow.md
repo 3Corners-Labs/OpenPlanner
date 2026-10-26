@@ -139,6 +139,19 @@ WxCC AI Agent ──GET groups, availability (bearer token)──> web: group na
 No personal data flows through this API. The next step (change requests, ADR 0023) adds the
 phone number from the bot; it will be compared in memory and never stored outside `bookings`.
 
+## Holiday calendars (ADR 0025)
+
+```
+superuser ──POST calendar name/slug, holiday date/name, year──> web ──SQL──> holiday_calendars, holidays
+organisation admin ──POST ticked calendars──> web ──SQL──> organisation_holiday_calendars
+group admin ──POST source, own calendars, kept-open date──> web ──SQL──> groups.holiday_source,
+                                                                 group_holiday_calendars, group_holiday_open_days
+citizen ──GET /g/{slug}──> web (holidays are closed days: no times, no holiday data shown)
+```
+
+Holiday calendars are configuration, not personal data; nothing leaves the system. Changes are
+audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
+
 ## Planned flows
 
 To be added per work package: purge sweep and backups (WP8). Each flow lists: data items, source, destination, legal

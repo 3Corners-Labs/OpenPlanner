@@ -53,15 +53,24 @@ def _invalid(field: str) -> DomainError:
     return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
 
 
-def _check_name_and_slug(name: str, slug: str) -> None:
-    """Validate the display name and URL slug shared by organisations and groups.
+def check_name(name: str) -> None:
+    """Validate a display name: not blank, at most ``MAX_NAME_LENGTH``, no control characters.
 
     Raises:
-        DomainError: ``invalid_configuration`` for ``name`` (empty, too long, control
-            characters) or ``slug`` (not lowercase words joined by hyphens, too long).
+        DomainError: ``invalid_configuration`` with field ``name``.
     """
     if not name.strip() or len(name) > MAX_NAME_LENGTH or _CONTROL_CHARS.search(name):
         raise _invalid("name")
+
+
+def check_name_and_slug(name: str, slug: str) -> None:
+    """Validate the display name and URL slug shared by organisations, groups and calendars.
+
+    Raises:
+        DomainError: ``invalid_configuration`` for ``name`` (see ``check_name``) or ``slug``
+            (not lowercase words joined by hyphens, too long).
+    """
+    check_name(name)
     if len(slug) > MAX_SLUG_LENGTH or not _SLUG.fullmatch(slug):
         raise _invalid("slug")
 
@@ -90,7 +99,7 @@ class Organisation:
 
     def __post_init__(self) -> None:
         """Validate name and slug; the locale is checked against the catalogues by the service."""
-        _check_name_and_slug(self.name, self.slug)
+        check_name_and_slug(self.name, self.slug)
 
 
 @dataclass(frozen=True)
@@ -139,7 +148,7 @@ class Group:
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""
-        _check_name_and_slug(self.name, self.slug)
+        check_name_and_slug(self.name, self.slug)
         try:
             ZoneInfo(self.timezone)
         except (ZoneInfoNotFoundError, ValueError) as exc:
@@ -184,6 +193,10 @@ class Group:
     def tz(self) -> ZoneInfo:
         """The group's time zone."""
         return ZoneInfo(self.timezone)
+
+    def today(self, now: datetime) -> date:
+        """Return the date of ``now`` in the group's time zone."""
+        return now.astimezone(self.tz).date()
 
     @property
     def dispatch_lead(self) -> timedelta:

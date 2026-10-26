@@ -79,6 +79,50 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/organisations/{org}/branding/logo/remove": {
         "/admin/organisations/demo/branding/logo/remove": statuses(303, 403, 403, 403, 403),
     },
+    # Holiday calendars (ADR 0025): the superuser maintains them; organisation admins choose
+    # them for their own organisation; group admins choose for their own groups (below).
+    "GET /admin/holidays": {"/admin/holidays": statuses(200, 200, 403, 200, 403)},
+    "POST /admin/holidays": {"/admin/holidays": statuses(422, 403, 403, 403, 403)},
+    "GET /admin/holidays/{calendar}": {
+        "/admin/holidays/nationaal": statuses(200, 403, 403, 403, 403),
+        "/admin/holidays/nope": statuses(404, 403, 403, 403, 403),
+    },
+    "POST /admin/holidays/{calendar}/days": {
+        "/admin/holidays/nationaal/days": statuses(422, 403, 403, 403, 403),
+    },
+    "POST /admin/holidays/{calendar}/national": {
+        "/admin/holidays/nationaal/national": statuses(422, 403, 403, 403, 403),
+    },
+    "POST /admin/holidays/{calendar}/days/{holiday_id}/delete": {
+        "/admin/holidays/nationaal/days/999999/delete": statuses(404, 403, 403, 403, 403),
+    },
+    "POST /admin/holidays/{calendar}/delete": {
+        "/admin/holidays/nope/delete": statuses(404, 403, 403, 403, 403),
+    },
+    "GET /admin/organisations/{org}/holidays": {
+        "/admin/organisations/demo/holidays": statuses(200, 200, 403, 403, 403),
+        "/admin/organisations/andere/holidays": statuses(200, 403, 403, 200, 403),
+    },
+    "POST /admin/organisations/{org}/holidays": {
+        "/admin/organisations/demo/holidays": statuses(303, 303, 403, 403, 403),
+        "/admin/organisations/andere/holidays": statuses(303, 403, 403, 303, 403),
+    },
+    "GET /admin/groups/{slug}/holidays": {
+        "/admin/groups/demo/holidays": statuses(200, 200, 200, 403, 403),
+        "/admin/groups/andere-team/holidays": statuses(200, 403, 403, 200, 403),
+    },
+    "POST /admin/groups/{slug}/holidays": {
+        "/admin/groups/demo/holidays": statuses(422, 422, 422, 403, 403),
+        "/admin/groups/andere-team/holidays": statuses(422, 403, 403, 422, 403),
+    },
+    "POST /admin/groups/{slug}/holidays/{day}/open": {
+        "/admin/groups/demo/holidays/2026-12-25/open": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/holidays/2026-12-25/open": statuses(404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/holidays/{day}/close": {
+        "/admin/groups/demo/holidays/2026-12-25/close": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/holidays/2026-12-25/close": statuses(404, 403, 403, 404, 403),
+    },
     # Machine API clients and switches (ADR 0023): superuser only. Unknown client ids: 404.
     "GET /admin/api": {"/admin/api": statuses(200, 403, 403, 403, 403)},
     "POST /admin/api/settings": {"/admin/api/settings": statuses(303, 403, 403, 403, 403)},

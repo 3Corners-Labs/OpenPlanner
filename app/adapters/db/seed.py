@@ -2,6 +2,8 @@
 
 ``demo`` is the organisation of the development test admins; ``andere`` exists so that every
 role can be tested against an organisation and group that are *not* theirs (ADR 0014).
+An empty holiday calendar ``nationaal`` is ready for the superuser to fill (ADR 0025); no
+organisation has chosen it, so it changes no opening hours.
 
 Used by ``python -m app.cli seed-demo`` and by tests. Idempotent: existing groups are left
 untouched.
@@ -12,13 +14,20 @@ from datetime import time
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from app.adapters.db.models import GroupRow, OrganisationRow, ReminderRuleRow, ScheduleRuleRow
+from app.adapters.db.models import (
+    GroupRow,
+    HolidayCalendarRow,
+    OrganisationRow,
+    ReminderRuleRow,
+    ScheduleRuleRow,
+)
 
 DEMO_SLUG = "demo"
 OTHER_ORGANISATION_SLUG = "andere"
 OTHER_GROUP_SLUG = "andere-team"
 DEMO_WINDOWS = ((time(9), time(12)), (time(13), time(17)))
 DEMO_CAPACITY = 2
+DEMO_CALENDAR_SLUG = "nationaal"
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -27,7 +36,18 @@ async def seed_demo(engine: AsyncEngine) -> bool:
     await _seed_group(
         engine, OTHER_ORGANISATION_SLUG, "Andere gemeente", OTHER_GROUP_SLUG, "Andere: team"
     )
+    await _seed_calendar(engine)
     return created
+
+
+async def _seed_calendar(engine: AsyncEngine) -> None:
+    """Create the empty demo holiday calendar unless it exists."""
+    async with AsyncSession(engine) as session, session.begin():
+        existing = await session.scalar(
+            select(HolidayCalendarRow.id).where(HolidayCalendarRow.slug == DEMO_CALENDAR_SLUG)
+        )
+        if existing is None:
+            session.add(HolidayCalendarRow(slug=DEMO_CALENDAR_SLUG, name="Nationale feestdagen"))
 
 
 async def _seed_group(

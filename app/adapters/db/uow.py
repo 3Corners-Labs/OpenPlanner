@@ -32,9 +32,14 @@ from app.adapters.db.models import (
     ChannelSettingsRow,
     ClosureNoticeRow,
     ClosureRow,
+    GroupHolidayCalendarRow,
+    GroupHolidayOpenDayRow,
     GroupRow,
     GroupTextRow,
+    HolidayCalendarRow,
+    HolidayRow,
     JobRow,
+    OrganisationHolidayCalendarRow,
     OrganisationLogoRow,
     OrganisationRow,
     ReminderRuleRow,
@@ -75,6 +80,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.closure import Closure
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.scheduling import (
     Group,
@@ -149,6 +155,16 @@ def _override(row: ScheduleOverrideRow) -> ScheduleOverride:
     return ScheduleOverride(
         day=row.day, window=TimeWindow(row.opens, row.closes, row.capacity), id=row.id
     )
+
+
+def _calendar(row: HolidayCalendarRow) -> HolidayCalendar:
+    """Map a holiday calendar row."""
+    return HolidayCalendar(row.id, row.slug, row.name)
+
+
+def _holiday(row: HolidayRow) -> Holiday:
+    """Map a holiday row."""
+    return Holiday(row.calendar_id, row.day, row.name, id=row.id)
 
 
 def _rule(row: ScheduleRuleRow) -> ScheduleRule:
@@ -542,6 +558,134 @@ class SqlTransaction(ApiClientQueries):
             )
         )
         return bool(getattr(result, "rowcount", 0))
+
+    async def get_holiday_calendars(self) -> list[HolidayCalendar]:
+        """Return every holiday calendar, by name (global reference data, ADR 0025)."""
+        rows = await self._session.scalars(
+            select(HolidayCalendarRow).order_by(HolidayCalendarRow.name, HolidayCalendarRow.slug)
+        )
+        return [_calendar(row) for row in rows]
+
+    async def get_holiday_calendar(self, slug: str) -> HolidayCalendar | None:
+        """Return the holiday calendar with ``slug``."""
+        row = await self._session.scalar(
+            select(HolidayCalendarRow).where(HolidayCalendarRow.slug == slug)
+        )
+        return _calendar(row) if row else None
+
+    async def add_holiday_calendar(self, calendar: HolidayCalendar) -> HolidayCalendar:
+        """Insert a calendar and return it with its ID."""
+        row = HolidayCalendarRow(slug=calendar.slug, name=calendar.name)
+        self._session.add(row)
+        await self._session.flush()
+        return _calendar(row)
+
+    async def delete_holiday_calendar(self, calendar_id: int) -> None:
+        """Delete the calendar; its holidays go with it (``ON DELETE CASCADE``)."""
+        await self._session.execute(
+            delete(HolidayCalendarRow).where(HolidayCalendarRow.id == calendar_id)
+        )
+
+    async def count_holiday_calendar_users(self, calendar_id: int) -> int:
+        """Return how many organisations and groups chose the calendar."""
+        organisations = await self._session.scalar(
+            select(func.count()).where(OrganisationHolidayCalendarRow.calendar_id == calendar_id)
+        )
+        groups = await self._session.scalar(
+            select(func.count()).where(GroupHolidayCalendarRow.calendar_id == calendar_id)
+        )
+        return int(organisations or 0) + int(groups or 0)
+
+    async def get_holidays(
+        self, calendar_ids: Collection[int], first_day: date, last_day: date
+    ) -> list[Holiday]:
+        """Return the holidays of the calendars between the two dates, by date."""
+        rows = await self._session.scalars(
+            select(HolidayRow)
+            .where(
+                HolidayRow.calendar_id.in_(sorted(calendar_ids)),
+                HolidayRow.day.between(first_day, last_day),
+            )
+            .order_by(HolidayRow.day, HolidayRow.calendar_id)
+        )
+        return [_holiday(row) for row in rows]
+
+    async def add_holiday(self, holiday: Holiday) -> int:
+        """Insert a holiday and return its ID."""
+        row = HolidayRow(calendar_id=holiday.calendar_id, day=holiday.day, name=holiday.name)
+        self._session.add(row)
+        await self._session.flush()
+        return row.id
+
+    async def delete_holiday(self, calendar_id: int, holiday_id: int) -> bool:
+        """Delete the calendar's holiday; the calendar condition keeps others out of reach."""
+        result = await self._session.execute(
+            delete(HolidayRow).where(
+                HolidayRow.id == holiday_id, HolidayRow.calendar_id == calendar_id
+            )
+        )
+        return bool(getattr(result, "rowcount", 0))
+
+    async def get_organisation_holiday_calendars(self, organisation_id: int) -> frozenset[int]:
+        """Return the ids of the calendars the organisation chose."""
+        ids = await self._session.scalars(
+            select(OrganisationHolidayCalendarRow.calendar_id).where(
+                OrganisationHolidayCalendarRow.organisation_id == organisation_id
+            )
+        )
+        return frozenset(ids)
+
+    async def save_organisation_holiday_calendars(
+        self, organisation_id: int, calendar_ids: frozenset[int]
+    ) -> None:
+        """Replace the organisation's calendar choice."""
+        await self._session.execute(
+            delete(OrganisationHolidayCalendarRow).where(
+                OrganisationHolidayCalendarRow.organisation_id == organisation_id
+            )
+        )
+        self._session.add_all(
+            OrganisationHolidayCalendarRow(organisation_id=organisation_id, calendar_id=c)
+            for c in sorted(calendar_ids)
+        )
+        await self._session.flush()
+
+    async def get_group_holidays(self, group_id: int) -> GroupHolidays:
+        """Return the group's source, own calendars and the holidays it keeps open."""
+        source = await self._session.scalar(
+            select(GroupRow.holiday_source).where(GroupRow.id == group_id)
+        )
+        calendar_ids = await self._session.scalars(
+            select(GroupHolidayCalendarRow.calendar_id).where(
+                GroupHolidayCalendarRow.group_id == group_id
+            )
+        )
+        open_days = await self._session.scalars(
+            select(GroupHolidayOpenDayRow.day).where(GroupHolidayOpenDayRow.group_id == group_id)
+        )
+        return GroupHolidays(
+            HolidaySource(source or HolidaySource.INHERIT.value),
+            frozenset(calendar_ids),
+            frozenset(open_days),
+        )
+
+    async def save_group_holidays(self, group_id: int, holidays: GroupHolidays) -> None:
+        """Replace the group's holiday choice."""
+        await self._session.execute(
+            update(GroupRow)
+            .where(GroupRow.id == group_id)
+            .values(holiday_source=holidays.source.value)
+        )
+        for table in (GroupHolidayCalendarRow, GroupHolidayOpenDayRow):
+            await self._session.execute(delete(table).where(table.group_id == group_id))
+        self._session.add_all(
+            GroupHolidayCalendarRow(group_id=group_id, calendar_id=c)
+            for c in sorted(holidays.calendar_ids)
+        )
+        self._session.add_all(
+            GroupHolidayOpenDayRow(group_id=group_id, day=d) for d in sorted(holidays.open_days)
+        )
+        await self._session.flush()
 
     async def save_meeting(self, booking_id: int, meeting: MeetingRef) -> None:
         """Store the booking's meeting id and join link (one link; roles follow the account)."""

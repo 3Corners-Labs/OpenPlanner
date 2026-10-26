@@ -6,43 +6,35 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Principal
 from app.domain.booking import Booking, BookingStatus, Slot
 from app.domain.errors import DomainError
 from app.domain.planning import NewGroup, PlanningService, settings_of
-from app.domain.scheduling import Organisation, PhoneMode, ScheduleOverride, ScheduleRule
+from app.domain.scheduling import PhoneMode, ScheduleOverride, ScheduleRule
 from tests.fakes.clock import FixedClock
-from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.domain import NOW, SLOT_0900, make_group, window
+from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.admin import (
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    OUTSIDER,
+    SUPER,
+    audit_rows,
+    two_organisations,
+)
+from tests.support.domain import NOW, SLOT_0900, window
 
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
-GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
-OUTSIDER = Principal("x-1", "X", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
 TODAY = date(2026, 1, 1)
 
 
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
-    state = State()
-    state.organisation_slugs = {1: "demo", 2: "andere"}
-    state.organisations = {
-        1: Organisation(1, "Demo-gemeente", "demo"),
-        2: Organisation(2, "Andere gemeente", "andere"),
-    }
-    state.groups[1] = make_group(id=1, organisation_id=1, slug="demo", name="Demo")
-    state.groups[2] = make_group(id=2, organisation_id=2, slug="andere-team", name="Andere")
-    return InMemoryUnitOfWork(state)
+    return InMemoryUnitOfWork(two_organisations())
 
 
 @pytest.fixture
 def planning(uow: InMemoryUnitOfWork) -> PlanningService:
     clock = FixedClock(NOW)
     return PlanningService(uow, clock, AdminService(uow, clock))
-
-
-def _audit(uow: InMemoryUnitOfWork) -> list[tuple[str, str, Outcome, str, str | None]]:
-    return [(e.actor, e.action, e.outcome, e.detail, e.group) for e in uow.state.audit]
 
 
 def _rule(weekday: int = 0, opens: str = "09:00", closes: str = "12:00", capacity: int = 2):
@@ -61,7 +53,7 @@ async def test_org_admin_creates_a_group_in_their_organisation(
 
     assert group.id not in (0, None)
     assert (group.organisation_id, group.slug, group.slot_minutes) == (1, "vergunningen", 20)
-    assert _audit(uow) == [
+    assert audit_rows(uow) == [
         ("o-1", "group.create", Outcome.SUCCESS, "", "vergunningen"),
     ]
     assert uow.state.audit[0].organisation == "demo"
@@ -134,7 +126,7 @@ async def test_settings_change_records_the_changed_fields(
         PhoneMode.REQUIRED,
         30,
     )
-    assert _audit(uow) == [
+    assert audit_rows(uow) == [
         ("o-1", "group.edit", Outcome.SUCCESS, "horizon_days,name,phone_mode", "demo")
     ]
 

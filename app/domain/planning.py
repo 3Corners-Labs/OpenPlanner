@@ -22,6 +22,8 @@ from app.domain.admin import AdminService, Authorization, record_change, require
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.availability import SlotTime, slots_on
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.holiday_service import effective_schedule
+from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import (
     RESERVED_SLUGS,
@@ -155,7 +157,7 @@ class PlanningService:
         permission = Permission.GROUP_EDIT
         authorization = require(await self._admin.authorize(principal, permission, group_slug=slug))
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             updated = replace(
                 group, **{f.name: getattr(settings, f.name) for f in fields(settings)}
             )
@@ -185,8 +187,8 @@ class PlanningService:
         """
         require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
         async with self._uow.read() as tx:
-            group = await _group(tx, slug)
-            rules, overrides = await tx.get_schedule_items(group.id, self._today(group))
+            group = await group_by_slug(tx, slug)
+            rules, overrides = await tx.get_schedule_items(group.id, group.today(self._clock.now()))
         return Schedule(
             sorted(rules, key=lambda r: (r.weekday, r.window, r.valid_from or date.min)),
             sorted(overrides, key=lambda o: (o.day, o.window is not None, o.window)),
@@ -195,15 +197,16 @@ class PlanningService:
     async def preview(self, principal: Principal, slug: str, days: int = 14) -> list[PreviewDay]:
         """Return the slots the schedule offers from today on, for ``days`` days.
 
-        Only days with slots are returned. Bookings, notice and horizon are left out: this
-        shows what the opening hours produce, not what is still free.
+        Only days with slots are returned. Holidays count (ADR 0025); bookings, notice and
+        horizon are left out: this shows what the opening hours produce, not what is free.
         """
         require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
         days = max(1, min(days, MAX_PREVIEW_DAYS))
         async with self._uow.read() as tx:
-            group = await _group(tx, slug)
-            today = self._today(group)
-            rules, overrides = await tx.get_schedule_items(group.id, today)
+            group = await group_by_slug(tx, slug)
+            today = group.today(self._clock.now())
+            last = today + timedelta(days=days - 1)
+            rules, overrides = await effective_schedule(tx, group, today, last)
         preview = []
         for offset in range(days):
             day = today + timedelta(days=offset)
@@ -220,7 +223,7 @@ class PlanningService:
         """
         authorization = await self._manage(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             rules, overrides = await tx.get_schedule_items(group.id)
             validate_schedule([*rules, rule], overrides)
             rule_id = await tx.add_schedule_rule(group.id, rule)
@@ -235,7 +238,7 @@ class PlanningService:
         """
         authorization = await self._manage(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             if not await tx.delete_schedule_rule(group.id, rule_id):
                 raise DomainError(ErrorCode.SCHEDULE_ITEM_NOT_FOUND)
             await self._schedule_audit(tx, principal, authorization, slug, "rule.remove")
@@ -251,8 +254,8 @@ class PlanningService:
         """
         authorization = await self._manage(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
-            if override.day < self._today(group):
+            group = await group_by_slug(tx, slug)
+            if override.day < group.today(self._clock.now()):
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "day")
             rules, overrides = await tx.get_schedule_items(group.id)
             validate_schedule(rules, [*overrides, override])
@@ -268,7 +271,7 @@ class PlanningService:
         """
         authorization = await self._manage(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             if not await tx.delete_schedule_override(group.id, override_id):
                 raise DomainError(ErrorCode.SCHEDULE_ITEM_NOT_FOUND)
             await self._schedule_audit(tx, principal, authorization, slug, "override.remove")
@@ -280,10 +283,6 @@ class PlanningService:
         return require(
             await self._admin.authorize(principal, Permission.SCHEDULE_MANAGE, group_slug=slug)
         )
-
-    def _today(self, group: Group) -> date:
-        """Return today's date in the group's time zone."""
-        return self._clock.now().astimezone(group.tz).date()
 
     async def _schedule_audit(
         self,
@@ -316,15 +315,3 @@ class PlanningService:
 def _organisation(authorization: Authorization) -> str | None:
     """Return the organisation slug of an authorised group-level target."""
     return authorization.target.organisation
-
-
-async def _group(tx: Transaction, slug: str) -> Group:
-    """Return the group with ``slug``.
-
-    Raises:
-        DomainError: ``group_not_found``.
-    """
-    group = await tx.get_group(slug)
-    if group is None:
-        raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-    return group
