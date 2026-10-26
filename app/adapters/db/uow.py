@@ -178,6 +178,18 @@ def _rule(row: ScheduleRuleRow) -> ScheduleRule:
     )
 
 
+def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
+    """Return the stored columns of a weekly rule (without its id and group)."""
+    return {
+        "weekday": rule.weekday,
+        "opens": rule.window.opens,
+        "closes": rule.window.closes,
+        "capacity": rule.window.capacity,
+        "valid_from": rule.valid_from,
+        "valid_to": rule.valid_to,
+    }
+
+
 def _group_columns(group: Group) -> dict[str, Any]:
     """Return the stored columns of a group's settings."""
     return {
@@ -514,18 +526,19 @@ class SqlTransaction(ApiClientQueries):
 
     async def add_schedule_rule(self, group_id: int, rule: ScheduleRule) -> int:
         """Insert a weekly rule and return its ID."""
-        row = ScheduleRuleRow(
-            group_id=group_id,
-            weekday=rule.weekday,
-            opens=rule.window.opens,
-            closes=rule.window.closes,
-            capacity=rule.window.capacity,
-            valid_from=rule.valid_from,
-            valid_to=rule.valid_to,
-        )
+        row = ScheduleRuleRow(group_id=group_id, **_rule_columns(rule))
         self._session.add(row)
         await self._session.flush()
         return row.id
+
+    async def update_schedule_rule(self, group_id: int, rule_id: int, rule: ScheduleRule) -> bool:
+        """Replace the group's rule; the group condition keeps other groups' rules out of reach."""
+        result = await self._session.execute(
+            update(ScheduleRuleRow)
+            .where(ScheduleRuleRow.id == rule_id, ScheduleRuleRow.group_id == group_id)
+            .values(**_rule_columns(rule))
+        )
+        return bool(getattr(result, "rowcount", 0))
 
     async def delete_schedule_rule(self, group_id: int, rule_id: int) -> bool:
         """Delete the group's rule; the group condition keeps other groups' rules out of reach."""

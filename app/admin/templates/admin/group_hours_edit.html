@@ -1,0 +1,14 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import form_body with context %}
+{% block title %}{{ _("admin.hours.edit") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/hours/{{ rule_id }}" novalidate aria-labelledby="edit-heading">
+  <div class="card__header">
+    <h2 id="edit-heading">{{ _("admin.hours.edit") }}</h2>
+    <p class="card__lead">{{ _("admin.hours.edit_lead") }}</p>
+  </div>
+  {{ form_body(fields, _("admin.save"), "/admin/groups/" ~ summary.group.slug ~ "/hours") }}
+</form>
+{% endblock %}

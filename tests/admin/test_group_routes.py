@@ -197,6 +197,49 @@ async def test_group_admin_adds_and_removes_opening_hours(site: Site) -> None:
     assert "10:00–12:00" not in (await site.client.get(f"{GROUP}/hours")).text
 
 
+async def _saturday_window(site: Site) -> tuple[str, str]:
+    """Add Saturday 10:00–12:00 as a group admin; return the week page and its change link."""
+    await site.login_as(GROUP_ADMIN)
+    await _post(
+        site,
+        f"{GROUP}/hours",
+        {"weekday": "5", "opens": "10:00", "closes": "12:00", "capacity": "3"},
+    )
+    week = (await site.client.get(f"{GROUP}/hours")).text
+    return week, week.split("10:00–12:00", 1)[1].split('href="', 1)[1].split('"', 1)[0]
+
+
+async def test_group_admin_changes_existing_opening_hours(site: Site) -> None:
+    week, link = await _saturday_window(site)
+    assert 'aria-label="Openingstijd zaterdag 10:00–12:00 wijzigen"' in week
+
+    form = (await site.client.get(link)).text
+    assert '<option value="5" selected>' in form
+    assert 'id="opens" name="opens" type="time" value="10:00"' in form
+    assert 'id="capacity" name="capacity" type="number" value="3"' in form
+
+    saved = await _post(
+        site, link, {"weekday": "5", "opens": "09:00", "closes": "12:00", "capacity": "4"}
+    )
+    assert saved.headers["location"] == f"{GROUP}/hours?done=saved"  # type: ignore[attr-defined]
+    page = (await site.client.get(f"{GROUP}/hours?done=saved")).text
+    assert "09:00–12:00" in page
+    assert "tot 4 tegelijk" in page
+    assert "10:00–12:00" not in page
+
+
+async def test_changed_hours_are_validated_like_new_ones(site: Site) -> None:
+    _, link = await _saturday_window(site)
+
+    response = await _post(
+        site, link, {"weekday": "5", "opens": "10:00", "closes": "12:00", "capacity": "0"}
+    )
+
+    assert response.status_code == 422  # type: ignore[attr-defined]
+    assert 'href="#capacity"' in response.text  # type: ignore[attr-defined]
+    assert "10:00–12:00" in (await site.client.get(f"{GROUP}/hours")).text
+
+
 async def test_every_day_links_to_the_form_with_that_day_chosen(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 

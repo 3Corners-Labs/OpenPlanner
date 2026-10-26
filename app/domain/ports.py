@@ -280,6 +280,10 @@ class Transaction(Protocol):
         """Store a rule for the group and return its id."""
         ...
 
+    async def update_schedule_rule(self, group_id: int, rule_id: int, rule: ScheduleRule) -> bool:
+        """Replace the group's rule ``rule_id``; ``False`` if the group has no such rule."""
+        ...
+
     async def delete_schedule_rule(self, group_id: int, rule_id: int) -> bool:
         """Delete the group's rule ``rule_id``; ``False`` if the group has no such rule."""
         ...
