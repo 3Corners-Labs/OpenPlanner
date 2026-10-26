@@ -30,7 +30,7 @@ from app.domain.ports import (
     Clock,
     ContactCenterDispatcher,
     IntegrationError,
-    MessageSender,
+    SenderDirectory,
     UnitOfWork,
     VideoProvider,
 )
@@ -67,14 +67,6 @@ class JobQueue(Protocol):
 
     async def fail(self, job_id: int, error: str) -> None:
         """Give up on a job."""
-        ...
-
-
-class SenderDirectory(Protocol):
-    """Finds the sender of an organisation's channel (``ConfiguredSenders``; a fake in tests)."""
-
-    async def sender(self, organisation_id: int, channel: ChannelKind) -> MessageSender | None:
-        """Return the sender, or ``None`` when the organisation has none on ``channel``."""
         ...
 
 

@@ -6,8 +6,13 @@ Metadata check, answered with a redirect and a confirmation. Secrets are write-o
 password fields are always empty, a blank field keeps the stored secret (ADR 0008).
 ``ChannelSettingsService`` authorises again, validates and audits.
 
+The test email goes through exactly the server the worker would use (the organisation's own,
+else the installation's fallback); a failure is explained per code, never with the server's
+own answer. It is rate-limited like a booking, since it sends mail to a typed-in address.
+
     GET  /admin/organisations/{org}/channels                   integrations.manage  forms
     POST /admin/organisations/{org}/channels/email             integrations.manage  SMTP
+    POST /admin/organisations/{org}/channels/email/test        integrations.manage  test email
     POST /admin/organisations/{org}/channels/sms               integrations.manage  SMS
     POST /admin/organisations/{org}/channels/{channel}/remove  integrations.manage  remove
 """
@@ -34,11 +39,12 @@ from app.domain.channel_settings import (
     SmtpSettings,
 )
 from app.domain.channels import ChannelKind
-from app.domain.errors import DomainError
+from app.domain.errors import DomainError, ErrorCode
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock, format_day_compact, local_day
+from app.web.errors import FormError
 from app.web.locale import RequestLocale
-from app.web.protection import RejectedRequest
+from app.web.protection import RejectedRequest, booking_limit, limiter
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -47,6 +53,18 @@ SECURITY_LABELS: dict[SmtpSecurity, str] = {
     SmtpSecurity.TLS: "admin.channels.security_tls",
     SmtpSecurity.NONE: "admin.channels.security_none",
 }
+
+TEST_FAILURES: dict[str, str] = {
+    "unreachable": "admin.channels.test_failed.unreachable",
+    "tls_failed": "admin.channels.test_failed.tls_failed",
+    "not_supported": "admin.channels.test_failed.not_supported",
+    "unauthorized": "admin.channels.test_failed.unauthorized",
+    "sender_refused": "admin.channels.test_failed.sender_refused",
+    "recipient_refused": "admin.channels.test_failed.recipient_refused",
+}
+"""Explanation per failure code of a test email; ``rejected_<status>`` and others are generic."""
+
+TEST_FIELD = "test_recipient"
 
 CHANNEL_PATHS = {"email": ChannelKind.EMAIL, "sms": ChannelKind.SMS}
 """The channels in URLs; anything else is a 404."""
@@ -201,6 +219,31 @@ def _sms_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext)
     ]
 
 
+def _test_fields(form: FormData, _: BoundGettext) -> list[Field]:
+    """Return the input of the test email form: where to send it."""
+    return [
+        Field(
+            TEST_FIELD,
+            _("admin.channels.test_recipient"),
+            "email",
+            form.text(TEST_FIELD),
+            hint=_("admin.channels.test_recipient_hint"),
+            error=form.error_for(TEST_FIELD),
+            attributes={"autocomplete": "email", "spellcheck": "false"},
+        )
+    ]
+
+
+def _test_failure(failure: str, _: BoundGettext) -> str:
+    """Return the explanation of a failed test email."""
+    if failure in TEST_FAILURES:
+        return _(TEST_FAILURES[failure])
+    status = failure.removeprefix("rejected_")
+    if status != failure and status.isdigit():
+        return _("admin.channels.test_failed.rejected", status=status)
+    return _("admin.channels.test_failed.other")
+
+
 def _status(stored: ChannelSettings | None, locale: RequestLocale, tz: ZoneInfo) -> dict[str, str]:
     """Return the status chip of a channel: label, tone and when it last changed."""
     _ = locale.gettext
@@ -222,13 +265,15 @@ async def _form_page(
     org: str,
     submitted: dict[ChannelKind, FormData],
     status: int = 200,
+    test: FormData | None = None,
 ) -> HTMLResponse:
-    """Render both channel forms with the stored settings."""
+    """Render both channel forms and the test email form with the stored settings."""
     overview: ChannelOverview = await channel_service(request).overview(context.principal, org)
     _ = locale.gettext
     tz = ZoneInfo(request.app.state.settings.admin_timezone)
     email = submitted.get(ChannelKind.EMAIL) or FormData({}, _)
     sms = submitted.get(ChannelKind.SMS) or FormData({}, _)
+    test = test or FormData({}, _)
     stored_email = overview.channels[ChannelKind.EMAIL]
     stored_sms = overview.channels[ChannelKind.SMS]
     response = _page(
@@ -245,7 +290,8 @@ async def _form_page(
             "email_stored": stored_email is not None,
             "sms_stored": stored_sms is not None,
             "fallback_mail": bool(request.app.state.settings.smtp_host),
-            "errors": email.errors + sms.errors,
+            "test_fields": _test_fields(test, _),
+            "errors": email.errors + sms.errors + test.errors,
             "done": forms.done_message(request, _),
         },
     )
@@ -304,6 +350,37 @@ async def save_email(
             form.refusal(error)
     secret = form.values.get("smtp_credential") or None
     return await _save(request, locale, context, org, ChannelKind.EMAIL, form, config, secret)
+
+
+@router.post("/organisations/{org}/channels/email/test", response_class=HTMLResponse)
+@limiter.limit(booking_limit)
+async def send_test_email(
+    request: Request, locale: Locale, org: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Send a test email through the server the worker would use, and say how it went."""
+    gettext = locale.gettext
+    form = await forms.read_form(request, locale)
+    try:
+        failure = await channel_service(request).send_test_email(
+            context.principal,
+            org,
+            form.text(TEST_FIELD).strip(),
+            gettext("admin.channels.test_subject"),
+            gettext("admin.channels.test_text"),
+        )
+    except DomainError as error:
+        forms.raise_refusal(error)
+        if error.code is ErrorCode.CHANNEL_NOT_CONFIGURED:
+            form.errors.append(
+                FormError(TEST_FIELD, gettext("admin.channels.test_failed.no_server"))
+            )
+        else:
+            form.refusal(error)
+    else:
+        if failure is None:
+            return forms.redirect_done(_url(org), "test_sent")
+        form.errors.append(FormError(TEST_FIELD, _test_failure(failure, gettext)))
+    return await _form_page(request, locale, context, org, {}, 422, form)
 
 
 @router.post("/organisations/{org}/channels/sms", response_class=HTMLResponse)

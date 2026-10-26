@@ -152,6 +152,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/organisations/{org}/channels/email": {
         "/admin/organisations/demo/channels/email": statuses(422, 403, 403, 403, 403),
     },
+    "POST /admin/organisations/{org}/channels/email/test": {
+        "/admin/organisations/demo/channels/email/test": statuses(422, 403, 403, 403, 403),
+    },
     "POST /admin/organisations/{org}/channels/sms": {
         "/admin/organisations/demo/channels/sms": statuses(422, 403, 403, 403, 403),
     },

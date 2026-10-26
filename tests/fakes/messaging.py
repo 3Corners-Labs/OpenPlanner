@@ -1,5 +1,5 @@
 from app.domain.channels import ChannelKind
-from app.domain.ports import OutboundMessage
+from app.domain.ports import IntegrationError, OutboundMessage
 
 
 class RecordingSender:
@@ -26,3 +26,17 @@ class RecordingSender:
             self.failures -= 1
             raise ConnectionError("smtp down")
         self.sent.append(message)
+
+
+class RefusingSender:
+    """MessageSender and ``SenderDirectory`` fake whose every delivery fails with ``code``."""
+
+    def __init__(self, code: str, retryable: bool = False) -> None:
+        self.code = code
+        self.retryable = retryable
+
+    async def sender(self, organisation_id: int, channel: ChannelKind) -> "RefusingSender":
+        return self
+
+    async def send(self, message: OutboundMessage) -> None:
+        raise IntegrationError(self.code, retryable=self.retryable)

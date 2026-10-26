@@ -1,3 +1,6 @@
+import smtplib
+import socket
+import ssl
 from email.message import EmailMessage
 from typing import Any
 
@@ -6,7 +9,7 @@ import pytest
 from app.adapters import smtp as smtp_module
 from app.adapters.smtp import SmtpConfig, SmtpMailSender, build_email
 from app.domain.channels import ChannelKind
-from app.domain.ports import Attachment, OutboundMessage
+from app.domain.ports import Attachment, IntegrationError, OutboundMessage
 
 MESSAGE = OutboundMessage(
     channel=ChannelKind.EMAIL,
@@ -102,3 +105,60 @@ async def test_implicit_tls_connects_securely_and_skips_starttls(
     await SmtpMailSender(config).send(MESSAGE)
 
     assert FakeSMTP.instances[0].calls == ["tls", "login:user", "quit"]
+
+
+FAILURES: list[tuple[str, Exception, str, bool]] = [
+    ("connect", ConnectionRefusedError(61, "refused"), "unreachable", True),
+    ("connect", socket.gaierror(8, "unknown host"), "unreachable", True),
+    ("connect", TimeoutError("timed out"), "unreachable", True),
+    ("connect", smtplib.SMTPServerDisconnected("closed"), "unreachable", True),
+    ("starttls", ssl.SSLCertVerificationError("bad certificate"), "tls_failed", False),
+    ("starttls", smtplib.SMTPNotSupportedError("no STARTTLS"), "not_supported", False),
+    ("login", smtplib.SMTPAuthenticationError(535, b"bad login"), "unauthorized", False),
+    ("send", smtplib.SMTPSenderRefused(553, b"no", "noreply@example.nl"), "sender_refused", False),
+    (
+        "send",
+        smtplib.SMTPRecipientsRefused({"ada@example.org": (550, b"unknown user")}),
+        "recipient_refused",
+        False,
+    ),
+    ("send", smtplib.SMTPDataError(451, b"try later"), "rejected_451", True),
+    ("send", smtplib.SMTPDataError(554, b"spam"), "rejected_554", False),
+    ("send", smtplib.SMTPException("odd"), "server_error", True),
+]
+
+
+@pytest.mark.parametrize(
+    ("step", "failure", "code", "retryable"), FAILURES, ids=[f[2] for f in FAILURES]
+)
+async def test_failures_are_reported_as_codes_without_details(
+    monkeypatch: pytest.MonkeyPatch, step: str, failure: Exception, code: str, retryable: bool
+) -> None:
+    class FailingSMTP(FakeSMTP):
+        def __init__(self, host: str, port: int, timeout: float) -> None:
+            if step == "connect":
+                raise failure
+            super().__init__(host, port, timeout)
+
+        def starttls(self, context: Any) -> None:
+            if step == "starttls":
+                raise failure
+
+        def login(self, username: str, password: str) -> None:
+            if step == "login":
+                raise failure
+
+        def send_message(self, message: EmailMessage) -> None:
+            if step == "send":
+                raise failure
+
+    monkeypatch.setattr(smtp_module.smtplib, "SMTP", FailingSMTP)
+    config = SmtpConfig("smtp", 587, "noreply@example.nl", True, "user", "pw")
+
+    with pytest.raises(IntegrationError) as error:
+        await SmtpMailSender(config).send(MESSAGE)
+
+    assert (error.value.code, error.value.retryable) == (code, retryable)
+    assert error.value.__cause__ is None
+    assert error.value.__suppress_context__  # the server's answer may name the recipient
+    assert "ada@example.org" not in str(error.value)
