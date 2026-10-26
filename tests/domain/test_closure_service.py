@@ -8,6 +8,7 @@ from app.domain.authorization import Principal, Role
 from app.domain.booking import BookingStatus
 from app.domain.closure import RETENTION_AFTER_CLOSURE
 from app.domain.closure_service import ClosureInput, ClosureService
+from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
 from app.domain.scheduling import Organisation, ScheduleRule
@@ -230,11 +231,11 @@ async def test_no_direct_call_while_closed(
     group = uow.state.groups[1]
     uow.state.groups[1] = group.__class__(**{**group.__dict__, "direct_call_enabled": True})
     clock.advance(SLOT_0900 - NOW)  # Monday 09:00, the group is open
-    assert await bookings.direct_call_available("demo")
+    assert await bookings.direct_call_availability("demo") is DirectAvailability.AVAILABLE
 
     await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
 
-    assert not await bookings.direct_call_available("demo")
+    assert await bookings.direct_call_availability("demo") is DirectAvailability.UNAVAILABLE
     with pytest.raises(DomainError, match="direct_call_unavailable"):
         await bookings.start_direct(group_slug="demo", contact=ADA, locale="nl")
 

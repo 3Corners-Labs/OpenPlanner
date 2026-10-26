@@ -152,3 +152,37 @@ async def test_honeypot_and_cross_site_are_refused(site: Site) -> None:
 
     assert (bot.status_code, cross.status_code) == (400, 403)
     assert site.dispatcher.items == []
+
+
+async def test_queue_info_on_the_form_and_the_waiting_page(site: Site) -> None:
+    before = (await site.client.get("/g/demo/direct")).text
+    wait = (await site.start()).headers["location"]
+
+    after = (await site.client.get("/g/demo/direct")).text
+    page = (await site.client.get(wait)).text
+
+    assert "Er wacht op dit moment niemand." in before
+    assert "Aantal mensen dat nu wacht: 1." in after
+    assert "Uw plaats in de rij: 1." in page
+    assert "Meestal neemt" not in page  # no pickups yet: no estimate
+
+
+async def test_full_when_every_agent_is_taken(site: Site) -> None:
+    await _configure(site.database_url, direct_call_max_concurrent=1)
+    await site.start()
+
+    group = (await site.client.get("/g/demo")).text
+    form = (await site.client.get("/g/demo/direct")).text
+    refused = await site.start()
+
+    assert "Alle medewerkers zijn nu in gesprek" in group
+    assert 'href="/g/demo/direct"' not in group
+    assert "Alle medewerkers zijn nu in gesprek" in form
+    assert 'action="/g/demo/direct"' not in form
+    assert refused.status_code == 409
+    assert "Alle medewerkers zijn net in gesprek" in refused.text
+    assert len(site.dispatcher.items) == 1
+
+    await site.record("task-1", EventKind.TASK_ENDED)
+
+    assert (await site.start()).status_code == 303

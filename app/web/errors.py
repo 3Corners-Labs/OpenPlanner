@@ -29,6 +29,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
     ErrorCode.INTEGRATION_NOT_READY: "error.invalid_request",
     ErrorCode.DIRECT_CALL_UNAVAILABLE: "error.direct_call_unavailable",
+    ErrorCode.DIRECT_CALL_FULL: "error.direct_call_full",
     ErrorCode.HOLIDAY_CALENDAR_NOT_FOUND: "error.not_found.text",
     ErrorCode.HOLIDAY_CALENDAR_IN_USE: "admin.form.error.calendar_in_use",
     ErrorCode.HOLIDAY_NOT_FOUND: "error.not_found.text",

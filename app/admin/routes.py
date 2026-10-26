@@ -114,6 +114,7 @@ DETAIL_LABELS: dict[str, str] = {
     "wxcc_routing_value": "admin.field.wxcc_routing_value",
     "direct_call_enabled": "admin.field.direct_call_enabled",
     "not_picked_up_minutes": "admin.field.not_picked_up_minutes",
+    "direct_call_max_concurrent": "admin.field.direct_call_max_concurrent",
     "display_name": "admin.branding.display_name",
     "accent_color": "admin.branding.accent_color",
     "logo": "admin.branding.logo",

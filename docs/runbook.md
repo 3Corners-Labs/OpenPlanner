@@ -106,7 +106,7 @@ in `OIDC_CLIENT_SECRET` and a restart of `web`.
 
 Without a Webex Service App OpenPlanner runs without video and WxCC; bookings keep working.
 Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (work items),
-0019 (direct call).
+0019 (direct call), 0026 (cap on open direct calls).
 
 ### 1. Webex Service App
 
@@ -461,6 +461,10 @@ Bookings keep working: they are stored first, and meetings and work items are jo
   re-run the job once WxCC is back (set the job's status to `pending` in the `jobs` table).
 - **Direct calls** during an outage show "no agent available" after the group's
   not-picked-up limit and offer to book instead.
+- **"All agents busy" while agents are free** (group with a cap on direct calls, ADR 0026):
+  the count relies on `task:ended` webhooks. If they are missing, a place frees itself after
+  the not-picked-up limit (waiting) or 30 minutes after the booking's end (connected); fix the
+  webhooks as below, or clear the cap in the group's settings meanwhile.
 - **Webhooks missing** (status not updating while calls happen): check **Koppelingen**, the
   secrets, and re-run `register-webhooks`; WxCC sets a subscription to `inactive` after
   repeated delivery errors.

@@ -204,6 +204,7 @@ same commit and rollback behaviour as the SQL one.
 | What leaves for Webex/WxCC, timeline, call status, join window | `app/domain/calls.py` |
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
+| Cap on open direct calls, place in line, usual wait (ADR 0026) | `app/domain/direct_queue.py` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
@@ -618,6 +619,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0023 | Machine API for contact-center bots: OAuth client credentials, off by default, no personal data |
 | 0024 | Emergency closure: appointments on hold, citizens informed, no deletion |
 | 0025 | Reusable holiday calendars with overrides per organisation and group |
+| 0026 | Cap on open direct calls per group; queue feedback from our own data |
 
 ## 12. Status and roadmap
 
@@ -632,6 +634,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP4 | SMS reminders, message editors | done (ADR 0022) |
 | WP5 | Webex Meetings, join page, live status (O1: Meetings API) | done |
 | WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |
+| WP6+ | Direct calls: cap per group, place in line and usual wait (ADR 0026); WxCC live queue statistics later | done (live statistics planned) |
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |

@@ -68,6 +68,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "wxcc_routing_value": "admin.form.error.integration_text",
     "direct_call_enabled": "admin.form.error.choice",
     "not_picked_up_minutes": "admin.form.error.not_picked_up_minutes",
+    "direct_call_max_concurrent": "admin.form.error.direct_call_max_concurrent",
     "display_name": "admin.form.error.display_name",
     "accent_color": "admin.form.error.accent_color",
     "logo": "admin.form.error.logo",
@@ -223,6 +224,10 @@ class FormData:
             return int(raw)
         self._fail(name)
         return None
+
+    def optional_integer(self, name: str) -> int | None:
+        """Return a whole number, or ``None`` when empty (an error when not a number)."""
+        return self.integer(name) if self.text(name) else None
 
     def clock(self, name: str) -> time | None:
         """Return a time of day (``HH:MM``), or ``None`` with an error."""

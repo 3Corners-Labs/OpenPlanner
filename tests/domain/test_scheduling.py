@@ -51,6 +51,8 @@ def test_group_defaults() -> None:
         ("wxcc_routing_value", "r" * 513),
         ("not_picked_up_minutes", 0),
         ("not_picked_up_minutes", 121),
+        ("direct_call_max_concurrent", 0),
+        ("direct_call_max_concurrent", 1001),
     ],
 )
 def test_group_rejects_invalid_configuration(field: str, value: object) -> None:

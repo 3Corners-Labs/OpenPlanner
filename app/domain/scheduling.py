@@ -43,6 +43,8 @@ INTEGRATION_TEXT_LIMITS = {
 
 DEFAULT_NOT_PICKED_UP_MINUTES = 10
 MAX_NOT_PICKED_UP_MINUTES = 120
+MAX_DIRECT_CALLS = MAX_CAPACITY
+"""Upper bound of a group's cap on open direct calls (ADR 0026)."""
 
 DEFAULT_DISPATCH_LEAD_MINUTES = 5
 MAX_DISPATCH_LEAD_MINUTES = 60
@@ -121,6 +123,9 @@ class Group:
         direct_call_enabled: Whether citizens can start a call right away (ADR 0019).
         not_picked_up_minutes: After this long without an agent a call counts as not
             picked up (signal for O2).
+        direct_call_max_concurrent: How many direct calls may be open (waiting or with an
+            agent) at once, typically the number of agents for direct calls; ``None`` leaves
+            it to WxCC (ADR 0026).
         dispatch_lead_minutes: How long before the start the WxCC task is created; from
             that moment the booking is read-only (``job_plan.change_deadline``). At most
             ``min_notice_minutes``, so no booking is read-only when it is made.
@@ -144,6 +149,7 @@ class Group:
     wxcc_routing_value: str | None = None
     direct_call_enabled: bool = False
     not_picked_up_minutes: int = DEFAULT_NOT_PICKED_UP_MINUTES
+    direct_call_max_concurrent: int | None = None
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
 
     def __post_init__(self) -> None:
@@ -173,6 +179,9 @@ class Group:
                 raise _invalid(name)
         if not 1 <= self.not_picked_up_minutes <= MAX_NOT_PICKED_UP_MINUTES:
             raise _invalid("not_picked_up_minutes")
+        cap = self.direct_call_max_concurrent
+        if cap is not None and not 1 <= cap <= MAX_DIRECT_CALLS:
+            raise _invalid("direct_call_max_concurrent")
 
     @property
     def video_enabled(self) -> bool:

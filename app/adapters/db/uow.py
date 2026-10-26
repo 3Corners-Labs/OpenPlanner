@@ -79,6 +79,7 @@ from app.domain.channel_settings import (
 )
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.closure import Closure
+from app.domain.direct_queue import DirectCall
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.job_plan import JobType, PlannedJob
@@ -125,6 +126,7 @@ def _group(row: GroupRow) -> Group:
         wxcc_routing_value=row.wxcc_routing_value,
         direct_call_enabled=row.direct_call_enabled,
         not_picked_up_minutes=row.not_picked_up_minutes,
+        direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
     )
 
@@ -193,6 +195,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "wxcc_routing_value": group.wxcc_routing_value,
         "direct_call_enabled": group.direct_call_enabled,
         "not_picked_up_minutes": group.not_picked_up_minutes,
+        "direct_call_max_concurrent": group.direct_call_max_concurrent,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
     }
 
@@ -786,6 +789,30 @@ class SqlTransaction(ApiClientQueries):
                 _call_status(status) if status else new_status(booking.id),
             )
             for booking, slot, status in rows
+        ]
+
+    async def get_direct_calls(self, group_id: int, since: datetime) -> list[DirectCall]:
+        """Return the group's direct calls started at or after ``since``, with their status."""
+        rows = await self._session.execute(
+            select(BookingRow.id, BookingRow.status, SlotRow.start, SlotRow.end, CallStatusRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .outerjoin(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
+            .where(
+                BookingRow.group_id == group_id,
+                SlotRow.kind == BookingKind.DIRECT.value,
+                SlotRow.start >= since,
+            )
+            .order_by(SlotRow.start, BookingRow.id)
+        )
+        return [
+            DirectCall(
+                booking_id,
+                start,
+                end,
+                status == BookingStatus.CONFIRMED.value,
+                _call_status(call) if call else new_status(booking_id),
+            )
+            for booking_id, status, start, end, call in rows
         ]
 
     async def get_call_status(self, booking_id: int) -> CallStatus | None:

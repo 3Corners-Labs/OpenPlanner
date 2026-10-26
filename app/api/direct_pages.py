@@ -4,7 +4,9 @@ Starting a call creates a booking of kind direct, then the meeting and the work 
 away so the citizen does not wait for the worker; if Webex or WxCC is slow or down, the
 worker's jobs take over (they are idempotent). The waiting page says honestly when no agent
 is available. It never reloads by itself (no time limits, WCAG 2.2.1); a button refreshes the
-status, and the citizen can wait in the Webex lobby meanwhile.
+status, and the citizen can wait in the Webex lobby meanwhile. When the group's cap of open
+direct calls is reached the form says all agents are busy; the form and the waiting page show
+the place in line and the usual wait from OpenPlanner's own data (ADR 0026).
 
     GET  /g/{slug}/direct   form (or "not possible now")
     POST /g/{slug}/direct   start, then 303 to the waiting page
@@ -23,6 +25,7 @@ from app.api.contact_form import HONEYPOT_FIELD, contact_fields, read_contact
 from app.domain.booking import BookingKind
 from app.domain.call_service import CallService
 from app.domain.calls import CallStatus, JoinState, TaskState, join_state, not_picked_up
+from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, IntegrationError
@@ -50,16 +53,18 @@ async def _form_page(
     locale: RequestLocale,
     group: Group,
     *,
-    available: bool,
+    availability: DirectAvailability,
     errors: list[FormError] | None = None,
     values: dict[str, str] | None = None,
     status: int = 200,
 ) -> HTMLResponse:
-    """Render the direct-call form, or the page saying it is not possible now."""
+    """Render the direct-call form with the queue, or the page saying it is not possible now."""
     errors = errors or []
-    context = {
+    available = availability is DirectAvailability.AVAILABLE
+    context: dict[str, object] = {
         "group": group,
-        "available": available,
+        "availability": availability.value,
+        "queue": await _bookings(request).direct_queue(group) if available else None,
         "fields": contact_fields(group, locale, errors, values or {}),
         "errors": errors,
         "honeypot": HONEYPOT_FIELD,
@@ -74,7 +79,7 @@ async def direct_form(request: Request, slug: str, locale: Locale) -> HTMLRespon
     service = _bookings(request)
     group = await service.get_group(slug)
     return await _form_page(
-        request, locale, group, available=await service.direct_call_available(slug)
+        request, locale, group, availability=await service.direct_call_availability(slug)
     )
 
 
@@ -92,12 +97,11 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
             locale=locale.code,
         )
     except DomainError as error:
-        available = await service.direct_call_available(slug)
         return await _form_page(
             request,
             locale,
             group,
-            available=available,
+            availability=await service.direct_call_availability(slug),
             errors=form_errors(error, locale.gettext),
             values=values,
             status=status_for(error),
@@ -141,6 +145,11 @@ async def wait_page(request: Request, token: str, locale: Locale) -> Response:
         "group": group,
         "token": token,
         "state": state,
+        "queue": (
+            await _bookings(request).direct_queue(group, booking.id)
+            if state == "searching"
+            else None
+        ),
         "joinable": joinable,
         "refresh": state in ("searching", "accepted"),
     }

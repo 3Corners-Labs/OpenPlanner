@@ -122,6 +122,7 @@ class GroupRow(Base):
     wxcc_routing_value: Mapped[str | None] = mapped_column(String(512))
     direct_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
+    direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
 
@@ -290,6 +291,8 @@ class SlotRow(Base):
             unique=True,
             sqlite_where=text("kind = 'scheduled'"),
         ),
+        # The group's recent direct calls, for the cap and the queue (ADR 0026).
+        Index("ix_slots_group_kind_start", "group_id", "kind", "start"),
         CheckConstraint("kind IN ('scheduled', 'direct')", name="kind"),
     )
 
