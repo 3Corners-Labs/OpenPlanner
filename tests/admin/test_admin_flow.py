@@ -168,11 +168,11 @@ async def test_denials_are_audited(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
     await site.client.get("/admin/groups/andere-team")
-    await site.client.get("/admin/audit")
+    await site.client.get("/admin/organisations")
 
     events = await audit_events(site)
     assert ("sub-group", "group.view", Outcome.DENIED, "out_of_scope") in events
-    assert ("sub-group", "audit.view", Outcome.DENIED, "out_of_scope") in events
+    assert ("sub-group", "organisation.manage", Outcome.DENIED, "not_permitted") in events
 
 
 async def test_dashboard_lists_only_groups_in_scope(site: Site) -> None:
@@ -194,8 +194,10 @@ async def test_navigation_follows_the_matrix(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     org_admin_page = (await site.client.get("/admin/")).text
 
-    assert 'href="/admin/audit"' not in group_admin_page
+    assert 'href="/admin/audit"' in group_admin_page  # ADR 0029: the own groups' log
     assert 'href="/admin/audit"' in org_admin_page
+    assert 'href="/admin/integrations"' not in group_admin_page
+    assert 'href="/admin/integrations"' not in org_admin_page
     assert 'href="/admin/rights"' in group_admin_page
     assert 'aria-current="page"' in group_admin_page
     assert "Ingelogd als Gina Group" in group_admin_page

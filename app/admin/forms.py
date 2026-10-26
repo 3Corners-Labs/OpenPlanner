@@ -21,7 +21,7 @@ from starlette.responses import RedirectResponse
 from app.admin.authz import AccessDenied
 from app.domain.errors import DomainError, ErrorCode
 from app.i18n import BoundGettext
-from app.i18n.dates import format_clock, format_day_compact, local_day
+from app.i18n.dates import format_moment_compact
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
@@ -173,8 +173,7 @@ def slot_options(starts: Sequence[datetime], tz: tzinfo, locale: str) -> tuple[O
     return tuple(
         Option(
             start.isoformat(),
-            f"{format_day_compact(local_day(start, tz), locale)}, "
-            f"{format_clock(start, tz, locale)}",
+            format_moment_compact(start, tz, locale),
         )
         for start in starts
     )

@@ -65,4 +65,6 @@ OUTCOME_LABELS: dict[Outcome, str] = {
     Outcome.SUCCESS: "audit.outcome.success",
     Outcome.DENIED: "audit.outcome.denied",
     Outcome.FAILURE: "audit.outcome.failure",
+    Outcome.RETRY: "audit.outcome.retry",
+    Outcome.SKIPPED: "audit.outcome.skipped",
 }

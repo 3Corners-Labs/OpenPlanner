@@ -67,6 +67,13 @@ def format_clock(moment: datetime, tz: tzinfo, locale: str) -> str:
     return format_time(moment.astimezone(tz), format=_clock_pattern, locale=_babel_locale(locale))
 
 
+def format_moment_compact(moment: datetime, tz: tzinfo, locale: str) -> str:
+    """Return a compact local date and time for tables, e.g. ``5 jan 2026, 09:00``."""
+    return (
+        f"{format_day_compact(local_day(moment, tz), locale)}, {format_clock(moment, tz, locale)}"
+    )
+
+
 def format_time_of_day(value: time, locale: str) -> str:
     """Return a wall-clock time without date (opening hours) in the clock style."""
     return format_time(value, format=_clock_pattern, locale=_babel_locale(locale))

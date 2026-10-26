@@ -9,7 +9,7 @@ from datetime import date, datetime
 
 from app.domain import holidays as holiday_model
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
-from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
+from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Source
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingKind, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, Logo
@@ -88,13 +88,26 @@ class InMemoryTransaction:
     async def add_audit_event(self, event: AuditEvent) -> None:
         self.state.audit.append(event)
 
-    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEntry]:
-        events = [e for e in self.state.audit if scope.contains(e.organisation, e.group)]
+    async def list_audit_events(
+        self, scope: Scope, limit: int = 100, narrow: AuditFilter | None = None
+    ) -> list[AuditEntry]:
+        narrow = narrow or AuditFilter()
+        events = [
+            e
+            for e in self.state.audit
+            if scope.contains(e.organisation, e.group) and narrow.matches(e)
+        ]
         profiles = self.state.admin_profiles
         return [
             AuditEntry(e, profiles[e.actor].display_name if e.actor in profiles else None)
             for e in reversed(events)
         ][:limit]
+
+    async def delete_audit_events(self, source: Source, before: datetime) -> int:
+        kept = [e for e in self.state.audit if e.source is not source or e.at >= before]
+        removed = len(self.state.audit) - len(kept)
+        self.state.audit = kept
+        return removed
 
     async def save_admin_profile(self, profile: AdminProfile) -> None:
         self.state.admin_profiles[profile.subject] = profile

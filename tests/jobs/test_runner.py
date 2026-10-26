@@ -5,16 +5,18 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.adapters.db.jobs import ClaimedJob
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.job_plan import JobType
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
+from app.domain.system_log import SystemLog
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
 from app.jobs.runner import BACKOFF, JobRunner
 from tests.fakes.clock import FixedClock
-from tests.fakes.messaging import RecordingSender
+from tests.fakes.messaging import RecordingSender, RefusingSender
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.closures import NOTICES
 from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book, make_group, window
@@ -224,3 +226,103 @@ async def test_closure_notice_goes_only_to_bookings_on_hold(
     queue.jobs = [job(bid, JobType.SEND_CLOSURE_UPDATE, pinned=None)]
     await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
     assert len(sender.sent) == 1  # reinstated in the meantime: the update is stale
+
+
+def system_events(uow: InMemoryUnitOfWork) -> list[tuple[str, Outcome, str, str, str | None]]:
+    return [
+        (e.action, e.outcome, e.reason, e.detail, e.group)
+        for e in uow.state.audit
+        if e.source is Source.SYSTEM
+    ]
+
+
+async def test_a_sent_message_is_a_system_event_of_the_group(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    # ADR 0029: the group's admins can see that the reminder went out, and on which channel.
+    bid = await booking_id(uow)
+    queue = FakeQueue([sms_job(bid)])
+
+    await JobRunner(queue, uow, FixedClock(NOW), RecordingSender(), composer).run_due()
+
+    assert system_events(uow) == [
+        ("job.send_reminder", Outcome.SUCCESS, "", "attempt:1,channel:sms", "aangifte")
+    ]
+    assert uow.state.audit[-1].booking_id == bid
+
+
+async def test_a_stale_job_is_recorded_as_skipped_with_the_reason(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    queue = FakeQueue([job(bid, JobType.SEND_REMINDER, pinned=SLOT_0900 - timedelta(days=1))])
+
+    await JobRunner(queue, uow, FixedClock(NOW), RecordingSender(), composer).run_due()
+
+    assert system_events(uow) == [
+        ("job.send_reminder", Outcome.SKIPPED, "stale", "attempt:1,channel:email", "aangifte")
+    ]
+
+
+async def test_retries_and_the_final_failure_are_recorded_with_the_error_code(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    queue = FakeQueue(
+        [
+            job(bid, JobType.SEND_CONFIRMATION, attempts=1),
+            job(bid, JobType.SEND_CONFIRMATION, attempts=len(BACKOFF) + 1),
+        ]
+    )
+    sender = RefusingSender("smtp_unreachable", retryable=True)
+
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert [(action, outcome, reason) for action, outcome, reason, _, _ in system_events(uow)] == [
+        ("job.send_confirmation", Outcome.RETRY, "smtp_unreachable"),
+        ("job.send_confirmation", Outcome.FAILURE, "smtp_unreachable"),
+    ]
+    assert system_events(uow)[1][3] == "attempt:4,channel:email"
+
+
+async def test_a_failing_system_log_never_stops_a_job(
+    uow: InMemoryUnitOfWork, composer: MessageComposer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bid = await booking_id(uow)
+    queue, sender = FakeQueue([job(bid, JobType.SEND_CONFIRMATION)]), RecordingSender()
+
+    async def broken(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("database locked")
+
+    monkeypatch.setattr(SystemLog, "record", broken)
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert queue.done == [1]
+    assert len(sender.sent) == 1
+
+
+async def test_old_system_events_are_pruned_at_most_once_an_hour(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    old = AuditEvent(
+        NOW - timedelta(days=31),
+        SYSTEM_ACTOR,
+        "job.purge_pii",
+        Outcome.SUCCESS,
+        source=Source.SYSTEM,
+    )
+    uow.state.audit = [old]
+    clock = FixedClock(NOW)
+    runner = JobRunner(FakeQueue([]), uow, clock, None, composer, retention=timedelta(days=30))
+
+    await runner.run_due()
+    assert uow.state.audit == []
+
+    uow.state.audit = [old]
+    clock.advance(timedelta(minutes=59))
+    await runner.run_due()
+    assert uow.state.audit == [old]
+
+    clock.advance(timedelta(minutes=1))
+    await runner.run_due()
+    assert uow.state.audit == []
