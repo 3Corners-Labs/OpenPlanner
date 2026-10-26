@@ -1,4 +1,5 @@
-{#- The weekly opening hours; with add and change links and remove buttons when ``removable`` is set. -#}
+{#- The weekly staffing blocks; with add, change, split and remove actions when ``removable`` is set.
+    A block without agents carries ``window--unstaffed`` and says "geen medewerkers" in words. -#}
 <ul class="week">
   {% for day in week %}
   <li class="day{% if not day.windows %} day--closed{% endif %}">
@@ -6,15 +7,19 @@
     {% if day.windows %}
     <ul class="windows">
       {% for window in day.windows %}
-      <li class="window">
+      <li class="window{% if not window.staffed %} window--unstaffed{% endif %}">
         <span class="window__time">{{ window.time }}</span>
         <span class="window__capacity">{{ window.capacity }}</span>
+        {% if window.label %}<span class="window__label">{{ window.label }}</span>{% endif %}
         {% if window.validity %}<span class="window__validity">{{ window.validity }}</span>{% endif %}
         {% if removable | default(false) %}
-        <a href="/admin/groups/{{ summary.group.slug }}/hours/{{ window.id }}" aria-label="{{ _("admin.hours.edit_label", day=day.name, time=window.time) }}">{{ _("admin.edit") }}</a>
-        <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/hours/{{ window.id }}/delete">
-          <button type="submit" class="button button--quiet" aria-label="{{ _("admin.hours.remove_label", day=day.name, time=window.time) }}">{{ _("admin.remove") }}</button>
-        </form>
+        <span class="window__actions">
+          <a href="/admin/groups/{{ summary.group.slug }}/staffing/{{ window.id }}" aria-label="{{ _("admin.hours.edit_label", day=day.name, time=window.time) }}">{{ _("admin.edit") }}</a>
+          <a href="/admin/groups/{{ summary.group.slug }}/staffing/{{ window.id }}/split" aria-label="{{ _("admin.hours.split_label", day=day.name, time=window.time) }}">{{ _("admin.hours.split") }}</a>
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/staffing/{{ window.id }}/delete">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.hours.remove_label", day=day.name, time=window.time) }}">{{ _("admin.remove") }}</button>
+          </form>
+        </span>
         {% endif %}
       </li>
       {% endfor %}
@@ -23,7 +28,7 @@
     <p class="muted">{{ _("admin.hours.closed") }}</p>
     {% endif %}
     {% if removable | default(false) %}
-    <a class="day__add" href="/admin/groups/{{ summary.group.slug }}/hours?weekday={{ day.weekday }}#weekday" aria-label="{{ _("admin.hours.add_label", day=day.name) }}">{{ _("admin.hours.add_link") }}</a>
+    <a class="day__add" href="/admin/groups/{{ summary.group.slug }}/staffing?weekday={{ day.weekday }}#weekday" aria-label="{{ _("admin.hours.add_label", day=day.name) }}">{{ _("admin.hours.add_link") }}</a>
     {% endif %}
   </li>
   {% endfor %}

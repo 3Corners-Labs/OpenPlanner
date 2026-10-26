@@ -182,15 +182,15 @@ async def test_group_admin_adds_and_removes_opening_hours(site: Site) -> None:
 
     added = await _post(
         site,
-        f"{GROUP}/hours",
+        f"{GROUP}/staffing",
         {"weekday": "5", "opens": "10:00", "closes": "12:00", "capacity": "3"},
     )
-    page = (await site.client.get(f"{GROUP}/hours?done=added")).text
+    page = (await site.client.get(f"{GROUP}/staffing?done=added")).text
 
-    assert added.headers["location"] == f"{GROUP}/hours?done=added"  # type: ignore[attr-defined]
+    assert added.headers["location"] == f"{GROUP}/staffing?done=added"  # type: ignore[attr-defined]
     assert "Toegevoegd." in page
     assert "10:00–12:00" in page
-    assert "tot 3 tegelijk" in page
+    assert "3 medewerkers" in page
     # Native time and date inputs follow the browser locale (AM/PM, mm/dd/yyyy).
     assert 'type="time"' not in page
     assert 'type="date"' not in page
@@ -199,8 +199,8 @@ async def test_group_admin_adds_and_removes_opening_hours(site: Site) -> None:
     assert 'id="opens" name="opens" type="text" inputmode="numeric" value="09:00"' in page
     action = page.split("10:00–12:00", 1)[1].split('action="', 1)[1].split('"', 1)[0]
     removed = await site.client.post(action, headers=SAME_ORIGIN)
-    assert removed.headers["location"] == f"{GROUP}/hours?done=removed"
-    assert "10:00–12:00" not in (await site.client.get(f"{GROUP}/hours")).text
+    assert removed.headers["location"] == f"{GROUP}/staffing?done=removed"
+    assert "10:00–12:00" not in (await site.client.get(f"{GROUP}/staffing")).text
 
 
 async def _saturday_window(site: Site) -> tuple[str, str]:
@@ -208,29 +208,29 @@ async def _saturday_window(site: Site) -> tuple[str, str]:
     await site.login_as(GROUP_ADMIN)
     await _post(
         site,
-        f"{GROUP}/hours",
+        f"{GROUP}/staffing",
         {"weekday": "5", "opens": "10:00", "closes": "12:00", "capacity": "3"},
     )
-    week = (await site.client.get(f"{GROUP}/hours")).text
+    week = (await site.client.get(f"{GROUP}/staffing")).text
     return week, week.split("10:00–12:00", 1)[1].split('href="', 1)[1].split('"', 1)[0]
 
 
 async def test_group_admin_changes_existing_opening_hours(site: Site) -> None:
     week, link = await _saturday_window(site)
-    assert 'aria-label="Openingstijd zaterdag 10:00–12:00 wijzigen"' in week
+    assert 'aria-label="Tijdblok zaterdag 10:00–12:00 wijzigen"' in week
 
     form = (await site.client.get(link)).text
     assert '<option value="5" selected>' in form
-    assert 'id="opens" name="opens" type="time" value="10:00"' in form
+    assert 'id="opens" name="opens" type="text" inputmode="numeric" value="10:00"' in form
     assert 'id="capacity" name="capacity" type="number" value="3"' in form
 
     saved = await _post(
         site, link, {"weekday": "5", "opens": "09:00", "closes": "12:00", "capacity": "4"}
     )
-    assert saved.headers["location"] == f"{GROUP}/hours?done=saved"  # type: ignore[attr-defined]
-    page = (await site.client.get(f"{GROUP}/hours?done=saved")).text
+    assert saved.headers["location"] == f"{GROUP}/staffing?done=saved"  # type: ignore[attr-defined]
+    page = (await site.client.get(f"{GROUP}/staffing?done=saved")).text
     assert "09:00–12:00" in page
-    assert "tot 4 tegelijk" in page
+    assert "4 medewerkers" in page
     assert "10:00–12:00" not in page
 
 
@@ -243,22 +243,22 @@ async def test_changed_hours_are_validated_like_new_ones(site: Site) -> None:
 
     assert response.status_code == 422  # type: ignore[attr-defined]
     assert 'href="#capacity"' in response.text  # type: ignore[attr-defined]
-    assert "10:00–12:00" in (await site.client.get(f"{GROUP}/hours")).text
+    assert "10:00–12:00" in (await site.client.get(f"{GROUP}/staffing")).text
 
 
 async def test_a_block_without_agents_gets_a_label(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
-    form = (await site.client.get(f"{GROUP}/hours")).text
+    form = (await site.client.get(f"{GROUP}/staffing")).text
     assert 'id="capacity" name="capacity" type="number" value="1" required' in form
     assert 'min="0"' in form
     assert 'id="label" name="label" type="text" value=""' in form
 
     added = await _post(
         site,
-        f"{GROUP}/hours",
+        f"{GROUP}/staffing",
         {"weekday": "5", "opens": "12:00", "closes": "12:30", "capacity": "0", "label": "Lunch"},
     )
-    week = (await site.client.get(f"{GROUP}/hours")).text
+    week = (await site.client.get(f"{GROUP}/staffing")).text
     link = week.split("12:00–12:30", 1)[1].split('href="', 1)[1].split('"', 1)[0]
     change = (await site.client.get(link)).text
 
@@ -274,7 +274,7 @@ async def test_an_invalid_label_is_explained(site: Site) -> None:
 
     response = await _post(
         site,
-        f"{GROUP}/hours",
+        f"{GROUP}/staffing",
         {"weekday": "5", "opens": "12:00", "closes": "12:30", "capacity": "0", "label": "x" * 51},
     )
 
@@ -286,15 +286,14 @@ async def test_an_invalid_label_is_explained(site: Site) -> None:
 async def test_every_day_links_to_the_form_with_that_day_chosen(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
-    week = (await site.client.get(f"{GROUP}/hours")).text
-    form = (await site.client.get(f"{GROUP}/hours?weekday=6")).text
-    bogus = (await site.client.get(f"{GROUP}/hours?weekday=9")).text
+    week = (await site.client.get(f"{GROUP}/staffing")).text
+    form = (await site.client.get(f"{GROUP}/staffing?weekday=6")).text
+    bogus = (await site.client.get(f"{GROUP}/staffing?weekday=9")).text
 
-    assert f'href="{GROUP}/hours?weekday=5#weekday"' in week
-    assert 'aria-label="Openingstijd op zaterdag toevoegen"' in week
+    assert f'href="{GROUP}/staffing?weekday=5#weekday"' in week
+    assert 'aria-label="Tijdblok op zaterdag toevoegen"' in week
     assert '<option value="6" selected>' in form
     assert '<option value="0" selected>' in bogus
-    assert "blok" not in week.lower()
 
 
 async def test_overlapping_hours_are_explained(site: Site) -> None:
@@ -302,7 +301,7 @@ async def test_overlapping_hours_are_explained(site: Site) -> None:
 
     response = await _post(
         site,
-        f"{GROUP}/hours",
+        f"{GROUP}/staffing",
         {"weekday": "0", "opens": "10:00", "closes": "11:00", "capacity": "1"},
     )
 
@@ -325,7 +324,7 @@ async def test_exceptions_close_a_day_or_change_hours(site: Site) -> None:
 
     assert closed.headers["location"] == f"{GROUP}/exceptions?done=added"  # type: ignore[attr-defined]
     assert hours.headers["location"] == f"{GROUP}/exceptions?done=added"  # type: ignore[attr-defined]
-    assert "Gesloten" in page
+    assert "Geen bezetting" in page
     assert "13:00–14:00" in page
 
 
@@ -366,18 +365,18 @@ async def test_changes_need_a_recent_login(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
     site.clock.advance(timedelta(minutes=61))
 
-    form = await site.client.get(f"{GROUP}/hours")
+    form = await site.client.get(f"{GROUP}/staffing")
     post = await site.client.post(
-        f"{GROUP}/hours",
+        f"{GROUP}/staffing",
         data={"weekday": "5", "opens": "10:00", "closes": "11:00", "capacity": "1"},
-        headers={**SAME_ORIGIN, "referer": f"http://testserver{GROUP}/hours"},
+        headers={**SAME_ORIGIN, "referer": f"http://testserver{GROUP}/staffing"},
     )
     overview = await site.client.get(GROUP)  # reading needs no fresh login
 
     assert form.status_code == 303
-    assert form.headers["location"] == f"/admin/login?next={GROUP}/hours"
+    assert form.headers["location"] == f"/admin/login?next={GROUP}/staffing"
     assert post.status_code == 303
-    assert post.headers["location"] == f"/admin/login?next={GROUP}/hours"
+    assert post.headers["location"] == f"/admin/login?next={GROUP}/staffing"
     assert overview.status_code == 200
 
 
@@ -386,7 +385,7 @@ async def test_forged_referer_cannot_leave_the_portal(site: Site) -> None:
     site.clock.advance(timedelta(minutes=61))
 
     post = await site.client.post(
-        f"{GROUP}/hours",
+        f"{GROUP}/staffing",
         data={},
         headers={**SAME_ORIGIN, "referer": "https://evil.example/steal"},
     )
@@ -398,13 +397,13 @@ async def test_cross_site_changes_are_refused(site: Site) -> None:
     await site.login_as(SUPER)
 
     response = await site.client.post(
-        f"{GROUP}/hours",
+        f"{GROUP}/staffing",
         data={"weekday": "5", "opens": "10:00", "closes": "11:00", "capacity": "1"},
         headers={"sec-fetch-site": "cross-site"},
     )
 
     assert response.status_code == 403
-    assert "10:00–11:00" not in (await site.client.get(f"{GROUP}/hours")).text
+    assert "10:00–11:00" not in (await site.client.get(f"{GROUP}/staffing")).text
 
 
 async def test_tabs_and_actions_follow_the_matrix(site: Site) -> None:
@@ -414,7 +413,7 @@ async def test_tabs_and_actions_follow_the_matrix(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     org_admin = (await site.client.get(GROUP)).text
 
-    assert f'href="{GROUP}/hours"' in group_admin
+    assert f'href="{GROUP}/staffing"' in group_admin
     assert f'href="{GROUP}/settings"' not in group_admin
     assert 'href="/admin/groups/new"' not in dashboard
     assert f'href="{GROUP}/settings"' in org_admin
@@ -445,7 +444,7 @@ async def test_overview_shows_week_preview_and_exceptions(site: Site) -> None:
 
     text = (await site.client.get(GROUP)).text
 
-    assert "Openingstijden per week" in text
+    assert "Bezetting per week" in text
     assert "Zo zien deelnemers het" in text
     assert "tijdsloten" in text
 
@@ -454,7 +453,7 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
     await site.login_as(SUPER)
     await _post(
         site,
-        f"{GROUP}/hours",
+        f"{GROUP}/staffing",
         {"weekday": "5", "opens": "10:00", "closes": "11:00", "capacity": "1"},
     )
     await _post(
@@ -475,7 +474,7 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
 
     text = (await site.client.get("/admin/audit")).text
 
-    assert "Openingstijd toegevoegd" in text
+    assert "Tijdblok toegevoegd" in text
     assert "Vooruit boeken (dagen), Naam" in text
 
 
@@ -483,7 +482,7 @@ async def test_oversized_forms_are_refused(site: Site) -> None:
     await site.login_as(SUPER)
 
     response = await site.client.post(
-        f"{GROUP}/hours", data={"weekday": "5", "padding": "x" * 20_000}, headers=SAME_ORIGIN
+        f"{GROUP}/staffing", data={"weekday": "5", "padding": "x" * 20_000}, headers=SAME_ORIGIN
     )
 
     assert response.status_code == 413
@@ -517,3 +516,92 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         assert "Vul een geheel getal van 1 tot en met 1000 in" in refused.text  # type: ignore[attr-defined]
     assert cleared.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
     assert f'{field} value=""' in (await site.client.get(f"{GROUP}/settings")).text
+
+
+async def test_old_hours_paths_redirect_permanently_to_staffing(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    week = await site.client.get("/admin/groups/demo/hours?weekday=5")
+    change = await site.client.get("/admin/groups/demo/hours/7")
+
+    assert week.status_code == 301
+    assert week.headers["location"] == f"{GROUP}/staffing?weekday=5"
+    assert change.status_code == 301
+    assert change.headers["location"] == f"{GROUP}/staffing/7"
+
+
+async def test_week_shows_labels_and_marks_blocks_without_agents_in_text(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    for opens, closes, capacity, label in (
+        ("09:00", "12:00", "1", ""),
+        ("12:00", "12:30", "0", "Lunch"),
+        ("12:30", "17:00", "3", ""),
+    ):
+        await _post(
+            site,
+            f"{GROUP}/staffing",
+            {
+                "weekday": "5",
+                "opens": opens,
+                "closes": closes,
+                "capacity": capacity,
+                "label": label,
+            },
+        )
+
+    week = (await site.client.get(f"{GROUP}/staffing")).text
+    lunch = week.split("12:00–12:30", 1)[1].split("</li>", 1)[0]
+
+    assert "1 medewerker<" in week
+    assert "3 medewerkers" in week
+    assert "geen medewerkers" in lunch
+    assert "Lunch" in lunch
+    assert 'class="window window--unstaffed"' in week
+    assert 'aria-label="Tijdblok zaterdag 12:00–12:30 splitsen"' in lunch
+    assert 'aria-label="Tijdblok zaterdag 12:00–12:30 verwijderen"' in lunch
+    overview = (await site.client.get(GROUP)).text
+    assert "geen medewerkers" in overview
+    assert "splitsen" not in overview  # the overview only shows the week
+
+
+async def test_group_admin_splits_a_block_for_lunch(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    await _post(
+        site,
+        f"{GROUP}/staffing",
+        {"weekday": "5", "opens": "09:00", "closes": "17:00", "capacity": "3", "label": "Dag"},
+    )
+    week = (await site.client.get(f"{GROUP}/staffing")).text
+    link = week.split("09:00–17:00", 1)[1].split('href="', 2)[2].split('"', 1)[0]
+    assert link.endswith("/split")
+
+    form = (await site.client.get(link)).text
+    assert "Tijdblok splitsen" in form
+    assert "zaterdag 09:00–17:00 · 3 medewerkers · Dag" in form
+    assert 'id="split_at" name="split_at"' in form
+    split = await _post(site, link, {"split_at": "12:00", "capacity": "0", "label": "Lunch"})
+
+    assert split.headers["location"] == f"{GROUP}/staffing?done=saved"  # type: ignore[attr-defined]
+    page = (await site.client.get(f"{GROUP}/staffing")).text
+    assert "09:00–12:00" in page
+    assert "12:00–17:00" in page
+    assert "09:00–17:00" not in page
+    await site.login_as(SUPER)
+    audit = (await site.client.get("/admin/audit")).text
+    assert "Tijdblok gesplitst" in audit
+    assert "Lunch" not in audit  # admin content, never in the audit log
+
+
+async def test_a_split_outside_the_block_is_explained(site: Site) -> None:
+    week, _ = await _saturday_window(site)
+    link = week.split("10:00–12:00", 1)[1].split('href="', 2)[2].split('"', 1)[0]
+
+    response = await _post(site, link, {"split_at": "13:00", "capacity": "1", "label": ""})
+    garbage = await _post(site, link, {"split_at": "later", "capacity": "-1", "label": ""})
+
+    assert response.status_code == 422  # type: ignore[attr-defined]
+    assert '<a href="#split_at">' in response.text  # type: ignore[attr-defined]
+    assert "vóór het einde van het tijdblok" in response.text  # type: ignore[attr-defined]
+    assert garbage.status_code == 422  # type: ignore[attr-defined]
+    assert '<a href="#split_at">' in garbage.text  # type: ignore[attr-defined]
+    assert "10:00–12:00" in (await site.client.get(f"{GROUP}/staffing")).text
