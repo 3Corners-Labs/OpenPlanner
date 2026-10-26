@@ -5,7 +5,7 @@ from datetime import timedelta
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.calls import EventKind, TaskState
+from app.domain.calls import CallState, EventKind, TaskState
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
@@ -163,7 +163,18 @@ async def test_final_failure_is_recorded(setup: Setup) -> None:
 
     assert queue.failed == [(1, "server_error")]
     events = setup.uow.state.booking_events[bid]
-    assert (events[-1].kind, events[-1].detail) == (EventKind.INTEGRATION_ERROR, "server_error")
+    assert (events[-1].kind, events[-1].detail) == (EventKind.MEETING_FAILED, "server_error")
+    assert setup.uow.state.call_status[bid].call is CallState.FAILED
+
+
+async def test_a_refused_meeting_fails_at_once_as_meeting_failed(setup: Setup) -> None:
+    bid = await setup.booking()
+    setup.video.error = IntegrationError("rejected_400", retryable=False)
+
+    await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
+
+    events = setup.uow.state.booking_events[bid]
+    assert (events[-1].kind, events[-1].detail) == (EventKind.MEETING_FAILED, "rejected_400")
 
 
 async def test_stale_dispatch_does_nothing(setup: Setup) -> None:

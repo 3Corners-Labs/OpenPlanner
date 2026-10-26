@@ -6,8 +6,8 @@ the first name and the meeting link (CLAUDE.md). Everything the platforms report
 a ``BookingEvent`` and updates one aggregated ``CallStatus`` per booking.
 
     booked ─► meeting_created ─► task_created ─► task_connected ─► host_joined
-                                     │                                 guest_joined …
-                                     └► task_failed (reason)        ─► meeting_ended
+          │                          │                                 guest_joined …
+          └► meeting_failed (reason) └► task_failed (reason)        ─► meeting_ended
     cancelled ─► task_marked_cancelled (v2) ─► task_end_requested (v1) ─► task_ended
                                             └► end_not_possible (reason)       (ADR 0021)
 
@@ -28,6 +28,8 @@ class EventKind(StrEnum):
     """Everything that can happen to a booking's call, in order of a normal call."""
 
     MEETING_CREATED = "meeting_created"
+    MEETING_FAILED = "meeting_failed"
+    """The meeting could not be created (detail: the code, e.g. ``rejected_400``)."""
     MEETING_DELETED = "meeting_deleted"
     JOIN_PAGE_OPENED = "join_page_opened"
     JOIN_CLICKED = "join_clicked"
@@ -84,6 +86,7 @@ class CallState(StrEnum):
     SCHEDULED = "scheduled"
     IN_PROGRESS = "in_progress"
     ENDED = "ended"
+    FAILED = "failed"
 
 
 class TaskState(StrEnum):
@@ -135,6 +138,8 @@ def apply_event(status: CallStatus, kind: EventKind, at: datetime) -> CallStatus
     changes: dict[str, object] = {"updated_at": at}
     if kind is EventKind.MEETING_CREATED:
         changes["call"] = CallState.SCHEDULED
+    elif kind is EventKind.MEETING_FAILED:
+        changes["call"] = CallState.FAILED
     elif kind is EventKind.MEETING_STARTED:
         changes |= {"call": CallState.IN_PROGRESS, "started_at": status.started_at or at}
     elif kind in (EventKind.HOST_JOINED, EventKind.GUEST_JOINED):
