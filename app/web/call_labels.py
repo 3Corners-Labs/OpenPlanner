@@ -1,4 +1,4 @@
-"""Call wording shared by web and worker: the agent's start time, and admin labels for states."""
+"""Call wording shared by web and worker: the agent's start time, admin labels and failure hints."""
 
 from app.domain.booking import Booking, BookingKind
 from app.domain.calls import CallState, EventKind, TaskState
@@ -20,6 +20,7 @@ CALL_STATE_LABELS: dict[CallState, tuple[str, str]] = {
     CallState.SCHEDULED: ("call.state.scheduled", "accent"),
     CallState.IN_PROGRESS: ("call.state.in_progress", "success"),
     CallState.ENDED: ("call.state.ended", ""),
+    CallState.FAILED: ("call.state.failed", "danger"),
 }
 """Catalogue key and chip tone per meeting state; the state is always written out."""
 
@@ -34,6 +35,7 @@ TASK_STATE_LABELS: dict[TaskState, tuple[str, str]] = {
 
 EVENT_LABELS: dict[EventKind, str] = {
     EventKind.MEETING_CREATED: "call.event.meeting_created",
+    EventKind.MEETING_FAILED: "call.event.meeting_failed",
     EventKind.MEETING_DELETED: "call.event.meeting_deleted",
     EventKind.JOIN_PAGE_OPENED: "call.event.join_page_opened",
     EventKind.JOIN_CLICKED: "call.event.join_clicked",
@@ -51,6 +53,38 @@ EVENT_LABELS: dict[EventKind, str] = {
     EventKind.MEETING_ENDED: "call.event.meeting_ended",
     EventKind.INTEGRATION_ERROR: "call.event.integration_error",
 }
+
+FAILURE_HINTS: dict[tuple[EventKind, str], str] = {
+    (EventKind.MEETING_FAILED, "rejected_400"): "call.hint.meeting.rejected_400",
+    (EventKind.MEETING_FAILED, "rejected_403"): "call.hint.meeting.rejected_403",
+    (EventKind.MEETING_FAILED, "rejected_404"): "call.hint.meeting.rejected_404",
+    (EventKind.TASK_FAILED, "meeting_missing"): "call.hint.task.meeting_missing",
+}
+"""What to check after a failure with a known meaning for that kind of event."""
+
+CODE_HINTS: dict[str, str] = {
+    "unauthorized": "call.hint.unauthorized",
+    "rate_limited": "call.hint.unavailable",
+    "server_error": "call.hint.unavailable",
+    "unreachable": "call.hint.unavailable",
+    "unexpected_response": "call.hint.unexpected_response",
+}
+"""What to check after a failure that means the same for every Webex API."""
+
+DEFAULT_HINTS: dict[EventKind, str] = {
+    EventKind.MEETING_FAILED: "call.hint.meeting.other",
+    EventKind.TASK_FAILED: "call.hint.task.other",
+    EventKind.INTEGRATION_ERROR: "call.hint.integration.other",
+}
+"""Fallback per failure event; ``end_not_possible`` has its own notice on the page."""
+
+
+def failure_hint(kind: EventKind, code: str) -> str | None:
+    """Return the catalogue key explaining a failure event, or ``None`` for other events."""
+    if kind not in DEFAULT_HINTS:
+        return None
+    return FAILURE_HINTS.get((kind, code)) or CODE_HINTS.get(code) or DEFAULT_HINTS[kind]
+
 
 KIND_LABELS: dict[BookingKind, str] = {
     BookingKind.SCHEDULED: "call.kind.scheduled",

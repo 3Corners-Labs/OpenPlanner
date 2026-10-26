@@ -125,6 +125,12 @@ def test_status_follows_task_and_meeting_events() -> None:
     assert status.task is TaskState.ENDED
 
 
+def test_a_failed_meeting_shows_as_failed() -> None:
+    status = apply_event(new_status(123), EventKind.MEETING_FAILED, NOW)
+
+    assert status.call is CallState.FAILED
+
+
 def test_participants_never_go_below_zero_and_failures_are_kept() -> None:
     status = apply_event(new_status(1), EventKind.PARTICIPANT_LEFT, NOW)
     failed = apply_event(new_status(1), EventKind.TASK_FAILED, NOW)
