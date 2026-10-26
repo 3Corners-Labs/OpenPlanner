@@ -9,6 +9,7 @@ input (``aria-describedby``, error summary with anchors) and never repeats the v
     ... domain call ...  except DomainError as error: form.refusal(error)
 """
 
+import re
 from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, tzinfo
@@ -27,6 +28,23 @@ from app.web.protection import RejectedRequest
 
 MAX_FORM_BYTES = 16 * 1024
 """Admin forms are small; anything larger is refused before parsing."""
+
+CLOCK_PATTERN = r"([01]?[0-9]|2[0-3])[:.][0-5][0-9]"
+"""A 24-hour time such as ``9:05``, ``09:05`` or ``17.30``; also the inputs' ``pattern``."""
+
+DAY_PATTERN = r"(0?[1-9]|[12][0-9]|3[01])[\-\/.](0?[1-9]|1[0-2])[\-\/.][0-9]{4}"
+"""A day-month-year date such as ``03-04-2026``, ``3/4/2026`` or ``3.4.2026``.
+
+Also the inputs' ``pattern``, so ``-`` and ``/`` are escaped for the browser's ``v`` flag.
+
+Times and dates are plain text inputs: a native ``type="time"`` or ``type="date"`` follows the
+browser locale (AM/PM, mm/dd/yyyy) whatever the page language, so the admin would see two
+formats side by side. ISO ``YYYY-MM-DD`` is still read, for links and older bookmarks.
+"""
+
+_CLOCK = re.compile(CLOCK_PATTERN)
+_DAY = re.compile(DAY_PATTERN)
+_ISO_DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 DONE_MESSAGES: dict[str, str] = {
     "created": "admin.done.created",
@@ -169,8 +187,9 @@ class Field:
     Attributes:
         name: Input name and id.
         label: Visible label.
-        kind: ``text``, ``number``, ``time``, ``date``, ``datetime-local``, ``textarea`` or
-            ``select``.
+        kind: ``text``, ``number``, ``time`` (24-hour text), ``date`` (dd-mm-yyyy text),
+            ``datetime`` (a date input plus a 24-hour ``{name}_time`` input; value
+            ``YYYY-MM-DDTHH:MM``), ``textarea`` or ``select``.
         value: Current or submitted value.
         hint: Help text, linked with ``aria-describedby``.
         error: Message for this field, linked the same way.
@@ -196,6 +215,27 @@ class Field:
         """Return the ids of hint and error, for ``aria-describedby``."""
         ids = [f"{self.name}-hint" if self.hint else "", f"{self.name}-error" if self.error else ""]
         return " ".join(i for i in ids if i)
+
+    @property
+    def clock_pattern(self) -> str:
+        """Return the ``pattern`` of a 24-hour time input (``CLOCK_PATTERN``)."""
+        return CLOCK_PATTERN
+
+    @property
+    def day_pattern(self) -> str:
+        """Return the ``pattern`` of a date input (``DAY_PATTERN``)."""
+        return DAY_PATTERN
+
+    @property
+    def date_text(self) -> str:
+        """Return the value of a ``date`` field as dd-mm-yyyy; typed text is kept as is."""
+        return _day_text(self.value)
+
+    @property
+    def moment_parts(self) -> tuple[str, str]:
+        """Return the date (dd-mm-yyyy) and time of a ``datetime`` field."""
+        day, _, clock = self.value.partition("T")
+        return _day_text(day), clock
 
 
 class FormData:
@@ -233,42 +273,43 @@ class FormData:
         return self.integer(name) if self.text(name) else None
 
     def clock(self, name: str) -> time | None:
-        """Return a time of day (``HH:MM``), or ``None`` with an error."""
-        try:
-            return time.fromisoformat(self.text(name))
-        except ValueError:
-            self._fail(name)
-            return None
+        """Return a 24-hour time of day (see ``CLOCK_PATTERN``), or ``None`` with an error."""
+        parsed = _parse_clock(self.text(name))
+        if parsed is None:
+            self._fail(name, "admin.form.error.time")
+        return parsed
 
     def day(self, name: str) -> date | None:
-        """Return a date (``YYYY-MM-DD``), or ``None`` with an error."""
-        try:
-            return date.fromisoformat(self.text(name))
-        except ValueError:
-            self._fail(name)
-            return None
+        """Return a date (see ``DAY_PATTERN``), or ``None`` with an error."""
+        parsed = _parse_day(self.text(name))
+        if parsed is None:
+            self._fail(name, "admin.form.error.date")
+        return parsed
 
     def optional_day(self, name: str) -> date | None:
         """Return a date, ``None`` when empty, or ``None`` with an error when malformed."""
         return self.day(name) if self.text(name) else None
 
     def optional_moment(self, name: str, tz: tzinfo) -> datetime | None:
-        """Return a local ``YYYY-MM-DDTHH:MM`` in ``tz`` as UTC; ``None`` when empty or malformed.
+        """Return the ``datetime`` field ``name`` in ``tz`` as UTC; ``None`` if empty or malformed.
 
-        Parsing happens here, at the edge, so the domain only sees UTC (CLAUDE.md).
+        The day comes from ``name`` and the time from ``{name}_time``; both or neither. Parsing
+        happens here, at the edge, so the domain only sees UTC (CLAUDE.md).
         """
-        raw = self.text(name)
-        if not raw:
+        raw_day, raw_clock = self.text(name), self.text(f"{name}_time")
+        if not raw_day and not raw_clock:
             return None
-        try:
-            local = datetime.fromisoformat(raw)
-        except ValueError:
-            self._fail(name)
+        day, clock = _parse_day(raw_day), _parse_clock(raw_clock)
+        if day is None or clock is None:
+            self._fail(name, "admin.form.error.moment")
             return None
-        if local.tzinfo is not None:
-            self._fail(name)
-            return None
-        return local.replace(tzinfo=tz).astimezone(UTC)
+        return datetime.combine(day, clock, tz).astimezone(UTC)
+
+    def moment_value(self, name: str, default: str = "") -> str:
+        """Return a submitted ``datetime`` field as ``dayTtime`` to re-render, or ``default``."""
+        if name not in self.values and f"{name}_time" not in self.values:
+            return default
+        return f"{self.text(name)}T{self.text(f'{name}_time')}"
 
     def checked(self, name: str) -> bool:
         """Return whether the checkbox ``name`` was ticked."""
@@ -298,10 +339,41 @@ class FormData:
         """Return the first message linked to ``name``."""
         return next((e.message for e in self.errors if e.field == name), None)
 
-    def _fail(self, name: str) -> None:
-        """Record that ``name`` could not be read."""
-        key = FIELD_MESSAGES.get(name, "error.invalid_request")
-        self.errors.append(FormError(name, self._(key)))
+    def _fail(self, name: str, key: str | None = None) -> None:
+        """Record that ``name`` could not be read, with ``key`` or the field's own message."""
+        message = key or FIELD_MESSAGES.get(name, "error.invalid_request")
+        self.errors.append(FormError(name, self._(message)))
+
+
+def _parse_clock(raw: str) -> time | None:
+    """Return the 24-hour time in ``raw``, or ``None`` when it is not one."""
+    if not _CLOCK.fullmatch(raw):
+        return None
+    hours, minutes = re.split(r"[:.]", raw)
+    return time(int(hours), int(minutes))
+
+
+def _parse_day(raw: str) -> date | None:
+    """Return the date in ``raw`` (day-month-year or ISO), or ``None`` when it is not one."""
+    if _ISO_DAY.fullmatch(raw):
+        parts = raw.split("-")
+    elif _DAY.fullmatch(raw):
+        parts = re.split(r"[-/.]", raw)[::-1]
+    else:
+        return None
+    year, month, day = (int(part) for part in parts)
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _day_text(value: str) -> str:
+    """Return an ISO date as dd-mm-yyyy for an input; anything else unchanged."""
+    if not _ISO_DAY.fullmatch(value):
+        return value
+    year, month, day = value.split("-")
+    return f"{day}-{month}-{year}"
 
 
 def done_message(request: Request, _: BoundGettext) -> str | None:
