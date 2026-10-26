@@ -4,7 +4,8 @@ Every write runs in one locked transaction, so slot creation, the capacity check
 booking and its jobs commit together or not at all (CLAUDE.md architecture rules).
 
     book ─► locked tx ─► _place: window ─► offered? ─► slot (create, snapshot capacity)
-                                ─► capacity ─► booking + token ─► replace_jobs
+                                ─► capacity (minus overlapping old-grid bookings)
+                                ─► booking + token ─► replace_jobs
     reschedule ─► locked tx ─► cancel old (jobs: purge only) ─► _place new in the SAME group
 
 A booking is read-only from its change deadline (``job_plan.change_deadline``: the group's
@@ -23,6 +24,7 @@ from app.domain.availability import (
     available_slots,
     booking_window,
     offered_slot,
+    overlapping_active,
     utc_bounds,
     validate_range,
 )
@@ -135,7 +137,10 @@ class BookingService:
         async with self._uow.read() as tx:
             group = await self._group(tx, group_slug)
             rules, overrides = await effective_schedule(tx, group, first_day, last_day)
-            usage = await tx.get_slot_usage(group.id, *utc_bounds(group, first_day, last_day))
+            lower, upper = utc_bounds(group, first_day, last_day)
+            # One slot length beyond the range, for slots of an old grid overlapping its edges.
+            margin = timedelta(minutes=group.slot_minutes)
+            usage = await tx.get_slot_usage(group.id, lower - margin, upper + margin)
             closures = await tx.get_closures(group.id, self._clock.now())
         slots = available_slots(
             group=group,
@@ -382,7 +387,10 @@ class BookingService:
             slot = await tx.add_slot(
                 Slot(None, group.id, offered.start, offered.end, offered.capacity)
             )
-        if await tx.count_active_bookings(_id(slot)) >= slot.capacity_snapshot:
+        length = offered.end - offered.start
+        usage = await tx.get_slot_usage(group.id, offered.start - length, offered.start + length)
+        overlap = overlapping_active(offered.start, length, {u.start: u.active for u in usage})
+        if await tx.count_active_bookings(_id(slot)) + overlap >= slot.capacity_snapshot:
             raise DomainError(ErrorCode.SLOT_FULL)
         salt = new_token_salt()
         token = derive_token(self._token_key, salt)

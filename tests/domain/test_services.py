@@ -103,6 +103,24 @@ async def test_capacity_snapshot_survives_schedule_changes(
     await book(service, SLOT_0930)  # new slots use the new capacity
 
 
+async def test_bookings_on_an_old_grid_count_against_overlapping_slots(
+    service: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    await book(service)  # 09:00–09:30, capacity 1
+    # The window moves to 08:45: the grid becomes 08:45, 09:15 and both overlap 09:00.
+    uow.state.rules[1] = [ScheduleRule(weekday=0, window=window("08:45", "10:00", 1))]
+
+    assert await service.availability("aangifte", MONDAY, MONDAY) == []
+    with pytest.raises(DomainError, match="slot_full"):
+        await book(service, SLOT_0900 - timedelta(minutes=15))
+
+    uow.state.rules[1] = [ScheduleRule(weekday=0, window=window("08:45", "10:00", 2))]
+    await book(service, SLOT_0900 - timedelta(minutes=15))  # 08:45: one agent left
+    await book(service, SLOT_0900 + timedelta(minutes=15))  # 09:15: 08:45 has ended
+    with pytest.raises(DomainError, match="slot_full"):
+        await book(service, SLOT_0900 + timedelta(minutes=15))
+
+
 async def test_closing_a_day_stops_new_bookings_in_existing_slots(
     service: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
