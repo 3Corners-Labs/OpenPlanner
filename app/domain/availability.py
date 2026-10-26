@@ -13,9 +13,16 @@ windows it covers. A window with 0 agents or a gap ends the run.
 
     windows_on(day) ──► slots_on(day) ──► filter: notice ≤ start ≤ horizon
                                           capacity = existing slot snapshot or window
-                                          remaining = capacity − active bookings > 0
+                                          remaining = capacity − active bookings
+                                                      − overlapping bookings at the
+                                                        busiest moment > 0
+
+Overlapping slots exist only after the grid moved (a window changed, or touching windows
+became one run, ADR 0027) while bookings on the old grid lie ahead. Their bookings occupy
+agents too, so at the busiest moment of a new slot they take places in it.
 """
 
+from bisect import bisect_left, bisect_right
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
@@ -84,6 +91,36 @@ def _lowest_capacity(run: Sequence[TimeWindow], day: date, start: datetime, end:
         w.capacity
         for w in run
         if datetime.combine(day, w.opens) < end and start < datetime.combine(day, w.closes)
+    )
+
+
+def overlapping_active(
+    start: datetime,
+    length: timedelta,
+    booked: Mapping[datetime, int],
+    starts: Sequence[datetime] | None = None,
+) -> int:
+    """Return the most bookings of other slots that are active at one moment of this slot.
+
+    All slots of a group have the same length (it is frozen while bookings lie ahead), so a
+    slot overlaps when its start lies less than ``length`` away; touching slots do not count.
+    Two old slots that overlap this slot at different moments (08:45 and 09:15 around 09:00)
+    never occupy the same agent time, so only the busiest moment counts. That moment is this
+    slot's start or the start of one of the overlapping slots.
+
+    Args:
+        start: Start of the slot to check.
+        length: Slot length.
+        booked: Active bookings per existing slot start.
+        starts: ``sorted(booked)``, when the caller checks many slots against the same map.
+    """
+    keys = sorted(booked) if starts is None else starts
+    lower, upper = bisect_right(keys, start - length), bisect_left(keys, start + length)
+    others = [other for other in keys[lower:upper] if other != start]
+    moments = [start, *(other for other in others if other > start)]
+    return max(
+        sum(booked[other] for other in others if other <= moment < other + length)
+        for moment in moments
     )
 
 
@@ -156,7 +193,8 @@ def available_slots(
         first_day: First local date.
         last_day: Last local date; at most ``MAX_RANGE_DAYS`` days after ``first_day``.
         now: Current time (UTC).
-        booked: Active bookings per slot start.
+        booked: Active bookings per slot start; those of other overlapping slots (an old
+            grid) count too.
         snapshots: Capacity snapshot per existing slot start; wins over the window.
 
     Raises:
@@ -164,6 +202,8 @@ def available_slots(
     """
     days = validate_range(first_day, last_day)
     earliest, latest = booking_window(group, now)
+    length = timedelta(minutes=group.slot_minutes)
+    starts = sorted(booked)
     result: list[AvailableSlot] = []
     for offset in range(days):
         day = first_day + timedelta(days=offset)
@@ -171,7 +211,11 @@ def available_slots(
             if not earliest <= slot.start <= latest:
                 continue
             capacity = snapshots.get(slot.start, slot.capacity)
-            remaining = capacity - booked.get(slot.start, 0)
+            remaining = (
+                capacity
+                - booked.get(slot.start, 0)
+                - overlapping_active(slot.start, length, booked, starts)
+            )
             if remaining > 0:
                 result.append(AvailableSlot(slot.start, slot.end, capacity, remaining))
     return result
