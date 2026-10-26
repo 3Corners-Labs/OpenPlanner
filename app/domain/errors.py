@@ -30,6 +30,9 @@ class ErrorCode(StrEnum):
     SCHEDULE_ITEM_NOT_FOUND = "schedule_item_not_found"
     INTEGRATION_NOT_READY = "integration_not_ready"
     DIRECT_CALL_UNAVAILABLE = "direct_call_unavailable"
+    CHANNEL_NOT_CONFIGURED = "channel_not_configured"
+    REMINDER_EXISTS = "reminder_exists"
+    REMINDER_NOT_FOUND = "reminder_not_found"
 
 
 class DomainError(Exception):

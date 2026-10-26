@@ -32,7 +32,7 @@ from app.domain.authorization import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.scheduling import GroupSummary
+from app.domain.scheduling import GroupSummary, Organisation
 
 ANONYMOUS = "anonymous"
 """Actor recorded for events without a logged-in admin (e.g. a failed login)."""
@@ -191,6 +191,18 @@ def require(authorization: Authorization) -> Authorization:
     if not authorization.decision.allowed:
         raise DomainError(ErrorCode.NOT_PERMITTED)
     return authorization
+
+
+async def organisation_by_slug(tx: Transaction, slug: str) -> Organisation:
+    """Return the organisation with ``slug``, for use cases that change one.
+
+    Raises:
+        DomainError: ``organisation_not_found``.
+    """
+    organisation = await tx.get_organisation(slug)
+    if organisation is None:
+        raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+    return organisation
 
 
 async def record_change(

@@ -1377,3 +1377,315 @@ msgstr "Logo uploaden"
 
 msgid "admin.branding.logo_remove"
 msgstr "Logo verwijderen"
+
+msgid "message.reminder.sms"
+msgstr "Beste {first_name}, herinnering: videogesprek met {group_name} op {date} om {time}. Wijzigen of annuleren: {manage_url}"
+
+msgid "admin.tab.reminders"
+msgstr "Herinneringen"
+
+msgid "admin.tab.messages"
+msgstr "Berichtteksten"
+
+msgid "admin.done.texts_saved"
+msgstr "De teksten zijn opgeslagen. Nieuwe berichten gebruiken ze meteen."
+
+msgid "admin.channels.title"
+msgstr "Berichtkanalen"
+
+msgid "admin.channels.lead"
+msgstr "Via welke mailserver en welke sms-dienst burgers berichten van deze organisatie krijgen."
+
+msgid "admin.integrations.channels_lead"
+msgstr "Mailserver en sms-dienst per organisatie. Kies een organisatie om ze in te stellen."
+
+msgid "admin.channels.email"
+msgstr "E-mail (SMTP)"
+
+msgid "admin.channels.email_lead"
+msgstr "Bevestigingen, wijzigingen, herinneringen en annuleringen per e-mail gaan via deze server."
+
+msgid "admin.channels.fallback_mail"
+msgstr "Zolang hier niets is ingesteld, gebruikt OpenPlanner de standaardserver uit de installatie."
+
+msgid "admin.channels.sms"
+msgstr "Sms (Webex Connect)"
+
+msgid "admin.channels.sms_lead"
+msgstr "Sms-herinneringen gaan via een sms-dienst in Webex Connect. De service key staat bij de dienst onder Messaging API."
+
+msgid "admin.channels.ready"
+msgstr "Ingesteld"
+
+msgid "admin.channels.not_configured"
+msgstr "Niet ingesteld"
+
+msgid "admin.channels.secret_missing"
+msgstr "Geheim ontbreekt"
+
+msgid "admin.channels.changed"
+msgstr "Laatst gewijzigd: {at}"
+
+msgid "admin.channels.smtp_host"
+msgstr "Server"
+
+msgid "admin.channels.smtp_host_hint"
+msgstr "Hostnaam van de SMTP-server, bijvoorbeeld smtp.gemeente.nl."
+
+msgid "admin.channels.smtp_port"
+msgstr "Poort"
+
+msgid "admin.channels.smtp_port_hint"
+msgstr "Meestal 587 met STARTTLS of 465 met TLS."
+
+msgid "admin.channels.smtp_security"
+msgstr "Beveiliging"
+
+msgid "admin.channels.security_starttls"
+msgstr "STARTTLS (aanbevolen)"
+
+msgid "admin.channels.security_tls"
+msgstr "TLS vanaf het begin"
+
+msgid "admin.channels.security_none"
+msgstr "Geen (alleen voor een relay in een vertrouwd netwerk)"
+
+msgid "admin.channels.smtp_username"
+msgstr "Gebruikersnaam"
+
+msgid "admin.channels.smtp_username_hint"
+msgstr "Leeg laten als de server zonder inloggen mail aanneemt."
+
+msgid "admin.channels.smtp_password"
+msgstr "Wachtwoord"
+
+msgid "admin.channels.smtp_password_hint"
+msgstr "Nodig als u een gebruikersnaam invult. Het wachtwoord wordt versleuteld opgeslagen en nooit meer getoond."
+
+msgid "admin.channels.secret_hint_set"
+msgstr "Er is een geheim opgeslagen. Laat dit veld leeg om het te houden, of vul een nieuw in om het te vervangen."
+
+msgid "admin.channels.sender_address"
+msgstr "Afzenderadres"
+
+msgid "admin.channels.sender_address_hint"
+msgstr "Het adres dat burgers zien en waarop zij kunnen antwoorden."
+
+msgid "admin.channels.sender_name"
+msgstr "Afzendernaam"
+
+msgid "admin.channels.sender_name_hint"
+msgstr "Bijvoorbeeld de naam van de organisatie."
+
+msgid "admin.channels.sms_api_base_url"
+msgstr "API-adres"
+
+msgid "admin.channels.sms_api_base_url_hint"
+msgstr "Het API-adres van uw Webex Connect-omgeving, bijvoorbeeld https://api.us.webexconnect.io."
+
+msgid "admin.channels.sms_service_key"
+msgstr "Service key"
+
+msgid "admin.channels.sms_service_key_hint"
+msgstr "De sleutel van de sms-dienst. Hij wordt versleuteld opgeslagen en nooit meer getoond."
+
+msgid "admin.channels.sms_sender_id"
+msgstr "Afzender"
+
+msgid "admin.channels.sms_sender_id_hint"
+msgstr "Hoogstens 11 letters, cijfers of spaties (met minstens één letter), of een geregistreerd telefoonnummer."
+
+msgid "admin.channels.sms_country_code"
+msgstr "Landcode"
+
+msgid "admin.channels.sms_country_code_hint"
+msgstr "Voor nummers zonder landcode, zoals 06-nummers: 31 voor Nederland."
+
+msgid "admin.channels.remove_email_lead"
+msgstr "Verwijdert de mailserver en het wachtwoord van deze organisatie."
+
+msgid "admin.channels.remove_email"
+msgstr "Mailserver verwijderen"
+
+msgid "admin.channels.remove_sms_lead"
+msgstr "Verwijdert de sms-dienst en de service key. Sms-herinneringen worden dan niet meer verstuurd."
+
+msgid "admin.channels.remove_sms"
+msgstr "Sms-dienst verwijderen"
+
+msgid "admin.form.error.smtp_host"
+msgstr "Vul een geldige hostnaam of een IP-adres in."
+
+msgid "admin.form.error.smtp_port"
+msgstr "Vul een poort in tussen 1 en 65535."
+
+msgid "admin.form.error.smtp_credential"
+msgstr "Vul een wachtwoord in van hoogstens 512 tekens, zonder regeleinden."
+
+msgid "admin.form.error.sender_address"
+msgstr "Vul een geldig e-mailadres in, zonder naam of punthaken."
+
+msgid "admin.form.error.sender_name"
+msgstr "Vul een naam in van hoogstens 100 tekens, zonder regeleinden."
+
+msgid "admin.form.error.sms_api_base_url"
+msgstr "Vul een https-adres in zonder gebruikersnaam, query of anker."
+
+msgid "admin.form.error.sms_service_key"
+msgstr "Vul de service key in van hoogstens 512 tekens."
+
+msgid "admin.form.error.sms_sender_id"
+msgstr "Gebruik hoogstens 11 letters, cijfers of spaties met minstens één letter, of een telefoonnummer."
+
+msgid "admin.form.error.sms_country_code"
+msgstr "Vul een landcode in van 1 tot 3 cijfers, zonder nul vooraan."
+
+msgid "admin.form.error.settings_key"
+msgstr "Geheimen kunnen niet worden opgeslagen: de installatie heeft geen SETTINGS_ENCRYPTION_KEY. Vraag de beheerder van de server."
+
+msgid "admin.form.error.reminder_channel"
+msgstr "Kies e-mail of sms. Sms kan alleen als het boekingsformulier om een telefoonnummer vraagt."
+
+msgid "admin.form.error.reminder_offset"
+msgstr "Kies een moment tussen 5 minuten en 30 dagen voor het gesprek."
+
+msgid "admin.form.error.reminder_limit"
+msgstr "Een groep heeft hoogstens 5 herinneringen."
+
+msgid "admin.form.error.reminder_exists"
+msgstr "Deze herinnering bestaat al."
+
+msgid "admin.form.error.message_text"
+msgstr "Gebruik hoogstens {max} tekens en alleen deze plaatshouders: {names}. Onderwerpregels hebben geen regeleinden."
+
+msgid "admin.reminders.title"
+msgstr "Herinneringen"
+
+msgid "admin.reminders.lead"
+msgstr "Wanneer en hoe burgers aan hun afspraak worden herinnerd. Wijzigingen gelden voor nieuwe boekingen; geplande herinneringen van bestaande boekingen blijven staan."
+
+msgid "admin.reminders.none"
+msgstr "Er zijn geen herinneringen ingesteld."
+
+msgid "admin.reminders.not_ready"
+msgstr "Voor minstens één herinnering is het kanaal niet ingesteld. Die berichten worden niet verstuurd tot een superuser het kanaal instelt bij Koppelingen."
+
+msgid "admin.reminders.channel"
+msgstr "Kanaal"
+
+msgid "admin.reminders.channel_email"
+msgstr "E-mail"
+
+msgid "admin.reminders.channel_sms"
+msgstr "Sms"
+
+msgid "admin.reminders.channel_other"
+msgstr "Ander kanaal"
+
+msgid "admin.reminders.when"
+msgstr "Moment"
+
+msgid "admin.reminders.status"
+msgstr "Status"
+
+msgid "admin.reminders.offset_day"
+msgstr "{count} dag vooraf"
+
+msgid "admin.reminders.offset_days"
+msgstr "{count} dagen vooraf"
+
+msgid "admin.reminders.offset_hour"
+msgstr "{count} uur vooraf"
+
+msgid "admin.reminders.offset_hours"
+msgstr "{count} uur vooraf"
+
+msgid "admin.reminders.offset_minute"
+msgstr "{count} minuut vooraf"
+
+msgid "admin.reminders.offset_minutes"
+msgstr "{count} minuten vooraf"
+
+msgid "admin.reminders.remove_label"
+msgstr "Herinnering per {channel}, {when}, verwijderen"
+
+msgid "admin.reminders.add"
+msgstr "Herinnering toevoegen"
+
+msgid "admin.reminders.add_lead"
+msgstr "Een sms gaat alleen naar burgers die een telefoonnummer hebben opgegeven."
+
+msgid "admin.reminders.no_phone"
+msgstr "Het boekingsformulier van deze groep vraagt geen telefoonnummer, dus sms is niet mogelijk."
+
+msgid "admin.reminders.amount"
+msgstr "Hoeveel"
+
+msgid "admin.reminders.amount_hint"
+msgstr "Een heel getal."
+
+msgid "admin.reminders.unit"
+msgstr "Eenheid"
+
+msgid "admin.reminders.unit_minutes"
+msgstr "minuten vooraf"
+
+msgid "admin.reminders.unit_hours"
+msgstr "uur vooraf"
+
+msgid "admin.reminders.unit_days"
+msgstr "dagen vooraf"
+
+msgid "admin.reminders.add_button"
+msgstr "Herinnering toevoegen"
+
+msgid "admin.messages.title"
+msgstr "Berichtteksten"
+
+msgid "admin.messages.lead"
+msgstr "De teksten van de berichten aan burgers. Opmaak, links en de agenda-bijlage blijven vast; u past alleen de tekst aan."
+
+msgid "admin.messages.languages"
+msgstr "Taal van de teksten"
+
+msgid "admin.messages.purpose_confirmation"
+msgstr "Bevestiging"
+
+msgid "admin.messages.purpose_change"
+msgstr "Wijziging"
+
+msgid "admin.messages.purpose_reminder"
+msgstr "Herinnering"
+
+msgid "admin.messages.purpose_cancellation"
+msgstr "Annulering"
+
+msgid "admin.messages.purpose_all"
+msgstr "Alle e-mails"
+
+msgid "admin.messages.part_subject"
+msgstr "Onderwerp (e-mail)"
+
+msgid "admin.messages.part_intro"
+msgstr "Inleiding (e-mail)"
+
+msgid "admin.messages.part_signoff"
+msgstr "Afsluiting (e-mail)"
+
+msgid "admin.messages.part_sms"
+msgstr "Sms-tekst"
+
+msgid "admin.messages.default"
+msgstr "Standaardtekst."
+
+msgid "admin.messages.custom"
+msgstr "Eigen tekst van deze groep."
+
+msgid "admin.messages.placeholders"
+msgstr "U kunt gebruiken: {names}."
+
+msgid "admin.messages.save_hint"
+msgstr "Maak een veld leeg om de standaardtekst terug te zetten."
+
+msgid "admin.form.error.smtp_security"
+msgstr "Kies STARTTLS of TLS: met een gebruikersnaam mag het wachtwoord niet onversleuteld over het netwerk."

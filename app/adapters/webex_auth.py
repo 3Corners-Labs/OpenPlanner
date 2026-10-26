@@ -210,12 +210,15 @@ class AuthorizedClient:
                 continue
             if response.status_code in ok:
                 return response
-            raise _failure(response)
+            raise http_failure(response)
         raise IntegrationError("unauthorized", retryable=False)  # pragma: no cover - loop ends
 
 
-def _failure(response: httpx.Response) -> IntegrationError:
-    """Map an unexpected status to an ``IntegrationError`` (status logged, body not)."""
+def http_failure(response: httpx.Response) -> IntegrationError:
+    """Map an unexpected status to an ``IntegrationError`` (status logged, body not).
+
+    Shared by every Webex API adapter (Meetings, WxCC, Connect SMS).
+    """
     status = response.status_code
     log.warning("integration.refused", status=status, path=response.request.url.path)
     if status == 401:

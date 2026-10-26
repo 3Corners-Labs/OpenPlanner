@@ -1377,3 +1377,315 @@ msgstr "Upload logo"
 
 msgid "admin.branding.logo_remove"
 msgstr "Remove logo"
+
+msgid "message.reminder.sms"
+msgstr "Dear {first_name}, reminder: video call with {group_name} on {date} at {time}. Change or cancel: {manage_url}"
+
+msgid "admin.tab.reminders"
+msgstr "Reminders"
+
+msgid "admin.tab.messages"
+msgstr "Message texts"
+
+msgid "admin.done.texts_saved"
+msgstr "The texts have been saved. New messages use them straight away."
+
+msgid "admin.channels.title"
+msgstr "Message channels"
+
+msgid "admin.channels.lead"
+msgstr "The mail server and SMS service through which citizens receive messages from this organisation."
+
+msgid "admin.integrations.channels_lead"
+msgstr "Mail server and SMS service per organisation. Choose an organisation to configure them."
+
+msgid "admin.channels.email"
+msgstr "Email (SMTP)"
+
+msgid "admin.channels.email_lead"
+msgstr "Confirmations, changes, reminders and cancellations by email go through this server."
+
+msgid "admin.channels.fallback_mail"
+msgstr "Until this is configured, OpenPlanner uses the installation's default server."
+
+msgid "admin.channels.sms"
+msgstr "SMS (Webex Connect)"
+
+msgid "admin.channels.sms_lead"
+msgstr "SMS reminders go through an SMS service in Webex Connect. The service key is shown with the service under Messaging API."
+
+msgid "admin.channels.ready"
+msgstr "Configured"
+
+msgid "admin.channels.not_configured"
+msgstr "Not configured"
+
+msgid "admin.channels.secret_missing"
+msgstr "Secret missing"
+
+msgid "admin.channels.changed"
+msgstr "Last changed: {at}"
+
+msgid "admin.channels.smtp_host"
+msgstr "Server"
+
+msgid "admin.channels.smtp_host_hint"
+msgstr "Host name of the SMTP server, for example smtp.example.org."
+
+msgid "admin.channels.smtp_port"
+msgstr "Port"
+
+msgid "admin.channels.smtp_port_hint"
+msgstr "Usually 587 with STARTTLS or 465 with TLS."
+
+msgid "admin.channels.smtp_security"
+msgstr "Security"
+
+msgid "admin.channels.security_starttls"
+msgstr "STARTTLS (recommended)"
+
+msgid "admin.channels.security_tls"
+msgstr "TLS from the start"
+
+msgid "admin.channels.security_none"
+msgstr "None (only for a relay on a trusted network)"
+
+msgid "admin.channels.smtp_username"
+msgstr "Username"
+
+msgid "admin.channels.smtp_username_hint"
+msgstr "Leave empty if the server accepts mail without logging in."
+
+msgid "admin.channels.smtp_password"
+msgstr "Password"
+
+msgid "admin.channels.smtp_password_hint"
+msgstr "Needed when you enter a username. The password is stored encrypted and never shown again."
+
+msgid "admin.channels.secret_hint_set"
+msgstr "A secret is stored. Leave this field empty to keep it, or enter a new one to replace it."
+
+msgid "admin.channels.sender_address"
+msgstr "Sender address"
+
+msgid "admin.channels.sender_address_hint"
+msgstr "The address citizens see and can reply to."
+
+msgid "admin.channels.sender_name"
+msgstr "Sender name"
+
+msgid "admin.channels.sender_name_hint"
+msgstr "For example the organisation's name."
+
+msgid "admin.channels.sms_api_base_url"
+msgstr "API address"
+
+msgid "admin.channels.sms_api_base_url_hint"
+msgstr "The API address of your Webex Connect tenant, for example https://api.us.webexconnect.io."
+
+msgid "admin.channels.sms_service_key"
+msgstr "Service key"
+
+msgid "admin.channels.sms_service_key_hint"
+msgstr "The SMS service's key. It is stored encrypted and never shown again."
+
+msgid "admin.channels.sms_sender_id"
+msgstr "Sender"
+
+msgid "admin.channels.sms_sender_id_hint"
+msgstr "At most 11 letters, digits or spaces (with at least one letter), or a registered phone number."
+
+msgid "admin.channels.sms_country_code"
+msgstr "Country code"
+
+msgid "admin.channels.sms_country_code_hint"
+msgstr "For numbers without a country code, such as 06 numbers: 31 for the Netherlands."
+
+msgid "admin.channels.remove_email_lead"
+msgstr "Removes this organisation's mail server and password."
+
+msgid "admin.channels.remove_email"
+msgstr "Remove mail server"
+
+msgid "admin.channels.remove_sms_lead"
+msgstr "Removes the SMS service and its key. SMS reminders are no longer sent."
+
+msgid "admin.channels.remove_sms"
+msgstr "Remove SMS service"
+
+msgid "admin.form.error.smtp_host"
+msgstr "Enter a valid host name or IP address."
+
+msgid "admin.form.error.smtp_port"
+msgstr "Enter a port between 1 and 65535."
+
+msgid "admin.form.error.smtp_credential"
+msgstr "Enter a password of at most 512 characters, without line breaks."
+
+msgid "admin.form.error.sender_address"
+msgstr "Enter a valid email address, without a name or angle brackets."
+
+msgid "admin.form.error.sender_name"
+msgstr "Enter a name of at most 100 characters, without line breaks."
+
+msgid "admin.form.error.sms_api_base_url"
+msgstr "Enter an https address without a username, query or fragment."
+
+msgid "admin.form.error.sms_service_key"
+msgstr "Enter the service key, at most 512 characters."
+
+msgid "admin.form.error.sms_sender_id"
+msgstr "Use at most 11 letters, digits or spaces with at least one letter, or a phone number."
+
+msgid "admin.form.error.sms_country_code"
+msgstr "Enter a country code of 1 to 3 digits, without a leading zero."
+
+msgid "admin.form.error.settings_key"
+msgstr "Secrets cannot be stored: the installation has no SETTINGS_ENCRYPTION_KEY. Ask the server's administrator."
+
+msgid "admin.form.error.reminder_channel"
+msgstr "Choose email or SMS. SMS only works when the booking form asks for a phone number."
+
+msgid "admin.form.error.reminder_offset"
+msgstr "Choose a moment between 5 minutes and 30 days before the call."
+
+msgid "admin.form.error.reminder_limit"
+msgstr "A group has at most 5 reminders."
+
+msgid "admin.form.error.reminder_exists"
+msgstr "This reminder already exists."
+
+msgid "admin.form.error.message_text"
+msgstr "Use at most {max} characters and only these placeholders: {names}. Subject lines have no line breaks."
+
+msgid "admin.reminders.title"
+msgstr "Reminders"
+
+msgid "admin.reminders.lead"
+msgstr "When and how citizens are reminded of their appointment. Changes apply to new bookings; reminders already planned for existing bookings stay."
+
+msgid "admin.reminders.none"
+msgstr "No reminders are configured."
+
+msgid "admin.reminders.not_ready"
+msgstr "At least one reminder uses a channel that is not configured. Those messages are not sent until a superuser configures the channel under Integrations."
+
+msgid "admin.reminders.channel"
+msgstr "Channel"
+
+msgid "admin.reminders.channel_email"
+msgstr "Email"
+
+msgid "admin.reminders.channel_sms"
+msgstr "SMS"
+
+msgid "admin.reminders.channel_other"
+msgstr "Other channel"
+
+msgid "admin.reminders.when"
+msgstr "When"
+
+msgid "admin.reminders.status"
+msgstr "Status"
+
+msgid "admin.reminders.offset_day"
+msgstr "{count} day before"
+
+msgid "admin.reminders.offset_days"
+msgstr "{count} days before"
+
+msgid "admin.reminders.offset_hour"
+msgstr "{count} hour before"
+
+msgid "admin.reminders.offset_hours"
+msgstr "{count} hours before"
+
+msgid "admin.reminders.offset_minute"
+msgstr "{count} minute before"
+
+msgid "admin.reminders.offset_minutes"
+msgstr "{count} minutes before"
+
+msgid "admin.reminders.remove_label"
+msgstr "Remove the {channel} reminder, {when}"
+
+msgid "admin.reminders.add"
+msgstr "Add a reminder"
+
+msgid "admin.reminders.add_lead"
+msgstr "An SMS only goes to citizens who entered a phone number."
+
+msgid "admin.reminders.no_phone"
+msgstr "This group's booking form does not ask for a phone number, so SMS is not possible."
+
+msgid "admin.reminders.amount"
+msgstr "How long"
+
+msgid "admin.reminders.amount_hint"
+msgstr "A whole number."
+
+msgid "admin.reminders.unit"
+msgstr "Unit"
+
+msgid "admin.reminders.unit_minutes"
+msgstr "minutes before"
+
+msgid "admin.reminders.unit_hours"
+msgstr "hours before"
+
+msgid "admin.reminders.unit_days"
+msgstr "days before"
+
+msgid "admin.reminders.add_button"
+msgstr "Add reminder"
+
+msgid "admin.messages.title"
+msgstr "Message texts"
+
+msgid "admin.messages.lead"
+msgstr "The texts of the messages to citizens. Layout, links and the calendar attachment stay fixed; you only change the text."
+
+msgid "admin.messages.languages"
+msgstr "Language of the texts"
+
+msgid "admin.messages.purpose_confirmation"
+msgstr "Confirmation"
+
+msgid "admin.messages.purpose_change"
+msgstr "Change"
+
+msgid "admin.messages.purpose_reminder"
+msgstr "Reminder"
+
+msgid "admin.messages.purpose_cancellation"
+msgstr "Cancellation"
+
+msgid "admin.messages.purpose_all"
+msgstr "All emails"
+
+msgid "admin.messages.part_subject"
+msgstr "Subject (email)"
+
+msgid "admin.messages.part_intro"
+msgstr "Introduction (email)"
+
+msgid "admin.messages.part_signoff"
+msgstr "Closing (email)"
+
+msgid "admin.messages.part_sms"
+msgstr "SMS text"
+
+msgid "admin.messages.default"
+msgstr "Default text."
+
+msgid "admin.messages.custom"
+msgstr "This group's own text."
+
+msgid "admin.messages.placeholders"
+msgstr "You can use: {names}."
+
+msgid "admin.messages.save_hint"
+msgstr "Empty a field to restore the default text."
+
+msgid "admin.form.error.smtp_security"
+msgstr "Choose STARTTLS or TLS: with a username the password must not travel unencrypted."
