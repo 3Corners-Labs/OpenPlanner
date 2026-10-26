@@ -1,0 +1,35 @@
+{#- Forms shared by the group's and the organisation's closure pages (ADR 0024). -#}
+{% from "admin/_fields.html" import field with context %}
+
+{#- Close: start, end and the notices, with a danger button. -#}
+{% macro start_form(action, heading, lead, button, fields) -%}
+<form class="card" method="post" action="{{ action }}" novalidate aria-labelledby="start-heading">
+  <div class="card__header">
+    <h2 id="start-heading">{{ heading }}</h2>
+    <p class="card__lead">{{ lead }}</p>
+  </div>
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button button--danger">{{ button }}</button>
+  </div>
+</form>
+{%- endmacro %}
+
+{#- Lift: open again, optionally confirming what can still go ahead. -#}
+{% macro lift_form(action, heading, button) -%}
+<form class="card" method="post" action="{{ action }}" aria-labelledby="lift-heading">
+  <div class="card__header">
+    <h2 id="lift-heading">{{ heading }}</h2>
+    <p class="card__lead">{{ _("admin.closure.lift_lead") }}</p>
+  </div>
+  <div class="choice__option">
+    <input type="checkbox" id="reinstate" name="reinstate" value="yes">
+    <label for="reinstate">{{ _("admin.closure.lift_reinstate") }}</label>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button button--secondary">{{ button }}</button>
+  </div>
+</form>
+{%- endmacro %}

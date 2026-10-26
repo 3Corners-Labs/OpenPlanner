@@ -6,6 +6,7 @@
 <p class="eyebrow">{{ _("group.kind", minutes=group.slot_minutes) }}</p>
 <h1>{{ group.name }}</h1>
 <p class="lead">{{ _("group.intro", minutes=group.slot_minutes) }}</p>
+{% include "_closure_notice.html" %}
 {{ steps(1) }}
 {% if direct_call_available %}
 <section class="notice" aria-labelledby="direct-heading">

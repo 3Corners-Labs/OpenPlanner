@@ -114,6 +114,7 @@ TABS = (
     Tab("admin.tab.reminders", "/reminders", Permission.REMINDERS_MANAGE, "bell"),
     Tab("admin.tab.messages", "/messages", Permission.TEXTS_MANAGE, "mail"),
     Tab("admin.tab.agenda", "/agenda", Permission.BOOKINGS_VIEW, "agenda"),
+    Tab("admin.tab.closure", "/closure", Permission.CLOSURE_MANAGE, "alert"),
 )
 
 

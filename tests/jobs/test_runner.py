@@ -6,6 +6,7 @@ import pytest
 
 from app.adapters.db.jobs import ClaimedJob
 from app.domain.channels import ChannelKind
+from app.domain.closure import Closure
 from app.domain.job_plan import JobType
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
@@ -15,6 +16,7 @@ from app.jobs.runner import BACKOFF, JobRunner
 from tests.fakes.clock import FixedClock
 from tests.fakes.messaging import RecordingSender
 from tests.fakes.persistence import InMemoryUnitOfWork, State
+from tests.support.closures import NOTICES
 from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book, make_group, window
 
 
@@ -203,3 +205,22 @@ async def test_sms_without_phone_number_is_skipped(
 
     assert sender.sent == []
     assert queue.done == [1]
+
+
+async def test_closure_notice_goes_only_to_bookings_on_hold(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    closure = Closure(7, 1, NOW, None, NOTICES, NOW)
+    uow.state.closures[7] = closure
+    uow.state.bookings[bid] = uow.state.bookings[bid].suspend(7)
+    queue = FakeQueue([job(bid, JobType.SEND_SUSPENSION, pinned=None)])
+    sender = RecordingSender()
+
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+    assert NOTICES["nl"] in sender.sent[0].text
+
+    uow.state.bookings[bid] = uow.state.bookings[bid].reinstate()
+    queue.jobs = [job(bid, JobType.SEND_CLOSURE_UPDATE, pinned=None)]
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+    assert len(sender.sent) == 1  # reinstated in the meantime: the update is stale

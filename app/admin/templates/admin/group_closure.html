@@ -1,0 +1,83 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% from "admin/_closure_forms.html" import start_form, lift_form with context %}
+{% block title %}{{ _("admin.tab.closure") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+{% if closure %}
+<section class="card" aria-labelledby="current-heading">
+  <div class="card__header">
+    <h2 id="current-heading">{{ _("admin.closure.current") }}</h2>
+    <p class="card__lead">{{ _("admin.closure.current_lead") }}</p>
+  </div>
+  {% set preview = closure %}{% include "admin/_closure_preview.html" %}
+</section>
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/update" novalidate aria-labelledby="update-heading">
+  <div class="card__header">
+    <h2 id="update-heading">{{ _("admin.closure.update") }}</h2>
+    <p class="card__lead">{{ _("admin.closure.update_lead") }}</p>
+  </div>
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="choice__option">
+    <input type="checkbox" id="notify" name="notify" value="yes" checked>
+    <label for="notify">{{ _("admin.closure.notify", count=suspended|length) }}</label>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.closure.update_button") }}</button>
+  </div>
+</form>
+{{ lift_form("/admin/groups/" ~ summary.group.slug ~ "/closure/lift", _("admin.closure.lift"), _("admin.closure.lift_button")) }}
+{% else %}
+{{ start_form("/admin/groups/" ~ summary.group.slug ~ "/closure", _("admin.closure.start"), _("admin.closure.start_lead", count=confirmed_ahead), _("admin.closure.start_button"), fields) }}
+{% endif %}
+<section class="card" aria-labelledby="suspended-heading">
+  <div class="card__header">
+    <h2 id="suspended-heading">{{ _("admin.closure.suspended") }}</h2>
+    <p class="card__lead">{{ _("admin.closure.suspended_lead") }}</p>
+  </div>
+  {% if suspended %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.closure.suspended") }}</caption>
+    <thead>
+      <tr><th scope="col">{{ _("admin.closure.reference") }}</th><th scope="col">{{ _("admin.closure.original_time") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th></tr>
+    </thead>
+    <tbody>
+      {% for item in suspended %}
+      <tr>
+        <th scope="row">{{ item.reference }}</th>
+        <td>{{ item.when }}{% if item.purged %} <span class="chip chip--warning">{{ _("admin.closure.purged") }}</span>{% endif %}</td>
+        <td>
+          <div class="closure-actions">
+            {% if not item.purged %}
+            <a class="button button--secondary button--small" href="/admin/groups/{{ summary.group.slug }}/closure/bookings/{{ item.id }}/move" aria-label="{{ _("admin.closure.move_label", reference=item.reference) }}">{{ _("admin.closure.move") }}</a>
+            <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/bookings/{{ item.id }}/reinstate">
+              <button type="submit" class="button button--quiet button--small" aria-label="{{ _("admin.closure.reinstate_label", reference=item.reference) }}">{{ _("admin.closure.reinstate") }}</button>
+            </form>
+            {% endif %}
+            <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/bookings/{{ item.id }}/cancel">
+              <button type="submit" class="button button--quiet button--small" aria-label="{{ _("admin.closure.cancel_label", reference=item.reference) }}">{{ _("admin.closure.cancel") }}</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="form-actions closure-actions">
+    <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/reinstate">
+      <button type="submit" class="button button--secondary">{{ _("admin.closure.reinstate_all") }}</button>
+    </form>
+    <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/cancel">
+      <button type="submit" class="button button--danger">{{ _("admin.closure.cancel_all") }}</button>
+    </form>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.closure.none_suspended") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

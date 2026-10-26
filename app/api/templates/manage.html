@@ -14,7 +14,17 @@
 {% if active and group.video_enabled %}
 <p><a class="button button--large" href="/b/{{ token }}/join">{{ _("join.from_manage") }}</a></p>
 {% endif %}
-{% if changeable %}
+{% if suspended %}
+<div class="notice notice--warning">
+  <h2>{{ _("manage.suspended.title") }}</h2>
+  <p>{{ _("manage.suspended.text") }}</p>
+</div>
+{% include "_closure_notice.html" %}
+<ul class="actions">
+  <li><a class="button" href="/b/{{ token }}/reschedule">{{ _("manage.suspended.reschedule") }}</a></li>
+  <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+</ul>
+{% elif changeable %}
 <p>{{ _("manage.deadline", deadline=deadline) }}</p>
 <ul class="actions">
   <li><a class="button button--secondary" href="/b/{{ token }}/reschedule">{{ _("manage.reschedule") }}</a></li>
