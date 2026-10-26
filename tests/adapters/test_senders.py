@@ -12,18 +12,24 @@ from app.adapters.crypto import SecretBox
 from app.adapters.db.engine import create_engine
 from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
-from app.adapters.senders import ConfiguredSenders, connect_config, fallback_mail, smtp_config
+from app.adapters.senders import (
+    SMS_GATEWAYS,
+    ConfiguredSenders,
+    fallback_mail,
+    sms_config,
+    smtp_config,
+)
 from app.adapters.smtp import SmtpConfig, SmtpMailSender
 from app.adapters.webex_connect_sms import WebexConnectSmsSender
 from app.config import Settings
-from app.domain.channel_settings import SmsSettings, SmtpSecurity, SmtpSettings
+from app.domain.channel_settings import SmsProvider, SmsSettings, SmtpSecurity, SmtpSettings
 from app.domain.channels import ChannelKind
 from tests.support.database import migrated_database
 
 AT = datetime(2026, 1, 1, tzinfo=UTC)
 FALLBACK = SmtpConfig("mailpit", 1025, "noreply@example.nl")
 SMTP = SmtpSettings("smtp.demo.nl", 465, SmtpSecurity.TLS, "user", "noreply@demo.nl", "Demo")
-SMS = SmsSettings("https://api.us.webexconnect.io", "GemDemo", "32")
+SMS = SmsSettings(SmsProvider.WEBEX_CONNECT, "https://api.us.webexconnect.io", "GemDemo", "32")
 
 
 @pytest.fixture
@@ -85,8 +91,12 @@ def test_adapter_configs_follow_the_settings() -> None:
         False,
     )
     assert mail.sender == "Demo <noreply@demo.nl>"
-    sms = connect_config(SMS, "key")
-    assert (sms.sender_id, sms.country_code, sms.service_key) == ("GemDemo", "32", "key")
+    sms = sms_config(SMS, "key")
+    assert (sms.sender_id, sms.country_code, sms.api_key) == ("GemDemo", "32", "key")
+
+
+def test_every_sms_provider_has_an_adapter() -> None:
+    assert set(SMS_GATEWAYS) == set(SmsProvider)
 
 
 SMTP_VARIABLES = (

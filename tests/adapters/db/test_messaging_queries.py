@@ -11,13 +11,13 @@ from app.adapters.crypto import SecretBox
 from app.adapters.db.models import ChannelSettingsRow
 from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.channel_settings import SmsSettings, SmtpSecurity, SmtpSettings
+from app.domain.channel_settings import SmsProvider, SmsSettings, SmtpSecurity, SmtpSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
 
 AT = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
 SMTP = SmtpSettings("smtp.demo.nl", 587, SmtpSecurity.STARTTLS, "user", "noreply@demo.nl", "Demo")
-SMS = SmsSettings("https://api.us.webexconnect.io", "Demo")
+SMS = SmsSettings(SmsProvider.WEBEX_CONNECT, "https://api.us.webexconnect.io", "Demo")
 BOX = SecretBox(b"s" * 32)
 
 
