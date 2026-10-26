@@ -3,13 +3,18 @@
 Every step is idempotent: a booking that already has its meeting or task is left alone, and
 a group without the integration is skipped. Each success is recorded on the booking's
 timeline. How the start time reads for agents is decided at the edge (``start_label``).
+
+Ending a cancelled booking's work item (ADR 0021), v2 first:
+
+    end_task ─► Task Messages v2 ─► task_marked_cancelled   (refused: integration_error)
+             ─► End Task v1     ─► task_end_requested      (refused: end_not_possible, code)
 """
 
 from collections.abc import Callable
 from dataclasses import replace
 
 from app.domain.booking import Booking
-from app.domain.calls import EventKind, meeting_request, work_item
+from app.domain.calls import EventKind, TaskState, meeting_request, work_item
 from app.domain.integration import IntegrationService
 from app.domain.ports import ContactCenterDispatcher, IntegrationError, UnitOfWork, VideoProvider
 from app.domain.scheduling import Group
@@ -82,6 +87,48 @@ class CallService:
             await tx.save_task_id(booking_id, task_id)
         await self._integration.record(booking_id, EventKind.TASK_CREATED)
         return _with(booking, wxcc_task_id=task_id)
+
+    @property
+    def end_available(self) -> bool:
+        """Whether work items can be ended (needs only WxCC)."""
+        return self._dispatcher is not None
+
+    async def end_task(self, booking: Booking) -> None:
+        """Mark a cancelled booking's work item cancelled (v2), then try to end it (v1).
+
+        Nothing happens without a task, or once WxCC reported it ended or failed. A retry
+        after a successful mark does not mark again.
+
+        Raises:
+            IntegrationError: Retryable failures, so the job tries again.
+        """
+        if self._dispatcher is None or not booking.wxcc_task_id:
+            return
+        task_id, booking_id = booking.wxcc_task_id, _id(booking)
+        status = await self._integration.status(booking_id)
+        if status.task in (TaskState.ENDED, TaskState.FAILED):
+            return
+        if status.task is not TaskState.CANCELLED:
+            try:
+                await self._dispatcher.mark_cancelled(task_id, booking.reference)
+            except IntegrationError as error:
+                if error.retryable:
+                    raise
+                await self._integration.record(
+                    booking_id, EventKind.INTEGRATION_ERROR, detail=error.code
+                )
+            else:
+                await self._integration.record(booking_id, EventKind.TASK_MARKED_CANCELLED)
+        try:
+            await self._dispatcher.end_task(task_id)
+        except IntegrationError as error:
+            if error.retryable:
+                raise
+            await self._integration.record(
+                booking_id, EventKind.END_NOT_POSSIBLE, detail=error.code
+            )
+            return
+        await self._integration.record(booking_id, EventKind.TASK_END_REQUESTED)
 
     async def delete_meeting(self, booking: Booking, group: Group) -> None:
         """Delete the booking's meeting, if it has one."""

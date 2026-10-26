@@ -4,7 +4,6 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
-from app.domain.authorization import Principal, Role
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.channel_settings import SmsSettings, SmtpSecurity, SmtpSettings
 from app.domain.channels import ChannelKind
@@ -12,10 +11,9 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import Organisation
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.domain import NOW
+from tests.support.domain import DEMO_ORG_ADMIN, DEMO_SUPERUSER, NOW
 
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+SUPER, ORG_ADMIN = DEMO_SUPERUSER, DEMO_ORG_ADMIN
 SMTP = SmtpSettings("smtp.demo.nl", 587, SmtpSecurity.STARTTLS, "afspraak", "afspraak@demo.nl")
 SMS = SmsSettings("https://api.us.webexconnect.io", "GemDemo")
 

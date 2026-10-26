@@ -1,4 +1,4 @@
-"""Build the ``MessageSender`` of an organisation's channel from its stored settings (ADR 0021).
+"""Build the ``MessageSender`` of an organisation's channel from its stored settings (ADR 0022).
 
 The worker asks per message job; the settings and the decrypted secret are read fresh each
 time, so a change in the admin portal applies to the next message without a restart.

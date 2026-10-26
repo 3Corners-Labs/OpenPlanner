@@ -9,7 +9,7 @@ input (``aria-describedby``, error summary with anchors) and never repeats the v
     ... domain call ...  except DomainError as error: form.refusal(error)
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
 from datetime import date, time
 from urllib.parse import parse_qsl
@@ -43,6 +43,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "name": "admin.form.error.name",
     "slug": "admin.form.error.slug",
     "organisation": "admin.form.error.organisation",
+    "default_locale": "admin.form.error.default_locale",
     "timezone": "admin.form.error.timezone",
     "slot_minutes": "admin.form.error.slot_minutes",
     "min_notice_minutes": "admin.form.error.min_notice_minutes",
@@ -195,7 +196,7 @@ class FormData:
         """Return a date, ``None`` when empty, or ``None`` with an error when malformed."""
         return self.day(name) if self.text(name) else None
 
-    def choice(self, name: str, allowed: set[str]) -> str | None:
+    def choice(self, name: str, allowed: Set[str]) -> str | None:
         """Return the submitted value if it is one of ``allowed``; else ``None`` with an error."""
         value = self.text(name)
         if value in allowed:

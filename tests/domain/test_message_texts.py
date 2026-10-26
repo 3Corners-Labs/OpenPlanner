@@ -1,4 +1,4 @@
-"""Editable message blocks: only allow-listed placeholders, sane lengths (ADR 0009, 0021)."""
+"""Editable message blocks: only allow-listed placeholders, sane lengths (ADR 0009, 0022)."""
 
 import pytest
 

@@ -1,7 +1,7 @@
 """SMTP adapter for the ``MessageSender`` port (email channel).
 
 Uses the standard library in a worker thread; no extra dependency. Each organisation's server
-comes from its channel settings in the admin portal (ADR 0021); ``SMTP_HOST`` in the
+comes from its channel settings in the admin portal (ADR 0022); ``SMTP_HOST`` in the
 environment is the fallback for organisations without one (development: Mailpit).
 """
 

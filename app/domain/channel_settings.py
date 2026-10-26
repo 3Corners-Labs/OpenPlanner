@@ -1,4 +1,4 @@
-"""How an organisation delivers messages: its SMTP server and its SMS gateway (ADR 0021).
+"""How an organisation delivers messages: its SMTP server and its SMS gateway (ADR 0022).
 
 Each organisation configures its own channels, so mail comes from its own sender (HANDOVER
 §4) and SMS goes through its own Webex Connect service (HANDOVER B6). Only the superuser may

@@ -1,4 +1,4 @@
-"""Channel screens (ADR 0021): SMTP and SMS per organisation, write-only secrets, audit."""
+"""Channel screens (ADR 0022): SMTP and SMS per organisation, write-only secrets, audit."""
 
 import httpx
 

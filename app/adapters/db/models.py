@@ -174,7 +174,7 @@ class ReminderRuleRow(Base):
 
 
 class GroupTextRow(Base):
-    """A group's own text of one message block in one locale (ADR 0021)."""
+    """A group's own text of one message block in one locale (ADR 0022)."""
 
     __tablename__ = "group_texts"
 
@@ -350,7 +350,7 @@ class IntegrationCredentialRow(Base):
 
 
 class ChannelSettingsRow(Base):
-    """An organisation's SMTP server or SMS gateway (ADR 0021).
+    """An organisation's SMTP server or SMS gateway (ADR 0022).
 
     ``settings`` holds the non-secret fields as JSON; the password or service key is sealed
     with AES-256-GCM under ``channel:<organisation id>:<channel>`` (ADR 0008).
@@ -368,3 +368,15 @@ class ChannelSettingsRow(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
     __table_args__ = (CheckConstraint("channel IN ('email', 'sms')", name="channel"),)
+
+
+class WebhookEventRow(Base):
+    """A Webex event key seen recently, so a replay is recorded once; no personal data."""
+
+    __tablename__ = "webhook_events"
+
+    source: Mapped[str] = mapped_column(String(16), primary_key=True)
+    event_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (Index("ix_webhook_events_seen_at", "seen_at"),)

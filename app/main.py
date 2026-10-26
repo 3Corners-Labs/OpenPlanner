@@ -35,6 +35,7 @@ from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.integration import IntegrationService
 from app.domain.messaging_service import MessagingService
+from app.domain.organisations import OrganisationService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.services import BookingService
@@ -115,6 +116,9 @@ def create_app(
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.channel_service = ChannelSettingsService(uow, clock, app.state.admin_service)
         app.state.messaging_service = MessagingService(
+            uow, clock, app.state.admin_service, app.state.translator.locales
+        )
+        app.state.organisation_service = OrganisationService(
             uow, clock, app.state.admin_service, app.state.translator.locales
         )
         wired = integrations or build_integrations(settings, app.state.engine, http, clock)
