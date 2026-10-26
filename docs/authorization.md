@@ -17,6 +17,7 @@ their claim and those organisations' groups, group admin in the groups of their 
 | Manage organisations (`organisation.manage`) | Portal | yes | – | – |
 | Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | yes | – | – |
 | Manage API clients (`api_clients.manage`) | Portal | yes | – | – |
+| Update the installation (`system.update`) | Portal | yes | – | – |
 | View audit log (`audit.view`) | Organisation | yes | yes | – |
 | Manage integrations and secrets (`integrations.manage`) | Organisation | yes | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | yes | – | – |
@@ -25,7 +26,7 @@ their claim and those organisations' groups, group admin in the groups of their 
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | yes | yes | – |
 | View group (`group.view`) | Group | yes | yes | yes |
 | Change group settings (`group.edit`) | Group | yes | yes | – |
-| Manage opening hours and exceptions (`schedule.manage`) | Group | yes | yes | yes |
+| Manage staffing and staffing exceptions (`schedule.manage`) | Group | yes | yes | yes |
 | Manage texts (`texts.manage`) | Group | yes | yes | yes |
 | Manage reminders (`reminders.manage`) | Group | yes | yes | – |
 | View bookings (`bookings.view`) | Group | yes | yes | yes |

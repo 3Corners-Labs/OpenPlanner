@@ -41,6 +41,9 @@ class ErrorCode(StrEnum):
     CHANNEL_NOT_CONFIGURED = "channel_not_configured"
     REMINDER_EXISTS = "reminder_exists"
     REMINDER_NOT_FOUND = "reminder_not_found"
+    UPDATE_NOT_AVAILABLE = "update_not_available"
+    UPDATE_IN_PROGRESS = "update_in_progress"
+    UPDATE_REQUEST_NOT_FOUND = "update_request_not_found"
 
 
 class DomainError(Exception):

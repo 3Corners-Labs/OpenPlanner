@@ -1,4 +1,4 @@
-# TLS termination for OpenPlanner (ADR 0029). Caddy obtains the certificate for TLS_DOMAIN
+# TLS termination for OpenPlanner (ADR 0030). Caddy obtains the certificate for TLS_DOMAIN
 # from a public ACME CA (Let's Encrypt by default), renews it on its own when a third of its
 # lifetime is left, and staples OCSP. Certificates and the ACME account live in /data.
 {

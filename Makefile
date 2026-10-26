@@ -53,7 +53,7 @@ mutation:
 	fi
 	$(UV) python scripts/check_mutation_score.py --min 80
 
-# TLS proxy (ADR 0029) against Let's Encrypt's test CA; needs docker.
+# TLS proxy (ADR 0030) against Let's Encrypt's test CA; needs docker.
 proxy-check:
 	scripts/check-proxy.sh
 

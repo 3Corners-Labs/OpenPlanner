@@ -26,6 +26,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
+from app.domain.updates import ReleaseCheck, UpdateRequest
 
 
 @dataclass
@@ -56,6 +57,8 @@ class State:
     channel_settings: dict[tuple[int, ChannelKind], ChannelSettings] = field(default_factory=dict)
     channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
+    release_check: ReleaseCheck | None = None
+    update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     next_id: int = 1
 
 
@@ -519,6 +522,24 @@ class InMemoryTransaction:
         )
         for token in own[: max(len(own) - keep, 0)]:
             del tokens[token.token_hash]
+
+    async def get_release_check(self) -> ReleaseCheck | None:
+        return self.state.release_check
+
+    async def save_release_check(self, check: ReleaseCheck) -> None:
+        self.state.release_check = check
+
+    async def get_update_requests(self, limit: int = 20) -> list[UpdateRequest]:
+        return sorted(self.state.update_requests.values(), key=lambda r: -(r.id or 0))[:limit]
+
+    async def add_update_request(self, request: UpdateRequest) -> UpdateRequest:
+        stored = replace(request, id=self.state.next_id)
+        self.state.next_id += 1
+        self.state.update_requests[stored.id or 0] = stored
+        return stored
+
+    async def save_update_request(self, request: UpdateRequest) -> None:
+        self.state.update_requests[request.id or 0] = request
 
 
 class InMemoryUnitOfWork:

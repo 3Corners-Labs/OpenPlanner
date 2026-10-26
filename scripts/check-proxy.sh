@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Start the compose stack with --profile tls against Pebble, Let's Encrypt's test ACME CA, and
-# check what ADR 0029 promises: a certificate is obtained without manual steps, port 80 only
+# check what ADR 0030 promises: a certificate is obtained without manual steps, port 80 only
 # redirects, public form bodies are capped, the proxy runs as non-root. Used by CI and by
 # `make proxy-check`. Needs docker with compose v2 and curl.
 set -eu

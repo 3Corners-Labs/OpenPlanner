@@ -130,7 +130,7 @@ jobs:
           scan-ref: .
           exit-code: "1"
           severity: HIGH,CRITICAL
-      # TLS proxy (ADR 0029): same lint and CVE gate as the app image, then a real ACME run
+      # TLS proxy (ADR 0030): same lint and CVE gate as the app image, then a real ACME run
       # against Pebble (Let's Encrypt's test CA).
       - uses: hadolint/hadolint-action@v3.1.0
         with:
