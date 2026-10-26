@@ -44,6 +44,7 @@ def fallback_mail(settings: Settings) -> SmtpConfig | None:
         port=settings.smtp_port,
         sender=settings.mail_from,
         starttls=settings.smtp_starttls,
+        implicit_tls=settings.smtp_implicit_tls,
         username=settings.smtp_username,
         password=settings.smtp_password.get_secret_value() if settings.smtp_password else None,
     )
