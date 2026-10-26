@@ -232,12 +232,49 @@ async def test_changed_hours_are_validated_like_new_ones(site: Site) -> None:
     _, link = await _saturday_window(site)
 
     response = await _post(
-        site, link, {"weekday": "5", "opens": "10:00", "closes": "12:00", "capacity": "0"}
+        site, link, {"weekday": "5", "opens": "10:00", "closes": "12:00", "capacity": "1001"}
     )
 
     assert response.status_code == 422  # type: ignore[attr-defined]
     assert 'href="#capacity"' in response.text  # type: ignore[attr-defined]
     assert "10:00–12:00" in (await site.client.get(f"{GROUP}/hours")).text
+
+
+async def test_a_block_without_agents_gets_a_label(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    form = (await site.client.get(f"{GROUP}/hours")).text
+    assert 'id="capacity" name="capacity" type="number" value="1" required' in form
+    assert 'min="0"' in form
+    assert 'id="label" name="label" type="text" value=""' in form
+
+    added = await _post(
+        site,
+        f"{GROUP}/hours",
+        {"weekday": "5", "opens": "12:00", "closes": "12:30", "capacity": "0", "label": "Lunch"},
+    )
+    week = (await site.client.get(f"{GROUP}/hours")).text
+    link = week.split("12:00–12:30", 1)[1].split('href="', 1)[1].split('"', 1)[0]
+    change = (await site.client.get(link)).text
+
+    assert added.status_code == 303  # type: ignore[attr-defined]
+    assert 'id="capacity" name="capacity" type="number" value="0"' in change
+    assert 'id="label" name="label" type="text" value="Lunch"' in change
+    events = [(b, d) for _, b, _, d in await audit_events(site)]
+    assert all("Lunch" not in str(detail) for _, detail in events)  # admin content, no audit
+
+
+async def test_an_invalid_label_is_explained(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    response = await _post(
+        site,
+        f"{GROUP}/hours",
+        {"weekday": "5", "opens": "12:00", "closes": "12:30", "capacity": "0", "label": "x" * 51},
+    )
+
+    assert response.status_code == 422  # type: ignore[attr-defined]
+    assert '<a href="#label">' in response.text  # type: ignore[attr-defined]
+    assert "50 tekens" in response.text  # type: ignore[attr-defined]
 
 
 async def test_every_day_links_to_the_form_with_that_day_chosen(site: Site) -> None:
@@ -284,6 +321,29 @@ async def test_exceptions_close_a_day_or_change_hours(site: Site) -> None:
     assert hours.headers["location"] == f"{GROUP}/exceptions?done=added"  # type: ignore[attr-defined]
     assert "Gesloten" in page
     assert "13:00–14:00" in page
+
+
+async def test_an_exception_may_have_no_agents_and_a_label(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    day = (site.clock.now() + timedelta(days=3)).date().isoformat()
+    form = (await site.client.get(f"{GROUP}/exceptions")).text
+    assert 'id="label" name="label" type="text"' in form
+
+    response = await _post(
+        site,
+        f"{GROUP}/exceptions",
+        {
+            "day": day,
+            "kind": "hours",
+            "opens": "09:00",
+            "closes": "12:00",
+            "capacity": "0",
+            "label": "Heidag",
+        },
+    )
+
+    assert response.headers["location"] == f"{GROUP}/exceptions?done=added"  # type: ignore[attr-defined]
+    assert "09:00–12:00" in (await site.client.get(f"{GROUP}/exceptions")).text
 
 
 async def test_exception_in_the_past_is_refused(site: Site) -> None:

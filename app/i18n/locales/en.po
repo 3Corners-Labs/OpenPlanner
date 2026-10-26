@@ -802,6 +802,12 @@ msgstr "Simultaneous calls"
 msgid "admin.field.capacity_hint"
 msgstr "How many participants can book the same time slot."
 
+msgid "admin.field.label"
+msgstr "Label"
+
+msgid "admin.field.label_hint"
+msgstr "For example Lunch or Team meeting. Only visible to administrators."
+
 msgid "admin.field.valid_from"
 msgstr "Valid from"
 
@@ -861,7 +867,10 @@ msgid "admin.form.error.window"
 msgstr "The end time must be after the start time."
 
 msgid "admin.form.error.capacity"
-msgstr "Enter a number from 1 to 1000."
+msgstr "Enter a number from 0 to 1000."
+
+msgid "admin.form.error.label"
+msgstr "Use at most 50 characters on one line, or leave the field empty."
 
 msgid "admin.form.error.date"
 msgstr "Enter a valid date."

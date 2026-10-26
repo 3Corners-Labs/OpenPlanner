@@ -67,3 +67,63 @@ def test_upgrade_and_downgrade_with_data(alembic_config: Config, tmp_path: Path)
     database.close()
     assert routing == ("q-1",)  # the old queue id became the routing value
     assert booking == (1,)
+
+
+def test_blocks_without_agents_survive_upgrade_and_are_removed_on_downgrade(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    import sqlite3
+
+    command.upgrade(alembic_config, "0017")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    database.executescript(
+        """
+        INSERT INTO organisations (id, name, slug) VALUES (1, 'Gemeente', 'gemeente');
+        INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+            min_notice_minutes, horizon_days, phone_mode)
+            VALUES (1, 1, 'Team', 'team', 'Europe/Amsterdam', 30, 60, 60, 'optional');
+        INSERT INTO schedule_rules (group_id, weekday, opens, closes, capacity)
+            VALUES (1, 0, '09:00:00', '12:00:00', 3);
+        INSERT INTO schedule_overrides (group_id, day, opens, closes, capacity)
+            VALUES (1, '2026-01-07', '09:00:00', '10:00:00', 2);
+        """
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        database.execute(
+            "INSERT INTO schedule_rules (group_id, weekday, opens, closes, capacity)"
+            " VALUES (1, 0, '12:00:00', '12:30:00', 0)"
+        )
+    database.commit()
+    database.close()
+
+    command.upgrade(alembic_config, "0018")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    database.executescript(
+        """
+        INSERT INTO schedule_rules (group_id, weekday, opens, closes, capacity, label)
+            VALUES (1, 0, '12:00:00', '12:30:00', 0, 'Lunch');
+        INSERT INTO schedule_overrides (group_id, day, opens, closes, capacity, label)
+            VALUES (1, '2026-01-08', '09:00:00', '10:00:00', 0, 'Heidag');
+        INSERT INTO schedule_overrides (group_id, day) VALUES (1, '2026-01-09');
+        """
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        database.execute(
+            "INSERT INTO schedule_rules (group_id, weekday, opens, closes, capacity)"
+            " VALUES (1, 1, '09:00:00', '10:00:00', -1)"
+        )
+    database.commit()
+    database.close()
+
+    command.downgrade(alembic_config, "0017")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    rules = database.execute("SELECT capacity FROM schedule_rules").fetchall()
+    overrides = database.execute("SELECT day, capacity FROM schedule_overrides").fetchall()
+    with pytest.raises(sqlite3.IntegrityError):
+        database.execute(
+            "INSERT INTO schedule_rules (group_id, weekday, opens, closes, capacity)"
+            " VALUES (1, 2, '09:00:00', '10:00:00', 0)"
+        )
+    database.close()
+    assert rules == [(3,)]
+    assert sorted(overrides) == [("2026-01-07", 2), ("2026-01-09", None)]

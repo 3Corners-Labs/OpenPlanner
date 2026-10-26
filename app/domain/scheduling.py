@@ -1,9 +1,11 @@
 """Group configuration and opening hours.
 
-A ``Group`` is a team (a WxCC queue) citizens book with. Its opening hours come from weekly
+A ``Group`` is a team (a WxCC queue) citizens book with. Its staffing comes from weekly
 ``ScheduleRule``s; a ``ScheduleOverride`` replaces all rules on one date (holiday, illness,
-extra session). Every window carries a capacity: how many appointments may start at the same
-time. That is a single number because the WxCC queue assigns the actual agent (HANDOVER B5).
+extra session). Every window (a staffing block, ADR 0027) carries a capacity: the number of
+agents, and so how many appointments may start at the same time. That is a single number
+because the WxCC queue assigns the actual agent (HANDOVER B5). A window with 0 agents (lunch,
+outside office hours) offers nothing, exactly like a gap, but says that it is deliberate.
 
     rules (weekly)      overrides (per date)
           │                     │
@@ -25,12 +27,15 @@ from app.domain.errors import DomainError, ErrorCode
 
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+_LINE_BREAKS = re.compile(r"[\x85\u2028\u2029]")
 MAX_NAME_LENGTH = 200
 MAX_SLUG_LENGTH = 64
 RESERVED_SLUGS = frozenset({"new"})
 """Slugs that are admin paths (``/admin/groups/new``, ``/admin/organisations/new``)."""
 MAX_CAPACITY = 1000
 """Upper bound per window; protects against typos such as 1000000."""
+MAX_LABEL_LENGTH = 50
+"""Longest label of a window ("Lunch", "Teamoverleg"; ADR 0027)."""
 
 _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,189}\.[^@\s]{2,63}$")
 
@@ -224,18 +229,37 @@ class GroupSummary:
 
 @dataclass(frozen=True, order=True)
 class TimeWindow:
-    """Local opening hours ``opens``–``closes`` with ``capacity`` parallel appointments."""
+    """A staffing block ``opens``–``closes`` (local) with ``capacity`` agents (ADR 0027).
+
+    Attributes:
+        capacity: Number of agents, 0 to ``MAX_CAPACITY``; 0 offers no slots (lunch).
+        label: Optional admin note such as "Lunch"; admin content only, never shown to
+            citizens or logged, and no part of equality or ordering.
+    """
 
     opens: time
     closes: time
     capacity: int
+    label: str | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
-        """Require ``opens < closes`` and ``1 <= capacity <= MAX_CAPACITY``."""
+        """Require ``opens < closes``, ``0 <= capacity <= MAX_CAPACITY`` and a valid label."""
         if self.opens >= self.closes:
             raise _invalid("window")
-        if not 1 <= self.capacity <= MAX_CAPACITY:
+        if not 0 <= self.capacity <= MAX_CAPACITY:
             raise _invalid("capacity")
+        if self.label is not None and (
+            not self.label.strip()
+            or len(self.label) > MAX_LABEL_LENGTH
+            or _CONTROL_CHARS.search(self.label)
+            or _LINE_BREAKS.search(self.label)
+        ):
+            raise _invalid("label")
+
+    @property
+    def staffed(self) -> bool:
+        """Whether at least one agent works in this block."""
+        return self.capacity > 0
 
     def overlaps(self, other: "TimeWindow") -> bool:
         """Return whether the two windows share any time (touching ends do not count)."""
@@ -340,9 +364,9 @@ def is_open(
     overrides: Iterable[ScheduleOverride],
     now: datetime,
 ) -> bool:
-    """Return whether ``now`` falls inside one of the group's opening windows (local time)."""
+    """Return whether ``now`` falls inside a staffed window of the group (local time)."""
     local = now.astimezone(group.tz)
     return any(
-        window.opens <= local.time() < window.closes
+        window.staffed and window.opens <= local.time() < window.closes
         for window in windows_on(local.date(), rules, overrides)
     )

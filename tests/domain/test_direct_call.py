@@ -29,6 +29,19 @@ def test_open_follows_windows_and_exceptions() -> None:
     assert not is_open(GROUP, RULES, closed, MONDAY_0915)
 
 
+def test_closed_during_a_block_without_agents() -> None:
+    rules = [
+        ScheduleRule(weekday=0, window=window("09:00", "12:00", 3)),
+        ScheduleRule(weekday=0, window=window("12:00", "12:30", 0)),
+        ScheduleRule(weekday=0, window=window("12:30", "17:00", 3)),
+    ]
+
+    assert is_open(GROUP, rules, [], MONDAY_0915 + timedelta(hours=2, minutes=44))  # 11:59
+    assert not is_open(GROUP, rules, [], MONDAY_0915 + timedelta(hours=2, minutes=45))  # 12:00
+    assert not is_open(GROUP, rules, [], MONDAY_0915 + timedelta(hours=3, minutes=14))  # 12:29
+    assert is_open(GROUP, rules, [], MONDAY_0915 + timedelta(hours=3, minutes=15))  # 12:30
+
+
 def _service(
     group: object = GROUP, now: datetime = MONDAY_0915
 ) -> tuple[BookingService, InMemoryUnitOfWork]:

@@ -78,6 +78,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "closes": "admin.form.error.time",
     "window": "admin.form.error.window",
     "capacity": "admin.form.error.capacity",
+    "label": "admin.form.error.label",
     "valid_from": "admin.form.error.date",
     "valid_to": "admin.form.error.valid_to",
     "day": "admin.form.error.day",

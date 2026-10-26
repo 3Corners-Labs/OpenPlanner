@@ -285,6 +285,7 @@ erDiagram
         time opens
         time closes
         int capacity
+        string label
         date valid_from
         date valid_to
     }
@@ -293,6 +294,7 @@ erDiagram
         time opens
         time closes
         int capacity
+        string label
     }
     REMINDER_RULE {
         string channel
@@ -328,9 +330,12 @@ erDiagram
 
 Rules that matter for the rest of the system:
 
-- **Capacity** is one number per opening window, because the WxCC queue assigns the agent
-  (HANDOVER B5). A slot row is created by the first booking and snapshots that capacity.
-  Later schedule edits change new slots only.
+- **Capacity** is one number per opening window (a staffing block: the number of agents,
+  0 to 1000, ADR 0027), because the WxCC queue assigns the agent (HANDOVER B5). A block with
+  0 agents (lunch) offers no slots and no direct calls, like a gap. Touching blocks with
+  agents form one *run*: the slot grid continues across their borders and a slot straddling
+  a border gets the lowest agent count. A slot row is created by the first booking and
+  snapshots that capacity. Later schedule edits change new slots only.
 - **An override replaces every rule on its date.** A closed override blocks new bookings,
   even in slots that already exist.
 - **Holidays come from reusable calendars** (ADR 0025): the superuser maintains them, an
