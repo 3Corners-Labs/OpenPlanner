@@ -239,7 +239,7 @@ def system_events(uow: InMemoryUnitOfWork) -> list[tuple[str, Outcome, str, str,
 async def test_a_sent_message_is_a_system_event_of_the_group(
     uow: InMemoryUnitOfWork, composer: MessageComposer
 ) -> None:
-    # ADR 0029: the group's admins can see that the reminder went out, and on which channel.
+    # ADR 0030: the group's admins can see that the reminder went out, and on which channel.
     bid = await booking_id(uow)
     queue = FakeQueue([sms_job(bid)])
 

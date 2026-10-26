@@ -2,12 +2,17 @@ import asyncio
 from datetime import timedelta
 from pathlib import Path
 
+import httpx
 import pytest
 
+from app.adapters.db.engine import create_engine
+from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
+from app.domain.updates import Version
 from app.jobs.healthcheck import heartbeat_is_fresh
 from app.jobs.worker import run_worker
 from tests.fakes.clock import FixedClock
+from tests.support.database import migrated_database
 
 
 async def test_worker_writes_heartbeat_and_stops_on_event(settings: Settings) -> None:
@@ -64,3 +69,46 @@ def test_heartbeat_missing_or_invalid_is_not_fresh(tmp_path: Path, content: str 
         path.write_text(content)
 
     assert not heartbeat_is_fresh(path, max_age=timedelta(seconds=60), now=FixedClock().now())
+
+
+@pytest.fixture
+def migrated_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    return migrated_database(tmp_path, monkeypatch, "releases")
+
+
+async def test_worker_looks_up_the_latest_release_once_per_hour(
+    settings: Settings, migrated_url: str
+) -> None:
+    url = migrated_url
+    configured = settings.model_copy(
+        update={"database_url": url, "update_repository": "acme/openplanner"}
+    )
+    calls: list[str] = []
+
+    def github(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        page = "https://github.com/acme/openplanner/releases/tag/v1.4.0"
+        return httpx.Response(200, json={"tag_name": "v1.4.0", "html_url": page})
+
+    stop = asyncio.Event()
+    task = asyncio.create_task(
+        run_worker(configured, stop, clock=FixedClock(), transport=httpx.MockTransport(github))
+    )
+    for _ in range(200):
+        if configured.worker_heartbeat_path.exists():
+            break
+        await asyncio.sleep(0.01)
+    await asyncio.sleep(0.05)  # a few more iterations: the clock stands still, so no new check
+    stop.set()
+    await asyncio.wait_for(task, timeout=2)
+
+    assert calls == ["/repos/acme/openplanner/releases/latest"]
+    engine = create_engine(url)
+    try:
+        async with SqlUnitOfWork(engine).read() as tx:
+            check = await tx.get_release_check()
+    finally:
+        await engine.dispose()
+    assert check is not None
+    assert check.latest is not None
+    assert check.latest.version == Version(1, 4, 0)

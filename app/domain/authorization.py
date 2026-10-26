@@ -3,7 +3,7 @@
 Roles come from the identity provider (ADR 0013). Each permission applies at one level:
 
     GLOBAL        something about the admin portal itself (dashboard, own rights, the
-                  holiday calendars every organisation can reuse)
+                  holiday calendars every organisation can reuse, updates of the installation)
     ORGANISATION  something of one organisation (new groups, integrations, branding)
     GROUP         something of one group (settings, opening hours, texts, bookings, the
                   audit log of its events)
@@ -69,6 +69,7 @@ class Permission(StrEnum):
     CLOSURE_MANAGE = "closure.manage"
     ORGANISATION_CLOSURE = "organisation.closure"
     API_CLIENTS_MANAGE = "api_clients.manage"
+    SYSTEM_UPDATE = "system.update"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -81,7 +82,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.BRANDING_MANAGE: Level.ORGANISATION,
     Permission.HOLIDAYS_ASSIGN: Level.ORGANISATION,
     Permission.GROUP_CREATE: Level.ORGANISATION,
-    Permission.AUDIT_VIEW: Level.GROUP,  # ADR 0029: one log, exact per level
+    Permission.AUDIT_VIEW: Level.GROUP,  # ADR 0030: one log, exact per level
     Permission.GROUP_VIEW: Level.GROUP,
     Permission.GROUP_EDIT: Level.GROUP,
     Permission.SCHEDULE_MANAGE: Level.GROUP,
@@ -91,6 +92,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.CLOSURE_MANAGE: Level.GROUP,
     Permission.ORGANISATION_CLOSURE: Level.ORGANISATION,
     Permission.API_CLIENTS_MANAGE: Level.GLOBAL,
+    # ADR 0029: update or restore the installation itself.
+    Permission.SYSTEM_UPDATE: Level.GLOBAL,
 }
 
 _EVERY_ADMIN = frozenset(
@@ -120,7 +123,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: _EVERY_ADMIN
     | {
-        # ADR 0029: the audit and system events of the own groups, for troubleshooting.
+        # ADR 0030: the audit and system events of the own groups, for troubleshooting.
         Permission.AUDIT_VIEW,
         Permission.GROUP_VIEW,
         Permission.SCHEDULE_MANAGE,

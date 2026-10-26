@@ -1,0 +1,15 @@
+# OpenPlanner host updater (ADR 0029): carries out update requests from the admin portal.
+# Install: docs/runbook.md, section Updates. Runs as root because it drives Docker.
+[Unit]
+Description=OpenPlanner host updater
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/openplanner-update
+# An update waits up to HEALTH_TIMEOUT for health twice (update, rollback), plus pulls.
+TimeoutStartSec=20min
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes

@@ -1,0 +1,14 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import form_body with context %}
+{% block title %}{{ _("admin.hours.split_title") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/staffing/{{ rule_id }}/split" novalidate aria-labelledby="split-heading">
+  <div class="card__header">
+    <h2 id="split-heading">{{ _("admin.hours.split_title") }}</h2>
+    <p class="card__lead">{{ lead }}</p>
+  </div>
+  {{ form_body(fields, _("admin.hours.split_button"), "/admin/groups/" ~ summary.group.slug ~ "/staffing") }}
+</form>
+{% endblock %}

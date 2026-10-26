@@ -1,7 +1,9 @@
 # Same shape for development and production: web + worker sharing one SQLite volume.
+# Production pins a signed release by digest in .env.update (OPENPLANNER_IMAGE) and passes
+# `--env-file .env.update`; the host updater maintains that file (ADR 0029).
 x-app: &app
   build: .
-  image: openplanner:local
+  image: ${OPENPLANNER_IMAGE:-openplanner:local}
   env_file:
     - path: .env
       required: false

@@ -39,6 +39,7 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.CLOSURE_MANAGE: "authz.permission.closure_manage",
     Permission.ORGANISATION_CLOSURE: "authz.permission.organisation_closure",
     Permission.API_CLIENTS_MANAGE: "authz.permission.api_clients_manage",
+    Permission.SYSTEM_UPDATE: "authz.permission.system_update",
 }
 
 API_SCOPE_LABELS: dict[ApiScope, str] = {

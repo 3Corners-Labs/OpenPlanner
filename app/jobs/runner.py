@@ -14,7 +14,7 @@ its channel fails at once as ``channel_not_configured`` (ADR 0022).
              failure ─► retry after 1, 5, 15 min ─► failed (refusals fail at once)
 
 Every outcome (sent, skipped with its reason, retry, failed with its error code) is also a
-system event in the audit log at the booking's group (ADR 0029), so admins can troubleshoot
+system event in the audit log at the booking's group (ADR 0030), so admins can troubleshoot
 their own groups without reading the container logs. Old system events are pruned at most
 once an hour. Writing the event never decides the job's fate: if it fails, it is logged.
 """
