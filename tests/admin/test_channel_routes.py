@@ -11,7 +11,7 @@ SMTP = {
     "smtp_port": "587",
     "smtp_security": "starttls",
     "smtp_username": "afspraak",
-    "smtp_credential": "Geheim-wachtwoord-123",
+    "smtp_credential": "Geheim-wachtwoord-123",  # gitleaks:allow (test value)
     "sender_address": "afspraak@demo.nl",
     "sender_name": "Gemeente Demo",
 }
