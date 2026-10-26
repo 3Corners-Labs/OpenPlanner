@@ -20,6 +20,15 @@
   <button type="submit" class="button button--secondary">{{ _("admin.channels.remove_email") }}</button>
 </form>
 {% endif %}
+{% if email_stored or fallback_mail %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/channels/email/test" novalidate aria-labelledby="test-heading">
+  <div class="card__header">
+    <h2 id="test-heading">{{ _("admin.channels.test_heading") }}</h2>
+    <p class="card__lead">{{ _("admin.channels.test_lead") }}</p>
+  </div>
+  {{ form_body(test_fields, _("admin.channels.test_send")) }}
+</form>
+{% endif %}
 <form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/channels/sms" novalidate aria-labelledby="sms-heading">
   <div class="card__header">
     <h2 id="sms-heading">{{ _("admin.channels.sms") }} <span class="chip{% if sms_status.tone %} chip--{{ sms_status.tone }}{% endif %}">{{ sms_status.label }}</span></h2>

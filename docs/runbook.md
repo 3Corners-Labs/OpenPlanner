@@ -378,10 +378,18 @@ stored encrypted with `SETTINGS_ENCRYPTION_KEY`; without that key they cannot be
   national numbers (31). Organisation admins then add SMS reminders per group under
   **Herinneringen**; the group's form must ask for a phone number.
 
-Failed deliveries are retried after 1, 5 and 15 minutes (timeouts, 429, 5xx) and then marked
-`failed` in the `jobs` table (`last_error` holds the exception type or code). Refusals fail at
-once: `unauthorized` (wrong service key or SMTP login), `rejected_<status>` (for example an
-invalid number), `channel_not_configured` (the organisation has no sender on that channel) or
+**Testing mail.** Under **Berichtkanalen**, *Testbericht versturen* sends one message through
+the server the worker uses for that organisation (its own settings, else `SMTP_HOST`) and says
+what failed: server unreachable, TLS, login, sender or recipient refused. Save changes first;
+the test uses the saved settings. Each test is audited (`smtp.test.ok` or `smtp.test.<code>`).
+
+Failed deliveries are retried after 1, 5 and 15 minutes (timeouts, 429, 5xx, SMTP 4xx,
+`unreachable`) and then marked `failed` in the `jobs` table (`last_error` holds the exception
+type or code). Refusals fail at once: `unauthorized` (wrong service key or SMTP login),
+`tls_failed` (wrong security setting for the port, or an invalid certificate), `not_supported`
+(the server offers no STARTTLS or login), `sender_refused` (the account may not send from the
+sender address), `recipient_refused`, `rejected_<status>` (for example an invalid number or
+an SMTP 5xx), `channel_not_configured` (the organisation has no sender on that channel) or
 `integration_not_ready` (the settings key is missing). The reminders page of a group warns
 when a rule's channel is not configured.
 
