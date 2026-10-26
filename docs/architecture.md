@@ -81,9 +81,10 @@ flowchart LR
 ```mermaid
 flowchart TB
     browser([Browser])
-    proxy[Reverse proxy<br/>TLS, body limit, forwarded IPs]
+    acme[Let's Encrypt<br/>ACME CA]
 
     subgraph host [One VM]
+        proxy["proxy (profile tls)<br/>Caddy: TLS, auto-renewal,<br/>body limit, forwarded IPs"]
         web["web<br/>FastAPI + uvicorn<br/>pages, migrations on start"]
         worker["worker<br/>job loop, heartbeat"]
         volume[("data volume<br/>SQLite (WAL)")]
@@ -94,7 +95,8 @@ flowchart TB
     github[GitHub releases<br/>GHCR images]
     updater["host updater<br/>systemd timer, cosign"]
 
-    browser --> proxy --> web
+    browser -- "https :443" --> proxy -- edge network --> web
+    proxy -. "ACME, renewal" .-> acme
     web <--> volume
     worker <--> volume
     worker -- SMTP --> smtp
@@ -103,10 +105,13 @@ flowchart TB
     updater -- "pull, verify, pin digest" --> github
     worker -. dev .-> mailpit
 
-    classDef planned stroke-dasharray: 5 5
-    class proxy planned
 ```
 
+- **TLS at the edge (ADR 0030).** With `--profile tls` the `proxy` service (Caddy) gets a
+  certificate for `TLS_DOMAIN` from Let's Encrypt and renews it on its own; port 80 only
+  redirects. It runs as uid 10001 on a read-only filesystem, keeps certificates in the
+  `proxy-data` volume and has a fixed address on the `edge` network, the only address `web`
+  accepts `X-Forwarded-For` from. Without the profile, a load balancer of the host does this.
 - **One image, two roles.** `web` runs `alembic upgrade head` and then uvicorn; `worker` runs
   `python -m app.jobs.worker` and starts only when `web` is healthy. Both run as uid 10001
   with a read-only root filesystem, no capabilities and `no-new-privileges`.
@@ -531,7 +536,7 @@ flowchart LR
     end
 
     subgraph edge [Edge]
-        proxy[Reverse proxy<br/>TLS, body limit]
+        proxy[Caddy proxy<br/>TLS, auto-renewal, body limit]
     end
 
     subgraph app [Application, trusted]
@@ -556,8 +561,6 @@ flowchart LR
     wxcc -- signed webhooks --> pages
     webex -- signed webhooks --> pages
 
-    classDef planned stroke-dasharray: 5 5
-    class proxy planned
 ```
 
 | Control | Where | Reference |
@@ -642,6 +645,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0027 | Staffing blocks with an agent count, including zero, instead of opening hours |
 | 0028 | Provider-neutral SMS gateway; Webex Connect as one adapter |
 | 0029 | Updates started from the admin portal, carried out by a signed-image host updater with rollback |
+| 0030 | HTTPS with free, automatically renewed certificates (Caddy, Let's Encrypt) |
 
 ## 12. Status and roadmap
 
