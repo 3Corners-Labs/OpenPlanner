@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from app.config import Settings
 from app.i18n.dates import ClockStyle
@@ -116,3 +117,20 @@ def test_webhooks_can_use_their_own_https_base_url() -> None:
     )
     assert dev.webhook_base == "https://abc.trycloudflare.com"
     assert dev.public_base_url == "http://127.0.0.1:8000"  # OIDC redirect and links unchanged
+
+
+def test_validation_errors_never_contain_the_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    test_pw = "never-in-an-error"  # noqa: S105 - test value
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.nl")
+    monkeypatch.setenv("SMTP_PORT", "25")
+    monkeypatch.setenv("SMTP_STARTTLS", "false")
+    monkeypatch.delenv("SMTP_TLS", raising=False)
+    monkeypatch.setenv("SMTP_USER", "planner@example.nl")
+    monkeypatch.setenv("SMTP_USER_PASSWORD", test_pw)
+
+    with pytest.raises(ValidationError) as caught:
+        Settings(environment="dev")
+
+    assert test_pw not in str(caught.value)
+    assert test_pw not in repr(caught.value)
+    assert "input_value" not in str(caught.value)

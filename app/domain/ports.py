@@ -27,6 +27,7 @@ from app.domain.calls import (
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.closure import Closure
+from app.domain.direct_queue import DirectCall
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.scheduling import (
@@ -72,6 +73,17 @@ class MessageSender(Protocol):
 
     async def send(self, message: OutboundMessage) -> None:
         """Deliver ``message``; raise on failure so the job is retried."""
+        ...
+
+
+class SenderDirectory(Protocol):
+    """Finds the sender of an organisation's channel (ADR 0022).
+
+    The organisation's own settings come first, else the installation's fallback for email.
+    """
+
+    async def sender(self, organisation_id: int, channel: ChannelKind) -> MessageSender | None:
+        """Return the sender, or ``None`` when the organisation has none on ``channel``."""
         ...
 
 
@@ -399,6 +411,10 @@ class Transaction(Protocol):
 
     async def save_call_status(self, status: CallStatus) -> None:
         """Create or replace the booking's aggregated call status."""
+        ...
+
+    async def get_direct_calls(self, group_id: int, since: datetime) -> list[DirectCall]:
+        """Return the group's direct calls that started at or after ``since``, any status."""
         ...
 
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:

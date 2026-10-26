@@ -106,7 +106,7 @@ in `OIDC_CLIENT_SECRET` and a restart of `web`.
 
 Without a Webex Service App OpenPlanner runs without video and WxCC; bookings keep working.
 Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (work items),
-0019 (direct call).
+0019 (direct call), 0026 (cap on open direct calls).
 
 ### 1. Webex Service App
 
@@ -367,19 +367,29 @@ stored encrypted with `SETTINGS_ENCRYPTION_KEY`; without that key they cannot be
 (the form says so). Changes apply to the next message, no restart needed.
 
 - **Mail.** An organisation without its own SMTP settings uses the installation's server from
-  `SMTP_HOST` (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`);
-  Mailpit in development. Use STARTTLS on 587 or TLS on 465; "none" only for a relay on a
-  trusted network.
+  `SMTP_HOST` (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_TLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
+  `MAIL_FROM`; `SMTP_USER` and `SMTP_USER_PASSWORD` are accepted as aliases); Mailpit in
+  development. Use STARTTLS on 587 or TLS on 465 (port 465 always means TLS); plain only for a
+  relay on a trusted network. The services refuse to start with a login but neither STARTTLS
+  nor TLS.
 - **SMS.** In Webex Connect, create a service with an SMS number or alphanumeric sender, copy
   the service key (service → Messaging API) and the tenant's API host (for example
   `https://api.us.webexconnect.io`). Enter both with the sender and the country code for
   national numbers (31). Organisation admins then add SMS reminders per group under
   **Herinneringen**; the group's form must ask for a phone number.
 
-Failed deliveries are retried after 1, 5 and 15 minutes (timeouts, 429, 5xx) and then marked
-`failed` in the `jobs` table (`last_error` holds the exception type or code). Refusals fail at
-once: `unauthorized` (wrong service key or SMTP login), `rejected_<status>` (for example an
-invalid number), `channel_not_configured` (the organisation has no sender on that channel) or
+**Testing mail.** Under **Berichtkanalen**, *Testbericht versturen* sends one message through
+the server the worker uses for that organisation (its own settings, else `SMTP_HOST`) and says
+what failed: server unreachable, TLS, login, sender or recipient refused. Save changes first;
+the test uses the saved settings. Each test is audited (`smtp.test.ok` or `smtp.test.<code>`).
+
+Failed deliveries are retried after 1, 5 and 15 minutes (timeouts, 429, 5xx, SMTP 4xx,
+`unreachable`) and then marked `failed` in the `jobs` table (`last_error` holds the exception
+type or code). Refusals fail at once: `unauthorized` (wrong service key or SMTP login),
+`tls_failed` (wrong security setting for the port, or an invalid certificate), `not_supported`
+(the server offers no STARTTLS or login), `sender_refused` (the account may not send from the
+sender address), `recipient_refused`, `rejected_<status>` (for example an invalid number or
+an SMTP 5xx), `channel_not_configured` (the organisation has no sender on that channel) or
 `integration_not_ready` (the settings key is missing). The reminders page of a group warns
 when a rule's channel is not configured.
 
@@ -461,6 +471,10 @@ Bookings keep working: they are stored first, and meetings and work items are jo
   re-run the job once WxCC is back (set the job's status to `pending` in the `jobs` table).
 - **Direct calls** during an outage show "no agent available" after the group's
   not-picked-up limit and offer to book instead.
+- **"All agents busy" while agents are free** (group with a cap on direct calls, ADR 0026):
+  the count relies on `task:ended` webhooks. If they are missing, a place frees itself after
+  the not-picked-up limit (waiting) or 30 minutes after the booking's end (connected); fix the
+  webhooks as below, or clear the cap in the group's settings meanwhile.
 - **Webhooks missing** (status not updating while calls happen): check **Koppelingen**, the
   secrets, and re-run `register-webhooks`; WxCC sets a subscription to `inactive` after
   repeated delivery errors.

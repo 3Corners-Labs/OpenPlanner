@@ -4,12 +4,15 @@
 {% include "_error_summary.html" %}
 <p class="eyebrow">{{ group.name }}</p>
 <h1>{{ _("direct.title") }}</h1>
-{% if available %}
+{% if availability == "available" %}
 <p>{{ _("direct.intro", group_name=group.name) }}</p>
+{% include "_queue_info.html" %}
 <form class="card" method="post" action="/g/{{ group.slug }}/direct" novalidate>
   {% include "_contact_fields.html" %}
   <button type="submit" class="button button--large">{{ _("direct.submit") }}</button>
 </form>
+{% elif availability == "full" %}
+<div class="notice"><p>{{ _("direct.full") }}</p></div>
 {% else %}
 <div class="notice"><p>{{ _("direct.unavailable") }}</p></div>
 {% endif %}

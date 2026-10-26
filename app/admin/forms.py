@@ -48,6 +48,7 @@ DONE_MESSAGES: dict[str, str] = {
     "client_disabled": "admin.done.client_disabled",
     "tokens_revoked": "admin.done.tokens_revoked",
     "texts_saved": "admin.done.texts_saved",
+    "test_sent": "admin.done.test_sent",
 }
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
@@ -68,6 +69,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "wxcc_routing_value": "admin.form.error.integration_text",
     "direct_call_enabled": "admin.form.error.choice",
     "not_picked_up_minutes": "admin.form.error.not_picked_up_minutes",
+    "direct_call_max_concurrent": "admin.form.error.direct_call_max_concurrent",
     "display_name": "admin.form.error.display_name",
     "accent_color": "admin.form.error.accent_color",
     "logo": "admin.form.error.logo",
@@ -105,6 +107,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "sms_service_key": "admin.form.error.sms_service_key",
     "sms_sender_id": "admin.form.error.sms_sender_id",
     "sms_country_code": "admin.form.error.sms_country_code",
+    "test_recipient": "admin.form.error.test_recipient",
     "channel": "admin.form.error.reminder_channel",
     "minutes_before": "admin.form.error.reminder_offset",
     "reminders": "admin.form.error.reminder_limit",
@@ -223,6 +226,10 @@ class FormData:
             return int(raw)
         self._fail(name)
         return None
+
+    def optional_integer(self, name: str) -> int | None:
+        """Return a whole number, or ``None`` when empty (an error when not a number)."""
+        return self.integer(name) if self.text(name) else None
 
     def clock(self, name: str) -> time | None:
         """Return a time of day (``HH:MM``), or ``None`` with an error."""
