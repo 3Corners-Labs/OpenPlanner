@@ -725,6 +725,30 @@ fieldset.card {
   border-color: var(--adm-text);
 }
 
+.admin .field input.input--clock,
+.admin .field input.input--day {
+  width: 6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin .field input.input--day {
+  width: 9rem;
+}
+
+
+.admin .field__pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.admin .field .field__sublabel {
+  display: inline;
+  margin: 0;
+  font-weight: 400;
+}
+
 .admin .field input[readonly] {
   background: var(--adm-surface-muted);
   color: var(--adm-text-muted);
@@ -781,7 +805,8 @@ fieldset.card {
   font-weight: 500;
 }
 
-.optional {
+.optional,
+.field__format {
   color: var(--adm-text-muted);
   font-weight: 400;
 }

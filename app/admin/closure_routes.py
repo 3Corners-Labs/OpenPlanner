@@ -131,7 +131,7 @@ def _suspended(bookings: Sequence[Booking], group: Group, locale: str) -> list[S
 
 
 def _local_input(value: datetime | None) -> str:
-    """Return a local datetime as the value of a ``datetime-local`` input (no seconds)."""
+    """Return a local datetime as the value of a ``datetime`` field (no seconds)."""
     return value.strftime("%Y-%m-%dT%H:%M") if value else ""
 
 
@@ -149,8 +149,8 @@ def _closure_fields(
             Field(
                 "starts_at",
                 _("admin.closure.starts_at"),
-                "datetime-local",
-                form.text("starts_at"),
+                "datetime",
+                form.moment_value("starts_at"),
                 hint=_("admin.closure.starts_at_hint"),
                 error=form.error_for("starts_at"),
                 required=False,
@@ -161,8 +161,8 @@ def _closure_fields(
         Field(
             "ends_at",
             _("admin.closure.ends_at"),
-            "datetime-local",
-            form.values.get("ends_at", _local_input(ends)),
+            "datetime",
+            form.moment_value("ends_at", _local_input(ends)),
             hint=_("admin.closure.ends_at_hint"),
             error=form.error_for("ends_at"),
             required=False,
