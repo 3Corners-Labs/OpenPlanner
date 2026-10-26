@@ -1,4 +1,4 @@
-"""Webex Connect SMS adapter: the request is the SMS API v1 contract (HANDOVER B6, ADR 0021)."""
+"""Webex Connect SMS adapter: the request is the SMS API v1 contract (HANDOVER B6, ADR 0022)."""
 
 import json
 from collections.abc import Callable

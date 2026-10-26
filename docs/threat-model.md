@@ -96,6 +96,20 @@ Admin: `GET /admin/branding`, `GET/POST /admin/organisations/{org}/branding`,
 | Repudiation | Who changed the branding | Audit event `branding.manage` with field names (never values) | `test_superuser_changes_name_and_colour_and_it_is_audited`, `tests/admin/test_branding_routes.py::test_name_and_colour_are_saved_shown_and_audited` |
 | Tampering (CSRF) | A third-party site changes branding in a superuser's browser | Fetch Metadata check on every POST | `test_cross_site_branding_posts_are_refused` |
 
+## Flow: organisation management
+
+Admin: `GET /admin/organisations`, `GET /admin/organisations/new`, `POST /admin/organisations`,
+`GET/POST /admin/organisations/{org}`. Inputs from outside: name, slug and default language
+(form fields), `org` (path).
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation of privilege | An organisation admin creates organisations or renames their own | `organisation.manage` is a global permission of the superuser only (HANDOVER §6); `RequirePermission` and `OrganisationService` both decide; denials audited | `tests/admin/test_authorization_matrix.py`, `tests/domain/test_organisations.py::test_org_admin_may_not_create_or_edit_organisations` |
+| Elevation of privilege | A changed slug moves an organisation under another identity-provider claim | The slug is fixed after creation; the form does not offer it and a submitted value is ignored; taken and reserved slugs (`new`) are refused | `tests/admin/test_organisation_routes.py::test_edit_saves_name_and_language_but_never_the_slug`, `tests/domain/test_organisations.py::test_a_taken_or_reserved_slug_is_refused` |
+| Tampering | Control characters or unknown languages in stored settings | Name and slug validated in the domain (shared with groups); the default language must have a catalogue | `tests/domain/test_organisations.py::test_invalid_input_is_refused_with_its_field` |
+| Repudiation | Who created or renamed an organisation | Audit event `organisation.manage` with `create` or the field names (never values) | `test_superuser_creates_an_organisation_and_it_is_audited`, `test_update_changes_name_and_locale_and_names_the_fields` |
+| Tampering (CSRF) | A third-party site creates an organisation in a superuser's browser | Fetch Metadata check on every POST | `tests/admin/test_organisation_routes.py::test_cross_site_posts_are_refused` |
+
 ## Flow: outgoing email (WP3, worker)
 
 | STRIDE | Threat | Mitigation | Test |
@@ -105,7 +119,7 @@ Admin: `GET /admin/branding`, `GET/POST /admin/organisations/{org}/branding`,
 | Injection | Group name or text with HTML in emails | Jinja2 autoescape for the HTML part; plain-text part separate | `tests/jobs/test_messages.py::test_html_is_escaped_and_semantic` |
 | Information disclosure | Personal data in calendar files | `.ics` contains team, times and the management link only | `test_calendar_attachment` |
 
-## Flow: message channels, SMS reminders and message texts (ADR 0021)
+## Flow: message channels, SMS reminders and message texts (ADR 0022)
 
 Superusers configure SMTP and the Webex Connect SMS service per organisation at
 `/admin/organisations/{org}/channels`; organisation admins add reminder rules per group at
@@ -154,7 +168,8 @@ other `/admin` route declares one permission of the matrix (ADR 0014). Inputs fr
 
 Admins only. `GET/POST /admin/groups/new`, `/admin/groups`, `/admin/groups/{slug}/settings`,
 `/hours`, `/exceptions` and their `/delete` actions. Inputs from outside: form fields (names,
-slug, time zone, numbers, times, dates, queue id), path slugs and item ids.
+slug, time zone, numbers, times, dates, queue id), path slugs, item ids and the
+`?weekday=` query parameter that preselects the day of the opening-hours form.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -164,6 +179,7 @@ slug, time zone, numbers, times, dates, queue id), path slugs and item ids.
 | Tampering (CSRF) | A third-party site submits a change in an admin's browser | Fetch Metadata check on every POST; session cookie `SameSite=Lax` on `/admin` | `test_cross_site_changes_are_refused` |
 | Elevation | A role revoked in the IdP keeps granting changes for the rest of the session | Changes and their forms need a login of at most 60 minutes (ADR 0015); a POST returns only to admin paths | `test_changes_need_a_recent_login`, `test_forged_referer_cannot_leave_the_portal` |
 | Tampering | A change breaks existing appointments (capacity lowered, time grid moved) | Capacity is snapshotted per slot; time zone and slot length are frozen while confirmed bookings lie ahead; overlapping windows are refused for the whole schedule | `test_capacity_change_never_touches_existing_slots`, `test_time_grid_is_frozen_while_future_bookings_exist`, `test_overlapping_opening_hours_are_refused` |
+| Tampering (XSS) | A crafted `?weekday=` value reflected into the opening-hours form | Only the digits 0–6 are kept; anything else falls back to Monday; output is autoescaped | `tests/admin/test_group_routes.py::test_every_day_links_to_the_form_with_that_day_chosen` |
 | Tampering (XSS) | Markup in a group name or queue id | Jinja2 autoescape; names and queue ids without control characters | `test_names_are_escaped`, `tests/domain/test_scheduling.py::test_group_rejects_invalid_configuration` |
 | Spoofing | A new group takes an admin path as its slug (`/admin/groups/new`) | Reserved slugs | `test_reserved_slugs_cannot_be_taken` |
 | Repudiation | An admin denies a change | Every change is audited in the same transaction, with the changed field names or `rule.add`-style keys (never values) | `test_settings_change_records_the_changed_fields`, `test_group_admin_manages_opening_hours_of_their_group` |
@@ -179,9 +195,12 @@ form, webhook bodies and headers, API responses.
 |---|---|---|---|
 | Spoofing / tampering | Forged or altered webhook changes a call's status | HMAC over the raw body before parsing (WxCC SHA-256, Webex SHA-1, constant-time); endpoints exist only with a secret; 64 KB cap; rate limit | `tests/adapters/test_webhooks.py::test_wxcc_signature_timestamp_and_window`, `test_webex_signature`, `tests/api/test_webhooks.py::test_forged_or_stale_webhooks_are_refused`, `test_oversized_bodies_are_refused`, `test_without_a_secret_the_endpoints_do_not_exist` |
 | Repudiation / tampering | Replayed WxCC webhook | Header and body timestamp must match and lie within 300 s | `test_wxcc_signature_timestamp_and_window`, `test_forged_or_stale_webhooks_are_refused` |
-| Tampering | Replayed Webex webhook (Webex signs no event time) | Signature still required; status changes are idempotent; participant counts never go below zero; only aggregates are stored | `tests/domain/test_integration.py::test_participants_never_go_below_zero_and_failures_are_kept` |
+| Tampering | Replayed Webex webhook (Webex signs no event time) | Signature still required; each event's key (digest of resource, event, `data.id`, join/leave time) is remembered for 30 days in `webhook_events` in the same transaction, so a replay or redelivery is recorded once; counts never go below zero; only aggregates are stored | `tests/domain/test_integration.py::test_a_replayed_webex_event_changes_the_counts_once`, `test_participants_never_go_below_zero_and_failures_are_kept`, `tests/api/test_webhooks.py::test_a_replayed_participant_event_counts_once` |
 | Information disclosure | Personal data to Webex or WxCC | Meeting request: group name and times only; work item: reference, first name, start, group, link, kind | `test_meeting_request_carries_no_personal_data`, `test_work_item_carries_only_first_name_and_meeting_link`, `tests/adapters/test_wxcc.py::test_task_body_matches_the_create_task_v2_contract` |
 | Information disclosure | Participant names or emails from webhooks stored or logged | Parsers read ids, event types, the host flag and reasons only | `test_webex_events_map_to_call_events_without_names` |
+| Information disclosure | Personal data to WxCC when a cancelled task is marked | The cancellation message carries only `bookingReference` and `kind`; the task id is URL-escaped so it cannot change the API path | `tests/adapters/test_wxcc.py::test_cancellation_message_carries_the_reference_only`, `test_a_task_id_cannot_change_the_path` |
+| Information disclosure | `wxcc-check` output shows tokens or user data | Prints status and a scope hint only; bodies are never read into the report | `tests/adapters/test_diagnostics.py::test_report_has_status_and_hint_but_no_token_or_body`, `tests/test_cli.py::test_wxcc_check_reports_todays_403s_and_fails` |
+| Information disclosure | `wxcc-config-check` leaks secrets or agent data from the configuration | Queues and entry points are listed with selected attributes only; asset webhook secrets are dropped when parsing; flows are reduced to variable and activity names | `tests/adapters/test_wxcc_config.py::test_config_is_fetched_with_selected_fields_and_no_secrets` |
 | Spoofing (open redirect) | `/join/go` sends the citizen to an attacker's site | Redirect only to the stored Webex link and only `https://`; only while the join window is open | `tests/api/test_join_pages.py::test_never_redirects_to_a_non_https_link`, `test_page_waits_until_fifteen_minutes_before` |
 | Information disclosure | Meeting link leaks or outlives the booking | Link is a PII field: excluded from `repr`, purged with the contact; the email links to OpenPlanner, not to Webex; `Referrer-Policy: same-origin` | `tests/adapters/db/test_call_queries.py::test_purge_removes_the_join_link_but_keeps_the_ids` |
 | Denial of service | Bots start direct calls and flood the WxCC queue | Same rate limit and honeypot as booking; only while open and switched on per group; WxCC limits active digital contacts | `tests/api/test_direct_pages.py::test_honeypot_and_cross_site_are_refused`, `test_not_offered_when_switched_off`, `tests/domain/test_direct_call.py::test_direct_call_only_when_enabled_and_open` |

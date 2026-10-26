@@ -1,4 +1,4 @@
-"""Admin routes for a group's reminders and message texts (ADR 0021).
+"""Admin routes for a group's reminders and message texts (ADR 0022).
 
 Every route depends on exactly one ``RequirePermission``; forms and changes are ``fresh``.
 Changes are POST forms with the Fetch Metadata check, answered with a redirect and a

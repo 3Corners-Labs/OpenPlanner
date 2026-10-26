@@ -1,4 +1,4 @@
-"""Reminder and message-text screens (ADR 0021): rules per group, texts per locale."""
+"""Reminder and message-text screens (ADR 0022): rules per group, texts per locale."""
 
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
 

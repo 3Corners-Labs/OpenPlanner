@@ -1,4 +1,4 @@
-"""Group messaging use cases: reminder rules and the group's own message texts (ADR 0021).
+"""Group messaging use cases: reminder rules and the group's own message texts (ADR 0022).
 
 Each operation asks ``AdminService.authorize`` first and records an audit event in the same
 transaction, naming what changed (``reminder.add:sms:120``, ``texts.nl:message.reminder.sms``),

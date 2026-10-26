@@ -1,4 +1,4 @@
-"""Admin routes for an organisation's message channels: SMTP and SMS gateway (ADR 0021).
+"""Admin routes for an organisation's message channels: SMTP and SMS gateway (ADR 0022).
 
 Every route depends on exactly one ``RequirePermission(integrations.manage)`` (superuser
 only, HANDOVER §6); forms and changes are ``fresh``. Changes are POST forms with the Fetch
@@ -19,16 +19,9 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
+from app.admin import forms
 from app.admin.authz import AdminContext, RequirePermission
-from app.admin.forms import (
-    Field,
-    FormData,
-    Option,
-    done_message,
-    raise_refusal,
-    read_form,
-    redirect_done,
-)
+from app.admin.forms import Field, FormData
 from app.admin.pages import Locale, SameOrigin
 from app.admin.pages import page as _page
 from app.domain.authorization import Permission
@@ -127,7 +120,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
             "select",
             form.values.get("smtp_security", security),
             error=form.error_for("smtp_security"),
-            options=tuple(Option(s.value, _(label)) for s, label in SECURITY_LABELS.items()),
+            options=tuple(forms.Option(s.value, _(label)) for s, label in SECURITY_LABELS.items()),
         ),
         Field(
             "smtp_username",
@@ -227,15 +220,15 @@ async def _form_page(
     locale: RequestLocale,
     context: AdminContext,
     org: str,
-    forms: dict[ChannelKind, FormData],
+    submitted: dict[ChannelKind, FormData],
     status: int = 200,
 ) -> HTMLResponse:
     """Render both channel forms with the stored settings."""
     overview: ChannelOverview = await channel_service(request).overview(context.principal, org)
     _ = locale.gettext
     tz = ZoneInfo(request.app.state.settings.admin_timezone)
-    email = forms.get(ChannelKind.EMAIL) or FormData({}, _)
-    sms = forms.get(ChannelKind.SMS) or FormData({}, _)
+    email = submitted.get(ChannelKind.EMAIL) or FormData({}, _)
+    sms = submitted.get(ChannelKind.SMS) or FormData({}, _)
     stored_email = overview.channels[ChannelKind.EMAIL]
     stored_sms = overview.channels[ChannelKind.SMS]
     response = _page(
@@ -253,7 +246,7 @@ async def _form_page(
             "sms_stored": stored_sms is not None,
             "fallback_mail": bool(request.app.state.settings.smtp_host),
             "errors": email.errors + sms.errors,
-            "done": done_message(request, _),
+            "done": forms.done_message(request, _),
         },
     )
     response.status_code = status
@@ -281,10 +274,10 @@ async def _save(
         try:
             changed = await channel_service(request).save(context.principal, org, config, secret)
         except DomainError as error:
-            raise_refusal(error)
+            forms.raise_refusal(error)
             form.refusal(error)
         else:
-            return redirect_done(_url(org), "saved" if changed else "unchanged")
+            return forms.redirect_done(_url(org), "saved" if changed else "unchanged")
     return await _form_page(request, locale, context, org, {channel: form}, 422)
 
 
@@ -293,7 +286,7 @@ async def save_email(
     request: Request, locale: Locale, org: str, _: SameOrigin, context: Manage
 ) -> Response:
     """Save the organisation's SMTP server; a blank password keeps the stored one."""
-    form = await read_form(request, locale)
+    form = await forms.read_form(request, locale)
     port = form.integer("smtp_port")
     security = form.choice("smtp_security", {s.value for s in SmtpSecurity})
     config: SmtpSettings | None = None
@@ -318,7 +311,7 @@ async def save_sms(
     request: Request, locale: Locale, org: str, _: SameOrigin, context: Manage
 ) -> Response:
     """Save the organisation's Webex Connect SMS service; a blank key keeps the stored one."""
-    form = await read_form(request, locale)
+    form = await forms.read_form(request, locale)
     config: SmsSettings | None = None
     try:
         config = SmsSettings(
@@ -343,6 +336,6 @@ async def remove_channel(
     try:
         await channel_service(request).remove(context.principal, org, kind)
     except DomainError as error:
-        raise_refusal(error)
+        forms.raise_refusal(error)
         raise
-    return redirect_done(_url(org), "removed")
+    return forms.redirect_done(_url(org), "removed")

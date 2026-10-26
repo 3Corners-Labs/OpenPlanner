@@ -66,11 +66,11 @@ flowchart LR
 
 | External system | Direction | Purpose | Decision |
 |---|---|---|---|
-| Mail provider (SMTP) | out | Confirmation, change, reminder, cancellation | ADR 0009; per organisation in the admin UI (ADR 0008, 0021) |
+| Mail provider (SMTP) | out | Confirmation, change, reminder, cancellation | ADR 0009; per organisation in the admin UI (ADR 0008, 0022) |
 | Webex Contact Center | out, in | Work item per booking or direct call; task events by signed webhook | ADR 0018 (supersedes 0007 in part) |
 | Webex Meetings | out, in | Meeting per booking on behalf of the group's host; status by signed webhook | ADR 0017, 0010 |
 | Identity provider | in | Admin login with roles | HANDOVER B8, O3 |
-| Webex Connect SMS API | out | SMS reminders, per organisation | ADR 0021 |
+| Webex Connect SMS API | out | SMS reminders, per organisation | ADR 0022 |
 | WhatsApp | out | Reminders | ADR 0009 (roadmap) |
 
 ## 4. Containers and deployment
@@ -200,6 +200,7 @@ same commit and rollback behaviour as the SQL one.
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
+| Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda, booking timeline, integrations page | `app/admin/call_routes.py`, `app/admin/routes.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
@@ -212,13 +213,14 @@ same commit and rollback behaviour as the SQL one.
 | Job queue | `app/adapters/db/jobs.py` |
 | Citizen pages | `app/api/booking_pages.py`, `app/api/citizen.py`, `app/api/templates/` |
 | Slot picker: month calendar and times (ADR 0020) | `app/api/slot_picker.py`, `app/web/static/calendar.js` |
+| Organisations (superuser) | `app/domain/organisations.py`, `app/admin/organisation_routes.py` |
 | Branding per organisation (O5) | `app/domain/branding.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
 | CSRF and rate limits | `app/web/protection.py` |
 | Rendering and security headers | `app/web/templates.py`, `app/api/security_headers.py` |
 | Translations and locale | `app/i18n/` |
 | Messages and calendar files | `app/jobs/messages.py`, `app/jobs/calendar.py` |
-| Channel settings per organisation (SMTP, SMS; ADR 0021) | `app/domain/channel_settings.py`, `app/domain/channel_service.py`, `app/admin/channel_routes.py` |
-| Reminder rules and group texts (ADR 0021) | `app/domain/messaging_service.py`, `app/domain/message_texts.py`, `app/admin/message_routes.py` |
+| Channel settings per organisation (SMTP, SMS; ADR 0022) | `app/domain/channel_settings.py`, `app/domain/channel_service.py`, `app/admin/channel_routes.py` |
+| Reminder rules and group texts (ADR 0022) | `app/domain/messaging_service.py`, `app/domain/message_texts.py`, `app/admin/message_routes.py` |
 | Senders per organisation, SMS adapter | `app/adapters/senders.py`, `app/adapters/webex_connect_sms.py`, `app/adapters/smtp.py` |
 | Job execution | `app/jobs/runner.py`, `app/jobs/worker.py` |
 
@@ -394,7 +396,7 @@ flowchart LR
     dispatch --> meeting(["call<br/>from start to finish"])
     meeting --> purge["slot end + 24h<br/>purge PII"]
 
-    cancel(["cancelled"]) --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
+    cancel(["cancelled"]) --> cend["mark WxCC task cancelled (v2)<br/>then End Task (v1), ADR 0021<br/>delete meeting"] --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]
 
 ```
 
@@ -571,7 +573,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0018 | Dispatch to WxCC as work items (Create Task API v2) |
 | 0019 | Direct video call ("now") per group |
 | 0020 | Citizen calendar as progressive enhancement; branding through tokens |
-| 0021 | Message channels per organisation, SMS through Webex Connect, editable texts |
+| 0021 | Provider-neutral contact-center integration (proposed) |
+| 0022 | Message channels per organisation, SMS through Webex Connect, editable texts |
 
 ## 12. Status and roadmap
 
@@ -583,13 +586,16 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP3 (slice 1) | Citizen pages, mail, worker, demo | done |
 | WP3b | Citizen pages: month calendar grid, modern layout, branding (O5) | done |
 | WP3c | Embeddable widget (Web Component, same tokens) | planned |
-| WP4 | SMS reminders, message editors | done (ADR 0021) |
+| WP4 | SMS reminders, message editors | done (ADR 0022) |
 | WP5 | Webex Meetings, join page, live status (O1: Meetings API) | done |
 | WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
-| WP7c–d | Texts and reminders, encrypted channel settings (ADR 0021); organisation-wide text overrides | partly done |
+| WP7b+ | Organisations (create, rename, default language) for the superuser | done |
+| ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
+| WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
+| idea | Booking API for the WxCC AI Agent (chat and voice bots): find, book, reschedule, cancel (O11) | not planned |
 
 The open decisions (O1–O10) are listed in `docs/HANDOVER.md` §11.

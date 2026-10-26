@@ -34,7 +34,7 @@ log = structlog.get_logger()
 def fallback_mail(settings: Settings) -> SmtpConfig | None:
     """Return the SMTP server from the environment, or ``None`` when ``SMTP_HOST`` is not set.
 
-    Used for organisations without their own SMTP settings (ADR 0021).
+    Used for organisations without their own SMTP settings (ADR 0022).
     """
     if not settings.smtp_host:
         return None

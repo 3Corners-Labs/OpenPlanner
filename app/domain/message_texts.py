@@ -1,4 +1,4 @@
-"""The editable text blocks of citizen messages, per group and locale (ADR 0009, ADR 0021).
+"""The editable text blocks of citizen messages, per group and locale (ADR 0009, ADR 0022).
 
 A message keeps its fixed, accessible layout; admins change only text blocks. A group text
 replaces the catalogue text of one block in one locale; removing it brings the default back.

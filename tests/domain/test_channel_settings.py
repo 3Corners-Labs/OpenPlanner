@@ -1,4 +1,4 @@
-"""Channel settings: what an SMTP server and an SMS gateway must look like (ADR 0021)."""
+"""Channel settings: what an SMTP server and an SMS gateway must look like (ADR 0022)."""
 
 from datetime import UTC, datetime
 

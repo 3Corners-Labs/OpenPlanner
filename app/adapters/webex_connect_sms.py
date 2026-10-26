@@ -1,4 +1,4 @@
-"""``MessageSender`` for SMS through Webex Connect (HANDOVER B6, ADR 0021).
+"""``MessageSender`` for SMS through Webex Connect (HANDOVER B6, ADR 0022).
 
 One request per message to the SMS API v1 of the organisation's Connect tenant:
 

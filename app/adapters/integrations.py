@@ -2,7 +2,7 @@
 
 Without a configured Service App the Webex adapters are ``None`` and OpenPlanner runs without
 video meetings and work items; bookings keep working. Without a settings key there is no
-``SecretBox``, so channel secrets (ADR 0021) can be neither stored nor read.
+``SecretBox``, so channel secrets (ADR 0022) can be neither stored nor read.
 """
 
 from dataclasses import dataclass

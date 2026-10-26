@@ -238,7 +238,7 @@ async def test_matrix_page(site: Site) -> None:
     text = (await site.client.get("/admin/matrix")).text
 
     assert "Koppelingen en geheimen beheren" in text
-    assert "Burgers (zonder inloggen)" in text
+    assert "Deelnemers (zonder inloggen)" in text
     assert "Met de beheerlink, tot de taak naar de wachtrij gaat" in text
 
 

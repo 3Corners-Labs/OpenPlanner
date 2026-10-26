@@ -3,7 +3,7 @@
 Handled: confirmation, change, reminder (email and SMS), cancellation, purge, and, when Webex
 and WxCC are configured, meetings and work items (``app.jobs.calls``). Jobs of an
 unconfigured integration are not claimed; they wait. A message for an organisation without
-a sender on its channel fails at once as ``channel_not_configured`` (ADR 0021).
+a sender on its channel fails at once as ``channel_not_configured`` (ADR 0022).
 
     claim due ─► stale? (pinned start changed / not confirmed / purged) ─► done, nothing sent
              ─► purge ─► NULL PII

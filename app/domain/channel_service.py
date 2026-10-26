@@ -1,4 +1,4 @@
-"""Channel settings use cases: an organisation's SMTP server and SMS gateway (ADR 0021).
+"""Channel settings use cases: an organisation's SMTP server and SMS gateway (ADR 0022).
 
 Every operation needs ``integrations.manage`` on the organisation (superuser only, HANDOVER
 §6), asks ``AdminService.authorize`` first and records an audit event in the same transaction
@@ -11,7 +11,7 @@ with the names of what changed, never the values (ADR 0008).
 
 from dataclasses import dataclass, fields
 
-from app.domain.admin import AdminService, organisation_by_slug, record_change, require
+from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.channel_settings import (
     CONFIGURABLE_CHANNELS,
@@ -22,6 +22,7 @@ from app.domain.channel_settings import (
 )
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Organisation
 

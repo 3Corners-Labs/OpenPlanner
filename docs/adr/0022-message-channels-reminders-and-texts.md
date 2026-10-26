@@ -1,4 +1,4 @@
-# 0021. Message channels per organisation, SMS through Webex Connect, editable texts
+# 0022. Message channels per organisation, SMS through Webex Connect, editable texts
 
 Status: accepted (2026-10-25). Implements ADR 0008 for SMTP and SMS, and the editors of ADR
 0009.
@@ -52,7 +52,7 @@ already existed, but there was no SMS adapter, no screen for reminder rules and 
 
 ## Consequences
 
-- New tables `channel_settings` and `group_texts` (migration 0012, reversible).
+- New tables `channel_settings` and `group_texts` (migration 0013, reversible).
 - Phone numbers now leave the system: to Webex Connect, only for SMS reminders of groups that
   ask for a phone number (`docs/dataflow.md`). The DPIA and the processor agreement with
   Cisco must cover SMS (B6).

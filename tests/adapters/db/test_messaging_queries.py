@@ -1,4 +1,4 @@
-"""Storage of channel settings (secret sealed), reminder rules and group texts (ADR 0021)."""
+"""Storage of channel settings (secret sealed), reminder rules and group texts (ADR 0022)."""
 
 from datetime import UTC, datetime
 

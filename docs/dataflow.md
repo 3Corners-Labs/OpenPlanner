@@ -16,7 +16,7 @@ web ──Set-Cookie: lang=<locale>──> visitor browser (functional preferenc
 The `lang` cookie stores only a locale code after an explicit choice in the language switcher.
 It identifies nobody and is strictly functional, so no consent banner is needed.
 
-## Outgoing email (WP3, ADR 0021)
+## Outgoing email (WP3, ADR 0022)
 
 ```
 worker ──SMTP──> mail provider of the organisation (admin portal; else SMTP_HOST) ──> citizen
@@ -26,7 +26,7 @@ worker ──SMTP──> mail provider of the organisation (admin portal; else S
 Jobs carry booking IDs only. Messages and calendar attachments contain no phone number and
 no full name. In development Mailpit (`--profile dev`) catches all mail locally.
 
-## SMS reminders (ADR 0021)
+## SMS reminders (ADR 0022)
 
 ```
 worker ──HTTPS──> Webex Connect SMS API of the organisation ──> mobile network ──> citizen
@@ -42,7 +42,7 @@ Only groups whose booking form asks for a phone number can have SMS reminders. T
 built from the allow-listed placeholders only (ADR 0009); group admins cannot add other data.
 OpenPlanner logs a random correlation ID per SMS, never the number or the text.
 
-## Channel settings and message texts (ADR 0021)
+## Channel settings and message texts (ADR 0022)
 
 SMTP and SMS settings per organisation are organisation data; their password and service key
 are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data.
@@ -54,7 +54,7 @@ Neither leaves the system except as part of the messages above.
 |---|---|---|---|---|
 | Name | `bookings.name` | booking form | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
 | Email | `bookings.email` | booking form | as above | mail provider (WP4) |
-| Phone (optional per group) | `bookings.phone` | booking form | as above | Webex Connect, for SMS reminders (ADR 0021) |
+| Phone (optional per group) | `bookings.phone` | booking form | as above | Webex Connect, for SMS reminders (ADR 0022) |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
 | Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the citizen, host URL to WxCC |
 | Management token | `bookings.management_token_hash` (SHA-256 only) | generated | kept (not personal data once the booking is purged) | token itself only in the confirmation mail |
@@ -87,6 +87,8 @@ worker/web ──HTTPS (Service App token)──> Webex Meetings API: title "Vid
 Webex ──meeting id, join link──> OpenPlanner (bookings.video_room_id, guest_join_url)
 worker/web ──HTTPS──> WxCC Create Task v2: booking reference, first name, start (text), group name, meeting link, kind
 WxCC ──task id──> OpenPlanner (bookings.wxcc_task_id)
+worker ──HTTPS──> WxCC Task Messages v2: booking reference, kind=cancelled; then End Task v1 (task id only)
+operator CLI <──HTTPS── WxCC configuration (wxcc-config-check): channel, asset, entry point, queue names and ids, schema keys, flow export; nothing stored, no personal data
 citizen ──GET /b/{token}/join/go──> OpenPlanner ──303──> Webex web app (no data added to the link)
 Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task events → booking_events, call_status
 ```
@@ -96,7 +98,8 @@ Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task e
 | Meeting join link | `bookings.guest_join_url`, `host_join_url` | Webex | purged with the contact (PII field) | in the citizen's link (via OpenPlanner) and to WxCC (`meetingLink`) |
 | First name | derived from `bookings.name` at dispatch | booking form | as the contact | to WxCC (`firstName`, `origin.name`) |
 | Meeting and task ids, timeline, call status | `bookings.video_room_id`, `wxcc_task_id`, `booking_events`, `call_status` | Webex, WxCC | kept for statistics (no personal data) | no |
-| Participant names/emails in webhook payloads | processed in memory only | Webex | not stored, not logged | no |
+| Participant names/emails in webhook payloads | processed in memory only; webhooks filtered on the groups' host accounts, so other meetings of the organisation are not delivered | Webex | not stored, not logged | no |
+| Webex event keys (SHA-256 of resource, event, event id, join/leave time) | `webhook_events` | OpenPlanner | 30 days, removed on a later event | no |
 | Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
 
 ## Branding and the calendar script (WP3b)

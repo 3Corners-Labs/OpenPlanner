@@ -10,10 +10,11 @@ with the names of what changed, never the values.
 
 from dataclasses import replace
 
-from app.domain.admin import AdminService, organisation_by_slug, record_change, require
+from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.branding import Branding, Logo
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, Organisation
 

@@ -1,4 +1,4 @@
-"""Compose the citizen's messages from editable text blocks (ADR 0009, ADR 0021).
+"""Compose the citizen's messages from editable text blocks (ADR 0009, ADR 0022).
 
 Every email uses one fixed layout (HTML plus plain text); an SMS is one text block. Text
 comes from the group's own texts first, then the i18n chain (organisation override,
@@ -52,7 +52,7 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
 
 
 class _Texts:
-    """``_()`` that prefers the group's own text of a block (ADR 0021)."""
+    """``_()`` that prefers the group's own text of a block (ADR 0022)."""
 
     def __init__(self, gettext: BoundGettext, texts: GroupTexts) -> None:
         """Bind the locale's catalogue lookup and the group's texts."""

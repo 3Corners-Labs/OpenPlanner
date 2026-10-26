@@ -5,8 +5,9 @@ Signatures are checked over the raw body before anything is parsed (docs/webhook
 - WxCC: ``X-WebexCC-Signature`` is hex HMAC-SHA256 of the body with the subscription secret;
   ``X-WebExCC-Timestamp`` must equal the body's ``comciscotimestamp`` and lie within 300 s.
 - Webex: ``X-Spark-Signature`` is hex HMAC-SHA1 of the body with the webhook secret. Webex
-  sends no signed event time, so there is no time window; event effects are idempotent where
-  they can be (state changes), and counts are capped at zero.
+  sends no signed event time, so there is no time window. Instead every event gets an
+  ``event_key`` (a digest of resource, event, ``data.id`` and the join/leave time) that the
+  domain remembers: a replayed or redelivered event is recorded once. Counts are capped at zero.
 
 Only ids, event types, the host flag and failure reasons are read; participant names and
 email addresses in the payloads are ignored.
@@ -38,6 +39,8 @@ class ParsedEvent:
     target_id: str
     kind: EventKind
     detail: str = ""
+    event_key: str = ""
+    """Identifies one delivery's event for deduplication; empty when there is nothing to key on."""
 
 
 def verify_webex(body: bytes, signature: str | None, secret: str) -> bool:
@@ -87,7 +90,29 @@ def parse_webex(payload: dict[str, Any]) -> ParsedEvent | None:
             kind = EventKind.GUEST_JOINED
     else:
         return None
-    return ParsedEvent(meeting_id, kind) if isinstance(meeting_id, str) else None
+    if not isinstance(meeting_id, str):
+        return None
+    return ParsedEvent(meeting_id, kind, event_key=_webex_key(str(resource), str(event), data))
+
+
+def _webex_key(resource: str, event: str, data: dict[str, Any]) -> str:
+    """Return a digest identifying one Webex event, or ``""`` without ``data.id``.
+
+    A participant keeps its ``data.id`` when leaving and rejoining, so the join and leave
+    times are part of the key; a replay of the same signed body gives the same key. Only ids
+    and times go in, never names or addresses, and the digest is all that is stored.
+    """
+    event_id = data.get("id")
+    if not isinstance(event_id, str):
+        return ""
+    parts = (
+        resource,
+        event,
+        event_id,
+        str(data.get("joinedTime", "")),
+        str(data.get("leftTime", "")),
+    )
+    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
 
 
 def parse_wxcc(payload: dict[str, Any]) -> ParsedEvent | None:
