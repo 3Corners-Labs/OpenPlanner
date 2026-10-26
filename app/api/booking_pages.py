@@ -7,7 +7,7 @@ Server-rendered and usable without JavaScript. Every response goes through
     GET  /g/{slug}/book?start=     contact form for one slot
     POST /g/{slug}/book            book ─► 303 /b/{token}?status=booked
     GET  /b/{token}                booking (read-only from the change deadline; a booking on
-                                   hold by an emergency closure shows its notice, ADR 0023)
+                                   hold by an emergency closure shows its notice, ADR 0024)
     GET  /b/{token}/cancel         confirm ─► POST ─► 303 /b/{token}?status=cancelled
     GET  /b/{token}/reschedule     slot picker ─► ?start= confirm ─► POST
                                    ─► 303 /b/{new token}?status=rescheduled

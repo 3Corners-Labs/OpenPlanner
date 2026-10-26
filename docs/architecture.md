@@ -35,6 +35,7 @@ flowchart LR
     website[Organisation website<br/>decision tree]
     admin([Group / organisation admin])
     agent([Contact center agent])
+    bot([Contact-center bot<br/>WxCC AI Agent])
 
     subgraph op [OpenPlanner]
         service[Booking service]
@@ -59,6 +60,7 @@ flowchart LR
     admin -. login .-> idp
     service -- SMS reminders --> sms --> citizen
     service -. roadmap .-> whatsapp
+    bot -- free times, OAuth client credentials --> service
 
     classDef planned stroke-dasharray: 5 5
     class whatsapp planned
@@ -72,6 +74,7 @@ flowchart LR
 | Identity provider | in | Admin login with roles | HANDOVER B8, O3 |
 | Webex Connect SMS API | out | SMS reminders, per organisation | ADR 0022 |
 | WhatsApp | out | Reminders | ADR 0009 (roadmap) |
+| Contact-center bot (WxCC AI Agent) | in | Free times through `/api/agent/v1`; changes through the citizen's confirmation (next step) | ADR 0023 |
 
 ## 4. Containers and deployment
 
@@ -120,7 +123,7 @@ flowchart TB
     main["app.main<br/>composition root"]
 
     subgraph entry [Entry points, never import each other]
-        api["app.api<br/>public pages, health"]
+        api["app.api<br/>public pages, health,<br/>agent API (sub-app)"]
         adminpkg["app.admin<br/>admin portal, RequirePermission"]
         jobs["app.jobs<br/>worker, runner, messages"]
         cli["app.cli<br/>seed-demo"]
@@ -155,7 +158,7 @@ import-linter enforces these arrows in CI (ADR 0005):
 ```mermaid
 flowchart LR
     subgraph domain [app.domain]
-        service[BookingService · AdminService]
+        service[BookingService · AdminService · ApiAccessService]
         ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider"}}
         service --> ports
     end
@@ -189,7 +192,7 @@ same commit and rollback behaviour as the SQL one.
 | Slot calculation (time zones, daylight saving) | `app/domain/availability.py` |
 | Bookings, contact validation | `app/domain/booking.py` |
 | Book, cancel, reschedule (use cases) | `app/domain/services.py` |
-| Emergency closure, bookings on hold (ADR 0023) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/web/closure_labels.py` |
+| Emergency closure, bookings on hold (ADR 0024) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/web/closure_labels.py` |
 | Which jobs, when | `app/domain/job_plan.py` |
 | Channels, reminder rules | `app/domain/channels.py` |
 | Management tokens | `app/domain/tokens.py` |
@@ -206,6 +209,9 @@ same commit and rollback behaviour as the SQL one.
 | Agenda, booking timeline, integrations page | `app/admin/call_routes.py`, `app/admin/routes.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
+| Machine API for bots: clients, credentials, tokens, scopes (ADR 0023) | `app/domain/api_clients.py`, `app/domain/api_access.py`, `app/adapters/db/api_clients.py` |
+| Machine API over HTTP: token endpoint, `RequireScope`, routes, JSON errors, docs page | `app/api/agent/` |
+| API clients and switches in the admin portal (superuser) | `app/admin/api_routes.py` |
 | Group and planning screens, admin forms, shared page plumbing | `app/admin/group_routes.py`, `app/admin/forms.py`, `app/admin/pages.py` |
 | Admin design (fixed look, no JavaScript, ADR 0016) | `app/web/static/admin.css`, `app/admin/templates/admin/` |
 | Generated matrix document | `app/web/authz_report.py`, `app/cli.py` (`authz-matrix`) |
@@ -453,7 +459,7 @@ stateDiagram-v2
     confirmed --> cancelled: reschedule (old booking; a new one is confirmed)
     confirmed --> completed: after the call (WP6)
     confirmed --> no_show: task not picked up (O2)
-    confirmed --> suspended: emergency closure (ADR 0023)
+    confirmed --> suspended: emergency closure (ADR 0024)
     suspended --> confirmed: reinstate (closure over, before the dispatch lead)
     suspended --> cancelled: cancel, or move (a new booking is confirmed)
     cancelled --> [*]
@@ -523,6 +529,7 @@ flowchart LR
 | Authorisation matrix: one `RequirePermission` per admin route, scoped SQL, audit of denials and logins | `app/domain/authorization.py`, `app/admin/authz.py` | ADR 0014 |
 | OIDC with PKCE, nonce, asymmetric algorithms only; RP-initiated logout | `app/adapters/oidc.py` | ADR 0013 |
 | Encrypted, write-only integration secrets | WP7 | ADR 0008 |
+| Machine API: off by default (environment and superuser switch), OAuth client credentials, hashed secrets and 10-minute opaque tokens, one `RequireScope` per route, per-client grant and network allow-list, no personal data | `app/api/agent/`, `app/domain/api_access.py` | ADR 0023 |
 | Signed images, SBOM, image and dependency scanning | CI | ADR 0006 |
 
 The STRIDE analysis per flow, with a test for every abuse case, is in
@@ -534,7 +541,7 @@ The STRIDE analysis per flow, with a test for every abuse case, is in
   `bookings`; jobs, slots and logs hold IDs.
 - **Purge:** the `purge_pii` job sets them to NULL at slot end + 24 h, or 24 h after a
   cancellation. A booking on hold by an emergency closure keeps them until it is resolved, at
-  most 30 days after the closure ends (ADR 0023). The nightly sweep and alert follow in WP8.
+  most 30 days after the closure ends (ADR 0024). The nightly sweep and alert follow in WP8.
 - **What leaves the system:** mails carry the first name, date, team and the management link;
   the calendar file carries no personal data. WxCC will receive only the first name and the
   host link.
@@ -587,7 +594,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0020 | Citizen calendar as progressive enhancement; branding through tokens |
 | 0021 | Provider-neutral contact-center integration (proposed) |
 | 0022 | Message channels per organisation, SMS through Webex Connect, editable texts |
-| 0023 | Emergency closure: appointments on hold, citizens informed, no deletion |
+| 0023 | Machine API for contact-center bots: OAuth client credentials, off by default, no personal data |
+| 0024 | Emergency closure: appointments on hold, citizens informed, no deletion |
 
 ## 12. Status and roadmap
 
@@ -609,6 +617,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
-| idea | Booking API for the WxCC AI Agent (chat and voice bots): find, book, reschedule, cancel (O11) | not planned |
+| O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
+| O11 step 2 | Change requests by phone number, confirmed by the citizen by email/SMS (ADR 0023) | planned |
 
 The open decisions (O1–O10) are listed in `docs/HANDOVER.md` §11.

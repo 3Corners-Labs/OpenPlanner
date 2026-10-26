@@ -5,8 +5,11 @@ import itertools
 import pytest
 
 from app.domain.authorization import (
+    API_SCOPES,
     LEVELS,
     MATRIX,
+    ApiScope,
+    ClientGrant,
     Decision,
     Level,
     Permission,
@@ -16,6 +19,7 @@ from app.domain.authorization import (
     Scope,
     Target,
     decide,
+    decide_client,
     permissions_for,
     scope_for,
 )
@@ -184,3 +188,43 @@ def test_citizen_actions_are_part_of_the_matrix() -> None:
         "citizen.booking_cancel": "management_link_before_deadline",
         "citizen.suspended_booking_change": "management_link_while_suspended",
     }
+
+
+# --- API clients (ADR 0023) ---------------------------------------------------------------
+
+READ = ApiScope.AVAILABILITY_READ
+WHOLE_ORG = ClientGrant("opc_a", "demo", frozenset(), frozenset({READ}))
+ONE_GROUP = ClientGrant("opc_b", "demo", frozenset({"demo"}), frozenset({READ}))
+NO_SCOPES = ClientGrant("opc_c", "demo", frozenset(), frozenset())
+
+
+def test_api_clients_are_managed_by_the_superuser_only() -> None:
+    assert LEVELS[Permission.API_CLIENTS_MANAGE] is Level.GLOBAL
+    holders = [role for role in Role if Permission.API_CLIENTS_MANAGE in MATRIX[role]]
+    assert holders == [Role.SUPERUSER]
+
+
+def test_every_api_scope_has_a_level() -> None:
+    assert set(API_SCOPES) == set(ApiScope)
+
+
+@pytest.mark.parametrize(
+    ("grant", "target", "expected"),
+    [
+        (WHOLE_ORG, OWN_GROUP, Decision(True, Reason.ORGANISATION)),
+        (WHOLE_ORG, Target.for_group("andere-groep", "demo"), Decision(True, Reason.ORGANISATION)),
+        (WHOLE_ORG, OTHER_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
+        (ONE_GROUP, OWN_GROUP, Decision(True, Reason.GROUP)),
+        (ONE_GROUP, Target.for_group("andere-groep", "demo"), Decision(False, Reason.OUT_OF_SCOPE)),
+        # A group slug of the client in another organisation still does not match.
+        (ONE_GROUP, Target.for_group("demo", "andere"), Decision(False, Reason.OUT_OF_SCOPE)),
+        (NO_SCOPES, OWN_GROUP, Decision(False, Reason.NOT_PERMITTED)),
+    ],
+)
+def test_decide_client(grant: ClientGrant, target: Target, expected: Decision) -> None:
+    assert decide_client(grant, READ, target) == expected
+
+
+def test_decide_client_refuses_a_target_of_the_wrong_level() -> None:
+    with pytest.raises(ValueError, match="group level target"):
+        decide_client(WHOLE_ORG, READ, OWN_ORG)

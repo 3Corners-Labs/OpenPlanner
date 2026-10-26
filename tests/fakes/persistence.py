@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
+from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsage
@@ -43,6 +44,9 @@ class State:
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
     closures: dict[int, Closure] = field(default_factory=dict)
+    api_settings: ApiSettings = field(default_factory=ApiSettings)
+    api_clients: dict[str, ApiClient] = field(default_factory=dict)
+    access_tokens: dict[str, AccessToken] = field(default_factory=dict)
     channel_settings: dict[tuple[int, ChannelKind], ChannelSettings] = field(default_factory=dict)
     channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
@@ -383,6 +387,49 @@ class InMemoryTransaction:
             if b.group_id == group_id and b.status is BookingStatus.SUSPENDED
         ]
         return sorted(found, key=lambda b: (b.start, b.id or 0))
+
+    async def get_api_settings(self) -> ApiSettings:
+        return self.state.api_settings
+
+    async def save_api_settings(self, settings: ApiSettings) -> None:
+        self.state.api_settings = settings
+
+    async def list_api_clients(self, scope: Scope) -> list[ApiClient]:
+        found = [c for c in self.state.api_clients.values() if scope.contains(c.organisation, None)]
+        return sorted(found, key=lambda c: c.name)
+
+    async def get_api_client(self, client_id: str) -> ApiClient | None:
+        return self.state.api_clients.get(client_id)
+
+    async def add_api_client(self, client: ApiClient) -> ApiClient:
+        stored = replace(client, id=self._new_id())
+        self.state.api_clients[client.client_id] = stored
+        return stored
+
+    async def save_api_client(self, client: ApiClient) -> None:
+        self.state.api_clients[client.client_id] = client
+
+    async def add_access_token(self, token: AccessToken) -> None:
+        self.state.access_tokens[token.token_hash] = token
+
+    async def get_access_token(self, token_hash: str) -> AccessToken | None:
+        return self.state.access_tokens.get(token_hash)
+
+    async def revoke_access_tokens(self, client_id: str) -> int:
+        doomed = [h for h, t in self.state.access_tokens.items() if t.client_id == client_id]
+        for token_hash in doomed:
+            del self.state.access_tokens[token_hash]
+        return len(doomed)
+
+    async def prune_access_tokens(self, client_id: str, now: datetime, keep: int) -> None:
+        tokens = self.state.access_tokens
+        for token_hash in [h for h, t in tokens.items() if t.expires_at <= now]:
+            del tokens[token_hash]
+        own = sorted(
+            (t for t in tokens.values() if t.client_id == client_id), key=lambda t: t.issued_at
+        )
+        for token in own[: max(len(own) - keep, 0)]:
+            del tokens[token.token_hash]
 
 
 class InMemoryUnitOfWork:

@@ -9,7 +9,7 @@ booking and its jobs commit together or not at all (CLAUDE.md architecture rules
 
 A booking is read-only from its change deadline (``job_plan.change_deadline``: the group's
 dispatch lead before the start, T−5 min by default): cancel and reschedule then raise
-``booking_locked``. A booking suspended by an emergency closure (ADR 0023) has no deadline:
+``booking_locked``. A booking suspended by an emergency closure (ADR 0024) has no deadline:
 the citizen can move or cancel it until it is resolved. No slot inside a closure is offered
 or booked (``group_closed``), and no direct call starts while one is active.
 """

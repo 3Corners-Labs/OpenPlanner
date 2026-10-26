@@ -114,6 +114,7 @@ Weekly: Renovate updates (security updates immediately), `trivy` on the running 
 - `docs/dataflow.md`, `docs/threat-model.md` — privacy and security inputs.
 - `docs/api.md` — generated from OpenAPI; `docs/webhooks.md` — payloads to/from Webex Connect.
 - `docs/widget.md` — how a website embeds the widget, CSP requirements, attributes.
+- `docs/agent-api.md` — how a contact-center bot connects to the machine API (ADR 0023).
 
 ## How to work in this repo (for Claude Code)
 - Read `docs/HANDOVER.md` §3 (domain) and §5 (flows) before touching domain code.

@@ -6,13 +6,15 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
     audit_events (no foreign keys: events outlive what they describe)
     booking_events, call_status (per booking; no personal data, kept after the purge)
     integration_credentials (encrypted tokens, ADR 0008)
+    api_settings (one row); organisations 1──* api_clients 1──* api_access_tokens
+                                                 └──* api_client_groups *──1 groups (ADR 0023)
     organisations 1──* channel_settings (SMTP and SMS per organisation, secret encrypted)
     admin_profiles (name per identity-provider subject; joined into the audit log)
     organisations 1──1 organisation_logos (branding, WP3b)
     organisations 1──* groups 1──* schedule_rules
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
-                         │  └───* closures 1──* closure_notices (ADR 0023)
+                         │  └───* closures 1──* closure_notices (ADR 0024)
                          │  └───* group_texts (message texts per locale and block)
                          └──* slots 1──* bookings 1──* jobs
                                          └──? closure (the one that suspended it)
@@ -40,6 +42,10 @@ from app.adapters.db.types import UTCDateTime
 
 __all__ = [
     "AdminProfileRow",
+    "ApiAccessTokenRow",
+    "ApiClientGroupRow",
+    "ApiClientRow",
+    "ApiSettingsRow",
     "IntegrationCredentialRow",
     "BookingEventRow",
     "CallStatusRow",
@@ -256,7 +262,7 @@ class BookingRow(Base):
 
 
 class ClosureRow(Base):
-    """An emergency closure of a group (ADR 0023); ``ends_at`` NULL until it is lifted."""
+    """An emergency closure of a group (ADR 0024); ``ends_at`` NULL until it is lifted."""
 
     __tablename__ = "closures"
 
@@ -410,3 +416,67 @@ class WebhookEventRow(Base):
     seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
     __table_args__ = (Index("ix_webhook_events_seen_at", "seen_at"),)
+
+
+class ApiSettingsRow(Base):
+    """The superuser's switches for the machine API (ADR 0023); at most one row."""
+
+    __tablename__ = "api_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    docs_public: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class ApiClientRow(Base):
+    """A registered bot (ADR 0023); only the SHA-256 of its secret is stored."""
+
+    __tablename__ = "api_clients"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    client_id: Mapped[str] = mapped_column(String(80), unique=True)
+    name: Mapped[str] = mapped_column(String(80))
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="RESTRICT"), index=True
+    )
+    scopes: Mapped[str] = mapped_column(String(255))
+    networks: Mapped[str] = mapped_column(String(1024), server_default=text("''"))
+    enabled: Mapped[bool] = mapped_column(Boolean)
+    secret_hash: Mapped[str] = mapped_column(String(64))
+    secret_expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    last_token_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+
+class ApiClientGroupRow(Base):
+    """A group an API client is narrowed to; none means every group of its organisation."""
+
+    __tablename__ = "api_client_groups"
+
+    client_pk: Mapped[int] = mapped_column(
+        ForeignKey("api_clients.id", ondelete="CASCADE"), primary_key=True
+    )
+    # RESTRICT: removing the group must not widen the client to the whole organisation.
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="RESTRICT"), primary_key=True
+    )
+
+
+class ApiAccessTokenRow(Base):
+    """An issued access token: its SHA-256, scopes and lifetime (ADR 0023)."""
+
+    __tablename__ = "api_access_tokens"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    client_pk: Mapped[int] = mapped_column(ForeignKey("api_clients.id", ondelete="CASCADE"))
+    scopes: Mapped[str] = mapped_column(String(255))
+    issued_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        Index("ix_api_access_tokens_client_pk", "client_pk"),
+        Index("ix_api_access_tokens_expires_at", "expires_at"),
+    )

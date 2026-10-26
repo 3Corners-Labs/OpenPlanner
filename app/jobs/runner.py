@@ -1,7 +1,7 @@
 """Run due jobs: message jobs through a ``MessageSender``, and the PII purge.
 
 Handled: confirmation, change, reminder (email and SMS), cancellation, the emergency closure
-messages (suspension, update, reinstatement; ADR 0023), purge, and, when Webex and WxCC are
+messages (suspension, update, reinstatement; ADR 0024), purge, and, when Webex and WxCC are
 configured, meetings and work items (``app.jobs.calls``). Jobs of an unconfigured
 integration are not claimed; they wait. A message for an organisation without a sender on
 its channel fails at once as ``channel_not_configured`` (ADR 0022).

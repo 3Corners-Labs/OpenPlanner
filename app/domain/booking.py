@@ -6,7 +6,7 @@ are excluded from ``repr`` so they cannot end up in logs or tracebacks by accide
     confirmed ──cancel()──► cancelled
         │  ▲
         │  └──reinstate()── suspended ──cancel()──► cancelled
-        ├──suspend()──────────►┘   (emergency closure, ADR 0023)
+        ├──suspend()──────────►┘   (emergency closure, ADR 0024)
         └──(after the call, WP4/WP6)──► completed | no_show
 """
 
@@ -191,7 +191,7 @@ class Booking:
 
     @property
     def is_suspended(self) -> bool:
-        """Whether an emergency closure put the appointment on hold (ADR 0023)."""
+        """Whether an emergency closure put the appointment on hold (ADR 0024)."""
         return self.status is BookingStatus.SUSPENDED
 
     @property

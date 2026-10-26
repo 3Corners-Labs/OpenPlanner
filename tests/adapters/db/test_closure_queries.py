@@ -1,4 +1,4 @@
-"""Emergency closures and suspended bookings in SQLite (ADR 0023)."""
+"""Emergency closures and suspended bookings in SQLite (ADR 0024)."""
 
 from datetime import timedelta
 

@@ -1,4 +1,4 @@
-"""Admin routes for emergency closures (ADR 0023).
+"""Admin routes for emergency closures (ADR 0024).
 
 Every route depends on exactly one ``RequirePermission``, always ``fresh``: closing a team is
 a change with impact on citizens. Changes are POST forms with the Fetch Metadata check,

@@ -1,4 +1,4 @@
-"""Emergency closure screens (ADR 0023): closing, informing citizens and handling bookings.
+"""Emergency closure screens (ADR 0024): closing, informing citizens and handling bookings.
 
 Calendar: "now" is Thursday 1 January 2026 08:00 UTC; the demo group is open on weekdays
 09:00-12:00 and 13:00-17:00 Amsterdam time, two places per slot.

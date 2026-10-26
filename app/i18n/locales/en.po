@@ -1402,7 +1402,7 @@ msgstr "Upload logo"
 msgid "admin.branding.logo_remove"
 msgstr "Remove logo"
 
-# Emergency closure (ADR 0023)
+# Emergency closure (ADR 0024)
 msgid "closure.banner.title_active"
 msgstr "Temporarily closed"
 
@@ -2074,3 +2074,278 @@ msgstr "The language of pages and messages when the visitor chooses no other."
 
 msgid "admin.form.error.default_locale"
 msgstr "Choose one of the available languages."
+
+# Machine API for contact-center bots (ADR 0023).
+
+msgid "authz.permission.api_clients_manage"
+msgstr "Manage API clients"
+
+msgid "authz.api_scope.availability_read"
+msgstr "Read free times"
+
+msgid "admin.nav.api"
+msgstr "API clients"
+
+msgid "admin.matrix.machines"
+msgstr "Machines (API clients)"
+
+msgid "admin.matrix.machines_intro"
+msgstr "Contact-center bots never get a role. The superuser registers each bot as an API client of one organisation, optionally narrowed to some of its teams, with these scopes."
+
+msgid "admin.api.scope"
+msgstr "Scope"
+
+msgid "admin.audit.detail.client_create"
+msgstr "API client created"
+
+msgid "admin.audit.detail.client_rotate"
+msgstr "New secret issued"
+
+msgid "admin.audit.detail.client_enable"
+msgstr "API client switched on"
+
+msgid "admin.audit.detail.client_disable"
+msgstr "API client switched off"
+
+msgid "admin.audit.detail.client_revoke_tokens"
+msgstr "Tokens revoked"
+
+msgid "audit.event.api_token"
+msgstr "API token requested"
+
+msgid "audit.event.api_call"
+msgstr "API call"
+
+msgid "admin.done.client_enabled"
+msgstr "The API client is on."
+
+msgid "admin.done.client_disabled"
+msgstr "The API client is off. Its tokens have been revoked."
+
+msgid "admin.done.tokens_revoked"
+msgstr "Every token of this client has been revoked."
+
+msgid "admin.form.error.scopes"
+msgstr "Choose at least one scope."
+
+msgid "admin.form.error.groups"
+msgstr "Choose only teams of this client's organisation."
+
+msgid "admin.form.error.networks"
+msgstr "Enter one IP address or network per line, for example 198.51.100.0/24 (at most 20)."
+
+msgid "admin.form.error.lifetime_days"
+msgstr "Choose a lifetime from the list."
+
+msgid "admin.api.title"
+msgstr "API clients"
+
+msgid "admin.api.lead"
+msgstr "Contact-center bots, such as the Webex AI Agent, use this API to look up free times. They never see personal data."
+
+msgid "admin.api.new_client"
+msgstr "New API client"
+
+msgid "admin.api.not_available"
+msgstr "The API is not enabled in this environment (AGENT_API_ENABLED). You can prepare clients already; they work once the environment's operator enables the API."
+
+msgid "admin.api.switches"
+msgstr "Switches"
+
+msgid "admin.api.switches_lead"
+msgstr "Switching off takes effect at once: no tokens are issued and existing tokens (valid for at most {minutes} minutes) are refused."
+
+msgid "admin.api.state"
+msgstr "Status"
+
+msgid "admin.api.on"
+msgstr "On"
+
+msgid "admin.api.off"
+msgstr "Off"
+
+msgid "admin.api.enabled"
+msgstr "API on"
+
+msgid "admin.api.enabled_hint"
+msgstr "Emergency stop: switch this off to stop every bot at once."
+
+msgid "admin.api.docs_public"
+msgstr "Publish documentation"
+
+msgid "admin.api.docs_hint"
+msgstr "The OpenAPI spec and the documentation page can only be reached while this is on:"
+
+msgid "admin.api.clients"
+msgstr "API clients"
+
+msgid "admin.api.clients_lead"
+msgstr "Every bot gets its own client with only the scopes and teams it needs."
+
+msgid "admin.api.name"
+msgstr "Name"
+
+msgid "admin.api.organisation"
+msgstr "Organisation"
+
+msgid "admin.api.scopes"
+msgstr "Scopes"
+
+msgid "admin.api.groups"
+msgstr "Teams"
+
+msgid "admin.api.networks"
+msgstr "Allowed networks"
+
+msgid "admin.api.status"
+msgstr "Status"
+
+msgid "admin.api.secret_expires"
+msgstr "Secret valid until"
+
+msgid "admin.api.last_token"
+msgstr "Last token"
+
+msgid "admin.api.client_on"
+msgstr "On"
+
+msgid "admin.api.client_off"
+msgstr "Off"
+
+msgid "admin.api.expiring"
+msgstr "Expires soon"
+
+msgid "admin.api.never"
+msgstr "Never"
+
+msgid "admin.api.none"
+msgstr "There are no API clients yet."
+
+msgid "admin.api.all_groups"
+msgstr "All teams"
+
+msgid "admin.api.disable"
+msgstr "Switch off"
+
+msgid "admin.api.enable"
+msgstr "Switch on"
+
+msgid "admin.api.revoke"
+msgstr "Revoke tokens"
+
+msgid "admin.api.lifetime_days"
+msgstr "Secret lifetime"
+
+msgid "admin.api.days"
+msgstr "{days} days"
+
+msgid "admin.api.rotate"
+msgstr "Create new secret"
+
+msgid "admin.api.actions_hint"
+msgstr "Switching off and creating a new secret revoke every token of this client at once. The old secret stops working."
+
+msgid "admin.api.grant"
+msgstr "What the client may reach"
+
+msgid "admin.api.grant_lead"
+msgstr "Grant only what the bot needs. Changing scopes, teams or networks revokes its tokens."
+
+msgid "admin.api.name_hint"
+msgstr "For yourself, for example the bot's name in Webex."
+
+msgid "admin.api.organisation_hint"
+msgstr "A client belongs to one organisation; this cannot change later."
+
+msgid "admin.api.lifetime_days_hint"
+msgstr "Create a new secret before it ends; after that the API issues no tokens."
+
+msgid "admin.api.scopes_hint"
+msgstr "What the client may do."
+
+msgid "admin.api.groups_hint"
+msgstr "Nothing ticked: every team of the organisation."
+
+msgid "admin.api.networks_hint"
+msgstr "One IP address or network per line, for example the egress addresses of your WxCC region. Empty: any address."
+
+msgid "admin.api.create"
+msgstr "Create client"
+
+msgid "admin.api.secret_title"
+msgstr "Credentials for the connection"
+
+msgid "admin.api.secret_once"
+msgstr "You see this secret only now. Copy it to the contact center's vault. Lost it? Create a new secret."
+
+msgid "admin.api.credentials"
+msgstr "Client credentials"
+
+msgid "admin.api.client_id"
+msgstr "Client ID"
+
+msgid "admin.api.client_secret"
+msgstr "Client secret"
+
+msgid "admin.api.token_url"
+msgstr "Token URL"
+
+msgid "admin.api.secret_store"
+msgstr "OpenPlanner keeps only a hash of the secret. Never put it in an email, chat or ticket."
+
+msgid "admin.api.secret_done"
+msgstr "I have stored the secret"
+
+msgid "agent_docs.title"
+msgstr "API for contact-center bots"
+
+msgid "agent_docs.lead"
+msgstr "Version {version}. For contact-center bots, such as the Webex AI Agent. Requests and responses contain no personal data."
+
+msgid "agent_docs.auth.title"
+msgstr "Authentication"
+
+msgid "agent_docs.auth.text"
+msgstr "OAuth 2.0 client credentials. Request a token with the client ID and secret from the admin portal. A token is valid for 10 minutes."
+
+msgid "agent_docs.auth.use"
+msgstr "Send the token with every call:"
+
+msgid "agent_docs.scopes.title"
+msgstr "Scopes"
+
+msgid "agent_docs.endpoints.title"
+msgstr "Endpoints"
+
+msgid "agent_docs.endpoints.bearer"
+msgstr "Requires a valid token."
+
+msgid "agent_docs.endpoints.parameters"
+msgstr "Parameters"
+
+msgid "agent_docs.endpoints.name"
+msgstr "Name"
+
+msgid "agent_docs.endpoints.in"
+msgstr "In"
+
+msgid "agent_docs.endpoints.required"
+msgstr "Required"
+
+msgid "agent_docs.endpoints.description"
+msgstr "Description"
+
+msgid "agent_docs.endpoints.responses"
+msgstr "Responses"
+
+msgid "agent_docs.endpoints.status"
+msgstr "Status"
+
+msgid "agent_docs.yes"
+msgstr "yes"
+
+msgid "agent_docs.no"
+msgstr "no"
+
+msgid "agent_docs.spec_link"
+msgstr "OpenAPI spec (JSON)"

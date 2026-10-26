@@ -1,0 +1,72 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
+{% block title %}{{ _("admin.api.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.api.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.api.lead") }}</p>
+  </div>
+  <div class="page-header__actions">
+    <a class="button" href="/admin/api/clients/new">{{ icon("plus") }}<span>{{ _("admin.api.new_client") }}</span></a>
+  </div>
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if not overview.available %}
+<div class="alert alert--info" role="status"><p>{{ _("admin.api.not_available") }}</p></div>
+{% endif %}
+<form class="card" method="post" action="/admin/api/settings" aria-labelledby="switches-heading">
+  <div class="card__header">
+    <h2 id="switches-heading">{{ _("admin.api.switches") }}</h2>
+    <p class="card__lead">{{ _("admin.api.switches_lead", minutes=token_minutes) }}</p>
+  </div>
+  <dl class="facts">
+    <div><dt>{{ _("admin.api.state") }}</dt><dd>{% if overview.available and overview.settings.enabled %}<span class="chip chip--success">{{ _("admin.api.on") }}</span>{% else %}<span class="chip">{{ _("admin.api.off") }}</span>{% endif %}</dd></div>
+  </dl>
+  <fieldset class="field choice">
+    <legend class="visually-hidden">{{ _("admin.api.switches") }}</legend>
+    <div class="choice__option"><input type="checkbox" id="enabled" name="enabled"{% if overview.settings.enabled %} checked{% endif %} aria-describedby="enabled-hint"><label for="enabled">{{ _("admin.api.enabled") }}</label></div>
+    <p class="hint" id="enabled-hint">{{ _("admin.api.enabled_hint") }}</p>
+    <div class="choice__option"><input type="checkbox" id="docs_public" name="docs_public"{% if overview.settings.docs_public %} checked{% endif %} aria-describedby="docs-hint"><label for="docs_public">{{ _("admin.api.docs_public") }}</label></div>
+    <p class="hint" id="docs-hint">{{ _("admin.api.docs_hint") }} <code>{{ docs_url }}</code></p>
+  </fieldset>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") }}</button>
+  </div>
+</form>
+<section class="card" aria-labelledby="clients-heading">
+  <div class="card__header">
+    <h2 id="clients-heading">{{ _("admin.api.clients") }}</h2>
+    <p class="card__lead">{{ _("admin.api.clients_lead") }}</p>
+  </div>
+  {% if clients %}
+  <div class="table-scroll" role="region" aria-labelledby="clients-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.api.clients") }}</caption>
+    <thead><tr>
+      <th scope="col">{{ _("admin.api.name") }}</th>
+      <th scope="col">{{ _("admin.api.organisation") }}</th>
+      <th scope="col">{{ _("admin.api.scopes") }}</th>
+      <th scope="col">{{ _("admin.api.status") }}</th>
+      <th scope="col">{{ _("admin.api.secret_expires") }}</th>
+      <th scope="col">{{ _("admin.api.last_token") }}</th>
+    </tr></thead>
+    <tbody>
+      {% for view in clients %}
+      <tr>
+        <th scope="row"><a href="/admin/api/clients/{{ view.client.client_id }}">{{ view.client.name }}</a><br><code>{{ view.client.client_id }}</code></th>
+        <td>{{ view.organisation_name }}<br>{{ view.groups }}</td>
+        <td>{{ view.scopes }}</td>
+        <td>{% if view.client.enabled %}<span class="chip chip--success">{{ _("admin.api.client_on") }}</span>{% else %}<span class="chip chip--danger">{{ _("admin.api.client_off") }}</span>{% endif %}</td>
+        <td>{{ view.secret_expires }}{% if view.secret_expiring %}<br><span class="chip chip--warning">{{ _("admin.api.expiring") }}</span>{% endif %}</td>
+        <td>{{ view.last_token or _("admin.api.never") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.api.none") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

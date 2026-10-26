@@ -174,7 +174,7 @@ def test_group_texts_replace_blocks_in_their_locale_only(composer: MessageCompos
     assert "the Aangifte &lt;Inkomstenbelasting&gt; team" in (english.html or "")
 
 
-# --- emergency closure (ADR 0023) ----------------------------------------------------------
+# --- emergency closure (ADR 0024) ----------------------------------------------------------
 
 CLOSURE = Closure(
     1,
