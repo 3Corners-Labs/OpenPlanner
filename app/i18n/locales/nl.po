@@ -627,7 +627,7 @@ msgid "authz.permission.group_edit"
 msgstr "Groepsinstellingen wijzigen"
 
 msgid "authz.permission.schedule_manage"
-msgstr "Openingstijden en uitzonderingen beheren"
+msgstr "Bezetting en afwijkende bezetting beheren"
 
 msgid "authz.permission.texts_manage"
 msgstr "Teksten beheren"
@@ -702,7 +702,7 @@ msgid "admin.done.added"
 msgstr "Toegevoegd."
 
 msgid "admin.done.created"
-msgstr "De groep is aangemaakt. Stel nu de openingstijden in."
+msgstr "De groep is aangemaakt. Stel nu de bezetting in."
 
 msgid "admin.done.removed"
 msgstr "Verwijderd."
@@ -720,10 +720,10 @@ msgid "admin.tab.settings"
 msgstr "Instellingen"
 
 msgid "admin.tab.hours"
-msgstr "Openingstijden"
+msgstr "Bezetting"
 
 msgid "admin.tab.exceptions"
-msgstr "Uitzonderingen"
+msgstr "Afwijkende bezetting"
 
 msgid "admin.group.sections"
 msgstr "Onderdelen van de groep"
@@ -741,7 +741,7 @@ msgid "admin.new_group.title"
 msgstr "Nieuwe groep"
 
 msgid "admin.new_group.lead"
-msgstr "Een groep is een team met één wachtrij in het contactcenter. Na het aanmaken stelt u de openingstijden in."
+msgstr "Een groep is een team met één wachtrij in het contactcenter. Na het aanmaken stelt u de bezetting in: per tijdblok het aantal medewerkers."
 
 msgid "admin.new_group.create"
 msgstr "Groep aanmaken"
@@ -806,10 +806,10 @@ msgid "admin.field.closes"
 msgstr "Tot"
 
 msgid "admin.field.capacity"
-msgstr "Gelijktijdige gesprekken"
+msgstr "Aantal medewerkers"
 
 msgid "admin.field.capacity_hint"
-msgstr "Hoeveel deelnemers in hetzelfde tijdslot kunnen boeken."
+msgstr "Zoveel deelnemers kunnen in hetzelfde tijdslot boeken. Vul 0 in voor bijvoorbeeld lunch: dan zijn er geen tijdsloten."
 
 msgid "admin.field.label"
 msgstr "Label"
@@ -891,91 +891,121 @@ msgid "admin.form.error.day"
 msgstr "Kies een datum vanaf vandaag."
 
 msgid "admin.form.error.overlap"
-msgstr "Deze tijden overlappen met een bestaande openingstijd op die dag."
+msgstr "Deze tijden overlappen met een bestaand tijdblok op die dag."
 
 msgid "admin.form.error.override_conflict"
-msgstr "Voor deze datum bestaat al een uitzondering die hiermee botst."
+msgstr "Voor deze datum bestaat al een afwijkende bezetting die hiermee botst."
 
 msgid "admin.hours.title"
-msgstr "Openingstijden per week"
+msgstr "Bezetting per week"
 
 msgid "admin.hours.lead"
-msgstr "Per dag één of meer openingstijden. Elke openingstijd wordt verdeeld in tijdsloten van de gespreksduur; deelnemers boeken een tijdslot."
+msgstr "Per dag één of meer tijdblokken, elk met een aantal medewerkers; 0 voor bijvoorbeeld lunch. Aansluitende tijdblokken met medewerkers worden samen verdeeld in tijdsloten van de gespreksduur; deelnemers boeken een tijdslot."
 
 msgid "admin.hours.manage"
-msgstr "Openingstijden beheren"
+msgstr "Bezetting beheren"
 
 msgid "admin.hours.closed"
-msgstr "Gesloten"
+msgstr "Geen bezetting"
 
 msgid "admin.hours.capacity"
-msgstr "tot {count} tegelijk"
+msgstr "{count} medewerkers"
+
+msgid "admin.hours.capacity_one"
+msgstr "1 medewerker"
+
+msgid "admin.hours.capacity_none"
+msgstr "geen medewerkers"
 
 msgid "admin.hours.validity"
 msgstr "{start} t/m {end}"
 
 msgid "admin.hours.add"
-msgstr "Openingstijd toevoegen"
+msgstr "Tijdblok toevoegen"
 
 msgid "admin.hours.add_lead"
-msgstr "Bestaande afspraken blijven staan; de nieuwe openingstijd geldt voor nieuwe afspraken."
+msgstr "Bestaande afspraken blijven staan; het nieuwe tijdblok geldt voor nieuwe afspraken."
 
 msgid "admin.hours.add_button"
-msgstr "Openingstijd toevoegen"
+msgstr "Tijdblok toevoegen"
 
 msgid "admin.hours.add_link"
 msgstr "Toevoegen"
 
 msgid "admin.hours.add_label"
-msgstr "Openingstijd op {day} toevoegen"
+msgstr "Tijdblok op {day} toevoegen"
 
 msgid "admin.hours.edit"
-msgstr "Openingstijd wijzigen"
+msgstr "Tijdblok wijzigen"
 
 msgid "admin.hours.edit_lead"
-msgstr "Bestaande afspraken blijven staan; de gewijzigde openingstijd geldt voor nieuwe afspraken."
+msgstr "Bestaande afspraken blijven staan; het gewijzigde tijdblok geldt voor nieuwe afspraken."
 
 msgid "admin.hours.edit_label"
-msgstr "Openingstijd {day} {time} wijzigen"
+msgstr "Tijdblok {day} {time} wijzigen"
 
 msgid "admin.hours.remove_label"
-msgstr "Openingstijd {day} {time} verwijderen"
+msgstr "Tijdblok {day} {time} verwijderen"
+
+msgid "admin.hours.split"
+msgstr "Splitsen"
+
+msgid "admin.hours.split_label"
+msgstr "Tijdblok {day} {time} splitsen"
+
+msgid "admin.hours.split_title"
+msgstr "Tijdblok splitsen"
+
+msgid "admin.hours.split_lead"
+msgstr "{block}. Het tijdblok wordt twee aansluitende tijdblokken: het eerste deel houdt het aantal medewerkers en het label, voor het tweede deel kiest u ze hier, bijvoorbeeld 0 en Lunch."
+
+msgid "admin.hours.split_button"
+msgstr "Splitsen"
+
+msgid "admin.field.split_at"
+msgstr "Splitsen om"
+
+msgid "admin.field.split_at_hint"
+msgstr "Het tweede deel begint op dit tijdstip."
+
+msgid "admin.form.error.split_at"
+msgstr "Kies een tijd na het begin en vóór het einde van het tijdblok."
 
 msgid "admin.exceptions.upcoming"
-msgstr "Komende uitzonderingen"
+msgstr "Komende afwijkende bezetting"
 
 msgid "admin.exceptions.lead"
-msgstr "Een uitzondering vervangt de openingstijden van die ene datum: gesloten, of andere tijden."
+msgstr "Een afwijkende bezetting vervangt de tijdblokken van die ene datum: geen bezetting, of andere tijdblokken."
 
 msgid "admin.exceptions.manage"
-msgstr "Uitzonderingen beheren"
+msgstr "Afwijkende bezetting beheren"
 
 msgid "admin.exceptions.none"
-msgstr "Geen uitzonderingen gepland."
+msgstr "Geen afwijkende bezetting gepland."
 
 msgid "admin.exceptions.closed"
-msgstr "Gesloten"
+msgstr "Geen bezetting"
 
 msgid "admin.exceptions.what"
 msgstr "Wat"
 
 msgid "admin.exceptions.add"
-msgstr "Uitzondering toevoegen"
+msgstr "Afwijkende bezetting toevoegen"
 
 msgid "admin.exceptions.add_button"
-msgstr "Uitzondering toevoegen"
+msgstr "Afwijkende bezetting toevoegen"
 
 msgid "admin.exceptions.kind"
 msgstr "Soort"
 
 msgid "admin.exceptions.kind_closed"
-msgstr "Hele dag gesloten"
+msgstr "Hele dag geen bezetting"
 
 msgid "admin.exceptions.kind_hours"
-msgstr "Afwijkende tijden"
+msgstr "Eigen tijdblok"
 
 msgid "admin.exceptions.remove_label"
-msgstr "Uitzondering op {day} verwijderen"
+msgstr "Afwijkende bezetting op {day} verwijderen"
 
 msgid "admin.preview.title"
 msgstr "Zo zien deelnemers het"
@@ -987,22 +1017,25 @@ msgid "admin.preview.day"
 msgstr "{count} tijdsloten, {first} tot {last}, tot {capacity} tegelijk"
 
 msgid "admin.preview.empty"
-msgstr "Nog geen tijdsloten: stel eerst openingstijden in."
+msgstr "Nog geen tijdsloten: stel eerst de bezetting in."
 
 msgid "admin.audit.detail.rule_add"
-msgstr "Openingstijd toegevoegd"
+msgstr "Tijdblok toegevoegd"
 
 msgid "admin.audit.detail.rule_edit"
-msgstr "Openingstijd gewijzigd"
+msgstr "Tijdblok gewijzigd"
 
 msgid "admin.audit.detail.rule_remove"
-msgstr "Openingstijd verwijderd"
+msgstr "Tijdblok verwijderd"
+
+msgid "admin.audit.detail.rule_split"
+msgstr "Tijdblok gesplitst"
 
 msgid "admin.audit.detail.override_add"
-msgstr "Uitzondering toegevoegd"
+msgstr "Afwijkende bezetting toegevoegd"
 
 msgid "admin.audit.detail.override_remove"
-msgstr "Uitzondering verwijderd"
+msgstr "Afwijkende bezetting verwijderd"
 
 msgid "admin.yes"
 msgstr "Ja"
@@ -1038,7 +1071,7 @@ msgid "admin.field.direct_call_enabled"
 msgstr "Direct gesprek starten"
 
 msgid "admin.field.direct_call_enabled_hint"
-msgstr "Deelnemers kunnen binnen de openingstijden meteen een gesprek starten."
+msgstr "Deelnemers kunnen meteen een gesprek starten tijdens een tijdblok met medewerkers."
 
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Niet opgepakt na (minuten)"
@@ -2519,7 +2552,7 @@ msgid "admin.holidays.state_open"
 msgstr "Gewoon open"
 
 msgid "admin.holidays.state_exception"
-msgstr "Eigen uitzondering"
+msgstr "Eigen afwijkende bezetting"
 
 msgid "admin.holidays.keep_open"
 msgstr "Toch open"
@@ -2534,7 +2567,7 @@ msgid "admin.holidays.close_label"
 msgstr "Weer sluiten op {name} ({day})"
 
 msgid "admin.holidays.see_exceptions"
-msgstr "Bekijk uitzonderingen"
+msgstr "Bekijk afwijkende bezetting"
 
 msgid "admin.holidays.none_upcoming"
 msgstr "Er gelden geen feestdagen voor deze groep in het komende jaar."
@@ -2543,7 +2576,7 @@ msgid "admin.holidays.group_choice"
 msgstr "Welke kalenders gelden"
 
 msgid "admin.holidays.group_choice_lead"
-msgstr "Een eigen uitzondering op een feestdag gaat altijd voor; zo kunt u een feestdag ook met andere tijden openen."
+msgstr "Een eigen afwijkende bezetting op een feestdag gaat altijd voor; zo kunt u op een feestdag toch medewerkers inplannen."
 
 msgid "admin.holidays.source"
 msgstr "Kalenders voor deze groep"

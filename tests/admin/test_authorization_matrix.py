@@ -178,26 +178,43 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/settings": statuses(422, 422, 403, 403, 403),
         "/admin/groups/andere-team/settings": statuses(422, 403, 403, 422, 403),
     },
-    # Opening hours, exceptions and capacity: group admins too, for their own groups.
-    "GET /admin/groups/{slug}/hours": {
-        "/admin/groups/demo/hours": statuses(200, 200, 200, 403, 403),
-        "/admin/groups/andere-team/hours": statuses(200, 403, 403, 200, 403),
+    # Staffing blocks and staffing exceptions: group admins too, for their own groups.
+    "GET /admin/groups/{slug}/staffing": {
+        "/admin/groups/demo/staffing": statuses(200, 200, 200, 403, 403),
+        "/admin/groups/andere-team/staffing": statuses(200, 403, 403, 200, 403),
     },
-    "POST /admin/groups/{slug}/hours": {
-        "/admin/groups/demo/hours": statuses(422, 422, 422, 403, 403),
-        "/admin/groups/andere-team/hours": statuses(422, 403, 403, 422, 403),
+    "POST /admin/groups/{slug}/staffing": {
+        "/admin/groups/demo/staffing": statuses(422, 422, 422, 403, 403),
+        "/admin/groups/andere-team/staffing": statuses(422, 403, 403, 422, 403),
+    },
+    "GET /admin/groups/{slug}/staffing/{rule_id}": {
+        "/admin/groups/demo/staffing/999999": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/staffing/999999": statuses(404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/staffing/{rule_id}": {
+        "/admin/groups/demo/staffing/999999": statuses(422, 422, 422, 403, 403),
+        "/admin/groups/andere-team/staffing/999999": statuses(422, 403, 403, 422, 403),
+    },
+    "GET /admin/groups/{slug}/staffing/{rule_id}/split": {
+        "/admin/groups/demo/staffing/999999/split": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/staffing/999999/split": statuses(404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/staffing/{rule_id}/split": {
+        "/admin/groups/demo/staffing/999999/split": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/staffing/999999/split": statuses(404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/staffing/{rule_id}/delete": {
+        "/admin/groups/demo/staffing/999999/delete": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/staffing/999999/delete": statuses(404, 403, 403, 404, 403),
+    },
+    # The old opening-hours paths (before ADR 0027) redirect permanently, behind the same check.
+    "GET /admin/groups/{slug}/hours": {
+        "/admin/groups/demo/hours": statuses(301, 301, 301, 403, 403),
+        "/admin/groups/andere-team/hours": statuses(301, 403, 403, 301, 403),
     },
     "GET /admin/groups/{slug}/hours/{rule_id}": {
-        "/admin/groups/demo/hours/999999": statuses(404, 404, 404, 403, 403),
-        "/admin/groups/andere-team/hours/999999": statuses(404, 403, 403, 404, 403),
-    },
-    "POST /admin/groups/{slug}/hours/{rule_id}": {
-        "/admin/groups/demo/hours/999999": statuses(422, 422, 422, 403, 403),
-        "/admin/groups/andere-team/hours/999999": statuses(422, 403, 403, 422, 403),
-    },
-    "POST /admin/groups/{slug}/hours/{rule_id}/delete": {
-        "/admin/groups/demo/hours/999999/delete": statuses(404, 404, 404, 403, 403),
-        "/admin/groups/andere-team/hours/999999/delete": statuses(404, 403, 403, 404, 403),
+        "/admin/groups/demo/hours/999999": statuses(301, 301, 301, 403, 403),
+        "/admin/groups/andere-team/hours/999999": statuses(301, 403, 403, 301, 403),
     },
     "GET /admin/groups/{slug}/exceptions": {
         "/admin/groups/demo/exceptions": statuses(200, 200, 200, 403, 403),
