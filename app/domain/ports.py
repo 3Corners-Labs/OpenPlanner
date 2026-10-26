@@ -69,7 +69,7 @@ class OutboundMessage:
 
 
 class MessageSender(Protocol):
-    """Delivers messages on one channel (ADR 0009): SMTP for email, Webex Connect for SMS."""
+    """Delivers messages on one channel (ADR 0009): SMTP for email, an SMS gateway for SMS."""
 
     async def send(self, message: OutboundMessage) -> None:
         """Deliver ``message``; raise on failure so the job is retried."""
