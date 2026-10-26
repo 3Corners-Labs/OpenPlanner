@@ -1,7 +1,7 @@
 # 0022. Message channels per organisation, SMS through Webex Connect, editable texts
 
-Status: accepted (2026-10-25). Implements ADR 0008 for SMTP and SMS, and the editors of ADR
-0009.
+Status: accepted (2026-10-25); superseded in part by ADR 0028 (SMS provider as data, Webex
+Connect as one adapter). Implements ADR 0008 for SMTP and SMS, and the editors of ADR 0009.
 
 ## Context
 
