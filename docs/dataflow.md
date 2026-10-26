@@ -91,6 +91,19 @@ visitor browser ──fetch same page (?day=)──> web   (calendar.js, same or
 Branding is organisation data, not personal data. The calendar script sends nothing the page
 link does not already send, and stores nothing in the browser.
 
+## Holiday calendars (ADR 0022)
+
+```
+superuser ──POST calendar name/slug, holiday date/name, year──> web ──SQL──> holiday_calendars, holidays
+organisation admin ──POST ticked calendars──> web ──SQL──> organisation_holiday_calendars
+group admin ──POST source, own calendars, kept-open date──> web ──SQL──> groups.holiday_source,
+                                                                 group_holiday_calendars, group_holiday_open_days
+citizen ──GET /g/{slug}──> web (holidays are closed days: no times, no holiday data shown)
+```
+
+Holiday calendars are configuration, not personal data; nothing leaves the system. Changes are
+audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
+
 ## Planned flows
 
 To be added per work package: SMS reminders (WP4/WP6), integration settings in the admin UI
