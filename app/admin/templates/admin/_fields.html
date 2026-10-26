@@ -1,6 +1,6 @@
 {#- One accessible input: visible label, hint and error linked with aria-describedby. -#}
 {% macro field(f) -%}
-<div class="field{% if f.error %} field--error{% endif %}">
+<div class="field{% if f.kind == "textarea" %} field--wide{% endif %}{% if f.error %} field--error{% endif %}">
   <label for="{{ f.name }}">{{ f.label }}{% if not f.required and not f.readonly %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</label>
   {%- if f.kind == "select" %}
   <select id="{{ f.name }}" name="{{ f.name }}"{% if f.required %} required{% endif %}{% if f.error %} aria-invalid="true"{% endif %}{% if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}>
@@ -8,6 +8,12 @@
     <option value="{{ option.value }}"{% if option.value == f.value %} selected{% endif %}>{{ option.label }}</option>
     {%- endfor %}
   </select>
+  {%- elif f.kind == "textarea" %}
+  <textarea id="{{ f.name }}" name="{{ f.name }}" rows="{{ f.attributes.get("rows", "3") }}"
+    {%- if f.required %} required{% endif %}
+    {%- if f.error %} aria-invalid="true"{% endif %}
+    {%- if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}
+    {%- for key, value in f.attributes.items() if key != "rows" %} {{ key }}="{{ value }}"{% endfor %}>{{ f.value }}</textarea>
   {%- else %}
   <input id="{{ f.name }}" name="{{ f.name }}" type="{{ f.kind }}" value="{{ f.value }}"
     {%- if f.required and not f.readonly %} required{% endif %}

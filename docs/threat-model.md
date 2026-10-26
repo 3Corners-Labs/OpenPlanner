@@ -119,6 +119,27 @@ Admin: `GET /admin/organisations`, `GET /admin/organisations/new`, `POST /admin/
 | Injection | Group name or text with HTML in emails | Jinja2 autoescape for the HTML part; plain-text part separate | `tests/jobs/test_messages.py::test_html_is_escaped_and_semantic` |
 | Information disclosure | Personal data in calendar files | `.ics` contains team, times and the management link only | `test_calendar_attachment` |
 
+## Flow: message channels, SMS reminders and message texts (ADR 0022)
+
+Superusers configure SMTP and the Webex Connect SMS service per organisation at
+`/admin/organisations/{org}/channels`; organisation admins add reminder rules per group at
+`/admin/groups/{slug}/reminders`; group admins edit message texts at
+`/admin/groups/{slug}/messages/{locale}`. The worker sends through the organisation's sender.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure | SMTP password or Connect service key leaks through the UI, logs or the database | Write-only fields (always empty, `autocomplete=new-password`); sealed with AES-256-GCM under a per-record name; never returned by the `Transaction` port; audit names fields only | `tests/admin/test_channel_routes.py::test_smtp_is_saved_and_the_password_never_shown`, `tests/adapters/db/test_messaging_queries.py::test_channel_settings_round_trip_with_sealed_secret` |
+| Information disclosure | SMTP password sent unencrypted | A username requires STARTTLS or TLS | `tests/domain/test_channel_settings.py::test_invalid_smtp_settings_name_the_field` |
+| Tampering | A sealed secret copied to another organisation or channel | The record name is the associated data; a moved ciphertext fails to open | `test_a_secret_cannot_be_moved_to_another_channel` |
+| Elevation of privilege | An organisation admin changes where mail or SMS of the organisation goes | `integrations.manage` is superuser only; route and service both check | `tests/admin/test_authorization_matrix.py`, `test_org_admin_may_not_configure_channels_handover_section_6` |
+| Spoofing / injection | Header injection through sender name, address or subject texts | No control characters or line breaks in sender fields and subject blocks; addresses without `<>",;` | `test_a_header_injection_in_the_sender_is_refused`, `tests/domain/test_message_texts.py::test_invalid_texts_name_the_block` |
+| Tampering | SSRF or downgrade through the SMS API host | https only, host name check, no credentials, query or fragment | `tests/domain/test_channel_settings.py::test_invalid_sms_settings_name_the_field` |
+| Information disclosure | A group text pulls in other data (`{x.__class__}`, `{email}`) | Only placeholders from the block's allow-list; the formatter has no attribute access | `test_an_unknown_placeholder_is_refused_and_kept_in_the_form`, `test_used_placeholders` |
+| Information disclosure | Phone number or text in logs or errors | The adapter logs a random correlation ID; response bodies are neither logged nor raised | `tests/adapters/test_webex_connect_sms.py::test_refusals_map_to_integration_errors` |
+| Denial of service | Reminder spam to citizens | At most five rules per group, 5 minutes to 30 days, one per channel and offset | `tests/domain/test_messaging_service.py::test_at_most_five_reminders` |
+| Repudiation | Who changed channels, reminders or texts | Audit events with field names or rule keys, never values or texts | `test_saving_smtp_with_password_is_audited_without_values`, `test_add_and_remove_an_sms_reminder_is_audited` |
+| Elevation of privilege | Texts or reminders of another organisation's group | Group-level permission on the group slug; the service authorises again | `test_texts_of_another_organisation_are_out_of_reach`, `test_reminders_need_reminders_manage_on_the_group` |
+
 ## Flow: admin portal login and authorisation (WP7a)
 
 Admins only; citizens never log in. `GET /admin/login` → identity provider (PingFederate in
