@@ -683,6 +683,9 @@ msgstr "Annuleren"
 msgid "admin.save"
 msgstr "Opslaan"
 
+msgid "admin.edit"
+msgstr "Wijzigen"
+
 msgid "admin.remove"
 msgstr "Verwijderen"
 
@@ -908,6 +911,15 @@ msgstr "Toevoegen"
 msgid "admin.hours.add_label"
 msgstr "Openingstijd op {day} toevoegen"
 
+msgid "admin.hours.edit"
+msgstr "Openingstijd wijzigen"
+
+msgid "admin.hours.edit_lead"
+msgstr "Bestaande afspraken blijven staan; de gewijzigde openingstijd geldt voor nieuwe afspraken."
+
+msgid "admin.hours.edit_label"
+msgstr "Openingstijd {day} {time} wijzigen"
+
 msgid "admin.hours.remove_label"
 msgstr "Openingstijd {day} {time} verwijderen"
 
@@ -961,6 +973,9 @@ msgstr "Nog geen tijdsloten: stel eerst openingstijden in."
 
 msgid "admin.audit.detail.rule_add"
 msgstr "Openingstijd toegevoegd"
+
+msgid "admin.audit.detail.rule_edit"
+msgstr "Openingstijd gewijzigd"
 
 msgid "admin.audit.detail.rule_remove"
 msgstr "Openingstijd verwijderd"

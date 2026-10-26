@@ -683,6 +683,9 @@ msgstr "Cancel"
 msgid "admin.save"
 msgstr "Save"
 
+msgid "admin.edit"
+msgstr "Change"
+
 msgid "admin.remove"
 msgstr "Remove"
 
@@ -908,6 +911,15 @@ msgstr "Add"
 msgid "admin.hours.add_label"
 msgstr "Add opening hours on {day}"
 
+msgid "admin.hours.edit"
+msgstr "Change opening hours"
+
+msgid "admin.hours.edit_lead"
+msgstr "Existing appointments stay; the changed opening hours apply to new appointments."
+
+msgid "admin.hours.edit_label"
+msgstr "Change opening hours {day} {time}"
+
 msgid "admin.hours.remove_label"
 msgstr "Remove opening hours {day} {time}"
 
@@ -961,6 +973,9 @@ msgstr "No slots yet: set opening hours first."
 
 msgid "admin.audit.detail.rule_add"
 msgstr "Opening hours added"
+
+msgid "admin.audit.detail.rule_edit"
+msgstr "Opening hours changed"
 
 msgid "admin.audit.detail.rule_remove"
 msgstr "Opening hours removed"

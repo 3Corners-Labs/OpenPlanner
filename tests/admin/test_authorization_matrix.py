@@ -187,6 +187,14 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/hours": statuses(422, 422, 422, 403, 403),
         "/admin/groups/andere-team/hours": statuses(422, 403, 403, 422, 403),
     },
+    "GET /admin/groups/{slug}/hours/{rule_id}": {
+        "/admin/groups/demo/hours/999999": statuses(404, 404, 404, 403, 403),
+        "/admin/groups/andere-team/hours/999999": statuses(404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/hours/{rule_id}": {
+        "/admin/groups/demo/hours/999999": statuses(422, 422, 422, 403, 403),
+        "/admin/groups/andere-team/hours/999999": statuses(422, 403, 403, 422, 403),
+    },
     "POST /admin/groups/{slug}/hours/{rule_id}/delete": {
         "/admin/groups/demo/hours/999999/delete": statuses(404, 404, 404, 403, 403),
         "/admin/groups/andere-team/hours/999999/delete": statuses(404, 403, 403, 404, 403),

@@ -12,6 +12,8 @@ The domain (``PlanningService``) authorises again, validates and audits.
     POST /admin/groups/{slug}/settings             group.edit        save
     GET  /admin/groups/{slug}/hours                schedule.manage   weekly hours
     POST /admin/groups/{slug}/hours                schedule.manage   add a window
+    GET  /admin/groups/{slug}/hours/{id}           schedule.manage   change-window form
+    POST /admin/groups/{slug}/hours/{id}           schedule.manage   change a window
     POST /admin/groups/{slug}/hours/{id}/delete    schedule.manage   remove a window
     GET  /admin/groups/{slug}/exceptions           schedule.manage   exceptions
     POST /admin/groups/{slug}/exceptions           schedule.manage   add an exception
@@ -40,7 +42,7 @@ from app.admin.forms import (
 from app.admin.pages import Locale, SameOrigin, page
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
-from app.domain.errors import DomainError
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.planning import (
     GroupSettings,
     NewGroup,
@@ -657,6 +659,33 @@ def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
     ]
 
 
+def _read_rule(form: FormData) -> ScheduleRule | None:
+    """Parse the window form into a rule; ``None`` (with form errors) when it is incomplete."""
+    weekday = form.choice("weekday", WEEKDAYS)
+    opens, closes = form.clock("opens"), form.clock("closes")
+    capacity = form.integer("capacity")
+    valid_from, valid_to = form.optional_day("valid_from"), form.optional_day("valid_to")
+    if form.errors or not (weekday and opens and closes and capacity is not None):
+        return None
+    try:
+        return ScheduleRule(int(weekday), TimeWindow(opens, closes, capacity), valid_from, valid_to)
+    except DomainError as error:
+        form.refusal(error)
+        return None
+
+
+def _rule_values(rule: ScheduleRule) -> dict[str, str]:
+    """Return a stored rule as form values, to pre-fill the change form."""
+    return {
+        "weekday": str(rule.weekday),
+        "opens": rule.window.opens.strftime("%H:%M"),
+        "closes": rule.window.closes.strftime("%H:%M"),
+        "capacity": str(rule.window.capacity),
+        "valid_from": rule.valid_from.isoformat() if rule.valid_from else "",
+        "valid_to": rule.valid_to.isoformat() if rule.valid_to else "",
+    }
+
+
 async def _hours_response(
     request: Request, locale: RequestLocale, context: AdminContext, form: FormData, status: int
 ) -> HTMLResponse:
@@ -696,15 +725,9 @@ async def add_hours(
 ) -> Response:
     """Add a weekly opening window."""
     form = await read_form(request, locale)
-    weekday = form.choice("weekday", WEEKDAYS)
-    opens, closes = form.clock("opens"), form.clock("closes")
-    capacity = form.integer("capacity")
-    valid_from, valid_to = form.optional_day("valid_from"), form.optional_day("valid_to")
-    if not form.errors and weekday and opens and closes and capacity is not None:
+    rule = _read_rule(form)
+    if rule is not None:
         try:
-            rule = ScheduleRule(
-                int(weekday), TimeWindow(opens, closes, capacity), valid_from, valid_to
-            )
             await planning_service(request).add_rule(context.principal, slug, rule)
         except DomainError as error:
             raise_refusal(error)
@@ -712,6 +735,61 @@ async def add_hours(
         else:
             return redirect_done(f"/admin/groups/{slug}/hours", "added")
     return await _hours_response(request, locale, context, form, 422)
+
+
+def _edit_hours_response(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    rule_id: int,
+    form: FormData,
+    status: int,
+) -> HTMLResponse:
+    """Render the change form of one weekly window."""
+    return group_page(
+        request,
+        locale,
+        context,
+        "admin/group_hours_edit.html",
+        {"rule_id": rule_id, "fields": _hours_fields(form, locale), "errors": form.errors},
+        status,
+    )
+
+
+@router.get("/groups/{slug}/hours/{rule_id}", response_class=HTMLResponse)
+async def edit_hours(
+    request: Request, locale: Locale, slug: str, rule_id: int, context: ManageGroup
+) -> HTMLResponse:
+    """Show the change form of a weekly opening window, pre-filled with its values."""
+    try:
+        rule = await planning_service(request).rule(context.principal, slug, rule_id)
+    except DomainError as error:
+        raise_refusal(error)
+        raise
+    form = FormData(_rule_values(rule), locale.gettext)
+    return _edit_hours_response(request, locale, context, rule_id, form, 200)
+
+
+@router.post("/groups/{slug}/hours/{rule_id}", response_class=HTMLResponse)
+async def update_hours(
+    request: Request, locale: Locale, slug: str, rule_id: int, _: SameOrigin, context: ManageGroup
+) -> Response:
+    """Change a weekly opening window; existing bookings keep their slots."""
+    form = await read_form(request, locale)
+    rule = _read_rule(form)
+    if rule is not None:
+        try:
+            changed = await planning_service(request).update_rule(
+                context.principal, slug, rule_id, rule
+            )
+        except DomainError as error:
+            raise_refusal(error)
+            if error.code is ErrorCode.SCHEDULE_ITEM_NOT_FOUND:
+                raise
+            form.refusal(error)
+        else:
+            return redirect_done(f"/admin/groups/{slug}/hours", "saved" if changed else "unchanged")
+    return _edit_hours_response(request, locale, context, rule_id, form, 422)
 
 
 @router.post("/groups/{slug}/hours/{rule_id}/delete", response_class=HTMLResponse)
