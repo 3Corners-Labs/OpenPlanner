@@ -14,6 +14,11 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
 FROM python:3.12-slim-bookworm AS runtime
+# Debian security fix not yet in the base image (CVE-2026-84782); drop once the tag carries it.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends --only-upgrade \
+      libssl3=3.0.22-1~deb12u2 openssl=3.0.22-1~deb12u2 \
+ && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 app \
  && useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
 WORKDIR /srv
