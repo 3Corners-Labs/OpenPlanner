@@ -74,4 +74,5 @@ make check
 - `docs/HANDOVER.md` — stakeholder design (Dutch).
 - `docs/adr/` — decisions.
 - `docs/runbook.md` — operating the service.
+- `docs/agent-api.md` — connecting a contact-center bot (WxCC AI Agent) to the machine API.
 - `SECURITY.md` — reporting vulnerabilities.

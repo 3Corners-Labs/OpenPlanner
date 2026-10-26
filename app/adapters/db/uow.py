@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.sql.elements import SQLCoreOperations
 
 from app.adapters.crypto import SecretBox
+from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.models import (
     AdminProfileRow,
@@ -251,8 +252,10 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
     return f"channel:{organisation_id}:{channel.value}"
 
 
-class SqlTransaction:
+class SqlTransaction(ApiClientQueries):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
+
+    The machine API's queries come from ``ApiClientQueries`` (ADR 0023).
 
     Args:
         session: The open session.

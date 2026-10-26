@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Protocol
 
+from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
@@ -458,6 +459,46 @@ class Transaction(Protocol):
 
         The group must lie inside ``scope`` (ADR 0014); otherwise the list is empty.
         """
+        ...
+
+    async def get_api_settings(self) -> ApiSettings:
+        """Return the machine API's switches (both off when never saved, ADR 0023)."""
+        ...
+
+    async def save_api_settings(self, settings: ApiSettings) -> None:
+        """Store the machine API's switches."""
+        ...
+
+    async def list_api_clients(self, scope: Scope) -> list[ApiClient]:
+        """Return the API clients of the organisations inside ``scope``, ordered by name."""
+        ...
+
+    async def get_api_client(self, client_id: str) -> ApiClient | None:
+        """Return the API client with the public ``client_id``."""
+        ...
+
+    async def add_api_client(self, client: ApiClient) -> ApiClient:
+        """Store a new API client and return it with its id."""
+        ...
+
+    async def save_api_client(self, client: ApiClient) -> None:
+        """Store the changed fields of an existing API client (its organisation never changes)."""
+        ...
+
+    async def add_access_token(self, token: AccessToken) -> None:
+        """Store an issued access token (its hash only)."""
+        ...
+
+    async def get_access_token(self, token_hash: str) -> AccessToken | None:
+        """Return the stored access token with ``token_hash``."""
+        ...
+
+    async def revoke_access_tokens(self, client_id: str) -> int:
+        """Delete every access token of the client; return how many were live."""
+        ...
+
+    async def prune_access_tokens(self, client_id: str, now: datetime, keep: int) -> None:
+        """Delete expired tokens of every client, and all but the newest ``keep`` of this one."""
         ...
 
 

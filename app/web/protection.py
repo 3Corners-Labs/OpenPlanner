@@ -65,17 +65,28 @@ class RateLimits:
     bookings: str = "10/hour"
     reads: str = "60/minute"
     assets: str = "600/minute"
+    agent_tokens: str = "10/minute"
+    agent_calls: str = "120/minute"
 
 
 LIMITS = RateLimits()
 limiter = Limiter(key_func=get_remote_address)
 
 
-def configure_rate_limits(*, enabled: bool, bookings: str, reads: str) -> None:
+def configure_rate_limits(
+    *,
+    enabled: bool,
+    bookings: str,
+    reads: str,
+    agent_tokens: str = "10/minute",
+    agent_calls: str = "120/minute",
+) -> None:
     """Apply the settings to the process-wide limiter and clear its counters."""
     limiter.enabled = enabled
     LIMITS.bookings = bookings
     LIMITS.reads = reads
+    LIMITS.agent_tokens = agent_tokens
+    LIMITS.agent_calls = agent_calls
     limiter.reset()
 
 
@@ -92,3 +103,13 @@ def read_limit() -> str:
 def asset_limit() -> str:
     """Limit for branding assets (theme stylesheet, logo); cached by browsers, so generous."""
     return LIMITS.assets
+
+
+def agent_token_limit() -> str:
+    """Limit for the machine API's token endpoint, per IP (credential guessing, ADR 0023)."""
+    return LIMITS.agent_tokens
+
+
+def agent_call_limit() -> str:
+    """Limit for machine API calls, per API client (ADR 0023)."""
+    return LIMITS.agent_calls

@@ -1,4 +1,4 @@
-"""Shared builders for emergency closure tests (ADR 0023)."""
+"""Shared builders for emergency closure tests (ADR 0024)."""
 
 from dataclasses import replace
 

@@ -4,7 +4,7 @@ Every email uses one fixed layout (HTML plus plain text); an SMS is one text blo
 comes from the group's own texts first, then the i18n chain (organisation override,
 catalogue). Placeholders are filled by the safe formatter in ``app.i18n``. A message carries
 the first name, date, time, team and the management link; nothing else. Messages
-about an emergency closure (ADR 0023) add the closure's notice: plain text an admin wrote,
+about an emergency closure (ADR 0024) add the closure's notice: plain text an admin wrote,
 escaped like every other value and never a template.
 """
 
