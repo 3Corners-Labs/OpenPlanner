@@ -14,6 +14,12 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
 FROM python:3.12-slim-bookworm AS runtime
+# Security updates of the Debian packages land here before a new base image is published
+# (e.g. libssl3, CVE-2026-84782); trivy fails the build on fixed HIGH/CRITICAL findings.
+# hadolint ignore=DL3005
+RUN apt-get update \
+ && apt-get -y upgrade --no-install-recommends \
+ && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 app \
  && useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
 WORKDIR /srv
