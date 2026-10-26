@@ -19,6 +19,7 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
+from tests.support.routes import all_routes
 
 ROLES = {
     "superuser": SUPER,
@@ -77,6 +78,26 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     "POST /admin/organisations/{org}/branding/logo/remove": {
         "/admin/organisations/demo/branding/logo/remove": statuses(303, 403, 403, 403, 403),
+    },
+    # Machine API clients and switches (ADR 0023): superuser only. Unknown client ids: 404.
+    "GET /admin/api": {"/admin/api": statuses(200, 403, 403, 403, 403)},
+    "POST /admin/api/settings": {"/admin/api/settings": statuses(303, 403, 403, 403, 403)},
+    "GET /admin/api/clients/new": {"/admin/api/clients/new": statuses(200, 403, 403, 403, 403)},
+    "POST /admin/api/clients": {"/admin/api/clients": statuses(422, 403, 403, 403, 403)},
+    "GET /admin/api/clients/{client_id}": {
+        "/admin/api/clients/opc_unknown-client-0000": statuses(404, 403, 403, 403, 403),
+    },
+    "POST /admin/api/clients/{client_id}": {
+        "/admin/api/clients/opc_unknown-client-0000": statuses(404, 403, 403, 403, 403),
+    },
+    "POST /admin/api/clients/{client_id}/rotate": {
+        "/admin/api/clients/opc_unknown-client-0000/rotate": statuses(404, 403, 403, 403, 403),
+    },
+    "POST /admin/api/clients/{client_id}/enable": {
+        "/admin/api/clients/opc_unknown-client-0000/enable": statuses(404, 403, 403, 403, 403),
+    },
+    "POST /admin/api/clients/{client_id}/revoke": {
+        "/admin/api/clients/opc_unknown-client-0000/revoke": statuses(404, 403, 403, 403, 403),
     },
     # Message channels (SMTP, SMS gateway) per organisation: secrets, so superuser only.
     "GET /admin/organisations/{org}/channels": {
@@ -216,21 +237,9 @@ def _requirements(route: APIRoute) -> list[RequirePermission]:
     return found
 
 
-def _all_routes(routes: list[object]) -> list[APIRoute]:
-    """Flatten the app's routes, including routers mounted with include_router."""
-    found: list[APIRoute] = []
-    for route in routes:
-        if isinstance(route, APIRoute):
-            found.append(route)
-        inner = getattr(route, "original_router", None)  # FastAPI's included-router wrapper
-        if inner is not None:
-            found.extend(_all_routes(inner.routes))
-    return found
-
-
 def test_every_admin_route_declares_one_permission_and_is_in_the_table(site: Site) -> None:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    routes = [r for r in _all_routes(app.routes) if r.path.startswith("/admin")]
+    routes = [r for r in all_routes(app.routes) if r.path.startswith("/admin")]
     protected = {
         f"{method} {r.path}": r
         for r in routes

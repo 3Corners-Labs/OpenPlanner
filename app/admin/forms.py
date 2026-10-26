@@ -35,6 +35,9 @@ DONE_MESSAGES: dict[str, str] = {
     "removed": "admin.done.removed",
     "logo_saved": "admin.done.logo_saved",
     "logo_removed": "admin.done.logo_removed",
+    "client_enabled": "admin.done.client_enabled",
+    "client_disabled": "admin.done.client_disabled",
+    "tokens_revoked": "admin.done.tokens_revoked",
     "texts_saved": "admin.done.texts_saved",
 }
 """Confirmations after a change; only these keys are read from ``?done=``."""
@@ -69,6 +72,10 @@ FIELD_MESSAGES: dict[str, str] = {
     "day": "admin.form.error.day",
     "schedule_rules": "admin.form.error.overlap",
     "schedule_overrides": "admin.form.error.override_conflict",
+    "scopes": "admin.form.error.scopes",
+    "groups": "admin.form.error.groups",
+    "networks": "admin.form.error.networks",
+    "lifetime_days": "admin.form.error.lifetime_days",
     "smtp_host": "admin.form.error.smtp_host",
     "smtp_port": "admin.form.error.smtp_port",
     "smtp_security": "admin.form.error.smtp_security",
