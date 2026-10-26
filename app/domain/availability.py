@@ -4,6 +4,13 @@ Windows are expressed in the group's local time and converted to UTC per slot, s
 saving time is handled per date. Local times that do not exist (spring forward) are skipped;
 ambiguous local times (fall back) use their first occurrence.
 
+Touching windows with agents form one *run* (ADR 0027): the slot grid starts at the run's
+start and continues across window borders, and a slot gets the lowest agent count among the
+windows it covers. A window with 0 agents or a gap ends the run.
+
+    09:00 ──── 3 ──── 10:15 ──── 2 ──── 12:00     one run
+    |09:00|09:30|10:00|10:30|11:00|11:30|         10:00 straddles the border: capacity 2
+
     windows_on(day) ──► slots_on(day) ──► filter: notice ≤ start ≤ horizon
                                           capacity = existing slot snapshot or window
                                           remaining = capacity − active bookings > 0
@@ -39,21 +46,45 @@ class AvailableSlot:
     remaining: int
 
 
+def staffed_runs(windows: Sequence[TimeWindow]) -> list[list[TimeWindow]]:
+    """Group the staffed windows into runs of touching windows, in time order.
+
+    A window with 0 agents takes no part and so splits a run, just like a gap.
+    """
+    runs: list[list[TimeWindow]] = []
+    for window in sorted(w for w in windows if w.staffed):
+        if runs and runs[-1][-1].closes == window.opens:
+            runs[-1].append(window)
+        else:
+            runs.append([window])
+    return runs
+
+
 def slots_on(group: Group, day: date, windows: Sequence[TimeWindow]) -> list[SlotTime]:
-    """Return every slot of ``day`` that fits completely inside one of ``windows``."""
+    """Return every slot of ``day`` that fits completely inside one run of staffed windows."""
     tz = group.tz
     length = timedelta(minutes=group.slot_minutes)
     slots: list[SlotTime] = []
-    for window in windows:
-        local = datetime.combine(day, window.opens)
-        closes = datetime.combine(day, window.closes)
+    for run in staffed_runs(windows):
+        local = datetime.combine(day, run[0].opens)
+        closes = datetime.combine(day, run[-1].closes)
         while local + length <= closes:
             start = local.replace(tzinfo=tz).astimezone(UTC)
             # A local time that does not exist does not survive the round trip.
             if start.astimezone(tz).replace(tzinfo=None) == local:
-                slots.append(SlotTime(start, start + length, window.capacity))
+                capacity = _lowest_capacity(run, day, local, local + length)
+                slots.append(SlotTime(start, start + length, capacity))
             local += length
     return slots
+
+
+def _lowest_capacity(run: Sequence[TimeWindow], day: date, start: datetime, end: datetime) -> int:
+    """Return the lowest agent count among the windows of ``run`` that ``start``–``end`` covers."""
+    return min(
+        w.capacity
+        for w in run
+        if datetime.combine(day, w.opens) < end and start < datetime.combine(day, w.closes)
+    )
 
 
 def offered_slot(
