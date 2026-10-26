@@ -35,6 +35,10 @@ Then open:
 The `dev` profile adds Mailpit and Keycloak (standing in for PingFederate); without it the shape
 is the production one (web + worker).
 
+On a server with a public domain, `docker compose --profile tls up -d` adds HTTPS with a free
+Let's Encrypt certificate that renews itself (ADR 0029; set `TLS_DOMAIN` and `ACME_EMAIL`, see
+`docs/runbook.md`, "HTTPS certificate").
+
 Two containers share one SQLite volume: `web` (FastAPI, runs Alembic migrations on start) and
 `worker` (job loop). Both run as non-root with a read-only filesystem.
 

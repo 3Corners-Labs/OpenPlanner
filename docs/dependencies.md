@@ -43,6 +43,12 @@ mutmut: all active and standard in their field. They are never shipped in the im
 @playwright/test, @axe-core/playwright (MPL-2.0, required by CLAUDE.md), lighthouse,
 chrome-launcher: all active (ADR 0006).
 
+## Containers (production)
+
+| Image | Purpose | License | Maintenance | Note |
+|---|---|---|---|---|
+| caddy, caddy builder (official images) | TLS proxy with automatic ACME certificates and renewal (`--profile tls`) | Apache-2.0 | very active (release every few months, Go stdlib TLS) | ADR 0029; checked 2026-10-26. Own image in `deploy/proxy/` (Caddy rebuilt with current Go, see the Dockerfile), scanned in CI |
+
 ## Containers (development only)
 
 | Image | Purpose | License |

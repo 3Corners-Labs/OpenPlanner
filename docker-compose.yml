@@ -27,6 +27,10 @@ services:
         alembic upgrade head &&
         exec uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000
         --no-access-log --proxy-headers
+    environment:
+      # Only the TLS proxy (ADR 0029) may set X-Forwarded-For; see the edge network below.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.31.240.2}
+    networks: [default, edge]
     ports:
       - "127.0.0.1:8000:8000"
 
@@ -42,6 +46,42 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+
+  # Production with a public domain (`docker compose --profile tls up -d`, ADR 0029): HTTPS on
+  # 443 with a certificate from Let's Encrypt, renewed automatically; port 80 only redirects and
+  # answers ACME challenges. Needs TLS_DOMAIN and ACME_EMAIL in .env and the domain's DNS
+  # pointing at this host.
+  proxy:
+    build: deploy/proxy
+    image: openplanner-proxy:local
+    profiles: [tls]
+    environment:
+      # The image refuses to start while either of these is empty.
+      TLS_DOMAIN: ${TLS_DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+    volumes:
+      # Certificates, keys and the ACME account: keep them, or every restart asks the CA again
+      # and soon hits its rate limits.
+      - proxy-data:/data
+    networks:
+      edge:
+        ipv4_address: 172.31.240.2
+    ports:
+      - "80:8080"
+      - "443:8443"
+    depends_on:
+      web:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /config:uid=10001,gid=10001
+      - /tmp
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
 
   # Development only (`docker compose --profile dev up`): catches all outgoing mail.
   # Inbox at http://127.0.0.1:8025. Never part of the production shape.
@@ -75,5 +115,15 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
 
+networks:
+  # Between the TLS proxy and web. Fixed so web can trust exactly the proxy's address.
+  edge:
+    ipam:
+      config:
+        - subnet: 172.31.240.0/28
+          # Dynamic addresses (web) come from the upper half, so the proxy's fixed one is free.
+          ip_range: 172.31.240.8/29
+
 volumes:
   data:
+  proxy-data:

@@ -81,9 +81,10 @@ flowchart LR
 ```mermaid
 flowchart TB
     browser([Browser])
-    proxy[Reverse proxy<br/>TLS, body limit, forwarded IPs]
+    acme[Let's Encrypt<br/>ACME CA]
 
     subgraph host [One VM]
+        proxy["proxy (profile tls)<br/>Caddy: TLS, auto-renewal,<br/>body limit, forwarded IPs"]
         web["web<br/>FastAPI + uvicorn<br/>pages, migrations on start"]
         worker["worker<br/>job loop, heartbeat"]
         volume[("data volume<br/>SQLite (WAL)")]
@@ -92,16 +93,20 @@ flowchart TB
 
     smtp[Mail provider]
 
-    browser --> proxy --> web
+    browser -- "https :443" --> proxy -- edge network --> web
+    proxy -. "ACME, renewal" .-> acme
     web <--> volume
     worker <--> volume
     worker -- SMTP --> smtp
     worker -. dev .-> mailpit
 
-    classDef planned stroke-dasharray: 5 5
-    class proxy planned
 ```
 
+- **TLS at the edge (ADR 0029).** With `--profile tls` the `proxy` service (Caddy) gets a
+  certificate for `TLS_DOMAIN` from Let's Encrypt and renews it on its own; port 80 only
+  redirects. It runs as uid 10001 on a read-only filesystem, keeps certificates in the
+  `proxy-data` volume and has a fixed address on the `edge` network, the only address `web`
+  accepts `X-Forwarded-For` from. Without the profile, a load balancer of the host does this.
 - **One image, two roles.** `web` runs `alembic upgrade head` and then uvicorn; `worker` runs
   `python -m app.jobs.worker` and starts only when `web` is healthy. Both run as uid 10001
   with a read-only root filesystem, no capabilities and `no-new-privileges`.
@@ -517,7 +522,7 @@ flowchart LR
     end
 
     subgraph edge [Edge]
-        proxy[Reverse proxy<br/>TLS, body limit]
+        proxy[Caddy proxy<br/>TLS, auto-renewal, body limit]
     end
 
     subgraph app [Application, trusted]
@@ -542,8 +547,6 @@ flowchart LR
     wxcc -- signed webhooks --> pages
     webex -- signed webhooks --> pages
 
-    classDef planned stroke-dasharray: 5 5
-    class proxy planned
 ```
 
 | Control | Where | Reference |
@@ -625,6 +628,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0024 | Emergency closure: appointments on hold, citizens informed, no deletion |
 | 0025 | Reusable holiday calendars with overrides per organisation and group |
 | 0026 | Cap on open direct calls per group; queue feedback from our own data |
+| 0029 | HTTPS with free, automatically renewed certificates (Caddy, Let's Encrypt) |
 
 ## 12. Status and roadmap
 

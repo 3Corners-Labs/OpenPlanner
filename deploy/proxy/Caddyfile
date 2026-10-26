@@ -1,0 +1,44 @@
+# TLS termination for OpenPlanner (ADR 0029). Caddy obtains the certificate for TLS_DOMAIN
+# from a public ACME CA (Let's Encrypt by default), renews it on its own when a third of its
+# lifetime is left, and staples OCSP. Certificates and the ACME account live in /data.
+{
+	email {$ACME_EMAIL}
+	acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
+	# Unprivileged ports inside the container; docker-compose publishes them as 80 and 443.
+	http_port 8080
+	https_port 8443
+	# Caddy's own redirect would point at :8443; the site below redirects to 443 instead.
+	# ACME HTTP-01 challenges on port 80 are still answered.
+	auto_https disable_redirects
+	admin 127.0.0.1:2019
+	servers {
+		protocols h1 h2
+		# Caddy sets no read timeouts by default; these stop slow-loris clients. No page
+		# streams, so a write timeout is safe.
+		timeouts {
+			read_header 10s
+			read_body 30s
+			write 60s
+			idle 2m
+		}
+	}
+}
+
+http://{$TLS_DOMAIN}:8080 {
+	redir https://{host}{uri} 308
+}
+
+{$TLS_DOMAIN}:8443 {
+	# No access log: request paths carry management tokens (/b/{token}).
+	# Public form posts are small; the limit keeps oversized bodies away from the app.
+	@public path /g/* /b/*
+	request_body @public {
+		max_size 64KB
+	}
+	request_body {
+		max_size 1MB
+	}
+	# Caddy sets X-Forwarded-For to the visitor's address and drops any value the client sent
+	# (no trusted_proxies), so rate limits in the app see the real IP.
+	reverse_proxy web:8000
+}

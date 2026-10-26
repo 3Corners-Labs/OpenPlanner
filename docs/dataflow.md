@@ -152,6 +152,19 @@ citizen ──GET /g/{slug}──> web (holidays are closed days: no times, no h
 Holiday calendars are configuration, not personal data; nothing leaves the system. Changes are
 audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
 
+## HTTPS certificate (ADR 0029)
+
+```
+proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
+Let's Encrypt ──HTTP-01 / TLS-ALPN-01──> proxy (ports 80/443): challenge token only
+visitor ──https──> proxy ──http, edge network──> web (X-Forwarded-For set by the proxy)
+```
+
+The CA learns the domain name and the operator's e-mail address; no citizen data leaves through
+this flow. The proxy keeps no access log, so booking paths with management tokens are not
+written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
+name only).
+
 ## Planned flows
 
 To be added per work package: purge sweep and backups (WP8). Each flow lists: data items, source, destination, legal

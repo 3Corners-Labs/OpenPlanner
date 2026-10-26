@@ -14,6 +14,20 @@ Public, unauthenticated: `GET /healthz`, `GET /readyz`.
 | Denial of service | `/readyz` flooded to exhaust database connections | Cheap `SELECT 1` on a pooled connection; rate limiting at the reverse proxy *(TBD, O7)* | — |
 | Tampering | Clickjacking / MIME sniffing on any response | Security headers middleware | `test_security_headers_on_every_response` |
 
+## Flow: TLS termination (ADR 0029)
+
+Public: ports 80 and 443 of the `proxy` service (`--profile tls`).
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure | Traffic, session cookies or management tokens read on the network | HTTPS only: port 80 answers ACME challenges and otherwise redirects (308); HSTS from the app | `scripts/check-proxy.sh` (CI step "proxy check") |
+| Denial of service | Certificate expires unnoticed: bookings, admin login and webhooks stop together | Caddy renews at a third of the lifetime with retries; certificates kept in `proxy-data`; expiry check in the runbook | — (operational) |
+| Spoofing | Client forges `X-Forwarded-For` to dodge or exhaust per-IP rate limits | Caddy sets the header itself (no `trusted_proxies`); `web` trusts it only from the proxy's fixed address on the `edge` network | — (configuration in `docker-compose.yml`) |
+| Denial of service | Oversized bodies on public forms | 64 KB on `/g/*` and `/b/*`, 1 MB elsewhere (HTTP 413) | `scripts/check-proxy.sh` |
+| Denial of service | Slow-loris clients hold connections open | Header 10 s, body 30 s, write 60 s, idle 2 min in the Caddyfile | — |
+| Information disclosure | Booking paths with tokens in proxy logs | No access log in the Caddyfile | — |
+| Elevation | Compromised proxy gains host rights | uid 10001, read-only filesystem, `cap_drop: ALL`, `no-new-privileges`, unprivileged ports | `trivy` misconfiguration scan |
+
 ## Flow: public pages and language choice
 
 Public, unauthenticated: `GET /` (more pages from WP3), `GET /static/*`. Inputs from outside:
