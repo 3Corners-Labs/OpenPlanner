@@ -25,7 +25,8 @@ test('the superuser fills a calendar and an organisation follows it', async ({ p
   await tabTo(page, page.getByRole('button', { name: /Feestdagen van \d{4} toevoegen/ }));
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status')).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Koningsdag' })).toBeVisible();
+  // exact: the remove button's label in the same row also mentions Koningsdag.
+  await expect(page.getByRole('cell', { name: 'Koningsdag', exact: true })).toBeVisible();
   await expectNoAxeViolations(page);
 
   await page.goto('/admin/organisations/andere/holidays');
