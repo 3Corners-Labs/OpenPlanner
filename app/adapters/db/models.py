@@ -162,7 +162,7 @@ class ScheduleOverrideRow(Base):
 
 
 class HolidayCalendarRow(Base):
-    """A reusable set of closed days, maintained by the superuser (ADR 0021)."""
+    """A reusable set of closed days, maintained by the superuser (ADR 0022)."""
 
     __tablename__ = "holiday_calendars"
 

@@ -293,7 +293,7 @@ class Transaction(Protocol):
         """Return every holiday calendar, by name.
 
         Calendars are global reference data (``holidays.manage`` is a global permission,
-        ADR 0021): every admin who chooses calendars sees all of them, so there is no scope.
+        ADR 0022): every admin who chooses calendars sees all of them, so there is no scope.
         """
         ...
 
