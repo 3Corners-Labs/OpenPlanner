@@ -14,6 +14,7 @@ import httpx
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.smtp import SmtpConfig, SmtpMailSender
 from app.adapters.webex_connect_sms import ConnectSmsConfig, WebexConnectSmsSender
+from app.config import Settings
 from app.domain.channel_settings import SmsSettings, SmtpSecurity, SmtpSettings
 from app.domain.channels import ChannelKind
 from app.domain.ports import MessageSender
@@ -54,6 +55,24 @@ class ConfiguredSenders:
         if isinstance(config, SmtpSettings):
             return SmtpMailSender(smtp_config(config, secret))
         return WebexConnectSmsSender(connect_config(config, secret or ""), self._http)
+
+
+def fallback_mail(settings: Settings) -> SmtpConfig | None:
+    """Return the SMTP server from the environment, or ``None`` when ``SMTP_HOST`` is not set.
+
+    Used for organisations without their own SMTP settings (ADR 0022).
+    """
+    if not settings.smtp_host:
+        return None
+    return SmtpConfig(
+        host=settings.smtp_host,
+        port=settings.smtp_port,
+        sender=settings.mail_from,
+        starttls=settings.smtp_starttls,
+        implicit_tls=settings.smtp_implicit_tls,
+        username=settings.smtp_username,
+        password=settings.smtp_password.get_secret_value() if settings.smtp_password else None,
+    )
 
 
 def smtp_config(settings: SmtpSettings, password: str | None) -> SmtpConfig:

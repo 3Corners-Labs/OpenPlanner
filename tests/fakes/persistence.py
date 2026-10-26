@@ -11,12 +11,13 @@ from app.domain import holidays as holiday_model
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
 from app.domain.authorization import Scope
-from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsage
+from app.domain.booking import Booking, BookingKind, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.closure import Closure
+from app.domain.direct_queue import DirectCall
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
     Group,
@@ -315,6 +316,19 @@ class InMemoryTransaction:
         return [
             BookingOverview(b, self.state.call_status.get(b.id or 0) or new_status(b.id or 0))
             for b in sorted(found, key=lambda b: (b.start, b.id or 0))
+        ]
+
+    async def get_direct_calls(self, group_id: int, since: datetime) -> list[DirectCall]:
+        return [
+            DirectCall(
+                b.id or 0,
+                b.start,
+                b.end,
+                b.is_active,
+                self.state.call_status.get(b.id or 0) or new_status(b.id or 0),
+            )
+            for b in self.state.bookings.values()
+            if b.group_id == group_id and b.kind is BookingKind.DIRECT and b.start >= since
         ]
 
     async def get_call_status(self, booking_id: int) -> CallStatus | None:

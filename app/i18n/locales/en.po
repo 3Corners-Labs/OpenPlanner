@@ -1028,6 +1028,12 @@ msgstr "Not picked up after (minutes)"
 msgid "admin.field.not_picked_up_minutes_hint"
 msgstr "How long a call may stay without an agent before it is flagged. 1 to 120."
 
+msgid "admin.field.direct_call_max_concurrent"
+msgstr "Maximum number of direct calls at once"
+
+msgid "admin.field.direct_call_max_concurrent_hint"
+msgstr "Usually the number of agents for direct calls. Counts calls that wait and calls with an agent. Empty: no limit, WxCC distributes."
+
 msgid "admin.form.error.video_host_email"
 msgstr "Enter a valid email address."
 
@@ -1039,6 +1045,9 @@ msgstr "Make a choice."
 
 msgid "admin.form.error.not_picked_up_minutes"
 msgstr "Enter a number of minutes from 1 to 120."
+
+msgid "admin.form.error.direct_call_max_concurrent"
+msgstr "Enter a whole number from 1 to 1000, or leave the field empty."
 
 msgid "admin.group.video"
 msgstr "Video call (Webex)"
@@ -1097,6 +1106,9 @@ msgstr "Back to your appointment"
 msgid "error.direct_call_unavailable"
 msgstr "Starting a call is not possible right now. Please book an appointment."
 
+msgid "error.direct_call_full"
+msgstr "All agents have just become busy. Please try again in a few minutes or book an appointment."
+
 msgid "direct.title"
 msgstr "Start a video call now"
 
@@ -1120,6 +1132,21 @@ msgstr "The team is open now. You can start a video call right away."
 
 msgid "direct.card.button"
 msgstr "Start a call now"
+
+msgid "direct.full"
+msgstr "All agents are busy right now. Please try again in a few minutes or book an appointment."
+
+msgid "queue.position"
+msgstr "Your place in line: {position}."
+
+msgid "queue.waiting"
+msgstr "Number of people waiting now: {count}."
+
+msgid "queue.nobody"
+msgstr "Nobody is waiting right now."
+
+msgid "queue.typical_wait"
+msgstr "An agent usually answers within about {minutes} min."
 
 msgid "wait.title"
 msgstr "Your video call"
@@ -2559,3 +2586,57 @@ msgstr "Christmas Day"
 
 msgid "holiday.nl.boxing_day"
 msgstr "Boxing Day"
+
+msgid "admin.channels.test_heading"
+msgstr "Send a test email"
+
+msgid "admin.channels.test_lead"
+msgstr "Check that mail works: OpenPlanner sends one message through the mail server it currently uses for this organisation, with the saved settings above or else the installation's default server. Save any changes first."
+
+msgid "admin.channels.test_recipient"
+msgstr "Send to"
+
+msgid "admin.channels.test_recipient_hint"
+msgstr "An address you can check yourself. The address is not stored."
+
+msgid "admin.channels.test_send"
+msgstr "Send test email"
+
+msgid "admin.channels.test_subject"
+msgstr "OpenPlanner: test email"
+
+msgid "admin.channels.test_text"
+msgstr "This is a test email from OpenPlanner. If it arrives, the mail server works. You do not need to do anything."
+
+msgid "admin.done.test_sent"
+msgstr "Test email sent: the mail server accepted it. Check that it arrived; also look in the junk mail folder."
+
+msgid "admin.form.error.test_recipient"
+msgstr "Enter a valid email address, for example name@example.com."
+
+msgid "admin.channels.test_failed.no_server"
+msgstr "No mail server is set up for this organisation and the installation has no default server. Fill in the settings above."
+
+msgid "admin.channels.test_failed.unreachable"
+msgstr "The mail server cannot be reached. Check the server and the port, and whether the server accepts connections from OpenPlanner."
+
+msgid "admin.channels.test_failed.tls_failed"
+msgstr "The secure connection failed. Check the security setting: STARTTLS usually goes with port 587, TLS with port 465. Or the server's certificate is not valid."
+
+msgid "admin.channels.test_failed.not_supported"
+msgstr "The mail server does not offer the chosen security or login. Check the security setting and the port."
+
+msgid "admin.channels.test_failed.unauthorized"
+msgstr "The mail server refuses the login. Check the username or password."
+
+msgid "admin.channels.test_failed.sender_refused"
+msgstr "The mail server refuses the sender address. Use an address this account may send from."
+
+msgid "admin.channels.test_failed.recipient_refused"
+msgstr "The mail server refuses the address you are sending the test email to."
+
+msgid "admin.channels.test_failed.rejected"
+msgstr "The mail server rejected the message (code {status})."
+
+msgid "admin.channels.test_failed.other"
+msgstr "Sending failed because of an unexpected mail server error. Try again later."

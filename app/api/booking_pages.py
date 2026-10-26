@@ -123,7 +123,7 @@ async def group_page(
     context = {
         "picker": view,
         "errors": errors,
-        "direct_call_available": await service.direct_call_available(slug),
+        "direct_call": await service.direct_call_availability(slug),
         "closure": closure_view(closure, group, locale, now) if closure else None,
     }
     return await citizen_page(request, locale, "group.html", group, context)

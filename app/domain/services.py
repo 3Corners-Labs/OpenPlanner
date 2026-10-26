@@ -11,7 +11,8 @@ A booking is read-only from its change deadline (``job_plan.change_deadline``: t
 dispatch lead before the start, T−5 min by default): cancel and reschedule then raise
 ``booking_locked``. A booking suspended by an emergency closure (ADR 0024) has no deadline:
 the citizen can move or cancel it until it is resolved. No slot inside a closure is offered
-or booked (``group_closed``), and no direct call starts while one is active.
+or booked (``group_closed``), and no direct call starts while one is active. A direct call
+also needs room under the group's cap of open direct calls (``direct_call_full``, ADR 0026).
 """
 
 from dataclasses import dataclass, field
@@ -28,6 +29,14 @@ from app.domain.availability import (
 from app.domain.booking import Booking, BookingKind, BookingStatus, Contact, Slot
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure, covering
+from app.domain.direct_queue import (
+    ESTIMATE_WINDOW,
+    DirectAvailability,
+    QueueInfo,
+    has_room,
+    load_since,
+    queue_info,
+)
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import effective_schedule
 from app.domain.job_plan import (
@@ -166,17 +175,27 @@ class BookingService:
             )
             return await self._place(tx, group, start, details, locale, consents, None)
 
-    async def direct_call_available(self, group_slug: str) -> bool:
-        """Return whether a direct call can be started now (switched on and open).
+    async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
+        """Return whether a direct call can be started now: switched on, open, and room.
 
         Raises:
             DomainError: ``group_not_found``.
         """
         async with self._uow.read() as tx:
             group = await self._group(tx, group_slug)
-            if not group.direct_call_enabled:
-                return False
-            return await self._direct_open(tx, group, self._clock.now())
+            now = self._clock.now()
+            if not group.direct_call_enabled or not await self._direct_open(tx, group, now):
+                return DirectAvailability.UNAVAILABLE
+            if not await self._direct_room(tx, group, now):
+                return DirectAvailability.FULL
+            return DirectAvailability.AVAILABLE
+
+    async def direct_queue(self, group: Group, booking_id: int | None = None) -> QueueInfo:
+        """Return the group's queue of direct calls, with the place of ``booking_id`` (ADR 0026)."""
+        now = self._clock.now()
+        async with self._uow.read() as tx:
+            calls = await tx.get_direct_calls(group.id, now - ESTIMATE_WINDOW)
+        return queue_info(calls, group, now, booking_id)
 
     async def start_direct(
         self, *, group_slug: str, contact: ContactInput, locale: str
@@ -184,14 +203,17 @@ class BookingService:
         """Start a call right away (ADR 0019): a booking in its own slot from now on.
 
         Raises:
-            DomainError: ``group_not_found``, ``invalid_contact`` or ``direct_call_unavailable``
-                (switched off, or the group is not open now).
+            DomainError: ``group_not_found``, ``invalid_contact``, ``direct_call_unavailable``
+                (switched off, or the group is not open now) or ``direct_call_full`` (the
+                group's cap of open direct calls is reached).
         """
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
             now = self._clock.now()
             if not group.direct_call_enabled or not await self._direct_open(tx, group, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_UNAVAILABLE)
+            if not await self._direct_room(tx, group, now):
+                raise DomainError(ErrorCode.DIRECT_CALL_FULL)
             details = Contact.create(
                 name=contact.name,
                 email=contact.email,
@@ -303,6 +325,12 @@ class BookingService:
         if any(c.is_active(now) for c in await tx.get_closures(group.id, now)):
             return False
         return is_open(group, rules, overrides, now)
+
+    async def _direct_room(self, tx: Transaction, group: Group, now: datetime) -> bool:
+        """Return whether another direct call fits under the group's cap at ``now``."""
+        if group.direct_call_max_concurrent is None:
+            return True
+        return has_room(group, await tx.get_direct_calls(group.id, load_since(group, now)), now)
 
     async def _group(self, tx: Transaction, slug: str) -> Group:
         """Return the group or raise ``group_not_found``."""

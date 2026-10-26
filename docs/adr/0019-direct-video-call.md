@@ -1,6 +1,7 @@
 # 0019. Direct video call ("now") per group
 
-Status: accepted (2026-10-23). Settles open point O9.
+Status: accepted (2026-10-23). Settles open point O9. Amended by ADR 0026 (cap on open direct
+calls per group, queue feedback).
 
 ## Context
 
