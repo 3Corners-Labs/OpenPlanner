@@ -130,6 +130,22 @@ jobs:
           scan-ref: .
           exit-code: "1"
           severity: HIGH,CRITICAL
+      # TLS proxy (ADR 0029): same lint and CVE gate as the app image, then a real ACME run
+      # against Pebble (Let's Encrypt's test CA).
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: deploy/proxy/Dockerfile
+      - name: build proxy
+        run: docker build -t openplanner-proxy:ci deploy/proxy
+      - name: trivy (CVE, proxy)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: openplanner-proxy:ci
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+      - name: proxy check (certificate over ACME, redirect, body limit)
+        run: scripts/check-proxy.sh
       - name: start read-only, non-root
         run: scripts/run-app-container.sh openplanner:ci
       - name: schemathesis

@@ -1,0 +1,35 @@
+# Test overlay for scripts/check-proxy.sh (ADR 0029): Let's Encrypt's test CA (Pebble) instead
+# of the real one, on loopback ports, with the app in development mode. Never for production.
+services:
+  web:
+    environment:
+      ENVIRONMENT: dev
+    ports: !override
+      - "127.0.0.1:18000:8000"
+  worker:
+    environment:
+      ENVIRONMENT: dev
+  pebble:
+    image: ghcr.io/letsencrypt/pebble:2.8.0
+    profiles: [tls]
+    environment:
+      # Pebble cannot reach the test domain; it accepts every challenge instead.
+      PEBBLE_VA_ALWAYS_VALID: "1"
+    networks:
+      edge:
+        ipv4_address: 172.31.240.5
+  proxy:
+    environment:
+      TLS_DOMAIN: booking.test
+      ACME_EMAIL: ops@booking.test
+      ACME_CA: https://pebble:14000/dir
+      # Trust Pebble's own TLS certificate (Go reads SSL_CERT_FILE).
+      SSL_CERT_FILE: /pebble/pebble.minica.pem
+    volumes:
+      - ${PEBBLE_CERTS:?set by scripts/check-proxy.sh}:/pebble:ro
+    depends_on:
+      pebble:
+        condition: service_started
+    ports: !override
+      - "127.0.0.1:18080:8080"
+      - "127.0.0.1:18443:8443"
