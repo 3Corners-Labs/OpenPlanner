@@ -64,6 +64,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.DASHBOARD_VIEW,
         Permission.RIGHTS_VIEW,
         Permission.MATRIX_VIEW,
+        Permission.AUDIT_VIEW,  # ADR 0029: the log of the own groups only
         Permission.GROUP_VIEW,
         Permission.SCHEDULE_MANAGE,
         Permission.TEXTS_MANAGE,
@@ -84,11 +85,12 @@ def test_every_permission_has_a_level() -> None:
         (ORG, Permission.GROUP_EDIT, OWN_GROUP, Decision(True, Reason.ORGANISATION)),
         (ORG, Permission.GROUP_EDIT, OTHER_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
         (ORG, Permission.INTEGRATIONS_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
-        (ORG, Permission.AUDIT_VIEW, OWN_ORG, Decision(True, Reason.ORGANISATION)),
+        (ORG, Permission.AUDIT_VIEW, OWN_GROUP, Decision(True, Reason.ORGANISATION)),
         (GROUP, Permission.SCHEDULE_MANAGE, OWN_GROUP, Decision(True, Reason.GROUP)),
         (GROUP, Permission.SCHEDULE_MANAGE, OTHER_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
         (GROUP, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.NOT_PERMITTED)),
-        (GROUP, Permission.AUDIT_VIEW, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
+        (GROUP, Permission.AUDIT_VIEW, OWN_GROUP, Decision(True, Reason.GROUP)),
+        (GROUP, Permission.AUDIT_VIEW, OTHER_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
         (GROUP, Permission.DASHBOARD_VIEW, Target.everything(), Decision(True, Reason.ROLE)),
         (NOBODY, Permission.DASHBOARD_VIEW, Target.everything(), Decision(False, Reason.NO_ROLE)),
         (NOBODY, Permission.GROUP_VIEW, OWN_GROUP, Decision(False, Reason.NO_ROLE)),
@@ -127,6 +129,16 @@ def test_scope_for_group_permissions() -> None:
     assert scope_for(GROUP, Permission.GROUP_VIEW) == Scope(groups=frozenset({"demo"}))
     assert scope_for(GROUP, Permission.GROUP_EDIT).is_empty
     assert scope_for(NOBODY, Permission.GROUP_VIEW).is_empty
+
+
+def test_audit_scope_is_exactly_the_own_level() -> None:
+    # ADR 0029: a group admin's log holds its groups only, never the organisation's own
+    # events; an organisation admin's log holds no global events.
+    assert scope_for(GROUP, Permission.AUDIT_VIEW) == Scope(groups=frozenset({"demo"}))
+    assert not scope_for(GROUP, Permission.AUDIT_VIEW).contains("demo", None)
+    assert scope_for(ORG, Permission.AUDIT_VIEW).contains("demo", None)
+    assert not scope_for(ORG, Permission.AUDIT_VIEW).contains(None, None)
+    assert scope_for(SUPER, Permission.AUDIT_VIEW).contains(None, None)
 
 
 def test_scope_for_rejects_global_permissions() -> None:

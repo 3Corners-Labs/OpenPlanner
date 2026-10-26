@@ -41,7 +41,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
 from app.i18n import BoundGettext
-from app.i18n.dates import format_clock, format_day_compact, local_day
+from app.i18n.dates import format_moment_compact
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest, booking_limit, limiter
@@ -250,9 +250,7 @@ def _status(stored: ChannelSettings | None, locale: RequestLocale, tz: ZoneInfo)
     if stored is None:
         return {"label": _("admin.channels.not_configured"), "tone": "", "changed": ""}
     at: datetime = stored.updated_at
-    changed = (
-        f"{format_day_compact(local_day(at, tz), locale.code)}, {format_clock(at, tz, locale.code)}"
-    )
+    changed = format_moment_compact(at, tz, locale.code)
     if not stored.ready:
         return {"label": _("admin.channels.secret_missing"), "tone": "warning", "changed": changed}
     return {"label": _("admin.channels.ready"), "tone": "success", "changed": changed}

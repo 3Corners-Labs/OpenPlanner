@@ -386,7 +386,11 @@ class JobRow(Base):
 
 
 class AuditEventRow(Base):
-    """An audited admin action (ADR 0014). Never holds personal data of citizens."""
+    """An audited admin action (ADR 0014) or system event (ADR 0029).
+
+    Never holds personal data of citizens; ``booking_id`` is a plain id without a foreign key,
+    so an event outlives what it describes.
+    """
 
     __tablename__ = "audit_events"
 
@@ -399,11 +403,18 @@ class AuditEventRow(Base):
     organisation: Mapped[str | None] = mapped_column(String(64))
     group: Mapped[str | None] = mapped_column(String(64))
     detail: Mapped[str] = mapped_column(String(255), server_default=text("''"))
+    source: Mapped[str] = mapped_column(String(16), server_default=text("'admin'"))
+    booking_id: Mapped[int | None] = mapped_column(Integer)
 
     __table_args__ = (
         Index("ix_audit_events_at", "at"),
         Index("ix_audit_events_organisation", "organisation"),
-        CheckConstraint("outcome IN ('success', 'denied', 'failure')", name="outcome"),
+        Index("ix_audit_events_group", "group"),
+        Index("ix_audit_events_source_at", "source", "at"),
+        CheckConstraint(
+            "outcome IN ('success', 'denied', 'failure', 'retry', 'skipped')", name="outcome"
+        ),
+        CheckConstraint("source IN ('admin', 'system')", name="source"),
     )
 
 

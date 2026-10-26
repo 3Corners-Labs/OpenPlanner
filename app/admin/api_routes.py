@@ -46,7 +46,7 @@ from app.domain.api_clients import (
 from app.domain.authorization import API_SCOPES, Permission
 from app.domain.errors import DomainError
 from app.domain.scheduling import GroupSummary
-from app.i18n.dates import format_clock, format_day_compact, local_day
+from app.i18n.dates import format_moment_compact
 from app.web.authz_labels import API_SCOPE_LABELS
 from app.web.locale import RequestLocale
 
@@ -94,9 +94,7 @@ class ClientView:
 def _moment(request: Request, locale: RequestLocale, at: datetime) -> str:
     """Return a compact local date and time in the admin time zone."""
     tz = ZoneInfo(request.app.state.settings.admin_timezone)
-    return (
-        f"{format_day_compact(local_day(at, tz), locale.code)}, {format_clock(at, tz, locale.code)}"
-    )
+    return format_moment_compact(at, tz, locale.code)
 
 
 def _view(

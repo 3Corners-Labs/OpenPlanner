@@ -7,6 +7,7 @@ Run with ``python -m app.jobs.worker``. Each iteration checks the database, runs
 import asyncio
 import signal
 from contextlib import suppress
+from datetime import timedelta
 
 import httpx
 import structlog
@@ -62,6 +63,7 @@ async def run_worker(settings: Settings, stop: asyncio.Event, clock: Clock) -> N
         video=integrations.video,
         dispatcher=integrations.dispatcher,
         integration=IntegrationService(uow, clock, AdminService(uow, clock)),
+        retention=timedelta(days=settings.system_event_retention_days),
     )
     log.info(
         "worker.started",

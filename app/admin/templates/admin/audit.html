@@ -7,6 +7,37 @@
     <p class="page-header__lead">{{ _("admin.audit.intro") }}</p>
   </div>
 </div>
+<form class="card" method="get" action="/admin/audit" aria-labelledby="filter-heading">
+  <h2 id="filter-heading" class="visually-hidden">{{ _("admin.audit.filter") }}</h2>
+  <div class="inline-forms">
+    <div class="field">
+      <label for="audit-source">{{ _("admin.audit.source") }}</label>
+      <select id="audit-source" name="source">
+        <option value="">{{ _("admin.audit.all") }}</option>
+        {% for option in filters.sources %}<option value="{{ option.value }}"{% if option.value == filters.source %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
+      </select>
+    </div>
+    {% if filters.groups | length > 1 %}
+    <div class="field">
+      <label for="audit-group">{{ _("admin.audit.group") }}</label>
+      <select id="audit-group" name="group">
+        <option value="">{{ _("admin.audit.all") }}</option>
+        {% for option in filters.groups %}<option value="{{ option.value }}"{% if option.value == filters.group %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="field">
+      <label for="audit-booking">{{ _("admin.audit.booking") }}</label>
+      <input type="text" id="audit-booking" name="booking" inputmode="numeric" pattern="[0-9]*" maxlength="12" value="{{ filters.booking }}">
+    </div>
+    <div class="choice__option">
+      <input type="checkbox" id="audit-problems" name="problems" value="1"{% if filters.problems %} checked{% endif %}>
+      <label for="audit-problems">{{ _("admin.audit.problems") }}</label>
+    </div>
+    <button type="submit" class="button button--secondary">{{ _("admin.audit.apply") }}</button>
+    {% if filters.active %}<a href="/admin/audit">{{ _("admin.audit.clear") }}</a>{% endif %}
+  </div>
+</form>
 {% if events %}
 <div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
 <table class="data-table">
@@ -25,8 +56,12 @@
     <tr>
       <td class="nowrap">{{ event.when }}</td>
       <td>{{ event.actor }}</td>
-      <td>{{ event.action }}{% if event.detail %}<br><span class="muted">{{ event.detail }}</span>{% endif %}</td>
-      <td><span class="chip chip--{{ event.tone }}">{{ event.outcome }}</span></td>
+      <td>{{ event.action }}
+        {%- if event.detail %}<br><span class="muted">{{ event.detail }}</span>{% endif %}
+        {%- if event.booking_url %}<br><a href="{{ event.booking_url }}">{{ _("admin.audit.booking_link", id=event.booking_id) }}</a>
+        {%- elif event.booking_id %}<br><span class="muted">{{ _("admin.audit.booking_link", id=event.booking_id) }}</span>{% endif %}</td>
+      <td><span class="chip{% if event.tone %} chip--{{ event.tone }}{% endif %}">{{ event.outcome }}</span>
+        {%- if event.code %}<br><span class="muted">{% if event.reason %}{{ event.reason }} {% endif %}<code>{{ event.code }}</code></span>{% endif %}</td>
       <td>{{ event.target }}</td>
     </tr>
     {% endfor %}

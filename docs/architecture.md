@@ -199,6 +199,7 @@ same commit and rollback behaviour as the SQL one.
 | Error codes | `app/domain/errors.py` |
 | Authorisation matrix, scopes (ADR 0014) | `app/domain/authorization.py` |
 | Admin use cases, audit events | `app/domain/admin.py`, `app/domain/audit.py` |
+| System events of the worker, exact per level, and their retention (ADR 0029) | `app/domain/system_log.py`, `app/jobs/runner.py`, `app/admin/audit_routes.py` |
 | Groups, opening hours, exceptions, preview (admin) | `app/domain/planning.py` |
 | Holiday calendars and their resolution per group (ADR 0025) | `app/domain/holidays.py`, `app/domain/holiday_service.py`, `app/admin/holiday_routes.py` |
 | What leaves for Webex/WxCC, timeline, call status, join window | `app/domain/calls.py` |
