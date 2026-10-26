@@ -1,13 +1,15 @@
 """Run due jobs: message jobs through a ``MessageSender``, and the PII purge.
 
-Handled: confirmation, change, reminder (email), cancellation, the emergency closure messages
-(suspension, update, reinstatement; ADR 0022), purge, and, when Webex and WxCC are
+Handled: confirmation, change, reminder (email and SMS), cancellation, the emergency closure
+messages (suspension, update, reinstatement; ADR 0023), purge, and, when Webex and WxCC are
 configured, meetings and work items (``app.jobs.calls``). Jobs of an unconfigured
-integration are not claimed; they wait.
+integration are not claimed; they wait. A message for an organisation without a sender on
+its channel fails at once as ``channel_not_configured`` (ADR 0022).
 
     claim due ─► stale? (pinned start changed / not confirmed / purged) ─► done, nothing sent
              ─► purge ─► NULL PII
-             ─► message ─► compose ─► send ─► done
+             ─► message ─► sender of the group's organisation and the job's channel
+                       ─► compose (group texts first) ─► send ─► done
              ─► meeting / work item ─► app.jobs.calls
              failure ─► retry after 1, 5, 15 min ─► failed (refusals fail at once)
 """
@@ -21,7 +23,7 @@ import structlog
 from app.adapters.db.jobs import ClaimedJob
 from app.domain.call_service import CallService
 from app.domain.channels import ChannelKind
-from app.domain.errors import DomainError
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType, is_stale
 from app.domain.ports import (
@@ -68,6 +70,18 @@ class JobQueue(Protocol):
         ...
 
 
+class SenderDirectory(Protocol):
+    """Finds the sender of an organisation's channel (``ConfiguredSenders``; a fake in tests)."""
+
+    async def sender(self, organisation_id: int, channel: ChannelKind) -> MessageSender | None:
+        """Return the sender, or ``None`` when the organisation has none on ``channel``."""
+        ...
+
+
+MESSAGE_CHANNELS = frozenset({ChannelKind.EMAIL, ChannelKind.SMS})
+"""Channels whose message jobs are claimed when a sender directory is available."""
+
+
 class JobRunner:
     """Claims and executes due jobs.
 
@@ -75,7 +89,7 @@ class JobRunner:
         queue: The job queue.
         uow: Reads bookings and groups; purges personal data.
         clock: Current time.
-        sender: Email sender, or ``None`` when no SMTP server is configured.
+        senders: Finds the sender per organisation and channel; ``None`` claims no messages.
         composer: Builds messages.
         video: Webex meetings, or ``None`` when not configured.
         dispatcher: WxCC work items, or ``None`` when not configured.
@@ -87,7 +101,7 @@ class JobRunner:
         queue: JobQueue,
         uow: UnitOfWork,
         clock: Clock,
-        sender: MessageSender | None,
+        senders: SenderDirectory | None,
         composer: MessageComposer,
         *,
         video: VideoProvider | None = None,
@@ -98,10 +112,10 @@ class JobRunner:
         self._queue = queue
         self._uow = uow
         self._clock = clock
-        self._sender = sender
+        self._senders = senders
         self._composer = composer
         self._types: set[JobType] = {JobType.PURGE_PII}
-        if sender is not None:
+        if senders is not None:
             self._types |= set(MESSAGE_KINDS)
         self._calls = (
             CallJobs(uow, CallService(uow, integration, video, dispatcher, agent_start_label))
@@ -114,7 +128,7 @@ class JobRunner:
     async def run_due(self) -> int:
         """Run every due job once; return how many were claimed."""
         now = self._clock.now()
-        jobs = await self._queue.claim_due(now, self._types, {ChannelKind.EMAIL})
+        jobs = await self._queue.claim_due(now, self._types, MESSAGE_CHANNELS)
         for job in jobs:
             try:
                 await self._run(job, now)
@@ -138,6 +152,7 @@ class JobRunner:
                 await tx.purge_personal_data(job.booking_id, now)
             log.info("job.purged", job_id=job.id, booking_id=job.booking_id)
             return
+        channel = job.channel or ChannelKind.EMAIL
         async with self._uow.read() as tx:
             booking = await tx.get_booking(job.booking_id)
             group = await tx.get_group_by_id(booking.group_id) if booking else None
@@ -146,16 +161,29 @@ class JobRunner:
                 if booking and booking.closure_id is not None
                 else None
             )
-        if booking is None or group is None or booking.contact is None:
+            texts = await tx.get_group_texts(group.id) if group else {}
+        contact = booking.contact if booking else None
+        if (
+            booking is None
+            or group is None
+            or contact is None
+            or (channel is ChannelKind.SMS and contact.phone is None)
+        ):
             log.info("job.skipped", job_id=job.id, reason="no_recipient")
             return
         if is_stale(job.pinned_start, booking, job.type):
             log.info("job.skipped", job_id=job.id, reason="stale")
             return
-        if self._sender is None:  # pragma: no cover - message jobs are not claimed then
-            raise RuntimeError("no sender configured")
-        await self._sender.send(self._composer.compose(job.type, booking, group, now, closure))
-        log.info("job.sent", job_id=job.id, type=job.type.value)
+        if self._senders is None:  # pragma: no cover - message jobs are not claimed then
+            raise RuntimeError("no sender directory")
+        sender = await self._senders.sender(group.organisation_id, channel)
+        if sender is None:
+            raise DomainError(ErrorCode.CHANNEL_NOT_CONFIGURED)
+        message = self._composer.compose(
+            job.type, booking, group, now, channel=channel, texts=texts, closure=closure
+        )
+        await sender.send(message)
+        log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)
 
     async def _handle_failure(
         self, job: ClaimedJob, now: datetime, error: str, *, retryable: bool = True

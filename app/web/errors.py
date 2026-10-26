@@ -32,6 +32,9 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.GROUP_CLOSED: "error.group_closed",
     ErrorCode.CLOSURE_EXISTS: "admin.form.error.closure_exists",
     ErrorCode.CLOSURE_NOT_FOUND: "error.not_found.text",
+    ErrorCode.CHANNEL_NOT_CONFIGURED: "error.invalid_request",
+    ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",
+    ErrorCode.REMINDER_NOT_FOUND: "error.not_found.text",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {
@@ -46,6 +49,7 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.GROUP_NOT_FOUND: 404,
     ErrorCode.BOOKING_NOT_FOUND: 404,
     ErrorCode.SCHEDULE_ITEM_NOT_FOUND: 404,
+    ErrorCode.REMINDER_NOT_FOUND: 404,
     ErrorCode.ORGANISATION_NOT_FOUND: 404,
     ErrorCode.CLOSURE_NOT_FOUND: 404,
     ErrorCode.NOT_PERMITTED: 403,

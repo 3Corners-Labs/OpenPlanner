@@ -3,6 +3,7 @@ from dataclasses import replace
 import pytest
 
 from app.domain.booking import Booking, BookingStatus, Contact
+from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.job_plan import JobType
 from app.domain.scheduling import PhoneMode
@@ -114,7 +115,66 @@ def test_join_link_only_for_groups_with_video(composer: MessageComposer) -> None
     assert "/join" not in cancelled.text
 
 
-# --- emergency closure (ADR 0022) ----------------------------------------------------------
+SMS_BOOKING = replace(
+    BOOKING,
+    contact=Contact.create(
+        name="Ada Lovelace",
+        email="ada@example.org",
+        phone="06 1234 5678",
+        phone_mode=PhoneMode.OPTIONAL,
+    ),
+)
+
+
+def test_sms_reminder_is_one_short_text_with_the_manage_link(composer: MessageComposer) -> None:
+    message = composer.compose(
+        JobType.SEND_REMINDER, SMS_BOOKING, GROUP, NOW, channel=ChannelKind.SMS
+    )
+
+    assert message.channel is ChannelKind.SMS
+    assert message.recipient == "0612345678"
+    assert message.html is None
+    assert message.attachments == ()
+    assert message.text.startswith("Beste Ada, herinnering: videogesprek met Aangifte")
+    assert "maandag 5 januari 2026 om 09:00" in message.text
+    assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}" in message.text
+    assert "Lovelace" not in message.text
+    assert "ada@example.org" not in message.text
+
+
+def test_sms_needs_a_phone_number_and_an_sms_form(composer: MessageComposer) -> None:
+    with pytest.raises(ValueError, match="phone"):
+        composer.compose(JobType.SEND_REMINDER, BOOKING, GROUP, NOW, channel=ChannelKind.SMS)
+    with pytest.raises(ValueError, match="SMS form"):
+        composer.compose(
+            JobType.SEND_CONFIRMATION, SMS_BOOKING, GROUP, NOW, channel=ChannelKind.SMS
+        )
+
+
+def test_group_texts_replace_blocks_in_their_locale_only(composer: MessageComposer) -> None:
+    texts = {
+        ("nl", "message.reminder.subject"): "Denkt u aan {date}?",
+        ("nl", "message.reminder.sms"): "Tot {date}, {first_name}! {manage_url}",
+        ("en", "message.signoff"): "Kind regards, the {group_name} team",
+    }
+
+    email = composer.compose(JobType.SEND_REMINDER, BOOKING, GROUP, NOW, texts=texts)
+    sms = composer.compose(
+        JobType.SEND_REMINDER, SMS_BOOKING, GROUP, NOW, channel=ChannelKind.SMS, texts=texts
+    )
+    english = composer.compose(
+        JobType.SEND_REMINDER, replace(BOOKING, locale="en"), GROUP, NOW, texts=texts
+    )
+
+    assert email.subject == "Denkt u aan maandag 5 januari 2026?"
+    assert "Dit is een herinnering" in email.text  # blocks without a group text stay default
+    assert sms.text.startswith("Tot maandag 5 januari 2026, Ada! https://afspraak.example.nl/b/")
+    assert english.subject.startswith("Reminder:")
+    assert "Kind regards, the Aangifte <Inkomstenbelasting> team" in english.text
+    assert "the Aangifte &lt;Inkomstenbelasting&gt; team" in (english.html or "")
+
+
+# --- emergency closure (ADR 0023) ----------------------------------------------------------
 
 CLOSURE = Closure(
     1,
@@ -132,7 +192,7 @@ def test_suspension_carries_the_notice_and_no_join_link_or_calendar(
     booking = replace(BOOKING, status=BookingStatus.SUSPENDED, closure_id=1)
     video = replace(GROUP, video_host_email="host@example.org")
 
-    message = composer.compose(JobType.SEND_SUSPENSION, booking, video, NOW, CLOSURE)
+    message = composer.compose(JobType.SEND_SUSPENSION, booking, video, NOW, closure=CLOSURE)
 
     assert message.subject == "Uw videogesprek op maandag 5 januari 2026 kan niet doorgaan"
     assert "Toelichting:\nStoring.\nWe bellen <niet>." in message.text
@@ -145,7 +205,7 @@ def test_suspension_carries_the_notice_and_no_join_link_or_calendar(
 def test_closure_update_in_english(composer: MessageComposer) -> None:
     booking = replace(BOOKING, status=BookingStatus.SUSPENDED, closure_id=1, locale="en")
 
-    message = composer.compose(JobType.SEND_CLOSURE_UPDATE, booking, GROUP, NOW, CLOSURE)
+    message = composer.compose(JobType.SEND_CLOSURE_UPDATE, booking, GROUP, NOW, closure=CLOSURE)
 
     assert message.subject.startswith("News about your video call")
     assert "Outage." in message.text
@@ -157,7 +217,7 @@ def test_closure_message_needs_the_closure(composer: MessageComposer) -> None:
 
 
 def test_reinstatement_has_the_calendar_and_no_notice(composer: MessageComposer) -> None:
-    message = composer.compose(JobType.SEND_REINSTATEMENT, BOOKING, GROUP, NOW, CLOSURE)
+    message = composer.compose(JobType.SEND_REINSTATEMENT, BOOKING, GROUP, NOW, closure=CLOSURE)
 
     assert "gaat toch door" in message.subject
     assert "Storing." not in message.text

@@ -1,4 +1,4 @@
-# 0022. Emergency closure: appointments on hold, citizens informed
+# 0023. Emergency closure: appointments on hold, citizens informed
 
 Status: accepted (2026-10-25), decided by the product owner. The retention exception needs
 confirmation by the privacy officer in the DPIA (open point O7).
@@ -46,7 +46,7 @@ nor personal data are deleted, so citizens do not have to book and fill in every
   An open-ended closure keeps personal data until it is lifted; the closure page says so.
 - A booking within its dispatch lead when the closure starts may already have a WxCC work
   item; it is ended like the work item of a cancelled booking (`end_wxcc_task`).
-- Mail is the only channel for now (SMS follows with ADR 0009's SMS adapter); the notice on the
+- Closure messages go by email; SMS (ADR 0022) is used for reminders only for now. The notice on the
   group page and the management page reaches those who do not read their mail.
-- Downgrading migration 0013 turns suspended bookings into cancelled ones and purges them at
+- Downgrading migration 0014 turns suspended bookings into cancelled ones and purges them at
   once, so no personal data outlives the closure that kept it.

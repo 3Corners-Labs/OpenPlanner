@@ -1,9 +1,10 @@
-"""Compose the citizen's messages from catalogue texts (ADR 0009).
+"""Compose the citizen's messages from editable text blocks (ADR 0009, ADR 0022).
 
-Every message uses one fixed layout (HTML plus plain text); only text blocks come from the
-i18n catalogues. Placeholders are filled by the safe formatter in ``app.i18n``. The message
-carries the first name, date, time, team and the management link; nothing else. Messages
-about an emergency closure (ADR 0022) add the closure's notice: plain text an admin wrote,
+Every email uses one fixed layout (HTML plus plain text); an SMS is one text block. Text
+comes from the group's own texts first, then the i18n chain (organisation override,
+catalogue). Placeholders are filled by the safe formatter in ``app.i18n``. A message carries
+the first name, date, time, team and the management link; nothing else. Messages
+about an emergency closure (ADR 0023) add the closure's notice: plain text an admin wrote,
 escaped like every other value and never a template.
 """
 
@@ -16,10 +17,11 @@ from app.domain.booking import Booking
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.job_plan import JobType, change_deadline
+from app.domain.message_texts import GroupTexts
 from app.domain.ports import Attachment, OutboundMessage
 from app.domain.scheduling import Group
 from app.domain.tokens import derive_token
-from app.i18n import BoundGettext, Translator
+from app.i18n import BoundGettext, Translator, format_message
 from app.i18n.dates import format_clock, format_day, local_day
 from app.jobs.calendar import build_ics
 from app.web.templates import create_environment
@@ -36,6 +38,7 @@ class MessageKind:
         intro_key: First paragraph.
         includes_manage_link: Whether the management link is in the message.
         cancels_event: Whether the calendar attachment removes the event.
+        sms_key: The text of the SMS form, if the message has one.
         manage_key: Text above the management link.
         closure_notice: Whether the closure's notice is part of the message (the appointment
             is on hold: no join link and no calendar attachment either).
@@ -45,6 +48,7 @@ class MessageKind:
     intro_key: str
     includes_manage_link: bool
     cancels_event: bool
+    sms_key: str | None = None
     manage_key: str = "message.manage"
     closure_notice: bool = False
 
@@ -55,7 +59,7 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
     ),
     JobType.SEND_CHANGE: MessageKind("message.change.subject", "message.change.intro", True, False),
     JobType.SEND_REMINDER: MessageKind(
-        "message.reminder.subject", "message.reminder.intro", True, False
+        "message.reminder.subject", "message.reminder.intro", True, False, "message.reminder.sms"
     ),
     JobType.SEND_CANCELLATION: MessageKind(
         "message.cancellation.subject", "message.cancellation.intro", False, True
@@ -65,7 +69,7 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
         "message.suspension.intro",
         True,
         False,
-        "message.manage_suspended",
+        manage_key="message.manage_suspended",
         closure_notice=True,
     ),
     JobType.SEND_CLOSURE_UPDATE: MessageKind(
@@ -73,7 +77,7 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
         "message.closure_update.intro",
         True,
         False,
-        "message.manage_suspended",
+        manage_key="message.manage_suspended",
         closure_notice=True,
     ),
     JobType.SEND_REINSTATEMENT: MessageKind(
@@ -82,8 +86,22 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
 }
 
 
+class _Texts:
+    """``_()`` that prefers the group's own text of a block (ADR 0022)."""
+
+    def __init__(self, gettext: BoundGettext, texts: GroupTexts) -> None:
+        """Bind the locale's catalogue lookup and the group's texts."""
+        self._ = gettext
+        self._texts = texts
+
+    def __call__(self, key: str, /, **params: object) -> str:
+        """Return the group's text for ``key`` if it has one, else the i18n text."""
+        own = self._texts.get((self._.locale, key))
+        return format_message(own, params) if own is not None else self._(key, **params)
+
+
 class MessageComposer:
-    """Builds the email for a message job.
+    """Builds the email or SMS for a message job.
 
     Args:
         translator: The application translator.
@@ -108,21 +126,36 @@ class MessageComposer:
         booking: Booking,
         group: Group,
         now: datetime,
+        *,
+        channel: ChannelKind = ChannelKind.EMAIL,
+        texts: GroupTexts | None = None,
         closure: Closure | None = None,
     ) -> OutboundMessage:
-        """Return the email for ``job_type``; closure messages include ``closure``'s notice.
+        """Return the message for ``job_type`` on ``channel``.
+
+        Args:
+            job_type: Which message.
+            booking: The booking it is about (with its contact details).
+            group: The booking's group.
+            now: Stamp of the calendar entry.
+            channel: Email or SMS (SMS exists for reminders).
+            texts: The group's own texts; catalogue texts where it has none.
+            closure: For closure messages: the closure whose notice they carry.
 
         Raises:
             KeyError: If ``job_type`` is not a message job.
-            ValueError: If the booking's personal data has been purged, or a closure message
-                has no closure.
+            ValueError: If the booking's personal data has been purged, it has no phone
+                number for an SMS, the message has no SMS form, or a closure message has no
+                closure.
         """
         kind = MESSAGE_KINDS[job_type]
         if booking.contact is None:
             raise ValueError("booking has no contact details")
         if kind.closure_notice and closure is None:
             raise ValueError("closure message without a closure")
-        _ = self._translator.bind(booking.locale, group.organisation_id)
+        _ = _Texts(self._translator.bind(booking.locale, group.organisation_id), texts or {})
+        if channel is ChannelKind.SMS:
+            return self._sms(kind, booking, group, _)
         tz, locale = group.tz, booking.locale
         date = format_day(local_day(booking.start, tz), locale)
         start_time = format_clock(booking.start, tz, locale)
@@ -176,7 +209,7 @@ class MessageComposer:
         group: Group,
         now: datetime,
         manage_url: str | None,
-        _: BoundGettext,
+        _: "_Texts",
     ) -> Attachment:
         """Return the ``.ics`` attachment for ``booking``."""
         calendar = build_ics(
@@ -190,3 +223,18 @@ class MessageComposer:
             cancelled=kind.cancels_event,
         )
         return Attachment("afspraak.ics", "text/calendar", calendar)
+
+    def _sms(self, kind: MessageKind, booking: Booking, group: Group, _: _Texts) -> OutboundMessage:
+        """Return the SMS: one text block with first name, moment, team and the manage link."""
+        contact = booking.contact
+        if kind.sms_key is None or contact is None or contact.phone is None:
+            raise ValueError("message has no SMS form or the booking no phone number")
+        text = _(
+            kind.sms_key,
+            first_name=contact.first_name,
+            date=format_day(local_day(booking.start, group.tz), booking.locale),
+            time=format_clock(booking.start, group.tz, booking.locale),
+            group_name=group.name,
+            manage_url=self.manage_url(booking),
+        )
+        return OutboundMessage(ChannelKind.SMS, contact.phone, "", text)

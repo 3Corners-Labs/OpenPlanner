@@ -1,4 +1,5 @@
 from collections.abc import Collection
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 import pytest
@@ -148,6 +149,62 @@ async def test_last_attempt_fails(uow: InMemoryUnitOfWork, composer: MessageComp
     await JobRunner(queue, uow, FixedClock(NOW), RecordingSender(failures=1), composer).run_due()
 
     assert queue.failed == [(1, "ConnectionError")]
+
+
+def sms_job(booking_id: int) -> ClaimedJob:
+    return ClaimedJob(1, booking_id, JobType.SEND_REMINDER, ChannelKind.SMS, SLOT_0900, 1)
+
+
+async def test_sms_reminder_goes_through_the_organisations_sms_sender(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    queue, sender = FakeQueue([sms_job(bid)]), RecordingSender()
+
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert sender.asked == [(1, ChannelKind.SMS)]
+    assert sender.sent[0].channel is ChannelKind.SMS
+    assert sender.sent[0].recipient == "0612345678"
+    assert queue.done == [1]
+
+
+async def test_group_texts_are_used(uow: InMemoryUnitOfWork, composer: MessageComposer) -> None:
+    bid = await booking_id(uow)
+    uow.state.group_texts[1] = {("nl", "message.confirmation.subject"): "Gelukt: {date}"}
+    queue, sender = FakeQueue([job(bid, JobType.SEND_CONFIRMATION)]), RecordingSender()
+
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert sender.sent[0].subject == "Gelukt: maandag 5 januari 2026"
+
+
+async def test_an_unconfigured_channel_fails_at_once(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    queue = FakeQueue([sms_job(bid)])
+    sender = RecordingSender(unconfigured=frozenset({ChannelKind.SMS}))
+
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert sender.sent == []
+    assert queue.failed == [(1, "channel_not_configured")]
+
+
+async def test_sms_without_phone_number_is_skipped(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    booking = uow.state.bookings[bid]
+    assert booking.contact is not None
+    uow.state.bookings[bid] = replace(booking, contact=replace(booking.contact, phone=None))
+    queue, sender = FakeQueue([sms_job(bid)]), RecordingSender()
+
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert sender.sent == []
+    assert queue.done == [1]
 
 
 async def test_closure_notice_goes_only_to_bookings_on_hold(

@@ -1,4 +1,4 @@
-"""Emergency closure of a group: no bookings, appointments on hold, citizens informed (ADR 0022).
+"""Emergency closure of a group: no bookings, appointments on hold, citizens informed (ADR 0023).
 
 A ``Closure`` covers the start times ``starts_at <= start < ends_at`` of one group; without
 ``ends_at`` it lasts until it is lifted. While it is visible (now before its end) the citizen

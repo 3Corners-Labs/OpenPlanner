@@ -84,3 +84,21 @@ def test_plain_text_only_message() -> None:
     email = build_email(plain, "noreply@example.nl")
 
     assert email.get_content_type() == "text/plain"
+
+
+class FakeSMTPSSL(FakeSMTP):
+    def __init__(self, host: str, port: int, timeout: float, context: Any) -> None:
+        super().__init__(host, port, timeout)
+        self.calls.append("tls")
+
+
+async def test_implicit_tls_connects_securely_and_skips_starttls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(smtp_module.smtplib, "SMTP_SSL", FakeSMTPSSL)
+    test_pw = "secret"  # gitleaks:allow (test value)
+    config = SmtpConfig("smtp", 465, "noreply@example.nl", True, "user", test_pw, implicit_tls=True)
+
+    await SmtpMailSender(config).send(MESSAGE)
+
+    assert FakeSMTP.instances[0].calls == ["tls", "login:user", "quit"]

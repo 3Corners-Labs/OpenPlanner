@@ -99,7 +99,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.TEXTS_MANAGE,
         Permission.REMINDERS_MANAGE,
         Permission.BOOKINGS_VIEW,
-        # ADR 0022: close one group or every group of the organisation at once.
+        # ADR 0023: close one group or every group of the organisation at once.
         Permission.CLOSURE_MANAGE,
         Permission.ORGANISATION_CLOSURE,
     },
@@ -110,7 +110,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.SCHEDULE_MANAGE,
         Permission.TEXTS_MANAGE,
         Permission.BOOKINGS_VIEW,
-        # ADR 0022: the team itself can close in an emergency and handle its bookings.
+        # ADR 0023: the team itself can close in an emergency and handle its bookings.
         Permission.CLOSURE_MANAGE,
     },
 }
@@ -130,7 +130,7 @@ CITIZEN_ACTIONS: tuple[CitizenAction, ...] = (
     CitizenAction("citizen.booking_view", "management_link"),
     CitizenAction("citizen.booking_change", "management_link_before_deadline"),
     CitizenAction("citizen.booking_cancel", "management_link_before_deadline"),
-    # ADR 0022: a booking on hold can be moved or cancelled until it is resolved.
+    # ADR 0023: a booking on hold can be moved or cancelled until it is resolved.
     CitizenAction("citizen.suspended_booking_change", "management_link_while_suspended"),
 )
 

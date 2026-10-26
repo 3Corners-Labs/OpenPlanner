@@ -119,6 +119,27 @@ Admin: `GET /admin/organisations`, `GET /admin/organisations/new`, `POST /admin/
 | Injection | Group name or text with HTML in emails | Jinja2 autoescape for the HTML part; plain-text part separate | `tests/jobs/test_messages.py::test_html_is_escaped_and_semantic` |
 | Information disclosure | Personal data in calendar files | `.ics` contains team, times and the management link only | `test_calendar_attachment` |
 
+## Flow: message channels, SMS reminders and message texts (ADR 0022)
+
+Superusers configure SMTP and the Webex Connect SMS service per organisation at
+`/admin/organisations/{org}/channels`; organisation admins add reminder rules per group at
+`/admin/groups/{slug}/reminders`; group admins edit message texts at
+`/admin/groups/{slug}/messages/{locale}`. The worker sends through the organisation's sender.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure | SMTP password or Connect service key leaks through the UI, logs or the database | Write-only fields (always empty, `autocomplete=new-password`); sealed with AES-256-GCM under a per-record name; never returned by the `Transaction` port; audit names fields only | `tests/admin/test_channel_routes.py::test_smtp_is_saved_and_the_password_never_shown`, `tests/adapters/db/test_messaging_queries.py::test_channel_settings_round_trip_with_sealed_secret` |
+| Information disclosure | SMTP password sent unencrypted | A username requires STARTTLS or TLS | `tests/domain/test_channel_settings.py::test_invalid_smtp_settings_name_the_field` |
+| Tampering | A sealed secret copied to another organisation or channel | The record name is the associated data; a moved ciphertext fails to open | `test_a_secret_cannot_be_moved_to_another_channel` |
+| Elevation of privilege | An organisation admin changes where mail or SMS of the organisation goes | `integrations.manage` is superuser only; route and service both check | `tests/admin/test_authorization_matrix.py`, `test_org_admin_may_not_configure_channels_handover_section_6` |
+| Spoofing / injection | Header injection through sender name, address or subject texts | No control characters or line breaks in sender fields and subject blocks; addresses without `<>",;` | `test_a_header_injection_in_the_sender_is_refused`, `tests/domain/test_message_texts.py::test_invalid_texts_name_the_block` |
+| Tampering | SSRF or downgrade through the SMS API host | https only, host name check, no credentials, query or fragment | `tests/domain/test_channel_settings.py::test_invalid_sms_settings_name_the_field` |
+| Information disclosure | A group text pulls in other data (`{x.__class__}`, `{email}`) | Only placeholders from the block's allow-list; the formatter has no attribute access | `test_an_unknown_placeholder_is_refused_and_kept_in_the_form`, `test_used_placeholders` |
+| Information disclosure | Phone number or text in logs or errors | The adapter logs a random correlation ID; response bodies are neither logged nor raised | `tests/adapters/test_webex_connect_sms.py::test_refusals_map_to_integration_errors` |
+| Denial of service | Reminder spam to citizens | At most five rules per group, 5 minutes to 30 days, one per channel and offset | `tests/domain/test_messaging_service.py::test_at_most_five_reminders` |
+| Repudiation | Who changed channels, reminders or texts | Audit events with field names or rule keys, never values or texts | `test_saving_smtp_with_password_is_audited_without_values`, `test_add_and_remove_an_sms_reminder_is_audited` |
+| Elevation of privilege | Texts or reminders of another organisation's group | Group-level permission on the group slug; the service authorises again | `test_texts_of_another_organisation_are_out_of_reach`, `test_reminders_need_reminders_manage_on_the_group` |
+
 ## Flow: admin portal login and authorisation (WP7a)
 
 Admins only; citizens never log in. `GET /admin/login` → identity provider (PingFederate in
@@ -160,10 +181,11 @@ slug, time zone, numbers, times, dates, queue id), path slugs, item ids and the
 | Tampering | A change breaks existing appointments (capacity lowered, time grid moved) | Capacity is snapshotted per slot; time zone and slot length are frozen while confirmed bookings lie ahead; overlapping windows are refused for the whole schedule | `test_capacity_change_never_touches_existing_slots`, `test_time_grid_is_frozen_while_future_bookings_exist`, `test_overlapping_opening_hours_are_refused` |
 | Tampering (XSS) | A crafted `?weekday=` value reflected into the opening-hours form | Only the digits 0–6 are kept; anything else falls back to Monday; output is autoescaped | `tests/admin/test_group_routes.py::test_every_day_links_to_the_form_with_that_day_chosen` |
 | Tampering (XSS) | Markup in a group name or queue id | Jinja2 autoescape; names and queue ids without control characters | `test_names_are_escaped`, `tests/domain/test_scheduling.py::test_group_rejects_invalid_configuration` |
+| Tampering | A crafted time zone (unknown name, fixed offset without summer time) is posted instead of a listed one | The form offers only `Region/City` zones and UTC; the domain accepts only zones of the tz database; a rejected value is not echoed back as an option | `tests/admin/test_group_routes.py::test_new_group_rejects_an_unknown_time_zone`, `tests/admin/test_timezones.py::test_an_unknown_submitted_value_is_not_echoed` |
 | Spoofing | A new group takes an admin path as its slug (`/admin/groups/new`) | Reserved slugs | `test_reserved_slugs_cannot_be_taken` |
 | Repudiation | An admin denies a change | Every change is audited in the same transaction, with the changed field names or `rule.add`-style keys (never values) | `test_settings_change_records_the_changed_fields`, `test_group_admin_manages_opening_hours_of_their_group` |
 
-## Flow: emergency closure (ADR 0022)
+## Flow: emergency closure (ADR 0023)
 
 Admins: `GET/POST /admin/groups/{slug}/closure` and its `update`, `lift`, `reinstate`,
 `cancel`, `bookings/{id}/…` actions; `/admin/closures`, `/admin/organisations/{org}/closure`
@@ -175,7 +197,7 @@ Inputs from outside: notice texts, date-times, booking ids in paths, a chosen sl
 | Elevation | An admin closes, or handles the bookings of, a group or organisation outside their scope | One `RequirePermission` per route and `ClosureService` authorises again; `closure.manage` (group) and `organisation.closure` (organisation, not for group admins) in the matrix | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_closure_service.py::test_other_groups_admin_cannot_close_or_touch_bookings`, `test_group_admin_cannot_close_the_organisation` |
 | Tampering (IDOR) | Moving or cancelling another group's booking by putting its id under one's own group | The booking must belong to the authorised group, else `booking_not_found` (no hint it exists); only suspended bookings can be handled | `test_other_groups_admin_cannot_close_or_touch_bookings`, `test_reinstate_one_booking` |
 | Tampering (XSS) | Markup or scripts in the notice, shown on public pages and in mail | Plain text only, no control characters, at most 1000 characters; Jinja2 autoescape on pages and in the HTML mail; never a template (ADR 0009) | `tests/domain/test_closure.py::test_invalid_notice_texts_are_refused`, `tests/admin/test_closure_routes.py::test_group_admin_closes_the_team_and_citizens_see_why`, `tests/jobs/test_messages.py::test_suspension_carries_the_notice_and_no_join_link_or_calendar` |
-| Information disclosure | Personal data kept longer than needed while bookings are on hold | Purge at closure end + 30 days (ADR 0022); the admin list shows references and times only; the audit keeps keys and counts | `test_closing_suspends_covered_bookings_and_keeps_their_data`, `test_open_ended_closure_has_no_purge_until_it_ends`, `test_update_mails_everyone_on_hold_and_suspends_newly_covered` |
+| Information disclosure | Personal data kept longer than needed while bookings are on hold | Purge at closure end + 30 days (ADR 0023); the admin list shows references and times only; the audit keeps keys and counts | `test_closing_suspends_covered_bookings_and_keeps_their_data`, `test_open_ended_closure_has_no_purge_until_it_ends`, `test_update_mails_everyone_on_hold_and_suspends_newly_covered` |
 | Denial of service | Bots book into a closed team, or start direct calls while it is closed | No slot inside a closure is offered or accepted (`group_closed`); direct calls off while active | `test_closed_group_offers_and_accepts_no_slots`, `test_no_direct_call_while_closed`, `tests/admin/test_closure_routes.py::test_closed_team_cannot_be_booked` |
 | Tampering | An update mail reaches citizens whose booking was already moved or cancelled | Closure mails only run while the booking is still suspended | `tests/domain/test_closure.py::test_closure_notices_only_go_to_bookings_still_on_hold`, `tests/jobs/test_runner.py::test_closure_notice_goes_only_to_bookings_on_hold` |
 | Tampering (CSRF) | A third-party site closes a team in an admin's browser | Fetch Metadata check on every POST; changes need a recent login (ADR 0015) | `tests/admin/test_group_routes.py::test_cross_site_changes_are_refused` (same dependency) |

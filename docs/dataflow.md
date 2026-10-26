@@ -16,15 +16,37 @@ web ──Set-Cookie: lang=<locale>──> visitor browser (functional preferenc
 The `lang` cookie stores only a locale code after an explicit choice in the language switcher.
 It identifies nobody and is strictly functional, so no consent banner is needed.
 
-## Outgoing email (WP3)
+## Outgoing email (WP3, ADR 0022)
 
 ```
-worker ──SMTP──> mail provider (per organisation in WP7, ADR 0008) ──> citizen
+worker ──SMTP──> mail provider of the organisation (admin portal; else SMTP_HOST) ──> citizen
    reads booking at send time: first name, email, date, time, team, management link
 ```
 
 Jobs carry booking IDs only. Messages and calendar attachments contain no phone number and
 no full name. In development Mailpit (`--profile dev`) catches all mail locally.
+
+## SMS reminders (ADR 0022)
+
+```
+worker ──HTTPS──> Webex Connect SMS API of the organisation ──> mobile network ──> citizen
+   body: phone number (E.164), text with first name, date, time, team, management link
+```
+
+| Data item | Destination | When | Legal basis owner | Retention at the processor |
+|---|---|---|---|---|
+| Phone number | Webex Connect (Cisco), mobile operators | per SMS reminder rule of the group, only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
+| First name, date, time, team, management link | as above (message text) | as above | as above | as above |
+
+Only groups whose booking form asks for a phone number can have SMS reminders. The text is
+built from the allow-listed placeholders only (ADR 0009); group admins cannot add other data.
+OpenPlanner logs a random correlation ID per SMS, never the number or the text.
+
+## Channel settings and message texts (ADR 0022)
+
+SMTP and SMS settings per organisation are organisation data; their password and service key
+are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data.
+Neither leaves the system except as part of the messages above.
 
 ## Stored personal data (WP2 schema)
 
@@ -32,14 +54,14 @@ no full name. In development Mailpit (`--profile dev`) catches all mail locally.
 |---|---|---|---|---|
 | Name | `bookings.name` | booking form | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
 | Email | `bookings.email` | booking form | as above | mail provider (WP4) |
-| Phone (optional per group) | `bookings.phone` | booking form | as above | SMS route (WP6) |
+| Phone (optional per group) | `bookings.phone` | booking form | as above | Webex Connect, for SMS reminders (ADR 0022) |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
 | Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the citizen, host URL to WxCC |
 | Management token | `bookings.management_token_hash` (SHA-256 only) | generated | kept (not personal data once the booking is purged) | token itself only in the confirmation mail |
 
 Jobs, slots, schedules and audit events carry no personal data of citizens.
 
-**Exception: emergency closure (ADR 0022).** A booking suspended by an emergency closure keeps
+**Exception: emergency closure (ADR 0023).** A booking suspended by an emergency closure keeps
 the data above until it is moved, reinstated or cancelled (then the rules above apply again),
 and at most until 30 days after the closure ends (`purge_pii` planned at the closure's end +
 30 days; none while the closure is open-ended). Decided by the product owner on 2026-10-25; to
@@ -100,6 +122,5 @@ link does not already send, and stores nothing in the browser.
 
 ## Planned flows
 
-To be added per work package: SMS reminders (WP4/WP6), integration settings in the admin UI
-(WP7d), purge sweep and backups (WP8). Each flow lists: data items, source, destination, legal
+To be added per work package: purge sweep and backups (WP8). Each flow lists: data items, source, destination, legal
 basis owner, retention.
