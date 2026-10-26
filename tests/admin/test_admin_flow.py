@@ -194,7 +194,7 @@ async def test_navigation_follows_the_matrix(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     org_admin_page = (await site.client.get("/admin/")).text
 
-    assert 'href="/admin/audit"' in group_admin_page  # ADR 0030: the own groups' log
+    assert 'href="/admin/audit"' in group_admin_page  # ADR 0031: the own groups' log
     assert 'href="/admin/audit"' in org_admin_page
     assert 'href="/admin/integrations"' not in group_admin_page
     assert 'href="/admin/integrations"' not in org_admin_page

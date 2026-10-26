@@ -181,7 +181,7 @@ class AdminService:
     ) -> list[AuditEntry]:
         """Return the newest audit events ``principal`` may see, with the actors' names.
 
-        The scope is exact per level (ADR 0030): a group admin sees their groups' events, an
+        The scope is exact per level (ADR 0031): a group admin sees their groups' events, an
         organisation admin also the organisation's own, the superuser also global ones.
         ``narrow`` filters within that scope and never widens it.
         """

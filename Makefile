@@ -1,4 +1,4 @@
-.PHONY: check fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation e2e up down
+.PHONY: check fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation e2e proxy-check up down
 
 UV := uv run
 
@@ -59,6 +59,10 @@ mutation:
 		$(UV) mutmut run && $(UV) mutmut export-cicd-stats; \
 	fi
 	$(UV) python scripts/check_mutation_score.py --min 80
+
+# TLS proxy (ADR 0030) against Let's Encrypt's test CA; needs docker.
+proxy-check:
+	scripts/check-proxy.sh
 
 # Needs a running app (docker compose up) at BASE_URL, default http://127.0.0.1:8000.
 e2e:

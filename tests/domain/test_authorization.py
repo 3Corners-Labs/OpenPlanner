@@ -64,7 +64,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.DASHBOARD_VIEW,
         Permission.RIGHTS_VIEW,
         Permission.MATRIX_VIEW,
-        Permission.AUDIT_VIEW,  # ADR 0030: the log of the own groups only
+        Permission.AUDIT_VIEW,  # ADR 0031: the log of the own groups only
         Permission.GROUP_VIEW,
         Permission.SCHEDULE_MANAGE,
         Permission.TEXTS_MANAGE,
@@ -132,7 +132,7 @@ def test_scope_for_group_permissions() -> None:
 
 
 def test_audit_scope_is_exactly_the_own_level() -> None:
-    # ADR 0030: a group admin's log holds its groups only, never the organisation's own
+    # ADR 0031: a group admin's log holds its groups only, never the organisation's own
     # events; an organisation admin's log holds no global events.
     assert scope_for(GROUP, Permission.AUDIT_VIEW) == Scope(groups=frozenset({"demo"}))
     assert not scope_for(GROUP, Permission.AUDIT_VIEW).contains("demo", None)

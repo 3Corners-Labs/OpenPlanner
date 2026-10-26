@@ -44,7 +44,7 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 403)},
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 403)},
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 403)},
-    # ADR 0030: every role has a log; what it lists is exact per level (test_audit_routes).
+    # ADR 0031: every role has a log; what it lists is exact per level (test_audit_routes).
     "GET /admin/audit": {"/admin/audit": statuses(200, 200, 200, 200, 403)},
     # Integrations and secrets: superuser only.
     "GET /admin/integrations": {"/admin/integrations": statuses(200, 403, 403, 403, 403)},

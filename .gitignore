@@ -9,6 +9,7 @@ coverage.xml
 htmlcov/
 data/
 .env
+proxy.env
 .audit-requirements.txt
 .DS_Store
 mutants/
