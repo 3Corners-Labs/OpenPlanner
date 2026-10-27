@@ -1,0 +1,219 @@
+"""``IntegrationChecker`` on Webex and WxCC: the "Koppeling controleren" button (read-only).
+
+For one group it walks the chain a call depends on and turns every link into a ``Finding``:
+
+    webex     the host account exists and the Service App may schedule for it
+    wxcc      region ─► channel ─► asset ─► schema ─► entry point ─► flow ─► queue ─► Screen Pop
+              (``wxcc_config``, the same rules as ``wxcc-config-check``)
+    webhooks  WEBHOOK_BASE_URL is https; this host's Webex webhooks and the WxCC subscription
+              exist and are current (``registrations``); a signed test event is delivered and a
+              wrongly signed one refused (``webhook_selftest``)
+
+Nothing is created or deleted at the platforms, and the self-test events belong to no booking.
+A platform that refuses or cannot be reached becomes a finding; the checker never raises for
+it. Findings carry names, ids and status codes only: no secrets, tokens or citizen data.
+"""
+
+from collections.abc import Sequence
+from dataclasses import dataclass
+
+import httpx
+
+from app.adapters.diagnostics import CheckResult
+from app.adapters.registrations import Expected, Listing, list_registrations
+from app.adapters.webex_auth import AuthorizedClient, WebexTokens
+from app.adapters.webhook_selftest import self_test
+from app.adapters.wxcc_config import GroupRouting, check_group, fetch_config, region_check
+from app.domain.checks import CheckArea, CheckStatus, Finding
+from app.domain.ports import Clock, IntegrationError
+from app.domain.scheduling import Group
+
+
+@dataclass(frozen=True)
+class CheckerConfig:
+    """Where the platforms and our webhook endpoints are, and the webhook secrets."""
+
+    webex_base_url: str
+    wxcc_base_url: str | None
+    webhook_base: str
+    webex_secret: str | None
+    wxcc_secret: str | None
+
+
+def _status(result: CheckResult) -> CheckStatus:
+    """Map a check line to a status: a failed optional check is a warning."""
+    if result.ok:
+        return CheckStatus.OK
+    return CheckStatus.FAIL if result.required else CheckStatus.WARN
+
+
+def _finding(area: CheckArea, result: CheckResult) -> Finding:
+    """Turn a coded check line into a finding of ``area``."""
+    return Finding(area, f"{area.value}.{result.code}", _status(result), result.params)
+
+
+class PlatformChecker:
+    """Checks a group against Webex and WxCC with the Service App's tokens.
+
+    Args:
+        http: Shared HTTP client.
+        tokens: The Service App's tokens.
+        config: Platform addresses, webhook base and secrets.
+        clock: Current time, for the signed test events.
+    """
+
+    def __init__(
+        self, http: httpx.AsyncClient, tokens: WebexTokens, config: CheckerConfig, clock: Clock
+    ) -> None:
+        """Store the collaborators."""
+        self._http = http
+        self._tokens = tokens
+        self._client = AuthorizedClient(http, tokens)
+        self._config = config
+        self._clock = clock
+
+    async def check_group(self, group: Group, peers: Sequence[Group]) -> list[Finding]:
+        """Return the findings for ``group``, in the order of the chain."""
+        return [
+            *await self._webex(group),
+            *await self._wxcc(group, peers),
+            *await self._webhooks(group),
+        ]
+
+    async def _webex(self, group: Group) -> list[Finding]:
+        """Check that the group's host account exists and may be scheduled for."""
+        host = group.video_host_email
+        if not host:
+            return [Finding(CheckArea.WEBEX, "webex.no_host", CheckStatus.WARN)]
+        try:
+            await self._client.request(
+                "GET",
+                f"{self._config.webex_base_url.rstrip('/')}/meetings",
+                params={"hostEmail": host, "max": "1"},
+            )
+        except IntegrationError as error:
+            if error.code in ("rejected_400", "rejected_404"):
+                code = "webex.host_unknown"
+            elif error.code in ("rejected_403", "unauthorized"):
+                code = "webex.host_refused"
+            else:
+                code = "webex.unreachable"
+            params = (("host", host), ("error", error.code))
+            return [Finding(CheckArea.WEBEX, code, CheckStatus.FAIL, params)]
+        return [Finding(CheckArea.WEBEX, "webex.host_ok", CheckStatus.OK, (("host", host),))]
+
+    async def _wxcc(self, group: Group, peers: Sequence[Group]) -> list[Finding]:
+        """Walk the WxCC routing chain of the group's work items."""
+        base = self._config.wxcc_base_url
+        if not base:
+            return [Finding(CheckArea.WXCC, "wxcc.not_configured", CheckStatus.SKIPPED)]
+        if not group.wxcc_channel or not group.wxcc_business_address:
+            return [Finding(CheckArea.WXCC, "wxcc.no_mapping", CheckStatus.WARN)]
+        routing = GroupRouting(
+            group.slug, group.wxcc_channel, group.wxcc_business_address, group.routing_value
+        )
+        sharing = sorted(
+            p.slug
+            for p in [group, *(p for p in peers if p.id != group.id)]
+            if p.wxcc_channel and p.wxcc_business_address == group.wxcc_business_address
+        )
+        try:
+            token = await self._tokens.access_token()
+            region, host, org = await region_check(self._http, token, base)
+            findings = [_finding(CheckArea.WXCC, region)]
+            if host and org:
+                config = await fetch_config(self._http, token, host, org)
+                findings += [
+                    _finding(CheckArea.WXCC, r) for r in check_group(routing, config, sharing)
+                ]
+        except IntegrationError as error:
+            return [
+                Finding(
+                    CheckArea.WXCC,
+                    "wxcc.config_refused",
+                    CheckStatus.FAIL,
+                    (("error", error.code),),
+                )
+            ]
+        return findings
+
+    async def _webhooks(self, group: Group) -> list[Finding]:
+        """Check this group's registrations and that signed events reach OpenPlanner."""
+        config = self._config
+        base = config.webhook_base.rstrip("/")
+        if not base.startswith("https://"):
+            return [
+                Finding(
+                    CheckArea.WEBHOOKS, "webhooks.not_https", CheckStatus.FAIL, (("base", base),)
+                )
+            ]
+        host = (group.video_host_email or "").strip().lower()
+        wxcc_target = (
+            f"{base}/webhooks/wxcc" if config.wxcc_base_url and config.wxcc_secret else None
+        )
+        expected = Expected(f"{base}/webhooks/webex", wxcc_target, (host,) if host else ())
+        listing = await list_registrations(
+            self._client, config.webex_base_url, config.wxcc_base_url, expected
+        )
+        findings = _registration_findings(listing, host, wxcc_target is not None)
+        deliveries = await self_test(
+            self._http,
+            base,
+            webex_secret=config.webex_secret,
+            wxcc_secret=config.wxcc_secret,
+            now=self._clock.now(),
+        )
+        if not deliveries:
+            findings.append(Finding(CheckArea.WEBHOOKS, "webhooks.no_secret", CheckStatus.WARN))
+        failed = [d for d in deliveries if not d.ok]
+        findings += [
+            Finding(
+                CheckArea.WEBHOOKS,
+                "webhooks.delivery_failed",
+                CheckStatus.FAIL,
+                (("endpoint", d.endpoint), ("outcome", d.outcome.value)),
+            )
+            for d in failed
+        ]
+        if deliveries and not failed:
+            findings.append(Finding(CheckArea.WEBHOOKS, "webhooks.delivery_ok", CheckStatus.OK))
+        return findings
+
+
+def _registration_findings(listing: Listing, host: str, wxcc_expected: bool) -> list[Finding]:
+    """Turn the registration listing into findings for one host account."""
+    area = CheckArea.WEBHOOKS
+    findings = [
+        Finding(
+            area,
+            "webhooks.listing_refused",
+            CheckStatus.FAIL,
+            (("platform", e.platform), ("error", e.code)),
+        )
+        for e in listing.errors
+    ]
+    if host and not any(e.platform == "webex" for e in listing.errors):
+        missing = [
+            m.split()[1] for m in listing.missing if m.startswith("webex") and f"[{host}]" in m
+        ]
+        if missing:
+            findings.append(
+                Finding(
+                    area,
+                    "webhooks.webex_missing",
+                    CheckStatus.WARN,
+                    (("events", ", ".join(missing)),),
+                )
+            )
+        else:
+            findings.append(Finding(area, "webhooks.webex_ok", CheckStatus.OK))
+    if wxcc_expected and not any(e.platform == "wxcc" for e in listing.errors):
+        if "wxcc task events" in listing.missing:
+            findings.append(Finding(area, "webhooks.wxcc_missing", CheckStatus.FAIL))
+        else:
+            findings.append(Finding(area, "webhooks.wxcc_ok", CheckStatus.OK))
+    if listing.stale:
+        findings.append(
+            Finding(area, "webhooks.stale", CheckStatus.WARN, (("count", str(len(listing.stale))),))
+        )
+    return findings

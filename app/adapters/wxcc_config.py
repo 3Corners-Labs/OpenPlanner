@@ -154,15 +154,25 @@ def check_groups(groups: Iterable[GroupRouting], config: WxccConfig) -> list[Che
     results: list[CheckResult] = []
     for group in groups:
         sharing = sorted(g.slug for g in groups if g.business_address == group.business_address)
-        results.extend(_check_group(group, config, sharing))
+        results.extend(check_group(group, config, sharing))
     return results
 
 
-def _check_group(group: GroupRouting, config: WxccConfig, sharing: list[str]) -> list[CheckResult]:
+def check_group(group: GroupRouting, config: WxccConfig, sharing: list[str]) -> list[CheckResult]:
     """Walk one group's chain; stop at the first link that is missing."""
 
-    def result(name: str, ok: bool, hint: str = "ok", *, required: bool = True) -> CheckResult:
-        return CheckResult(f"[{group.slug}] {name}", None, ok, hint, required)
+    def result(
+        name: str,
+        ok: bool,
+        hint: str = "ok",
+        *,
+        required: bool = True,
+        code: str = "",
+        **params: str,
+    ) -> CheckResult:
+        return CheckResult(
+            f"[{group.slug}] {name}", None, ok, hint, required, code, tuple(params.items())
+        )
 
     channel = next((c for c in config.channels if c.name == group.channel), None)
     work_item_channels = [c.name for c in config.channels if c.type == WORK_ITEM]
@@ -173,12 +183,24 @@ def _check_group(group: GroupRouting, config: WxccConfig, sharing: list[str]) ->
                 False,
                 f"no channel named '{group.channel}'; Work Item "
                 f"channels: {', '.join(work_item_channels) or 'none'}",
+                code="channel.missing",
+                channel=str(group.channel),
+                available=", ".join(work_item_channels) or "-",
             )
         ]
     elif channel.type != WORK_ITEM:
-        out = [result("channel", False, f"'{channel.name}' is a {channel.type} channel")]
+        out = [
+            result(
+                "channel",
+                False,
+                f"'{channel.name}' is a {channel.type} channel",
+                code="channel.wrong_type",
+                channel=channel.name,
+                type=channel.type,
+            )
+        ]
     else:
-        out = [result("channel", True)]
+        out = [result("channel", True, code="channel.ok", channel=channel.name)]
 
     asset = next((a for a in config.assets if a.business_address == group.business_address), None)
     if asset is None:
@@ -189,35 +211,66 @@ def _check_group(group: GroupRouting, config: WxccConfig, sharing: list[str]) ->
                 "asset",
                 False,
                 f"no asset with business address '{group.business_address}'; existing: {addresses}",
+                code="asset.missing",
+                address=str(group.business_address),
+                available=addresses,
             ),
         ]
     if channel is not None and asset.channel_id != channel.id:
         actual = next((c.name for c in config.channels if c.id == asset.channel_id), "unknown")
         out.append(
             result(
-                "asset", False, f"asset '{asset.name}' is on channel {actual}, not {group.channel}"
+                "asset",
+                False,
+                f"asset '{asset.name}' is on channel {actual}, not {group.channel}",
+                code="asset.wrong_channel",
+                asset=asset.name,
+                actual=actual,
+                channel=str(group.channel),
             )
         )
     else:
-        out.append(result("asset", True, f"ok ({asset.name})"))
+        out.append(result("asset", True, f"ok ({asset.name})", code="asset.ok", asset=asset.name))
     out.append(_schema_result(asset, result))
 
     entry = next((e for e in config.entry_points if e.asset_id == asset.id), None)
     if entry is None or not entry.flow_id:
-        what = (
-            "no Work Item entry point"
-            if entry is None
-            else f"entry point '{entry.name}' has no flow"
-        )
-        return [*out, result("entry point", False, f"{what} for asset '{asset.name}'")]
+        if entry is None:
+            missing = result(
+                "entry point",
+                False,
+                f"no Work Item entry point for asset '{asset.name}'",
+                code="entry.missing",
+                asset=asset.name,
+            )
+        else:
+            missing = result(
+                "entry point",
+                False,
+                f"entry point '{entry.name}' has no flow for asset '{asset.name}'",
+                code="entry.no_flow",
+                entry=entry.name,
+            )
+        return [*out, missing]
     if not entry.active:
-        out.append(result("entry point", False, f"entry point '{entry.name}' is not active"))
+        out.append(
+            result(
+                "entry point",
+                False,
+                f"entry point '{entry.name}' is not active",
+                code="entry.inactive",
+                entry=entry.name,
+            )
+        )
     else:
-        out.append(result("entry point", True, f"ok ({entry.name})"))
+        out.append(
+            result("entry point", True, f"ok ({entry.name})", code="entry.ok", entry=entry.name)
+        )
 
     flow = config.flows.get(entry.flow_id)
     if flow is None:
-        return [*out, result("flow", False, f"the flow of '{entry.name}' could not be exported")]
+        hint = f"the flow of '{entry.name}' could not be exported"
+        return [*out, result("flow", False, hint, code="flow.not_exported", entry=entry.name)]
     return [*out, *_flow_results(group, flow, config.queues, sharing, result)]
 
 
@@ -232,10 +285,24 @@ def _schema_result(asset: Asset, result: Result) -> CheckResult:
     if required:
         problems.append(f"requires {', '.join(required)} (only bookingReference may be required)")
     if problems:
-        return result("asset schema", False, "; ".join(problems) + ": Create Task is refused")
+        return result(
+            "asset schema",
+            False,
+            "; ".join(problems) + ": Create Task is refused",
+            code="schema.refused",
+            missing=", ".join(missing) or "-",
+            extra=", ".join(required) or "-",
+        )
     if hidden:
-        return result("asset schema", False, f"not viewable: {', '.join(hidden)}", required=False)
-    return result("asset schema", True)
+        return result(
+            "asset schema",
+            False,
+            f"not viewable: {', '.join(hidden)}",
+            required=False,
+            code="schema.hidden",
+            fields=", ".join(hidden),
+        )
+    return result("asset schema", True, code="schema.ok")
 
 
 def _flow_results(
@@ -248,9 +315,9 @@ def _flow_results(
     """Check routing variable, branch, queues, naming rule and Screen Pop of the flow."""
     out: list[CheckResult] = []
     if ROUTING_KEY in flow.variables:
-        out.append(result("flow routing", True))
+        out.append(result("flow routing", True, code="routing.ok"))
         if group.routing_value in flow.strings:
-            out.append(result("flow branch", True))
+            out.append(result("flow branch", True, code="branch.ok", value=group.routing_value))
         else:
             out.append(
                 result(
@@ -258,6 +325,8 @@ def _flow_results(
                     False,
                     f"no branch for '{group.routing_value}': work items go to the default branch",
                     required=False,
+                    code="branch.missing",
+                    value=group.routing_value,
                 )
             )
     elif len(sharing) > 1:
@@ -267,6 +336,8 @@ def _flow_results(
                 False,
                 f"the flow does not read {ROUTING_KEY}, so "
                 f"groups {', '.join(sharing)} all land in the same queue",
+                code="routing.shared",
+                groups=", ".join(sharing),
             )
         )
     else:
@@ -277,22 +348,42 @@ def _flow_results(
                 f"the flow does not read {ROUTING_KEY}: every "
                 "work item of this entry point goes to the same queue",
                 required=False,
+                code="routing.not_read",
             )
         )
 
     used = [q for q in queues if q.id in flow.strings]
     wrong = [q for q in used if q.channel_type != WORK_ITEM]
     if not used:
-        out.append(result("flow queues", False, "the flow queues to no known queue"))
+        out.append(
+            result("flow queues", False, "the flow queues to no known queue", code="queues.none")
+        )
     elif wrong:
         listed = ", ".join(f"{q.name} ({q.channel_type})" for q in wrong)
-        out.append(result("flow queues", False, f"not Work Item queues: {listed}"))
+        out.append(
+            result(
+                "flow queues",
+                False,
+                f"not Work Item queues: {listed}",
+                code="queues.wrong_type",
+                queues=listed,
+            )
+        )
     else:
-        out.append(result("flow queues", True, f"ok ({', '.join(q.name for q in used)})"))
+        names = ", ".join(q.name for q in used)
+        out.append(result("flow queues", True, f"ok ({names})", code="queues.ok", queues=names))
 
     named = [q.name for q in used if names_match(group.routing_value, q.name)]
     if named:
-        out.append(result("queue naming", True, f"ok ({', '.join(named)})"))
+        out.append(
+            result(
+                "queue naming",
+                True,
+                f"ok ({', '.join(named)})",
+                code="naming.ok",
+                queues=", ".join(named),
+            )
+        )
     elif used:
         out.append(
             result(
@@ -302,14 +393,22 @@ def _flow_results(
                 "(rule: the queue name contains the routing value as a name part; "
                 "'-', '_' and case alike)",
                 required=False,
+                code="naming.no_match",
+                value=group.routing_value,
             )
         )
 
     if any("screen" in activity.lower() for activity in flow.activities):
-        out.append(result("screen pop", True))
+        out.append(result("screen pop", True, code="screenpop.ok"))
     else:
         out.append(
-            result("screen pop", False, "no Screen Pop: add one with meetingLink", required=False)
+            result(
+                "screen pop",
+                False,
+                "no Screen Pop: add one with meetingLink",
+                required=False,
+                code="screenpop.missing",
+            )
         )
     return out
 
@@ -458,6 +557,7 @@ async def region_check(
                 None,
                 False,
                 "organisation id unknown: GET /v2/subscriptions failed (cjp:config_read)",
+                code="region.no_org",
             ),
             None,
             None,
@@ -465,10 +565,21 @@ async def region_check(
     found = await find_region(http, token, base_url, org)
     configured = base_url.rstrip("/")
     if found == configured:
-        return CheckResult("WxCC region", 200, True, f"ok ({configured})"), found, org
+        ok = CheckResult(
+            "WxCC region",
+            200,
+            True,
+            f"ok ({configured})",
+            code="region.ok",
+            params=(("host", configured),),
+        )
+        return ok, found, org
     if found:
         hint = f"the organisation's configuration lives at {found}: set WXCC_API_BASE_URL={found}"
-        return CheckResult("WxCC region", 404, False, hint), found, org
+        wrong = CheckResult(
+            "WxCC region", 404, False, hint, code="region.wrong", params=(("host", found),)
+        )
+        return wrong, found, org
     return (
         CheckResult(
             "WxCC region",
@@ -476,6 +587,7 @@ async def region_check(
             False,
             "no region's configuration service knows "
             "this organisation (cjp:config_read, Contact Center admin role)",
+            code="region.unknown",
         ),
         None,
         org,
