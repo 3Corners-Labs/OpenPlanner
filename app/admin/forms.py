@@ -206,6 +206,9 @@ class Field:
         required: Whether the input is required.
         readonly: Shown but not editable (for example the slug).
         attributes: Extra input attributes such as ``min`` and ``step``.
+        more: The input's section of the manual (rendered HTML), shown in an (i) disclosure
+            (ADR 0033).
+        more_link: The help page anchored at that section.
     """
 
     name: str
@@ -218,6 +221,8 @@ class Field:
     required: bool = True
     readonly: bool = False
     attributes: Mapping[str, str] = field(default_factory=dict)
+    more: str | None = None
+    more_link: str | None = None
 
     @property
     def described_by(self) -> str:

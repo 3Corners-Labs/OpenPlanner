@@ -29,6 +29,9 @@
   {% endif %}
   <main id="content" tabindex="-1" class="admin-main">
     {% if update_banner %}{% include "admin/_update_banner.html" %}{% endif %}
+    {% if help_topic %}
+    <p class="page-help"><a href="/admin/help/{{ help_topic.slug }}">{{ icon("help") }}<span>{{ _("help.page_link") }}</span></a></p>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 </div>

@@ -5,7 +5,8 @@ matrix); refusals and notices go through ``message``. Route modules (``routes`` 
 overview and reports, ``group_routes`` for groups and planning) import from here.
 """
 
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
@@ -15,9 +16,10 @@ from fastapi import Depends, Request
 from starlette.responses import HTMLResponse
 
 from app.admin.authz import can_function, session_principal
-from app.admin.forms import moment_label
+from app.admin.forms import Field, moment_label
 from app.domain.authorization import Permission, Principal, Role
 from app.web.authz_labels import ROLE_LABELS
+from app.web.help import HELP_PATH, HelpTopic, shipped_manual, topic_for_path
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.protection import require_same_origin
 from app.web.templates import create_templates, render
@@ -57,6 +59,7 @@ NAVIGATION = (
     NavItem("admin.nav.closures", "/admin/closures", Permission.ORGANISATION_CLOSURE, "alert"),
     NavItem("admin.nav.api", "/admin/api", Permission.API_CLIENTS_MANAGE, "key"),
     NavItem("admin.nav.updates", "/admin/updates", Permission.SYSTEM_UPDATE, "refresh"),
+    NavItem("admin.nav.help", HELP_PATH, Permission.DASHBOARD_VIEW, "help"),
 )
 
 
@@ -96,7 +99,28 @@ def _is_current(request: Request, item: NavItem) -> bool:
             and not channels
         )
         or (item.href == "/admin/api" and path.startswith("/admin/api/"))
+        or (item.href == HELP_PATH and path.startswith(f"{HELP_PATH}/"))
     )
+
+
+def page_topic(request: Request) -> HelpTopic | None:
+    """Return the manual topic of the current route, if the screen is documented (ADR 0033)."""
+    return topic_for_path(getattr(request.scope.get("route"), "path", ""))
+
+
+def with_manual(request: Request, locale: RequestLocale, fields: Sequence[Field]) -> list[Field]:
+    """Return ``fields`` with their manual section attached, for the (i) disclosures.
+
+    The topic follows from the route, so a route module only passes its fields through.
+    """
+    found = page_topic(request)
+    manual = shipped_manual().page(found.slug, locale.code) if found else None
+    if manual is None:
+        return list(fields)
+    return [
+        replace(f, more=more, more_link=manual.link(f.name)) if (more := manual.more(f.name)) else f
+        for f in fields
+    ]
 
 
 def admin_moment(request: Request, locale: RequestLocale, at: datetime) -> str:
@@ -130,6 +154,8 @@ def page(
             "nav": nav,
             "can": can,
             "role_labels": role_labels,
+            # A message page (refusal, not found) keeps ``help_topic`` None: no help link.
+            "help_topic": context["help_topic"] if "help_topic" in context else page_topic(request),
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
             "update_banner": getattr(request.state, "update_notice", None),
         },
@@ -153,6 +179,7 @@ def message(
         "title": locale.gettext(title_key),
         "message": locale.gettext(message_key),
         "back_link": back_link,
+        "help_topic": None,
     }
     principal = session_principal(request)
     if principal is not None:
