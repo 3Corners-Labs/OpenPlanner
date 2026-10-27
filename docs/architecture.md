@@ -637,7 +637,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0018 | Dispatch to WxCC as work items (Create Task API v2) |
 | 0019 | Direct video call ("now") per group |
 | 0020 | Citizen calendar as progressive enhancement; branding through tokens |
-| 0021 | Provider-neutral contact-center integration (proposed) |
+| 0021 | Ending the work item of a cancelled booking |
 | 0022 | Message channels per organisation, SMS through Webex Connect, editable texts |
 | 0023 | Machine API for contact-center bots: OAuth client credentials, off by default, no personal data |
 | 0024 | Emergency closure: appointments on hold, citizens informed, no deletion |
@@ -648,6 +648,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0029 | Updates started from the admin portal, carried out by a signed-image host updater with rollback |
 | 0030 | HTTPS with free, automatically renewed certificates (Caddy, Let's Encrypt) |
 | 0031 | Audit log exact per role level, with system events of the worker for troubleshooting |
+| 0032 | Provider-neutral contact-center integration (proposed; renumbered from 0021) |
 
 ## 12. Status and roadmap
 
@@ -666,7 +667,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |
-| ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
+| ADR 0032 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
 | ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
