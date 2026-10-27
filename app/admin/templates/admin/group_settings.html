@@ -29,4 +29,30 @@
     <a href="/admin/groups/{{ summary.group.slug }}">{{ _("admin.cancel") }}</a>
   </div>
 </form>
+<section class="card" id="check" aria-labelledby="check-heading">
+  <div class="card__header">
+    <h2 id="check-heading">{{ _("admin.check.title") }}</h2>
+    <p class="card__lead">{{ _("admin.check.lead") }}</p>
+  </div>
+  {% if check %}
+  <p class="check-summary">
+    {{ _("admin.check.last", at=check.at) }} ·
+    {{ _("admin.check.overall") }}: <span class="chip{% if check.tone %} chip--{{ check.tone }}{% endif %}">{{ check.status }}</span>
+  </p>
+  {% for area in check.areas %}
+  <h3 class="check-area">{{ area.label }}</h3>
+  <ul class="check-list">
+    {% for row in area.rows %}
+    <li class="check-list__item"><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %}">{{ row.status }}</span><span>{{ row.text }}</span></li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+  {% else %}
+  <p>{{ _("admin.check.never") }}</p>
+  {% endif %}
+  <form method="post" action="/admin/groups/{{ summary.group.slug }}/check" class="form-actions">
+    <button type="submit" class="button">{{ _("admin.check.button") }}</button>
+    <p class="hint">{{ _("admin.check.after_save") }}</p>
+  </form>
+</section>
 {% endblock %}

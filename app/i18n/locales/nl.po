@@ -3201,3 +3201,203 @@ msgstr "Onbereikbaar: controleer DNS en de tunnel."
 
 msgid "admin.integrations.outcome.unexpected"
 msgstr "Onverwachte status: controleer wat er op het webhookadres antwoordt."
+
+#. Verify button "Koppeling controleren" per group.
+
+msgid "admin.done.checked"
+msgstr "De koppeling is gecontroleerd. De uitslag staat hieronder."
+
+msgid "admin.check.title"
+msgstr "Koppeling controleren"
+
+msgid "admin.check.lead"
+msgstr "Controleert bij Webex en Webex Contact Center of gesprekken van deze groep goed aankomen: de host, de routering van het work item naar de queue en de webhooks. Er wordt niets gewijzigd; alleen een ondertekend testbericht naar OpenPlanner zelf."
+
+msgid "admin.check.button"
+msgstr "Nu controleren"
+
+msgid "admin.check.never"
+msgstr "Deze groep is nog niet gecontroleerd."
+
+msgid "admin.check.last"
+msgstr "Laatst gecontroleerd: {at}"
+
+msgid "admin.check.overall"
+msgstr "Uitslag"
+
+msgid "admin.check.after_save"
+msgstr "Sla wijzigingen eerst op: de controle gebruikt de opgeslagen instellingen."
+
+msgid "admin.check.area.platform"
+msgstr "Koppelingen"
+
+msgid "admin.check.area.webex"
+msgstr "Webex (videogesprek)"
+
+msgid "admin.check.area.wxcc"
+msgstr "Webex Contact Center (routering naar de queue)"
+
+msgid "admin.check.area.webhooks"
+msgstr "Webhooks (terugmeldingen naar OpenPlanner)"
+
+msgid "admin.check.status.ok"
+msgstr "OK"
+
+msgid "admin.check.status.warn"
+msgstr "Waarschuwing"
+
+msgid "admin.check.status.fail"
+msgstr "Fout"
+
+msgid "admin.check.status.skipped"
+msgstr "Overgeslagen"
+
+msgid "admin.check.unknown"
+msgstr "Onbekende uitkomst ({code})."
+
+msgid "admin.check.platform.not_configured"
+msgstr "Er is geen Webex Service App ingesteld; er valt niets te controleren."
+
+msgid "admin.check.webex.no_host"
+msgstr "Geen Webex-host ingevuld: deze groep krijgt geen videogesprekken."
+
+msgid "admin.check.webex.host_ok"
+msgstr "Host {host} is bekend en de Service App mag namens deze host plannen."
+
+msgid "admin.check.webex.host_unknown"
+msgstr "Webex kent host {host} niet, of de host heeft geen licentie op deze site ({error})."
+
+msgid "admin.check.webex.host_refused"
+msgstr "De Service App mag niet plannen namens {host} ({error}): controleer de scopes en de autorisatie in Control Hub."
+
+msgid "admin.check.webex.unreachable"
+msgstr "Webex was niet bereikbaar om host {host} te controleren ({error}). Probeer het later opnieuw."
+
+msgid "admin.check.wxcc.not_configured"
+msgstr "Webex Contact Center is niet ingesteld; de routering is niet gecontroleerd."
+
+msgid "admin.check.wxcc.no_mapping"
+msgstr "Werkitem-kanaal of business address ontbreekt: deze groep maakt geen work items aan."
+
+msgid "admin.check.wxcc.config_refused"
+msgstr "De configuratie van Webex Contact Center kon niet worden gelezen ({error}): nodig is cjp:config_read en de beheerrol voor Contact Center."
+
+msgid "admin.check.wxcc.region.ok"
+msgstr "De regio klopt ({host})."
+
+msgid "admin.check.wxcc.region.wrong"
+msgstr "De organisatie staat in een andere regio: stel WXCC_API_BASE_URL in op {host}."
+
+msgid "admin.check.wxcc.region.no_org"
+msgstr "De organisatie van de Service App is onbekend bij Webex Contact Center (cjp:config_read)."
+
+msgid "admin.check.wxcc.region.unknown"
+msgstr "Geen enkele regio kent deze organisatie (cjp:config_read, beheerrol voor Contact Center)."
+
+msgid "admin.check.wxcc.channel.ok"
+msgstr "Werkitem-kanaal {channel} bestaat."
+
+msgid "admin.check.wxcc.channel.missing"
+msgstr "Er is geen kanaal met de naam {channel}. Bestaande werkitem-kanalen: {available}."
+
+msgid "admin.check.wxcc.channel.wrong_type"
+msgstr "Kanaal {channel} is geen werkitem-kanaal maar {type}."
+
+msgid "admin.check.wxcc.asset.ok"
+msgstr "Asset {asset} hoort bij het business address."
+
+msgid "admin.check.wxcc.asset.missing"
+msgstr "Er is geen asset met business address {address}. Bestaande: {available}."
+
+msgid "admin.check.wxcc.asset.wrong_channel"
+msgstr "Asset {asset} staat op kanaal {actual}, niet op {channel}."
+
+msgid "admin.check.wxcc.schema.ok"
+msgstr "Het schema van de asset bevat de velden die OpenPlanner meestuurt."
+
+msgid "admin.check.wxcc.schema.refused"
+msgstr "Webex Contact Center weigert het work item: velden die ontbreken: {missing}; verplichte velden die OpenPlanner niet kent: {extra}. Pas het schema van de asset aan (runbook)."
+
+msgid "admin.check.wxcc.schema.hidden"
+msgstr "Deze velden zijn niet zichtbaar voor agents: {fields}."
+
+msgid "admin.check.wxcc.entry.ok"
+msgstr "Entry point {entry} is actief en heeft een flow."
+
+msgid "admin.check.wxcc.entry.missing"
+msgstr "Asset {asset} heeft geen werkitem-entry point."
+
+msgid "admin.check.wxcc.entry.no_flow"
+msgstr "Entry point {entry} heeft geen flow."
+
+msgid "admin.check.wxcc.entry.inactive"
+msgstr "Entry point {entry} staat uit."
+
+msgid "admin.check.wxcc.flow.not_exported"
+msgstr "De flow van entry point {entry} kon niet worden gelezen."
+
+msgid "admin.check.wxcc.routing.ok"
+msgstr "De flow leest openplannerGroup om de queue te kiezen."
+
+msgid "admin.check.wxcc.routing.shared"
+msgstr "De flow leest openplannerGroup niet, dus de groepen {groups} komen allemaal in dezelfde queue."
+
+msgid "admin.check.wxcc.routing.not_read"
+msgstr "De flow leest openplannerGroup niet: alle work items van dit entry point gaan naar dezelfde queue."
+
+msgid "admin.check.wxcc.branch.ok"
+msgstr "De flow heeft een tak voor routeringswaarde {value}."
+
+msgid "admin.check.wxcc.branch.missing"
+msgstr "De flow heeft geen tak voor {value}: work items gaan naar de standaardtak."
+
+msgid "admin.check.wxcc.queues.ok"
+msgstr "De flow zet work items in queue {queues}."
+
+msgid "admin.check.wxcc.queues.none"
+msgstr "De flow zet work items in geen enkele bekende queue."
+
+msgid "admin.check.wxcc.queues.wrong_type"
+msgstr "Deze queues zijn geen werkitem-queues: {queues}."
+
+msgid "admin.check.wxcc.naming.ok"
+msgstr "De queuenaam past bij de groep ({queues})."
+
+msgid "admin.check.wxcc.naming.no_match"
+msgstr "Geen queue met {value} in de naam (afspraak, geen eis)."
+
+msgid "admin.check.wxcc.screenpop.ok"
+msgstr "De flow toont een Screen Pop aan de agent."
+
+msgid "admin.check.wxcc.screenpop.missing"
+msgstr "Geen Screen Pop: voeg er een toe met meetingLink, zodat de agent de link direct ziet."
+
+msgid "admin.check.webhooks.not_https"
+msgstr "Het webhook-adres {base} is geen https-adres: Webex en Webex Contact Center kunnen niets afleveren."
+
+msgid "admin.check.webhooks.listing_refused"
+msgstr "De webhooks bij {platform} konden niet worden opgevraagd ({error})."
+
+msgid "admin.check.webhooks.webex_ok"
+msgstr "De Webex-webhooks voor de host van deze groep zijn actief op het huidige adres."
+
+msgid "admin.check.webhooks.webex_missing"
+msgstr "Deze Webex-webhooks ontbreken voor de host: {events}. Draai register-webhooks (runbook)."
+
+msgid "admin.check.webhooks.wxcc_ok"
+msgstr "De abonnementen op taakgebeurtenissen van Webex Contact Center zijn actief op het huidige adres."
+
+msgid "admin.check.webhooks.wxcc_missing"
+msgstr "Er is geen actief abonnement op taakgebeurtenissen: OpenPlanner hoort niet of een agent het work item oppakt. Draai register-webhooks."
+
+msgid "admin.check.webhooks.stale"
+msgstr "{count} verouderde registratie(s) gevonden, bijvoorbeeld op een oud tunneladres. Ruim op met webhooks-reset (runbook)."
+
+msgid "admin.check.webhooks.no_secret"
+msgstr "Er is geen webhookgeheim ingesteld; de aflevering is niet getest."
+
+msgid "admin.check.webhooks.delivery_ok"
+msgstr "Een ondertekend testbericht kwam aan, en een vals ondertekend bericht werd geweigerd."
+
+msgid "admin.check.webhooks.delivery_failed"
+msgstr "Testbericht naar {endpoint}: {outcome}"
