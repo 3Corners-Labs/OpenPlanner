@@ -9,6 +9,7 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
     api_settings (one row); organisations 1──* api_clients 1──* api_access_tokens
                                                  └──* api_client_groups *──1 groups (ADR 0023)
     organisations 1──* channel_settings (SMTP and SMS per organisation, secret encrypted)
+    integration_reports (last webhook listing and delivery test; no secrets)
     admin_profiles (name per identity-provider subject; joined into the audit log)
     release_checks (one row), update_requests (ADR 0029; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
@@ -34,6 +35,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
+    Text,
     Time,
     UniqueConstraint,
     text,
@@ -50,6 +52,7 @@ __all__ = [
     "ApiClientRow",
     "ApiSettingsRow",
     "IntegrationCredentialRow",
+    "IntegrationReportRow",
     "BookingEventRow",
     "CallStatusRow",
     "ChannelSettingsRow",
@@ -495,6 +498,16 @@ class ChannelSettingsRow(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
     __table_args__ = (CheckConstraint("channel IN ('email', 'sms')", name="channel"),)
+
+
+class IntegrationReportRow(Base):
+    """The last result of an operator check (JSON), shown read-only in the admin portal."""
+
+    __tablename__ = "integration_reports"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    body: Mapped[str] = mapped_column(Text)
+    checked_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
 class WebhookEventRow(Base):
