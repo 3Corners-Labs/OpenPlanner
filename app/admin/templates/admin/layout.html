@@ -2,6 +2,7 @@
 {% extends "admin/_shell.html" %}
 {% from "admin/_icons.html" import icon %}
 {% block page %}
+{% include "admin/_environment.html" %}
 <div class="admin-shell{% if not nav %} admin-shell--no-nav{% endif %}">
   <header class="admin-topbar">
     {#- Without a menu (no role) the overview would only loop back to the refusal. -#}
@@ -28,6 +29,9 @@
   {% endif %}
   <main id="content" tabindex="-1" class="admin-main">
     {% if update_banner %}{% include "admin/_update_banner.html" %}{% endif %}
+    {% if help_topic %}
+    <p class="page-help"><a href="/admin/help/{{ help_topic.slug }}">{{ icon("help") }}<span>{{ _("help.page_link") }}</span></a></p>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 </div>

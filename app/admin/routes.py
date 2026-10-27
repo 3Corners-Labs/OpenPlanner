@@ -36,9 +36,11 @@ from app.admin import (
     check_routes,
     closure_routes,
     group_routes,
+    help_routes,
     holiday_routes,
     message_routes,
     organisation_routes,
+    simulator_routes,
     update_routes,
 )
 from app.admin.authz import (
@@ -384,6 +386,8 @@ def register_admin(app: FastAPI) -> None:
         organisation_routes.router,
         closure_routes.router,
         api_routes.router,
+        simulator_routes.router,
         update_routes.router,
+        help_routes.router,
     ):
         app.include_router(module_router, dependencies=banner)

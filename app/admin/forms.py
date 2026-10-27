@@ -55,6 +55,11 @@ DONE_MESSAGES: dict[str, str] = {
     "logo_saved": "admin.done.logo_saved",
     "logo_removed": "admin.done.logo_removed",
     "checked": "admin.done.checked",
+    "simulated": "admin.done.simulated",
+    "simulated_prepared": "admin.done.simulated_prepared",
+    "simulator_no_ids": "admin.done.simulator_no_ids",
+    "simulator_no_secret": "admin.done.simulator_no_secret",  # nosec B105 - a catalogue key
+    "simulator_refused": "admin.done.simulator_refused",
     "closure_started": "admin.done.closure_started",
     "closure_updated": "admin.done.closure_updated",
     "closure_lifted": "admin.done.closure_lifted",
@@ -201,6 +206,9 @@ class Field:
         required: Whether the input is required.
         readonly: Shown but not editable (for example the slug).
         attributes: Extra input attributes such as ``min`` and ``step``.
+        more: The input's section of the manual (rendered HTML), shown in an (i) disclosure
+            (ADR 0033).
+        more_link: The help page anchored at that section.
     """
 
     name: str
@@ -213,6 +221,8 @@ class Field:
     required: bool = True
     readonly: bool = False
     attributes: Mapping[str, str] = field(default_factory=dict)
+    more: str | None = None
+    more_link: str | None = None
 
     @property
     def described_by(self) -> str:

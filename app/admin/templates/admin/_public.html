@@ -1,6 +1,7 @@
 {#- Pages outside a session (logged out, login failed): a centred card. -#}
 {% extends "admin/_shell.html" %}
 {% block page %}
+{% include "admin/_environment.html" %}
 <div class="admin-public">
   <header class="admin-public__header">
     <span class="admin-brand"><span class="admin-brand__mark" aria-hidden="true">OP</span><span>{{ _("admin.title") }}</span></span>

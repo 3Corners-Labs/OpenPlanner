@@ -21,5 +21,6 @@
 - [ ] `make check` green
 - [ ] Screenshots for UI changes
 - [ ] i18n checked (nl/en)
+- [ ] Manual updated for every admin screen this PR adds or changes (`docs/manual/`, ADR 0033)
 - [ ] Migration reversible: yes / no / n.a.
 - [ ] Docs updated (threat model, dataflow, runbook, ADR) where a flow changed

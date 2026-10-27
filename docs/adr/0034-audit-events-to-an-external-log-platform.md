@@ -1,4 +1,4 @@
-# 0033. Audit events to an external log platform
+# 0034. Audit events to an external log platform
 
 Status: proposed (2026-10-27). Extends ADR 0031 (audit log per level, with system events).
 
