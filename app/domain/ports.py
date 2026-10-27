@@ -13,7 +13,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
-from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
+from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Source
 from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, Logo
@@ -226,11 +226,18 @@ class Transaction(Protocol):
         """Store an audit event."""
         ...
 
-    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEntry]:
+    async def list_audit_events(
+        self, scope: Scope, limit: int = 100, narrow: AuditFilter | None = None
+    ) -> list[AuditEntry]:
         """Return the newest audit events about organisations and groups inside ``scope``.
 
-        Each entry carries the actor's display name from their ``AdminProfile``, if any.
+        ``narrow`` only ever narrows further; it never widens the scope. Each entry carries
+        the actor's display name from their ``AdminProfile``, if any.
         """
+        ...
+
+    async def delete_audit_events(self, source: Source, before: datetime) -> int:
+        """Delete the events of ``source`` older than ``before``; return how many (ADR 0031)."""
         ...
 
     async def save_admin_profile(self, profile: AdminProfile) -> None:

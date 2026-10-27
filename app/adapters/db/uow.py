@@ -49,7 +49,15 @@ from app.adapters.db.models import (
     WebhookEventRow,
 )
 from app.adapters.db.updates import UpdateQueries
-from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
+from app.domain.audit import (
+    PROBLEMS,
+    AdminProfile,
+    AuditEntry,
+    AuditEvent,
+    AuditFilter,
+    Outcome,
+    Source,
+)
 from app.domain.authorization import Scope
 from app.domain.booking import (
     HOLDS_PLACE,
@@ -338,18 +346,32 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
                 organisation=event.organisation,
                 group=event.group,
                 detail=event.detail[:255],
+                source=event.source.value,
+                booking_id=event.booking_id,
             )
         )
         await self._session.flush()
 
-    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEntry]:
-        """Return the newest audit events about organisations and groups inside ``scope``."""
-        rows = await self._session.execute(
+    async def list_audit_events(
+        self, scope: Scope, limit: int = 100, narrow: AuditFilter | None = None
+    ) -> list[AuditEntry]:
+        """Return the newest audit events inside ``scope``, narrowed by ``narrow`` (ADR 0031)."""
+        query = (
             select(AuditEventRow, AdminProfileRow.display_name)
             .outerjoin(AdminProfileRow, AdminProfileRow.subject == AuditEventRow.actor)
             .where(scope_filter(scope, AuditEventRow.organisation, AuditEventRow.group))
-            .order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc())
-            .limit(limit)
+        )
+        narrow = narrow or AuditFilter()
+        if narrow.source is not None:
+            query = query.where(AuditEventRow.source == narrow.source.value)
+        if narrow.problems_only:
+            query = query.where(AuditEventRow.outcome.in_(sorted(o.value for o in PROBLEMS)))
+        if narrow.group is not None:
+            query = query.where(AuditEventRow.group == narrow.group)
+        if narrow.booking_id is not None:
+            query = query.where(AuditEventRow.booking_id == narrow.booking_id)
+        rows = await self._session.execute(
+            query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
         )
         return [
             AuditEntry(
@@ -362,11 +384,22 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
                     organisation=row.organisation,
                     group=row.group,
                     detail=row.detail,
+                    source=Source(row.source),
+                    booking_id=row.booking_id,
                 ),
                 name,
             )
             for row, name in rows
         ]
+
+    async def delete_audit_events(self, source: Source, before: datetime) -> int:
+        """Delete the events of ``source`` older than ``before``; return how many."""
+        result = await self._session.execute(
+            delete(AuditEventRow).where(
+                AuditEventRow.source == source.value, AuditEventRow.at < before
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     async def save_admin_profile(self, profile: AdminProfile) -> None:
         """Create or replace the profile of ``profile.subject``."""

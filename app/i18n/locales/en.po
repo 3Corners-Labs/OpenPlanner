@@ -516,7 +516,7 @@ msgid "admin.audit.title"
 msgstr "Audit log"
 
 msgid "admin.audit.intro"
-msgstr "The latest logins, refused actions and changes within your organisations."
+msgstr "Logins, refused actions, changes and what the system did itself (messages, video meetings, queue tasks), only for your own organisation or groups."
 
 msgid "admin.audit.when"
 msgstr "When"
@@ -2740,6 +2740,113 @@ msgstr "The mail server rejected the message (code {status})."
 msgid "admin.channels.test_failed.other"
 msgstr "Sending failed because of an unexpected mail server error. Try again later."
 
+msgid "admin.audit.filter"
+msgstr "Filter"
+
+msgid "admin.audit.source"
+msgstr "Kind"
+
+msgid "admin.audit.source.admin"
+msgstr "Admin actions"
+
+msgid "admin.audit.source.system"
+msgstr "System events"
+
+msgid "admin.audit.all"
+msgstr "All"
+
+msgid "admin.audit.group"
+msgstr "Group"
+
+msgid "admin.audit.booking"
+msgstr "Appointment number"
+
+msgid "admin.audit.problems"
+msgstr "Problems only"
+
+msgid "admin.audit.apply"
+msgstr "Apply"
+
+msgid "admin.audit.clear"
+msgstr "Clear filter"
+
+msgid "admin.audit.booking_link"
+msgstr "Appointment {id}"
+
+msgid "admin.audit.detail.channel_email"
+msgstr "email"
+
+msgid "admin.audit.detail.channel_sms"
+msgstr "text message"
+
+msgid "admin.audit.detail.attempt"
+msgstr "attempt {count}"
+
+msgid "admin.audit.reason.no_role"
+msgstr "No role in the admin portal."
+
+msgid "admin.audit.reason.not_permitted"
+msgstr "The role does not grant this right."
+
+msgid "admin.audit.reason.out_of_scope"
+msgstr "Outside the own organisation or group."
+
+msgid "admin.audit.reason.stale"
+msgstr "No longer needed: the appointment was moved or cancelled."
+
+msgid "admin.audit.reason.no_recipient"
+msgstr "No recipient: contact details are missing or already removed."
+
+msgid "admin.audit.reason.no_booking"
+msgstr "The appointment no longer exists."
+
+msgid "admin.audit.reason.channel_not_configured"
+msgstr "This channel is not set up for the organisation."
+
+msgid "audit.actor.system"
+msgstr "System"
+
+msgid "audit.outcome.retry"
+msgstr "Will be retried"
+
+msgid "audit.outcome.skipped"
+msgstr "Skipped"
+
+msgid "audit.job.create_video_room"
+msgstr "Create video meeting"
+
+msgid "audit.job.delete_video_room"
+msgstr "Delete video meeting"
+
+msgid "audit.job.send_confirmation"
+msgstr "Send confirmation"
+
+msgid "audit.job.send_change"
+msgstr "Send change notice"
+
+msgid "audit.job.send_reminder"
+msgstr "Send reminder"
+
+msgid "audit.job.send_cancellation"
+msgstr "Send cancellation"
+
+msgid "audit.job.dispatch_wxcc_task"
+msgstr "Send task to the queue"
+
+msgid "audit.job.end_wxcc_task"
+msgstr "End task in the queue"
+
+msgid "audit.job.purge_pii"
+msgstr "Remove personal data"
+
+msgid "audit.job.send_suspension"
+msgstr "Send closure notice"
+
+msgid "audit.job.send_closure_update"
+msgstr "Send closure update"
+
+msgid "audit.job.send_reinstatement"
+msgstr "Send reinstatement notice"
 msgid "authz.permission.system_update"
 msgstr "Update the installation"
 

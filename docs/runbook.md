@@ -560,6 +560,28 @@ When a team cannot hold its appointments (outage, illness, closed building):
 6. **Retention.** Appointments still on hold lose their personal data 30 days after the end of
    the closure. An open-ended closure keeps it until it is lifted, so lift or end it promptly.
 
+## Troubleshooting with the audit log (ADR 0031)
+
+Every admin has an audit log under **Audit log** that lists only their own level: a group admin
+sees their groups, an organisation admin sees the organisation and its groups, and the superuser
+sees everything, including global events. Besides admin actions it shows **system events**: one
+per job the worker ran (confirmation, change, reminder, cancellation, closure messages, video
+meeting, WxCC task, purge). Each event shows the outcome, the reason or error code, the attempt
+and the channel. Filter on **System events**, **Problems only**, a group, or an appointment
+number. A booking id links to that booking's timeline.
+
+| Outcome | Meaning | What to do |
+|---|---|---|
+| Succeeded | The job did what it should | nothing |
+| Skipped, `stale` | The appointment moved or was cancelled after the job was planned | nothing; the new time has its own jobs |
+| Skipped, `no_recipient` | No contact details (already purged, or no phone number for an SMS) | nothing, unless it happens for new bookings |
+| Will be retried, `<code>` | Failed, tried again after 1, 5, 15 minutes | watch for the next attempt; see the code below |
+| Failed, `channel_not_configured` | The organisation has no sender on that channel | set up mail/SMS under Channels (superuser) |
+| Failed, other `<code>` | Gave up after the last attempt, or a refusal | look up the code under the integration's section of this runbook |
+
+System events are deleted after `SYSTEM_EVENT_RETENTION_DAYS` (default 90). Admin actions are
+kept. Webhook rejections and Webex token-refresh failures are still only in the container logs.
+
 ## Webex or WxCC is down
 
 Bookings keep working: they are stored first, and meetings and work items are jobs.

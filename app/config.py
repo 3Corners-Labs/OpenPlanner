@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = 30.0
     worker_heartbeat_path: Path = Path("data/worker.heartbeat")
     worker_heartbeat_max_age_seconds: float = 120.0
+    # ADR 0031: system events (job outcomes) in the audit log are deleted after this many
+    # days; admin actions are kept.
+    system_event_retention_days: int = Field(default=90, ge=1, le=3650)
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"

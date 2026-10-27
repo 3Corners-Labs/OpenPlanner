@@ -215,6 +215,7 @@ same commit and rollback behaviour as the SQL one.
 | Error codes | `app/domain/errors.py` |
 | Authorisation matrix, scopes (ADR 0014) | `app/domain/authorization.py` |
 | Admin use cases, audit events | `app/domain/admin.py`, `app/domain/audit.py` |
+| System events of the worker, exact per level, and their retention (ADR 0031) | `app/domain/system_log.py`, `app/jobs/runner.py`, `app/admin/audit_routes.py` |
 | Groups, staffing blocks (add, change, split, remove), staffing exceptions, preview (admin) | `app/domain/planning.py` |
 | Holiday calendars and their resolution per group (ADR 0025) | `app/domain/holidays.py`, `app/domain/holiday_service.py`, `app/admin/holiday_routes.py` |
 | What leaves for Webex/WxCC, timeline, call status, join window | `app/domain/calls.py` |
@@ -646,6 +647,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0028 | Provider-neutral SMS gateway; Webex Connect as one adapter |
 | 0029 | Updates started from the admin portal, carried out by a signed-image host updater with rollback |
 | 0030 | HTTPS with free, automatically renewed certificates (Caddy, Let's Encrypt) |
+| 0031 | Audit log exact per role level, with system events of the worker for troubleshooting |
 
 ## 12. Status and roadmap
 
@@ -666,6 +668,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |
 | ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
 | ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
+| ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |

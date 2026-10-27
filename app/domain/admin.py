@@ -17,7 +17,7 @@ such a context (superuser, no role) the event is global and only the superuser s
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
+from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Outcome
 from app.domain.authorization import (
     LEVELS,
     Decision,
@@ -176,10 +176,18 @@ class AdminService:
         async with self._uow.read() as tx:
             return await tx.list_groups(scope_for(principal, permission))
 
-    async def audit_log(self, principal: Principal, limit: int = 100) -> list[AuditEntry]:
-        """Return the newest audit events ``principal`` may see, with the actors' names."""
+    async def audit_log(
+        self, principal: Principal, narrow: AuditFilter | None = None, limit: int = 100
+    ) -> list[AuditEntry]:
+        """Return the newest audit events ``principal`` may see, with the actors' names.
+
+        The scope is exact per level (ADR 0031): a group admin sees their groups' events, an
+        organisation admin also the organisation's own, the superuser also global ones.
+        ``narrow`` filters within that scope and never widens it.
+        """
+        scope = scope_for(principal, Permission.AUDIT_VIEW)
         async with self._uow.read() as tx:
-            return await tx.list_audit_events(scope_for(principal, Permission.AUDIT_VIEW), limit)
+            return await tx.list_audit_events(scope, limit, narrow)
 
 
 def require(authorization: Authorization) -> Authorization:
