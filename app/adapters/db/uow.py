@@ -38,6 +38,7 @@ from app.adapters.db.models import (
     GroupTextRow,
     HolidayCalendarRow,
     HolidayRow,
+    IntegrationReportRow,
     JobRow,
     OrganisationHolidayCalendarRow,
     OrganisationLogoRow,
@@ -88,6 +89,7 @@ from app.domain.channel_settings import (
     SmtpSettings,
 )
 from app.domain.channels import ChannelKind, ReminderRule
+from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.direct_queue import DirectCall
 from app.domain.errors import DomainError, ErrorCode
@@ -105,6 +107,11 @@ from app.domain.scheduling import (
 
 _PENDING = "pending"
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
+
+
+def _check_name(group_id: int) -> str:
+    """Return the integration report name of a group's latest check."""
+    return f"group-check:{group_id}"
 
 
 def _organisation(row: OrganisationRow) -> Organisation:
@@ -452,6 +459,40 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
             select(OrganisationRow).where(OrganisationRow.slug == slug)
         )
         return _organisation(row) if row else None
+
+    async def save_group_check(self, check: GroupCheck) -> None:
+        """Store a group's latest check as an integration report (``group-check:<id>``)."""
+        body = {
+            "findings": [
+                {"area": f.area.value, "code": f.code, "status": f.status.value, "params": f.params}
+                for f in check.findings
+            ]
+        }
+        await self._session.merge(
+            IntegrationReportRow(
+                name=_check_name(check.group_id), body=json.dumps(body), checked_at=check.checked_at
+            )
+        )
+
+    async def get_group_check(self, group_id: int) -> GroupCheck | None:
+        """Return a group's latest check; findings with unknown values are left out."""
+        row = await self._session.get(IntegrationReportRow, _check_name(group_id))
+        if row is None:
+            return None
+        findings = []
+        for item in json.loads(row.body).get("findings", []):
+            try:
+                findings.append(
+                    Finding(
+                        CheckArea(item["area"]),
+                        str(item["code"]),
+                        CheckStatus(item["status"]),
+                        tuple((str(k), str(v)) for k, v in item.get("params", [])),
+                    )
+                )
+            except (KeyError, ValueError, TypeError):
+                continue  # written by another version; skip rather than fail the page
+        return GroupCheck(group_id, row.checked_at, tuple(findings))
 
     async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
         """Return the organisation with ``organisation_id``."""

@@ -26,6 +26,7 @@ from app.domain.calls import (
 )
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
+from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.direct_queue import DirectCall
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
@@ -141,6 +142,17 @@ class VideoProvider(Protocol):
         ...
 
 
+class IntegrationChecker(Protocol):
+    """Checks a group's integration chain at the platforms (read-only; verify button)."""
+
+    async def check_group(self, group: Group, peers: Sequence[Group]) -> list[Finding]:
+        """Return the findings for ``group``; ``peers`` are its organisation's groups.
+
+        Never raises for a platform problem: an unreachable or refusing platform is a finding.
+        """
+        ...
+
+
 class ContactCenterDispatcher(Protocol):
     """Creates and ends work items in Webex Contact Center (ADR 0018, 0021)."""
 
@@ -216,6 +228,14 @@ class Transaction(Protocol):
 
     async def list_groups(self, scope: Scope) -> list[GroupSummary]:
         """Return the groups inside ``scope``, ordered by organisation and name."""
+        ...
+
+    async def save_group_check(self, check: GroupCheck) -> None:
+        """Store the latest integration check of a group, replacing the previous one."""
+        ...
+
+    async def get_group_check(self, group_id: int) -> GroupCheck | None:
+        """Return the latest integration check of a group, if any."""
         ...
 
     async def get_group_summary(self, slug: str) -> GroupSummary | None:
