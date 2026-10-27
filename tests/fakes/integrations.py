@@ -1,8 +1,12 @@
 """Fake Webex and WxCC adapters: record what they were asked, answer or fail on demand."""
 
+from collections.abc import Sequence
+
 from app.domain.booking import MeetingRef
 from app.domain.calls import MeetingRequest, WorkItem
+from app.domain.checks import Finding
 from app.domain.ports import IntegrationError
+from app.domain.scheduling import Group
 
 
 class FakeVideo:
@@ -49,3 +53,15 @@ class FakeDispatcher:
         if self.mark_error:
             raise self.mark_error
         self.marked.append((task_id, reference))
+
+
+class FakeChecker:
+    """``IntegrationChecker`` that returns fixed findings and remembers what it was asked."""
+
+    def __init__(self, findings: Sequence[Finding]) -> None:
+        self.findings = list(findings)
+        self.calls: list[tuple[str, list[str]]] = []
+
+    async def check_group(self, group: Group, peers: Sequence[Group]) -> list[Finding]:
+        self.calls.append((group.slug, sorted(p.slug for p in peers)))
+        return self.findings

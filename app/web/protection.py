@@ -65,6 +65,7 @@ class RateLimits:
     bookings: str = "10/hour"
     reads: str = "60/minute"
     assets: str = "600/minute"
+    checks: str = "6/minute"
     agent_tokens: str = "10/minute"
     agent_calls: str = "120/minute"
 
@@ -113,3 +114,8 @@ def agent_token_limit() -> str:
 def agent_call_limit() -> str:
     """Limit for machine API calls, per API client (ADR 0023)."""
     return LIMITS.agent_calls
+
+
+def check_limit() -> str:
+    """Limit for the admin "Koppeling controleren" button: each run calls the platforms."""
+    return LIMITS.checks
