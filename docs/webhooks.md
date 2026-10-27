@@ -107,6 +107,35 @@ tunnel or staging host can receive webhooks while the admin login (OIDC redirect
 links in messages stay on `PUBLIC_BASE_URL`. It must be https in production, and
 `register-webhooks` refuses anything but https. **Koppelingen** shows the addresses in use.
 
+## Managing registrations (`webhooks-list`, `webhooks-reset`, `webhooks-health`)
+
+Operator commands (runbook, section 8) that call these APIs with the Service App token:
+
+| Call | Command | Kept from the answer |
+|---|---|---|
+| `GET /v1/webhooks?max=100&ownedBy=org` (+ `Link: rel="next"` on the same https host, at most 10 pages) | list, reset | `id`, `name` (OpenPlanner's or not), `resource`, `event`, `filter`, `status`, whether `secret` is set, `targetUrl` without query (host only if foreign) |
+| `GET /v2/subscriptions` | list, reset | `id`, `name`, `eventTypes`, `status`, whether `secret` is set, `destinationUrl` as above |
+| `DELETE /v1/webhooks/{id}` | reset `--yes` | status only; `204` deleted, `404` already gone, `403` Webex quirk |
+| `DELETE /v2/subscriptions/{id}` | reset `--yes` | status only; `403` needs `cjp:config_write` |
+
+Ids from a listing must match `[A-Za-z0-9_=-]{1,256}` before they go into a DELETE path.
+Only `STALE` registrations are deleted, never `CURRENT` or `FOREIGN` ones.
+
+**Delivery self-test** (`webhooks-health`): no Webex or WxCC call. OpenPlanner posts to its
+own endpoints through `WEBHOOK_BASE_URL`, without a bearer token:
+
+```json
+POST /webhooks/webex   X-Spark-Signature: <hex HMAC-SHA1>
+{"resource":"meetings","event":"ended","data":{"id":"openplanner-selftest-<16 hex>"}}
+
+POST /webhooks/wxcc    X-WebexCC-Signature: <hex HMAC-SHA256>   X-WebexCC-Timestamp: <ms>
+{"type":"task:ended","comciscotimestamp":<ms>,"data":{"taskId":"openplanner-selftest-<16 hex>"}}
+```
+
+Each is sent once signed with the configured secret (expected `204`) and once with a random
+wrong key (expected `401`). The ids match no meeting or task, so the endpoint acknowledges
+them as unknown: nothing is recorded and no dedup key is stored.
+
 ## Inbound: Webex webhooks (`POST /webhooks/webex`)
 
 Registered org-owned for `meetings` (`started`, `ended`) and `meetingParticipants` (`joined`,

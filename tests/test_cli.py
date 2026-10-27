@@ -1,4 +1,4 @@
-"""Operator commands: ``wxcc-check``, ``wxcc-config-check`` and ``register-webhooks``."""
+"""Operator commands: checks, webhook registration, listing, reset and delivery self-test."""
 
 from pathlib import Path
 from typing import Any
@@ -10,8 +10,16 @@ from sqlalchemy import update
 
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import GroupRow
+from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore, StoredReport
 from app.adapters.wxcc_config import PROJECT_ID
-from app.cli import _register_webhooks, _wxcc_check, _wxcc_config_check
+from app.cli import (
+    _register_webhooks,
+    _webhooks_health,
+    _webhooks_list,
+    _webhooks_reset,
+    _wxcc_check,
+    _wxcc_config_check,
+)
 from app.config import Settings
 from tests.adapters.db.conftest import seed_group
 from tests.support.database import migrated_database
@@ -200,3 +208,165 @@ async def test_wxcc_check_reports_a_wrong_region(configured: Settings) -> None:
 
     assert not passed
     assert "FAIL  WxCC region" in report
+
+
+TUNNEL = "https://issues-tvs-chronicle-exact.trycloudflare.com"
+
+
+def _registrations(seen: list[httpx.Request]) -> httpx.MockTransport:
+    """Webex and WxCC as on 2026-10-25: current, unfiltered and old-tunnel registrations."""
+    hook = {"resource": "meetings", "event": "started", "secret": "s", "status": "active"}
+    webhooks = [
+        hook
+        | {
+            "id": "current",
+            "targetUrl": f"{TUNNEL}/webhooks/webex",
+            "filter": "hostEmail=host-demo@example.nl",
+        },
+        hook | {"id": "unfiltered", "targetUrl": f"{TUNNEL}/webhooks/webex"},
+        hook
+        | {
+            "id": "old",
+            "targetUrl": "https://old.trycloudflare.com/webhooks/webex",
+            "filter": "hostEmail=host-demo@example.nl",
+        },
+    ]
+    subscription = {
+        "id": "sub",
+        "destinationUrl": f"{TUNNEL}/webhooks/wxcc",
+        "eventTypes": ["task:new", "task:connected", "task:ended", "task:failed"],
+    }
+
+    def route(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path == "/v1/access_token":
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": ACCESS_TOKEN,
+                    "expires_in": 3600,
+                    "refresh_token": "rotated",
+                    "refresh_token_expires_in": 7_776_000,
+                },
+            )
+        if request.method == "DELETE":
+            return httpx.Response(403 if request.url.path.endswith("unfiltered") else 204)
+        if request.method == "POST":
+            return httpx.Response(201, json={"id": "new"})
+        if request.url.path == "/v1/webhooks":
+            return httpx.Response(200, json={"items": webhooks})
+        if request.url.path == "/v2/subscriptions":
+            return httpx.Response(200, json={"data": [subscription]})
+        return httpx.Response(404)
+
+    return httpx.MockTransport(route)
+
+
+@pytest.fixture
+def tunnelled(configured: Settings) -> Settings:
+    return configured.model_copy(update={"webhook_base_url": TUNNEL})
+
+
+async def test_webhooks_list_classifies_and_stores_the_result(tunnelled: Settings) -> None:
+    await _wired_group(tunnelled)
+
+    report, ok = await _webhooks_list(tunnelled, _registrations([]))
+
+    assert not ok
+    assert "CURRENT  webex  meetings/started" in report
+    assert "no hostEmail filter" in report
+    assert "points at another address" in report
+    assert "MISSING  webex meetings/ended [host-demo@example.nl]" in report
+    assert ACCESS_TOKEN not in report
+    stored = await _stored(tunnelled, REGISTRATIONS_REPORT)
+    assert stored is not None
+    assert stored.body["base"] == TUNNEL
+    assert len(stored.body["registrations"]) == 4
+
+
+async def test_webhooks_reset_is_a_dry_run_without_yes(tunnelled: Settings) -> None:
+    await _wired_group(tunnelled)
+    seen: list[httpx.Request] = []
+
+    report, ok = await _webhooks_reset(
+        tunnelled, _registrations(seen), confirmed=False, reregister=True
+    )
+
+    assert ok
+    assert not [r for r in seen if r.method in ("DELETE", "POST") and "webhooks" in r.url.path]
+    assert "would delete webex meetings/started unfiltered" in report
+    assert "would delete webex meetings/started old" in report
+    assert "Dry run: nothing deleted. Run again with --yes" in report
+    assert "only together with --yes" in report
+
+
+async def test_webhooks_reset_with_yes_deletes_stale_and_reports_refusals(
+    tunnelled: Settings,
+) -> None:
+    await _wired_group(tunnelled)
+    seen: list[httpx.Request] = []
+
+    report, ok = await _webhooks_reset(
+        tunnelled, _registrations(seen), confirmed=True, reregister=True
+    )
+
+    assert not ok
+    deleted = sorted(r.url.path for r in seen if r.method == "DELETE")
+    assert deleted == ["/v1/webhooks/old", "/v1/webhooks/unfiltered"]
+    assert "unfiltered: refused (rejected_403): Webex quirk" in report
+    assert "deleted webex meetings/started old" in report
+    assert "meetings/ended [host-demo@example.nl]: created" in report
+    assert await _stored(tunnelled, REGISTRATIONS_REPORT) is not None
+
+
+async def test_webhooks_health_reports_tokens_and_deliveries(tunnelled: Settings) -> None:
+    def route(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "issues-tvs-chronicle-exact.trycloudflare.com":
+            return httpx.Response(530)  # Cloudflare: the tunnel is down
+        return _registrations([]).handle_request(request)
+
+    report, ok = await _webhooks_health(tunnelled, httpx.MockTransport(route))
+
+    assert not ok
+    assert "OK    token refresh" in report
+    assert "refresh token" in report
+    assert "FAIL  POST /webhooks/webex (signed)" in report
+    assert "proxy or tunnel error" in report
+    assert ACCESS_TOKEN not in report
+    assert "webhook-secret" not in report
+    stored = await _stored(tunnelled, HEALTH_REPORT)
+    assert stored is not None
+    assert {d["status"] for d in stored.body["deliveries"]} == {530}
+
+
+async def test_webhooks_health_warns_about_a_plain_http_base(configured: Settings) -> None:
+    def route(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "testserver":
+            return httpx.Response(401)
+        return _registrations([]).handle_request(request)
+
+    report, ok = await _webhooks_health(
+        configured.model_copy(update={"public_base_url": "http://testserver"}),
+        httpx.MockTransport(route),
+    )
+
+    assert not ok
+    assert "FAIL  WEBHOOK_BASE_URL" in report
+
+
+async def test_webhook_commands_without_a_service_app_do_nothing(settings: Settings) -> None:
+    listed, list_ok = await _webhooks_list(settings)
+    reset, reset_ok = await _webhooks_reset(settings, confirmed=True)
+
+    assert not list_ok
+    assert not reset_ok
+    assert "WEBEX_CLIENT_ID" in listed
+    assert "WEBEX_CLIENT_ID" in reset
+
+
+async def _stored(settings: Settings, name: str) -> StoredReport | None:
+    engine = create_engine(settings.database_url)
+    try:
+        return await ReportStore(engine).get(name)
+    finally:
+        await engine.dispose()
