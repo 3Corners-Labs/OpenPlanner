@@ -289,10 +289,10 @@ It registers the Webex webhooks (meetings started/ended, participants joined/lef
 group host account** (`hostEmail` filter, from each group's *Video host e-mail*) and the WxCC
 subscription (task events) on `WEBHOOK_BASE_URL` (or `PUBLIC_BASE_URL` when that is not set),
 and skips what exists. **Run it again after giving a group a new host account.** Unfiltered
-webhooks from earlier versions are listed as `stale`: delete them in the developer portal or
-with `DELETE /v1/webhooks/{id}`, or OpenPlanner keeps receiving every meeting of the
-organisation. Webex and WxCC only call **https on port 443 with a public
-domain**; in production `WEBHOOK_BASE_URL` must be https.
+webhooks from earlier versions are listed as `stale`: remove them with `webhooks-reset`
+(section 8), or OpenPlanner keeps receiving every meeting of the organisation. Webex and WxCC
+only call **https on port 443 with a public domain**; in production `WEBHOOK_BASE_URL` must be
+https. Afterwards, verify with `webhooks-list` and `webhooks-health` (section 8).
 
 **On a laptop (tunnel).** Keep `PUBLIC_BASE_URL=http://127.0.0.1:8000`, so the Keycloak login
 redirect and the links in mails keep working, and give the webhooks their own address:
@@ -301,24 +301,28 @@ redirect and the links in mails keep working, and give the webhooks their own ad
    (or `ngrok http 8000`). Note the `https://…` address it prints.
 2. Set `WEBHOOK_BASE_URL=https://<that address>` in `.env` and restart `web`
    (`docker compose up -d web`). **Koppelingen** now shows the tunnel's webhook addresses.
-3. Run `register-webhooks`. A quick tunnel gets a new address on every start: run it again
-   after a restart; the registrations on the old address stay until you delete them in the
-   developer portal (Webex) or with `DELETE /v2/subscriptions/{id}` (WxCC).
-4. Check delivery: a test meeting's start and the participant counts appear on the
+3. Run `register-webhooks`. A quick tunnel gets a new address on every start: after a
+   restart, run `webhooks-reset --yes --reregister` (section 8). It deletes the
+   registrations on the old address and registers on the new one.
+4. Check delivery with `webhooks-health` (section 8): it sends signed test events through
+   the tunnel. A live check: a test meeting's start and the participant counts appear on the
    booking's timeline; `docker compose logs web | grep webhook` shows `webhook.webex` lines
    (`webhook.rejected` means a wrong secret).
 
 **After changing `WXCC_API_BASE_URL`** (for example to the right region), `register-webhooks`
-lists subscriptions on the new host only and creates one there; a subscription made earlier
-through another host stays. List both (`GET /v2/subscriptions` on each host) and delete the
-stale one with `DELETE /v2/subscriptions/{id}`, or events may arrive twice. Webex lists
+and `webhooks-list` see subscriptions on the new host only; a subscription made earlier
+through another host stays. Before the change, run `webhooks-reset --yes` with the old host to
+remove it; otherwise remove it with `DELETE /v2/subscriptions/{id}` on the old host, or
+events may arrive twice. Webex lists
 org-owned webhooks only with `ownedBy=org`; `register-webhooks` asks for that and treats a
 `409` (already exists) as `exists`.
 
 **Webex quirk (seen 2026-10-25):** a create that Webex answers with `403` can still leave an
 active org-owned webhook behind, which the Service App then cannot delete (`403` from the
 webhook engine), and which does not show up for an admin's own token in **List Webhooks**.
-Register only after `wxcc-check` shows `GET /webhooks (org-owned)` as `OK`. A left-over
+Register only after `wxcc-check` shows `GET /webhooks (org-owned)` as `OK`. `webhooks-list`
+shows such a webhook as `STALE` (no hostEmail filter), and `webhooks-reset --yes` reports
+`refused (rejected_403): Webex quirk` for it and continues with the rest. A left-over
 webhook does no harm beyond extra events (unknown meetings are ignored); it goes inactive once
 its target stops answering, or Cisco developer support can remove it by id.
 
@@ -372,7 +376,8 @@ A 404 on the WxCC reads means `WXCC_API_BASE_URL` points at the wrong region; th
 **WxCC region**, checks it against the configuration service and names the right host (the
 task and subscription APIs answer on every regional host, the configuration only on the
 organisation's own). Once all lines are `OK`, run `wxcc-config-check` (section 7) and then
-`register-webhooks` (section 4).
+`register-webhooks` (section 4). Token expiry and webhook delivery are in `webhooks-health`
+(section 8).
 
 ### 7. Checking the WxCC routing configuration (`wxcc-config-check`)
 
@@ -408,6 +413,70 @@ as a name part; `-`, `_`, spaces and case count as the same. With routing value 
 `FIN-BLD_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
 per group which queue it will use, and a wrong Case branch stands out. Prefer routing values
 without spaces (the web address of the group is a good default).
+
+Once the routing is right, register the webhooks (section 4) and verify them (section 8).
+
+### 8. Listing, cleaning up and testing webhooks
+
+Three commands for registrations at Webex and WxCC. Run them in the `web` container, like the
+others: they share its database (one token store, section 1 step 4) and its secrets. Each one
+stores its result, which **Koppelingen** in the admin portal shows read-only (time, states,
+delivery outcomes). Cleaning up happens only here, on the command line.
+
+```sh
+docker compose exec web python -m app.cli webhooks-list
+docker compose exec web python -m app.cli webhooks-reset            # dry run
+docker compose exec web python -m app.cli webhooks-reset --yes --reregister
+docker compose exec web python -m app.cli webhooks-health
+```
+
+**`webhooks-list`** lists every org-owned Webex webhook (`ownedBy=org`) and every WxCC
+subscription on `WXCC_API_BASE_URL`. Per registration it shows the state, platform, event,
+filter, status, whether a secret is set (never the value), target and id. The target has no
+query string; for a foreign registration it shows only the host. It ends with `MISSING` lines
+for registrations the groups need that do not exist. The exit code is 0 only when everything
+is current and nothing is missing.
+
+| State | Meaning | Reasons |
+|---|---|---|
+| `CURRENT` | OpenPlanner's, on `WEBHOOK_BASE_URL`, for a host account a group uses | – |
+| `STALE` | OpenPlanner's (path `/webhooks/webex` or `/webhooks/wxcc`, or named "OpenPlanner …") but no longer right | other address (old tunnel or base URL), no `hostEmail` filter, host account no group uses, event not used, inactive, duplicate |
+| `FOREIGN` | another application's | never touched |
+
+**`webhooks-reset`** deletes the `STALE` registrations. Without `--yes` it only prints
+`would delete …` lines. With `--yes` it deletes them and prints one line per registration:
+`deleted`, `already gone` (404), `refused (rejected_403)` (Webex quirk, section 4; WxCC: needs
+`cjp:config_write`) or `failed` (busy or failing; run again). Then it lists again for
+**Koppelingen**. `--reregister` (with `--yes`) runs `register-webhooks` afterwards; use it
+after a new tunnel address. `CURRENT` and `FOREIGN` registrations are never deleted. The exit
+code is 1 when something was refused or failed.
+
+**`webhooks-health`** shows token health (refresh, access and refresh token expiry; `WARN`
+two weeks before the refresh token expires). It then sends two test events per endpoint to
+`WEBHOOK_BASE_URL`/webhooks/webex and /wxcc: one signed with this environment's secret
+(expected `204`) and one with a wrong signature (expected `401`). The events carry ids
+(`openplanner-selftest-…`) that belong to no meeting or task, so no booking changes.
+
+| Result | Meaning | Fix |
+|---|---|---|
+| signed `204`, wrong signature `401` | delivery and verification work | – |
+| signed `401` | the secret here differs from the `web` container's (WxCC also: clock) | run the command in `web`; check the secrets |
+| `404` | `web` has no secret for this endpoint, or the address reaches something else | set the secret, check `WEBHOOK_BASE_URL` |
+| `502`, `530` and other 5xx | proxy or tunnel error | restart the tunnel, then `webhooks-reset --yes --reregister` |
+| unreachable | DNS or no tunnel | check `WEBHOOK_BASE_URL` |
+| wrong signature `204` | verification is off | stop: report it as a security incident |
+| `FAIL WEBHOOK_BASE_URL` | the base is not https | Webex and WxCC deliver to https only |
+
+A passing self-test proves that the address, the tunnel and the secrets work. It does not
+prove that Webex or WxCC send events. For that, check `webhooks-list` (all `CURRENT`, nothing
+`MISSING`, status `active`) and a test meeting's timeline (section 4, tunnel step 4).
+
+## Mail
+
+The worker sends mail when `SMTP_HOST` is set (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`,
+`SMTP_PASSWORD`, `MAIL_FROM`). Failed deliveries are retried after 1, 5 and 15 minutes and then
+marked `failed` in the `jobs` table (`last_error` holds the exception type). Without
+`SMTP_HOST`, message jobs stay pending until mail is configured.
 
 ## Mail and SMS (ADR 0022)
 
