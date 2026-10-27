@@ -1,4 +1,4 @@
-.PHONY: check fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation e2e proxy-check up down
+.PHONY: check fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation e2e proxy-check diagrams up down
 
 UV := uv run
 
@@ -52,6 +52,11 @@ semgrep:
 
 duplication:
 	npx --yes jscpd@4.0.5
+
+# Architecture plates in docs/diagrams from scripts/diagrams/content.py. Needs the draw.io desktop
+# app and Chrome locally; python-docx is added for this run only (not a project dependency).
+diagrams:
+	uv run --with python-docx==1.2.0 python -m scripts.diagrams.build
 
 # Mutates app/domain and app/i18n; runs once either has tests, then enforces >= 80%.
 mutation:
