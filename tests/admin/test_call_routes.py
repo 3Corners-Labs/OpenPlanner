@@ -2,7 +2,17 @@
 
 from datetime import UTC, datetime
 
+from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.registrations import (
+    Listing,
+    ListingError,
+    Reason,
+    Registration,
+    State,
+    listing_to_report,
+)
+from app.adapters.webhook_selftest import Delivery, Outcome, deliveries_to_report
 from app.domain.admin import AdminService
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
@@ -128,6 +138,69 @@ async def test_integrations_page_shows_the_webhook_base_url(site: Site) -> None:
 
     assert "https://abc.trycloudflare.com/webhooks/webex" in text
     assert "https://abc.trycloudflare.com/webhooks/wxcc" in text
+
+
+async def test_integrations_page_says_when_nothing_was_checked_yet(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    text = (await site.client.get("/admin/integrations")).text
+
+    assert "Nog niet gecontroleerd. Voer python -m app.cli webhooks-list uit" in text
+    assert "python -m app.cli webhooks-health" in text
+
+
+async def test_integrations_page_shows_the_last_checks_read_only(site: Site) -> None:
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    reports = ReportStore(app.state.engine)
+    tunnel = "https://old.trycloudflare.com"
+    listing = Listing(
+        [
+            Registration(
+                "webex",
+                "w1",
+                "meetings/started",
+                f"{tunnel}/webhooks/webex",
+                "hostEmail=host-demo@example.nl",
+                "active",
+                True,
+                State.STALE,
+                Reason.OTHER_TARGET,
+            ),
+            Registration(
+                "wxcc",
+                "s1",
+                "task events",
+                "https://abc.example/webhooks/wxcc",
+                "",
+                "-",
+                None,
+                State.CURRENT,
+                Reason.NONE,
+            ),
+        ],
+        missing=["webex meetings/ended [host-demo@example.nl]"],
+        errors=[ListingError("webex", "rejected_403")],
+    )
+    await reports.put(
+        REGISTRATIONS_REPORT, listing_to_report(listing) | {"base": tunnel}, FRIDAY_0900
+    )
+    deliveries = [Delivery("webex", True, 530, Outcome.PROXY_ERROR)]
+    await reports.put(
+        HEALTH_REPORT, deliveries_to_report(deliveries) | {"base": tunnel}, FRIDAY_0900
+    )
+    await site.login_as(SUPER)
+
+    text = (await site.client.get("/admin/integrations")).text
+
+    assert "Verouderd" in text
+    assert "Verwijst naar een ander adres" in text
+    assert "Actueel" in text
+    assert "<code>hostEmail=host-demo@example.nl</code>" in text
+    assert "webex meetings/ended [host-demo@example.nl]" in text
+    assert "De lijst van webex kon niet worden opgehaald (rejected_403)." in text
+    assert "Fout in proxy of tunnel" in text
+    assert "<td>530</td>" in text
+    assert "<form" not in text.split("registrations-heading", 1)[1].split("groups-heading", 1)[0]
 
 
 async def test_timeline_explains_a_work_item_that_could_not_be_ended(site: Site) -> None:

@@ -40,6 +40,7 @@ from app.domain.channel_service import ChannelSettingsService
 from app.domain.closure_service import ClosureService
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
+from app.domain.integration_check import IntegrationCheckService
 from app.domain.messaging_service import MessagingService
 from app.domain.organisations import OrganisationService
 from app.domain.planning import PlanningService
@@ -155,6 +156,9 @@ def create_app(
         app.state.integrations = wired
         app.state.call_service = CallService(
             uow, app.state.integration_service, wired.video, wired.dispatcher, agent_start_label
+        )
+        app.state.integration_check_service = IntegrationCheckService(
+            uow, clock, app.state.admin_service, wired.checker
         )
         try:
             yield
