@@ -14,14 +14,13 @@ import { adminMenu, expectForbidden, loginAs, logout, requireKeycloak } from '..
 
 requireKeycloak();
 
-test('group admin sees only their own group and no audit log', async ({ page }) => {
+test('group admin sees only their own group and its own audit log', async ({ page }) => {
   await loginAs(page, 'groupadmin');
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Overzicht');
   const groups = page.getByRole('list', { name: 'Uw groepen' }).getByRole('listitem');
   await expect(groups).toHaveCount(1);
   await expect(groups.first()).toContainText('Demo: videogesprek');
-  await expect(adminMenu(page).getByRole('link', { name: 'Auditlog' })).toHaveCount(0);
   await expectNoAxeViolations(page);
 
   await page.getByRole('link', { name: 'Demo: videogesprek', exact: true }).click();
@@ -39,7 +38,16 @@ test('group admin sees only their own group and no audit log', async ({ page }) 
   await expectForbidden(page, '/admin/groups/andere-team');
   await expect(adminMenu(page)).toBeVisible(); // the refusal stays inside the portal
   await expectNoAxeViolations(page);
-  await expectForbidden(page, '/admin/audit');
+
+  // ADR 0031: the group admin's log holds the own group only, never the organisation or others.
+  await adminMenu(page).getByRole('link', { name: 'Auditlog' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Auditlog');
+  await expect(page.getByRole('row').filter({ hasText: 'andere-team' })).toHaveCount(0);
+  await expect(page.getByRole('row').filter({ hasText: 'demo / demo' }).first()).toBeVisible();
+  await page.getByLabel('Alleen problemen').check();
+  await page.getByRole('button', { name: 'Toepassen' }).click();
+  await expect(page).toHaveURL(/problems=1/);
+  await expectNoAxeViolations(page);
 
   await logout(page);
   await expectNoAxeViolations(page);

@@ -516,7 +516,7 @@ msgid "admin.audit.title"
 msgstr "Auditlog"
 
 msgid "admin.audit.intro"
-msgstr "De laatste inlogpogingen, geweigerde acties en wijzigingen binnen uw organisaties."
+msgstr "Inlogpogingen, geweigerde acties, wijzigingen en wat het systeem zelf deed (berichten, videogesprekken, wachtrijtaken), alleen voor uw eigen organisatie of groepen."
 
 msgid "admin.audit.when"
 msgstr "Wanneer"
@@ -2740,6 +2740,113 @@ msgstr "De mailserver weigerde het bericht (code {status})."
 msgid "admin.channels.test_failed.other"
 msgstr "Het versturen is mislukt door een onverwachte fout van de mailserver. Probeer het later opnieuw."
 
+msgid "admin.audit.filter"
+msgstr "Filter"
+
+msgid "admin.audit.source"
+msgstr "Soort"
+
+msgid "admin.audit.source.admin"
+msgstr "Acties van beheerders"
+
+msgid "admin.audit.source.system"
+msgstr "Systeemgebeurtenissen"
+
+msgid "admin.audit.all"
+msgstr "Alle"
+
+msgid "admin.audit.group"
+msgstr "Groep"
+
+msgid "admin.audit.booking"
+msgstr "Afspraaknummer"
+
+msgid "admin.audit.problems"
+msgstr "Alleen problemen"
+
+msgid "admin.audit.apply"
+msgstr "Toepassen"
+
+msgid "admin.audit.clear"
+msgstr "Filter wissen"
+
+msgid "admin.audit.booking_link"
+msgstr "Afspraak {id}"
+
+msgid "admin.audit.detail.channel_email"
+msgstr "e-mail"
+
+msgid "admin.audit.detail.channel_sms"
+msgstr "sms"
+
+msgid "admin.audit.detail.attempt"
+msgstr "poging {count}"
+
+msgid "admin.audit.reason.no_role"
+msgstr "Geen rol in het beheerportaal."
+
+msgid "admin.audit.reason.not_permitted"
+msgstr "De rol geeft dit recht niet."
+
+msgid "admin.audit.reason.out_of_scope"
+msgstr "Buiten de eigen organisatie of groep."
+
+msgid "admin.audit.reason.stale"
+msgstr "Niet meer nodig: de afspraak is verplaatst of geannuleerd."
+
+msgid "admin.audit.reason.no_recipient"
+msgstr "Geen ontvanger: contactgegevens ontbreken of zijn al verwijderd."
+
+msgid "admin.audit.reason.no_booking"
+msgstr "De afspraak bestaat niet meer."
+
+msgid "admin.audit.reason.channel_not_configured"
+msgstr "Dit kanaal is voor de organisatie niet ingesteld."
+
+msgid "audit.actor.system"
+msgstr "Systeem"
+
+msgid "audit.outcome.retry"
+msgstr "Wordt opnieuw geprobeerd"
+
+msgid "audit.outcome.skipped"
+msgstr "Overgeslagen"
+
+msgid "audit.job.create_video_room"
+msgstr "Videogesprek aanmaken"
+
+msgid "audit.job.delete_video_room"
+msgstr "Videogesprek verwijderen"
+
+msgid "audit.job.send_confirmation"
+msgstr "Bevestiging versturen"
+
+msgid "audit.job.send_change"
+msgstr "Wijziging versturen"
+
+msgid "audit.job.send_reminder"
+msgstr "Herinnering versturen"
+
+msgid "audit.job.send_cancellation"
+msgstr "Annulering versturen"
+
+msgid "audit.job.dispatch_wxcc_task"
+msgstr "Taak naar de wachtrij sturen"
+
+msgid "audit.job.end_wxcc_task"
+msgstr "Taak in de wachtrij beëindigen"
+
+msgid "audit.job.purge_pii"
+msgstr "Persoonsgegevens verwijderen"
+
+msgid "audit.job.send_suspension"
+msgstr "Bericht over sluiting versturen"
+
+msgid "audit.job.send_closure_update"
+msgstr "Update over sluiting versturen"
+
+msgid "audit.job.send_reinstatement"
+msgstr "Bericht over hervatting versturen"
 msgid "authz.permission.system_update"
 msgstr "Updates van de installatie uitvoeren"
 
@@ -2916,3 +3023,451 @@ msgstr "Naar updates"
 
 msgid "admin.updates.banner.snooze"
 msgstr "Herinner me over 60 minuten"
+
+#. Context-sensitive help and the manual (ADR 0033).
+msgid "admin.nav.help"
+msgstr "Handleiding"
+
+msgid "help.title"
+msgstr "Handleiding"
+
+msgid "help.lead"
+msgstr "Uitleg per scherm: wat het doet en wat elk veld betekent."
+
+msgid "help.topics"
+msgstr "Schermen"
+
+msgid "help.no_topics"
+msgstr "Voor de schermen die u kunt openen is nog geen handleiding geschreven."
+
+msgid "help.page_lead"
+msgstr "Uitleg bij dit scherm en bij elk veld."
+
+msgid "help.other_language"
+msgstr "Deze uitleg is nog niet vertaald en staat hieronder in het Nederlands."
+
+msgid "help.page_link"
+msgstr "Help bij deze pagina"
+
+msgid "help.more"
+msgstr "Meer uitleg"
+
+#. Read by screen readers after "Meer uitleg"; {label} is the field label.
+msgid "help.more_for"
+msgstr "bij {label}"
+
+msgid "help.in_manual"
+msgstr "Lees verder in de handleiding"
+
+#. Webhook registrations and delivery self-test (integrations page).
+
+msgid "admin.integrations.registrations"
+msgstr "Registraties bij Webex en WxCC"
+
+msgid "admin.integrations.registrations_lead"
+msgstr "Alle webhooks en abonnementen die naar OpenPlanner verwijzen, met hun staat bij de laatste controle. Bijwerken met python -m app.cli webhooks-list; verouderde registraties opruimen met python -m app.cli webhooks-reset (runbook, hoofdstuk 6)."
+
+msgid "admin.integrations.checked_at"
+msgstr "Laatste controle: {date}, vergeleken met {base}."
+
+msgid "admin.integrations.not_checked"
+msgstr "Nog niet gecontroleerd. Voer {command} uit in de web-container."
+
+msgid "admin.integrations.none_found"
+msgstr "Geen registraties gevonden."
+
+msgid "admin.integrations.missing"
+msgstr "Ontbreekt"
+
+msgid "admin.integrations.listing_failed"
+msgstr "De lijst van {platform} kon niet worden opgehaald ({code})."
+
+msgid "admin.integrations.col.state"
+msgstr "Staat"
+
+msgid "admin.integrations.col.platform"
+msgstr "Platform"
+
+msgid "admin.integrations.col.event"
+msgstr "Gebeurtenis"
+
+msgid "admin.integrations.col.filter"
+msgstr "Filter"
+
+msgid "admin.integrations.col.status"
+msgstr "Status"
+
+msgid "admin.integrations.col.secret"
+msgstr "Geheim"
+
+msgid "admin.integrations.col.target"
+msgstr "Adres"
+
+msgid "admin.integrations.state.current"
+msgstr "Actueel"
+
+msgid "admin.integrations.state.stale"
+msgstr "Verouderd"
+
+msgid "admin.integrations.state.foreign"
+msgstr "Niet van OpenPlanner"
+
+msgid "admin.integrations.reason.foreign"
+msgstr "Hoort bij een andere toepassing en blijft ongemoeid."
+
+msgid "admin.integrations.reason.other_target"
+msgstr "Verwijst naar een ander adres (oude tunnel of basis-URL)."
+
+msgid "admin.integrations.reason.unfiltered"
+msgstr "Zonder hostEmail-filter: meldt elke meeting van de organisatie."
+
+msgid "admin.integrations.reason.unknown_host"
+msgstr "Hostaccount dat geen groep meer gebruikt."
+
+msgid "admin.integrations.reason.unused_event"
+msgstr "Gebeurtenis die OpenPlanner niet gebruikt."
+
+msgid "admin.integrations.reason.inactive"
+msgstr "Inactief: het platform levert niet meer af."
+
+msgid "admin.integrations.reason.duplicate"
+msgstr "Dubbel: een andere registratie doet hetzelfde."
+
+msgid "admin.integrations.secret.yes"
+msgstr "Ingesteld"
+
+msgid "admin.integrations.secret.no"
+msgstr "Niet ingesteld"
+
+msgid "admin.integrations.secret.unknown"
+msgstr "Onbekend"
+
+msgid "admin.integrations.delivery"
+msgstr "Afleveringstest"
+
+msgid "admin.integrations.delivery_lead"
+msgstr "Ondertekende testberichten via het webhookadres naar OpenPlanner zelf, met onbekende ids zodat geen afspraak verandert. Bijwerken met python -m app.cli webhooks-health."
+
+msgid "admin.integrations.no_secrets"
+msgstr "Er is geen webhookgeheim ingesteld; er is niets getest."
+
+msgid "admin.integrations.col.endpoint"
+msgstr "Adres"
+
+msgid "admin.integrations.col.test"
+msgstr "Test"
+
+msgid "admin.integrations.col.http"
+msgstr "HTTP-status"
+
+msgid "admin.integrations.col.result"
+msgstr "Resultaat"
+
+msgid "admin.integrations.delivery.signed"
+msgstr "Correct ondertekend bericht"
+
+msgid "admin.integrations.delivery.unsigned"
+msgstr "Bericht met verkeerde handtekening"
+
+msgid "admin.integrations.ok"
+msgstr "In orde"
+
+msgid "admin.integrations.failed"
+msgstr "Mislukt"
+
+msgid "admin.integrations.outcome.delivered"
+msgstr "Afgeleverd en geverifieerd."
+
+msgid "admin.integrations.outcome.refused"
+msgstr "Geweigerd, zoals het hoort."
+
+msgid "admin.integrations.outcome.signature_refused"
+msgstr "Handtekening geweigerd: het geheim verschilt van dat van de web-container."
+
+msgid "admin.integrations.outcome.unsigned_accepted"
+msgstr "Geaccepteerd terwijl de handtekening fout is: de controle staat uit."
+
+msgid "admin.integrations.outcome.not_found"
+msgstr "Niet gevonden: geen geheim ingesteld, of het webhookadres bereikt OpenPlanner niet."
+
+msgid "admin.integrations.outcome.rate_limited"
+msgstr "Te veel verzoeken; probeer het over een minuut opnieuw."
+
+msgid "admin.integrations.outcome.proxy_error"
+msgstr "Fout in proxy of tunnel: draait de tunnel nog?"
+
+msgid "admin.integrations.outcome.unreachable"
+msgstr "Onbereikbaar: controleer DNS en de tunnel."
+
+msgid "admin.integrations.outcome.unexpected"
+msgstr "Onverwachte status: controleer wat er op het webhookadres antwoordt."
+
+#. Verify button "Koppeling controleren" per group.
+
+msgid "admin.done.checked"
+msgstr "De koppeling is gecontroleerd. De uitslag staat hieronder."
+
+msgid "admin.check.title"
+msgstr "Koppeling controleren"
+
+msgid "admin.check.lead"
+msgstr "Controleert bij Webex en Webex Contact Center of gesprekken van deze groep goed aankomen: de host, de routering van het work item naar de queue en de webhooks. Er wordt niets gewijzigd; alleen een ondertekend testbericht naar OpenPlanner zelf."
+
+msgid "admin.check.button"
+msgstr "Nu controleren"
+
+msgid "admin.check.never"
+msgstr "Deze groep is nog niet gecontroleerd."
+
+msgid "admin.check.last"
+msgstr "Laatst gecontroleerd: {at}"
+
+msgid "admin.check.overall"
+msgstr "Uitslag"
+
+msgid "admin.check.after_save"
+msgstr "Sla wijzigingen eerst op: de controle gebruikt de opgeslagen instellingen."
+
+msgid "admin.check.area.platform"
+msgstr "Koppelingen"
+
+msgid "admin.check.area.webex"
+msgstr "Webex (videogesprek)"
+
+msgid "admin.check.area.wxcc"
+msgstr "Webex Contact Center (routering naar de queue)"
+
+msgid "admin.check.area.webhooks"
+msgstr "Webhooks (terugmeldingen naar OpenPlanner)"
+
+msgid "admin.check.status.ok"
+msgstr "OK"
+
+msgid "admin.check.status.warn"
+msgstr "Waarschuwing"
+
+msgid "admin.check.status.fail"
+msgstr "Fout"
+
+msgid "admin.check.status.skipped"
+msgstr "Overgeslagen"
+
+msgid "admin.check.unknown"
+msgstr "Onbekende uitkomst ({code})."
+
+msgid "admin.check.platform.not_configured"
+msgstr "Er is geen Webex Service App ingesteld; er valt niets te controleren."
+
+msgid "admin.check.webex.no_host"
+msgstr "Geen Webex-host ingevuld: deze groep krijgt geen videogesprekken."
+
+msgid "admin.check.webex.host_ok"
+msgstr "Host {host} is bekend en de Service App mag namens deze host plannen."
+
+msgid "admin.check.webex.host_unknown"
+msgstr "Webex kent host {host} niet, of de host heeft geen licentie op deze site ({error})."
+
+msgid "admin.check.webex.host_refused"
+msgstr "De Service App mag niet plannen namens {host} ({error}): controleer de scopes en de autorisatie in Control Hub."
+
+msgid "admin.check.webex.unreachable"
+msgstr "Webex was niet bereikbaar om host {host} te controleren ({error}). Probeer het later opnieuw."
+
+msgid "admin.check.wxcc.not_configured"
+msgstr "Webex Contact Center is niet ingesteld; de routering is niet gecontroleerd."
+
+msgid "admin.check.wxcc.no_mapping"
+msgstr "Werkitem-kanaal of business address ontbreekt: deze groep maakt geen work items aan."
+
+msgid "admin.check.wxcc.config_refused"
+msgstr "De configuratie van Webex Contact Center kon niet worden gelezen ({error}): nodig is cjp:config_read en de beheerrol voor Contact Center."
+
+msgid "admin.check.wxcc.region.ok"
+msgstr "De regio klopt ({host})."
+
+msgid "admin.check.wxcc.region.wrong"
+msgstr "De organisatie staat in een andere regio: stel WXCC_API_BASE_URL in op {host}."
+
+msgid "admin.check.wxcc.region.no_org"
+msgstr "De organisatie van de Service App is onbekend bij Webex Contact Center (cjp:config_read)."
+
+msgid "admin.check.wxcc.region.unknown"
+msgstr "Geen enkele regio kent deze organisatie (cjp:config_read, beheerrol voor Contact Center)."
+
+msgid "admin.check.wxcc.channel.ok"
+msgstr "Werkitem-kanaal {channel} bestaat."
+
+msgid "admin.check.wxcc.channel.missing"
+msgstr "Er is geen kanaal met de naam {channel}. Bestaande werkitem-kanalen: {available}."
+
+msgid "admin.check.wxcc.channel.wrong_type"
+msgstr "Kanaal {channel} is geen werkitem-kanaal maar {type}."
+
+msgid "admin.check.wxcc.asset.ok"
+msgstr "Asset {asset} hoort bij het business address."
+
+msgid "admin.check.wxcc.asset.missing"
+msgstr "Er is geen asset met business address {address}. Bestaande: {available}."
+
+msgid "admin.check.wxcc.asset.wrong_channel"
+msgstr "Asset {asset} staat op kanaal {actual}, niet op {channel}."
+
+msgid "admin.check.wxcc.schema.ok"
+msgstr "Het schema van de asset bevat de velden die OpenPlanner meestuurt."
+
+msgid "admin.check.wxcc.schema.refused"
+msgstr "Webex Contact Center weigert het work item: velden die ontbreken: {missing}; verplichte velden die OpenPlanner niet kent: {extra}. Pas het schema van de asset aan (runbook)."
+
+msgid "admin.check.wxcc.schema.hidden"
+msgstr "Deze velden zijn niet zichtbaar voor agents: {fields}."
+
+msgid "admin.check.wxcc.entry.ok"
+msgstr "Entry point {entry} is actief en heeft een flow."
+
+msgid "admin.check.wxcc.entry.missing"
+msgstr "Asset {asset} heeft geen werkitem-entry point."
+
+msgid "admin.check.wxcc.entry.no_flow"
+msgstr "Entry point {entry} heeft geen flow."
+
+msgid "admin.check.wxcc.entry.inactive"
+msgstr "Entry point {entry} staat uit."
+
+msgid "admin.check.wxcc.flow.not_exported"
+msgstr "De flow van entry point {entry} kon niet worden gelezen."
+
+msgid "admin.check.wxcc.routing.ok"
+msgstr "De flow leest openplannerGroup om de queue te kiezen."
+
+msgid "admin.check.wxcc.routing.shared"
+msgstr "De flow leest openplannerGroup niet, dus de groepen {groups} komen allemaal in dezelfde queue."
+
+msgid "admin.check.wxcc.routing.not_read"
+msgstr "De flow leest openplannerGroup niet: alle work items van dit entry point gaan naar dezelfde queue."
+
+msgid "admin.check.wxcc.branch.ok"
+msgstr "De flow heeft een tak voor routeringswaarde {value}."
+
+msgid "admin.check.wxcc.branch.missing"
+msgstr "De flow heeft geen tak voor {value}: work items gaan naar de standaardtak."
+
+msgid "admin.check.wxcc.queues.ok"
+msgstr "De flow zet work items in queue {queues}."
+
+msgid "admin.check.wxcc.queues.none"
+msgstr "De flow zet work items in geen enkele bekende queue."
+
+msgid "admin.check.wxcc.queues.wrong_type"
+msgstr "Deze queues zijn geen werkitem-queues: {queues}."
+
+msgid "admin.check.wxcc.naming.ok"
+msgstr "De queuenaam past bij de groep ({queues})."
+
+msgid "admin.check.wxcc.naming.no_match"
+msgstr "Geen queue met {value} in de naam (afspraak, geen eis)."
+
+msgid "admin.check.wxcc.screenpop.ok"
+msgstr "De flow toont een Screen Pop aan de agent."
+
+msgid "admin.check.wxcc.screenpop.missing"
+msgstr "Geen Screen Pop: voeg er een toe met meetingLink, zodat de agent de link direct ziet."
+
+msgid "admin.check.webhooks.not_https"
+msgstr "Het webhook-adres {base} is geen https-adres: Webex en Webex Contact Center kunnen niets afleveren."
+
+msgid "admin.check.webhooks.listing_refused"
+msgstr "De webhooks bij {platform} konden niet worden opgevraagd ({error})."
+
+msgid "admin.check.webhooks.webex_ok"
+msgstr "De Webex-webhooks voor de host van deze groep zijn actief op het huidige adres."
+
+msgid "admin.check.webhooks.webex_missing"
+msgstr "Deze Webex-webhooks ontbreken voor de host: {events}. Draai register-webhooks (runbook)."
+
+msgid "admin.check.webhooks.wxcc_ok"
+msgstr "De abonnementen op taakgebeurtenissen van Webex Contact Center zijn actief op het huidige adres."
+
+msgid "admin.check.webhooks.wxcc_missing"
+msgstr "Er is geen actief abonnement op taakgebeurtenissen: OpenPlanner hoort niet of een agent het work item oppakt. Draai register-webhooks."
+
+msgid "admin.check.webhooks.stale"
+msgstr "{count} verouderde registratie(s) gevonden, bijvoorbeeld op een oud tunneladres. Ruim op met webhooks-reset (runbook)."
+
+msgid "admin.check.webhooks.no_secret"
+msgstr "Er is geen webhookgeheim ingesteld; de aflevering is niet getest."
+
+msgid "admin.check.webhooks.delivery_ok"
+msgstr "Een ondertekend testbericht kwam aan, en een vals ondertekend bericht werd geweigerd."
+
+msgid "admin.check.webhooks.delivery_failed"
+msgstr "Testbericht naar {endpoint}: {outcome}"
+
+#. Simulator for platform events (not in production).
+
+msgid "admin.simulator.title"
+msgstr "Simulator (alleen in test)"
+
+msgid "admin.simulator.lead"
+msgstr "Speel na wat Webex en Webex Contact Center zouden melden, zonder agent of tunnel. Elk event gaat ondertekend door het echte webhook-endpoint en komt op de tijdlijn. Deze kaart bestaat niet in productie."
+
+msgid "admin.simulator.prepare_lead"
+msgstr "Deze boeking heeft nog geen meeting of work item. Geef haar eerst nep-id's, dan kunnen de events haar vinden."
+
+msgid "admin.simulator.prepare"
+msgstr "Nep-meeting en -taak aanmaken"
+
+msgid "admin.simulator.event.task_connected"
+msgstr "Agent neemt taak aan"
+
+msgid "admin.simulator.event.host_joined"
+msgstr "Agent komt binnen"
+
+msgid "admin.simulator.event.guest_joined"
+msgstr "Burger komt binnen"
+
+msgid "admin.simulator.event.participant_left"
+msgstr "Deelnemer vertrekt"
+
+msgid "admin.simulator.event.meeting_started"
+msgstr "Meeting gestart"
+
+msgid "admin.simulator.event.meeting_ended"
+msgstr "Meeting beëindigd"
+
+msgid "admin.simulator.event.task_failed"
+msgstr "Taak niet opgepakt"
+
+msgid "admin.simulator.event.task_ended"
+msgstr "Taak beëindigd"
+
+msgid "admin.done.simulated"
+msgstr "Het event is afgeleverd en staat op de tijdlijn."
+
+msgid "admin.done.simulated_prepared"
+msgstr "De boeking heeft nu een nep-meeting en een nep-taak."
+
+msgid "admin.done.simulator_no_ids"
+msgstr "Deze boeking heeft daarvoor geen meeting of taak. Maak eerst een nep-meeting en -taak aan."
+
+msgid "admin.done.simulator_no_secret"
+msgstr "Er is geen webhookgeheim ingesteld (WEBEX_WEBHOOK_SECRET of WXCC_WEBHOOK_SECRET), dus het endpoint bestaat niet."
+
+msgid "admin.done.simulator_refused"
+msgstr "Het webhook-endpoint weigerde het event. Kijk in het log van de web-container."
+
+#. Environment bar in the admin portal (dev/test only).
+
+msgid "admin.environment.label"
+msgstr "Omgeving"
+
+msgid "admin.environment.dev"
+msgstr "Ontwikkelomgeving"
+
+msgid "admin.environment.test"
+msgstr "Testomgeving"
+
+msgid "admin.environment.text"
+msgstr "Niet voor echte afspraken van burgers."
+
+msgid "admin.environment.simulator"
+msgstr "Simulator staat aan"

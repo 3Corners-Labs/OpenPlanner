@@ -1,0 +1,18 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_page_header.html" import page_header with context %}
+{% block title %}{{ _("help.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{{ page_header('/admin/', _("admin.nav.dashboard"), _("help.title"), _("help.title"), _("help.lead")) }}
+<section class="card" aria-labelledby="help-topics">
+  <h2 id="help-topics">{{ _("help.topics") }}</h2>
+  {% if topics %}
+  <ul class="help-topics">
+    {% for t in topics %}
+    <li><a href="{{ t.href }}">{{ t.title }}</a></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>{{ _("help.no_topics") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

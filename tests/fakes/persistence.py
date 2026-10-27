@@ -9,13 +9,14 @@ from datetime import date, datetime
 
 from app.domain import holidays as holiday_model
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
-from app.domain.audit import AdminProfile, AuditEntry, AuditEvent
+from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Source
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingKind, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
+from app.domain.checks import GroupCheck
 from app.domain.closure import Closure
 from app.domain.direct_queue import DirectCall
 from app.domain.job_plan import PlannedJob
@@ -46,6 +47,7 @@ class State:
     audit: list[AuditEvent] = field(default_factory=list)
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
+    group_checks: dict[int, GroupCheck] = field(default_factory=dict)
     holiday_calendars: dict[int, holiday_model.HolidayCalendar] = field(default_factory=dict)
     holidays: dict[int, holiday_model.Holiday] = field(default_factory=dict)
     organisation_holidays: dict[int, frozenset[int]] = field(default_factory=dict)
@@ -91,13 +93,26 @@ class InMemoryTransaction:
     async def add_audit_event(self, event: AuditEvent) -> None:
         self.state.audit.append(event)
 
-    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEntry]:
-        events = [e for e in self.state.audit if scope.contains(e.organisation, e.group)]
+    async def list_audit_events(
+        self, scope: Scope, limit: int = 100, narrow: AuditFilter | None = None
+    ) -> list[AuditEntry]:
+        narrow = narrow or AuditFilter()
+        events = [
+            e
+            for e in self.state.audit
+            if scope.contains(e.organisation, e.group) and narrow.matches(e)
+        ]
         profiles = self.state.admin_profiles
         return [
             AuditEntry(e, profiles[e.actor].display_name if e.actor in profiles else None)
             for e in reversed(events)
         ][:limit]
+
+    async def delete_audit_events(self, source: Source, before: datetime) -> int:
+        kept = [e for e in self.state.audit if e.source is not source or e.at >= before]
+        removed = len(self.state.audit) - len(kept)
+        self.state.audit = kept
+        return removed
 
     async def save_admin_profile(self, profile: AdminProfile) -> None:
         self.state.admin_profiles[profile.subject] = profile
@@ -122,6 +137,12 @@ class InMemoryTransaction:
 
     async def get_organisation(self, slug: str) -> Organisation | None:
         return next((o for o in self.state.organisations.values() if o.slug == slug), None)
+
+    async def save_group_check(self, check: GroupCheck) -> None:
+        self.state.group_checks[check.group_id] = check
+
+    async def get_group_check(self, group_id: int) -> GroupCheck | None:
+        return self.state.group_checks.get(group_id)
 
     async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
         return self.state.organisations.get(organisation_id)

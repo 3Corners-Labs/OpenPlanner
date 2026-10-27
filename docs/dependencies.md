@@ -27,6 +27,7 @@ Checked on 2026-10-23 against PyPI release history and GitHub activity (tzdata: 
 | cryptography | AES-256-GCM for integration secrets at rest (ADR 0008); also used by PyJWT | Apache-2.0/BSD-3 | very active (PyCA) | De facto Python crypto library; direct dependency since WP5/6 |
 | itsdangerous | Signed session cookie (Starlette `SessionMiddleware`) | BSD-3 | maintained (Pallets), feature-complete | Starlette's own choice |
 | tzdata | IANA time-zone database for `zoneinfo` (summer/winter time rules) | Apache-2.0 | active (CPython core devs, follows every IANA release) | PEP 615's official fallback; pinned in `uv.lock` and the only source in the image (`PYTHONTZPATH=""`), so DST rules change only through a reviewed Renovate PR |
+| markdown-it-py (+ mdurl) | Renders the manual in the portal, raw HTML off (ADR 0033) | MIT | active (executablebooks; release 2026) | De facto CommonMark parser for Python; already in the lock through development tools |
 | certifi | CA bundle (via httpx) | MPL-2.0 | active | Exception: ADR 0003 |
 
 Rejected: **authlib** (its httpx integration is deprecated and cannot be imported under

@@ -1,7 +1,7 @@
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.audit import Outcome
+from app.domain.audit import AuditFilter, Outcome, Source
 from app.domain.authorization import Decision, Permission, Principal, Reason, Role
 from app.domain.errors import DomainError
 from tests.fakes.clock import FixedClock
@@ -10,6 +10,9 @@ from tests.support.domain import NOW, make_group
 
 GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
 ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+OTHER_ADMIN = Principal(
+    "x-1", "X", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"elders"})
+)
 SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 NO_ROLE = Principal("n-1", "N", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
 
@@ -48,10 +51,10 @@ async def test_denial_is_audited(service: AdminService, uow: InMemoryUnitOfWork)
 
 
 async def test_organisation_and_global_permissions(service: AdminService) -> None:
-    audit = await service.authorize(ORG_ADMIN, Permission.AUDIT_VIEW, organisation_slug="demo")
+    branding = await service.authorize(ORG_ADMIN, Permission.GROUP_CREATE, organisation_slug="demo")
     dashboard = await service.authorize(GROUP_ADMIN, Permission.DASHBOARD_VIEW)
 
-    assert audit.decision.allowed
+    assert branding.decision.allowed
     assert dashboard.decision.allowed
     assert dashboard.group is None
 
@@ -63,7 +66,7 @@ async def test_unknown_group(service: AdminService) -> None:
 
 @pytest.mark.parametrize(
     ("permission", "kwargs"),
-    [(Permission.GROUP_VIEW, {}), (Permission.AUDIT_VIEW, {})],
+    [(Permission.GROUP_VIEW, {}), (Permission.GROUP_CREATE, {})],
 )
 async def test_missing_target_is_a_programming_error(
     service: AdminService, permission: Permission, kwargs: dict[str, str]
@@ -84,7 +87,26 @@ async def test_audit_log_is_scoped(service: AdminService) -> None:
     await service.record("o-1", "group.edit", Outcome.SUCCESS, "", "demo", "demo")
 
     assert [e.event.action for e in await service.audit_log(ORG_ADMIN)] == ["group.edit"]
-    assert await service.audit_log(GROUP_ADMIN) == []  # group admins have no audit.view
+    assert [e.event.action for e in await service.audit_log(GROUP_ADMIN)] == ["group.edit"]
+    assert await service.audit_log(OTHER_ADMIN) == []
+
+
+async def test_audit_log_shows_no_higher_level(service: AdminService) -> None:
+    await service.record("o-1", "holidays.assign", Outcome.SUCCESS, "", "demo")
+    await service.record("o-1", "group.edit", Outcome.SUCCESS, "", "demo", "demo")
+
+    assert [e.event.action for e in await service.audit_log(GROUP_ADMIN)] == ["group.edit"]
+    assert len(await service.audit_log(ORG_ADMIN)) == 2
+
+
+async def test_audit_log_filters(service: AdminService) -> None:
+    await service.record("o-1", "group.edit", Outcome.SUCCESS, "", "demo", "demo")
+    await service.record("o-1", "group.view", Outcome.DENIED, "out_of_scope", "demo", "demo")
+
+    problems = await service.audit_log(ORG_ADMIN, AuditFilter(problems_only=True))
+
+    assert [e.event.action for e in problems] == ["group.view"]
+    assert await service.audit_log(ORG_ADMIN, AuditFilter(source=Source.SYSTEM)) == []
 
 
 async def test_authorize_anywhere(service: AdminService, uow: InMemoryUnitOfWork) -> None:
@@ -92,9 +114,9 @@ async def test_authorize_anywhere(service: AdminService, uow: InMemoryUnitOfWork
     assert (
         await service.authorize_anywhere(GROUP_ADMIN, Permission.DASHBOARD_VIEW)
     ).decision.allowed
-    denied = await service.authorize_anywhere(GROUP_ADMIN, Permission.AUDIT_VIEW)
+    denied = await service.authorize_anywhere(GROUP_ADMIN, Permission.GROUP_CREATE)
     assert denied.decision == Decision(False, Reason.OUT_OF_SCOPE)
-    assert [(e.action, e.outcome) for e in uow.state.audit] == [("audit.view", Outcome.DENIED)]
+    assert [(e.action, e.outcome) for e in uow.state.audit] == [("group.create", Outcome.DENIED)]
 
 
 def _contexts(uow: InMemoryUnitOfWork) -> list[tuple[str, str, str | None, str | None]]:

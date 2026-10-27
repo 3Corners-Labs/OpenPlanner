@@ -38,6 +38,7 @@ from app.adapters.db.models import (
     GroupTextRow,
     HolidayCalendarRow,
     HolidayRow,
+    IntegrationReportRow,
     JobRow,
     OrganisationHolidayCalendarRow,
     OrganisationLogoRow,
@@ -49,7 +50,15 @@ from app.adapters.db.models import (
     WebhookEventRow,
 )
 from app.adapters.db.updates import UpdateQueries
-from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, Outcome
+from app.domain.audit import (
+    PROBLEMS,
+    AdminProfile,
+    AuditEntry,
+    AuditEvent,
+    AuditFilter,
+    Outcome,
+    Source,
+)
 from app.domain.authorization import Scope
 from app.domain.booking import (
     HOLDS_PLACE,
@@ -80,6 +89,7 @@ from app.domain.channel_settings import (
     SmtpSettings,
 )
 from app.domain.channels import ChannelKind, ReminderRule
+from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.direct_queue import DirectCall
 from app.domain.errors import DomainError, ErrorCode
@@ -97,6 +107,11 @@ from app.domain.scheduling import (
 
 _PENDING = "pending"
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
+
+
+def _check_name(group_id: int) -> str:
+    """Return the integration report name of a group's latest check."""
+    return f"group-check:{group_id}"
 
 
 def _organisation(row: OrganisationRow) -> Organisation:
@@ -338,18 +353,32 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
                 organisation=event.organisation,
                 group=event.group,
                 detail=event.detail[:255],
+                source=event.source.value,
+                booking_id=event.booking_id,
             )
         )
         await self._session.flush()
 
-    async def list_audit_events(self, scope: Scope, limit: int = 100) -> list[AuditEntry]:
-        """Return the newest audit events about organisations and groups inside ``scope``."""
-        rows = await self._session.execute(
+    async def list_audit_events(
+        self, scope: Scope, limit: int = 100, narrow: AuditFilter | None = None
+    ) -> list[AuditEntry]:
+        """Return the newest audit events inside ``scope``, narrowed by ``narrow`` (ADR 0031)."""
+        query = (
             select(AuditEventRow, AdminProfileRow.display_name)
             .outerjoin(AdminProfileRow, AdminProfileRow.subject == AuditEventRow.actor)
             .where(scope_filter(scope, AuditEventRow.organisation, AuditEventRow.group))
-            .order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc())
-            .limit(limit)
+        )
+        narrow = narrow or AuditFilter()
+        if narrow.source is not None:
+            query = query.where(AuditEventRow.source == narrow.source.value)
+        if narrow.problems_only:
+            query = query.where(AuditEventRow.outcome.in_(sorted(o.value for o in PROBLEMS)))
+        if narrow.group is not None:
+            query = query.where(AuditEventRow.group == narrow.group)
+        if narrow.booking_id is not None:
+            query = query.where(AuditEventRow.booking_id == narrow.booking_id)
+        rows = await self._session.execute(
+            query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
         )
         return [
             AuditEntry(
@@ -362,11 +391,22 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
                     organisation=row.organisation,
                     group=row.group,
                     detail=row.detail,
+                    source=Source(row.source),
+                    booking_id=row.booking_id,
                 ),
                 name,
             )
             for row, name in rows
         ]
+
+    async def delete_audit_events(self, source: Source, before: datetime) -> int:
+        """Delete the events of ``source`` older than ``before``; return how many."""
+        result = await self._session.execute(
+            delete(AuditEventRow).where(
+                AuditEventRow.source == source.value, AuditEventRow.at < before
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     async def save_admin_profile(self, profile: AdminProfile) -> None:
         """Create or replace the profile of ``profile.subject``."""
@@ -419,6 +459,40 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
             select(OrganisationRow).where(OrganisationRow.slug == slug)
         )
         return _organisation(row) if row else None
+
+    async def save_group_check(self, check: GroupCheck) -> None:
+        """Store a group's latest check as an integration report (``group-check:<id>``)."""
+        body = {
+            "findings": [
+                {"area": f.area.value, "code": f.code, "status": f.status.value, "params": f.params}
+                for f in check.findings
+            ]
+        }
+        await self._session.merge(
+            IntegrationReportRow(
+                name=_check_name(check.group_id), body=json.dumps(body), checked_at=check.checked_at
+            )
+        )
+
+    async def get_group_check(self, group_id: int) -> GroupCheck | None:
+        """Return a group's latest check; findings with unknown values are left out."""
+        row = await self._session.get(IntegrationReportRow, _check_name(group_id))
+        if row is None:
+            return None
+        findings = []
+        for item in json.loads(row.body).get("findings", []):
+            try:
+                findings.append(
+                    Finding(
+                        CheckArea(item["area"]),
+                        str(item["code"]),
+                        CheckStatus(item["status"]),
+                        tuple((str(k), str(v)) for k, v in item.get("params", [])),
+                    )
+                )
+            except (KeyError, ValueError, TypeError):
+                continue  # written by another version; skip rather than fail the page
+        return GroupCheck(group_id, row.checked_at, tuple(findings))
 
     async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
         """Return the organisation with ``organisation_id``."""

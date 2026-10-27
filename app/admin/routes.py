@@ -1,4 +1,4 @@
-"""Admin portal routes (WP7a): login, overview, own rights, matrix, audit log, group view.
+"""Admin portal routes (WP7a): login, overview, own rights, matrix, integrations.
 
 Every route except the login flow depends on exactly one ``RequirePermission``; the public
 ones are listed in ``PUBLIC_ADMIN_PATHS`` and the route-coverage test checks both.
@@ -9,10 +9,9 @@ ones are listed in ``PUBLIC_ADMIN_PATHS`` and the route-coverage test checks bot
     GET  /admin/             dashboard.view   groups in scope
     GET  /admin/rights       rights.view      own permissions with their scope
     GET  /admin/matrix       matrix.view      the whole matrix (same data as the docs)
-    GET  /admin/audit        audit.view       audit events in scope
 
-Groups and their planning live in ``group_routes``, organisations in
-``organisation_routes`` and their branding in ``branding_routes``.
+The audit log lives in ``audit_routes``, groups and their planning in ``group_routes``,
+organisations in ``organisation_routes`` and their branding in ``branding_routes``.
 """
 
 import hmac
@@ -21,23 +20,27 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated
 from urllib.parse import quote
-from zoneinfo import ZoneInfo
 
 import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.integrations import Integrations
 from app.admin import (
     api_routes,
+    audit_routes,
     branding_routes,
     call_routes,
     channel_routes,
+    check_routes,
     closure_routes,
     group_routes,
+    help_routes,
     holiday_routes,
     message_routes,
     organisation_routes,
+    simulator_routes,
     update_routes,
 )
 from app.admin.authz import (
@@ -50,17 +53,16 @@ from app.admin.authz import (
     session_principal,
 )
 from app.admin.forms import safe_next
-from app.admin.pages import Locale, SameOrigin, templates
+from app.admin.integration_views import check_view
+from app.admin.pages import Locale, SameOrigin, admin_moment, templates
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
 from app.admin.session import end_session, pop_login_start, save_login_start, start_session
-from app.domain.admin import ANONYMOUS, LOGIN_EVENT, LOGOUT_EVENT
-from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
-from app.domain.audit import AuditEntry, Outcome
+from app.domain.admin import ANONYMOUS, LOGIN_EVENT
+from app.domain.audit import Outcome
 from app.domain.authorization import (
     API_SCOPES,
     CITIZEN_ACTIONS,
-    ApiScope,
     Permission,
     Role,
     Scope,
@@ -68,13 +70,11 @@ from app.domain.authorization import (
 )
 from app.domain.ports import Clock, IdentityError, IdentityProvider
 from app.i18n import BoundGettext
-from app.i18n.dates import format_clock, format_day_compact, local_day
 from app.web.authz_labels import (
     API_SCOPE_LABELS,
     CITIZEN_LABELS,
     CONDITION_LABELS,
     LEVEL_LABELS,
-    OUTCOME_LABELS,
     PERMISSION_LABELS,
     ROLE_LABELS,
 )
@@ -90,72 +90,6 @@ PUBLIC_ADMIN_PATHS = frozenset(
     {"/admin/login", "/admin/callback", "/admin/logout", "/admin/logged-out"}
 )
 """The only admin paths without a ``RequirePermission``: the login flow itself."""
-
-EVENT_LABELS: dict[str, str] = {
-    LOGIN_EVENT: "audit.event.login",
-    LOGOUT_EVENT: "audit.event.logout",
-    TOKEN_EVENT: "audit.event.api_token",
-    CALL_EVENT: "audit.event.api_call",
-}
-
-DETAIL_LABELS: dict[str, str] = {
-    "rule.add": "admin.audit.detail.rule_add",
-    "rule.edit": "admin.audit.detail.rule_edit",
-    "rule.remove": "admin.audit.detail.rule_remove",
-    "rule.split": "admin.audit.detail.rule_split",
-    "override.add": "admin.audit.detail.override_add",
-    "override.remove": "admin.audit.detail.override_remove",
-    "name": "admin.field.name",
-    "timezone": "admin.field.timezone",
-    "slot_minutes": "admin.field.slot_minutes",
-    "min_notice_minutes": "admin.field.min_notice_minutes",
-    "horizon_days": "admin.field.horizon_days",
-    "phone_mode": "admin.field.phone_mode",
-    "dispatch_lead_minutes": "admin.field.dispatch_lead_minutes",
-    "video_host_email": "admin.field.video_host_email",
-    "wxcc_business_address": "admin.field.wxcc_business_address",
-    "wxcc_channel": "admin.field.wxcc_channel",
-    "wxcc_routing_value": "admin.field.wxcc_routing_value",
-    "direct_call_enabled": "admin.field.direct_call_enabled",
-    "not_picked_up_minutes": "admin.field.not_picked_up_minutes",
-    "direct_call_max_concurrent": "admin.field.direct_call_max_concurrent",
-    "display_name": "admin.branding.display_name",
-    "accent_color": "admin.branding.accent_color",
-    "logo": "admin.branding.logo",
-    "logo.remove": "admin.audit.detail.logo_remove",
-    "closure.start": "admin.audit.detail.closure_start",
-    "closure.update": "admin.audit.detail.closure_update",
-    "closure.lift": "admin.audit.detail.closure_lift",
-    "booking.reinstate": "admin.audit.detail.booking_reinstate",
-    "booking.reinstate_all": "admin.audit.detail.booking_reinstate_all",
-    "booking.cancel": "admin.audit.detail.booking_cancel",
-    "booking.cancel_all": "admin.audit.detail.booking_cancel_all",
-    "booking.move": "admin.audit.detail.booking_move",
-    "client.create": "admin.audit.detail.client_create",
-    "client.rotate": "admin.audit.detail.client_rotate",
-    "client.enable": "admin.audit.detail.client_enable",
-    "client.disable": "admin.audit.detail.client_disable",
-    "client.revoke_tokens": "admin.audit.detail.client_revoke_tokens",
-    "groups": "admin.api.groups",
-    "scopes": "admin.api.scopes",
-    "networks": "admin.api.networks",
-    "api.enabled": "admin.api.enabled",
-    "api.docs_public": "admin.api.docs_public",
-}
-"""Readable label per audit detail key (changed field names and schedule actions)."""
-
-COUNT_LABELS: dict[str, str] = {
-    "bookings": "admin.audit.detail.bookings",
-    "notified": "admin.audit.detail.notified",
-}
-"""Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0024)."""
-
-OUTCOME_TONES: dict[Outcome, str] = {
-    Outcome.SUCCESS: "success",
-    Outcome.DENIED: "danger",
-    Outcome.FAILURE: "warning",
-}
-"""Chip colour per audit outcome; the outcome is always also written out (WCAG 1.4.1)."""
 
 
 def _identity_provider(request: Request) -> IdentityProvider | None:
@@ -343,81 +277,6 @@ async def matrix(
 
 
 @dataclass(frozen=True)
-class AuditView:
-    """A translated audit event."""
-
-    when: str
-    actor: str
-    action: str
-    outcome: str
-    target: str
-    tone: str
-    detail: str
-
-
-def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
-    """Name the actor: display name, "not signed in", or the subject as a last resort."""
-    if entry.event.actor == ANONYMOUS:
-        return _("audit.actor.anonymous")
-    return entry.actor_name or entry.event.actor
-
-
-def _detail_label(detail: str, _: BoundGettext) -> str:
-    """Translate an audit detail such as ``horizon_days,name`` into readable labels."""
-    labels = []
-    for key in (key for key in detail.split(",") if key):
-        name, _sep, count = key.partition(":")
-        if name in COUNT_LABELS and count.isdigit():
-            labels.append(_(COUNT_LABELS[name], count=int(count)))
-        else:
-            labels.append(_(DETAIL_LABELS[key]) if key in DETAIL_LABELS else key)
-    return ", ".join(labels)
-
-
-def _moment(at: datetime, tz: ZoneInfo, locale: str) -> str:
-    """Return a compact local date and time, e.g. ``5 jan 2026, 09:00``."""
-    return f"{format_day_compact(local_day(at, tz), locale)}, {format_clock(at, tz, locale)}"
-
-
-def _action_label(action: str, _: BoundGettext) -> str:
-    """Translate a permission; event keys such as ``admin.login`` have their own labels."""
-    if action in EVENT_LABELS:
-        return _(EVENT_LABELS[action])
-    if action in API_SCOPES:
-        return _(API_SCOPE_LABELS[ApiScope(action)])
-    try:
-        return _(PERMISSION_LABELS[Permission(action)])
-    except ValueError:
-        return action
-
-
-@router.get("/audit", response_class=HTMLResponse)
-async def audit(
-    request: Request,
-    locale: Locale,
-    context: Annotated[AdminContext, Depends(RequirePermission(Permission.AUDIT_VIEW))],
-) -> HTMLResponse:
-    """Show the newest audit events about organisations and groups in scope."""
-    _ = locale.gettext
-    tz = ZoneInfo(request.app.state.settings.admin_timezone)
-    events = await admin_service(request).audit_log(context.principal)
-    views = [
-        AuditView(
-            _moment(e.at, tz, locale.code),
-            _actor_label(entry, _),
-            _action_label(e.action, _),
-            _(OUTCOME_LABELS[e.outcome]),
-            " / ".join(t for t in (e.organisation, e.group) if t) or "–",
-            OUTCOME_TONES[e.outcome],
-            _detail_label(e.detail, _),
-        )
-        for entry in events
-        for e in (entry.event,)
-    ]
-    return _page(request, locale, "admin/audit.html", context.principal, {"events": views})
-
-
-@dataclass(frozen=True)
 class IntegrationView:
     """What the integrations page shows; never a secret or token value."""
 
@@ -438,14 +297,17 @@ async def integrations(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.INTEGRATIONS_MANAGE))],
 ) -> HTMLResponse:
-    """Show whether Webex and WxCC are connected, token expiry and the webhook URLs."""
+    """Show whether Webex and WxCC are connected, token expiry, the webhook URLs and checks.
+
+    The last ``webhooks-list`` and ``webhooks-health`` results are shown read-only; cleaning
+    up registrations stays on the command line.
+    """
     settings = request.app.state.settings
     wired: Integrations = request.app.state.integrations
     health = await wired.tokens.health() if wired.tokens else None
-    tz = ZoneInfo(settings.admin_timezone)
 
     def moment(value: datetime | None) -> str | None:
-        return _moment(value, tz, locale.code) if value else None
+        return admin_moment(request, locale, value) if value else None
 
     base = settings.webhook_base
     view = IntegrationView(
@@ -465,12 +327,19 @@ async def integrations(
         await service.overview(context.principal, organisation.slug)
         for organisation in await service.organisations(context.principal)
     ]
+    reports = ReportStore(request.app.state.engine)
+    checks = check_view(
+        await reports.get(REGISTRATIONS_REPORT),
+        await reports.get(HEALTH_REPORT),
+        locale.gettext,
+        lambda at: admin_moment(request, locale, at),
+    )
     return _page(
         request,
         locale,
         "admin/integrations.html",
         context.principal,
-        {"view": view, "groups": groups, "channels": channels},
+        {"view": view, "groups": groups, "channels": channels, "checks": checks},
     )
 
 
@@ -506,8 +375,10 @@ def register_admin(app: FastAPI) -> None:
     banner = [Depends(update_routes.load_update_notice)]
     for module_router in (
         router,
+        audit_routes.router,
         group_routes.router,
         call_routes.router,
+        check_routes.router,
         branding_routes.router,
         holiday_routes.router,
         channel_routes.router,
@@ -515,6 +386,8 @@ def register_admin(app: FastAPI) -> None:
         organisation_routes.router,
         closure_routes.router,
         api_routes.router,
+        simulator_routes.router,
         update_routes.router,
+        help_routes.router,
     ):
         app.include_router(module_router, dependencies=banner)

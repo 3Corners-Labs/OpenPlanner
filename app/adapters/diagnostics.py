@@ -60,6 +60,10 @@ class CheckResult:
     ok: bool
     hint: str
     required: bool = True
+    code: str = ""
+    """Stable finding code (``channel.missing``) for translated texts in the admin portal."""
+    params: tuple[tuple[str, str], ...] = ()
+    """Values the translated text needs (names, ids); never secrets or personal data."""
 
 
 def probes(webex_base_url: str, wxcc_base_url: str | None) -> list[Probe]:

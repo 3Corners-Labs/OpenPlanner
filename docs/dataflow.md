@@ -76,6 +76,7 @@ admin ──browser──> web /admin/login ──redirect──> identity provi
 identity provider ──ID token (sub, name, roles, organisations, groups)──> web /admin/callback
 web ──signed session cookie op_admin (sub, name, roles, scope; 8 h)──> admin browser
 web ──SQL──> audit_events (sub, action, outcome, organisation, group)
+worker ──SQL──> audit_events (source=system: job type, outcome, error code, booking id; ADR 0031)
 web ──SQL──> admin_profiles (sub, display name, last login)
 ```
 
@@ -83,6 +84,11 @@ web ──SQL──> admin_profiles (sub, display name, last login)
 |---|---|---|---|---|
 | Admin subject identifier | `audit_events.actor`, `admin_profiles.subject`, session cookie | identity provider | audit events: kept as the audit trail (retention to be set with the hosting owner, O7) | no |
 | Admin display name | `admin_profiles.display_name`, session cookie | identity provider | replaced at every login; to be removed for admins inactive longer than the audit retention (WP8) | no |
+| System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
+
+System events hold no personal data: no names, addresses, message text or join links, only codes
+and the booking id. Each admin sees them at their own level only (group admin: their groups;
+organisation admin: their organisation and its groups; superuser: everything).
 
 Admin names are personal data of employees, processed for accountability (who did what in the
 portal). They never appear in logs, exceptions or audit events; the audit log joins them in when
@@ -97,6 +103,9 @@ worker/web ──HTTPS──> WxCC Create Task v2: booking reference, first name
 WxCC ──task id──> OpenPlanner (bookings.wxcc_task_id)
 worker ──HTTPS──> WxCC Task Messages v2: booking reference, kind=cancelled; then End Task v1 (task id only)
 operator CLI <──HTTPS── WxCC configuration (wxcc-config-check): channel, asset, entry point, queue names and ids, schema keys, flow export; nothing stored, no personal data
+operator CLI <──HTTPS── Webex webhooks (ownedBy=org), WxCC subscriptions (webhooks-list/-reset): ids, events, hostEmail filters, status, secret set or not, target without query → integration_reports
+operator CLI ──DELETE──> Webex webhooks, WxCC subscriptions (webhooks-reset --yes): ids of stale registrations only
+operator CLI ──signed test events (unknown ids)──> WEBHOOK_BASE_URL/webhooks/* (webhooks-health) → outcome codes in integration_reports
 citizen ──GET /b/{token}/join/go──> OpenPlanner ──303──> Webex web app (no data added to the link)
 Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task events → booking_events, call_status
 ```
@@ -109,6 +118,7 @@ Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task e
 | Participant names/emails in webhook payloads | processed in memory only; webhooks filtered on the groups' host accounts, so other meetings of the organisation are not delivered | Webex | not stored, not logged | no |
 | Webex event keys (SHA-256 of resource, event, event id, join/leave time) | `webhook_events` | OpenPlanner | 30 days, removed on a later event | no |
 | Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
+| Last webhook listing and delivery test (registration ids, events, host account filters, target URLs without query, statuses, outcome codes) | `integration_reports` | Webex, WxCC, the self-test | replaced by the next check | no; shown read-only on **Koppelingen** |
 
 ## Branding and the calendar script (WP3b)
 

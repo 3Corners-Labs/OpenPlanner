@@ -8,6 +8,7 @@ writes the heartbeat.
 import asyncio
 import signal
 from contextlib import suppress
+from datetime import timedelta
 
 import httpx
 import structlog
@@ -71,6 +72,7 @@ async def run_worker(
         video=integrations.video,
         dispatcher=integrations.dispatcher,
         integration=IntegrationService(uow, clock, AdminService(uow, clock)),
+        retention=timedelta(days=settings.system_event_retention_days),
     )
     updates = update_service(settings, uow, clock, http)
     log.info(

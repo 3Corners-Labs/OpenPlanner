@@ -75,8 +75,19 @@ def test_production_is_the_default_and_refuses_development_defaults(
     with pytest.raises(ValueError, match="OIDC"):
         Settings(**production, oidc_discovery_url="http://idp.local/.well-known")  # type: ignore[arg-type]
 
+    with pytest.raises(ValueError, match="SIMULATOR_ENABLED"):
+        Settings(**production, simulator_enabled=True)  # type: ignore[arg-type]
+
     settings = Settings(**production)  # type: ignore[arg-type]
     assert settings.environment == "prod"
+    assert not settings.simulator_enabled
+
+
+def test_the_simulator_is_off_unless_switched_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SIMULATOR_ENABLED", raising=False)
+    assert not Settings(environment="dev").simulator_enabled
+    monkeypatch.setenv("SIMULATOR_ENABLED", "true")
+    assert Settings(environment="test").simulator_enabled
 
 
 def test_production_webex_needs_secrets_and_the_encryption_key() -> None:
