@@ -648,6 +648,9 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0029 | Updates started from the admin portal, carried out by a signed-image host updater with rollback |
 | 0030 | HTTPS with free, automatically renewed certificates (Caddy, Let's Encrypt) |
 | 0031 | Audit log exact per role level, with system events of the worker for troubleshooting |
+| 0033 | Audit events also on the log stream for an external log platform such as Splunk (proposed) |
+| 0034 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes (proposed) |
+| 0035 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond (proposed) |
 
 ## 12. Status and roadmap
 
@@ -658,7 +661,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP2 | Domain, persistence, write lock | done |
 | WP3 (slice 1) | Citizen pages, mail, worker, demo | done |
 | WP3b | Citizen pages: month calendar grid, modern layout, branding (O5) | done |
-| WP3c | Embeddable widget (Web Component, same tokens) | planned |
+| WP3c | Embeddable widget (Web Component, same tokens; ADR 0034, backlog EM-1 to EM-5) | planned |
 | WP4 | SMS reminders, message editors | done (ADR 0022) |
 | WP5 | Webex Meetings, join page, live status (O1: Meetings API) | done |
 | WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |
@@ -666,13 +669,15 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |
-| ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
+| ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns; backlog CC-0 to CC-6) | planned |
 | ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
+| ADR 0033 | Audit events to an external log platform (backlog AU-1 to AU-4) | proposed |
+| ADR 0035 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
 | O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
 | O11 step 2 | Change requests by phone number, confirmed by the citizen by email/SMS (ADR 0023) | planned |
 
