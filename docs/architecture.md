@@ -140,7 +140,7 @@ flowchart TB
         api["app.api<br/>public pages, health,<br/>agent API (sub-app)"]
         adminpkg["app.admin<br/>admin portal, RequirePermission"]
         jobs["app.jobs<br/>worker, runner, messages"]
-        cli["app.cli<br/>seed-demo"]
+        cli["app.cli<br/>seed-demo, checks, webhooks"]
     end
 
     web["app.web<br/>locale, templates, render(),<br/>protection, error pages"]
@@ -225,8 +225,9 @@ same commit and rollback behaviour as the SQL one.
 | Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/cli.py`, `scripts/updater/` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
+| Operator commands: `webhooks-list`, `webhooks-reset`, `webhooks-health`; stored results | `app/cli.py`, `app/adapters/registrations.py`, `app/adapters/webhook_selftest.py`, `app/adapters/db/reports.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
-| Agenda, booking timeline, integrations page | `app/admin/call_routes.py`, `app/admin/routes.py` |
+| Agenda, booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
 | Machine API for bots: clients, credentials, tokens, scopes (ADR 0023) | `app/domain/api_clients.py`, `app/domain/api_access.py`, `app/adapters/db/api_clients.py` |
