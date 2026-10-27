@@ -1,0 +1,12 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_page_header.html" import page_header with context %}
+{% block title %}{{ manual.title }} · {{ _("help.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{{ page_header('/admin/help', _("help.title"), manual.title, manual.title, _("help.page_lead")) }}
+{% if manual.locale != locale %}
+<p class="hint">{{ _("help.other_language") }}</p>
+{% endif %}
+<article class="card manual" lang="{{ manual.locale }}">
+  {{ manual.html }}
+</article>
+{% endblock %}

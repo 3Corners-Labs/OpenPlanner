@@ -1262,6 +1262,84 @@ fieldset.card {
   align-items: flex-end;
 }
 
+/* Help (ADR 0033): the page link, the (i) disclosure under a field and the manual itself. */
+.page-help {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 0.5rem;
+}
+
+.page-help a,
+.more summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 24px;
+  color: var(--adm-accent-strong);
+}
+
+.more {
+  margin: 0.25rem 0 0.5rem;
+  max-width: 40rem;
+}
+
+.more summary {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.more__body {
+  margin-top: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--adm-accent);
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-surface-muted);
+}
+
+.more__body > :first-child {
+  margin-top: 0;
+}
+
+.more__body > :last-child {
+  margin-bottom: 0;
+}
+
+.manual {
+  max-width: var(--adm-content-width);
+}
+
+.manual h2 {
+  margin-top: 2rem;
+}
+
+.manual h3 {
+  margin-top: 1.5rem;
+  scroll-margin-top: 1rem;
+}
+
+.manual h3:target {
+  outline: 3px solid var(--adm-focus);
+  outline-offset: 0.25rem;
+}
+
+.manual table {
+  border-collapse: collapse;
+}
+
+.manual th,
+.manual td {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--adm-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.help-topics {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
 /* --- "Koppeling controleren": the latest check of a group --------------------------------- */
 .check-summary {
   margin: 0 0 1rem;

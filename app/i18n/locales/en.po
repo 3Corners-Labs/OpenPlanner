@@ -3024,6 +3024,41 @@ msgstr "Go to updates"
 msgid "admin.updates.banner.snooze"
 msgstr "Remind me in 60 minutes"
 
+#. Context-sensitive help and the manual (ADR 0033).
+msgid "admin.nav.help"
+msgstr "Manual"
+
+msgid "help.title"
+msgstr "Manual"
+
+msgid "help.lead"
+msgstr "An explanation per screen: what it does and what each field means."
+
+msgid "help.topics"
+msgstr "Screens"
+
+msgid "help.no_topics"
+msgstr "No manual has been written yet for the screens you can open."
+
+msgid "help.page_lead"
+msgstr "An explanation of this screen and each of its fields."
+
+msgid "help.other_language"
+msgstr "This explanation has not been translated yet and is shown below in Dutch."
+
+msgid "help.page_link"
+msgstr "Help with this page"
+
+msgid "help.more"
+msgstr "More information"
+
+#. Read by screen readers after "More information"; {label} is the field label.
+msgid "help.more_for"
+msgstr "about {label}"
+
+msgid "help.in_manual"
+msgstr "Read more in the manual"
+
 #. Webhook registrations and delivery self-test (integrations page).
 
 msgid "admin.integrations.registrations"

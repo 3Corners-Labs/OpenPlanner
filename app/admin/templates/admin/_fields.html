@@ -1,3 +1,4 @@
+{% from "admin/_icons.html" import icon %}
 {#- A 24-hour time ("clock") or dd-mm-yyyy date ("day") as text: native type="time" and
     type="date" follow the browser locale (AM/PM, mm/dd/yyyy), not the page language. -#}
 {% macro typed_input(f, name, value, kind) -%}
@@ -48,6 +49,15 @@
   {%- endif %}
   {%- if f.hint %}
   <p class="hint" id="{{ f.name }}-hint">{{ f.hint }}</p>
+  {%- endif %}
+  {%- if f.more %}
+  <details class="more" id="{{ f.name }}-more">
+    <summary>{{ icon("info") }}<span>{{ _("help.more") }}<span class="visually-hidden"> {{ _("help.more_for", label=f.label) }}</span></span></summary>
+    <div class="more__body">
+      {{ f.more }}
+      <p><a href="{{ f.more_link }}">{{ _("help.in_manual") }}</a></p>
+    </div>
+  </details>
   {%- endif %}
   {%- if f.error %}
   <p class="error-message" id="{{ f.name }}-error">{{ f.error }}</p>

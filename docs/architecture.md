@@ -237,6 +237,7 @@ same commit and rollback behaviour as the SQL one.
 | API clients and switches in the admin portal (superuser) | `app/admin/api_routes.py` |
 | Group and planning screens, admin forms, shared page plumbing | `app/admin/group_routes.py`, `app/admin/forms.py`, `app/admin/pages.py` |
 | Admin design (fixed look, no JavaScript, ADR 0016) | `app/web/static/admin.css`, `app/admin/templates/admin/` |
+| Manual and context-sensitive help (ADR 0033) | `docs/manual/`, `app/web/help.py`, `app/admin/help_routes.py`, `with_manual` in `app/admin/pages.py` |
 | Generated matrix document | `app/web/authz_report.py`, `app/cli.py` (`authz-matrix`) |
 | Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |
 | Transactions, write lock | `app/adapters/db/uow.py`, `app/adapters/db/engine.py` |
@@ -652,6 +653,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0030 | HTTPS with free, automatically renewed certificates (Caddy, Let's Encrypt) |
 | 0031 | Audit log exact per role level, with system events of the worker for troubleshooting |
 | 0032 | Provider-neutral contact-center integration (proposed; renumbered from 0021) |
+| 0033 | Context-sensitive help: one Markdown manual, shown on GitHub and in the portal, (i) per field |
 
 ## 12. Status and roadmap
 
@@ -673,6 +675,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | ADR 0032 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns) | planned |
 | ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
+| ADR 0033 | Manual and context-sensitive help: group settings documented, other screens follow | in progress |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |
