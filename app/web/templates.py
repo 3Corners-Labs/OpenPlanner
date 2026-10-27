@@ -105,6 +105,30 @@ def language_options(request: Request, locale: RequestLocale) -> list[LanguageOp
     return options
 
 
+@dataclass(frozen=True)
+class EnvironmentNotice:
+    """What the admin portal's environment bar says outside production."""
+
+    label_key: str
+    simulator: bool
+
+
+ENVIRONMENT_LABELS = {
+    "dev": "admin.environment.dev",
+    "test": "admin.environment.test",
+}
+"""Bar label per non-production ``ENVIRONMENT``; production shows no bar."""
+
+
+def environment_of(request: Request) -> EnvironmentNotice | None:
+    """Return the environment bar for this installation, or ``None`` in production."""
+    settings = getattr(request.app.state, "settings", None)
+    key = ENVIRONMENT_LABELS.get(getattr(settings, "environment", "prod"))
+    if key is None:
+        return None
+    return EnvironmentNotice(key, bool(getattr(settings, "simulator_enabled", False)))
+
+
 def render(
     templates: Jinja2Templates,
     request: Request,
@@ -127,6 +151,7 @@ def render(
             "_": locale.gettext,
             "locale": locale.code,
             "languages": language_options(request, locale),
+            "environment": environment_of(request),
         },
     )
     response.headers["content-security-policy"] = SCRIPT_CSP if scripts else HTML_CSP

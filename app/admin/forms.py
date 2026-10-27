@@ -55,6 +55,11 @@ DONE_MESSAGES: dict[str, str] = {
     "logo_saved": "admin.done.logo_saved",
     "logo_removed": "admin.done.logo_removed",
     "checked": "admin.done.checked",
+    "simulated": "admin.done.simulated",
+    "simulated_prepared": "admin.done.simulated_prepared",
+    "simulator_no_ids": "admin.done.simulator_no_ids",
+    "simulator_no_secret": "admin.done.simulator_no_secret",  # nosec B105 - a catalogue key
+    "simulator_refused": "admin.done.simulator_refused",
     "closure_started": "admin.done.closure_started",
     "closure_updated": "admin.done.closure_updated",
     "closure_lifted": "admin.done.closure_lifted",

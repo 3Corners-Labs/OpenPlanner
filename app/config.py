@@ -114,6 +114,10 @@ class Settings(BaseSettings):
 
     # Rate limits on public endpoints (CLAUDE.md security baseline).
     rate_limit_enabled: bool = True
+
+    # Simulator for platform events on admin booking pages; off unless switched on, refused in
+    # production (docs/runbook.md, section 10).
+    simulator_enabled: bool = False
     rate_limit_bookings: str = "10/hour"
     rate_limit_reads: str = "60/minute"
 
@@ -145,6 +149,8 @@ class Settings(BaseSettings):
     def _production_requirements(self) -> "Settings":
         """In production, refuse to start with development defaults."""
         if self.environment == "prod":
+            if self.simulator_enabled:
+                raise ValueError("SIMULATOR_ENABLED is not allowed in production")
             if self.management_token_key is None:
                 raise ValueError("MANAGEMENT_TOKEN_KEY is required in production")
             if not self.public_base_url.startswith("https://"):

@@ -16,9 +16,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse
 
-from app.admin.authz import AccessDenied, AdminContext, RequirePermission
+from app.admin.authz import AccessDenied, AdminContext, RequirePermission, can_function
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale
+from app.admin.simulator_routes import simulator_view
 from app.domain.authorization import Permission
 from app.domain.calls import BookingOverview, CallStatus, EventKind, not_picked_up
 from app.domain.errors import DomainError, ErrorCode
@@ -183,5 +184,12 @@ async def booking_detail(
             "events": events,
             "end_not_possible": any(e.kind is EventKind.END_NOT_POSSIBLE for e in timeline.events),
             "back": f"/admin/groups/{slug}/agenda?day={booking.start.astimezone(tz).date()}",
+            "simulator": simulator_view(
+                request,
+                slug,
+                booking,
+                can_function(context.principal)(Permission.GROUP_EDIT, context.group),
+                _,
+            ),
         },
     )

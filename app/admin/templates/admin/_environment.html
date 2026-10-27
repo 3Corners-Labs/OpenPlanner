@@ -1,0 +1,8 @@
+{#- Environment bar outside production (ENVIRONMENT=dev or test): always visible, in words. -#}
+{% if environment %}
+<div class="env-bar" role="note" aria-label="{{ _("admin.environment.label") }}">
+  <strong>{{ _(environment.label_key) }}</strong>
+  <span>{{ _("admin.environment.text") }}</span>
+  {% if environment.simulator %}<span class="env-bar__tag">{{ _("admin.environment.simulator") }}</span>{% endif %}
+</div>
+{% endif %}

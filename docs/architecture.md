@@ -226,6 +226,8 @@ same commit and rollback behaviour as the SQL one.
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Operator commands: `webhooks-list`, `webhooks-reset`, `webhooks-health`; stored results | `app/cli.py`, `app/adapters/registrations.py`, `app/adapters/webhook_selftest.py`, `app/adapters/db/reports.py` |
+| Verify button "Koppeling controleren" | `app/domain/checks.py`, `app/domain/integration_check.py`, `app/adapters/group_check.py`, `app/admin/check_routes.py`, `app/web/check_labels.py` |
+| Simulator for platform events (not in production) | `app/domain/simulation.py`, `app/adapters/simulated_events.py`, `app/admin/simulator_routes.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda, booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |

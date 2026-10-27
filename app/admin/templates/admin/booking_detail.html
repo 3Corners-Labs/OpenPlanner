@@ -30,4 +30,21 @@
   <p class="empty-state">{{ _("admin.booking.no_events") }}</p>
   {% endif %}
 </section>
+{% if simulator %}
+<section class="card card--test" id="simulator" aria-labelledby="simulator-heading">
+  <div class="card__header">
+    <h2 id="simulator-heading">{{ _("admin.simulator.title") }}</h2>
+    <p class="card__lead">{{ _("admin.simulator.lead") }}</p>
+  </div>
+  <form method="post" action="{{ simulator.action }}">
+    {% if not simulator.prepared %}
+    <p>{{ _("admin.simulator.prepare_lead") }}</p>
+    <div class="form-actions"><button type="submit" class="button button--secondary" name="event" value="prepare">{{ _("admin.simulator.prepare") }}</button></div>
+    {% endif %}
+    <div class="simulator-buttons">
+      {% for button in simulator.buttons %}<button type="submit" class="button button--secondary" name="event" value="{{ button.value }}">{{ button.label }}</button>{% endfor %}
+    </div>
+  </form>
+</section>
+{% endif %}
 {% endblock %}
