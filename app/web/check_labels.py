@@ -54,7 +54,7 @@ FINDING_LABELS: dict[str, str] = {
     "webhooks.wxcc_ok": "admin.check.webhooks.wxcc_ok",
     "webhooks.wxcc_missing": "admin.check.webhooks.wxcc_missing",
     "webhooks.stale": "admin.check.webhooks.stale",
-    "webhooks.no_secret": "admin.check.webhooks.no_secret",
+    "webhooks.no_secret": "admin.check.webhooks.no_secret",  # nosec B105 - a catalogue key
     "webhooks.delivery_ok": "admin.check.webhooks.delivery_ok",
     "webhooks.delivery_failed": "admin.check.webhooks.delivery_failed",
 }
