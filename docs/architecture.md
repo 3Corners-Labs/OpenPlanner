@@ -226,6 +226,8 @@ same commit and rollback behaviour as the SQL one.
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Operator commands: `webhooks-list`, `webhooks-reset`, `webhooks-health`; stored results | `app/cli.py`, `app/adapters/registrations.py`, `app/adapters/webhook_selftest.py`, `app/adapters/db/reports.py` |
+| Verify button "Koppeling controleren" | `app/domain/checks.py`, `app/domain/integration_check.py`, `app/adapters/group_check.py`, `app/admin/check_routes.py`, `app/web/check_labels.py` |
+| Simulator for platform events (not in production) | `app/domain/simulation.py`, `app/adapters/simulated_events.py`, `app/admin/simulator_routes.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda, booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
@@ -235,6 +237,7 @@ same commit and rollback behaviour as the SQL one.
 | API clients and switches in the admin portal (superuser) | `app/admin/api_routes.py` |
 | Group and planning screens, admin forms, shared page plumbing | `app/admin/group_routes.py`, `app/admin/forms.py`, `app/admin/pages.py` |
 | Admin design (fixed look, no JavaScript, ADR 0016) | `app/web/static/admin.css`, `app/admin/templates/admin/` |
+| Manual and context-sensitive help (ADR 0033) | `docs/manual/`, `app/web/help.py`, `app/admin/help_routes.py`, `with_manual` in `app/admin/pages.py` |
 | Generated matrix document | `app/web/authz_report.py`, `app/cli.py` (`authz-matrix`) |
 | Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |
 | Transactions, write lock | `app/adapters/db/uow.py`, `app/adapters/db/engine.py` |
@@ -650,9 +653,10 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0030 | HTTPS with free, automatically renewed certificates (Caddy, Let's Encrypt) |
 | 0031 | Audit log exact per role level, with system events of the worker for troubleshooting |
 | 0032 | Provider-neutral contact-center integration (proposed; renumbered from 0021) |
-| 0033 | Audit events also on the log stream for an external log platform such as Splunk (proposed) |
-| 0034 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes (proposed) |
-| 0035 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond (proposed) |
+| 0033 | Context-sensitive help: one Markdown manual, shown on GitHub and in the portal, (i) per field |
+| 0034 | Audit events also on the log stream for an external log platform such as Splunk (proposed) |
+| 0035 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes (proposed) |
+| 0036 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond (proposed) |
 
 ## 12. Status and roadmap
 
@@ -663,7 +667,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP2 | Domain, persistence, write lock | done |
 | WP3 (slice 1) | Citizen pages, mail, worker, demo | done |
 | WP3b | Citizen pages: month calendar grid, modern layout, branding (O5) | done |
-| WP3c | Embeddable widget (Web Component, same tokens; ADR 0034, backlog EM-1 to EM-5) | planned |
+| WP3c | Embeddable widget (Web Component, same tokens; ADR 0035, backlog EM-1 to EM-5) | planned |
 | WP4 | SMS reminders, message editors | done (ADR 0022) |
 | WP5 | Webex Meetings, join page, live status (O1: Meetings API) | done |
 | WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |
@@ -674,12 +678,13 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | ADR 0032 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns; backlog CC-0 to CC-6) | planned |
 | ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
+| ADR 0033 | Manual and context-sensitive help: group settings documented, other screens follow | in progress |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
-| ADR 0033 | Audit events to an external log platform (backlog AU-1 to AU-4) | proposed |
-| ADR 0035 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
+| ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | proposed |
+| ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
 | O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
 | O11 step 2 | Change requests by phone number, confirmed by the citizen by email/SMS (ADR 0023) | planned |
 

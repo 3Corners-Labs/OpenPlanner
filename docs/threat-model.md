@@ -213,6 +213,21 @@ the split time), path slugs, item ids and the `?weekday=` query parameter that p
 | Spoofing | A new group takes an admin path as its slug (`/admin/groups/new`) | Reserved slugs | `test_reserved_slugs_cannot_be_taken` |
 | Repudiation | An admin denies a change | Every change is audited in the same transaction, with the changed field names or `rule.add`-style keys (never values) | `test_settings_change_records_the_changed_fields`, `test_group_admin_manages_opening_hours_of_their_group` |
 
+## Flow: manual and context-sensitive help (ADR 0033)
+
+Admins only. `GET /admin/help` (topics of the screens the admin can open) and
+`GET /admin/help/{topic}`, both `dashboard.view`; the (i) disclosures and the "Help with this
+page" link are part of the documented screens. The text is the Markdown in `docs/manual/`,
+reviewed in PRs and shipped in the image. Inputs from outside: the `{topic}` path segment and
+the language (`?lang=`, cookie, header; already resolved to a known locale). No personal data.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure (path traversal) | `{topic}` reads another file (`../`, an encoded path, a trailing newline) | Only registered topics are served (`TOPICS`); a slug must fully match `[a-z0-9-]`; the locale is a known code | `tests/web/test_help.py::test_manual_falls_back_to_dutch_and_knows_missing_topics`, `tests/admin/test_help_routes.py::test_unknown_topic_is_not_found` |
+| Tampering (stored XSS) | Markup in the manual runs in the portal | Raw HTML is off in the renderer; the only markup added is a heading id from the marker pattern; the CSP has no scripts or inline styles | `tests/web/test_help.py::test_raw_html_in_the_manual_is_escaped`, `test_the_manual_needs_no_inline_styles` |
+| Elevation | The help page is used to reach a screen or data beyond the admin's rights | Help pages only show static text; the topic list follows the matrix; every screen still checks its own permission | `tests/admin/test_authorization_matrix.py` (`/admin/help` rows), `tests/admin/test_help_routes.py::test_topic_list_shows_only_screens_the_admin_can_open` |
+| Information disclosure | Citizens are sent to GitHub or the admin manual | Citizen pages explain themselves through `_()`; a test forbids links to GitHub, `/admin/help` or `docs/manual` in citizen templates | `tests/web/test_help.py::test_the_manual_never_links_citizens_away` |
+
 ## Flow: holiday calendars (ADR 0025)
 
 Admins only. `GET/POST /admin/holidays`, `/admin/holidays/{calendar}` with `/days`,
@@ -283,6 +298,22 @@ form, webhook bodies and headers, API responses.
 | Information disclosure | Webex echoes submitted citizen data in a refusal that is logged | A refusal logs status and `trackingId` only; Webex's message is logged only for Meetings requests, which carry no citizen data, with email addresses masked | `tests/adapters/test_webex_auth.py::test_without_explain_only_the_tracking_id_is_logged`, `test_a_refusal_logs_webexs_reason_and_tracking_id_without_addresses`, `tests/adapters/test_webex_meetings.py::test_a_refused_meeting_logs_webexs_reason` |
 | Denial of service | Webex or WxCC slow or down blocks bookings | Bookings commit first; meetings and work items are idempotent jobs with backoff; direct calls defer to the worker | `tests/jobs/test_call_jobs.py`, `tests/api/test_direct_pages.py::test_platform_failure_defers_to_the_worker` |
 | Tampering | A schema migration fails half-way on production data | SQLite rebuilds run with foreign keys off and must pass `foreign_key_check` | `tests/test_migrations.py::test_upgrade_and_downgrade_with_data` |
+
+## Flow: verify button and simulator (admin)
+
+`POST /admin/groups/{slug}/check` ("Koppeling controleren") and
+`POST /admin/groups/{slug}/bookings/{id}/simulate` (simulator, not in production).
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation of privilege | A group admin or another organisation's admin checks or simulates | `group.edit` on the route (`RequirePermission`, fresh login) and again in the domain; the booking must belong to the group | `tests/admin/test_authorization_matrix.py`, `tests/domain/test_integration_check.py`, `tests/domain/test_simulation.py::test_a_booking_of_another_group_is_not_found` |
+| Information disclosure | A check reveals another organisation's groups (shared asset) | Peers come from the group's own organisation only | `tests/domain/test_integration_check.py::test_run_stores_the_result_and_audits_it` |
+| Tampering at the platforms | The check changes Webex or WxCC | Read-only: only GET (and the token refresh) go to the platforms; self-test events go to our own endpoints without a bearer token | `tests/adapters/test_group_check.py::test_nothing_is_created_or_deleted_and_no_token_leaves_for_our_endpoints` |
+| Denial of service | Repeated checks hammer the platforms | 6 runs per minute per address, fresh admin login | rate limit setting `checks` |
+| Spoofing | The simulator forges events in production | Off unless `SIMULATOR_ENABLED=true`; production refuses to start with it; without it the route answers 403 and the card is hidden | `tests/test_config.py::test_production_is_the_default_and_refuses_development_defaults`, `test_the_simulator_is_off_unless_switched_on`, `tests/admin/test_simulator_routes.py::test_without_the_switch_there_is_no_simulator` |
+| Repudiation / human error | An admin changes settings in the wrong environment | A striped environment bar on every admin page outside production; none in production | `tests/web/test_environment_bar.py`, `tests/admin/test_environment_bar.py` |
+| Tampering | Simulated ids overwrite a real meeting or task | `prepare` sets ids only where none exist; stand-ins are marked `simulated` on the timeline | `tests/domain/test_simulation.py::test_real_platform_ids_are_never_overwritten` |
+| Tampering (CSRF) | A third-party site triggers a check or a simulated event | Fetch Metadata check on both POSTs | `tests/admin/test_check_routes.py::test_cross_site_check_is_refused`, `tests/admin/test_simulator_routes.py::test_unknown_events_and_cross_site_posts_are_refused` |
 
 ## Flow: machine API for contact-center bots (ADR 0023)
 

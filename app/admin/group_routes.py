@@ -47,7 +47,7 @@ from app.admin.forms import (
     read_form,
     redirect_done,
 )
-from app.admin.pages import Locale, SameOrigin, page
+from app.admin.pages import Locale, SameOrigin, page, with_manual
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
 from app.domain.errors import DomainError, ErrorCode
@@ -558,8 +558,8 @@ async def _settings_response(
         context,
         "admin/group_settings.html",
         {
-            "fields": planning,
-            "integration_fields": integrations,
+            "fields": with_manual(request, locale, planning),
+            "integration_fields": with_manual(request, locale, integrations),
             "errors": form.errors,
             "check": await check_view(request, locale, context),
         },

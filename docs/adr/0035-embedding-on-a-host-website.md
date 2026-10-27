@@ -1,4 +1,4 @@
-# 0034. Embedding on a host website: Web Component, CORS allow-list, no iframes
+# 0035. Embedding on a host website: Web Component, CORS allow-list, no iframes
 
 Status: proposed (2026-10-27). Builds on HANDOVER B4/B13 and ADR 0020 (citizen calendar and
 branding).

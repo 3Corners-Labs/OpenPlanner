@@ -42,6 +42,13 @@ load: check for long-running admin exports or a full volume.
 
 ## Production settings
 
+**Which environment am I in?** `ENVIRONMENT` decides, and it defaults to `prod`, so a forgotten
+setting is the safe one. Production refuses to start with development defaults (missing keys,
+http addresses, `SIMULATOR_ENABLED=true`). Outside production every admin page shows a striped
+bar, "Ontwikkelomgeving" or "Testomgeving" ("not for real appointments of citizens"); in
+production there is no bar. An acceptance environment where real citizens book must run with
+`ENVIRONMENT=prod`.
+
 The image refuses to start in production (`ENVIRONMENT` defaults to `prod`) without
 `MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`. With the bundled TLS proxy (next
 section) nothing else is needed. Behind a reverse proxy of your own also set:
@@ -470,6 +477,48 @@ two weeks before the refresh token expires). It then sends two test events per e
 A passing self-test proves that the address, the tunnel and the secrets work. It does not
 prove that Webex or WxCC send events. For that, check `webhooks-list` (all `CURRENT`, nothing
 `MISSING`, status `active`) and a test meeting's timeline (section 4, tunnel step 4).
+
+### 9. Checking one group from the admin portal ("Koppeling controleren")
+
+Each group's **Instellingen** page has a card **Koppeling controleren**. Whoever may edit the
+group (`group.edit`: the organisation admin, the superuser) can press **Nu controleren**. It
+runs, read-only, what sections 6–8 check, but for that one group:
+
+- **Webex:** the host account exists and the Service App may schedule for it.
+- **Webex Contact Center:** region, channel, asset, asset schema, entry point, flow
+  (`openplannerGroup` and a branch for the routing value), queue, Screen Pop. These are the
+  same rules as `wxcc-config-check`.
+- **Webhooks:** `WEBHOOK_BASE_URL` is https; this host's webhooks and the WxCC subscription
+  exist on the current address; a signed self-test event arrives.
+
+Each line says OK, Waarschuwing, Fout or Overgeslagen, and what to change. The latest result
+stays on the page with its time, and every run is audited as `integration.check`. Save
+changes first: the check uses the saved settings. It is limited to 6 runs per minute.
+
+### 10. Trying the flows without agents (simulator, not in production)
+
+With `SIMULATOR_ENABLED=true` (off by default; the service refuses to start with it when
+`ENVIRONMENT=prod`), an admin booking page (Agenda → a booking) has a card **Simulator (alleen
+in test)**. The environment bar then also says "Simulator staat aan". Whoever may edit the
+group can:
+
+1. **Nep-meeting en -taak aanmaken** for a booking without them. This sets stand-in ids
+   (`simulated-meeting-<id>`, `simulated-task-<id>`, a join link on `.invalid`) and records
+   "meeting created" and "task created" with detail `simulated`. Real ids are never replaced.
+2. Play events in the order of a call: agent accepts the task, agent joins, citizen joins,
+   participant leaves, meeting started or ended, task not picked up, task ended.
+
+Each event is signed with this installation's `WEBEX_WEBHOOK_SECRET` or
+`WXCC_WEBHOOK_SECRET` and posted in-process to `/webhooks/webex` or `/webhooks/wxcc`. It takes
+the real path (signature, time window, parsing, deduplication, timeline, call status) without
+a tunnel. Without a secret the endpoint does not exist and the page says so. Every action is
+audited (`simulator.prepare`, `simulator.event`). Without the switch the card is not shown and
+the route answers 403.
+
+A quick end-to-end try without Webex: create a group with opening hours and "Direct gesprek
+starten", start a call as a citizen (`/g/<slug>/direct`), open the booking in the agenda,
+create the stand-ins, and play "agent accepts" and "agent joins". The citizen's waiting page
+then shows the matching status.
 
 ## Mail
 

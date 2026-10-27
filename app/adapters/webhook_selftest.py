@@ -15,9 +15,6 @@ secrets themselves never leave this process; only the HMAC is in a header.
     POST {base}/webhooks/wxcc   X-WebexCC-Signature (HMAC-SHA256)    task:ended, +timestamp
 """
 
-import hashlib
-import hmac
-import json
 import secrets
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -27,6 +24,7 @@ from typing import Any
 import httpx
 
 from app.adapters.diagnostics import CheckResult
+from app.adapters.webhooks import event_body, sign_webex, sign_wxcc
 
 SELFTEST_PREFIX = "openplanner-selftest-"
 
@@ -90,22 +88,18 @@ async def self_test(
     base = base_url.rstrip("/")
     results = []
     for signed in (True, False) if webex_secret is not None else ():
-        body = _body({"resource": "meetings", "event": "ended", "data": {"id": _test_id()}})
+        body = event_body({"resource": "meetings", "event": "ended", "data": {"id": _test_id()}})
         key = webex_secret if signed and webex_secret else secrets.token_hex(16)
-        signature = hmac.new(key.encode(), body, hashlib.sha1).hexdigest()  # noqa: S324 - Webex's scheme
-        headers = {"X-Spark-Signature": signature}
+        headers = sign_webex(body, key)
         results.append(
             await _deliver(http, f"{base}/webhooks/webex", "webex", signed, body, headers)
         )
     for signed in (True, False) if wxcc_secret is not None else ():
         stamp = int(now.timestamp() * 1000)
         data = {"taskId": _test_id()}
-        body = _body({"type": "task:ended", "comciscotimestamp": stamp, "data": data})
+        body = event_body({"type": "task:ended", "comciscotimestamp": stamp, "data": data})
         key = wxcc_secret if signed and wxcc_secret else secrets.token_hex(16)
-        headers = {
-            "X-WebexCC-Signature": hmac.new(key.encode(), body, hashlib.sha256).hexdigest(),
-            "X-WebexCC-Timestamp": str(stamp),
-        }
+        headers = sign_wxcc(body, key, stamp)
         results.append(await _deliver(http, f"{base}/webhooks/wxcc", "wxcc", signed, body, headers))
     return results
 
@@ -113,11 +107,6 @@ async def self_test(
 def _test_id() -> str:
     """Return an id that no meeting or task has."""
     return f"{SELFTEST_PREFIX}{secrets.token_hex(8)}"
-
-
-def _body(payload: dict[str, Any]) -> bytes:
-    """Serialise a test event exactly as it is signed."""
-    return json.dumps(payload, separators=(",", ":")).encode()
 
 
 async def _deliver(

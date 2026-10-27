@@ -23,7 +23,7 @@ The design is complete in the proposed ADR; what remains is the decision and the
 | CC-5 | Docs: architecture, dataflow, webhooks, threat model, `scripts/diagrams/content.py` | S | Plates regenerated; data flow says "contact-center provider" |
 | CC-6 | Second platform adapter (for example Genesys Cloud), with its own ADR for API, auth and webhooks | L | Contract tests on recorded fixtures; no change outside its adapter and descriptor |
 
-## 2. Audit events to an external log platform — ADR 0033
+## 2. Audit events to an external log platform — ADR 0034
 
 | ID | Item | Size | Done when |
 |---|---|---|---|
@@ -32,7 +32,7 @@ The design is complete in the proposed ADR; what remains is the decision and the
 | AU-3 | Runbook: shipping with Docker's `splunk` logging driver, Universal Forwarder or Fluent Bit; `docs/dataflow.md` names the log platform as recipient of admin subjects | S | Runbook section reviewed by the client's security team |
 | AU-4 | Webhook rejections and Webex token-refresh failures as deduplicated global system events (left open by ADR 0031) | M | Flood of invalid webhooks gives one event per window, test included |
 
-## 3. Embedding on a host website — ADR 0034 (WP3c)
+## 3. Embedding on a host website — ADR 0035 (WP3c)
 
 | ID | Item | Size | Done when |
 |---|---|---|---|
@@ -42,7 +42,7 @@ The design is complete in the proposed ADR; what remains is the decision and the
 | EM-4 | Test host page in `e2e/pages.json` for every widget state | M | axe zero violations, Lighthouse ≥ 95, keyboard flow, nl and en |
 | EM-5 | Docs: `docs/widget.md` (attributes, tokens, parts, host CSP, origin registration), threat model flow, dataflow | S | A host developer can embed from the doc alone |
 
-## 4. Scaling beyond one VM — ADR 0035
+## 4. Scaling beyond one VM — ADR 0036
 
 | ID | Item | Size | Done when |
 |---|---|---|---|
@@ -50,5 +50,5 @@ The design is complete in the proposed ADR; what remains is the decision and the
 | SC-2 | Contract test for the write lock: concurrent bookings of the last place never both succeed, against the SQL unit of work and the fake | S | Test names the guarantee, not SQLite |
 | SC-3 | Backup and restore behind one interface in `app/adapters/db/backup.py` | S | Updater (ADR 0029) unchanged in behaviour; its tests green |
 | SC-4 | Measurements: booking transaction duration, lock wait, busy-timeout count in the logs (no PII) | S | Visible in the log platform next to AU-1 |
-| SC-5 | Runbook: the triggers of ADR 0035 and where to read the measurements | S | Operations team knows when to raise the scaling ADR |
+| SC-5 | Runbook: the triggers of ADR 0036 and where to read the measurements | S | Operations team knows when to raise the scaling ADR |
 | SC-6 | Only when a trigger fires: ADR for Postgres and multiple `web` replicas, then the adapter work | L | Separate decision; not planned |

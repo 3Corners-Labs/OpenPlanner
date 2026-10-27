@@ -3024,6 +3024,41 @@ msgstr "Naar updates"
 msgid "admin.updates.banner.snooze"
 msgstr "Herinner me over 60 minuten"
 
+#. Context-sensitive help and the manual (ADR 0033).
+msgid "admin.nav.help"
+msgstr "Handleiding"
+
+msgid "help.title"
+msgstr "Handleiding"
+
+msgid "help.lead"
+msgstr "Uitleg per scherm: wat het doet en wat elk veld betekent."
+
+msgid "help.topics"
+msgstr "Schermen"
+
+msgid "help.no_topics"
+msgstr "Voor de schermen die u kunt openen is nog geen handleiding geschreven."
+
+msgid "help.page_lead"
+msgstr "Uitleg bij dit scherm en bij elk veld."
+
+msgid "help.other_language"
+msgstr "Deze uitleg is nog niet vertaald en staat hieronder in het Nederlands."
+
+msgid "help.page_link"
+msgstr "Help bij deze pagina"
+
+msgid "help.more"
+msgstr "Meer uitleg"
+
+#. Read by screen readers after "Meer uitleg"; {label} is the field label.
+msgid "help.more_for"
+msgstr "bij {label}"
+
+msgid "help.in_manual"
+msgstr "Lees verder in de handleiding"
+
 #. Webhook registrations and delivery self-test (integrations page).
 
 msgid "admin.integrations.registrations"
@@ -3366,3 +3401,73 @@ msgstr "Een ondertekend testbericht kwam aan, en een vals ondertekend bericht we
 
 msgid "admin.check.webhooks.delivery_failed"
 msgstr "Testbericht naar {endpoint}: {outcome}"
+
+#. Simulator for platform events (not in production).
+
+msgid "admin.simulator.title"
+msgstr "Simulator (alleen in test)"
+
+msgid "admin.simulator.lead"
+msgstr "Speel na wat Webex en Webex Contact Center zouden melden, zonder agent of tunnel. Elk event gaat ondertekend door het echte webhook-endpoint en komt op de tijdlijn. Deze kaart bestaat niet in productie."
+
+msgid "admin.simulator.prepare_lead"
+msgstr "Deze boeking heeft nog geen meeting of work item. Geef haar eerst nep-id's, dan kunnen de events haar vinden."
+
+msgid "admin.simulator.prepare"
+msgstr "Nep-meeting en -taak aanmaken"
+
+msgid "admin.simulator.event.task_connected"
+msgstr "Agent neemt taak aan"
+
+msgid "admin.simulator.event.host_joined"
+msgstr "Agent komt binnen"
+
+msgid "admin.simulator.event.guest_joined"
+msgstr "Burger komt binnen"
+
+msgid "admin.simulator.event.participant_left"
+msgstr "Deelnemer vertrekt"
+
+msgid "admin.simulator.event.meeting_started"
+msgstr "Meeting gestart"
+
+msgid "admin.simulator.event.meeting_ended"
+msgstr "Meeting beëindigd"
+
+msgid "admin.simulator.event.task_failed"
+msgstr "Taak niet opgepakt"
+
+msgid "admin.simulator.event.task_ended"
+msgstr "Taak beëindigd"
+
+msgid "admin.done.simulated"
+msgstr "Het event is afgeleverd en staat op de tijdlijn."
+
+msgid "admin.done.simulated_prepared"
+msgstr "De boeking heeft nu een nep-meeting en een nep-taak."
+
+msgid "admin.done.simulator_no_ids"
+msgstr "Deze boeking heeft daarvoor geen meeting of taak. Maak eerst een nep-meeting en -taak aan."
+
+msgid "admin.done.simulator_no_secret"
+msgstr "Er is geen webhookgeheim ingesteld (WEBEX_WEBHOOK_SECRET of WXCC_WEBHOOK_SECRET), dus het endpoint bestaat niet."
+
+msgid "admin.done.simulator_refused"
+msgstr "Het webhook-endpoint weigerde het event. Kijk in het log van de web-container."
+
+#. Environment bar in the admin portal (dev/test only).
+
+msgid "admin.environment.label"
+msgstr "Omgeving"
+
+msgid "admin.environment.dev"
+msgstr "Ontwikkelomgeving"
+
+msgid "admin.environment.test"
+msgstr "Testomgeving"
+
+msgid "admin.environment.text"
+msgstr "Niet voor echte afspraken van burgers."
+
+msgid "admin.environment.simulator"
+msgstr "Simulator staat aan"

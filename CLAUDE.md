@@ -115,6 +115,7 @@ Weekly: Renovate updates (security updates immediately), `trivy` on the running 
 - `docs/api.md` — generated from OpenAPI; `docs/webhooks.md` — payloads to/from Webex Connect.
 - `docs/widget.md` — how a website embeds the widget, CSP requirements, attributes.
 - `docs/agent-api.md` — how a contact-center bot connects to the machine API (ADR 0023).
+- `docs/manual/{nl,en}/` — admin manual, one topic per screen, shown in the portal and behind each field's (i) (ADR 0033). A PR that adds or changes an admin screen updates its topic; citizens get help in the page itself, never a link out.
 
 ## How to work in this repo (for Claude Code)
 - Read `docs/HANDOVER.md` §3 (domain) and §5 (flows) before touching domain code.

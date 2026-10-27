@@ -46,6 +46,12 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 403)},
     # ADR 0031: every role has a log; what it lists is exact per level (test_audit_routes).
     "GET /admin/audit": {"/admin/audit": statuses(200, 200, 200, 200, 403)},
+    # ADR 0033: the manual is public, every admin may read every topic.
+    "GET /admin/help": {"/admin/help": statuses(200, 200, 200, 200, 403)},
+    "GET /admin/help/{topic}": {
+        "/admin/help/group-settings": statuses(200, 200, 200, 200, 403),
+        "/admin/help/nope": statuses(404, 404, 404, 404, 403),
+    },
     # Integrations and secrets: superuser only.
     "GET /admin/integrations": {"/admin/integrations": statuses(200, 403, 403, 403, 403)},
     # Organisations: create and edit, superuser only (HANDOVER §6).
@@ -277,6 +283,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/groups/{slug}/bookings/{booking_id}": {
         "/admin/groups/demo/bookings/999999": statuses(404, 404, 404, 403, 403),
         "/admin/groups/andere-team/bookings/999999": statuses(404, 403, 403, 404, 403),
+    },
+    # Simulator (not in production): whoever edits the group; an empty form is refused (400).
+    "POST /admin/groups/{slug}/bookings/{booking_id}/simulate": {
+        "/admin/groups/demo/bookings/999999/simulate": statuses(400, 400, 403, 403, 403),
+        "/admin/groups/andere-team/bookings/999999/simulate": statuses(400, 403, 403, 400, 403),
     },
     "POST /admin/groups/{slug}/exceptions/{override_id}/delete": {
         "/admin/groups/demo/exceptions/999999/delete": statuses(404, 404, 404, 403, 403),

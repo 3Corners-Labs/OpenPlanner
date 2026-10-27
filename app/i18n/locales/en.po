@@ -3024,6 +3024,41 @@ msgstr "Go to updates"
 msgid "admin.updates.banner.snooze"
 msgstr "Remind me in 60 minutes"
 
+#. Context-sensitive help and the manual (ADR 0033).
+msgid "admin.nav.help"
+msgstr "Manual"
+
+msgid "help.title"
+msgstr "Manual"
+
+msgid "help.lead"
+msgstr "An explanation per screen: what it does and what each field means."
+
+msgid "help.topics"
+msgstr "Screens"
+
+msgid "help.no_topics"
+msgstr "No manual has been written yet for the screens you can open."
+
+msgid "help.page_lead"
+msgstr "An explanation of this screen and each of its fields."
+
+msgid "help.other_language"
+msgstr "This explanation has not been translated yet and is shown below in Dutch."
+
+msgid "help.page_link"
+msgstr "Help with this page"
+
+msgid "help.more"
+msgstr "More information"
+
+#. Read by screen readers after "More information"; {label} is the field label.
+msgid "help.more_for"
+msgstr "about {label}"
+
+msgid "help.in_manual"
+msgstr "Read more in the manual"
+
 #. Webhook registrations and delivery self-test (integrations page).
 
 msgid "admin.integrations.registrations"
@@ -3366,3 +3401,73 @@ msgstr "A signed test message arrived, and a wrongly signed one was refused."
 
 msgid "admin.check.webhooks.delivery_failed"
 msgstr "Test message to {endpoint}: {outcome}"
+
+#. Simulator for platform events (not in production).
+
+msgid "admin.simulator.title"
+msgstr "Simulator (test only)"
+
+msgid "admin.simulator.lead"
+msgstr "Play what Webex and Webex Contact Center would report, without an agent or a tunnel. Each event goes signed through the real webhook endpoint and lands on the timeline. This card does not exist in production."
+
+msgid "admin.simulator.prepare_lead"
+msgstr "This booking has no meeting or work item yet. Give it stand-in ids first, so the events can find it."
+
+msgid "admin.simulator.prepare"
+msgstr "Create stand-in meeting and task"
+
+msgid "admin.simulator.event.task_connected"
+msgstr "Agent accepts the task"
+
+msgid "admin.simulator.event.host_joined"
+msgstr "Agent joins"
+
+msgid "admin.simulator.event.guest_joined"
+msgstr "Citizen joins"
+
+msgid "admin.simulator.event.participant_left"
+msgstr "Participant leaves"
+
+msgid "admin.simulator.event.meeting_started"
+msgstr "Meeting started"
+
+msgid "admin.simulator.event.meeting_ended"
+msgstr "Meeting ended"
+
+msgid "admin.simulator.event.task_failed"
+msgstr "Task not picked up"
+
+msgid "admin.simulator.event.task_ended"
+msgstr "Task ended"
+
+msgid "admin.done.simulated"
+msgstr "The event was delivered and is on the timeline."
+
+msgid "admin.done.simulated_prepared"
+msgstr "The booking now has a stand-in meeting and task."
+
+msgid "admin.done.simulator_no_ids"
+msgstr "This booking has no meeting or task for that. Create a stand-in meeting and task first."
+
+msgid "admin.done.simulator_no_secret"
+msgstr "No webhook secret is configured (WEBEX_WEBHOOK_SECRET or WXCC_WEBHOOK_SECRET), so the endpoint does not exist."
+
+msgid "admin.done.simulator_refused"
+msgstr "The webhook endpoint refused the event. Check the web container's log."
+
+#. Environment bar in the admin portal (dev/test only).
+
+msgid "admin.environment.label"
+msgstr "Environment"
+
+msgid "admin.environment.dev"
+msgstr "Development environment"
+
+msgid "admin.environment.test"
+msgstr "Test environment"
+
+msgid "admin.environment.text"
+msgstr "Not for real appointments of citizens."
+
+msgid "admin.environment.simulator"
+msgstr "Simulator is on"
