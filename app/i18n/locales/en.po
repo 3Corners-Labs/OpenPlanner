@@ -3023,3 +3023,346 @@ msgstr "Go to updates"
 
 msgid "admin.updates.banner.snooze"
 msgstr "Remind me in 60 minutes"
+
+#. Webhook registrations and delivery self-test (integrations page).
+
+msgid "admin.integrations.registrations"
+msgstr "Registrations at Webex and WxCC"
+
+msgid "admin.integrations.registrations_lead"
+msgstr "Every webhook and subscription that points at OpenPlanner, with its state at the last check. Refresh with python -m app.cli webhooks-list; clean up stale registrations with python -m app.cli webhooks-reset (runbook, section 6)."
+
+msgid "admin.integrations.checked_at"
+msgstr "Last check: {date}, compared with {base}."
+
+msgid "admin.integrations.not_checked"
+msgstr "Not checked yet. Run {command} in the web container."
+
+msgid "admin.integrations.none_found"
+msgstr "No registrations found."
+
+msgid "admin.integrations.missing"
+msgstr "Missing"
+
+msgid "admin.integrations.listing_failed"
+msgstr "The {platform} listing could not be read ({code})."
+
+msgid "admin.integrations.col.state"
+msgstr "State"
+
+msgid "admin.integrations.col.platform"
+msgstr "Platform"
+
+msgid "admin.integrations.col.event"
+msgstr "Event"
+
+msgid "admin.integrations.col.filter"
+msgstr "Filter"
+
+msgid "admin.integrations.col.status"
+msgstr "Status"
+
+msgid "admin.integrations.col.secret"
+msgstr "Secret"
+
+msgid "admin.integrations.col.target"
+msgstr "Target"
+
+msgid "admin.integrations.state.current"
+msgstr "Current"
+
+msgid "admin.integrations.state.stale"
+msgstr "Stale"
+
+msgid "admin.integrations.state.foreign"
+msgstr "Not OpenPlanner's"
+
+msgid "admin.integrations.reason.foreign"
+msgstr "Belongs to another application and is left alone."
+
+msgid "admin.integrations.reason.other_target"
+msgstr "Points at another address (old tunnel or base URL)."
+
+msgid "admin.integrations.reason.unfiltered"
+msgstr "No hostEmail filter: reports every meeting of the organisation."
+
+msgid "admin.integrations.reason.unknown_host"
+msgstr "Host account that no group uses."
+
+msgid "admin.integrations.reason.unused_event"
+msgstr "Event OpenPlanner does not use."
+
+msgid "admin.integrations.reason.inactive"
+msgstr "Inactive: the platform stopped delivering."
+
+msgid "admin.integrations.reason.duplicate"
+msgstr "Duplicate: another registration does the same."
+
+msgid "admin.integrations.secret.yes"
+msgstr "Set"
+
+msgid "admin.integrations.secret.no"
+msgstr "Not set"
+
+msgid "admin.integrations.secret.unknown"
+msgstr "Unknown"
+
+msgid "admin.integrations.delivery"
+msgstr "Delivery self-test"
+
+msgid "admin.integrations.delivery_lead"
+msgstr "Signed test events through the webhook address to OpenPlanner itself, with unknown ids so no booking changes. Refresh with python -m app.cli webhooks-health."
+
+msgid "admin.integrations.no_secrets"
+msgstr "No webhook secret is configured; nothing was tested."
+
+msgid "admin.integrations.col.endpoint"
+msgstr "Endpoint"
+
+msgid "admin.integrations.col.test"
+msgstr "Test"
+
+msgid "admin.integrations.col.http"
+msgstr "HTTP status"
+
+msgid "admin.integrations.col.result"
+msgstr "Result"
+
+msgid "admin.integrations.delivery.signed"
+msgstr "Correctly signed event"
+
+msgid "admin.integrations.delivery.unsigned"
+msgstr "Event with a wrong signature"
+
+msgid "admin.integrations.ok"
+msgstr "OK"
+
+msgid "admin.integrations.failed"
+msgstr "Failed"
+
+msgid "admin.integrations.outcome.delivered"
+msgstr "Delivered and verified."
+
+msgid "admin.integrations.outcome.refused"
+msgstr "Refused, as it should be."
+
+msgid "admin.integrations.outcome.signature_refused"
+msgstr "Signature refused: the secret differs from the web container's."
+
+msgid "admin.integrations.outcome.unsigned_accepted"
+msgstr "Accepted although the signature is wrong: verification is off."
+
+msgid "admin.integrations.outcome.not_found"
+msgstr "Not found: no secret configured, or the webhook address does not reach OpenPlanner."
+
+msgid "admin.integrations.outcome.rate_limited"
+msgstr "Too many requests; try again in a minute."
+
+msgid "admin.integrations.outcome.proxy_error"
+msgstr "Proxy or tunnel error: is the tunnel still running?"
+
+msgid "admin.integrations.outcome.unreachable"
+msgstr "Unreachable: check DNS and the tunnel."
+
+msgid "admin.integrations.outcome.unexpected"
+msgstr "Unexpected status: check what answers on the webhook address."
+
+#. Verify button "Koppeling controleren" per group.
+
+msgid "admin.done.checked"
+msgstr "The integration has been checked. The result is below."
+
+msgid "admin.check.title"
+msgstr "Check integration"
+
+msgid "admin.check.lead"
+msgstr "Checks at Webex and Webex Contact Center whether this group's calls arrive correctly: the host, the routing of the work item to the queue, and the webhooks. Nothing is changed; only a signed test message to OpenPlanner itself."
+
+msgid "admin.check.button"
+msgstr "Check now"
+
+msgid "admin.check.never"
+msgstr "This group has not been checked yet."
+
+msgid "admin.check.last"
+msgstr "Last checked: {at}"
+
+msgid "admin.check.overall"
+msgstr "Result"
+
+msgid "admin.check.after_save"
+msgstr "Save changes first: the check uses the saved settings."
+
+msgid "admin.check.area.platform"
+msgstr "Integrations"
+
+msgid "admin.check.area.webex"
+msgstr "Webex (video call)"
+
+msgid "admin.check.area.wxcc"
+msgstr "Webex Contact Center (routing to the queue)"
+
+msgid "admin.check.area.webhooks"
+msgstr "Webhooks (events back to OpenPlanner)"
+
+msgid "admin.check.status.ok"
+msgstr "OK"
+
+msgid "admin.check.status.warn"
+msgstr "Warning"
+
+msgid "admin.check.status.fail"
+msgstr "Error"
+
+msgid "admin.check.status.skipped"
+msgstr "Skipped"
+
+msgid "admin.check.unknown"
+msgstr "Unknown outcome ({code})."
+
+msgid "admin.check.platform.not_configured"
+msgstr "No Webex Service App is configured; there is nothing to check."
+
+msgid "admin.check.webex.no_host"
+msgstr "No Webex host entered: this group gets no video calls."
+
+msgid "admin.check.webex.host_ok"
+msgstr "Host {host} is known and the Service App may schedule on its behalf."
+
+msgid "admin.check.webex.host_unknown"
+msgstr "Webex does not know host {host}, or the host has no licence on this site ({error})."
+
+msgid "admin.check.webex.host_refused"
+msgstr "The Service App may not schedule on behalf of {host} ({error}): check the scopes and the authorisation in Control Hub."
+
+msgid "admin.check.webex.unreachable"
+msgstr "Webex could not be reached to check host {host} ({error}). Try again later."
+
+msgid "admin.check.wxcc.not_configured"
+msgstr "Webex Contact Center is not configured; the routing was not checked."
+
+msgid "admin.check.wxcc.no_mapping"
+msgstr "Work item channel or business address is missing: this group creates no work items."
+
+msgid "admin.check.wxcc.config_refused"
+msgstr "Webex Contact Center's configuration could not be read ({error}): it needs cjp:config_read and the Contact Center admin role."
+
+msgid "admin.check.wxcc.region.ok"
+msgstr "The region is right ({host})."
+
+msgid "admin.check.wxcc.region.wrong"
+msgstr "The organisation lives in another region: set WXCC_API_BASE_URL to {host}."
+
+msgid "admin.check.wxcc.region.no_org"
+msgstr "Webex Contact Center does not know the Service App's organisation (cjp:config_read)."
+
+msgid "admin.check.wxcc.region.unknown"
+msgstr "No region knows this organisation (cjp:config_read, Contact Center admin role)."
+
+msgid "admin.check.wxcc.channel.ok"
+msgstr "Work item channel {channel} exists."
+
+msgid "admin.check.wxcc.channel.missing"
+msgstr "There is no channel named {channel}. Existing work item channels: {available}."
+
+msgid "admin.check.wxcc.channel.wrong_type"
+msgstr "Channel {channel} is not a work item channel but {type}."
+
+msgid "admin.check.wxcc.asset.ok"
+msgstr "Asset {asset} belongs to the business address."
+
+msgid "admin.check.wxcc.asset.missing"
+msgstr "There is no asset with business address {address}. Existing: {available}."
+
+msgid "admin.check.wxcc.asset.wrong_channel"
+msgstr "Asset {asset} is on channel {actual}, not on {channel}."
+
+msgid "admin.check.wxcc.schema.ok"
+msgstr "The asset's schema has the fields OpenPlanner sends."
+
+msgid "admin.check.wxcc.schema.refused"
+msgstr "Webex Contact Center refuses the work item: missing fields: {missing}; required fields OpenPlanner does not know: {extra}. Change the asset's schema (runbook)."
+
+msgid "admin.check.wxcc.schema.hidden"
+msgstr "These fields are not visible to agents: {fields}."
+
+msgid "admin.check.wxcc.entry.ok"
+msgstr "Entry point {entry} is active and has a flow."
+
+msgid "admin.check.wxcc.entry.missing"
+msgstr "Asset {asset} has no work item entry point."
+
+msgid "admin.check.wxcc.entry.no_flow"
+msgstr "Entry point {entry} has no flow."
+
+msgid "admin.check.wxcc.entry.inactive"
+msgstr "Entry point {entry} is switched off."
+
+msgid "admin.check.wxcc.flow.not_exported"
+msgstr "The flow of entry point {entry} could not be read."
+
+msgid "admin.check.wxcc.routing.ok"
+msgstr "The flow reads openplannerGroup to choose the queue."
+
+msgid "admin.check.wxcc.routing.shared"
+msgstr "The flow does not read openplannerGroup, so groups {groups} all land in the same queue."
+
+msgid "admin.check.wxcc.routing.not_read"
+msgstr "The flow does not read openplannerGroup: every work item of this entry point goes to the same queue."
+
+msgid "admin.check.wxcc.branch.ok"
+msgstr "The flow has a branch for routing value {value}."
+
+msgid "admin.check.wxcc.branch.missing"
+msgstr "The flow has no branch for {value}: work items go to the default branch."
+
+msgid "admin.check.wxcc.queues.ok"
+msgstr "The flow puts work items in queue {queues}."
+
+msgid "admin.check.wxcc.queues.none"
+msgstr "The flow puts work items in no known queue."
+
+msgid "admin.check.wxcc.queues.wrong_type"
+msgstr "These queues are not work item queues: {queues}."
+
+msgid "admin.check.wxcc.naming.ok"
+msgstr "The queue name fits the group ({queues})."
+
+msgid "admin.check.wxcc.naming.no_match"
+msgstr "No queue with {value} in its name (a convention, not a requirement)."
+
+msgid "admin.check.wxcc.screenpop.ok"
+msgstr "The flow shows a Screen Pop to the agent."
+
+msgid "admin.check.wxcc.screenpop.missing"
+msgstr "No Screen Pop: add one with meetingLink so the agent sees the link at once."
+
+msgid "admin.check.webhooks.not_https"
+msgstr "The webhook address {base} is not https: Webex and Webex Contact Center cannot deliver."
+
+msgid "admin.check.webhooks.listing_refused"
+msgstr "The webhooks at {platform} could not be listed ({error})."
+
+msgid "admin.check.webhooks.webex_ok"
+msgstr "The Webex webhooks for this group's host are active on the current address."
+
+msgid "admin.check.webhooks.webex_missing"
+msgstr "These Webex webhooks are missing for the host: {events}. Run register-webhooks (runbook)."
+
+msgid "admin.check.webhooks.wxcc_ok"
+msgstr "The subscription to Webex Contact Center task events is active on the current address."
+
+msgid "admin.check.webhooks.wxcc_missing"
+msgstr "There is no active subscription to task events: OpenPlanner does not hear when an agent picks up the work item. Run register-webhooks."
+
+msgid "admin.check.webhooks.stale"
+msgstr "{count} stale registration(s) found, for example on an old tunnel address. Clean up with webhooks-reset (runbook)."
+
+msgid "admin.check.webhooks.no_secret"
+msgstr "No webhook secret is configured; delivery was not tested."
+
+msgid "admin.check.webhooks.delivery_ok"
+msgstr "A signed test message arrived, and a wrongly signed one was refused."
+
+msgid "admin.check.webhooks.delivery_failed"
+msgstr "Test message to {endpoint}: {outcome}"

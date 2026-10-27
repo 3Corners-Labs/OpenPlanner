@@ -9,7 +9,7 @@ Suggested order: audit export (small, asked for by security teams), scaling seam
 answers the review question), contact-center neutrality (needed before a second platform),
 embedding (largest).
 
-## 1. Provider-neutral contact center — ADR 0021 (renumbered to 0032 by #37)
+## 1. Provider-neutral contact center — ADR 0032 (formerly 0021)
 
 The design is complete in the proposed ADR; what remains is the decision and the build.
 

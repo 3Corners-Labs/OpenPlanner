@@ -140,7 +140,7 @@ flowchart TB
         api["app.api<br/>public pages, health,<br/>agent API (sub-app)"]
         adminpkg["app.admin<br/>admin portal, RequirePermission"]
         jobs["app.jobs<br/>worker, runner, messages"]
-        cli["app.cli<br/>seed-demo"]
+        cli["app.cli<br/>seed-demo, checks, webhooks"]
     end
 
     web["app.web<br/>locale, templates, render(),<br/>protection, error pages"]
@@ -225,8 +225,9 @@ same commit and rollback behaviour as the SQL one.
 | Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/cli.py`, `scripts/updater/` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
+| Operator commands: `webhooks-list`, `webhooks-reset`, `webhooks-health`; stored results | `app/cli.py`, `app/adapters/registrations.py`, `app/adapters/webhook_selftest.py`, `app/adapters/db/reports.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
-| Agenda, booking timeline, integrations page | `app/admin/call_routes.py`, `app/admin/routes.py` |
+| Agenda, booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
 | Machine API for bots: clients, credentials, tokens, scopes (ADR 0023) | `app/domain/api_clients.py`, `app/domain/api_access.py`, `app/adapters/db/api_clients.py` |
@@ -637,7 +638,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0018 | Dispatch to WxCC as work items (Create Task API v2) |
 | 0019 | Direct video call ("now") per group |
 | 0020 | Citizen calendar as progressive enhancement; branding through tokens |
-| 0021 | Provider-neutral contact-center integration (proposed) |
+| 0021 | Ending the work item of a cancelled booking |
 | 0022 | Message channels per organisation, SMS through Webex Connect, editable texts |
 | 0023 | Machine API for contact-center bots: OAuth client credentials, off by default, no personal data |
 | 0024 | Emergency closure: appointments on hold, citizens informed, no deletion |
@@ -648,6 +649,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0029 | Updates started from the admin portal, carried out by a signed-image host updater with rollback |
 | 0030 | HTTPS with free, automatically renewed certificates (Caddy, Let's Encrypt) |
 | 0031 | Audit log exact per role level, with system events of the worker for troubleshooting |
+| 0032 | Provider-neutral contact-center integration (proposed; renumbered from 0021) |
 | 0033 | Audit events also on the log stream for an external log platform such as Splunk (proposed) |
 | 0034 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes (proposed) |
 | 0035 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond (proposed) |
@@ -669,7 +671,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7a | Admin portal login, authorisation matrix, audit log | done |
 | WP7b | Groups, opening hours, exceptions and capacity in the admin portal | done |
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |
-| ADR 0021 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns; backlog CC-0 to CC-6) | planned |
+| ADR 0032 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns; backlog CC-0 to CC-6) | planned |
 | ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
