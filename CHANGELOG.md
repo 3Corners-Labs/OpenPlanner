@@ -72,3 +72,8 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - Admin tabs per group: Herinneringen (reminder rules: email or SMS, 5 minutes to 30 days,
   at most five) and Berichtteksten (subject, introduction, closing and SMS text per locale,
   with allow-listed placeholders).
+- "Koppeling controleren" per group: a read-only check of the Webex host, the WxCC routing
+  chain and the webhooks, with translated findings and an audit entry.
+- Simulator on admin booking pages (not in production): stand-in meeting and task, and signed
+  platform events played through OpenPlanner's own webhook endpoints.
+

@@ -46,6 +46,7 @@ from app.domain.organisations import OrganisationService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.services import BookingService
+from app.domain.simulation import SimulationService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import management_token_key, session_secret
@@ -159,6 +160,14 @@ def create_app(
         )
         app.state.integration_check_service = IntegrationCheckService(
             uow, clock, app.state.admin_service, wired.checker
+        )
+        # The simulator plays platform events through our own webhooks; never in production.
+        app.state.simulation_service = SimulationService(
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.integration_service,
+            enabled=settings.environment != "prod",
         )
         try:
             yield
