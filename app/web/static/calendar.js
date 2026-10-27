@@ -7,7 +7,7 @@
  *   - choosing a day fetches that day's page and swaps in its times, announces the result in
  *     the live region and moves focus to the times heading (the next step).
  *
- * All text comes from the server-rendered page, so the script has no strings to translate.
+ * All text is in the server-rendered page, so the script has no strings to translate.
  * Any failure falls back to normal navigation.
  */
 (function () {
