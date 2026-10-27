@@ -284,6 +284,22 @@ form, webhook bodies and headers, API responses.
 | Denial of service | Webex or WxCC slow or down blocks bookings | Bookings commit first; meetings and work items are idempotent jobs with backoff; direct calls defer to the worker | `tests/jobs/test_call_jobs.py`, `tests/api/test_direct_pages.py::test_platform_failure_defers_to_the_worker` |
 | Tampering | A schema migration fails half-way on production data | SQLite rebuilds run with foreign keys off and must pass `foreign_key_check` | `tests/test_migrations.py::test_upgrade_and_downgrade_with_data` |
 
+## Flow: verify button and simulator (admin)
+
+`POST /admin/groups/{slug}/check` ("Koppeling controleren") and
+`POST /admin/groups/{slug}/bookings/{id}/simulate` (simulator, not in production).
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation of privilege | A group admin or another organisation's admin checks or simulates | `group.edit` on the route (`RequirePermission`, fresh login) and again in the domain; the booking must belong to the group | `tests/admin/test_authorization_matrix.py`, `tests/domain/test_integration_check.py`, `tests/domain/test_simulation.py::test_a_booking_of_another_group_is_not_found` |
+| Information disclosure | A check reveals another organisation's groups (shared asset) | Peers come from the group's own organisation only | `tests/domain/test_integration_check.py::test_run_stores_the_result_and_audits_it` |
+| Tampering at the platforms | The check changes Webex or WxCC | Read-only: only GET (and the token refresh) go to the platforms; self-test events go to our own endpoints without a bearer token | `tests/adapters/test_group_check.py::test_nothing_is_created_or_deleted_and_no_token_leaves_for_our_endpoints` |
+| Denial of service | Repeated checks hammer the platforms | 6 runs per minute per address, fresh admin login | rate limit setting `checks` |
+| Spoofing | The simulator forges events in production | Off unless `SIMULATOR_ENABLED=true`; production refuses to start with it; without it the route answers 403 and the card is hidden | `tests/test_config.py::test_production_is_the_default_and_refuses_development_defaults`, `test_the_simulator_is_off_unless_switched_on`, `tests/admin/test_simulator_routes.py::test_without_the_switch_there_is_no_simulator` |
+| Repudiation / human error | An admin changes settings in the wrong environment | A striped environment bar on every admin page outside production; none in production | `tests/web/test_environment_bar.py`, `tests/admin/test_environment_bar.py` |
+| Tampering | Simulated ids overwrite a real meeting or task | `prepare` sets ids only where none exist; stand-ins are marked `simulated` on the timeline | `tests/domain/test_simulation.py::test_real_platform_ids_are_never_overwritten` |
+| Tampering (CSRF) | A third-party site triggers a check or a simulated event | Fetch Metadata check on both POSTs | `tests/admin/test_check_routes.py::test_cross_site_check_is_refused`, `tests/admin/test_simulator_routes.py::test_unknown_events_and_cross_site_posts_are_refused` |
+
 ## Flow: machine API for contact-center bots (ADR 0023)
 
 Machine: `POST /api/agent/v1/oauth/token` (client credentials), `GET /api/agent/v1/me`,
