@@ -662,7 +662,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0034 | Audit events also on the log stream for an external log platform such as Splunk (proposed) |
 | 0035 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes (proposed) |
 | 0036 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond (proposed) |
-| 0037 | Adjustable roles within fixed bounds (superuser only), and a read-only auditor role (proposed) |
+| 0037 | Adjustable roles within fixed bounds (superuser only), and a read-only auditor role |
 
 ## 12. Status and roadmap
 
@@ -691,7 +691,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 | ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | proposed |
 | ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
-| ADR 0037 | Auditor role and matrix page text first, then custom roles within bounds (decision points B1 to B8) | proposed |
+| ADR 0037 | Rights: (1) auditor role, reach, matrix page text; (2) retention overview; (3) custom roles within bounds | in progress |
 | O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
 | O11 step 2 | Change requests by phone number, confirmed by the citizen by email/SMS (ADR 0023) | planned |
 

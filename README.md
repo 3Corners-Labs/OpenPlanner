@@ -29,7 +29,7 @@ Then open:
 - http://127.0.0.1:8025 — Mailpit, which catches the confirmation, change, reminder and
   cancellation emails (with calendar attachment and the management link).
 - http://127.0.0.1:8000/admin/ — the admin portal. Log in at the development Keycloak with one
-  test user per role (`super`, `orgadmin`, `groupadmin`, `outsider`, `norole`; see
+  test user per role (`super`, `orgadmin`, `groupadmin`, `auditor`, `outsider`, `norole`; see
   `dev/keycloak/README.md`) to walk the portal as each role.
 
 The `dev` profile adds Mailpit and Keycloak (standing in for PingFederate); without it the shape

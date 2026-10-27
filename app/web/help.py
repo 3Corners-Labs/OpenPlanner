@@ -53,7 +53,10 @@ class HelpTopic:
     permission: Permission
 
 
-TOPICS = (HelpTopic("group-settings", ("/admin/groups/{slug}/settings",), Permission.GROUP_EDIT),)
+TOPICS = (
+    HelpTopic("group-settings", ("/admin/groups/{slug}/settings",), Permission.GROUP_EDIT),
+    HelpTopic("rights-matrix", ("/admin/matrix",), Permission.MATRIX_VIEW),
+)
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 
 _BY_SLUG = {t.slug: t for t in TOPICS}

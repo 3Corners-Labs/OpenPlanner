@@ -237,6 +237,8 @@ class MatrixRowView:
     label: str
     level: str
     granted: list[bool]
+    locked: bool
+    pii: bool
 
 
 @router.get("/matrix", response_class=HTMLResponse)
@@ -245,13 +247,15 @@ async def matrix(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.MATRIX_VIEW))],
 ) -> HTMLResponse:
-    """Show the whole matrix, generated from the same code as the documentation."""
+    """Show the whole matrix with its bounds: locked and personal-data permissions (ADR 0037)."""
     _ = locale.gettext
     rows = [
         MatrixRowView(
             _(PERMISSION_LABELS[row.permission]),
             _(LEVEL_LABELS[row.level]),
             [row.granted[role] for role in Role],
+            row.locked,
+            row.pii,
         )
         for row in matrix_rows()
     ]

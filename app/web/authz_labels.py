@@ -11,6 +11,7 @@ ROLE_LABELS: dict[Role, str] = {
     Role.SUPERUSER: "authz.role.superuser",
     Role.ORG_ADMIN: "authz.role.org_admin",
     Role.GROUP_ADMIN: "authz.role.group_admin",
+    Role.AUDITOR: "authz.role.auditor",
 }
 
 LEVEL_LABELS: dict[Level, str] = {

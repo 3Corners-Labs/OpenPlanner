@@ -492,7 +492,7 @@ msgid "admin.matrix.title"
 msgstr "Rechtenmatrix"
 
 msgid "admin.matrix.intro"
-msgstr "Welke rol wat mag. Deze tabel komt rechtstreeks uit de code, net als de documentatie."
+msgstr "Overzicht van wat elke rol mag, per organisatie en per groep. Rechten met het kenmerk Alleen superuser liggen vast. Rechten met het kenmerk Persoonsgegevens tonen gegevens van burgers. Welke rol iemand heeft, regelt uw organisatie in de identity provider."
 
 msgid "admin.matrix.level"
 msgstr "Niveau"
@@ -502,6 +502,12 @@ msgstr "Ja"
 
 msgid "admin.matrix.no"
 msgstr "Nee"
+
+msgid "admin.matrix.locked"
+msgstr "Alleen superuser"
+
+msgid "admin.matrix.pii"
+msgstr "Persoonsgegevens"
 
 msgid "admin.matrix.citizen"
 msgstr "Deelnemers (zonder inloggen)"
@@ -589,6 +595,9 @@ msgstr "Organisatiebeheerder"
 
 msgid "authz.role.group_admin"
 msgstr "Groepsbeheerder"
+
+msgid "authz.role.auditor"
+msgstr "Compliance en privacy (alleen lezen)"
 
 msgid "authz.level.global"
 msgstr "Portaal"

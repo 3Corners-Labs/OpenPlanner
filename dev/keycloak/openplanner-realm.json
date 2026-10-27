@@ -160,6 +160,29 @@
       ]
     },
     {
+      "username": "auditor",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Anouk",
+      "lastName": "Audit",
+      "email": "auditor@openplanner.test",
+      "attributes": {
+        "roles": [
+          "openplanner-auditor"
+        ],
+        "organisations": [
+          "demo"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
       "username": "outsider",
       "enabled": true,
       "emailVerified": true,

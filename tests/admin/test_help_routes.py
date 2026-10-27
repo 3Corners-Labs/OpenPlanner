@@ -40,7 +40,6 @@ NOT_YET_DOCUMENTED: frozenset[str] = frozenset(
         "/admin/holidays",
         "/admin/holidays/{calendar}",
         "/admin/integrations",
-        "/admin/matrix",
         "/admin/organisations",
         "/admin/organisations/new",
         "/admin/organisations/{org}",
