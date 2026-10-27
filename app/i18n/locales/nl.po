@@ -3023,3 +3023,38 @@ msgstr "Naar updates"
 
 msgid "admin.updates.banner.snooze"
 msgstr "Herinner me over 60 minuten"
+
+#. Context-sensitive help and the manual (ADR 0033).
+msgid "admin.nav.help"
+msgstr "Handleiding"
+
+msgid "help.title"
+msgstr "Handleiding"
+
+msgid "help.lead"
+msgstr "Uitleg per scherm: wat het doet en wat elk veld betekent."
+
+msgid "help.topics"
+msgstr "Schermen"
+
+msgid "help.no_topics"
+msgstr "Voor de schermen die u kunt openen is nog geen handleiding geschreven."
+
+msgid "help.page_lead"
+msgstr "Uitleg bij dit scherm en bij elk veld."
+
+msgid "help.other_language"
+msgstr "Deze uitleg is nog niet vertaald en staat hieronder in het Nederlands."
+
+msgid "help.page_link"
+msgstr "Help bij deze pagina"
+
+msgid "help.more"
+msgstr "Meer uitleg"
+
+#. Read by screen readers after "Meer uitleg"; {label} is the field label.
+msgid "help.more_for"
+msgstr "bij {label}"
+
+msgid "help.in_manual"
+msgstr "Lees verder in de handleiding"

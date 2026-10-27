@@ -213,6 +213,21 @@ the split time), path slugs, item ids and the `?weekday=` query parameter that p
 | Spoofing | A new group takes an admin path as its slug (`/admin/groups/new`) | Reserved slugs | `test_reserved_slugs_cannot_be_taken` |
 | Repudiation | An admin denies a change | Every change is audited in the same transaction, with the changed field names or `rule.add`-style keys (never values) | `test_settings_change_records_the_changed_fields`, `test_group_admin_manages_opening_hours_of_their_group` |
 
+## Flow: manual and context-sensitive help (ADR 0033)
+
+Admins only. `GET /admin/help` (topics of the screens the admin can open) and
+`GET /admin/help/{topic}`, both `dashboard.view`; the (i) disclosures and the "Help with this
+page" link are part of the documented screens. The text is the Markdown in `docs/manual/`,
+reviewed in PRs and shipped in the image. Inputs from outside: the `{topic}` path segment and
+the language (`?lang=`, cookie, header; already resolved to a known locale). No personal data.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure (path traversal) | `{topic}` reads another file (`../`, an encoded path, a trailing newline) | Only registered topics are served (`TOPICS`); a slug must fully match `[a-z0-9-]`; the locale is a known code | `tests/web/test_help.py::test_manual_falls_back_to_dutch_and_knows_missing_topics`, `tests/admin/test_help_routes.py::test_unknown_topic_is_not_found` |
+| Tampering (stored XSS) | Markup in the manual runs in the portal | Raw HTML is off in the renderer; the only markup added is a heading id from the marker pattern; the CSP has no scripts or inline styles | `tests/web/test_help.py::test_raw_html_in_the_manual_is_escaped`, `test_the_manual_needs_no_inline_styles` |
+| Elevation | The help page is used to reach a screen or data beyond the admin's rights | Help pages only show static text; the topic list follows the matrix; every screen still checks its own permission | `tests/admin/test_authorization_matrix.py` (`/admin/help` rows), `tests/admin/test_help_routes.py::test_topic_list_shows_only_screens_the_admin_can_open` |
+| Information disclosure | Citizens are sent to GitHub or the admin manual | Citizen pages explain themselves through `_()`; a test forbids links to GitHub, `/admin/help` or `docs/manual` in citizen templates | `tests/web/test_help.py::test_the_manual_never_links_citizens_away` |
+
 ## Flow: holiday calendars (ADR 0025)
 
 Admins only. `GET/POST /admin/holidays`, `/admin/holidays/{calendar}` with `/days`,
