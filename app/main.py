@@ -40,11 +40,13 @@ from app.domain.channel_service import ChannelSettingsService
 from app.domain.closure_service import ClosureService
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
+from app.domain.integration_check import IntegrationCheckService
 from app.domain.messaging_service import MessagingService
 from app.domain.organisations import OrganisationService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.services import BookingService
+from app.domain.simulation import SimulationService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import management_token_key, session_secret
@@ -155,6 +157,18 @@ def create_app(
         app.state.integrations = wired
         app.state.call_service = CallService(
             uow, app.state.integration_service, wired.video, wired.dispatcher, agent_start_label
+        )
+        app.state.integration_check_service = IntegrationCheckService(
+            uow, clock, app.state.admin_service, wired.checker
+        )
+        # The simulator plays platform events through our own webhooks: only when switched on
+        # (SIMULATOR_ENABLED), which the settings refuse in production.
+        app.state.simulation_service = SimulationService(
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.integration_service,
+            enabled=settings.simulator_enabled and settings.environment != "prod",
         )
         try:
             yield

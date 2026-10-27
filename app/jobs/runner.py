@@ -12,6 +12,11 @@ its channel fails at once as ``channel_not_configured`` (ADR 0022).
                        ─► compose (group texts first) ─► send ─► done
              ─► meeting / work item ─► app.jobs.calls
              failure ─► retry after 1, 5, 15 min ─► failed (refusals fail at once)
+
+Every outcome (sent, skipped with its reason, retry, failed with its error code) is also a
+system event in the audit log at the booking's group (ADR 0031), so admins can troubleshoot
+their own groups without reading the container logs. Old system events are pruned at most
+once an hour. Writing the event never decides the job's fate: if it fails, it is logged.
 """
 
 from collections.abc import Collection
@@ -21,6 +26,7 @@ from typing import Protocol
 import structlog
 
 from app.adapters.db.jobs import ClaimedJob
+from app.domain.audit import Outcome
 from app.domain.call_service import CallService
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
@@ -34,7 +40,8 @@ from app.domain.ports import (
     UnitOfWork,
     VideoProvider,
 )
-from app.jobs.calls import CALL_JOBS, CallJobs
+from app.domain.system_log import SystemLog
+from app.jobs.calls import CALL_JOBS, STALE, CallJobs
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
 from app.web.call_labels import agent_start_label
 
@@ -42,6 +49,12 @@ log = structlog.get_logger()
 
 BACKOFF = (timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=15))
 """Delay before attempt 2, 3 and 4; after that the job fails."""
+
+RETENTION = timedelta(days=90)
+"""Default age after which system events are pruned (``SYSTEM_EVENT_RETENTION_DAYS``)."""
+
+PRUNE_EVERY = timedelta(hours=1)
+"""How often the runner prunes old system events."""
 
 
 class JobQueue(Protocol):
@@ -70,6 +83,9 @@ class JobQueue(Protocol):
         ...
 
 
+NO_RECIPIENT = "no_recipient"
+"""Skip reason: the booking, its group, its contact details or (for SMS) its phone is gone."""
+
 MESSAGE_CHANNELS = frozenset({ChannelKind.EMAIL, ChannelKind.SMS})
 """Channels whose message jobs are claimed when a sender directory is available."""
 
@@ -86,6 +102,7 @@ class JobRunner:
         video: Webex meetings, or ``None`` when not configured.
         dispatcher: WxCC work items, or ``None`` when not configured.
         integration: Records call events; required when ``video`` is set.
+        retention: Age after which system events are pruned.
     """
 
     def __init__(
@@ -99,9 +116,13 @@ class JobRunner:
         video: VideoProvider | None = None,
         dispatcher: ContactCenterDispatcher | None = None,
         integration: IntegrationService | None = None,
+        retention: timedelta = RETENTION,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
+        self._system_log = SystemLog(uow, clock)
+        self._retention = retention
+        self._pruned_at: datetime | None = None
         self._uow = uow
         self._clock = clock
         self._senders = senders
@@ -120,10 +141,11 @@ class JobRunner:
     async def run_due(self) -> int:
         """Run every due job once; return how many were claimed."""
         now = self._clock.now()
+        await self._prune(now)
         jobs = await self._queue.claim_due(now, self._types, MESSAGE_CHANNELS)
         for job in jobs:
             try:
-                await self._run(job, now)
+                skipped = await self._run(job, now)
             except IntegrationError as exc:
                 await self._handle_failure(job, now, exc.code, retryable=exc.retryable)
             except DomainError as exc:  # e.g. integration_not_ready: retrying will not help
@@ -132,18 +154,19 @@ class JobRunner:
                 await self._handle_failure(job, now, type(exc).__name__)
             else:
                 await self._queue.complete(job.id)
+                outcome = Outcome.SUCCESS if skipped is None else Outcome.SKIPPED
+                await self._record(job, outcome, skipped or "")
         return len(jobs)
 
-    async def _run(self, job: ClaimedJob, now: datetime) -> None:
-        """Execute one job."""
+    async def _run(self, job: ClaimedJob, now: datetime) -> str | None:
+        """Execute one job; return why it was skipped, or ``None`` when it was done."""
         if job.type in CALL_JOBS and self._calls is not None:
-            await self._calls.run(job)
-            return
+            return await self._calls.run(job)
         if job.type is JobType.PURGE_PII:
             async with self._uow.locked() as tx:
                 await tx.purge_personal_data(job.booking_id, now)
             log.info("job.purged", job_id=job.id, booking_id=job.booking_id)
-            return
+            return None
         channel = job.channel or ChannelKind.EMAIL
         async with self._uow.read() as tx:
             booking = await tx.get_booking(job.booking_id)
@@ -161,11 +184,11 @@ class JobRunner:
             or contact is None
             or (channel is ChannelKind.SMS and contact.phone is None)
         ):
-            log.info("job.skipped", job_id=job.id, reason="no_recipient")
-            return
+            log.info("job.skipped", job_id=job.id, reason=NO_RECIPIENT)
+            return NO_RECIPIENT
         if is_stale(job.pinned_start, booking, job.type):
-            log.info("job.skipped", job_id=job.id, reason="stale")
-            return
+            log.info("job.skipped", job_id=job.id, reason=STALE)
+            return STALE
         if self._senders is None:  # pragma: no cover - message jobs are not claimed then
             raise RuntimeError("no sender directory")
         sender = await self._senders.sender(group.organisation_id, channel)
@@ -176,6 +199,7 @@ class JobRunner:
         )
         await sender.send(message)
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)
+        return None
 
     async def _handle_failure(
         self, job: ClaimedJob, now: datetime, error: str, *, retryable: bool = True
@@ -184,8 +208,39 @@ class JobRunner:
         if retryable and job.attempts <= len(BACKOFF):
             await self._queue.retry(job.id, now + BACKOFF[job.attempts - 1], error)
             log.warning("job.retry", job_id=job.id, attempt=job.attempts, error=error)
+            await self._record(job, Outcome.RETRY, error)
             return
         await self._queue.fail(job.id, error)
         log.error("job.failed", job_id=job.id, type=job.type.value, error=error)
+        await self._record(job, Outcome.FAILURE, error)
         if job.type in CALL_JOBS and self._calls is not None:
             await self._calls.record_failure(job, error)
+
+    async def _record(self, job: ClaimedJob, outcome: Outcome, reason: str) -> None:
+        """Write the job's outcome as a system event; a failure here is only logged."""
+        detail = f"attempt:{job.attempts}"
+        if job.channel is not None:
+            detail += f",channel:{job.channel.value}"
+        try:
+            await self._system_log.record(
+                f"job.{job.type.value}",
+                outcome,
+                booking_id=job.booking_id,
+                reason=reason,
+                detail=detail,
+            )
+        except Exception as exc:  # the job's own outcome is already settled
+            log.warning("system_log.failed", job_id=job.id, error=type(exc).__name__)
+
+    async def _prune(self, now: datetime) -> None:
+        """Delete expired system events, at most once per ``PRUNE_EVERY``."""
+        if self._pruned_at is not None and now - self._pruned_at < PRUNE_EVERY:
+            return
+        self._pruned_at = now
+        try:
+            removed = await self._system_log.prune(self._retention)
+        except Exception as exc:  # pruning is housekeeping; jobs come first
+            log.warning("system_log.prune_failed", error=type(exc).__name__)
+            return
+        if removed:
+            log.info("system_log.pruned", removed=removed)

@@ -43,6 +43,24 @@ class ParsedEvent:
     """Identifies one delivery's event for deduplication; empty when there is nothing to key on."""
 
 
+def event_body(payload: dict[str, Any]) -> bytes:
+    """Serialise an outgoing test or simulated event exactly as it is signed."""
+    return json.dumps(payload, separators=(",", ":")).encode()
+
+
+def sign_webex(body: bytes, secret: str) -> dict[str, str]:
+    """Return the headers Webex sends with ``body`` (self-test and simulator)."""
+    return {"X-Spark-Signature": hmac.new(secret.encode(), body, hashlib.sha1).hexdigest()}  # noqa: S324 - Webex's scheme
+
+
+def sign_wxcc(body: bytes, secret: str, stamp_ms: int) -> dict[str, str]:
+    """Return the headers WxCC sends with ``body``; ``stamp_ms`` is its ``comciscotimestamp``."""
+    return {
+        "X-WebexCC-Signature": hmac.new(secret.encode(), body, hashlib.sha256).hexdigest(),
+        "X-WebexCC-Timestamp": str(stamp_ms),
+    }
+
+
 def verify_webex(body: bytes, signature: str | None, secret: str) -> bool:
     """Return whether ``signature`` is the HMAC-SHA1 of ``body`` under ``secret``."""
     if not signature:

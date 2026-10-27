@@ -1261,3 +1261,162 @@ fieldset.card {
   gap: 0.75rem;
   align-items: flex-end;
 }
+
+/* Help (ADR 0033): the page link, the (i) disclosure under a field and the manual itself. */
+.page-help {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 0.5rem;
+}
+
+.page-help a,
+.more summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 24px;
+  color: var(--adm-accent-strong);
+}
+
+.more {
+  margin: 0.25rem 0 0.5rem;
+  max-width: 40rem;
+}
+
+.more summary {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.more__body {
+  margin-top: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--adm-accent);
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-surface-muted);
+}
+
+.more__body > :first-child {
+  margin-top: 0;
+}
+
+.more__body > :last-child {
+  margin-bottom: 0;
+}
+
+.manual {
+  max-width: var(--adm-content-width);
+}
+
+.manual h2 {
+  margin-top: 2rem;
+}
+
+.manual h3 {
+  margin-top: 1.5rem;
+  scroll-margin-top: 1rem;
+}
+
+.manual h3:target {
+  outline: 3px solid var(--adm-focus);
+  outline-offset: 0.25rem;
+}
+
+.manual table {
+  border-collapse: collapse;
+}
+
+.manual th,
+.manual td {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--adm-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.help-topics {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+/* --- "Koppeling controleren": the latest check of a group --------------------------------- */
+.check-summary {
+  margin: 0 0 1rem;
+}
+
+.check-area {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+.check-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-list__item {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--adm-border);
+}
+
+.check-list__item .chip {
+  justify-self: start;
+}
+
+@media (max-width: 40rem) {
+  .check-list__item {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+}
+
+/* --- Simulator (not in production): clearly marked as a test tool ------------------------- */
+.card--test {
+  border-style: dashed;
+  border-color: var(--adm-warning);
+  background: var(--adm-warning-soft);
+}
+
+.simulator-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* --- Environment bar (dev/test only): unmistakable, text not colour alone ------------------ */
+.env-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 2px solid var(--adm-warning);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--adm-warning-soft) 0 12px,
+    #fbe7c2 12px 24px
+  );
+  color: var(--adm-text);
+  font-size: 0.95rem;
+}
+
+.env-bar strong {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.env-bar__tag {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--adm-warning);
+  border-radius: 999px;
+  background: var(--adm-surface);
+  font-size: 0.85rem;
+  font-weight: 600;
+}

@@ -37,6 +37,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, can_function
+from app.admin.check_routes import check_view
 from app.admin.forms import (
     Field,
     FormData,
@@ -46,7 +47,7 @@ from app.admin.forms import (
     read_form,
     redirect_done,
 )
-from app.admin.pages import Locale, SameOrigin, page
+from app.admin.pages import Locale, SameOrigin, page, with_manual
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
 from app.domain.errors import DomainError, ErrorCode
@@ -545,10 +546,10 @@ def _settings_fields(
     return planning, integrations
 
 
-def _settings_response(
+async def _settings_response(
     request: Request, locale: RequestLocale, context: AdminContext, form: FormData, status: int
 ) -> HTMLResponse:
-    """Render the settings form."""
+    """Render the settings form with the latest "Koppeling controleren" result."""
     current = settings_of(context.group.group)
     planning, integrations = _settings_fields(form, current, locale.gettext)
     return group_page(
@@ -557,9 +558,10 @@ def _settings_response(
         context,
         "admin/group_settings.html",
         {
-            "fields": planning,
-            "integration_fields": integrations,
+            "fields": with_manual(request, locale, planning),
+            "integration_fields": with_manual(request, locale, integrations),
             "errors": form.errors,
+            "check": await check_view(request, locale, context),
         },
         status,
     )
@@ -576,7 +578,7 @@ async def settings(
     ],
 ) -> HTMLResponse:
     """Show the group's settings form."""
-    return _settings_response(request, locale, context, FormData({}, locale.gettext), 200)
+    return await _settings_response(request, locale, context, FormData({}, locale.gettext), 200)
 
 
 @router.post("/groups/{slug}/settings", response_class=HTMLResponse)
@@ -618,7 +620,7 @@ async def save_settings(
             return redirect_done(
                 f"/admin/groups/{slug}/settings", "saved" if changed else "unchanged"
             )
-    return _settings_response(request, locale, context, form, 422)
+    return await _settings_response(request, locale, context, form, 422)
 
 
 # --- staffing blocks ------------------------------------------------------------------------
