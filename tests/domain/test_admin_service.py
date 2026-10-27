@@ -144,6 +144,17 @@ async def test_login_is_recorded_per_organisation_and_group_in_scope(
     assert {e.reason for e in uow.state.audit} == {"group_admin,org_admin"}
 
 
+async def test_auditor_login_is_recorded_in_their_organisation(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    # ADR 0037: the organisation admins and auditors of "demo" can see who checked the log.
+    auditor = Principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
+
+    await service.record_login(auditor)
+
+    assert _contexts(uow) == [("a-1", "admin.login", "demo", None)]
+
+
 async def test_claims_without_the_matching_role_give_no_context(
     service: AdminService, uow: InMemoryUnitOfWork
 ) -> None:

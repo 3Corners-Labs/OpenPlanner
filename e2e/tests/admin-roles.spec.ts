@@ -69,6 +69,32 @@ test('organisation admin sees the logins of their own admins, by name', async ({
   await expectForbidden(page, '/admin/groups/andere-team');
 });
 
+test('auditor reads the matrix and the own log, but no bookings and no changes', async ({ page }) => {
+  // ADR 0037: compliance and privacy, read-only, never personal data.
+  await loginAs(page, 'auditor');
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Overzicht');
+  await expect(page.getByRole('link', { name: 'Demo: videogesprek', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Andere: team', exact: true })).toHaveCount(0);
+
+  await adminMenu(page).getByRole('link', { name: 'Rechtenmatrix' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Rechtenmatrix');
+  await expect(page.getByRole('columnheader', { name: 'Compliance en privacy (alleen lezen)' })).toBeVisible();
+  await expect(page.getByText('Alleen superuser').first()).toBeVisible();
+  await expect(page.getByText('Persoonsgegevens').first()).toBeVisible();
+  await expectNoAxeViolations(page);
+
+  await adminMenu(page).getByRole('link', { name: 'Auditlog' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Auditlog');
+  await expect(page.getByRole('row').filter({ hasText: 'andere-team' })).toHaveCount(0);
+  await expectNoAxeViolations(page);
+
+  await expectForbidden(page, '/admin/groups/demo/agenda');
+  await expectForbidden(page, '/admin/groups/demo/settings');
+  await expectForbidden(page, '/admin/groups/andere-team');
+  await logout(page);
+});
+
 test("an outsider's refusal shows up in the superuser's audit log", async ({ page }) => {
   // Deep link: after login the portal returns to the requested page, which is refused.
   await loginAs(page, 'outsider', '/admin/groups/demo');

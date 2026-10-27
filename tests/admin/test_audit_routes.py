@@ -6,7 +6,7 @@ import pytest
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
 from tests.support.domain import NOW
 
 GLOBAL_FAILURE = AuditEvent(
@@ -67,6 +67,8 @@ async def logged(site: Site) -> Site:
         (ORG_ADMIN, {"org_marker", "smtp_unreachable"}),
         (GROUP_ADMIN, {"smtp_unreachable"}),
         (OUTSIDER, {"other_marker"}),
+        # ADR 0037: the auditor reads exactly what the organisation admin reads.
+        (AUDITOR, {"org_marker", "smtp_unreachable"}),
     ],
 )
 async def test_each_role_sees_its_own_level_and_nothing_above_or_beside(
@@ -89,6 +91,15 @@ async def test_a_system_event_explains_itself(logged: Site) -> None:
     assert "poging 2, sms" in text
     assert "<td>Systeem</td>" in text
     assert 'href="/admin/groups/demo/bookings/7"' in text
+
+
+async def test_the_auditor_sees_the_booking_id_but_no_link_to_the_booking(logged: Site) -> None:
+    # ADR 0037 B6: the timeline needs bookings.view, which shows personal data.
+    await logged.login_as(AUDITOR)
+    text = (await logged.client.get("/admin/audit")).text
+
+    assert "smtp_unreachable" in text
+    assert 'href="/admin/groups/demo/bookings/7"' not in text
 
 
 async def test_a_denial_shows_its_reason(site: Site) -> None:

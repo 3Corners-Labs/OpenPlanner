@@ -24,10 +24,11 @@ from app.domain.authorization import (
     Level,
     Permission,
     Principal,
+    Reach,
     Reason,
-    Role,
     Target,
     decide,
+    reaches,
     scope_for,
 )
 from app.domain.errors import DomainError, ErrorCode
@@ -154,9 +155,10 @@ class AdminService:
     ) -> None:
         """Write ``action`` once per organisation/group context of ``principal``."""
         contexts: list[tuple[str | None, str | None]] = []
-        if Role.ORG_ADMIN in principal.roles:
+        reach = reaches(principal)
+        if Reach.ORGANISATIONS in reach:
             contexts += [(organisation, None) for organisation in sorted(principal.organisations)]
-        if Role.GROUP_ADMIN in principal.roles:
+        if Reach.GROUPS in reach:
             for slug in sorted(principal.groups):
                 summary = await tx.get_group_summary(slug)
                 if summary is not None:  # a claim for a group we do not know grants nothing

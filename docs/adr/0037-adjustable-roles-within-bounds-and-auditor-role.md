@@ -1,8 +1,8 @@
 # 0037. Adjustable roles within fixed bounds, and a read-only auditor role
 
-Status: proposed (2026-10-27), requested by the product owner. Amends ADR 0014 (where role
+Status: accepted (2026-10-27), requested by the product owner. Amends ADR 0014 (where role
 definitions live, how a role's reach is derived) and ADR 0031 (who holds `audit.view`). The
-decision points at the end are open until the product owner settles them.
+product owner settled decision points B1 to B8 on 2026-10-27 by taking every recommendation.
 
 ## Context
 
@@ -132,15 +132,17 @@ log is `org_admin`, which also grants write access and `bookings.view` with pers
   auditor, and by ADR 0034 (audit events to an external log platform), not by a technical
   four-eyes check (see B5).
 
-## Decision points (open)
+## Decision points (settled 2026-10-27)
 
-| # | Question | Options | Recommendation |
-|---|---|---|---|
-| B1 | May the superuser change the built-in roles, or only make custom ones? | (a) only custom roles; built-ins read-only. (b) delegable permissions of `org_admin` and `group_admin` can be switched too. | (a). The built-ins stay a known, tested baseline. Changing a built-in silently changes every client's meaning of "org admin". |
-| B2 | Are custom roles defined once for the whole installation, or per organisation? | (a) one catalogue for the installation. (b) per organisation, still only by the superuser. | (a) for now. With several organisations on one installation, (b) can follow without changing the rules. |
-| B3 | Is the locked list in item 1 complete? | Add or remove permissions. | As listed. Also consider `branding.manage` if branding stays a contractual matter (O5). |
-| B4 | Does the auditor also exist across all organisations (for the party that hosts several)? | (a) own organisation only. (b) an extra built-in `platform_auditor` with `everything` reach for the hosting party. | (a) until O7 (hosting) says one party operates for several organisations; then (b). |
-| B5 | Do rights changes need a second superuser's approval (four eyes)? | (a) no; audit history and external log are the control. (b) a change waits until a second superuser approves. | (a). Most installations will have one or two superusers; (b) would block them. Revisit after the pentest (O10). |
-| B6 | Should the auditor see a booking's timeline without personal data? | (a) no, ids only. (b) a PII-free timeline view (`bookings.timeline_view`). | (a) now; (b) when an auditor asks for it, as a small follow-up. |
-| B7 | Name of the role in the portal. | "Compliance en privacy", "Auditor", "Toezicht". | "Compliance en privacy (alleen lezen)": it says who it is for and what it cannot do. |
-| B8 | Order of delivery. | (a) auditor role and page text first, custom roles second. (b) everything in one PR. | (a). The auditor is small and independent; the role editor needs a migration, a new screen and the manual. |
+The product owner took the recommendation on every point.
+
+| # | Question | Decided |
+|---|---|---|
+| B1 | May the superuser change the built-in roles, or only make custom ones? | Only custom roles. Built-in roles stay read-only templates: a known, tested baseline whose meaning is the same for every client. |
+| B2 | Are custom roles defined once for the whole installation, or per organisation? | One catalogue for the installation, maintained by the superuser. Per organisation can follow later without changing the rules. |
+| B3 | Is the locked list in item 1 complete? | Yes, as listed. `branding.manage` stays superuser-only through the built-in roles and is reconsidered with O5. |
+| B4 | Does the auditor also exist across all organisations? | No: own organisation only. A `platform_auditor` with `everything` reach follows only if O7 (hosting) says one party operates for several organisations. |
+| B5 | Do rights changes need a second superuser's approval (four eyes)? | No. The audit history and the external log platform (ADR 0034) are the control. Revisit after the pentest (O10). |
+| B6 | Should the auditor see a booking's timeline without personal data? | No, ids only for now. A PII-free timeline (`bookings.timeline_view`) is a later follow-up. |
+| B7 | Name of the role in the portal. | "Compliance en privacy (alleen lezen)" / "Compliance and privacy (read-only)". |
+| B8 | Order of delivery. | In steps, each its own PR: (1) the auditor role, reach per role, the `locked` and `pii` markers and the matrix page text; (2) `retention.view` and its page; (3) custom roles: migration, role editor, change history, manual. |
