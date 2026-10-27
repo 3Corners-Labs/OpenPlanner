@@ -28,6 +28,8 @@ COPY --from=build /srv/.venv /srv/.venv
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY app ./app
+# The manual is rendered in the portal (ADR 0033).
+COPY docs/manual ./docs/manual
 # The data volume (SQLite database, worker heartbeat) is the only writable path.
 RUN mkdir /srv/data && chown app:app /srv/data
 # Summer and winter time come from the pinned `tzdata` package (uv.lock, Renovate), not from
