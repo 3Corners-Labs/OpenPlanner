@@ -1,23 +1,18 @@
 """IntegrationCheckService: the "Koppeling controleren" button per group."""
 
-
 import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Principal
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration_check import IntegrationCheckService
-from app.domain.scheduling import Organisation
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeChecker
-from tests.fakes.persistence import InMemoryUnitOfWork, State
+from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, two_organisations
 from tests.support.domain import NOW, make_group
-
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
-GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
-OUTSIDER = Principal("x-1", "X", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
 
 OK = Finding(CheckArea.WEBEX, "webex.host_ok", CheckStatus.OK, (("host", "h@example.nl"),))
 WARN = Finding(CheckArea.WXCC, "wxcc.screenpop.missing", CheckStatus.WARN)
@@ -26,15 +21,8 @@ FAIL = Finding(CheckArea.WXCC, "wxcc.schema.refused", CheckStatus.FAIL, (("missi
 
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
-    state = State()
-    state.organisation_slugs = {1: "demo", 2: "andere"}
-    state.organisations = {
-        1: Organisation(1, "Demo-gemeente", "demo"),
-        2: Organisation(2, "Andere gemeente", "andere"),
-    }
-    state.groups[1] = make_group(id=1, organisation_id=1, slug="demo", name="Demo")
-    state.groups[2] = make_group(id=2, organisation_id=1, slug="demo-2", name="Demo 2")
-    state.groups[3] = make_group(id=3, organisation_id=2, slug="andere-team", name="Andere")
+    state = two_organisations()
+    state.groups[3] = make_group(id=3, organisation_id=1, slug="demo-2", name="Demo 2")
     return InMemoryUnitOfWork(state)
 
 
