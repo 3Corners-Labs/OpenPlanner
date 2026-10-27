@@ -1311,3 +1311,34 @@ fieldset.card {
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
+
+/* --- Environment bar (dev/test only): unmistakable, text not colour alone ------------------ */
+.env-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 2px solid var(--adm-warning);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--adm-warning-soft) 0 12px,
+    #fbe7c2 12px 24px
+  );
+  color: var(--adm-text);
+  font-size: 0.95rem;
+}
+
+.env-bar strong {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.env-bar__tag {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--adm-warning);
+  border-radius: 999px;
+  background: var(--adm-surface);
+  font-size: 0.85rem;
+  font-weight: 600;
+}

@@ -2,6 +2,7 @@
 {% extends "admin/_shell.html" %}
 {% from "admin/_icons.html" import icon %}
 {% block page %}
+{% include "admin/_environment.html" %}
 <div class="admin-shell{% if not nav %} admin-shell--no-nav{% endif %}">
   <header class="admin-topbar">
     {#- Without a menu (no role) the overview would only loop back to the refusal. -#}

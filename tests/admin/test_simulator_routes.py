@@ -24,6 +24,7 @@ def _secrets(settings: Settings, admin_db: str) -> Settings:
     return settings.model_copy(
         update={
             "database_url": admin_db,
+            "simulator_enabled": True,
             "webex_webhook_secret": SecretStr("webex-test-secret"),
             "wxcc_webhook_secret": SecretStr("wxcc-test-secret"),
         }
@@ -130,16 +131,17 @@ async def test_group_admins_see_no_simulator(booked: tuple[Site, int]) -> None:
 
     page = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
 
-    assert "Simulator" not in page
+    assert "Simulator (alleen in test)" not in page
+    assert "Simulator staat aan" in page  # the bar says it is switched on
 
 
-async def test_in_production_there_is_no_simulator(settings: Settings, admin_db: str) -> None:
-    # Production refuses to start with development defaults, so switch only the service off
-    # the way the composition root does when ENVIRONMENT=prod.
-    async for site, booking_id in _site(_secrets(settings, admin_db)):
-        site.client._transport.app.state.simulation_service.enabled = False  # type: ignore[attr-defined]  # noqa: SLF001
+async def test_without_the_switch_there_is_no_simulator(settings: Settings, admin_db: str) -> None:
+    # SIMULATOR_ENABLED off (the default, and the only value production accepts).
+    switched_off = _secrets(settings, admin_db).model_copy(update={"simulator_enabled": False})
+    async for site, booking_id in _site(switched_off):
         await site.login_as(ORG_ADMIN)
         page = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
         response = await _play(site, booking_id, "prepare")
-        assert "Simulator" not in page
+        assert "Simulator (alleen in test)" not in page
+        assert "Simulator staat aan" not in page
         assert response.status_code == 403
