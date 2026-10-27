@@ -54,6 +54,7 @@ DONE_MESSAGES: dict[str, str] = {
     "removed": "admin.done.removed",
     "logo_saved": "admin.done.logo_saved",
     "logo_removed": "admin.done.logo_removed",
+    "checked": "admin.done.checked",
     "closure_started": "admin.done.closure_started",
     "closure_updated": "admin.done.closure_updated",
     "closure_lifted": "admin.done.closure_lifted",
@@ -413,15 +414,19 @@ def safe_next(value: str | None) -> str:
     return "/admin/"
 
 
-def redirect_done(url: str, done: str, count: int | None = None) -> RedirectResponse:
+def redirect_done(
+    url: str, done: str, count: int | None = None, *, anchor: str = ""
+) -> RedirectResponse:
     """Answer a successful change with a redirect to ``url`` and its confirmation.
 
     ``url`` may carry a query of its own (``?year=2027``); ``done`` (and ``count``, for
-    confirmations that state a number) are appended to it.
+    confirmations that state a number) are appended to it. ``anchor`` scrolls the page to
+    the part the confirmation is about.
     """
     separator = "&" if "?" in url else "?"
     suffix = f"&count={count}" if count is not None else ""
-    return RedirectResponse(f"{url}{separator}done={done}{suffix}", status_code=303)
+    fragment = f"#{anchor}" if anchor else ""
+    return RedirectResponse(f"{url}{separator}done={done}{suffix}{fragment}", status_code=303)
 
 
 async def read_form(request: Request, locale: RequestLocale) -> FormData:

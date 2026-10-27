@@ -196,6 +196,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/settings": statuses(422, 422, 403, 403, 403),
         "/admin/groups/andere-team/settings": statuses(422, 403, 403, 422, 403),
     },
+    # "Koppeling controleren": whoever edits the group's settings (incl. routing) may check them.
+    "POST /admin/groups/{slug}/check": {
+        "/admin/groups/demo/check": statuses(303, 303, 403, 403, 403),
+        "/admin/groups/andere-team/check": statuses(303, 403, 403, 303, 403),
+    },
     # Staffing blocks and staffing exceptions: group admins too, for their own groups.
     "GET /admin/groups/{slug}/staffing": {
         "/admin/groups/demo/staffing": statuses(200, 200, 200, 403, 403),

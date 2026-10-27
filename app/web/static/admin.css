@@ -1339,3 +1339,39 @@ fieldset.card {
   margin: 0;
   padding-left: 1.25rem;
 }
+
+/* --- "Koppeling controleren": the latest check of a group --------------------------------- */
+.check-summary {
+  margin: 0 0 1rem;
+}
+
+.check-area {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+.check-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-list__item {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--adm-border);
+}
+
+.check-list__item .chip {
+  justify-self: start;
+}
+
+@media (max-width: 40rem) {
+  .check-list__item {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+}
