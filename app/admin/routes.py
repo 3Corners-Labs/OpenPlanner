@@ -25,6 +25,7 @@ import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.integrations import Integrations
 from app.admin import (
     api_routes,
@@ -49,6 +50,7 @@ from app.admin.authz import (
     session_principal,
 )
 from app.admin.forms import safe_next
+from app.admin.integration_views import check_view
 from app.admin.pages import Locale, SameOrigin, admin_moment, templates
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
@@ -292,7 +294,11 @@ async def integrations(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.INTEGRATIONS_MANAGE))],
 ) -> HTMLResponse:
-    """Show whether Webex and WxCC are connected, token expiry and the webhook URLs."""
+    """Show whether Webex and WxCC are connected, token expiry, the webhook URLs and checks.
+
+    The last ``webhooks-list`` and ``webhooks-health`` results are shown read-only; cleaning
+    up registrations stays on the command line.
+    """
     settings = request.app.state.settings
     wired: Integrations = request.app.state.integrations
     health = await wired.tokens.health() if wired.tokens else None
@@ -318,12 +324,19 @@ async def integrations(
         await service.overview(context.principal, organisation.slug)
         for organisation in await service.organisations(context.principal)
     ]
+    reports = ReportStore(request.app.state.engine)
+    checks = check_view(
+        await reports.get(REGISTRATIONS_REPORT),
+        await reports.get(HEALTH_REPORT),
+        locale.gettext,
+        lambda at: admin_moment(request, locale, at),
+    )
     return _page(
         request,
         locale,
         "admin/integrations.html",
         context.principal,
-        {"view": view, "groups": groups, "channels": channels},
+        {"view": view, "groups": groups, "channels": channels, "checks": checks},
     )
 
 

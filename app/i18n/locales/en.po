@@ -3023,3 +3023,146 @@ msgstr "Go to updates"
 
 msgid "admin.updates.banner.snooze"
 msgstr "Remind me in 60 minutes"
+
+#. Webhook registrations and delivery self-test (integrations page).
+
+msgid "admin.integrations.registrations"
+msgstr "Registrations at Webex and WxCC"
+
+msgid "admin.integrations.registrations_lead"
+msgstr "Every webhook and subscription that points at OpenPlanner, with its state at the last check. Refresh with python -m app.cli webhooks-list; clean up stale registrations with python -m app.cli webhooks-reset (runbook, section 6)."
+
+msgid "admin.integrations.checked_at"
+msgstr "Last check: {date}, compared with {base}."
+
+msgid "admin.integrations.not_checked"
+msgstr "Not checked yet. Run {command} in the web container."
+
+msgid "admin.integrations.none_found"
+msgstr "No registrations found."
+
+msgid "admin.integrations.missing"
+msgstr "Missing"
+
+msgid "admin.integrations.listing_failed"
+msgstr "The {platform} listing could not be read ({code})."
+
+msgid "admin.integrations.col.state"
+msgstr "State"
+
+msgid "admin.integrations.col.platform"
+msgstr "Platform"
+
+msgid "admin.integrations.col.event"
+msgstr "Event"
+
+msgid "admin.integrations.col.filter"
+msgstr "Filter"
+
+msgid "admin.integrations.col.status"
+msgstr "Status"
+
+msgid "admin.integrations.col.secret"
+msgstr "Secret"
+
+msgid "admin.integrations.col.target"
+msgstr "Target"
+
+msgid "admin.integrations.state.current"
+msgstr "Current"
+
+msgid "admin.integrations.state.stale"
+msgstr "Stale"
+
+msgid "admin.integrations.state.foreign"
+msgstr "Not OpenPlanner's"
+
+msgid "admin.integrations.reason.foreign"
+msgstr "Belongs to another application and is left alone."
+
+msgid "admin.integrations.reason.other_target"
+msgstr "Points at another address (old tunnel or base URL)."
+
+msgid "admin.integrations.reason.unfiltered"
+msgstr "No hostEmail filter: reports every meeting of the organisation."
+
+msgid "admin.integrations.reason.unknown_host"
+msgstr "Host account that no group uses."
+
+msgid "admin.integrations.reason.unused_event"
+msgstr "Event OpenPlanner does not use."
+
+msgid "admin.integrations.reason.inactive"
+msgstr "Inactive: the platform stopped delivering."
+
+msgid "admin.integrations.reason.duplicate"
+msgstr "Duplicate: another registration does the same."
+
+msgid "admin.integrations.secret.yes"
+msgstr "Set"
+
+msgid "admin.integrations.secret.no"
+msgstr "Not set"
+
+msgid "admin.integrations.secret.unknown"
+msgstr "Unknown"
+
+msgid "admin.integrations.delivery"
+msgstr "Delivery self-test"
+
+msgid "admin.integrations.delivery_lead"
+msgstr "Signed test events through the webhook address to OpenPlanner itself, with unknown ids so no booking changes. Refresh with python -m app.cli webhooks-health."
+
+msgid "admin.integrations.no_secrets"
+msgstr "No webhook secret is configured; nothing was tested."
+
+msgid "admin.integrations.col.endpoint"
+msgstr "Endpoint"
+
+msgid "admin.integrations.col.test"
+msgstr "Test"
+
+msgid "admin.integrations.col.http"
+msgstr "HTTP status"
+
+msgid "admin.integrations.col.result"
+msgstr "Result"
+
+msgid "admin.integrations.delivery.signed"
+msgstr "Correctly signed event"
+
+msgid "admin.integrations.delivery.unsigned"
+msgstr "Event with a wrong signature"
+
+msgid "admin.integrations.ok"
+msgstr "OK"
+
+msgid "admin.integrations.failed"
+msgstr "Failed"
+
+msgid "admin.integrations.outcome.delivered"
+msgstr "Delivered and verified."
+
+msgid "admin.integrations.outcome.refused"
+msgstr "Refused, as it should be."
+
+msgid "admin.integrations.outcome.signature_refused"
+msgstr "Signature refused: the secret differs from the web container's."
+
+msgid "admin.integrations.outcome.unsigned_accepted"
+msgstr "Accepted although the signature is wrong: verification is off."
+
+msgid "admin.integrations.outcome.not_found"
+msgstr "Not found: no secret configured, or the webhook address does not reach OpenPlanner."
+
+msgid "admin.integrations.outcome.rate_limited"
+msgstr "Too many requests; try again in a minute."
+
+msgid "admin.integrations.outcome.proxy_error"
+msgstr "Proxy or tunnel error: is the tunnel still running?"
+
+msgid "admin.integrations.outcome.unreachable"
+msgstr "Unreachable: check DNS and the tunnel."
+
+msgid "admin.integrations.outcome.unexpected"
+msgstr "Unexpected status: check what answers on the webhook address."
