@@ -39,6 +39,15 @@ ADR 0013.
 pytest, pytest-asyncio, pytest-cov, ruff, mypy, import-linter, bandit, pip-audit, pip-licenses,
 mutmut: all active and standard in their field. They are never shipped in the image.
 
+## Documentation tooling (local only)
+
+| Package | Purpose | License | Maintenance | Note |
+|---|---|---|---|---|
+| python-docx | Word version of the architecture plates (`make diagrams`, `scripts/diagrams/`) | MIT | active (1.2.0, 2025) | De facto library for .docx. Added per run with `uv run --with`; not in `uv.lock`, never in CI or the image |
+
+`make diagrams` also calls the draw.io desktop app (Apache-2.0) and Chrome on the developer's
+machine; neither is a dependency of the project.
+
 ## Browser tests (npm, CI only)
 
 @playwright/test, @axe-core/playwright (MPL-2.0, required by CLAUDE.md), lighthouse,

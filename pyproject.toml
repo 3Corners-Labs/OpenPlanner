@@ -73,6 +73,11 @@ strict = true
 plugins = ["pydantic.mypy"]
 files = ["app", "scripts"]
 
+# python-docx is a documentation tool, added only by `make diagrams` (scripts/diagrams).
+[[tool.mypy.overrides]]
+module = ["docx", "docx.*"]
+ignore_missing_imports = true
+
 # --- pytest / coverage ------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]

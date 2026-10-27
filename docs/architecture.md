@@ -7,6 +7,11 @@ the stakeholder design is in `docs/HANDOVER.md` (Dutch).
 Status: October 2026, after work package 3 (first demo slice). Parts drawn with a **dashed
 border** are designed but not built yet; the roadmap at the end says when.
 
+The same architecture as shareable plates (building blocks, components per layer, integrations
+and adapters) plus a building-block register is in `docs/diagrams/`: draw.io, PNG, PDF and
+Word, generated from `scripts/diagrams/content.py` with `make diagrams`. Update that content in
+the same PR as a change it shows.
+
 ## 1. Purpose and scope
 
 Citizens book a video call with a team of a government contact center (a *group*, one
