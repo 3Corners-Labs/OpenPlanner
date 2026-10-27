@@ -1297,3 +1297,17 @@ fieldset.card {
     gap: 0.25rem;
   }
 }
+
+/* --- Simulator (not in production): clearly marked as a test tool ------------------------- */
+.card--test {
+  border-style: dashed;
+  border-color: var(--adm-warning);
+  background: var(--adm-warning-soft);
+}
+
+.simulator-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

@@ -471,6 +471,47 @@ A passing self-test proves that the address, the tunnel and the secrets work. It
 prove that Webex or WxCC send events. For that, check `webhooks-list` (all `CURRENT`, nothing
 `MISSING`, status `active`) and a test meeting's timeline (section 4, tunnel step 4).
 
+### 9. Checking one group from the admin portal ("Koppeling controleren")
+
+Each group's **Instellingen** page has a card **Koppeling controleren**. Whoever may edit the
+group (`group.edit`: the organisation admin, the superuser) can press **Nu controleren**. It
+runs, read-only, what sections 6–8 check, but for that one group:
+
+- **Webex:** the host account exists and the Service App may schedule for it.
+- **Webex Contact Center:** region, channel, asset, asset schema, entry point, flow
+  (`openplannerGroup` and a branch for the routing value), queue, Screen Pop. These are the
+  same rules as `wxcc-config-check`.
+- **Webhooks:** `WEBHOOK_BASE_URL` is https; this host's webhooks and the WxCC subscription
+  exist on the current address; a signed self-test event arrives.
+
+Each line says OK, Waarschuwing, Fout or Overgeslagen, and what to change. The latest result
+stays on the page with its time, and every run is audited as `integration.check`. Save
+changes first: the check uses the saved settings. It is limited to 6 runs per minute.
+
+### 10. Trying the flows without agents (simulator, not in production)
+
+Outside production (`ENVIRONMENT=dev` or `test`), an admin booking page (Agenda → a booking)
+has a card **Simulator (alleen in test)**. Whoever may edit the group can:
+
+1. **Nep-meeting en -taak aanmaken** for a booking without them. This sets stand-in ids
+   (`simulated-meeting-<id>`, `simulated-task-<id>`, a join link on `.invalid`) and records
+   "meeting created" and "task created" with detail `simulated`. Real ids are never replaced.
+2. Play events in the order of a call: agent accepts the task, agent joins, citizen joins,
+   participant leaves, meeting started or ended, task not picked up, task ended.
+
+Each event is signed with this installation's `WEBEX_WEBHOOK_SECRET` or
+`WXCC_WEBHOOK_SECRET` and posted in-process to `/webhooks/webex` or `/webhooks/wxcc`. It takes
+the real path (signature, time window, parsing, deduplication, timeline, call status) without
+a tunnel. Without a secret the endpoint does not exist and the page says so. Every action is
+audited (`simulator.prepare`, `simulator.event`). In production the card and the route are off. An
+acceptance environment where real citizens book must run with `ENVIRONMENT=prod`: with `test`
+the simulator is available there too.
+
+A quick end-to-end try without Webex: create a group with opening hours and "Direct gesprek
+starten", start a call as a citizen (`/g/<slug>/direct`), open the booking in the agenda,
+create the stand-ins, and play "agent accepts" and "agent joins". The citizen's waiting page
+then shows the matching status.
+
 ## Mail
 
 The worker sends mail when `SMTP_HOST` is set (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`,
