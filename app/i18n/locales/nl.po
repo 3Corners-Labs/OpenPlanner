@@ -516,7 +516,7 @@ msgid "admin.audit.title"
 msgstr "Auditlog"
 
 msgid "admin.audit.intro"
-msgstr "De laatste inlogpogingen, geweigerde acties en wijzigingen binnen uw organisaties."
+msgstr "Inlogpogingen, geweigerde acties, wijzigingen en wat het systeem zelf deed (berichten, videogesprekken, wachtrijtaken), alleen voor uw eigen organisatie of groepen."
 
 msgid "admin.audit.when"
 msgstr "Wanneer"
@@ -2740,6 +2740,113 @@ msgstr "De mailserver weigerde het bericht (code {status})."
 msgid "admin.channels.test_failed.other"
 msgstr "Het versturen is mislukt door een onverwachte fout van de mailserver. Probeer het later opnieuw."
 
+msgid "admin.audit.filter"
+msgstr "Filter"
+
+msgid "admin.audit.source"
+msgstr "Soort"
+
+msgid "admin.audit.source.admin"
+msgstr "Acties van beheerders"
+
+msgid "admin.audit.source.system"
+msgstr "Systeemgebeurtenissen"
+
+msgid "admin.audit.all"
+msgstr "Alle"
+
+msgid "admin.audit.group"
+msgstr "Groep"
+
+msgid "admin.audit.booking"
+msgstr "Afspraaknummer"
+
+msgid "admin.audit.problems"
+msgstr "Alleen problemen"
+
+msgid "admin.audit.apply"
+msgstr "Toepassen"
+
+msgid "admin.audit.clear"
+msgstr "Filter wissen"
+
+msgid "admin.audit.booking_link"
+msgstr "Afspraak {id}"
+
+msgid "admin.audit.detail.channel_email"
+msgstr "e-mail"
+
+msgid "admin.audit.detail.channel_sms"
+msgstr "sms"
+
+msgid "admin.audit.detail.attempt"
+msgstr "poging {count}"
+
+msgid "admin.audit.reason.no_role"
+msgstr "Geen rol in het beheerportaal."
+
+msgid "admin.audit.reason.not_permitted"
+msgstr "De rol geeft dit recht niet."
+
+msgid "admin.audit.reason.out_of_scope"
+msgstr "Buiten de eigen organisatie of groep."
+
+msgid "admin.audit.reason.stale"
+msgstr "Niet meer nodig: de afspraak is verplaatst of geannuleerd."
+
+msgid "admin.audit.reason.no_recipient"
+msgstr "Geen ontvanger: contactgegevens ontbreken of zijn al verwijderd."
+
+msgid "admin.audit.reason.no_booking"
+msgstr "De afspraak bestaat niet meer."
+
+msgid "admin.audit.reason.channel_not_configured"
+msgstr "Dit kanaal is voor de organisatie niet ingesteld."
+
+msgid "audit.actor.system"
+msgstr "Systeem"
+
+msgid "audit.outcome.retry"
+msgstr "Wordt opnieuw geprobeerd"
+
+msgid "audit.outcome.skipped"
+msgstr "Overgeslagen"
+
+msgid "audit.job.create_video_room"
+msgstr "Videogesprek aanmaken"
+
+msgid "audit.job.delete_video_room"
+msgstr "Videogesprek verwijderen"
+
+msgid "audit.job.send_confirmation"
+msgstr "Bevestiging versturen"
+
+msgid "audit.job.send_change"
+msgstr "Wijziging versturen"
+
+msgid "audit.job.send_reminder"
+msgstr "Herinnering versturen"
+
+msgid "audit.job.send_cancellation"
+msgstr "Annulering versturen"
+
+msgid "audit.job.dispatch_wxcc_task"
+msgstr "Taak naar de wachtrij sturen"
+
+msgid "audit.job.end_wxcc_task"
+msgstr "Taak in de wachtrij beëindigen"
+
+msgid "audit.job.purge_pii"
+msgstr "Persoonsgegevens verwijderen"
+
+msgid "audit.job.send_suspension"
+msgstr "Bericht over sluiting versturen"
+
+msgid "audit.job.send_closure_update"
+msgstr "Update over sluiting versturen"
+
+msgid "audit.job.send_reinstatement"
+msgstr "Bericht over hervatting versturen"
 msgid "authz.permission.system_update"
 msgstr "Updates van de installatie uitvoeren"
 

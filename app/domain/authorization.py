@@ -4,8 +4,9 @@ Roles come from the identity provider (ADR 0013). Each permission applies at one
 
     GLOBAL        something about the admin portal itself (dashboard, own rights, the
                   holiday calendars every organisation can reuse, updates of the installation)
-    ORGANISATION  something of one organisation (audit log, new groups, integrations)
-    GROUP         something of one group (settings, opening hours, texts, bookings)
+    ORGANISATION  something of one organisation (new groups, integrations, branding)
+    GROUP         something of one group (settings, opening hours, texts, bookings, the
+                  audit log of its events)
 
 A role grants a permission at the levels it covers:
 
@@ -77,11 +78,11 @@ LEVELS: dict[Permission, Level] = {
     Permission.MATRIX_VIEW: Level.GLOBAL,
     Permission.ORGANISATION_MANAGE: Level.GLOBAL,
     Permission.HOLIDAYS_MANAGE: Level.GLOBAL,
-    Permission.AUDIT_VIEW: Level.ORGANISATION,
     Permission.INTEGRATIONS_MANAGE: Level.ORGANISATION,
     Permission.BRANDING_MANAGE: Level.ORGANISATION,
     Permission.HOLIDAYS_ASSIGN: Level.ORGANISATION,
     Permission.GROUP_CREATE: Level.ORGANISATION,
+    Permission.AUDIT_VIEW: Level.GROUP,  # ADR 0031: one log, exact per level
     Permission.GROUP_VIEW: Level.GROUP,
     Permission.GROUP_EDIT: Level.GROUP,
     Permission.SCHEDULE_MANAGE: Level.GROUP,
@@ -122,6 +123,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: _EVERY_ADMIN
     | {
+        # ADR 0031: the audit and system events of the own groups, for troubleshooting.
+        Permission.AUDIT_VIEW,
         Permission.GROUP_VIEW,
         Permission.SCHEDULE_MANAGE,
         Permission.TEXTS_MANAGE,

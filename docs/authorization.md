@@ -18,12 +18,12 @@ their claim and those organisations' groups, group admin in the groups of their 
 | Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | yes | – | – |
 | Manage API clients (`api_clients.manage`) | Portal | yes | – | – |
 | Update the installation (`system.update`) | Portal | yes | – | – |
-| View audit log (`audit.view`) | Organisation | yes | yes | – |
 | Manage integrations and secrets (`integrations.manage`) | Organisation | yes | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | yes | – | – |
 | Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | yes | yes | – |
 | Create groups (`group.create`) | Organisation | yes | yes | – |
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | yes | yes | – |
+| View audit log (`audit.view`) | Group | yes | yes | yes |
 | View group (`group.view`) | Group | yes | yes | yes |
 | Change group settings (`group.edit`) | Group | yes | yes | – |
 | Manage staffing and staffing exceptions (`schedule.manage`) | Group | yes | yes | yes |

@@ -76,6 +76,7 @@ admin ──browser──> web /admin/login ──redirect──> identity provi
 identity provider ──ID token (sub, name, roles, organisations, groups)──> web /admin/callback
 web ──signed session cookie op_admin (sub, name, roles, scope; 8 h)──> admin browser
 web ──SQL──> audit_events (sub, action, outcome, organisation, group)
+worker ──SQL──> audit_events (source=system: job type, outcome, error code, booking id; ADR 0031)
 web ──SQL──> admin_profiles (sub, display name, last login)
 ```
 
@@ -83,6 +84,11 @@ web ──SQL──> admin_profiles (sub, display name, last login)
 |---|---|---|---|---|
 | Admin subject identifier | `audit_events.actor`, `admin_profiles.subject`, session cookie | identity provider | audit events: kept as the audit trail (retention to be set with the hosting owner, O7) | no |
 | Admin display name | `admin_profiles.display_name`, session cookie | identity provider | replaced at every login; to be removed for admins inactive longer than the audit retention (WP8) | no |
+| System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
+
+System events hold no personal data: no names, addresses, message text or join links, only codes
+and the booking id. Each admin sees them at their own level only (group admin: their groups;
+organisation admin: their organisation and its groups; superuser: everything).
 
 Admin names are personal data of employees, processed for accountability (who did what in the
 portal). They never appear in logs, exceptions or audit events; the audit log joins them in when
