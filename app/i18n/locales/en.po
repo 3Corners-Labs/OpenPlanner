@@ -3419,3 +3419,20 @@ msgstr "No webhook secret is configured (WEBEX_WEBHOOK_SECRET or WXCC_WEBHOOK_SE
 
 msgid "admin.done.simulator_refused"
 msgstr "The webhook endpoint refused the event. Check the web container's log."
+
+#. Environment bar in the admin portal (dev/test only).
+
+msgid "admin.environment.label"
+msgstr "Environment"
+
+msgid "admin.environment.dev"
+msgstr "Development environment"
+
+msgid "admin.environment.test"
+msgstr "Test environment"
+
+msgid "admin.environment.text"
+msgstr "Not for real appointments of citizens."
+
+msgid "admin.environment.simulator"
+msgstr "Simulator is on"

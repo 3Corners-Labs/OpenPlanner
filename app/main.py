@@ -161,13 +161,14 @@ def create_app(
         app.state.integration_check_service = IntegrationCheckService(
             uow, clock, app.state.admin_service, wired.checker
         )
-        # The simulator plays platform events through our own webhooks; never in production.
+        # The simulator plays platform events through our own webhooks: only when switched on
+        # (SIMULATOR_ENABLED), which the settings refuse in production.
         app.state.simulation_service = SimulationService(
             uow,
             clock,
             app.state.admin_service,
             app.state.integration_service,
-            enabled=settings.environment != "prod",
+            enabled=settings.simulator_enabled and settings.environment != "prod",
         )
         try:
             yield

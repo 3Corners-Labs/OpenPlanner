@@ -74,6 +74,9 @@ All notable changes are listed here, generated from Conventional Commits on rele
   with allow-listed placeholders).
 - "Koppeling controleren" per group: a read-only check of the Webex host, the WxCC routing
   chain and the webhooks, with translated findings and an audit entry.
-- Simulator on admin booking pages (not in production): stand-in meeting and task, and signed
-  platform events played through OpenPlanner's own webhook endpoints.
+- Simulator on admin booking pages (`SIMULATOR_ENABLED`, off by default, refused in
+  production): stand-in meeting and task, and signed platform events played through
+  OpenPlanner's own webhook endpoints.
+- Environment bar on every admin page outside production ("Ontwikkelomgeving",
+  "Testomgeving").
 

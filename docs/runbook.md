@@ -42,6 +42,13 @@ load: check for long-running admin exports or a full volume.
 
 ## Production settings
 
+**Which environment am I in?** `ENVIRONMENT` decides, and it defaults to `prod`, so a forgotten
+setting is the safe one. Production refuses to start with development defaults (missing keys,
+http addresses, `SIMULATOR_ENABLED=true`). Outside production every admin page shows a striped
+bar, "Ontwikkelomgeving" or "Testomgeving" ("not for real appointments of citizens"); in
+production there is no bar. An acceptance environment where real citizens book must run with
+`ENVIRONMENT=prod`.
+
 The image refuses to start in production (`ENVIRONMENT` defaults to `prod`) without
 `MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`. With the bundled TLS proxy (next
 section) nothing else is needed. Behind a reverse proxy of your own also set:
@@ -490,8 +497,10 @@ changes first: the check uses the saved settings. It is limited to 6 runs per mi
 
 ### 10. Trying the flows without agents (simulator, not in production)
 
-Outside production (`ENVIRONMENT=dev` or `test`), an admin booking page (Agenda → a booking)
-has a card **Simulator (alleen in test)**. Whoever may edit the group can:
+With `SIMULATOR_ENABLED=true` (off by default; the service refuses to start with it when
+`ENVIRONMENT=prod`), an admin booking page (Agenda → a booking) has a card **Simulator (alleen
+in test)**. The environment bar then also says "Simulator staat aan". Whoever may edit the
+group can:
 
 1. **Nep-meeting en -taak aanmaken** for a booking without them. This sets stand-in ids
    (`simulated-meeting-<id>`, `simulated-task-<id>`, a join link on `.invalid`) and records
@@ -503,9 +512,8 @@ Each event is signed with this installation's `WEBEX_WEBHOOK_SECRET` or
 `WXCC_WEBHOOK_SECRET` and posted in-process to `/webhooks/webex` or `/webhooks/wxcc`. It takes
 the real path (signature, time window, parsing, deduplication, timeline, call status) without
 a tunnel. Without a secret the endpoint does not exist and the page says so. Every action is
-audited (`simulator.prepare`, `simulator.event`). In production the card and the route are off. An
-acceptance environment where real citizens book must run with `ENVIRONMENT=prod`: with `test`
-the simulator is available there too.
+audited (`simulator.prepare`, `simulator.event`). Without the switch the card is not shown and
+the route answers 403.
 
 A quick end-to-end try without Webex: create a group with opening hours and "Direct gesprek
 starten", start a call as a citizen (`/g/<slug>/direct`), open the booking in the agenda,

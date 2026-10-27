@@ -3419,3 +3419,20 @@ msgstr "Er is geen webhookgeheim ingesteld (WEBEX_WEBHOOK_SECRET of WXCC_WEBHOOK
 
 msgid "admin.done.simulator_refused"
 msgstr "Het webhook-endpoint weigerde het event. Kijk in het log van de web-container."
+
+#. Environment bar in the admin portal (dev/test only).
+
+msgid "admin.environment.label"
+msgstr "Omgeving"
+
+msgid "admin.environment.dev"
+msgstr "Ontwikkelomgeving"
+
+msgid "admin.environment.test"
+msgstr "Testomgeving"
+
+msgid "admin.environment.text"
+msgstr "Niet voor echte afspraken van burgers."
+
+msgid "admin.environment.simulator"
+msgstr "Simulator staat aan"
