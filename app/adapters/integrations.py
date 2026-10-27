@@ -13,11 +13,17 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.credentials import CredentialStore
+from app.adapters.group_check import CheckerConfig, PlatformChecker
 from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTokens
 from app.adapters.webex_meetings import WebexMeetings
 from app.adapters.wxcc import WxccTasks
 from app.config import Settings
-from app.domain.ports import Clock, ContactCenterDispatcher, VideoProvider
+from app.domain.ports import (
+    Clock,
+    ContactCenterDispatcher,
+    IntegrationChecker,
+    VideoProvider,
+)
 from app.keys import settings_encryption_key
 
 log = structlog.get_logger()
@@ -30,6 +36,7 @@ class Integrations:
     tokens: WebexTokens | None = None
     video: VideoProvider | None = None
     dispatcher: ContactCenterDispatcher | None = None
+    checker: IntegrationChecker | None = None
 
 
 def secret_box(settings: Settings) -> SecretBox | None:
@@ -71,4 +78,17 @@ def build_integrations(
         if settings.dispatch_configured and settings.wxcc_api_base_url
         else None
     )
-    return Integrations(tokens, video, dispatcher)
+    webex_secret, wxcc_secret = settings.webex_webhook_secret, settings.wxcc_webhook_secret
+    checker = PlatformChecker(
+        http,
+        tokens,
+        CheckerConfig(
+            webex_base_url=settings.webex_api_base_url,
+            wxcc_base_url=settings.wxcc_api_base_url if dispatcher else None,
+            webhook_base=settings.webhook_base,
+            webex_secret=webex_secret.get_secret_value() if webex_secret else None,
+            wxcc_secret=wxcc_secret.get_secret_value() if wxcc_secret else None,
+        ),
+        clock,
+    )
+    return Integrations(tokens, video, dispatcher, checker)
