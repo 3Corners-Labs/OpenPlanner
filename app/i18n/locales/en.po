@@ -3817,3 +3817,50 @@ msgstr "The opening hours of contact option {row} may be at most 200 characters 
 
 msgid "admin.contacts.error.heading"
 msgstr "The heading may be at most 120 characters on one line."
+
+# Closure content and group contact blocks (ADR 0037, CL-1).
+
+msgid "admin.form.error.closure_heading"
+msgstr "The heading may be at most 120 characters on one line."
+
+msgid "admin.closure.heading_nl"
+msgstr "Heading (Dutch)"
+
+msgid "admin.closure.heading_en"
+msgstr "Heading (English)"
+
+msgid "admin.closure.heading_hint"
+msgstr "Optional, at most 120 characters. Empty: the default heading of the closure page."
+
+msgid "admin.closure.no_contacts"
+msgstr "This closure shows no alternative contact options."
+
+msgid "admin.closure.refresh_contacts"
+msgstr "Take over the contact options that apply to this team now ({count})"
+
+msgid "admin.group_contacts.title"
+msgstr "This team's own contact options"
+
+msgid "admin.group_contacts.lead"
+msgstr "Does this team have another desk or number than the organisation? Then fill in its own block here. A new closure takes over this block; a running closure keeps the block that applied when it started."
+
+msgid "admin.group_contacts.own"
+msgstr "This team has its own block. It applies instead of the organisation's default."
+
+msgid "admin.group_contacts.default"
+msgstr "This team has no block of its own. The organisation's default applies ({count} contact options)."
+
+msgid "admin.group_contacts.none"
+msgstr "This team has no block of its own and the organisation has set no default."
+
+msgid "admin.group_contacts.back"
+msgstr "Back to this team's closure"
+
+msgid "admin.group_contacts.preview_lead"
+msgstr "How citizens see the block that applies to this team now: its own block, or else the organisation's default."
+
+msgid "admin.group_contacts.summary_own"
+msgstr "Own block with {count} contact options."
+
+msgid "admin.group_contacts.summary_default"
+msgstr "Organisation default: {count} contact options."

@@ -3817,3 +3817,50 @@ msgstr "De bereikbaarheid bij contactmogelijkheid {row} mag maximaal 200 tekens 
 
 msgid "admin.contacts.error.heading"
 msgstr "De kop mag maximaal 120 tekens op één regel zijn."
+
+# Closure content and group contact blocks (ADR 0037, CL-1).
+
+msgid "admin.form.error.closure_heading"
+msgstr "De kop mag hooguit 120 tekens op één regel zijn."
+
+msgid "admin.closure.heading_nl"
+msgstr "Kop (Nederlands)"
+
+msgid "admin.closure.heading_en"
+msgstr "Kop (Engels)"
+
+msgid "admin.closure.heading_hint"
+msgstr "Optioneel, hooguit 120 tekens. Leeg: de standaardkop van de sluitingspagina."
+
+msgid "admin.closure.no_contacts"
+msgstr "Bij deze sluiting staan geen contactalternatieven."
+
+msgid "admin.closure.refresh_contacts"
+msgstr "Neem de contactalternatieven over die nu voor dit team gelden ({count})"
+
+msgid "admin.group_contacts.title"
+msgstr "Eigen contactalternatieven van dit team"
+
+msgid "admin.group_contacts.lead"
+msgstr "Heeft dit team een ander loket of nummer dan de organisatie? Vul dan hier een eigen blok in. Een nieuwe sluiting neemt dit blok over; een lopende sluiting houdt het blok dat bij de start gold."
+
+msgid "admin.group_contacts.own"
+msgstr "Dit team heeft een eigen blok. Dat geldt in plaats van de standaard van de organisatie."
+
+msgid "admin.group_contacts.default"
+msgstr "Dit team heeft geen eigen blok. De standaard van de organisatie geldt ({count} contactmogelijkheden)."
+
+msgid "admin.group_contacts.none"
+msgstr "Dit team heeft geen eigen blok en de organisatie heeft geen standaard ingesteld."
+
+msgid "admin.group_contacts.back"
+msgstr "Terug naar de sluiting van dit team"
+
+msgid "admin.group_contacts.preview_lead"
+msgstr "Zo zien burgers het blok dat nu voor dit team geldt: het eigen blok of anders de standaard van de organisatie."
+
+msgid "admin.group_contacts.summary_own"
+msgstr "Eigen blok met {count} contactmogelijkheden."
+
+msgid "admin.group_contacts.summary_default"
+msgstr "Standaard van de organisatie: {count} contactmogelijkheden."

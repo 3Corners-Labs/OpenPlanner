@@ -198,3 +198,37 @@ def test_an_existing_database_is_switched_to_incremental_vacuum(
 
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         assert database.execute("PRAGMA auto_vacuum").fetchone() == (2,)
+
+
+def test_closure_content_goes_on_downgrade_and_the_notices_stay(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0037: downgrading keeps only what ADR 0024 had, the closure and its notices.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0025")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO organisations (id, name, slug) VALUES (1, 'Gemeente', 'gemeente');
+            INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+                min_notice_minutes, horizon_days, phone_mode)
+                VALUES (1, 1, 'Team', 'team', 'Europe/Amsterdam', 30, 60, 60, 'optional');
+            INSERT INTO group_contacts (group_id, body) VALUES (1, '{"options": []}');
+            INSERT INTO closures (id, group_id, starts_at, created_at, contacts)
+                VALUES (1, 1, '2026-01-05 08:00:00', '2026-01-01 08:00:00', '{"options": []}');
+            INSERT INTO closure_notices (closure_id, locale, text, heading)
+                VALUES (1, 'nl', 'Gesloten.', 'Storing'), (1, 'en', 'Closed.', NULL);
+            """
+        )
+
+    command.downgrade(alembic_config, "0024")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        notices = database.execute("SELECT locale, text FROM closure_notices").fetchall()
+        closures = database.execute("SELECT id, group_id FROM closures").fetchall()
+        tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
+    assert sorted(notices) == [("en", "Closed."), ("nl", "Gesloten.")]
+    assert closures == [(1, 1)]
+    assert "group_contacts" not in tables

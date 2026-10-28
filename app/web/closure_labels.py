@@ -18,12 +18,14 @@ class ClosureView:
         period: From when until when, in the group's time zone.
         paragraphs: The notice in the reader's language, split into paragraphs.
         active: Whether the group is closed right now.
+        heading: The admin's heading in the reader's language (ADR 0037), if any.
     """
 
     title: str
     period: str
     paragraphs: list[str]
     active: bool
+    heading: str | None = None
 
 
 def moment_label(moment: datetime, group: Group, locale: str) -> str:
@@ -49,4 +51,4 @@ def closure_view(
     active = closure.is_active(now)
     title = _("closure.banner.title_active") if active else _("closure.banner.title_upcoming")
     paragraphs = [p for p in closure.notice(locale.code).split("\n") if p.strip()]
-    return ClosureView(title, period, paragraphs, active)
+    return ClosureView(title, period, paragraphs, active, closure.heading(locale.code))

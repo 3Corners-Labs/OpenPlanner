@@ -9,6 +9,12 @@ organisation admin or superuser can change it.
 Set this up before something goes wrong. In an emergency there is no time to look up and
 translate numbers.
 
+## A team's own block
+
+A team with its own desk or number can get a block of its own (screen **A team's contact
+options**). That block then applies instead of this one. A closure takes a copy of the block
+that applies when it starts; later changes do not alter a running closure.
+
 ## What citizens see
 
 A heading (by default "Other ways to reach us") followed by the contact options in your order.

@@ -9,6 +9,12 @@ superuser kan het wijzigen.
 Regel dit vóórdat er iets misgaat. In een noodsituatie is er geen tijd om nummers op te
 zoeken en te vertalen.
 
+## Eigen blok per team
+
+Een team met een eigen loket of nummer kan een eigen blok krijgen (scherm **Contactalternatieven
+van een team**). Dat blok geldt dan in plaats van dit blok. Een sluiting neemt bij de start een
+kopie van het blok dat dan geldt; latere wijzigingen veranderen een lopende sluiting niet.
+
 ## Wat burgers zien
 
 Een kop (standaard "Andere manieren om ons te bereiken") met daaronder de contactmogelijkheden

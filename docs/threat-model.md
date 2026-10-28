@@ -279,14 +279,19 @@ Inputs from outside: notice texts, date-times, booking ids in paths, a chosen sl
 
 ## Flow: alternative contact options (ADR 0037 §2)
 
-Admins: `GET/POST /admin/organisations/{org}/contacts` (`organisation.closure`). Citizens: the
-block on closure and maintenance pages (from CL-2 and MM-3). Inputs from outside: kind,
-details, labels, opening hours and headings of up to six options.
+Admins: `GET/POST /admin/organisations/{org}/contacts` (`organisation.closure`) and a group's
+own block at `GET/POST /admin/groups/{slug}/closure/contacts` (`closure.manage`); a closure
+copies the block that applies when it starts, with an optional heading per locale (CL-1).
+Citizens: the block on closure and maintenance pages (from CL-2 and MM-3). Inputs from outside:
+kind, details, labels, opening hours and headings of up to six options; closure headings.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
 | Tampering (XSS) | A `javascript:`, `data:` or `http:` link, or markup, in a contact option shown on public pages | Fixed kinds with their own validation: links only `https` with a host, no credentials, quotes, spaces or control characters; phone and email by pattern; texts single line; Jinja2 autoescape; `tel:`/`mailto:` built by the domain, never typed | `tests/domain/test_contacts.py::test_links_other_than_plain_https_are_refused`, `test_malformed_email_addresses_are_refused`, `test_phone_numbers_with_letters_or_odd_lengths_are_refused`, `tests/web/test_contact_labels.py::test_the_partial_renders_links_and_addresses_escaped`, `tests/admin/test_contact_routes.py::test_a_javascript_link_is_refused_with_a_message_linked_to_its_row` |
 | Elevation | A group admin or another organisation's admin changes what citizens of an organisation read | One `RequirePermission(organisation.closure)`; `ContactService` authorises again | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_contact_service.py::test_group_admins_and_other_organisations_are_refused_and_audited` |
+| Elevation | Another team's admin changes or reads a team's own block | One `RequirePermission(closure.manage)` on the group; `ContactService.view_group`/`save_group` authorise again | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_closure_content.py::test_another_groups_admin_cannot_read_or_change_the_groups_block` |
+| Tampering (XSS) | A `javascript:` link in a team's own block, or markup in a closure heading | Same `ContactBlock` validation as the organisation default; headings single line, at most 120 characters, autoescaped | `tests/admin/test_closure_content_routes.py::test_a_javascript_link_in_the_teams_block_is_refused`, `tests/domain/test_closure_content.py::test_a_heading_that_is_too_long_multi_line_or_in_another_locale_is_refused` |
+| Tampering | Editing a block later changes what a running closure shows, so the page no longer matches the mail citizens got | The closure keeps its own copy, taken at the start; only an explicit "take over" on update replaces it | `tests/domain/test_closure_content.py::test_the_groups_own_block_wins_and_later_edits_leave_the_closure_alone`, `test_an_update_keeps_the_copy_unless_asked_to_take_over_the_current_block` |
 | Information disclosure | A personal number or address published as contact option | The form warns that everything is public and asks for general numbers only; the manual repeats it | `tests/admin/test_contact_routes.py::test_six_empty_rows_and_a_public_warning_are_shown` |
 | Tampering | Stored JSON from another version breaks the page or smuggles an invalid link | Options are validated again when read; invalid ones are left out | `tests/adapters/db/test_contact_queries.py::test_options_another_version_wrote_are_left_out` |
 | Tampering (CSRF) | A third-party site changes the block in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_contact_routes.py::test_cross_site_posts_are_refused` |

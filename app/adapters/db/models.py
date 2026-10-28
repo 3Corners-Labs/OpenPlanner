@@ -173,6 +173,17 @@ class GroupRow(Base):
     )
 
 
+class GroupContactsRow(Base):
+    """A group's own contact block (ADR 0037 §2) as JSON, overriding the organisation default."""
+
+    __tablename__ = "group_contacts"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    body: Mapped[str] = mapped_column(Text)
+
+
 class ScheduleRuleRow(Base):
     """A weekly staffing block of a group; capacity 0 is a block without agents (ADR 0027)."""
 
@@ -388,10 +399,12 @@ class ClosureRow(Base):
     starts_at: Mapped[datetime] = mapped_column(UTCDateTime())
     ends_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    # The JSON copy of the contact block taken when the closure started (ADR 0037 §2).
+    contacts: Mapped[str | None] = mapped_column(Text)
 
 
 class ClosureNoticeRow(Base):
-    """The text citizens see about a closure, in one locale. Written by an admin; no PII."""
+    """The notice and optional heading of a closure, in one locale. Written by an admin; no PII."""
 
     __tablename__ = "closure_notices"
 
@@ -400,6 +413,7 @@ class ClosureNoticeRow(Base):
     )
     locale: Mapped[str] = mapped_column(String(16), primary_key=True)
     text: Mapped[str] = mapped_column(String(1000))
+    heading: Mapped[str | None] = mapped_column(String(120))
 
 
 class JobRow(Base):
