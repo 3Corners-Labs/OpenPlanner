@@ -9,6 +9,7 @@ from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.images import ImageFile, ImageText
 from app.domain.scenarios import ClosureScenario
+from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import count_images, seed_group
 from tests.fakes.clock import FixedClock
@@ -22,13 +23,20 @@ BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "14 020"),), {"nl"
 TEXT = ImageText({"nl": "Deur", "en": "Door"})
 
 
-async def test_scenarios_round_trip_per_owner(engine: AsyncEngine) -> None:
+async def _group(engine: AsyncEngine) -> tuple[SqlUnitOfWork, Group]:
+    """Seed the group ``aangifte`` and return the unit of work and the group."""
     await seed_group(engine, slug="aangifte")
     uow = SqlUnitOfWork(engine)
-    async with uow.locked() as tx:
+    async with uow.read() as tx:
         group = await tx.get_group("aangifte")
-        assert group is not None
-        org = group.organisation_id
+    assert group is not None
+    return uow, group
+
+
+async def test_scenarios_round_trip_per_owner(engine: AsyncEngine) -> None:
+    uow, group = await _group(engine)
+    org = group.organisation_id
+    async with uow.locked() as tx:
         shared = await tx.add_scenario(
             ClosureScenario(None, org, None, "Storing", NOTICES, {"nl": "Storing"}, BLOCK)
         )
@@ -104,12 +112,9 @@ async def test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with
 
 
 async def test_listing_follows_the_scope(engine: AsyncEngine) -> None:
-    await seed_group(engine, slug="aangifte")
-    uow = SqlUnitOfWork(engine)
+    uow, group = await _group(engine)
+    org = group.organisation_id
     async with uow.locked() as tx:
-        group = await tx.get_group("aangifte")
-        assert group is not None
-        org = group.organisation_id
         await tx.add_scenario(ClosureScenario(None, org, None, "Storing", NOTICES))
         await tx.add_scenario(ClosureScenario(None, org, group.id, "Brand", NOTICES))
         summary = await tx.get_group_summary("aangifte")
