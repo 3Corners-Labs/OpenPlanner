@@ -12,6 +12,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 |---|---|---|
 | Group settings / groepsinstellingen | [Groepsinstellingen](nl/group-settings.md) | [Group settings](en/group-settings.md) |
 | Branding / huisstijl | [Huisstijl](nl/branding.md) | [Branding](en/branding.md) |
+| Rights matrix / rechtenmatrix | [Rechtenmatrix](nl/rights-matrix.md) | [Rights matrix](en/rights-matrix.md) |
 | Alternative contact options / contactalternatieven | [Contactalternatieven](nl/organisation-contacts.md) | [Alternative contact options](en/organisation-contacts.md) |
 
 ## Writing a topic

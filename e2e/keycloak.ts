@@ -10,7 +10,7 @@ export const KEYCLOAK_URL = process.env.KEYCLOAK_URL ?? 'http://127.0.0.1:8080';
 // Test users exist only in the development realm (dev/keycloak/openplanner-realm.json).
 const PASSWORD = process.env.KEYCLOAK_TEST_PASSWORD ?? 'dev-only-password';
 
-export type TestUser = 'super' | 'orgadmin' | 'groupadmin' | 'outsider' | 'norole';
+export type TestUser = 'super' | 'orgadmin' | 'groupadmin' | 'auditor' | 'outsider' | 'norole';
 
 /** Skip the spec outside CI when Keycloak is not running; in CI that is a failure. */
 export function requireKeycloak(): void {

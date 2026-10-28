@@ -26,6 +26,9 @@ GROUP_ADMIN = Principal(
 OUTSIDER = Principal(
     "sub-outsider", "Otto Other", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset()
 )
+AUDITOR = Principal(
+    "sub-auditor", "Anouk Audit", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset()
+)
 NO_ROLE = Principal("sub-none", "Nina None", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
 
 SAME_ORIGIN = {"sec-fetch-site": "same-origin"}
