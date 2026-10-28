@@ -678,6 +678,24 @@ When a team cannot hold its appointments (outage, illness, closed building):
 6. **Retention.** Appointments still on hold lose their personal data 30 days after the end of
    the closure. An open-ended closure keeps it until it is lifted, so lift or end it promptly.
 
+## Personal data not removed on time (ADR 0037)
+
+**Retention** in the admin portal (organisation admins, the compliance role and the superuser)
+shows per group how many bookings still hold personal data past their purge moment and how
+many `purge_pii` jobs failed. Both should be 0. A booking counts as overdue one hour after its
+purge moment (slot end + 24 h, cancellation + 24 h, or closure end + 30 days), which leaves
+room for the worker and its retries.
+
+| Shown | Likely cause | What to do |
+|---|---|---|
+| Overdue > 0, failed 0, "last removed" long ago | the `worker` container is not running or not claiming jobs | `docker compose ps worker`, then `docker compose logs worker`; restart it; the backlog clears on its own |
+| Failed > 0 | the purge itself failed (database locked or full) | look up the code at **Remove personal data** in the audit log (Problems only); fix the cause and report the code to the developers (below) |
+| Overdue > 0 for a suspended booking | the closure was lifted, but no purge job was planned | report it to the developers as a bug (below) |
+
+There is no command yet to re-plan a failed or missing purge; until there is, report it to the
+developers with the error code. The nightly sweep from the privacy rules, which would catch such
+stragglers by itself, is not built yet either.
+
 ## Troubleshooting with the audit log (ADR 0031)
 
 Every admin has an audit log under **Audit log** that lists only their own level: a group admin

@@ -16,7 +16,7 @@ identiteitsbeheerder.
 | Superuser | alles | richt de installatie in: organisaties, koppelingen, feestdagen, updates |
 | Organisatiebeheerder | eigen organisaties en hun groepen | beheert groepen, planning, teksten, herinneringen en afspraken |
 | Groepsbeheerder | eigen groepen | beheert de planning, teksten en afspraken van het eigen team |
-| Compliance en privacy (alleen lezen) | eigen organisaties en hun groepen | controleert: leest de auditlog en de groepsinstellingen, ziet geen persoonsgegevens en kan niets wijzigen |
+| Compliance en privacy (alleen lezen) | eigen organisaties en hun groepen | controleert: leest de auditlog, de bewaartermijnen en de groepsinstellingen, ziet geen persoonsgegevens en kan niets wijzigen |
 
 De rol **Compliance en privacy** is bedoeld voor bijvoorbeeld de functionaris
 gegevensbescherming, de CISO of een auditor. In de auditlog ziet deze rol wel het nummer van
