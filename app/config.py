@@ -1,5 +1,6 @@
 """Application settings, read from the environment only."""
 
+import os
 import re
 from pathlib import Path
 from typing import Literal
@@ -18,6 +19,14 @@ SMTPS_PORT = 465
 """Mail submission over implicit TLS (RFC 8314); STARTTLS is never offered there."""
 
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
+
+
+def environment() -> dict[str, str]:
+    """Return a copy of the process environment, for reporting where a setting came from.
+
+    The only other place that reads the environment; ``settings list`` uses it (ADR 0042 §10).
+    """
+    return dict(os.environ)
 
 
 class Settings(BaseSettings):

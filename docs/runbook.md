@@ -60,6 +60,19 @@ section) nothing else is needed. Behind a reverse proxy of your own also set:
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 - No access log on the proxy: paths carry management tokens.
 
+**What is configured, and from where?** Every setting and its class (ADR 0042) is listed in
+`docs/settings.md`. On the host, without sending anyone the `.env`:
+
+```bash
+docker compose exec web python -m app.cli settings list
+```
+
+It shows each variable with its class, its source (`env` or `default`), whether the
+environment locks it, and its value; secrets show only `set` or `not set`.
+`settings show RATE_LIMIT_BOOKINGS` shows one setting with its portal bounds. A value set in
+the environment outside the portal bounds still applies, but is marked
+`! outside portal bounds`.
+
 ## HTTPS certificate (ADR 0030)
 
 The `proxy` service (Caddy, profile `tls`) gets a certificate from Let's Encrypt over ACME and
