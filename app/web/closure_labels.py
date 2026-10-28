@@ -1,4 +1,8 @@
-"""Closure wording shared by citizen and admin pages: the banner as people read it (ADR 0024)."""
+"""Closure wording shared by citizen and admin pages: the banner as people read it (ADR 0024).
+
+The same view feeds the full closure page of ADR 0037 §5: heading, period, notice and the
+copy of the contact options taken when the closure started.
+"""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -6,6 +10,7 @@ from datetime import datetime
 from app.domain.closure import Closure
 from app.domain.scheduling import Group
 from app.i18n.dates import format_clock, format_day, local_day
+from app.web.contact_labels import ContactBlockView, contact_view
 from app.web.locale import RequestLocale
 
 
@@ -19,6 +24,7 @@ class ClosureView:
         paragraphs: The notice in the reader's language, split into paragraphs.
         active: Whether the group is closed right now.
         heading: The admin's heading in the reader's language (ADR 0037), if any.
+        contacts: The closure's copy of the contact options, in the reader's language.
     """
 
     title: str
@@ -26,6 +32,7 @@ class ClosureView:
     paragraphs: list[str]
     active: bool
     heading: str | None = None
+    contacts: ContactBlockView | None = None
 
 
 def moment_label(moment: datetime, group: Group, locale: str) -> str:
@@ -51,4 +58,11 @@ def closure_view(
     active = closure.is_active(now)
     title = _("closure.banner.title_active") if active else _("closure.banner.title_upcoming")
     paragraphs = [p for p in closure.notice(locale.code).split("\n") if p.strip()]
-    return ClosureView(title, period, paragraphs, active, closure.heading(locale.code))
+    return ClosureView(
+        title,
+        period,
+        paragraphs,
+        active,
+        closure.heading(locale.code),
+        contact_view(closure.contacts, locale),
+    )

@@ -9,15 +9,17 @@ cannot disagree.
         ├─ decide() ──► allowed  ──► return
         └─────────────► denied   ──► audit event (denied, reason) ──► return
 
-Logins and logouts are recorded once per organisation and group the admin holds a role in,
-so an organisation admin sees the logins of the admins of their own organisation; without
-such a context (superuser, no role) the event is global and only the superuser sees it.
+Logins and logouts are recorded once per organisation and group the admin holds a role in
+(their ``Membership``s), so an organisation admin sees the logins of the admins of their own
+organisation; without such a context (superuser, no role) the event is global and only the
+superuser sees it. Each login also refreshes the admin's staff record and audits what changed
+in their roles and memberships since the last one (ADR 0046).
 """
 
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Outcome
+from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Outcome
 from app.domain.authorization import (
     LEVELS,
     Decision,
@@ -37,6 +39,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.retention import RetentionOverview, candidates_before, summarise
 from app.domain.scheduling import GroupSummary
+from app.domain.staff import Membership, StaffFilter, StaffMember, change_events
 
 ANONYMOUS = "anonymous"
 """Actor recorded for events without a logged-in admin (e.g. a failed login)."""
@@ -141,38 +144,66 @@ class AdminService:
             await tx.add_audit_event(event)
 
     async def record_login(self, principal: Principal) -> None:
-        """Audit a successful login and refresh the admin's profile, in one transaction."""
+        """Audit a login and refresh the admin's staff record, in one transaction (ADR 0046)."""
+        now = self._clock.now()
         async with self._uow.locked() as tx:
-            await self._record_session_event(tx, principal, LOGIN_EVENT)
-            await tx.save_admin_profile(
-                AdminProfile(principal.subject, principal.display_name, self._clock.now())
+            memberships = await _memberships(tx, principal)
+            await self._record_session_event(tx, principal, LOGIN_EVENT, memberships)
+            old = await tx.get_staff(principal.subject)
+            new = StaffMember(
+                subject=principal.subject,
+                display_name=principal.display_name,
+                roles=principal.roles,
+                memberships=frozenset(memberships),
+                first_seen_at=old.first_seen_at if old else now,
+                last_login_at=now,
+                last_seen_at=now,
+                last_logout_at=old.last_logout_at if old else None,
             )
+            for event in change_events(old, new):
+                await tx.add_audit_event(event)
+            await tx.save_staff(new)
 
     async def record_logout(self, principal: Principal) -> None:
-        """Audit a logout."""
+        """Audit a logout and note it on the admin's staff record."""
         async with self._uow.locked() as tx:
-            await self._record_session_event(tx, principal, LOGOUT_EVENT)
+            memberships = await _memberships(tx, principal)
+            await self._record_session_event(tx, principal, LOGOUT_EVENT, memberships)
+            await tx.set_staff_logout(principal.subject, self._clock.now())
+
+    async def record_seen(self, principal: Principal) -> None:
+        """Note that the admin is active now (the caller throttles how often)."""
+        async with self._uow.locked() as tx:
+            await tx.set_staff_seen(principal.subject, self._clock.now())
 
     async def _record_session_event(
-        self, tx: Transaction, principal: Principal, action: str
+        self, tx: Transaction, principal: Principal, action: str, memberships: list[Membership]
     ) -> None:
-        """Write ``action`` once per organisation/group context of ``principal``."""
-        contexts: list[tuple[str | None, str | None]] = []
-        reach = reaches(principal)
-        if Reach.ORGANISATIONS in reach:
-            contexts += [(organisation, None) for organisation in sorted(principal.organisations)]
-        if Reach.GROUPS in reach:
-            for slug in sorted(principal.groups):
-                summary = await tx.get_group_summary(slug)
-                if summary is not None:  # a claim for a group we do not know grants nothing
-                    contexts.append((summary.organisation_slug, slug))
+        """Write ``action`` once per membership of ``principal`` (global without any)."""
         roles = ",".join(role_keys(principal))
         now = self._clock.now()
+        contexts: list[tuple[str | None, str | None]] = [
+            (m.organisation, m.group) for m in memberships
+        ]
         for organisation, group in contexts or [(None, None)]:
             event = AuditEvent(
                 now, principal.subject, action, Outcome.SUCCESS, roles, organisation, group
             )
             await tx.add_audit_event(event)
+
+    async def staff(
+        self, principal: Principal, narrow: StaffFilter | None = None
+    ) -> list[StaffMember]:
+        """Return the staff ``principal`` may see, each with only the memberships in scope."""
+        scope = scope_for(principal, Permission.STAFF_VIEW)
+        async with self._uow.read() as tx:
+            members = await tx.list_staff(scope, narrow or StaffFilter())
+        return [m.within(scope) for m in members]
+
+    async def staff_member(self, principal: Principal, member_id: int) -> StaffMember | None:
+        """Return one person if ``principal`` may see them, else ``None`` (as if unknown)."""
+        found = await self.staff(principal, StaffFilter(id=member_id))
+        return found[0] if found else None
 
     async def groups(
         self, principal: Principal, permission: Permission = Permission.GROUP_VIEW
@@ -201,6 +232,24 @@ class AdminService:
         async with self._uow.read() as tx:
             facts = await tx.list_retention(scope, candidates_before(now))
         return summarise(facts, now)
+
+
+async def _memberships(tx: Transaction, principal: Principal) -> list[Membership]:
+    """Return the organisations and groups the principal's roles reach, in a stable order.
+
+    Organisation claims count for roles that reach organisations, group claims for roles
+    that reach groups. A claim for a group we do not know grants nothing and is left out.
+    """
+    memberships: list[Membership] = []
+    reach = reaches(principal)
+    if Reach.ORGANISATIONS in reach:
+        memberships += [Membership(o) for o in sorted(principal.organisations)]
+    if Reach.GROUPS in reach:
+        for slug in sorted(principal.groups):
+            summary = await tx.get_group_summary(slug)
+            if summary is not None:
+                memberships.append(Membership(summary.organisation_slug, slug))
+    return memberships
 
 
 def require(authorization: Authorization) -> Authorization:

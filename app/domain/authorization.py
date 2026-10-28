@@ -96,6 +96,7 @@ class Permission(StrEnum):
     SYSTEM_UPDATE = "system.update"
     RETENTION_VIEW = "retention.view"
     ROLES_MANAGE = "roles.manage"
+    STAFF_VIEW = "staff.view"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -124,6 +125,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.RETENTION_VIEW: Level.ORGANISATION,
     # ADR 0039: create, change and delete custom roles.
     Permission.ROLES_MANAGE: Level.GLOBAL,
+    # ADR 0046: who uses the portal; group level so a group admin sees their own team.
+    Permission.STAFF_VIEW: Level.GROUP,
 }
 
 LOCKED_PERMISSIONS = frozenset(
@@ -150,6 +153,7 @@ READ_PERMISSIONS = frozenset(
         Permission.GROUP_VIEW,
         Permission.BOOKINGS_VIEW,
         Permission.RETENTION_VIEW,
+        Permission.STAFF_VIEW,
     }
 )
 """ADR 0039: permissions that only show; everything else changes something."""
@@ -190,6 +194,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.ORGANISATION_CLOSURE,
         # ADR 0039: whether the organisation's personal data is removed on time.
         Permission.RETENTION_VIEW,
+        # ADR 0046: the staff of the own organisations.
+        Permission.STAFF_VIEW,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: EVERY_ADMIN
@@ -202,10 +208,18 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.BOOKINGS_VIEW,
         # ADR 0024: the team itself can close in an emergency and handle its bookings.
         Permission.CLOSURE_MANAGE,
+        # ADR 0046: who else administers the own groups, read-only.
+        Permission.STAFF_VIEW,
     },
     # ADR 0039: compliance and privacy (FG, CISO, auditors): reading only, no personal data.
     Role.AUDITOR: EVERY_ADMIN
-    | {Permission.AUDIT_VIEW, Permission.GROUP_VIEW, Permission.RETENTION_VIEW},
+    | {
+        Permission.AUDIT_VIEW,
+        Permission.GROUP_VIEW,
+        Permission.RETENTION_VIEW,
+        # ADR 0046: who has access, for an access review.
+        Permission.STAFF_VIEW,
+    },
 }
 
 REACH: dict[Role, Reach] = {

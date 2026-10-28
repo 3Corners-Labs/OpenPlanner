@@ -65,6 +65,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.CLOSURE_MANAGE,
         Permission.ORGANISATION_CLOSURE,
         Permission.RETENTION_VIEW,
+        Permission.STAFF_VIEW,  # ADR 0046
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -76,6 +77,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.TEXTS_MANAGE,
         Permission.BOOKINGS_VIEW,
         Permission.CLOSURE_MANAGE,
+        Permission.STAFF_VIEW,  # ADR 0046: read-only, the own groups
     }
     # ADR 0039: compliance and privacy, read-only, never personal data.
     assert MATRIX[Role.AUDITOR] == {
@@ -85,6 +87,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.AUDIT_VIEW,
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
+        Permission.STAFF_VIEW,  # ADR 0046
     }
 
 
@@ -96,6 +99,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.AUDIT_VIEW,
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
+        Permission.STAFF_VIEW,  # ADR 0046
     }
 
     assert not MATRIX[Role.AUDITOR] & PII_PERMISSIONS
@@ -170,6 +174,10 @@ def test_every_permission_has_a_level() -> None:
         (AUDITOR, Permission.RETENTION_VIEW, OWN_ORG, Decision(True, Reason.ORGANISATION)),
         (ORG, Permission.RETENTION_VIEW, OTHER_ORG, Decision(False, Reason.OUT_OF_SCOPE)),
         (GROUP, Permission.RETENTION_VIEW, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
+        # ADR 0046: staff of the own organisation or group.
+        (AUDITOR, Permission.STAFF_VIEW, OWN_GROUP, Decision(True, Reason.ORGANISATION)),
+        (GROUP, Permission.STAFF_VIEW, OWN_GROUP, Decision(True, Reason.GROUP)),
+        (GROUP, Permission.STAFF_VIEW, OTHER_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
         # Roles combine: org admin elsewhere, group admin here.
         (MIXED, Permission.SCHEDULE_MANAGE, OWN_GROUP, Decision(True, Reason.GROUP)),
         (MIXED, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
@@ -214,6 +222,13 @@ def test_retention_scope_is_the_organisation() -> None:
     assert auditor == scope_for(ORG, Permission.RETENTION_VIEW)
     assert scope_for(GROUP, Permission.RETENTION_VIEW).is_empty
     assert scope_for(SUPER, Permission.RETENTION_VIEW) == Scope(everything=True)
+
+
+def test_staff_scope_is_the_organisation_or_the_groups() -> None:
+    # ADR 0046: a group admin sees the staff of their own groups.
+    assert scope_for(ORG, Permission.STAFF_VIEW) == Scope(organisations=frozenset({"demo"}))
+    assert scope_for(GROUP, Permission.STAFF_VIEW) == Scope(groups=frozenset({"demo"}))
+    assert scope_for(SUPER, Permission.STAFF_VIEW) == Scope(everything=True)
 
 
 def test_scope_for_rejects_global_permissions() -> None:

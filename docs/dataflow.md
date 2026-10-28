@@ -72,7 +72,7 @@ be confirmed in the DPIA (O7). The closure notice is admin text without personal
 **Alternative contact options (ADR 0037).** Phone numbers, email addresses, links and addresses
 of the organisation (`organisation_contacts`), entered by an organisation admin, or of one team
 (`group_contacts`), entered by its group admin, and shown publicly on closure and maintenance
-pages. A closure keeps a copy of the block that applied when it started (`closures.contacts`)
+pages and on the page of a booking on hold (CL-2). A closure keeps a copy of the block that applied when it started (`closures.contacts`)
 and an optional heading per locale (`closure_notices.heading`). Organisation data, not personal data of citizens;
 the admin page asks for general numbers and addresses only. No purge job; kept until changed.
 
@@ -84,13 +84,16 @@ identity provider ──ID token (sub, name, roles, organisations, groups)──
 web ──signed session cookie op_admin (sub, name, roles, scope; 8 h)──> admin browser
 web ──SQL──> audit_events (sub, action, outcome, organisation, group)
 worker ──SQL──> audit_events (source=system: job type, outcome, error code, booking id; ADR 0031)
-web ──SQL──> admin_profiles (sub, display name, last login)
+web ──SQL──> staff, staff_memberships (sub, display name, roles, organisation and group slugs,
+             first/last login, last seen, last logout; ADR 0046)
 ```
 
 | Data item | Table.column / place | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| Admin subject identifier | `audit_events.actor`, `admin_profiles.subject`, session cookie | identity provider | audit events: kept as the audit trail (retention to be set with the hosting owner, O7) | no |
-| Admin display name | `admin_profiles.display_name`, session cookie | identity provider | replaced at every login; to be removed for admins inactive longer than the audit retention (WP8) | no |
+| Admin subject identifier | `audit_events.actor`, `staff.subject`, session cookie | identity provider | audit events: kept as the audit trail (retention to be set with the hosting owner, O7) | no |
+| Admin display name | `staff.display_name`, session cookie | identity provider | replaced at every login; to be erased for admins inactive longer than `staff_retention_days` (ADR 0046, step 2) | no |
+| Admin roles and memberships | `staff.roles`, `staff_memberships` (organisation and group slugs) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed` | no |
+| Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
 | System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
 
 System events hold no personal data: no names, addresses, message text or join links, only codes
