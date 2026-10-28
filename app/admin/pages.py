@@ -17,6 +17,7 @@ from starlette.responses import HTMLResponse
 
 from app.admin.authz import can_function, session_principal
 from app.admin.forms import Field, moment_label
+from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
 from app.domain.authorization import Permission, Principal, Role
 from app.web.authz_labels import ROLE_LABELS
 from app.web.help import HELP_PATH, HelpTopic, shipped_manual, topic_for_path
@@ -145,7 +146,8 @@ def page(
         if can(item.permission)
     ]
     role_labels = [locale.gettext(ROLE_LABELS[role]) for role in Role if role in principal.roles]
-    return render(
+    maintenance = getattr(request.state, "maintenance_notice", None)
+    response = render(
         templates,
         request,
         name,
@@ -161,9 +163,20 @@ def page(
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
             "update_banner": getattr(request.state, "update_notice", None),
             # Set by ``maintenance_routes.load_maintenance_notice`` (ADR 0038).
-            "maintenance_notice": getattr(request.state, "maintenance_notice", None),
+            "maintenance_notice": maintenance,
         },
     )
+    if maintenance is not None:
+        _freeze(request, principal, response)
+    return response
+
+
+def _freeze(request: Request, principal: Principal, response: HTMLResponse) -> None:
+    """Disable the buttons of changes that maintenance refuses (ADR 0038), from the matrix."""
+    writable = writable_in_maintenance(request.app.routes, principal)
+    body = freeze_forms(bytes(response.body).decode(), writable).encode()
+    response.body = body
+    response.headers["content-length"] = str(len(body))
 
 
 def message(
