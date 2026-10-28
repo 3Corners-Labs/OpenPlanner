@@ -388,6 +388,18 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # Alternative contact options of the organisation (ADR 0037): with organisation.closure.
     # An empty form removes nothing that is not there, so an allowed POST redirects (303).
+    # ADR 0035: the websites allowed to embed the organisation's groups, embedding.manage.
+    # An empty form removes nothing that is not there, so an allowed POST redirects (303).
+    "GET /admin/embedding": {"/admin/embedding": statuses(200, 200, 403, 200, 403, 403)},
+    "GET /admin/organisations/{org}/embedding": {
+        "/admin/organisations/demo/embedding": statuses(200, 200, 403, 403, 403, 403),
+        "/admin/organisations/andere/embedding": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/organisations/nope/embedding": statuses(404, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/embedding": {
+        "/admin/organisations/demo/embedding": statuses(303, 303, 403, 403, 403, 403),
+        "/admin/organisations/andere/embedding": statuses(303, 403, 403, 303, 403, 403),
+    },
     "GET /admin/organisations/{org}/contacts": {
         "/admin/organisations/demo/contacts": statuses(200, 200, 403, 403, 403, 403),
         "/admin/organisations/andere/contacts": statuses(200, 403, 403, 200, 403, 403),

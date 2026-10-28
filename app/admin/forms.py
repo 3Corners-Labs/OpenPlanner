@@ -99,6 +99,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "wxcc_channel": "admin.form.error.integration_text",
     "wxcc_routing_value": "admin.form.error.integration_text",
     "direct_call_enabled": "admin.form.error.choice",
+    "embedding_enabled": "admin.form.error.choice",
     "not_picked_up_minutes": "admin.form.error.not_picked_up_minutes",
     "direct_call_max_concurrent": "admin.form.error.direct_call_max_concurrent",
     "display_name": "admin.form.error.display_name",

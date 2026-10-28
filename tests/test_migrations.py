@@ -232,3 +232,39 @@ def test_closure_content_goes_on_downgrade_and_the_notices_stay(
     assert sorted(notices) == [("en", "Closed."), ("nl", "Gesloten.")]
     assert closures == [(1, 1)]
     assert "group_contacts" not in tables
+
+
+def test_existing_groups_are_not_embeddable_and_origins_go_on_downgrade(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0035: the migration makes nothing embeddable; downgrading drops the lists.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0026")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO organisations (id, name, slug) VALUES (1, 'Gemeente', 'gemeente');
+            INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+                min_notice_minutes, horizon_days, phone_mode)
+                VALUES (1, 1, 'Team', 'team', 'Europe/Amsterdam', 30, 60, 60, 'optional');
+            """
+        )
+
+    command.upgrade(alembic_config, "0037")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        assert database.execute("SELECT embedding_enabled FROM groups").fetchall() == [(0,)]
+        database.execute(
+            "INSERT INTO organisation_origins (organisation_id, origin, position)"
+            " VALUES (1, 'https://www.gemeente.nl', 0)"
+        )
+        database.commit()
+
+    command.downgrade(alembic_config, "0026")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
+        columns = {r[1] for r in database.execute("PRAGMA table_info(groups)")}
+    assert "organisation_origins" not in tables
+    assert "embedding_enabled" not in columns

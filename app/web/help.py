@@ -60,6 +60,11 @@ TOPICS = (
     HelpTopic("retention", ("/admin/retention",), Permission.RETENTION_VIEW),
     HelpTopic("staff", ("/admin/staff", "/admin/staff/{member_id}"), Permission.STAFF_VIEW),
     HelpTopic(
+        "embedding",
+        ("/admin/embedding", "/admin/organisations/{org}/embedding"),
+        Permission.EMBEDDING_MANAGE,
+    ),
+    HelpTopic(
         "organisation-contacts",
         ("/admin/organisations/{org}/contacts",),
         Permission.ORGANISATION_CLOSURE,

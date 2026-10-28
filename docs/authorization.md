@@ -28,6 +28,7 @@ permissions show citizens' data and are never held by the auditor.
 | Create groups (`group.create`) | Organisation | – | yes | yes | – | – |
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | – | yes | yes | – | – |
 | View retention (`retention.view`) | Organisation | – | yes | yes | – | yes |
+| Manage embedding on websites (`embedding.manage`) | Organisation | – | yes | yes | – | – |
 | View audit log (`audit.view`) | Group | – | yes | yes | yes | yes |
 | View group (`group.view`) | Group | – | yes | yes | yes | yes |
 | Change group settings (`group.edit`) | Group | – | yes | yes | – | – |
