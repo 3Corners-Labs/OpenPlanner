@@ -8,6 +8,8 @@ import pytest
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
+from app.domain.authorization import Scope
+from app.domain.maintenance import MaintenanceState
 from app.domain.updates import Version
 from app.jobs.healthcheck import heartbeat_is_fresh
 from app.jobs.worker import run_worker
@@ -112,3 +114,40 @@ async def test_worker_looks_up_the_latest_release_once_per_hour(
     assert check is not None
     assert check.latest is not None
     assert check.latest.version == Version(1, 4, 0)
+
+
+async def test_worker_reports_maintenance_that_has_been_on_too_long(
+    settings: Settings, migrated_url: str
+) -> None:
+    # ADR 0038 §6: no automatic end; the worker records a system event after the threshold.
+    url = migrated_url
+    configured = settings.model_copy(update={"database_url": url})
+    clock = FixedClock()
+    engine = create_engine(url)
+    try:
+        async with SqlUnitOfWork(engine).locked() as tx:
+            await tx.save_maintenance_state(
+                MaintenanceState(True, clock.now() - timedelta(hours=5), "host-cli")
+            )
+    finally:
+        await engine.dispose()
+
+    stop = asyncio.Event()
+    task = asyncio.create_task(run_worker(configured, stop, clock=clock))
+    for _ in range(200):
+        if configured.worker_heartbeat_path.exists():
+            break
+        await asyncio.sleep(0.01)
+    await asyncio.sleep(0.05)  # more iterations: reported once, not on every loop
+    stop.set()
+    await asyncio.wait_for(task, timeout=2)
+
+    engine = create_engine(url)
+    try:
+        async with SqlUnitOfWork(engine).read() as tx:
+            events = await tx.list_audit_events(Scope(everything=True), 50)
+    finally:
+        await engine.dispose()
+    assert [e.event.detail for e in events if e.event.action == "maintenance.overdue"] == [
+        "hours:5"
+    ]

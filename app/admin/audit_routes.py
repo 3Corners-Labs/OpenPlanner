@@ -33,7 +33,7 @@ from app.domain.authorization import (
     Target,
     decide,
 )
-from app.domain.maintenance import MaintenanceReason
+from app.domain.maintenance import OVERDUE_EVENT, MaintenanceReason
 from app.domain.storage import (
     DATABASE_TOO_LARGE,
     FREE_SPACE_CRITICAL,
@@ -65,6 +65,8 @@ EVENT_LABELS: dict[str, str] = {
     "job.send_reinstatement": "audit.job.send_reinstatement",
     # Storage watch (ADR 0040): global, so only the superuser sees it.
     STORAGE_EVENT: "audit.event.storage_check",
+    # ADR 0038: maintenance on longer than the alert threshold (global).
+    OVERDUE_EVENT: "audit.event.maintenance_overdue",
 }
 """Readable label per event key that is not a permission."""
 
@@ -135,6 +137,7 @@ COUNT_LABELS: dict[str, str] = {
     "attempt": "admin.audit.detail.attempt",
     "free_percent": "admin.audit.detail.free_percent",
     "database_mb": "admin.audit.detail.database_mb",
+    "hours": "admin.audit.detail.hours",
 }
 """Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0024)."""
 
