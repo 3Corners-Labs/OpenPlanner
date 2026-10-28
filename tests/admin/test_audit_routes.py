@@ -134,3 +134,30 @@ async def test_a_filter_cannot_reach_outside_the_scope(logged: Site) -> None:
     assert "other_marker" not in text
     assert "smtp_unreachable" in text  # an out-of-scope group is ignored, not applied
     assert "other_marker" not in by_booking
+
+
+async def test_a_storage_event_explains_itself_to_the_superuser_only(site: Site) -> None:
+    # ADR 0040: the storage watch writes global events.
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        await tx.add_audit_event(
+            AuditEvent(
+                NOW,
+                SYSTEM_ACTOR,
+                "storage.check",
+                Outcome.FAILURE,
+                "free_space_low",
+                detail="free_percent:12,database_mb:340",
+                source=Source.SYSTEM,
+            )
+        )
+
+    await site.login_as(SUPER)
+    text = (await site.client.get("/admin/audit")).text
+    await site.login_as(ORG_ADMIN)
+    hidden = (await site.client.get("/admin/audit")).text
+
+    assert "Opslag controleren" in text
+    assert "Er is weinig schijfruimte over voor de gegevens." in text
+    assert "12% vrij, database 340 MB" in text
+    assert "free_space_low" not in hidden

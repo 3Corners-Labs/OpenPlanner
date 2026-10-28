@@ -13,6 +13,7 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
     admin_profiles (name per identity-provider subject; joined into the audit log)
     release_checks (one row), update_requests (ADR 0029; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
+    organisations 1──n organisation_fonts (branding, ADR 0041)
     holiday_calendars 1──* holidays (ADR 0025; chosen through organisation_holiday_calendars
                          and group_holiday_calendars; group_holiday_open_days keep one open)
     organisations 1──* groups 1──* schedule_rules
@@ -70,6 +71,7 @@ __all__ = [
     "JobRow",
     "OrganisationHolidayCalendarRow",
     "OrganisationLogoRow",
+    "OrganisationFontRow",
     "OrganisationRow",
     "ReleaseCheckRow",
     "ReminderRuleRow",
@@ -93,6 +95,13 @@ class OrganisationRow(Base):
     accent_color: Mapped[str] = mapped_column(String(7), server_default=text("'#01689B'"))
     logo_media_type: Mapped[str | None] = mapped_column(String(32))
     logo_digest: Mapped[str | None] = mapped_column(String(16))
+    theme_tokens: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+    header_style: Mapped[str] = mapped_column(String(16), server_default=text("'standard'"))
+    font_digests: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+
+    __table_args__ = (
+        CheckConstraint("header_style IN ('standard', 'accent', 'logo')", name="header_style"),
+    )
 
 
 class OrganisationLogoRow(Base):
@@ -104,6 +113,20 @@ class OrganisationLogoRow(Base):
         ForeignKey("organisations.id", ondelete="CASCADE"), primary_key=True
     )
     data: Mapped[bytes] = mapped_column(LargeBinary)
+
+
+class OrganisationFontRow(Base):
+    """One uploaded WOFF2 font of an organisation; its digest lives on ``organisations``."""
+
+    __tablename__ = "organisation_fonts"
+
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(String(16), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+
+    __table_args__ = (CheckConstraint("role IN ('text', 'text-bold', 'heading')", name="role"),)
 
 
 class OrganisationContactsRow(Base):

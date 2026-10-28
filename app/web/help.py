@@ -55,6 +55,7 @@ class HelpTopic:
 
 TOPICS = (
     HelpTopic("group-settings", ("/admin/groups/{slug}/settings",), Permission.GROUP_EDIT),
+    HelpTopic("branding", ("/admin/organisations/{org}/branding",), Permission.BRANDING_MANAGE),
     HelpTopic(
         "organisation-contacts",
         ("/admin/organisations/{org}/contacts",),

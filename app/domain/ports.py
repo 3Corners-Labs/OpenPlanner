@@ -16,7 +16,7 @@ from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Source
 from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
-from app.domain.branding import Branding, Logo
+from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
@@ -300,7 +300,7 @@ class Transaction(Protocol):
         ...
 
     async def save_branding(self, organisation_id: int, branding: Branding) -> None:
-        """Store display name and accent colour (the logo is stored by ``save_logo``)."""
+        """Store name, accent, theme and header style (logo and fonts have their own calls)."""
         ...
 
     async def get_logo(self, organisation_slug: str) -> Logo | None:
@@ -309,6 +309,14 @@ class Transaction(Protocol):
 
     async def save_logo(self, organisation_id: int, logo: Logo | None) -> None:
         """Store or, with ``None``, remove the organisation's logo."""
+        ...
+
+    async def get_font(self, organisation_slug: str, role: FontRole) -> FontFile | None:
+        """Return the organisation's font of ``role``, if it has one."""
+        ...
+
+    async def save_font(self, organisation_id: int, role: FontRole, font: FontFile | None) -> None:
+        """Store or, with ``None``, remove the organisation's font of ``role``."""
         ...
 
     async def get_contact_block(self, organisation_id: int) -> ContactBlock | None:

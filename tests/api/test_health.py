@@ -20,6 +20,18 @@ async def test_readiness_checks_database(client: httpx.AsyncClient) -> None:
     assert response.json() == {"status": "ok"}
 
 
+async def test_readiness_reports_a_volume_short_of_space_as_degraded(settings: Settings) -> None:
+    # ADR 0040: still 200, so an update is not rolled back; the body does not say why.
+    cramped = settings.model_copy(
+        update={"storage_low_free_percent": 99.999, "storage_critical_free_percent": 99.998}
+    )
+    async with app_client(cramped) as client:
+        response = await client.get("/readyz")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "degraded"}
+
+
 async def test_readiness_reports_unavailable_without_leaking_details(
     unreachable_db_settings: Settings, tmp_path: Path
 ) -> None:

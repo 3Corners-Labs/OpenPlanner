@@ -44,8 +44,16 @@
 body.admin {
   background: var(--adm-bg);
   color: var(--adm-text);
+  /* Fixed: an organisation's theme (loaded for the branding preview) must not restyle us. */
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 1rem;
   line-height: 1.55;
+}
+
+/* site.css gives headings the organisation's heading font; the portal keeps its own. */
+.admin :is(h1, h2, h3) {
+  font-family: inherit;
+  font-weight: 700;
 }
 
 .admin h1 {
@@ -1174,7 +1182,9 @@ fieldset.card {
   overflow: hidden;
   border: 1px solid var(--adm-border);
   border-radius: var(--adm-radius-s);
-  background: #ffffff;
+  background: var(--booking-color-page);
+  color: var(--booking-color-text);
+  font-family: var(--booking-font-family);
 }
 
 .brand-preview__header {
@@ -1183,7 +1193,14 @@ fieldset.card {
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-bottom: 4px solid var(--booking-color-accent);
-  font-weight: 700;
+  background: var(--booking-color-background);
+  font-family: var(--booking-font-family-heading);
+  font-weight: var(--booking-font-weight-heading);
+}
+
+.brand-preview__header--accent {
+  background: var(--booking-color-accent);
+  color: var(--booking-color-on-accent);
 }
 
 .brand-preview__logo {
@@ -1193,19 +1210,44 @@ fieldset.card {
   object-fit: contain;
 }
 
+.brand-preview__header--logo .brand-preview__logo {
+  max-width: 14rem;
+  height: 3.5rem;
+}
+
+.brand-preview__page {
+  margin: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--booking-color-border);
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-surface);
+  box-shadow: var(--booking-shadow);
+}
+
+.brand-preview__heading {
+  margin: 0 0 0.25rem;
+  font-family: var(--booking-font-family-heading);
+  font-size: 1.25rem;
+  font-weight: var(--booking-font-weight-heading);
+}
+
+.brand-preview__muted {
+  margin: 0 0 1rem;
+  color: var(--booking-color-text-muted);
+}
+
 .brand-preview__body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
-  padding: 1rem;
 }
 
 .brand-preview__button {
   padding: 0.5rem 1.25rem;
-  border-radius: 6px;
+  border-radius: var(--booking-radius-small);
   background: var(--booking-color-accent);
-  color: #ffffff;
+  color: var(--booking-color-on-accent);
   font-weight: 700;
 }
 
@@ -1215,7 +1257,7 @@ fieldset.card {
   width: 2.75rem;
   height: 2.75rem;
   border: 2px solid var(--booking-color-accent);
-  border-radius: 6px;
+  border-radius: var(--booking-radius-small);
   color: var(--booking-color-accent);
   font-weight: 700;
 }
@@ -1223,6 +1265,12 @@ fieldset.card {
 .brand-preview__link {
   color: var(--booking-color-accent);
   text-decoration: underline;
+}
+
+.font-slot + .font-slot {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--adm-border);
 }
 
 /* --- Emergency closure (ADR 0024) --------------------------------------------------------- */

@@ -12,7 +12,7 @@ from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Source
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingKind, BookingStatus, MeetingRef, Slot, SlotUsage
-from app.domain.branding import Branding, Logo
+from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
@@ -48,6 +48,7 @@ class State:
     audit: list[AuditEvent] = field(default_factory=list)
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
+    fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
     contact_blocks: dict[int, ContactBlock] = field(default_factory=dict)
     group_checks: dict[int, GroupCheck] = field(default_factory=dict)
     holiday_calendars: dict[int, holiday_model.HolidayCalendar] = field(default_factory=dict)
@@ -176,6 +177,20 @@ class InMemoryTransaction:
         else:
             self.state.logos[organisation_id] = logo
         branding = replace(organisation.branding, logo=logo.ref if logo else None)
+        self.state.organisations[organisation_id] = replace(organisation, branding=branding)
+
+    async def get_font(self, organisation_slug: str, role: FontRole) -> FontFile | None:
+        organisation = await self.get_organisation(organisation_slug)
+        return self.state.fonts.get((organisation.id, role)) if organisation else None
+
+    async def save_font(self, organisation_id: int, role: FontRole, font: FontFile | None) -> None:
+        organisation = self.state.organisations[organisation_id]
+        if font is None:
+            self.state.fonts.pop((organisation_id, role), None)
+        else:
+            self.state.fonts[(organisation_id, role)] = font
+        fonts = tuple(f.ref for (org, _), f in self.state.fonts.items() if org == organisation_id)
+        branding = replace(organisation.branding, fonts=fonts)
         self.state.organisations[organisation_id] = replace(organisation, branding=branding)
 
     async def get_contact_block(self, organisation_id: int) -> ContactBlock | None:
