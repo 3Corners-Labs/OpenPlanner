@@ -1524,3 +1524,16 @@ fieldset.card {
   padding: 0 0.375rem;
   font-weight: 600;
 }
+
+/* The embed code a host copies (ADR 0035): wraps instead of scrolling sideways. */
+.code-block {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--adm-border-strong);
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-surface-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

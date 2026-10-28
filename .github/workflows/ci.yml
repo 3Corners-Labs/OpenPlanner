@@ -81,6 +81,9 @@ jobs:
       - name: npm audit (e2e tooling)
         working-directory: e2e
         run: npm ci && npm audit --audit-level=moderate
+      - name: npm audit and build (widget, ADR 0035)
+        working-directory: widget
+        run: npm ci --ignore-scripts && npm audit --audit-level=moderate && npm run build
 
   semgrep:
     runs-on: ubuntu-24.04
@@ -220,7 +223,8 @@ jobs:
       - name: Lighthouse accessibility >= 95
         run: >-
           docker run --rm --network host -e CI=true
-          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE" npm run lighthouse
+          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE"
+          sh -c "node host/serve.mjs & npm run lighthouse"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
