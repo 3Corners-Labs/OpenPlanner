@@ -92,6 +92,7 @@ from app.domain.booking import (
     BookingKind,
     BookingStatus,
     ChangeReason,
+    Claim,
     Contact,
     MeetingRef,
     Slot,
@@ -193,6 +194,8 @@ def _group(row: GroupRow) -> Group:
         queue_change_working_days=row.queue_change_working_days,
         planner_change_min_lead_minutes=row.planner_change_min_lead_minutes,
         embedding_enabled=row.embedding_enabled,
+        queue_visible_from_minutes=row.queue_visible_from_minutes,
+        queue_free_pick_allowed=row.queue_free_pick_allowed,
     )
 
 
@@ -260,6 +263,8 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "queue_change_working_days": group.queue_change_working_days,
         "planner_change_min_lead_minutes": group.planner_change_min_lead_minutes,
         "embedding_enabled": group.embedding_enabled,
+        "queue_visible_from_minutes": group.queue_visible_from_minutes,
+        "queue_free_pick_allowed": group.queue_free_pick_allowed,
     }
 
 
@@ -291,6 +296,9 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
         rebook_by=row.rebook_by,
+        claim=Claim(row.claimed_at, row.claimed_by)
+        if row.claimed_at is not None and row.claimed_by is not None
+        else None,
     )
 
 
@@ -1030,6 +1038,27 @@ class SqlTransaction(
         """Return the booking whose meeting has ``meeting_id``."""
         return await self._booking_where(BookingRow.video_room_id == meeting_id)
 
+    async def claim_booking(self, booking_id: int, claim: Claim) -> bool:
+        """Record ``claim`` if the booking is confirmed and unclaimed (one conditional UPDATE)."""
+        result = await self._session.execute(
+            update(BookingRow)
+            .where(
+                BookingRow.id == booking_id,
+                BookingRow.status == BookingStatus.CONFIRMED.value,
+                BookingRow.claimed_at.is_(None),
+            )
+            .values(claimed_at=claim.claimed_at, claimed_by=claim.claimed_by)
+        )
+        return bool(result.rowcount)  # type: ignore[attr-defined]
+
+    async def release_claim(self, booking_id: int) -> None:
+        """Clear the booking's claim, so it returns to the queue."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(claimed_at=None, claimed_by=None)
+        )
+
     async def get_booking_by_task(self, task_id: str) -> Booking | None:
         """Return the booking whose WxCC task has ``task_id``."""
         return await self._booking_where(BookingRow.wxcc_task_id == task_id)
@@ -1374,6 +1403,7 @@ class SqlTransaction(
                 phone=None,
                 guest_join_url=None,
                 host_join_url=None,
+                claimed_by=None,
                 pii_purged_at=now,
             )
         )

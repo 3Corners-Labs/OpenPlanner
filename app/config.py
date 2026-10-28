@@ -251,6 +251,7 @@ class Settings(BaseSettings):
     oidc_role_org_admin: str = "openplanner-org-admin"
     oidc_role_group_admin: str = "openplanner-group-admin"
     oidc_role_auditor: str = "openplanner-auditor"
+    oidc_role_agent: str = "openplanner-agent"
 
     # Integration secrets at rest (ADR 0008): AES-256-GCM under a key derived from this value.
     settings_encryption_key: SecretStr | None = None

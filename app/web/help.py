@@ -71,6 +71,11 @@ TOPICS = (
         Permission.EMBEDDING_MANAGE,
     ),
     HelpTopic(
+        "queue",
+        ("/admin/groups/{slug}/queue", "/admin/groups/{slug}/queue/{booking_id}"),
+        Permission.QUEUE_WORK,
+    ),
+    HelpTopic(
         "organisation-contacts",
         ("/admin/organisations/{org}/contacts",),
         Permission.ORGANISATION_CLOSURE,

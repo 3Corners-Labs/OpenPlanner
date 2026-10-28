@@ -80,6 +80,19 @@ public holidays count as working days here. Example with 1: an appointment on Mo
 can be changed until Friday 10:00. A citizen cannot change an appointment booked later than
 that.
 
+<!-- field: queue_visible_from_minutes -->
+### Visible in the queue (minutes ahead, own queue)
+
+Only with the own queue. How many minutes before the start an appointment appears in the
+agents' queue, from 0 to 120. Default 15. An appointment stays visible until its end.
+
+<!-- field: queue_free_pick_allowed -->
+### Agents may choose an appointment (own queue)
+
+Only with the own queue. **No** (default): agents always pick up the next appointment, so every
+participant gets the first free agent. **Yes**: they can also pick up another appointment from
+the list. That is a working agreement within the team, not a protection.
+
 <!-- field: dispatch_lead_minutes -->
 ### Send to the queue
 

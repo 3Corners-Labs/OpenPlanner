@@ -53,6 +53,8 @@ class Role(StrEnum):
     ORG_ADMIN = "org_admin"
     GROUP_ADMIN = "group_admin"
     AUDITOR = "auditor"
+    AGENT = "agent"
+    """ADR 0043: works the own queue of its groups (NL: medewerker)."""
 
 
 class Reach(StrEnum):
@@ -102,6 +104,7 @@ class Permission(StrEnum):
     ROLES_MANAGE = "roles.manage"
     STAFF_VIEW = "staff.view"
     EMBEDDING_MANAGE = "embedding.manage"
+    QUEUE_WORK = "queue.work"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -142,6 +145,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.STAFF_VIEW: Level.GROUP,
     # ADR 0035: on which websites the organisation's groups may be embedded.
     Permission.EMBEDDING_MANAGE: Level.ORGANISATION,
+    # ADR 0043: see and claim the bookings in a group's own queue.
+    Permission.QUEUE_WORK: Level.GROUP,
 }
 
 LOCKED_PERMISSIONS = frozenset(
@@ -158,7 +163,9 @@ LOCKED_PERMISSIONS = frozenset(
 )
 """ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
 
-PII_PERMISSIONS = frozenset({Permission.BOOKINGS_VIEW, Permission.BOOKINGS_MANAGE})
+PII_PERMISSIONS = frozenset(
+    {Permission.BOOKINGS_VIEW, Permission.BOOKINGS_MANAGE, Permission.QUEUE_WORK}
+)
 """ADR 0039: permissions that show citizens' personal data; never held by the auditor."""
 
 MAINTENANCE_WRITABLE = frozenset(
@@ -227,6 +234,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.STAFF_VIEW,
         # ADR 0035: the host websites allowed to embed the organisation's groups.
         Permission.EMBEDDING_MANAGE,
+        # ADR 0043: can step in as an agent in the own queue.
+        Permission.QUEUE_WORK,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: EVERY_ADMIN
@@ -243,6 +252,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.CLOSURE_MANAGE,
         # ADR 0046: who else administers the own groups, read-only.
         Permission.STAFF_VIEW,
+        # ADR 0043: can step in as an agent in the own queue.
+        Permission.QUEUE_WORK,
     },
     # ADR 0039: compliance and privacy (FG, CISO, auditors): reading only, no personal data.
     Role.AUDITOR: EVERY_ADMIN
@@ -254,6 +265,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         # ADR 0046: who has access, for an access review.
         Permission.STAFF_VIEW,
     },
+    # ADR 0043: picks up bookings in the own queue of its groups; sees first names only.
+    Role.AGENT: EVERY_ADMIN | {Permission.GROUP_VIEW, Permission.QUEUE_WORK},
 }
 
 REACH: dict[Role, Reach] = {
@@ -261,6 +274,7 @@ REACH: dict[Role, Reach] = {
     Role.ORG_ADMIN: Reach.ORGANISATIONS,
     Role.GROUP_ADMIN: Reach.GROUPS,
     Role.AUDITOR: Reach.ORGANISATIONS,
+    Role.AGENT: Reach.GROUPS,
 }
 
 TEMPLATES: tuple[Role, ...] = (Role.ORG_ADMIN, Role.GROUP_ADMIN, Role.AUDITOR)

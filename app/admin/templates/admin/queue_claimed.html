@@ -1,0 +1,26 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ booking.reference }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+<p><a href="/admin/groups/{{ summary.group.slug }}/queue">{{ _("admin.queue.back") }}</a></p>
+<section class="card" aria-labelledby="claimed-heading">
+  <div class="card__header">
+    <h2 id="claimed-heading">{{ _("admin.queue.claimed_title", reference=booking.reference) }}</h2>
+    <p class="card__lead">{{ _("admin.queue.claimed_lead") }}</p>
+  </div>
+  <dl class="facts">
+    <div><dt>{{ _("admin.agenda.time") }}</dt><dd>{{ time }}</dd></div>
+    <div><dt>{{ _("admin.agenda.citizen") }}</dt><dd>{{ booking.first_name }}</dd></div>
+  </dl>
+  <div class="form-actions">
+    {% if booking.join_url %}
+    <a class="button" href="{{ booking.join_url }}" target="_blank" rel="noopener noreferrer">{{ _("admin.queue.join") }}<span class="visually-hidden"> {{ _("admin.queue.new_window") }}</span></a>
+    {% else %}
+    <p>{{ _("admin.queue.no_meeting") }}</p>
+    {% endif %}
+    <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/{{ booking.booking_id }}/release">
+      <button type="submit" class="button button--secondary">{{ _("admin.queue.release") }}</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

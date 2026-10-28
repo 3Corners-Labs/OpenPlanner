@@ -71,6 +71,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.EMBEDDING_MANAGE,  # ADR 0035
+        Permission.QUEUE_WORK,  # ADR 0043
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -84,6 +85,15 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.BOOKINGS_MANAGE,  # ADR 0044: the team's own planner
         Permission.CLOSURE_MANAGE,
         Permission.STAFF_VIEW,  # ADR 0046: read-only, the own groups
+        Permission.QUEUE_WORK,  # ADR 0043
+    }
+    # ADR 0043: the agent works the own queue of its groups and reads its own rights.
+    assert MATRIX[Role.AGENT] == {
+        Permission.DASHBOARD_VIEW,
+        Permission.RIGHTS_VIEW,
+        Permission.MATRIX_VIEW,
+        Permission.GROUP_VIEW,
+        Permission.QUEUE_WORK,
     }
     # ADR 0039: compliance and privacy, read-only, never personal data.
     assert MATRIX[Role.AUDITOR] == {
@@ -129,8 +139,12 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
 
 
-def test_bookings_are_the_permissions_that_show_personal_data() -> None:
-    assert {Permission.BOOKINGS_VIEW, Permission.BOOKINGS_MANAGE} == PII_PERMISSIONS
+def test_bookings_and_the_queue_are_the_permissions_that_show_personal_data() -> None:
+    assert {
+        Permission.BOOKINGS_VIEW,
+        Permission.BOOKINGS_MANAGE,
+        Permission.QUEUE_WORK,
+    } == PII_PERMISSIONS
 
 
 def test_every_role_has_a_reach_and_only_the_superuser_reaches_everything() -> None:
@@ -139,6 +153,7 @@ def test_every_role_has_a_reach_and_only_the_superuser_reaches_everything() -> N
         Role.ORG_ADMIN: Reach.ORGANISATIONS,
         Role.GROUP_ADMIN: Reach.GROUPS,
         Role.AUDITOR: Reach.ORGANISATIONS,
+        Role.AGENT: Reach.GROUPS,
     }
 
 

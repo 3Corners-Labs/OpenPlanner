@@ -160,6 +160,29 @@
       ]
     },
     {
+      "username": "agent",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Mo",
+      "lastName": "Medewerker",
+      "email": "agent@openplanner.test",
+      "attributes": {
+        "roles": [
+          "openplanner-agent"
+        ],
+        "groups": [
+          "demo"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
       "username": "auditor",
       "enabled": true,
       "emailVerified": true,

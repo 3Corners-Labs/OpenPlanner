@@ -193,7 +193,7 @@ In PingFederate, create an OIDC client:
 | ID token signing | RS256, PS256 or ES256 (symmetric algorithms are refused) |
 | Scopes | `openid profile email` |
 | Claims in the ID token | `roles`, `organisations`, `groups` (multi-valued; names configurable with `OIDC_ROLE_CLAIM`, `OIDC_ORGANISATION_CLAIM`, `OIDC_GROUP_CLAIM`) |
-| Role values | `openplanner-superuser`, `openplanner-org-admin`, `openplanner-group-admin`, `openplanner-auditor` (configurable with `OIDC_ROLE_*`) |
+| Role values | `openplanner-superuser`, `openplanner-org-admin`, `openplanner-group-admin`, `openplanner-auditor`, `openplanner-agent` (ADR 0043; configurable with `OIDC_ROLE_*`) |
 
 Organisation and group claims carry the slugs shown in the portal (`/g/<group-slug>`). A claim
 without the matching role grants nothing. Fill these claims only from sources that admins
@@ -608,6 +608,22 @@ A quick end-to-end try without Webex: create a group with opening hours and "Dir
 starten", start a call as a citizen (`/g/<slug>/direct`), open the booking in the agenda,
 create the stand-ins, and play "agent accepts" and "agent joins". The citizen's waiting page
 then shows the matching status.
+
+### 11. When the contact center is down: the own queue (ADR 0043)
+
+When Webex Connect or Webex Contact Center cannot take tasks, a group admin with
+`group.edit` (organisation admin or superuser) can switch a group to OpenPlanner's own queue:
+**Groepen › (groep) › Instellingen › Hoe afspraken bij medewerkers komen › Eigen wachtrij van
+OpenPlanner**. From then on:
+
+- bookings whose dispatch job has not run yet create no WxCC task; already dispatched ones keep
+  theirs;
+- the team's agents sign in to the admin portal (IdP role `OIDC_ROLE_AGENT`, default
+  `openplanner-agent`, with the group in the group claim) and open the **Wachtrij** tab;
+- citizens can change or cancel until `queue_change_working_days` working days before the start.
+
+Switch back the same way once the contact center works again. Both changes are in the audit
+log (`group.edit`, detail `dispatch_kind`).
 
 ## Mail
 

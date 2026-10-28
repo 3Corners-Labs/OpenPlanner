@@ -17,36 +17,37 @@ Maintenance (ADR 0038): while maintenance mode is on, every change is refused ex
 for the permissions marked *maintenance*, and those only for the superuser. Reading
 stays open to every role as usual.
 
-| Permission | Level | Bounds | Superuser | Organisation admin | Group admin | Compliance and privacy (read-only) |
-|---|---|---|---|---|---|---|
-| View overview (`dashboard.view`) | Portal | – | yes | yes | yes | yes |
-| View own rights (`rights.view`) | Portal | – | yes | yes | yes | yes |
-| View rights matrix (`matrix.view`) | Portal | – | yes | yes | yes | yes |
-| Manage organisations (`organisation.manage`) | Portal | locked | yes | – | – | – |
-| Switch diagnostic mode (`diagnostics.manage`) | Portal | locked | yes | – | – | – |
-| Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | locked | yes | – | – | – |
-| Manage API clients (`api_clients.manage`) | Portal | locked | yes | – | – | – |
-| Update the installation (`system.update`) | Portal | locked, maintenance | yes | – | – | – |
-| Switch maintenance mode on and off (`system.maintenance`) | Portal | locked, maintenance | yes | – | – | – |
-| Adjust roles (`roles.manage`) | Portal | locked | yes | – | – | – |
-| Manage integrations and secrets (`integrations.manage`) | Organisation | locked, maintenance | yes | – | – | – |
-| Manage an organisation's branding (`branding.manage`) | Organisation | – | yes | – | – | – |
-| Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | – | yes | yes | – | – |
-| Create groups (`group.create`) | Organisation | – | yes | yes | – | – |
-| Close every team of an organisation at once (`organisation.closure`) | Organisation | needs `closure.manage` | yes | yes | – | – |
-| View retention (`retention.view`) | Organisation | – | yes | yes | – | yes |
-| Manage embedding on websites (`embedding.manage`) | Organisation | – | yes | yes | – | – |
-| View audit log (`audit.view`) | Group | – | yes | yes | yes | yes |
-| Export audit log (`audit.export`) | Group | – | yes | yes | – | yes |
-| View group (`group.view`) | Group | – | yes | yes | yes | yes |
-| Change group settings (`group.edit`) | Group | needs `group.view` | yes | yes | – | – |
-| Manage staffing and staffing exceptions (`schedule.manage`) | Group | needs `group.view` | yes | yes | yes | – |
-| Manage texts (`texts.manage`) | Group | needs `group.view` | yes | yes | yes | – |
-| Manage reminders (`reminders.manage`) | Group | needs `group.view` | yes | yes | – | – |
-| View bookings (`bookings.view`) | Group | personal data | yes | yes | yes | – |
-| Change bookings (`bookings.manage`) | Group | personal data, needs `bookings.view`, `group.view` | yes | yes | yes | – |
-| Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | needs `group.view` | yes | yes | yes | – |
-| View staff (`staff.view`) | Group | – | yes | yes | yes | yes |
+| Permission | Level | Bounds | Superuser | Organisation admin | Group admin | Compliance and privacy (read-only) | Agent |
+|---|---|---|---|---|---|---|---|
+| View overview (`dashboard.view`) | Portal | – | yes | yes | yes | yes | yes |
+| View own rights (`rights.view`) | Portal | – | yes | yes | yes | yes | yes |
+| View rights matrix (`matrix.view`) | Portal | – | yes | yes | yes | yes | yes |
+| Manage organisations (`organisation.manage`) | Portal | locked | yes | – | – | – | – |
+| Switch diagnostic mode (`diagnostics.manage`) | Portal | locked | yes | – | – | – | – |
+| Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | locked | yes | – | – | – | – |
+| Manage API clients (`api_clients.manage`) | Portal | locked | yes | – | – | – | – |
+| Update the installation (`system.update`) | Portal | locked, maintenance | yes | – | – | – | – |
+| Switch maintenance mode on and off (`system.maintenance`) | Portal | locked, maintenance | yes | – | – | – | – |
+| Adjust roles (`roles.manage`) | Portal | locked | yes | – | – | – | – |
+| Manage integrations and secrets (`integrations.manage`) | Organisation | locked, maintenance | yes | – | – | – | – |
+| Manage an organisation's branding (`branding.manage`) | Organisation | – | yes | – | – | – | – |
+| Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | – | yes | yes | – | – | – |
+| Create groups (`group.create`) | Organisation | – | yes | yes | – | – | – |
+| Close every team of an organisation at once (`organisation.closure`) | Organisation | needs `closure.manage` | yes | yes | – | – | – |
+| View retention (`retention.view`) | Organisation | – | yes | yes | – | yes | – |
+| Manage embedding on websites (`embedding.manage`) | Organisation | – | yes | yes | – | – | – |
+| View audit log (`audit.view`) | Group | – | yes | yes | yes | yes | – |
+| Export audit log (`audit.export`) | Group | – | yes | yes | – | yes | – |
+| View group (`group.view`) | Group | – | yes | yes | yes | yes | yes |
+| Change group settings (`group.edit`) | Group | needs `group.view` | yes | yes | – | – | – |
+| Manage staffing and staffing exceptions (`schedule.manage`) | Group | needs `group.view` | yes | yes | yes | – | – |
+| Manage texts (`texts.manage`) | Group | needs `group.view` | yes | yes | yes | – | – |
+| Manage reminders (`reminders.manage`) | Group | needs `group.view` | yes | yes | – | – | – |
+| View bookings (`bookings.view`) | Group | personal data | yes | yes | yes | – | – |
+| Change bookings (`bookings.manage`) | Group | personal data, needs `bookings.view`, `group.view` | yes | yes | yes | – | – |
+| Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | needs `group.view` | yes | yes | yes | – | – |
+| View staff (`staff.view`) | Group | – | yes | yes | yes | yes | – |
+| Pick up appointments in the own queue (`queue.work`) | Group | personal data | yes | yes | yes | – | yes |
 
 ## Custom roles
 
@@ -60,8 +61,8 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 
 | Template | Reach | Delegable permissions |
 |---|---|---|
-| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
-| Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `reminders.manage`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
+| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `queue.work`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
+| Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `queue.work`, `reminders.manage`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
 | Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `matrix.view`, `retention.view`, `rights.view`, `staff.view` |
 
 ## Citizens

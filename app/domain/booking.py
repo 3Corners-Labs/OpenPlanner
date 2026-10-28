@@ -169,6 +169,20 @@ class SlotUsage:
 
 
 @dataclass(frozen=True)
+class Claim:
+    """Who picked up a booking in the own queue, and when (ADR 0043).
+
+    Attributes:
+        claimed_at: When the agent claimed it (UTC).
+        claimed_by: Pseudonym of the agent (``tokens.agent_pseudonym``), never a name or
+            email address. Removed with the citizen's data by ``purge_pii``.
+    """
+
+    claimed_at: datetime
+    claimed_by: str = field(repr=False)
+
+
+@dataclass(frozen=True)
 class Booking:
     """One citizen's appointment in a slot.
 
@@ -195,6 +209,7 @@ class Booking:
     closure_id: int | None = None
     change_reason: ChangeReason | None = None
     rebook_by: datetime | None = None
+    claim: Claim | None = None
 
     @property
     def reference(self) -> str:

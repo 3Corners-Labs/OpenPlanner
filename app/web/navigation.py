@@ -313,6 +313,14 @@ OBJECTS = (
                 ),
             ),
             Screen(
+                "group.queue",
+                "admin.tab.queue",
+                f"{_GROUP}/queue",
+                Permission.QUEUE_WORK,
+                "queue",
+                (f"{_GROUP}/queue/{{booking_id}}",),
+            ),
+            Screen(
                 "group.closure",
                 "admin.tab.closure",
                 f"{_GROUP}/closure",
@@ -329,7 +337,7 @@ OBJECTS = (
         ),
     ),
 )
-"""Object pages with tabs. The group still has nine tabs until ADR 0047 build step 4."""
+"""Object pages with tabs. The group still has ten tabs until ADR 0047 build step 4."""
 
 
 def screens() -> Iterator[tuple[str, Screen]]:

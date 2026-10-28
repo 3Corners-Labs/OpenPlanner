@@ -184,6 +184,18 @@ The product owner accepted this ADR with these choices, so it can be built befor
 - **Three PRs:** dispatch kind and change deadline; the own queue (role `agent`, claim,
   release, not picked up); the calendar invite.
 
+Built in step 2 with these limits, each a follow-up:
+
+- **No automatic refresh yet.** HTMX (point 5) needs a vendored script and a CSP change with
+  its own review (ADR 0016); until then the queue has a **Refresh** link and announces its
+  counts in a polite live region on load. `queue_refresh_seconds` is therefore not added yet.
+- **"Waited longest" is approximated.** The lobby join time is not stored, so among citizens
+  in the lobby the earliest start goes first.
+- **"Not picked up" (point 8)** shows in the queue; the system event and the flag on the
+  dashboard and the agenda follow with ADR 0044's agenda.
+- **Releasing others' claims** is allowed to whoever holds `bookings.view` on the group (group
+  and organisation admins), since group admins do not hold `group.edit`.
+
 ## Consequences
 
 - New port `BookingDispatcher` and adapters `app/adapters/dispatch_contact_center.py` and
