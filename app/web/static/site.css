@@ -1,9 +1,9 @@
 /*
  * Citizen pages (and the shared base of every page). All design decisions are --booking-*
  * custom properties, the same tokens the embeddable widget will read (docs/widget.md). An
- * organisation's branding (/o/{slug}/theme.css) overrides --booking-color-accent only; the
- * domain guarantees at least 4.5:1 against white, so accent text on white and white text on
- * the accent are both readable. Defaults follow NL Design System conventions: system font,
+ * organisation's branding (/o/{slug}/theme.css) overrides an allow-list of them (ADR 0041):
+ * colours, fonts, font size, line height, corners, width and shadow; the domain checks the
+ * contrast between them before they are saved. Spacing, target size and focus colours stay. Defaults follow NL Design System conventions: system font,
  * high contrast, a focus ring that is always visible (3:1), targets of at least 44x44 px.
  */
 :root {
@@ -29,6 +29,8 @@
   --booking-color-later-background: #eceef0;
   --booking-color-later-stripe: #dadde1;
   --booking-font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --booking-font-family-heading: var(--booking-font-family);
+  --booking-font-weight-heading: 700;
   --booking-font-size: 1.0625rem;
   --booking-line-height: 1.6;
   --booking-space-xs: 0.25rem;
@@ -106,6 +108,14 @@ h2:focus-visible {
   box-shadow: none;
 }
 
+h1,
+h2,
+h3,
+.site-name {
+  font-family: var(--booking-font-family-heading);
+  font-weight: var(--booking-font-weight-heading);
+}
+
 h1 {
   margin: 0 0 var(--booking-space-s);
   font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.1rem);
@@ -156,7 +166,23 @@ h2 {
   align-items: center;
   gap: var(--booking-space-s);
   margin: 0;
-  font-weight: 700;
+}
+
+/* Header styles (ADR 0041 §6): filled with the accent, or the logo alone (larger). */
+.site-header--accent {
+  border-bottom-color: var(--booking-color-accent);
+  background: var(--booking-color-accent);
+  color: var(--booking-color-on-accent);
+}
+
+.site-header--accent a:not(:focus-visible),
+.site-header--accent a:not(:focus-visible):hover {
+  color: var(--booking-color-on-accent);
+}
+
+.site-header--logo .site-logo {
+  max-width: 14rem;
+  height: 3.5rem;
 }
 
 .site-logo {

@@ -89,6 +89,22 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/organisations/{org}/branding/logo/remove": {
         "/admin/organisations/demo/branding/logo/remove": statuses(303, 403, 403, 403, 403, 403),
     },
+    # ADR 0041: theme file, fonts. Same rule: superuser only.
+    "GET /admin/organisations/{org}/branding/theme.css": {
+        "/admin/organisations/demo/branding/theme.css": statuses(200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/branding/theme.css": statuses(200, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/branding/theme": {
+        "/admin/organisations/demo/branding/theme": statuses(422, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/branding/font/{role}": {
+        "/admin/organisations/demo/branding/font/text": statuses(422, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/branding/font/{role}/remove": {
+        "/admin/organisations/demo/branding/font/heading/remove": statuses(
+            303, 403, 403, 403, 403, 403
+        ),
+    },
     # Holiday calendars (ADR 0025): the superuser maintains them; organisation admins choose
     # them for their own organisation; group admins choose for their own groups (below).
     "GET /admin/holidays": {"/admin/holidays": statuses(200, 200, 403, 200, 403, 403)},

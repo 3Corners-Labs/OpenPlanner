@@ -11,9 +11,11 @@
 <body{% block body_attributes %}{% endblock %}>
   <a class="skip-link" href="#content">{{ _("site.skip_to_content") }}</a>
   {% block page %}
-  <header class="site-header">
+  <header class="site-header{% if brand is defined %} site-header--{{ brand.header_style }}{% endif %}">
     <p class="site-name">{% block site_name %}
-      {%- if brand is defined -%}
+      {%- if brand is defined and brand.header_style == "logo" -%}
+      <img class="site-logo" src="{{ brand.logo_href }}" alt="{{ brand.name }}">
+      {%- elif brand is defined -%}
       {% if brand.logo_href %}<img class="site-logo" src="{{ brand.logo_href }}" alt="">{% endif %}<span>{{ brand.name }}</span>
       {%- else -%}
       {{ _("site.name") }}

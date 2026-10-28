@@ -40,6 +40,7 @@ from app.adapters.db.models import (
     HolidayRow,
     IntegrationReportRow,
     JobRow,
+    OrganisationFontRow,
     OrganisationHolidayCalendarRow,
     OrganisationLogoRow,
     OrganisationRow,
@@ -70,7 +71,7 @@ from app.domain.booking import (
     Slot,
     SlotUsage,
 )
-from app.domain.branding import Branding, Logo, LogoRef
+from app.domain.branding import Branding, FontFile, FontRef, FontRole, HeaderStyle, Logo, LogoRef
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
@@ -104,6 +105,7 @@ from app.domain.scheduling import (
     ScheduleRule,
     TimeWindow,
 )
+from app.domain.theme import Theme
 
 _PENDING = "pending"
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
@@ -121,7 +123,17 @@ def _organisation(row: OrganisationRow) -> Organisation:
         if row.logo_media_type and row.logo_digest
         else None
     )
-    branding = Branding(row.display_name, row.accent_color, logo)
+    fonts = tuple(
+        FontRef(FontRole(role), digest) for role, digest in json.loads(row.font_digests).items()
+    )
+    branding = Branding(
+        row.display_name,
+        row.accent_color,
+        logo,
+        Theme(tuple(sorted(json.loads(row.theme_tokens).items()))),
+        HeaderStyle(row.header_style),
+        fonts,
+    )
     return Organisation(row.id, row.name, row.slug, row.default_locale, branding)
 
 
@@ -520,11 +532,16 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
         )
 
     async def save_branding(self, organisation_id: int, branding: Branding) -> None:
-        """Store display name and accent colour; the logo columns are left alone."""
+        """Store name, accent, theme and header style; logo and font columns are left alone."""
         await self._session.execute(
             update(OrganisationRow)
             .where(OrganisationRow.id == organisation_id)
-            .values(display_name=branding.display_name, accent_color=branding.accent_color)
+            .values(
+                display_name=branding.display_name,
+                accent_color=branding.accent_color,
+                theme_tokens=json.dumps(dict(branding.theme.values), sort_keys=True),
+                header_style=branding.header_style.value,
+            )
         )
 
     async def get_logo(self, organisation_slug: str) -> Logo | None:
@@ -558,6 +575,41 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
                 logo_media_type=logo.media_type if logo else None,
                 logo_digest=logo.digest if logo else None,
             )
+        )
+
+    async def get_font(self, organisation_slug: str, role: FontRole) -> FontFile | None:
+        """Return the organisation's font of ``role``, if it has one."""
+        found = await self._session.scalar(
+            select(OrganisationFontRow.data)
+            .join(OrganisationRow, OrganisationFontRow.organisation_id == OrganisationRow.id)
+            .where(OrganisationRow.slug == organisation_slug, OrganisationFontRow.role == role)
+        )
+        return FontFile(role, found) if found is not None else None
+
+    async def save_font(self, organisation_id: int, role: FontRole, font: FontFile | None) -> None:
+        """Replace or remove the font of ``role`` and keep the digests on the organisation."""
+        await self._session.execute(
+            delete(OrganisationFontRow).where(
+                OrganisationFontRow.organisation_id == organisation_id,
+                OrganisationFontRow.role == role,
+            )
+        )
+        if font is not None:
+            self._session.add(
+                OrganisationFontRow(organisation_id=organisation_id, role=role, data=font.data)
+            )
+        stored = await self._session.scalar(
+            select(OrganisationRow.font_digests).where(OrganisationRow.id == organisation_id)
+        )
+        digests: dict[str, str] = json.loads(stored or "{}")
+        if font is None:
+            digests.pop(role, None)
+        else:
+            digests[role] = font.digest
+        await self._session.execute(
+            update(OrganisationRow)
+            .where(OrganisationRow.id == organisation_id)
+            .values(font_digests=json.dumps(digests, sort_keys=True))
         )
 
     async def add_group(self, group: Group) -> Group:
