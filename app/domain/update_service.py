@@ -90,7 +90,10 @@ class UpdateService:
         clock: Current time.
         admin: Authorises the superuser and audits refusals.
         current: The running version (``APP_VERSION``); ``None`` when it is not a release.
-        releases: Where releases are looked up; ``None`` when ``UPDATE_REPOSITORY`` is unset.
+        releases: Where releases are looked up; ``None`` when ``UPDATE_REPOSITORY`` is unset
+            and in the web process, which leaves the lookup to the worker.
+        checking: Whether the installation checks for releases (``UPDATE_REPOSITORY``), also
+            when this process does not look them up itself; defaults to ``releases`` being set.
     """
 
     def __init__(
@@ -101,6 +104,7 @@ class UpdateService:
         *,
         current: Version | None,
         releases: ReleaseSource | None,
+        checking: bool | None = None,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -108,6 +112,7 @@ class UpdateService:
         self._admin = admin
         self._current = current
         self._releases = releases
+        self._checking = releases is not None if checking is None else checking
 
     @property
     def current(self) -> Version | None:
@@ -172,7 +177,7 @@ class UpdateService:
             history = await tx.get_update_requests()
         current = open_request(history)
         return UpdateOverview(
-            enabled=self._releases is not None,
+            enabled=self._checking,
             current=self._current,
             check=check,
             available=None if current else available_update(self._current, check),

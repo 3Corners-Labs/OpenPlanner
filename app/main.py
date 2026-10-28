@@ -150,9 +150,7 @@ def create_app(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled
         )
         # ADR 0029: the web process only reads checks and stores requests; no release lookup.
-        app.state.update_service = update_service(
-            settings.model_copy(update={"update_repository": None}), uow, clock, http
-        )
+        app.state.update_service = update_service(settings, uow, clock, http, lookup=False)
         if agent_api is not None:
             for name in ("api_access", "booking_service", "translator", "limiter", "clock"):
                 setattr(agent_api.state, name, getattr(app.state, name))

@@ -11,6 +11,7 @@ from app.domain.ports import IntegrationError
 from app.domain.updates import Release, Version
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.domain import DEMO_SUPERUSER
 
 LATEST = {  # recorded shape of GET /repos/{owner}/{repo}/releases/latest (trimmed)
     "url": "https://api.github.com/repos/acme/openplanner/releases/1",
@@ -112,3 +113,14 @@ async def test_update_service_checks_only_with_a_repository() -> None:
         )
         assert not await off.check_if_due()
         assert await on.check_if_due()
+
+
+async def test_web_process_never_looks_up_but_knows_the_worker_does() -> None:
+    uow, clock = InMemoryUnitOfWork(), FixedClock()
+    repository = Settings(environment="dev", update_repository="acme/openplanner")
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _: httpx.Response(500))
+    ) as http:
+        web = update_service(repository, uow, clock, http, lookup=False)
+        assert not await web.check_if_due()
+    assert (await web.overview(DEMO_SUPERUSER)).enabled
