@@ -151,6 +151,10 @@ class Settings(BaseSettings):
     # Class C: the Retry-After of citizen pages and machine-API writes refused during
     # maintenance (seconds); maintenance has no automatic end, so this is a polite guess.
     maintenance_retry_after_seconds: int = Field(default=300, ge=30, le=3600)
+    # Class C: maintenance on longer than this many hours is reported as a system event by the
+    # worker (ADR 0038 §6), and again every MAINTENANCE_ALERT_REPEAT_HOURS while it lasts.
+    maintenance_alert_hours: int = Field(default=4, ge=1, le=72)
+    maintenance_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
 
     @model_validator(mode="after")
     def _storage_limits_are_ordered(self) -> "Settings":
