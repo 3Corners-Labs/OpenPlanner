@@ -22,8 +22,9 @@ from sqlalchemy.sql.elements import SQLCoreOperations
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
+from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
-from app.adapters.db.images import ImageQueries
+from app.adapters.db.images import ImageQueries, page_image
 from app.adapters.db.models import (
     AdminProfileRow,
     AuditEventRow,
@@ -54,6 +55,7 @@ from app.adapters.db.models import (
     WebhookEventRow,
 )
 from app.adapters.db.retention import RetentionQueries
+from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.updates import UpdateQueries
 from app.domain.audit import (
     PROBLEMS,
@@ -96,7 +98,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
-from app.domain.contacts import ContactBlock, ContactKind, ContactOption
+from app.domain.contacts import ContactBlock
 from app.domain.direct_queue import DirectCall
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
@@ -120,34 +122,6 @@ _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
 def _check_name(group_id: int) -> str:
     """Return the integration report name of a group's latest check."""
     return f"group-check:{group_id}"
-
-
-def _contacts_json(block: ContactBlock) -> str:
-    """Return a contact block as the JSON stored for organisations, groups and closures."""
-    options = [
-        {"kind": o.kind.value, "value": o.value, "labels": dict(o.labels), "hours": dict(o.hours)}
-        for o in block.options
-    ]
-    return json.dumps({"headings": dict(block.headings), "options": options})
-
-
-def _contacts_block(body: str) -> ContactBlock:
-    """Return the stored contact block; options another version wrote are left out."""
-    data = json.loads(body)
-    options = []
-    for item in data.get("options", []):
-        try:
-            options.append(
-                ContactOption(
-                    ContactKind(item["kind"]),
-                    str(item["value"]),
-                    dict(item.get("labels", {})),
-                    dict(item.get("hours", {})),
-                )
-            )
-        except (KeyError, ValueError, TypeError, DomainError):
-            continue  # written by another version; skip rather than fail the page
-    return ContactBlock(tuple(options), dict(data.get("headings", {})))
 
 
 def _organisation(row: OrganisationRow) -> Organisation:
@@ -317,14 +291,14 @@ def _closure(
         notices={n.locale: n.text for n in notices},
         created_at=row.created_at,
         headings={n.locale: n.heading for n in notices if n.heading},
-        contacts=_contacts_block(row.contacts) if row.contacts else None,
+        contacts=contacts_block(row.contacts) if row.contacts else None,
         image=image,
     )
 
 
 def _contacts_column(block: ContactBlock | None) -> str | None:
     """Return the ``contacts`` column of a closure: the block as JSON, or NULL."""
-    return _contacts_json(block) if block else None
+    return contacts_json(block) if block else None
 
 
 def _call_status(row: CallStatusRow) -> CallStatus:
@@ -357,12 +331,15 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
     return f"channel:{organisation_id}:{channel.value}"
 
 
-class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, ImageQueries):
+class SqlTransaction(
+    ApiClientQueries, UpdateQueries, RetentionQueries, ImageQueries, ScenarioQueries
+):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
     from ``UpdateQueries`` (ADR 0029), those of the retention overview from
-    ``RetentionQueries`` (ADR 0039), those of closure images from ``ImageQueries`` (ADR 0037).
+    ``RetentionQueries`` (ADR 0039), those of closure images and scenarios from
+    ``ImageQueries`` and ``ScenarioQueries`` (ADR 0037).
 
     Args:
         session: The open session.
@@ -660,7 +637,7 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, ImageQue
     async def get_contact_block(self, organisation_id: int) -> ContactBlock | None:
         """Return the organisation's default contact block, if it has one."""
         row = await self._session.get(OrganisationContactsRow, organisation_id)
-        return _contacts_block(row.body) if row else None
+        return contacts_block(row.body) if row else None
 
     async def save_contact_block(self, organisation_id: int, block: ContactBlock | None) -> None:
         """Replace or, with ``None``, remove the organisation's default contact block."""
@@ -671,13 +648,13 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, ImageQue
         )
         if block is not None:
             self._session.add(
-                OrganisationContactsRow(organisation_id=organisation_id, body=_contacts_json(block))
+                OrganisationContactsRow(organisation_id=organisation_id, body=contacts_json(block))
             )
 
     async def get_group_contact_block(self, group_id: int) -> ContactBlock | None:
         """Return the group's own contact block, if it has one."""
         row = await self._session.get(GroupContactsRow, group_id)
-        return _contacts_block(row.body) if row else None
+        return contacts_block(row.body) if row else None
 
     async def save_group_contact_block(self, group_id: int, block: ContactBlock | None) -> None:
         """Replace or, with ``None``, remove the group's own contact block."""
@@ -685,7 +662,7 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, ImageQue
             delete(GroupContactsRow).where(GroupContactsRow.group_id == group_id)
         )
         if block is not None:
-            self._session.add(GroupContactsRow(group_id=group_id, body=_contacts_json(block)))
+            self._session.add(GroupContactsRow(group_id=group_id, body=contacts_json(block)))
 
     async def add_group(self, group: Group) -> Group:
         """Insert a group and return it with its ID."""
@@ -1420,7 +1397,7 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, ImageQue
         notices = await self._session.scalars(
             select(ClosureNoticeRow).where(ClosureNoticeRow.closure_id == row.id)
         )
-        return _closure(row, list(notices), await self.page_image(row.image_id))
+        return _closure(row, list(notices), await page_image(self._session, row.image_id))
 
     async def _save_notices(self, closure_id: int, closure: Closure) -> None:
         """Replace the notices and headings of ``closure_id`` with those of ``closure``."""

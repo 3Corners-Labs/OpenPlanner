@@ -83,6 +83,12 @@ stripped before the file is stored, so only the picture itself is kept. Served f
 origin and only while its closure is visible; never mailed, never sent to a third party.
 Organisation data; no purge job.
 
+**Closure scenarios (ADR 0037 §4, CL-4).** Prepared closure content per organisation or team
+(`closure_scenarios`): an admin-facing name, notices and headings, optionally a contact block
+and an image (`closure_images`, stripped as above). Admin-only until a closure starts from it;
+then the closure gets its own copy, so deleting or editing the scenario never changes what
+citizens were told. Organisation data; no personal data of citizens; no purge job.
+
 ## Admin login and audit (WP7a)
 
 ```

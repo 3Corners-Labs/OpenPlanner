@@ -20,6 +20,13 @@ As soon as the closure starts:
 
 A closure that starts later is shown to citizens beforehand as a notice above the calendar.
 
+### Starting from a scenario
+
+If you prepared a scenario, choose it under **Start from a scenario** and click **Use**: the
+form is filled with the scenario's notice and heading. On closing, the closure also takes over
+the scenario's contact options and image. See
+[Scenarios for an emergency closure](closure-scenarios.md).
+
 ## Image
 
 A running or planned closure can have one image, such as a pictogram for "closed" or

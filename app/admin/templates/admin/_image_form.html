@@ -1,0 +1,31 @@
+{#- The image form of a closure or scenario (ADR 0037 §3-4): preview, file, text alternative,
+    "decorative", and a separate remove form. ``image`` has ``src`` and ``alt``. -#}
+{% from "admin/_fields.html" import field with context %}
+
+{% macro image_form(action, image, fields, is_decorative, lead) -%}
+<form class="card" method="post" action="{{ action }}" enctype="multipart/form-data" novalidate aria-labelledby="image-heading">
+  <div class="card__header">
+    <h2 id="image-heading">{{ _("admin.closure.image") }}</h2>
+    <p class="card__lead">{{ lead }}</p>
+  </div>
+  {% if image %}
+  <p>{{ _("admin.closure.image_current") }}</p>
+  <img class="closure-image" src="{{ image.src }}" alt="{{ image.alt }}">
+  {% endif %}
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="choice__option">
+    <input type="checkbox" id="decorative" name="decorative" value="yes"{% if is_decorative %} checked{% endif %}>
+    <label for="decorative">{{ _("admin.closure.image_decorative") }}</label>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.closure.image_save") }}</button>
+  </div>
+</form>
+{% if image %}
+<form class="card" method="post" action="{{ action }}/remove" aria-label="{{ _("admin.closure.image_remove") }}">
+  <button type="submit" class="button button--secondary">{{ _("admin.closure.image_remove") }}</button>
+</form>
+{% endif %}
+{%- endmacro %}

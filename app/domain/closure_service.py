@@ -15,7 +15,9 @@ are on hold; an admin resolves them one by one or all at once.
     reinstate / cancel / move        one suspended booking (or all: reinstate_all, cancel_all)
 
 A closure copies the contact block that applies to its group when it starts (ADR 0037 §2,
-``effective_block``): later edits of the group's or organisation's block leave it alone.
+``effective_block``): later edits of the group's or organisation's block leave it alone. Started
+from a prepared scenario (ADR 0037 §4) it copies the scenario's contact block (if it has one)
+and image as well; the notices and headings come from the form, which the scenario prefilled.
 
 Audit details are machine keys with counts (``closure.start,bookings:3,contacts:2``), never
 values.
@@ -51,6 +53,7 @@ from app.domain.job_plan import (
     plan_purge,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.scenario_service import usable_scenario
 from app.domain.scheduling import Group, GroupSummary, Organisation
 from app.domain.services import BookingService
 
@@ -64,12 +67,14 @@ class ClosureInput:
         ends_at: First start time that is open again (UTC); ``None`` until further notice.
         notices: The explanation for citizens per locale (``NOTICE_LOCALES`` required).
         headings: Optional heading per locale; empty means the page's default heading.
+        scenario_id: The prepared scenario the closure starts from, if any (ADR 0037 §4).
     """
 
     starts_at: datetime | None
     ends_at: datetime | None
     notices: Mapping[str, str] = field(default_factory=dict)
     headings: Mapping[str, str] = field(default_factory=dict)
+    scenario_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -178,7 +183,8 @@ class ClosureService:
         async with self._uow.locked() as tx:
             group = await _group(tx, slug)
             stored, count = await self._close(tx, group, closure)
-            await self._audit(tx, principal, authorization, slug, _start_detail(stored, count))
+            detail = _start_detail(stored, count, closure.scenario_id)
+            await self._audit(tx, principal, authorization, slug, detail)
         return count
 
     async def update(
@@ -415,11 +421,10 @@ class ClosureService:
                 if await tx.get_closures(summary.group.id, now):
                     outcomes.append(GroupOutcome(summary.group.slug, changed=False))
                     continue
-                stored, count = await self._close(tx, summary.group, closure)
+                stored, count = await self._close(tx, summary.group, closure, organisation=True)
                 outcomes.append(GroupOutcome(summary.group.slug, True, count))
-                await self._organisation_audit(
-                    tx, principal, organisation_slug, summary, _start_detail(stored, count)
-                )
+                detail = _start_detail(stored, count, closure.scenario_id)
+                await self._organisation_audit(tx, principal, organisation_slug, summary, detail)
         return outcomes
 
     async def lift_organisation(
@@ -452,15 +457,25 @@ class ClosureService:
     # --- steps ----------------------------------------------------------------------------
 
     async def _close(
-        self, tx: Transaction, group: Group, closure: ClosureInput
+        self, tx: Transaction, group: Group, closure: ClosureInput, *, organisation: bool = False
     ) -> tuple[Closure, int]:
-        """Store a closure for ``group`` and suspend what it covers; return it and how many."""
+        """Store a closure for ``group`` and suspend what it covers; return it and how many.
+
+        With a scenario, its contact block (or else the group's) and its image are copied;
+        ``organisation`` allows only organisation scenarios (closing a whole organisation).
+        """
         now = self._clock.now()
         starts_at = max(closure.starts_at or now, now)
         if closure.ends_at is not None and closure.ends_at <= starts_at:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "ends_at")
+        scenario = (
+            await usable_scenario(tx, group, closure.scenario_id, organisation_only=organisation)
+            if closure.scenario_id is not None
+            else None
+        )
         if await tx.get_closures(group.id, now):
             raise DomainError(ErrorCode.CLOSURE_EXISTS)
+        contacts = scenario.contacts if scenario and scenario.contacts else None
         stored = await tx.add_closure(
             Closure(
                 None,
@@ -470,9 +485,14 @@ class ClosureService:
                 _notices(closure.notices),
                 now,
                 closure.headings,
-                await effective_block(tx, group),
+                contacts or await effective_block(tx, group),
             )
         )
+        if scenario and scenario.image and scenario.id is not None:
+            image = await tx.get_scenario_image(scenario.id)
+            if image is not None:
+                await tx.save_closure_image(_id(stored), scenario.image.text, image)
+                stored = replace(stored, image=image.ref(scenario.image.text))
         return stored, await self._suspend_covered(tx, group, stored)
 
     async def _suspend_covered(self, tx: Transaction, group: Group, closure: Closure) -> int:
@@ -628,9 +648,10 @@ class ClosureService:
         )
 
 
-def _start_detail(closure: Closure, bookings: int) -> str:
-    """Return the audit detail of a started closure: counts only, contacts when copied."""
-    detail = f"closure.start,bookings:{bookings}"
+def _start_detail(closure: Closure, bookings: int, scenario_id: int | None = None) -> str:
+    """Return the audit detail of a started closure: ids and counts only, never texts."""
+    scenario = f"scenario:{scenario_id}," if scenario_id is not None else ""
+    detail = f"closure.start,{scenario}bookings:{bookings}"
     return f"{detail},contacts:{len(closure.contacts.options)}" if closure.contacts else detail
 
 

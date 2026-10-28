@@ -67,6 +67,15 @@ TOPICS = (
         "group-contacts", ("/admin/groups/{slug}/closure/contacts",), Permission.CLOSURE_MANAGE
     ),
     HelpTopic("group-closure", ("/admin/groups/{slug}/closure",), Permission.CLOSURE_MANAGE),
+    HelpTopic(
+        "closure-scenarios",
+        tuple(
+            f"{base}/closure/scenarios{suffix}"
+            for base in ("/admin/organisations/{org}", "/admin/groups/{slug}")
+            for suffix in ("", "/{scenario_id}", "/{scenario_id}/contacts")
+        ),
+        Permission.CLOSURE_MANAGE,
+    ),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 

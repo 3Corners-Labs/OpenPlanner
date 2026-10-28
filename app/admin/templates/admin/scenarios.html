@@ -1,0 +1,56 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.scenarios.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% set page_title = _("admin.scenarios.title") %}
+{% set page_lead = _("admin.scenarios.lead") %}
+{% include "admin/_scenario_header.html" %}
+{% include "_error_summary.html" %}
+{% macro scenario_table(id, caption, items) -%}
+<div class="table-scroll">
+<table class="data-table" id="{{ id }}">
+  <caption class="visually-hidden">{{ caption }}</caption>
+  <thead>
+    <tr><th scope="col">{{ _("admin.scenarios.name") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th></tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <th scope="row"><a href="{{ item.url }}">{{ item.name }}</a></th>
+      <td><a href="{{ item.use_url }}" aria-label="{{ _("admin.scenarios.use_label", name=item.name) }}">{{ _("admin.scenarios.use") }}</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{%- endmacro %}
+<section class="card" aria-labelledby="own-heading">
+  <div class="card__header">
+    <h2 id="own-heading">{% if is_group %}{{ _("admin.scenarios.own_group") }}{% else %}{{ _("admin.scenarios.own_organisation") }}{% endif %}</h2>
+    <p class="card__lead">{{ _("admin.scenarios.own_lead") }}</p>
+  </div>
+  {% if own %}{{ scenario_table("own-scenarios", _("admin.scenarios.title"), own) }}{% else %}<p class="empty-state">{{ _("admin.scenarios.empty") }}</p>{% endif %}
+</section>
+{% if is_group %}
+<section class="card" aria-labelledby="shared-heading">
+  <div class="card__header">
+    <h2 id="shared-heading">{{ _("admin.scenarios.shared") }}</h2>
+    <p class="card__lead">{{ _("admin.scenarios.shared_lead") }}</p>
+  </div>
+  {% if shared %}{{ scenario_table("shared-scenarios", _("admin.scenarios.shared"), shared) }}{% else %}<p class="empty-state">{{ _("admin.scenarios.empty") }}</p>{% endif %}
+</section>
+{% endif %}
+<form class="card" method="post" action="{{ scenarios_url }}" novalidate aria-labelledby="new-heading">
+  <div class="card__header">
+    <h2 id="new-heading">{{ _("admin.scenarios.new") }}</h2>
+    <p class="card__lead">{{ _("admin.scenarios.new_lead") }}</p>
+  </div>
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.scenarios.create") }}</button>
+    <a href="{{ closure_url }}">{{ _("admin.scenarios.back") }}</a>
+  </div>
+</form>
+{% endblock %}

@@ -97,3 +97,8 @@ All notable changes are listed here, generated from Conventional Commits on rele
   served from our origin only while the closure is visible. Magic-byte recognition and the
   multipart upload reader are shared with the logo (`app/domain/images.py`,
   `app/admin/uploads.py`). Migration 0028. Manual topic for the closure screen.
+- Closure scenarios (ADR 0037, CL-4): organisation scenarios (`organisation.closure`) and a
+  team's own (`closure.manage`) with name, notices, headings, an optional contact block and an
+  image that only admins see. "Close the team" and "close the organisation" start from a
+  scenario (or empty) and copy it; later edits never change a running closure. Audited as
+  `closure.start,scenario:N,bookings:N`. Migration 0036. Manual topic with examples to copy.
