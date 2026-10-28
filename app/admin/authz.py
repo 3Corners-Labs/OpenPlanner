@@ -7,6 +7,11 @@ object is inspectable, so a test can prove that no admin route lacks one.
 
 Templates receive ``can(permission, group=None)`` to show only the actions the matrix allows;
 hiding is a convenience, the server always decides again.
+
+The principal is resolved once per request by ``load_principal`` (a dependency of every admin
+router): the session cookie gives the built-in roles and the other role claim values, the
+role catalogue adds the custom roles those values grant now (ADR 0039), so a changed or
+deleted custom role takes effect on the next request without a new login.
 """
 
 from collections.abc import Callable
@@ -28,6 +33,7 @@ from app.domain.authorization import (
     scope_for,
 )
 from app.domain.ports import Clock
+from app.domain.roles import RoleService
 from app.domain.scheduling import GroupSummary
 
 log = structlog.get_logger()
@@ -75,11 +81,37 @@ def admin_service(request: Request) -> AdminService:
     return service
 
 
-def session_principal(request: Request) -> Principal | None:
-    """Return the logged-in principal of ``request``, honouring the absolute lifetime."""
+def role_service(request: Request) -> RoleService:
+    """Return the application's role service (custom roles, ADR 0039)."""
+    service: RoleService = request.app.state.role_service
+    return service
+
+
+def _cookie_principal(request: Request) -> Principal | None:
+    """Return the principal stored in the session, honouring the absolute lifetime."""
     clock: Clock = request.app.state.clock
     hours: int = request.app.state.settings.admin_session_hours
     return current_principal(request, clock.now(), timedelta(hours=hours))
+
+
+async def load_principal(request: Request) -> None:
+    """Resolve the logged-in principal with its custom roles once, for the whole request."""
+    principal = _cookie_principal(request)
+    if principal is not None:
+        principal = await role_service(request).attach(principal)
+    request.state.admin_principal = principal
+
+
+def session_principal(request: Request) -> Principal | None:
+    """Return the logged-in principal of ``request``, honouring the absolute lifetime.
+
+    Outside an admin router (where ``load_principal`` did not run) custom roles are left out,
+    so the principal can only hold less.
+    """
+    loaded: Principal | None | bool = getattr(request.state, "admin_principal", False)
+    if loaded is not False:
+        return loaded if isinstance(loaded, Principal) else None
+    return _cookie_principal(request)
 
 
 def can_function(principal: Principal) -> Callable[..., bool]:

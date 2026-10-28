@@ -129,6 +129,13 @@ def admin_moment(request: Request, locale: RequestLocale, at: datetime) -> str:
     return moment_label(at, ZoneInfo(request.app.state.settings.admin_timezone), locale.code)
 
 
+def role_labels(principal: Principal, locale: RequestLocale) -> list[str]:
+    """Name the principal's roles: built-in ones translated, custom ones by their own name."""
+    built_in = [locale.gettext(ROLE_LABELS[role]) for role in Role if role in principal.roles]
+    custom = sorted(role.name(locale.code) for role in principal.custom_roles)
+    return built_in + custom
+
+
 def page(
     request: Request,
     locale: RequestLocale,
@@ -143,7 +150,6 @@ def page(
         for item in NAVIGATION
         if can(item.permission)
     ]
-    role_labels = [locale.gettext(ROLE_LABELS[role]) for role in Role if role in principal.roles]
     return render(
         templates,
         request,
@@ -154,7 +160,7 @@ def page(
             "principal": principal,
             "nav": nav,
             "can": can,
-            "role_labels": role_labels,
+            "role_labels": role_labels(principal, locale),
             # A message page (refusal, not found) keeps ``help_topic`` None: no help link.
             "help_topic": context["help_topic"] if "help_topic" in context else page_topic(request),
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).

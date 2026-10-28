@@ -48,6 +48,19 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 200, 403)},
+    # ADR 0039: the role editor is the superuser's (roles.manage is locked).
+    "GET /admin/roles": {"/admin/roles": statuses(200, 403, 403, 403, 403, 403)},
+    "GET /admin/roles/new": {"/admin/roles/new": statuses(200, 403, 403, 403, 403, 403)},
+    "POST /admin/roles": {"/admin/roles": statuses(422, 403, 403, 403, 403, 403)},
+    "GET /admin/roles/{role_id}": {
+        "/admin/roles/999999": statuses(404, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/roles/{role_id}": {
+        "/admin/roles/999999": statuses(404, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/roles/{role_id}/delete": {
+        "/admin/roles/999999/delete": statuses(404, 403, 403, 403, 403, 403),
+    },
     # ADR 0031: every role has a log; what it lists is exact per level (test_audit_routes).
     "GET /admin/audit": {"/admin/audit": statuses(200, 200, 200, 200, 200, 403)},
     # ADR 0039: retention counts per organisation; no group admins, never personal data.

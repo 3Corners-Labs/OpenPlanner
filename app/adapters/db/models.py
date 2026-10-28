@@ -11,6 +11,7 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
     organisations 1──* channel_settings (SMTP and SMS per organisation, secret encrypted)
     integration_reports (last webhook listing and delivery test; no secrets)
     admin_profiles (name per identity-provider subject; joined into the audit log)
+    roles (custom roles of the superuser, ADR 0039; no foreign keys, linked by claim value)
     release_checks (one row), update_requests (ADR 0029; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
     organisations 1──n organisation_fonts (branding, ADR 0041)
@@ -672,3 +673,21 @@ class UpdateRequestRow(Base):
             name="status",
         ),
     )
+
+
+class RoleRow(Base):
+    """A custom role (ADR 0039): a copy of a built-in template within its bounds.
+
+    ``permissions`` is space separated; a permission no longer known grants nothing. The
+    reach follows from ``template`` and never changes.
+    """
+
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    template: Mapped[str] = mapped_column(String(32))
+    name_nl: Mapped[str] = mapped_column(String(80))
+    name_en: Mapped[str] = mapped_column(String(80))
+    claim_value: Mapped[str] = mapped_column(String(128), unique=True)
+    permissions: Mapped[str] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer)

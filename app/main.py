@@ -46,6 +46,7 @@ from app.domain.messaging_service import MessagingService
 from app.domain.organisations import OrganisationService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
+from app.domain.roles import RoleService
 from app.domain.services import BookingService
 from app.domain.simulation import SimulationService
 from app.i18n import Translator, load_catalogues
@@ -145,6 +146,17 @@ def create_app(
         )
         app.state.closure_service = ClosureService(
             uow, clock, app.state.admin_service, app.state.booking_service
+        )
+        app.state.role_service = RoleService(
+            uow,
+            clock,
+            app.state.admin_service,
+            (
+                settings.oidc_role_superuser,
+                settings.oidc_role_org_admin,
+                settings.oidc_role_group_admin,
+                settings.oidc_role_auditor,
+            ),
         )
         app.state.api_access = ApiAccessService(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled

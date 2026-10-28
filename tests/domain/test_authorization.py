@@ -109,6 +109,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.INTEGRATIONS_MANAGE,
         Permission.API_CLIENTS_MANAGE,
         Permission.SYSTEM_UPDATE,
+        Permission.ROLES_MANAGE,  # ADR 0039 step 3
     } == LOCKED_PERMISSIONS
     for permission in LOCKED_PERMISSIONS:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]

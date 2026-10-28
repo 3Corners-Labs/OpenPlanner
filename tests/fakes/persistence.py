@@ -10,7 +10,7 @@ from datetime import date, datetime
 from app.domain import holidays as holiday_model
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Source
-from app.domain.authorization import Scope
+from app.domain.authorization import CustomRole, Scope
 from app.domain.booking import Booking, BookingKind, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
@@ -66,6 +66,7 @@ class State:
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
+    custom_roles: dict[int, CustomRole] = field(default_factory=dict)
     purged_at: dict[int, datetime] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
     next_id: int = 1
@@ -625,6 +626,31 @@ class InMemoryTransaction:
 
     async def save_update_request(self, request: UpdateRequest) -> None:
         self.state.update_requests[request.id or 0] = request
+
+    async def list_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+        profiles = self.state.admin_profiles
+        return [
+            AuditEntry(e, profiles[e.actor].display_name if e.actor in profiles else None)
+            for e in reversed(self.state.audit)
+            if e.action in actions
+        ][:limit]
+
+    async def list_custom_roles(self) -> list[CustomRole]:
+        return [self.state.custom_roles[k] for k in sorted(self.state.custom_roles)]
+
+    async def get_custom_role(self, role_id: int) -> CustomRole | None:
+        return self.state.custom_roles.get(role_id)
+
+    async def add_custom_role(self, role: CustomRole) -> CustomRole:
+        stored = replace(role, id=self._new_id())
+        self.state.custom_roles[stored.id] = stored
+        return stored
+
+    async def save_custom_role(self, role: CustomRole) -> None:
+        self.state.custom_roles[role.id] = role
+
+    async def delete_custom_role(self, role_id: int) -> None:
+        self.state.custom_roles.pop(role_id, None)
 
 
 class InMemoryUnitOfWork:

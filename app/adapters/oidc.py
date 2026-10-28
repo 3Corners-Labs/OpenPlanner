@@ -27,6 +27,7 @@ import structlog
 
 from app.domain.authorization import Principal, Role
 from app.domain.ports import IdentityError, LoginStart
+from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 
 log = structlog.get_logger()
 
@@ -75,12 +76,15 @@ def _values(claim: object) -> frozenset[str]:
 
 
 def principal_from_claims(claims: Mapping[str, Any], mapping: ClaimMapping) -> Principal:
-    """Map verified ID-token claims to a ``Principal``; unknown role values are ignored."""
-    roles = frozenset(
-        mapping.role_values[value]
-        for value in _values(claims.get(mapping.role_claim))
-        if value in mapping.role_values
-    )
+    """Map verified ID-token claims to a ``Principal``.
+
+    Values of built-in roles become roles. The other role values are kept as
+    ``role_claims`` (custom roles link to them, ADR 0039): only values shaped like a claim
+    value, at most ``MAX_ROLE_CLAIMS`` of them in a stable order, so the session stays small.
+    """
+    values = _values(claims.get(mapping.role_claim))
+    roles = frozenset(mapping.role_values[v] for v in values if v in mapping.role_values)
+    others = sorted(v for v in values if v not in mapping.role_values and is_claim_value(v))
     name = claims.get("name") or claims.get("preferred_username") or claims["sub"]
     return Principal(
         subject=str(claims["sub"]),
@@ -88,6 +92,7 @@ def principal_from_claims(claims: Mapping[str, Any], mapping: ClaimMapping) -> P
         roles=roles,
         organisations=_values(claims.get(mapping.organisation_claim)),
         groups=_values(claims.get(mapping.group_claim)),
+        role_claims=frozenset(others[:MAX_ROLE_CLAIMS]),
     )
 
 
