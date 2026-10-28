@@ -152,9 +152,26 @@ configured (open decision O3), and IdP changes shouldn't need a redeploy. Three 
    refused.
 2. **Lockable.** As with every class C setting, the environment can lock it.
 3. **Recoverable from the host** via the CLI in §10, never via a login bypass.
+4. **Diagnosable without the portal.** The dry run cannot catch a change on the IdP's side
+   (a renamed claim or role). When a login is refused because the mapping finds no role,
+   the log records which configured claim was missing and the *names* of the claims that
+   were present, never their values. `app.cli oidc-check` (§10) checks the configuration
+   without a login. The operator then fixes it with an env lock or `settings reset`.
 
 `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` and `OIDC_SCOPES` stay in
 class A.
+
+**When the IdP is down**, nobody can log in to the admin portal. Citizens are not affected:
+they never log in, so booking, reminders, dispatch and the PII purge carry on. The admin
+tasks that cannot wait for the IdP to come back get a command in the host CLI (§10). Today
+that is only the emergency closure of ADR 0024. Decided by the product owner on 2026-10-28.
+
+Rejected, because each adds a way in that can be abused:
+
+- *A fallback IdP switched on from the environment for a limited time.* Whoever controls
+  that IdP, or can set the variable, becomes superuser.
+- *A local break-glass account* (password with TOTP or WebAuthn), as Keycloak and GitLab
+  offer. This is the login bypass CLAUDE.md rules out.
 
 ### 9. Bootstrap: `init` and `_FILE`
 
@@ -191,6 +208,13 @@ the authorisation here, as it already is for backups and updates.
   default or env value applies again.
 - `settings set KEY VALUE`: non-secret class C and D only, validated against the registry
   bounds. Secrets are never set or printed by the CLI.
+- `oidc-check`: fetches the discovery document and the signing keys, checks the algorithms
+  and the redirect URL, and prints the effective claim mapping with its source. It never
+  starts a login and prints no secrets.
+- `closure start (--group SLUG | --organisation SLUG) --notice-nl TEXT --notice-en TEXT
+  [--end ISO]` and `closure lift (--group SLUG | --organisation SLUG)`: the emergency
+  closure of ADR 0024 for an IdP outage, with the same domain rules, mails and audit as in
+  the portal. Everything else (moving, reinstating, cancelling) waits for the portal.
 
 Every command that changes something writes an audit event with actor `system:cli`. The CLI
 can never create users, grant roles or start a session. CLAUDE.md's "no login bypass or role
@@ -303,7 +327,8 @@ Every field of `app/config.py` and `proxy.env.example` on 2026-10-28, with its c
   §7, the kill switches in class B, the env lock, the fresh login and the audit trail.
   `docs/threat-model.md` gets abuse cases for:
   - loosening rate limits;
-  - a lockout through the OIDC claim mapping;
+  - a lockout through the OIDC claim mapping, or a renamed claim on the IdP's side;
+  - claim values leaking into the log through the lockout diagnostics;
   - turning `LOG_LEVEL` to DEBUG to fish for data;
   - replacing the SMTP fallback to intercept mail.
   Each abuse case gets a test.
@@ -337,6 +362,8 @@ Each step is its own PR. Each one leaves the service working with the existing `
    generated webhook secrets; *Manage this here from now on* (§12). When ADR 0032 is built,
    the Webex/WxCC block moves to the organisation's connection.
 7. OIDC claim and role mapping with the dry run of §8.
+8. Lockout diagnostics (§8 rule 4), `oidc-check` and the `closure` commands of §10. These
+   do not depend on steps 1–7 and can be built at any time.
 
 ## Assumptions to confirm
 
