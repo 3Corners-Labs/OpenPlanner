@@ -9,4 +9,4 @@ The machine API for contact-center bots (`/api/agent/v1`, ADR 0023) has its own 
 | Method | Path | Response |
 |---|---|---|
 | GET | `/healthz` | `200 {"status": "ok"}` |
-| GET | `/readyz` | `200 {"status": "ok"}` or `503 {"status": "unavailable"}` |
+| GET | `/readyz` | `200 {"status": "ok"}`, `200 {"status": "degraded"}` (data volume short of space, ADR 0040) or `503 {"status": "unavailable"}` |

@@ -152,3 +152,11 @@ def test_update_repository_must_be_owner_and_name() -> None:
     for bad in ("acme", "acme/x/y", "../etc", "acme/x?y=1"):
         with pytest.raises(ValidationError):
             Settings(environment="dev", update_repository=bad)
+
+
+def test_storage_limits_must_be_ordered(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("STORAGE_LOW_FREE_PERCENT", "5")
+    monkeypatch.setenv("STORAGE_CRITICAL_FREE_PERCENT", "10")
+
+    with pytest.raises(ValidationError, match="STORAGE_CRITICAL_FREE_PERCENT"):
+        Settings(environment="dev")
