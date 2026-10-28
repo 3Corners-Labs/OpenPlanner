@@ -182,6 +182,23 @@ Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task e
 | Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
 | Last webhook listing and delivery test (registration ids, events, host account filters, target URLs without query, statuses, outcome codes) | `integration_reports` | Webex, WxCC, the self-test | replaced by the next check | no; shown read-only on **Koppelingen** |
 
+## Own queue (ADR 0043)
+
+A group with dispatch kind `openplanner_queue` sends nothing to a contact center. Its agents
+sign in to the admin portal (OIDC, role `agent`) and claim bookings.
+
+```
+admin portal (agent of the group) <── web: first name, booking reference, start, lobby state
+agent ──claim──> web ──> bookings.claimed_at, claimed_by (HMAC pseudonym of the OIDC subject)
+web ──> agent who claimed: the meeting link (only after the claim)
+web ──> audit_events: queue.claimed / queue.released (actor subject, group, booking id)
+```
+
+| Data | Where | Source | Retention | Leaves OpenPlanner? |
+|---|---|---|---|---|
+| First name, meeting link | read from `bookings` | booking form, Webex | as the contact | shown to agents of the group only (link only after a claim) |
+| Who claimed | `bookings.claimed_by` (pseudonym, not the subject) | the agent's login | removed by `purge_pii` with the contact; `claimed_at` stays for statistics | no |
+
 ## Branding and the calendar script (WP3b)
 
 ```

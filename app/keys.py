@@ -1,4 +1,4 @@
-"""Resolve bootstrap keys from the environment (ADR 0008, ADR 0011, ADR 0013, ADR 0053)."""
+"""Resolve bootstrap keys from the environment and derive keys from them (ADR 0008, 0011, 0043)."""
 
 import os
 import secrets
@@ -14,6 +14,9 @@ MIN_KEY_BYTES = 32
 
 CLIENT_PSEUDONYM_INFO = b"openplanner/client-pseudonym/v1"
 """HKDF label of the key behind caller pseudonyms (ADR 0053); a new label means new pseudonyms."""
+
+AGENT_PSEUDONYM_INFO = b"openplanner/agent-pseudonym/v1"
+"""HKDF label of the agent pseudonym key (ADR 0043); a new label makes new pseudonyms."""
 
 
 def _bootstrap_key(settings: Settings, value: SecretStr | None, name: str, dev_path: Path) -> bytes:
@@ -47,14 +50,25 @@ def management_token_key(settings: Settings) -> bytes:
     )
 
 
-def client_pseudonym_key(settings: Settings) -> bytes:
-    """Return the key that turns caller addresses into pseudonyms (ADR 0053).
+def _derived(settings: Settings, info: bytes) -> bytes:
+    """Return a 32-byte key derived from ``MANAGEMENT_TOKEN_KEY`` with HKDF-SHA256 under ``info``.
 
-    Derived from ``MANAGEMENT_TOKEN_KEY`` under its own label, so no new secret is needed and
-    neither key reveals the other. Rotating that key changes every pseudonym.
+    Each purpose has its own label, so the token key is never used for a second purpose,
+    neither key reveals the other and no extra secret has to be managed. Rotating the token
+    key changes every derived key.
     """
-    hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=CLIENT_PSEUDONYM_INFO)
+    hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
     return hkdf.derive(management_token_key(settings))
+
+
+def client_pseudonym_key(settings: Settings) -> bytes:
+    """Return the key that turns caller addresses into pseudonyms (ADR 0053)."""
+    return _derived(settings, CLIENT_PSEUDONYM_INFO)
+
+
+def agent_pseudonym_key(settings: Settings) -> bytes:
+    """Return the key of the agents' pseudonyms in the own queue (ADR 0043)."""
+    return _derived(settings, AGENT_PSEUDONYM_INFO)
 
 
 def session_secret(settings: Settings) -> str:

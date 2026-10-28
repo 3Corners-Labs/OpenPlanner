@@ -65,6 +65,7 @@ from app.domain.scheduling import (
     MAX_LABEL_LENGTH,
     MAX_PLANNER_LEAD_MINUTES,
     MAX_QUEUE_CHANGE_WORKING_DAYS,
+    MAX_QUEUE_VISIBLE_FROM_MINUTES,
     DispatchKind,
     GroupSummary,
     PhoneMode,
@@ -114,6 +115,10 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
         "admin.field.planner_change_min_lead_minutes",
         "admin.field.planner_change_min_lead_minutes_hint",
     ),
+    "queue_visible_from_minutes": (
+        "admin.field.queue_visible_from_minutes",
+        "admin.field.queue_visible_from_minutes_hint",
+    ),
     "not_picked_up_minutes": (
         "admin.field.not_picked_up_minutes",
         "admin.field.not_picked_up_minutes_hint",
@@ -134,6 +139,10 @@ INTEGRATION_LABELS: dict[str, str] = {
     "wxcc_channel": "admin.field.wxcc_channel",
     "wxcc_routing_value": "admin.field.wxcc_routing_value",
 }
+
+
+OWN_QUEUE_TABS = frozenset({"group.queue"})
+"""Tabs shown only on a group that dispatches to OpenPlanner's own queue (ADR 0043)."""
 
 
 def planning_service(request: Request) -> PlanningService:
@@ -163,6 +172,7 @@ def group_page(
         )
         for t in object_page("group").tabs
         if can(t.permission, summary)
+        and (summary.group.has_own_queue or t.key not in OWN_QUEUE_TABS)
     ]
     response = page(
         request,
@@ -485,6 +495,7 @@ def _settings_fields(
         )
 
     phone_options = tuple(Option(mode.value, _(PHONE_LABELS[mode])) for mode in PhoneMode)
+    yes_no = (Option("yes", _("admin.yes")), Option("no", _("admin.no")))
     dispatch_options = tuple(Option(kind.value, _(DISPATCH_LABELS[kind])) for kind in DispatchKind)
     planning = [
         Field(
@@ -517,6 +528,20 @@ def _settings_fields(
             current.planner_change_min_lead_minutes,
             {"min": "0", "max": str(MAX_PLANNER_LEAD_MINUTES), "step": "5"},
         ),
+        number(
+            "queue_visible_from_minutes",
+            current.queue_visible_from_minutes,
+            {"min": "0", "max": str(MAX_QUEUE_VISIBLE_FROM_MINUTES)},
+        ),
+        Field(
+            "queue_free_pick_allowed",
+            _("admin.field.queue_free_pick_allowed"),
+            "select",
+            value("queue_free_pick_allowed", "yes" if current.queue_free_pick_allowed else "no"),
+            hint=_("admin.field.queue_free_pick_allowed_hint"),
+            error=form.error_for("queue_free_pick_allowed"),
+            options=yes_no,
+        ),
         Field(
             "phone_mode",
             _("admin.field.phone_mode"),
@@ -526,7 +551,6 @@ def _settings_fields(
             options=phone_options,
         ),
     ]
-    yes_no = (Option("yes", _("admin.yes")), Option("no", _("admin.no")))
     integrations = [
         text("video_host_email", current.video_host_email, "admin.field.video_host_email_hint"),
         text("wxcc_business_address", current.wxcc_business_address),
@@ -616,18 +640,14 @@ async def save_settings(
     direct = form.choice("direct_call_enabled", {"yes", "no"})
     dispatch = form.choice("dispatch_kind", {kind.value for kind in DispatchKind})
     embedding = form.choice("embedding_enabled", {"yes", "no"})
-    if (
-        not form.errors
-        and phone is not None
-        and direct is not None
-        and dispatch is not None
-        and embedding is not None
-    ):
+    free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
+    if not form.errors and None not in (phone, direct, dispatch, embedding, free_pick):
         new = GroupSettings(
             name=form.text("name"),
             timezone=form.text("timezone"),
-            phone_mode=PhoneMode(phone),
-            dispatch_kind=DispatchKind(dispatch),
+            phone_mode=PhoneMode(str(phone)),
+            dispatch_kind=DispatchKind(str(dispatch)),
+            queue_free_pick_allowed=free_pick == "yes",
             video_host_email=form.optional_text("video_host_email"),
             wxcc_business_address=form.optional_text("wxcc_business_address"),
             wxcc_channel=form.optional_text("wxcc_channel"),

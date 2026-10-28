@@ -53,6 +53,11 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.CLAIM_VALUE_TAKEN: "admin.form.error.claim_value_taken",
     ErrorCode.MAINTENANCE: "error.maintenance",
     ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
+    ErrorCode.QUEUE_NOT_ENABLED: "error.not_found.text",
+    ErrorCode.QUEUE_EMPTY: "error.queue_empty",
+    ErrorCode.ALREADY_CLAIMED: "error.already_claimed",
+    ErrorCode.FREE_PICK_NOT_ALLOWED: "error.free_pick_not_allowed",
+    ErrorCode.NOT_CLAIMED: "error.not_claimed",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {
@@ -76,6 +81,7 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.API_CLIENT_NOT_FOUND: 404,
     ErrorCode.UPDATE_REQUEST_NOT_FOUND: 404,
     ErrorCode.ROLE_NOT_FOUND: 404,
+    ErrorCode.QUEUE_NOT_ENABLED: 404,
     ErrorCode.NOT_PERMITTED: 403,
     ErrorCode.DATABASE_BUSY: 503,
     ErrorCode.MAINTENANCE: 503,

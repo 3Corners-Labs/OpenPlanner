@@ -59,6 +59,7 @@ from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
+from app.domain.queue_service import QueueService
 from app.domain.roles import RoleService
 from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
@@ -66,7 +67,12 @@ from app.domain.services import BookingService
 from app.domain.simulation import SimulationService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
-from app.keys import client_pseudonym_key, management_token_key, session_secret
+from app.keys import (
+    agent_pseudonym_key,
+    client_pseudonym_key,
+    management_token_key,
+    session_secret,
+)
 from app.logging import configure_logging, warn_loose_secret_files
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
@@ -87,6 +93,7 @@ def oidc_provider(settings: Settings, http: httpx.AsyncClient) -> IdentityProvid
             settings.oidc_role_org_admin: Role.ORG_ADMIN,
             settings.oidc_role_group_admin: Role.GROUP_ADMIN,
             settings.oidc_role_auditor: Role.AUDITOR,
+            settings.oidc_role_agent: Role.AGENT,
         },
     )
     secret = settings.oidc_client_secret.get_secret_value() if settings.oidc_client_secret else ""
@@ -163,6 +170,9 @@ def create_app(
             cache=timedelta(seconds=settings.maintenance_cache_seconds),
         )
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
+        app.state.queue_service = QueueService(
+            uow, clock, app.state.admin_service, agent_pseudonym_key(settings)
+        )
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
