@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     storage_critical_free_percent: float = Field(default=5.0, gt=0, lt=100)
     database_max_mb: int | None = Field(default=None, ge=1)
 
+    # ADR 0044: how many days ahead the shortfall summary (group page, dashboard) looks.
+    # Class D organisation (ADR 0042) until the settings registry holds it.
+    shortfall_horizon_days: int = Field(default=14, ge=1, le=60)
+
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
     # Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL: an https tunnel or staging

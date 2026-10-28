@@ -1382,6 +1382,69 @@ msgstr "Niet opgepakt"
 msgid "admin.agenda.empty"
 msgstr "Geen afspraken op deze dag."
 
+msgid "admin.agenda.view_week"
+msgstr "Weekoverzicht"
+
+msgid "admin.agenda.view_day"
+msgstr "Dagoverzicht"
+
+msgid "admin.agenda.weeks"
+msgstr "Andere week"
+
+msgid "admin.agenda.previous_week"
+msgstr "Vorige week"
+
+msgid "admin.agenda.this_week"
+msgstr "Deze week"
+
+msgid "admin.agenda.next_week"
+msgstr "Volgende week"
+
+msgid "admin.agenda.slot_staffing"
+msgstr "Medewerkers: {agents}, afspraken: {booked}"
+
+msgid "admin.agenda.shortfall"
+msgstr "Tekort: {count}"
+
+msgid "admin.agenda.closed"
+msgstr "Gesloten"
+
+msgid "admin.agenda.off_schedule"
+msgstr "Buiten de bezetting"
+
+msgid "admin.agenda.no_bookings"
+msgstr "Geen afspraken in dit tijdslot."
+
+msgid "admin.agenda.direct"
+msgstr "Direct gesprekken"
+
+msgid "admin.agenda.week_title"
+msgstr "Week van {day}"
+
+msgid "admin.agenda.week_caption"
+msgstr "Medewerkers en afspraken per tijdslot, {week}"
+
+msgid "admin.agenda.week_shortfalls"
+msgstr "Tijdsloten met meer afspraken dan medewerkers deze week: {count}."
+
+msgid "admin.agenda.week_no_shortfalls"
+msgstr "Deze week heeft elk tijdslot genoeg medewerkers."
+
+msgid "admin.agenda.week_empty"
+msgstr "Geen tijdsloten in deze week."
+
+msgid "admin.agenda.no_slot"
+msgstr "Geen tijdslot"
+
+msgid "admin.shortfall.some"
+msgstr "Tijdsloten met meer afspraken dan medewerkers in de komende {days} dagen: {count}."
+
+msgid "admin.shortfall.first"
+msgstr "Eerste tekort: {when}"
+
+msgid "admin.shortfall.chip"
+msgstr "Tekorten: {count}"
+
 msgid "admin.booking.back"
 msgstr "Terug naar de agenda"
 
