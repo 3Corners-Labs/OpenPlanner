@@ -1,4 +1,4 @@
-# 0047. Role and scope paired in one claim value
+# 0049. Role and scope paired in one claim value
 
 Status: accepted (2026-10-28), requested by the product owner; E1–E4 settled as recommended.
 Amends ADR 0013 (point 3: which
@@ -146,9 +146,10 @@ rights (ADR 0014); the domain stays free of frameworks.
    ```python
    @dataclass(frozen=True)
    class Grant:
-       role: str                 # role key, built-in or custom
+       role: str  # role key, built-in or custom
        organisation: str | None  # organisation slug; None for the superuser
-       group: str | None         # group slug; only for group-reach roles
+       group: str | None  # group slug; only for group-reach roles
+
 
    @dataclass(frozen=True)
    class Principal:
