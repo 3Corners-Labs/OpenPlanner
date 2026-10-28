@@ -2,7 +2,6 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Principal, Role
 from app.domain.booking import BookingStatus
@@ -22,7 +21,6 @@ from tests.support.domain import (
     NOW,
     SLOT_0900,
     SLOT_0930,
-    TEST_TOKEN_KEY,
     make_group,
     window,
 )
@@ -35,11 +33,6 @@ OTHER_TEAM = Principal(
 )
 NEXT_MONDAY = SLOT_0900 + timedelta(days=7)
 UNTIL_TUESDAY = ClosureInput(None, SLOT_0900 + timedelta(days=1), NOTICES)
-
-
-@pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
 
 
 @pytest.fixture
@@ -57,18 +50,6 @@ def uow() -> InMemoryUnitOfWork:
         state.rules[group_id] = [ScheduleRule(weekday=0, window=window(capacity=2))]
     state.next_id = 100
     return InMemoryUnitOfWork(state)
-
-
-@pytest.fixture
-def bookings(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
-    return BookingService(uow, clock, TEST_TOKEN_KEY)
-
-
-@pytest.fixture
-def closures(
-    uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
-) -> ClosureService:
-    return ClosureService(uow, clock, AdminService(uow, clock), bookings)
 
 
 async def _book(bookings: BookingService, start: datetime = SLOT_0900, slug: str = "demo") -> int:

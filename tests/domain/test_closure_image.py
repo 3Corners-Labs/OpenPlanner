@@ -8,17 +8,15 @@ from datetime import timedelta
 
 import pytest
 
-from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.images import ImageFile, ImageText
 from app.domain.services import BookingService
-from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import GROUP_ADMIN, OUTSIDER, two_organisations
 from tests.support.closures import NOTICES
-from tests.support.domain import NOW, TEST_TOKEN_KEY
+from tests.support.domain import NOW
 from tests.support.images import jpeg, png
 
 TEXT = ImageText({"nl": "Een gesloten deur", "en": "A closed door"})
@@ -27,23 +25,6 @@ TEXT = ImageText({"nl": "Een gesloten deur", "en": "A closed door"})
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     return InMemoryUnitOfWork(two_organisations(next_id=100))
-
-
-@pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
-def bookings(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
-    return BookingService(uow, clock, TEST_TOKEN_KEY)
-
-
-@pytest.fixture
-def closures(
-    uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
-) -> ClosureService:
-    return ClosureService(uow, clock, AdminService(uow, clock), bookings)
 
 
 async def _close(closures: ClosureService, *, hours: int | None = None) -> None:
