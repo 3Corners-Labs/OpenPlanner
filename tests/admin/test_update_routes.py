@@ -14,12 +14,14 @@ from tests.support.domain import NOW
 
 RELEASE = Release(Version(1, 4, 0), "https://github.com/acme/openplanner/releases/tag/v1.4.0")
 BANNER = 'class="update-banner'
+NOT_CHECKING = "zoekt niet naar nieuwe versies"
 
 
 @pytest.fixture
-def settings(settings: Settings) -> Settings:
-    """The demo site running release 1.3.0 of a repository that has releases."""
-    return settings.model_copy(update={"app_version": "1.3.0"})
+def settings(settings: Settings, request: pytest.FixtureRequest) -> Settings:
+    """The demo site running release 1.3.0; a test may pass more settings as its parameter."""
+    extra = getattr(request, "param", {})
+    return settings.model_copy(update={"app_version": "1.3.0", **extra})
 
 
 @pytest.fixture
@@ -68,6 +70,18 @@ async def test_snooze_hides_the_banner_for_an_hour(site: Site) -> None:
     assert "1.4.0" in (await site.client.get("/admin/updates")).text  # the page stays
     site.clock.advance(timedelta(minutes=60))
     assert BANNER in (await site.client.get("/admin/")).text
+
+
+@pytest.mark.parametrize("settings", [{"update_repository": "acme/openplanner"}], indirect=True)
+async def test_page_knows_the_worker_checks_for_releases(site: Site) -> None:
+    # Web never looks up releases itself (the worker does), but UPDATE_REPOSITORY is set.
+    await site.login_as(SUPER)
+    assert NOT_CHECKING not in (await site.client.get("/admin/updates")).text
+
+
+async def test_page_says_when_nobody_checks_for_releases(site: Site) -> None:
+    await site.login_as(SUPER)
+    assert NOT_CHECKING in (await site.client.get("/admin/updates")).text
 
 
 async def test_snooze_never_redirects_off_the_portal(site: Site) -> None:

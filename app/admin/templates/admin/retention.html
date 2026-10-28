@@ -1,0 +1,57 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.retention.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("admin.retention.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.retention.intro") }}</p>
+  </div>
+</div>
+{% if rows %}
+{% if overview.in_order %}
+<div class="alert alert--success"><p>{{ _("admin.retention.in_order") }}</p></div>
+{% else %}
+<div class="alert alert--error"><p>{{ _("admin.retention.attention", overdue=overview.overdue, failed=overview.failed_purges) }}</p></div>
+{% endif %}
+<section class="card" aria-labelledby="summary-heading">
+  <h2 id="summary-heading">{{ _("admin.retention.summary") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("admin.retention.overdue") }}</dt><dd>{{ overview.overdue }}</dd></div>
+    <div><dt>{{ _("admin.retention.failed") }}</dt><dd>{{ overview.failed_purges }}</dd></div>
+    <div><dt>{{ _("admin.retention.last_purged") }}</dt><dd>{{ last_purged }}</dd></div>
+    <div><dt>{{ _("admin.retention.checked_at") }}</dt><dd>{{ checked_at }}</dd></div>
+  </dl>
+</section>
+<div class="table-scroll" role="region" aria-labelledby="groups-heading" tabindex="0">
+<h2 id="groups-heading" class="visually-hidden">{{ _("admin.retention.groups") }}</h2>
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("admin.retention.groups") }}</caption>
+  <thead>
+    <tr>
+      <th scope="col">{{ _("admin.retention.group") }}</th>
+      <th scope="col">{{ _("admin.retention.holding") }}</th>
+      <th scope="col">{{ _("admin.retention.overdue") }}</th>
+      <th scope="col">{{ _("admin.retention.failed") }}</th>
+      <th scope="col">{{ _("admin.retention.last_purged") }}</th>
+      <th scope="col">{{ _("admin.retention.status") }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <th scope="row">{{ row.name }}<br><span class="muted">{{ row.organisation }}</span></th>
+      <td>{{ row.holding }}</td>
+      <td>{{ row.overdue }}</td>
+      <td>{{ row.failed }}</td>
+      <td class="nowrap">{{ row.last_purged }}</td>
+      <td>{% if row.attention %}<span class="chip chip--danger">{{ _("admin.retention.needs_attention") }}</span>{% else %}<span class="chip chip--success">{{ _("admin.retention.ok") }}</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted">{{ _("admin.retention.rule") }}</p>
+{% else %}
+<p class="empty-state">{{ _("admin.retention.empty") }}</p>
+{% endif %}
+{% endblock %}
