@@ -2,6 +2,10 @@
 
 from datetime import timedelta
 
+import pytest
+
+from app.adapters.db.uow import SqlUnitOfWork
+from app.domain.authorization import Scope
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_admin_flow import audit_events
 
@@ -60,7 +64,7 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     form = (await site.client.get(f"{GROUP}/settings")).text
 
     assert '<option value="Europe/Amsterdam" selected>' in form
-    assert form.count(" selected>") == 3  # time zone, phone mode, direct call
+    assert form.count(" selected>") == 4  # time zone, dispatch kind, phone mode, direct call
 
 
 async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
@@ -190,6 +194,8 @@ async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None
         "min_notice_minutes": "60",
         "horizon_days": "30",
         "dispatch_lead_minutes": "5",
+        "dispatch_kind": "contact_center",
+        "queue_change_working_days": "1",
         "phone_mode": "required",
         "video_host_email": "host-demo@example.nl",
         "wxcc_business_address": "openplanner@example.biz",
@@ -211,6 +217,66 @@ async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None
     assert any(e[1] == "group.edit" for e in events)
 
 
+async def test_group_switches_to_the_own_queue(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    page = (await site.client.get(f"{GROUP}/settings")).text
+    form = {
+        "name": "Demo",
+        "timezone": "Europe/Amsterdam",
+        "slot_minutes": "30",
+        "min_notice_minutes": "60",
+        "horizon_days": "60",
+        "dispatch_lead_minutes": "5",
+        "dispatch_kind": "openplanner_queue",
+        "queue_change_working_days": "2",
+        "phone_mode": "optional",
+        "direct_call_enabled": "no",
+        "not_picked_up_minutes": "10",
+    }
+
+    saved = await _post(site, f"{GROUP}/settings", form)
+
+    assert 'name="dispatch_kind"' in page
+    assert "Eigen wachtrij van OpenPlanner" in page
+    assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
+    after = (await site.client.get(f"{GROUP}/settings")).text
+    assert '<option value="openplanner_queue" selected' in after
+    assert 'name="queue_change_working_days" type="number" value="2"' in after
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).read() as tx:
+        events = await tx.list_audit_events(Scope(everything=True), limit=5)
+    assert "dispatch_kind" in events[0].event.detail
+
+
+@pytest.mark.parametrize(
+    ("kind", "days", "error"),
+    [
+        ("genesys", "1", '<a href="#dispatch_kind">'),
+        ("openplanner_queue", "9", '<a href="#queue_change_working_days">Vul een aantal werkdagen'),
+    ],
+)
+async def test_dispatch_fields_are_checked(site: Site, kind: str, days: str, error: str) -> None:
+    await site.login_as(SUPER)
+    form = {
+        "name": "Demo",
+        "timezone": "Europe/Amsterdam",
+        "slot_minutes": "30",
+        "min_notice_minutes": "60",
+        "horizon_days": "60",
+        "dispatch_lead_minutes": "5",
+        "dispatch_kind": kind,
+        "queue_change_working_days": days,
+        "phone_mode": "optional",
+        "direct_call_enabled": "no",
+        "not_picked_up_minutes": "10",
+    }
+
+    response = await _post(site, f"{GROUP}/settings", form)
+
+    assert response.status_code == 422  # type: ignore[attr-defined]
+    assert error in response.text  # type: ignore[attr-defined]
+
+
 async def test_invalid_settings_show_the_field_error(site: Site) -> None:
     await site.login_as(SUPER)
 
@@ -224,6 +290,8 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "min_notice_minutes": "60",
             "horizon_days": "60",
             "dispatch_lead_minutes": "5",
+            "dispatch_kind": "contact_center",
+            "queue_change_working_days": "1",
             "phone_mode": "optional",
             "direct_call_enabled": "no",
             "not_picked_up_minutes": "10",
@@ -524,6 +592,8 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "min_notice_minutes": "60",
             "horizon_days": "45",
             "dispatch_lead_minutes": "5",
+            "dispatch_kind": "contact_center",
+            "queue_change_working_days": "1",
             "phone_mode": "optional",
             "direct_call_enabled": "no",
             "not_picked_up_minutes": "10",
@@ -555,6 +625,8 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "min_notice_minutes": "60",
         "horizon_days": "60",
         "dispatch_lead_minutes": "5",
+        "dispatch_kind": "contact_center",
+        "queue_change_working_days": "1",
         "phone_mode": "optional",
         "direct_call_enabled": "yes",
         "not_picked_up_minutes": "10",

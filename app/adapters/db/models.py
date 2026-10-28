@@ -170,11 +170,17 @@ class GroupRow(Base):
     not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
+    dispatch_kind: Mapped[str] = mapped_column(String(32), server_default=text("'contact_center'"))
+    queue_change_working_days: Mapped[int] = mapped_column(Integer, server_default=text("1"))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
 
     __table_args__ = (
         CheckConstraint("phone_mode IN ('hidden', 'optional', 'required')", name="phone_mode"),
         CheckConstraint("dispatch_lead_minutes BETWEEN 0 AND 60", name="dispatch_lead"),
+        CheckConstraint(
+            "dispatch_kind IN ('contact_center', 'openplanner_queue')", name="dispatch_kind"
+        ),
+        CheckConstraint("queue_change_working_days BETWEEN 1 AND 5", name="queue_change_days"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
     )
 

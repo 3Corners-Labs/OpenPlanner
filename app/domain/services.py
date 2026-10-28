@@ -8,8 +8,9 @@ booking and its jobs commit together or not at all (CLAUDE.md architecture rules
                                 ─► booking + token ─► replace_jobs
     reschedule ─► locked tx ─► cancel old (jobs: purge only) ─► _place new in the SAME group
 
-A booking is read-only from its change deadline (``job_plan.change_deadline``: the group's
-dispatch lead before the start, T−5 min by default): cancel and reschedule then raise
+A booking is read-only from its change deadline (``Group.change_deadline``: the group's
+dispatch lead before the start, T−5 min by default, or with the own queue a number of working
+days before, ADR 0043): cancel and reschedule then raise
 ``booking_locked``. A booking suspended by an emergency closure (ADR 0024) has no deadline:
 the citizen can move or cancel it until it is resolved. No slot inside a closure is offered
 or booked (``group_closed``), and no direct call starts while one is active. A direct call
@@ -43,7 +44,6 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import effective_schedule
 from app.domain.job_plan import (
     JobType,
-    change_deadline,
     plan_for_booking,
     plan_for_cancellation,
     plan_for_direct,
@@ -262,7 +262,7 @@ class BookingService:
                 if booking.is_suspended and booking.closure_id is not None
                 else None
             )
-        deadline = change_deadline(booking.start, group.dispatch_lead)
+        deadline = group.change_deadline(booking.start)
         changeable = booking.is_suspended or (booking.is_active and self._clock.now() < deadline)
         return BookingDetails(booking, group, deadline, changeable, closure)
 
@@ -432,7 +432,7 @@ def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
     """
     if booking.is_suspended:
         return
-    if now >= change_deadline(booking.start, group.dispatch_lead):
+    if now >= group.change_deadline(booking.start):
         raise DomainError(ErrorCode.BOOKING_LOCKED)
 
 

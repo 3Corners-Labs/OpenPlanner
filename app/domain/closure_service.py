@@ -41,7 +41,6 @@ from app.domain.contact_service import effective_block
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import (
     JobType,
-    change_deadline,
     plan_closure_update,
     plan_for_booking,
     plan_for_cancellation,
@@ -483,7 +482,7 @@ class ClosureService:
     async def _reinstate(self, tx: Transaction, group: Group, booking: Booking) -> None:
         """Confirm ``booking`` again and plan its jobs as a fresh booking."""
         now = self._clock.now()
-        if now >= change_deadline(booking.start, group.dispatch_lead):
+        if now >= group.change_deadline(booking.start):
             raise DomainError(ErrorCode.BOOKING_LOCKED)
         if covering(await tx.get_closures(group.id, now), booking.start) is not None:
             raise DomainError(ErrorCode.GROUP_CLOSED)

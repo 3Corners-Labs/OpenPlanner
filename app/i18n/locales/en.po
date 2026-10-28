@@ -475,6 +475,12 @@ msgstr "Phone number"
 msgid "admin.group.phone_hidden"
 msgstr "Not asked"
 
+msgid "admin.group.dispatch_contact_center"
+msgstr "Contact center (task in the team's queue)"
+
+msgid "admin.group.dispatch_openplanner_queue"
+msgstr "OpenPlanner's own queue"
+
 msgid "admin.group.phone_optional"
 msgstr "Optional"
 
@@ -833,6 +839,18 @@ msgstr "Send to the queue (minutes before)"
 msgid "admin.field.dispatch_lead_minutes_hint"
 msgstr "From this moment the participant can no longer change the appointment. 0 to 60."
 
+msgid "admin.field.dispatch_kind"
+msgstr "How appointments reach staff"
+
+msgid "admin.field.dispatch_kind_hint"
+msgstr "Contact center: a task in the team's queue, shortly before the start. Own queue: staff sign in to OpenPlanner and pick up an appointment. Applies to appointments not yet dispatched."
+
+msgid "admin.field.queue_change_working_days"
+msgstr "Changes until (working days ahead, own queue)"
+
+msgid "admin.field.queue_change_working_days_hint"
+msgstr "With the own queue the participant can change or cancel the appointment until this many working days (Monday to Friday) before the start, at the same time of day. 1 to 5."
+
 msgid "admin.field.phone_mode"
 msgstr "Phone number on the form"
 
@@ -900,6 +918,9 @@ msgstr "Enter a number of days from 1 to 366."
 
 msgid "admin.form.error.dispatch_lead_minutes"
 msgstr "Enter a number of minutes from 0 to 60."
+
+msgid "admin.form.error.queue_change_working_days"
+msgstr "Enter a number of working days from 1 to 5."
 
 msgid "admin.form.error.phone_mode"
 msgstr "Choose whether the phone number is hidden, optional or required."
