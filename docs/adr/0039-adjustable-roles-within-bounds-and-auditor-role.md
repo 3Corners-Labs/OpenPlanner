@@ -1,4 +1,4 @@
-# 0037. Adjustable roles within fixed bounds, and a read-only auditor role
+# 0039. Adjustable roles within fixed bounds, and a read-only auditor role
 
 Status: accepted (2026-10-27), requested by the product owner. Amends ADR 0014 (where role
 definitions live, how a role's reach is derived) and ADR 0031 (who holds `audit.view`). The

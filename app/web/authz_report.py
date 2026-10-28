@@ -31,7 +31,7 @@ from app.web.authz_labels import (
 
 @dataclass(frozen=True)
 class MatrixRow:
-    """One permission with its level, its bounds (ADR 0037) and, per role, whether it is held."""
+    """One permission with its level, its bounds (ADR 0039) and, per role, whether it is held."""
 
     permission: Permission
     level: Level
@@ -71,9 +71,9 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
         "Roles come from the identity provider (ADR 0013). A role grants a permission only",
         "within its reach: superuser everywhere; organisation admin and auditor in the",
         "organisations of their claim and those organisations' groups; group admin in the",
-        "groups of their claim. The auditor reads only and never sees personal data (ADR 0037).",
+        "groups of their claim. The auditor reads only and never sees personal data (ADR 0039).",
         "",
-        "Bounds (ADR 0037): *locked* permissions belong to the superuser only; *personal data*",
+        "Bounds (ADR 0039): *locked* permissions belong to the superuser only; *personal data*",
         "permissions show citizens' data and are never held by the auditor.",
         "",
         "| Permission | Level | Bounds | " + " | ".join(_(ROLE_LABELS[r]) for r in roles) + " |",

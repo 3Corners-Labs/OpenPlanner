@@ -247,7 +247,7 @@ async def matrix(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.MATRIX_VIEW))],
 ) -> HTMLResponse:
-    """Show the whole matrix with its bounds: locked and personal-data permissions (ADR 0037)."""
+    """Show the whole matrix with its bounds: locked and personal-data permissions (ADR 0039)."""
     _ = locale.gettext
     rows = [
         MatrixRowView(

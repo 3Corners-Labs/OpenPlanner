@@ -245,7 +245,7 @@ async def test_matrix_page(site: Site) -> None:
 
 
 async def test_matrix_page_marks_the_bounds_and_shows_the_auditor(site: Site) -> None:
-    # ADR 0037: locked and personal-data permissions are marked in words, not by colour.
+    # ADR 0039: locked and personal-data permissions are marked in words, not by colour.
     await site.login_as(GROUP_ADMIN)
     text = (await site.client.get("/admin/matrix")).text
 

@@ -89,7 +89,7 @@ web ──SQL──> admin_profiles (sub, display name, last login)
 System events hold no personal data: no names, addresses, message text or join links, only codes
 and the booking id. Each admin sees them at their own level only (group admin: their groups;
 organisation admin and auditor: their organisation and its groups; superuser: everything).
-The auditor role (ADR 0037) is read-only and holds no permission that shows citizens' data; it
+The auditor role (ADR 0039) is read-only and holds no permission that shows citizens' data; it
 does see admin names in the audit log, which is the accountability it exists for.
 
 Admin names are personal data of employees, processed for accountability (who did what in the
