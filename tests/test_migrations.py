@@ -180,3 +180,21 @@ def test_stored_sms_settings_become_webex_connect_and_back(
     database.close()
     assert [org for org, _ in rows] == [1]  # another provider would go through Connect
     assert "provider" not in json.loads(rows[0][1])
+
+
+def test_an_existing_database_is_switched_to_incremental_vacuum(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0040: databases created before the connect pragma are converted once, at migration.
+    import sqlite3
+    from contextlib import closing
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as old:
+        old.execute("PRAGMA journal_mode=WAL")
+        old.execute("CREATE TABLE legacy (a)")
+        old.commit()
+
+    command.upgrade(alembic_config, "head")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        assert database.execute("PRAGMA auto_vacuum").fetchone() == (2,)
