@@ -662,6 +662,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0034 | Audit events also on the log stream for an external log platform such as Splunk (proposed) |
 | 0035 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes (proposed) |
 | 0036 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond (proposed) |
+| 0037 | Closure page: prepared scenarios, structured alternative contact options, an image with alt text |
+| 0038 | Maintenance mode for the whole installation: data frozen, integrations open for the superuser |
 | 0040 | Standard event schema, log levels, role tags, CSV export and storage limits (log rotation, SQLite space reclaim, disk watch) |
 
 ## 12. Status and roadmap
@@ -691,6 +693,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 | ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | proposed |
 | ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
+| ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | planned |
+| ADR 0038 | Maintenance mode (backlog MM-1 to MM-5) | planned |
 | ADR 0040 | Logging and storage: step 1 rotation, reclaim and disk watch; steps 2–4 schema and levels, filters and CSV export, diagnostic mode and retention | step 1 done |
 | O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
 | O11 step 2 | Change requests by phone number, confirmed by the citizen by email/SMS (ADR 0023) | planned |
