@@ -283,8 +283,12 @@ Inputs from outside: notice texts, date-times, booking ids in paths, a chosen sl
 Admins: `GET/POST /admin/organisations/{org}/contacts` (`organisation.closure`) and a group's
 own block at `GET/POST /admin/groups/{slug}/closure/contacts` (`closure.manage`); a closure
 copies the block that applies when it starts, with an optional heading per locale (CL-1).
-Citizens: the block on closure and maintenance pages (from CL-2 and MM-3). Inputs from outside:
-kind, details, labels, opening hours and headings of up to six options; closure headings.
+Citizens (CL-2): the closure page `GET /g/{slug}/closure`, shown in place of the calendar on
+`GET /g/{slug}` while the team is closed and linked from the banner before; the management page
+of a booking on hold (`GET /b/{token}`) shows the closure's copy above its actions. The
+maintenance page follows in MM-3. Inputs from outside: kind, details, labels, opening hours and
+headings of up to six options; closure headings; on the citizen side only the slug and token
+in the path. The e2e examples come from `python -m app.cli seed-closures`.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -297,6 +301,9 @@ kind, details, labels, opening hours and headings of up to six options; closure 
 | Tampering | Stored JSON from another version breaks the page or smuggles an invalid link | Options are validated again when read; invalid ones are left out | `tests/adapters/db/test_contact_queries.py::test_options_another_version_wrote_are_left_out` |
 | Tampering (CSRF) | A third-party site changes the block in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_contact_routes.py::test_cross_site_posts_are_refused` |
 | Repudiation | Who changed the contact options | Audited in the same transaction with counts per kind, never values | `tests/domain/test_contact_service.py::test_organisation_admin_saves_the_block_and_it_is_audited_with_counts` |
+| Information disclosure | The closure page reveals a closure citizens should not see yet, or a past one | It shows only what the banner shows (active, or upcoming and announced); the URL has only the slug, so past closures cannot be listed; without one it redirects to the calendar | `tests/api/test_closure_pages.py::test_the_closure_page_of_an_open_team_goes_back_to_the_calendar`, `test_an_upcoming_closure_keeps_the_calendar_and_links_to_its_page` |
+| Information disclosure | The page of a booking on hold shows the citizen's details next to the contact options | The management page shows the appointment, never contact details | `tests/api/test_closure_pages.py::test_a_booking_on_hold_shows_the_contact_options_above_its_actions` |
+| Information disclosure | The e2e example booking (a made-up citizen) ends up in a production database | `seed-closures` refuses when `ENVIRONMENT=prod` | `tests/test_cli.py::test_seed_closures_refuses_production` |
 
 ## Flow: video meetings, work items and direct calls (WP5/WP6)
 

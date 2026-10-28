@@ -21,6 +21,15 @@ A heading (by default "Other ways to reach us") followed by the contact options 
 Phone numbers and email addresses are links that call or mail straight away on a phone. The
 preview at the top of the screen shows the block as it is saved now.
 
+Citizens see the block in three places, always as the copy that belongs to the closure:
+
+- **During a closure** the team's page shows no calendar but the closure page: the closure's
+  heading, the period, the text and this block below it.
+- **Before a planned closure** the calendar stays. The notice above it links to the closure
+  page, so citizens already see how to reach you during the closure.
+- **For an appointment on hold** the block is on that appointment's page, above the buttons to
+  choose a new time or cancel.
+
 ## Contact options
 
 You can fill in at most six. Choose a kind per row and fill in the details:
