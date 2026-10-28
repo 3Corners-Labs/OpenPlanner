@@ -80,6 +80,7 @@ tests/         mirrors app/; fakes for ports live in tests/fakes/.
 ## Pull requests
 
 Short-lived branch, Conventional Commit title, squash merge after one human approval and green
-CI. The PR template asks the five review questions from `CLAUDE.md`; answer all of them.
+CI. The PR template asks the six review questions from `CLAUDE.md`; answer all of them.
+New ADRs start from `docs/adr/template.md`, including its *Settings* section (ADR 0042).
 Run the `security-review` skill (`.claude/skills/security-review/`) before opening the PR.
 `docs/skills.md` lists which Claude Code skills to use in each work package.
