@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+from app.domain.event_context import current_service, current_trace_id, new_id
+
 
 class Outcome(StrEnum):
     """Result of the audited action."""
@@ -43,6 +45,39 @@ SYSTEM_ACTOR = "system"
 """Actor recorded for system events."""
 
 
+class Category(StrEnum):
+    """What kind of event it is, for filtering, retention and the log platform (ADR 0040)."""
+
+    AUDIT = "audit"
+    """An admin action: login, denial, change."""
+    SYSTEM = "system"
+    """What the platform did on its own: jobs, storage checks."""
+    SECURITY = "security"
+    """A rejected webhook or a failing credential."""
+    DIAGNOSTIC = "diagnostic"
+    """Debug detail, only while diagnostic mode is on."""
+
+
+class Level(StrEnum):
+    """Log level, the syslog levels Python has (ADR 0040)."""
+
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
+LEVEL_BY_OUTCOME: dict[Outcome, Level] = {
+    Outcome.SUCCESS: Level.INFO,
+    Outcome.SKIPPED: Level.INFO,
+    Outcome.RETRY: Level.WARNING,
+    Outcome.DENIED: Level.WARNING,
+    Outcome.FAILURE: Level.ERROR,
+}
+"""The level of an audit or system event follows from its outcome."""
+
+
 @dataclass(frozen=True)
 class AuditEvent:
     """One audited action.
@@ -59,6 +94,11 @@ class AuditEvent:
             values, so no personal data.
         source: Admin action or system event.
         booking_id: The booking a system event is about, if any (an id, not personal data).
+        category: Kind of event; ``None`` follows the source (admin: audit, system: system).
+        level: Log level; ``None`` follows the outcome (``LEVEL_BY_OUTCOME``).
+        trace_id: The request or job that caused it; taken from the current context.
+        service: ``web`` or ``worker``; taken from the current context.
+        event_id: Unique id, so a copy on the log platform can be matched to the table.
     """
 
     at: datetime
@@ -71,6 +111,28 @@ class AuditEvent:
     detail: str = ""
     source: Source = Source.ADMIN
     booking_id: int | None = None
+    category: Category | None = None
+    level: Level | None = None
+    trace_id: str = field(default_factory=current_trace_id, compare=False)
+    service: str = field(default_factory=current_service, compare=False)
+    event_id: str = field(default_factory=new_id, compare=False)
+
+    def __post_init__(self) -> None:
+        """Fill in the derived category and level, so a stored event equals the one read back."""
+        object.__setattr__(self, "category", self.event_category)
+        object.__setattr__(self, "level", self.log_level)
+
+    @property
+    def event_category(self) -> Category:
+        """The category, derived from the source when not set."""
+        if self.category is not None:
+            return self.category
+        return Category.AUDIT if self.source is Source.ADMIN else Category.SYSTEM
+
+    @property
+    def log_level(self) -> Level:
+        """The level, derived from the outcome when not set."""
+        return self.level if self.level is not None else LEVEL_BY_OUTCOME[self.outcome]
 
 
 @dataclass(frozen=True)
