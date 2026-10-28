@@ -4,7 +4,7 @@ ADR 0037 §3 (CL-3). ``closure_images`` holds the stripped image bytes, their ty
 and the text alternative per locale (or ``decorative``); ``closures.image_id`` points at the
 closure's image. Organisation data only; no personal data of citizens.
 
-Revision ID: 0027
+Revision ID: 0028
 Revises: 0025
 Create Date: 2026-10-28 23:30:00.000000
 """
@@ -14,7 +14,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0027"
+revision: str = "0028"
 down_revision: str | None = "0025"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
