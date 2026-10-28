@@ -31,10 +31,11 @@ Deploy by digest, not by tag.
 | Check | Healthy | Meaning when unhealthy |
 |---|---|---|
 | `GET /healthz` | `200 {"status":"ok"}` | web process down or hung |
-| `GET /readyz` | `200 {"status":"ok"}` | `503`: database unreachable; see `readiness.database_unavailable` in the log |
+| `GET /readyz` | `200 {"status":"ok"}` | `503`: database unreachable; see `readiness.database_unavailable` in the log. `200 {"status":"degraded"}`: the data volume is short of space; see *Logs and disk space* |
 | worker container health | `healthy` | heartbeat older than 120 s: worker stuck or database unreachable (`worker.database_unavailable`) |
 
-Logs are JSON on stdout: `docker compose logs -f web worker`.
+Logs are JSON on stdout: `docker compose logs -f web worker`. They rotate at 5 files of 20 MB
+per container (see *Logs and disk space*).
 
 `database_busy` errors mean a booking waited longer than 5 s for SQLite's write lock. At the
 expected volume (peak 20 bookings/min) this indicates a stuck transaction or a slow disk, not
@@ -717,6 +718,38 @@ number. A booking id links to that booking's timeline.
 
 System events are deleted after `SYSTEM_EVENT_RETENTION_DAYS` (default 90). Admin actions are
 kept. Webhook rejections and Webex token-refresh failures are still only in the container logs.
+
+## Logs and disk space (ADR 0040)
+
+Three things keep the host from filling up:
+
+- **Container logs rotate.** `docker-compose.yml` gives every service the `json-file` driver
+  with `max-size: 20m`, `max-file: 5`, `compress: "true"`: about 100 MB per container at most,
+  oldest file dropped first. Other limits: put a `logging:` block in a
+  `docker-compose.override.yml`, or set `log-opts` in `/etc/docker/daemon.json`. A log agent
+  (Fluent Bit, Splunk forwarder) must read faster than the files rotate.
+- **The database gives space back.** The worker returns freed pages to the disk once an hour
+  (`database.reclaimed` in the log). A database created before this release is converted once
+  at the first start of `web` (`database.auto_vacuum_enabled`); that `VACUUM` needs free space
+  about the size of the database. If it logs `database.auto_vacuum_failed`, free some space and
+  restart `web`; it tries again on every start.
+- **The worker watches the volume.** Every loop it compares the free space of the data volume
+  with `STORAGE_LOW_FREE_PERCENT` (default 15) and `STORAGE_CRITICAL_FREE_PERCENT` (default 5),
+  and the database (with its WAL) with `DATABASE_MAX_MB` (default: no limit).
+
+| Signal | Where | Meaning |
+|---|---|---|
+| `storage.degraded`, `warning` | worker log, on change and then hourly | free space below the low limit (`free_space_low`) or database above its maximum (`database_too_large`) |
+| `storage.degraded`, `error` | worker log, on change and then hourly | free space below the critical limit (`free_space_critical`) |
+| `storage.recovered` | worker log | back to normal |
+| *Opslag controleren*, failed | superuser's audit log | the same change of grade, with `free_percent` and `database_mb` |
+| `{"status":"degraded"}` | `GET /readyz` (still 200) | either grade; alert on it, it does not take the service out |
+
+What to do: `docker system df` and `du -sh /var/lib/docker/volumes/*` show what grows. Usual
+causes are old images (`docker image prune`), logs of containers outside this compose file,
+and backups. The database itself shrinks only by retention (`SYSTEM_EVENT_RETENTION_DAYS`) and
+the PII purge; never delete rows by hand. Below critical, SQLite writes start to fail and
+bookings are refused with `database_busy` or an internal error.
 
 ## Webex or WxCC is down
 
