@@ -134,6 +134,10 @@ class Settings(BaseSettings):
     rate_limit_bookings: str = "10/hour"
     rate_limit_reads: str = "60/minute"
 
+    # ADR 0035: how many host websites one organisation may allow for the widget. Class C
+    # (platform, superuser) once the ADR 0042 registry exists; until then from the environment.
+    embedding_max_origins: int = Field(default=20, ge=1, le=100)
+
     # Machine API for contact-center bots (ADR 0023). Off: the routes do not exist. On: the
     # superuser still switches it on in the admin portal and registers each client there.
     agent_api_enabled: bool = False

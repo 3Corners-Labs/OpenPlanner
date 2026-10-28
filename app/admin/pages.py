@@ -57,6 +57,7 @@ NAVIGATION = (
         "organisation",
     ),
     NavItem("admin.nav.branding", "/admin/branding", Permission.BRANDING_MANAGE, "palette"),
+    NavItem("admin.nav.embedding", "/admin/embedding", Permission.EMBEDDING_MANAGE, "code"),
     NavItem("admin.nav.holidays", "/admin/holidays", Permission.HOLIDAYS_ASSIGN, "holiday"),
     NavItem("admin.nav.closures", "/admin/closures", Permission.ORGANISATION_CLOSURE, "alert"),
     NavItem("admin.nav.api", "/admin/api", Permission.API_CLIENTS_MANAGE, "key"),

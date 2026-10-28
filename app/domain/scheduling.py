@@ -151,6 +151,8 @@ class Group:
         dispatch_lead_minutes: How long before the start the WxCC task is created; from
             that moment the booking is read-only (``job_plan.change_deadline``). At most
             ``min_notice_minutes``, so no booking is read-only when it is made.
+        embedding_enabled: Whether the group may appear in the widget on the websites its
+            organisation allows (ADR 0035); off until the group switches it on.
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -173,6 +175,7 @@ class Group:
     not_picked_up_minutes: int = DEFAULT_NOT_PICKED_UP_MINUTES
     direct_call_max_concurrent: int | None = None
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
+    embedding_enabled: bool = False
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""

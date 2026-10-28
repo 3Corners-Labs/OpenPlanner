@@ -39,6 +39,7 @@ from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.closure_service import ClosureService
 from app.domain.contact_service import ContactService
+from app.domain.embedding_service import EmbeddingService
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
@@ -131,6 +132,13 @@ def create_app(
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
+        app.state.embedding_service = EmbeddingService(
+            uow,
+            clock,
+            app.state.admin_service,
+            max_origins=settings.embedding_max_origins,
+            allow_local=settings.environment != "prod",
+        )
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
         # Test emails go through exactly the senders the worker uses (ADR 0022).
         senders = ConfiguredSenders(uow, http, fallback_mail(settings))
