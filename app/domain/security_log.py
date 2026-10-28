@@ -23,7 +23,7 @@ from app.domain.ports import Clock, UnitOfWork
 WEBHOOK_REJECTED = "webhook.rejected"
 """A webhook whose signature or timestamp did not verify."""
 
-TOKEN_REFRESH_FAILED = "webex.token_refresh"  # noqa: S105 - an event key, not a secret
+TOKEN_REFRESH_FAILED = "webex.token_refresh"  # noqa: S105  # nosec B105 - an event key
 """Webex refused, or could not be reached for, a token refresh."""
 
 INVALID_SIGNATURE = "invalid_signature"
