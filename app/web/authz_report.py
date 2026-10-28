@@ -11,7 +11,9 @@ from app.domain.authorization import (
     API_SCOPES,
     CITIZEN_ACTIONS,
     LEVELS,
+    LOCKED_PERMISSIONS,
     MATRIX,
+    PII_PERMISSIONS,
     Level,
     Permission,
     Role,
@@ -29,17 +31,28 @@ from app.web.authz_labels import (
 
 @dataclass(frozen=True)
 class MatrixRow:
-    """One permission with its level and, per role, whether the role has it."""
+    """One permission with its level, its bounds (ADR 0039) and, per role, whether it is held."""
 
     permission: Permission
     level: Level
     granted: dict[Role, bool]
+    locked: bool
+    pii: bool
 
 
 def matrix_rows() -> list[MatrixRow]:
     """Return the matrix in a stable order: by level, then as declared."""
     order = {Level.GLOBAL: 0, Level.ORGANISATION: 1, Level.GROUP: 2}
-    rows = [MatrixRow(p, LEVELS[p], {role: p in MATRIX[role] for role in Role}) for p in Permission]
+    rows = [
+        MatrixRow(
+            p,
+            LEVELS[p],
+            {role: p in MATRIX[role] for role in Role},
+            locked=p in LOCKED_PERMISSIONS,
+            pii=p in PII_PERMISSIONS,
+        )
+        for p in Permission
+    ]
     return sorted(rows, key=lambda row: order[row.level])
 
 
@@ -56,17 +69,24 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
         "## Admins",
         "",
         "Roles come from the identity provider (ADR 0013). A role grants a permission only",
-        "within its scope: superuser everywhere, organisation admin in the organisations of",
-        "their claim and those organisations' groups, group admin in the groups of their claim.",
+        "within its reach: superuser everywhere; organisation admin and auditor in the",
+        "organisations of their claim and those organisations' groups; group admin in the",
+        "groups of their claim. The auditor reads only and never sees personal data (ADR 0039).",
         "",
-        "| Permission | Level | " + " | ".join(_(ROLE_LABELS[r]) for r in roles) + " |",
-        "|---|---|" + "---|" * len(roles),
+        "Bounds (ADR 0039): *locked* permissions belong to the superuser only; *personal data*",
+        "permissions show citizens' data and are never held by the auditor.",
+        "",
+        "| Permission | Level | Bounds | " + " | ".join(_(ROLE_LABELS[r]) for r in roles) + " |",
+        "|---|---|---|" + "---|" * len(roles),
     ]
     for row in matrix_rows():
         marks = " | ".join("yes" if row.granted[r] else "–" for r in roles)
+        bounds = ", ".join(
+            label for label, on in (("locked", row.locked), ("personal data", row.pii)) if on
+        )
         lines.append(
             f"| {_(PERMISSION_LABELS[row.permission])} (`{row.permission}`) "
-            f"| {_(LEVEL_LABELS[row.level])} | {marks} |"
+            f"| {_(LEVEL_LABELS[row.level])} | {bounds or '–'} | {marks} |"
         )
     lines += [
         "",

@@ -492,7 +492,7 @@ msgid "admin.matrix.title"
 msgstr "Rights matrix"
 
 msgid "admin.matrix.intro"
-msgstr "Which role may do what. This table comes straight from the code, like the documentation."
+msgstr "What each role may do, per organisation and per group. Permissions marked Superuser only are fixed. Permissions marked Personal data show citizens' data. Your organisation assigns roles in its identity provider."
 
 msgid "admin.matrix.level"
 msgstr "Level"
@@ -502,6 +502,12 @@ msgstr "Yes"
 
 msgid "admin.matrix.no"
 msgstr "No"
+
+msgid "admin.matrix.locked"
+msgstr "Superuser only"
+
+msgid "admin.matrix.pii"
+msgstr "Personal data"
 
 msgid "admin.matrix.citizen"
 msgstr "Participants (without logging in)"
@@ -589,6 +595,9 @@ msgstr "Organisation admin"
 
 msgid "authz.role.group_admin"
 msgstr "Group admin"
+
+msgid "authz.role.auditor"
+msgstr "Compliance and privacy (read-only)"
 
 msgid "authz.level.global"
 msgstr "Portal"

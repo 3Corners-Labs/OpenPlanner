@@ -1,4 +1,5 @@
 {% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
 {% block title %}{{ _("admin.matrix.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -20,7 +21,7 @@
   <tbody>
     {% for row in rows %}
     <tr>
-      <th scope="row">{{ row.label }}</th>
+      <th scope="row">{{ row.label }}{% if row.locked or row.pii %}<span class="matrix-bounds">{% if row.locked %}<span class="chip">{{ icon("lock") }}{{ _("admin.matrix.locked") }}</span>{% endif %}{% if row.pii %}<span class="chip chip--warning">{{ icon("info") }}{{ _("admin.matrix.pii") }}</span>{% endif %}</span>{% endif %}</th>
       <td>{{ row.level }}</td>
       {% for granted in row.granted %}<td>{% if granted %}<span class="cell-yes"><span aria-hidden="true">✓</span>{{ _("admin.matrix.yes") }}</span>{% else %}<span class="cell-no"><span aria-hidden="true">–</span>{{ _("admin.matrix.no") }}</span>{% endif %}</td>{% endfor %}
     </tr>

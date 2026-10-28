@@ -6,31 +6,35 @@ Do not edit by hand: CI fails when this file differs from the code (ADR 0014).
 ## Admins
 
 Roles come from the identity provider (ADR 0013). A role grants a permission only
-within its scope: superuser everywhere, organisation admin in the organisations of
-their claim and those organisations' groups, group admin in the groups of their claim.
+within its reach: superuser everywhere; organisation admin and auditor in the
+organisations of their claim and those organisations' groups; group admin in the
+groups of their claim. The auditor reads only and never sees personal data (ADR 0039).
 
-| Permission | Level | Superuser | Organisation admin | Group admin |
-|---|---|---|---|---|
-| View overview (`dashboard.view`) | Portal | yes | yes | yes |
-| View own rights (`rights.view`) | Portal | yes | yes | yes |
-| View rights matrix (`matrix.view`) | Portal | yes | yes | yes |
-| Manage organisations (`organisation.manage`) | Portal | yes | – | – |
-| Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | yes | – | – |
-| Manage API clients (`api_clients.manage`) | Portal | yes | – | – |
-| Update the installation (`system.update`) | Portal | yes | – | – |
-| Manage integrations and secrets (`integrations.manage`) | Organisation | yes | – | – |
-| Manage an organisation's branding (`branding.manage`) | Organisation | yes | – | – |
-| Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | yes | yes | – |
-| Create groups (`group.create`) | Organisation | yes | yes | – |
-| Close every team of an organisation at once (`organisation.closure`) | Organisation | yes | yes | – |
-| View audit log (`audit.view`) | Group | yes | yes | yes |
-| View group (`group.view`) | Group | yes | yes | yes |
-| Change group settings (`group.edit`) | Group | yes | yes | – |
-| Manage staffing and staffing exceptions (`schedule.manage`) | Group | yes | yes | yes |
-| Manage texts (`texts.manage`) | Group | yes | yes | yes |
-| Manage reminders (`reminders.manage`) | Group | yes | yes | – |
-| View bookings (`bookings.view`) | Group | yes | yes | yes |
-| Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | yes | yes | yes |
+Bounds (ADR 0039): *locked* permissions belong to the superuser only; *personal data*
+permissions show citizens' data and are never held by the auditor.
+
+| Permission | Level | Bounds | Superuser | Organisation admin | Group admin | Compliance and privacy (read-only) |
+|---|---|---|---|---|---|---|
+| View overview (`dashboard.view`) | Portal | – | yes | yes | yes | yes |
+| View own rights (`rights.view`) | Portal | – | yes | yes | yes | yes |
+| View rights matrix (`matrix.view`) | Portal | – | yes | yes | yes | yes |
+| Manage organisations (`organisation.manage`) | Portal | locked | yes | – | – | – |
+| Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | locked | yes | – | – | – |
+| Manage API clients (`api_clients.manage`) | Portal | locked | yes | – | – | – |
+| Update the installation (`system.update`) | Portal | locked | yes | – | – | – |
+| Manage integrations and secrets (`integrations.manage`) | Organisation | locked | yes | – | – | – |
+| Manage an organisation's branding (`branding.manage`) | Organisation | – | yes | – | – | – |
+| Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | – | yes | yes | – | – |
+| Create groups (`group.create`) | Organisation | – | yes | yes | – | – |
+| Close every team of an organisation at once (`organisation.closure`) | Organisation | – | yes | yes | – | – |
+| View audit log (`audit.view`) | Group | – | yes | yes | yes | yes |
+| View group (`group.view`) | Group | – | yes | yes | yes | yes |
+| Change group settings (`group.edit`) | Group | – | yes | yes | – | – |
+| Manage staffing and staffing exceptions (`schedule.manage`) | Group | – | yes | yes | yes | – |
+| Manage texts (`texts.manage`) | Group | – | yes | yes | yes | – |
+| Manage reminders (`reminders.manage`) | Group | – | yes | yes | – | – |
+| View bookings (`bookings.view`) | Group | personal data | yes | yes | yes | – |
+| Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | – | yes | yes | yes | – |
 
 ## Citizens
 
