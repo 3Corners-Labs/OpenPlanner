@@ -25,7 +25,6 @@ from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.images import ImageQueries, page_image
 from app.adapters.db.models import (
-    AdminProfileRow,
     AuditEventRow,
     BookingEventRow,
     BookingRow,
@@ -51,15 +50,16 @@ from app.adapters.db.models import (
     ScheduleOverrideRow,
     ScheduleRuleRow,
     SlotRow,
+    StaffRow,
     WebhookEventRow,
 )
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.scope import scope_filter
+from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
 from app.domain.audit import (
     PROBLEMS,
-    AdminProfile,
     AuditEntry,
     AuditEvent,
     AuditFilter,
@@ -313,7 +313,12 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 
 
 class SqlTransaction(
-    ApiClientQueries, UpdateQueries, RetentionQueries, ImageQueries, ScenarioQueries
+    ApiClientQueries,
+    UpdateQueries,
+    RetentionQueries,
+    StaffQueries,
+    ImageQueries,
+    ScenarioQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
@@ -379,8 +384,8 @@ class SqlTransaction(
     ) -> list[AuditEntry]:
         """Return the newest audit events inside ``scope``, narrowed by ``narrow`` (ADR 0031)."""
         query = (
-            select(AuditEventRow, AdminProfileRow.display_name)
-            .outerjoin(AdminProfileRow, AdminProfileRow.subject == AuditEventRow.actor)
+            select(AuditEventRow, StaffRow.display_name)
+            .outerjoin(StaffRow, StaffRow.subject == AuditEventRow.actor)
             .where(scope_filter(scope, AuditEventRow.organisation, AuditEventRow.group))
         )
         narrow = narrow or AuditFilter()
@@ -392,6 +397,8 @@ class SqlTransaction(
             query = query.where(AuditEventRow.group == narrow.group)
         if narrow.booking_id is not None:
             query = query.where(AuditEventRow.booking_id == narrow.booking_id)
+        if narrow.actor is not None:
+            query = query.where(AuditEventRow.actor == narrow.actor)
         rows = await self._session.execute(
             query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
         )
@@ -422,17 +429,6 @@ class SqlTransaction(
             )
         )
         return int(getattr(result, "rowcount", 0) or 0)
-
-    async def save_admin_profile(self, profile: AdminProfile) -> None:
-        """Create or replace the profile of ``profile.subject``."""
-        await self._session.merge(
-            AdminProfileRow(
-                subject=profile.subject[:255],
-                display_name=profile.display_name[:255],
-                last_login_at=profile.last_login_at,
-            )
-        )
-        await self._session.flush()
 
     async def get_group(self, slug: str) -> Group | None:
         """Return the group with ``slug``."""

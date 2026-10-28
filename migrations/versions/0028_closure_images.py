@@ -5,7 +5,7 @@ and the text alternative per locale (or ``decorative``); ``closures.image_id`` p
 closure's image. Organisation data only; no personal data of citizens.
 
 Revision ID: 0028
-Revises: 0025
+Revises: 0026
 Create Date: 2026-10-28 23:30:00.000000
 """
 
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0028"
-down_revision: str | None = "0025"
+down_revision: str | None = "0026"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
