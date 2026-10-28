@@ -2791,6 +2791,12 @@ msgstr "sms"
 msgid "admin.audit.detail.attempt"
 msgstr "poging {count}"
 
+msgid "admin.audit.detail.free_percent"
+msgstr "{count}% vrij"
+
+msgid "admin.audit.detail.database_mb"
+msgstr "database {count} MB"
+
 msgid "admin.audit.reason.no_role"
 msgstr "Geen rol in het beheerportaal."
 
@@ -2811,6 +2817,15 @@ msgstr "De afspraak bestaat niet meer."
 
 msgid "admin.audit.reason.channel_not_configured"
 msgstr "Dit kanaal is voor de organisatie niet ingesteld."
+
+msgid "admin.audit.reason.free_space_low"
+msgstr "Er is weinig schijfruimte over voor de gegevens."
+
+msgid "admin.audit.reason.free_space_critical"
+msgstr "De schijfruimte voor de gegevens is bijna op."
+
+msgid "admin.audit.reason.database_too_large"
+msgstr "De database is groter dan het ingestelde maximum."
 
 msgid "audit.actor.system"
 msgstr "Systeem"
@@ -2847,6 +2862,9 @@ msgstr "Taak in de wachtrij beëindigen"
 
 msgid "audit.job.purge_pii"
 msgstr "Persoonsgegevens verwijderen"
+
+msgid "audit.event.storage_check"
+msgstr "Opslag controleren"
 
 msgid "audit.job.send_suspension"
 msgstr "Bericht over sluiting versturen"

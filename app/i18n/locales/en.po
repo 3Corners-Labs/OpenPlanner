@@ -2791,6 +2791,12 @@ msgstr "text message"
 msgid "admin.audit.detail.attempt"
 msgstr "attempt {count}"
 
+msgid "admin.audit.detail.free_percent"
+msgstr "{count}% free"
+
+msgid "admin.audit.detail.database_mb"
+msgstr "database {count} MB"
+
 msgid "admin.audit.reason.no_role"
 msgstr "No role in the admin portal."
 
@@ -2811,6 +2817,15 @@ msgstr "The appointment no longer exists."
 
 msgid "admin.audit.reason.channel_not_configured"
 msgstr "This channel is not set up for the organisation."
+
+msgid "admin.audit.reason.free_space_low"
+msgstr "Little disk space is left for the data."
+
+msgid "admin.audit.reason.free_space_critical"
+msgstr "The disk space for the data has nearly run out."
+
+msgid "admin.audit.reason.database_too_large"
+msgstr "The database is larger than the configured maximum."
 
 msgid "audit.actor.system"
 msgstr "System"
@@ -2847,6 +2862,9 @@ msgstr "End task in the queue"
 
 msgid "audit.job.purge_pii"
 msgstr "Remove personal data"
+
+msgid "audit.event.storage_check"
+msgstr "Check storage"
 
 msgid "audit.job.send_suspension"
 msgstr "Send closure notice"

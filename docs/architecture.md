@@ -665,6 +665,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0037 | Closure page: prepared scenarios, structured alternative contact options, an image with alt text |
 | 0038 | Maintenance mode for the whole installation: data frozen, integrations open for the superuser |
 | 0039 | Adjustable roles within fixed bounds (superuser only), and a read-only auditor role |
+| 0040 | Standard event schema, log levels, role tags, CSV export and storage limits (log rotation, SQLite space reclaim, disk watch) |
 
 ## 12. Status and roadmap
 
@@ -696,6 +697,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | planned |
 | ADR 0038 | Maintenance mode (backlog MM-1 to MM-5) | planned |
 | ADR 0039 | Rights: (1) auditor role, reach, matrix page text; (2) retention overview; (3) custom roles within bounds | in progress |
+| ADR 0040 | Logging and storage: step 1 rotation, reclaim and disk watch; steps 2–4 schema and levels, filters and CSV export, diagnostic mode and retention | step 1 done |
 | O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
 | O11 step 2 | Change requests by phone number, confirmed by the citizen by email/SMS (ADR 0023) | planned |
 
