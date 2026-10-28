@@ -11,6 +11,8 @@ Public, unauthenticated: `GET /healthz`, `GET /readyz`.
 |---|---|---|---|
 | Information disclosure | Readiness error reveals database path, driver message or connection string | Fixed body `{"status":"unavailable"}`; only the exception type is logged | `tests/api/test_health.py::test_readiness_reports_unavailable_without_leaking_details` |
 | Information disclosure | Interactive docs expose internals and load third-party scripts | Swagger UI / ReDoc disabled | `test_interactive_docs_are_disabled` |
+| Information disclosure | Readiness tells an outsider how full the disk is | Body is only `{"status":"degraded"}`; percentages and sizes go to the worker log and the superuser's audit log | `tests/api/test_health.py::test_readiness_reports_a_volume_short_of_space_as_degraded` |
+| Denial of service | Logs or tables grow until the data volume is full and SQLite stops writing (e.g. a flood of failing jobs or rejected webhooks) | Container logs rotate (5 × 20 MB); system events pruned and pages reclaimed hourly; worker grades free space, logs and records a system event on change, `/readyz` degraded (ADR 0040) | `tests/jobs/test_housekeeping.py`, `tests/domain/test_storage.py` |
 | Denial of service | `/readyz` flooded to exhaust database connections | Cheap `SELECT 1` on a pooled connection; rate limiting at the reverse proxy *(TBD, O7)* | — |
 | Tampering | Clickjacking / MIME sniffing on any response | Security headers middleware | `test_security_headers_on_every_response` |
 
