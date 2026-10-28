@@ -123,12 +123,14 @@ Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task e
 ## Branding and the calendar script (WP3b)
 
 ```
-superuser ──POST name, colour, logo──> web ──SQL──> organisations, organisation_logos
-visitor ──GET /o/{slug}/theme.css, /o/{slug}/logo──> web (organisation data, no PII)
+superuser ──POST name, colours, logo, fonts, theme file──> web ──SQL──> organisations,
+                                                     organisation_logos, organisation_fonts
+visitor ──GET /o/{slug}/theme.css, /logo, /font/{role}──> web (organisation data, no PII)
 visitor browser ──fetch same page (?day=)──> web   (calendar.js, same origin, no new data)
 ```
 
-Branding is organisation data, not personal data. The calendar script sends nothing the page
+Branding is organisation data, not personal data. Fonts come from our own origin only
+(`font-src 'self'`, ADR 0041), so no font or stylesheet request reaches a third party. The calendar script sends nothing the page
 link does not already send, and stores nothing in the browser.
 
 ## Machine API for contact-center bots (ADR 0023)

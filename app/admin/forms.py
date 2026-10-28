@@ -10,7 +10,7 @@ input (``aria-describedby``, error summary with anchors) and never repeats the v
 """
 
 import re
-from collections.abc import Mapping, Sequence, Set
+from collections.abc import Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, tzinfo
 from urllib.parse import parse_qsl
@@ -20,6 +20,7 @@ from starlette.responses import RedirectResponse
 
 from app.admin.authz import AccessDenied
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.theme import TOKENS, TokenKind
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock, format_day_compact, local_day
 from app.web.errors import FormError
@@ -54,6 +55,9 @@ DONE_MESSAGES: dict[str, str] = {
     "removed": "admin.done.removed",
     "logo_saved": "admin.done.logo_saved",
     "logo_removed": "admin.done.logo_removed",
+    "font_saved": "admin.done.font_saved",
+    "font_removed": "admin.done.font_removed",
+    "theme_saved": "admin.done.theme_saved",
     "checked": "admin.done.checked",
     "simulated": "admin.done.simulated",
     "simulated_prepared": "admin.done.simulated_prepared",
@@ -100,6 +104,13 @@ FIELD_MESSAGES: dict[str, str] = {
     "display_name": "admin.form.error.display_name",
     "accent_color": "admin.form.error.accent_color",
     "logo": "admin.form.error.logo",
+    "header_style": "admin.form.error.choice",
+    **{
+        spec.field: "admin.form.error.contrast"
+        if spec.kind is TokenKind.COLOUR
+        else "admin.form.error.token_range"
+        for spec in TOKENS
+    },
     "weekday": "admin.form.error.weekday",
     "opens": "admin.form.error.time",
     "closes": "admin.form.error.time",
@@ -177,6 +188,11 @@ class Option:
 
     value: str
     label: str
+
+
+def options(pairs: Iterable[tuple[str, str]]) -> tuple[Option, ...]:
+    """Return select options from ``(value, label)`` pairs."""
+    return tuple(Option(value, label) for value, label in pairs)
 
 
 def moment_label(at: datetime, tz: tzinfo, locale: str) -> str:
