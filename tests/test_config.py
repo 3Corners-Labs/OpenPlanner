@@ -174,3 +174,11 @@ def test_the_installation_name_and_version_go_into_every_record() -> None:
 def test_the_installation_name_is_a_plain_token() -> None:
     with pytest.raises(ValidationError):
         Settings(environment="dev", installation_name='prod\n{"x":1}')
+
+
+@pytest.mark.parametrize("minutes", [0, 1441])
+def test_the_security_event_window_has_bounds(minutes: int) -> None:
+    # ADR 0034, AU-4 (class C): 1 minute to 1 day, default 15.
+    assert Settings(environment="dev").security_event_window_minutes == 15
+    with pytest.raises(ValidationError):
+        Settings(environment="dev", security_event_window_minutes=minutes)
