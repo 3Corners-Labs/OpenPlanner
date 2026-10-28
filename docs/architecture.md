@@ -251,7 +251,7 @@ same commit and rollback behaviour as the SQL one.
 | Citizen pages | `app/api/booking_pages.py`, `app/api/citizen.py`, `app/api/templates/` |
 | Slot picker: month calendar and times (ADR 0020) | `app/api/slot_picker.py`, `app/web/static/calendar.js` |
 | Organisations (superuser) | `app/domain/organisations.py`, `app/admin/organisation_routes.py` |
-| Branding per organisation (O5) | `app/domain/branding.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
+| Branding per organisation (O5, ADR 0041) | `app/domain/branding.py`, `app/domain/theme.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
 | CSRF and rate limits | `app/web/protection.py` |
 | Rendering and security headers | `app/web/templates.py`, `app/api/security_headers.py` |
 | Translations and locale | `app/i18n/` |
@@ -665,6 +665,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0036 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond (proposed) |
 | 0037 | Closure page: prepared scenarios, structured alternative contact options, an image with alt text |
 | 0038 | Maintenance mode for the whole installation: data frozen, integrations open for the superuser |
+| 0040 | Standard event schema, log levels, role tags, CSV export and storage limits (log rotation, SQLite space reclaim, disk watch) |
+| 0041 | Extended branding: allow-listed tokens with contrast checks, own WOFF2 fonts, header styles, theme file; no free CSS |
 
 ## 12. Status and roadmap
 
@@ -695,6 +697,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
 | ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | in progress (CB-1 done) |
 | ADR 0038 | Maintenance mode (backlog MM-1 to MM-5) | planned |
+| ADR 0040 | Logging and storage: step 1 rotation, reclaim and disk watch; steps 2–4 schema and levels, filters and CSV export, diagnostic mode and retention | step 1 done |
 | O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
 | O11 step 2 | Change requests by phone number, confirmed by the citizen by email/SMS (ADR 0023) | planned |
 

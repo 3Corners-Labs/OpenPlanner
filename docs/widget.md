@@ -27,6 +27,8 @@ properties (`app/web/static/site.css`). Defaults follow NL Design System convent
 | `--booking-color-unavailable` | `#6b7178` | Days without free times |
 | `--booking-color-later`, `-later-background`, `-later-stripe` | `#545454`, `#eceef0`, `#dadde1` | Days beyond the booking horizon ("nog niet te boeken") |
 | `--booking-font-family` | system UI stack | Text (the widget will use `inherit`) |
+| `--booking-font-family-heading` | `var(--booking-font-family)` | Headings and the name in the header |
+| `--booking-font-weight-heading` | `700` | Headings |
 | `--booking-font-size`, `--booking-line-height` | `1.0625rem`, `1.6` | Text |
 | `--booking-space-xs` … `--booking-space-xl` | `0.25rem` … `2.5rem` | Spacing |
 | `--booking-radius`, `--booking-radius-small` | `10px`, `6px` | Corners |
@@ -37,10 +39,37 @@ transitions.
 
 ## Organisation branding
 
-The superuser sets a display name, an accent colour and a logo per organisation (Admin →
-Branding). Pages load `/o/{slug}/theme.css`, which sets `--booking-color-accent` only; the
-domain refuses colours below 4.5:1 against white. Logos are PNG, JPEG or WebP up to 200 kB and
-are served from `/o/{slug}/logo`. Both URLs carry a version, so browsers may cache them.
+The superuser sets the branding per organisation (Admin → Huisstijl, ADR 0020 and 0041):
+
+- display name, logo (PNG, JPEG or WebP up to 200 kB) and a header style: `standard` (logo and
+  name, accent line), `accent` (header filled with the accent) or `logo` (logo only, the name
+  in its `alt`);
+- the accent colour and the other editable tokens below, checked for contrast across tokens on
+  save (text 4.5:1, borders and focus 3:1);
+- up to three WOFF2 fonts (text, text bold, heading; 250 kB each), served from
+  `/o/{slug}/font/{role}` and declared as `"OpenPlanner Text"` and `"OpenPlanner Heading"`;
+- or all tokens at once as a theme file: only `--booking-*` declarations from the list below,
+  no selectors, at-rules, `url()` or `!important`.
+
+Pages load `/o/{slug}/theme.css`, generated from the validated values. Colour tokens other
+than the accent sit in `@media not (prefers-contrast: more)`, so the high-contrast defaults
+win when a citizen asks for them. Theme, logo and font URLs carry a version, so browsers may
+cache them.
+
+| Editable token | Values |
+|---|---|
+| `--booking-color-accent` | `#RRGGBB` |
+| `--booking-color-text`, `-text-muted`, `-page`, `-surface`, `-background`, `-border`, `-border-strong`, `-on-accent` | `#RRGGBB` |
+| `--booking-font-family`, `--booking-font-family-heading` | family names and generic keywords |
+| `--booking-font-size` | 16–20 px (`px` or `rem`) |
+| `--booking-line-height` | 1.4–2.0 |
+| `--booking-font-weight-heading` | 400–900, steps of 100 |
+| `--booking-radius`, `--booking-radius-small` | 0–24 px, 0–16 px |
+| `--booking-max-width` | 640–1440 px |
+| `--booking-shadow` | `none` |
+
+Spacing, `--booking-target` and the focus colours are not editable: they carry the WCAG
+guarantees for target size and visible focus.
 
 ## Calendar behaviour
 

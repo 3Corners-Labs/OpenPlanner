@@ -1466,7 +1466,7 @@ msgid "admin.form.error.display_name"
 msgstr "Enter a name of at most 200 characters, without line breaks."
 
 msgid "admin.form.error.accent_color"
-msgstr "Choose a darker colour: white text on this colour needs a contrast of at least 4.5:1."
+msgstr "Choose another accent colour: text on it and the colour as text on the background need a contrast of at least 4.5:1."
 
 msgid "admin.form.error.logo"
 msgstr "Choose a PNG, JPEG or WebP image of at most 200 kB. SVG is not possible."
@@ -1478,7 +1478,7 @@ msgid "admin.branding.title"
 msgstr "Branding"
 
 msgid "admin.branding.lead"
-msgstr "Logo, name and accent colour on an organisation's booking pages."
+msgstr "Logo, name, colours, fonts and header of an organisation's booking pages."
 
 msgid "admin.branding.organisations"
 msgstr "Organisations"
@@ -1499,7 +1499,7 @@ msgid "admin.branding.logo_alt"
 msgstr "Logo of {name}"
 
 msgid "admin.branding.name_colour"
-msgstr "Name and colour"
+msgstr "Name, header and colours"
 
 msgid "admin.branding.display_name"
 msgstr "Name in the header"
@@ -1511,13 +1511,13 @@ msgid "admin.branding.accent_color"
 msgstr "Accent colour"
 
 msgid "admin.branding.accent_color_hint"
-msgstr "For buttons, links and the chosen day. White text on this colour needs a contrast of at least 4.5:1 (WCAG)."
+msgstr "For buttons, links and the chosen day. Text on this colour and this colour as text need a contrast of at least 4.5:1 (WCAG)."
 
 msgid "admin.branding.logo"
 msgstr "Logo"
 
 msgid "admin.branding.logo_lead"
-msgstr "Shown on the left of the header, next to the name. PNG, JPEG or WebP, at most {kb} kB."
+msgstr "Shown on the left of the header, next to the name (or alone, with the logo-only header). PNG, JPEG or WebP, at most {kb} kB."
 
 msgid "admin.branding.logo_file"
 msgstr "Image"
@@ -1530,6 +1530,217 @@ msgstr "Upload logo"
 
 msgid "admin.branding.logo_remove"
 msgstr "Remove logo"
+
+# Extended branding (ADR 0041)
+msgid "admin.done.font_saved"
+msgstr "The font has been saved."
+
+msgid "admin.done.font_removed"
+msgstr "The font has been removed."
+
+msgid "admin.done.theme_saved"
+msgstr "The theme file has been applied."
+
+msgid "admin.form.error.contrast"
+msgstr "This colour does not have enough contrast with the colours around it. Text needs at least 4.5:1, borders and the focus outline 3:1."
+
+msgid "admin.form.error.token_range"
+msgstr "Enter a number within the limits shown for this field."
+
+msgid "admin.form.error.theme_file"
+msgstr "Choose a theme file: CSS text in UTF-8, at most {kb} kB."
+
+msgid "admin.form.error.theme_file_line"
+msgstr "Line {line} of the theme file cannot be used. Only --booking variables from the list are allowed, with a valid value; selectors, @-rules, url() and !important are not."
+
+msgid "admin.form.error.theme_contrast"
+msgstr "The theme file gives too little contrast at {token}. Text needs at least 4.5:1, borders 3:1."
+
+msgid "admin.form.error.font"
+msgstr "Choose a WOFF2 font of at most {kb} kB."
+
+msgid "admin.branding.header_style"
+msgstr "Header"
+
+msgid "admin.branding.header_style_hint"
+msgstr "How the header of the booking pages shows logo and name."
+
+msgid "admin.branding.header.standard"
+msgstr "Logo and name, with a line in the accent colour"
+
+msgid "admin.branding.header.accent"
+msgstr "Logo and name on a bar in the accent colour"
+
+msgid "admin.branding.header.logo"
+msgstr "Logo only (the name is in its text alternative)"
+
+msgid "admin.branding.colours"
+msgstr "Colours"
+
+msgid "admin.branding.colours_lead"
+msgstr "When saving, the portal checks the contrast between all colours (WCAG 2.2 AA). People who ask their operating system for more contrast get the default colours with extra contrast."
+
+msgid "admin.branding.shape"
+msgstr "Shape and text"
+
+msgid "admin.branding.colours_shape"
+msgstr "Colours and shape"
+
+msgid "admin.branding.token.color_text"
+msgstr "Text"
+
+msgid "admin.branding.token.color_text_hint"
+msgstr "Body text and the text on the yellow focus highlight."
+
+msgid "admin.branding.token.color_text_muted"
+msgstr "Text, less emphasis"
+
+msgid "admin.branding.token.color_text_muted_hint"
+msgstr "Hints and secondary text."
+
+msgid "admin.branding.token.color_page"
+msgstr "Page background"
+
+msgid "admin.branding.token.color_page_hint"
+msgstr "Around the cards."
+
+msgid "admin.branding.token.color_surface"
+msgstr "Card background"
+
+msgid "admin.branding.token.color_surface_hint"
+msgstr "The panels with the calendar and the form."
+
+msgid "admin.branding.token.color_background"
+msgstr "Header and input background"
+
+msgid "admin.branding.token.color_background_hint"
+msgstr "Also behind the calendar days."
+
+msgid "admin.branding.token.color_border"
+msgstr "Borders (decorative)"
+
+msgid "admin.branding.token.color_border_hint"
+msgstr "Lines around cards and between parts."
+
+msgid "admin.branding.token.color_border_strong"
+msgstr "Input borders"
+
+msgid "admin.branding.token.color_border_strong_hint"
+msgstr "Needs at least 3:1, so inputs can be seen."
+
+msgid "admin.branding.token.color_on_accent"
+msgstr "Text on the accent colour"
+
+msgid "admin.branding.token.color_on_accent_hint"
+msgstr "On buttons, the chosen day and the header bar. Usually white."
+
+msgid "admin.branding.token.font_size"
+msgstr "Text size (pixels)"
+
+msgid "admin.branding.token.font_size_hint"
+msgstr "From {low} to {high}. Smaller than the browser default is not possible."
+
+msgid "admin.branding.token.line_height"
+msgstr "Line height"
+
+msgid "admin.branding.token.line_height_hint"
+msgstr "From {low} to {high} times the text size."
+
+msgid "admin.branding.token.font_weight_heading"
+msgstr "Heading weight"
+
+msgid "admin.branding.token.font_weight_heading_hint"
+msgstr "400 is normal, 700 is bold."
+
+msgid "admin.branding.token.radius"
+msgstr "Card corner radius (pixels)"
+
+msgid "admin.branding.token.radius_hint"
+msgstr "From {low} to {high}; 0 gives square corners."
+
+msgid "admin.branding.token.radius_small"
+msgstr "Button and input corner radius (pixels)"
+
+msgid "admin.branding.token.radius_small_hint"
+msgstr "From {low} to {high}; 0 gives square corners."
+
+msgid "admin.branding.token.max_width"
+msgstr "Maximum content width (pixels)"
+
+msgid "admin.branding.token.max_width_hint"
+msgstr "From {low} to {high}."
+
+msgid "admin.branding.token.shadow"
+msgstr "Shadow under cards"
+
+msgid "admin.branding.token.shadow_hint"
+msgstr "A flat style without a shadow suits some websites better."
+
+msgid "admin.branding.shadow.default"
+msgstr "With shadow"
+
+msgid "admin.branding.shadow.none"
+msgstr "Without shadow"
+
+msgid "admin.branding.fonts"
+msgstr "Fonts"
+
+msgid "admin.branding.fonts_lead"
+msgstr "Own fonts as WOFF2 files, at most {kb} kB per file. They are loaded from this service, never from another website. Make sure the font's licence allows this."
+
+msgid "admin.branding.font.text"
+msgstr "Text (regular)"
+
+msgid "admin.branding.font.text_bold"
+msgstr "Text (bold)"
+
+msgid "admin.branding.font.heading"
+msgstr "Headings"
+
+msgid "admin.branding.font_stored"
+msgstr "Stored"
+
+msgid "admin.branding.font_hint"
+msgstr "WOFF2, at most {kb} kB. Without a bold font the browser makes the regular one bolder itself."
+
+msgid "admin.branding.font_upload"
+msgstr "Upload {label}"
+
+msgid "admin.branding.font_remove"
+msgstr "Remove {label}"
+
+msgid "admin.audit.detail.font_remove.text"
+msgstr "Text font (regular) removed"
+
+msgid "admin.audit.detail.font_remove.text_bold"
+msgstr "Text font (bold) removed"
+
+msgid "admin.audit.detail.font_remove.heading"
+msgstr "Heading font removed"
+
+msgid "admin.branding.theme_file"
+msgstr "Theme file"
+
+msgid "admin.branding.theme_file_lead"
+msgstr "For those who prefer to keep the house style in a file: download the current theme, change the values and upload it again. Only --booking variables from the list are allowed; free CSS is not, so the pages stay accessible and safe."
+
+msgid "admin.branding.theme_download"
+msgstr "Download current theme (CSS)"
+
+msgid "admin.branding.theme_file_input"
+msgstr "Theme file"
+
+msgid "admin.branding.theme_file_hint"
+msgstr "CSS file of at most {kb} kB. It replaces the whole theme: variables it leaves out return to their default. Fonts and logo stay."
+
+msgid "admin.branding.theme_upload"
+msgstr "Apply theme file"
+
+msgid "admin.branding.preview_heading"
+msgstr "Choose a moment"
+
+msgid "admin.branding.preview_text"
+msgstr "This is how a card with text looks."
 
 # Emergency closure (ADR 0024)
 msgid "closure.banner.title_active"
@@ -2782,6 +2993,12 @@ msgstr "text message"
 msgid "admin.audit.detail.attempt"
 msgstr "attempt {count}"
 
+msgid "admin.audit.detail.free_percent"
+msgstr "{count}% free"
+
+msgid "admin.audit.detail.database_mb"
+msgstr "database {count} MB"
+
 msgid "admin.audit.reason.no_role"
 msgstr "No role in the admin portal."
 
@@ -2802,6 +3019,15 @@ msgstr "The appointment no longer exists."
 
 msgid "admin.audit.reason.channel_not_configured"
 msgstr "This channel is not set up for the organisation."
+
+msgid "admin.audit.reason.free_space_low"
+msgstr "Little disk space is left for the data."
+
+msgid "admin.audit.reason.free_space_critical"
+msgstr "The disk space for the data has nearly run out."
+
+msgid "admin.audit.reason.database_too_large"
+msgstr "The database is larger than the configured maximum."
 
 msgid "audit.actor.system"
 msgstr "System"
@@ -2838,6 +3064,9 @@ msgstr "End task in the queue"
 
 msgid "audit.job.purge_pii"
 msgstr "Remove personal data"
+
+msgid "audit.event.storage_check"
+msgstr "Check storage"
 
 msgid "audit.job.send_suspension"
 msgstr "Send closure notice"
