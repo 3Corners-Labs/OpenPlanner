@@ -13,7 +13,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
-from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Source
+from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Source
 from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
@@ -40,6 +40,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
+from app.domain.staff import StaffFilter, StaffMember
 from app.domain.updates import Release, ReleaseCheck, UpdateRequest
 
 
@@ -254,7 +255,7 @@ class Transaction(Protocol):
         """Return the newest audit events about organisations and groups inside ``scope``.
 
         ``narrow`` only ever narrows further; it never widens the scope. Each entry carries
-        the actor's display name from their ``AdminProfile``, if any.
+        the actor's display name from their ``StaffMember`` record, if any.
         """
         ...
 
@@ -262,8 +263,28 @@ class Transaction(Protocol):
         """Delete the events of ``source`` older than ``before``; return how many (ADR 0031)."""
         ...
 
-    async def save_admin_profile(self, profile: AdminProfile) -> None:
-        """Create or replace the profile of ``profile.subject``."""
+    async def get_staff(self, subject: str) -> StaffMember | None:
+        """Return the staff record of ``subject`` with all its memberships (ADR 0046)."""
+        ...
+
+    async def save_staff(self, member: StaffMember) -> None:
+        """Create or replace the staff record of ``member.subject`` and its memberships."""
+        ...
+
+    async def set_staff_seen(self, subject: str, at: datetime) -> None:
+        """Record the latest request of ``subject``; unknown subjects are ignored."""
+        ...
+
+    async def set_staff_logout(self, subject: str, at: datetime) -> None:
+        """Record the latest logout of ``subject``; unknown subjects are ignored."""
+        ...
+
+    async def list_staff(self, scope: Scope, narrow: StaffFilter) -> list[StaffMember]:
+        """Return the staff ``scope`` may see (``app.domain.staff.visible``), by name.
+
+        ``narrow`` only ever narrows further. Each member carries all memberships; the
+        caller hides those outside the scope.
+        """
         ...
 
     async def get_group(self, slug: str) -> Group | None:
