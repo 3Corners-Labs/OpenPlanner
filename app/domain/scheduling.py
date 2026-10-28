@@ -16,6 +16,7 @@ outside office hours) offers nothing, exactly like a gap, but says that it is de
 """
 
 import re
+import unicodedata
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
@@ -26,6 +27,7 @@ from app.domain.branding import Branding
 from app.domain.errors import DomainError, ErrorCode
 
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_NOT_SLUG = re.compile(r"[^a-z0-9]+")
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 _LINE_BREAKS = re.compile(r"[\x85\u2028\u2029]")
 MAX_NAME_LENGTH = 200
@@ -68,6 +70,21 @@ def check_name(name: str) -> None:
     """
     if not name.strip() or len(name) > MAX_NAME_LENGTH or _CONTROL_CHARS.search(name):
         raise _invalid("name")
+
+
+def slug_from(text: str) -> str:
+    """Return ``text`` as a slug: lowercase ASCII words joined by hyphens, at most 64 characters.
+
+    Accents are dropped (``Café`` → ``cafe``), every run of other characters becomes one hyphen,
+    and a too-long result is cut at the last hyphen within the limit. Returns ``""`` when nothing
+    usable is left; ``check_name_and_slug`` then refuses it.
+    """
+    ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    slug = _NOT_SLUG.sub("-", ascii_text.lower()).strip("-")
+    if len(slug) <= MAX_SLUG_LENGTH:
+        return slug
+    cut = slug[: MAX_SLUG_LENGTH + 1]
+    return cut[: cut.rfind("-")] if "-" in cut else slug[:MAX_SLUG_LENGTH]
 
 
 def check_name_and_slug(name: str, slug: str) -> None:

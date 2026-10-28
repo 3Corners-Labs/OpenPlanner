@@ -765,7 +765,7 @@ msgid "admin.field.slug"
 msgstr "Webadres"
 
 msgid "admin.field.slug_hint"
-msgstr "Wordt /g/<webadres>. Kleine letters, cijfers en streepjes, bijvoorbeeld vergunningen-loket."
+msgstr "Wordt /g/<webadres>. Leeg laten maakt het uit de naam; hoofdletters, spaties en accenten worden omgezet, bijvoorbeeld Vergunningen Loket → vergunningen-loket."
 
 msgid "admin.field.slug_fixed"
 msgstr "Het webadres verandert niet, zodat links op websites blijven werken."
