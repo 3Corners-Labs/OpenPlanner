@@ -26,6 +26,9 @@ def settings(tmp_path: Path) -> Settings:
         dev_settings_key_path=tmp_path / "dev-settings.key",
         session_secret=SecretStr("x" * 32),
         rate_limit_enabled=False,
+        # Storage grades (ADR 0040) must not depend on the free space of the test machine.
+        storage_low_free_percent=0.002,
+        storage_critical_free_percent=0.001,
     )
 
 

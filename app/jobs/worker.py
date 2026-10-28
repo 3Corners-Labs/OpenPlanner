@@ -1,8 +1,9 @@
 """Worker process: runs due jobs and proves liveness with a heartbeat file.
 
 Run with ``python -m app.jobs.worker``. Each iteration checks the database, runs due jobs
-(``app.jobs.runner``), looks up the latest release when that is due (hourly, ADR 0029) and
-writes the heartbeat.
+(``app.jobs.runner``), watches the data volume and reclaims freed database pages
+(``app.jobs.housekeeping``, ADR 0040), looks up the latest release when that is due (hourly,
+ADR 0029) and writes the heartbeat.
 """
 
 import asyncio
@@ -16,6 +17,7 @@ import structlog
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable
 from app.adapters.db.jobs import SqlJobQueue
+from app.adapters.db.maintenance import storage_limits
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.integrations import build_integrations, secret_box
 from app.adapters.releases import update_service
@@ -27,6 +29,7 @@ from app.domain.ports import Clock
 from app.domain.update_service import UpdateService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
+from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from app.keys import management_token_key
@@ -74,6 +77,9 @@ async def run_worker(
         integration=IntegrationService(uow, clock, AdminService(uow, clock)),
         retention=timedelta(days=settings.system_event_retention_days),
     )
+    housekeeping = Housekeeping.for_database(
+        engine, uow, clock, storage_limits(settings), settings.database_url
+    )
     updates = update_service(settings, uow, clock, http)
     log.info(
         "worker.started",
@@ -90,6 +96,7 @@ async def run_worker(
                     await runner.run_due()
                 except Exception as exc:  # e.g. schema not migrated yet; keep the loop alive
                     log.warning("worker.run_failed", error=type(exc).__name__)
+                await housekeeping.run()
                 await _check_releases(updates)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
