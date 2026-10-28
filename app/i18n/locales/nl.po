@@ -2978,9 +2978,6 @@ msgstr "Acties van beheerders"
 msgid "admin.audit.source.system"
 msgstr "Systeemgebeurtenissen"
 
-msgid "admin.audit.all"
-msgstr "Alle"
-
 msgid "admin.audit.group"
 msgstr "Groep"
 
@@ -3930,3 +3927,122 @@ msgstr "Eigen blok met {count} contactmogelijkheden."
 
 msgid "admin.group_contacts.summary_default"
 msgstr "Standaard van de organisatie: {count} contactmogelijkheden."
+
+# ADR 0046: staff directory
+
+msgid "authz.permission.staff_view"
+msgstr "Medewerkers bekijken"
+
+msgid "admin.nav.staff"
+msgstr "Medewerkers"
+
+msgid "audit.event.staff_created"
+msgstr "Eerste keer ingelogd"
+
+msgid "audit.event.staff_changed"
+msgstr "Rollen of lidmaatschappen gewijzigd"
+
+msgid "admin.audit.detail.role_add"
+msgstr "rol erbij: {value}"
+
+msgid "admin.audit.detail.role_remove"
+msgstr "rol eraf: {value}"
+
+msgid "admin.audit.detail.organisation_add"
+msgstr "organisatie erbij: {value}"
+
+msgid "admin.audit.detail.organisation_remove"
+msgstr "organisatie eraf: {value}"
+
+msgid "admin.audit.detail.group_add"
+msgstr "groep erbij: {value}"
+
+msgid "admin.audit.detail.group_remove"
+msgstr "groep eraf: {value}"
+
+msgid "admin.staff.title"
+msgstr "Medewerkers"
+
+msgid "admin.staff.intro"
+msgstr "Wie het beheerportaal gebruikt, met welke rol en voor welke organisaties en groepen. U ziet alleen medewerkers binnen uw eigen organisaties of groepen."
+
+msgid "admin.staff.filter"
+msgstr "Medewerkers filteren"
+
+msgid "admin.staff.organisation"
+msgstr "Organisatie"
+
+msgid "admin.staff.group"
+msgstr "Groep"
+
+msgid "admin.staff.role"
+msgstr "Rol"
+
+msgid "admin.filter.all"
+msgstr "Alle"
+
+msgid "admin.staff.dormant_only"
+msgstr "Alleen wie {days} dagen niet heeft ingelogd"
+
+msgid "admin.staff.apply"
+msgstr "Filteren"
+
+msgid "admin.staff.clear"
+msgstr "Filters wissen"
+
+msgid "admin.staff.name"
+msgstr "Naam"
+
+msgid "admin.staff.roles"
+msgstr "Rollen"
+
+msgid "admin.staff.places"
+msgstr "Organisaties en groepen"
+
+msgid "admin.staff.first_seen"
+msgstr "Eerste keer ingelogd"
+
+msgid "admin.staff.last_login"
+msgstr "Laatst ingelogd"
+
+msgid "admin.staff.last_seen"
+msgstr "Laatst actief"
+
+msgid "admin.staff.last_logout"
+msgstr "Laatst afgemeld"
+
+msgid "admin.staff.never"
+msgstr "Nog niet"
+
+msgid "admin.staff.dormant"
+msgstr "Lang niet ingelogd"
+
+msgid "admin.staff.no_role"
+msgstr "Geen rol"
+
+msgid "admin.staff.whole_organisation"
+msgstr "Hele organisatie"
+
+msgid "admin.staff.source"
+msgstr "Rollen, organisaties en groepen komen van de identiteitsprovider en zijn bijgewerkt bij de laatste login. Wijzigen doet u daar."
+
+msgid "admin.staff.empty"
+msgstr "Er zijn geen medewerkers die aan deze keuze voldoen."
+
+msgid "admin.staff.back"
+msgstr "Terug naar medewerkers"
+
+msgid "admin.staff.access"
+msgstr "Toegang"
+
+msgid "admin.staff.times"
+msgstr "Aanmelden en afmelden"
+
+msgid "admin.staff.activity"
+msgstr "Recente activiteit"
+
+msgid "admin.staff.activity_intro"
+msgstr "De laatste {count} gebeurtenissen uit de auditlog binnen uw eigen organisaties of groepen."
+
+msgid "admin.staff.activity_empty"
+msgstr "Geen activiteit binnen uw organisaties of groepen."
