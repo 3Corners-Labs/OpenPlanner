@@ -11,6 +11,7 @@
 3. **Can PII reach a log, error message, URL or external payload here?**
 4. **Which test would fail if this change were wrong?**
 5. **Is a dependency added, and why?**
+6. **Which settings does this add or change (key, class A–D, default, bounds, permission), and which tunable value stays hard-coded, and why?** <!-- ADR 0042 -->
 
 ## Security review
 <!-- Paste the findings of the security-review skill. -->
