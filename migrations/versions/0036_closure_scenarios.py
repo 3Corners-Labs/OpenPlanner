@@ -5,8 +5,8 @@ ADR 0037 §4 (CL-4). ``closure_scenarios`` holds a name, the notices and heading
 scenario with ``group_id`` NULL belongs to the organisation. Organisation data only; no
 personal data of citizens.
 
-Revision ID: 0028
-Revises: 0027
+Revision ID: 0036
+Revises: 0028
 Create Date: 2026-10-29 01:00:00.000000
 """
 
@@ -15,8 +15,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0028"
-down_revision: str | None = "0027"
+revision: str = "0036"
+down_revision: str | None = "0028"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
