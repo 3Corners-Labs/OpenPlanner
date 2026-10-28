@@ -140,7 +140,10 @@ meeting of the organisation.
 
 The citizen's join page (`/b/{token}/join/go`, ADR 0017) forwards to Webex only when
 `policy_state` is not `drift` **on a fixed protection** (§Fixed on purpose). Otherwise it
-runs one synchronous check-and-patch (§3.3). If that succeeds the citizen continues; if it
+runs one synchronous check-and-patch (§3.3), at most once per booking per
+`video_join_recheck_seconds`. Within that interval it reuses the last result, so a reloaded or
+abused join link cannot drive calls to Webex; the existing rate limit on the public join
+routes stays in front of it. If that succeeds the citizen continues; if it
 fails the page tells the citizen, in the page itself, that the call cannot start yet and that
 the organisation will contact them. It also raises `video.join_blocked`. Drift on a tunable
 choice (for example chat) never blocks the citizen. It only raises the event.
@@ -168,7 +171,7 @@ summaries or stored transcripts, the O8 decision can switch them on in the floor
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `webex_site_url` | D organisation | empty (host's default site, today's behaviour) | `https://<name>.webex.com` | `integrations.manage` | external address; a change re-runs the site check of §7 |
+| `webex_site_url` | D organisation | empty (host's default site, today's behaviour) | `https://<name>.webex.com` | `integrations.manage` (superuser only, ADR 0039) | external address; a new value is saved only after the site check of §7 passes; once set it **cannot be cleared** in the portal, because the floor lives on that site |
 | `video_template_id` (per group) | D organisation | empty | must exist on the site (§7) | `integrations.manage` | optional, cannot override the policy |
 | `video_chat_enabled` | D organisation | on | on/off | `integrations.manage` | ADR 0017 default |
 | `video_private_chat_enabled` | D organisation | on | on/off | `integrations.manage` | `enabledChatOtherParticipants`, e.g. citizen and interpreter |
@@ -177,6 +180,7 @@ summaries or stored transcripts, the O8 decision can switch them on in the floor
 | `video_auto_lock_minutes` | D organisation | 0 (off) | 0–60 | `integrations.manage` | an extra on top of the fixed lobby; 0 is the platform default, not a protection being switched off |
 | `video_visual_watermark` | D organisation | off | on/off | `integrations.manage` | blocks local recording but keeps old clients out; test before enabling |
 | `video_policy_check_lead_minutes` | C platform | 30 | 5–240 | `settings.platform.manage` | §4 |
+| `video_join_recheck_seconds` | C platform | 60 | 30–600 | `settings.platform.manage` | §6; bounds keep the join gate from becoming a Webex call per click |
 | `webex_floor_review_days` | C platform | 90 | 30–365 | `settings.platform.manage` | §7.2 |
 
 Until the registry of ADR 0042 exists, the class D keys live in `app/config.py` with their
