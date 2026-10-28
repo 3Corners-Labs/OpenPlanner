@@ -27,6 +27,7 @@ from app.api import (
     join_pages,
     pages,
     webhooks,
+    widget_api,
 )
 from app.api.agent import create_agent_api
 from app.api.security_headers import SecurityHeadersMiddleware
@@ -213,6 +214,8 @@ def create_app(
     app.include_router(direct_pages.router)
     app.include_router(brand_assets.router)
     app.include_router(webhooks.router)
+    app.include_router(widget_api.texts_router)
+    app.include_router(widget_api.router)
     if agent_api is not None:
         app.mount(AGENT_API_PREFIX, agent_api)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
