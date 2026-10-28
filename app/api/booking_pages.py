@@ -3,7 +3,9 @@
 Server-rendered and usable without JavaScript. Every response goes through
 ``app.web.templates.render``; every write is a same-origin, rate-limited POST.
 
-    GET  /g/{slug}?month=&day=     slot picker: month calendar + times of one day (ADR 0020)
+    GET  /g/{slug}?month=&day=     slot picker: month calendar + times of one day (ADR 0020);
+                                   the closure page instead while the team is closed (ADR 0037)
+    GET  /g/{slug}/closure         closure page of an active or upcoming closure, else ─► 303
     GET  /g/{slug}/book?start=     contact form for one slot
     POST /g/{slug}/book            book ─► 303 /b/{token}?status=booked
     GET  /b/{token}                booking (read-only from the change deadline; a booking on
@@ -100,9 +102,17 @@ async def group_page(
     day: str | None = None,
     status: str | None = None,
 ) -> HTMLResponse:
-    """Show the group's month calendar and the free times of one day."""
+    """Show the group's month calendar and the free times of one day.
+
+    While the team is closed, the closure page takes the calendar's place (ADR 0037 §5).
+    """
     service = _service(request)
     group = await service.get_group(slug)
+    now = _clock(request).now()
+    closure = await service.closure_notice(group)
+    banner = closure_view(closure, group, locale, now) if closure else None
+    if banner and banner.active:
+        return await citizen_page(request, locale, "closure.html", group, {"closure": banner})
     view = await picker(
         service,
         group,
@@ -118,15 +128,27 @@ async def group_page(
         if status == "unavailable"
         else []
     )
-    closure = await service.closure_notice(group)
-    now = _clock(request).now()
     context = {
         "picker": view,
         "errors": errors,
         "direct_call": await service.direct_call_availability(slug),
-        "closure": closure_view(closure, group, locale, now) if closure else None,
+        "closure": banner,
+        "closure_page": f"/g/{group.slug}/closure",
     }
     return await citizen_page(request, locale, "group.html", group, context)
+
+
+@router.get("/g/{slug}/closure", response_class=HTMLResponse)
+@limiter.limit(read_limit)
+async def closure_page(request: Request, slug: str, locale: Locale) -> Response:
+    """Show the closure page of the group; without a closure to show, go to its calendar."""
+    service = _service(request)
+    group = await service.get_group(slug)
+    closure = await service.closure_notice(group)
+    if closure is None:
+        return RedirectResponse(f"/g/{group.slug}", status_code=303)
+    banner = closure_view(closure, group, locale, _clock(request).now())
+    return await citizen_page(request, locale, "closure.html", group, {"closure": banner})
 
 
 def _book_context(

@@ -72,7 +72,7 @@ be confirmed in the DPIA (O7). The closure notice is admin text without personal
 **Alternative contact options (ADR 0037).** Phone numbers, email addresses, links and addresses
 of the organisation (`organisation_contacts`), entered by an organisation admin, or of one team
 (`group_contacts`), entered by its group admin, and shown publicly on closure and maintenance
-pages. A closure keeps a copy of the block that applied when it started (`closures.contacts`)
+pages and on the page of a booking on hold (CL-2). A closure keeps a copy of the block that applied when it started (`closures.contacts`)
 and an optional heading per locale (`closure_notices.heading`). Organisation data, not personal data of citizens;
 the admin page asks for general numbers and addresses only. No purge job; kept until changed.
 

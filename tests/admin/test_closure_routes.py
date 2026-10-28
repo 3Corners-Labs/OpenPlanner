@@ -59,7 +59,7 @@ async def test_group_admin_closes_the_team_and_citizens_see_why(site: Site) -> N
     assert "We excuseren ons &lt;b&gt;hiervoor&lt;/b&gt;." in page  # escaped, never HTML
 
     public = (await site.client.get("/g/demo")).text
-    assert "Tijdelijk gesloten" in public
+    assert '<h1 id="closure-heading">Tijdelijk gesloten</h1>' in public  # no heading given
     assert "Door een stroomstoring zijn wij gesloten." in public
     assert "<b>hiervoor</b>" not in public
 
