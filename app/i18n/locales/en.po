@@ -1764,6 +1764,12 @@ msgstr "Closed from {start} until {end}."
 msgid "closure.banner.period_open"
 msgstr "Closed from {start} until further notice."
 
+msgid "closure.banner.more"
+msgstr "More about the closure and other ways to reach us"
+
+msgid "closure.page.calendar"
+msgstr "To the calendar: you can still book an appointment until the closure"
+
 msgid "manage.status.suspended"
 msgstr "On hold"
 
@@ -2972,9 +2978,6 @@ msgstr "Admin actions"
 msgid "admin.audit.source.system"
 msgstr "System events"
 
-msgid "admin.audit.all"
-msgstr "All"
-
 msgid "admin.audit.group"
 msgstr "Group"
 
@@ -3085,6 +3088,7 @@ msgstr "Send closure update"
 
 msgid "audit.job.send_reinstatement"
 msgstr "Send reinstatement notice"
+
 msgid "authz.permission.system_update"
 msgstr "Update the installation"
 
@@ -4119,3 +4123,121 @@ msgstr "value in the identity provider"
 
 msgid "admin.matrix.history.count"
 msgstr "{count} permissions"
+# ADR 0046: staff directory
+
+msgid "authz.permission.staff_view"
+msgstr "View staff"
+
+msgid "admin.nav.staff"
+msgstr "Staff"
+
+msgid "audit.event.staff_created"
+msgstr "First login"
+
+msgid "audit.event.staff_changed"
+msgstr "Roles or memberships changed"
+
+msgid "admin.audit.detail.role_add"
+msgstr "role added: {value}"
+
+msgid "admin.audit.detail.role_remove"
+msgstr "role removed: {value}"
+
+msgid "admin.audit.detail.organisation_add"
+msgstr "organisation added: {value}"
+
+msgid "admin.audit.detail.organisation_remove"
+msgstr "organisation removed: {value}"
+
+msgid "admin.audit.detail.group_add"
+msgstr "group added: {value}"
+
+msgid "admin.audit.detail.group_remove"
+msgstr "group removed: {value}"
+
+msgid "admin.staff.title"
+msgstr "Staff"
+
+msgid "admin.staff.intro"
+msgstr "Who uses the admin portal, with which role and for which organisations and groups. You only see staff within your own organisations or groups."
+
+msgid "admin.staff.filter"
+msgstr "Filter staff"
+
+msgid "admin.staff.organisation"
+msgstr "Organisation"
+
+msgid "admin.staff.group"
+msgstr "Group"
+
+msgid "admin.staff.role"
+msgstr "Role"
+
+msgid "admin.filter.all"
+msgstr "All"
+
+msgid "admin.staff.dormant_only"
+msgstr "Only people without a login for {days} days"
+
+msgid "admin.staff.apply"
+msgstr "Filter"
+
+msgid "admin.staff.clear"
+msgstr "Clear filters"
+
+msgid "admin.staff.name"
+msgstr "Name"
+
+msgid "admin.staff.roles"
+msgstr "Roles"
+
+msgid "admin.staff.places"
+msgstr "Organisations and groups"
+
+msgid "admin.staff.first_seen"
+msgstr "First login"
+
+msgid "admin.staff.last_login"
+msgstr "Last login"
+
+msgid "admin.staff.last_seen"
+msgstr "Last active"
+
+msgid "admin.staff.last_logout"
+msgstr "Last logout"
+
+msgid "admin.staff.never"
+msgstr "Not yet"
+
+msgid "admin.staff.dormant"
+msgstr "No recent login"
+
+msgid "admin.staff.no_role"
+msgstr "No role"
+
+msgid "admin.staff.whole_organisation"
+msgstr "Whole organisation"
+
+msgid "admin.staff.source"
+msgstr "Roles, organisations and groups come from the identity provider and were updated at the last login. Change them there."
+
+msgid "admin.staff.empty"
+msgstr "No staff match this selection."
+
+msgid "admin.staff.back"
+msgstr "Back to staff"
+
+msgid "admin.staff.access"
+msgstr "Access"
+
+msgid "admin.staff.times"
+msgstr "Logins and logouts"
+
+msgid "admin.staff.activity"
+msgstr "Recent activity"
+
+msgid "admin.staff.activity_intro"
+msgstr "The latest {count} events from the audit log within your own organisations or groups."
+
+msgid "admin.staff.activity_empty"
+msgstr "No activity within your organisations or groups."

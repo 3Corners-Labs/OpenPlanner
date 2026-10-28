@@ -19,24 +19,20 @@ from sqlalchemy import (
     Select,
     case,
     delete,
-    false,
     func,
     insert,
     or_,
     select,
-    true,
     update,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.sql.elements import SQLCoreOperations
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.models import (
-    AdminProfileRow,
     AuditEventRow,
     BookingEventRow,
     BookingRow,
@@ -62,14 +58,16 @@ from app.adapters.db.models import (
     ScheduleOverrideRow,
     ScheduleRuleRow,
     SlotRow,
+    StaffRow,
     WebhookEventRow,
 )
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
+from app.adapters.db.scope import scope_filter
+from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
 from app.domain.audit import (
     PROBLEMS,
-    AdminProfile,
     AuditEntry,
     AuditEvent,
     AuditFilter,
@@ -203,25 +201,6 @@ def _group(row: GroupRow) -> Group:
         direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
     )
-
-
-def scope_filter(
-    scope: Scope,
-    organisation_slug: SQLCoreOperations[Any],
-    group_slug: SQLCoreOperations[Any] | None,
-) -> ColumnElement[bool]:
-    """Translate a ``Scope`` into a SQL condition; the one place this happens (ADR 0014).
-
-    An empty scope matches nothing; ``everything`` matches all rows.
-    """
-    if scope.everything:
-        return true()
-    conditions: list[ColumnElement[bool]] = []
-    if scope.organisations:
-        conditions.append(organisation_slug.in_(sorted(scope.organisations)))
-    if scope.groups and group_slug is not None:
-        conditions.append(group_slug.in_(sorted(scope.groups)))
-    return or_(*conditions) if conditions else false()
 
 
 def _override(row: ScheduleOverrideRow) -> ScheduleOverride:
@@ -365,7 +344,7 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
     return f"channel:{organisation_id}:{channel.value}"
 
 
-class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, RoleQueries):
+class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, RoleQueries, StaffQueries):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
@@ -429,8 +408,8 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, RoleQuer
     ) -> list[AuditEntry]:
         """Return the newest audit events inside ``scope``, narrowed by ``narrow`` (ADR 0031)."""
         query = (
-            select(AuditEventRow, AdminProfileRow.display_name)
-            .outerjoin(AdminProfileRow, AdminProfileRow.subject == AuditEventRow.actor)
+            select(AuditEventRow, StaffRow.display_name)
+            .outerjoin(StaffRow, StaffRow.subject == AuditEventRow.actor)
             .where(scope_filter(scope, AuditEventRow.organisation, AuditEventRow.group))
         )
         narrow = narrow or AuditFilter()
@@ -442,13 +421,15 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, RoleQuer
             query = query.where(AuditEventRow.group == narrow.group)
         if narrow.booking_id is not None:
             query = query.where(AuditEventRow.booking_id == narrow.booking_id)
+        if narrow.actor is not None:
+            query = query.where(AuditEventRow.actor == narrow.actor)
         return await self._entries(query, limit)
 
     async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
         """Return the newest audit events with one of ``actions``, with the actors' names."""
         query = (
-            select(AuditEventRow, AdminProfileRow.display_name)
-            .outerjoin(AdminProfileRow, AdminProfileRow.subject == AuditEventRow.actor)
+            select(AuditEventRow, StaffRow.display_name)
+            .outerjoin(StaffRow, StaffRow.subject == AuditEventRow.actor)
             .where(AuditEventRow.action.in_(list(actions)))
         )
         return await self._entries(query, limit)
@@ -485,17 +466,6 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, RoleQuer
             )
         )
         return int(getattr(result, "rowcount", 0) or 0)
-
-    async def save_admin_profile(self, profile: AdminProfile) -> None:
-        """Create or replace the profile of ``profile.subject``."""
-        await self._session.merge(
-            AdminProfileRow(
-                subject=profile.subject[:255],
-                display_name=profile.display_name[:255],
-                last_login_at=profile.last_login_at,
-            )
-        )
-        await self._session.flush()
 
     async def get_group(self, slug: str) -> Group | None:
         """Return the group with ``slug``."""

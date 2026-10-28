@@ -21,6 +21,7 @@ from app.admin.authz import AdminContext, RequirePermission, admin_service
 from app.admin.forms import Option
 from app.admin.pages import Locale, admin_moment
 from app.admin.pages import page as _page
+from app.domain import staff
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT, LOGOUT_EVENT
 from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
 from app.domain.audit import SYSTEM_ACTOR, AuditEntry, AuditFilter, Outcome, Source
@@ -30,6 +31,7 @@ from app.domain.authorization import (
     Permission,
     Principal,
     Reason,
+    Role,
     Target,
     decide,
 )
@@ -41,7 +43,13 @@ from app.domain.storage import (
     STORAGE_EVENT,
 )
 from app.i18n import BoundGettext
-from app.web.authz_labels import API_SCOPE_LABELS, OUTCOME_LABELS, PERMISSION_LABELS
+from app.web.authz_labels import (
+    API_SCOPE_LABELS,
+    OUTCOME_LABELS,
+    PERMISSION_LABELS,
+    ROLE_LABELS,
+)
+from app.web.locale import RequestLocale
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -70,6 +78,9 @@ EVENT_LABELS: dict[str, str] = {
     "job.send_reinstatement": "audit.job.send_reinstatement",
     # Storage watch (ADR 0040): global, so only the superuser sees it.
     STORAGE_EVENT: "audit.event.storage_check",
+    # Staff directory (ADR 0046): first login, and roles or memberships changed at login.
+    staff.CREATED_EVENT: "audit.event.staff_created",
+    staff.CHANGED_EVENT: "audit.event.staff_changed",
 }
 """Readable label per event key that is not a permission."""
 
@@ -138,6 +149,16 @@ COUNT_LABELS: dict[str, str] = {
     "database_mb": "admin.audit.detail.database_mb",
 }
 """Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0024)."""
+
+VALUE_LABELS: dict[str, str] = {
+    staff.ROLE_ADDED: "admin.audit.detail.role_add",
+    staff.ROLE_REMOVED: "admin.audit.detail.role_remove",
+    staff.ORGANISATION_ADDED: "admin.audit.detail.organisation_add",
+    staff.ORGANISATION_REMOVED: "admin.audit.detail.organisation_remove",
+    staff.GROUP_ADDED: "admin.audit.detail.group_add",
+    staff.GROUP_REMOVED: "admin.audit.detail.group_remove",
+}
+"""Readable label per audit detail with a code or slug, e.g. ``role.add:org_admin`` (ADR 0046)."""
 
 REASON_LABELS: dict[str, str] = {
     Reason.NO_ROLE: "admin.audit.reason.no_role",
@@ -214,6 +235,9 @@ def _detail_label(detail: str, _: BoundGettext) -> str:
         name, _sep, count = key.partition(":")
         if name in COUNT_LABELS and count.isdigit():
             labels.append(_(COUNT_LABELS[name], count=int(count)))
+        elif name in VALUE_LABELS:
+            value = _(ROLE_LABELS[Role(count)]) if count in set(Role) else count
+            labels.append(_(VALUE_LABELS[name], value=value))
         else:
             labels.append(_(DETAIL_LABELS[key]) if key in DETAIL_LABELS else key)
     return ", ".join(labels)
@@ -263,6 +287,30 @@ def _narrow(
     )
 
 
+def audit_views(
+    request: Request, locale: RequestLocale, principal: Principal, entries: list[AuditEntry]
+) -> list[AuditView]:
+    """Translate audit entries for ``_audit_table.html`` (the log and a staff member's page)."""
+    _ = locale.gettext
+    return [
+        AuditView(
+            admin_moment(request, locale, e.at),
+            _actor_label(entry, _),
+            _action_label(e.action, _),
+            _(OUTCOME_LABELS[e.outcome]),
+            " / ".join(t for t in (e.organisation, e.group) if t) or "–",
+            OUTCOME_TONES[e.outcome],
+            _detail_label(e.detail, _),
+            _reason_label(e.reason, _),
+            e.reason,
+            e.booking_id,
+            _booking_url(principal, entry),
+        )
+        for entry in entries
+        for e in (entry.event,)
+    ]
+
+
 @router.get("/audit", response_class=HTMLResponse)
 async def audit(
     request: Request,
@@ -279,23 +327,7 @@ async def audit(
     in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
     narrow = _narrow(source, problems, group, booking, {g.group.slug for g in in_scope})
     events = await service.audit_log(context.principal, narrow)
-    views = [
-        AuditView(
-            admin_moment(request, locale, e.at),
-            _actor_label(entry, _),
-            _action_label(e.action, _),
-            _(OUTCOME_LABELS[e.outcome]),
-            " / ".join(t for t in (e.organisation, e.group) if t) or "–",
-            OUTCOME_TONES[e.outcome],
-            _detail_label(e.detail, _),
-            _reason_label(e.reason, _),
-            e.reason,
-            e.booking_id,
-            _booking_url(context.principal, entry),
-        )
-        for entry in events
-        for e in (entry.event,)
-    ]
+    views = audit_views(request, locale, context.principal, events)
     filters = FilterView(
         sources=tuple(Option(s.value, _(SOURCE_LABELS[s])) for s in Source),
         source=narrow.source.value if narrow.source else "",

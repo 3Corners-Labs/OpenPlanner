@@ -21,7 +21,7 @@ from datetime import timedelta
 import structlog
 from fastapi import Request
 
-from app.admin.session import current_principal, login_age
+from app.admin.session import activity_due, current_principal, login_age
 from app.domain.admin import AdminService, Authorization
 from app.domain.authorization import (
     LEVELS,
@@ -114,6 +114,14 @@ def session_principal(request: Request) -> Principal | None:
     return _cookie_principal(request)
 
 
+async def _note_activity(request: Request, principal: Principal) -> None:
+    """Write the admin's "last seen" to the staff record, at most once per interval."""
+    clock: Clock = request.app.state.clock
+    seconds: int = request.app.state.settings.staff_last_seen_interval_seconds
+    if activity_due(request, clock.now(), timedelta(seconds=seconds)):
+        await admin_service(request).record_seen(principal)
+
+
 def can_function(principal: Principal) -> Callable[..., bool]:
     """Return ``can(permission, group=None)`` for templates (same matrix as the server)."""
 
@@ -179,6 +187,7 @@ class RequirePermission:
         principal = session_principal(request)
         if principal is None:
             raise LoginRequired
+        await _note_activity(request, principal)
         if self.fresh:
             self._require_recent_login(request)
         service = admin_service(request)
