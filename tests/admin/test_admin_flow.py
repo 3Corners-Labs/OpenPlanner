@@ -244,6 +244,17 @@ async def test_matrix_page(site: Site) -> None:
     assert "Met de beheerlink, tot de taak naar de wachtrij gaat" in text
 
 
+async def test_matrix_page_marks_the_bounds_and_shows_the_auditor(site: Site) -> None:
+    # ADR 0039: locked and personal-data permissions are marked in words, not by colour.
+    await site.login_as(GROUP_ADMIN)
+    text = (await site.client.get("/admin/matrix")).text
+
+    assert "Compliance en privacy (alleen lezen)" in text
+    assert text.count("Alleen superuser</span>") == 5
+    assert text.count("Persoonsgegevens</span>") == 1
+    assert "rechtstreeks uit de code" not in text
+
+
 async def test_no_role_sees_a_forbidden_page(site: Site) -> None:
     await site.login_as(NO_ROLE)
     response = await site.client.get("/admin/")

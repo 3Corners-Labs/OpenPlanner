@@ -137,7 +137,7 @@ In PingFederate, create an OIDC client:
 | ID token signing | RS256, PS256 or ES256 (symmetric algorithms are refused) |
 | Scopes | `openid profile email` |
 | Claims in the ID token | `roles`, `organisations`, `groups` (multi-valued; names configurable with `OIDC_ROLE_CLAIM`, `OIDC_ORGANISATION_CLAIM`, `OIDC_GROUP_CLAIM`) |
-| Role values | `openplanner-superuser`, `openplanner-org-admin`, `openplanner-group-admin` (configurable with `OIDC_ROLE_*`) |
+| Role values | `openplanner-superuser`, `openplanner-org-admin`, `openplanner-group-admin`, `openplanner-auditor` (configurable with `OIDC_ROLE_*`) |
 
 Organisation and group claims carry the slugs shown in the portal (`/g/<group-slug>`). A claim
 without the matching role grants nothing. Fill these claims only from sources that admins

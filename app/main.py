@@ -69,6 +69,7 @@ def oidc_provider(settings: Settings, http: httpx.AsyncClient) -> IdentityProvid
             settings.oidc_role_superuser: Role.SUPERUSER,
             settings.oidc_role_org_admin: Role.ORG_ADMIN,
             settings.oidc_role_group_admin: Role.GROUP_ADMIN,
+            settings.oidc_role_auditor: Role.AUDITOR,
         },
     )
     secret = settings.oidc_client_secret.get_secret_value() if settings.oidc_client_secret else ""

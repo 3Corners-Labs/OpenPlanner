@@ -7,13 +7,17 @@ import pytest
 from app.domain.authorization import (
     API_SCOPES,
     LEVELS,
+    LOCKED_PERMISSIONS,
     MATRIX,
+    PII_PERMISSIONS,
+    REACH,
     ApiScope,
     ClientGrant,
     Decision,
     Level,
     Permission,
     Principal,
+    Reach,
     Reason,
     Role,
     Scope,
@@ -27,6 +31,7 @@ from app.domain.authorization import (
 SUPER = Principal("s", "Super", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 ORG = Principal("o", "Org", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
 GROUP = Principal("g", "Group", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
+AUDITOR = Principal("a", "Auditor", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
 NOBODY = Principal("n", "Nobody", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
 MIXED = Principal(
     "m",
@@ -71,6 +76,52 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.BOOKINGS_VIEW,
         Permission.CLOSURE_MANAGE,
     }
+    # ADR 0039: compliance and privacy, read-only, never personal data.
+    assert MATRIX[Role.AUDITOR] == {
+        Permission.DASHBOARD_VIEW,
+        Permission.RIGHTS_VIEW,
+        Permission.MATRIX_VIEW,
+        Permission.AUDIT_VIEW,
+        Permission.GROUP_VIEW,
+    }
+
+
+def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
+    read_only = {
+        Permission.DASHBOARD_VIEW,
+        Permission.RIGHTS_VIEW,
+        Permission.MATRIX_VIEW,
+        Permission.AUDIT_VIEW,
+        Permission.GROUP_VIEW,
+    }
+
+    assert not MATRIX[Role.AUDITOR] & PII_PERMISSIONS
+    assert MATRIX[Role.AUDITOR] <= read_only
+
+
+def test_locked_permissions_belong_to_the_superuser_only() -> None:
+    assert {
+        Permission.ORGANISATION_MANAGE,
+        Permission.HOLIDAYS_MANAGE,
+        Permission.INTEGRATIONS_MANAGE,
+        Permission.API_CLIENTS_MANAGE,
+        Permission.SYSTEM_UPDATE,
+    } == LOCKED_PERMISSIONS
+    for permission in LOCKED_PERMISSIONS:
+        assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
+
+
+def test_bookings_are_the_permission_that_shows_personal_data() -> None:
+    assert {Permission.BOOKINGS_VIEW} == PII_PERMISSIONS
+
+
+def test_every_role_has_a_reach_and_only_the_superuser_reaches_everything() -> None:
+    assert REACH == {
+        Role.SUPERUSER: Reach.EVERYTHING,
+        Role.ORG_ADMIN: Reach.ORGANISATIONS,
+        Role.GROUP_ADMIN: Reach.GROUPS,
+        Role.AUDITOR: Reach.ORGANISATIONS,
+    }
 
 
 def test_every_permission_has_a_level() -> None:
@@ -106,6 +157,12 @@ def test_every_permission_has_a_level() -> None:
             Target.everything(),
             Decision(False, Reason.NOT_PERMITTED),
         ),
+        (AUDITOR, Permission.AUDIT_VIEW, OWN_GROUP, Decision(True, Reason.ORGANISATION)),
+        (AUDITOR, Permission.AUDIT_VIEW, OTHER_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
+        (AUDITOR, Permission.GROUP_VIEW, OWN_GROUP, Decision(True, Reason.ORGANISATION)),
+        (AUDITOR, Permission.BOOKINGS_VIEW, OWN_GROUP, Decision(False, Reason.NOT_PERMITTED)),
+        (AUDITOR, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.NOT_PERMITTED)),
+        (AUDITOR, Permission.MATRIX_VIEW, Target.everything(), Decision(True, Reason.ROLE)),
         # Roles combine: org admin elsewhere, group admin here.
         (MIXED, Permission.SCHEDULE_MANAGE, OWN_GROUP, Decision(True, Reason.GROUP)),
         (MIXED, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
@@ -139,6 +196,8 @@ def test_audit_scope_is_exactly_the_own_level() -> None:
     assert scope_for(ORG, Permission.AUDIT_VIEW).contains("demo", None)
     assert not scope_for(ORG, Permission.AUDIT_VIEW).contains(None, None)
     assert scope_for(SUPER, Permission.AUDIT_VIEW).contains(None, None)
+    # ADR 0039: the auditor reads the log exactly as the organisation admin does.
+    assert scope_for(AUDITOR, Permission.AUDIT_VIEW) == scope_for(ORG, Permission.AUDIT_VIEW)
 
 
 def test_scope_for_rejects_global_permissions() -> None:
@@ -156,7 +215,7 @@ def test_scope_contains() -> None:
     assert not Scope().contains("a", "b")
 
 
-PRINCIPALS = [SUPER, ORG, GROUP, NOBODY, MIXED]
+PRINCIPALS = [SUPER, ORG, GROUP, AUDITOR, NOBODY, MIXED]
 GROUP_TARGETS = [OWN_GROUP, OTHER_GROUP, Target.for_group("losse", "demo")]
 GROUP_PERMISSIONS = [p for p in Permission if LEVELS[p] is Level.GROUP]
 
