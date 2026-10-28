@@ -21,6 +21,7 @@ from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock
 from app.domain.direct_queue import DirectCall
 from app.domain.job_plan import PlannedJob
+from app.domain.retention import GroupRetentionCounts, PurgeCandidate, RetentionFacts
 from app.domain.scheduling import (
     Group,
     GroupSummary,
@@ -64,6 +65,8 @@ class State:
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
+    purged_at: dict[int, datetime] = field(default_factory=dict)
+    failed_purges: set[int] = field(default_factory=set)
     next_id: int = 1
 
 
@@ -467,6 +470,31 @@ class InMemoryTransaction:
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], contact=None)
+        self.state.purged_at[booking_id] = now
+
+    async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:
+        groups = await self.list_groups(scope)
+        counts, candidates = [], []
+        for summary in groups:
+            bookings = [b for b in self.state.bookings.values() if b.group_id == summary.group.id]
+            holding = [b for b in bookings if b.contact is not None]
+            purged = [self.state.purged_at[b.id] for b in bookings if b.id in self.state.purged_at]
+            failed = sum(1 for b in holding if b.id in self.state.failed_purges)
+            counts.append(
+                GroupRetentionCounts(summary, len(holding), failed, max(purged, default=None))
+            )
+            for b in holding:
+                closure = self.state.closures.get(b.closure_id) if b.closure_id else None
+                if (
+                    b.end < candidates_before
+                    or (b.cancelled_at is not None and b.cancelled_at < candidates_before)
+                    or b.status is BookingStatus.SUSPENDED
+                ):
+                    ends = closure.ends_at if closure else None
+                    candidates.append(
+                        PurgeCandidate(b.group_id, b.status, b.end, b.cancelled_at, ends)
+                    )
+        return RetentionFacts(counts, candidates)
 
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         return next((b for b in self.state.bookings.values() if b.token_hash == token_hash), None)

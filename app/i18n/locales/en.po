@@ -3710,6 +3710,66 @@ msgstr "Not for real appointments of citizens."
 msgid "admin.environment.simulator"
 msgstr "Simulator is on"
 
+msgid "authz.permission.retention_view"
+msgstr "View retention"
+
+msgid "admin.nav.retention"
+msgstr "Retention"
+
+msgid "admin.retention.title"
+msgstr "Retention"
+
+msgid "admin.retention.intro"
+msgstr "Checks, per group, whether citizens' personal data is removed on time. This page shows counts and times only, never citizens' data."
+
+msgid "admin.retention.in_order"
+msgstr "In order: no personal data is past its retention period and no removal failed."
+
+msgid "admin.retention.attention"
+msgstr "Action needed. Bookings with personal data past the retention period: {overdue}. Failed removals: {failed}. Report this to the operator of the installation; the audit log shows the error code."
+
+msgid "admin.retention.summary"
+msgstr "Summary"
+
+msgid "admin.retention.groups"
+msgstr "Retention per group"
+
+msgid "admin.retention.group"
+msgstr "Group"
+
+msgid "admin.retention.holding"
+msgstr "With personal data"
+
+msgid "admin.retention.overdue"
+msgstr "Past the retention period"
+
+msgid "admin.retention.failed"
+msgstr "Failed removals"
+
+msgid "admin.retention.last_purged"
+msgstr "Last removed"
+
+msgid "admin.retention.checked_at"
+msgstr "Checked at"
+
+msgid "admin.retention.status"
+msgstr "Status"
+
+msgid "admin.retention.ok"
+msgstr "In order"
+
+msgid "admin.retention.needs_attention"
+msgstr "Action needed"
+
+msgid "admin.retention.never"
+msgstr "Not yet"
+
+msgid "admin.retention.rule"
+msgstr "Personal data is removed 24 hours after the end of the appointment or after the cancellation. After an emergency closure, it is removed at most 30 days after the closure ends. A booking counts as past the retention period when its data is still there an hour after that moment."
+
+msgid "admin.retention.empty"
+msgstr "There are no groups to check yet."
+
 msgid "contacts.heading"
 msgstr "Other ways to reach us"
 

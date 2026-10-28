@@ -51,6 +51,7 @@ from app.adapters.db.models import (
     SlotRow,
     WebhookEventRow,
 )
+from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.updates import UpdateQueries
 from app.domain.audit import (
     PROBLEMS,
@@ -343,11 +344,12 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
     return f"channel:{organisation_id}:{channel.value}"
 
 
-class SqlTransaction(ApiClientQueries, UpdateQueries):
+class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
-    from ``UpdateQueries`` (ADR 0029).
+    from ``UpdateQueries`` (ADR 0029), those of the retention overview from
+    ``RetentionQueries`` (ADR 0039).
 
     Args:
         session: The open session.
