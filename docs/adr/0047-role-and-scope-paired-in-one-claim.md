@@ -1,6 +1,7 @@
 # 0047. Role and scope paired in one claim value
 
-Status: proposed (2026-10-28), requested by the product owner. Amends ADR 0013 (point 3: which
+Status: accepted (2026-10-28), requested by the product owner; E1–E4 settled as recommended.
+Amends ADR 0013 (point 3: which
 claims carry rights, and that their values are slugs), ADR 0014 (how `decide` and `scope_for`
 combine roles and scopes), ADR 0039 (points 3 and 6: how a custom role is linked to the identity
 provider) and ADR 0046 (a membership carries a role). Relates to open point O4 (agents in
@@ -317,7 +318,8 @@ setting for any of them could only make it weaker.
   it must be multi-valued in the ID token, how to build values from directory groups (one
   directory group per entitlement is simplest), how to test with `oidc-check --claims`, and the
   switch procedure: `legacy` → `shadow` → no `auth.entitlement_mismatch` events for a full
-  working week → `entitlements`; rollback by setting `legacy`.
+  working week → `entitlements`; rollback by setting `legacy`; and, before the
+  safety net ships, how to find admins whose legacy claims are ambiguous.
 - **`docs/authorization.md`** (generated): the two new permissions and the grant rule of
   points 10–11.
 - **Manual `docs/manual/{nl,en}/`**: new topic `idp-mapping`; updates to `organisation`
@@ -331,13 +333,20 @@ setting for any of them could only make it weaker.
 - **Cost.** The IdP team must maintain one value per role per organisation or group instead of
   three lists. That is more values, but each one is exactly one grant, which is what an access
   review asks for.
-- **Delivery.** (1) domain: `Grant`, parsing, `decide`/`scope_for`, legacy safety net, tests
-  A1–A8, A11, A13; (2) `idp_key` columns and forms, `shadow` mode, audit, staff detail block,
+- **Before the safety net is released** (E3): the IdP team checks whether any current admin
+  holds two roles of the same reach while the claim that scopes that reach has more than one
+  organisation or group. Such a person is refused at login (`ambiguous_claims`) until
+  PingFederate sends entitlements for them or their roles are split. The runbook explains the
+  check and both remedies.
+- **Delivery.** (0) the `legacy` safety net of point 14 on its own, with test A3 (E3); (1)
+  domain: `Grant`, parsing, `decide`/`scope_for`, tests A1, A2, A4–A8, A11, A13; (2) `idp_key` columns and forms, `shadow` mode, audit, staff detail block,
   A9, A10, A12, A14; (3) the mapping page, `oidc-check --claims`, runbook and manual.
 
-## Decision points (open)
+## Decision points (settled 2026-10-28)
 
-| # | Question | Recommendation |
+The product owner took the recommendation on every point.
+
+| # | Question | Decided |
 |---|---|---|
 | E1 | Role segment: the role's key (`org_admin`) or its configured claim value (`openplanner-org-admin`)? | The key: stable, readable, one per role; the claim values only exist for the legacy claims. |
 | E2 | May an organisation-reach role (for example `auditor`) be given for a single group? | Not now. It needs a rule for which organisation-level permissions apply; reconsider when a client asks. |
