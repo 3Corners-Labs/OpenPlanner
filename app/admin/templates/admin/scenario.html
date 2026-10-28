@@ -1,5 +1,5 @@
 {% extends "admin/layout.html" %}
-{% from "admin/_fields.html" import field with context %}
+{% from "admin/_fields.html" import form_body with context %}
 {% from "admin/_image_form.html" import image_form with context %}
 {% from "_contact_block.html" import contact_block %}
 {% block title %}{{ scenario.name }} · {{ _("admin.scenarios.title") }} – {{ _("admin.title") }}{% endblock %}
@@ -30,12 +30,7 @@
   <div class="card__header">
     <h2 id="texts-heading">{{ _("admin.scenarios.texts") }}</h2>
   </div>
-  <div class="form-grid">
-    {% for f in fields %}{{ field(f) }}{% endfor %}
-  </div>
-  <div class="form-actions">
-    <button type="submit" class="button">{{ _("admin.save") }}</button>
-  </div>
+  {{ form_body(fields, _("admin.save")) }}
 </form>
 <section class="card" aria-labelledby="scenario-contacts-heading">
   <div class="card__header">

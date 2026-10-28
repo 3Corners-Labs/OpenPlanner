@@ -16,12 +16,10 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.images import ImageFile, ImageText
 from app.domain.scenario_service import ScenarioInput, ScenarioService
 from app.domain.scenarios import MAX_NAME_LENGTH, ClosureScenario, ScenarioOwner
-from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, two_organisations
+from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, three_groups
 from tests.support.closures import NOTICES, confirmed_booking
-from tests.support.domain import NOW, TEST_TOKEN_KEY, make_group
 from tests.support.images import png
 
 ORGANISATION = ScenarioOwner(organisation="demo")
@@ -38,25 +36,12 @@ TEXT = ImageText({"nl": "Gesloten", "en": "Closed"})
 
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
-    state = two_organisations(next_id=100)
-    state.groups[3] = make_group(id=3, organisation_id=1, slug="demo-twee", name="Demo twee")
-    return InMemoryUnitOfWork(state)
-
-
-@pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
+    return three_groups()
 
 
 @pytest.fixture
 def scenarios(uow: InMemoryUnitOfWork, clock: FixedClock) -> ScenarioService:
     return ScenarioService(uow, clock, AdminService(uow, clock))
-
-
-@pytest.fixture
-def closures(uow: InMemoryUnitOfWork, clock: FixedClock) -> ClosureService:
-    bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
-    return ClosureService(uow, clock, AdminService(uow, clock), bookings)
 
 
 # --- the scenario itself --------------------------------------------------------------------

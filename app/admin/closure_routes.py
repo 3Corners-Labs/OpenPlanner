@@ -36,11 +36,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
+from app.admin import forms
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import (
     Field,
     FormData,
-    Option,
     done_message,
     raise_refusal,
     read_form,
@@ -264,7 +264,7 @@ class ScenarioChoice:
         manage_url: Where the owner's scenarios are managed.
     """
 
-    options: tuple[Option, ...]
+    options: tuple[forms.Option, ...]
     chosen: ClosureScenario | None
     manage_url: str
 
@@ -287,8 +287,8 @@ async def _scenario_choice(
     chosen = next((s for s in usable if s.id == chosen_id), None)
     if chosen_id is not None and chosen is None:
         raise DomainError(ErrorCode.SCENARIO_NOT_FOUND)
-    options = (Option("", _("admin.scenarios.none")),) + tuple(
-        Option(
+    options = (forms.Option("", _("admin.scenarios.none")),) + tuple(
+        forms.Option(
             str(s.id),
             _("admin.scenarios.organisation_option", name=s.name)
             if s.is_organisation and owner.group
