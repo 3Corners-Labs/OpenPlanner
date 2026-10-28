@@ -76,7 +76,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.BOOKINGS_VIEW,
         Permission.CLOSURE_MANAGE,
     }
-    # ADR 0037: compliance and privacy, read-only, never personal data.
+    # ADR 0039: compliance and privacy, read-only, never personal data.
     assert MATRIX[Role.AUDITOR] == {
         Permission.DASHBOARD_VIEW,
         Permission.RIGHTS_VIEW,
@@ -196,7 +196,7 @@ def test_audit_scope_is_exactly_the_own_level() -> None:
     assert scope_for(ORG, Permission.AUDIT_VIEW).contains("demo", None)
     assert not scope_for(ORG, Permission.AUDIT_VIEW).contains(None, None)
     assert scope_for(SUPER, Permission.AUDIT_VIEW).contains(None, None)
-    # ADR 0037: the auditor reads the log exactly as the organisation admin does.
+    # ADR 0039: the auditor reads the log exactly as the organisation admin does.
     assert scope_for(AUDITOR, Permission.AUDIT_VIEW) == scope_for(ORG, Permission.AUDIT_VIEW)
 
 
