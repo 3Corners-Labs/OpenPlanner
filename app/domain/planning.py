@@ -27,6 +27,7 @@ from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import (
     RESERVED_SLUGS,
+    DispatchKind,
     Group,
     Organisation,
     PhoneMode,
@@ -65,6 +66,8 @@ class GroupSettings:
     horizon_days: int
     phone_mode: PhoneMode
     dispatch_lead_minutes: int
+    dispatch_kind: DispatchKind
+    queue_change_working_days: int
     video_host_email: str | None
     wxcc_business_address: str | None
     wxcc_channel: str | None

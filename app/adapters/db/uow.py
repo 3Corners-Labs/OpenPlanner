@@ -108,6 +108,7 @@ from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, Holiday
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.ports import EventSink
 from app.domain.scheduling import (
+    DispatchKind,
     Group,
     GroupSummary,
     Organisation,
@@ -196,6 +197,8 @@ def _group(row: GroupRow) -> Group:
         not_picked_up_minutes=row.not_picked_up_minutes,
         direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
+        dispatch_kind=DispatchKind(row.dispatch_kind),
+        queue_change_working_days=row.queue_change_working_days,
     )
 
 
@@ -259,6 +262,8 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "not_picked_up_minutes": group.not_picked_up_minutes,
         "direct_call_max_concurrent": group.direct_call_max_concurrent,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
+        "dispatch_kind": group.dispatch_kind.value,
+        "queue_change_working_days": group.queue_change_working_days,
     }
 
 

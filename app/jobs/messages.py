@@ -16,7 +16,7 @@ from urllib.parse import urlsplit
 from app.domain.booking import Booking
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
-from app.domain.job_plan import JobType, change_deadline
+from app.domain.job_plan import JobType
 from app.domain.message_texts import GroupTexts
 from app.domain.ports import Attachment, OutboundMessage
 from app.domain.scheduling import Group
@@ -160,7 +160,7 @@ class MessageComposer:
         date = format_day(local_day(booking.start, tz), locale)
         start_time = format_clock(booking.start, tz, locale)
         end_time = format_clock(booking.end, tz, locale)
-        deadline = change_deadline(booking.start, group.dispatch_lead)
+        deadline = group.change_deadline(booking.start)
         params = {"date": date, "time": start_time, "group_name": group.name}
         manage_url = self.manage_url(booking) if kind.includes_manage_link else None
         on_hold = kind.closure_notice

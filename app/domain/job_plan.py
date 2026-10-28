@@ -28,10 +28,11 @@ from app.domain.booking import Booking, Contact
 from app.domain.channels import ChannelKind, ReminderRule, reachable
 
 
-def change_deadline(start: datetime, dispatch_lead: timedelta) -> datetime:
-    """Return the moment a booking becomes read-only: when its WxCC task is dispatched.
+def dispatch_moment(start: datetime, dispatch_lead: timedelta) -> datetime:
+    """Return the moment a booking's WxCC task is dispatched.
 
-    From then on an agent may pick up the task and join the meeting, so cancelling or
+    For a contact-center group it is also the change deadline (``Group.change_deadline``):
+    from then on an agent may pick up the task and join the meeting, so cancelling or
     rescheduling would leave a task for an appointment that no longer exists.
     """
     return start - dispatch_lead
@@ -109,7 +110,7 @@ def plan_for_booking(
         seen.add(key)
         reminders.append(PlannedJob(JobType.SEND_REMINDER, run_at, start, rule.channel))
     jobs.extend(sorted(reminders, key=lambda job: job.run_at))
-    dispatch_at = max(now, change_deadline(start, dispatch_lead))
+    dispatch_at = max(now, dispatch_moment(start, dispatch_lead))
     jobs.append(PlannedJob(JobType.DISPATCH_WXCC_TASK, dispatch_at, start))
     jobs.append(PlannedJob(JobType.PURGE_PII, end + PURGE_AFTER, None))
     return jobs

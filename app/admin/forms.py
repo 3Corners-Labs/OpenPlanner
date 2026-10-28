@@ -97,6 +97,8 @@ FIELD_MESSAGES: dict[str, str] = {
     "min_notice_minutes": "admin.form.error.min_notice_minutes",
     "horizon_days": "admin.form.error.horizon_days",
     "dispatch_lead_minutes": "admin.form.error.dispatch_lead_minutes",
+    "dispatch_kind": "admin.form.error.choice",
+    "queue_change_working_days": "admin.form.error.queue_change_working_days",
     "phone_mode": "admin.form.error.phone_mode",
     "video_host_email": "admin.form.error.video_host_email",
     "wxcc_business_address": "admin.form.error.integration_text",
