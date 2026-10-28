@@ -626,6 +626,9 @@ msgstr "View audit log"
 msgid "authz.permission.audit_export"
 msgstr "Export audit log"
 
+msgid "authz.permission.diagnostics_manage"
+msgstr "Switch diagnostic mode"
+
 msgid "authz.permission.integrations_manage"
 msgstr "Manage integrations and secrets"
 
@@ -3073,6 +3076,48 @@ msgstr "Remove personal data"
 
 msgid "audit.event.storage_check"
 msgstr "Check storage"
+
+msgid "admin.audit.diagnostics.title"
+msgstr "Diagnostic mode"
+
+msgid "admin.audit.diagnostics.intro"
+msgstr "While diagnostic mode is on, the platform writes extra debug entries about that group or organisation into this log. The group's admins see them too. The mode ends by itself after the set time (24 hours by default), and also when the disk is nearly full."
+
+msgid "admin.audit.diagnostics.active"
+msgstr "{target}: on until {until}"
+
+msgid "admin.audit.diagnostics.off"
+msgstr "Switch off"
+
+msgid "admin.audit.diagnostics.on"
+msgstr "Switch on"
+
+msgid "admin.audit.diagnostics.none"
+msgstr "Diagnostic mode is off everywhere."
+
+msgid "admin.audit.diagnostics.target"
+msgstr "Group or organisation"
+
+msgid "admin.done.diagnostics_on"
+msgstr "Diagnostic mode is on."
+
+msgid "admin.done.diagnostics_off"
+msgstr "Diagnostic mode is off."
+
+msgid "audit.event.job_run"
+msgstr "Job run (diagnostics)"
+
+msgid "audit.event.diagnostics_brake"
+msgstr "Diagnostic mode stopped"
+
+msgid "admin.audit.detail.diagnostics_on"
+msgstr "diagnostic mode on"
+
+msgid "admin.audit.detail.diagnostics_off"
+msgstr "diagnostic mode off"
+
+msgid "admin.audit.detail.modes"
+msgstr "{count} ended"
 
 msgid "admin.audit.level"
 msgstr "Minimum level"

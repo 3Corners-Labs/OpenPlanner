@@ -736,8 +736,11 @@ number. A booking id links to that booking's timeline.
 | Failed, `channel_not_configured` | The organisation has no sender on that channel | set up mail/SMS under Channels (superuser) |
 | Failed, other `<code>` | Gave up after the last attempt, or a refusal | look up the code under the integration's section of this runbook |
 
-System events are deleted after `SYSTEM_EVENT_RETENTION_DAYS` (default 90). Admin actions are
-kept. Webhook rejections and Webex token-refresh failures are global security events (ADR
+Every category has its own retention (ADR 0040): admin actions `AUDIT_RETENTION_DAYS`
+(default 730, the product owner's term), system events `SYSTEM_EVENT_RETENTION_DAYS` (90),
+security events `SECURITY_EVENT_RETENTION_DAYS` (365), debug events
+`DIAGNOSTIC_EVENT_RETENTION_DAYS` (7). The worker prunes once an hour; a lower value deletes
+older rows for good at the next prune, so agree it with the records officer first. Webhook rejections and Webex token-refresh failures are global security events (ADR
 0034), so only the superuser sees them: at most one per kind per
 `SECURITY_EVENT_WINDOW_MINUTES` (default 15), the next one saying how many were held back.
 Many *Webhook geweigerd* entries mean someone is probing the webhook URL or a secret was
@@ -773,6 +776,16 @@ on a row shows every event of that request or job, and the same `trace.id` finds
 lines on the platform. Organisation admins, the auditor and the superuser can download the
 current filter as CSV (`AUDIT_EXPORT_MAX_ROWS`, default 100 000; `AUDIT_EXPORT_MAX_DAYS`,
 default 366). A refused export says why on the page; every export is an `audit.export` event.
+
+### Diagnostic mode (ADR 0040)
+
+To troubleshoot one team, the superuser switches **Diagnosemodus** on at the top of the audit
+log for that group or its whole organisation. While it is on, every worker job of that group
+writes a debug event *Taak uitgevoerd (diagnose)* with job type, attempt and duration in ms,
+and the group's admins see these with the kind *Diagnose*. It ends by itself after
+`DIAGNOSTIC_MODE_HOURS` (default 24) or with **Uitzetten**. At storage grade critical the
+worker ends every mode (`diagnostics.braked` in the log, *Diagnosemodus gestopt* in the
+superuser's audit log). Debug events never go to the log platform.
 
 ## Shipping audit events to a log platform (ADR 0034)
 
