@@ -214,6 +214,7 @@ same commit and rollback behaviour as the SQL one.
 | Bookings, contact validation | `app/domain/booking.py` |
 | Book, cancel, reschedule (use cases) | `app/domain/services.py` |
 | Emergency closure, bookings on hold (ADR 0024) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/web/closure_labels.py` |
+| Alternative contact options (ADR 0037) | `app/domain/contacts.py`, `app/domain/contact_service.py`, `app/admin/contact_routes.py`, `app/web/contact_labels.py`, `app/web/templates/_contact_block.html` |
 | Which jobs, when | `app/domain/job_plan.py` |
 | Channels, reminder rules | `app/domain/channels.py` |
 | Management tokens | `app/domain/tokens.py` |
@@ -692,7 +693,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 | ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | proposed |
 | ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
-| ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | planned |
+| ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | in progress (CB-1 done) |
 | ADR 0038 | Maintenance mode (backlog MM-1 to MM-5) | planned |
 | O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
 | O11 step 2 | Change requests by phone number, confirmed by the citizen by email/SMS (ADR 0023) | planned |

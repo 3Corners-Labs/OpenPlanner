@@ -69,6 +69,11 @@ and at most until 30 days after the closure ends (`purge_pii` planned at the clo
 be confirmed in the DPIA (O7). The closure notice is admin text without personal data
 (`closure_notices`); it goes to the citizen by mail and on the public group page.
 
+**Alternative contact options (ADR 0037).** Phone numbers, email addresses, links and addresses
+of the organisation (`organisation_contacts`), entered by an organisation admin and shown
+publicly on closure and maintenance pages. Organisation data, not personal data of citizens;
+the admin page asks for general numbers and addresses only. No purge job; kept until changed.
+
 ## Admin login and audit (WP7a)
 
 ```

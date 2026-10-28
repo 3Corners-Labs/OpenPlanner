@@ -1,0 +1,42 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% from "_contact_block.html" import contact_block %}
+{% from "admin/_page_header.html" import page_header with context %}
+{% block title %}{{ _("admin.contacts.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{{ page_header("/admin/closures", _("admin.closures.title"), _("admin.contacts.title"), _("admin.contacts.title"), _("admin.contacts.lead", name=organisation.name), "/admin/organisations/" ~ organisation.slug ~ "/closure", organisation.name) }}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="contacts-preview">
+  <div class="card__header">
+    <h2 id="contacts-preview">{{ _("admin.contacts.preview") }}</h2>
+    <p class="card__lead">{{ _("admin.contacts.preview_lead") }}</p>
+  </div>
+  {% if preview %}
+  {{ contact_block(preview, level=3, id="preview-contacts") }}
+  {% else %}
+  <p class="empty-state">{{ _("admin.contacts.empty") }}</p>
+  {% endif %}
+</section>
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/contacts" novalidate>
+  <div class="card__header">
+    <h2>{{ _("admin.contacts.form") }}</h2>
+    <p class="card__lead">{{ _("admin.contacts.form_lead") }}</p>
+  </div>
+  <div class="alert alert--info"><p>{{ _("admin.contacts.public_warning") }}</p></div>
+  <div class="form-grid">
+    {% for f in heading_fields %}{{ field(f) }}{% endfor %}
+  </div>
+  {% for row in rows %}
+  <fieldset class="contact-row">
+    <legend>{{ _("admin.contacts.row", number=row.number) }}</legend>
+    <div class="form-grid">
+      {% for f in row.fields %}{{ field(f) }}{% endfor %}
+    </div>
+  </fieldset>
+  {% endfor %}
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") }}</button>
+  </div>
+</form>
+{% endblock %}

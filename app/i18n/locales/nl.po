@@ -3471,3 +3471,111 @@ msgstr "Niet voor echte afspraken van burgers."
 
 msgid "admin.environment.simulator"
 msgstr "Simulator staat aan"
+
+msgid "contacts.heading"
+msgstr "Andere manieren om ons te bereiken"
+
+msgid "contacts.kind.phone"
+msgstr "Telefoon"
+
+msgid "contacts.kind.email"
+msgstr "E-mail"
+
+msgid "contacts.kind.website"
+msgstr "Website"
+
+msgid "contacts.kind.chat"
+msgstr "Chat"
+
+msgid "contacts.kind.address"
+msgstr "Adres"
+
+msgid "admin.contacts.title"
+msgstr "Contactalternatieven"
+
+msgid "admin.contacts.lead"
+msgstr "Hoe burgers {name} kunnen bereiken als ze geen afspraak kunnen maken. Dit blok staat op de pagina van een noodsluiting en op de onderhoudspagina."
+
+msgid "admin.contacts.manage"
+msgstr "Contactalternatieven beheren"
+
+msgid "admin.contacts.summary"
+msgstr "{count} contactmogelijkheden ingesteld."
+
+msgid "admin.contacts.preview"
+msgstr "Voorbeeld"
+
+msgid "admin.contacts.preview_lead"
+msgstr "Zo zien burgers het blok, zoals nu opgeslagen."
+
+msgid "admin.contacts.empty"
+msgstr "Nog geen contactalternatieven ingesteld. Burgers zien dan alleen de tekst van de sluiting."
+
+msgid "admin.contacts.form"
+msgstr "Contactmogelijkheden"
+
+msgid "admin.contacts.form_lead"
+msgstr "Maximaal zes, in deze volgorde. Laat een rij helemaal leeg om hem over te slaan; laat alle rijen leeg om het blok te verwijderen."
+
+msgid "admin.contacts.public_warning"
+msgstr "Deze gegevens zijn openbaar. Gebruik alleen algemene nummers en adressen van de organisatie, nooit die van een persoon."
+
+msgid "admin.contacts.heading_nl"
+msgstr "Kop (Nederlands)"
+
+msgid "admin.contacts.heading_en"
+msgstr "Kop (Engels)"
+
+msgid "admin.contacts.heading_hint"
+msgstr "Leeg: \"Andere manieren om ons te bereiken\"."
+
+msgid "admin.contacts.row"
+msgstr "Contactmogelijkheid {number}"
+
+msgid "admin.contacts.kind"
+msgstr "Soort"
+
+msgid "admin.contacts.kind_unused"
+msgstr "Niet gebruikt"
+
+msgid "admin.contacts.value"
+msgstr "Gegevens"
+
+msgid "admin.contacts.value_hint"
+msgstr "Telefoonnummer, e-mailadres, een link die met https:// begint, of een adres van maximaal vier regels."
+
+msgid "admin.contacts.label_nl"
+msgstr "Naam (Nederlands)"
+
+msgid "admin.contacts.label_en"
+msgstr "Naam (Engels)"
+
+msgid "admin.contacts.hours_nl"
+msgstr "Bereikbaarheid (Nederlands)"
+
+msgid "admin.contacts.hours_en"
+msgstr "Bereikbaarheid (Engels)"
+
+msgid "admin.contacts.error.kind"
+msgstr "Kies bij contactmogelijkheid {row} een soort."
+
+msgid "admin.contacts.error.phone"
+msgstr "Vul bij contactmogelijkheid {row} een telefoonnummer in van 3 tot 15 cijfers; alleen cijfers, spaties en + - ( )."
+
+msgid "admin.contacts.error.email"
+msgstr "Vul bij contactmogelijkheid {row} een e-mailadres in, zoals info@gemeente.nl."
+
+msgid "admin.contacts.error.url"
+msgstr "Vul bij contactmogelijkheid {row} een link in die met https:// begint, zonder spaties."
+
+msgid "admin.contacts.error.address"
+msgstr "Vul bij contactmogelijkheid {row} een adres in van één tot vier regels van maximaal 80 tekens."
+
+msgid "admin.contacts.error.label"
+msgstr "De naam bij contactmogelijkheid {row} mag maximaal 80 tekens op één regel zijn."
+
+msgid "admin.contacts.error.hours"
+msgstr "De bereikbaarheid bij contactmogelijkheid {row} mag maximaal 200 tekens op één regel zijn."
+
+msgid "admin.contacts.error.heading"
+msgstr "De kop mag maximaal 120 tekens op één regel zijn."

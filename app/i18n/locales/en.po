@@ -3471,3 +3471,111 @@ msgstr "Not for real appointments of citizens."
 
 msgid "admin.environment.simulator"
 msgstr "Simulator is on"
+
+msgid "contacts.heading"
+msgstr "Other ways to reach us"
+
+msgid "contacts.kind.phone"
+msgstr "Phone"
+
+msgid "contacts.kind.email"
+msgstr "Email"
+
+msgid "contacts.kind.website"
+msgstr "Website"
+
+msgid "contacts.kind.chat"
+msgstr "Chat"
+
+msgid "contacts.kind.address"
+msgstr "Address"
+
+msgid "admin.contacts.title"
+msgstr "Alternative contact options"
+
+msgid "admin.contacts.lead"
+msgstr "How citizens can reach {name} when they cannot book an appointment. This block is shown on the page of an emergency closure and on the maintenance page."
+
+msgid "admin.contacts.manage"
+msgstr "Manage alternative contact options"
+
+msgid "admin.contacts.summary"
+msgstr "{count} contact options set."
+
+msgid "admin.contacts.preview"
+msgstr "Preview"
+
+msgid "admin.contacts.preview_lead"
+msgstr "How citizens see the block, as currently saved."
+
+msgid "admin.contacts.empty"
+msgstr "No alternative contact options set yet. Citizens then see only the text of the closure."
+
+msgid "admin.contacts.form"
+msgstr "Contact options"
+
+msgid "admin.contacts.form_lead"
+msgstr "At most six, in this order. Leave a row completely empty to skip it; leave every row empty to remove the block."
+
+msgid "admin.contacts.public_warning"
+msgstr "This information is public. Use only general numbers and addresses of the organisation, never those of a person."
+
+msgid "admin.contacts.heading_nl"
+msgstr "Heading (Dutch)"
+
+msgid "admin.contacts.heading_en"
+msgstr "Heading (English)"
+
+msgid "admin.contacts.heading_hint"
+msgstr "Empty: \"Other ways to reach us\"."
+
+msgid "admin.contacts.row"
+msgstr "Contact option {number}"
+
+msgid "admin.contacts.kind"
+msgstr "Kind"
+
+msgid "admin.contacts.kind_unused"
+msgstr "Not used"
+
+msgid "admin.contacts.value"
+msgstr "Details"
+
+msgid "admin.contacts.value_hint"
+msgstr "Phone number, email address, a link starting with https://, or an address of at most four lines."
+
+msgid "admin.contacts.label_nl"
+msgstr "Name (Dutch)"
+
+msgid "admin.contacts.label_en"
+msgstr "Name (English)"
+
+msgid "admin.contacts.hours_nl"
+msgstr "Opening hours (Dutch)"
+
+msgid "admin.contacts.hours_en"
+msgstr "Opening hours (English)"
+
+msgid "admin.contacts.error.kind"
+msgstr "Choose a kind for contact option {row}."
+
+msgid "admin.contacts.error.phone"
+msgstr "Enter a phone number of 3 to 15 digits for contact option {row}; only digits, spaces and + - ( )."
+
+msgid "admin.contacts.error.email"
+msgstr "Enter an email address for contact option {row}, such as info@example.org."
+
+msgid "admin.contacts.error.url"
+msgstr "Enter a link starting with https:// for contact option {row}, without spaces."
+
+msgid "admin.contacts.error.address"
+msgstr "Enter an address of one to four lines of at most 80 characters for contact option {row}."
+
+msgid "admin.contacts.error.label"
+msgstr "The name of contact option {row} may be at most 80 characters on one line."
+
+msgid "admin.contacts.error.hours"
+msgstr "The opening hours of contact option {row} may be at most 200 characters on one line."
+
+msgid "admin.contacts.error.heading"
+msgstr "The heading may be at most 120 characters on one line."
