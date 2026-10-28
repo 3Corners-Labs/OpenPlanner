@@ -1,0 +1,16 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_contact_form.html" import contact_form with context %}
+{% block title %}{{ _("admin.contacts.title") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="group-contacts-heading">
+  <div class="card__header">
+    <h2 id="group-contacts-heading">{{ _("admin.group_contacts.title") }}</h2>
+    <p class="card__lead">{{ _("admin.group_contacts.lead") }}</p>
+  </div>
+  <p>{% if own %}{{ _("admin.group_contacts.own") }}{% elif default_count %}{{ _("admin.group_contacts.default", count=default_count) }}{% else %}{{ _("admin.group_contacts.none") }}{% endif %}</p>
+  <p><a href="/admin/groups/{{ summary.group.slug }}/closure">{{ _("admin.group_contacts.back") }}</a></p>
+</section>
+{{ contact_form("/admin/groups/" ~ summary.group.slug ~ "/closure/contacts", preview, _("admin.group_contacts.preview_lead"), heading_fields, rows) }}
+{% endblock %}

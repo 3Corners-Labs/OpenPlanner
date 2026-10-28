@@ -63,6 +63,9 @@ TOPICS = (
         ("/admin/organisations/{org}/contacts",),
         Permission.ORGANISATION_CLOSURE,
     ),
+    HelpTopic(
+        "group-contacts", ("/admin/groups/{slug}/closure/contacts",), Permission.CLOSURE_MANAGE
+    ),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 

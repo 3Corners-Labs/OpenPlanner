@@ -15,6 +15,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Rights matrix / rechtenmatrix | [Rechtenmatrix](nl/rights-matrix.md) | [Rights matrix](en/rights-matrix.md) |
 | Retention / bewaartermijnen | [Bewaartermijnen](nl/retention.md) | [Retention](en/retention.md) |
 | Alternative contact options / contactalternatieven | [Contactalternatieven](nl/organisation-contacts.md) | [Alternative contact options](en/organisation-contacts.md) |
+| A team's contact options / contactalternatieven van een team | [Contactalternatieven van een team](nl/group-contacts.md) | [A team's contact options](en/group-contacts.md) |
 
 ## Writing a topic
 

@@ -83,3 +83,6 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - Alternative contact options per organisation (ADR 0037, CB-1): up to six phone, email,
   website, chat and address options with labels and opening hours in nl/en, validated per
   kind, with a preview; the shared block for closure and maintenance pages.
+- Closure content (ADR 0037, CL-1): optional heading per locale on a closure, a team's own
+  contact block overriding the organisation default, and a copy of the block that applies taken
+  when a closure starts; an update can take over the current block.
