@@ -677,14 +677,14 @@ class Transaction(Protocol):
         """Store the status, times and reason of an existing request."""
         ...
 
-    async def list_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+    async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
         """Return the newest audit events with one of ``actions``, with the actors' names.
 
         Only for events every admin may see, such as role changes (ADR 0039 item 7).
         """
         ...
 
-    async def list_custom_roles(self) -> list[CustomRole]:
+    async def get_custom_roles(self) -> list[CustomRole]:
         """Return every custom role, ordered by id (ADR 0039)."""
         ...
 

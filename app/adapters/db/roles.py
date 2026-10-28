@@ -43,7 +43,7 @@ class RoleQueries:
 
     _session: AsyncSession
 
-    async def list_custom_roles(self) -> list[CustomRole]:
+    async def get_custom_roles(self) -> list[CustomRole]:
         """Return every custom role, ordered by id."""
         rows = (await self._session.scalars(select(RoleRow).order_by(RoleRow.id))).all()
         return [role for role in map(_role, rows) if role is not None]

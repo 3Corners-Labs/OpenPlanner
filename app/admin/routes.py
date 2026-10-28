@@ -262,6 +262,11 @@ class RoleChangeView:
     detail: str
 
 
+CHANGED_FIELD_LABELS: dict[str, str] = {
+    "name": "admin.matrix.history.name",
+    "claim_value": "admin.matrix.history.claim_value",
+}
+
 ROLE_CHANGE_LABELS: dict[str, str] = {
     ROLE_CREATED: "admin.matrix.history.created",
     ROLE_UPDATED: "admin.matrix.history.updated",
@@ -288,8 +293,8 @@ def _role_change(
             removed.append(
                 _("admin.matrix.history.count", count=int(value)) if value.isdigit() else value
             )
-        elif part in ("name", "claim_value"):
-            detail.append(_(f"admin.matrix.history.{part}"))
+        elif part in CHANGED_FIELD_LABELS:
+            detail.append(_(CHANGED_FIELD_LABELS[part]))
         else:
             parts[name] = value
     if removed:
