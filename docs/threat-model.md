@@ -375,10 +375,12 @@ address; in the admin portal the client form.
 
 Worker: `GET https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest` (hourly).
 Admin (superuser): `GET /admin/updates`, `POST /admin/updates/update`, `/restore`,
-`/requests/{id}/cancel`, `/snooze`. Host updater: `python -m app.cli update-claim`,
+`/requests/{id}/cancel`, `/snooze`, and `GET /admin/updates/progress?seen=` polled by the
+page's script (ADR 0048). Host updater: `python -m app.cli update-claim`, `update-progress`,
 `update-report`, `backup-db`, `restore-db` inside the web container. Inputs from outside: the
-release body from GitHub (tag, page), the snooze's return path, a request id in the path, and
-the updater's status and reason. No personal data, except in the database backups.
+release body from GitHub (tag, page), the snooze's return path, a request id in the path, the
+poller's `seen` key, and the updater's step, status and reason. No personal data, except in the
+database backups.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -392,5 +394,8 @@ the updater's status and reason. No personal data, except in the database backup
 | Denial of service | A broken release takes the booking pages down | Backup before the switch; health wait of `HEALTH_TIMEOUT`; automatic return to the previous digest and the backup | `tests/scripts/test_updater.py::test_unhealthy_update_restores_the_backup_and_the_previous_digest`, `test_restore_downgrades_the_schema_then_runs_the_previous_digest`; runbook "Updates" |
 | Information disclosure | Database backups (personal data) outlive the retention rules | Backups only in the data volume, mode 600, deleted after 24 hours on every updater run | `tests/adapters/db/test_backup.py::test_backup_is_a_private_consistent_copy`, `test_prune_deletes_backups_older_than_a_day` |
 | Tampering | A backup name used as a path | Backup names are plain words (`[A-Za-z0-9_-]{1,64}`) | `test_backup_name_is_a_plain_word` |
+| Tampering | The updater (or a shell in the container) reports nonsense steps to mislead the superuser, or a step that goes back | Steps must be in the action's plan (also a database check) and only move forward; the CLI only accepts known step names | `tests/domain/test_updates.py::test_steps_only_move_forward_and_belong_to_the_action`, `tests/test_cli_updates.py::test_progress_records_the_step` |
+| Elevation (XSS) | The live progress script becomes a way to run injected markup on an admin page | The script runs only on the updates page while a request is open, loads from our origin (`script-src 'self'`, no inline), fetches only the same-origin fragment and inserts autoescaped server HTML; `seen` is only compared, never echoed unescaped | `tests/admin/test_update_routes.py::test_page_shows_the_steps_and_loads_the_poller_while_a_request_is_open`, `test_progress_fragment_answers_only_when_something_changed` |
+| Elevation | An organisation admin reads the update progress | The fragment needs `system.update` like the page | `test_progress_fragment_refuses_an_organisation_admin`, `tests/admin/test_authorization_matrix.py::test_matrix` |
 | Repudiation | Who started an update and what the updater did | Requests and cancellations audited (`system.update`, `update.request`, `restore.request`, `request.cancel`); every updater step audited as `host-updater` with its reason | `test_cancel_a_waiting_request`, `test_updater_claims_the_waiting_request_once` |
 

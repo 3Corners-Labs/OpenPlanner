@@ -106,7 +106,7 @@ flowchart TB
     worker <--> volume
     worker -- SMTP --> smtp
     worker -- hourly release check --> github
-    updater -- "app.cli: claim, report, backup" --> web
+    updater -- "app.cli: claim, progress, report, backup" --> web
     updater -- "pull, verify, pin digest" --> github
     worker -. dev .-> mailpit
 
@@ -228,7 +228,7 @@ same commit and rollback behaviour as the SQL one.
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
 | Cap on open direct calls, place in line, usual wait (ADR 0026) | `app/domain/direct_queue.py` |
-| Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/cli.py`, `scripts/updater/` |
+| Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029); live steps (ADR 0048) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/web/static/update-progress.js`, `app/cli.py`, `scripts/updater/` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Operator commands: `webhooks-list`, `webhooks-reset`, `webhooks-health`; stored results | `app/cli.py`, `app/adapters/registrations.py`, `app/adapters/webhook_selftest.py`, `app/adapters/db/reports.py` |
@@ -668,6 +668,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0039 | Adjustable roles within fixed bounds (superuser only), and a read-only auditor role |
 | 0040 | Standard event schema, log levels, role tags, CSV export and storage limits (log rotation, SQLite space reclaim, disk watch) |
 | 0041 | Extended branding: allow-listed tokens with contrast checks, own WOFF2 fonts, header styles, theme file; no free CSS |
+| 0048 | Live progress of updates: the host updater reports each step, the updates page polls a fragment (proposed) |
 
 ## 12. Status and roadmap
 
@@ -688,6 +689,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP7b+ | Organisations (create, rename, default language) for the superuser | done |
 | ADR 0032 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns; backlog CC-0 to CC-6) | planned |
 | ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
+| ADR 0048 | Live update progress: steps reported by the host updater, shown live on the updates page | done |
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
 | ADR 0033 | Manual and context-sensitive help: group settings documented, other screens follow | in progress |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |

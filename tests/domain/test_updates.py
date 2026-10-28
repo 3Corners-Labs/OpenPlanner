@@ -1,4 +1,5 @@
-"""Update rules (ADR 0029): versions, the hourly check, the request queue and the restore window."""
+"""Update rules (ADR 0029, ADR 0048): versions, the hourly check, the request queue, the
+restore window and the host updater's steps."""
 
 from dataclasses import replace
 from datetime import timedelta
@@ -11,17 +12,21 @@ from app.domain.updates import (
     OUTCOME_SHOWN,
     RESTORE_WINDOW,
     UNCLAIMED_AFTER,
+    PlanStep,
     Release,
     ReleaseCheck,
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
+    UpdateStep,
     Version,
     available_update,
     check_due,
     claimed,
     finished,
     open_request,
+    progress,
+    progressed,
     recent_outcome,
     restore_candidate,
     unclaimed,
@@ -183,3 +188,69 @@ def test_recent_outcome_is_the_latest_finished_request_for_a_day() -> None:
     assert recent_outcome([cancelled, done], NOW + OUTCOME_SHOWN - timedelta(seconds=1)) == done
     assert recent_outcome([done], NOW + OUTCOME_SHOWN) is None
     assert recent_outcome([request()], NOW) is None
+
+
+def states(request: UpdateRequest) -> list[tuple[UpdateStep, str]]:
+    return [(item.step, item.state) for item in progress(request)]
+
+
+def test_waiting_request_shows_the_waiting_step_as_current() -> None:
+    assert states(request()) == [
+        (UpdateStep.WAITING, "current"),
+        (UpdateStep.PULLING, "pending"),
+        (UpdateStep.VERIFYING, "pending"),
+        (UpdateStep.BACKING_UP, "pending"),
+        (UpdateStep.STARTING, "pending"),
+    ]
+
+
+def test_claimed_request_without_a_reported_step_is_at_its_first_step() -> None:
+    running = claimed(request(action=UpdateAction.RESTORE, target=V1, from_version=V2), NOW)
+    assert states(running) == [
+        (UpdateStep.WAITING, "done"),
+        (UpdateStep.BACKING_UP, "current"),
+        (UpdateStep.MIGRATING, "pending"),
+        (UpdateStep.STARTING, "pending"),
+    ]
+
+
+def test_reported_step_marks_the_earlier_ones_done() -> None:
+    later = NOW + timedelta(minutes=1)
+    moved = progressed(claimed(request(), NOW), UpdateStep.BACKING_UP, later)
+    assert moved.step is UpdateStep.BACKING_UP
+    assert moved.step_at == later
+    assert states(moved)[2:] == [
+        (UpdateStep.VERIFYING, "done"),
+        (UpdateStep.BACKING_UP, "current"),
+        (UpdateStep.STARTING, "pending"),
+    ]
+    assert progress(moved)[3] == PlanStep(UpdateStep.BACKING_UP, "current", later)
+
+
+def test_rolling_back_is_added_after_the_plan() -> None:
+    started = progressed(claimed(request(), NOW), UpdateStep.STARTING, NOW)
+    back = progressed(started, UpdateStep.ROLLING_BACK, NOW)
+    assert states(back)[-2:] == [
+        (UpdateStep.STARTING, "done"),
+        (UpdateStep.ROLLING_BACK, "current"),
+    ]
+
+
+def test_steps_only_move_forward_and_belong_to_the_action() -> None:
+    started = progressed(claimed(request(), NOW), UpdateStep.BACKING_UP, NOW)
+    assert progressed(started, UpdateStep.BACKING_UP, NOW + timedelta(seconds=5)) == started
+    for step in (UpdateStep.VERIFYING, UpdateStep.MIGRATING, UpdateStep.WAITING):
+        with pytest.raises(DomainError) as caught:
+            progressed(started, step, NOW)
+        assert caught.value.field == "step"
+
+
+@pytest.mark.parametrize("status", [UpdateStatus.REQUESTED, UpdateStatus.SUCCEEDED])
+def test_steps_only_while_running(status: UpdateStatus) -> None:
+    with pytest.raises(DomainError) as caught:
+        progressed(request(status=status), UpdateStep.PULLING, NOW)
+    assert caught.value.code is ErrorCode.UPDATE_IN_PROGRESS
+
+
+def test_finished_request_has_no_progress() -> None:
+    assert progress(request(status=UpdateStatus.SUCCEEDED, finished_at=NOW)) == []
