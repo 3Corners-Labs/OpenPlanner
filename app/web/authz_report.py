@@ -10,13 +10,18 @@ from dataclasses import dataclass
 from app.domain.authorization import (
     API_SCOPES,
     CITIZEN_ACTIONS,
+    HELD_BACK,
     LEVELS,
     LOCKED_PERMISSIONS,
     MATRIX,
     PII_PERMISSIONS,
+    REACH,
+    REQUIRES,
+    TEMPLATES,
     Level,
     Permission,
     Role,
+    delegable,
 )
 from app.i18n import Translator
 from app.web.authz_labels import (
@@ -81,13 +86,35 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
     ]
     for row in matrix_rows():
         marks = " | ".join("yes" if row.granted[r] else "–" for r in roles)
+        needs = sorted(REQUIRES.get(row.permission, frozenset()))
         bounds = ", ".join(
-            label for label, on in (("locked", row.locked), ("personal data", row.pii)) if on
+            [label for label, on in (("locked", row.locked), ("personal data", row.pii)) if on]
+            + ([f"needs {', '.join(f'`{p}`' for p in needs)}"] if needs else [])
         )
         lines.append(
             f"| {_(PERMISSION_LABELS[row.permission])} (`{row.permission}`) "
             f"| {_(LEVEL_LABELS[row.level])} | {bounds or '–'} | {marks} |"
         )
+    lines += [
+        "",
+        "## Custom roles",
+        "",
+        "The superuser can make custom roles (ADR 0039): a copy of a template below, with a",
+        "name, a role claim value of its own and delegable permissions switched on or off. A",
+        "custom role keeps the reach of its template and never reaches everything. Every role",
+        "holds the permissions every admin holds and the permissions its permissions need. A",
+        "copy of the auditor only reads and never holds a personal-data permission. Custom",
+        "roles are data; `decide` clips each one to these bounds again on every request.",
+        "Held back from custom roles for now: "
+        + ", ".join(f"`{p}`" for p in sorted(HELD_BACK))
+        + " (ADR 0039 B3, until O5).",
+        "",
+        "| Template | Reach | Delegable permissions |",
+        "|---|---|---|",
+    ]
+    for template in TEMPLATES:
+        offered = ", ".join(f"`{p}`" for p in sorted(delegable(template)))
+        lines.append(f"| {_(ROLE_LABELS[template])} | {REACH[template]} | {offered} |")
     lines += [
         "",
         "## Citizens",

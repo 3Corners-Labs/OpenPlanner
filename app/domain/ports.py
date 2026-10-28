@@ -14,7 +14,7 @@ from typing import Protocol
 
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Source
-from app.domain.authorization import Principal, Scope
+from app.domain.authorization import CustomRole, Principal, Scope
 from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import (
@@ -675,6 +675,33 @@ class Transaction(Protocol):
 
     async def save_update_request(self, request: UpdateRequest) -> None:
         """Store the status, times and reason of an existing request."""
+        ...
+
+    async def list_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+        """Return the newest audit events with one of ``actions``, with the actors' names.
+
+        Only for events every admin may see, such as role changes (ADR 0039 item 7).
+        """
+        ...
+
+    async def list_custom_roles(self) -> list[CustomRole]:
+        """Return every custom role, ordered by id (ADR 0039)."""
+        ...
+
+    async def get_custom_role(self, role_id: int) -> CustomRole | None:
+        """Return the custom role with ``role_id``."""
+        ...
+
+    async def add_custom_role(self, role: CustomRole) -> CustomRole:
+        """Store a new custom role (its id is ignored) and return it with its id."""
+        ...
+
+    async def save_custom_role(self, role: CustomRole) -> None:
+        """Store names, claim value, permissions and version of an existing custom role."""
+        ...
+
+    async def delete_custom_role(self, role_id: int) -> None:
+        """Delete a custom role."""
         ...
 
 

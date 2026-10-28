@@ -14,7 +14,19 @@ from dataclasses import asdict
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, case, delete, false, func, insert, or_, select, true, update
+from sqlalchemy import (
+    ColumnElement,
+    Select,
+    case,
+    delete,
+    false,
+    func,
+    insert,
+    or_,
+    select,
+    true,
+    update,
+)
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -53,6 +65,7 @@ from app.adapters.db.models import (
     WebhookEventRow,
 )
 from app.adapters.db.retention import RetentionQueries
+from app.adapters.db.roles import RoleQueries
 from app.adapters.db.updates import UpdateQueries
 from app.domain.audit import (
     PROBLEMS,
@@ -352,12 +365,12 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
     return f"channel:{organisation_id}:{channel.value}"
 
 
-class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries):
+class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, RoleQueries):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
     from ``UpdateQueries`` (ADR 0029), those of the retention overview from
-    ``RetentionQueries`` (ADR 0039).
+    ``RetentionQueries`` (ADR 0039), those of custom roles from ``RoleQueries`` (ADR 0039).
 
     Args:
         session: The open session.
@@ -429,6 +442,19 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries):
             query = query.where(AuditEventRow.group == narrow.group)
         if narrow.booking_id is not None:
             query = query.where(AuditEventRow.booking_id == narrow.booking_id)
+        return await self._entries(query, limit)
+
+    async def list_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+        """Return the newest audit events with one of ``actions``, with the actors' names."""
+        query = (
+            select(AuditEventRow, AdminProfileRow.display_name)
+            .outerjoin(AdminProfileRow, AdminProfileRow.subject == AuditEventRow.actor)
+            .where(AuditEventRow.action.in_(list(actions)))
+        )
+        return await self._entries(query, limit)
+
+    async def _entries(self, query: Select[AuditEventRow, str], limit: int) -> list[AuditEntry]:
+        """Run an audit query newest first and map the rows with the actors' names."""
         rows = await self._session.execute(
             query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
         )

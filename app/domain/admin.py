@@ -28,7 +28,9 @@ from app.domain.authorization import (
     Reason,
     Target,
     decide,
+    holds_a_role,
     reaches,
+    role_keys,
     scope_for,
 )
 from app.domain.errors import DomainError, ErrorCode
@@ -119,7 +121,7 @@ class AdminService:
         if LEVELS[permission] is Level.GLOBAL:
             return await self.authorize(principal, permission)
         if scope_for(principal, permission).is_empty:
-            reason = Reason.NO_ROLE if not principal.roles else Reason.OUT_OF_SCOPE
+            reason = Reason.OUT_OF_SCOPE if holds_a_role(principal) else Reason.NO_ROLE
             await self.record(principal.subject, permission.value, Outcome.DENIED, reason.value)
             return Authorization(Decision(False, reason), Target.everything())
         return Authorization(Decision(True, Reason.ROLE), Target.everything())
@@ -164,7 +166,7 @@ class AdminService:
                 summary = await tx.get_group_summary(slug)
                 if summary is not None:  # a claim for a group we do not know grants nothing
                     contexts.append((summary.organisation_slug, slug))
-        roles = ",".join(sorted(principal.roles))
+        roles = ",".join(role_keys(principal))
         now = self._clock.now()
         for organisation, group in contexts or [(None, None)]:
             event = AuditEvent(

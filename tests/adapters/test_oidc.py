@@ -317,3 +317,15 @@ async def test_logout_url_is_none_when_discovery_fails(
     unreachable: OidcIdentityProvider,
 ) -> None:
     assert await unreachable.logout_url("https://x/admin/logged-out") is None
+
+
+def test_other_role_values_are_kept_for_custom_roles_within_bounds() -> None:
+    # ADR 0039: custom roles link to role claim values; only well-shaped ones, at most 20.
+    others = [f"op-team-{n:02d}" for n in range(25)]
+    principal = principal_from_claims(
+        {"sub": "s", "roles": ["op-group-admin", "<bad value>", *others]}, MAPPING
+    )
+
+    assert principal.roles == frozenset({Role.GROUP_ADMIN})
+    assert principal.role_claims == frozenset(others[:20])
+    assert principal.custom_roles == frozenset()

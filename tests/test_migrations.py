@@ -232,3 +232,23 @@ def test_closure_content_goes_on_downgrade_and_the_notices_stay(
     assert sorted(notices) == [("en", "Closed."), ("nl", "Gesloten.")]
     assert closures == [(1, 1)]
     assert "group_contacts" not in tables
+
+
+def test_custom_roles_go_on_downgrade(alembic_config: Config, tmp_path: Path) -> None:
+    # ADR 0039: the downgrade drops custom roles; their holders fall back to no role.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0030")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.execute(
+            "INSERT INTO roles (template, name_nl, name_en, claim_value, permissions, version)"
+            " VALUES ('group_admin', 'Teamleider', 'Team lead', 'lead', 'group.view', 1)"
+        )
+        database.commit()
+
+    command.downgrade(alembic_config, "0025")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
+    assert "roles" not in tables

@@ -43,6 +43,7 @@ from app.admin import (
     message_routes,
     organisation_routes,
     retention_routes,
+    role_routes,
     simulator_routes,
     update_routes,
 )
@@ -53,16 +54,18 @@ from app.admin.authz import (
     ReauthRequired,
     RequirePermission,
     admin_service,
+    load_principal,
+    role_service,
     session_principal,
 )
 from app.admin.forms import safe_next
 from app.admin.integration_views import check_view
-from app.admin.pages import Locale, SameOrigin, admin_moment, templates
+from app.admin.pages import Locale, SameOrigin, admin_moment, role_labels, templates
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
 from app.admin.session import end_session, pop_login_start, save_login_start, start_session
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT
-from app.domain.audit import Outcome
+from app.domain.audit import AuditEntry, Outcome
 from app.domain.authorization import (
     API_SCOPES,
     CITIZEN_ACTIONS,
@@ -70,8 +73,10 @@ from app.domain.authorization import (
     Role,
     Scope,
     permissions_for,
+    role_keys,
 )
 from app.domain.ports import Clock, IdentityError, IdentityProvider
+from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.i18n import BoundGettext
 from app.web.authz_labels import (
     API_SCOPE_LABELS,
@@ -82,7 +87,7 @@ from app.web.authz_labels import (
     ROLE_LABELS,
 )
 from app.web.authz_report import matrix_rows
-from app.web.locale import resolve_locale
+from app.web.locale import RequestLocale, resolve_locale
 from app.web.protection import limiter, read_limit
 from app.web.templates import render
 
@@ -157,9 +162,10 @@ async def callback(
     except IdentityError as error:
         await service.record(ANONYMOUS, LOGIN_EVENT, Outcome.FAILURE, error.code)
         return _message(request, locale, 401, "admin.login_failed.title", "admin.login_failed.text")
+    principal = await role_service(request).attach(principal)
     start_session(request, principal, _clock(request).now())
     await service.record_login(principal)
-    log.info("admin.login", actor=principal.subject, roles=sorted(principal.roles))
+    log.info("admin.login", actor=principal.subject, roles=role_keys(principal))
     return RedirectResponse(safe_next(pending.get("next")), status_code=303)
 
 
@@ -229,7 +235,7 @@ async def rights(
         (_(PERMISSION_LABELS[permission]), _scope_text(scope, _))
         for permission, scope in permissions_for(principal)
     ]
-    roles = [_(ROLE_LABELS[role]) for role in Role if role in principal.roles]
+    roles = role_labels(principal, locale)
     return _page(request, locale, "admin/rights.html", principal, {"rights": rows, "roles": roles})
 
 
@@ -244,19 +250,78 @@ class MatrixRowView:
     pii: bool
 
 
+@dataclass(frozen=True)
+class RoleChangeView:
+    """One entry of the roles' change history (ADR 0039 item 7)."""
+
+    when: str
+    actor: str
+    action: str
+    role: str
+    version: str
+    detail: str
+
+
+ROLE_CHANGE_LABELS: dict[str, str] = {
+    ROLE_CREATED: "admin.matrix.history.created",
+    ROLE_UPDATED: "admin.matrix.history.updated",
+    ROLE_DELETED: "admin.matrix.history.deleted",
+}
+
+
+def _role_change(
+    request: Request, locale: RequestLocale, entry: AuditEntry, names: dict[str, str]
+) -> RoleChangeView:
+    """Translate a role change: which role, which version, which permissions."""
+    _ = locale.gettext
+    parts: dict[str, str] = {}
+    added: list[str] = []
+    removed: list[str] = []
+    detail: list[str] = []
+    for part in (p for p in entry.event.detail.split(",") if p):
+        name, _sep, value = part.partition(":")
+        if name == "perm.add":
+            added.append(
+                _("admin.matrix.history.count", count=int(value)) if value.isdigit() else value
+            )
+        elif name == "perm.remove":
+            removed.append(
+                _("admin.matrix.history.count", count=int(value)) if value.isdigit() else value
+            )
+        elif part in ("name", "claim_value"):
+            detail.append(_(f"admin.matrix.history.{part}"))
+        else:
+            parts[name] = value
+    if removed:
+        detail.insert(0, _("admin.matrix.history.removed", permissions=", ".join(removed)))
+    if added:
+        detail.insert(0, _("admin.matrix.history.added", permissions=", ".join(added)))
+    key = entry.event.reason
+    return RoleChangeView(
+        when=admin_moment(request, locale, entry.event.at),
+        actor=entry.actor_name or entry.event.actor,
+        action=_(ROLE_CHANGE_LABELS.get(entry.event.action, "admin.matrix.history.updated")),
+        role=names.get(key, key),
+        version=parts.get("version", ""),
+        detail="; ".join(detail),
+    )
+
+
 @router.get("/matrix", response_class=HTMLResponse)
 async def matrix(
     request: Request,
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.MATRIX_VIEW))],
 ) -> HTMLResponse:
-    """Show the whole matrix with its bounds: locked and personal-data permissions (ADR 0039)."""
+    """Show the matrix with its bounds, the custom roles and who changed them (ADR 0039)."""
     _ = locale.gettext
+    service = role_service(request)
+    custom = (await service.catalogue()).custom
     rows = [
         MatrixRowView(
             _(PERMISSION_LABELS[row.permission]),
             _(LEVEL_LABELS[row.level]),
-            [row.granted[role] for role in Role],
+            [row.granted[role] for role in Role] + [row.permission in c.granted for c in custom],
             row.locked,
             row.pii,
         )
@@ -266,6 +331,7 @@ async def matrix(
         (_(CITIZEN_LABELS[action.key]), _(CONDITION_LABELS[action.condition]))
         for action in CITIZEN_ACTIONS
     ]
+    names = {c.key: c.name(locale.code) for c in custom}
     return _page(
         request,
         locale,
@@ -273,7 +339,10 @@ async def matrix(
         context.principal,
         {
             "rows": rows,
-            "role_columns": [_(ROLE_LABELS[r]) for r in Role],
+            "role_columns": [_(ROLE_LABELS[r]) for r in Role]
+            + [c.name(locale.code) for c in custom],
+            "custom_count": len(custom),
+            "history": [_role_change(request, locale, e, names) for e in await service.history()],
             "citizen": citizen,
             "api_scopes": [
                 (f"{_(API_SCOPE_LABELS[scope])} ({scope})", _(LEVEL_LABELS[level]))
@@ -379,11 +448,13 @@ def register_admin(app: FastAPI) -> None:
     for exc_type, handler in handlers.items():
         app.add_exception_handler(exc_type, handler)  # type: ignore[arg-type]
     # The update banner (ADR 0029) is loaded for every admin page in one place.
-    banner = [Depends(update_routes.load_update_notice)]
+    # Custom roles (ADR 0039) are attached first, then the update banner (ADR 0029) is loaded.
+    banner = [Depends(load_principal), Depends(update_routes.load_update_notice)]
     for module_router in (
         router,
         audit_routes.router,
         retention_routes.router,
+        role_routes.router,
         group_routes.router,
         call_routes.router,
         check_routes.router,
