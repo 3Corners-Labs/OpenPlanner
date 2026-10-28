@@ -1,6 +1,16 @@
 # Same shape for development and production: web + worker sharing one SQLite volume.
 # Production pins a signed release by digest in .env.update (OPENPLANNER_IMAGE) and passes
 # `--env-file .env.update`; the host updater maintains that file (ADR 0029).
+# Container logs rotate (ADR 0040): at most 5 files of 20 MB per container, the oldest dropped
+# first. json-file stays the driver because log agents read its files; other limits go in a
+# docker-compose.override.yml or the Docker daemon's defaults.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 20m
+    max-file: "5"
+    compress: "true"
+
 x-app: &app
   build: .
   image: ${OPENPLANNER_IMAGE:-openplanner:local}
@@ -17,6 +27,7 @@ x-app: &app
   security_opt:
     - no-new-privileges:true
   restart: unless-stopped
+  logging: *logging
 
 services:
   web:
@@ -85,6 +96,7 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
+    logging: *logging
 
   # Development only (`docker compose --profile dev up`): catches all outgoing mail.
   # Inbox at http://127.0.0.1:8025. Never part of the production shape.
@@ -99,6 +111,7 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
+    logging: *logging
 
   # Development only: OIDC provider standing in for PingFederate (ADR 0013).
   # Realm with one test user per role: see dev/keycloak/README.md.
@@ -117,6 +130,7 @@ services:
       - ./dev/keycloak/openplanner-realm.json:/opt/keycloak/data/import/openplanner-realm.json:ro
     ports:
       - "127.0.0.1:8080:8080"
+    logging: *logging
 
 networks:
   # Between the TLS proxy and web. Fixed so web can trust exactly the proxy's address.

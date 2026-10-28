@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # ADR 0031: system events (job outcomes) in the audit log are deleted after this many
     # days; admin actions are kept.
     system_event_retention_days: int = Field(default=90, ge=1, le=3650)
+    # ADR 0040: grades of the data volume. Below these free-space percentages (or above
+    # DATABASE_MAX_MB, default no limit) the worker records a system event, logs a warning or
+    # error every hour and /readyz answers "degraded".
+    storage_low_free_percent: float = Field(default=15.0, gt=0, lt=100)
+    storage_critical_free_percent: float = Field(default=5.0, gt=0, lt=100)
+    database_max_mb: int | None = Field(default=None, ge=1)
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
@@ -134,6 +140,13 @@ class Settings(BaseSettings):
     app_version: str = ""
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _storage_limits_are_ordered(self) -> "Settings":
+        """Refuse a critical free-space limit that is not below the low one."""
+        if self.storage_critical_free_percent >= self.storage_low_free_percent:
+            raise ValueError("STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT")
+        return self
 
     @model_validator(mode="after")
     def _smtp_login_is_encrypted(self) -> "Settings":
