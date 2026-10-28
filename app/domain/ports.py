@@ -34,6 +34,7 @@ from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.retention import RetentionFacts
+from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
     Group,
     GroupSummary,
@@ -613,6 +614,46 @@ class Transaction(Protocol):
 
     async def remove_closure_image(self, closure_id: int) -> None:
         """Delete the closure's image, if it has one."""
+        ...
+
+    async def list_scenarios(
+        self, organisation_id: int, group_id: int | None
+    ) -> list[ClosureScenario]:
+        """Return the scenarios of a group, or with ``group_id`` ``None`` of the organisation.
+
+        Sorted by name. The organisation is always given, so a group id never reaches another
+        organisation's scenarios.
+        """
+        ...
+
+    async def get_scenario(self, scenario_id: int) -> ClosureScenario | None:
+        """Return the scenario with ``scenario_id`` (the caller checks whose it is)."""
+        ...
+
+    async def add_scenario(self, scenario: ClosureScenario) -> ClosureScenario:
+        """Store a new scenario and return it with its id."""
+        ...
+
+    async def save_scenario(self, scenario: ClosureScenario) -> None:
+        """Store the name, texts and contact block of a scenario; its image has its own calls."""
+        ...
+
+    async def delete_scenario(self, scenario_id: int) -> None:
+        """Delete the scenario and its image."""
+        ...
+
+    async def get_scenario_image(self, scenario_id: int) -> ImageFile | None:
+        """Return the stored image of the scenario, if it has one."""
+        ...
+
+    async def save_scenario_image(
+        self, scenario_id: int, text: ImageText, image: ImageFile | None
+    ) -> None:
+        """Store the scenario's image with ``text``; ``image`` ``None`` keeps the stored file."""
+        ...
+
+    async def remove_scenario_image(self, scenario_id: int) -> None:
+        """Delete the scenario's image, if it has one."""
         ...
 
     async def find_confirmed_bookings(

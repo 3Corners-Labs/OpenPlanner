@@ -23,10 +23,12 @@ authorises again, validates and audits.
 The closing and update forms also take an optional heading per locale; the closure copies the
 contact block that applies to the group (ADR 0037 §2), edited on its own page
 (``contact_routes``) and shown here as a preview with a count. The image of a running closure
-(ADR 0037 §3) has its own form on this page, posted to ``closure_image_routes``.
+(ADR 0037 §3) has its own form on this page, posted to ``closure_image_routes``. Closing starts
+from a prepared scenario or empty (ADR 0037 §4): ``?scenario=`` prefills the form, whose hidden
+``scenario_id`` makes the closure copy the scenario's contact block and image.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Annotated
@@ -38,6 +40,7 @@ from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import (
     Field,
     FormData,
+    Option,
     done_message,
     raise_refusal,
     read_form,
@@ -45,6 +48,7 @@ from app.admin.forms import (
     slot_options,
 )
 from app.admin.group_routes import group_page
+from app.admin.image_forms import decorative, image_fields
 from app.admin.pages import Locale, SameOrigin, page, with_manual
 from app.domain.authorization import Permission
 from app.domain.booking import Booking
@@ -57,9 +61,10 @@ from app.domain.closure import (
     notice_field,
 )
 from app.domain.closure_service import ClosureInput, ClosureService
-from app.domain.errors import DomainError
-from app.domain.images import ALT_LOCALES, IMAGE_TYPES, MAX_ALT_LENGTH, MAX_IMAGE_BYTES, alt_field
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock
+from app.domain.scenario_service import ScenarioService
+from app.domain.scenarios import ClosureScenario, ScenarioOwner
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.i18n.dates import local_day
@@ -97,6 +102,12 @@ OrganisationClosure = Annotated[
         RequirePermission(Permission.ORGANISATION_CLOSURE, organisation_param="org", fresh=True)
     ),
 ]
+
+
+def scenario_service(request: Request) -> ScenarioService:
+    """Return the application's scenario service."""
+    service: ScenarioService = request.app.state.scenario_service
+    return service
 
 
 def closure_service(request: Request) -> ClosureService:
@@ -155,13 +166,59 @@ def _local_input(value: datetime | None) -> str:
     return value.strftime("%Y-%m-%dT%H:%M") if value else ""
 
 
+def text_fields(
+    form: FormData,
+    locale: RequestLocale,
+    notices: Mapping[str, str],
+    headings: Mapping[str, str],
+) -> list[Field]:
+    """Return the notice and optional heading inputs per locale, pre-filled from the arguments.
+
+    Shared by the closing and update forms and by closure scenarios (ADR 0037 §4).
+    """
+    _ = locale.gettext
+    fields: list[Field] = []
+    for code in NOTICE_LOCALES:
+        name = notice_field(code)
+        label_key, hint_key = NOTICE_LABELS[code]
+        fields.append(
+            Field(
+                name,
+                _(label_key),
+                "textarea",
+                form.values.get(name, notices.get(code, "")),
+                hint=_(hint_key, limit=MAX_NOTICE_LENGTH),
+                error=form.error_for(name),
+                attributes={"maxlength": str(MAX_NOTICE_LENGTH)},
+            )
+        )
+    for code in NOTICE_LOCALES:
+        name = heading_field(code)
+        fields.append(
+            Field(
+                name,
+                _(HEADING_LABELS[code]),
+                value=form.values.get(name, headings.get(code, "")),
+                hint=_("admin.closure.heading_hint"),
+                error=form.error_for(name),
+                required=False,
+                attributes={"maxlength": str(MAX_HEADING_LENGTH)},
+            )
+        )
+    return fields
+
+
 def _closure_fields(
     form: FormData,
     locale: RequestLocale,
     group: Group,
     current: Closure | None,
+    scenario: ClosureScenario | None = None,
 ) -> list[Field]:
-    """Return the inputs of the closing form, or of the update form for ``current``."""
+    """Return the inputs of the closing form, or of the update form for ``current``.
+
+    A chosen ``scenario`` prefills the notices and headings of the closing form.
+    """
     _ = locale.gettext
     fields: list[Field] = []
     if current is None:
@@ -188,88 +245,73 @@ def _closure_fields(
             required=False,
         )
     )
-    for code in NOTICE_LOCALES:
-        name = notice_field(code)
-        label_key, hint_key = NOTICE_LABELS[code]
-        fields.append(
-            Field(
-                name,
-                _(label_key),
-                "textarea",
-                form.values.get(name, current.notice(code) if current else ""),
-                hint=_(hint_key, limit=MAX_NOTICE_LENGTH),
-                error=form.error_for(name),
-                attributes={"maxlength": str(MAX_NOTICE_LENGTH)},
-            )
-        )
-    for code in NOTICE_LOCALES:
-        name = heading_field(code)
-        fields.append(
-            Field(
-                name,
-                _(HEADING_LABELS[code]),
-                value=form.values.get(name, current.headings.get(code, "") if current else ""),
-                hint=_("admin.closure.heading_hint"),
-                error=form.error_for(name),
-                required=False,
-                attributes={"maxlength": str(MAX_HEADING_LENGTH)},
-            )
-        )
-    return fields
+    if current is not None:
+        notices = {code: current.notice(code) for code in NOTICE_LOCALES}
+        headings = current.headings
+    else:
+        notices = dict(scenario.notices) if scenario else {}
+        headings = scenario.headings if scenario else {}
+    return fields + text_fields(form, locale, notices, headings)
 
 
-ALT_LABELS: dict[str, str] = {
-    "nl": "admin.closure.image_alt_nl",
-    "en": "admin.closure.image_alt_en",
-}
-"""Label key of the image's text alternative per locale (literal for the catalogue test)."""
+@dataclass(frozen=True)
+class ScenarioChoice:
+    """The scenario picker of a closing form (ADR 0037 §4).
+
+    Attributes:
+        options: "Empty" first, then the scenarios that may be used, by name.
+        chosen: The scenario the form starts from, if any.
+        manage_url: Where the owner's scenarios are managed.
+    """
+
+    options: tuple[Option, ...]
+    chosen: ClosureScenario | None
+    manage_url: str
 
 
-def _image_fields(form: FormData, locale: RequestLocale, current: Closure | None) -> list[Field]:
-    """Return the inputs of the image form: the file and the text alternative per locale."""
+async def _scenario_choice(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    owner: ScenarioOwner,
+    chosen_id: int | None,
+) -> ScenarioChoice:
+    """Return the scenarios ``owner`` may start a closure from and the chosen one.
+
+    Raises:
+        DomainError: ``scenario_not_found`` when ``chosen_id`` is not one of them.
+    """
     _ = locale.gettext
-    image = current.image if current else None
-    fields = [
-        Field(
-            "image",
-            _("admin.closure.image_file"),
-            "file",
-            hint=_("admin.closure.image_hint", kb=MAX_IMAGE_BYTES // 1000),
-            error=form.error_for("image"),
-            required=image is None,
-            attributes={"accept": ",".join(IMAGE_TYPES)},
+    listed = await scenario_service(request).list(context.principal, owner)
+    usable = [*listed.organisation, *listed.own]
+    chosen = next((s for s in usable if s.id == chosen_id), None)
+    if chosen_id is not None and chosen is None:
+        raise DomainError(ErrorCode.SCENARIO_NOT_FOUND)
+    options = (Option("", _("admin.scenarios.none")),) + tuple(
+        Option(
+            str(s.id),
+            _("admin.scenarios.organisation_option", name=s.name)
+            if s.is_organisation and owner.group
+            else s.name,
         )
-    ]
-    for code in ALT_LOCALES:
-        name = alt_field(code)
-        stored = image.text.alts.get(code, "") if image else ""
-        fields.append(
-            Field(
-                name,
-                _(ALT_LABELS[code]),
-                value=form.values.get(name, stored),
-                hint=_("admin.closure.image_alt_hint"),
-                error=form.error_for(name),
-                required=False,
-                attributes={"maxlength": str(MAX_ALT_LENGTH)},
-            )
-        )
-    return fields
+        for s in usable
+    )
+    return ScenarioChoice(options, chosen, scenario_url(owner))
 
 
-def _decorative(form: FormData, current: Closure | None) -> bool:
-    """Return whether the "decorative" box is ticked: as submitted, else as stored."""
-    if form.values:
-        return form.checked("decorative")
-    return bool(current and current.image and current.image.text.decorative)
+def scenario_url(owner: ScenarioOwner) -> str:
+    """Return the scenario list of ``owner``."""
+    if owner.group is not None:
+        return f"/admin/groups/{owner.group}/closure/scenarios"
+    return f"/admin/organisations/{owner.organisation}/closure/scenarios"
 
 
-def _notices(form: FormData) -> dict[str, str]:
+def notices_of(form: FormData) -> dict[str, str]:
     """Return the submitted notice per required locale."""
     return {code: form.values.get(notice_field(code), "") for code in NOTICE_LOCALES}
 
 
-def _headings(form: FormData) -> dict[str, str]:
+def headings_of(form: FormData) -> dict[str, str]:
     """Return the submitted heading per locale; empty means the default heading."""
     return {code: form.text(heading_field(code)) for code in NOTICE_LOCALES}
 
@@ -279,8 +321,9 @@ def _closure_input(form: FormData, group: Group) -> ClosureInput:
     return ClosureInput(
         form.optional_moment("starts_at", group.tz),
         form.optional_moment("ends_at", group.tz),
-        _notices(form),
-        _headings(form),
+        notices_of(form),
+        headings_of(form),
+        form.optional_integer("scenario_id"),
     )
 
 
@@ -293,16 +336,22 @@ async def closure_page_response(
     context: AdminContext,
     form: FormData,
     status: int = 200,
+    scenario_id: int | None = None,
 ) -> HTMLResponse:
-    """Render the closure page of the group."""
+    """Render the closure page of the group; ``scenario_id`` prefills the closing form."""
     group = context.group.group
     overview = await closure_service(request).overview(context.principal, group.slug)
+    owner = ScenarioOwner(group=group.slug)
+    if scenario_id is None:
+        scenario_id = form.optional_integer("scenario_id") if form.values else None
+    choice = await _scenario_choice(request, locale, context, owner, scenario_id)
     now = _clock(request).now()
     banner: ClosureView | None = (
         closure_view(overview.closure, group, locale, now) if overview.closure else None
     )
     contacts = await contact_service(request).view_group(context.principal, group.slug)
     applies = contacts.block or contacts.organisation_default
+    image = overview.closure.image if overview.closure else None
     return group_page(
         request,
         locale,
@@ -310,14 +359,13 @@ async def closure_page_response(
         "admin/group_closure.html",
         {
             "closure": banner,
-            "fields": _closure_fields(form, locale, group, overview.closure),
+            "fields": _closure_fields(form, locale, group, overview.closure, choice.chosen),
+            "scenarios": choice,
             "suspended": _suspended(overview.suspended, group, locale.code),
             "confirmed_ahead": overview.confirmed_ahead,
             "closure_contacts": banner.contacts if banner else None,
-            "image_fields": with_manual(
-                request, locale, _image_fields(form, locale, overview.closure)
-            ),
-            "image_decorative": _decorative(form, overview.closure),
+            "image_fields": with_manual(request, locale, image_fields(form, locale, image)),
+            "image_decorative": decorative(form, image),
             "own_contacts": contacts.block is not None,
             "contact_count": len(applies.options) if applies else 0,
             "errors": form.errors,
@@ -338,10 +386,22 @@ async def _refused(
 
 @router.get("/groups/{slug}/closure", response_class=HTMLResponse)
 async def closure_page(
-    request: Request, locale: Locale, slug: str, context: ManageClosure
+    request: Request,
+    locale: Locale,
+    slug: str,
+    context: ManageClosure,
+    scenario: int | None = None,
 ) -> HTMLResponse:
-    """Show the group's closure, the bookings on hold and the forms."""
-    return await closure_page_response(request, locale, context, FormData({}, locale.gettext))
+    """Show the group's closure, the bookings on hold and the forms.
+
+    ``?scenario=`` starts the closing form from that scenario (ADR 0037 §4).
+    """
+    form = FormData({}, locale.gettext)
+    try:
+        return await closure_page_response(request, locale, context, form, scenario_id=scenario)
+    except DomainError as error:
+        raise_refusal(error)
+        raise
 
 
 @router.post("/groups/{slug}/closure", response_class=HTMLResponse)
@@ -375,9 +435,9 @@ async def update_closure(
                 context.principal,
                 slug,
                 ends_at,
-                _notices(form),
+                notices_of(form),
                 notify=form.checked("notify"),
-                headings=_headings(form),
+                headings=headings_of(form),
                 refresh_contacts=form.checked("refresh_contacts"),
             )
         except DomainError as error:
@@ -568,9 +628,14 @@ async def _organisation_response(
     org: str,
     form: FormData,
     status: int = 200,
+    scenario_id: int | None = None,
 ) -> HTMLResponse:
-    """Render the organisation's closure page."""
+    """Render the organisation's closure page; ``scenario_id`` prefills the closing form."""
     states = await closure_service(request).organisation_overview(context.principal, org)
+    if scenario_id is None:
+        scenario_id = form.optional_integer("scenario_id") if form.values else None
+    owner = ScenarioOwner(organisation=org)
+    choice = await _scenario_choice(request, locale, context, owner, scenario_id)
     now = _clock(request).now()
     groups = [
         GroupStateView(
@@ -582,7 +647,8 @@ async def _organisation_response(
         for s in states
     ]
     name = states[0].summary.organisation_name if states else org
-    fields = _closure_fields(form, locale, states[0].summary.group, None) if states else []
+    first = states[0].summary.group if states else None
+    fields = _closure_fields(form, locale, first, None, choice.chosen) if first else []
     contacts = await contact_service(request).view(context.principal, org)
     response = page(
         request,
@@ -596,6 +662,7 @@ async def _organisation_response(
             "any_closed": any(g.closure for g in groups),
             "contact_count": len(contacts.block.options) if contacts.block else 0,
             "fields": fields,
+            "scenarios": choice,
             "errors": form.errors,
             "done": done_message(request, locale.gettext),
         },
@@ -606,10 +673,24 @@ async def _organisation_response(
 
 @router.get("/organisations/{org}/closure", response_class=HTMLResponse)
 async def organisation_page(
-    request: Request, locale: Locale, org: str, context: OrganisationClosure
+    request: Request,
+    locale: Locale,
+    org: str,
+    context: OrganisationClosure,
+    scenario: int | None = None,
 ) -> HTMLResponse:
-    """Show every group of the organisation with its closure, and the close-all form."""
-    return await _organisation_response(request, locale, context, org, FormData({}, locale.gettext))
+    """Show every group of the organisation with its closure, and the close-all form.
+
+    ``?scenario=`` starts the close-all form from that organisation scenario.
+    """
+    form = FormData({}, locale.gettext)
+    try:
+        return await _organisation_response(
+            request, locale, context, org, form, scenario_id=scenario
+        )
+    except DomainError as error:
+        raise_refusal(error)
+        raise
 
 
 @router.post("/organisations/{org}/closure", response_class=HTMLResponse)

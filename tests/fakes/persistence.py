@@ -23,6 +23,7 @@ from app.domain.direct_queue import DirectCall
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import PlannedJob
 from app.domain.retention import GroupRetentionCounts, PurgeCandidate, RetentionFacts
+from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
     Group,
     GroupSummary,
@@ -60,6 +61,8 @@ class State:
     group_holidays: dict[int, holiday_model.GroupHolidays] = field(default_factory=dict)
     closures: dict[int, Closure] = field(default_factory=dict)
     closure_images: dict[int, ImageFile] = field(default_factory=dict)
+    scenarios: dict[int, ClosureScenario] = field(default_factory=dict)
+    scenario_images: dict[int, ImageFile] = field(default_factory=dict)
     api_settings: ApiSettings = field(default_factory=ApiSettings)
     api_clients: dict[str, ApiClient] = field(default_factory=dict)
     access_tokens: dict[str, AccessToken] = field(default_factory=dict)
@@ -556,6 +559,48 @@ class InMemoryTransaction:
         self.state.closure_images[closure_id] = stored
         closure = self.state.closures[closure_id]
         self.state.closures[closure_id] = replace(closure, image=stored.ref(text))
+
+    async def list_scenarios(
+        self, organisation_id: int, group_id: int | None
+    ) -> list[ClosureScenario]:
+        found = [
+            s
+            for s in self.state.scenarios.values()
+            if s.organisation_id == organisation_id and s.group_id == group_id
+        ]
+        return sorted(found, key=lambda s: s.name)
+
+    async def get_scenario(self, scenario_id: int) -> ClosureScenario | None:
+        return self.state.scenarios.get(scenario_id)
+
+    async def add_scenario(self, scenario: ClosureScenario) -> ClosureScenario:
+        stored = replace(scenario, id=self._new_id(), image=None)
+        self.state.scenarios[stored.id or 0] = stored
+        return stored
+
+    async def save_scenario(self, scenario: ClosureScenario) -> None:
+        current = self.state.scenarios[scenario.id or 0]
+        self.state.scenarios[scenario.id or 0] = replace(scenario, image=current.image)
+
+    async def delete_scenario(self, scenario_id: int) -> None:
+        self.state.scenarios.pop(scenario_id, None)
+        self.state.scenario_images.pop(scenario_id, None)
+
+    async def get_scenario_image(self, scenario_id: int) -> ImageFile | None:
+        return self.state.scenario_images.get(scenario_id)
+
+    async def save_scenario_image(
+        self, scenario_id: int, text: ImageText, image: ImageFile | None
+    ) -> None:
+        stored = image or self.state.scenario_images[scenario_id]
+        self.state.scenario_images[scenario_id] = stored
+        scenario = self.state.scenarios[scenario_id]
+        self.state.scenarios[scenario_id] = replace(scenario, image=stored.ref(text))
+
+    async def remove_scenario_image(self, scenario_id: int) -> None:
+        self.state.scenario_images.pop(scenario_id, None)
+        scenario = self.state.scenarios[scenario_id]
+        self.state.scenarios[scenario_id] = replace(scenario, image=None)
 
     async def remove_closure_image(self, closure_id: int) -> None:
         self.state.closure_images.pop(closure_id, None)
