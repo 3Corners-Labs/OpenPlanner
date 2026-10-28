@@ -32,6 +32,7 @@ from app.api.agent import create_agent_api
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.config import AGENT_API_PREFIX, Settings
 from app.domain.admin import AdminService
+from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
 from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
@@ -132,6 +133,9 @@ def create_app(
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
+        app.state.agenda_service = AgendaService(
+            uow, clock, app.state.admin_service, settings.shortfall_horizon_days
+        )
         # Test emails go through exactly the senders the worker uses (ADR 0022).
         senders = ConfiguredSenders(uow, http, fallback_mail(settings))
         app.state.channel_service = ChannelSettingsService(

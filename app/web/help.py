@@ -67,6 +67,11 @@ TOPICS = (
     HelpTopic(
         "group-contacts", ("/admin/groups/{slug}/closure/contacts",), Permission.CLOSURE_MANAGE
     ),
+    HelpTopic(
+        "group-agenda",
+        ("/admin/groups/{slug}/agenda", "/admin/groups/{slug}/agenda/week"),
+        Permission.BOOKINGS_VIEW,
+    ),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 
