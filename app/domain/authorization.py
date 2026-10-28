@@ -83,6 +83,7 @@ class Permission(StrEnum):
     ORGANISATION_CLOSURE = "organisation.closure"
     API_CLIENTS_MANAGE = "api_clients.manage"
     SYSTEM_UPDATE = "system.update"
+    RETENTION_VIEW = "retention.view"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -107,6 +108,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.API_CLIENTS_MANAGE: Level.GLOBAL,
     # ADR 0029: update or restore the installation itself.
     Permission.SYSTEM_UPDATE: Level.GLOBAL,
+    # ADR 0037: per group, whether personal data is removed on time (counts only).
+    Permission.RETENTION_VIEW: Level.ORGANISATION,
 }
 
 LOCKED_PERMISSIONS = frozenset(
@@ -146,6 +149,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         # ADR 0024: close one group or every group of the organisation at once.
         Permission.CLOSURE_MANAGE,
         Permission.ORGANISATION_CLOSURE,
+        # ADR 0037: whether the organisation's personal data is removed on time.
+        Permission.RETENTION_VIEW,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: _EVERY_ADMIN
@@ -160,7 +165,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.CLOSURE_MANAGE,
     },
     # ADR 0037: compliance and privacy (FG, CISO, auditors): reading only, no personal data.
-    Role.AUDITOR: _EVERY_ADMIN | {Permission.AUDIT_VIEW, Permission.GROUP_VIEW},
+    Role.AUDITOR: _EVERY_ADMIN
+    | {Permission.AUDIT_VIEW, Permission.GROUP_VIEW, Permission.RETENTION_VIEW},
 }
 
 REACH: dict[Role, Reach] = {

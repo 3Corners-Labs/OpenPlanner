@@ -12,6 +12,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 |---|---|---|
 | Group settings / groepsinstellingen | [Groepsinstellingen](nl/group-settings.md) | [Group settings](en/group-settings.md) |
 | Rights matrix / rechtenmatrix | [Rechtenmatrix](nl/rights-matrix.md) | [Rights matrix](en/rights-matrix.md) |
+| Retention / bewaartermijnen | [Bewaartermijnen](nl/retention.md) | [Retention](en/retention.md) |
 
 ## Writing a topic
 

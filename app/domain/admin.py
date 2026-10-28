@@ -33,6 +33,7 @@ from app.domain.authorization import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.retention import RetentionOverview, candidates_before, summarise
 from app.domain.scheduling import GroupSummary
 
 ANONYMOUS = "anonymous"
@@ -190,6 +191,14 @@ class AdminService:
         scope = scope_for(principal, Permission.AUDIT_VIEW)
         async with self._uow.read() as tx:
             return await tx.list_audit_events(scope, limit, narrow)
+
+    async def retention(self, principal: Principal) -> RetentionOverview:
+        """Return whether personal data is removed on time, per group in scope (ADR 0037)."""
+        now = self._clock.now()
+        scope = scope_for(principal, Permission.RETENTION_VIEW)
+        async with self._uow.read() as tx:
+            facts = await tx.list_retention(scope, candidates_before(now))
+        return summarise(facts, now)
 
 
 def require(authorization: Authorization) -> Authorization:

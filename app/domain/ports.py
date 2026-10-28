@@ -31,6 +31,7 @@ from app.domain.closure import Closure
 from app.domain.direct_queue import DirectCall
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.job_plan import JobType, PlannedJob
+from app.domain.retention import RetentionFacts
 from app.domain.scheduling import (
     Group,
     GroupSummary,
@@ -528,6 +529,15 @@ class Transaction(Protocol):
 
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         """Return the booking whose management token hashes to ``token_hash``."""
+        ...
+
+    async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:
+        """Return the retention counts per group in ``scope`` and the possibly overdue bookings.
+
+        Counts, statuses and times only, never personal data or booking ids (ADR 0037).
+        Candidates still hold personal data and ended or were cancelled before
+        ``candidates_before``, or are suspended.
+        """
         ...
 
     async def save_booking(self, booking: Booking) -> None:

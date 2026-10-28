@@ -56,6 +56,7 @@ class HelpTopic:
 TOPICS = (
     HelpTopic("group-settings", ("/admin/groups/{slug}/settings",), Permission.GROUP_EDIT),
     HelpTopic("rights-matrix", ("/admin/matrix",), Permission.MATRIX_VIEW),
+    HelpTopic("retention", ("/admin/retention",), Permission.RETENTION_VIEW),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 

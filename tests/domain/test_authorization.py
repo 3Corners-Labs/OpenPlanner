@@ -64,6 +64,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.BOOKINGS_VIEW,
         Permission.CLOSURE_MANAGE,
         Permission.ORGANISATION_CLOSURE,
+        Permission.RETENTION_VIEW,
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -83,6 +84,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
         Permission.GROUP_VIEW,
+        Permission.RETENTION_VIEW,
     }
 
 
@@ -93,6 +95,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
         Permission.GROUP_VIEW,
+        Permission.RETENTION_VIEW,
     }
 
     assert not MATRIX[Role.AUDITOR] & PII_PERMISSIONS
@@ -163,6 +166,9 @@ def test_every_permission_has_a_level() -> None:
         (AUDITOR, Permission.BOOKINGS_VIEW, OWN_GROUP, Decision(False, Reason.NOT_PERMITTED)),
         (AUDITOR, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.NOT_PERMITTED)),
         (AUDITOR, Permission.MATRIX_VIEW, Target.everything(), Decision(True, Reason.ROLE)),
+        (AUDITOR, Permission.RETENTION_VIEW, OWN_ORG, Decision(True, Reason.ORGANISATION)),
+        (ORG, Permission.RETENTION_VIEW, OTHER_ORG, Decision(False, Reason.OUT_OF_SCOPE)),
+        (GROUP, Permission.RETENTION_VIEW, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
         # Roles combine: org admin elsewhere, group admin here.
         (MIXED, Permission.SCHEDULE_MANAGE, OWN_GROUP, Decision(True, Reason.GROUP)),
         (MIXED, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
@@ -198,6 +204,15 @@ def test_audit_scope_is_exactly_the_own_level() -> None:
     assert scope_for(SUPER, Permission.AUDIT_VIEW).contains(None, None)
     # ADR 0037: the auditor reads the log exactly as the organisation admin does.
     assert scope_for(AUDITOR, Permission.AUDIT_VIEW) == scope_for(ORG, Permission.AUDIT_VIEW)
+
+
+def test_retention_scope_is_the_organisation() -> None:
+    # ADR 0037: counts per group of the own organisation; a group admin has none.
+    assert scope_for(ORG, Permission.RETENTION_VIEW) == Scope(organisations=frozenset({"demo"}))
+    auditor = scope_for(AUDITOR, Permission.RETENTION_VIEW)
+    assert auditor == scope_for(ORG, Permission.RETENTION_VIEW)
+    assert scope_for(GROUP, Permission.RETENTION_VIEW).is_empty
+    assert scope_for(SUPER, Permission.RETENTION_VIEW) == Scope(everything=True)
 
 
 def test_scope_for_rejects_global_permissions() -> None:

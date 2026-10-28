@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import pytest
 
 from app.domain.admin import AdminService
@@ -6,6 +8,7 @@ from app.domain.authorization import Decision, Permission, Principal, Reason, Ro
 from app.domain.errors import DomainError
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
+from tests.support.closures import confirmed_booking
 from tests.support.domain import NOW, make_group
 
 GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
@@ -193,3 +196,27 @@ async def test_audit_log_shows_the_latest_known_name(service: AdminService) -> N
     names = [e.actor_name for e in await service.audit_log(SUPER)]
 
     assert names == [None, "Gina Groep", "Gina Groep"]
+
+
+async def test_retention_overview_counts_the_own_organisation_only(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    # ADR 0037: an ended booking still holding personal data two days later is overdue.
+    late = confirmed_booking(id=10, start=NOW - timedelta(days=2), end=NOW - timedelta(days=2))
+    elsewhere = confirmed_booking(id=11, group_id=2, end=NOW - timedelta(days=2))
+    upcoming = confirmed_booking(id=12)
+    uow.state.bookings = {b.id or 0: b for b in (late, elsewhere, upcoming)}
+    uow.state.failed_purges = {10}
+
+    overview = await service.retention(ORG_ADMIN)
+    everything = await service.retention(SUPER)
+
+    rows = [(g.group.group.slug, g.holding, g.overdue, g.failed_purges) for g in overview.groups]
+    assert rows == [("demo", 2, 1, 1)]
+    assert overview.checked_at == NOW
+    assert not overview.in_order
+    assert [g.group.group.slug for g in everything.groups] == ["demo", "andere-team"]
+
+
+async def test_retention_overview_is_empty_without_the_permission(service: AdminService) -> None:
+    assert (await service.retention(GROUP_ADMIN)).groups == ()
