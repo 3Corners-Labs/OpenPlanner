@@ -1,0 +1,38 @@
+{#- Preview and form of a contact block, shared by the organisation and group pages (ADR 0037). -#}
+{% from "admin/_fields.html" import field with context %}
+{% from "_contact_block.html" import contact_block %}
+
+{% macro contact_form(action, preview, preview_lead, heading_fields, rows) -%}
+<section class="card" aria-labelledby="contacts-preview">
+  <div class="card__header">
+    <h2 id="contacts-preview">{{ _("admin.contacts.preview") }}</h2>
+    <p class="card__lead">{{ preview_lead }}</p>
+  </div>
+  {% if preview %}
+  {{ contact_block(preview, level=3, id="preview-contacts") }}
+  {% else %}
+  <p class="empty-state">{{ _("admin.contacts.empty") }}</p>
+  {% endif %}
+</section>
+<form class="card" method="post" action="{{ action }}" novalidate>
+  <div class="card__header">
+    <h2>{{ _("admin.contacts.form") }}</h2>
+    <p class="card__lead">{{ _("admin.contacts.form_lead") }}</p>
+  </div>
+  <div class="alert alert--info"><p>{{ _("admin.contacts.public_warning") }}</p></div>
+  <div class="form-grid">
+    {% for f in heading_fields %}{{ field(f) }}{% endfor %}
+  </div>
+  {% for row in rows %}
+  <fieldset class="contact-row">
+    <legend>{{ _("admin.contacts.row", number=row.number) }}</legend>
+    <div class="form-grid">
+      {% for f in row.fields %}{{ field(f) }}{% endfor %}
+    </div>
+  </fieldset>
+  {% endfor %}
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") }}</button>
+  </div>
+</form>
+{%- endmacro %}
