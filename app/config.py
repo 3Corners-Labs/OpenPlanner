@@ -141,6 +141,14 @@ class Settings(BaseSettings):
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
 
+    # Maintenance mode (ADR 0038). MAINTENANCE_MODE (class B, deployment: needed while the
+    # database is unavailable or being restored) switches it on from the environment; the
+    # portal shows that and cannot switch it off.
+    maintenance_mode: bool = False
+    # Class C (platform, ADR 0042): how long the web process trusts its last read of the
+    # maintenance switch; ADR 0038 sets 5 seconds as the upper bound.
+    maintenance_cache_seconds: float = Field(default=5.0, ge=0, le=5)
+
     @model_validator(mode="after")
     def _storage_limits_are_ordered(self) -> "Settings":
         """Refuse a critical free-space limit that is not below the low one."""
