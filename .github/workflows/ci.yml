@@ -21,7 +21,9 @@ jobs:
   python:
     name: lint, types, tests, migrations
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # The test suite alone takes about 26 minutes on main (the authorisation matrix starts an
+    # app per role and route); 30 left no headroom and cancelled runs that were passing.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
