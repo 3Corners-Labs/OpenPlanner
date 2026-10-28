@@ -11,6 +11,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Screen / scherm | Nederlands | English |
 |---|---|---|
 | Group settings / groepsinstellingen | [Groepsinstellingen](nl/group-settings.md) | [Group settings](en/group-settings.md) |
+| Branding / huisstijl | [Huisstijl](nl/branding.md) | [Branding](en/branding.md) |
 | Rights matrix / rechtenmatrix | [Rechtenmatrix](nl/rights-matrix.md) | [Rights matrix](en/rights-matrix.md) |
 | Retention / bewaartermijnen | [Bewaartermijnen](nl/retention.md) | [Retention](en/retention.md) |
 

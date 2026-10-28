@@ -27,14 +27,16 @@ STATIC_DIR = Path(__file__).parent / "static"
 """Stylesheets and images, served under ``/static``."""
 
 HTML_CSP = (
-    "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; "
+    "default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; "
     "base-uri 'none'; frame-ancestors 'none'"
 )
-"""No scripts, no inline styles, no framing. Relaxed per page only when a feature needs it."""
+"""No scripts, no inline styles, no framing. Relaxed per page only when a feature needs it.
+Fonts only from our own origin: an organisation's uploaded fonts (ADR 0041)."""
 
 SCRIPT_CSP = (
     "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; "
-    "img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+    "img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; "
+    "frame-ancestors 'none'"
 )
 """Citizen pages (ADR 0020): own scripts only, which may fetch the same pages; still no
 inline scripts or styles, so injected markup cannot run."""
