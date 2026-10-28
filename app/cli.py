@@ -3,6 +3,7 @@
 Usage:
     ``python -m app.cli seed-demo``     create the demo organisations and groups
     ``python -m app.cli authz-matrix``  print the authorisation matrix (docs/authorization.md)
+    ``python -m app.cli admin-map``  print the admin structure (docs/admin-map.md, ADR 0047)
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
@@ -65,6 +66,7 @@ from app.domain.scheduling import Group
 from app.domain.update_service import UpdateService
 from app.domain.updates import OUTCOMES
 from app.i18n import Translator, load_catalogues
+from app.web import navigation
 from app.web.authz_report import render_markdown
 
 
@@ -411,6 +413,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("seed-demo", help="create the demo organisations and groups")
     commands.add_parser("authz-matrix", help="print the authorisation matrix as Markdown")
+    commands.add_parser("admin-map", help="print the admin structure as Markdown")
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
@@ -457,6 +460,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _write(asyncio.run(_webhooks_health(Settings())))
     if args.command == "authz-matrix":
         sys.stdout.write(render_markdown(Translator(load_catalogues())))
+        return 0
+    if args.command == "admin-map":
+        sys.stdout.write(navigation.render_markdown(Translator(load_catalogues())))
         return 0
     if args.command == "wxcc-check":
         report, passed = asyncio.run(_wxcc_check(Settings()))
