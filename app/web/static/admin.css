@@ -4,41 +4,101 @@
  * All colours are tokens; text contrast is at least 4.5:1 (WCAG 2.2 AA), focus is always
  * visible, targets are at least 24x24 px. No JavaScript: layout and states are pure CSS.
  */
+
+/*
+ * Light and dark (ADR 0047): every colour token is light-dark(light, dark). The body's
+ * color-scheme picks the side: "system" follows the device, "light" and "dark" are the admin's
+ * choice from the profile menu, kept in the admin session. Dark text contrast is 4.5:1 or more.
+ */
 :root {
-  --adm-bg: #f5f6f8;
-  --adm-surface: #ffffff;
-  --adm-surface-muted: #f0f2f5;
-  --adm-border: #dde1e6;
-  --adm-border-strong: #8a939e;
-  --adm-text: #1b1f24;
-  --adm-text-muted: #545d68;
-  --adm-accent: #01689b;
-  --adm-accent-strong: #004f78;
-  --adm-accent-soft: #e5f0f6;
-  --adm-on-accent: #ffffff;
-  --adm-success: #26703a;
-  --adm-success-soft: #e7f3ea;
-  --adm-danger: #b42318;
-  --adm-danger-soft: #fcebea;
-  --adm-warning: #8a5300;
-  --adm-warning-soft: #fdf3e1;
-  --adm-focus: #1b1f24;
+  --adm-bg: light-dark(#f5f6f8, #111418);
+  --adm-surface: light-dark(#ffffff, #1a1e23);
+  --adm-surface-muted: light-dark(#f0f2f5, #252a31);
+  --adm-row-hover: light-dark(#fafbfc, #20252b);
+  --adm-border: light-dark(#dde1e6, #343b44);
+  --adm-border-strong: light-dark(#8a939e, #7b8591);
+  --adm-text: light-dark(#1b1f24, #e8ebef);
+  --adm-text-muted: light-dark(#545d68, #aab3be);
+  --adm-accent: light-dark(#01689b, #6cb4ee);
+  --adm-accent-strong: light-dark(#004f78, #a5d2f5);
+  --adm-accent-soft: light-dark(#e5f0f6, #15324a);
+  --adm-on-accent: light-dark(#ffffff, #0b1a26);
+  --adm-success: light-dark(#26703a, #74d08e);
+  --adm-success-soft: light-dark(#e7f3ea, #14301d);
+  --adm-danger: light-dark(#b42318, #ff9a8f);
+  --adm-danger-soft: light-dark(#fcebea, #3b1715);
+  --adm-warning: light-dark(#8a5300, #f2b84b);
+  --adm-warning-soft: light-dark(#fdf3e1, #33270e);
+  --adm-warning-stripe: light-dark(#fbe7c2, #45330f);
+  --adm-focus: light-dark(#1b1f24, #ffffff);
   --adm-focus-halo: #ffbf47;
   --adm-radius: 10px;
   --adm-radius-s: 6px;
-  --adm-shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 8%);
+  --adm-shadow: light-dark(
+    0 1px 2px rgb(16 24 40 / 6%),
+    0 1px 2px rgb(0 0 0 / 40%)
+  );
+  --adm-shadow-popover: 0 8px 24px rgb(0 0 0 / 18%), 0 2px 6px rgb(0 0 0 / 12%);
   --adm-nav-width: 15rem;
   --adm-content-width: 72rem;
+
+  /* The organisation's citizen colours as the page defines them (site.css or its theme file),
+     kept so the branding preview shows them even in the dark portal. */
+  --adm-org-page: var(--booking-color-page);
+  --adm-org-background: var(--booking-color-background);
+  --adm-org-surface: var(--booking-color-surface);
+  --adm-org-text: var(--booking-color-text);
+  --adm-org-text-muted: var(--booking-color-text-muted);
+  --adm-org-border: var(--booking-color-border);
+  --adm-org-accent: var(--booking-color-accent);
+  --adm-org-accent-hover: var(--booking-color-accent-hover);
+  --adm-org-accent-subtle: var(--booking-color-accent-subtle);
+  --adm-org-on-accent: var(--booking-color-on-accent);
+  --adm-org-focus: var(--booking-color-focus);
+  --adm-org-error: var(--booking-color-error);
+  --adm-org-error-subtle: var(--booking-color-error-subtle);
 }
 
 @media (prefers-contrast: more) {
   :root {
-    --adm-text-muted: #1b1f24;
-    --adm-border: #4a525c;
-    --adm-border-strong: #000000;
-    --adm-accent: #00436b;
+    --adm-text-muted: light-dark(#1b1f24, #ffffff);
+    --adm-border: light-dark(#4a525c, #aab3be);
+    --adm-border-strong: light-dark(#000000, #ffffff);
+    --adm-accent: light-dark(#00436b, #a5d2f5);
     --adm-shadow: none;
   }
+}
+
+body.admin {
+  color-scheme: light dark;
+
+  /* Shared parts from site.css (fields, buttons, links, error summary) follow the portal. */
+  --booking-color-page: light-dark(var(--adm-org-page), var(--adm-bg));
+  --booking-color-background: light-dark(var(--adm-org-background), var(--adm-surface));
+  --booking-color-surface: light-dark(var(--adm-org-surface), var(--adm-surface));
+  --booking-color-text: light-dark(var(--adm-org-text), var(--adm-text));
+  --booking-color-text-muted: light-dark(var(--adm-org-text-muted), var(--adm-text-muted));
+  --booking-color-border: light-dark(var(--adm-org-border), var(--adm-border));
+  --booking-color-accent: light-dark(var(--adm-org-accent), var(--adm-accent));
+  --booking-color-accent-hover: light-dark(var(--adm-org-accent-hover), var(--adm-accent-strong));
+  --booking-color-accent-subtle: light-dark(var(--adm-org-accent-subtle), var(--adm-accent-soft));
+  --booking-color-on-accent: light-dark(var(--adm-org-on-accent), var(--adm-on-accent));
+  --booking-color-focus: light-dark(var(--adm-org-focus), var(--adm-focus));
+  --booking-color-error: light-dark(var(--adm-org-error), var(--adm-danger));
+  --booking-color-error-subtle: light-dark(var(--adm-org-error-subtle), var(--adm-danger-soft));
+}
+
+body.admin[data-theme="light"] {
+  color-scheme: light;
+}
+
+body.admin[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* The preview shows the citizen page, which is always light. */
+.admin .brand-preview {
+  color-scheme: light;
 }
 
 body.admin {
@@ -140,7 +200,27 @@ body.admin {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem 1.25rem;
+  gap: 0.5rem 1rem;
+}
+
+.admin-topbar__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 32px;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--adm-radius-s);
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.admin .admin-topbar__link {
+  color: var(--adm-text-muted);
+}
+
+.admin .admin-topbar__link:hover {
+  background: var(--adm-surface-muted);
+  color: var(--adm-text);
 }
 
 .admin .language-switcher a {
@@ -148,33 +228,129 @@ body.admin {
   font-size: 0.95rem;
 }
 
-.admin-user {
-  display: flex;
-  flex-wrap: wrap;
+/* Profile: a disclosure, so it opens without JavaScript. */
+.admin-profile {
+  position: relative;
+}
+
+.admin-profile summary {
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  min-height: 32px;
+  padding: 0.125rem 0.5rem 0.125rem 0.125rem;
+  border-radius: 999px;
+  cursor: pointer;
+  list-style: none;
 }
 
-.admin-user__name {
-  color: var(--adm-text-muted);
+.admin-profile summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-profile summary::after {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  margin: 0 0.15rem 0.2rem 0.1rem;
+  border-right: 2px solid currentcolor;
+  border-bottom: 2px solid currentcolor;
+  transform: rotate(45deg);
+}
+
+.admin-profile[open] summary::after {
+  margin-bottom: -0.2rem;
+  transform: rotate(225deg);
+}
+
+.admin-profile summary:hover {
+  background: var(--adm-surface-muted);
+}
+
+.admin-profile__avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--adm-accent-soft);
+  color: var(--adm-accent-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.admin-profile__name {
   font-size: 0.95rem;
+  font-weight: 500;
 }
 
-.admin-user form {
+.admin-profile__panel {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: max-content;
+  min-width: 16rem;
+  max-width: min(22rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius);
+  background: var(--adm-surface);
+  box-shadow: var(--adm-shadow-popover);
+}
+
+.admin-profile__panel p {
+  margin: 0 0 0.5rem;
+}
+
+.admin-profile__signed-in {
+  font-weight: 600;
+}
+
+.admin-profile__roles-label {
+  color: var(--adm-text-muted);
+  font-size: 0.875rem;
+}
+
+.admin-profile__roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-profile form {
   margin: 0;
 }
 
+/* Side navigation in sections (ADR 0047). */
 .admin-nav {
   grid-area: nav;
-  padding: 1.25rem 0.75rem;
+  padding: 1rem 0.75rem 2rem;
   border-right: 1px solid var(--adm-border);
   background: var(--adm-surface);
+}
+
+.admin-nav__section + .admin-nav__section {
+  margin-top: 1.25rem;
+}
+
+.admin-nav__heading {
+  display: block;
+  margin: 0 0 0.375rem;
+  padding: 0 0.75rem;
+  color: var(--adm-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .admin-nav ul {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.125rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -184,10 +360,11 @@ body.admin {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  min-height: 40px;
-  padding: 0.5rem 0.75rem;
+  min-height: 36px;
+  padding: 0.375rem 0.75rem;
   border-radius: var(--adm-radius-s);
   color: var(--adm-text);
+  font-size: 0.95rem;
   font-weight: 500;
   text-decoration: none;
 }
@@ -212,7 +389,13 @@ body.admin {
   width: 100%;
   max-width: var(--adm-content-width);
   margin: 0;
-  padding: 2rem 2rem 4rem;
+  padding: 0 2rem 4rem;
+  --adm-main-pad: 2rem;
+}
+
+/* Pages without a header band keep their distance to the top bar. */
+.admin-main > :first-child:not(.breadcrumbs, .page-header) {
+  margin-top: 2rem;
 }
 
 @media (max-width: 52rem) {
@@ -225,10 +408,26 @@ body.admin {
   }
 
   .admin-nav {
+    display: flex;
+    gap: 0.25rem;
     padding: 0.5rem 0.75rem;
     border-right: 0;
     border-bottom: 1px solid var(--adm-border);
     overflow-x: auto;
+  }
+
+  .admin-nav__section + .admin-nav__section {
+    margin-top: 0;
+  }
+
+  /* The headings still label the lists for screen readers. */
+  .admin-nav__heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .admin-nav ul {
@@ -241,10 +440,10 @@ body.admin {
   }
 
   .admin-topbar__end {
-    gap: 0.25rem 0.75rem;
+    gap: 0.25rem 0.5rem;
   }
 
-  .admin-user__name {
+  .admin-profile__name {
     font-size: 0.85rem;
   }
 
@@ -257,7 +456,12 @@ body.admin {
   }
 
   .admin-main {
-    padding: 1.25rem 1rem 3rem;
+    padding: 0 1rem 3rem;
+    --adm-main-pad: 1rem;
+  }
+
+  .admin-main > :first-child:not(.breadcrumbs, .page-header) {
+    margin-top: 1.25rem;
   }
 }
 
@@ -307,6 +511,47 @@ body.admin {
 .tabs {
   margin: 0 0 1.5rem;
   border-bottom: 1px solid var(--adm-border);
+}
+
+/* Header band: breadcrumbs, page header and tabs at the top of a page share one white band that
+   runs to the right edge (ADR 0047 §8). Pure CSS: the shadow paints the band, the clip keeps it
+   out of the side navigation. */
+.admin-main > :is(.breadcrumbs, .page-header, .tabs) {
+  background: var(--adm-surface);
+  box-shadow: 0 0 0 100vmax var(--adm-surface);
+  clip-path: inset(0 -100vmax 0 calc(-1 * var(--adm-main-pad)));
+}
+
+.admin-main > .breadcrumbs {
+  padding-top: 1.25rem;
+}
+
+.admin-main > .breadcrumbs ol {
+  margin: 0;
+}
+
+.admin-main > .page-header {
+  margin: 0;
+  padding: 0.75rem 0 1.25rem;
+}
+
+.admin-main > .page-header:first-child {
+  padding-top: 1.5rem;
+}
+
+/* The last part of the band draws the band's bottom line, one pixel below it. */
+.admin-main > .page-header:not(:has(+ .tabs)),
+.admin-main > .tabs {
+  margin-bottom: 1.75rem;
+  border-bottom: 0;
+  box-shadow:
+    0 0 0 100vmax var(--adm-surface),
+    0 1px 0 100vmax var(--adm-border);
+  clip-path: inset(0 -100vmax -1px calc(-1 * var(--adm-main-pad)));
+}
+
+.admin-main > .tabs a {
+  min-height: 40px;
 }
 
 .tabs ul {
@@ -584,7 +829,7 @@ fieldset.card {
 }
 
 .admin .data-table tbody tr:hover {
-  background: #fafbfc;
+  background: var(--adm-row-hover);
 }
 
 .cell-yes,
@@ -1320,13 +1565,6 @@ fieldset.card {
 }
 
 /* Help (ADR 0033): the page link, the (i) disclosure under a field and the manual itself. */
-.page-help {
-  display: flex;
-  justify-content: flex-end;
-  margin: 0 0 0.5rem;
-}
-
-.page-help a,
 .more summary {
   display: inline-flex;
   align-items: center;
@@ -1458,7 +1696,7 @@ fieldset.card {
   background: repeating-linear-gradient(
     -45deg,
     var(--adm-warning-soft) 0 12px,
-    #fbe7c2 12px 24px
+    var(--adm-warning-stripe) 12px 24px
   );
   color: var(--adm-text);
   font-size: 0.95rem;
