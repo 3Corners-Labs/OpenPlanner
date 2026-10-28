@@ -86,17 +86,36 @@ def running_version(settings: Settings) -> Version | None:
 
 
 def update_service(
-    settings: Settings, uow: UnitOfWork, clock: Clock, http: httpx.AsyncClient
+    settings: Settings,
+    uow: UnitOfWork,
+    clock: Clock,
+    http: httpx.AsyncClient,
+    *,
+    lookup: bool = True,
 ) -> UpdateService:
-    """Return the update service the settings describe (web, worker and the CLI share it)."""
+    """Return the update service the settings describe (web, worker and the CLI share it).
+
+    Args:
+        settings: Version, repository and token.
+        uow: Opens database transactions.
+        clock: Current time.
+        http: Shared HTTP client.
+        lookup: Whether this process looks up releases itself; the web process passes
+            ``False`` and only reads the worker's checks (ADR 0029).
+    """
     token = settings.update_check_token
     releases = (
         GitHubReleases(
             http, settings.update_repository, token.get_secret_value() if token else None
         )
-        if settings.update_repository
+        if settings.update_repository and lookup
         else None
     )
     return UpdateService(
-        uow, clock, AdminService(uow, clock), current=running_version(settings), releases=releases
+        uow,
+        clock,
+        AdminService(uow, clock),
+        current=running_version(settings),
+        releases=releases,
+        checking=settings.update_repository is not None,
     )

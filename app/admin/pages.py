@@ -43,6 +43,7 @@ class NavItem:
 NAVIGATION = (
     NavItem("admin.nav.dashboard", "/admin/", Permission.DASHBOARD_VIEW, "dashboard"),
     NavItem("admin.nav.audit", "/admin/audit", Permission.AUDIT_VIEW, "audit"),
+    NavItem("admin.nav.retention", "/admin/retention", Permission.RETENTION_VIEW, "clock"),
     NavItem("admin.nav.rights", "/admin/rights", Permission.RIGHTS_VIEW, "rights"),
     NavItem("admin.nav.matrix", "/admin/matrix", Permission.MATRIX_VIEW, "matrix"),
     NavItem(

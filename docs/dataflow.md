@@ -99,6 +99,12 @@ organisation admin and auditor: their organisation and its groups; superuser: ev
 The auditor role (ADR 0039) is read-only and holds no permission that shows citizens' data; it
 does see admin names in the audit log, which is the accountability it exists for.
 
+The retention overview (`/admin/retention`, ADR 0039) reads `bookings` only to count, per group,
+how many still hold personal data, how many are past their purge moment and how many purges
+failed, and when the last purge ran. It selects no personal data column and no booking id, so it
+is no new processing of citizens' data; it is the control that the purge (CLAUDE.md privacy
+rules) works.
+
 Admin names are personal data of employees, processed for accountability (who did what in the
 portal). They never appear in logs, exceptions or audit events; the audit log joins them in when
 it is shown.

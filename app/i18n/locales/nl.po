@@ -3710,6 +3710,66 @@ msgstr "Niet voor echte afspraken van burgers."
 msgid "admin.environment.simulator"
 msgstr "Simulator staat aan"
 
+msgid "authz.permission.retention_view"
+msgstr "Bewaartermijnen bekijken"
+
+msgid "admin.nav.retention"
+msgstr "Bewaartermijnen"
+
+msgid "admin.retention.title"
+msgstr "Bewaartermijnen"
+
+msgid "admin.retention.intro"
+msgstr "Controle of persoonsgegevens van burgers op tijd worden verwijderd, per groep. U ziet hier alleen aantallen en tijden, nooit gegevens van burgers."
+
+msgid "admin.retention.in_order"
+msgstr "In orde: er zijn geen persoonsgegevens over hun bewaartermijn en geen mislukte verwijderingen."
+
+msgid "admin.retention.attention"
+msgstr "Actie nodig. Afspraken met persoonsgegevens over de bewaartermijn: {overdue}. Mislukte verwijderingen: {failed}. Meld dit bij de beheerder van de installatie; de auditlog toont de foutcode."
+
+msgid "admin.retention.summary"
+msgstr "Samenvatting"
+
+msgid "admin.retention.groups"
+msgstr "Bewaartermijnen per groep"
+
+msgid "admin.retention.group"
+msgstr "Groep"
+
+msgid "admin.retention.holding"
+msgstr "Met persoonsgegevens"
+
+msgid "admin.retention.overdue"
+msgstr "Over de bewaartermijn"
+
+msgid "admin.retention.failed"
+msgstr "Mislukte verwijderingen"
+
+msgid "admin.retention.last_purged"
+msgstr "Laatst verwijderd"
+
+msgid "admin.retention.checked_at"
+msgstr "Gecontroleerd op"
+
+msgid "admin.retention.status"
+msgstr "Status"
+
+msgid "admin.retention.ok"
+msgstr "In orde"
+
+msgid "admin.retention.needs_attention"
+msgstr "Actie nodig"
+
+msgid "admin.retention.never"
+msgstr "Nog niet"
+
+msgid "admin.retention.rule"
+msgstr "Persoonsgegevens worden 24 uur na het einde van de afspraak of na de annulering verwijderd. Bij een noodsluiting gebeurt dat uiterlijk 30 dagen na het einde van de sluiting. Een afspraak telt als over de bewaartermijn als de gegevens een uur na dat moment nog niet zijn verwijderd."
+
+msgid "admin.retention.empty"
+msgstr "Er zijn nog geen groepen om te controleren."
+
 msgid "contacts.heading"
 msgstr "Andere manieren om ons te bereiken"
 

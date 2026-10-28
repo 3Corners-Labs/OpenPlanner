@@ -42,13 +42,16 @@ def statuses(*codes: int) -> dict[str, int]:
 # Allowed POSTs answer 422 (empty form) or 404 (unknown item id); refused ones 403.
 # "METHOD route template" -> concrete paths -> expected status per role (HANDOVER §6):
 #   superuser · org_admin (demo) · group_admin (demo) · org_admin (andere) · auditor (demo) ·
-#   no role. The auditor (ADR 0039) reads: overview, rights, matrix, log, manual, group page.
+#   no role. The auditor (ADR 0039) reads: overview, rights, matrix, log, retention, manual,
+#   group page.
 EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 200, 403)},
     # ADR 0031: every role has a log; what it lists is exact per level (test_audit_routes).
     "GET /admin/audit": {"/admin/audit": statuses(200, 200, 200, 200, 200, 403)},
+    # ADR 0039: retention counts per organisation; no group admins, never personal data.
+    "GET /admin/retention": {"/admin/retention": statuses(200, 200, 403, 200, 200, 403)},
     # ADR 0033: the manual is public, every admin may read every topic.
     "GET /admin/help": {"/admin/help": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/help/{topic}": {
