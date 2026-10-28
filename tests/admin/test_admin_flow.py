@@ -250,7 +250,7 @@ async def test_matrix_page_marks_the_bounds_and_shows_the_auditor(site: Site) ->
     text = (await site.client.get("/admin/matrix")).text
 
     assert "Compliance en privacy (alleen lezen)" in text
-    assert text.count("Alleen superuser</span>") == 5
+    assert text.count("Alleen superuser</span>") == 6  # ADR 0039 step 3 adds roles.manage
     assert text.count("Persoonsgegevens</span>") == 1
     assert "rechtstreeks uit de code" not in text
 

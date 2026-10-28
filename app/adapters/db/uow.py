@@ -444,7 +444,7 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, RoleQuer
             query = query.where(AuditEventRow.booking_id == narrow.booking_id)
         return await self._entries(query, limit)
 
-    async def list_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+    async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
         """Return the newest audit events with one of ``actions``, with the actors' names."""
         query = (
             select(AuditEventRow, AdminProfileRow.display_name)

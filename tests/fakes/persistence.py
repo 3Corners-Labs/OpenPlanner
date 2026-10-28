@@ -627,7 +627,7 @@ class InMemoryTransaction:
     async def save_update_request(self, request: UpdateRequest) -> None:
         self.state.update_requests[request.id or 0] = request
 
-    async def list_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+    async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
         profiles = self.state.admin_profiles
         return [
             AuditEntry(e, profiles[e.actor].display_name if e.actor in profiles else None)
@@ -635,7 +635,7 @@ class InMemoryTransaction:
             if e.action in actions
         ][:limit]
 
-    async def list_custom_roles(self) -> list[CustomRole]:
+    async def get_custom_roles(self) -> list[CustomRole]:
         return [self.state.custom_roles[k] for k in sorted(self.state.custom_roles)]
 
     async def get_custom_role(self, role_id: int) -> CustomRole | None:

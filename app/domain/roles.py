@@ -197,12 +197,12 @@ class RoleService:
     async def catalogue(self) -> RoleCatalogue:
         """Return every custom role (role definitions are not secret, ADR 0039 item 7)."""
         async with self._uow.read() as tx:
-            return RoleCatalogue(tuple(await tx.list_custom_roles()))
+            return RoleCatalogue(tuple(await tx.get_custom_roles()))
 
     async def history(self, limit: int = HISTORY_LIMIT) -> list[AuditEntry]:
         """Return the newest role changes with their actors' names (for ``matrix.view``)."""
         async with self._uow.read() as tx:
-            return await tx.list_events(ROLE_EVENTS, limit)
+            return await tx.get_events(ROLE_EVENTS, limit)
 
     async def role(self, principal: Principal, role_id: int) -> CustomRole:
         """Return one custom role for the editor.
@@ -287,7 +287,7 @@ class RoleService:
         folded = value.casefold()
         if folded in self._reserved or any(
             role.claim_value.casefold() == folded and role.id != role_id
-            for role in await tx.list_custom_roles()
+            for role in await tx.get_custom_roles()
         ):
             raise DomainError(ErrorCode.CLAIM_VALUE_TAKEN, "claim_value")
 
