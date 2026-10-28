@@ -10,8 +10,9 @@ ones are listed in ``PUBLIC_ADMIN_PATHS`` and the route-coverage test checks bot
     GET  /admin/rights       rights.view      own permissions with their scope
     GET  /admin/matrix       matrix.view      the whole matrix (same data as the docs)
 
-The audit log lives in ``audit_routes``, groups and their planning in ``group_routes``,
-organisations in ``organisation_routes`` and their branding in ``branding_routes``.
+The audit log lives in ``audit_routes``, the retention overview in ``retention_routes``,
+groups and their planning in ``group_routes``, organisations in ``organisation_routes`` and
+their branding in ``branding_routes``.
 """
 
 import hmac
@@ -41,6 +42,7 @@ from app.admin import (
     holiday_routes,
     message_routes,
     organisation_routes,
+    retention_routes,
     simulator_routes,
     update_routes,
 )
@@ -381,6 +383,7 @@ def register_admin(app: FastAPI) -> None:
     for module_router in (
         router,
         audit_routes.router,
+        retention_routes.router,
         group_routes.router,
         call_routes.router,
         check_routes.router,

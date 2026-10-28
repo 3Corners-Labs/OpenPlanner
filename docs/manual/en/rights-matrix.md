@@ -15,7 +15,7 @@ So you cannot assign roles in the portal; ask your identity management team.
 | Superuser | everything | sets up the installation: organisations, integrations, holidays, updates |
 | Organisation admin | own organisations and their groups | manages groups, planning, texts, reminders and bookings |
 | Group admin | own groups | manages the planning, texts and bookings of the own team |
-| Compliance and privacy (read-only) | own organisations and their groups | checks: reads the audit log and the group settings, sees no personal data and cannot change anything |
+| Compliance and privacy (read-only) | own organisations and their groups | checks: reads the audit log, retention and the group settings, sees no personal data and cannot change anything |
 
 The **Compliance and privacy** role is meant for, for example, the data protection officer,
 the CISO or an auditor. In the audit log this role sees a booking's number, but not the

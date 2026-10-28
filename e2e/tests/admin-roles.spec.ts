@@ -69,7 +69,7 @@ test('organisation admin sees the logins of their own admins, by name', async ({
   await expectForbidden(page, '/admin/groups/andere-team');
 });
 
-test('auditor reads the matrix and the own log, but no bookings and no changes', async ({ page }) => {
+test('auditor reads the matrix, the own log and retention, but no bookings and no changes', async ({ page }) => {
   // ADR 0039: compliance and privacy, read-only, never personal data.
   await loginAs(page, 'auditor');
 
@@ -87,6 +87,12 @@ test('auditor reads the matrix and the own log, but no bookings and no changes',
   await adminMenu(page).getByRole('link', { name: 'Auditlog' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Auditlog');
   await expect(page.getByRole('row').filter({ hasText: 'andere-team' })).toHaveCount(0);
+  await expectNoAxeViolations(page);
+
+  await adminMenu(page).getByRole('link', { name: 'Bewaartermijnen' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bewaartermijnen');
+  await expect(page.getByRole('rowheader', { name: /videogesprek/ })).toBeVisible();
+  await expect(page.getByRole('rowheader', { name: /Andere/ })).toHaveCount(0);
   await expectNoAxeViolations(page);
 
   await expectForbidden(page, '/admin/groups/demo/agenda');
