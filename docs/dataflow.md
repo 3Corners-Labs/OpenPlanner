@@ -198,6 +198,7 @@ web ──> audit_events: queue.claimed / queue.released (actor subject, group, 
 |---|---|---|---|---|
 | First name, meeting link | read from `bookings` | booking form, Webex | as the contact | shown to agents of the group only (link only after a claim) |
 | Who claimed | `bookings.claimed_by` (pseudonym, not the subject) | the agent's login | removed by `purge_pii` with the contact; `claimed_at` stays for statistics | no |
+| Team invite: first name, booking reference, group, start/end, queue link | built in memory by the worker | `bookings`, the group | not stored by OpenPlanner; **in the team's mailbox outside our purge** (DPIA) | by email to `groups.calendar_invite_address` (own queue only), withdrawn with `METHOD:CANCEL` on cancel, move or suspension; never the meeting link, email or phone |
 
 ## Branding and the calendar script (WP3b)
 
