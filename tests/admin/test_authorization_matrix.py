@@ -394,6 +394,15 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/organisations/demo/contacts": statuses(303, 303, 403, 403, 403, 403),
         "/admin/organisations/andere/contacts": statuses(303, 403, 403, 303, 403, 403),
     },
+    # A group's own contact block: closure.manage, like the rest of its closure page.
+    "GET /admin/groups/{slug}/closure/contacts": {
+        "/admin/groups/demo/closure/contacts": statuses(200, 200, 200, 403, 403, 403),
+        "/admin/groups/andere-team/closure/contacts": statuses(200, 403, 403, 200, 403, 403),
+    },
+    "POST /admin/groups/{slug}/closure/contacts": {
+        "/admin/groups/demo/closure/contacts": statuses(303, 303, 303, 403, 403, 403),
+        "/admin/groups/andere-team/closure/contacts": statuses(303, 403, 403, 303, 403, 403),
+    },
 }
 
 CASES = [

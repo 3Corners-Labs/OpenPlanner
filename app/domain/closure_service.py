@@ -8,17 +8,22 @@ are on hold; an admin resolves them one by one or all at once.
     close_group / close_organisation
         └─ closure ─► confirmed bookings inside it ─► suspended ─► notice mail (+ purge at
                                                                     closure end + 30 days)
-    update   end and notices; newly covered bookings suspended; optional update mail to all
+    update   end, notices and headings; newly covered bookings suspended; optional update
+             mail to all; optionally take over the contact block that applies now
     lift     end now; optionally reinstate what can still go ahead
     reinstate / cancel / move        one suspended booking (or all: reinstate_all, cancel_all)
 
-Audit details are machine keys with counts (``closure.start,bookings:3``), never values.
+A closure copies the contact block that applies to its group when it starts (ADR 0037 §2,
+``effective_block``): later edits of the group's or organisation's block leave it alone.
+
+Audit details are machine keys with counts (``closure.start,bookings:3,contacts:2``), never
+values.
 A suspended booking can only be handled through the group it belongs to: the booking id in
 the URL is checked against the authorised group, so one group's admin cannot reach another's.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 
 from app.domain.admin import AdminService, Authorization, record_change, require
@@ -27,10 +32,12 @@ from app.domain.booking import Booking
 from app.domain.closure import (
     NOTICE_LOCALES,
     Closure,
+    clean_headings,
     clean_notice,
     covering,
     notice_field,
 )
+from app.domain.contact_service import effective_block
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import (
     JobType,
@@ -54,11 +61,13 @@ class ClosureInput:
         starts_at: First closed start time (UTC); ``None`` or a past moment means now.
         ends_at: First start time that is open again (UTC); ``None`` until further notice.
         notices: The explanation for citizens per locale (``NOTICE_LOCALES`` required).
+        headings: Optional heading per locale; empty means the page's default heading.
     """
 
     starts_at: datetime | None
     ends_at: datetime | None
     notices: Mapping[str, str] = field(default_factory=dict)
+    headings: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -166,8 +175,8 @@ class ClosureService:
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
             group = await _group(tx, slug)
-            count = await self._close(tx, group, closure)
-            await self._audit(tx, principal, authorization, slug, f"closure.start,bookings:{count}")
+            stored, count = await self._close(tx, group, closure)
+            await self._audit(tx, principal, authorization, slug, _start_detail(stored, count))
         return count
 
     async def update(
@@ -178,12 +187,16 @@ class ClosureService:
         notices: Mapping[str, str],
         *,
         notify: bool,
+        headings: Mapping[str, str] | None = None,
+        refresh_contacts: bool = False,
     ) -> UpdateOutcome:
-        """Change the end and the notices of the group's visible closure.
+        """Change the end, the notices and the headings of the group's visible closure.
 
         Bookings that the new end brings inside the closure are suspended (and get the
         notice); with ``notify`` every other suspended booking of the closure gets the updated
-        notice by email. The purge of all of them follows the new end.
+        notice by email. The purge of all of them follows the new end. ``headings`` ``None``
+        keeps the current ones; ``refresh_contacts`` replaces the closure's copy of the contact
+        block with the one that applies now.
 
         Raises:
             DomainError: ``not_permitted``, ``closure_not_found`` or ``invalid_configuration``.
@@ -195,13 +208,12 @@ class ClosureService:
             current = await _visible(tx, group, now)
             if ends_at is not None and ends_at <= max(now, current.starts_at):
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "ends_at")
-            updated = Closure(
-                current.id,
-                group.id,
-                current.starts_at,
-                ends_at,
-                _notices(notices),
-                current.created_at,
+            updated = replace(
+                current,
+                ends_at=ends_at,
+                notices=_notices(notices),
+                headings=current.headings if headings is None else clean_headings(headings),
+                contacts=await effective_block(tx, group) if refresh_contacts else current.contacts,
             )
             await tx.save_closure(updated)
             notified = 0
@@ -366,10 +378,10 @@ class ClosureService:
                 if await tx.get_closures(summary.group.id, now):
                     outcomes.append(GroupOutcome(summary.group.slug, changed=False))
                     continue
-                count = await self._close(tx, summary.group, closure)
+                stored, count = await self._close(tx, summary.group, closure)
                 outcomes.append(GroupOutcome(summary.group.slug, True, count))
                 await self._organisation_audit(
-                    tx, principal, organisation_slug, summary, f"closure.start,bookings:{count}"
+                    tx, principal, organisation_slug, summary, _start_detail(stored, count)
                 )
         return outcomes
 
@@ -402,8 +414,10 @@ class ClosureService:
 
     # --- steps ----------------------------------------------------------------------------
 
-    async def _close(self, tx: Transaction, group: Group, closure: ClosureInput) -> int:
-        """Store a closure for ``group`` and suspend what it covers; return how many."""
+    async def _close(
+        self, tx: Transaction, group: Group, closure: ClosureInput
+    ) -> tuple[Closure, int]:
+        """Store a closure for ``group`` and suspend what it covers; return it and how many."""
         now = self._clock.now()
         starts_at = max(closure.starts_at or now, now)
         if closure.ends_at is not None and closure.ends_at <= starts_at:
@@ -411,9 +425,18 @@ class ClosureService:
         if await tx.get_closures(group.id, now):
             raise DomainError(ErrorCode.CLOSURE_EXISTS)
         stored = await tx.add_closure(
-            Closure(None, group.id, starts_at, closure.ends_at, _notices(closure.notices), now)
+            Closure(
+                None,
+                group.id,
+                starts_at,
+                closure.ends_at,
+                _notices(closure.notices),
+                now,
+                closure.headings,
+                await effective_block(tx, group),
+            )
         )
-        return await self._suspend_covered(tx, group, stored)
+        return stored, await self._suspend_covered(tx, group, stored)
 
     async def _suspend_covered(self, tx: Transaction, group: Group, closure: Closure) -> int:
         """Suspend the confirmed bookings inside ``closure``; return how many."""
@@ -435,7 +458,7 @@ class ClosureService:
         current = await _visible(tx, group, now)
         # An upcoming closure that is lifted never starts: its window becomes empty.
         starts_at = min(now, current.starts_at)
-        ended = Closure(current.id, group.id, starts_at, now, current.notices, current.created_at)
+        ended = replace(current, starts_at=starts_at, ends_at=now)
         await tx.save_closure(ended)
         for booking in await self._closure_bookings(tx, principal, group, ended):
             await self._repurge(tx, booking, ended)
@@ -566,6 +589,12 @@ class ClosureService:
             summary.group.slug,
             detail,
         )
+
+
+def _start_detail(closure: Closure, bookings: int) -> str:
+    """Return the audit detail of a started closure: counts only, contacts when copied."""
+    detail = f"closure.start,bookings:{bookings}"
+    return f"{detail},contacts:{len(closure.contacts.options)}" if closure.contacts else detail
 
 
 def _notices(raw: Mapping[str, str]) -> dict[str, str]:

@@ -1,6 +1,7 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_fields.html" import field with context %}
 {% from "admin/_closure_forms.html" import start_form, lift_form with context %}
+{% from "_contact_block.html" import contact_block %}
 {% block title %}{{ _("admin.tab.closure") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
@@ -12,6 +13,11 @@
     <p class="card__lead">{{ _("admin.closure.current_lead") }}</p>
   </div>
   {% set preview = closure %}{% include "admin/_closure_preview.html" %}
+  {% if closure_contacts %}
+  {{ contact_block(closure_contacts, level=3, id="closure-contacts") }}
+  {% else %}
+  <p class="empty-state">{{ _("admin.closure.no_contacts") }}</p>
+  {% endif %}
 </section>
 <form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/update" novalidate aria-labelledby="update-heading">
   <div class="card__header">
@@ -25,6 +31,10 @@
     <input type="checkbox" id="notify" name="notify" value="yes" checked>
     <label for="notify">{{ _("admin.closure.notify", count=suspended|length) }}</label>
   </div>
+  <div class="choice__option">
+    <input type="checkbox" id="refresh_contacts" name="refresh_contacts" value="yes">
+    <label for="refresh_contacts">{{ _("admin.closure.refresh_contacts", count=contact_count) }}</label>
+  </div>
   <div class="form-actions">
     <button type="submit" class="button">{{ _("admin.closure.update_button") }}</button>
   </div>
@@ -33,6 +43,13 @@
 {% else %}
 {{ start_form("/admin/groups/" ~ summary.group.slug ~ "/closure", _("admin.closure.start"), _("admin.closure.start_lead", count=confirmed_ahead), _("admin.closure.start_button"), fields) }}
 {% endif %}
+<section class="card" aria-labelledby="contacts-heading">
+  <div class="card__header">
+    <h2 id="contacts-heading">{{ _("admin.contacts.title") }}</h2>
+    <p class="card__lead">{% if own_contacts %}{{ _("admin.group_contacts.summary_own", count=contact_count) }}{% elif contact_count %}{{ _("admin.group_contacts.summary_default", count=contact_count) }}{% else %}{{ _("admin.contacts.empty") }}{% endif %}</p>
+  </div>
+  <p><a href="/admin/groups/{{ summary.group.slug }}/closure/contacts">{{ _("admin.contacts.manage") }}</a></p>
+</section>
 <section class="card" aria-labelledby="suspended-heading">
   <div class="card__header">
     <h2 id="suspended-heading">{{ _("admin.closure.suspended") }}</h2>

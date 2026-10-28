@@ -131,6 +131,8 @@ FIELD_MESSAGES: dict[str, str] = {
     "ends_at": "admin.form.error.ends_at",
     "notice_nl": "admin.form.error.notice",
     "notice_en": "admin.form.error.notice",
+    "heading_nl": "admin.form.error.closure_heading",
+    "heading_en": "admin.form.error.closure_heading",
     "start": "admin.form.error.start",
     "scopes": "admin.form.error.scopes",
     "groups": "admin.form.error.groups",
