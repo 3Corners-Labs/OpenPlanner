@@ -3,7 +3,9 @@
 SQLite in WAL mode (HANDOVER B2; Postgres is not a target). The Python driver's implicit
 transaction handling is switched off so that we emit ``BEGIN`` ourselves: a plain ``BEGIN``
 for reads and ``BEGIN IMMEDIATE`` for booking transactions, selected per connection with the
-``sqlite_begin`` execution option (see ``app.adapters.db.uow``).
+``sqlite_begin`` execution option (see ``app.adapters.db.uow``). A new database is created in
+incremental auto-vacuum mode, so pages freed by pruning can go back to the disk (ADR 0040,
+``app.adapters.db.maintenance``).
 """
 
 from functools import partial
@@ -26,9 +28,11 @@ log = structlog.get_logger()
 
 
 def _sqlite_connect(busy_timeout_ms: int, dbapi_connection: Any, _record: Any) -> None:
-    """Disable implicit transactions and apply WAL, foreign keys and the lock timeout."""
+    """Disable implicit transactions and apply auto-vacuum, WAL, foreign keys, lock timeout."""
     dbapi_connection.isolation_level = None
     cursor = dbapi_connection.cursor()
+    # Takes effect only before the first table exists; existing files are converted once.
+    cursor.execute("PRAGMA auto_vacuum=INCREMENTAL")
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.execute("PRAGMA foreign_keys=ON")

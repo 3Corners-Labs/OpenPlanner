@@ -33,6 +33,12 @@ from app.domain.authorization import (
     Target,
     decide,
 )
+from app.domain.storage import (
+    DATABASE_TOO_LARGE,
+    FREE_SPACE_CRITICAL,
+    FREE_SPACE_LOW,
+    STORAGE_EVENT,
+)
 from app.i18n import BoundGettext
 from app.web.authz_labels import API_SCOPE_LABELS, OUTCOME_LABELS, PERMISSION_LABELS
 
@@ -56,6 +62,8 @@ EVENT_LABELS: dict[str, str] = {
     "job.send_suspension": "audit.job.send_suspension",
     "job.send_closure_update": "audit.job.send_closure_update",
     "job.send_reinstatement": "audit.job.send_reinstatement",
+    # Storage watch (ADR 0040): global, so only the superuser sees it.
+    STORAGE_EVENT: "audit.event.storage_check",
 }
 """Readable label per event key that is not a permission."""
 
@@ -120,6 +128,8 @@ COUNT_LABELS: dict[str, str] = {
     "bookings": "admin.audit.detail.bookings",
     "notified": "admin.audit.detail.notified",
     "attempt": "admin.audit.detail.attempt",
+    "free_percent": "admin.audit.detail.free_percent",
+    "database_mb": "admin.audit.detail.database_mb",
 }
 """Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0024)."""
 
@@ -131,6 +141,9 @@ REASON_LABELS: dict[str, str] = {
     "no_recipient": "admin.audit.reason.no_recipient",
     "no_booking": "admin.audit.reason.no_booking",
     "channel_not_configured": "admin.audit.reason.channel_not_configured",
+    FREE_SPACE_LOW: "admin.audit.reason.free_space_low",
+    FREE_SPACE_CRITICAL: "admin.audit.reason.free_space_critical",
+    DATABASE_TOO_LARGE: "admin.audit.reason.database_too_large",
 }
 """Readable explanation per known reason; any other code (an error code) is shown as is."""
 
