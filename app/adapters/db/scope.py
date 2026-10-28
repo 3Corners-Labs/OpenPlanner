@@ -1,4 +1,8 @@
-"""The one translation of a ``Scope`` into SQL (ADR 0014), shared by every listing query."""
+"""The one translation of an authorisation ``Scope`` into SQL (ADR 0014).
+
+Every scoped listing of the database adapter (``uow`` and its query mixins) filters through
+``scope_filter``, so what a list shows is exactly what ``decide`` allows.
+"""
 
 from typing import Any
 

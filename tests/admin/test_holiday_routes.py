@@ -114,6 +114,7 @@ async def test_superuser_creates_and_deletes_a_calendar(site: Site) -> None:
     # Creating and deleting are audited; the refused duplicate wrote nothing.
     assert [(a, b, str(c)) for a, b, c, _ in await audit_events(site)] == [
         ("sub-super", "admin.login", "success"),
+        ("sub-super", "staff.created", "success"),  # ADR 0046: the first login
         ("sub-super", "holidays.manage", "success"),
         ("sub-super", "holidays.manage", "success"),
     ]
