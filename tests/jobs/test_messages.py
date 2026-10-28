@@ -1,10 +1,13 @@
+import os
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
 from app.domain.booking import Booking, BookingStatus, Contact
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
+from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.job_plan import JobType
 from app.domain.scheduling import PhoneMode
 from app.domain.tokens import derive_token, new_token_salt
@@ -222,3 +225,87 @@ def test_reinstatement_has_the_calendar_and_no_notice(composer: MessageComposer)
     assert "gaat toch door" in message.subject
     assert "Storing." not in message.text
     assert [a.filename for a in message.attachments] == ["afspraak.ics"]
+
+
+# --- closure page and contact options in the mails (ADR 0037 §5, CL-5) -------------------
+
+SNAPSHOTS = Path(__file__).parent / "snapshots"
+CONTACTS = ContactBlock(
+    (
+        ContactOption.create(
+            ContactKind.PHONE, "14 020", hours={"nl": "ma-vr 8-17", "en": "Mon-Fri 8-17"}
+        ),
+        ContactOption.create(ContactKind.WEBSITE, "https://gemeente.example/contact"),
+        ContactOption.create(
+            ContactKind.ADDRESS,
+            "Stadhuisplein 1\n1234 AB Stad",
+            labels={"nl": "Balie", "en": "Desk"},
+        ),
+    ),
+    {"nl": "Zo bereikt u ons", "en": "How to reach us"},
+)
+CONTACT_CLOSURE = replace(CLOSURE, contacts=CONTACTS, headings={"nl": "Storing", "en": "Outage"})
+FIXED = replace(BOOKING, status=BookingStatus.SUSPENDED, closure_id=1, token_salt="s" * 43)
+
+
+@pytest.mark.parametrize(
+    ("job_type", "locale"),
+    [
+        (JobType.SEND_SUSPENSION, "nl"),
+        (JobType.SEND_SUSPENSION, "en"),
+        (JobType.SEND_CLOSURE_UPDATE, "nl"),
+        (JobType.SEND_CLOSURE_UPDATE, "en"),
+    ],
+)
+def test_closure_mails_match_their_snapshots(
+    composer: MessageComposer, job_type: JobType, locale: str
+) -> None:
+    group = replace(GROUP, slug="aangifte")
+    message = composer.compose(
+        job_type, replace(FIXED, locale=locale), group, NOW, closure=CONTACT_CLOSURE
+    )
+
+    assert "<img" not in (message.html or "")  # the closure image is never mailed
+    name = f"{job_type.value}.{locale}"
+    for suffix, rendered in (("txt", message.text), ("html", message.html or "")):
+        path = SNAPSHOTS / f"{name}.{suffix}"
+        if os.environ.get("UPDATE_SNAPSHOTS"):
+            path.write_text(rendered, encoding="utf-8")
+        assert rendered == path.read_text(encoding="utf-8"), f"{path.name} changed"
+
+
+def test_the_plain_text_part_has_the_contact_options_and_the_closure_page(
+    composer: MessageComposer,
+) -> None:
+    group = replace(GROUP, slug="aangifte")
+
+    message = composer.compose(JobType.SEND_SUSPENSION, FIXED, group, NOW, closure=CONTACT_CLOSURE)
+
+    assert "Zo bereikt u ons:" in message.text
+    assert "- Telefoon: 14 020 (ma-vr 8-17)" in message.text
+    assert "- Website: https://gemeente.example/contact" in message.text
+    assert "- Balie: Stadhuisplein 1, 1234 AB Stad" in message.text
+    assert "https://afspraak.example.nl/g/aangifte/closure" in message.text
+    html = message.html or ""
+    assert '<a href="tel:14020">14 020</a>' in html
+    assert '<a href="https://afspraak.example.nl/g/aangifte/closure">' in html
+    assert "<h2>Storing</h2>" in html  # the closure's heading names the notice
+
+
+def test_without_contact_options_the_mail_still_links_the_closure_page(
+    composer: MessageComposer,
+) -> None:
+    message = composer.compose(JobType.SEND_CLOSURE_UPDATE, FIXED, GROUP, NOW, closure=CLOSURE)
+
+    assert "Zo bereikt u ons" not in message.text
+    assert f"/g/{GROUP.slug}/closure" in message.text
+    assert "Toelichting:" in message.text
+
+
+def test_other_mails_have_no_contact_block_or_closure_link(composer: MessageComposer) -> None:
+    message = composer.compose(
+        JobType.SEND_REINSTATEMENT, BOOKING, GROUP, NOW, closure=CONTACT_CLOSURE
+    )
+
+    assert "14 020" not in message.text
+    assert "/closure" not in message.text

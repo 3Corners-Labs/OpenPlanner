@@ -293,7 +293,8 @@ closure (CL-3): `POST /admin/groups/{slug}/closure/image` and `…/image/remove`
 (`closure.manage`, multipart), public `GET /g/{slug}/closure/image`. Closure scenarios
 (CL-4): `/admin/organisations/{org}/closure/scenarios…` (`organisation.closure`) and
 `/admin/groups/{slug}/closure/scenarios…` (`closure.manage`), the closing forms with
-`?scenario=` and a hidden `scenario_id`.
+`?scenario=` and a hidden `scenario_id`. Closure mails (CL-5): the suspension and update mails
+carry the closure's contact options and a link to the closure page.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -323,6 +324,9 @@ closure (CL-3): `POST /admin/groups/{slug}/closure/image` and `…/image/remove`
 | Tampering | Editing or deleting a scenario changes a running closure, so the page no longer matches the mail | The closure copies texts, contact block and image (its own image row) at the start | `tests/domain/test_scenarios.py::test_a_closure_copies_the_scenario_and_later_edits_leave_it_alone`, `tests/adapters/db/test_scenario_queries.py::test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with_it`, `tests/admin/test_scenario_routes.py::test_deleting_a_scenario_keeps_a_running_closure` |
 | Tampering (XSS) | A `javascript:` link, markup or an SVG in a scenario | Same validation as closures: `ContactBlock`, single-line headings and names, `ImageFile` by magic bytes; autoescape | `tests/admin/test_scenario_routes.py::test_scenario_errors_are_linked_to_their_fields` |
 | Repudiation | Who prepared or used a scenario | Audited with the scenario id and counts (`closure.start,scenario:N,bookings:N`), never names or texts | `tests/domain/test_scenarios.py::test_contacts_image_and_deletion`, `tests/admin/test_scenario_routes.py::test_start_closure_picks_a_scenario_and_copies_it` |
+| Tampering (HTML injection in mail) | Markup or a `javascript:` link from a notice, heading or contact option in the suspension or update mail (CL-5) | Fixed layout (ADR 0009); every value autoescaped; contact links are the domain's own `tel:`/`mailto:`/`https:` (validated when stored and read); the plain-text part never interprets HTML | `tests/jobs/test_messages.py::test_suspension_carries_the_notice_and_no_join_link_or_calendar`, `test_closure_mails_match_their_snapshots`, `test_the_plain_text_part_has_the_contact_options_and_the_closure_page` |
+| Information disclosure (privacy) | The closure image in a mail lets a third party (remote image host) see who opens it, or makes the mail heavy | The image is never mailed; the mail links to the closure page on our own origin | `tests/jobs/test_messages.py::test_closure_mails_match_their_snapshots` (no `<img>` in the snapshots) |
+| Information disclosure | Contact options or the closure link in mails that are not about a closure | Only suspension and update mails carry the block and the link | `tests/jobs/test_messages.py::test_other_mails_have_no_contact_block_or_closure_link` |
 
 ## Flow: video meetings, work items and direct calls (WP5/WP6)
 

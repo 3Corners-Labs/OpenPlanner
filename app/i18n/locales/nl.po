@@ -4131,3 +4131,9 @@ msgstr "afbeelding van scenario verwijderd"
 
 msgid "admin.audit.detail.scenario"
 msgstr "scenario"
+
+msgid "message.closure_page"
+msgstr "Alle informatie en de andere manieren om ons te bereiken staan ook op onze sluitingspagina."
+
+msgid "message.closure_page_link"
+msgstr "Naar de sluitingspagina"

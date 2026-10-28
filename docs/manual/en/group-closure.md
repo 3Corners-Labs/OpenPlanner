@@ -16,7 +16,8 @@ As soon as the closure starts:
 - citizens see the closure page instead of the calendar on the team's page: the heading, the
   notice, the image and the alternative contact options, in that order;
 - confirmed appointments inside the closure are **put on hold**, not cancelled. The citizen
-  gets an email with the notice and can choose a new time or cancel.
+  gets an email with the heading and notice, the closure's contact options and a link to the
+  closure page, and can choose a new time or cancel. The image is not included in the email.
 
 A closure that starts later is shown to citizens beforehand as a notice above the calendar.
 
@@ -62,7 +63,8 @@ takes it away at once. The image is not included in emails.
 ## Updating and lifting
 
 Under **Change the emergency closure** you change the end, the notice and the heading. Tick whether
-citizens with an appointment on hold get the new notice by email. When a later end brings more
+citizens with an appointment on hold get the new notice by email; that email also carries the
+closure's contact options. When a later end brings more
 appointments inside the closure, those are put on hold too.
 
 **Lift the emergency closure** opens the team again at once. Tick whether appointments on hold that can

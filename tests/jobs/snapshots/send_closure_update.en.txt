@@ -1,0 +1,22 @@
+Dear Ada,
+
+There is news about the temporary closure of Aangifte <Inkomstenbelasting>. Your appointment on Monday, January 5, 2026 at 09:00 is still on hold.
+
+When: Monday, January 5, 2026, 09:00–09:30
+Team: Aangifte <Inkomstenbelasting>
+
+Outage:
+Outage.
+
+How to reach us:
+- Phone: 14 020 (Mon-Fri 8-17)
+- Website: https://gemeente.example/contact
+- Desk: Stadhuisplein 1, 1234 AB Stad
+
+All information and the other ways to reach us are also on our closure page.
+Go to the closure page: https://afspraak.example.nl/g/aangifte/closure
+
+Use the link below to choose a new time or cancel the appointment. You do not need to enter your details again.
+View or change appointment: https://afspraak.example.nl/b/jlpF9bIU1ILhUqkoQBXjGwKvPqmSLWsfQHu66qOO4rs
+
+Kind regards, Aangifte <Inkomstenbelasting>

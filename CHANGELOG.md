@@ -102,3 +102,6 @@ All notable changes are listed here, generated from Conventional Commits on rele
   image that only admins see. "Close the team" and "close the organisation" start from a
   scenario (or empty) and copy it; later edits never change a running closure. Audited as
   `closure.start,scenario:N,bookings:N`. Migration 0036. Manual topic with examples to copy.
+- Closure mails (ADR 0037, CL-5): the suspension and update mails carry the closure's heading,
+  notice and copy of the contact options as a fixed block in the HTML and plain-text parts, and
+  link to the closure page; the image is not mailed. Snapshot tests in nl and en.

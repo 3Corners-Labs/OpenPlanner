@@ -21,6 +21,8 @@ It identifies nobody and is strictly functional, so no consent banner is needed.
 ```
 worker ──SMTP──> mail provider of the organisation (admin portal; else SMTP_HOST) ──> citizen
    reads booking at send time: first name, email, date, time, team, management link
+   closure mails also: the closure's notice and heading, its copy of the contact options
+   (organisation data) and the link to the closure page (ADR 0037 §5); never the image
 ```
 
 Jobs carry booking IDs only. Messages and calendar attachments contain no phone number and
@@ -72,7 +74,7 @@ be confirmed in the DPIA (O7). The closure notice is admin text without personal
 **Alternative contact options (ADR 0037).** Phone numbers, email addresses, links and addresses
 of the organisation (`organisation_contacts`), entered by an organisation admin, or of one team
 (`group_contacts`), entered by its group admin, and shown publicly on closure and maintenance
-pages and on the page of a booking on hold (CL-2). A closure keeps a copy of the block that applied when it started (`closures.contacts`)
+pages, on the page of a booking on hold (CL-2) and in the suspension and update mails (CL-5). A closure keeps a copy of the block that applied when it started (`closures.contacts`)
 and an optional heading per locale (`closure_notices.heading`). Organisation data, not personal data of citizens;
 the admin page asks for general numbers and addresses only. No purge job; kept until changed.
 

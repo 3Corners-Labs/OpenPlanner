@@ -20,6 +20,17 @@
     {% for paragraph in notice.split("\n") if paragraph %}<p>{{ paragraph }}</p>
     {% endfor %}
     {% endif %}
+    {% if contacts %}
+    <h2>{{ contacts.heading }}</h2>
+    <ul>
+      {% for item in contacts.items %}
+      <li><strong>{{ item.term }}</strong>: {% if item.href %}<a href="{{ item.href }}">{{ item.text }}</a>{% else %}{{ item.lines|join(", ") }}{% endif %}{% if item.hours %} ({{ item.hours }}){% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if closure_url %}
+    <p>{{ closure_text }} <a href="{{ closure_url }}">{{ closure_link }}</a></p>
+    {% endif %}
     {% if join_url %}
     <p>{{ join_text }}</p>
     <p><a href="{{ join_url }}">{{ join_link }}</a></p>
