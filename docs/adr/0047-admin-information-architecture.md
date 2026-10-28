@@ -193,15 +193,35 @@ text and 3:1 for the focus ring, targets of at least 24×24 px, colour never the
 and `prefers-contrast` and `prefers-reduced-motion` honoured. No JavaScript is needed: tabs are
 links with `aria-current`, and the profile and filters are `<details>` or GET forms.
 
+### 9. Light and dark theme, chosen in the profile
+
+The profile menu offers *System*, *Light* and *Dark*. *System* is the default and follows the
+device (`prefers-color-scheme`). An explicit choice is kept in the existing signed admin session
+(`op_admin`, ADR 0013), so it adds **no cookie** and stores nothing in the database. It carries
+over a fresh login (ADR 0015) and ends at logout. The choice is a query-only link (`?theme=`),
+the same pattern as the language switch. Only the three known values are accepted, and nothing
+from the request is reflected into the page.
+
+- Every admin colour token is `light-dark(light, dark)`, and the body's `color-scheme` picks
+  the side. Dark text contrast is at least 4.5:1, and `prefers-contrast: more` has a dark
+  variant too.
+- The branding preview always shows the citizen page as citizens see it: light, in the
+  organisation's colours. Citizen pages get no dark theme from this ADR.
+- Keeping the choice across logins needs a stored per-user preference. That waits for the staff
+  records of ADR 0046, which are a better home than a cookie.
+
 ## Settings
 
 None. The structure in this ADR is not tunable per installation or organisation: a portal
-whose menu differs per installation cannot have one manual.
+whose menu differs per installation cannot have one manual. The theme (§9) is a personal
+display preference held in the session, not a setting of the installation or an organisation
+(ADR 0042).
 
 **Fixed on purpose:**
 
 - the three sections and the limit of six top-level tabs per object, as a design rule (§7.2);
-- the redirect status 308 for old URLs, a protocol constant.
+- the redirect status 308 for old URLs, a protocol constant;
+- the three theme values and the default *System* (§9).
 
 The readiness checklist (§5) uses existing data and adds no thresholds.
 
