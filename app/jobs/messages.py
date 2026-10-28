@@ -5,7 +5,9 @@ comes from the group's own texts first, then the i18n chain (organisation overri
 catalogue). Placeholders are filled by the safe formatter in ``app.i18n``. A message carries
 the first name, date, time, team and the management link; nothing else. Messages
 about an emergency closure (ADR 0024) add the closure's notice: plain text an admin wrote,
-escaped like every other value and never a template.
+escaped like every other value and never a template. Since ADR 0037 §5 they also carry the
+closure's copy of the contact options as a fixed block and link to the closure page; the
+closure's image is never mailed.
 """
 
 from dataclasses import dataclass
@@ -24,6 +26,7 @@ from app.domain.tokens import derive_token
 from app.i18n import BoundGettext, Translator, format_message
 from app.i18n.dates import format_clock, format_day, local_day
 from app.jobs.calendar import build_ics
+from app.web.contact_labels import block_view
 from app.web.templates import create_environment
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -153,7 +156,8 @@ class MessageComposer:
             raise ValueError("booking has no contact details")
         if kind.closure_notice and closure is None:
             raise ValueError("closure message without a closure")
-        _ = _Texts(self._translator.bind(booking.locale, group.organisation_id), texts or {})
+        gettext = self._translator.bind(booking.locale, group.organisation_id)
+        _ = _Texts(gettext, texts or {})
         if channel is ChannelKind.SMS:
             return self._sms(kind, booking, group, _)
         tz, locale = group.tz, booking.locale
@@ -177,8 +181,15 @@ class MessageComposer:
             "team_label": _("message.team"),
             "group_name": group.name,
             "manage_url": manage_url,
-            "notice_label": _("message.closure_notice"),
+            "notice_label": (closure.heading(locale) if closure else None)
+            or _("message.closure_notice"),
             "notice": closure.notice(locale) if closure and on_hold else None,
+            "contacts": block_view(closure.contacts, locale, gettext)
+            if closure and on_hold
+            else None,
+            "closure_url": f"{self._base_url}/g/{group.slug}/closure" if on_hold else None,
+            "closure_text": _("message.closure_page"),
+            "closure_link": _("message.closure_page_link"),
             "manage_text": _(
                 kind.manage_key,
                 deadline=f"{format_day(local_day(deadline, tz), locale)}, "

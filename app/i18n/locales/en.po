@@ -4131,3 +4131,9 @@ msgstr "scenario image removed"
 
 msgid "admin.audit.detail.scenario"
 msgstr "scenario"
+
+msgid "message.closure_page"
+msgstr "All information and the other ways to reach us are also on our closure page."
+
+msgid "message.closure_page_link"
+msgstr "Go to the closure page"

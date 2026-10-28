@@ -1,7 +1,7 @@
 {
-  "$comment": "Copy-paste detection. Shared behaviour belongs in one module; see docs/adr/0005. Add widget/ in WP3.",
+  "$comment": "Copy-paste detection. Shared behaviour belongs in one module; see docs/adr/0005. Add widget/ in WP3. Snapshot files are expected output, alike by design (CL-5 mails).",
   "path": ["app", "tests"],
-  "ignore": ["**/__pycache__/**", "**/dist/**", "**/i18n/locales/**"],
+  "ignore": ["**/__pycache__/**", "**/dist/**", "**/i18n/locales/**", "**/snapshots/**"],
   "minTokens": 50,
   "minLines": 6,
   "threshold": 1,
