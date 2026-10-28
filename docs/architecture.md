@@ -250,7 +250,7 @@ same commit and rollback behaviour as the SQL one.
 | Citizen pages | `app/api/booking_pages.py`, `app/api/citizen.py`, `app/api/templates/` |
 | Slot picker: month calendar and times (ADR 0020) | `app/api/slot_picker.py`, `app/web/static/calendar.js` |
 | Organisations (superuser) | `app/domain/organisations.py`, `app/admin/organisation_routes.py` |
-| Branding per organisation (O5) | `app/domain/branding.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
+| Branding per organisation (O5, ADR 0041) | `app/domain/branding.py`, `app/domain/theme.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
 | CSRF and rate limits | `app/web/protection.py` |
 | Rendering and security headers | `app/web/templates.py`, `app/api/security_headers.py` |
 | Translations and locale | `app/i18n/` |
@@ -662,6 +662,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0034 | Audit events also on the log stream for an external log platform such as Splunk (proposed) |
 | 0035 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes (proposed) |
 | 0036 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond (proposed) |
+| 0041 | Extended branding: allow-listed tokens with contrast checks, own WOFF2 fonts, header styles, theme file; no free CSS |
 
 ## 12. Status and roadmap
 
