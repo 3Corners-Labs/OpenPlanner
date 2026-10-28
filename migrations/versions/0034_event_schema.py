@@ -23,30 +23,30 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    """Add the columns, fill them for existing rows, then index and constrain them."""
-    with op.batch_alter_table("audit_events", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("event_id", sa.String(length=32), nullable=True))
-        batch_op.add_column(
-            sa.Column(
-                "level", sa.String(length=16), server_default=sa.text("'info'"), nullable=False
-            )
-        )
-        batch_op.add_column(
-            sa.Column(
-                "category",
-                sa.String(length=16),
-                server_default=sa.text("'audit'"),
-                nullable=False,
-            )
-        )
-        batch_op.add_column(
-            sa.Column(
-                "trace_id", sa.String(length=32), server_default=sa.text("''"), nullable=False
-            )
-        )
-        batch_op.add_column(
-            sa.Column("service", sa.String(length=16), server_default=sa.text("''"), nullable=False)
-        )
+    """Add the columns, fill them for existing rows, then index and constrain them.
+
+    The columns are added in place (no table copy); one batch then makes ``event_id``
+    required and adds the checks.
+    """
+    op.add_column("audit_events", sa.Column("event_id", sa.String(length=32), nullable=True))
+    op.add_column(
+        "audit_events",
+        sa.Column("level", sa.String(length=16), server_default=sa.text("'info'"), nullable=False),
+    )
+    op.add_column(
+        "audit_events",
+        sa.Column(
+            "category", sa.String(length=16), server_default=sa.text("'audit'"), nullable=False
+        ),
+    )
+    op.add_column(
+        "audit_events",
+        sa.Column("trace_id", sa.String(length=32), server_default=sa.text("''"), nullable=False),
+    )
+    op.add_column(
+        "audit_events",
+        sa.Column("service", sa.String(length=16), server_default=sa.text("''"), nullable=False),
+    )
     op.execute(
         "UPDATE audit_events SET event_id = lower(hex(randomblob(16))), "
         "level = CASE outcome WHEN 'failure' THEN 'error' "
@@ -55,14 +55,14 @@ def upgrade() -> None:
     )
     with op.batch_alter_table("audit_events", schema=None) as batch_op:
         batch_op.alter_column("event_id", existing_type=sa.String(length=32), nullable=False)
-        batch_op.create_index("ix_audit_events_event_id", ["event_id"], unique=True)
-        batch_op.create_index("ix_audit_events_trace_id", ["trace_id"], unique=False)
         batch_op.create_check_constraint(
             "level", "level IN ('debug', 'info', 'warning', 'error', 'critical')"
         )
         batch_op.create_check_constraint(
             "category", "category IN ('audit', 'system', 'security', 'diagnostic')"
         )
+    op.create_index("ix_audit_events_event_id", "audit_events", ["event_id"], unique=True)
+    op.create_index("ix_audit_events_trace_id", "audit_events", ["trace_id"], unique=False)
 
 
 def downgrade() -> None:
