@@ -668,6 +668,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0039 | Adjustable roles within fixed bounds (superuser only), and a read-only auditor role |
 | 0040 | Standard event schema, log levels, role tags, CSV export and storage limits (log rotation, SQLite space reclaim, disk watch) |
 | 0041 | Extended branding: allow-listed tokens with contrast checks, own WOFF2 fonts, header styles, theme file; no free CSS |
+| 0043 | Dispatch option per group: contact center or OpenPlanner's own queue (claim by agents, optional calendar invite to a group address) (proposed) |
+| 0044 | Planner: group agenda with shortfalls; move, ask to rebook, cancel or accept per booking (`bookings.manage`) (proposed) |
 | 0048 | Live progress of updates: the host updater reports each step, the updates page polls a fragment (proposed) |
 
 ## 12. Status and roadmap
