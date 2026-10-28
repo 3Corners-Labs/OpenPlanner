@@ -15,7 +15,7 @@
 #              no:  restore backup, pin the newer digest again -> report rolled_back
 #
 # Configuration: /etc/openplanner/updater.env (see updater.env.example). The pinned image is
-# OPENPLANNER_IMAGE in $COMPOSE_DIR/.env.update; production compose commands pass
+# OPENPLANNER_IMAGE in $COMPOSE_DIR/.env.update (written by scripts/install.sh); compose commands pass
 # `--env-file .env.update`. Backups live in the data volume and expire after 24 hours.
 set -Eeuo pipefail
 
@@ -44,7 +44,11 @@ VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$'
 REVISION_RE='^[0-9A-Za-z_]{1,32}$'
 IMAGE_RE='^[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?(@sha256:[0-9a-f]{64})?$'
 state() { sed -n "s/^$1=//p" "$STATE_FILE"; }
-pin() { printf 'OPENPLANNER_IMAGE=%s\n' "$1" >"$PIN_FILE.tmp" && mv "$PIN_FILE.tmp" "$PIN_FILE"; }
+# Replaces only the image: the installer keeps COMPOSE_PROFILES and OPENPLANNER_MODE in this file.
+pin() {
+  { grep -v '^OPENPLANNER_IMAGE=' "$PIN_FILE" || true; printf 'OPENPLANNER_IMAGE=%s\n' "$1"; } \
+    >"$PIN_FILE.tmp" && mv "$PIN_FILE.tmp" "$PIN_FILE"
+}
 
 report() { # report ID STATUS [REASON]; never fails the script (the old version may lack it)
   if app update-report "$@" >/dev/null; then

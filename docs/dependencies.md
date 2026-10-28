@@ -59,6 +59,20 @@ chrome-launcher: all active (ADR 0006).
 |---|---|---|---|---|
 | caddy, caddy builder (official images) | TLS proxy with automatic ACME certificates and renewal (`--profile tls`) | Apache-2.0 | very active (release every few months, Go stdlib TLS) | ADR 0030; checked 2026-10-26. Own image in `deploy/proxy/` (Caddy rebuilt with current Go, see the Dockerfile), scanned in CI |
 
+## Host packages (installed by `scripts/install.sh`)
+
+Programs on the host that the installer and the host updater run; nothing of them is linked into
+or shipped with the image. Kept at their newest version on every installer run, except the
+engine (`docs/install.md`). Checked 2026-10-29.
+
+| Package | Purpose | Source | License | Maintenance |
+|---|---|---|---|---|
+| Docker Engine (`docker-ce`, or Ubuntu's `docker.io`) | runs the containers | Docker's apt repository (key pinned by fingerprint), or Ubuntu | Apache-2.0 | very active |
+| Docker Compose plugin (`docker-compose-plugin` / `docker-compose-v2`) | the stack; 2.24+ for `env_file` with `required` | same as the engine | Apache-2.0 | very active |
+| cosign | verifies release images before they run (ADR 0006, 0029) | `sigstore/cosign` GitHub releases, `.deb` checked against `cosign_checksums.txt` | Apache-2.0 | very active (OpenSSF) |
+| curl, ca-certificates | release checks, health checks, downloads | Ubuntu | curl (MIT-style), MPL-2.0 | very active |
+| util-linux (`flock`), gnupg | one updater run at a time; checking Docker's release key | Ubuntu | GPL-2.0+, GPL-3.0+ | very active; OS tools run as separate programs, not linked |
+
 ## Containers (development only)
 
 | Image | Purpose | License |
