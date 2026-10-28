@@ -58,6 +58,11 @@ TOPICS = (
     HelpTopic("branding", ("/admin/organisations/{org}/branding",), Permission.BRANDING_MANAGE),
     HelpTopic("rights-matrix", ("/admin/matrix",), Permission.MATRIX_VIEW),
     HelpTopic("retention", ("/admin/retention",), Permission.RETENTION_VIEW),
+    HelpTopic(
+        "organisation-contacts",
+        ("/admin/organisations/{org}/contacts",),
+        Permission.ORGANISATION_CLOSURE,
+    ),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 

@@ -38,6 +38,7 @@ from app.domain.branding_service import BrandingService
 from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.closure_service import ClosureService
+from app.domain.contact_service import ContactService
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
@@ -129,6 +130,7 @@ def create_app(
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
+        app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
         # Test emails go through exactly the senders the worker uses (ADR 0022).
         senders = ConfiguredSenders(uow, http, fallback_mail(settings))
