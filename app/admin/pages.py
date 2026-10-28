@@ -184,7 +184,6 @@ def message(
         "message": locale.gettext(message_key),
         "back_link": back_link,
         "help_topic": None,
-        "maintenance_notice": getattr(request.state, "maintenance_notice", None),
     }
     principal = session_principal(request)
     if principal is not None:

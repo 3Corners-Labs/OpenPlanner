@@ -17,7 +17,12 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
-from app.admin.authz import AdminContext, RequirePermission, maintenance_service
+from app.admin.authz import (
+    AdminContext,
+    RequirePermission,
+    maintenance_service,
+    session_principal,
+)
 from app.admin.forms import (
     Field,
     FormData,
@@ -89,8 +94,9 @@ async def load_maintenance_notice(request: Request) -> None:
     """Put the maintenance bar on ``request.state`` when maintenance is on (all admin pages).
 
     Read through the service's short cache, so a page costs at most one read per few seconds.
+    Only for logged-in admins: the login flow itself never depends on the database.
     """
-    if not hasattr(request.app.state, "maintenance_service"):
+    if session_principal(request) is None or not hasattr(request.app.state, "maintenance_service"):
         return
     status = await maintenance_service(request).status()
     if status.active:
