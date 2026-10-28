@@ -889,3 +889,38 @@ a.calendar__day:focus-visible {
 .data-table thead th {
   border-bottom: 2px solid var(--booking-color-text);
 }
+
+/* Alternative contact options of the organisation (ADR 0037): kind in words, large targets. */
+.contact-block__list {
+  display: grid;
+  gap: var(--booking-space-m);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact-block__item {
+  display: grid;
+  gap: var(--booking-space-xs);
+  padding-left: var(--booking-space-s);
+  border-left: 3px solid var(--booking-color-accent);
+}
+
+.contact-block__term {
+  font-weight: 700;
+}
+
+.contact-block__link {
+  display: inline-block;
+  min-height: 24px;
+  padding-block: 2px;
+  overflow-wrap: anywhere;
+}
+
+.contact-block__address {
+  font-style: normal;
+}
+
+.contact-block__hours {
+  color: var(--booking-color-text-muted);
+}

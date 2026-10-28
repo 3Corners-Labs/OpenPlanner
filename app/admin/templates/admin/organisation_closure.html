@@ -40,6 +40,13 @@
   <p class="empty-state">{{ _("admin.closures.no_groups") }}</p>
   {% endif %}
 </section>
+<section class="card" aria-labelledby="contacts-heading">
+  <div class="card__header">
+    <h2 id="contacts-heading">{{ _("admin.contacts.title") }}</h2>
+    <p class="card__lead">{% if contact_count %}{{ _("admin.contacts.summary", count=contact_count) }}{% else %}{{ _("admin.contacts.empty") }}{% endif %}</p>
+  </div>
+  <p><a href="/admin/organisations/{{ organisation_slug }}/contacts">{{ _("admin.contacts.manage") }}</a></p>
+</section>
 {% if fields %}
 {{ start_form("/admin/organisations/" ~ organisation_slug ~ "/closure", _("admin.closures.start"), _("admin.closures.start_lead"), _("admin.closures.start_button"), fields) }}
 {% endif %}

@@ -106,6 +106,17 @@ class OrganisationLogoRow(Base):
     data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
+class OrganisationContactsRow(Base):
+    """The default contact block of an organisation (ADR 0037) as JSON; no personal data."""
+
+    __tablename__ = "organisation_contacts"
+
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), primary_key=True
+    )
+    body: Mapped[str] = mapped_column(Text)
+
+
 class GroupRow(Base):
     """A bookable team mapped to a WxCC queue."""
 

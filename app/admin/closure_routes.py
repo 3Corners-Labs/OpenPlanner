@@ -51,6 +51,7 @@ from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.i18n.dates import local_day
 from app.web.closure_labels import ClosureView, closure_view, moment_label
+from app.web.contact_labels import contact_service
 from app.web.errors import status_for
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
@@ -483,6 +484,7 @@ async def _organisation_response(
     ]
     name = states[0].summary.organisation_name if states else org
     fields = _closure_fields(form, locale, states[0].summary.group, None) if states else []
+    contacts = await contact_service(request).view(context.principal, org)
     response = page(
         request,
         locale,
@@ -493,6 +495,7 @@ async def _organisation_response(
             "organisation_name": name,
             "groups": groups,
             "any_closed": any(g.closure for g in groups),
+            "contact_count": len(contacts.block.options) if contacts.block else 0,
             "fields": fields,
             "errors": form.errors,
             "done": done_message(request, locale.gettext),

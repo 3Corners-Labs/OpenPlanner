@@ -40,6 +40,7 @@ from app.adapters.db.models import (
     HolidayRow,
     IntegrationReportRow,
     JobRow,
+    OrganisationContactsRow,
     OrganisationHolidayCalendarRow,
     OrganisationLogoRow,
     OrganisationRow,
@@ -91,6 +92,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
+from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.direct_queue import DirectCall
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
@@ -112,6 +114,34 @@ _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
 def _check_name(group_id: int) -> str:
     """Return the integration report name of a group's latest check."""
     return f"group-check:{group_id}"
+
+
+def _contacts_json(block: ContactBlock) -> str:
+    """Return a contact block as the JSON stored in ``organisation_contacts``."""
+    options = [
+        {"kind": o.kind.value, "value": o.value, "labels": dict(o.labels), "hours": dict(o.hours)}
+        for o in block.options
+    ]
+    return json.dumps({"headings": dict(block.headings), "options": options})
+
+
+def _contacts_block(body: str) -> ContactBlock:
+    """Return the stored contact block; options another version wrote are left out."""
+    data = json.loads(body)
+    options = []
+    for item in data.get("options", []):
+        try:
+            options.append(
+                ContactOption(
+                    ContactKind(item["kind"]),
+                    str(item["value"]),
+                    dict(item.get("labels", {})),
+                    dict(item.get("hours", {})),
+                )
+            )
+        except (KeyError, ValueError, TypeError, DomainError):
+            continue  # written by another version; skip rather than fail the page
+    return ContactBlock(tuple(options), dict(data.get("headings", {})))
 
 
 def _organisation(row: OrganisationRow) -> Organisation:
@@ -559,6 +589,23 @@ class SqlTransaction(ApiClientQueries, UpdateQueries):
                 logo_digest=logo.digest if logo else None,
             )
         )
+
+    async def get_contact_block(self, organisation_id: int) -> ContactBlock | None:
+        """Return the organisation's default contact block, if it has one."""
+        row = await self._session.get(OrganisationContactsRow, organisation_id)
+        return _contacts_block(row.body) if row else None
+
+    async def save_contact_block(self, organisation_id: int, block: ContactBlock | None) -> None:
+        """Replace or, with ``None``, remove the organisation's default contact block."""
+        await self._session.execute(
+            delete(OrganisationContactsRow).where(
+                OrganisationContactsRow.organisation_id == organisation_id
+            )
+        )
+        if block is not None:
+            self._session.add(
+                OrganisationContactsRow(organisation_id=organisation_id, body=_contacts_json(block))
+            )
 
     async def add_group(self, group: Group) -> Group:
         """Insert a group and return it with its ID."""
