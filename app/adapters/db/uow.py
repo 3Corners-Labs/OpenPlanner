@@ -307,7 +307,7 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries):
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
     from ``UpdateQueries`` (ADR 0029), those of the retention overview from
-    ``RetentionQueries`` (ADR 0037).
+    ``RetentionQueries`` (ADR 0039).
 
     Args:
         session: The open session.

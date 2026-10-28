@@ -193,7 +193,7 @@ class AdminService:
             return await tx.list_audit_events(scope, limit, narrow)
 
     async def retention(self, principal: Principal) -> RetentionOverview:
-        """Return whether personal data is removed on time, per group in scope (ADR 0037)."""
+        """Return whether personal data is removed on time, per group in scope (ADR 0039)."""
         now = self._clock.now()
         scope = scope_for(principal, Permission.RETENTION_VIEW)
         async with self._uow.read() as tx:

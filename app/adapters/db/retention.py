@@ -1,4 +1,4 @@
-"""SQL queries of the retention overview (ADR 0037, ``retention.view``).
+"""SQL queries of the retention overview (ADR 0039, ``retention.view``).
 
 A mixin of ``SqlTransaction``, so these queries run in the caller's transaction like every
 other one. They select counts, statuses and times only, never a personal data column or a

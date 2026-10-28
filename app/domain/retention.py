@@ -1,4 +1,4 @@
-"""Retention overview: whether personal data is removed on time (ADR 0037, ``retention.view``).
+"""Retention overview: whether personal data is removed on time (ADR 0039, ``retention.view``).
 
 Per group in scope it counts the bookings that still hold personal data, how many of them
 are past their purge moment, and how many ``purge_pii`` jobs failed, plus when the last purge

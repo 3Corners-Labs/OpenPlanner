@@ -591,7 +591,7 @@ fieldset.card {
   color: var(--adm-success);
 }
 
-/* ADR 0037: locked and personal-data markers under a permission in the rights matrix. */
+/* ADR 0039: locked and personal-data markers under a permission in the rights matrix. */
 .matrix-bounds {
   display: flex;
   flex-wrap: wrap;

@@ -12,7 +12,7 @@ reach production, which uses PingFederate.
 | `super` | superuser | everything | full access |
 | `orgadmin` | org_admin | organisation `demo` | own organisation and its groups |
 | `groupadmin` | group_admin | group `demo` | own group only |
-| `auditor` | auditor | organisation `demo` | compliance and privacy: reads the log, no personal data (ADR 0037) |
+| `auditor` | auditor | organisation `demo` | compliance and privacy: reads the log, no personal data (ADR 0039) |
 | `outsider` | org_admin | organisation `andere` | checks that `demo` is out of reach |
 | `norole` | none | – | logged in without rights: sees "no access" |
 

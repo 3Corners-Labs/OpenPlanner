@@ -1,4 +1,4 @@
-"""The retention overview page: whether personal data is removed on time (ADR 0037).
+"""The retention overview page: whether personal data is removed on time (ADR 0039).
 
 Per group in scope: how many bookings still hold personal data, how many of them are past
 their purge moment, how many purges failed, and when the last purge ran. Counts and times

@@ -70,7 +70,7 @@ test('organisation admin sees the logins of their own admins, by name', async ({
 });
 
 test('auditor reads the matrix, the own log and retention, but no bookings and no changes', async ({ page }) => {
-  // ADR 0037: compliance and privacy, read-only, never personal data.
+  // ADR 0039: compliance and privacy, read-only, never personal data.
   await loginAs(page, 'auditor');
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Overzicht');

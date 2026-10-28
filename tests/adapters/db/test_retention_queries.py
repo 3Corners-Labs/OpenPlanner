@@ -1,4 +1,4 @@
-"""The retention overview's queries in SQLite (ADR 0037)."""
+"""The retention overview's queries in SQLite (ADR 0039)."""
 
 from datetime import timedelta
 
