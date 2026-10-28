@@ -1,0 +1,37 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ person.name }} – {{ _("admin.staff.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<p><a href="/admin/staff">{{ _("admin.staff.back") }}</a></p>
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ person.name }}</h1>
+    {% if person.dormant %}<p><span class="chip chip--warning">{{ _("admin.staff.dormant") }}</span></p>{% endif %}
+  </div>
+</div>
+<section class="card" aria-labelledby="access-heading">
+  <h2 id="access-heading">{{ _("admin.staff.access") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("admin.staff.roles") }}</dt><dd>{{ person.roles | join(", ") if person.roles else _("admin.staff.no_role") }}</dd></div>
+    {% for place in person.places %}
+    <div><dt>{{ place.organisation }}</dt><dd>{{ place.groups | join(", ") if place.groups else _("admin.staff.whole_organisation") }}</dd></div>
+    {% endfor %}
+  </dl>
+  <p class="muted">{{ _("admin.staff.source") }}</p>
+</section>
+<section class="card" aria-labelledby="times-heading">
+  <h2 id="times-heading">{{ _("admin.staff.times") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("admin.staff.first_seen") }}</dt><dd>{{ person.first_seen }}</dd></div>
+    <div><dt>{{ _("admin.staff.last_login") }}</dt><dd>{{ person.last_login }}</dd></div>
+    <div><dt>{{ _("admin.staff.last_seen") }}</dt><dd>{{ person.last_seen }}</dd></div>
+    <div><dt>{{ _("admin.staff.last_logout") }}</dt><dd>{{ person.last_logout }}</dd></div>
+  </dl>
+</section>
+<h2 id="activity-heading">{{ _("admin.staff.activity") }}</h2>
+<p class="muted">{{ _("admin.staff.activity_intro", count=activity_limit) }}</p>
+{% if events %}
+{% set caption = _("admin.staff.activity") %}{% include "admin/_audit_table.html" %}
+{% else %}
+<p class="empty-state">{{ _("admin.staff.activity_empty") }}</p>
+{% endif %}
+{% endblock %}
