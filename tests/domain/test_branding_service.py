@@ -5,10 +5,11 @@ import pytest
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Principal, Role
-from app.domain.branding import Branding, Logo
+from app.domain.branding import Branding, FontFile, FontRole, HeaderStyle, Logo
 from app.domain.branding_service import BrandingService
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import Organisation
+from app.domain.theme import Theme, ThemeFileError
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW, make_group
@@ -109,3 +110,83 @@ async def test_public_lookup_by_slug(service: BrandingService) -> None:
     with pytest.raises(DomainError) as error:
         await service.public("nope")
     assert error.value.code is ErrorCode.ORGANISATION_NOT_FOUND
+
+
+WOFF2 = b"wOF2" + b"\x00" * 64
+
+
+async def test_theme_and_header_are_saved_and_audited_by_name(
+    service: BrandingService, uow: InMemoryUnitOfWork
+) -> None:
+    theme = Theme.of({"radius": "0px", "color-text": "#0B0C0C"})
+    branding = Branding(theme=theme, header_style=HeaderStyle.ACCENT)
+
+    changed = await service.update(SUPER, "demo", branding)
+
+    assert changed == ["header_style", "theme"]
+    assert uow.state.organisations[1].branding.theme == theme
+    assert uow.state.audit[-1].detail == "header_style,theme"
+
+
+async def test_colours_without_contrast_are_refused_before_anything_is_stored(
+    service: BrandingService, uow: InMemoryUnitOfWork
+) -> None:
+    with pytest.raises(DomainError) as error:
+        await service.update(SUPER, "demo", Branding(theme=Theme.of({"color-text": "#AAAAAA"})))
+    assert error.value.field == "color_text"
+    assert uow.state.organisations[1].branding == Branding()
+
+
+async def test_a_theme_file_replaces_accent_and_tokens(
+    service: BrandingService, uow: InMemoryUnitOfWork
+) -> None:
+    await service.update(
+        SUPER, "demo", Branding("Naam", "#154273", theme=Theme.of({"radius": "0px"}))
+    )
+
+    changed = await service.apply_theme_file(SUPER, "demo", b"--booking-line-height: 1.8;")
+
+    branding = uow.state.organisations[1].branding
+    assert changed == ["accent_color", "theme"]
+    assert branding.accent_color == "#01689B"  # left out: back to the default
+    assert branding.theme == Theme.of({"line-height": "1.8"})
+    assert branding.display_name == "Naam"
+    assert uow.state.audit[-1].detail == "theme_file"
+
+
+async def test_a_theme_file_is_checked_for_contrast_and_syntax(service: BrandingService) -> None:
+    with pytest.raises(DomainError) as error:
+        await service.apply_theme_file(SUPER, "demo", b"--booking-color-page: #000000;")
+    assert error.value.field == "color_page"
+    with pytest.raises(ThemeFileError):
+        await service.apply_theme_file(SUPER, "demo", b"body { display: none }")
+
+
+async def test_org_admin_may_not_upload_a_theme_file(service: BrandingService) -> None:
+    with pytest.raises(DomainError) as error:
+        await service.apply_theme_file(ORG_ADMIN, "demo", b"--booking-radius: 0px;")
+    assert error.value.code is ErrorCode.NOT_PERMITTED
+
+
+async def test_fonts_are_stored_per_role_and_removed(
+    service: BrandingService, uow: InMemoryUnitOfWork
+) -> None:
+    font = FontFile.from_upload(FontRole.HEADING, WOFF2)
+    await service.set_font(SUPER, "demo", font)
+
+    assert uow.state.organisations[1].branding.font(FontRole.HEADING) == font.ref
+    assert await service.font("demo", FontRole.HEADING) == font
+    assert await service.font("demo", FontRole.TEXT) is None
+    assert uow.state.audit[-1].detail == "font.heading"
+    await service.update(SUPER, "demo", Branding("Nieuw"))
+    assert uow.state.organisations[1].branding.fonts == (font.ref,)  # kept by update
+
+    await service.remove_font(SUPER, "demo", FontRole.HEADING)
+    assert uow.state.organisations[1].branding.fonts == ()
+    assert uow.state.audit[-1].detail == "font.heading.remove"
+
+
+async def test_org_admin_may_not_upload_a_font(service: BrandingService) -> None:
+    with pytest.raises(DomainError) as error:
+        await service.set_font(ORG_ADMIN, "demo", FontFile.from_upload(FontRole.TEXT, WOFF2))
+    assert error.value.code is ErrorCode.NOT_PERMITTED

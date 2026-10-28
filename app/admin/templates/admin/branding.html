@@ -18,14 +18,21 @@
     <p class="card__lead">{{ _("admin.branding.preview_lead") }}</p>
   </div>
   <div class="brand-preview">
-    <div class="brand-preview__header">
+    <div class="brand-preview__header brand-preview__header--{{ brand.header_style }}">
+      {% if brand.header_style == "logo" %}<img class="brand-preview__logo" src="{{ brand.logo_href }}" alt="{{ _("admin.branding.logo_alt", name=organisation.name) }}">
+      {%- else -%}
       {% if brand.logo_href %}<img class="brand-preview__logo" src="{{ brand.logo_href }}" alt="{{ _("admin.branding.logo_alt", name=organisation.name) }}">{% endif %}
       <span>{{ brand.name }}</span>
+      {%- endif %}
     </div>
-    <div class="brand-preview__body">
-      <span class="brand-preview__button">{{ _("picker.first_choose") }}</span>
-      <span class="brand-preview__day">26</span>
-      <span class="brand-preview__link">{{ _("book.change_slot") }}</span>
+    <div class="brand-preview__page">
+      <p class="brand-preview__heading">{{ _("admin.branding.preview_heading") }}</p>
+      <p class="brand-preview__muted">{{ _("admin.branding.preview_text") }}</p>
+      <div class="brand-preview__body">
+        <span class="brand-preview__button">{{ _("picker.first_choose") }}</span>
+        <span class="brand-preview__day">26</span>
+        <span class="brand-preview__link">{{ _("book.change_slot") }}</span>
+      </div>
     </div>
   </div>
 </section>
@@ -33,7 +40,16 @@
   <div class="card__header">
     <h2>{{ _("admin.branding.name_colour") }}</h2>
   </div>
-  {{ form_body(fields, _("admin.save")) }}
+  <div class="form-grid">
+    {% for f in name_fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <h3>{{ _("admin.branding.colours") }}</h3>
+  <p class="hint">{{ _("admin.branding.colours_lead") }}</p>
+  <div class="form-grid">
+    {% for f in colour_fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <h3>{{ _("admin.branding.shape") }}</h3>
+  {{ form_body(shape_fields, _("admin.save")) }}
 </form>
 <section class="card" aria-labelledby="logo-heading">
   <div class="card__header">
@@ -55,5 +71,55 @@
     <button type="submit" class="button button--secondary">{{ _("admin.branding.logo_remove") }}</button>
   </form>
   {% endif %}
+</section>
+<section class="card" aria-labelledby="fonts-heading">
+  <div class="card__header">
+    <h2 id="fonts-heading" tabindex="-1">{{ _("admin.branding.fonts") }}</h2>
+    <p class="card__lead">{{ _("admin.branding.fonts_lead", kb=max_font_kb) }}</p>
+  </div>
+  {% for slot in fonts %}
+  {%- set id = "font-" ~ slot.role %}
+  {%- set error = slot.error %}
+  <div class="font-slot">
+    <form method="post" action="/admin/organisations/{{ organisation.slug }}/branding/font/{{ slot.role }}" enctype="multipart/form-data" novalidate>
+      <div class="field{% if error %} field--error{% endif %}">
+        <label for="{{ id }}">{{ slot.label }}{% if slot.stored %} <span class="chip">{{ _("admin.branding.font_stored") }}</span>{% endif %}</label>
+        <input id="{{ id }}" name="font" type="file" accept="{{ font_types }}" required aria-describedby="{{ id }}-hint{% if error %} {{ id }}-error{% endif %}"{% if error %} aria-invalid="true"{% endif %}>
+        <p class="hint" id="{{ id }}-hint">{{ _("admin.branding.font_hint", kb=max_font_kb) }}</p>
+        {%- if error %}
+        <p class="error-message" id="{{ id }}-error">{{ error }}</p>
+        {%- endif %}
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="button">{{ _("admin.branding.font_upload", label=slot.label) }}</button>
+      </div>
+    </form>
+    {% if slot.stored %}
+    <form method="post" action="/admin/organisations/{{ organisation.slug }}/branding/font/{{ slot.role }}/remove">
+      <button type="submit" class="button button--secondary">{{ _("admin.branding.font_remove", label=slot.label) }}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+<section class="card" aria-labelledby="theme-heading">
+  <div class="card__header">
+    <h2 id="theme-heading">{{ _("admin.branding.theme_file") }}</h2>
+    <p class="card__lead">{{ _("admin.branding.theme_file_lead") }}</p>
+  </div>
+  <p><a href="/admin/organisations/{{ organisation.slug }}/branding/theme.css" download>{{ _("admin.branding.theme_download") }}</a></p>
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/branding/theme" enctype="multipart/form-data" novalidate>
+    <div class="field{% if theme_error %} field--error{% endif %}">
+      <label for="theme_file">{{ _("admin.branding.theme_file_input") }}</label>
+      <input id="theme_file" name="theme_file" type="file" accept="{{ theme_types }}" required aria-describedby="theme_file-hint{% if theme_error %} theme_file-error{% endif %}"{% if theme_error %} aria-invalid="true"{% endif %}>
+      <p class="hint" id="theme_file-hint">{{ _("admin.branding.theme_file_hint", kb=max_theme_kb) }}</p>
+      {%- if theme_error %}
+      <p class="error-message" id="theme_file-error">{{ theme_error }}</p>
+      {%- endif %}
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.branding.theme_upload") }}</button>
+    </div>
+  </form>
 </section>
 {% endblock %}

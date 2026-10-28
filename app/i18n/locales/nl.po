@@ -1475,7 +1475,7 @@ msgid "admin.form.error.display_name"
 msgstr "Vul een naam in van hoogstens 200 tekens, zonder regeleinden."
 
 msgid "admin.form.error.accent_color"
-msgstr "Kies een donkerdere kleur: witte tekst op deze kleur moet een contrast van minstens 4,5:1 hebben."
+msgstr "Kies een andere accentkleur: tekst op deze kleur en deze kleur als tekst op de achtergrond moeten een contrast van minstens 4,5:1 hebben."
 
 msgid "admin.form.error.logo"
 msgstr "Kies een PNG-, JPEG- of WebP-afbeelding van hoogstens 200 kB. SVG kan niet."
@@ -1487,7 +1487,7 @@ msgid "admin.branding.title"
 msgstr "Huisstijl"
 
 msgid "admin.branding.lead"
-msgstr "Logo, naam en accentkleur op de afspraakpagina's van een organisatie."
+msgstr "Logo, naam, kleuren, lettertypen en kop van de afspraakpagina's van een organisatie."
 
 msgid "admin.branding.organisations"
 msgstr "Organisaties"
@@ -1508,7 +1508,7 @@ msgid "admin.branding.logo_alt"
 msgstr "Logo van {name}"
 
 msgid "admin.branding.name_colour"
-msgstr "Naam en kleur"
+msgstr "Naam, kop en kleuren"
 
 msgid "admin.branding.display_name"
 msgstr "Naam in de kop"
@@ -1520,13 +1520,13 @@ msgid "admin.branding.accent_color"
 msgstr "Accentkleur"
 
 msgid "admin.branding.accent_color_hint"
-msgstr "Voor knoppen, links en de gekozen dag. Witte tekst op deze kleur moet een contrast van minstens 4,5:1 hebben (WCAG)."
+msgstr "Voor knoppen, links en de gekozen dag. Tekst op deze kleur en deze kleur als tekst moeten een contrast van minstens 4,5:1 hebben (WCAG)."
 
 msgid "admin.branding.logo"
 msgstr "Logo"
 
 msgid "admin.branding.logo_lead"
-msgstr "Staat links in de kop, naast de naam. PNG, JPEG of WebP, hoogstens {kb} kB."
+msgstr "Staat links in de kop, naast de naam (of alleen, bij de kop met alleen het logo). PNG, JPEG of WebP, hoogstens {kb} kB."
 
 msgid "admin.branding.logo_file"
 msgstr "Afbeelding"
@@ -1539,6 +1539,217 @@ msgstr "Logo uploaden"
 
 msgid "admin.branding.logo_remove"
 msgstr "Logo verwijderen"
+
+# Extended branding (ADR 0041)
+msgid "admin.done.font_saved"
+msgstr "Het lettertype is opgeslagen."
+
+msgid "admin.done.font_removed"
+msgstr "Het lettertype is verwijderd."
+
+msgid "admin.done.theme_saved"
+msgstr "Het themabestand is toegepast."
+
+msgid "admin.form.error.contrast"
+msgstr "Deze kleur heeft te weinig contrast met de kleuren eromheen. Tekst moet minstens 4,5:1 halen, randen en de focusrand 3:1."
+
+msgid "admin.form.error.token_range"
+msgstr "Vul een getal in binnen de grenzen bij dit veld."
+
+msgid "admin.form.error.theme_file"
+msgstr "Kies een themabestand: CSS-tekst in UTF-8, hoogstens {kb} kB."
+
+msgid "admin.form.error.theme_file_line"
+msgstr "Regel {line} van het themabestand kan niet worden gebruikt. Alleen --booking-variabelen uit de lijst zijn toegestaan, met een geldige waarde; selectors, @-regels, url() en !important kunnen niet."
+
+msgid "admin.form.error.theme_contrast"
+msgstr "Het themabestand geeft te weinig contrast bij {token}. Tekst moet minstens 4,5:1 halen, randen 3:1."
+
+msgid "admin.form.error.font"
+msgstr "Kies een WOFF2-lettertype van hoogstens {kb} kB."
+
+msgid "admin.branding.header_style"
+msgstr "Kop"
+
+msgid "admin.branding.header_style_hint"
+msgstr "Hoe de kop van de afspraakpagina's logo en naam toont."
+
+msgid "admin.branding.header.standard"
+msgstr "Logo en naam, met een lijn in de accentkleur"
+
+msgid "admin.branding.header.accent"
+msgstr "Logo en naam op een balk in de accentkleur"
+
+msgid "admin.branding.header.logo"
+msgstr "Alleen het logo (de naam staat in de alternatieve tekst)"
+
+msgid "admin.branding.colours"
+msgstr "Kleuren"
+
+msgid "admin.branding.colours_lead"
+msgstr "Bij opslaan controleert het portaal het contrast tussen alle kleuren (WCAG 2.2 AA). Wie in het besturingssysteem om meer contrast vraagt, krijgt de standaardkleuren met extra contrast."
+
+msgid "admin.branding.shape"
+msgstr "Vorm en tekst"
+
+msgid "admin.branding.colours_shape"
+msgstr "Kleuren en vorm"
+
+msgid "admin.branding.token.color_text"
+msgstr "Tekst"
+
+msgid "admin.branding.token.color_text_hint"
+msgstr "Gewone tekst en de tekst bij de gele focusmarkering."
+
+msgid "admin.branding.token.color_text_muted"
+msgstr "Tekst, minder nadruk"
+
+msgid "admin.branding.token.color_text_muted_hint"
+msgstr "Toelichtingen en bijzaken."
+
+msgid "admin.branding.token.color_page"
+msgstr "Achtergrond van de pagina"
+
+msgid "admin.branding.token.color_page_hint"
+msgstr "Rond de kaarten."
+
+msgid "admin.branding.token.color_surface"
+msgstr "Achtergrond van kaarten"
+
+msgid "admin.branding.token.color_surface_hint"
+msgstr "De vlakken met de kalender en het formulier."
+
+msgid "admin.branding.token.color_background"
+msgstr "Achtergrond van kop en invoervelden"
+
+msgid "admin.branding.token.color_background_hint"
+msgstr "Ook achter de kalenderdagen."
+
+msgid "admin.branding.token.color_border"
+msgstr "Randen (decoratief)"
+
+msgid "admin.branding.token.color_border_hint"
+msgstr "Lijnen rond kaarten en tussen onderdelen."
+
+msgid "admin.branding.token.color_border_strong"
+msgstr "Randen van invoervelden"
+
+msgid "admin.branding.token.color_border_strong_hint"
+msgstr "Moet minstens 3:1 halen, zodat velden te zien zijn."
+
+msgid "admin.branding.token.color_on_accent"
+msgstr "Tekst op de accentkleur"
+
+msgid "admin.branding.token.color_on_accent_hint"
+msgstr "Op knoppen, de gekozen dag en de balk in de kop. Meestal wit."
+
+msgid "admin.branding.token.font_size"
+msgstr "Tekstgrootte (pixels)"
+
+msgid "admin.branding.token.font_size_hint"
+msgstr "Van {low} tot {high}. Kleiner dan de standaard van de browser kan niet."
+
+msgid "admin.branding.token.line_height"
+msgstr "Regelafstand"
+
+msgid "admin.branding.token.line_height_hint"
+msgstr "Van {low} tot {high} keer de tekstgrootte."
+
+msgid "admin.branding.token.font_weight_heading"
+msgstr "Dikte van koppen"
+
+msgid "admin.branding.token.font_weight_heading_hint"
+msgstr "400 is normaal, 700 is vet."
+
+msgid "admin.branding.token.radius"
+msgstr "Afronding van kaarten (pixels)"
+
+msgid "admin.branding.token.radius_hint"
+msgstr "Van {low} tot {high}; 0 geeft rechte hoeken."
+
+msgid "admin.branding.token.radius_small"
+msgstr "Afronding van knoppen en velden (pixels)"
+
+msgid "admin.branding.token.radius_small_hint"
+msgstr "Van {low} tot {high}; 0 geeft rechte hoeken."
+
+msgid "admin.branding.token.max_width"
+msgstr "Maximale breedte van de inhoud (pixels)"
+
+msgid "admin.branding.token.max_width_hint"
+msgstr "Van {low} tot {high}."
+
+msgid "admin.branding.token.shadow"
+msgstr "Schaduw onder kaarten"
+
+msgid "admin.branding.token.shadow_hint"
+msgstr "Een vlakke stijl zonder schaduw past bij sommige websites beter."
+
+msgid "admin.branding.shadow.default"
+msgstr "Met schaduw"
+
+msgid "admin.branding.shadow.none"
+msgstr "Zonder schaduw"
+
+msgid "admin.branding.fonts"
+msgstr "Lettertypen"
+
+msgid "admin.branding.fonts_lead"
+msgstr "Eigen lettertypen als WOFF2-bestand, hoogstens {kb} kB per bestand. Ze worden vanaf deze dienst geladen, nooit van een andere website. Zorg dat de licentie van het lettertype dat toestaat."
+
+msgid "admin.branding.font.text"
+msgstr "Tekst (normaal)"
+
+msgid "admin.branding.font.text_bold"
+msgstr "Tekst (vet)"
+
+msgid "admin.branding.font.heading"
+msgstr "Koppen"
+
+msgid "admin.branding.font_stored"
+msgstr "Opgeslagen"
+
+msgid "admin.branding.font_hint"
+msgstr "WOFF2, hoogstens {kb} kB. Zonder vet lettertype maakt de browser de normale letter zelf vetter."
+
+msgid "admin.branding.font_upload"
+msgstr "{label} uploaden"
+
+msgid "admin.branding.font_remove"
+msgstr "{label} verwijderen"
+
+msgid "admin.audit.detail.font_remove.text"
+msgstr "Lettertype tekst (normaal) verwijderd"
+
+msgid "admin.audit.detail.font_remove.text_bold"
+msgstr "Lettertype tekst (vet) verwijderd"
+
+msgid "admin.audit.detail.font_remove.heading"
+msgstr "Lettertype koppen verwijderd"
+
+msgid "admin.branding.theme_file"
+msgstr "Themabestand"
+
+msgid "admin.branding.theme_file_lead"
+msgstr "Voor wie de huisstijl liever in een bestand bijhoudt: download het huidige thema, pas de waarden aan en upload het weer. Alleen --booking-variabelen uit de lijst zijn toegestaan; vrije CSS kan niet, zodat de pagina toegankelijk en veilig blijft."
+
+msgid "admin.branding.theme_download"
+msgstr "Huidig thema downloaden (CSS)"
+
+msgid "admin.branding.theme_file_input"
+msgstr "Themabestand"
+
+msgid "admin.branding.theme_file_hint"
+msgstr "CSS-bestand van hoogstens {kb} kB. Het vervangt het hele thema: variabelen die er niet in staan, krijgen weer hun standaardwaarde. Lettertypen en logo blijven."
+
+msgid "admin.branding.theme_upload"
+msgstr "Themabestand toepassen"
+
+msgid "admin.branding.preview_heading"
+msgstr "Kies een moment"
+
+msgid "admin.branding.preview_text"
+msgstr "Zo ziet een kaart met tekst eruit."
 
 # Emergency closure (ADR 0024)
 msgid "closure.banner.title_active"
