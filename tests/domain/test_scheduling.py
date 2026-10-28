@@ -8,6 +8,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
     TimeWindow,
+    slug_from,
     validate_schedule,
     windows_on,
 )
@@ -366,3 +367,31 @@ def test_the_label_takes_no_part_in_equality_or_ordering() -> None:
     assert TimeWindow(time(9), time(10), 1, "Ochtend") == TimeWindow(time(9), time(10), 1)
     later, earlier = TimeWindow(time(10), time(11), 1, "B"), TimeWindow(time(9), time(10), 1, "A")
     assert sorted([later, earlier])[0].label == "A"
+
+
+@pytest.mark.parametrize(
+    ("text", "slug"),
+    [
+        ("FINBLDVIDEOGROEP1", "finbldvideogroep1"),
+        ("Vergunningen loket", "vergunningen-loket"),
+        ("  Café & Crème -- Zuid!  ", "cafe-creme-zuid"),
+        ("Ĳsselmonde/Oost_2", "ijsselmonde-oost-2"),
+        ("already-a-slug", "already-a-slug"),
+        ("!!!", ""),
+        ("", ""),
+    ],
+)
+def test_slug_from_follows_the_slug_rules(text: str, slug: str) -> None:
+    assert slug_from(text) == slug
+
+
+def test_slug_from_cuts_at_a_word_boundary_within_the_limit() -> None:
+    slug = slug_from("woord " * 20)
+
+    assert len(slug) <= 64
+    assert slug.endswith("woord")
+    assert not slug.endswith("-")
+
+
+def test_slug_from_cuts_a_single_long_word_hard() -> None:
+    assert slug_from("a" * 100) == "a" * 64
