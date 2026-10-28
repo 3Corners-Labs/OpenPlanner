@@ -32,6 +32,7 @@ from app.adapters.db.models import (
     ChannelSettingsRow,
     ClosureNoticeRow,
     ClosureRow,
+    GroupContactsRow,
     GroupHolidayCalendarRow,
     GroupHolidayOpenDayRow,
     GroupRow,
@@ -120,7 +121,7 @@ def _check_name(group_id: int) -> str:
 
 
 def _contacts_json(block: ContactBlock) -> str:
-    """Return a contact block as the JSON stored in ``organisation_contacts``."""
+    """Return a contact block as the JSON stored for organisations, groups and closures."""
     options = [
         {"kind": o.kind.value, "value": o.value, "labels": dict(o.labels), "hours": dict(o.hours)}
         for o in block.options
@@ -303,7 +304,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
 
 
 def _closure(row: ClosureRow, notices: Sequence[ClosureNoticeRow]) -> Closure:
-    """Map a closure row with its notices."""
+    """Map a closure row with its notices, headings and copy of the contact block."""
     return Closure(
         id=row.id,
         group_id=row.group_id,
@@ -311,7 +312,14 @@ def _closure(row: ClosureRow, notices: Sequence[ClosureNoticeRow]) -> Closure:
         ends_at=row.ends_at,
         notices={n.locale: n.text for n in notices},
         created_at=row.created_at,
+        headings={n.locale: n.heading for n in notices if n.heading},
+        contacts=_contacts_block(row.contacts) if row.contacts else None,
     )
+
+
+def _contacts_column(block: ContactBlock | None) -> str | None:
+    """Return the ``contacts`` column of a closure: the block as JSON, or NULL."""
+    return _contacts_json(block) if block else None
 
 
 def _call_status(row: CallStatusRow) -> CallStatus:
@@ -660,6 +668,19 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries):
             self._session.add(
                 OrganisationContactsRow(organisation_id=organisation_id, body=_contacts_json(block))
             )
+
+    async def get_group_contact_block(self, group_id: int) -> ContactBlock | None:
+        """Return the group's own contact block, if it has one."""
+        row = await self._session.get(GroupContactsRow, group_id)
+        return _contacts_block(row.body) if row else None
+
+    async def save_group_contact_block(self, group_id: int, block: ContactBlock | None) -> None:
+        """Replace or, with ``None``, remove the group's own contact block."""
+        await self._session.execute(
+            delete(GroupContactsRow).where(GroupContactsRow.group_id == group_id)
+        )
+        if block is not None:
+            self._session.add(GroupContactsRow(group_id=group_id, body=_contacts_json(block)))
 
     async def add_group(self, group: Group) -> Group:
         """Insert a group and return it with its ID."""
@@ -1333,6 +1354,7 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries):
             starts_at=closure.starts_at,
             ends_at=closure.ends_at,
             created_at=closure.created_at,
+            contacts=_contacts_column(closure.contacts),
         )
         self._session.add(row)
         await self._session.flush()
@@ -1340,11 +1362,15 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries):
         return await self._with_notices(row)
 
     async def save_closure(self, closure: Closure) -> None:
-        """Store the window and the notices of an existing closure."""
+        """Store the window, the notices, headings and contacts of an existing closure."""
         await self._session.execute(
             update(ClosureRow)
             .where(ClosureRow.id == closure.id)
-            .values(starts_at=closure.starts_at, ends_at=closure.ends_at)
+            .values(
+                starts_at=closure.starts_at,
+                ends_at=closure.ends_at,
+                contacts=_contacts_column(closure.contacts),
+            )
         )
         if closure.id is not None:
             await self._save_notices(closure.id, closure)
@@ -1392,12 +1418,17 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries):
         return _closure(row, list(notices))
 
     async def _save_notices(self, closure_id: int, closure: Closure) -> None:
-        """Replace the notices of ``closure_id`` with those of ``closure``."""
+        """Replace the notices and headings of ``closure_id`` with those of ``closure``."""
         await self._session.execute(
             delete(ClosureNoticeRow).where(ClosureNoticeRow.closure_id == closure_id)
         )
         self._session.add_all(
-            ClosureNoticeRow(closure_id=closure_id, locale=locale, text=text)
+            ClosureNoticeRow(
+                closure_id=closure_id,
+                locale=locale,
+                text=text,
+                heading=closure.headings.get(locale),
+            )
             for locale, text in closure.notices.items()
         )
         await self._session.flush()

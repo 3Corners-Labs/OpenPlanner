@@ -73,3 +73,22 @@ async def test_options_another_version_wrote_are_left_out(engine: AsyncEngine) -
     async with uow.read() as tx:
         block = await tx.get_contact_block(demo)
     assert block == ContactBlock((ContactOption(ContactKind.PHONE, "14 020"),), {"nl": "Kop"})
+
+
+async def test_a_groups_own_block_round_trips_and_is_removed(engine: AsyncEngine) -> None:
+    await seed_demo(engine)
+    uow = SqlUnitOfWork(engine)
+    async with uow.read() as tx:
+        group = await tx.get_group("demo")
+    assert group is not None
+
+    async with uow.locked() as tx:
+        await tx.save_group_contact_block(group.id, BLOCK)
+    async with uow.read() as tx:
+        assert await tx.get_group_contact_block(group.id) == BLOCK
+        assert await tx.get_contact_block(group.organisation_id) is None  # apart from the default
+
+    async with uow.locked() as tx:
+        await tx.save_group_contact_block(group.id, None)
+    async with uow.read() as tx:
+        assert await tx.get_group_contact_block(group.id) is None
