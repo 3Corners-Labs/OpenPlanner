@@ -1764,6 +1764,12 @@ msgstr "Gesloten van {start} tot {end}."
 msgid "closure.banner.period_open"
 msgstr "Gesloten vanaf {start}, tot nader bericht."
 
+msgid "closure.banner.more"
+msgstr "Meer over de sluiting en andere manieren om ons te bereiken"
+
+msgid "closure.page.calendar"
+msgstr "Naar de kalender: tot de sluiting kunt u nog een afspraak maken"
+
 msgid "manage.status.suspended"
 msgstr "Opgeschort"
 

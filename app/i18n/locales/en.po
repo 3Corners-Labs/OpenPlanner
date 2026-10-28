@@ -1764,6 +1764,12 @@ msgstr "Closed from {start} until {end}."
 msgid "closure.banner.period_open"
 msgstr "Closed from {start} until further notice."
 
+msgid "closure.banner.more"
+msgstr "More about the closure and other ways to reach us"
+
+msgid "closure.page.calendar"
+msgstr "To the calendar: you can still book an appointment until the closure"
+
 msgid "manage.status.suspended"
 msgstr "On hold"
 
