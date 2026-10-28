@@ -697,6 +697,22 @@ There is no command yet to re-plan a failed or missing purge; until there is, re
 developers with the error code. The nightly sweep from the privacy rules, which would catch such
 stragglers by itself, is not built yet either.
 
+## Widget on a host website (ADR 0035)
+
+A web editor reports that `<gov-booking>` says the calendar "is not available here".
+
+| Check | Where | Fix |
+|---|---|---|
+| The page's origin is on the organisation's list, exactly (`https`, `www.`, port) | Admin → **Insluiten** → the organisation | add it; the change is audited |
+| The group is switched on | Group settings → **Insluiten op websites** | set it to Yes |
+| The script loads | the browser console on the host page; `curl -sI https://<host>/widget/v1/gov-booking.js` must give `200` | a `404` means the image has no bundle: rebuild it (the `widget` stage of the Dockerfile) |
+| A pinned `integrity` matches | the console says the integrity check failed, typically right after an update | copy the new code from **Insluiten** |
+| The host's CSP allows our origin in `script-src` and `connect-src` | the console shows a CSP report | the host adds them (`docs/widget.md`, section 3) |
+
+Refused origins are logged as `widget.origin_refused` with the origin and the group (no
+personal data). Many refusals from one unknown origin mean a copied tag: nothing to do, it
+cannot book.
+
 ## Troubleshooting with the audit log (ADR 0031)
 
 Every admin has an audit log under **Audit log** that lists only their own level: a group admin
