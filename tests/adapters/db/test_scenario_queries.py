@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.admin import AdminService
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Principal, Role, Scope
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.images import ImageFile, ImageText
@@ -16,6 +16,7 @@ from tests.support.closures import NOTICES
 from tests.support.domain import NOW, TEST_TOKEN_KEY
 from tests.support.images import png
 
+EVERYTHING = Scope(everything=True)
 ADMIN = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "14 020"),), {"nl": "Bel ons"})
 TEXT = ImageText({"nl": "Deur", "en": "Door"})
@@ -35,9 +36,9 @@ async def test_scenarios_round_trip_per_owner(engine: AsyncEngine) -> None:
         await tx.save_scenario(ClosureScenario(own.id, org, group.id, "Brand", NOTICES))
 
     async with uow.read() as tx:
-        organisation = await tx.list_scenarios(org, None)
-        groups = await tx.list_scenarios(org, group.id)
-        other = await tx.list_scenarios(org + 1, None)
+        organisation = await tx.list_scenarios(EVERYTHING, org, None)
+        groups = await tx.list_scenarios(EVERYTHING, org, group.id)
+        other = await tx.list_scenarios(EVERYTHING, org + 1, None)
         stored = await tx.get_scenario(shared.id or 0)
         missing = await tx.get_scenario(999)
 
@@ -100,3 +101,41 @@ async def test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with
         await tx.remove_scenario_image(again.id or 0)
         assert await tx.get_scenario_image(again.id or 0) is None
     assert await count_images(engine) == 1
+
+
+async def test_listing_follows_the_scope(engine: AsyncEngine) -> None:
+    await seed_group(engine, slug="aangifte")
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        group = await tx.get_group("aangifte")
+        assert group is not None
+        org = group.organisation_id
+        await tx.add_scenario(ClosureScenario(None, org, None, "Storing", NOTICES))
+        await tx.add_scenario(ClosureScenario(None, org, group.id, "Brand", NOTICES))
+        summary = await tx.get_group_summary("aangifte")
+        assert summary is not None
+        slug = summary.organisation_slug
+
+    in_group = Scope(groups=frozenset({"aangifte"}))
+    other_group = Scope(groups=frozenset({"elders"}))
+    in_organisation = Scope(organisations=frozenset({slug}))
+    async with uow.read() as tx:
+        seen = {
+            name: (
+                [s.name for s in await tx.list_scenarios(scope, org, None)],
+                [s.name for s in await tx.list_scenarios(scope, org, group.id)],
+            )
+            for name, scope in (
+                ("group", in_group),
+                ("other group", other_group),
+                ("organisation", in_organisation),
+                ("nothing", Scope()),
+            )
+        }
+
+    assert seen == {
+        "group": (["Storing"], ["Brand"]),  # a group admin uses the organisation's scenarios
+        "other group": ([], []),
+        "organisation": (["Storing"], ["Brand"]),
+        "nothing": ([], []),
+    }

@@ -617,12 +617,13 @@ class Transaction(Protocol):
         ...
 
     async def list_scenarios(
-        self, organisation_id: int, group_id: int | None
+        self, scope: Scope, organisation_id: int, group_id: int | None
     ) -> list[ClosureScenario]:
         """Return the scenarios of a group, or with ``group_id`` ``None`` of the organisation.
 
-        Sorted by name. The organisation is always given, so a group id never reaches another
-        organisation's scenarios.
+        Sorted by name, inside ``scope``: a group scenario when its group is in scope, an
+        organisation scenario when its organisation or any of its groups is. The organisation
+        is always given, so a group id never reaches another organisation's scenarios.
         """
         ...
 

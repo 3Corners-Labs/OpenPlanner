@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 
 from app.domain.admin import AdminService, Authorization, record_change, require
-from app.domain.authorization import Permission, Principal
+from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.contacts import ContactBlock
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.images import ImageFile, ImageText
@@ -113,9 +113,12 @@ class ScenarioService:
         organisation = await self._authorize(principal, owner)
         async with self._uow.read() as tx:
             resolved = await _resolve(tx, owner, organisation)
-            own = await tx.list_scenarios(resolved.organisation_id, resolved.group_id)
+            scope = scope_for(principal, resolved.permission)
+            own = await tx.list_scenarios(scope, resolved.organisation_id, resolved.group_id)
             shared = (
-                await tx.list_scenarios(resolved.organisation_id, None) if resolved.group else []
+                await tx.list_scenarios(scope, resolved.organisation_id, None)
+                if resolved.group
+                else []
             )
         return ScenarioList(own, shared)
 

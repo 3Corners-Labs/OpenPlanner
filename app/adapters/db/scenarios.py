@@ -3,19 +3,23 @@
 A mixin of ``SqlTransaction``, so these queries run in the caller's transaction like every
 other one. Whose a scenario is (organisation, group) is decided in
 ``app.domain.scenario_service``; listing always names the organisation, so a group id never
-reaches another organisation's scenarios. Texts are stored as JSON per locale and validated
-again by the domain when read.
+reaches another organisation's scenarios, and takes the caller's ``Scope`` (ADR 0014): a group
+scenario is listed when its group is in scope, an organisation scenario when its organisation
+or any of its groups is (a group admin uses the organisation's scenarios). Texts are stored as
+JSON per locale and validated again by the domain when read.
 """
 
 import json
 from typing import Protocol
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import and_, delete, exists, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db import images
 from app.adapters.db.contact_json import contacts_block, contacts_json
-from app.adapters.db.models import ClosureImageRow, ClosureScenarioRow
+from app.adapters.db.models import ClosureImageRow, ClosureScenarioRow, GroupRow, OrganisationRow
+from app.adapters.db.scope import scope_filter
+from app.domain.authorization import Scope
 from app.domain.images import ImageFile, ImageText
 from app.domain.scenarios import ClosureScenario
 
@@ -44,16 +48,29 @@ class ScenarioQueries:
     """The closure scenario part of ``SqlTransaction``."""
 
     async def list_scenarios(
-        self: _Transaction, organisation_id: int, group_id: int | None
+        self: _Transaction, scope: Scope, organisation_id: int, group_id: int | None
     ) -> list[ClosureScenario]:
         """Return the scenarios of a group, or with ``group_id`` ``None`` of the organisation."""
-        owner = (
-            ClosureScenarioRow.group_id.is_(None)
-            if group_id is None
-            else ClosureScenarioRow.group_id == group_id
-        )
+        if group_id is None:
+            in_organisation = (
+                select(GroupRow.id)
+                .where(GroupRow.organisation_id == ClosureScenarioRow.organisation_id)
+                .where(scope_filter(scope, OrganisationRow.slug, GroupRow.slug))
+            )
+            owner = and_(
+                ClosureScenarioRow.group_id.is_(None),
+                or_(scope_filter(scope, OrganisationRow.slug, None), exists(in_organisation)),
+            )
+        else:
+            in_group = (
+                select(GroupRow.id)
+                .where(GroupRow.id == ClosureScenarioRow.group_id)
+                .where(scope_filter(scope, OrganisationRow.slug, GroupRow.slug))
+            )
+            owner = and_(ClosureScenarioRow.group_id == group_id, exists(in_group))
         rows = await self._session.scalars(
             select(ClosureScenarioRow)
+            .join(OrganisationRow, OrganisationRow.id == ClosureScenarioRow.organisation_id)
             .where(ClosureScenarioRow.organisation_id == organisation_id, owner)
             .order_by(ClosureScenarioRow.name, ClosureScenarioRow.id)
         )
