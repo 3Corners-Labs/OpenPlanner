@@ -1,7 +1,8 @@
 /**
  * Branding per organisation (WP3b) through the real identity provider: only the superuser may
  * change it (HANDOVER §6); the form saves with the keyboard, refuses a light colour with a
- * linked error, and passes axe (WCAG 2.2 AA).
+ * linked error, and passes axe (WCAG 2.2 AA). "Accentkleur" is matched exactly: "Tekst op accentkleur"
+ * (ADR 0041) contains it.
  *
  * The three browsers run in parallel against one database: each uses its own colour on the
  * "andere" organisation, so the citizen specs on "demo" are not affected.
@@ -28,15 +29,17 @@ test('the superuser changes the branding with the keyboard', async ({ page }, te
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Andere gemeente');
   await expectNoAxeViolations(page);
 
+  const accent = page.getByLabel('Accentkleur', { exact: true });
+
   // A colour that white text cannot be read on is refused, with the error linked to the field.
-  await page.getByLabel('Accentkleur').fill('#ffbf47');
+  await accent.fill('#ffbf47');
   await tabTo(page, page.getByRole('button', { name: 'Opslaan' }));
   await page.keyboard.press('Enter');
   await expect(page.getByRole('alert')).toBeFocused();
-  await expect(page.getByLabel('Accentkleur')).toHaveAttribute('aria-invalid', 'true');
+  await expect(accent).toHaveAttribute('aria-invalid', 'true');
   await expectNoAxeViolations(page);
 
-  await page.getByLabel('Accentkleur').fill(COLOURS[testInfo.project.name] ?? '#000000');
+  await accent.fill(COLOURS[testInfo.project.name] ?? '#000000');
   await tabTo(page, page.getByRole('button', { name: 'Opslaan' }));
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status')).toContainText(/opgeslagen|niets gewijzigd/);

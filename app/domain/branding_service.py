@@ -2,23 +2,34 @@
 
 Changing branding needs ``branding.manage`` on the organisation (superuser only, HANDOVER §6).
 Every change asks ``AdminService.authorize`` first and is audited in the same transaction,
-with the names of what changed, never the values.
+with the names of what changed, never the values. Colours are checked for contrast across
+tokens before anything is stored (ADR 0041).
 
-    public / for_group / logo        citizens, no authorisation (branding is public)
-    update / set_logo / remove_logo  branding.manage, organisation level
+    public / for_group / logo / font      citizens, no authorisation (branding is public)
+    update / apply_theme_file             branding.manage, organisation level
+    set_logo / remove_logo                branding.manage, organisation level
+    set_font / remove_font                branding.manage, organisation level
 """
 
 from dataclasses import replace
 
 from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal, scope_for
-from app.domain.branding import Branding, Logo
+from app.domain.branding import DEFAULT_ACCENT, Branding, FontFile, FontRole, Logo
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, Organisation
+from app.domain.theme import parse_theme_file
 
-_EDITABLE = ("display_name", "accent_color")
+_EDITABLE = ("display_name", "accent_color", "theme", "header_style")
+
+
+def _check_contrast(branding: Branding) -> None:
+    """Raise ``invalid_configuration`` with the field of the first colour without contrast."""
+    failing = branding.contrast_failure()
+    if failing is not None:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, failing)
 
 
 class BrandingService:
@@ -62,27 +73,60 @@ class BrandingService:
         async with self._uow.read() as tx:
             return await tx.get_logo(slug)
 
+    async def font(self, slug: str, role: FontRole) -> FontFile | None:
+        """Return the font of ``role`` of the organisation with ``slug``, if it has one."""
+        async with self._uow.read() as tx:
+            return await tx.get_font(slug, role)
+
     async def organisations(self, principal: Principal) -> list[Organisation]:
         """Return the organisations whose branding ``principal`` may change."""
         async with self._uow.read() as tx:
             return await tx.list_organisations(scope_for(principal, Permission.BRANDING_MANAGE))
 
     async def update(self, principal: Principal, slug: str, branding: Branding) -> list[str]:
-        """Change display name and accent colour; return the names of the changed fields.
+        """Change name, accent, theme and header style; return the names of changed fields.
 
-        The logo is kept; it changes only through ``set_logo`` and ``remove_logo``.
+        Logo and fonts are kept; they change only through their own operations.
 
         Raises:
-            DomainError: ``not_permitted`` or ``organisation_not_found``.
+            DomainError: ``not_permitted``, ``organisation_not_found`` or
+                ``invalid_configuration`` with the field of a colour without enough contrast.
         """
         await self._authorize(principal, slug)
+        _check_contrast(branding)
+        return await self._store(principal, slug, branding, None)
+
+    async def apply_theme_file(self, principal: Principal, slug: str, data: bytes) -> list[str]:
+        """Replace accent and theme by an uploaded theme file; return the changed fields.
+
+        Tokens the file leaves out return to their defaults, the accent included.
+
+        Raises:
+            ThemeFileError: The file is not a valid theme file (with the offending line).
+            DomainError: ``not_permitted``, ``organisation_not_found`` or
+                ``invalid_configuration`` with the field of a colour without enough contrast.
+        """
+        await self._authorize(principal, slug)
+        parsed = parse_theme_file(data)
+        current = (await self.public(slug)).branding
+        branding = replace(
+            current, accent_color=parsed.accent or DEFAULT_ACCENT, theme=parsed.theme
+        )
+        _check_contrast(branding)
+        return await self._store(principal, slug, branding, "theme_file")
+
+    async def _store(
+        self, principal: Principal, slug: str, branding: Branding, detail: str | None
+    ) -> list[str]:
+        """Save the editable fields of ``branding`` if any changed, keeping logo and fonts."""
         async with self._uow.locked() as tx:
             organisation = await organisation_by_slug(tx, slug)
             current = organisation.branding
             changed = [n for n in sorted(_EDITABLE) if getattr(current, n) != getattr(branding, n)]
             if changed:
-                await tx.save_branding(organisation.id, replace(branding, logo=current.logo))
-                await self._audit(tx, principal, slug, ",".join(changed))
+                kept = replace(branding, logo=current.logo, fonts=current.fonts)
+                await tx.save_branding(organisation.id, kept)
+                await self._audit(tx, principal, slug, detail or ",".join(changed))
         return changed
 
     async def set_logo(self, principal: Principal, slug: str, logo: Logo) -> None:
@@ -100,6 +144,32 @@ class BrandingService:
             DomainError: ``not_permitted`` or ``organisation_not_found``.
         """
         await self._save_logo(principal, slug, None, "logo.remove")
+
+    async def set_font(self, principal: Principal, slug: str, font: FontFile) -> None:
+        """Store a font for its role, replacing the old one.
+
+        Raises:
+            DomainError: ``not_permitted`` or ``organisation_not_found``.
+        """
+        await self._save_font(principal, slug, font.role, font, f"font.{font.role}")
+
+    async def remove_font(self, principal: Principal, slug: str, role: FontRole) -> None:
+        """Remove the font of ``role``; pages then use the font stack of the theme.
+
+        Raises:
+            DomainError: ``not_permitted`` or ``organisation_not_found``.
+        """
+        await self._save_font(principal, slug, role, None, f"font.{role}.remove")
+
+    async def _save_font(
+        self, principal: Principal, slug: str, role: FontRole, font: FontFile | None, detail: str
+    ) -> None:
+        """Authorise, store or remove the font of ``role``, and audit it."""
+        await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            organisation = await organisation_by_slug(tx, slug)
+            await tx.save_font(organisation.id, role, font)
+            await self._audit(tx, principal, slug, detail)
 
     async def _save_logo(
         self, principal: Principal, slug: str, logo: Logo | None, detail: str
