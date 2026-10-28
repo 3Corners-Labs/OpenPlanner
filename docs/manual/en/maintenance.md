@@ -10,6 +10,11 @@ from taking appointments for a while, use an emergency closure instead.
 
 ## What happens while maintenance mode is on
 
+- **Citizens** cannot book, reschedule or cancel an appointment, nor start a direct call. They
+  see a notice that maintenance is in progress, with the expected end if you entered one and
+  the team's alternative contact options (or the organisation's), if there are any. Viewing an appointment and joining a call that is already confirmed still work.
+- **Confirmed appointments** go ahead: reminders, work items and video calls keep working.
+  Personal data is removed on time as always.
 - **Admins** can read everything but change nothing. Every page shows the **Maintenance mode**
   bar at the top. A refused change is recorded in the audit log with the reason **Refused:
   maintenance mode**.
