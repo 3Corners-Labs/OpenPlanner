@@ -9,7 +9,7 @@ from datetime import date, datetime
 
 from app.domain import holidays as holiday_model
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
-from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Source
+from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Source
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingKind, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
@@ -31,6 +31,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
+from app.domain.staff import StaffFilter, StaffMember, visible
 from app.domain.updates import ReleaseCheck, UpdateRequest
 
 
@@ -49,7 +50,7 @@ class State:
     call_status: dict[int, CallStatus] = field(default_factory=dict)
     webhook_events: dict[tuple[str, str], datetime] = field(default_factory=dict)
     audit: list[AuditEvent] = field(default_factory=list)
-    admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
+    staff: dict[str, StaffMember] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
     fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
     contact_blocks: dict[int, ContactBlock] = field(default_factory=dict)
@@ -114,9 +115,9 @@ class InMemoryTransaction:
             for e in self.state.audit
             if scope.contains(e.organisation, e.group) and narrow.matches(e)
         ]
-        profiles = self.state.admin_profiles
+        staff = self.state.staff
         return [
-            AuditEntry(e, profiles[e.actor].display_name if e.actor in profiles else None)
+            AuditEntry(e, staff[e.actor].display_name if e.actor in staff else None)
             for e in reversed(events)
         ][:limit]
 
@@ -126,8 +127,25 @@ class InMemoryTransaction:
         self.state.audit = kept
         return removed
 
-    async def save_admin_profile(self, profile: AdminProfile) -> None:
-        self.state.admin_profiles[profile.subject] = profile
+    async def get_staff(self, subject: str) -> StaffMember | None:
+        return self.state.staff.get(subject)
+
+    async def save_staff(self, member: StaffMember) -> None:
+        old = self.state.staff.get(member.subject)
+        member_id = old.id if old and old.id is not None else self._new_id()
+        self.state.staff[member.subject] = replace(member, id=member_id, recorded=True)
+
+    async def set_staff_seen(self, subject: str, at: datetime) -> None:
+        if subject in self.state.staff:
+            self.state.staff[subject] = replace(self.state.staff[subject], last_seen_at=at)
+
+    async def set_staff_logout(self, subject: str, at: datetime) -> None:
+        if subject in self.state.staff:
+            self.state.staff[subject] = replace(self.state.staff[subject], last_logout_at=at)
+
+    async def list_staff(self, scope: Scope, narrow: StaffFilter) -> list[StaffMember]:
+        found = [m for m in self.state.staff.values() if visible(m, scope) and narrow.matches(m)]
+        return sorted(found, key=lambda m: (m.display_name, m.subject))
 
     async def get_group(self, slug: str) -> Group | None:
         return next((g for g in self.state.groups.values() if g.slug == slug), None)
