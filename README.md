@@ -35,9 +35,11 @@ Then open:
 The `dev` profile adds Mailpit and Keycloak (standing in for PingFederate); without it the shape
 is the production one (web + worker).
 
-On a server with a public domain, `docker compose --profile tls up -d` adds HTTPS with a free
-Let's Encrypt certificate that renews itself (ADR 0030; set `TLS_DOMAIN` and `ACME_EMAIL` in `proxy.env`, see
-`docs/runbook.md`, "HTTPS certificate").
+**Installing on a server** (production, test or lab): clone a release tag to
+`/home/<user>/openplanner` and run `./scripts/install.sh --mode production`. It installs the
+missing host packages, writes `.env` and `proxy.env`, pins the signed release, starts the stack
+with HTTPS from Let's Encrypt (ADR 0030) and installs the host updater (ADR 0029). Run it again
+to repair a host. See `docs/install.md`.
 
 Two containers share one SQLite volume: `web` (FastAPI, runs Alembic migrations on start) and
 `worker` (job loop). Both run as non-root with a read-only filesystem.
@@ -78,6 +80,7 @@ make check
 - `CONTRIBUTING.md` — dev setup, tests, PR checklist.
 - `docs/HANDOVER.md` — stakeholder design (Dutch).
 - `docs/adr/` — decisions.
+- `docs/install.md` — installing and repairing a host with `scripts/install.sh`.
 - `docs/runbook.md` — operating the service.
 - `docs/agent-api.md` — connecting a contact-center bot (WxCC AI Agent) to the machine API.
 - `SECURITY.md` — reporting vulnerabilities.

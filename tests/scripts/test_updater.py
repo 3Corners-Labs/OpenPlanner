@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -83,7 +84,10 @@ class Host:
         raise AssertionError(f"not called: {command} (pinned {pinned})")
 
     def pinned(self) -> str:
-        return self.pin_file.read_text().removeprefix("OPENPLANNER_IMAGE=").strip()
+        lines = self.pin_file.read_text().splitlines()
+        return next(line for line in lines if line.startswith("OPENPLANNER_IMAGE=")).split("=", 1)[
+            1
+        ]
 
 
 def cli(*args: str) -> str:
@@ -245,3 +249,35 @@ def test_the_state_file_is_never_sourced(host: Host) -> None:
     assert not host.marker.exists()
     assert host.pinned() == OLD
     assert host.commands()[-1] == cli("update-report", "8", "succeeded")
+
+
+def test_an_update_keeps_the_installers_settings_in_the_pin_file(host: Host) -> None:
+    host.pin_file.write_text(
+        f"OPENPLANNER_MODE=production\nCOMPOSE_PROFILES=tls\nOPENPLANNER_IMAGE={OLD}\n"
+    )
+
+    updated(host)
+
+    assert host.pin_file.read_text().splitlines() == [
+        "OPENPLANNER_MODE=production",
+        "COMPOSE_PROFILES=tls",
+        f"OPENPLANNER_IMAGE={NEW}",
+    ]
+
+
+def test_the_example_config_keeps_the_signature_identity_strict(tmp_path: Path) -> None:
+    example = SCRIPT.with_name("updater.env.example").read_text()
+    config = tmp_path / "updater.env"
+    config.write_text(example.replace("<owner>", "acme").replace("<repo>", "openplanner"))
+
+    sourced = subprocess.run(  # noqa: S603 - fixed argv, no shell
+        [BASH, "-c", '. "$1" && printf %s "$CERT_IDENTITY_REGEXP"', "bash", str(config)],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=True,
+    ).stdout
+
+    workflow = "acme/openplanner/.github/workflows/main.yml"
+    assert re.fullmatch(sourced, f"https://github.com/{workflow}@refs/tags/v1.4.0")
+    assert not re.fullmatch(sourced, f"https://githubXcom/{workflow}@refs/tags/v1.4.0")

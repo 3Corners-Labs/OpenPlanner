@@ -1,4 +1,4 @@
-"""Fake host tools for the updater script (ADR 0029): docker, cosign, curl, flock and sleep.
+"""Fake host tools for the updater and the installer: docker, cosign, curl, sudo, systemctl...
 
 The test puts one small wrapper per tool on ``PATH``; each runs this file with the tool name as
 its first argument. Every call is appended to ``calls.jsonl`` in ``FAKE_HOST_DIR`` together with
@@ -9,9 +9,17 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``claim``: what ``app.cli update-claim`` prints.
 - ``revision``: what ``alembic current`` prints as the revision.
 - ``fail``: one operation per line that exits 1 (``pull``, ``cosign``, ``backup-db``,
-  ``restore-db``, ``downgrade``).
+  ``restore-db``, ``downgrade``, ``docker-info``).
+- ``compose-version``: what ``docker compose version --short`` prints (default 2.40.3).
+- ``latest``: the tag of the latest GitHub release (default none: the API call fails).
 - ``unhealthy``: one image reference per line; the worker reports ``unhealthy`` while it is
   pinned.
+- ``cosign-version``: the installed cosign (default v3.1.4, the latest the fake GitHub offers).
+- ``installed``: Debian packages ``dpkg -s`` finds; ``upgradable``: ``apt list --upgradable``.
+- ``docker-key``: the fingerprint of Docker's release key (default the real one).
+
+``apt-get``, ``usermod`` and ``systemctl`` only record their call; ``curl -o`` writes a small
+stand-in for the downloaded file, with a matching checksum unless ``fail`` lists ``checksum``.
 """
 
 import hashlib
@@ -22,6 +30,9 @@ import time
 from pathlib import Path
 
 WORKER = "worker-container-id"
+COSIGN = "3.1.4"
+COSIGN_DEB = b"cosign package"
+DOCKER_KEY = "9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
 
 
 def digest(image: str, version: str) -> str:
@@ -76,8 +87,12 @@ def _compose(args: list[str]) -> int:
 
 
 def _docker(args: list[str]) -> int:
-    if args[0] == "compose":
+    if args[:2] == ["compose", "version"]:
+        print(next(iter(_lines("compose-version")), "2.40.3"))
+    elif args[0] == "compose":
         return _compose(args)
+    elif args[0] == "info":
+        return _failing("docker-info")
     if args[0] == "pull":
         return _failing("pull")
     if args[:2] == ["image", "inspect"]:
@@ -88,6 +103,46 @@ def _docker(args: list[str]) -> int:
     return 0
 
 
+def _download(args: list[str]) -> int:
+    """Handle ``curl -o FILE URL``: write a stand-in for the release file."""
+    target, url = Path(args[args.index("-o") + 1]), args[-1]
+    if url.endswith(".deb"):
+        target.write_bytes(COSIGN_DEB)
+    elif url.endswith("cosign_checksums.txt"):
+        version = url.split("/")[-2].removeprefix("v")
+        checksum = "0" * 64 if _failing("checksum") else hashlib.sha256(COSIGN_DEB).hexdigest()
+        target.write_text(f"{checksum}  cosign_{version}_amd64.deb\n")
+    else:
+        target.write_text("release key\n")
+    return 0
+
+
+def _curl(args: list[str]) -> int:
+    if "-o" in args:
+        return _download(args)
+    if any("api.github.com/repos/sigstore" in arg for arg in args):
+        print(json.dumps({"tag_name": f"v{COSIGN}"}))
+    elif any("api.github.com" in arg for arg in args):
+        latest = _lines("latest")
+        if not latest:
+            return 22
+        print(json.dumps({"tag_name": latest[0], "name": latest[0]}))
+    return 0
+
+
+def _packages(tool: str, args: list[str]) -> int:
+    """Answer dpkg, apt and gpg the way an Ubuntu host would."""
+    if tool == "dpkg" and args == ["--print-architecture"]:
+        print("amd64")
+    elif tool == "dpkg":
+        return 0 if args[-1] in _lines("installed") else 1
+    elif tool == "apt":
+        print("\n".join(f"{name}/noble-updates 2.0 amd64" for name in _lines("upgradable")))
+    elif tool == "gpg":
+        print(f"fpr:::::::::{next(iter(_lines('docker-key')), DOCKER_KEY)}:")
+    return 0
+
+
 def main() -> int:
     """Record the call, then act as the tool named in ``sys.argv[1]``."""
     tool, args = sys.argv[1], sys.argv[2:]
@@ -95,8 +150,18 @@ def main() -> int:
         calls.write(json.dumps({"tool": tool, "args": args, "pinned": _pinned()}) + "\n")
     if tool == "docker":
         return _docker(args)
-    if tool == "cosign":
+    if tool == "cosign" and args == ["version"]:
+        print(f"GitVersion:    {next(iter(_lines('cosign-version')), 'v' + COSIGN)}")
+    elif tool == "cosign":
         return _failing("cosign")
+    if tool == "curl":
+        return _curl(args)
+    if tool in ("dpkg", "apt", "gpg"):
+        return _packages(tool, args)
+    if tool == "sha256sum":
+        print(f"{hashlib.sha256(Path(args[0]).read_bytes()).hexdigest()}  {args[0]}")
+    if tool == "id":
+        print("operator docker" if args[:1] == ["-nG"] else "operator")
     if tool == "sleep":
         time.sleep(0.05)
     return 0

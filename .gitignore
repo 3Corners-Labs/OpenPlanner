@@ -9,7 +9,11 @@ coverage.xml
 htmlcov/
 data/
 .env
+.env.bak.*
+.env.update
 proxy.env
+# Host-specific additions on an installed checkout (docs/install.md).
+docker-compose.override.yml
 .audit-requirements.txt
 .DS_Store
 mutants/
