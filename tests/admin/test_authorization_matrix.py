@@ -383,6 +383,17 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/organisations/{org}/closure/lift": {
         "/admin/organisations/demo/closure/lift": statuses(303, 303, 403, 403, 403, 403),
     },
+    # Alternative contact options of the organisation (ADR 0037): with organisation.closure.
+    # An empty form removes nothing that is not there, so an allowed POST redirects (303).
+    "GET /admin/organisations/{org}/contacts": {
+        "/admin/organisations/demo/contacts": statuses(200, 200, 403, 403, 403, 403),
+        "/admin/organisations/andere/contacts": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/organisations/nope/contacts": statuses(404, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/contacts": {
+        "/admin/organisations/demo/contacts": statuses(303, 303, 403, 403, 403, 403),
+        "/admin/organisations/andere/contacts": statuses(303, 403, 403, 303, 403, 403),
+    },
 }
 
 CASES = [

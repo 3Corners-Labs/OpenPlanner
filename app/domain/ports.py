@@ -28,6 +28,7 @@ from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
+from app.domain.contacts import ContactBlock
 from app.domain.direct_queue import DirectCall
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.job_plan import JobType, PlannedJob
@@ -317,6 +318,14 @@ class Transaction(Protocol):
 
     async def save_font(self, organisation_id: int, role: FontRole, font: FontFile | None) -> None:
         """Store or, with ``None``, remove the organisation's font of ``role``."""
+        ...
+
+    async def get_contact_block(self, organisation_id: int) -> ContactBlock | None:
+        """Return the organisation's default contact block (ADR 0037), if it has one."""
+        ...
+
+    async def save_contact_block(self, organisation_id: int, block: ContactBlock | None) -> None:
+        """Store or, with ``None``, remove the organisation's default contact block."""
         ...
 
     async def add_group(self, group: Group) -> Group:
