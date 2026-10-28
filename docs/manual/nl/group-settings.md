@@ -10,6 +10,11 @@ Wijzigingen gelden voor nieuwe afspraken. Bestaande afspraken blijven zoals ze z
 
 ## Webadres
 
+Bij het aanmaken mag u het webadres leeg laten: het portaal maakt het dan uit de naam. Wat u
+zelf invult, zet het portaal om naar de regels: kleine letters, cijfers en streepjes, zonder
+accenten, hoogstens 64 tekens (`FIN BLD Videogroep` wordt `fin-bld-videogroep`). Is dat adres al
+in gebruik, dan ziet u het voorgestelde adres terug en kiest u een ander.
+
 Het webadres (de *slug*) staat vast zodra de groep is aangemaakt. Websites van de organisatie
 linken ernaar, dus een nieuw adres zou die links breken. Is een ander adres echt nodig, maak dan
 een nieuwe groep aan.

@@ -104,6 +104,64 @@ async def test_new_group_errors_are_linked_to_their_fields(site: Site) -> None:
     assert 'value="Dubbel"' in text  # the admin's input is kept
 
 
+async def test_an_empty_web_address_is_made_from_the_name(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    response = await _post(
+        site,
+        "/admin/groups",
+        {
+            "organisation": "demo",
+            "name": "FIN BLD Video groep 1",
+            "slug": "",
+            "timezone": "Europe/Amsterdam",
+            "slot_minutes": "30",
+        },
+    )
+
+    assert response.status_code == 303  # type: ignore[attr-defined]
+    assert response.headers["location"] == "/admin/groups/fin-bld-video-groep-1?done=created"  # type: ignore[attr-defined]
+
+
+async def test_a_typed_web_address_is_tidied_to_the_rules(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    response = await _post(
+        site,
+        "/admin/groups",
+        {
+            "organisation": "demo",
+            "name": "Video",
+            "slug": "FINBLDVIDEOGROEP1",
+            "timezone": "Europe/Amsterdam",
+            "slot_minutes": "30",
+        },
+    )
+
+    assert response.status_code == 303  # type: ignore[attr-defined]
+    assert response.headers["location"] == "/admin/groups/finbldvideogroep1?done=created"  # type: ignore[attr-defined]
+
+
+async def test_a_refused_form_shows_the_web_address_that_was_tried(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    response = await _post(
+        site,
+        "/admin/groups",
+        {
+            "organisation": "demo",
+            "name": "Demo",
+            "slug": "",
+            "timezone": "Europe/Amsterdam",
+            "slot_minutes": "30",
+        },
+    )
+
+    assert response.status_code == 422  # type: ignore[attr-defined]
+    assert '<a href="#slug">Dit webadres is al in gebruik' in response.text  # type: ignore[attr-defined]
+    assert 'id="slug" name="slug" type="text" value="demo"' in response.text  # type: ignore[attr-defined]
+
+
 async def test_outsider_cannot_create_a_group_in_another_organisation(site: Site) -> None:
     await site.login_as(OUTSIDER)
 

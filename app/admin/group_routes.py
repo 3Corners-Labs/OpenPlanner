@@ -67,6 +67,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
     TimeWindow,
+    slug_from,
 )
 from app.i18n import BoundGettext
 from app.i18n.dates import (
@@ -281,6 +282,7 @@ async def create_group(
 ) -> Response:
     """Create a group, then continue with its staffing."""
     form = await read_form(request, locale)
+    form.values["slug"] = slug_from(form.text("slug") or form.text("name"))
     minutes = form.integer("slot_minutes")
     if not form.errors and minutes is not None:
         new = NewGroup(

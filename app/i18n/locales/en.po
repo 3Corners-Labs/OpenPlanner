@@ -765,7 +765,7 @@ msgid "admin.field.slug"
 msgstr "Web address"
 
 msgid "admin.field.slug_hint"
-msgstr "Becomes /g/<web address>. Lower-case letters, digits and hyphens, for example permits-desk."
+msgstr "Becomes /g/<web address>. Leave empty to make it from the name; capitals, spaces and accents are converted, for example Permits Desk → permits-desk."
 
 msgid "admin.field.slug_fixed"
 msgstr "The web address does not change, so links on websites keep working."
