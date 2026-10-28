@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.domain.event_schema import Envelope
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -56,6 +57,9 @@ class Settings(BaseSettings):
     storage_low_free_percent: float = Field(default=15.0, gt=0, lt=100)
     storage_critical_free_percent: float = Field(default=5.0, gt=0, lt=100)
     database_max_mb: int | None = Field(default=None, ge=1)
+    # ADR 0040 / 0034 (class B, deployment): name of this installation in every log line and
+    # event record, so a log platform that receives several can tell them apart. Empty: none.
+    installation_name: str = Field(default="", pattern=r"^[A-Za-z0-9_.-]{0,64}$")
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
@@ -204,6 +208,11 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("OIDC needs an https discovery URL and a client secret")
         return self
+
+    @property
+    def event_envelope(self) -> Envelope:
+        """Release and installation name for every log line and event record (ADR 0040)."""
+        return Envelope(self.app_version, self.installation_name)
 
     @property
     def smtp_implicit_tls(self) -> bool:
