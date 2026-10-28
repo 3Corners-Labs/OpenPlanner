@@ -4051,9 +4051,6 @@ msgstr "Begin met de naam en de melding. Contactalternatieven en een afbeelding 
 msgid "admin.scenarios.create"
 msgstr "Scenario aanmaken"
 
-msgid "admin.scenarios.back"
-msgstr "Terug naar de noodsluiting"
-
 msgid "admin.scenarios.scenario_lead"
 msgstr "Wat dit scenario bij een noodsluiting laat zien."
 

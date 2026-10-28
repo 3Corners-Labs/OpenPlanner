@@ -4051,9 +4051,6 @@ msgstr "Start with the name and the notice. Add contact options and an image aft
 msgid "admin.scenarios.create"
 msgstr "Create scenario"
 
-msgid "admin.scenarios.back"
-msgstr "Back to the emergency closure"
-
 msgid "admin.scenarios.scenario_lead"
 msgstr "What this scenario shows in an emergency closure."
 
