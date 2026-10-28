@@ -31,6 +31,7 @@ from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock
 from app.domain.direct_queue import DirectCall
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
+from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.retention import RetentionFacts
 from app.domain.scheduling import (
@@ -595,6 +596,23 @@ class Transaction(Protocol):
 
     async def save_closure(self, closure: Closure) -> None:
         """Store the end and the notices of an existing closure."""
+        ...
+
+    async def get_closure_image(self, closure_id: int) -> ImageFile | None:
+        """Return the stored image of the closure, if it has one."""
+        ...
+
+    async def save_closure_image(
+        self, closure_id: int, text: ImageText, image: ImageFile | None
+    ) -> None:
+        """Store the closure's image with ``text``; ``image`` ``None`` keeps the stored file.
+
+        Replacing a file deletes the old one: a closure has one image at most.
+        """
+        ...
+
+    async def remove_closure_image(self, closure_id: int) -> None:
+        """Delete the closure's image, if it has one."""
         ...
 
     async def find_confirmed_bookings(
