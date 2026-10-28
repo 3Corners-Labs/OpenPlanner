@@ -8,11 +8,15 @@ Roles come from the identity provider (ADR 0013). Each permission applies at one
     GROUP         something of one group (settings, opening hours, texts, bookings, the
                   audit log of its events)
 
-A role grants a permission at the levels it covers:
+A role grants a permission within its reach (``REACH``):
 
-    superuser    every organisation and group (a scope that matches everything, not a bypass)
-    org_admin    the organisations in the principal's organisation claim, and their groups
-    group_admin  the groups in the principal's group claim
+    superuser    everything: every organisation and group (a scope, not a bypass)
+    org_admin    organisations: those in the principal's organisation claim, and their groups
+    auditor      organisations, read-only and without personal data (ADR 0039)
+    group_admin  groups: those in the principal's group claim
+
+Some permissions are locked to the superuser (``LOCKED_PERMISSIONS``); some show citizens'
+personal data (``PII_PERMISSIONS``). The matrix page and the documentation mark both.
 
 ``decide`` answers one question for routes; ``scope_for`` turns the same rules into a
 ``Scope`` that the database adapter applies to listings. Both are derived from ``MATRIX``,
@@ -37,6 +41,15 @@ class Role(StrEnum):
     SUPERUSER = "superuser"
     ORG_ADMIN = "org_admin"
     GROUP_ADMIN = "group_admin"
+    AUDITOR = "auditor"
+
+
+class Reach(StrEnum):
+    """Which organisations and groups a role covers, taken from the principal's claims."""
+
+    EVERYTHING = "everything"
+    ORGANISATIONS = "organisations"
+    GROUPS = "groups"
 
 
 class Level(StrEnum):
@@ -96,6 +109,20 @@ LEVELS: dict[Permission, Level] = {
     Permission.SYSTEM_UPDATE: Level.GLOBAL,
 }
 
+LOCKED_PERMISSIONS = frozenset(
+    {
+        Permission.ORGANISATION_MANAGE,
+        Permission.HOLIDAYS_MANAGE,
+        Permission.INTEGRATIONS_MANAGE,
+        Permission.API_CLIENTS_MANAGE,
+        Permission.SYSTEM_UPDATE,
+    }
+)
+"""ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
+
+PII_PERMISSIONS = frozenset({Permission.BOOKINGS_VIEW})
+"""ADR 0039: permissions that show citizens' personal data; never held by the auditor."""
+
 _EVERY_ADMIN = frozenset(
     {Permission.DASHBOARD_VIEW, Permission.RIGHTS_VIEW, Permission.MATRIX_VIEW}
 )
@@ -132,6 +159,15 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         # ADR 0024: the team itself can close in an emergency and handle its bookings.
         Permission.CLOSURE_MANAGE,
     },
+    # ADR 0039: compliance and privacy (FG, CISO, auditors): reading only, no personal data.
+    Role.AUDITOR: _EVERY_ADMIN | {Permission.AUDIT_VIEW, Permission.GROUP_VIEW},
+}
+
+REACH: dict[Role, Reach] = {
+    Role.SUPERUSER: Reach.EVERYTHING,
+    Role.ORG_ADMIN: Reach.ORGANISATIONS,
+    Role.GROUP_ADMIN: Reach.GROUPS,
+    Role.AUDITOR: Reach.ORGANISATIONS,
 }
 
 
@@ -274,6 +310,12 @@ def _granting_roles(principal: Principal, permission: Permission) -> set[Role]:
     return {role for role in principal.roles if permission in MATRIX[role]}
 
 
+def reaches(principal: Principal, permission: Permission | None = None) -> set[Reach]:
+    """Return the reach of the principal's roles (only those granting ``permission``, if given)."""
+    roles = principal.roles if permission is None else _granting_roles(principal, permission)
+    return {REACH[role] for role in roles}
+
+
 def decide(principal: Principal, permission: Permission, target: Target) -> Decision:
     """Decide whether ``principal`` may use ``permission`` on ``target``.
 
@@ -287,17 +329,14 @@ def decide(principal: Principal, permission: Permission, target: Target) -> Deci
     roles = _granting_roles(principal, permission)
     if not roles:
         return Decision(False, Reason.NOT_PERMITTED)
-    if Role.SUPERUSER in roles:
+    reach = {REACH[role] for role in roles}
+    if Reach.EVERYTHING in reach:
         return Decision(True, Reason.SUPERUSER)
     if target.level is Level.GLOBAL:
         return Decision(True, Reason.ROLE)
-    if Role.ORG_ADMIN in roles and target.organisation in principal.organisations:
+    if Reach.ORGANISATIONS in reach and target.organisation in principal.organisations:
         return Decision(True, Reason.ORGANISATION)
-    if (
-        target.level is Level.GROUP
-        and Role.GROUP_ADMIN in roles
-        and target.group in principal.groups
-    ):
+    if target.level is Level.GROUP and Reach.GROUPS in reach and target.group in principal.groups:
         return Decision(True, Reason.GROUP)
     return Decision(False, Reason.OUT_OF_SCOPE)
 
@@ -333,11 +372,11 @@ def scope_for(principal: Principal, permission: Permission) -> Scope:
     level = LEVELS[permission]
     if level is Level.GLOBAL:
         raise ValueError(f"{permission} is a global permission and has no scope")
-    roles = _granting_roles(principal, permission)
-    if Role.SUPERUSER in roles:
+    reach = reaches(principal, permission)
+    if Reach.EVERYTHING in reach:
         return Scope(everything=True)
-    organisations = principal.organisations if Role.ORG_ADMIN in roles else frozenset()
-    groups = principal.groups if Role.GROUP_ADMIN in roles and level is Level.GROUP else frozenset()
+    organisations = principal.organisations if Reach.ORGANISATIONS in reach else frozenset()
+    groups = principal.groups if Reach.GROUPS in reach and level is Level.GROUP else frozenset()
     return Scope(organisations=organisations, groups=groups)
 
 
