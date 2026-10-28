@@ -160,6 +160,38 @@ If PingFederate is down, admins cannot log in; booking, reminders and dispatch k
 Rotating `SESSION_SECRET` logs every admin out. Rotating the client secret needs the new value
 in `OIDC_CLIENT_SECRET` and a restart of `web`.
 
+### Nobody can log in (ADR 0042 §8)
+
+There is no login bypass, fallback IdP or local account. Diagnose and act from the host:
+
+1. **Check the configuration** without logging in:
+   `docker compose exec web python -m app.cli oidc-check`. It reads the discovery document and
+   the signing keys only, and reports the signing algorithms, PKCE, the redirect URL
+   (`https://<host>/admin/callback`, https in production) and whether a client secret is set,
+   followed by the effective claim mapping (`OIDC_ROLE_CLAIM` … `OIDC_ROLE_AUDITOR`) with its
+   source (`env` or `default`). It prints no secrets. Exit code 1 means a required check failed.
+2. **Logged in, but "no role".** The web log has `oidc.no_role` (or `oidc.no_scope` for an
+   organisation or group admin without organisations or groups) with `missing_claim`, the
+   claim the mapping looked for and did not find, `role_values_seen`, how many role values
+   came in but matched none of `OIDC_ROLE_*`, and `claims_present`, the *names* of the
+   claims in the ID token. Values are never logged. Typical cause: the claim or a role value
+   was renamed at PingFederate. Fix it there, or set the matching `OIDC_*` variable and
+   restart `web`.
+3. **Teams must close while the IdP is down** (ADR 0024, same rules, mails and audit as the
+   portal; the audit log shows the actor `system:cli`):
+
+   ```sh
+   docker compose exec web python -m app.cli closure start --group SLUG \
+     --notice-nl "Door een storing …" --notice-en "Due to an outage …" [--end 2026-11-02T08:00+01:00]
+   docker compose exec web python -m app.cli closure lift --group SLUG
+   ```
+
+   Use `--organisation SLUG` instead of `--group` for every team of an organisation (teams
+   that already have a closure are skipped). `--end` needs an offset; without it the closure
+   lasts until it is lifted. Lifting from the host never reinstates appointments: moving,
+   reinstating and cancelling wait until someone can log in to the portal (*Noodsluiting*).
+   The notices are shown to citizens and mailed: plain text, no names or other personal data.
+
 ## Webex meetings and Webex Contact Center
 
 Without a Webex Service App OpenPlanner runs without video and WxCC; bookings keep working.
