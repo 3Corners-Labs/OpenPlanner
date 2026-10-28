@@ -1,5 +1,5 @@
 {% extends "admin/layout.html" %}
-{% from "admin/_fields.html" import field with context %}
+{% from "admin/_fields.html" import form_body with context %}
 {% block title %}{{ _("admin.scenarios.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% set page_title = _("admin.scenarios.title") %}
@@ -45,12 +45,6 @@
     <h2 id="new-heading">{{ _("admin.scenarios.new") }}</h2>
     <p class="card__lead">{{ _("admin.scenarios.new_lead") }}</p>
   </div>
-  <div class="form-grid">
-    {% for f in fields %}{{ field(f) }}{% endfor %}
-  </div>
-  <div class="form-actions">
-    <button type="submit" class="button">{{ _("admin.scenarios.create") }}</button>
-    <a href="{{ closure_url }}">{{ _("admin.scenarios.back") }}</a>
-  </div>
+  {{ form_body(fields, _("admin.scenarios.create"), closure_url) }}
 </form>
 {% endblock %}

@@ -1,9 +1,7 @@
 """Closure scenarios in SQLite (ADR 0037 §4): per organisation or group, with an image."""
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.db.models import ClosureImageRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.admin import AdminService
 from app.domain.authorization import Principal, Role
@@ -12,7 +10,7 @@ from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.images import ImageFile, ImageText
 from app.domain.scenarios import ClosureScenario
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
+from tests.adapters.db.conftest import count_images, seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.closures import NOTICES
 from tests.support.domain import NOW, TEST_TOKEN_KEY
@@ -21,12 +19,6 @@ from tests.support.images import png
 ADMIN = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "14 020"),), {"nl": "Bel ons"})
 TEXT = ImageText({"nl": "Deur", "en": "Door"})
-
-
-async def _images(engine: AsyncEngine) -> int:
-    async with engine.connect() as connection:
-        result = await connection.execute(select(func.count()).select_from(ClosureImageRow))
-        return int(result.scalar_one())
 
 
 async def test_scenarios_round_trip_per_owner(engine: AsyncEngine) -> None:
@@ -88,7 +80,7 @@ async def test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with
     )
     start = ClosureInput(None, None, NOTICES, scenario_id=scenario_id)
     await closures.close_group(ADMIN, "aangifte", start)
-    assert await _images(engine) == 2  # the closure has its own copy
+    assert await count_images(engine) == 2  # the closure has its own copy
 
     async with uow.locked() as tx:
         await tx.delete_scenario(scenario_id)
@@ -97,7 +89,7 @@ async def test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with
         assert await tx.get_scenario(scenario_id) is None
         assert await tx.get_closure_image(closure.id or 0) == image
     assert closure.image == image.ref(TEXT)
-    assert await _images(engine) == 1
+    assert await count_images(engine) == 1
 
     async with uow.locked() as tx:
         again = await tx.add_scenario(
@@ -107,4 +99,4 @@ async def test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with
         await tx.remove_scenario_image(again.id or 0)
         await tx.remove_scenario_image(again.id or 0)
         assert await tx.get_scenario_image(again.id or 0) is None
-    assert await _images(engine) == 1
+    assert await count_images(engine) == 1
