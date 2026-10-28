@@ -14,11 +14,10 @@ from dataclasses import asdict
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, case, delete, false, func, insert, or_, select, true, update
+from sqlalchemy import ColumnElement, case, delete, func, insert, or_, select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.sql.elements import SQLCoreOperations
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
@@ -56,6 +55,7 @@ from app.adapters.db.models import (
 )
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.scenarios import ScenarioQueries
+from app.adapters.db.scope import scope_filter
 from app.adapters.db.updates import UpdateQueries
 from app.domain.audit import (
     PROBLEMS,
@@ -166,25 +166,6 @@ def _group(row: GroupRow) -> Group:
         direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
     )
-
-
-def scope_filter(
-    scope: Scope,
-    organisation_slug: SQLCoreOperations[Any],
-    group_slug: SQLCoreOperations[Any] | None,
-) -> ColumnElement[bool]:
-    """Translate a ``Scope`` into a SQL condition; the one place this happens (ADR 0014).
-
-    An empty scope matches nothing; ``everything`` matches all rows.
-    """
-    if scope.everything:
-        return true()
-    conditions: list[ColumnElement[bool]] = []
-    if scope.organisations:
-        conditions.append(organisation_slug.in_(sorted(scope.organisations)))
-    if scope.groups and group_slug is not None:
-        conditions.append(group_slug.in_(sorted(scope.groups)))
-    return or_(*conditions) if conditions else false()
 
 
 def _override(row: ScheduleOverrideRow) -> ScheduleOverride:

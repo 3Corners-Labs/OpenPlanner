@@ -561,12 +561,22 @@ class InMemoryTransaction:
         self.state.closures[closure_id] = replace(closure, image=stored.ref(text))
 
     async def list_scenarios(
-        self, organisation_id: int, group_id: int | None
+        self, scope: Scope, organisation_id: int, group_id: int | None
     ) -> list[ClosureScenario]:
+        organisation = self.state.organisation_slugs.get(organisation_id)
+        groups = [g for g in self.state.groups.values() if g.organisation_id == organisation_id]
+
+        def in_scope(scenario: ClosureScenario) -> bool:
+            if scenario.group_id is not None:
+                return scope.contains(organisation, self.state.groups[scenario.group_id].slug)
+            return scope.contains(organisation, None) or any(
+                scope.contains(organisation, g.slug) for g in groups
+            )
+
         found = [
             s
             for s in self.state.scenarios.values()
-            if s.organisation_id == organisation_id and s.group_id == group_id
+            if s.organisation_id == organisation_id and s.group_id == group_id and in_scope(s)
         ]
         return sorted(found, key=lambda s: s.name)
 
