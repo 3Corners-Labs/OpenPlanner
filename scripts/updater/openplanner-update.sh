@@ -6,13 +6,20 @@
 # `python -m app.cli` inside the web container.
 #
 #   update   pull <image>:<version> -> digest -> cosign verify -> record previous digest and
-#            Alembic revision -> backup -> pin digest -> up -> healthy?
-#              yes: report succeeded
-#              no:  restore backup, pin previous digest, up -> report rolled_back
-#   restore  (within 24 h of an update) backup -> alembic downgrade <previous revision>
-#            -> pin previous digest -> up -> healthy?
-#              yes: report succeeded
-#              no:  restore backup, pin the newer digest again -> report rolled_back
+#            Alembic revision -> maintenance on -> backup -> pin digest -> up -> healthy?
+#              yes: report succeeded, maintenance off
+#              no:  restore backup, pin previous digest, up -> report rolled_back, maintenance off
+#   restore  (within 24 h of an update) maintenance on -> backup -> alembic downgrade
+#            <previous revision> -> pin previous digest -> up -> healthy?
+#              yes: report succeeded, maintenance off
+#              no:  restore backup, pin the newer digest again -> report rolled_back,
+#                   maintenance off
+#
+# Maintenance mode (ADR 0038) keeps citizens and admins from writing what a rollback would
+# lose. It is switched on before the backup, so a restored backup has it on as well. An update
+# or restore that ends as `failed` after the switch leaves it on: citizens see the maintenance
+# page instead of a half-working system until an operator has looked. A backup that fails
+# changed nothing, so maintenance is switched off again then.
 #
 # Configuration: /etc/openplanner/updater.env (see updater.env.example). The pinned image is
 # OPENPLANNER_IMAGE in $COMPOSE_DIR/.env.update; production compose commands pass
@@ -51,6 +58,14 @@ report() { # report ID STATUS [REASON]; never fails the script (the old version 
     log "request $1: $2 ${3:-}"
   else
     log "request $1: $2 ${3:-} (could not be recorded in the portal)"
+  fi
+}
+
+maintenance() { # maintenance on|off; never fails the script (a version before ADR 0038 lacks it)
+  if app maintenance "$1" --reason "${2:-update}" --by host-updater >/dev/null; then
+    log "maintenance $1"
+  else
+    log "maintenance $1: could not be switched"
   fi
 }
 
@@ -105,9 +120,14 @@ do_update() { # do_update ID TARGET FROM
     return
   fi
   revision=$(compose exec -T web alembic current 2>/dev/null | awk 'NR==1 {print $1}')
-  if ! [[ $revision =~ $REVISION_RE && $previous =~ $IMAGE_RE ]] \
-    || ! app backup-db "$backup" >/dev/null; then
+  if ! [[ $revision =~ $REVISION_RE && $previous =~ $IMAGE_RE ]]; then
     report "$id" failed backup_failed
+    return
+  fi
+  maintenance on update
+  if ! app backup-db "$backup" >/dev/null; then
+    report "$id" failed backup_failed
+    maintenance off
     return
   fi
   printf 'PREVIOUS_IMAGE=%s\nPREVIOUS_REVISION=%s\nPREVIOUS_VERSION=%s\nNEWER_IMAGE=%s\n' \
@@ -116,11 +136,13 @@ do_update() { # do_update ID TARGET FROM
   switch_to "$digest"
   if healthy; then
     report "$id" succeeded
+    maintenance off
     return
   fi
   log "request $id: $target did not become healthy; rolling back"
   if put_back "$backup" "$previous"; then
     report "$id" rolled_back health_check_failed
+    maintenance off
   else
     report "$id" failed restore_failed
   fi
@@ -144,8 +166,10 @@ do_restore() { # do_restore ID TARGET
     report "$id" failed updater_error
     return
   fi
+  maintenance on restore
   if ! app backup-db "$backup" >/dev/null; then
     report "$id" failed backup_failed
+    maintenance off
     return
   fi
   compose stop web worker
@@ -159,6 +183,7 @@ do_restore() { # do_restore ID TARGET
   switch_to "$PREVIOUS_IMAGE"
   if healthy; then
     report "$id" succeeded
+    maintenance off
     rm -f "$STATE_FILE"
     return
   fi
@@ -166,6 +191,7 @@ do_restore() { # do_restore ID TARGET
   pin "$NEWER_IMAGE"
   if put_back "$backup" "$NEWER_IMAGE"; then
     report "$id" rolled_back health_check_failed
+    maintenance off
   else
     report "$id" failed restore_failed
   fi
