@@ -1,6 +1,7 @@
 """Scoped admin queries (ADR 0014): the SQL filter is the database side of decide()."""
 
 import inspect
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
@@ -19,6 +20,7 @@ from app.domain.audit import (
     Source,
 )
 from app.domain.authorization import Scope
+from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.ports import Transaction
 from app.domain.staff import StaffMember
 from tests.support.domain import NOW
@@ -203,7 +205,7 @@ async def test_old_system_events_are_deleted_admin_actions_kept(engine: AsyncEng
         await tx.add_audit_event(_system(10, Outcome.SUCCESS, "demo", "demo"))
 
     async with uow.locked() as tx:
-        removed = await tx.delete_audit_events(Source.SYSTEM, NOW + timedelta(seconds=5))
+        removed = await tx.delete_audit_events(Category.SYSTEM, NOW + timedelta(seconds=5))
     async with uow.read() as tx:
         left = await tx.list_audit_events(EVERYTHING)
 
@@ -285,3 +287,51 @@ async def test_the_sql_filter_narrows_by_level_category_period_and_trace(
             found = [e.event for e in await tx.list_audit_events(EVERYTHING, narrow=narrow)]
             assert found == [e for e in reversed(events) if narrow.matches(e)]
             assert found
+
+
+async def test_diagnostic_modes_round_trip_replace_and_end(engine: AsyncEngine) -> None:
+    # ADR 0040, part 4: one mode per target; ended modes are not active.
+    uow = SqlUnitOfWork(engine)
+    group = DiagnosticMode("demo", "aangifte", NOW + timedelta(hours=24), "s-1")
+    organisation = DiagnosticMode("demo", None, NOW + timedelta(hours=1), "s-1")
+    async with uow.locked() as tx:
+        await tx.save_diagnostic_mode(group)
+        await tx.save_diagnostic_mode(organisation)
+        await tx.save_diagnostic_mode(replace(group, until=NOW + timedelta(hours=2)))
+
+    async with uow.locked() as tx:
+        active = await tx.active_diagnostic_modes(NOW)
+        later = await tx.active_diagnostic_modes(NOW + timedelta(hours=1))
+        ended = await tx.end_diagnostic_mode("demo", None, NOW)
+        again = await tx.end_diagnostic_mode("demo", None, NOW)
+    async with uow.locked() as tx:
+        braked = await tx.end_all_diagnostic_modes(NOW)
+        left = await tx.active_diagnostic_modes(NOW)
+
+    assert active == [organisation, replace(group, until=NOW + timedelta(hours=2))]
+    assert later == [replace(group, until=NOW + timedelta(hours=2))]
+    assert (ended, again, braked, left) == (True, False, 1, [])
+
+
+async def test_events_are_pruned_per_category(engine: AsyncEngine) -> None:
+    uow = SqlUnitOfWork(engine)
+    kept = AuditEvent(NOW, "sub-9", "admin.logout", Outcome.SUCCESS)
+    async with uow.locked() as tx:
+        await tx.add_audit_event(kept)
+        await tx.add_audit_event(
+            AuditEvent(
+                NOW,
+                SYSTEM_ACTOR,
+                "job.run",
+                Outcome.SUCCESS,
+                source=Source.SYSTEM,
+                category=Category.DIAGNOSTIC,
+                level=Level.DEBUG,
+            )
+        )
+    async with uow.locked() as tx:
+        removed = await tx.delete_audit_events(Category.DIAGNOSTIC, NOW + timedelta(seconds=1))
+        left = await tx.list_audit_events(EVERYTHING)
+
+    assert removed == 1
+    assert [e.event for e in left] == [kept]
