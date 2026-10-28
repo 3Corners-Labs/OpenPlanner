@@ -76,6 +76,14 @@ pages and on the page of a booking on hold (CL-2). A closure keeps a copy of the
 and an optional heading per locale (`closure_notices.heading`). Organisation data, not personal data of citizens;
 the admin page asks for general numbers and addresses only. No purge job; kept until changed.
 
+**Embedded booking (ADR 0035).** With `<gov-booking>` on a host website, the citizen's
+browser calls `/api/v1/widget/{org}/{group}/` directly: name, email and (optional) phone go
+from the browser to OpenPlanner over TLS, never through the host's servers. The host site
+does see that a citizen opened its page with the widget, and which group the tag names; it
+cannot read what is typed into the shadow root's form through our API, and the answer to a
+booking holds no personal data and no management token (the link goes by email only). The
+same personal data rules apply as for the standalone page.
+
 **Allowed origins for embedding (ADR 0035).** The websites on which an organisation's groups
 may appear as a widget (`organisation_origins`, such as `https://www.gemeente.nl`), entered by
 an organisation admin, and a switch per group (`groups.embedding_enabled`). Organisation data,

@@ -145,3 +145,24 @@ async def test_a_group_is_allowed_only_when_switched_on_and_the_origin_is_listed
     assert not await service.allows(on, WORK)  # another organisation's site
     assert not await service.allows(on, "https://www.gemeente.nl.evil.example")
     assert not await service.allows(on, None)
+
+
+async def test_the_widget_group_needs_the_right_organisation_and_the_switch(
+    service: EmbeddingService, uow: InMemoryUnitOfWork
+) -> None:
+    await service.save(SUPER, "demo", SITE)
+    with pytest.raises(DomainError) as off:
+        await service.widget_group("demo", "demo", SITE)
+    assert off.value.code is ErrorCode.GROUP_NOT_FOUND
+
+    uow.state.groups[1] = replace(uow.state.groups[1], embedding_enabled=True)
+    access = await service.widget_group("demo", "demo", SITE)
+    foreign = await service.widget_group("demo", "demo", "https://evil.example")
+    without = await service.widget_group("demo", "demo", None)
+
+    assert (access.group.slug, access.origin_allowed) == ("demo", True)
+    assert not foreign.origin_allowed
+    assert not without.origin_allowed
+    for org, group in (("andere", "demo"), ("onbekend", "demo"), ("demo", "onbekend")):
+        with pytest.raises(DomainError):
+            await service.widget_group(org, group, SITE)
