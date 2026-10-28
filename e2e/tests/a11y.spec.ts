@@ -9,7 +9,8 @@ import { pageVariants } from '../pages';
 
 for (const variant of pageVariants()) {
   test(`axe: ${variant.title}`, async ({ page }) => {
-    await page.goto(variant.path);
+    // networkidle: the widget pages render after their API calls (ADR 0035).
+    await page.goto(variant.path, { waitUntil: 'networkidle' });
     await expectNoAxeViolations(page);
   });
 }

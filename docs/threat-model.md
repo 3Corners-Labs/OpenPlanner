@@ -325,6 +325,17 @@ booking body and the `Origin` header.
 | Tampering | A booking during an emergency closure or outside the horizon | The same `BookingService.book` as the standalone page: `group_closed`, `outside_booking_window`, `slot_full` | `tests/api/test_widget_api.py::test_a_taken_slot_is_a_conflict`, `tests/domain/test_services.py` |
 | Information disclosure | A cached answer of one origin served to another | `Cache-Control: no-store` and `Vary: Origin` on every answer | `tests/api/test_widget_api.py::test_the_group_comes_with_its_form_and_texts_for_an_allowed_origin` |
 
+## Flow: widget script on host websites (ADR 0035, EM-3)
+
+Public: `GET /widget/v1/gov-booking.js`, loaded by host pages as a module script.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Tampering | A changed script runs on many government sites | The bundle is built in CI from `widget/src/` (no CDN, no runtime dependencies) and shipped in the signed image (ADR 0006); the admin portal gives hosts its SRI hash to pin | `tests/api/test_widget_script.py::test_the_integrity_is_the_sha384_of_the_file`, `tests/admin/test_embedding_routes.py::test_the_code_for_the_host_has_the_script_its_hash_and_each_embedded_group` |
+| Tampering (XSS) | Data from the API becomes markup inside the host page | The component builds DOM with text nodes only, never `innerHTML`; the shadow root keeps its markup apart from the host's | `e2e/tests/widget.spec.ts` (strict host CSP, no script errors) |
+| Elevation | The widget asks hosts to weaken their CSP (`unsafe-inline`, `unsafe-eval`) | A constructable stylesheet (not governed by `style-src`), no inline scripts, no `eval`: hosts add only `script-src` and `connect-src` for our origin | `e2e/tests/widget.spec.ts::book through the widget with the keyboard only` on a host page with exactly that CSP |
+| Information disclosure | The script response is readable by any origin | It is public code: `Access-Control-Allow-Origin: *` without credentials and `Cross-Origin-Resource-Policy: cross-origin` on this one path; every other response keeps `same-origin` | `tests/api/test_widget_script.py::test_the_script_is_served_for_any_host_page`, `tests/api/test_health.py::test_security_headers_on_every_response` |
+
 ## Flow: allowed origins for embedding (ADR 0035, EM-1)
 
 Admins: `GET /admin/embedding` and `GET/POST /admin/organisations/{org}/embedding`

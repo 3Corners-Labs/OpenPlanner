@@ -1,5 +1,5 @@
 {
-  "$comment": "Public pages under test. Single source for axe (tests/a11y.spec.ts) and Lighthouse (scripts/lighthouse.mjs). Each page is checked in every listed locale via ?lang=. /g/demo needs the demo seed (python -m app.cli seed-demo); the closure pages (ADR 0037) need python -m app.cli seed-closures > e2e/fixtures.json, which also resolves \"{name}\" paths.",
+  "$comment": "Public pages under test. Single source for axe (tests/a11y.spec.ts) and Lighthouse (scripts/lighthouse.mjs). Each page is checked in every listed locale via ?lang=. /g/demo needs the demo seed (python -m app.cli seed-demo); the closure pages (ADR 0037) need python -m app.cli seed-closures > e2e/fixtures.json, which also resolves \"{name}\" paths. The widget pages (ADR 0035) are on the test host page of another origin, http://localhost:8001 (e2e/host/serve.mjs).",
   "pages": [
     {
       "name": "home",
@@ -52,6 +52,30 @@
     {
       "name": "suspended booking",
       "path": "{suspended_booking}",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "widget on a host page",
+      "path": "http://localhost:8001/",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "widget with the host's house style",
+      "path": "http://localhost:8001/?theme=gemeente",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "widget for a group not embedded there",
+      "path": "http://localhost:8001/?organisation=andere&group=andere-team",
       "locales": [
         "nl",
         "en"
