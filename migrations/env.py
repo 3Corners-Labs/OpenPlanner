@@ -7,20 +7,27 @@ Batch mode rebuilds a table (create copy, move rows, drop old). With foreign key
 dropping a table that other rows reference fails, so on SQLite foreign keys are switched off
 for the migration (the pragma only works outside a transaction) and ``PRAGMA
 foreign_key_check`` must come back empty before the migration commits.
+
+After the migrations, an existing SQLite file is switched to incremental auto-vacuum once
+(ADR 0040). That ``VACUUM`` runs here because the web container migrates before it serves
+anything; when it fails (a disk too full for the temporary copy), startup carries on.
 """
 
 import asyncio
 from typing import Any
 
+import structlog
 from alembic import context
 from sqlalchemy.engine import Connection
 
 from app.adapters.db.engine import create_engine
+from app.adapters.db.maintenance import enable_incremental_vacuum
 from app.adapters.db.models import Base
 from app.adapters.db.types import UTCDateTime
 from app.config import Settings
 
 target_metadata = Base.metadata
+log = structlog.get_logger()
 
 
 def _render_item(type_: str, obj: Any, autogen_context: Any) -> str | bool:
@@ -63,6 +70,20 @@ def _run(connection: Connection) -> None:
     finally:
         if sqlite:
             _pragma(connection, "PRAGMA foreign_keys=ON")
+    if sqlite:
+        # The migrations are committed; end the connection's empty autobegun transaction,
+        # exactly what closing it would do, because VACUUM refuses to run inside one.
+        connection.rollback()
+        _incremental_vacuum(connection)
+
+
+def _incremental_vacuum(connection: Connection) -> None:
+    """Convert the database to incremental auto-vacuum once; a failure is only logged."""
+    try:
+        if enable_incremental_vacuum(connection):
+            log.info("database.auto_vacuum_enabled")
+    except Exception as exc:  # housekeeping must not block startup
+        log.warning("database.auto_vacuum_failed", error=type(exc).__name__)
 
 
 async def _run_online() -> None:
