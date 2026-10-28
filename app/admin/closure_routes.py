@@ -7,7 +7,7 @@ authorises again, validates and audits.
 
     GET  /admin/groups/{slug}/closure                         closure.manage   status and forms
     POST /admin/groups/{slug}/closure                         closure.manage   close the group
-    POST /admin/groups/{slug}/closure/update                  closure.manage   end, notices, mail
+    POST /admin/groups/{slug}/closure/update                  closure.manage   end, texts, contacts
     POST /admin/groups/{slug}/closure/lift                    closure.manage   open again
     POST /admin/groups/{slug}/closure/reinstate               closure.manage   reinstate all
     POST /admin/groups/{slug}/closure/cancel                  closure.manage   cancel all
@@ -19,6 +19,10 @@ authorises again, validates and audits.
     GET  /admin/organisations/{org}/closure                   organisation.closure  all groups
     POST /admin/organisations/{org}/closure                   organisation.closure  close all
     POST /admin/organisations/{org}/closure/lift              organisation.closure  lift all
+
+The closing and update forms also take an optional heading per locale; the closure copies the
+contact block that applies to the group (ADR 0037 §2), edited on its own page
+(``contact_routes``) and shown here as a preview with a count.
 """
 
 from collections.abc import Sequence
@@ -43,7 +47,14 @@ from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin, page
 from app.domain.authorization import Permission
 from app.domain.booking import Booking
-from app.domain.closure import MAX_NOTICE_LENGTH, NOTICE_LOCALES, Closure, notice_field
+from app.domain.closure import (
+    MAX_HEADING_LENGTH,
+    MAX_NOTICE_LENGTH,
+    NOTICE_LOCALES,
+    Closure,
+    heading_field,
+    notice_field,
+)
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.errors import DomainError
 from app.domain.ports import Clock
@@ -51,7 +62,7 @@ from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.i18n.dates import local_day
 from app.web.closure_labels import ClosureView, closure_view, moment_label
-from app.web.contact_labels import contact_service
+from app.web.contact_labels import ContactBlockView, contact_service, contact_view
 from app.web.errors import status_for
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
@@ -67,6 +78,12 @@ NOTICE_LABELS: dict[str, tuple[str, str]] = {
     "en": ("admin.closure.notice_en", "admin.closure.notice_hint"),
 }
 """Label and hint key of the notice per required locale (literal for the catalogue test)."""
+
+HEADING_LABELS: dict[str, str] = {
+    "nl": "admin.closure.heading_nl",
+    "en": "admin.closure.heading_en",
+}
+"""Label key of the optional heading per locale (literal for the catalogue test)."""
 
 ManageClosure = Annotated[
     AdminContext,
@@ -183,6 +200,19 @@ def _closure_fields(
                 attributes={"maxlength": str(MAX_NOTICE_LENGTH)},
             )
         )
+    for code in NOTICE_LOCALES:
+        name = heading_field(code)
+        fields.append(
+            Field(
+                name,
+                _(HEADING_LABELS[code]),
+                value=form.values.get(name, current.headings.get(code, "") if current else ""),
+                hint=_("admin.closure.heading_hint"),
+                error=form.error_for(name),
+                required=False,
+                attributes={"maxlength": str(MAX_HEADING_LENGTH)},
+            )
+        )
     return fields
 
 
@@ -191,12 +221,18 @@ def _notices(form: FormData) -> dict[str, str]:
     return {code: form.values.get(notice_field(code), "") for code in NOTICE_LOCALES}
 
 
+def _headings(form: FormData) -> dict[str, str]:
+    """Return the submitted heading per locale; empty means the default heading."""
+    return {code: form.text(heading_field(code)) for code in NOTICE_LOCALES}
+
+
 def _closure_input(form: FormData, group: Group) -> ClosureInput:
     """Read the closing form; parse errors are collected on ``form``."""
     return ClosureInput(
         form.optional_moment("starts_at", group.tz),
         form.optional_moment("ends_at", group.tz),
         _notices(form),
+        _headings(form),
     )
 
 
@@ -217,6 +253,11 @@ async def _group_response(
     banner: ClosureView | None = (
         closure_view(overview.closure, group, locale, now) if overview.closure else None
     )
+    contacts = await contact_service(request).view_group(context.principal, group.slug)
+    applies = contacts.block or contacts.organisation_default
+    copy: ContactBlockView | None = (
+        contact_view(overview.closure.contacts, locale) if overview.closure else None
+    )
     return group_page(
         request,
         locale,
@@ -227,6 +268,9 @@ async def _group_response(
             "fields": _closure_fields(form, locale, group, overview.closure),
             "suspended": _suspended(overview.suspended, group, locale.code),
             "confirmed_ahead": overview.confirmed_ahead,
+            "closure_contacts": copy,
+            "own_contacts": contacts.block is not None,
+            "contact_count": len(applies.options) if applies else 0,
             "errors": form.errors,
         },
         status,
@@ -279,7 +323,13 @@ async def update_closure(
     if not form.errors:
         try:
             outcome = await closure_service(request).update(
-                context.principal, slug, ends_at, _notices(form), notify=form.checked("notify")
+                context.principal,
+                slug,
+                ends_at,
+                _notices(form),
+                notify=form.checked("notify"),
+                headings=_headings(form),
+                refresh_contacts=form.checked("refresh_contacts"),
             )
         except DomainError as error:
             raise_refusal(error)

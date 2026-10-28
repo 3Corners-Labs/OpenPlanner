@@ -1,5 +1,6 @@
 """Emergency closures and suspended bookings in SQLite (ADR 0024)."""
 
+from dataclasses import replace
 from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -10,6 +11,7 @@ from app.domain.authorization import Principal, Role, Scope
 from app.domain.booking import BookingStatus
 from app.domain.closure import Closure
 from app.domain.closure_service import ClosureInput, ClosureService
+from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.job_plan import JobType, plan_closure_update, plan_purge
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
@@ -124,3 +126,23 @@ async def test_add_and_delete_pending_jobs_by_type(engine: AsyncEngine) -> None:
         types = [row[0] for row in rows]
 
     assert types == ["end_wxcc_task", "send_suspension", "send_closure_update", "purge_pii"]
+
+
+async def test_headings_and_the_contact_copy_round_trip_and_follow_an_update(
+    engine: AsyncEngine,
+) -> None:
+    uow, _, _ = await _closed(engine)
+    block = ContactBlock((ContactOption.create(ContactKind.PHONE, "14 020"),), {"en": "Call"})
+    async with uow.read() as tx:
+        group = await tx.get_group("aangifte")
+        assert group is not None
+        (current,) = await tx.get_closures(group.id, NOW)
+    assert (current.headings, current.contacts) == ({}, None)
+
+    async with uow.locked() as tx:
+        await tx.save_closure(replace(current, headings={"nl": "Storing"}, contacts=block))
+    async with uow.read() as tx:
+        stored = await tx.get_closure(current.id or 0)
+
+    assert stored is not None
+    assert (stored.headings, stored.contacts) == ({"nl": "Storing"}, block)

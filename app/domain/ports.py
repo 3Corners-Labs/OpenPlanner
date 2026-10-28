@@ -328,6 +328,14 @@ class Transaction(Protocol):
         """Store or, with ``None``, remove the organisation's default contact block."""
         ...
 
+    async def get_group_contact_block(self, group_id: int) -> ContactBlock | None:
+        """Return the group's own contact block (ADR 0037 §2), if it has one."""
+        ...
+
+    async def save_group_contact_block(self, group_id: int, block: ContactBlock | None) -> None:
+        """Store or, with ``None``, remove the group's own contact block."""
+        ...
+
     async def add_group(self, group: Group) -> Group:
         """Store a new group and return it with its id; the slug must be free."""
         ...
