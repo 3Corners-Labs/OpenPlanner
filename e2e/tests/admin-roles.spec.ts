@@ -66,6 +66,17 @@ test('organisation admin sees the logins of their own admins, by name', async ({
   const outsiderLogins = page.getByRole('row').filter({ hasText: 'Otto Anders' }).filter({ hasText: 'Inloggen' });
   await expect(outsiderLogins).toHaveCount(0);
   await expectNoAxeViolations(page);
+
+  // ADR 0046: the staff of the own organisation, recorded at their login; nobody from elsewhere.
+  await adminMenu(page).getByRole('link', { name: 'Medewerkers' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Medewerkers');
+  await expect(page.getByRole('link', { name: 'Gina Groep' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Otto Anders' })).toHaveCount(0);
+  await expectNoAxeViolations(page);
+  await page.getByRole('link', { name: 'Gina Groep' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Gina Groep');
+  await expect(page.getByRole('heading', { name: 'Recente activiteit' })).toBeVisible();
+  await expectNoAxeViolations(page);
   await expectForbidden(page, '/admin/groups/andere-team');
 });
 

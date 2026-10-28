@@ -21,6 +21,15 @@ Een kop (standaard "Andere manieren om ons te bereiken") met daaronder de contac
 in uw volgorde. Telefoonnummers en e-mailadressen zijn links die op een telefoon direct bellen
 of mailen. Het voorbeeld bovenaan het scherm laat zien hoe het blok nu is opgeslagen.
 
+Burgers zien het blok op drie plekken, altijd als de kopie die bij de sluiting hoort:
+
+- **Tijdens een sluiting** staat op de pagina van het team geen kalender, maar de
+  sluitingspagina: de kop van de sluiting, de periode, de tekst en daaronder dit blok.
+- **Voor een geplande sluiting** blijft de kalender staan. De melding erboven linkt naar de
+  sluitingspagina, zodat burgers al zien hoe zij u tijdens de sluiting kunnen bereiken.
+- **Bij een opgeschorte afspraak** staat het blok op de pagina van die afspraak, boven de
+  knoppen om een nieuwe tijd te kiezen of te annuleren.
+
 ## Contactmogelijkheden
 
 U kunt er maximaal zes invullen. Kies per rij een soort en vul de gegevens in:
