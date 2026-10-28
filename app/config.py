@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # webhooks and failing token refreshes are written as at most one security event per kind
     # per this many minutes; the rest are counted into the next one.
     security_event_window_minutes: int = Field(default=15, ge=1, le=1440)
+    # ADR 0040, part 3 (class C, platform; env until the settings registry of ADR 0042): one
+    # CSV export of the audit log holds at most this many rows and covers at most this many
+    # days; a larger one is refused, never cut short.
+    audit_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
+    audit_export_max_days: int = Field(default=366, ge=1, le=3660)
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
