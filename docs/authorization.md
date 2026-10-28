@@ -8,9 +8,9 @@ Do not edit by hand: CI fails when this file differs from the code (ADR 0014).
 Roles come from the identity provider (ADR 0013). A role grants a permission only
 within its reach: superuser everywhere; organisation admin and auditor in the
 organisations of their claim and those organisations' groups; group admin in the
-groups of their claim. The auditor reads only and never sees personal data (ADR 0037).
+groups of their claim. The auditor reads only and never sees personal data (ADR 0039).
 
-Bounds (ADR 0037): *locked* permissions belong to the superuser only; *personal data*
+Bounds (ADR 0039): *locked* permissions belong to the superuser only; *personal data*
 permissions show citizens' data and are never held by the auditor.
 
 | Permission | Level | Bounds | Superuser | Organisation admin | Group admin | Compliance and privacy (read-only) |

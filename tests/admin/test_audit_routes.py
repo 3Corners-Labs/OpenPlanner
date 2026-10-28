@@ -67,7 +67,7 @@ async def logged(site: Site) -> Site:
         (ORG_ADMIN, {"org_marker", "smtp_unreachable"}),
         (GROUP_ADMIN, {"smtp_unreachable"}),
         (OUTSIDER, {"other_marker"}),
-        # ADR 0037: the auditor reads exactly what the organisation admin reads.
+        # ADR 0039: the auditor reads exactly what the organisation admin reads.
         (AUDITOR, {"org_marker", "smtp_unreachable"}),
     ],
 )
@@ -94,7 +94,7 @@ async def test_a_system_event_explains_itself(logged: Site) -> None:
 
 
 async def test_the_auditor_sees_the_booking_id_but_no_link_to_the_booking(logged: Site) -> None:
-    # ADR 0037 B6: the timeline needs bookings.view, which shows personal data.
+    # ADR 0039 B6: the timeline needs bookings.view, which shows personal data.
     await logged.login_as(AUDITOR)
     text = (await logged.client.get("/admin/audit")).text
 

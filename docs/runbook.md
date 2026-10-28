@@ -678,7 +678,7 @@ When a team cannot hold its appointments (outage, illness, closed building):
 6. **Retention.** Appointments still on hold lose their personal data 30 days after the end of
    the closure. An open-ended closure keeps it until it is lifted, so lift or end it promptly.
 
-## Personal data not removed on time (ADR 0037)
+## Personal data not removed on time (ADR 0039)
 
 **Retention** in the admin portal (organisation admins, the compliance role and the superuser)
 shows per group how many bookings still hold personal data past their purge moment and how

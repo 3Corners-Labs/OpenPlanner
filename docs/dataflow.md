@@ -89,10 +89,10 @@ web ──SQL──> admin_profiles (sub, display name, last login)
 System events hold no personal data: no names, addresses, message text or join links, only codes
 and the booking id. Each admin sees them at their own level only (group admin: their groups;
 organisation admin and auditor: their organisation and its groups; superuser: everything).
-The auditor role (ADR 0037) is read-only and holds no permission that shows citizens' data; it
+The auditor role (ADR 0039) is read-only and holds no permission that shows citizens' data; it
 does see admin names in the audit log, which is the accountability it exists for.
 
-The retention overview (`/admin/retention`, ADR 0037) reads `bookings` only to count, per group,
+The retention overview (`/admin/retention`, ADR 0039) reads `bookings` only to count, per group,
 how many still hold personal data, how many are past their purge moment and how many purges
 failed, and when the last purge ran. It selects no personal data column and no booking id, so it
 is no new processing of citizens' data; it is the control that the purge (CLAUDE.md privacy

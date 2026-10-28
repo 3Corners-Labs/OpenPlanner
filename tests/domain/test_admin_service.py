@@ -150,7 +150,7 @@ async def test_login_is_recorded_per_organisation_and_group_in_scope(
 async def test_auditor_login_is_recorded_in_their_organisation(
     service: AdminService, uow: InMemoryUnitOfWork
 ) -> None:
-    # ADR 0037: the organisation admins and auditors of "demo" can see who checked the log.
+    # ADR 0039: the organisation admins and auditors of "demo" can see who checked the log.
     auditor = Principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
 
     await service.record_login(auditor)
@@ -201,7 +201,7 @@ async def test_audit_log_shows_the_latest_known_name(service: AdminService) -> N
 async def test_retention_overview_counts_the_own_organisation_only(
     service: AdminService, uow: InMemoryUnitOfWork
 ) -> None:
-    # ADR 0037: an ended booking still holding personal data two days later is overdue.
+    # ADR 0039: an ended booking still holding personal data two days later is overdue.
     late = confirmed_booking(id=10, start=NOW - timedelta(days=2), end=NOW - timedelta(days=2))
     elsewhere = confirmed_booking(id=11, group_id=2, end=NOW - timedelta(days=2))
     upcoming = confirmed_booking(id=12)

@@ -12,7 +12,7 @@ A role grants a permission within its reach (``REACH``):
 
     superuser    everything: every organisation and group (a scope, not a bypass)
     org_admin    organisations: those in the principal's organisation claim, and their groups
-    auditor      organisations, read-only and without personal data (ADR 0037)
+    auditor      organisations, read-only and without personal data (ADR 0039)
     group_admin  groups: those in the principal's group claim
 
 Some permissions are locked to the superuser (``LOCKED_PERMISSIONS``); some show citizens'
@@ -108,7 +108,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.API_CLIENTS_MANAGE: Level.GLOBAL,
     # ADR 0029: update or restore the installation itself.
     Permission.SYSTEM_UPDATE: Level.GLOBAL,
-    # ADR 0037: per group, whether personal data is removed on time (counts only).
+    # ADR 0039: per group, whether personal data is removed on time (counts only).
     Permission.RETENTION_VIEW: Level.ORGANISATION,
 }
 
@@ -121,10 +121,10 @@ LOCKED_PERMISSIONS = frozenset(
         Permission.SYSTEM_UPDATE,
     }
 )
-"""ADR 0037: permissions that affect more than one organisation or touch secrets; superuser only."""
+"""ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
 
 PII_PERMISSIONS = frozenset({Permission.BOOKINGS_VIEW})
-"""ADR 0037: permissions that show citizens' personal data; never held by the auditor."""
+"""ADR 0039: permissions that show citizens' personal data; never held by the auditor."""
 
 _EVERY_ADMIN = frozenset(
     {Permission.DASHBOARD_VIEW, Permission.RIGHTS_VIEW, Permission.MATRIX_VIEW}
@@ -149,7 +149,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         # ADR 0024: close one group or every group of the organisation at once.
         Permission.CLOSURE_MANAGE,
         Permission.ORGANISATION_CLOSURE,
-        # ADR 0037: whether the organisation's personal data is removed on time.
+        # ADR 0039: whether the organisation's personal data is removed on time.
         Permission.RETENTION_VIEW,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
@@ -164,7 +164,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         # ADR 0024: the team itself can close in an emergency and handle its bookings.
         Permission.CLOSURE_MANAGE,
     },
-    # ADR 0037: compliance and privacy (FG, CISO, auditors): reading only, no personal data.
+    # ADR 0039: compliance and privacy (FG, CISO, auditors): reading only, no personal data.
     Role.AUDITOR: _EVERY_ADMIN
     | {Permission.AUDIT_VIEW, Permission.GROUP_VIEW, Permission.RETENTION_VIEW},
 }

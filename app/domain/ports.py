@@ -534,7 +534,7 @@ class Transaction(Protocol):
     async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:
         """Return the retention counts per group in ``scope`` and the possibly overdue bookings.
 
-        Counts, statuses and times only, never personal data or booking ids (ADR 0037).
+        Counts, statuses and times only, never personal data or booking ids (ADR 0039).
         Candidates still hold personal data and ended or were cancelled before
         ``candidates_before``, or are suspended.
         """

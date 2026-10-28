@@ -1,4 +1,4 @@
-"""The retention overview page (ADR 0037): counts per group, never personal data."""
+"""The retention overview page (ADR 0039): counts per group, never personal data."""
 
 from datetime import UTC, datetime, timedelta
 
