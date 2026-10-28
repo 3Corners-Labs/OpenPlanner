@@ -1477,3 +1477,50 @@ fieldset.card {
   font-size: 0.85rem;
   font-weight: 600;
 }
+
+/* Contact block: the same markup as on citizen pages (ADR 0037), here as preview. */
+.contact-block__list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact-block__item {
+  display: grid;
+  gap: 0.25rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--adm-accent);
+}
+
+.contact-block__term {
+  font-weight: 700;
+}
+
+.contact-block__link {
+  display: inline-block;
+  min-height: 24px;
+  padding-block: 2px;
+  overflow-wrap: anywhere;
+}
+
+.contact-block__address {
+  font-style: normal;
+}
+
+.contact-block__hours {
+  color: var(--adm-text-muted);
+}
+
+.contact-row {
+  margin: 1.25rem 0 0;
+  padding: 1rem;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius-s);
+}
+
+.contact-row legend {
+  padding: 0 0.375rem;
+  font-weight: 600;
+}

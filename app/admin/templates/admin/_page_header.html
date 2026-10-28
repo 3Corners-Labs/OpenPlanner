@@ -1,8 +1,11 @@
-{#- Breadcrumbs (parent section → current page) and the page heading with its lead line. -#}
-{% macro page_header(parent_href, parent_label, current, title, lead) -%}
+{#- Breadcrumbs (parent section → optional middle page → current page) and the page heading with its lead line. -#}
+{% macro page_header(parent_href, parent_label, current, title, lead, middle_href=none, middle_label=none) -%}
 <nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
   <ol>
     <li><a href="{{ parent_href }}">{{ parent_label }}</a></li>
+    {%- if middle_href %}
+    <li><a href="{{ middle_href }}">{{ middle_label }}</a></li>
+    {%- endif %}
     <li><span aria-current="page">{{ current }}</span></li>
   </ol>
 </nav>

@@ -80,3 +80,6 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - Environment bar on every admin page outside production ("Ontwikkelomgeving",
   "Testomgeving").
 
+- Alternative contact options per organisation (ADR 0037, CB-1): up to six phone, email,
+  website, chat and address options with labels and opening hours in nl/en, validated per
+  kind, with a preview; the shared block for closure and maintenance pages.

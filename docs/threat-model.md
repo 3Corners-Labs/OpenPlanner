@@ -277,6 +277,21 @@ Inputs from outside: notice texts, date-times, booking ids in paths, a chosen sl
 | Tampering (CSRF) | A third-party site closes a team in an admin's browser | Fetch Metadata check on every POST; changes need a recent login (ADR 0015) | `tests/admin/test_group_routes.py::test_cross_site_changes_are_refused` (same dependency) |
 | Repudiation | An admin denies closing a team or cancelling appointments | Audited in the same transaction, per group, with counts | `test_closing_suspends_covered_bookings_and_keeps_their_data`, `test_org_admin_closes_and_lifts_every_group_of_the_organisation` |
 
+## Flow: alternative contact options (ADR 0037 §2)
+
+Admins: `GET/POST /admin/organisations/{org}/contacts` (`organisation.closure`). Citizens: the
+block on closure and maintenance pages (from CL-2 and MM-3). Inputs from outside: kind,
+details, labels, opening hours and headings of up to six options.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Tampering (XSS) | A `javascript:`, `data:` or `http:` link, or markup, in a contact option shown on public pages | Fixed kinds with their own validation: links only `https` with a host, no credentials, quotes, spaces or control characters; phone and email by pattern; texts single line; Jinja2 autoescape; `tel:`/`mailto:` built by the domain, never typed | `tests/domain/test_contacts.py::test_links_other_than_plain_https_are_refused`, `test_malformed_email_addresses_are_refused`, `test_phone_numbers_with_letters_or_odd_lengths_are_refused`, `tests/web/test_contact_labels.py::test_the_partial_renders_links_and_addresses_escaped`, `tests/admin/test_contact_routes.py::test_a_javascript_link_is_refused_with_a_message_linked_to_its_row` |
+| Elevation | A group admin or another organisation's admin changes what citizens of an organisation read | One `RequirePermission(organisation.closure)`; `ContactService` authorises again | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_contact_service.py::test_group_admins_and_other_organisations_are_refused_and_audited` |
+| Information disclosure | A personal number or address published as contact option | The form warns that everything is public and asks for general numbers only; the manual repeats it | `tests/admin/test_contact_routes.py::test_six_empty_rows_and_a_public_warning_are_shown` |
+| Tampering | Stored JSON from another version breaks the page or smuggles an invalid link | Options are validated again when read; invalid ones are left out | `tests/adapters/db/test_contact_queries.py::test_options_another_version_wrote_are_left_out` |
+| Tampering (CSRF) | A third-party site changes the block in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_contact_routes.py::test_cross_site_posts_are_refused` |
+| Repudiation | Who changed the contact options | Audited in the same transaction with counts per kind, never values | `tests/domain/test_contact_service.py::test_organisation_admin_saves_the_block_and_it_is_audited_with_counts` |
+
 ## Flow: video meetings, work items and direct calls (WP5/WP6)
 
 Public: `GET /b/{token}/join`, `GET /b/{token}/join/go`, `GET/POST /g/{slug}/direct`,

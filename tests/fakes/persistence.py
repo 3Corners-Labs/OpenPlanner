@@ -18,6 +18,7 @@ from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import GroupCheck
 from app.domain.closure import Closure
+from app.domain.contacts import ContactBlock
 from app.domain.direct_queue import DirectCall
 from app.domain.job_plan import PlannedJob
 from app.domain.scheduling import (
@@ -48,6 +49,7 @@ class State:
     admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
     fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
+    contact_blocks: dict[int, ContactBlock] = field(default_factory=dict)
     group_checks: dict[int, GroupCheck] = field(default_factory=dict)
     holiday_calendars: dict[int, holiday_model.HolidayCalendar] = field(default_factory=dict)
     holidays: dict[int, holiday_model.Holiday] = field(default_factory=dict)
@@ -190,6 +192,15 @@ class InMemoryTransaction:
         fonts = tuple(f.ref for (org, _), f in self.state.fonts.items() if org == organisation_id)
         branding = replace(organisation.branding, fonts=fonts)
         self.state.organisations[organisation_id] = replace(organisation, branding=branding)
+
+    async def get_contact_block(self, organisation_id: int) -> ContactBlock | None:
+        return self.state.contact_blocks.get(organisation_id)
+
+    async def save_contact_block(self, organisation_id: int, block: ContactBlock | None) -> None:
+        if block is None:
+            self.state.contact_blocks.pop(organisation_id, None)
+        else:
+            self.state.contact_blocks[organisation_id] = block
 
     async def add_group(self, group: Group) -> Group:
         stored = replace(group, id=self._new_id())
