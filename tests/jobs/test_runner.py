@@ -24,7 +24,15 @@ from tests.fakes.clock import FixedClock
 from tests.fakes.messaging import RecordingSender, RefusingSender
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.closures import NOTICES
-from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book, make_group, window
+from tests.support.domain import (
+    NOW,
+    SLOT_0900,
+    TEST_TOKEN_KEY,
+    book,
+    make_group,
+    window,
+    with_team_invite,
+)
 
 
 def merge_context(_logger: WrappedLogger, _method: str, event_dict: EventDict) -> EventDict:
@@ -451,3 +459,21 @@ async def test_the_request_to_rebook_goes_only_while_it_is_open(
 
     assert len(sender.sent) == 1
     assert sender.sent[0].subject == "Kies een nieuwe tijd voor uw videogesprek"
+
+
+async def test_team_invite_goes_to_the_teams_address_only_while_the_group_sends_one(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    uow.state.groups[1] = with_team_invite(uow.state.groups[1])
+    bid = await booking_id(uow)
+    invite = ClaimedJob(1, bid, JobType.SEND_TEAM_INVITE, ChannelKind.EMAIL, SLOT_0900, 1)
+    queue, sender = FakeQueue([invite]), RecordingSender()
+
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+    uow.state.groups[1] = replace(uow.state.groups[1], calendar_invite_address=None)
+    later = FakeQueue([replace(invite, id=2)])
+    await JobRunner(later, uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert JobType.SEND_TEAM_INVITE in queue.requested_types
+    assert [m.recipient for m in sender.sent] == ["team@example.org"]
+    assert later.done == [2]

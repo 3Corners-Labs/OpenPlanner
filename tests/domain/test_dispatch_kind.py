@@ -65,3 +65,19 @@ def test_working_days_are_bounded(days: int) -> None:
 @pytest.mark.parametrize("days", [1, 5])
 def test_working_days_accept_the_bounds(days: int) -> None:
     make_group(queue_change_working_days=days)
+
+
+def test_only_an_own_queue_group_with_an_address_sends_the_team_invite() -> None:
+    address = {"calendar_invite_address": "team-aangifte@example.org"}
+
+    assert make_group(dispatch_kind=QUEUE, **address).sends_team_invite
+    assert not make_group(**address).sends_team_invite
+    assert not make_group(dispatch_kind=QUEUE).sends_team_invite
+
+
+@pytest.mark.parametrize("address", ["no-at-sign", "a@b", "x" * 250 + "@example.org", " "])
+def test_the_invite_address_must_be_an_email_address(address: str) -> None:
+    with pytest.raises(DomainError) as excinfo:
+        make_group(calendar_invite_address=address)
+
+    assert excinfo.value.field == "calendar_invite_address"

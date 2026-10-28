@@ -93,6 +93,18 @@ Only with the own queue. **No** (default): agents always pick up the next appoin
 participant gets the first free agent. **Yes**: they can also pick up another appointment from
 the list. That is a working agreement within the team, not a protection.
 
+<!-- field: calendar_invite_address -->
+### Calendar invite to (own queue)
+
+Only with the own queue, and optional. A shared mailbox or mailing list of the team, such as
+`team-aangifte@organisatie.nl`. Each appointment sends that address a calendar invite with the
+time, the participant's first name, the reference and a link to the queue. When the
+appointment is moved, cancelled or put on hold, the invite is withdrawn.
+
+The link to the call is left out on purpose: an agent only gets it by picking up the
+appointment. The invite lives in the team's mailbox, outside OpenPlanner's retention. Check
+the address carefully; it is also shown on the group's overview page and in the audit log.
+
 <!-- field: dispatch_lead_minutes -->
 ### Send to the queue
 
