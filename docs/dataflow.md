@@ -196,6 +196,18 @@ data volume with mode 600 and are deleted after 24 hours (`backup-db --prune` on
 run). A backup that is put back is minutes old: purge jobs that ran after it are still pending
 in it and run again on the next worker cycle.
 
+## Maintenance mode (ADR 0038)
+
+```
+superuser ──POST /admin/maintenance/on|off (reason code, expected end)──> web ──SQL──> maintenance_state
+host (CLI, updater) ──docker exec python -m app.cli maintenance──> web ──SQL──> maintenance_state, audit_events
+operator ──MAINTENANCE_MODE (environment)──> web (no database read)
+admin ──POST (any change) during maintenance──> web ──refused──> audit_events (permission, target slugs)
+```
+
+The switch holds a subject identifier or a host actor, times and a reason code: no personal
+data. A refused change is audited with its permission and target only, never the form content.
+
 ## HTTPS certificate (ADR 0030)
 
 ```
