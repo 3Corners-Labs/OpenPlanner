@@ -4,14 +4,14 @@ Written for every login, every denied authorisation decision and every change (A
 and, as system events, for what the platform did on its own: every message, meeting, work
 item and purge job with its result (ADR 0031). An event never contains personal data of
 citizens; the actor is the subject identifier from the identity provider, or ``system``. The
-admin's display name lives once in ``AdminProfile`` and is joined in when the log is read, so
-events stay immutable and a name is stored in one place only.
+admin's display name lives once in their ``StaffMember`` record (ADR 0046) and is joined in
+when the log is read, so events stay immutable and a name is stored in one place only.
 
 An event sits at exactly one level: global (no organisation), an organisation (no group) or
 a group. The audit log shows each admin the levels of their own scope and nothing above it.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
@@ -82,12 +82,14 @@ class AuditFilter:
         problems_only: Only denials, failures and retries.
         group: Only events of this group (slug).
         booking_id: Only events about this booking.
+        actor: Only events of this actor (subject); the staff detail page (ADR 0046).
     """
 
     source: Source | None = None
     problems_only: bool = False
     group: str | None = None
     booking_id: int | None = None
+    actor: str | None = None
 
     def matches(self, event: AuditEvent) -> bool:
         """Return whether ``event`` passes the filter (the SQL adapter applies the same rules)."""
@@ -96,6 +98,7 @@ class AuditFilter:
             and (not self.problems_only or event.outcome in PROBLEMS)
             and (self.group is None or event.group == self.group)
             and (self.booking_id is None or event.booking_id == self.booking_id)
+            and (self.actor is None or event.actor == self.actor)
         )
 
 
@@ -110,18 +113,3 @@ class AuditEntry:
 
     event: AuditEvent
     actor_name: str | None = None
-
-
-@dataclass(frozen=True)
-class AdminProfile:
-    """What the portal remembers about an admin, refreshed at every login.
-
-    Attributes:
-        subject: Subject identifier from the identity provider.
-        display_name: Name from the identity provider, for the audit log.
-        last_login_at: Time of the latest login (UTC).
-    """
-
-    subject: str
-    display_name: str = field(repr=False)
-    last_login_at: datetime

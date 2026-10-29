@@ -22,6 +22,7 @@ from app.domain.updates import (
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
+    UpdateStep,
     Version,
 )
 from tests.fakes.clock import FixedClock
@@ -252,6 +253,39 @@ async def test_report_rollback_with_its_reason(
     notice = await service(uow, clock).notice(DEMO_SUPERUSER)
     assert notice is not None
     assert notice.outcome == done
+
+
+async def test_updater_reports_its_steps(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    request_id = await running(uow, clock, releases)
+    clock.advance(timedelta(seconds=30))
+    moved = await service(uow, clock).report_step(request_id, UpdateStep.VERIFYING)
+    assert (moved.step, moved.step_at) == (UpdateStep.VERIFYING, clock.now())
+    overview = await service(uow, clock).overview(DEMO_SUPERUSER)
+    assert overview.open == moved
+    event = uow.state.audit[-1]
+    assert (event.actor, event.detail, event.at) == (UPDATER_ACTOR, "update.verifying", clock.now())
+
+
+async def test_a_repeated_step_is_not_audited_again(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    request_id = await running(uow, clock, releases)
+    await service(uow, clock).report_step(request_id, UpdateStep.PULLING)
+    count = len(uow.state.audit)
+    await service(uow, clock).report_step(request_id, UpdateStep.PULLING)
+    assert len(uow.state.audit) == count
+
+
+async def test_a_step_going_back_is_refused(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    request_id = await running(uow, clock, releases)
+    await service(uow, clock).report_step(request_id, UpdateStep.STARTING)
+    with pytest.raises(DomainError) as caught:
+        await service(uow, clock).report_step(request_id, UpdateStep.PULLING)
+    assert caught.value.field == "step"
 
 
 async def test_report_for_an_unknown_request(uow: InMemoryUnitOfWork, clock: FixedClock) -> None:

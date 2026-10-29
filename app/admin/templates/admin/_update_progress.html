@@ -1,0 +1,35 @@
+{#- Progress of the open update request (ADR 0048): the host updater's steps, or how it ended.
+    Rendered inside the updates page and on its own for static/update-progress.js, which swaps
+    it in while ``data-poll`` is present. Works without the script: "Refresh status" reloads. -#}
+<div class="update-progress" data-update-fragment{% if progress and progress.polling %} data-poll="{{ "/admin/updates/progress?seen=" ~ (progress.key | urlencode) }}"{% endif %}>
+{% if progress and progress.steps %}
+  <p class="update-progress__status" data-status>{{ progress.status }}</p>
+  <ol class="update-steps" aria-label="{{ _("admin.updates.steps") }}">
+    {% for step in progress.steps %}
+    <li class="update-steps__item update-steps__item--{{ step.state }}"{% if step.state == "current" %} aria-current="step"{% endif %}>
+      <span class="update-steps__marker" aria-hidden="true"></span>
+      <span class="update-steps__label">{{ step.label }}</span>
+      <span class="chip{% if step.state == "current" %} chip--accent{% elif step.state == "done" %} chip--success{% endif %}">{{ step.state_label }}</span>
+      {% if step.since %}<span class="hint">{{ step.since }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% if progress.unclaimed %}
+  <div class="alert alert--error"><p>{{ _("admin.updates.unclaimed") }}</p></div>
+  {% endif %}
+  <div class="form-actions">
+    {% if progress.request.status == "requested" %}
+    <form method="post" action="/admin/updates/requests/{{ progress.request.id }}/cancel">
+      <button type="submit" class="button button--secondary">{{ _("admin.updates.cancel") }}</button>
+    </form>
+    {% endif %}
+    <a class="button button--ghost" href="/admin/updates">{{ _("admin.updates.progress.refresh") }}</a>
+  </div>
+{% elif progress %}
+  <p class="update-progress__status" data-status>{{ progress.status }}</p>
+  {% if progress.reason %}<p>{{ progress.reason }}</p>{% endif %}
+  <p><a href="/admin/updates">{{ _("admin.updates.progress.reload") }}</a></p>
+{% else %}
+  <p><a href="/admin/updates">{{ _("admin.updates.progress.reload") }}</a></p>
+{% endif %}
+</div>

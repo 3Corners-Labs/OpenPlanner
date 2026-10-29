@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     # A change needs a login of at most this age; older sessions are sent to the IdP first,
     # which refreshes the roles (invisible with an active SSO session).
     admin_reauth_minutes: int = 60
+    # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
+    # seconds (class C, platform; here until the ADR 0042 registry exists).
+    staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
+    # Without a login for this many days, a person is marked dormant in the staff list
+    # (class D, organisation; one value for every organisation until the registry exists).
+    staff_dormant_after_days: int = Field(default=90, ge=14, le=365)
     admin_timezone: str = "Europe/Amsterdam"
     oidc_discovery_url: str | None = None
     oidc_client_id: str = "openplanner-admin"

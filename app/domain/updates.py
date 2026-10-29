@@ -8,6 +8,9 @@ the outcome. A successful update can be restored to the version it replaced for
     requested ──claim──► running ──report──► succeeded | rolled_back | failed
         └──cancel──► cancelled
 
+While running, the updater reports each step it starts (ADR 0048), so the portal can show
+where it is: ``PLANS`` lists the steps per action; rolling back may follow any of them.
+
 Everything here is about the installation, not about citizens: no personal data.
 """
 
@@ -116,6 +119,38 @@ class UpdateStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class UpdateStep(StrEnum):
+    """A step of the host updater, in the order it takes them.
+
+    ``WAITING`` is not reported: it is the step of a request nobody claimed yet.
+    """
+
+    WAITING = "waiting"
+    PULLING = "pulling"
+    VERIFYING = "verifying"
+    BACKING_UP = "backing_up"
+    MIGRATING = "migrating"
+    STARTING = "starting"
+    ROLLING_BACK = "rolling_back"
+
+
+PLANS: dict[UpdateAction, tuple[UpdateStep, ...]] = {
+    UpdateAction.UPDATE: (
+        UpdateStep.PULLING,
+        UpdateStep.VERIFYING,
+        UpdateStep.BACKING_UP,
+        UpdateStep.STARTING,
+    ),
+    UpdateAction.RESTORE: (UpdateStep.BACKING_UP, UpdateStep.MIGRATING, UpdateStep.STARTING),
+}
+"""The steps the host updater reports per action (``scripts/updater``), in order."""
+
+REPORTED_STEPS = frozenset(UpdateStep) - {UpdateStep.WAITING}
+"""What the host updater can report."""
+
+_ORDER = tuple(UpdateStep)
+
+
 OUTCOMES = frozenset({UpdateStatus.SUCCEEDED, UpdateStatus.ROLLED_BACK, UpdateStatus.FAILED})
 """What the host updater can report."""
 
@@ -135,6 +170,8 @@ class UpdateRequest:
         started_at: When the host updater claimed it.
         finished_at: When it ended (reported or cancelled).
         reason: The updater's code for a rollback or failure (``health_check_failed``, …).
+        step: The step the updater reported last; ``None`` before its first report.
+        step_at: When it reported that step.
     """
 
     id: int | None
@@ -147,6 +184,8 @@ class UpdateRequest:
     started_at: datetime | None = None
     finished_at: datetime | None = None
     reason: str = ""
+    step: UpdateStep | None = None
+    step_at: datetime | None = None
 
     @property
     def is_open(self) -> bool:
@@ -202,6 +241,72 @@ def finished(
     if reason and not _REASON.fullmatch(reason):
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "reason")
     return replace(request, status=status, reason=reason, finished_at=now)
+
+
+def progressed(request: UpdateRequest, step: UpdateStep, now: datetime) -> UpdateRequest:
+    """Return the running request at ``step``, as the host updater reported it.
+
+    Steps only move forward; reporting the current step again changes nothing.
+
+    Raises:
+        DomainError: ``update_in_progress`` when the request is not running;
+            ``invalid_configuration`` for ``step`` when it is not in the action's plan (or
+            rolling back), or lies before the step reported last.
+    """
+    if request.status is not UpdateStatus.RUNNING:
+        raise DomainError(ErrorCode.UPDATE_IN_PROGRESS)
+    if step is request.step:
+        return request
+    allowed = (*PLANS[request.action], UpdateStep.ROLLING_BACK)
+    if step not in allowed or (
+        request.step is not None and _ORDER.index(step) < _ORDER.index(request.step)
+    ):
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "step")
+    return replace(request, step=step, step_at=now)
+
+
+@dataclass(frozen=True)
+class PlanStep:
+    """One line of the progress list.
+
+    Attributes:
+        step: The step.
+        state: ``done``, ``current`` or ``pending``.
+        since: When the current step began (claimed or reported); ``None`` otherwise.
+    """
+
+    step: UpdateStep
+    state: str
+    since: datetime | None = None
+
+
+def progress(request: UpdateRequest) -> list[PlanStep]:
+    """Return the steps of an open request with their state; empty once it ended.
+
+    The waiting step comes first. A claimed request without a reported step (an updater or
+    a running version from before ADR 0048) is shown at the first step of its plan. Rolling
+    back is listed only once the updater reports it.
+    """
+    if not request.is_open:
+        return []
+    since: datetime | None
+    if request.status is UpdateStatus.REQUESTED:
+        current, since = UpdateStep.WAITING, request.requested_at
+    else:
+        current = request.step or PLANS[request.action][0]
+        since = request.step_at or request.started_at
+    steps = [UpdateStep.WAITING, *PLANS[request.action]]
+    if current is UpdateStep.ROLLING_BACK:
+        steps.append(UpdateStep.ROLLING_BACK)
+    at = steps.index(current)
+    return [
+        PlanStep(step, "done")
+        if index < at
+        else PlanStep(step, "current", since)
+        if index == at
+        else PlanStep(step, "pending")
+        for index, step in enumerate(steps)
+    ]
 
 
 def restore_candidate(

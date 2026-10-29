@@ -190,13 +190,15 @@ other `/admin` route declares one permission of the matrix (ADR 0014). Inputs fr
 | Spoofing | Silent re-login after logout through the identity provider's SSO session | RP-initiated logout at the provider's `end_session_endpoint`; an interstitial page keeps CSP `form-action 'self'` | `test_logout`, `tests/adapters/test_oidc.py::test_logout_url_uses_the_end_session_endpoint`, `e2e/tests/admin-roles.spec.ts` (outsider logs out, super must log in afresh) |
 | Tampering (CSRF) | A third-party site logs an admin out | Logout is a POST with the Fetch Metadata check | `test_logout` |
 | Spoofing (open redirect) | `next` sends the admin to another site after login | `next` must be a path under `/admin/` | `test_next_cannot_leave_the_admin_portal` |
-| Repudiation | An admin denies a login, a refused attempt or a change | Logins, logouts, failed logins and denials go to `audit_events`, per organisation/group in the admin's scope; the audit log shows names from `admin_profiles` | `test_denials_are_audited`, `test_identity_errors_are_audited`, `test_audit_log_shows_names_and_logins_within_the_organisation` |
+| Repudiation | An admin denies a login, a refused attempt or a change | Logins, logouts, failed logins and denials go to `audit_events`, per organisation/group in the admin's scope; the audit log shows names from `staff` (ADR 0046) | `test_denials_are_audited`, `test_identity_errors_are_audited`, `test_audit_log_shows_names_and_logins_within_the_organisation` |
 | Information disclosure | A group admin reads the organisation's own events, or any admin reads another organisation's or group's events in the audit log (ADR 0031) | `audit.view` is a group-level permission; the scope from the matrix is applied in SQL and is exact per level (a group admin's scope has no organisations, so events with an empty group never match); the page's filters are ANDed with the scope and an out-of-scope group is ignored | `tests/adapters/db/test_admin_queries.py::test_audit_scope_is_exact_per_level`, `test_audit_filter_narrows_within_the_scope`, `tests/admin/test_audit_routes.py::test_each_role_sees_its_own_level_and_nothing_above_or_beside`, `test_a_filter_cannot_reach_outside_the_scope` |
 | Information disclosure | The read-only auditor role (ADR 0039) reaches citizens' personal data or changes something | The auditor's permissions are reading only and exclude every permission in `PII_PERMISSIONS` (`bookings.view`); in the audit log a booking id links to the timeline only with `bookings.view`; routes and services decide again on every request | `tests/domain/test_authorization.py::test_the_auditor_never_holds_personal_data_or_a_change`, `tests/admin/test_authorization_matrix.py::test_matrix` (auditor column), `e2e/tests/admin-roles.spec.ts` (auditor refused on agenda and settings) |
 | Information disclosure | The retention overview (ADR 0039) shows citizens' data, identifies a booking, or shows another organisation's groups | The adapter selects only counts, statuses and times (no personal data column, no booking id); `retention.view` is an organisation-level permission whose scope is applied in SQL; group admins do not hold it | `tests/adapters/db/test_retention_queries.py::test_the_scope_is_applied_in_sql`, `tests/admin/test_retention_routes.py::test_a_booking_past_its_purge_moment_needs_attention` (no name, email or phone on the page), `test_each_admin_sees_the_groups_of_their_own_organisation`, `tests/admin/test_authorization_matrix.py::test_matrix` |
+| Information disclosure | The staff directory (ADR 0046) shows an admin of another organisation or group, a superuser, or where else a colleague works | `staff.view` is a group-level permission whose scope is applied in SQL (`scope_filter` on the memberships); superusers are listed only for the superuser's scope; memberships outside the viewer's scope are removed before rendering; filters are ignored outside the scope; a person outside the scope answers 404; links carry the record number, never the IdP subject | `tests/adapters/db/test_staff_queries.py::test_sql_applies_the_domain_rules`, `tests/domain/test_staff.py`, `tests/admin/test_staff_routes.py::test_each_viewer_sees_their_own_scope_and_no_superuser`, `test_a_person_outside_the_scope_does_not_exist`, `test_filters_outside_the_scope_are_ignored` |
+| Repudiation | A role or membership change in the IdP goes unnoticed | Each login compares the claims with the staff record and audits the difference per organisation and group (`staff.membership_changed`), without slugs of other organisations in the detail | `tests/domain/test_staff.py::test_a_move_is_shown_to_both_organisations_without_the_other_ones_slug`, `tests/domain/test_admin_service.py::test_a_login_records_the_staff_member_and_what_changed` |
 | Elevation | A permission that affects several organisations or secrets reaches a role other than the superuser (ADR 0039) | `LOCKED_PERMISSIONS` lists them; a test asserts that only the superuser holds each one; the matrix page and `docs/authorization.md` mark them | `tests/domain/test_authorization.py::test_locked_permissions_belong_to_the_superuser_only` |
 | Information disclosure | Personal data of citizens in system events | The worker records only the job type, outcome, error code (never exception text), attempt, channel and booking id | `tests/jobs/test_runner.py::test_a_sent_message_is_a_system_event_of_the_group`, `test_retries_and_the_final_failure_are_recorded_with_the_error_code` |
-| Information disclosure | Personal data in logs or audit events | Logs and audit events carry the subject identifier only; the display name is stored once in `admin_profiles` and hidden from `repr` | `tests/domain/test_authorization.py::test_principal_repr_hides_the_display_name`, `tests/test_logging.py` |
+| Information disclosure | Personal data in logs or audit events | Logs and audit events carry the subject identifier only; the display name is stored once in `staff` and hidden from `repr` (`Principal`, `StaffMember`) | `tests/domain/test_authorization.py::test_principal_repr_hides_the_display_name`, `tests/test_logging.py` |
 | Elevation | A development shortcut reaches production (login bypass, role switcher, test users) | No bypass or switcher exists in code; test users exist only in the Keycloak dev realm; production requires an `https` discovery URL and a client secret | `tests/test_config.py::test_production_is_the_default_and_refuses_development_defaults`, `e2e/tests/admin-roles.spec.ts` logs in through the real provider |
 
 ## Flow: groups and planning in the admin portal (WP7b)
@@ -283,8 +285,12 @@ Inputs from outside: notice texts, date-times, booking ids in paths, a chosen sl
 Admins: `GET/POST /admin/organisations/{org}/contacts` (`organisation.closure`) and a group's
 own block at `GET/POST /admin/groups/{slug}/closure/contacts` (`closure.manage`); a closure
 copies the block that applies when it starts, with an optional heading per locale (CL-1).
-Citizens: the block on closure and maintenance pages (from CL-2 and MM-3). Inputs from outside:
-kind, details, labels, opening hours and headings of up to six options; closure headings.
+Citizens (CL-2): the closure page `GET /g/{slug}/closure`, shown in place of the calendar on
+`GET /g/{slug}` while the team is closed and linked from the banner before; the management page
+of a booking on hold (`GET /b/{token}`) shows the closure's copy above its actions. The
+maintenance page follows in MM-3. Inputs from outside: kind, details, labels, opening hours and
+headings of up to six options; closure headings; on the citizen side only the slug and token
+in the path. The e2e examples come from `python -m app.cli seed-closures`.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -297,6 +303,9 @@ kind, details, labels, opening hours and headings of up to six options; closure 
 | Tampering | Stored JSON from another version breaks the page or smuggles an invalid link | Options are validated again when read; invalid ones are left out | `tests/adapters/db/test_contact_queries.py::test_options_another_version_wrote_are_left_out` |
 | Tampering (CSRF) | A third-party site changes the block in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_contact_routes.py::test_cross_site_posts_are_refused` |
 | Repudiation | Who changed the contact options | Audited in the same transaction with counts per kind, never values | `tests/domain/test_contact_service.py::test_organisation_admin_saves_the_block_and_it_is_audited_with_counts` |
+| Information disclosure | The closure page reveals a closure citizens should not see yet, or a past one | It shows only what the banner shows (active, or upcoming and announced); the URL has only the slug, so past closures cannot be listed; without one it redirects to the calendar | `tests/api/test_closure_pages.py::test_the_closure_page_of_an_open_team_goes_back_to_the_calendar`, `test_an_upcoming_closure_keeps_the_calendar_and_links_to_its_page` |
+| Information disclosure | The page of a booking on hold shows the citizen's details next to the contact options | The management page shows the appointment, never contact details | `tests/api/test_closure_pages.py::test_a_booking_on_hold_shows_the_contact_options_above_its_actions` |
+| Information disclosure | The e2e example booking (a made-up citizen) ends up in a production database | `seed-closures` refuses when `ENVIRONMENT=prod` | `tests/test_cli.py::test_seed_closures_refuses_production` |
 
 ## Flow: video meetings, work items and direct calls (WP5/WP6)
 
@@ -375,10 +384,12 @@ address; in the admin portal the client form.
 
 Worker: `GET https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest` (hourly).
 Admin (superuser): `GET /admin/updates`, `POST /admin/updates/update`, `/restore`,
-`/requests/{id}/cancel`, `/snooze`. Host updater: `python -m app.cli update-claim`,
+`/requests/{id}/cancel`, `/snooze`, and `GET /admin/updates/progress?seen=` polled by the
+page's script (ADR 0048). Host updater: `python -m app.cli update-claim`, `update-progress`,
 `update-report`, `backup-db`, `restore-db` inside the web container. Inputs from outside: the
-release body from GitHub (tag, page), the snooze's return path, a request id in the path, and
-the updater's status and reason. No personal data, except in the database backups.
+release body from GitHub (tag, page), the snooze's return path, a request id in the path, the
+poller's `seen` key, and the updater's step, status and reason. No personal data, except in the
+database backups.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -392,6 +403,9 @@ the updater's status and reason. No personal data, except in the database backup
 | Denial of service | A broken release takes the booking pages down | Backup before the switch; health wait of `HEALTH_TIMEOUT`; automatic return to the previous digest and the backup | `tests/scripts/test_updater.py::test_unhealthy_update_restores_the_backup_and_the_previous_digest`, `test_restore_downgrades_the_schema_then_runs_the_previous_digest`; runbook "Updates" |
 | Information disclosure | Database backups (personal data) outlive the retention rules | Backups only in the data volume, mode 600, deleted after 24 hours on every updater run | `tests/adapters/db/test_backup.py::test_backup_is_a_private_consistent_copy`, `test_prune_deletes_backups_older_than_a_day` |
 | Tampering | A backup name used as a path | Backup names are plain words (`[A-Za-z0-9_-]{1,64}`) | `test_backup_name_is_a_plain_word` |
+| Tampering | The updater (or a shell in the container) reports nonsense steps to mislead the superuser, or a step that goes back | Steps must be in the action's plan (also a database check) and only move forward; the CLI only accepts known step names | `tests/domain/test_updates.py::test_steps_only_move_forward_and_belong_to_the_action`, `tests/test_cli_updates.py::test_progress_records_the_step` |
+| Elevation (XSS) | The live progress script becomes a way to run injected markup on an admin page | The script runs only on the updates page while a request is open, loads from our origin (`script-src 'self'`, no inline), fetches only the same-origin fragment and inserts autoescaped server HTML; `seen` is only compared, never echoed unescaped | `tests/admin/test_update_routes.py::test_page_shows_the_steps_and_loads_the_poller_while_a_request_is_open`, `test_progress_fragment_answers_only_when_something_changed` |
+| Elevation | An organisation admin reads the update progress | The fragment needs `system.update` like the page | `test_progress_fragment_refuses_an_organisation_admin`, `tests/admin/test_authorization_matrix.py::test_matrix` |
 | Repudiation | Who started an update and what the updater did | Requests and cancellations audited (`system.update`, `update.request`, `restore.request`, `request.cancel`); every updater step audited as `host-updater` with its reason | `test_cancel_a_waiting_request`, `test_updater_claims_the_waiting_request_once` |
 
 

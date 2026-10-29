@@ -86,3 +86,8 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - Closure content (ADR 0037, CL-1): optional heading per locale on a closure, a team's own
   contact block overriding the organisation default, and a copy of the block that applies taken
   when a closure starts; an update can take over the current block.
+- Closure pages for citizens (ADR 0037, CL-2): while a team is closed its page shows the
+  closure page (heading, period, notice, contact options) instead of the calendar; the banner of
+  an upcoming closure links to that page at `/g/{slug}/closure`; the page of a booking on hold
+  shows the contact options above its actions. `seed-closures` adds the examples that e2e checks
+  (axe, Lighthouse, keyboard) in nl and en; refused in production.
