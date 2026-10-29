@@ -14,7 +14,8 @@ test('book, move and cancel with the keyboard only', async ({ page }) => {
 
   // The calendar is one tab stop (an ARIA grid); arrow keys move between days.
   const grid = page.getByRole('grid');
-  const selected = grid.locator('a.calendar__day[tabindex="0"]');
+  // Any day can hold the tab stop: a day without times (a span) as well as a free one (a link).
+  const selected = grid.locator('.calendar__day[tabindex="0"]');
   const day = await selected.getAttribute('data-day');
   await tabTo(page, selected);
   await page.keyboard.press('ArrowRight');
@@ -87,10 +88,11 @@ test('the calendar works without JavaScript', async ({ browser }) => {
 
   // Without the script the calendar is a plain table of links, not a grid.
   await expect(page.getByRole('grid')).toHaveCount(0);
+  // The last free day of the month: late in a month there may be only one.
   const days = page.locator('a.calendar__day');
-  const second = days.nth(1);
-  const label = await second.getAttribute('data-day');
-  await second.click();
+  const last = days.last();
+  const label = await last.getAttribute('data-day');
+  await last.click();
   await expect(page).toHaveURL(new RegExp(`day=${label}`));
   await expect(page.locator(`a[data-day="${label}"]`)).toHaveAttribute('aria-current', 'true');
   // No axe here: axe runs as a script. The same markup is scanned in the other tests.
