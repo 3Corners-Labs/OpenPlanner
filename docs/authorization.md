@@ -23,6 +23,7 @@ stays open to every role as usual.
 | View own rights (`rights.view`) | Portal | – | yes | yes | yes | yes |
 | View rights matrix (`matrix.view`) | Portal | – | yes | yes | yes | yes |
 | Manage organisations (`organisation.manage`) | Portal | locked | yes | – | – | – |
+| Switch diagnostic mode (`diagnostics.manage`) | Portal | locked | yes | – | – | – |
 | Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | locked | yes | – | – | – |
 | Manage API clients (`api_clients.manage`) | Portal | locked | yes | – | – | – |
 | Update the installation (`system.update`) | Portal | locked, maintenance | yes | – | – | – |
@@ -34,6 +35,7 @@ stays open to every role as usual.
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | – | yes | yes | – | – |
 | View retention (`retention.view`) | Organisation | – | yes | yes | – | yes |
 | View audit log (`audit.view`) | Group | – | yes | yes | yes | yes |
+| Export audit log (`audit.export`) | Group | – | yes | yes | – | yes |
 | View group (`group.view`) | Group | – | yes | yes | yes | yes |
 | Change group settings (`group.edit`) | Group | – | yes | yes | – | – |
 | Manage staffing and staffing exceptions (`schedule.manage`) | Group | – | yes | yes | yes | – |
