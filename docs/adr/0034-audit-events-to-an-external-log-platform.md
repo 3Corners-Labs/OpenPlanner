@@ -1,6 +1,8 @@
 # 0034. Audit events to an external log platform
 
-Status: proposed (2026-10-27). Extends ADR 0031 (audit log per level, with system events).
+Status: accepted (2026-10-28) by the product owner, with the choices recorded under
+*Acceptance* below. Extends ADR 0031 (audit log per level, with system events). The field list
+of point 2 is replaced by `openplanner.event/1` of ADR 0040, part 2.
 
 ## Context
 
@@ -45,6 +47,40 @@ events are not in that stream; they exist only in the database.
 5. **One place in code.** The emit lives in the audit adapter next to the code that writes
    `AuditEventRow`, as a post-commit callback of the unit of work. Routes and services do not
    log audit events themselves.
+
+## Acceptance (2026-10-28)
+
+The product owner accepted this ADR with these choices:
+
+- **Delivery:** one JSON line on stdout after commit (points 1 and 4), no outbox table; the
+  gap when the process dies between commit and emit is accepted.
+- **Schema:** the record is `openplanner.event/1` (ADR 0040) plus `log_type: "audit"`, not
+  `openplanner.audit/1`; `docs/audit-events.md` lists the fields.
+- **Categories shipped:** `audit`, `system` and `security`. `diagnostic` events never leave
+  the installation.
+- **Admin identity:** the subject only (point 3); no display name or email.
+- **Security events (AU-4):** a rejected webhook (`webhook.rejected`, reason
+  `invalid_signature`, detail `source:webex|wxcc`) and a failed Webex token refresh
+  (`webex.token_refresh`, reason `unauthorized` or `unreachable`) are global events of
+  category `security`. Per kind, at most one is written per window of
+  `SECURITY_EVENT_WINDOW_MINUTES` (default 15); the next one says how many were held back
+  (`suppressed:<n>`). The counters are kept in memory per process.
+
+As built: `app/adapters/event_sink.py` (the line), `SqlUnitOfWork(sink=...)` (post-commit, also
+for audit events written in a read transaction), `app/domain/security_log.py` (AU-4). The audit
+line bypasses `LOG_LEVEL`, so a quiet log level never drops the trail. Audit events written by
+the host CLI (`docker exec ... python -m app.cli`) are not shipped: that output does not reach
+the container log; they are in the table.
+
+## Settings
+
+| Key | Class | Default | Bounds | Permission | Note |
+|---|---|---|---|---|---|
+| `SECURITY_EVENT_WINDOW_MINUTES` | C platform | 15 | 1–1440 | superuser (env until the ADR 0042 registry exists) | window of AU-4 |
+| `INSTALLATION_NAME` | B deployment | empty | `[A-Za-z0-9_.-]{0,64}` | env | from ADR 0040 part 2 |
+
+**Fixed on purpose:** the categories that are shipped (a choice of the product owner, and
+keeping diagnostic data inside the installation is a protection); the `log_type` marker.
 
 ## Consequences
 

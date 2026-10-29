@@ -382,6 +382,33 @@ msgstr "Beheer"
 msgid "admin.nav.label"
 msgstr "Beheermenu"
 
+msgid "admin.nav.section.monitor"
+msgstr "Bewaken"
+
+msgid "admin.nav.section.manage"
+msgstr "Beheren"
+
+msgid "admin.nav.section.platform"
+msgstr "Platform"
+
+msgid "admin.nav.object.group"
+msgstr "Groep"
+
+msgid "admin.profile.roles"
+msgstr "Uw rollen"
+
+msgid "admin.theme.label"
+msgstr "Weergave"
+
+msgid "admin.theme.system"
+msgstr "Systeem"
+
+msgid "admin.theme.light"
+msgstr "Licht"
+
+msgid "admin.theme.dark"
+msgstr "Donker"
+
 msgid "admin.nav.dashboard"
 msgstr "Overzicht"
 
@@ -622,6 +649,12 @@ msgstr "Organisaties beheren"
 
 msgid "authz.permission.audit_view"
 msgstr "Auditlog bekijken"
+
+msgid "authz.permission.audit_export"
+msgstr "Auditlog exporteren"
+
+msgid "authz.permission.diagnostics_manage"
+msgstr "Diagnosemodus schakelen"
 
 msgid "authz.permission.integrations_manage"
 msgstr "Koppelingen en geheimen beheren"
@@ -2969,15 +3002,6 @@ msgstr "Het versturen is mislukt door een onverwachte fout van de mailserver. Pr
 msgid "admin.audit.filter"
 msgstr "Filter"
 
-msgid "admin.audit.source"
-msgstr "Soort"
-
-msgid "admin.audit.source.admin"
-msgstr "Acties van beheerders"
-
-msgid "admin.audit.source.system"
-msgstr "Systeemgebeurtenissen"
-
 msgid "admin.audit.group"
 msgstr "Groep"
 
@@ -3079,6 +3103,126 @@ msgstr "Persoonsgegevens verwijderen"
 
 msgid "audit.event.storage_check"
 msgstr "Opslag controleren"
+
+msgid "admin.audit.diagnostics.title"
+msgstr "Diagnosemodus"
+
+msgid "admin.audit.diagnostics.intro"
+msgstr "Zolang de diagnosemodus aan staat, schrijft het platform extra debugregels over die groep of organisatie in dit log. De beheerders van de groep zien ze ook. De modus gaat na de ingestelde tijd vanzelf uit (standaard 24 uur), en ook als de schijf bijna vol is."
+
+msgid "admin.audit.diagnostics.active"
+msgstr "{target}: aan tot {until}"
+
+msgid "admin.audit.diagnostics.off"
+msgstr "Uitzetten"
+
+msgid "admin.audit.diagnostics.on"
+msgstr "Aanzetten"
+
+msgid "admin.audit.diagnostics.none"
+msgstr "De diagnosemodus staat nergens aan."
+
+msgid "admin.audit.diagnostics.target"
+msgstr "Groep of organisatie"
+
+msgid "admin.done.diagnostics_on"
+msgstr "De diagnosemodus staat aan."
+
+msgid "admin.done.diagnostics_off"
+msgstr "De diagnosemodus staat uit."
+
+msgid "audit.event.job_run"
+msgstr "Taak uitgevoerd (diagnose)"
+
+msgid "audit.event.diagnostics_brake"
+msgstr "Diagnosemodus gestopt"
+
+msgid "admin.audit.detail.diagnostics_on"
+msgstr "diagnosemodus aan"
+
+msgid "admin.audit.detail.diagnostics_off"
+msgstr "diagnosemodus uit"
+
+msgid "admin.audit.detail.modes"
+msgstr "{count} keer beëindigd"
+
+msgid "admin.audit.level"
+msgstr "Minimaal niveau"
+
+msgid "admin.audit.level.debug"
+msgstr "Debug"
+
+msgid "admin.audit.level.info"
+msgstr "Info"
+
+msgid "admin.audit.level.warning"
+msgstr "Waarschuwing"
+
+msgid "admin.audit.level.error"
+msgstr "Fout"
+
+msgid "admin.audit.level.critical"
+msgstr "Kritiek"
+
+msgid "admin.audit.category"
+msgstr "Soort"
+
+msgid "admin.audit.category.audit"
+msgstr "Beheeracties"
+
+msgid "admin.audit.category.system"
+msgstr "Systeem"
+
+msgid "admin.audit.category.security"
+msgstr "Beveiliging"
+
+msgid "admin.audit.category.diagnostic"
+msgstr "Diagnose"
+
+msgid "admin.audit.from"
+msgstr "Van"
+
+msgid "admin.audit.to"
+msgstr "Tot en met"
+
+msgid "admin.audit.trace"
+msgstr "Keten-id"
+
+msgid "admin.audit.trace_link"
+msgstr "Hele keten"
+
+msgid "admin.audit.export"
+msgstr "Exporteren als CSV"
+
+msgid "admin.audit.export.too_many_days"
+msgstr "De export beslaat te veel dagen. Kies een kortere periode."
+
+msgid "admin.audit.export.too_many_rows"
+msgstr "De export bevat te veel regels. Maak het filter nauwer, bijvoorbeeld met een kortere periode."
+
+msgid "audit.event.webhook_rejected"
+msgstr "Webhook geweigerd"
+
+msgid "audit.event.token_refresh"
+msgstr "Webex-token vernieuwen"
+
+msgid "admin.audit.reason.invalid_signature"
+msgstr "Handtekening of tijdstempel klopt niet."
+
+msgid "admin.audit.reason.unauthorized"
+msgstr "De dienst weigert onze inloggegevens."
+
+msgid "admin.audit.reason.unreachable"
+msgstr "De dienst is niet bereikbaar."
+
+msgid "admin.audit.detail.suppressed"
+msgstr "nog {count} keer sinds de vorige melding"
+
+msgid "admin.audit.detail.source_webex"
+msgstr "van Webex"
+
+msgid "admin.audit.detail.source_wxcc"
+msgstr "van Webex Contact Center"
 
 msgid "audit.job.send_suspension"
 msgstr "Bericht over sluiting versturen"
