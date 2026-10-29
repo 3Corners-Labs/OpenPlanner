@@ -1,0 +1,11 @@
+{#- Header of the scenario pages (ADR 0037 §4): the group's header with its tabs, or the
+    organisation's breadcrumbs. Expects ``page_title`` and ``page_lead``. -#}
+{% from "admin/_page_header.html" import page_header with context %}
+{% if summary is defined %}
+{% include "admin/_group_header.html" %}
+<h2 class="section-title">{{ page_title }}</h2>
+<p>{{ page_lead }}</p>
+{% else %}
+{{ page_header("/admin/closures", _("admin.closures.title"), page_title, page_title, page_lead, closure_url, organisation_name) }}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% endif %}

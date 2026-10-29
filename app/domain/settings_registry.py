@@ -382,6 +382,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Age after which the worker healthcheck fails.",
     ),
     S("app_version", K.STRING, "", _B, T.HOST, "Baked into release images (ADR 0029)."),
+    S("app_commit", K.STRING, "", _B, T.HOST, "Git commit baked into every image (ADR 0052)."),
     S(
         "installation_name",
         K.STRING,
@@ -585,6 +586,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "One security event per source and reason per window; repeats are counted (ADR 0034).",
         minimum=1,
         maximum=1440,
+    ),
+    S(
+        "security_event_max_sources",
+        K.INT,
+        1000,
+        _C,
+        T.OPERATIONS,
+        "Windows (kind of event × caller) a process keeps; beyond that, callers count as many "
+        "(ADR 0053).",
+        minimum=10,
+        maximum=100_000,
     ),
     S(
         "audit_export_max_rows",

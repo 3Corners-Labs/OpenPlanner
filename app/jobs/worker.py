@@ -24,7 +24,7 @@ from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import build_integrations, secret_box
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
-from app.config import Settings
+from app.config import Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
@@ -40,7 +40,7 @@ from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from app.keys import management_token_key
-from app.logging import configure_logging
+from app.logging import configure_logging, warn_loose_secret_files
 
 log = structlog.get_logger()
 
@@ -68,7 +68,12 @@ async def run_worker(
     http = httpx.AsyncClient(timeout=15.0, transport=transport)
     # ADR 0034: committed audit events also go to stdout for the log platform.
     uow = SqlUnitOfWork(engine, secret_box(settings), StdoutEventSink(settings.event_envelope))
-    security = SecurityLog(uow, clock, timedelta(minutes=settings.security_event_window_minutes))
+    security = SecurityLog(
+        uow,
+        clock,
+        timedelta(minutes=settings.security_event_window_minutes),
+        max_sources=settings.security_event_max_sources,
+    )
     integrations = build_integrations(settings, engine, http, clock, security)
     fallback = fallback_mail(settings)
     runner = JobRunner(
@@ -154,6 +159,7 @@ async def _main() -> None:
     settings = Settings()
     set_service("worker")
     configure_logging(settings.log_level, envelope=settings.event_envelope)
+    warn_loose_secret_files(loose_secret_files(environment()))
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):

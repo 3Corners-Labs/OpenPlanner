@@ -17,6 +17,9 @@ x-app: &app
   env_file:
     - path: .env
       required: false
+    # Bootstrap keys from `python -m app.cli init` (ADR 0042 §9).
+    - path: secrets/secrets.env
+      required: false
   volumes:
     - data:/srv/data
   read_only: true

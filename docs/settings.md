@@ -6,6 +6,8 @@ file differs from the code. The classes and their rules are in
 [ADR 0042](adr/0042-settings-layers-env-lock-and-advanced-settings.md).
 
 - **A and B** are read from the environment only; their values never appear in the portal.
+  A bootstrap secret `X` may instead come from the file named by `X_FILE` (§9);
+  `python -m app.cli init` generates the three keys into `secrets/secrets.env`.
 - **C and D** will be set in the portal (build step 3 onwards). An environment variable
   *locks* them: it wins, and the portal shows the setting read-only. A locked value outside
   the portal bounds is accepted but flagged by `python -m app.cli settings list`.
@@ -41,6 +43,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WORKER_HEARTBEAT_PATH` | path | `data/worker.heartbeat` | Heartbeat file the worker healthcheck reads. |
 | `WORKER_HEARTBEAT_MAX_AGE_SECONDS` | float | `120.0` | Age after which the worker healthcheck fails. |
 | `APP_VERSION` | string | `""` | Baked into release images (ADR 0029). |
+| `APP_COMMIT` | string | `""` | Git commit baked into every image (ADR 0052). |
 | `INSTALLATION_NAME` | string | `""` | Name of this installation in every log line and event record (ADR 0040/0034). |
 | `WEBEX_API_BASE_URL` | url | `https://webexapis.com/v1` | Webex API endpoint; changed only for test doubles. |
 | `SIMULATOR_ENABLED` | bool | `false` | Platform-event simulator on admin booking pages; refused in production. |
@@ -68,6 +71,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |
 | `SECURITY_EVENT_WINDOW_MINUTES` | int | `15` | 1–1440 | `settings.platform.manage` | One security event per source and reason per window; repeats are counted (ADR 0034). |
+| `SECURITY_EVENT_MAX_SOURCES` | int | `1000` | 10–100000 | `settings.platform.manage` | Windows (kind of event × caller) a process keeps; beyond that, callers count as many (ADR 0053). |
 | `AUDIT_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of the audit log may hold; more is refused (ADR 0040). |
 | `AUDIT_EXPORT_MAX_DAYS` | int | `366` | 1–3660 | `settings.platform.manage` | Most days one CSV export of the audit log may cover (ADR 0040). |
 | `EMBEDDING_MAX_ORIGINS` | int | `20` | 1–100 | `settings.platform.manage` | Most host websites one organisation may allow for the embedded widget (ADR 0035). |

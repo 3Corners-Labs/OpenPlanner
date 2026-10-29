@@ -14,6 +14,8 @@ data/
 proxy.env
 # Host-specific additions on an installed checkout (docs/install.md).
 docker-compose.override.yml
+# Bootstrap keys from `python -m app.cli init` (ADR 0042).
+secrets/
 .audit-requirements.txt
 .DS_Store
 mutants/
@@ -26,3 +28,7 @@ mutants/
 
 # Local gstack reports (security audits stay on the machine)
 .gstack/
+
+# The widget bundle is built by esbuild in CI and in the image (ADR 0035).
+widget/node_modules/
+widget/dist/
