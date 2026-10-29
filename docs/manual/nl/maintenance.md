@@ -10,6 +10,12 @@ tijdelijk geen afspraken laten aannemen, gebruik dan een noodsluiting.
 
 ## Wat er gebeurt als de onderhoudsmodus aan staat
 
+- **Burgers** kunnen geen afspraak maken, verzetten of annuleren en geen direct gesprek
+  starten. Ze zien een melding dat er onderhoud is, met de verwachte eindtijd als u die hebt
+  ingevuld en de contactalternatieven van het team (of van de organisatie) als die er zijn.
+  Een afspraak bekijken en deelnemen aan een gesprek dat al vaststaat, kan wel.
+- **Afspraken die al vaststaan** gaan gewoon door: herinneringen, werkitems en videogesprekken
+  blijven werken. Persoonsgegevens worden op tijd verwijderd zoals altijd.
 - **Beheerders** kunnen alles lezen, maar niets wijzigen. Elke pagina toont bovenaan de balk
   **Onderhoudsmodus**. Een geweigerde wijziging komt in de auditlog met de reden
   **Geweigerd: onderhoudsmodus**.

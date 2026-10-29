@@ -220,6 +220,8 @@ superuser ──POST /admin/maintenance/on|off (reason code, expected end)──
 host (CLI, updater) ──docker exec python -m app.cli maintenance──> web ──SQL──> maintenance_state, audit_events
 operator ──MAINTENANCE_MODE (environment)──> web (no database read)
 admin ──POST (any change) during maintenance──> web ──refused──> audit_events (permission, target slugs)
+citizen ──GET/POST /g/{slug}…, /b/{token}/cancel|reschedule──> web ──503 maintenance page (no write)
+bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error": "maintenance"} (no write)
 ```
 
 The switch holds a subject identifier or a host actor, times and a reason code: no personal

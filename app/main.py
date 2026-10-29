@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import timedelta
 
 import httpx
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -31,6 +31,7 @@ from app.api import (
     webhooks,
 )
 from app.api.agent import create_agent_api
+from app.api.maintenance import citizen_gate, register_maintenance
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings
@@ -189,7 +190,15 @@ def create_app(
         # ADR 0029: the web process only reads checks and stores requests; no release lookup.
         app.state.update_service = update_service(settings, uow, clock, http, lookup=False)
         if agent_api is not None:
-            for name in ("api_access", "booking_service", "translator", "limiter", "clock"):
+            for name in (
+                "api_access",
+                "booking_service",
+                "translator",
+                "limiter",
+                "clock",
+                "maintenance_service",
+                "settings",
+            ):
                 setattr(agent_api.state, name, getattr(app.state, name))
         wired = integrations or build_integrations(
             settings, app.state.engine, http, clock, app.state.security_log
@@ -239,13 +248,19 @@ def create_app(
     app.add_middleware(TraceMiddleware)
     register_error_pages(app)
     register_admin(app)
-    app.include_router(health.router)
-    app.include_router(pages.router)
-    app.include_router(booking_pages.router)
-    app.include_router(join_pages.router)
-    app.include_router(direct_pages.router)
-    app.include_router(brand_assets.router)
-    app.include_router(webhooks.router)
+    # ADR 0038: the fixed maintenance rules of app.api.maintenance guard every public router.
+    register_maintenance(app)
+    gate = [Depends(citizen_gate)]
+    for public_router in (
+        health.router,
+        pages.router,
+        booking_pages.router,
+        join_pages.router,
+        direct_pages.router,
+        brand_assets.router,
+        webhooks.router,
+    ):
+        app.include_router(public_router, dependencies=gate)
     if agent_api is not None:
         app.mount(AGENT_API_PREFIX, agent_api)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
