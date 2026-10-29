@@ -54,6 +54,7 @@ from app.domain.integration_check import IntegrationCheckService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.messaging_service import MessagingService
 from app.domain.organisations import OrganisationService
+from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.roles import RoleService
@@ -187,6 +188,13 @@ def create_app(
         )
         app.state.closure_service = ClosureService(
             uow, clock, app.state.admin_service, app.state.booking_service
+        )
+        app.state.planner_service = PlannerService(
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.booking_service,
+            settings.planner_changes_alert_per_hour,
         )
         app.state.role_service = RoleService(
             uow,

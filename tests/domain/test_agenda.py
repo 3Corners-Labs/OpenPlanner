@@ -1,6 +1,12 @@
 from datetime import UTC, datetime, timedelta
 
-from app.domain.agenda import AgendaSlot, agenda_day, agents_for, first_shortfall
+from app.domain.agenda import (
+    AgendaSlot,
+    ShortfallAcceptance,
+    agenda_day,
+    agents_for,
+    first_shortfall,
+)
 from app.domain.closure import Closure
 from tests.support.domain import MONDAY, NOW, SLOT_0900, SLOT_0930, make_group, window
 
@@ -69,3 +75,28 @@ def test_slot_times_are_utc() -> None:
     (first, _) = agenda_day(GROUP, MONDAY, [window()], {}, [])
 
     assert first.start.tzinfo is UTC
+
+
+def test_an_accepted_shortfall_is_no_longer_open() -> None:
+    accepted = {SLOT_0900: ShortfallAcceptance(1, SLOT_0900, 2, 3, NOW, "p-1")}
+
+    (first, _) = agenda_day(GROUP, MONDAY, [window(capacity=2)], {SLOT_0900: 3}, [], accepted)
+
+    assert first.accepted
+    assert (first.shortfall, first.open_shortfall) == (1, 0)
+    assert first_shortfall([first], NOW) is None
+
+
+def test_an_acceptance_lapses_when_the_counts_change() -> None:
+    accepted = {SLOT_0900: ShortfallAcceptance(1, SLOT_0900, 2, 3, NOW, "p-1")}
+
+    (more_bookings, _) = agenda_day(
+        GROUP, MONDAY, [window(capacity=2)], {SLOT_0900: 4}, [], accepted
+    )
+    (fewer_agents, _) = agenda_day(
+        GROUP, MONDAY, [window(capacity=1)], {SLOT_0900: 3}, [], accepted
+    )
+
+    assert not more_bookings.accepted
+    assert not fewer_agents.accepted
+    assert fewer_agents.open_shortfall == 2

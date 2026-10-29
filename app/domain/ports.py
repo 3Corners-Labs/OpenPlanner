@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Protocol
 
+from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import CustomRole, Principal, Scope
@@ -642,6 +643,22 @@ class Transaction(Protocol):
 
     async def delete_pending_jobs(self, booking_id: int, types: Collection[JobType]) -> None:
         """Delete the booking's pending jobs of the given types."""
+        ...
+
+    async def get_shortfall_acceptances(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[ShortfallAcceptance]:
+        """Return the group's accepted shortfalls of slots starting in [lower, upper)."""
+        ...
+
+    async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
+        """Store a planner's acceptance; it replaces an earlier one for the same slot."""
+        ...
+
+    async def count_audit_events(
+        self, actor: str, actions: Collection[str], since: datetime
+    ) -> int:
+        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
         ...
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:

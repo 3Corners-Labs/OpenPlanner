@@ -14,6 +14,10 @@ SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozense
 ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
 GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
 OUTSIDER = Principal("x-1", "X", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
+AUDITOR = Principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
+OTHER_TEAM = Principal(
+    "g-2", "G2", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"andere-team"})
+)
 
 
 def two_organisations(next_id: int = 1) -> State:

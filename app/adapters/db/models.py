@@ -189,12 +189,15 @@ class GroupRow(Base):
     not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
+    # ADR 0044: a planner changes bookings up to this long before the start.
+    planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
 
     __table_args__ = (
         CheckConstraint("phone_mode IN ('hidden', 'optional', 'required')", name="phone_mode"),
         CheckConstraint("dispatch_lead_minutes BETWEEN 0 AND 60", name="dispatch_lead"),
+        CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
     )
 
@@ -403,6 +406,8 @@ class BookingRow(Base):
         ForeignKey("bookings.id", ondelete="SET NULL")
     )
     closure_id: Mapped[int | None] = mapped_column(ForeignKey("closures.id", ondelete="SET NULL"))
+    # ADR 0044: the fixed reason a planner gave; a code, never free text.
+    change_reason: Mapped[str | None] = mapped_column(String(16))
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),
@@ -412,7 +417,26 @@ class BookingRow(Base):
             "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended')",
             name="status",
         ),
+        CheckConstraint(
+            "change_reason IS NULL OR change_reason IN ('staffing', 'technical', 'unforeseen')",
+            name="change_reason",
+        ),
     )
+
+
+class ShortfallAcceptanceRow(Base):
+    """A planner accepted a slot's shortfall at these counts (ADR 0044); no personal data."""
+
+    __tablename__ = "shortfall_acceptances"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    start: Mapped[datetime] = mapped_column(UTCDateTime(), primary_key=True)
+    agents: Mapped[int] = mapped_column(Integer)
+    booked: Mapped[int] = mapped_column(Integer)
+    accepted_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    actor: Mapped[str] = mapped_column(String(255))
 
 
 class ClosureRow(Base):
