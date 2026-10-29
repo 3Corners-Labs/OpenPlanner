@@ -42,6 +42,7 @@ SETTING_LABELS: dict[str, str] = {
     "oidc_role_org_admin": "settings.field.oidc_role_org_admin.label",
     "oidc_role_group_admin": "settings.field.oidc_role_group_admin.label",
     "oidc_role_auditor": "settings.field.oidc_role_auditor.label",
+    "oidc_role_agent": "settings.field.oidc_role_agent.label",
     "smtp_host": "settings.field.smtp_host.label",
     "smtp_port": "settings.field.smtp_port.label",
     "smtp_starttls": "settings.field.smtp_starttls.label",

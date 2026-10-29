@@ -235,6 +235,7 @@ same commit and rollback behaviour as the SQL one.
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
 | Cap on open direct calls, place in line, usual wait (ADR 0026) | `app/domain/direct_queue.py` |
+| Own queue: visible bookings, next up, claims, release, agent pseudonym (ADR 0043) | `app/domain/own_queue.py`, `app/domain/queue_service.py`, `app/admin/queue_routes.py`, `app/keys.py` |
 | Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029); live steps (ADR 0048) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/web/static/update-progress.js`, `app/cli.py`, `scripts/updater/` |
 | Installing and repairing a host: packages, settings files, pinned release, host updater (ADR 0050) | `scripts/install.sh`, `docs/install.md` |
 | Maintenance mode: switch, cache, refusals in `RequirePermission`, disabled buttons, citizen and machine-API rules, alert (ADR 0038) | `app/domain/maintenance.py`, `app/domain/maintenance_service.py`, `app/adapters/db/maintenance_state.py`, `app/admin/maintenance_routes.py`, `app/admin/frozen_forms.py`, `app/api/maintenance.py`, `app/cli.py`, `scripts/updater/` |
@@ -307,6 +308,10 @@ erDiagram
         int min_notice_minutes
         int horizon_days
         int dispatch_lead_minutes
+        string dispatch_kind "contact_center | openplanner_queue"
+        int queue_change_working_days
+        int queue_visible_from_minutes
+        bool queue_free_pick_allowed
         string phone_mode
         string wxcc_queue_id
         string holiday_source "inherit | own"
@@ -389,6 +394,11 @@ Rules that matter for the rest of the system:
 - **The dispatch lead** (`dispatch_lead_minutes`, default 5) sets two moments: when the WxCC
   task is created, and when the booking becomes read-only. The minimum notice can never be
   shorter than it.
+- **Dispatch kind per group** (ADR 0043): `contact_center` (the WxCC task above) or
+  `openplanner_queue`, where agents sign in and claim bookings in the group's own queue
+  (`app/domain/own_queue.py`, `queue_service.py`). An own-queue group sends no task and its
+  bookings become read-only `queue_change_working_days` working days before the start
+  (`Group.change_deadline`).
 - **All times are stored in UTC.** They are converted to the group's time zone only when
   rendering and parsing.
 
@@ -472,8 +482,11 @@ schedule, writes and audits in one locked transaction.
 flowchart LR
     book(["booked"]) --> confirm["create video room<br/>send confirmation<br/>now"]
     confirm --> remind["reminders<br/>per group rule<br/>e.g. T-24h"]
-    remind --> dispatch["T-dispatch lead<br/>WxCC task created,<br/>booking read-only"]
+    remind --> kind{"dispatch kind<br/>(ADR 0043)"}
+    kind -->|contact center| dispatch["T-dispatch lead<br/>WxCC task created,<br/>booking read-only"]
+    kind -->|own queue| claim["read-only N working days ahead;<br/>visible in the queue,<br/>an agent claims it"]
     dispatch --> meeting(["call<br/>from start to finish"])
+    claim --> meeting
     meeting --> purge["slot end + 24h<br/>purge PII"]
 
     cancel(["cancelled"]) --> cend["mark WxCC task cancelled (v2)<br/>then End Task (v1), ADR 0021<br/>delete meeting"] --> cmail["cancellation mail"] --> cpurge["cancel + 24h<br/>purge PII"]

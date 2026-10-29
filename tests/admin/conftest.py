@@ -29,6 +29,9 @@ OUTSIDER = Principal(
 AUDITOR = Principal(
     "sub-auditor", "Anouk Audit", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset()
 )
+AGENT = Principal(
+    "sub-agent", "Mo Medewerker", frozenset({Role.AGENT}), frozenset(), frozenset({"demo"})
+)
 NO_ROLE = Principal("sub-none", "Nina None", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
 
 SAME_ORIGIN = {"sec-fetch-site": "same-origin"}

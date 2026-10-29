@@ -12,7 +12,15 @@ from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import CustomRole, Scope
-from app.domain.booking import Booking, BookingKind, BookingStatus, MeetingRef, Slot, SlotUsage
+from app.domain.booking import (
+    Booking,
+    BookingKind,
+    BookingStatus,
+    Claim,
+    MeetingRef,
+    Slot,
+    SlotUsage,
+)
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
@@ -413,6 +421,17 @@ class InMemoryTransaction:
             None,
         )
 
+    async def claim_booking(self, booking_id: int, claim: Claim) -> bool:
+        booking = self.state.bookings[booking_id]
+        if booking.claim is not None or not booking.is_active:
+            return False
+        self.state.bookings[booking_id] = replace(booking, claim=claim)
+        return True
+
+    async def release_claim(self, booking_id: int) -> None:
+        booking = self.state.bookings[booking_id]
+        self.state.bookings[booking_id] = replace(booking, claim=None)
+
     async def get_booking_by_task(self, task_id: str) -> Booking | None:
         return next((b for b in self.state.bookings.values() if b.wxcc_task_id == task_id), None)
 
@@ -547,7 +566,9 @@ class InMemoryTransaction:
         return self.state.bookings.get(booking_id)
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
-        self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], contact=None)
+        self.state.bookings[booking_id] = replace(
+            self.state.bookings[booking_id], contact=None, claim=None
+        )
         self.state.purged_at[booking_id] = now
 
     async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:

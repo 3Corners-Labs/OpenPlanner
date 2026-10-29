@@ -69,6 +69,8 @@ class GroupSettings:
     dispatch_kind: DispatchKind
     queue_change_working_days: int
     planner_change_min_lead_minutes: int
+    queue_visible_from_minutes: int
+    queue_free_pick_allowed: bool
     video_host_email: str | None
     wxcc_business_address: str | None
     wxcc_channel: str | None

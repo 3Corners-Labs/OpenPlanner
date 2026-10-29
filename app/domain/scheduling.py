@@ -58,6 +58,8 @@ MAX_DISPATCH_LEAD_MINUTES = 60
 DEFAULT_QUEUE_CHANGE_WORKING_DAYS = 1
 """Own queue: a citizen can change or cancel until this many working days before the start."""
 MAX_QUEUE_CHANGE_WORKING_DAYS = 5
+DEFAULT_QUEUE_VISIBLE_FROM_MINUTES = 15
+MAX_QUEUE_VISIBLE_FROM_MINUTES = 120
 WORKING_DAYS = frozenset(range(5))
 """Monday to Friday; holidays do not count as non-working days here (ADR 0043)."""
 MAX_PLANNER_LEAD_MINUTES = 1440
@@ -182,6 +184,9 @@ class Group:
             ``dispatch_lead_minutes``: a dispatched booking needs a phone call, not a mail.
         embedding_enabled: Whether the group may appear in the widget on the websites its
             organisation allows (ADR 0035); off until the group switches it on.
+        queue_visible_from_minutes: Own queue: how long before its start a booking appears.
+        queue_free_pick_allowed: Own queue: whether agents may claim any row, not only the
+            next one (a working agreement against cherry picking, not a protection).
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -208,6 +213,8 @@ class Group:
     queue_change_working_days: int = DEFAULT_QUEUE_CHANGE_WORKING_DAYS
     planner_change_min_lead_minutes: int = 60
     embedding_enabled: bool = False
+    queue_visible_from_minutes: int = DEFAULT_QUEUE_VISIBLE_FROM_MINUTES
+    queue_free_pick_allowed: bool = False
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""
@@ -231,6 +238,8 @@ class Group:
         planner_lead = self.planner_change_min_lead_minutes
         if not self.dispatch_lead_minutes <= planner_lead <= MAX_PLANNER_LEAD_MINUTES:
             raise _invalid("planner_change_min_lead_minutes")
+        if not 0 <= self.queue_visible_from_minutes <= MAX_QUEUE_VISIBLE_FROM_MINUTES:
+            raise _invalid("queue_visible_from_minutes")
         if self.video_host_email is not None and not _EMAIL.fullmatch(self.video_host_email):
             raise _invalid("video_host_email")
         for name, limit in INTEGRATION_TEXT_LIMITS.items():
@@ -283,13 +292,18 @@ class Group:
         """How long before the start a planner may last change a booking (ADR 0044)."""
         return timedelta(minutes=self.planner_change_min_lead_minutes)
 
+    @property
+    def has_own_queue(self) -> bool:
+        """Whether agents pick up this group's bookings in OpenPlanner (ADR 0043)."""
+        return self.dispatch_kind is DispatchKind.OPENPLANNER_QUEUE
+
     def change_deadline(self, start: datetime) -> datetime:
         """Return the moment a booking starting at ``start`` becomes read-only.
 
         Contact center: when its task is dispatched, since an agent may pick it up from then
         on. Own queue: ``queue_change_working_days`` working days earlier (ADR 0043).
         """
-        if self.dispatch_kind is DispatchKind.OPENPLANNER_QUEUE:
+        if self.has_own_queue:
             return working_days_before(start, self.queue_change_working_days, self.tz)
         return start - self.dispatch_lead
 

@@ -442,6 +442,24 @@ form, webhook bodies and headers, API responses.
 | Denial of service | Webex or WxCC slow or down blocks bookings | Bookings commit first; meetings and work items are idempotent jobs with backoff; direct calls defer to the worker | `tests/jobs/test_call_jobs.py`, `tests/api/test_direct_pages.py::test_platform_failure_defers_to_the_worker` |
 | Tampering | A schema migration fails half-way on production data | SQLite rebuilds run with foreign keys off and must pass `foreign_key_check` | `tests/test_migrations.py::test_upgrade_and_downgrade_with_data` |
 
+## Flow: own queue (ADR 0043)
+
+Admin: `GET /admin/groups/{slug}/queue`, `POST …/queue/next`, `POST …/queue/{booking_id}/claim`,
+`GET …/queue/{booking_id}`, `POST …/queue/{booking_id}/release`, all `queue.work` on the group.
+Inputs from outside: the slug and booking id in the path. Agents are portal users (role
+`agent`, ADR 0013 login); they see first names and, after a claim, the meeting link.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation | An agent claims or reads in another group's queue | `queue.work` checked per group by the route and again by `QueueService`; denials audited | `tests/admin/test_authorization_matrix.py::test_matrix` (queue rows), `tests/domain/test_queue_service.py::test_others_are_refused_and_audited` |
+| Elevation (IDOR) | Guessing booking ids in claim, open or release URLs | The booking must belong to the URL's group, else `booking_not_found` (404) | `tests/domain/test_queue_service.py::test_another_groups_booking_does_not_exist_here` |
+| Tampering (race) | Two agents claim the same booking at once | Locked transaction (`BEGIN IMMEDIATE`) and a conditional `UPDATE … WHERE claimed_at IS NULL AND status = 'confirmed'`; the loser gets "already picked up" | `tests/adapters/db/test_queue_queries.py::test_only_the_first_claim_wins_and_a_release_reopens`, `tests/domain/test_queue_service.py::test_two_agents_never_claim_the_same_booking` |
+| Information disclosure | The meeting link is read without a claim, so two agents start the same meeting | The list never contains the link; the claimed page shows it to the claiming agent only (pseudonym match) | `tests/domain/test_queue_service.py::test_the_join_link_is_for_the_claiming_agent_only`, `tests/admin/test_queue_routes.py::test_pick_up_next_opens_the_meeting_for_that_agent_only` |
+| Information disclosure | Email, phone or note shown to agents | The queue row carries first name, reference, time and states only; `queue.work` is a PII permission (never for the auditor) | `tests/admin/test_queue_routes.py::test_the_queue_shows_first_names_and_hides_the_meeting_link`, `tests/domain/test_authorization.py::test_bookings_and_the_queue_are_the_permissions_that_show_personal_data` |
+| Repudiation | Who picked up or released a booking | `queue.claimed` and `queue.released` audit events with actor, group and booking id; `claimed_by` is an HMAC pseudonym of the subject under an HKDF-derived key, removed by the purge | `tests/domain/test_queue_service.py::test_pick_up_next_claims_the_citizen_waiting_in_the_lobby`, `tests/adapters/db/test_queue_queries.py::test_the_purge_removes_the_agent_pseudonym`, `tests/test_keys.py::test_agent_pseudonym_key_is_derived_and_differs_from_the_token_key` |
+| Denial of service | An agent hoards claims or leaves without releasing | Group admins (`bookings.view`) release any claim; unclaimed bookings past `not_picked_up_minutes` are flagged | `tests/domain/test_queue_service.py::test_release_by_the_agent_or_a_group_admin_only`, `test_not_claimed_in_time_is_flagged` |
+| Tampering (CSRF) | A third-party site makes an agent claim or release | Fetch Metadata check (`SameOrigin`) on every POST, as on all admin forms | `tests/admin/test_authorization_matrix.py` (POSTs need `sec-fetch-site: same-origin`) |
+
 ## Flow: verify button and simulator (admin)
 
 `POST /admin/groups/{slug}/check` ("Koppeling controleren") and

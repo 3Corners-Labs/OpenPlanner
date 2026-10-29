@@ -91,6 +91,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `OIDC_ROLE_ORG_ADMIN` | string | `openplanner-org-admin` | — | `settings.login.manage` | Role value of an organisation admin. |
 | `OIDC_ROLE_GROUP_ADMIN` | string | `openplanner-group-admin` | — | `settings.login.manage` | Role value of a group admin. |
 | `OIDC_ROLE_AUDITOR` | string | `openplanner-auditor` | — | `settings.login.manage` | Role value of an auditor (ADR 0039). |
+| `OIDC_ROLE_AGENT` | string | `openplanner-agent` | — | `settings.login.manage` | Role value of an agent who works a group's own queue (ADR 0043). |
 | `SMTP_HOST` | string | — | — | `settings.platform.manage` | Fallback mail server (ADR 0022); empty means no fallback mail. |
 | `SMTP_PORT` | int | `25` | 1–65535 | `settings.platform.manage` | Port of the fallback mail server. |
 | `SMTP_STARTTLS` | bool | `false` | — | `settings.platform.manage` | Upgrade the connection with STARTTLS. |

@@ -194,6 +194,8 @@ class GroupRow(Base):
     # ADR 0044: a planner changes bookings up to this long before the start.
     planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    queue_visible_from_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))
+    queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
 
     __table_args__ = (
@@ -204,6 +206,7 @@ class GroupRow(Base):
         ),
         CheckConstraint("queue_change_working_days BETWEEN 1 AND 5", name="queue_change_days"),
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
+        CheckConstraint("queue_visible_from_minutes BETWEEN 0 AND 120", name="queue_visible_from"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
     )
 
@@ -416,6 +419,8 @@ class BookingRow(Base):
     change_reason: Mapped[str | None] = mapped_column(String(16))
     # ADR 0044: when an unanswered request to choose a new time lapses.
     rebook_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    claimed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    claimed_by: Mapped[str | None] = mapped_column(String(64))
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),

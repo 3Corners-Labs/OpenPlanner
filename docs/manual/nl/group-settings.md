@@ -83,6 +83,21 @@ met vrijdag; feestdagen tellen hier als werkdag. Voorbeeld met 1: een afspraak o
 10:00 kan tot vrijdag 10:00 worden gewijzigd. Een afspraak die later wordt geboekt, kan de
 burger niet meer zelf wijzigen.
 
+<!-- field: queue_visible_from_minutes -->
+### Zichtbaar in de wachtrij (minuten vooraf, eigen wachtrij)
+
+Alleen bij de eigen wachtrij. Hoeveel minuten voor de start een afspraak in de wachtrij van de
+medewerkers verschijnt, van 0 tot 120. Standaard 15. Een afspraak blijft zichtbaar tot het
+einde.
+
+<!-- field: queue_free_pick_allowed -->
+### Medewerkers mogen zelf een afspraak kiezen (eigen wachtrij)
+
+Alleen bij de eigen wachtrij. **Nee** (standaard): medewerkers pakken altijd de volgende
+afspraak op, zodat elke deelnemer de eerste vrije medewerker krijgt. **Ja**: ze kunnen ook een
+andere afspraak uit de lijst oppakken. Dat is een werkafspraak binnen het team, geen
+beveiliging.
+
 <!-- field: dispatch_lead_minutes -->
 ### Doorzetten naar de wachtrij
 

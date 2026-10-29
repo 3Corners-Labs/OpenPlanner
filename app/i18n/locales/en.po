@@ -335,6 +335,18 @@ msgstr "This time can no longer be booked. Choose another time."
 msgid "error.booking_locked"
 msgstr "This appointment is fixed and can no longer be changed."
 
+msgid "error.queue_empty"
+msgstr "There is no appointment left to pick up."
+
+msgid "error.already_claimed"
+msgstr "Already picked up by a colleague. Pick up the next one."
+
+msgid "error.free_pick_not_allowed"
+msgstr "In this group you always pick up the next appointment."
+
+msgid "error.not_claimed"
+msgstr "You did not pick up this appointment."
+
 msgid "error.booking_not_active"
 msgstr "This appointment is no longer active."
 
@@ -701,6 +713,9 @@ msgstr "Group admin"
 msgid "authz.role.auditor"
 msgstr "Compliance and privacy (read-only)"
 
+msgid "authz.role.agent"
+msgstr "Agent"
+
 msgid "authz.level.global"
 msgstr "Portal"
 
@@ -824,6 +839,9 @@ msgstr "Added."
 msgid "admin.done.created"
 msgstr "The group has been created. Now set its staffing."
 
+msgid "admin.done.released"
+msgstr "The appointment was released and is back in the queue."
+
 msgid "admin.done.removed"
 msgstr "Removed."
 
@@ -917,6 +935,18 @@ msgstr "How appointments reach staff"
 msgid "admin.field.dispatch_kind_hint"
 msgstr "Contact center: a task in the team's queue, shortly before the start. Own queue: staff sign in to OpenPlanner and pick up an appointment. Applies to appointments not yet dispatched."
 
+msgid "admin.field.queue_visible_from_minutes"
+msgstr "Visible in the queue (minutes ahead, own queue)"
+
+msgid "admin.field.queue_visible_from_minutes_hint"
+msgstr "How many minutes before the start an appointment appears in the queue. 0 to 120."
+
+msgid "admin.field.queue_free_pick_allowed"
+msgstr "Agents may choose an appointment (own queue)"
+
+msgid "admin.field.queue_free_pick_allowed_hint"
+msgstr "No: agents always pick up the next one. Yes: they can also pick up another appointment from the list."
+
 msgid "admin.field.queue_change_working_days"
 msgstr "Changes until (working days ahead, own queue)"
 
@@ -1008,6 +1038,9 @@ msgstr "This booking starts soon or has already gone to the contact center. Call
 
 msgid "admin.form.error.move_causes_shortfall"
 msgstr "This slot would then have more bookings than agents. Confirm that you accept the shortfall, or choose another slot."
+
+msgid "admin.form.error.queue_visible_from_minutes"
+msgstr "Enter a number of minutes from 0 to 120."
 
 msgid "admin.form.error.phone_mode"
 msgstr "Choose whether the phone number is hidden, optional or required."
@@ -1483,6 +1516,75 @@ msgstr "Direct"
 
 msgid "admin.tab.agenda"
 msgstr "Agenda"
+
+msgid "admin.tab.queue"
+msgstr "Queue"
+
+msgid "admin.queue.title"
+msgstr "Waiting appointments"
+
+msgid "admin.queue.lead"
+msgstr "Today's appointments that start soon or are still going on. Pick up the next one; the participant always gets the first free agent."
+
+msgid "admin.queue.announcement"
+msgstr "{count} appointments in the queue, {waiting} with a waiting participant."
+
+msgid "admin.queue.pick_up_next"
+msgstr "Pick up next"
+
+msgid "admin.queue.refresh"
+msgstr "Refresh"
+
+msgid "admin.queue.caption"
+msgstr "Appointments in the queue"
+
+msgid "admin.queue.status"
+msgstr "Status"
+
+msgid "admin.queue.direct"
+msgstr "Direct call"
+
+msgid "admin.queue.open"
+msgstr "Open"
+
+msgid "admin.queue.claim"
+msgstr "Pick up"
+
+msgid "admin.queue.release"
+msgstr "Release"
+
+msgid "admin.queue.empty"
+msgstr "There are no appointments in the queue right now."
+
+msgid "admin.queue.back"
+msgstr "Back to the queue"
+
+msgid "admin.queue.claimed_title"
+msgstr "You picked up {reference}"
+
+msgid "admin.queue.claimed_lead"
+msgstr "Join the call. If that does not work, release the appointment: it goes back to the top of the queue."
+
+msgid "admin.queue.join"
+msgstr "Join the call"
+
+msgid "admin.queue.new_window"
+msgstr "(opens in a new window)"
+
+msgid "admin.queue.no_meeting"
+msgstr "The video call for this appointment is not ready yet. Try again in a minute or release the appointment."
+
+msgid "admin.queue.state.mine"
+msgstr "Picked up by you"
+
+msgid "admin.queue.state.claimed"
+msgstr "Picked up by a colleague"
+
+msgid "admin.queue.state.in_lobby"
+msgstr "Participant waiting"
+
+msgid "admin.queue.state.upcoming"
+msgstr "Not started yet"
 
 msgid "admin.agenda.days"
 msgstr "Other day"
@@ -4299,6 +4401,9 @@ msgstr "Manage embedding on websites"
 msgid "admin.nav.embedding"
 msgstr "Embedding"
 
+msgid "authz.permission.queue_work"
+msgstr "Pick up appointments in the own queue"
+
 msgid "admin.nav.retention"
 msgstr "Retention"
 
@@ -5550,6 +5655,9 @@ msgstr "Role value group admin"
 
 msgid "settings.field.oidc_role_auditor.label"
 msgstr "Role value compliance and privacy"
+
+msgid "settings.field.oidc_role_agent.label"
+msgstr "Role value own-queue agent"
 
 msgid "settings.field.smtp_host.label"
 msgstr "Mail server"

@@ -3,7 +3,13 @@ import hmac
 
 import pytest
 
-from app.domain.tokens import derive_token, hash_token, new_token_salt, token_matches
+from app.domain.tokens import (
+    agent_pseudonym,
+    derive_token,
+    hash_token,
+    new_token_salt,
+    token_matches,
+)
 
 KEY = b"k" * 32
 
@@ -46,3 +52,13 @@ def test_token_matches_in_constant_time() -> None:
 def test_short_keys_are_rejected(key: bytes) -> None:
     with pytest.raises(ValueError, match="32 bytes"):
         derive_token(key, new_token_salt())
+
+
+def test_agent_pseudonym_is_stable_per_subject_and_key() -> None:
+    first = agent_pseudonym(b"k" * 32, "user-1")
+
+    assert first == agent_pseudonym(b"k" * 32, "user-1")
+    assert first != agent_pseudonym(b"k" * 32, "user-2")
+    assert first != agent_pseudonym(b"j" * 32, "user-1")
+    assert "user-1" not in first
+    assert len(first) == 64

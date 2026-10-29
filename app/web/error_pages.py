@@ -34,6 +34,7 @@ _NOT_FOUND = {
     ErrorCode.ORGANISATION_NOT_FOUND,
     ErrorCode.API_CLIENT_NOT_FOUND,
     ErrorCode.UPDATE_REQUEST_NOT_FOUND,
+    ErrorCode.QUEUE_NOT_ENABLED,
 }
 
 
