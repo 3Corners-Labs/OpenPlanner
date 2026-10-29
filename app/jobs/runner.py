@@ -25,7 +25,7 @@ While that group or its organisation is in diagnostic mode, each job also writes
 its own retention period.
 """
 
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from datetime import datetime, timedelta
 from typing import Protocol
 
@@ -50,6 +50,7 @@ from app.domain.ports import (
     VideoProvider,
 )
 from app.domain.system_log import EventRetention, SystemLog
+from app.domain.tunable import value_of
 from app.jobs.calls import CALL_JOBS, STALE, CallJobs
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
 from app.web.call_labels import agent_start_label
@@ -123,7 +124,7 @@ class JobRunner:
         video: VideoProvider | None = None,
         dispatcher: ContactCenterDispatcher | None = None,
         integration: IntegrationService | None = None,
-        retention: EventRetention | None = None,
+        retention: EventRetention | Callable[[], EventRetention] | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
@@ -287,7 +288,7 @@ class JobRunner:
             return
         self._pruned_at = now
         try:
-            removed = await self._system_log.prune(self._retention)
+            removed = await self._system_log.prune(value_of(self._retention))
         except Exception as exc:  # pruning is housekeeping; jobs come first
             log.warning("system_log.prune_failed", error=type(exc).__name__)
             return

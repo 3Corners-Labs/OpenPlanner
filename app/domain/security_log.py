@@ -18,12 +18,14 @@ memory and rows. The counters live in memory per process (web and worker each ke
 own), so a restart loses at most one window's count; the container log still has every line.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
 from app.domain.client_pseudonym import MANY_CLIENTS
 from app.domain.ports import Clock, UnitOfWork
+from app.domain.tunable import value_of
 
 WEBHOOK_REJECTED = "webhook.rejected"
 """A webhook whose signature or timestamp did not verify."""
@@ -81,7 +83,12 @@ class SecurityLog:
     """
 
     def __init__(
-        self, uow: UnitOfWork, clock: Clock, window: timedelta, *, max_sources: int = 1000
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        window: timedelta | Callable[[], timedelta],
+        *,
+        max_sources: int | Callable[[], int] = 1000,
     ) -> None:
         """Store the collaborators; no window is open yet."""
         self._uow = uow
@@ -115,12 +122,12 @@ class SecurityLog:
         """
         now = self._clock.now()
         key = (action, reason, detail, client)
-        if key not in self._windows and len(self._windows) >= self._max_sources:
+        if key not in self._windows and len(self._windows) >= value_of(self._max_sources):
             self._drop_expired(now)
-            if len(self._windows) >= self._max_sources:
+            if len(self._windows) >= value_of(self._max_sources):
                 key = (action, reason, detail, MANY_CLIENTS)
         window = self._windows.get(key)
-        if window is not None and now - window.started < self._window:
+        if window is not None and now - window.started < value_of(self._window):
             window.suppressed += 1
             return False
         held_back = window.suppressed if window is not None else 0
@@ -147,5 +154,7 @@ class SecurityLog:
 
     def _drop_expired(self, now: datetime) -> None:
         """Forget windows that ended; their held-back counts are lost (logged per line)."""
-        for key in [k for k, w in self._windows.items() if now - w.started >= self._window]:
+        for key in [
+            k for k, w in self._windows.items() if now - w.started >= value_of(self._window)
+        ]:
             del self._windows[key]

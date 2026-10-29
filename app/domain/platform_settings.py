@@ -15,6 +15,7 @@ process refreshes every ``RELOAD_SECONDS``, the worker once per loop.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 
 from app.domain.ports import UnitOfWork
@@ -40,10 +41,24 @@ class PortalValues:
     Attributes:
         version: The counter at the time of reading; 0 means nothing was ever changed.
         values: Plain JSON values by setting key; secrets are never among them.
+        expires: When a value lapses, for the keys that have an expiry (``LOG_LEVEL``).
     """
 
     version: int
     values: Mapping[str, object] = field(default_factory=dict)
+    expires: Mapping[str, datetime] = field(default_factory=dict)
+
+    def applies(self, key: str, now: datetime | None) -> bool:
+        """Return whether a value is stored for ``key`` and has not lapsed at ``now``."""
+        if key not in self.values:
+            return False
+        lapse = self.expires.get(key)
+        return lapse is None or now is None or now < lapse
+
+    def next_expiry(self, now: datetime) -> datetime | None:
+        """Return the next moment after ``now`` at which a stored value lapses, if any."""
+        future = [at for at in self.expires.values() if at > now]
+        return min(future) if future else None
 
 
 EMPTY = PortalValues(0)
@@ -100,7 +115,11 @@ def usable(spec: SettingSpec, value: object) -> bool:
 
 
 def resolve(
-    spec: SettingSpec, env_value: object, env_source: Source | None, portal: PortalValues
+    spec: SettingSpec,
+    env_value: object,
+    env_source: Source | None,
+    portal: PortalValues,
+    now: datetime | None = None,
 ) -> Resolved:
     """Resolve one setting: code default, then portal value, then environment lock.
 
@@ -110,8 +129,10 @@ def resolve(
             code default when it is not set.
         env_source: ``ENV`` or ``FILE`` when a variable sets it, else ``None``.
         portal: The stored portal values.
+        now: The current time; a value that lapsed before it no longer applies. ``None``
+            applies every stored value.
     """
-    stored = spec.key in portal.values
+    stored = portal.applies(spec.key, now)
     ignored = stored and spec.in_portal and not usable(spec, portal.values[spec.key])
     if env_source is not None:
         outside = spec.in_portal and not spec.secret and not within_bounds(spec, env_value)
@@ -144,6 +165,7 @@ class PlatformSettingsStore:
             if self._loaded and version == self.current.version:
                 return False
             values = await tx.platform_settings()
-        self.current = PortalValues(version, values)
+            expires = await tx.platform_setting_expiries()
+        self.current = PortalValues(version, values, expires)
         self._loaded = True
         return True

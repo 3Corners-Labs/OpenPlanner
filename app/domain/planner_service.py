@@ -22,6 +22,7 @@ planner makes more than ``alert_per_hour`` changes in an hour, a system event wa
 group's admins (abuse case: a compromised planner account). It never blocks.
 """
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from app.domain import booking_changes
@@ -36,6 +37,7 @@ from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
+from app.domain.tunable import value_of
 
 ALERT_ACTION = "planner.changes_alert"
 """System event key of the warning about many changes by one planner."""
@@ -65,7 +67,7 @@ class PlannerService:
         clock: Clock,
         admin: AdminService,
         bookings: BookingService,
-        alert_per_hour: int,
+        alert_per_hour: int | Callable[[], int],
         *,
         rebook_days: int = 14,
         reminder_days: int = 3,
@@ -319,7 +321,7 @@ class PlannerService:
             )
         )
         count = await tx.count_audit_events(principal.subject, {action}, now - ALERT_WINDOW)
-        if count == self._alert_per_hour + 1:
+        if count == value_of(self._alert_per_hour) + 1:
             await tx.add_audit_event(
                 AuditEvent(
                     now,

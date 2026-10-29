@@ -84,6 +84,7 @@ class State:
     custom_roles: dict[int, CustomRole] = field(default_factory=dict)
     settings_version: int = 0
     platform_settings: dict[str, object] = field(default_factory=dict)
+    platform_expiries: dict[str, datetime] = field(default_factory=dict)
     purged_at: dict[int, datetime] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
     next_id: int = 1
@@ -821,6 +822,28 @@ class InMemoryTransaction:
 
     async def platform_settings(self) -> dict[str, object]:
         return dict(self.state.platform_settings)
+
+    async def platform_setting_expiries(self) -> dict[str, datetime]:
+        return dict(self.state.platform_expiries)
+
+    async def save_platform_setting(
+        self, key: str, value: object, updated_at: datetime, expires_at: datetime | None
+    ) -> None:
+        self.state.platform_settings[key] = value
+        if expires_at is None:
+            self.state.platform_expiries.pop(key, None)
+        else:
+            self.state.platform_expiries[key] = expires_at
+
+    async def delete_platform_setting(self, key: str) -> bool:
+        self.state.platform_expiries.pop(key, None)
+        present = key in self.state.platform_settings
+        self.state.platform_settings.pop(key, None)
+        return present
+
+    async def bump_settings_version(self) -> int:
+        self.state.settings_version += 1
+        return self.state.settings_version
 
 
 class InMemoryUnitOfWork:
