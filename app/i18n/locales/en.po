@@ -4997,6 +4997,12 @@ msgstr "Do you need help now? You can also reach us in another way."
 msgid "maintenance.try_later"
 msgstr "Please try again later."
 
+msgid "audit.event.maintenance_overdue"
+msgstr "Maintenance mode on for long"
+
+msgid "admin.audit.detail.hours"
+msgstr "{count} hours"
+
 # ADR 0046: staff directory
 
 msgid "authz.permission.staff_view"
