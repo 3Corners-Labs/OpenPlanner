@@ -24,6 +24,7 @@ from app.domain.ports import (
     IntegrationChecker,
     VideoProvider,
 )
+from app.domain.security_log import SecurityLog
 from app.keys import settings_encryption_key
 
 log = structlog.get_logger()
@@ -53,9 +54,13 @@ def secret_box(settings: Settings) -> SecretBox | None:
 
 
 def build_integrations(
-    settings: Settings, engine: AsyncEngine, http: httpx.AsyncClient, clock: Clock
+    settings: Settings,
+    engine: AsyncEngine,
+    http: httpx.AsyncClient,
+    clock: Clock,
+    security: SecurityLog | None = None,
 ) -> Integrations:
-    """Return the adapters the settings allow."""
+    """Return the adapters the settings allow; ``security`` records failing token refreshes."""
     client_id, secret, refresh = (
         settings.webex_client_id,
         settings.webex_client_secret,
@@ -70,7 +75,7 @@ def build_integrations(
         oauth_url=f"{settings.webex_api_base_url.rstrip('/')}/access_token",
     )
     store = CredentialStore(engine, SecretBox(settings_encryption_key(settings)))
-    tokens = WebexTokens(config, http, store, clock)
+    tokens = WebexTokens(config, http, store, clock, security)
     client = AuthorizedClient(http, tokens)
     video = WebexMeetings(client, settings.webex_api_base_url)
     dispatcher = (
