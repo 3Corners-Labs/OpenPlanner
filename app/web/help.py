@@ -57,6 +57,11 @@ TOPICS = (
     HelpTopic("group-settings", ("/admin/groups/{slug}/settings",), Permission.GROUP_EDIT),
     HelpTopic("branding", ("/admin/organisations/{org}/branding",), Permission.BRANDING_MANAGE),
     HelpTopic("rights-matrix", ("/admin/matrix",), Permission.MATRIX_VIEW),
+    HelpTopic(
+        "roles",
+        ("/admin/roles", "/admin/roles/new", "/admin/roles/{role_id}"),
+        Permission.ROLES_MANAGE,
+    ),
     HelpTopic("retention", ("/admin/retention",), Permission.RETENTION_VIEW),
     HelpTopic("staff", ("/admin/staff", "/admin/staff/{member_id}"), Permission.STAFF_VIEW),
     HelpTopic("audit", ("/admin/audit",), Permission.AUDIT_VIEW),

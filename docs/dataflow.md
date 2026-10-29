@@ -119,6 +119,12 @@ organisation admin and auditor: their organisation and its groups; superuser: ev
 The auditor role (ADR 0039) is read-only and holds no permission that shows citizens' data; it
 does see admin names in the audit log, which is the accountability it exists for.
 
+Custom roles (ADR 0039 step 3) live in `roles`: template, names, the role claim value and the
+permission codes, no personal data. The session cookie keeps, next to the built-in roles, at
+most 20 other role claim values (group or role names from the IdP, no personal data); the
+custom roles they grant are looked up per request. Changes are audited as `role.*` events
+with codes only and shown on the matrix page with the actor's display name.
+
 The retention overview (`/admin/retention`, ADR 0039) reads `bookings` only to count, per group,
 how many still hold personal data, how many are past their purge moment and how many purges
 failed, and when the last purge ran. It selects no personal data column and no booking id, so it
