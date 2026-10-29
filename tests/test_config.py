@@ -86,6 +86,29 @@ def test_production_is_the_default_and_refuses_development_defaults(
     assert not settings.simulator_enabled
 
 
+@pytest.mark.parametrize(
+    ("field", "key"),
+    [("oidc_client_secret", "OIDC_CLIENT_SECRET"), ("session_secret", "SESSION_SECRET")],
+)
+def test_production_refuses_development_placeholder_secrets(field: str, key: str) -> None:
+    # .env.example and the dev Keycloak realm share "dev-only-openplanner-admin-secret".
+    production = {
+        "environment": "prod",
+        "management_token_key": "m" * 40,
+        "session_secret": "s" * 40,
+        "public_base_url": "https://afspraak.example.nl",
+        "oidc_discovery_url": "https://idp.example.nl/.well-known/openid-configuration",
+        "oidc_client_secret": "real-client-secret",
+    }
+    placeholder = "dev-only-openplanner-admin-secret"
+    with pytest.raises(ValidationError, match=key) as refused:
+        Settings(**{**production, field: placeholder})  # type: ignore[arg-type]
+    assert placeholder not in str(refused.value)
+
+    assert Settings(environment="dev", **{field: placeholder}).environment == "dev"  # type: ignore[arg-type]
+    assert Settings(**production).environment == "prod"  # type: ignore[arg-type]
+
+
 def test_the_simulator_is_off_unless_switched_on(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SIMULATOR_ENABLED", raising=False)
     assert not Settings(environment="dev").simulator_enabled
