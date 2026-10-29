@@ -1,8 +1,19 @@
-.PHONY: check fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation e2e proxy-check diagrams up down
+.PHONY: setup check pins fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation e2e proxy-check diagrams up down
 
 UV := uv run
 
-check: lint shellcheck type imports test security audit lock duplication ## Everything a PR must pass locally
+# One command from a fresh clone to a machine that runs `make check` (ADR 0051): Python
+# environment, e2e tooling, .env from the example, and the pre-push hook that runs `make pins`.
+setup:
+	@command -v uv >/dev/null || { echo "install uv first: https://docs.astral.sh/uv/" >&2; exit 1; }
+	@command -v node >/dev/null || { echo "install Node.js $$(sed -n 's/^  NODE_VERSION: "\(.*\)"/\1/p' .github/workflows/ci.yml) (LTS) first" >&2; exit 1; }
+	uv sync --locked
+	cd e2e && npm ci
+	@[ -f .env ] || { cp .env.example .env && echo "created .env from .env.example"; }
+	git config core.hooksPath .githooks
+	@echo "setup done; run 'make check' before a PR"
+
+check: lint shellcheck type imports test security audit lock pins duplication ## Everything a PR must pass locally
 
 fmt:
 	$(UV) ruff format .
@@ -12,12 +23,12 @@ lint:
 	$(UV) ruff format --check .
 	$(UV) ruff check .
 
-# The host's shell scripts, the root-run updater among them. Uses a local shellcheck when there
-# is one (CI runners have it), otherwise the pinned image.
-SHELLCHECK_IMAGE := koalaman/shellcheck:v0.10.0
+# The host's shell scripts (the root-run updater among them) and the git hooks. The pinned
+# shellcheck from PyPI, so CI and every laptop run the same version without Docker.
+# renovate: datasource=pypi depName=shellcheck-py
+SHELLCHECK_VERSION := 0.11.0.1
 shellcheck:
-	@if command -v shellcheck >/dev/null; then shellcheck scripts/*.sh scripts/updater/*.sh; \
-	else docker run --rm -v "$$PWD:/mnt:ro" -w /mnt $(SHELLCHECK_IMAGE) scripts/*.sh scripts/updater/*.sh; fi
+	uvx --from shellcheck-py==$(SHELLCHECK_VERSION) shellcheck scripts/*.sh scripts/updater/*.sh .githooks/*
 
 type:
 	$(UV) mypy
@@ -39,6 +50,13 @@ audit:
 lock:
 	uv lock --check
 
+# ADR 0051: every pinned version is one Renovate can update, and renovate.json is valid.
+# renovate: datasource=npm depName=renovate
+RENOVATE_VERSION := 44.193.0
+pins:
+	$(UV) python -m scripts.check_pins
+	npx --yes --package renovate@$(RENOVATE_VERSION) renovate-config-validator --strict renovate.json
+
 # Runtime dependencies only (dev tools never ship). Exceptions need an ADR: see docs/adr/0003.
 licenses:
 	scripts/check-licenses.sh
@@ -50,13 +68,17 @@ semgrep:
 	uvx semgrep --test --config .semgrep/rules.yml .semgrep/rules.py
 	uvx semgrep scan --error --config p/python --config p/owasp-top-ten --config p/secrets --metrics=off --config .semgrep/rules.yml app/
 
+# renovate: datasource=npm depName=jscpd
+JSCPD_VERSION := 5.4.2
 duplication:
-	npx --yes jscpd@4.0.5
+	npx --yes jscpd@$(JSCPD_VERSION)
 
 # Architecture plates in docs/diagrams from scripts/diagrams/content.py. Needs the draw.io desktop
 # app and Chrome locally; python-docx is added for this run only (not a project dependency).
+# renovate: datasource=pypi depName=python-docx
+PYTHON_DOCX_VERSION := 1.2.0
 diagrams:
-	uv run --with python-docx==1.2.0 python -m scripts.diagrams.build
+	uv run --with python-docx==$(PYTHON_DOCX_VERSION) python -m scripts.diagrams.build
 
 # Mutates app/domain and app/i18n; runs once either has tests, then enforces >= 80%.
 mutation:

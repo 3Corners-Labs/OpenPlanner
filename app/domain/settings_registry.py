@@ -587,6 +587,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1440,
     ),
     S(
+        "security_event_max_sources",
+        K.INT,
+        1000,
+        _C,
+        T.OPERATIONS,
+        "Windows (kind of event × caller) a process keeps; beyond that, callers count as many "
+        "(ADR 0053).",
+        minimum=10,
+        maximum=100_000,
+    ),
+    S(
         "audit_export_max_rows",
         K.INT,
         100_000,

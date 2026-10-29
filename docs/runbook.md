@@ -844,6 +844,24 @@ Many *Webhook geweigerd* entries mean someone is probing the webhook URL or a se
 rotated on one side only; *Webex-token vernieuwen* with `unauthorized` means the Service App
 must be reconnected (see *Webex or WxCC is down*).
 
+Attempts on the public entry points are security events too (ADR 0053), each naming its
+caller by pseudonym (`client:<16 hex>`), never by IP address:
+
+| Entry | Means | What to do |
+|---|---|---|
+| *Te veel verzoeken*, `too_many_requests` (`surface:web` or `surface:agent`) | one caller went over a rate limit | many from one caller: a scanner or bot, block it at the proxy or firewall; from `many` callers: a distributed attack |
+| *Verzoek geweigerd*, `honeypot` | a bot filled in the hidden field of the booking form | nothing for one; a stream: consider Turnstile (feature flag) |
+| *Verzoek geweigerd*, `cross_site` / `origin_mismatch` | a form post from another site (CSRF attempt), or a proxy that rewrites `Origin` | check the proxy if it comes from all callers |
+| *Inloggen*, outcome denied, `invalid_state` / `invalid_token` / `nonce_mismatch` | a failed admin login | one: an expired login tab; many from one caller: an attack on the login |
+| *Onbekende sleutel of link*, `unknown_token` | a bearer token on the machine API that matches nothing | many: token guessing; check the API clients |
+| *Onbekende sleutel of link*, `unknown_management_link` | a `/b/...` link that matches no booking | one per caller is normal (purged or mistyped link); a stream from one caller is link guessing |
+
+To check whether an IP address from a firewall or proxy log is the caller in an event, run
+`docker compose exec web python -m app.cli client-pseudonym 203.0.113.7` and compare. There
+is no way from a pseudonym back to an address. Rotating `MANAGEMENT_TOKEN_KEY` changes every
+pseudonym (and every management link). At most `SECURITY_EVENT_MAX_SOURCES` callers (default
+1000) are tracked per window and process; beyond that, events count under `client:many`.
+
 ## Log lines and the event schema (ADR 0040)
 
 Every line on stdout is one JSON object in the field names of `openplanner.event/1`

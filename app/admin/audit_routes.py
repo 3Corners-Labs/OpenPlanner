@@ -70,7 +70,20 @@ from app.domain.planner_service import ALERT_ACTION
 from app.domain.ports import Clock
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.scheduling import GroupSummary
-from app.domain.security_log import INVALID_SIGNATURE, TOKEN_REFRESH_FAILED, WEBHOOK_REJECTED
+from app.domain.security_log import (
+    CROSS_SITE,
+    HONEYPOT,
+    INVALID_SIGNATURE,
+    ORIGIN_MISMATCH,
+    RATE_LIMITED,
+    REQUEST_REJECTED,
+    TOKEN_REFRESH_FAILED,
+    TOKEN_REJECTED,
+    TOO_MANY_REQUESTS,
+    UNKNOWN_MANAGEMENT_LINK,
+    UNKNOWN_TOKEN,
+    WEBHOOK_REJECTED,
+)
 from app.domain.storage import (
     DATABASE_TOO_LARGE,
     FREE_SPACE_CRITICAL,
@@ -125,6 +138,10 @@ EVENT_LABELS: dict[str, str] = {
     # Security events (ADR 0034): global, deduplicated per window.
     WEBHOOK_REJECTED: "audit.event.webhook_rejected",
     TOKEN_REFRESH_FAILED: "audit.event.token_refresh",
+    # ADR 0053: attempts on public entry points.
+    RATE_LIMITED: "audit.event.rate_limited",
+    REQUEST_REJECTED: "audit.event.request_rejected",
+    TOKEN_REJECTED: "audit.event.token_rejected",
     # Diagnostic mode (ADR 0040, part 4).
     "job.run": "audit.event.job_run",
     BRAKE_EVENT: "audit.event.diagnostics_brake",
@@ -206,6 +223,8 @@ DETAIL_LABELS: dict[str, str] = {
     "maintenance.refused": "admin.audit.detail.maintenance_refused",
     "source:webex": "admin.audit.detail.source_webex",
     "source:wxcc": "admin.audit.detail.source_wxcc",
+    "surface:web": "admin.audit.detail.surface_web",
+    "surface:agent": "admin.audit.detail.surface_agent",
     "diagnostics.on": "admin.audit.detail.diagnostics_on",
     "diagnostics.off": "admin.audit.detail.diagnostics_off",
 }
@@ -233,6 +252,7 @@ VALUE_LABELS: dict[str, str] = {
     staff.ORGANISATION_REMOVED: "admin.audit.detail.organisation_remove",
     staff.GROUP_ADDED: "admin.audit.detail.group_add",
     staff.GROUP_REMOVED: "admin.audit.detail.group_remove",
+    "client": "admin.audit.detail.client",
     "reason": "admin.audit.detail.reason",
     "actor": "admin.audit.detail.actor",
 }
@@ -255,6 +275,12 @@ REASON_LABELS: dict[str, str] = {
     INVALID_SIGNATURE: "admin.audit.reason.invalid_signature",
     "unauthorized": "admin.audit.reason.unauthorized",
     "unreachable": "admin.audit.reason.unreachable",
+    TOO_MANY_REQUESTS: "admin.audit.reason.too_many_requests",
+    HONEYPOT: "admin.audit.reason.honeypot",
+    CROSS_SITE: "admin.audit.reason.cross_site",
+    ORIGIN_MISMATCH: "admin.audit.reason.origin_mismatch",
+    UNKNOWN_TOKEN: "admin.audit.reason.unknown_token",
+    UNKNOWN_MANAGEMENT_LINK: "admin.audit.reason.unknown_management_link",
 }
 """Readable explanation per known reason; any other code (an error code) is shown as is."""
 
