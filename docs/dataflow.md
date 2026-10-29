@@ -98,11 +98,14 @@ web ──SQL──> staff, staff_memberships (sub, display name, roles, organis
 
 | Data item | Table.column / place | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| Admin subject identifier | `audit_events.actor`, `staff.subject`, session cookie | identity provider | audit events: kept as the audit trail (retention to be set with the hosting owner, O7) | no |
+| Admin subject identifier | `audit_events.actor`, `staff.subject`, session cookie | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
 | Admin display name | `staff.display_name`, session cookie | identity provider | replaced at every login; to be erased for admins inactive longer than `staff_retention_days` (ADR 0046, step 2) | no |
 | Admin roles and memberships | `staff.roles`, `staff_memberships` (organisation and group slugs) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed` | no |
 | Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
 | System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
+| Audit events on the log platform (ADR 0034) | one JSON line per audit, system and security event on stdout, shipped by the host to the organisation's log platform (SIEM) | web, worker | the organisation's log policy | no citizen data; **admin subjects** (personal data of employees): the log platform is a recipient |
+| Audit log export (ADR 0040) | CSV download of the audit log in the admin's scope: ids, codes, admin subjects | web → admin's browser | the organisation's policy; every export is an audit event | no citizen data; admin subjects |
+| Diagnostic mode (ADR 0040) | `diagnostic_modes`: organisation and group slug, end time, superuser's subject; debug events in `audit_events` (category `diagnostic`: job type, attempt, duration) | web (superuser), worker | mode: until it ends; debug events `DIAGNOSTIC_EVENT_RETENTION_DAYS` (7) | no |
 | Event schema fields (ADR 0040) | `audit_events.event_id`, `level`, `category`, `trace_id`, `service`; the same trace id on stdout | web, worker | as the event they belong to | no: random ids and codes |
 
 System events hold no personal data: no names, addresses, message text or join links, only codes

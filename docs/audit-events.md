@@ -27,6 +27,16 @@ model, so Elastic, Splunk or an OpenTelemetry collector reads it without mapping
 | `installation` | `gemeente-prod` | `INSTALLATION_NAME`; empty when not set |
 | `detail` | `horizon_days,name` | what changed, as machine keys; never values |
 
+## On the log platform (ADR 0034)
+
+After commit, each audit, system and security event is written once to stdout as the record
+above plus `"log_type": "audit"`, for the log platform to route; diagnostic events stay inside
+the installation. Security events (`event.category = security`): `webhook.rejected` (reason
+`invalid_signature`, detail `source:webex` or `source:wxcc`) and `webex.token_refresh`
+(reason `unauthorized` or `unreachable`, detail `status:<n>` or an exception type), at most one
+per kind per window, with `suppressed:<n>` for the ones held back. Shipping is described in
+`docs/runbook.md`.
+
 ## What never appears
 
 No personal data of citizens (name, email, phone, note, join links) and no admin display
