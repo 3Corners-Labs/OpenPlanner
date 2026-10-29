@@ -5,19 +5,26 @@ sections marked *TBD* are completed in work package 9.
 
 ## Deploy
 
+A host is installed, and repaired, with `scripts/install.sh` from the checkout in
+`/home/<user>/openplanner`: see `docs/install.md` for prerequisites, the layout of every file
+and what to do when it stops. Every Compose command on the host afterwards:
+
 ```sh
-docker compose pull   # or: docker compose build
-docker compose up -d
-docker compose ps     # web and worker must report "healthy"
+cd ~/openplanner
+docker compose --env-file .env.update up -d
+docker compose --env-file .env.update ps     # web and worker must report "healthy"
 ```
 
-`web` applies pending Alembic migrations before it starts serving. The worker starts after
-`web` is healthy.
+`.env.update` pins the signed release by digest and carries the installation's profiles (`tls`
+in production). `web` applies pending Alembic migrations before it starts serving. The worker
+starts after `web` is healthy.
 
 ### First install: the bootstrap keys (ADR 0042 §9)
 
 A new installation needs three random keys: `SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`
-and `SESSION_SECRET`. Generate them once, before the first `up`:
+and `SESSION_SECRET`. On a host, `scripts/install.sh` generates them into `secrets/secrets.env`
+and moves keys an older installation kept in `.env` there (`docs/install.md`). By hand, generate
+them once, before the first `up`:
 
 ```bash
 mkdir -m 700 secrets
@@ -63,7 +70,7 @@ Only deploy images signed by the `main` workflow of this repository:
 
 ```sh
 cosign verify ghcr.io/<owner>/<repo>@sha256:<digest> \
-  --certificate-identity-regexp '^https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/(heads/main|tags/v.*)$' \
+  --certificate-identity-regexp '^https://github\.com/<owner>/<repo>/\.github/workflows/main\.yml@refs/(heads/main|tags/v.*)$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -132,19 +139,20 @@ First start:
    record, it must allow `letsencrypt.org`.
 2. Open ports 80 and 443 from the internet. Port 80 is needed for the ACME challenge and
    redirects everything else to https.
-3. `cp proxy.env.example proxy.env` and fill in `TLS_DOMAIN=<host name>` and
+3. `scripts/install.sh --mode production --acme-staging` does steps 3 and 4 (`docs/install.md`).
+   By hand: `cp proxy.env.example proxy.env` and fill in `TLS_DOMAIN=<host name>` and
    `ACME_EMAIL=<operations mailbox>`. The proxy reads only this file, not `.env`, so it never
    holds the app's secrets and works with `--env-file .env.update` (updater, ADR 0029) too.
    In `.env`: `PUBLIC_BASE_URL=https://<host name>`; leave `FORWARDED_ALLOW_IPS` unset, its
    default is the proxy's fixed address.
 4. Trial run first, to stay clear of Let's Encrypt's rate limits: in `proxy.env`
    `ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory`, then
-   `docker compose --profile tls up -d` and look for `certificate obtained successfully` in
-   `docker compose logs proxy`. Browsers will not trust the staging certificate; that is
-   expected.
+   `docker compose --env-file .env.update up -d` and look for `certificate obtained
+   successfully` in `docker compose --env-file .env.update logs proxy`. Browsers will not trust
+   the staging certificate; that is expected.
 5. Remove `ACME_CA` (default: Let's Encrypt production), delete the staging certificate with
-   `docker compose --profile tls down && docker volume rm <project>_proxy-data`, and start
-   again with `docker compose --profile tls up -d`.
+   `docker compose --env-file .env.update stop proxy && docker compose --env-file .env.update rm -f proxy && docker volume rm openplanner_proxy-data`,
+   and start again with `docker compose --env-file .env.update up -d`.
 
 Day to day:
 
@@ -160,8 +168,9 @@ Day to day:
 - **Another ACME CA** (for example ZeroSSL, or a government CA that speaks ACME): set `ACME_CA`
   in `proxy.env` to its directory URL and restart the proxy.
 - **Updates from the admin portal** (ADR 0029) restart only `web` and `worker`; the proxy keeps
-  running and answers 502 for the seconds `web` is down. Add `--profile tls` to your own
-  `docker compose --env-file .env.update up -d` so the proxy stays part of the stack. An organisation-validated (PKIoverheid)
+  running and answers 502 for the seconds `web` is down. `.env.update` carries
+  `COMPOSE_PROFILES=tls`, so `docker compose --env-file .env.update up -d` keeps the proxy in
+  the stack. An organisation-validated (PKIoverheid)
   certificate without ACME is not supported by this profile (ADR 0030).
 - **Webhooks**: with a public domain, `WEBHOOK_BASE_URL` can stay empty; Webex and WxCC use
   `PUBLIC_BASE_URL`.
@@ -750,23 +759,21 @@ With `UPDATE_REPOSITORY=<owner>/<repo>` the worker looks up the latest GitHub re
 hour, and the superuser sees a banner on every admin page when it is newer than the running
 version (`APP_VERSION`, baked into release images). "Update now" and "Restore previous
 version" on `/admin/updates` only store a request; the **host updater** carries it out. Without
-the updater, requests stay "requested" and the page says so after 10 minutes; deploy by hand as
-above.
+the updater, requests stay "requested" and the page says so after 10 minutes: install it with
+`scripts/install.sh` (above), which also carries out the waiting request within a minute.
 
-### Installing the host updater (once per host)
+### Installing the host updater
 
-```sh
-install -m 755 scripts/updater/openplanner-update.sh /usr/local/sbin/openplanner-update
-install -m 644 scripts/updater/openplanner-updater.service scripts/updater/openplanner-updater.timer /etc/systemd/system/
-install -d -m 700 /etc/openplanner
-install -m 600 scripts/updater/updater.env.example /etc/openplanner/updater.env   # then edit it
-# Pin the image that runs now, by digest (after `cosign verify`, see above):
-echo "OPENPLANNER_IMAGE=ghcr.io/<owner>/<repo>@sha256:<digest>" > /opt/openplanner/.env.update
-systemctl daemon-reload && systemctl enable --now openplanner-updater.timer
-```
+`scripts/install.sh` installs it on every run (`docs/install.md`): the script in
+`/usr/local/sbin/openplanner-update`, the units in `/etc/systemd/system/`, a drop-in that lets
+the service write only the checkout under `/home` (the unit has `ProtectHome=yes`), and
+`/etc/openplanner/updater.env` with `COMPOSE_DIR=/home/<user>/openplanner`. It copies the
+operator's ghcr.io login to `/var/lib/openplanner-updater/.docker/` so root can pull a private
+image; after a new `docker login`, run the installer again. Check it with
+`systemctl list-timers openplanner-updater.timer` and `sudo journalctl -u openplanner-updater`.
 
-The host needs `docker` (with compose), `cosign`, `curl` and `flock`. From now on every compose
-command on the host passes `--env-file .env.update`, so the pinned digest is what runs.
+The updater replaces only `OPENPLANNER_IMAGE` in `.env.update` and keeps the profiles and mode
+the installer wrote there.
 
 ### What the updater does
 
