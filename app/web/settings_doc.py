@@ -21,6 +21,8 @@ file differs from the code. The classes and their rules are in
 [ADR 0042](adr/0042-settings-layers-env-lock-and-advanced-settings.md).
 
 - **A and B** are read from the environment only; their values never appear in the portal.
+  A bootstrap secret `X` may instead come from the file named by `X_FILE` (§9);
+  `python -m app.cli init` generates the three keys into `secrets/secrets.env`.
 - **C and D** will be set in the portal (build step 3 onwards). An environment variable
   *locks* them: it wins, and the portal shows the setting read-only. A locked value outside
   the portal bounds is accepted but flagged by `python -m app.cli settings list`.
