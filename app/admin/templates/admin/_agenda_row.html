@@ -1,0 +1,9 @@
+<tr>
+  <th scope="row" class="nowrap">{{ row.time }}<br><span class="muted">{{ row.kind }}</span></th>
+  <td>{{ row.first_name }}{% if row.cancelled %}<br><span class="chip">{{ _("admin.agenda.cancelled") }}</span>{% endif %}</td>
+  <td><span class="chip{% if row.call.tone %} chip--{{ row.call.tone }}{% endif %}">{{ row.call.label }}</span></td>
+  <td><span class="chip{% if row.task.tone %} chip--{{ row.task.tone }}{% endif %}">{{ row.task.label }}</span>{% if row.not_picked_up %}<br><span class="chip chip--danger">{{ _("admin.agenda.not_picked_up") }}</span>{% endif %}</td>
+  <td>{% if row.host_joined %}<span class="cell-yes"><span aria-hidden="true">✓</span>{{ _("admin.yes") }}</span>{% else %}<span class="cell-no"><span aria-hidden="true">–</span>{{ _("admin.no") }}</span>{% endif %}</td>
+  <td>{{ row.participants }}</td>
+  <td><a href="/admin/groups/{{ summary.group.slug }}/bookings/{{ row.id }}">{{ _("admin.agenda.details") }}<span class="visually-hidden"> {{ row.time }}</span></a></td>
+</tr>

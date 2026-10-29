@@ -1,4 +1,5 @@
 {% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
 {% block title %}{{ _("admin.tab.agenda") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
@@ -9,11 +10,12 @@
       <a href="?day={{ previous_day }}">{{ _("admin.agenda.previous") }}</a>
       <a href="?day={{ today }}">{{ _("admin.agenda.today") }}</a>
       <a href="?day={{ next_day }}">{{ _("admin.agenda.next") }}</a>
+      <a href="{{ week_href }}">{{ _("admin.agenda.view_week") }}</a>
     </nav>
   </div>
-  {% if rows %}
+  {% if slots %}
   <div class="table-scroll" role="region" aria-labelledby="agenda-heading" tabindex="0">
-  <table class="data-table">
+  <table class="data-table agenda-table">
     <caption class="visually-hidden">{{ _("admin.agenda.caption", day=day_label) }}</caption>
     <thead>
       <tr>
@@ -26,19 +28,32 @@
         <th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th>
       </tr>
     </thead>
-    <tbody>
-      {% for row in rows %}
-      <tr>
-        <th scope="row" class="nowrap">{{ row.time }}<br><span class="muted">{{ row.kind }}</span></th>
-        <td>{{ row.first_name }}{% if row.cancelled %}<br><span class="chip">{{ _("admin.agenda.cancelled") }}</span>{% endif %}</td>
-        <td><span class="chip{% if row.call.tone %} chip--{{ row.call.tone }}{% endif %}">{{ row.call.label }}</span></td>
-        <td><span class="chip{% if row.task.tone %} chip--{{ row.task.tone }}{% endif %}">{{ row.task.label }}</span>{% if row.not_picked_up %}<br><span class="chip chip--danger">{{ _("admin.agenda.not_picked_up") }}</span>{% endif %}</td>
-        <td>{% if row.host_joined %}<span class="cell-yes"><span aria-hidden="true">✓</span>{{ _("admin.yes") }}</span>{% else %}<span class="cell-no"><span aria-hidden="true">–</span>{{ _("admin.no") }}</span>{% endif %}</td>
-        <td>{{ row.participants }}</td>
-        <td><a href="/admin/groups/{{ summary.group.slug }}/bookings/{{ row.id }}">{{ _("admin.agenda.details") }}<span class="visually-hidden"> {{ row.time }}</span></a></td>
+    {% for slot in slots %}
+    <tbody id="{{ slot.anchor }}">
+      <tr class="agenda-slot{% if slot.shortfall %} agenda-slot--short{% endif %}">
+        <th scope="rowgroup" colspan="7">
+          <span class="nowrap">{{ slot.time }}</span>
+          {% if slot.closed %}<span class="chip">{{ icon("lock") }}{{ _("admin.agenda.closed") }}</span>
+          {% elif slot.staffing %}<span class="muted">{{ slot.staffing }}</span>
+          {% else %}<span class="muted">{{ _("admin.agenda.off_schedule") }}</span>{% endif %}
+          {% if slot.shortfall %}<span class="chip chip--danger">{{ icon("alert") }}{{ slot.shortfall }}</span>{% endif %}
+        </th>
       </tr>
+      {% for row in slot.rows %}
+      {% include "admin/_agenda_row.html" %}
+      {% else %}
+      <tr><td colspan="7" class="muted">{{ _("admin.agenda.no_bookings") }}</td></tr>
       {% endfor %}
     </tbody>
+    {% endfor %}
+    {% if direct %}
+    <tbody>
+      <tr class="agenda-slot"><th scope="rowgroup" colspan="7">{{ _("admin.agenda.direct") }}</th></tr>
+      {% for row in direct %}
+      {% include "admin/_agenda_row.html" %}
+      {% endfor %}
+    </tbody>
+    {% endif %}
   </table>
   </div>
   {% else %}

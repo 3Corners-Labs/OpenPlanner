@@ -23,6 +23,7 @@ the display name of admins, from the identity provider (ADR 0046).
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
                          │  └───* closures 1──* closure_notices (ADR 0024)
+                         │            └──? closure_images (ADR 0037 §3; one per closure)
                          │  └───* group_texts (message texts per locale and block)
                          └──* slots 1──* bookings 1──* jobs
                                          └──? closure (the one that suspended it)
@@ -66,6 +67,7 @@ __all__ = [
     "BookingRow",
     "GroupHolidayCalendarRow",
     "GroupHolidayOpenDayRow",
+    "ClosureImageRow",
     "ClosureNoticeRow",
     "ClosureRow",
     "GroupRow",
@@ -420,6 +422,26 @@ class ClosureRow(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
     # The JSON copy of the contact block taken when the closure started (ADR 0037 §2).
     contacts: Mapped[str | None] = mapped_column(Text)
+    image_id: Mapped[int | None] = mapped_column(
+        ForeignKey("closure_images.id", ondelete="SET NULL")
+    )
+
+
+class ClosureImageRow(Base):
+    """An image of a closure with its text alternative (ADR 0037 §3); metadata already stripped.
+
+    Organisation data, not personal data: no purge. The type comes from the magic bytes.
+    """
+
+    __tablename__ = "closure_images"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    media_type: Mapped[str] = mapped_column(String(16))
+    digest: Mapped[str] = mapped_column(String(16))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    # The text alternative per locale as JSON; ``{}`` when decorative.
+    alts: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+    decorative: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
 
 
 class ClosureNoticeRow(Base):
