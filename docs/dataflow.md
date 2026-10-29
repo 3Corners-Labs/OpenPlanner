@@ -85,6 +85,13 @@ cannot read what is typed into the shadow root's form through our API, and the a
 booking holds no personal data and no management token (the link goes by email only). The
 same personal data rules apply as for the standalone page.
 
+**Closure image (ADR 0037 §3, CL-3).** One image per closure (`closure_images`), uploaded by an
+admin with a text alternative in nl and en. Metadata a photo can carry about people (EXIF and
+XMP, such as a GPS position or the photographer's name; PNG text chunks; JPEG comments) is
+stripped before the file is stored, so only the picture itself is kept. Served from our own
+origin and only while its closure is visible; never mailed, never sent to a third party.
+Organisation data; no purge job.
+
 **Allowed origins for embedding (ADR 0035).** The websites on which an organisation's groups
 may appear as a widget (`organisation_origins`, such as `https://www.gemeente.nl`), entered by
 an organisation admin, and a switch per group (`groups.embedding_enabled`). Organisation data,
