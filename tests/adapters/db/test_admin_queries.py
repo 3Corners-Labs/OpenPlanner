@@ -13,6 +13,8 @@ from app.domain.audit import (
     AuditEntry,
     AuditEvent,
     AuditFilter,
+    Category,
+    Level,
     Outcome,
     Source,
 )
@@ -222,3 +224,28 @@ def test_every_listing_query_requires_a_scope() -> None:
         assert "scope" in parameters, name
         assert parameters["scope"].annotation in (Scope, "Scope"), name
         assert parameters["scope"].default is inspect.Parameter.empty, name
+
+
+async def test_audit_events_keep_the_event_schema_fields(engine: AsyncEngine) -> None:
+    # ADR 0040, part 2: id, level, category, trace and service survive the round trip.
+    uow = SqlUnitOfWork(engine)
+    event = AuditEvent(
+        NOW,
+        SYSTEM_ACTOR,
+        "webhook.rejected",
+        Outcome.FAILURE,
+        source=Source.SYSTEM,
+        category=Category.SECURITY,
+        trace_id="b" * 32,
+        service="web",
+    )
+    async with uow.locked() as tx:
+        await tx.add_audit_event(event)
+
+    async with uow.read() as tx:
+        (entry,) = await tx.list_audit_events(EVERYTHING)
+
+    stored = entry.event
+    assert stored == event
+    assert (stored.event_id, stored.trace_id, stored.service) == (event.event_id, "b" * 32, "web")
+    assert (stored.category, stored.level) == (Category.SECURITY, Level.ERROR)
