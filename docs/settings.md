@@ -102,6 +102,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WXCC_WEBHOOK_SECRET` | secret | — | — | `settings.platform.manage` | WxCC webhook secret; to be generated and rotated by the server. |
 | `UPDATE_REPOSITORY` | string | — | — | `settings.platform.manage` | owner/name of the release repository (ADR 0029). |
 | `UPDATE_CHECK_TOKEN` | secret | — | — | `settings.platform.manage` | Read token for a private repository; write-only. |
+| `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
 
 ## D. Organisation (portal, organisation settings; lockable by env)
 

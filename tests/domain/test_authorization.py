@@ -65,6 +65,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.TEXTS_MANAGE,
         Permission.REMINDERS_MANAGE,
         Permission.BOOKINGS_VIEW,
+        Permission.BOOKINGS_MANAGE,  # ADR 0044
         Permission.CLOSURE_MANAGE,
         Permission.ORGANISATION_CLOSURE,
         Permission.RETENTION_VIEW,
@@ -80,6 +81,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.SCHEDULE_MANAGE,
         Permission.TEXTS_MANAGE,
         Permission.BOOKINGS_VIEW,
+        Permission.BOOKINGS_MANAGE,  # ADR 0044: the team's own planner
         Permission.CLOSURE_MANAGE,
         Permission.STAFF_VIEW,  # ADR 0046: read-only, the own groups
     }
@@ -127,8 +129,8 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
 
 
-def test_bookings_are_the_permission_that_shows_personal_data() -> None:
-    assert {Permission.BOOKINGS_VIEW} == PII_PERMISSIONS
+def test_bookings_are_the_permissions_that_show_personal_data() -> None:
+    assert {Permission.BOOKINGS_VIEW, Permission.BOOKINGS_MANAGE} == PII_PERMISSIONS
 
 
 def test_every_role_has_a_reach_and_only_the_superuser_reaches_everything() -> None:

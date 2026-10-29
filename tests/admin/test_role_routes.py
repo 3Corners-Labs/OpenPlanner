@@ -85,6 +85,7 @@ async def test_a_copy_of_a_template_answers_every_route_like_the_template(
 
 async def test_a_narrowed_copy_loses_exactly_what_was_switched_off(site: Site) -> None:
     narrowed = MATRIX[Role.GROUP_ADMIN] - {Permission.BOOKINGS_VIEW, Permission.TEXTS_MANAGE}
+    narrowed -= {Permission.BOOKINGS_MANAGE}  # it requires bookings.view (ADR 0044)
     await create_role(site, role_form(Role.GROUP_ADMIN, narrowed))
     await site.login_as(holder_like(GROUP_ADMIN))
 
@@ -110,7 +111,7 @@ async def test_a_role_change_works_on_the_next_request_without_logging_in(site: 
     assert (await client.get("/admin/groups/demo/agenda")).status_code == 200
 
     act_as(superuser)
-    narrowed = MATRIX[Role.GROUP_ADMIN] - {Permission.BOOKINGS_VIEW}
+    narrowed = MATRIX[Role.GROUP_ADMIN] - {Permission.BOOKINGS_VIEW, Permission.BOOKINGS_MANAGE}
     form = role_form(Role.GROUP_ADMIN, narrowed, version="1")
     saved = await client.post(f"/admin/roles/{role_id}", data=form, headers=SAME_ORIGIN)
     assert saved.status_code == 303
