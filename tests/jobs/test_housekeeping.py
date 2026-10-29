@@ -127,3 +127,41 @@ async def test_freed_pages_are_reclaimed_once_per_hour(engine: AsyncEngine) -> N
 
     await setup.run(50, after=timedelta(minutes=30))
     assert await _free_pages(engine) == 0
+
+
+async def test_at_grade_critical_the_brake_ends_diagnostic_mode(engine: AsyncEngine) -> None:
+    # ADR 0040, part 4: the emergency brake runs every loop at critical, never otherwise.
+    reasons: list[str] = []
+
+    async def brake(reason: str) -> int:
+        reasons.append(reason)
+        return 1
+
+    clock, disk = FixedClock(), Disk()
+    housekeeping = Housekeeping(
+        engine, InMemoryUnitOfWork(State()), clock, StorageLimits(), disk, brake
+    )
+
+    for free in (10, 3, 3, 40):
+        disk.free_percent = free
+        with capture_logs() as logs:
+            await housekeeping.run()
+
+    assert reasons == ["free_space_critical", "free_space_critical"]
+    assert not [e for e in logs if e["event"] == "diagnostics.braked"]  # recovered: no brake
+
+
+async def test_a_failing_brake_never_stops_housekeeping(engine: AsyncEngine) -> None:
+    async def brake(_reason: str) -> int:
+        raise RuntimeError("disk full")
+
+    disk = Disk()
+    disk.free_percent = 3
+    housekeeping = Housekeeping(
+        engine, InMemoryUnitOfWork(State()), FixedClock(), StorageLimits(), disk, brake
+    )
+
+    with capture_logs() as logs:
+        await housekeeping.run()
+
+    assert "diagnostics.brake_failed" in [e["event"] for e in logs]

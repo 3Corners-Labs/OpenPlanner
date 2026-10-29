@@ -45,3 +45,23 @@ groepsbeheerders niet.
 
 Een export bevat de identificatie (subject) van beheerders. Bewaar het bestand volgens het
 beleid van uw organisatie.
+
+## Diagnosemodus
+
+Alleen de superuser ziet bovenaan het blok **Diagnosemodus**. Kies een groep of een hele
+organisatie en klik op **Aanzetten**. Zolang de modus aan staat, schrijft het platform extra
+regels van de soort *Diagnose* over die groep, bijvoorbeeld *Taak uitgevoerd (diagnose)* met
+het soort taak, de poging en de duur. De beheerders van de groep zien die regels ook.
+
+De modus gaat na 24 uur vanzelf uit (instelbaar), met **Uitzetten**, of als de schijf bijna
+vol is. Aan- en uitzetten komt in het log.
+
+## Hoe lang regels blijven staan
+
+- Beheeracties: 2 jaar.
+- Systeem: 90 dagen.
+- Beveiliging: 1 jaar.
+- Diagnose: 7 dagen.
+
+De beheerder van de installatie kan deze termijnen aanpassen. Daarna verdwijnen oudere regels
+definitief.
