@@ -1,7 +1,7 @@
 {
-  "$comment": "Copy-paste detection. Shared behaviour belongs in one module; see docs/adr/0005. Add widget/ in WP3.",
-  "path": ["app", "tests"],
-  "ignore": ["**/__pycache__/**", "**/dist/**", "**/i18n/locales/**"],
+  "$comment": "Copy-paste detection. Shared behaviour belongs in one module; see docs/adr/0005.",
+  "path": ["app", "tests", "widget/src"],
+  "ignore": ["**/__pycache__/**", "**/dist/**", "**/node_modules/**", "**/i18n/locales/**"],
   "minTokens": 50,
   "minLines": 6,
   "threshold": 1,

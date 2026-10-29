@@ -37,3 +37,15 @@ Every change goes to the audit log, with the number of websites added and remove
 
 Below the list you see, for each group of the organisation, whether it appears in the widget.
 The group's name links to its settings, where you switch **Embed on websites** on or off.
+
+## Code for your website
+
+At the bottom is the code the web editors paste into a page: one line with the script and,
+for each group that is switched on, an element `<gov-booking>`. The script needs to be on a
+page only once, also when you show more groups.
+
+The script has an `integrity` value. With it, the browser checks that the script has not
+changed. After every OpenPlanner update that value changes: if the web editors copy the code
+with `integrity`, they must take over the new value after an update, or the calendar no longer
+loads. If you do not want that, leave out `integrity="…"`. The technical explanation for the
+web editors is in `docs/widget.md`.

@@ -5097,3 +5097,15 @@ msgstr "Uw afspraak is gemaakt"
 
 msgid "widget.error_summary"
 msgstr "Er is iets niet goed ingevuld"
+
+msgid "admin.embedding.code"
+msgstr "Code voor uw website"
+
+msgid "admin.embedding.code_lead"
+msgstr "Plaats het script één keer per pagina en het element waar de kalender moet komen. Laat integrity weg als u het script niet bij elke update opnieuw wilt vastleggen; zie de handleiding."
+
+msgid "admin.embedding.code_no_build"
+msgstr "Op deze installatie is het widgetscript niet gebouwd; de code staat hier zonder integrity."
+
+msgid "admin.embedding.code_none"
+msgstr "Zet eerst bij een groep Insluiten op websites aan."

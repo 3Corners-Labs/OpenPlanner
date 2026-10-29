@@ -5097,3 +5097,15 @@ msgstr "Your appointment is booked"
 
 msgid "widget.error_summary"
 msgstr "Something was not filled in correctly"
+
+msgid "admin.embedding.code"
+msgstr "Code for your website"
+
+msgid "admin.embedding.code_lead"
+msgstr "Place the script once per page and the element where the calendar should appear. Leave out integrity if you do not want to pin the script again after every update; see the manual."
+
+msgid "admin.embedding.code_no_build"
+msgstr "This installation has no build of the widget script; the code is shown without integrity."
+
+msgid "admin.embedding.code_none"
+msgstr "First switch on Embed on websites for a group."
