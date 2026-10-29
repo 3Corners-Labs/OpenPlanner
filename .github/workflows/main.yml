@@ -114,7 +114,9 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    # Job permissions replace the workflow's, so contents: read is repeated for the checkout.
     permissions:
+      contents: read
       actions: read
       checks: read
     steps:
