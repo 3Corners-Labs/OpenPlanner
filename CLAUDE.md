@@ -37,7 +37,7 @@ Lightweight group-booking service for a government contact center: embeddable wi
 ## Delivery surface
 - Default: a standalone page per group at `/g/{slug}` in the organisation's branding; the client's website links to it after its own decision tree. We are the end station; there is no routing step in this service.
 - Optional: the same UI as an embeddable Web Component for sites that want it inline.
-- Booking form asks only email, name and (per group optional) phone. Never BSN, never DigiD, no free-text field unless a group explicitly enables one.
+- Booking form asks first name, last name, email and (per group optional) phone, plus the group's custom fields from the closed type catalogue of ADR 0055 (no admin regex, PII by default, blocklist for BSN and special categories). Never BSN, never DigiD, no free-text field unless a group explicitly adds one.
 
 ## Code style and quality gates (CI fails on any of these; branch protection makes CI mandatory, no `[skip ci]`)
 Per PR:
@@ -84,7 +84,7 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 - External penetration test before go-live and yearly; `SECURITY.md` and `/.well-known/security.txt` describe responsible disclosure.
 
 ## Privacy rules
-- PII fields: `name, email, phone, note, guest_join_url, host_join_url`. Only on `Booking`. Nowhere else.
+- PII fields: `first_name, last_name, email, phone, note, form_answers, guest_join_url, host_join_url`. Only on `Booking`. Nowhere else. Answers to a group's custom form fields (ADR 0055) are read only through `Answers.visible(purpose)`; never read a field's PII tag yourself.
 - `purge_pii` job runs at `slot.end + 24h` or `cancelled_at + 24h`; sets fields to NULL and `pii_purged_at`. A nightly sweep re-checks for stragglers and alerts if any booking older than 48 h still has PII.
 - Outbound payloads to any contact-center provider (Webex Contact Center today, ADR 0032) contain only first name and the host join URL.
 - Data flow diagram in `docs/dataflow.md` is the input for the DPIA; keep it current.

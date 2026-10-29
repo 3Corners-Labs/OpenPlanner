@@ -186,8 +186,10 @@ Do not use `::part()` to hide information or reduce contrast; the widget is test
 
 Step 1, a time: the group's name and introduction, a closure notice if the group is closed
 or will close (no booking while closed), "first possible", the month grid and the free
-times of the chosen day. Step 2, details: name, email and, per group, phone, with the same
-validation as the standalone page. Step 3, done: the appointment and "you will receive a
+times of the chosen day. Step 2, details: first and last name, email, per group phone, and the
+group's own questions (text, choice list, checkbox, date …; ADR 0055), with the same
+validation as the standalone page. Every input, select and textarea is exposed as
+`part="input"`, so your `::part(input)` rule styles them all; a checkbox sits before its label. Step 3, done: the appointment and "you will receive a
 confirmation by email". The management link (view, move, cancel) arrives by email only; it is
 never shown to or readable by your page.
 
@@ -204,8 +206,14 @@ of a chosen day, errors and the result; no time limits; `prefers-reduced-motion`
 
 Your website learns that a visitor opened a page with the widget and which group the tag
 names, as for any element on your page. The widget sends no cookies, and the citizen's name,
-email and phone go from their browser to OpenPlanner directly (`docs/dataflow.md`). Answers
+email, phone and answers go from their browser to OpenPlanner directly (`docs/dataflow.md`). Answers
 to your page hold no personal data and no management token.
+
+For a client of your own (not the Web Component): `POST …/bookings` takes `first_name`,
+`last_name`, `email`, an optional `phone` and `answers`, an object of the group's field keys
+(the `name` in the group answer without `q_`) to strings; a ticked checkbox is `"on"`. The
+older `name` is still accepted and split at the first space. A refused answer is
+`{"error": "invalid_answer", "field": "q_<key>"}`.
 
 ### 7. When it says "not available here"
 

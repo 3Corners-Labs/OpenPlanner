@@ -357,6 +357,22 @@ carry the closure's contact options and a link to the closure page.
 | Information disclosure (privacy) | The closure image in a mail lets a third party (remote image host) see who opens it, or makes the mail heavy | The image is never mailed; the mail links to the closure page on our own origin | `tests/jobs/test_messages.py::test_closure_mails_match_their_snapshots` (no `<img>` in the snapshots) |
 | Information disclosure | Contact options or the closure link in mails that are not about a closure | Only suspension and update mails carry the block and the link | `tests/jobs/test_messages.py::test_other_mails_have_no_contact_block_or_closure_link` |
 
+## Flow: custom booking form fields (ADR 0055)
+
+Admin: `GET/POST /admin/groups/{slug}/settings/form[/{key}[/move|/retire]]` behind
+`group.edit`. Public: the answers on `POST /g/{slug}/book`, `POST /g/{slug}/direct` and the
+widget's `POST …/bookings`. Inputs from outside: field definitions (an administrator) and
+answers (anyone).
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure | An administrator adds a question that collects a BSN, an identity document or special categories of personal data | Blocklist on keys, labels, help texts and option labels (nl and en); manual topic; every change audited by key | `tests/domain/test_form_fields.py::test_forbidden_terms_are_refused_in_keys`, `test_forbidden_terms_are_refused_in_labels`, `tests/admin/test_form_routes.py::test_refusals_are_linked_to_their_inputs` |
+| Information disclosure | A field holding personal data is tagged *not personal data* and its answers reach logs, audit, exports, messages or the queue | Default `pii`; email, phone and free text can never be lowered; lowering needs an explicit confirmation; raising or retiring rewrites stored answers at once; one enforcement point `Answers.visible(purpose)`; purge clears all answers whatever the tag | `tests/domain/test_form_fields.py::test_other_purposes_see_only_non_pii`, `test_contact_details_and_free_text_are_always_pii`, `tests/domain/test_form_service.py::test_not_pii_needs_a_confirmation`, `test_raising_a_tag_makes_earlier_answers_pii_at_once`, `tests/adapters/db/test_form_field_queries.py::test_answers_are_stored_raised_to_pii_and_purged` |
+| Information disclosure | Answers through errors, logs or `repr` | Errors name the field key only; an unknown key is reported as `unknown`; `Answers` has no values in `repr`; the log masker masks `form_answers`, `answers`, `first_name`, `last_name` | `tests/domain/test_form_fields.py::test_errors_never_contain_the_value`, `test_unknown_keys_are_refused_without_echoing_the_key`, `test_answers_never_show_values_in_repr`, `tests/test_logging.py::test_pii_fields_cover_the_booking_pii_columns`, `tests/api/test_custom_field_pages.py::test_an_unknown_answer_is_refused_without_naming_it` |
+| Denial of service / tampering | Oversized or many answers, control characters, a regular expression that backtracks | No administrator regex (closed type catalogue); lengths bounded per type; the widget body caps answers at 15 and 1001 characters; control characters refused | `tests/domain/test_form_fields.py::test_short_text_is_trimmed_and_bounded`, `tests/api/test_custom_field_pages.py::test_oversized_answers_are_refused_before_the_domain` |
+| Tampering | A stored answer changes meaning because its question changed | Key and type are fixed after saving; a retired key is never used again; answers keep the form version | `tests/domain/test_form_service.py::test_update_keeps_key_and_type_and_reports_a_change`, `test_retiring_keeps_the_label_blocks_the_key_and_makes_answers_pii` |
+| Elevation of privilege | A group admin or another organisation's admin changes a form | `group.edit` on the route and again in `FormService`; denials audited | `tests/admin/test_authorization_matrix.py` (rows `/settings/form`), `tests/domain/test_form_service.py::test_only_who_edits_the_group_may_change_its_form` |
+
 ## Flow: embedded booking (ADR 0035, EM-2)
 
 Public, unauthenticated, called by `<gov-booking>` on a host website:

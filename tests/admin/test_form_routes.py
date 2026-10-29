@@ -50,7 +50,8 @@ async def test_the_settings_link_to_the_booking_form(site: Site) -> None:
     page = (await site.client.get(PAGE)).text
 
     assert f'href="{PAGE}"' in settings
-    assert "Dit team heeft nog geen eigen velden." in page
+    assert "Waar gaat uw vraag over?" in page  # the demo's example fields
+    assert "<code>tolk</code>" in page
     assert 'aria-current="page"' in page  # the Settings tab stays selected
 
 
