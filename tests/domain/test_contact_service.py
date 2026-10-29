@@ -93,3 +93,17 @@ async def test_an_unknown_organisation_is_not_found(service: ContactService) -> 
     with pytest.raises(DomainError) as missing:
         await service.save(SUPER, "onbekend", BLOCK)
     assert missing.value.code is ErrorCode.ORGANISATION_NOT_FOUND
+
+
+async def test_the_maintenance_page_uses_the_groups_own_block_else_the_organisations(
+    service: ContactService, uow: InMemoryUnitOfWork
+) -> None:
+    group = uow.state.groups[1]
+    assert await service.public_for_group(group) is None
+
+    await service.save(SUPER, "demo", BLOCK)
+    assert await service.public_for_group(group) == BLOCK
+
+    own = ContactBlock((CHAT,))
+    await service.save_group(SUPER, "demo", own)
+    assert await service.public_for_group(group) == own
