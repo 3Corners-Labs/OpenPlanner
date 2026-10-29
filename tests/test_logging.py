@@ -8,7 +8,13 @@ import structlog
 
 from app.domain.event_context import bind_level, set_service, trace_scope
 from app.domain.event_schema import Envelope
-from app.logging import MASK, PII_FIELDS, configure_logging, warn_loose_secret_files
+from app.logging import (
+    MASK,
+    PII_FIELDS,
+    configure_logging,
+    set_log_level,
+    warn_loose_secret_files,
+)
 
 
 @pytest.fixture
@@ -131,3 +137,18 @@ def test_a_loose_secret_file_is_reported_by_variable_name_only(stream: io.String
     (record,) = _records(stream)
     assert record["message"] == "settings.secret_file_readable"
     assert record["variable"] == "SESSION_SECRET_FILE"
+
+
+def test_the_level_can_change_while_running_and_masking_stays() -> None:
+    stream = io.StringIO()
+    configure_logging("INFO", stream)
+    structlog.get_logger().debug("hidden", email="ada@example.org")
+
+    set_log_level("DEBUG")
+    structlog.get_logger().debug("shown", email="ada@example.org")
+
+    out = stream.getvalue()
+    assert "hidden" not in out
+    assert "shown" in out
+    assert "ada@example.org" not in out
+    set_log_level("INFO")

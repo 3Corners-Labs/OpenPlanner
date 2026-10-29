@@ -16,6 +16,7 @@ Debug events carry codes and ids only, like every audit event, and never leave t
 installation (ADR 0034).
 """
 
+from collections.abc import Callable
 from datetime import timedelta
 
 from app.domain.admin import AdminService, record_change, require
@@ -24,6 +25,7 @@ from app.domain.authorization import Permission, Principal
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, UnitOfWork
+from app.domain.tunable import value_of
 
 BRAKE_EVENT = "diagnostics.brake"
 """System event when the worker ends diagnostic mode because the disk is nearly full."""
@@ -40,7 +42,11 @@ class DiagnosticsService:
     """
 
     def __init__(
-        self, uow: UnitOfWork, clock: Clock, admin: AdminService, duration: timedelta
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        admin: AdminService,
+        duration: timedelta | Callable[[], timedelta],
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -72,7 +78,9 @@ class DiagnosticsService:
                     raise DomainError(ErrorCode.GROUP_NOT_FOUND)
             elif await tx.get_organisation(organisation) is None:
                 raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
-            mode = DiagnosticMode(organisation, group, now + self._duration, principal.subject)
+            mode = DiagnosticMode(
+                organisation, group, now + value_of(self._duration), principal.subject
+            )
             await tx.save_diagnostic_mode(mode)
             await record_change(
                 tx,

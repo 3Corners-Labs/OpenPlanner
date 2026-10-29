@@ -2,7 +2,7 @@
 
 This screen shows how the installation is configured and where each value comes from. Open it
 with **Advanced settings** in the menu. The superuser and the Compliance and privacy role can
-view it. Nothing can be changed here yet; that follows in a later version.
+view it. The superuser can change some of the settings; the auditor only reads.
 
 Secret values, such as passwords and keys, are never shown: only whether they are set.
 
@@ -31,6 +31,28 @@ and its source:
 - **File**: a secret the server reads from a file.
 
 A changed value applies within about ten seconds, without a restart.
+
+## Changing a setting
+
+The superuser changes the settings for operations, retention, storage, rate limits, admin
+sessions, staff and the planner. The fallback mail server, Webex, updates and the login
+mapping follow in a later version.
+
+- Enter the new value under **Change** and choose **Save**. The portal only accepts values
+  within its bounds, for example 1 to 30 bookings per hour per address. A value outside them
+  is refused at the row, with the reason.
+- Some settings depend on each other: critical storage must stay below low storage, and the
+  reminder to rebook must come before the request lapses. A value that contradicts another
+  setting is refused.
+- **Use the default** removes the value set here; the default (or the server's value)
+  applies again.
+- A setting **locked by the server operator** has no form: change it in the server's
+  environment, or ask the operator.
+- The **log level** always falls back to the default by itself, after at most 24 hours. Enter
+  after how many hours. Personal data stays masked in the log at every level.
+
+You need a recent login to change a setting. Every change is recorded in the audit log with
+the old and the new value; a refused change is recorded too.
 
 ## Notes
 

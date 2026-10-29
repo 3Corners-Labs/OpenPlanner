@@ -5294,7 +5294,7 @@ msgid "admin.settings.title"
 msgstr "Advanced settings"
 
 msgid "admin.settings.intro"
-msgstr "How this installation is configured and where each value comes from. Secret values are never shown. Nothing can be changed on this screen yet."
+msgstr "How this installation is configured and where each value comes from. Secret values are never shown. The superuser changes operations, retention, storage, rate limits and sessions here; a change applies within ten seconds."
 
 msgid "admin.settings.status.title"
 msgstr "System status"
@@ -5631,3 +5631,33 @@ msgstr "Request to rebook lapses after (days)"
 
 msgid "settings.field.planner_rebook_reminder_days.label"
 msgstr "Rebook reminder (days before the lapse)"
+
+msgid "admin.settings.change"
+msgstr "Change"
+
+msgid "admin.settings.new_value"
+msgstr "New value"
+
+msgid "admin.settings.hours"
+msgstr "Back to the default after (hours, at most {max})"
+
+msgid "admin.settings.save"
+msgstr "Save"
+
+msgid "admin.settings.reset"
+msgstr "Use the default"
+
+msgid "admin.form.error.setting_not_editable"
+msgstr "This setting cannot be changed here (yet)."
+
+msgid "admin.form.error.setting_locked"
+msgstr "The server operator has locked this setting; change it in the server's environment."
+
+msgid "admin.form.error.setting_invalid"
+msgstr "This value is outside the portal bounds."
+
+msgid "admin.form.error.setting_combination"
+msgstr "This value contradicts another setting (for example critical storage not below low storage)."
+
+msgid "admin.form.error.setting_expiry"
+msgstr "Enter the hours after which the log level falls back: 1 to 24."

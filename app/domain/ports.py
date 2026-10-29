@@ -861,6 +861,24 @@ class Transaction(Protocol):
         """Return the stored portal values of class C settings by key, as plain JSON values."""
         ...
 
+    async def platform_setting_expiries(self) -> dict[str, datetime]:
+        """Return when stored values lapse, for the keys that have an expiry (``LOG_LEVEL``)."""
+        ...
+
+    async def save_platform_setting(
+        self, key: str, value: object, updated_at: datetime, expires_at: datetime | None
+    ) -> None:
+        """Store or replace the portal value of ``key`` (a plain JSON value)."""
+        ...
+
+    async def delete_platform_setting(self, key: str) -> bool:
+        """Remove the portal value of ``key``; return whether there was one."""
+        ...
+
+    async def bump_settings_version(self) -> int:
+        """Raise ``settings_version`` by one and return the new value (ADR 0042 §6)."""
+        ...
+
 
 class UnitOfWork(Protocol):
     """Opens transactions. Leaving the context commits; an exception rolls back."""
