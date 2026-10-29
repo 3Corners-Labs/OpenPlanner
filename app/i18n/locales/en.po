@@ -5968,7 +5968,7 @@ msgid "admin.form_fields.limit_reached"
 msgstr "The form already has {count} custom fields, the maximum. Retire a field first."
 
 msgid "admin.form_fields.edit_lead"
-msgstr "Key {key}, type {type}. Key and type are fixed."
+msgstr "Key {field_key}, type {type}. Key and type are fixed."
 
 msgid "admin.form_fields.up"
 msgstr "Up"

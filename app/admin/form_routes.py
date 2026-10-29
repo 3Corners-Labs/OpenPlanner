@@ -316,8 +316,12 @@ async def _edit_page(
         "admin/group_form_field.html",
         {
             "field_key": current.key,
+            "edit_lead": _(
+                "admin.form_fields.edit_lead",
+                field_key=current.key,
+                type=_(TYPE_LABELS[current.type]),
+            ),
             "field_label": current.label(locale.code),
-            "field_type": _(TYPE_LABELS[current.type]),
             "always_pii": current.type in ALWAYS_PII,
             "fields": with_manual(request, locale, _inputs(_, form, current)),
             "required": form.checked("required") if form.values else current.required,

@@ -152,15 +152,15 @@ def _definition_error(field_name: str) -> DomainError:
     return DomainError(ErrorCode.INVALID_FORM_FIELD, field_name)
 
 
-def check_label(text: str) -> None:
+def check_label(text: str, field_name: str = "label") -> None:
     """Refuse a key or label that asks for an identifier or a special category of data.
 
     Raises:
-        DomainError: ``form_field_forbidden`` with field ``label``.
+        DomainError: ``form_field_forbidden`` naming ``field_name``.
     """
     squashed = _TERM_SEPARATORS.sub("", text.casefold())
     if any(term in squashed for term in FORBIDDEN_TERMS):
-        raise DomainError(ErrorCode.FORM_FIELD_FORBIDDEN, "label")
+        raise DomainError(ErrorCode.FORM_FIELD_FORBIDDEN, field_name)
 
 
 def normalise_email(raw: str, field_name: str, code: ErrorCode = ErrorCode.INVALID_CONTACT) -> str:
@@ -249,7 +249,7 @@ class FieldDefinition:
         """
         if not _KEY.fullmatch(key) or key in SYSTEM_KEYS:
             raise _definition_error("key")
-        check_label(key)
+        check_label(key, "key")
         if type in ALWAYS_PII and classification is not Classification.PII:
             raise _definition_error("classification")
         option_keys = tuple(options)
@@ -324,7 +324,7 @@ def _texts(
             continue
         if len(text) > max_length or _CONTROL_CHARS.search(raw):
             raise _definition_error(attribute)
-        check_label(text)
+        check_label(text, attribute)
         cleaned[locale] = text
     if any(locale not in cleaned for locale in required_locales):
         raise _definition_error(attribute)
@@ -419,6 +419,10 @@ class Answers:
     version: int
     _values: Mapping[str, AnswerValue] = field(repr=False)
     _not_pii: frozenset[str] = field(repr=False)
+
+    def __deepcopy__(self, memo: dict[int, object]) -> "Answers":
+        """Return ``self``: answers are immutable, so a copy may share them."""
+        return self
 
     def visible(self, purpose: Purpose) -> dict[str, AnswerValue]:
         """Return the answers ``purpose`` may see (ADR 0055 point 7)."""
