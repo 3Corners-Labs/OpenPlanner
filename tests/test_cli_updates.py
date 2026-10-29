@@ -1,4 +1,5 @@
-"""Operator commands of the host updater (ADR 0029): claim, report, backup and restore."""
+"""Operator commands of the host updater (ADR 0029, ADR 0048): claim, steps, report, backup
+and restore."""
 
 from pathlib import Path
 
@@ -6,11 +7,11 @@ import pytest
 
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
-from app.cli import _backup, _restore, _update_claim, _update_report, main
+from app.cli import _backup, _restore, _update_claim, _update_progress, _update_report, main
 from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.update_service import UpdateService
-from app.domain.updates import Release, ReleaseCheck, UpdateStatus, Version
+from app.domain.updates import Release, ReleaseCheck, UpdateStatus, UpdateStep, Version
 from tests.fakes.clock import FixedClock
 from tests.support.database import migrated_database
 from tests.support.domain import DEMO_SUPERUSER, NOW
@@ -64,6 +65,16 @@ async def test_report_refuses_nonsense(configured: Settings) -> None:
     assert (await _update_report(configured, request_id, "failed", ""))[1] == 1
 
 
+async def test_progress_records_the_step(configured: Settings) -> None:
+    request_id = await requested(configured)
+    assert (await _update_progress(configured, request_id, "pulling"))[1] == 1  # not claimed
+    await _update_claim(configured)
+    assert await _update_progress(configured, request_id, "backing_up") == ("backing_up\n", 0)
+    assert (await _update_progress(configured, request_id, "pulling"))[1] == 1  # going back
+    assert (await _update_progress(configured, request_id, "waiting"))[1] == 2
+    assert (await _update_progress(configured, request_id, "rm -rf"))[1] == 2
+
+
 def test_backup_restore_and_prune(configured: Settings) -> None:
     assert _backup(configured, "request-1", prune=True).startswith("backup written: request-1")
     assert "restored request-1" in _restore(configured, "request-1")
@@ -80,6 +91,12 @@ async def test_restored_database_has_the_state_of_the_backup(configured: Setting
             assert await tx.get_update_requests() == []
     finally:
         await engine.dispose()
+
+
+def test_main_rejects_an_unknown_step(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        main(["update-progress", "1", "waiting"])
+    assert UpdateStep.PULLING.value in capsys.readouterr().err
 
 
 def test_main_rejects_an_unknown_status(capsys: pytest.CaptureFixture[str]) -> None:
