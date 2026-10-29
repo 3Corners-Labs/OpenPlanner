@@ -47,6 +47,7 @@ from app.adapters.db.models import (
     ReminderRuleRow,
     ScheduleOverrideRow,
     ScheduleRuleRow,
+    ShortfallAcceptanceRow,
     SlotRow,
     StaffRow,
     WebhookEventRow,
@@ -55,6 +56,7 @@ from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
+from app.domain.agenda import ShortfallAcceptance
 from app.domain.audit import (
     PROBLEMS,
     AuditEntry,
@@ -69,6 +71,7 @@ from app.domain.booking import (
     Booking,
     BookingKind,
     BookingStatus,
+    ChangeReason,
     Contact,
     MeetingRef,
     Slot,
@@ -189,6 +192,7 @@ def _group(row: GroupRow) -> Group:
         not_picked_up_minutes=row.not_picked_up_minutes,
         direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
+        planner_change_min_lead_minutes=row.planner_change_min_lead_minutes,
     )
 
 
@@ -252,6 +256,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "not_picked_up_minutes": group.not_picked_up_minutes,
         "direct_call_max_concurrent": group.direct_call_max_concurrent,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
+        "planner_change_min_lead_minutes": group.planner_change_min_lead_minutes,
     }
 
 
@@ -281,6 +286,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         wxcc_task_id=row.wxcc_task_id,
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
+        change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
     )
 
 
@@ -1257,7 +1263,7 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, StaffQue
         return _booking(*found) if found else None
 
     async def save_booking(self, booking: Booking) -> None:
-        """Persist the mutable fields of a booking (status, cancellation time, closure)."""
+        """Persist the mutable fields of a booking (status, cancellation, closure, reason)."""
         await self._session.execute(
             update(BookingRow)
             .where(BookingRow.id == booking.id)
@@ -1265,6 +1271,7 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, StaffQue
                 status=booking.status.value,
                 cancelled_at=booking.cancelled_at,
                 closure_id=booking.closure_id,
+                change_reason=booking.change_reason.value if booking.change_reason else None,
             )
         )
 
@@ -1301,6 +1308,52 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, StaffQue
                 JobRow.type.in_(sorted(t.value for t in types)),
             )
         )
+
+    async def get_shortfall_acceptances(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[ShortfallAcceptance]:
+        """Return the group's accepted shortfalls of slots starting in [lower, upper)."""
+        rows = await self._session.scalars(
+            select(ShortfallAcceptanceRow)
+            .where(
+                ShortfallAcceptanceRow.group_id == group_id,
+                ShortfallAcceptanceRow.start >= lower,
+                ShortfallAcceptanceRow.start < upper,
+            )
+            .order_by(ShortfallAcceptanceRow.start)
+        )
+        return [
+            ShortfallAcceptance(r.group_id, r.start, r.agents, r.booked, r.accepted_at, r.actor)
+            for r in rows
+        ]
+
+    async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
+        """Store a planner's acceptance; it replaces an earlier one for the same slot."""
+        await self._session.merge(
+            ShortfallAcceptanceRow(
+                group_id=acceptance.group_id,
+                start=acceptance.start,
+                agents=acceptance.agents,
+                booked=acceptance.booked,
+                accepted_at=acceptance.accepted_at,
+                actor=acceptance.actor,
+            )
+        )
+
+    async def count_audit_events(
+        self, actor: str, actions: Collection[str], since: datetime
+    ) -> int:
+        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
+        count = await self._session.scalar(
+            select(func.count())
+            .select_from(AuditEventRow)
+            .where(
+                AuditEventRow.actor == actor,
+                AuditEventRow.action.in_(list(actions)),
+                AuditEventRow.at >= since,
+            )
+        )
+        return int(count or 0)
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
         """Return the group's closures that have not ended at ``now``, earliest first."""
