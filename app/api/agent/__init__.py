@@ -9,11 +9,12 @@ superuser's switch in the admin portal then decides whether it answers.
     openapi.json, docs   only while published                (docs)
 """
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api.agent import docs, routes, token
 from app.api.agent.errors import register_errors
+from app.api.maintenance import machine_gate, register_machine_maintenance
 from app.config import AGENT_API_PREFIX as PREFIX
 
 VERSION = "1.0.0"
@@ -56,9 +57,12 @@ def create_agent_api() -> FastAPI:
         openapi_url=None,
         docs_url=None,
         redoc_url=None,
+        # ADR 0038: writes are refused during maintenance; reads and the token stay open.
+        dependencies=[Depends(machine_gate)],
     )
     app.add_middleware(NoStoreMiddleware)
     register_errors(app)
+    register_machine_maintenance(app)
     app.include_router(token.router)
     app.include_router(routes.router)
     app.include_router(docs.router)

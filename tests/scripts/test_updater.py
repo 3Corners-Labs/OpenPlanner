@@ -93,6 +93,11 @@ def cli(*args: str) -> str:
 UP = "docker compose up -d web worker"
 
 
+def reports(host: Host) -> list[str]:
+    """The outcomes the updater reported, in order (maintenance may be switched after them)."""
+    return [c for c in host.commands() if c.startswith(cli("update-report"))]
+
+
 def steps(host: Host, request_id: str) -> list[str]:
     """Return the steps the updater reported for ``request_id``, in order."""
     prefix = cli("update-progress", request_id, "")
@@ -147,7 +152,7 @@ def test_update_pins_the_verified_digest_after_a_backup(host: Host) -> None:
     )
     assert host.index(verify) < host.index(cli("backup-db", "request-7"))
     assert host.index(cli("backup-db", "request-7")) < host.index(UP, pinned=NEW)
-    assert host.commands()[-1] == cli("update-report", "7", "succeeded")
+    assert reports(host)[-1] == cli("update-report", "7", "succeeded")
     assert host.state_file.read_text() == (
         f"PREVIOUS_IMAGE={OLD}\nPREVIOUS_REVISION=a1b2c3d4e5f6\n"
         f"PREVIOUS_VERSION=1.3.0\nNEWER_IMAGE={NEW}\n"
@@ -161,7 +166,7 @@ def test_invalid_signature_leaves_the_running_version(host: Host) -> None:
     host.run()
 
     assert host.pinned() == OLD
-    assert host.commands()[-1] == cli("update-report", "7", "failed", "signature_invalid")
+    assert reports(host)[-1] == cli("update-report", "7", "failed", "signature_invalid")
     assert UP not in host.commands()
     assert cli("backup-db", "request-7") not in host.commands()
 
@@ -175,7 +180,7 @@ def test_unhealthy_update_restores_the_backup_and_the_previous_digest(host: Host
     restore = "docker compose run --rm --no-deps -T web python -m app.cli restore-db request-7"
     assert host.index(UP, pinned=NEW) < host.index(restore) < host.index(UP, pinned=OLD)
     assert host.pinned() == OLD
-    assert host.commands()[-1] == cli("update-report", "7", "rolled_back", "health_check_failed")
+    assert reports(host)[-1] == cli("update-report", "7", "rolled_back", "health_check_failed")
     assert not host.state_file.exists()
 
 
@@ -190,7 +195,7 @@ def test_restore_downgrades_the_schema_then_runs_the_previous_digest(host: Host)
     assert host.index(cli("backup-db", "request-8-restore")) < host.index(downgrade, pinned=NEW)
     assert host.index(downgrade) < host.index(UP, pinned=OLD)
     assert host.pinned() == OLD
-    assert host.commands()[-1] == cli("update-report", "8", "succeeded")
+    assert reports(host)[-1] == cli("update-report", "8", "succeeded")
     assert not host.state_file.exists()
 
 
@@ -222,7 +227,7 @@ def test_an_alembic_revision_is_never_executed(host: Host) -> None:
 
     assert not host.marker.exists()
     assert host.pinned() == OLD
-    assert host.commands()[-1] == cli("update-report", "7", "failed", "backup_failed")
+    assert reports(host)[-1] == cli("update-report", "7", "failed", "backup_failed")
     assert not host.state_file.exists()
 
 
@@ -237,7 +242,7 @@ def test_a_tampered_state_file_is_never_executed(host: Host) -> None:
 
     assert not host.marker.exists()
     assert host.pinned() == NEW
-    assert host.commands()[-1] == cli("update-report", "8", "failed", "updater_error")
+    assert reports(host)[-1] == cli("update-report", "8", "failed", "updater_error")
 
 
 def test_the_state_file_is_never_sourced(host: Host) -> None:
@@ -250,7 +255,7 @@ def test_the_state_file_is_never_sourced(host: Host) -> None:
 
     assert not host.marker.exists()
     assert host.pinned() == OLD
-    assert host.commands()[-1] == cli("update-report", "8", "succeeded")
+    assert reports(host)[-1] == cli("update-report", "8", "succeeded")
 
 
 def test_update_reports_each_step_before_taking_it(host: Host) -> None:
@@ -291,4 +296,81 @@ def test_a_version_without_steps_does_not_stop_the_update(host: Host) -> None:
 
     updated(host)
 
-    assert host.commands()[-1] == cli("update-report", "7", "succeeded")
+    assert reports(host)[-1] == cli("update-report", "7", "succeeded")
+
+
+# --- maintenance mode around the backup (ADR 0038 §5, MM-4) ---------------------------------
+
+ON = cli("maintenance", "on", "--reason", "update", "--by", "host-updater")
+ON_RESTORE = cli("maintenance", "on", "--reason", "restore", "--by", "host-updater")
+OFF = cli("maintenance", "off", "--reason", "update", "--by", "host-updater")
+
+
+def test_maintenance_is_on_before_the_backup_and_off_after_success(host: Host) -> None:
+    updated(host)
+
+    assert host.index(ON) < host.index(cli("backup-db", "request-7"))
+    assert host.index(cli("update-report", "7", "succeeded")) < host.index(OFF, pinned=NEW)
+    assert host.commands()[-1] == OFF
+
+
+def test_maintenance_is_off_after_a_rollback(host: Host) -> None:
+    host.given("unhealthy", f"{NEW}\n")
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+
+    host.run()
+
+    assert host.index(ON) < host.index(cli("backup-db", "request-7"))
+    # The backup was taken with maintenance on, so the restored database has it on too.
+    assert host.index(UP, pinned=OLD) < host.index(OFF, pinned=OLD)
+    assert host.commands()[-1] == OFF
+
+
+def test_maintenance_is_on_around_a_restore_and_off_after_it(host: Host) -> None:
+    updated(host)
+    host.given("claim", "8 restore 1.3.0 1.4.0\n")
+
+    host.run()
+
+    assert host.index(ON_RESTORE) < host.index(cli("backup-db", "request-8-restore"))
+    assert host.commands()[-1] == OFF
+    assert host.index(OFF, pinned=OLD) > host.index(UP, pinned=OLD)
+
+
+def test_a_failed_update_leaves_maintenance_on(host: Host) -> None:
+    host.given("unhealthy", f"{NEW}\n{OLD}\n")
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+
+    host.run()
+
+    assert reports(host)[-1] == cli("update-report", "7", "failed", "restore_failed")
+    assert ON in host.commands()
+    assert OFF not in host.commands()
+
+
+def test_a_failed_backup_changes_nothing_and_switches_maintenance_off(host: Host) -> None:
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+    host.given("fail", "backup-db\n")
+
+    host.run()
+
+    assert host.pinned() == OLD
+    assert host.commands()[-2:] == [cli("update-report", "7", "failed", "backup_failed"), OFF]
+
+
+def test_no_maintenance_before_the_signature_is_verified(host: Host) -> None:
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+    host.given("fail", "cosign\n")
+
+    host.run()
+
+    assert ON not in host.commands()
+
+
+def test_an_old_version_without_maintenance_does_not_stop_the_update(host: Host) -> None:
+    host.given("fail", "maintenance\n")
+
+    updated(host)
+
+    assert host.commands()[-1] == OFF
+    assert host.commands()[-2] == cli("update-report", "7", "succeeded")

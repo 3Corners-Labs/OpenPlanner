@@ -221,6 +221,12 @@ jobs:
         run: >-
           docker run --rm --network host -e CI=true
           -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE" npm run lighthouse
+      # ADR 0038: maintenance closes every citizen page, so its page is checked last, alone.
+      - name: maintenance page + axe (switches maintenance on and off again)
+        run: >-
+          docker run --rm --network host --ipc host -e CI=true -e MAINTENANCE_E2E=1
+          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE"
+          npx playwright test tests/maintenance.spec.ts --project=chromium
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
