@@ -14,7 +14,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.engine import create_engine
-from app.adapters.db.models import GroupRow, ScheduleRuleRow
+from app.adapters.db.models import BookingRow, GroupRow, ScheduleRuleRow
 from app.config import Settings
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
@@ -424,3 +424,30 @@ async def test_filter_ignores_garbage_and_the_switcher_keeps_it(site: httpx.Asyn
     assert "<strong>Eerst mogelijk:</strong>" in garbage.text
     assert '<details class="filter">' in garbage.text
     assert "?days=1&amp;days=4&amp;from=13&amp;lang=en" in kept
+
+
+async def test_a_booking_awaiting_a_new_time_offers_the_choice_after_its_time(
+    demo_settings: Settings,
+) -> None:
+    async with app_client(demo_settings, FixedClock(NOW)) as early:
+        token = token_of(await book(early))
+    engine = create_engine(demo_settings.database_url)
+    async with AsyncSession(engine) as session, session.begin():
+        await session.execute(
+            update(BookingRow).values(
+                status="awaiting_rebook",
+                change_reason="staffing",
+                rebook_by=NOW + timedelta(days=15),
+            )
+        )
+    await engine.dispose()
+    late_clock = FixedClock(NOW + timedelta(days=2))  # past the original time
+
+    async with app_client(demo_settings, late_clock) as late:
+        page = (await late.get(f"/b/{token}")).text
+        picker = await late.get(f"/b/{token}/reschedule")
+
+    assert "Wacht op uw nieuwe tijd" in page
+    assert "Kiest u voor vrijdag 16 januari 2026, 09:00 geen nieuwe tijd" in page
+    assert f'href="/b/{token}/reschedule"' in page
+    assert picker.status_code == 200

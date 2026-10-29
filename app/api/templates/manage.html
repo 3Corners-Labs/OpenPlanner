@@ -26,6 +26,16 @@
   <li><a class="button" href="/b/{{ token }}/reschedule">{{ _("manage.suspended.reschedule") }}</a></li>
   <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
 </ul>
+{% elif awaiting_rebook %}
+<div class="notice notice--warning">
+  <h2>{{ _("manage.suspended.title") }}</h2>
+  <p>{{ _("manage.suspended.text") }}</p>
+  <p>{{ _("manage.rebook_by", deadline=rebook_by) }}</p>
+</div>
+<ul class="actions">
+  <li><a class="button" href="/b/{{ token }}/reschedule">{{ _("manage.suspended.reschedule") }}</a></li>
+  <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+</ul>
 {% elif changeable %}
 <p>{{ _("manage.deadline", deadline=deadline) }}</p>
 <ul class="actions">
