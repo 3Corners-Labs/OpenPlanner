@@ -1,4 +1,4 @@
-.PHONY: check fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation e2e proxy-check diagrams up down
+.PHONY: check fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation release-plan e2e proxy-check diagrams up down
 
 UV := uv run
 
@@ -64,6 +64,12 @@ mutation:
 		$(UV) mutmut run && $(UV) mutmut export-cicd-stats; \
 	fi
 	$(UV) python scripts/check_mutation_score.py --min 80
+
+# What the next release would be, from the commits since the last tag (ADR 0051). Changes
+# nothing; docs/runbook.md, "Releasing a version", says what to do with the answer.
+release-plan:
+	@git fetch --quiet --tags origin
+	$(UV) python -m scripts.release_plan
 
 # TLS proxy (ADR 0030) against Let's Encrypt's test CA; needs docker.
 proxy-check:
