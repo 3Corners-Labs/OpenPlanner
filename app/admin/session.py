@@ -1,9 +1,10 @@
 """The admin session: who is logged in, and the OIDC login in progress (ADR 0013).
 
 Stored in Starlette's signed session cookie (``op_admin``, path ``/admin``). Holds the
-principal's subject, display name, roles, organisations and groups, the login time and when
-activity was last written to the staff record (ADR 0046). The absolute lifetime is enforced
-here; the cookie's own expiry slides with every response.
+principal's subject, display name, roles, organisations and groups, the login time, when
+activity was last written to the staff record (ADR 0046) and the chosen theme. The absolute
+lifetime is enforced here; the cookie's own expiry slides with every response. The theme lives
+here so that it needs no cookie of its own.
 """
 
 from datetime import datetime, timedelta
@@ -18,6 +19,10 @@ _PRINCIPAL = "principal"
 _LOGIN_AT = "login_at"
 _SEEN_AT = "seen_at"
 _OIDC = "oidc"
+_THEME = "theme"
+
+THEMES = ("system", "light", "dark")
+"""The portal's colour themes; ``system`` follows the device setting and is the default."""
 
 
 def save_login_start(request: Request, start: LoginStart, next_url: str) -> None:
@@ -37,8 +42,14 @@ def pop_login_start(request: Request) -> dict[str, str] | None:
 
 
 def start_session(request: Request, principal: Principal, now: datetime) -> None:
-    """Replace the whole session with a fresh one for ``principal`` (no session fixation)."""
+    """Replace the whole session with a fresh one for ``principal`` (no session fixation).
+
+    Only the theme carries over, so a fresh login (ADR 0015) keeps the admin's choice.
+    """
+    theme = session_theme(request)
     request.session.clear()
+    if theme != THEMES[0]:
+        request.session[_THEME] = theme
     request.session[_PRINCIPAL] = {
         "subject": principal.subject,
         "name": principal.display_name,
@@ -104,3 +115,16 @@ def activity_due(request: Request, now: datetime, interval: timedelta) -> bool:
 def end_session(request: Request) -> None:
     """Forget everything about the admin."""
     request.session.clear()
+
+
+def session_theme(request: Request) -> str:
+    """Return the theme chosen in this session, or ``system``."""
+    value: Any = request.session.get(_THEME)
+    return value if value in THEMES else THEMES[0]
+
+
+def choose_theme(request: Request, theme: str | None) -> str:
+    """Remember ``theme`` for this session if it is a known theme; return the session's theme."""
+    if theme in THEMES:
+        request.session[_THEME] = theme
+    return session_theme(request)
