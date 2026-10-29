@@ -45,6 +45,8 @@ class ErrorCode(StrEnum):
     UPDATE_NOT_AVAILABLE = "update_not_available"
     UPDATE_IN_PROGRESS = "update_in_progress"
     UPDATE_REQUEST_NOT_FOUND = "update_request_not_found"
+    MAINTENANCE = "maintenance"
+    MAINTENANCE_FROM_ENVIRONMENT = "maintenance_from_environment"
 
 
 class DomainError(Exception):
