@@ -1,10 +1,10 @@
-"""Catalogue keys for update actions, statuses and the host updater's reasons (ADR 0029).
+"""Catalogue keys for update actions, statuses, steps and the updater's reasons (ADR 0029, 0048).
 
 Written out literally so the catalogue test can check that every one exists in Dutch and
 English. A reason the portal does not know (a newer updater) is shown as "other".
 """
 
-from app.domain.updates import UpdateAction, UpdateStatus
+from app.domain.updates import UpdateAction, UpdateStatus, UpdateStep
 
 ACTION_LABELS: dict[UpdateAction, str] = {
     UpdateAction.UPDATE: "admin.updates.action.update",
@@ -18,6 +18,23 @@ STATUS_LABELS: dict[UpdateStatus, str] = {
     UpdateStatus.ROLLED_BACK: "admin.updates.status.rolled_back",
     UpdateStatus.FAILED: "admin.updates.status.failed",
     UpdateStatus.CANCELLED: "admin.updates.status.cancelled",
+}
+
+STEP_LABELS: dict[UpdateStep, str] = {
+    UpdateStep.WAITING: "admin.updates.step.waiting",
+    UpdateStep.PULLING: "admin.updates.step.pulling",
+    UpdateStep.VERIFYING: "admin.updates.step.verifying",
+    UpdateStep.BACKING_UP: "admin.updates.step.backing_up",
+    UpdateStep.MIGRATING: "admin.updates.step.migrating",
+    UpdateStep.STARTING: "admin.updates.step.starting",
+    UpdateStep.ROLLING_BACK: "admin.updates.step.rolling_back",
+}
+"""Step labels; they may use ``{version}``, the request's target."""
+
+STEP_STATE_LABELS: dict[str, str] = {
+    "done": "admin.updates.step_state.done",
+    "current": "admin.updates.step_state.current",
+    "pending": "admin.updates.step_state.pending",
 }
 
 REASON_LABELS: dict[str, str] = {
