@@ -162,13 +162,15 @@ async def test_reads_health_and_webhooks_stay_open(site: Site, method: str, path
 
 
 async def test_purge_jobs_are_not_touched() -> None:
-    # The worker never asks for maintenance: the privacy jobs keep their schedule (ADR 0038).
+    # The worker never asks the gate: the privacy jobs keep their schedule (ADR 0038). It only
+    # watches how long maintenance lasts (MaintenanceWatch), which refuses nothing.
     from pathlib import Path
 
     import app.jobs as jobs_package
 
     sources = [p.read_text() for p in Path(jobs_package.__file__).parent.glob("*.py")]
-    assert not any("maintenance_service" in source for source in sources)
+    assert not any("MaintenanceService" in source for source in sources)
+    assert not any(".refuse(" in source or ".status()" in source for source in sources)
 
 
 def test_every_public_route_is_closed_or_explicitly_open(demo_settings: Settings) -> None:
