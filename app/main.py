@@ -52,6 +52,7 @@ from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
 from app.domain.event_context import set_service
+from app.domain.form_service import FormService
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
@@ -201,6 +202,9 @@ def create_app(
             phone_region=lambda org: per_organisation(org).phone_default_region,
         )
         app.state.admin_service = AdminService(uow, clock)
+        app.state.form_service = FormService(
+            uow, clock, app.state.admin_service, lambda: live().booking_form_max_custom_fields
+        )
         # ADR 0042 step 4: class C settings changed in the portal, checked against the lock.
         app.state.settings_service = SettingsService(
             uow,

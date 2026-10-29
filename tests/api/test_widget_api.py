@@ -30,7 +30,12 @@ SITE = "https://www.gemeente.example"
 EVIL = "https://evil.example"
 BASE = "/api/v1/widget/demo/demo"
 FRIDAY_0900 = "2026-01-02T08:00:00Z"
-ADA = {"start": FRIDAY_0900, "first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org"}
+ADA = {
+    "start": FRIDAY_0900,
+    "first_name": "Ada",
+    "last_name": "Lovelace",
+    "email": "ada@example.org",
+}
 
 
 async def _embed(settings: Settings, *, enabled: bool = True) -> None:

@@ -11,10 +11,18 @@ NOW = datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
 START = datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
 END = START + timedelta(minutes=30)
 WITH_PHONE = Contact.create(
-    first_name="Ada", last_name="Lovelace", email="ada@example.org", phone="0612345678", phone_mode=PhoneMode.OPTIONAL
+    first_name="Ada",
+    last_name="Lovelace",
+    email="ada@example.org",
+    phone="0612345678",
+    phone_mode=PhoneMode.OPTIONAL,
 )
 NO_PHONE = Contact.create(
-    first_name="Ada", last_name="Lovelace", email="ada@example.org", phone=None, phone_mode=PhoneMode.OPTIONAL
+    first_name="Ada",
+    last_name="Lovelace",
+    email="ada@example.org",
+    phone=None,
+    phone_mode=PhoneMode.OPTIONAL,
 )
 
 

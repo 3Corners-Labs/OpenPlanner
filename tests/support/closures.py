@@ -13,7 +13,11 @@ NOTICES = {
 }
 
 _ADA = Contact.create(
-    first_name="Ada", last_name="Lovelace", email="ada@example.org", phone=None, phone_mode=PhoneMode.OPTIONAL
+    first_name="Ada",
+    last_name="Lovelace",
+    email="ada@example.org",
+    phone=None,
+    phone_mode=PhoneMode.OPTIONAL,
 )
 
 

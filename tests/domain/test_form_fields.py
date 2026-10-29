@@ -11,8 +11,11 @@ from app.domain.form_fields import (
     FormDefinition,
     Purpose,
     check_label,
+    format_options,
+    labelled_answers,
     normalise_email,
     normalise_phone,
+    parse_options,
     raise_to_pii,
     validate_answers,
 )
@@ -372,3 +375,44 @@ def test_normalisers_name_the_field_they_were_given() -> None:
     assert str(caught.value) == "invalid_contact: email"
     with pytest.raises(DomainError):
         normalise_phone("123", "NL", "phone")
+
+
+def test_options_are_parsed_from_lines_and_formatted_back() -> None:
+    keys, labels = parse_options("rent; Huur; Rent\n\n benefits ; Uitkering ; Benefits \n")
+
+    assert keys == ("rent", "benefits")
+    assert labels["benefits"] == {"nl": "Uitkering", "en": "Benefits"}
+    f = field("topic", type=FieldType.CHOICE, options=keys, option_labels=labels)
+    assert format_options(f) == "rent; Huur; Rent\nbenefits; Uitkering; Benefits"
+
+
+@pytest.mark.parametrize("text", ["rent; Huur", "rent;;Rent", "a; b; c; d"])
+def test_option_lines_need_a_key_and_both_labels(text: str) -> None:
+    with pytest.raises(DomainError) as caught:
+        parse_options(text)
+    assert str(caught.value) == "invalid_form_field: options"
+
+
+def test_labelled_answers_follow_the_form_and_the_purpose() -> None:
+    secret = field("customer_no", required=True, labels={"nl": "Klantnummer", "en": "Customer"})
+    topic = field(
+        "topic",
+        type=FieldType.CHOICE,
+        options=("rent",),
+        option_labels={"rent": {"nl": "Huur", "en": "Rent"}},
+        classification=Classification.NOT_PII,
+    )
+    answers = validate_answers(
+        form(topic, secret), {"customer_no": "A-1", "topic": "rent"}, today=TODAY, region="NL"
+    )
+    current = FormDefinition.create(
+        version=4, fields=(topic,), max_custom_fields=5, retired=(secret,)
+    )
+
+    shown = labelled_answers(answers, current, Purpose.PLANNER_VIEW, "en")
+    assert [(a.label, a.value) for a in shown] == [("Question", "Rent"), ("Customer", "A-1")]
+    agent = labelled_answers(answers, current, Purpose.AGENT_VIEW, "nl")
+    assert [(a.label, a.value) for a in agent] == [("Vraag", "Huur")]
+    assert labelled_answers(None, current, Purpose.PLANNER_VIEW, "nl") == ()
+    unknown = labelled_answers(answers, form(), Purpose.PLANNER_VIEW, "nl")
+    assert {a.label for a in unknown} == {"customer_no", "topic"}
