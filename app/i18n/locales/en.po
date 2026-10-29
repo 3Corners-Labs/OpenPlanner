@@ -3284,6 +3284,30 @@ msgstr "Remove personal data"
 msgid "audit.event.storage_check"
 msgstr "Check storage"
 
+msgid "audit.event.webhook_rejected"
+msgstr "Webhook rejected"
+
+msgid "audit.event.token_refresh"
+msgstr "Renew Webex token"
+
+msgid "admin.audit.reason.invalid_signature"
+msgstr "Signature or timestamp does not verify."
+
+msgid "admin.audit.reason.unauthorized"
+msgstr "The service refuses our credentials."
+
+msgid "admin.audit.reason.unreachable"
+msgstr "The service cannot be reached."
+
+msgid "admin.audit.detail.suppressed"
+msgstr "{count} more since the previous entry"
+
+msgid "admin.audit.detail.source_webex"
+msgstr "from Webex"
+
+msgid "admin.audit.detail.source_wxcc"
+msgstr "from Webex Contact Center"
+
 msgid "audit.job.send_suspension"
 msgstr "Send closure notice"
 

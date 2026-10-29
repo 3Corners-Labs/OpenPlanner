@@ -40,6 +40,7 @@ from app.domain.booking import ChangeReason
 from app.domain.event_schema import rfc3339
 from app.domain.maintenance import MaintenanceReason
 from app.domain.planner_service import ALERT_ACTION
+from app.domain.security_log import INVALID_SIGNATURE, TOKEN_REFRESH_FAILED, WEBHOOK_REJECTED
 from app.domain.storage import (
     DATABASE_TOO_LARGE,
     FREE_SPACE_CRITICAL,
@@ -82,6 +83,9 @@ EVENT_LABELS: dict[str, str] = {
     # Staff directory (ADR 0046): first login, and roles or memberships changed at login.
     staff.CREATED_EVENT: "audit.event.staff_created",
     staff.CHANGED_EVENT: "audit.event.staff_changed",
+    # Security events (ADR 0034): global, deduplicated per window.
+    WEBHOOK_REJECTED: "audit.event.webhook_rejected",
+    TOKEN_REFRESH_FAILED: "audit.event.token_refresh",
 }
 """Readable label per event key that is not a permission."""
 
@@ -147,6 +151,8 @@ DETAIL_LABELS: dict[str, str] = {
     "maintenance.on": "admin.audit.detail.maintenance_on",
     "maintenance.off": "admin.audit.detail.maintenance_off",
     "maintenance.refused": "admin.audit.detail.maintenance_refused",
+    "source:webex": "admin.audit.detail.source_webex",
+    "source:wxcc": "admin.audit.detail.source_wxcc",
 }
 """Readable label per audit detail key (changed field names and schedule actions)."""
 
@@ -157,6 +163,7 @@ COUNT_LABELS: dict[str, str] = {
     "free_percent": "admin.audit.detail.free_percent",
     "database_mb": "admin.audit.detail.database_mb",
     "changes": "admin.audit.detail.changes",
+    "suppressed": "admin.audit.detail.suppressed",
 }
 """Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0024)."""
 
@@ -186,6 +193,9 @@ REASON_LABELS: dict[str, str] = {
     FREE_SPACE_LOW: "admin.audit.reason.free_space_low",
     FREE_SPACE_CRITICAL: "admin.audit.reason.free_space_critical",
     DATABASE_TOO_LARGE: "admin.audit.reason.database_too_large",
+    INVALID_SIGNATURE: "admin.audit.reason.invalid_signature",
+    "unauthorized": "admin.audit.reason.unauthorized",
+    "unreachable": "admin.audit.reason.unreachable",
 }
 """Readable explanation per known reason; any other code (an error code) is shown as is."""
 
