@@ -232,3 +232,36 @@ def test_closure_content_goes_on_downgrade_and_the_notices_stay(
     assert sorted(notices) == [("en", "Closed."), ("nl", "Gesloten.")]
     assert closures == [(1, 1)]
     assert "group_contacts" not in tables
+
+
+def test_existing_audit_events_get_an_id_level_and_category(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0040, part 2: rows from before the event schema are filled from outcome and source.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0025")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO audit_events (at, actor, action, outcome, source)
+                VALUES ('2026-10-01 08:00:00', 'sub-1', 'admin.login', 'denied', 'admin'),
+                       ('2026-10-01 08:01:00', 'system', 'job.send_reminder', 'failure', 'system'),
+                       ('2026-10-01 08:02:00', 'system', 'job.purge_pii', 'success', 'system');
+            """
+        )
+
+    command.upgrade(alembic_config, "head")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        rows = database.execute(
+            "SELECT event_id, level, category, trace_id FROM audit_events ORDER BY at"
+        ).fetchall()
+    assert [(level, category) for _, level, category, _ in rows] == [
+        ("warning", "audit"),
+        ("error", "system"),
+        ("info", "system"),
+    ]
+    assert len({event_id for event_id, *_ in rows}) == 3
+    assert all(len(event_id) == 32 and trace == "" for event_id, _, _, trace in rows)
