@@ -11,11 +11,10 @@ from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
-from app.domain.scheduling import Organisation, ScheduleRule
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
-from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.closures import NOTICES
+from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.closures import NOTICES, three_groups
 from tests.support.domain import (
     ADA,
     MONDAY,
@@ -23,8 +22,6 @@ from tests.support.domain import (
     SLOT_0900,
     SLOT_0930,
     TEST_TOKEN_KEY,
-    make_group,
-    window,
 )
 
 SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
@@ -44,19 +41,7 @@ def clock() -> FixedClock:
 
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
-    state = State()
-    state.organisation_slugs = {1: "demo", 2: "andere"}
-    state.organisations = {
-        1: Organisation(1, "Demo", "demo"),
-        2: Organisation(2, "Andere", "andere"),
-    }
-    state.groups[1] = make_group(id=1, organisation_id=1, slug="demo", horizon_days=30)
-    state.groups[2] = make_group(id=2, organisation_id=2, slug="andere-team")
-    state.groups[3] = make_group(id=3, organisation_id=1, slug="demo-twee")
-    for group_id in state.groups:
-        state.rules[group_id] = [ScheduleRule(weekday=0, window=window(capacity=2))]
-    state.next_id = 100
-    return InMemoryUnitOfWork(state)
+    return InMemoryUnitOfWork(three_groups())
 
 
 @pytest.fixture

@@ -24,7 +24,6 @@ NOT_YET_DOCUMENTED: frozenset[str] = frozenset(
         "/admin/closures",
         "/admin/groups/new",
         "/admin/groups/{slug}",
-        "/admin/groups/{slug}/agenda",
         "/admin/groups/{slug}/bookings/{booking_id}",
         "/admin/groups/{slug}/closure",
         "/admin/groups/{slug}/closure/bookings/{booking_id}/move",
