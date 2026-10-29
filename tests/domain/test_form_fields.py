@@ -416,3 +416,10 @@ def test_labelled_answers_follow_the_form_and_the_purpose() -> None:
     assert labelled_answers(None, current, Purpose.PLANNER_VIEW, "nl") == ()
     unknown = labelled_answers(answers, form(), Purpose.PLANNER_VIEW, "nl")
     assert {a.label for a in unknown} == {"customer_no", "topic"}
+
+
+def test_answers_are_shared_by_a_deep_copy() -> None:
+    import copy
+
+    answers = _mixed_answers()
+    assert copy.deepcopy(answers) is answers

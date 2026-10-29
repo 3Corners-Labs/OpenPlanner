@@ -5968,7 +5968,7 @@ msgid "admin.form_fields.limit_reached"
 msgstr "Het formulier heeft al {count} eigen velden, het maximum. Zet eerst een veld uit."
 
 msgid "admin.form_fields.edit_lead"
-msgstr "Sleutel {key}, soort {type}. Sleutel en soort liggen vast."
+msgstr "Sleutel {field_key}, soort {type}. Sleutel en soort liggen vast."
 
 msgid "admin.form_fields.up"
 msgstr "Omhoog"
