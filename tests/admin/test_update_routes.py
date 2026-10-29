@@ -93,7 +93,7 @@ COMMIT = "ce5602a8f4e1b2c3d4e5f60718293a4b5c6d7e8f"
     indirect=True,
 )
 async def test_page_names_the_commit_the_image_was_built_from(site: Site) -> None:
-    # ADR 0051: version and commit together say which fixes run here.
+    # ADR 0052: version and commit together say which fixes run here.
     await site.login_as(SUPER)
     page = (await site.client.get("/admin/updates")).text
     assert "<code>ce5602a8f4e1</code>" in page

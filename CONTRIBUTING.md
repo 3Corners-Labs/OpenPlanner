@@ -105,7 +105,7 @@ Run the `security-review` skill (`.claude/skills/security-review/`) before openi
 
 ## Releases
 
-A merge to `main` is no release. Releases follow ADR 0051: `make release-plan` proposes the
+A merge to `main` is no release. Releases follow ADR 0052: `make release-plan` proposes the
 number, a `chore(release): vX.Y.Z` PR sets it, and a tag on `main` publishes it. The commands
 are in `docs/runbook.md`, *Releasing a version*.
 `docs/skills.md` lists which Claude Code skills to use in each work package.

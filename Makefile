@@ -87,7 +87,7 @@ mutation:
 	fi
 	$(UV) python scripts/check_mutation_score.py --min 80
 
-# What the next release would be, from the commits since the last tag (ADR 0051). Changes
+# What the next release would be, from the commits since the last tag (ADR 0052). Changes
 # nothing; docs/runbook.md, "Releasing a version", says what to do with the answer.
 release-plan:
 	@git fetch --quiet --tags origin

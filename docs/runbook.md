@@ -613,7 +613,7 @@ when a rule's channel is not configured.
 link in mails already sent; bookings are unaffected. Rotate only after an incident, and tell the
 contact center that citizens may call about broken links.
 
-## Releasing a version (ADR 0051)
+## Releasing a version (ADR 0052)
 
 A merge to `main` is **not** a release. An installation only sees a new version after a tag
 `vX.Y.Z` on `main` has gone through `main.yml`. You do two things by hand (a release PR, then a
@@ -637,7 +637,7 @@ make release-plan
 ```
 
 It prints the last release, every commit since then and the next version by the rules of
-ADR 0051 (breaking → MAJOR, from 1.0; `feat` → MINOR; anything else → PATCH). It changes
+ADR 0052 (breaking → MAJOR, from 1.0; `feat` → MINOR; anything else → PATCH). It changes
 nothing. Write the number down, for example `0.3.0`.
 
 ### Step 2: the release PR
@@ -692,7 +692,7 @@ it. Fix forward with the next number.
 
 ### Security fixes
 
-Release on the day the fix is merged (ADR 0051 §6): run the same steps; `make release-plan`
+Release on the day the fix is merged (ADR 0052 §6): run the same steps; `make release-plan`
 gives a PATCH when only fixes are waiting, otherwise a MINOR that also carries the features on
 `main`. Keep the release notes free of exploit details until installations have updated.
 

@@ -8,7 +8,7 @@ Usage:
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
-    ``python -m app.cli version``  the release and commit this image was built from (ADR 0051)
+    ``python -m app.cli version``  the release and commit this image was built from (ADR 0052)
     ``python -m app.cli client-pseudonym ADDRESS``  the pseudonym security events use for an
         IP address the security team already has (ADR 0053); there is no way back
     ``python -m app.cli settings list``  every setting with its class, source and lock (ADR 0042)
@@ -273,7 +273,7 @@ async def _updates(settings: Settings) -> AsyncIterator[UpdateService]:
 
 
 def _version(settings: Settings) -> str:
-    """Return the release and commit this image was built from (ADR 0051)."""
+    """Return the release and commit this image was built from (ADR 0052)."""
     release = settings.app_version or "none (no release)"
     return f"version {release}\ncommit {settings.app_commit or 'unknown'}\n"
 

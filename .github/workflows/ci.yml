@@ -23,6 +23,8 @@ env:
   NODE_VERSION: "24"
   # renovate: datasource=docker depName=ghcr.io/gitleaks/gitleaks
   GITLEAKS_VERSION: "v8.30.1"
+  # renovate: datasource=docker depName=fsfe/reuse
+  REUSE_VERSION: "5.0.2"
 
 jobs:
   python:
@@ -123,10 +125,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # ADR 0054: every file carries licence and copyright information (REUSE.toml).
       - name: reuse lint
-        run: docker run --rm -v "$PWD:/data" fsfe/reuse:5.0.2 lint
+        run: docker run --rm -v "$PWD:/data" "fsfe/reuse:$REUSE_VERSION" lint
       # Outside contributors tick the CLA box (docs/cla.md). The body is read from the
       # environment, never interpolated into the script.
       - name: contributor licence agreement
