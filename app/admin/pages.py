@@ -62,6 +62,7 @@ NAVIGATION = (
     NavItem("admin.nav.closures", "/admin/closures", Permission.ORGANISATION_CLOSURE, "alert"),
     NavItem("admin.nav.api", "/admin/api", Permission.API_CLIENTS_MANAGE, "key"),
     NavItem("admin.nav.updates", "/admin/updates", Permission.SYSTEM_UPDATE, "refresh"),
+    NavItem("admin.nav.maintenance", "/admin/maintenance", Permission.SYSTEM_MAINTENANCE, "lock"),
     NavItem("admin.nav.help", HELP_PATH, Permission.DASHBOARD_VIEW, "help"),
 )
 
@@ -137,8 +138,14 @@ def page(
     name: str,
     principal: Principal,
     context: dict[str, object],
+    *,
+    scripts: bool = False,
 ) -> HTMLResponse:
-    """Render an admin page with navigation and ``can()`` from the matrix."""
+    """Render an admin page with navigation and ``can()`` from the matrix.
+
+    ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``); only pages that enhance
+    themselves under an ADR do (the updates page, ADR 0048).
+    """
     can = can_function(principal)
     nav = [
         NavView(locale.gettext(item.label_key), item.href, _is_current(request, item), item.icon)
@@ -161,7 +168,10 @@ def page(
             "help_topic": context["help_topic"] if "help_topic" in context else page_topic(request),
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
             "update_banner": getattr(request.state, "update_notice", None),
+            # Set by ``maintenance_routes.load_maintenance_notice`` (ADR 0038).
+            "maintenance_notice": getattr(request.state, "maintenance_notice", None),
         },
+        scripts=scripts,
     )
 
 

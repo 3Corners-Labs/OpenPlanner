@@ -59,6 +59,8 @@ DONE_MESSAGES: dict[str, str] = {
     "font_removed": "admin.done.font_removed",
     "theme_saved": "admin.done.theme_saved",
     "checked": "admin.done.checked",
+    "maintenance_on": "admin.done.maintenance_on",
+    "maintenance_off": "admin.done.maintenance_off",
     "simulated": "admin.done.simulated",
     "simulated_prepared": "admin.done.simulated_prepared",
     "simulator_no_ids": "admin.done.simulator_no_ids",
@@ -130,6 +132,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "source": "admin.form.error.choice",
     "starts_at": "admin.form.error.moment",
     "ends_at": "admin.form.error.ends_at",
+    "expected_end": "admin.form.error.expected_end",
     "notice_nl": "admin.form.error.notice",
     "notice_en": "admin.form.error.notice",
     "heading_nl": "admin.form.error.closure_heading",
@@ -182,6 +185,7 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SAME_SLOT: "error.same_slot",
     ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",
     ErrorCode.INTEGRATION_NOT_READY: "admin.form.error.settings_key",
+    ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
 }
 
 

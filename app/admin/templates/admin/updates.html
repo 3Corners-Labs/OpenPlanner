@@ -23,20 +23,16 @@
     <div><dt>{{ _("admin.updates.checked_at") }}</dt><dd>{{ checked_at or _("admin.updates.never") }}{% if check_error %} <span class="chip chip--warning">{{ _("admin.updates.check_failed", code=check_error) }}</span>{% endif %}</dd></div>
   </dl>
 </section>
-{% if overview.open %}
+{% if progress %}
 <section class="card" aria-labelledby="open-heading">
   <div class="card__header">
-    <h2 id="open-heading">{{ _("admin.updates.open") }}</h2>
-    <p class="card__lead">{{ _("admin.updates.open_lead", version=overview.open.target) }}</p>
+    <h2 id="open-heading" tabindex="-1">{{ _("admin.updates.open") }}</h2>
+    <p class="card__lead">{{ _("admin.updates.open_lead", version=progress.request.target) }}</p>
   </div>
-  {% if overview.unclaimed %}
-  <div class="alert alert--error" role="status"><p>{{ _("admin.updates.unclaimed") }}</p></div>
-  {% endif %}
-  {% if overview.open.status == "requested" %}
-  <form method="post" action="/admin/updates/requests/{{ overview.open.id }}/cancel" class="form-actions">
-    <button type="submit" class="button button--secondary">{{ _("admin.updates.cancel") }}</button>
-  </form>
-  {% endif %}
+  <div data-update-progress data-heading="open-heading">
+    {% include "admin/_update_progress.html" %}
+  </div>
+  <p class="visually-hidden" aria-live="polite" data-update-announce></p>
 </section>
 {% endif %}
 {% if overview.available %}
@@ -95,3 +91,4 @@
   {% endif %}
 </section>
 {% endblock %}
+{% block scripts %}{% if progress %}<script src="/static/update-progress.js" defer></script>{% endif %}{% endblock %}

@@ -1,6 +1,6 @@
 """Shared fixtures: isolated settings per test and an in-process HTTP client."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -10,8 +10,16 @@ from pydantic import SecretStr
 
 from app.adapters.integrations import Integrations
 from app.config import Settings
+from app.domain.event_context import set_service
 from app.domain.ports import Clock
 from app.main import create_app
+
+
+@pytest.fixture(autouse=True)
+def _no_service_name() -> Iterator[None]:
+    """Forget the process-wide service name an app's lifespan sets (ADR 0040)."""
+    yield
+    set_service("")
 
 
 @pytest.fixture

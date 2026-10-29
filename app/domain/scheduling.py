@@ -87,6 +87,11 @@ def slug_from(text: str) -> str:
     return cut[: cut.rfind("-")] if "-" in cut else slug[:MAX_SLUG_LENGTH]
 
 
+def is_slug(text: str) -> bool:
+    """Return whether ``text`` is a valid slug: lowercase words joined by hyphens, not too long."""
+    return len(text) <= MAX_SLUG_LENGTH and _SLUG.fullmatch(text) is not None
+
+
 def check_name_and_slug(name: str, slug: str) -> None:
     """Validate the display name and URL slug shared by organisations, groups and calendars.
 
@@ -95,7 +100,7 @@ def check_name_and_slug(name: str, slug: str) -> None:
             (not lowercase words joined by hyphens, too long).
     """
     check_name(name)
-    if len(slug) > MAX_SLUG_LENGTH or not _SLUG.fullmatch(slug):
+    if not is_slug(slug):
         raise _invalid("slug")
 
 
