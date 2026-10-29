@@ -12,9 +12,10 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Protocol
 
+from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
-from app.domain.authorization import Principal, Scope
+from app.domain.authorization import CustomRole, Principal, Scope
 from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import (
@@ -643,6 +644,22 @@ class Transaction(Protocol):
         """Delete the booking's pending jobs of the given types."""
         ...
 
+    async def get_shortfall_acceptances(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[ShortfallAcceptance]:
+        """Return the group's accepted shortfalls of slots starting in [lower, upper)."""
+        ...
+
+    async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
+        """Store a planner's acceptance; it replaces an earlier one for the same slot."""
+        ...
+
+    async def count_audit_events(
+        self, actor: str, actions: Collection[str], since: datetime
+    ) -> int:
+        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
+        ...
+
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
         """Return the group's closures that have not ended at ``now``, earliest first."""
         ...
@@ -755,6 +772,32 @@ class Transaction(Protocol):
     async def save_update_request(self, request: UpdateRequest) -> None:
         """Store the status, times and reason of an existing request."""
         ...
+
+    async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+        """Return the newest audit events with one of ``actions``, with the actors' names.
+
+        Only for events every admin may see, such as role changes (ADR 0039 item 7).
+        """
+        ...
+
+    async def get_custom_roles(self) -> list[CustomRole]:
+        """Return every custom role, ordered by id (ADR 0039)."""
+        ...
+
+    async def get_custom_role(self, role_id: int) -> CustomRole | None:
+        """Return the custom role with ``role_id``."""
+        ...
+
+    async def add_custom_role(self, role: CustomRole) -> CustomRole:
+        """Store a new custom role (its id is ignored) and return it with its id."""
+        ...
+
+    async def save_custom_role(self, role: CustomRole) -> None:
+        """Store names, claim value, permissions and version of an existing custom role."""
+        ...
+
+    async def delete_custom_role(self, role_id: int) -> None:
+        """Delete a custom role."""
 
     async def get_maintenance_state(self) -> MaintenanceState:
         """Return the maintenance switch of the installation (ADR 0038); off if never set."""

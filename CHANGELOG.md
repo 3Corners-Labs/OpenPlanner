@@ -105,3 +105,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
   Insluiten (`embedding.manage`, organisation admin and superuser), exact `https` origins,
   localhost only outside production; a group's own switch "Insluiten op websites" (off by
   default); audited with counts. ADR 0035 accepted.
+- Widget API (ADR 0035, EM-2): `/api/v1/widget/{org}/{group}/` with the group, its form and
+  texts, the month and the times of a day, and booking; CORS only for the organisation's
+  allowed origins, `require_allowed_origin` on bookings, the standalone page's rate limits and
+  honeypot, no token or personal data in answers.

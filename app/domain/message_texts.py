@@ -23,6 +23,8 @@ MAX_SMS_LENGTH = 320
 
 EMAIL_PLACEHOLDERS = frozenset({"date", "time", "group_name"})
 SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name", "manage_url"})
+CANCELLATION_SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name", "reason"})
+"""A cancelled booking has nothing left to manage; a planner's reason may be added (ADR 0044)."""
 
 _TOKEN = re.compile(r"\{\{|\}\}|\{([^{}]*)\}?|\}")
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -36,9 +38,10 @@ class TextBlock:
 
     Attributes:
         key: Catalogue key of the default text, e.g. ``message.reminder.intro``.
-        purpose: ``confirmation``, ``change``, ``reminder``, ``cancellation`` or ``all``.
+        purpose: ``confirmation``, ``change``, ``reminder``, ``cancellation``, ``reason``
+            (a planner's reasons, ADR 0044) or ``all``.
         channel: The channel the block is sent on.
-        part: ``subject``, ``intro``, ``signoff`` or ``body`` (SMS).
+        part: ``subject``, ``intro``, ``signoff``, ``body`` (SMS) or ``reason_<code>``.
         placeholders: The ``{name}``s the text may use.
         max_length: Maximum length before the placeholders are filled.
         single_line: Subjects may not contain line breaks (header injection).
@@ -71,6 +74,10 @@ MESSAGE_BLOCKS: tuple[TextBlock, ...] = (
     _email("confirmation", "intro"),
     _email("change", "subject", subject=True),
     _email("change", "intro"),
+    # ADR 0044: a planner's move also goes out as an SMS where the citizen can get one.
+    TextBlock(
+        "message.change.sms", "change", ChannelKind.SMS, "body", SMS_PLACEHOLDERS, MAX_SMS_LENGTH
+    ),
     _email("reminder", "subject", subject=True),
     _email("reminder", "intro"),
     TextBlock(
@@ -83,6 +90,27 @@ MESSAGE_BLOCKS: tuple[TextBlock, ...] = (
     ),
     _email("cancellation", "subject", subject=True),
     _email("cancellation", "intro"),
+    TextBlock(
+        "message.cancellation.sms",
+        "cancellation",
+        ChannelKind.SMS,
+        "body",
+        CANCELLATION_SMS_PLACEHOLDERS,
+        MAX_SMS_LENGTH,
+    ),
+    # ADR 0044: the fixed reasons a planner chooses from; never free text.
+    *(
+        TextBlock(
+            f"message.reason.{code}",
+            "reason",
+            ChannelKind.EMAIL,
+            f"reason_{code}",
+            frozenset(),
+            MAX_SUBJECT_LENGTH,
+            single_line=True,
+        )
+        for code in ("staffing", "technical", "unforeseen")
+    ),
     TextBlock(
         "message.signoff",
         "all",

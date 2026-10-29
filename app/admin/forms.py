@@ -76,6 +76,7 @@ DONE_MESSAGES: dict[str, str] = {
     "reinstated": "admin.done.reinstated",
     "cancelled": "admin.done.cancelled",
     "moved": "admin.done.moved",
+    "shortfall_accepted": "admin.done.shortfall_accepted",
     "organisation_closed": "admin.done.organisation_closed",
     "organisation_lifted": "admin.done.organisation_lifted",
     "client_enabled": "admin.done.client_enabled",
@@ -99,6 +100,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "min_notice_minutes": "admin.form.error.min_notice_minutes",
     "horizon_days": "admin.form.error.horizon_days",
     "dispatch_lead_minutes": "admin.form.error.dispatch_lead_minutes",
+    "planner_change_min_lead_minutes": "admin.form.error.planner_change_min_lead_minutes",
     "phone_mode": "admin.form.error.phone_mode",
     "video_host_email": "admin.form.error.video_host_email",
     "wxcc_business_address": "admin.form.error.integration_text",
@@ -164,6 +166,11 @@ FIELD_MESSAGES: dict[str, str] = {
     "channel": "admin.form.error.reminder_channel",
     "minutes_before": "admin.form.error.reminder_offset",
     "reminders": "admin.form.error.reminder_limit",
+    "name_nl": "admin.form.error.role_name",
+    "name_en": "admin.form.error.role_name",
+    "claim_value": "admin.form.error.claim_value",
+    "permissions": "admin.form.error.permissions",
+    "template": "admin.form.error.choice",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -189,8 +196,11 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SLOT_UNAVAILABLE: "error.slot_unavailable",
     ErrorCode.OUTSIDE_BOOKING_WINDOW: "error.outside_booking_window",
     ErrorCode.SAME_SLOT: "error.same_slot",
+    ErrorCode.PLANNER_TOO_LATE: "admin.form.error.planner_too_late",
+    ErrorCode.MOVE_CAUSES_SHORTFALL: "admin.form.error.move_causes_shortfall",
     ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",
     ErrorCode.INTEGRATION_NOT_READY: "admin.form.error.settings_key",
+    ErrorCode.ROLE_CHANGED: "admin.form.error.role_changed",
     ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
 }
 
