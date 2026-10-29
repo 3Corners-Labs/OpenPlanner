@@ -549,7 +549,7 @@ msgid "admin.matrix.title"
 msgstr "Rechtenmatrix"
 
 msgid "admin.matrix.intro"
-msgstr "Overzicht van wat elke rol mag, per organisatie en per groep. Rechten met het kenmerk Alleen superuser liggen vast. Rechten met het kenmerk Persoonsgegevens tonen gegevens van burgers. Welke rol iemand heeft, regelt uw organisatie in de identity provider."
+msgstr "Overzicht van wat elke rol mag, per organisatie en per groep. Rechten met het kenmerk Alleen superuser liggen vast. Rechten met het kenmerk Persoonsgegevens tonen gegevens van burgers. Alleen de superuser kan rollen aanpassen; elke wijziging wordt vastgelegd en staat onderaan deze pagina. Welke rol iemand heeft, regelt uw organisatie in de identity provider."
 
 msgid "admin.matrix.level"
 msgstr "Niveau"
@@ -3442,6 +3442,7 @@ msgstr "Update over sluiting versturen"
 
 msgid "audit.job.send_reinstatement"
 msgstr "Bericht over hervatting versturen"
+
 msgid "authz.permission.system_update"
 msgstr "Updates van de installatie uitvoeren"
 
@@ -4338,6 +4339,201 @@ msgstr "Eigen blok met {count} contactmogelijkheden."
 
 msgid "admin.group_contacts.summary_default"
 msgstr "Standaard van de organisatie: {count} contactmogelijkheden."
+
+msgid "authz.permission.roles_manage"
+msgstr "Rollen aanpassen"
+
+msgid "audit.event.role_created"
+msgstr "Rol gemaakt"
+
+msgid "audit.event.role_updated"
+msgstr "Rol gewijzigd"
+
+msgid "audit.event.role_deleted"
+msgstr "Rol verwijderd"
+
+msgid "admin.roles.manage"
+msgstr "Rollen aanpassen"
+
+msgid "admin.roles.title"
+msgstr "Eigen rollen"
+
+msgid "admin.roles.lead"
+msgstr "Maak een rol op maat voor een team, als kopie van een vaste rol. Een eigen rol kan nooit meer dan de grenzen van die vaste rol: rechten met een slotje en rechten buiten het bereik zijn niet te kiezen. Elke wijziging wordt vastgelegd en is voor alle beheerders zichtbaar in de rechtenmatrix."
+
+msgid "admin.roles.copy"
+msgstr "Nieuwe rol"
+
+msgid "admin.roles.copy_lead"
+msgstr "Kies de vaste rol die u als startpunt neemt. Het bereik van die rol (per organisatie of per groep) blijft daarna vast."
+
+msgid "admin.roles.template"
+msgstr "Kopie van"
+
+msgid "admin.roles.template_hint"
+msgstr "Organisatiebeheerder en Compliance en privacy werken per organisatie, groepsbeheerder per groep. Een kopie van Compliance en privacy blijft alleen-lezen en zonder persoonsgegevens."
+
+msgid "admin.roles.new"
+msgstr "Nieuwe rol maken"
+
+msgid "admin.roles.custom"
+msgstr "Eigen rollen"
+
+msgid "admin.roles.name"
+msgstr "Naam"
+
+msgid "admin.roles.claim_value"
+msgstr "Waarde in de identity provider"
+
+msgid "admin.roles.version"
+msgstr "Versie"
+
+msgid "admin.roles.none"
+msgstr "Er zijn nog geen eigen rollen."
+
+msgid "admin.roles.copy_of"
+msgstr "Kopie van {template}"
+
+msgid "admin.roles.definition"
+msgstr "Rol"
+
+msgid "admin.roles.definition_lead"
+msgstr "Naam, koppeling met de identity provider en rechten."
+
+msgid "admin.roles.name_nl"
+msgstr "Naam (Nederlands)"
+
+msgid "admin.roles.name_en"
+msgstr "Naam (Engels)"
+
+msgid "admin.roles.name_hint"
+msgstr "Zoals beheerders de rol zien, bijvoorbeeld Teamleider. Ten hoogste 80 tekens."
+
+msgid "admin.roles.claim_value_hint"
+msgstr "De rolwaarde die de identity provider meestuurt, bijvoorbeeld openplanner-teamleider. Zonder spaties of komma's. Mag niet gelijk zijn aan de waarde van een vaste rol of een andere eigen rol."
+
+msgid "admin.roles.claim_notice"
+msgstr "Zolang de identity provider deze waarde niet meestuurt, heeft niemand deze rol. Vraag het team dat de identity provider beheert om de waarde toe te kennen. Een wijziging van de rechten werkt bij de volgende pagina die iemand opent; een nieuwe of gewijzigde waarde na de volgende keer inloggen."
+
+msgid "admin.roles.permissions"
+msgstr "Rechten"
+
+msgid "admin.roles.permissions_hint"
+msgstr "Alleen de rechten die deze rol mag krijgen staan hier. Een recht dat een ander recht nodig heeft, zegt dat erbij."
+
+msgid "admin.roles.permissions_hint_read_only"
+msgstr "Een kopie van Compliance en privacy kan alleen lezen en ziet nooit persoonsgegevens van burgers."
+
+msgid "admin.roles.requires"
+msgstr "Heeft nodig: {permissions}"
+
+msgid "admin.roles.create"
+msgstr "Rol maken"
+
+msgid "admin.roles.unavailable"
+msgstr "Niet te kiezen voor deze rol"
+
+msgid "admin.roles.unavailable_lead"
+msgstr "Deze rechten liggen vast in de code. Ze veranderen alleen met een nieuwe versie van OpenPlanner."
+
+msgid "admin.roles.reason_write"
+msgstr "wijzigt iets; deze rol leest alleen"
+
+msgid "admin.roles.reason_reach"
+msgstr "buiten het bereik van deze rol"
+
+msgid "admin.roles.delete"
+msgstr "Rol verwijderen"
+
+msgid "admin.roles.delete_lead"
+msgstr "Wie deze rol via de identity provider heeft, houdt er geen rechten van over. Andere rollen van die persoon blijven gewoon werken. De verwijdering wordt vastgelegd."
+
+msgid "admin.roles.error.template"
+msgstr "Kies een vaste rol als startpunt."
+
+msgid "admin.roles.error.locked"
+msgstr "{permission} is alleen voor de superuser."
+
+msgid "admin.roles.error.above_reach"
+msgstr "{permission} valt buiten het bereik van deze rol."
+
+msgid "admin.roles.error.pii"
+msgstr "{permission} toont persoonsgegevens; een kopie van Compliance en privacy mag dat niet."
+
+msgid "admin.roles.error.write"
+msgstr "{permission} wijzigt iets; een kopie van Compliance en privacy leest alleen."
+
+msgid "admin.roles.error.requirement"
+msgstr "{permission} heeft een ander recht nodig dat nog uit staat."
+
+msgid "admin.roles.error.basics"
+msgstr "{permission} hoort bij elke beheerder; zet het aan."
+
+msgid "admin.form.error.role_invalid"
+msgstr "Deze rol gaat buiten de grenzen."
+
+msgid "admin.form.error.role_changed"
+msgstr "Iemand anders heeft deze rol intussen gewijzigd. Bekijk de nieuwe versie en probeer het opnieuw."
+
+msgid "admin.form.error.claim_value_taken"
+msgstr "Deze waarde hoort al bij een vaste rol of een andere eigen rol."
+
+msgid "admin.form.error.role_name"
+msgstr "Vul een naam in van ten hoogste 80 tekens."
+
+msgid "admin.form.error.claim_value"
+msgstr "Vul een waarde in van ten hoogste 128 tekens, zonder spaties of komma's."
+
+msgid "admin.form.error.permissions"
+msgstr "Kies alleen rechten uit de lijst."
+
+msgid "admin.matrix.custom_intro"
+msgstr "De laatste kolommen zijn eigen rollen ({count}), gemaakt door de superuser binnen de grenzen van een vaste rol."
+
+msgid "admin.matrix.history"
+msgstr "Wijzigingen van rollen"
+
+msgid "admin.matrix.history_intro"
+msgstr "Wie welke eigen rol wanneer heeft gemaakt, gewijzigd of verwijderd. Zichtbaar voor elke beheerder."
+
+msgid "admin.matrix.history_none"
+msgstr "Er zijn nog geen rollen gewijzigd."
+
+msgid "admin.matrix.history.when"
+msgstr "Wanneer"
+
+msgid "admin.matrix.history.role"
+msgstr "Rol"
+
+msgid "admin.matrix.history.change"
+msgstr "Wijziging"
+
+msgid "admin.matrix.history.actor"
+msgstr "Door"
+
+msgid "admin.matrix.history.created"
+msgstr "Gemaakt"
+
+msgid "admin.matrix.history.updated"
+msgstr "Gewijzigd"
+
+msgid "admin.matrix.history.deleted"
+msgstr "Verwijderd"
+
+msgid "admin.matrix.history.added"
+msgstr "aan: {permissions}"
+
+msgid "admin.matrix.history.removed"
+msgstr "uit: {permissions}"
+
+msgid "admin.matrix.history.name"
+msgstr "naam"
+
+msgid "admin.matrix.history.claim_value"
+msgstr "waarde in de identity provider"
+
+msgid "admin.matrix.history.count"
+msgstr "{count} rechten"
 
 msgid "admin.closure.image"
 msgstr "Afbeelding"

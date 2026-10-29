@@ -25,7 +25,7 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 | Emergency closure | `/admin/closures` | `organisation.closure` | `/admin/organisations/{org}/closure` |
 | Staff | `/admin/staff` | `staff.view` | `/admin/staff/{member_id}` |
 | My rights | `/admin/rights` | `rights.view` | – |
-| Rights matrix | `/admin/matrix` | `matrix.view` | – |
+| Rights matrix | `/admin/matrix` | `matrix.view` | `/admin/roles`, `/admin/roles/new`, `/admin/roles/{role_id}` |
 
 ### Platform
 

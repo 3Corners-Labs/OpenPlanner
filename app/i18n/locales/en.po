@@ -549,7 +549,7 @@ msgid "admin.matrix.title"
 msgstr "Rights matrix"
 
 msgid "admin.matrix.intro"
-msgstr "What each role may do, per organisation and per group. Permissions marked Superuser only are fixed. Permissions marked Personal data show citizens' data. Your organisation assigns roles in its identity provider."
+msgstr "What each role may do, per organisation and per group. Permissions marked Superuser only are fixed. Permissions marked Personal data show citizens' data. Only the superuser can adjust roles; every change is recorded and listed at the bottom of this page. Your organisation assigns roles in its identity provider."
 
 msgid "admin.matrix.level"
 msgstr "Level"
@@ -3442,6 +3442,7 @@ msgstr "Send closure update"
 
 msgid "audit.job.send_reinstatement"
 msgstr "Send reinstatement notice"
+
 msgid "authz.permission.system_update"
 msgstr "Update the installation"
 
@@ -4338,6 +4339,201 @@ msgstr "Own block with {count} contact options."
 
 msgid "admin.group_contacts.summary_default"
 msgstr "Organisation default: {count} contact options."
+
+msgid "authz.permission.roles_manage"
+msgstr "Adjust roles"
+
+msgid "audit.event.role_created"
+msgstr "Role created"
+
+msgid "audit.event.role_updated"
+msgstr "Role changed"
+
+msgid "audit.event.role_deleted"
+msgstr "Role deleted"
+
+msgid "admin.roles.manage"
+msgstr "Adjust roles"
+
+msgid "admin.roles.title"
+msgstr "Custom roles"
+
+msgid "admin.roles.lead"
+msgstr "Make a role to fit a team, as a copy of a built-in role. A custom role can never go beyond the bounds of that built-in role: permissions with a lock and permissions outside its reach cannot be chosen. Every change is recorded and visible to every admin in the rights matrix."
+
+msgid "admin.roles.copy"
+msgstr "New role"
+
+msgid "admin.roles.copy_lead"
+msgstr "Choose the built-in role to start from. Its reach (per organisation or per group) stays fixed afterwards."
+
+msgid "admin.roles.template"
+msgstr "Copy of"
+
+msgid "admin.roles.template_hint"
+msgstr "Organisation admin and Compliance and privacy work per organisation, group admin per group. A copy of Compliance and privacy stays read-only and without personal data."
+
+msgid "admin.roles.new"
+msgstr "Make a new role"
+
+msgid "admin.roles.custom"
+msgstr "Custom roles"
+
+msgid "admin.roles.name"
+msgstr "Name"
+
+msgid "admin.roles.claim_value"
+msgstr "Value in the identity provider"
+
+msgid "admin.roles.version"
+msgstr "Version"
+
+msgid "admin.roles.none"
+msgstr "There are no custom roles yet."
+
+msgid "admin.roles.copy_of"
+msgstr "Copy of {template}"
+
+msgid "admin.roles.definition"
+msgstr "Role"
+
+msgid "admin.roles.definition_lead"
+msgstr "Name, link to the identity provider and permissions."
+
+msgid "admin.roles.name_nl"
+msgstr "Name (Dutch)"
+
+msgid "admin.roles.name_en"
+msgstr "Name (English)"
+
+msgid "admin.roles.name_hint"
+msgstr "As admins see the role, for example Team lead. At most 80 characters."
+
+msgid "admin.roles.claim_value_hint"
+msgstr "The role value the identity provider sends, for example openplanner-team-lead. No spaces or commas. It may not equal the value of a built-in role or another custom role."
+
+msgid "admin.roles.claim_notice"
+msgstr "As long as the identity provider does not send this value, nobody holds this role. Ask the team that runs the identity provider to assign the value. A change of permissions works from the next page someone opens; a new or changed value after their next login."
+
+msgid "admin.roles.permissions"
+msgstr "Permissions"
+
+msgid "admin.roles.permissions_hint"
+msgstr "Only the permissions this role may get are listed. A permission that needs another one says so."
+
+msgid "admin.roles.permissions_hint_read_only"
+msgstr "A copy of Compliance and privacy can only read and never sees citizens' personal data."
+
+msgid "admin.roles.requires"
+msgstr "Needs: {permissions}"
+
+msgid "admin.roles.create"
+msgstr "Make role"
+
+msgid "admin.roles.unavailable"
+msgstr "Not available for this role"
+
+msgid "admin.roles.unavailable_lead"
+msgstr "These permissions are fixed in the code. They change only with a new version of OpenPlanner."
+
+msgid "admin.roles.reason_write"
+msgstr "changes something; this role only reads"
+
+msgid "admin.roles.reason_reach"
+msgstr "outside this role's reach"
+
+msgid "admin.roles.delete"
+msgstr "Delete role"
+
+msgid "admin.roles.delete_lead"
+msgstr "Whoever holds this role through the identity provider keeps no rights from it. Their other roles keep working. The deletion is recorded."
+
+msgid "admin.roles.error.template"
+msgstr "Choose a built-in role to start from."
+
+msgid "admin.roles.error.locked"
+msgstr "{permission} is for the superuser only."
+
+msgid "admin.roles.error.above_reach"
+msgstr "{permission} is outside this role's reach."
+
+msgid "admin.roles.error.pii"
+msgstr "{permission} shows personal data; a copy of Compliance and privacy may not."
+
+msgid "admin.roles.error.write"
+msgstr "{permission} changes something; a copy of Compliance and privacy only reads."
+
+msgid "admin.roles.error.requirement"
+msgstr "{permission} needs another permission that is still off."
+
+msgid "admin.roles.error.basics"
+msgstr "{permission} belongs to every admin; switch it on."
+
+msgid "admin.form.error.role_invalid"
+msgstr "This role goes beyond its bounds."
+
+msgid "admin.form.error.role_changed"
+msgstr "Someone else changed this role in the meantime. Look at the new version and try again."
+
+msgid "admin.form.error.claim_value_taken"
+msgstr "This value already belongs to a built-in role or another custom role."
+
+msgid "admin.form.error.role_name"
+msgstr "Enter a name of at most 80 characters."
+
+msgid "admin.form.error.claim_value"
+msgstr "Enter a value of at most 128 characters, without spaces or commas."
+
+msgid "admin.form.error.permissions"
+msgstr "Choose permissions from the list only."
+
+msgid "admin.matrix.custom_intro"
+msgstr "The last columns are custom roles ({count}), made by the superuser within the bounds of a built-in role."
+
+msgid "admin.matrix.history"
+msgstr "Changes to roles"
+
+msgid "admin.matrix.history_intro"
+msgstr "Who made, changed or deleted which custom role, and when. Visible to every admin."
+
+msgid "admin.matrix.history_none"
+msgstr "No roles have been changed yet."
+
+msgid "admin.matrix.history.when"
+msgstr "When"
+
+msgid "admin.matrix.history.role"
+msgstr "Role"
+
+msgid "admin.matrix.history.change"
+msgstr "Change"
+
+msgid "admin.matrix.history.actor"
+msgstr "By"
+
+msgid "admin.matrix.history.created"
+msgstr "Created"
+
+msgid "admin.matrix.history.updated"
+msgstr "Changed"
+
+msgid "admin.matrix.history.deleted"
+msgstr "Deleted"
+
+msgid "admin.matrix.history.added"
+msgstr "on: {permissions}"
+
+msgid "admin.matrix.history.removed"
+msgstr "off: {permissions}"
+
+msgid "admin.matrix.history.name"
+msgstr "name"
+
+msgid "admin.matrix.history.claim_value"
+msgstr "value in the identity provider"
+
+msgid "admin.matrix.history.count"
+msgstr "{count} permissions"
 
 msgid "admin.closure.image"
 msgstr "Image"
