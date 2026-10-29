@@ -103,3 +103,26 @@ def test_main_rejects_an_unknown_status(capsys: pytest.CaptureFixture[str]) -> N
     with pytest.raises(SystemExit):
         main(["update-report", "1", "done"])
     assert UpdateStatus.SUCCEEDED.value in capsys.readouterr().err
+
+
+def test_version_prints_release_and_commit(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # ADR 0052: the operator's check of what runs on the host, without the portal.
+    monkeypatch.setenv("ENVIRONMENT", "dev")
+    monkeypatch.setenv("APP_VERSION", "0.3.0")
+    monkeypatch.setenv("APP_COMMIT", "ce5602a8f4e1b2c3d4e5f60718293a4b5c6d7e8f")
+    assert main(["version"]) == 0
+    assert capsys.readouterr().out == (
+        "version 0.3.0\ncommit ce5602a8f4e1b2c3d4e5f60718293a4b5c6d7e8f\n"
+    )
+
+
+def test_version_of_a_development_build(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "dev")
+    monkeypatch.delenv("APP_VERSION", raising=False)
+    monkeypatch.delenv("APP_COMMIT", raising=False)
+    assert main(["version"]) == 0
+    assert capsys.readouterr().out == "version none (no release)\ncommit unknown\n"
