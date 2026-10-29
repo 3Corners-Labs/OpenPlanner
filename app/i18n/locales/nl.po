@@ -4339,6 +4339,60 @@ msgstr "Eigen blok met {count} contactmogelijkheden."
 msgid "admin.group_contacts.summary_default"
 msgstr "Standaard van de organisatie: {count} contactmogelijkheden."
 
+msgid "admin.closure.image"
+msgstr "Afbeelding"
+
+msgid "admin.closure.image_lead"
+msgstr "Eén afbeelding op de sluitingspagina, onder de melding, zoals een pictogram voor ‘gesloten’ of ‘storing’. Zet nooit informatie alleen in de afbeelding: burgers die hem niet zien, lezen alleen de tekst."
+
+msgid "admin.closure.image_current"
+msgstr "Zo staat de afbeelding nu op de sluitingspagina."
+
+msgid "admin.closure.image_file"
+msgstr "Afbeeldingsbestand"
+
+msgid "admin.closure.image_hint"
+msgstr "PNG, JPEG of WebP, hoogstens {kb} kB. Gegevens in het bestand (zoals locatie of maker) halen we weg. Laat leeg om alleen de tekst aan te passen."
+
+msgid "admin.closure.image_alt_nl"
+msgstr "Beschrijving (Nederlands)"
+
+msgid "admin.closure.image_alt_en"
+msgstr "Beschrijving (Engels)"
+
+msgid "admin.closure.image_alt_hint"
+msgstr "Wat de afbeelding laat zien, in één zin van hoogstens 250 tekens. Nodig, tenzij de afbeelding alleen versiert."
+
+msgid "admin.closure.image_decorative"
+msgstr "Deze afbeelding is alleen versiering (geen beschrijving nodig)"
+
+msgid "admin.closure.image_save"
+msgstr "Afbeelding opslaan"
+
+msgid "admin.closure.image_remove"
+msgstr "Afbeelding verwijderen"
+
+msgid "admin.form.error.image"
+msgstr "Kies een PNG-, JPEG- of WebP-afbeelding van hoogstens {kb} kB. SVG kan niet."
+
+msgid "admin.form.error.image_alt"
+msgstr "Beschrijf de afbeelding in één regel van hoogstens 250 tekens, of vink aan dat hij alleen versiert."
+
+msgid "admin.done.image_saved"
+msgstr "De afbeelding is opgeslagen."
+
+msgid "admin.done.image_removed"
+msgstr "De afbeelding is verwijderd."
+
+msgid "admin.audit.detail.closure_image_update"
+msgstr "afbeelding van de noodsluiting opgeslagen"
+
+msgid "admin.audit.detail.closure_image_remove"
+msgstr "afbeelding van de noodsluiting verwijderd"
+
+msgid "admin.audit.detail.file"
+msgstr "nieuw bestand"
+
 msgid "authz.permission.system_maintenance"
 msgstr "Onderhoudsmodus aan- en uitzetten"
 

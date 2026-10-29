@@ -39,6 +39,31 @@
     <button type="submit" class="button">{{ _("admin.closure.update_button") }}</button>
   </div>
 </form>
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/image" enctype="multipart/form-data" novalidate aria-labelledby="image-heading">
+  <div class="card__header">
+    <h2 id="image-heading">{{ _("admin.closure.image") }}</h2>
+    <p class="card__lead">{{ _("admin.closure.image_lead") }}</p>
+  </div>
+  {% if closure.image %}
+  <p>{{ _("admin.closure.image_current") }}</p>
+  <img class="closure-image" src="{{ closure.image.src }}" alt="{{ closure.image.alt }}">
+  {% endif %}
+  <div class="form-grid">
+    {% for f in image_fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="choice__option">
+    <input type="checkbox" id="decorative" name="decorative" value="yes"{% if image_decorative %} checked{% endif %}>
+    <label for="decorative">{{ _("admin.closure.image_decorative") }}</label>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.closure.image_save") }}</button>
+  </div>
+</form>
+{% if closure.image %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/image/remove" aria-label="{{ _("admin.closure.image_remove") }}">
+  <button type="submit" class="button button--secondary">{{ _("admin.closure.image_remove") }}</button>
+</form>
+{% endif %}
 {{ lift_form("/admin/groups/" ~ summary.group.slug ~ "/closure/lift", _("admin.closure.lift"), _("admin.closure.lift_button")) }}
 {% else %}
 {{ start_form("/admin/groups/" ~ summary.group.slug ~ "/closure", _("admin.closure.start"), _("admin.closure.start_lead", count=confirmed_ahead), _("admin.closure.start_button"), fields) }}
