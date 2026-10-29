@@ -5031,3 +5031,27 @@ msgstr "Regel {line} is geen website. Vul alleen het begin van het webadres in, 
 
 msgid "admin.embedding.error.count"
 msgstr "Vul maximaal {count} websites in."
+
+msgid "widget.region"
+msgstr "Afspraak maken"
+
+msgid "widget.loading"
+msgstr "Bezig met laden…"
+
+msgid "widget.unavailable"
+msgstr "De afsprakenkalender is hier nu niet beschikbaar."
+
+msgid "widget.maintenance"
+msgstr "We voeren onderhoud uit. Daarom kunt u nu geen afspraak maken. Probeer het later opnieuw."
+
+msgid "widget.retry"
+msgstr "Opnieuw proberen"
+
+msgid "widget.more"
+msgstr "Meer mogelijkheden, zoals direct een gesprek starten, vindt u op de pagina van {name}."
+
+msgid "widget.done_title"
+msgstr "Uw afspraak is gemaakt"
+
+msgid "widget.error_summary"
+msgstr "Er is iets niet goed ingevuld"
