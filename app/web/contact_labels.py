@@ -1,8 +1,9 @@
 """The contact block as people read it, shared by citizen and admin pages (ADR 0037 §2).
 
-``contact_view`` turns a ``ContactBlock`` into what ``_contact_block.html`` renders in the
-reader's language: a heading (the admin's, or a catalogue text), and per option a term (its
-label, or the name of its kind), the link or the address lines, and the opening hours.
+``contact_view`` (``block_view`` outside a request, for mails) turns a ``ContactBlock`` into
+what ``_contact_block.html`` renders in the reader's language: a heading (the admin's, or a
+catalogue text), and per option a term (its label, or the name of its kind), the link or the
+address lines, and the opening hours.
 """
 
 from dataclasses import dataclass
@@ -74,10 +75,17 @@ def _item(option: ContactOption, code: str, _: BoundGettext) -> ContactItemView:
     return ContactItemView(term, option.href, text, (), hours)
 
 
-def contact_view(block: ContactBlock | None, locale: RequestLocale) -> ContactBlockView | None:
-    """Return the block for ``locale``, or ``None`` when there is nothing to show."""
+def block_view(block: ContactBlock | None, code: str, _: BoundGettext) -> ContactBlockView | None:
+    """Return the block in locale ``code``, or ``None`` when there is nothing to show.
+
+    Also used outside a request, for the closure mails (ADR 0037 §5).
+    """
     if block is None or block.is_empty:
         return None
-    _ = locale.gettext
-    heading = block.heading(locale.code) or _("contacts.heading")
-    return ContactBlockView(heading, [_item(o, locale.code, _) for o in block.options])
+    heading = block.heading(code) or _("contacts.heading")
+    return ContactBlockView(heading, [_item(o, code, _) for o in block.options])
+
+
+def contact_view(block: ContactBlock | None, locale: RequestLocale) -> ContactBlockView | None:
+    """Return the block for the reader's locale, or ``None`` when there is nothing to show."""
+    return block_view(block, locale.code, locale.gettext)

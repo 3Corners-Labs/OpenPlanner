@@ -841,14 +841,21 @@ Client secrets live only in the contact center's vault; OpenPlanner keeps their 
 
 When a team cannot hold its appointments (outage, illness, closed building):
 
-1. **Close.** Admin portal → the group → tab *Noodsluiting*. Leave *Begin* empty to close now;
+0. **Prepare (before any emergency).** Fill in the organisation's *Contactalternatieven* and
+   prepare a few *scenario's* (outage, strike, building closed) under *Noodsluiting →
+   Scenario's beheren*: notice and heading in Dutch and English, if needed their own contact
+   options and an image. The manual topic *Scenario's voor een noodsluiting* has examples to
+   copy. New installations have none.
+1. **Close.** Optionally start from a scenario (*Beginnen met een scenario* → *Gebruiken*): it
+   fills in the form, and its contact options and image are copied into the closure. Admin portal → the group → tab *Noodsluiting*. Leave *Begin* empty to close now;
    leave *Einde* empty for "until further notice". Write the notice in Dutch and English (plain
    text; no names or other personal data). For every team of an organisation at once:
    *Noodsluiting* in the main menu (organisation admins).
 2. **What happens.** Nothing can be booked inside the closure and direct calls are off. Every
    confirmed appointment inside it is put on hold: reminders and the WxCC task are cancelled and
-   the citizen gets an email with the notice and a link to choose a new time or cancel. The
-   group page shows the notice. Nothing is deleted.
+   the citizen gets an email with the notice, the closure's contact options, a link to the
+   closure page and a link to choose a new time or cancel (ADR 0037 §5; the image is not
+   mailed). The group page shows the closure page. Nothing is deleted.
 3. **Keep citizens informed.** Change the notice or the end on the same tab and tick *Stuur de
    nieuwe toelichting…* to mail everyone still on hold.
 4. **Handle appointments.** In *Opgeschorte afspraken*: move one to a free time (the citizen
