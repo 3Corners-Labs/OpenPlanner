@@ -488,16 +488,28 @@ class AuditEventRow(Base):
     detail: Mapped[str] = mapped_column(String(255), server_default=text("''"))
     source: Mapped[str] = mapped_column(String(16), server_default=text("'admin'"))
     booking_id: Mapped[int | None] = mapped_column(Integer)
+    # ADR 0040, part 2: the fields of the one event schema that are not derived on export.
+    event_id: Mapped[str] = mapped_column(String(32))
+    level: Mapped[str] = mapped_column(String(16), server_default=text("'info'"))
+    category: Mapped[str] = mapped_column(String(16), server_default=text("'audit'"))
+    trace_id: Mapped[str] = mapped_column(String(32), server_default=text("''"))
+    service: Mapped[str] = mapped_column(String(16), server_default=text("''"))
 
     __table_args__ = (
         Index("ix_audit_events_at", "at"),
         Index("ix_audit_events_organisation", "organisation"),
         Index("ix_audit_events_group", "group"),
         Index("ix_audit_events_source_at", "source", "at"),
+        Index("ix_audit_events_event_id", "event_id", unique=True),
+        Index("ix_audit_events_trace_id", "trace_id"),
         CheckConstraint(
             "outcome IN ('success', 'denied', 'failure', 'retry', 'skipped')", name="outcome"
         ),
         CheckConstraint("source IN ('admin', 'system')", name="source"),
+        CheckConstraint("level IN ('debug', 'info', 'warning', 'error', 'critical')", name="level"),
+        CheckConstraint(
+            "category IN ('audit', 'system', 'security', 'diagnostic')", name="category"
+        ),
     )
 
 
