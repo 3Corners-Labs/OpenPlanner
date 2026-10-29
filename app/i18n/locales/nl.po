@@ -4462,6 +4462,21 @@ msgstr "Onderhoudsmodus uitgezet"
 msgid "admin.audit.detail.maintenance_refused"
 msgstr "Wijziging geweigerd tijdens onderhoud"
 
+msgid "maintenance.title"
+msgstr "We voeren onderhoud uit"
+
+msgid "maintenance.text"
+msgstr "Daarom kunt u nu geen afspraak maken, verzetten of annuleren. Afspraken die al vaststaan gaan gewoon door."
+
+msgid "maintenance.expected_end"
+msgstr "We verwachten klaar te zijn op {moment}."
+
+msgid "maintenance.contacts_lead"
+msgstr "Heeft u nu hulp nodig? U kunt ons ook op een andere manier bereiken."
+
+msgid "maintenance.try_later"
+msgstr "Probeer het later opnieuw."
+
 # ADR 0046: staff directory
 
 msgid "authz.permission.staff_view"
