@@ -736,7 +736,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 | ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | proposed |
 | ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
-| ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | in progress (CB-1, CL-1 to CL-4 done) |
+| ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | done (CB-1, CL-1 to CL-5) |
 | ADR 0038 | Maintenance mode (backlog MM-1 to MM-5) | planned |
 | ADR 0039 | Rights: (1) auditor role, reach, matrix page text; (2) retention overview; (3) custom roles within bounds | in progress |
 | ADR 0040 | Logging and storage: step 1 rotation, reclaim and disk watch; steps 2–4 schema and levels, filters and CSV export, diagnostic mode and retention | step 1 done |
