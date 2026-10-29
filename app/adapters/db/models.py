@@ -13,6 +13,8 @@ the display name of admins, from the identity provider (ADR 0046).
     integration_reports (last webhook listing and delivery test; no secrets)
     staff 1──* staff_memberships (admins as last seen at login, ADR 0046; the name is joined
                                   into the audit log)
+    admin_profiles (name per identity-provider subject; joined into the audit log)
+    roles (custom roles of the superuser, ADR 0039; no foreign keys, linked by claim value)
     release_checks (one row), update_requests (ADR 0029; the installation, no personal data)
     maintenance_state (one row, ADR 0038; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
@@ -23,6 +25,7 @@ the display name of admins, from the identity provider (ADR 0046).
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
                          │  └───* closures 1──* closure_notices (ADR 0024)
+                         │            └──? closure_images (ADR 0037 §3; one per closure)
                          │  └───* group_texts (message texts per locale and block)
                          └──* slots 1──* bookings 1──* jobs
                                          └──? closure (the one that suspended it)
@@ -66,6 +69,7 @@ __all__ = [
     "BookingRow",
     "GroupHolidayCalendarRow",
     "GroupHolidayOpenDayRow",
+    "ClosureImageRow",
     "ClosureNoticeRow",
     "ClosureRow",
     "GroupRow",
@@ -184,6 +188,8 @@ class GroupRow(Base):
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
     dispatch_kind: Mapped[str] = mapped_column(String(32), server_default=text("'contact_center'"))
     queue_change_working_days: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+    # ADR 0044: a planner changes bookings up to this long before the start.
+    planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
 
@@ -194,6 +200,7 @@ class GroupRow(Base):
             "dispatch_kind IN ('contact_center', 'openplanner_queue')", name="dispatch_kind"
         ),
         CheckConstraint("queue_change_working_days BETWEEN 1 AND 5", name="queue_change_days"),
+        CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
     )
 
@@ -402,6 +409,8 @@ class BookingRow(Base):
         ForeignKey("bookings.id", ondelete="SET NULL")
     )
     closure_id: Mapped[int | None] = mapped_column(ForeignKey("closures.id", ondelete="SET NULL"))
+    # ADR 0044: the fixed reason a planner gave; a code, never free text.
+    change_reason: Mapped[str | None] = mapped_column(String(16))
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),
@@ -411,7 +420,26 @@ class BookingRow(Base):
             "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended')",
             name="status",
         ),
+        CheckConstraint(
+            "change_reason IS NULL OR change_reason IN ('staffing', 'technical', 'unforeseen')",
+            name="change_reason",
+        ),
     )
+
+
+class ShortfallAcceptanceRow(Base):
+    """A planner accepted a slot's shortfall at these counts (ADR 0044); no personal data."""
+
+    __tablename__ = "shortfall_acceptances"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    start: Mapped[datetime] = mapped_column(UTCDateTime(), primary_key=True)
+    agents: Mapped[int] = mapped_column(Integer)
+    booked: Mapped[int] = mapped_column(Integer)
+    accepted_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    actor: Mapped[str] = mapped_column(String(255))
 
 
 class ClosureRow(Base):
@@ -426,6 +454,26 @@ class ClosureRow(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
     # The JSON copy of the contact block taken when the closure started (ADR 0037 §2).
     contacts: Mapped[str | None] = mapped_column(Text)
+    image_id: Mapped[int | None] = mapped_column(
+        ForeignKey("closure_images.id", ondelete="SET NULL")
+    )
+
+
+class ClosureImageRow(Base):
+    """An image of a closure with its text alternative (ADR 0037 §3); metadata already stripped.
+
+    Organisation data, not personal data: no purge. The type comes from the magic bytes.
+    """
+
+    __tablename__ = "closure_images"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    media_type: Mapped[str] = mapped_column(String(16))
+    digest: Mapped[str] = mapped_column(String(16))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    # The text alternative per locale as JSON; ``{}`` when decorative.
+    alts: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+    decorative: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
 
 
 class ClosureNoticeRow(Base):
@@ -777,3 +825,21 @@ class MaintenanceStateRow(Base):
     reason: Mapped[str | None] = mapped_column(String(16))
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class RoleRow(Base):
+    """A custom role (ADR 0039): a copy of a built-in template within its bounds.
+
+    ``permissions`` is space separated; a permission no longer known grants nothing. The
+    reach follows from ``template`` and never changes.
+    """
+
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    template: Mapped[str] = mapped_column(String(32))
+    name_nl: Mapped[str] = mapped_column(String(80))
+    name_en: Mapped[str] = mapped_column(String(80))
+    claim_value: Mapped[str] = mapped_column(String(128), unique=True)
+    permissions: Mapped[str] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer)

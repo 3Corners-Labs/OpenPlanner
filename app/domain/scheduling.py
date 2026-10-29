@@ -60,6 +60,8 @@ DEFAULT_QUEUE_CHANGE_WORKING_DAYS = 1
 MAX_QUEUE_CHANGE_WORKING_DAYS = 5
 WORKING_DAYS = frozenset(range(5))
 """Monday to Friday; holidays do not count as non-working days here (ADR 0043)."""
+MAX_PLANNER_LEAD_MINUTES = 1440
+"""ADR 0044: upper bound of ``planner_change_min_lead_minutes`` (one day)."""
 
 
 def _invalid(field: str) -> DomainError:
@@ -175,6 +177,9 @@ class Group:
         queue_change_working_days: With the own queue, how many working days (Monday to
             Friday) before the start the booking becomes read-only, at the same local time.
             A booking made later than that is read-only from the start.
+        planner_change_min_lead_minutes: How long before the start a planner may still move
+            or cancel a booking (ADR 0044, class D per group). Never below
+            ``dispatch_lead_minutes``: a dispatched booking needs a phone call, not a mail.
         embedding_enabled: Whether the group may appear in the widget on the websites its
             organisation allows (ADR 0035); off until the group switches it on.
 
@@ -201,6 +206,7 @@ class Group:
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
     dispatch_kind: DispatchKind = DispatchKind.CONTACT_CENTER
     queue_change_working_days: int = DEFAULT_QUEUE_CHANGE_WORKING_DAYS
+    planner_change_min_lead_minutes: int = 60
     embedding_enabled: bool = False
 
     def __post_init__(self) -> None:
@@ -222,6 +228,9 @@ class Group:
             raise _invalid("min_notice_minutes")
         if not 1 <= self.queue_change_working_days <= MAX_QUEUE_CHANGE_WORKING_DAYS:
             raise _invalid("queue_change_working_days")
+        planner_lead = self.planner_change_min_lead_minutes
+        if not self.dispatch_lead_minutes <= planner_lead <= MAX_PLANNER_LEAD_MINUTES:
+            raise _invalid("planner_change_min_lead_minutes")
         if self.video_host_email is not None and not _EMAIL.fullmatch(self.video_host_email):
             raise _invalid("video_host_email")
         for name, limit in INTEGRATION_TEXT_LIMITS.items():
@@ -268,6 +277,11 @@ class Group:
     def dispatch_lead(self) -> timedelta:
         """How long before the start the WxCC task is created."""
         return timedelta(minutes=self.dispatch_lead_minutes)
+
+    @property
+    def planner_lead(self) -> timedelta:
+        """How long before the start a planner may last change a booking (ADR 0044)."""
+        return timedelta(minutes=self.planner_change_min_lead_minutes)
 
     def change_deadline(self, start: datetime) -> datetime:
         """Return the moment a booking starting at ``start`` becomes read-only.
