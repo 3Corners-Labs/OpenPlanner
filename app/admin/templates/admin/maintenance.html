@@ -1,0 +1,49 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import form_body with context %}
+{% block title %}{{ _("admin.maintenance.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.maintenance.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.maintenance.lead") }}</p>
+  </div>
+</div>
+{% include "_error_summary.html" %}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+<section class="card" aria-labelledby="state-heading">
+  <div class="card__header">
+    <h2 id="state-heading">{{ _("admin.maintenance.state") }}</h2>
+  </div>
+  <dl class="facts">
+    <div><dt>{{ _("admin.maintenance.state") }}</dt><dd>{% if status.active %}<span class="chip chip--danger">{{ _("admin.maintenance.on") }}</span>{% else %}<span class="chip chip--success">{{ _("admin.maintenance.off") }}</span>{% endif %}</dd></div>
+    {% if status.state.on %}
+    <div><dt>{{ _("admin.maintenance.since") }}</dt><dd>{{ since }}</dd></div>
+    <div><dt>{{ _("admin.maintenance.by") }}</dt><dd><code>{{ status.state.by }}</code></dd></div>
+    <div><dt>{{ _("admin.maintenance.reason") }}</dt><dd>{{ reason or "–" }}</dd></div>
+    <div><dt>{{ _("admin.maintenance.expected_end") }}</dt><dd>{{ expected_end or _("admin.maintenance.no_expected_end") }}</dd></div>
+    {% endif %}
+  </dl>
+  {% if status.environment %}
+  <div class="alert alert--info" role="status"><p>{{ _("admin.maintenance.environment") }}</p></div>
+  {% endif %}
+</section>
+<form class="card" method="post" action="/admin/maintenance/on" novalidate aria-labelledby="on-heading">
+  <div class="card__header">
+    <h2 id="on-heading">{% if status.state.on %}{{ _("admin.maintenance.change_heading") }}{% else %}{{ _("admin.maintenance.on_heading") }}{% endif %}</h2>
+    <p class="card__lead">{{ _("admin.maintenance.on_lead") }}</p>
+  </div>
+  {{ form_body(fields, _("admin.maintenance.change") if status.state.on else _("admin.maintenance.switch_on")) }}
+</form>
+{% if status.state.on %}
+<form class="card" method="post" action="/admin/maintenance/off" aria-labelledby="off-heading">
+  <div class="card__header">
+    <h2 id="off-heading">{{ _("admin.maintenance.off_heading") }}</h2>
+    <p class="card__lead">{% if status.environment %}{{ _("admin.maintenance.off_lead_environment") }}{% else %}{{ _("admin.maintenance.off_lead") }}{% endif %}</p>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button"{% if status.environment %} disabled aria-describedby="off-reason"{% endif %}>{{ _("admin.maintenance.switch_off") }}</button>
+    {% if status.environment %}<p class="hint" id="off-reason">{{ _("admin.maintenance.environment") }}</p>{% endif %}
+  </div>
+</form>
+{% endif %}
+{% endblock %}

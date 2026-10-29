@@ -16,10 +16,17 @@ superuser sees it. Each login also refreshes the admin's staff record and audits
 in their roles and memberships since the last one (ADR 0046).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Outcome
+from app.domain.audit_export import (
+    EXPORT_EVENT,
+    ExportLimits,
+    ExportRefused,
+    export_window,
+    to_csv,
+)
 from app.domain.authorization import (
     LEVELS,
     Decision,
@@ -28,12 +35,14 @@ from app.domain.authorization import (
     Principal,
     Reach,
     Reason,
+    Scope,
     Target,
     decide,
     reaches,
     scope_for,
 )
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.event_schema import Envelope, to_record
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.retention import RetentionOverview, candidates_before, summarise
 from app.domain.scheduling import GroupSummary
@@ -135,9 +144,12 @@ class AdminService:
         reason: str = "",
         organisation: str | None = None,
         group: str | None = None,
+        detail: str = "",
     ) -> None:
         """Write an audit event (logins, denials, changes)."""
-        event = AuditEvent(self._clock.now(), actor, action, outcome, reason, organisation, group)
+        event = AuditEvent(
+            self._clock.now(), actor, action, outcome, reason, organisation, group, detail
+        )
         async with self._uow.locked() as tx:
             await tx.add_audit_event(event)
 
@@ -222,6 +234,68 @@ class AdminService:
         scope = scope_for(principal, Permission.AUDIT_VIEW)
         async with self._uow.read() as tx:
             return await tx.list_audit_events(scope, limit, narrow)
+
+    async def export_audit(
+        self,
+        principal: Principal,
+        narrow: AuditFilter,
+        envelope: Envelope,
+        limits: ExportLimits,
+    ) -> tuple[str, int]:
+        """Return the CSV of exactly ``narrow`` inside the principal's scope, and its row count.
+
+        Without a period the last ``limits.max_days`` are exported. Every export, and every
+        refused one, is itself an audit event (``audit.export``, detail ``rows:<n>``) at the
+        level of what was exported (ADR 0040, part 3).
+
+        Raises:
+            ExportRefused: ``too_many_days`` or ``too_many_rows``; narrow the filter.
+        """
+        scope = scope_for(principal, Permission.AUDIT_EXPORT)
+        try:
+            since, until = export_window(narrow.since, narrow.until, self._clock.now(), limits)
+            async with self._uow.read() as tx:
+                entries = await tx.list_audit_events(
+                    scope, limits.max_rows + 1, replace(narrow, since=since, until=until)
+                )
+            if len(entries) > limits.max_rows:
+                raise ExportRefused("too_many_rows")
+        except ExportRefused as refused:
+            await self._record_export(principal, scope, narrow, Outcome.FAILURE, refused.code)
+            raise
+        await self._record_export(principal, scope, narrow, Outcome.SUCCESS, "", len(entries))
+        return to_csv(to_record(entry.event, envelope) for entry in entries), len(entries)
+
+    async def _record_export(
+        self,
+        principal: Principal,
+        scope: Scope,
+        narrow: AuditFilter,
+        outcome: Outcome,
+        reason: str,
+        rows: int = 0,
+    ) -> None:
+        """Audit an export at the narrowest level that covers it."""
+        async with self._uow.locked() as tx:
+            summary = await tx.get_group_summary(narrow.group) if narrow.group else None
+            if summary is not None:
+                organisation, group = summary.organisation_slug, summary.group.slug
+            elif not scope.everything and len(scope.organisations) == 1 and not scope.groups:
+                organisation, group = next(iter(scope.organisations)), None
+            else:
+                organisation, group = None, None
+            await tx.add_audit_event(
+                AuditEvent(
+                    self._clock.now(),
+                    principal.subject,
+                    EXPORT_EVENT,
+                    outcome,
+                    reason,
+                    organisation,
+                    group,
+                    f"rows:{rows}" if outcome is Outcome.SUCCESS else "",
+                )
+            )
 
     async def retention(self, principal: Principal) -> RetentionOverview:
         """Return whether personal data is removed on time, per group in scope (ADR 0039)."""

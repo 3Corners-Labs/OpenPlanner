@@ -13,22 +13,29 @@ groups of their claim. The auditor reads only and never sees personal data (ADR 
 Bounds (ADR 0039): *locked* permissions belong to the superuser only; *personal data*
 permissions show citizens' data and are never held by the auditor.
 
+Maintenance (ADR 0038): while maintenance mode is on, every change is refused except
+for the permissions marked *maintenance*, and those only for the superuser. Reading
+stays open to every role as usual.
+
 | Permission | Level | Bounds | Superuser | Organisation admin | Group admin | Compliance and privacy (read-only) |
 |---|---|---|---|---|---|---|
 | View overview (`dashboard.view`) | Portal | – | yes | yes | yes | yes |
 | View own rights (`rights.view`) | Portal | – | yes | yes | yes | yes |
 | View rights matrix (`matrix.view`) | Portal | – | yes | yes | yes | yes |
 | Manage organisations (`organisation.manage`) | Portal | locked | yes | – | – | – |
+| Switch diagnostic mode (`diagnostics.manage`) | Portal | locked | yes | – | – | – |
 | Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | locked | yes | – | – | – |
 | Manage API clients (`api_clients.manage`) | Portal | locked | yes | – | – | – |
-| Update the installation (`system.update`) | Portal | locked | yes | – | – | – |
-| Manage integrations and secrets (`integrations.manage`) | Organisation | locked | yes | – | – | – |
+| Update the installation (`system.update`) | Portal | locked, maintenance | yes | – | – | – |
+| Switch maintenance mode on and off (`system.maintenance`) | Portal | locked, maintenance | yes | – | – | – |
+| Manage integrations and secrets (`integrations.manage`) | Organisation | locked, maintenance | yes | – | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | – | yes | – | – | – |
 | Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | – | yes | yes | – | – |
 | Create groups (`group.create`) | Organisation | – | yes | yes | – | – |
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | – | yes | yes | – | – |
 | View retention (`retention.view`) | Organisation | – | yes | yes | – | yes |
 | View audit log (`audit.view`) | Group | – | yes | yes | yes | yes |
+| Export audit log (`audit.export`) | Group | – | yes | yes | – | yes |
 | View group (`group.view`) | Group | – | yes | yes | yes | yes |
 | Change group settings (`group.edit`) | Group | – | yes | yes | – | – |
 | Manage staffing and staffing exceptions (`schedule.manage`) | Group | – | yes | yes | yes | – |

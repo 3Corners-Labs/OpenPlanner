@@ -382,6 +382,33 @@ msgstr "Administration"
 msgid "admin.nav.label"
 msgstr "Administration menu"
 
+msgid "admin.nav.section.monitor"
+msgstr "Monitor"
+
+msgid "admin.nav.section.manage"
+msgstr "Manage"
+
+msgid "admin.nav.section.platform"
+msgstr "Platform"
+
+msgid "admin.nav.object.group"
+msgstr "Group"
+
+msgid "admin.profile.roles"
+msgstr "Your roles"
+
+msgid "admin.theme.label"
+msgstr "Appearance"
+
+msgid "admin.theme.system"
+msgstr "System"
+
+msgid "admin.theme.light"
+msgstr "Light"
+
+msgid "admin.theme.dark"
+msgstr "Dark"
+
 msgid "admin.nav.dashboard"
 msgstr "Overview"
 
@@ -622,6 +649,12 @@ msgstr "Manage organisations"
 
 msgid "authz.permission.audit_view"
 msgstr "View audit log"
+
+msgid "authz.permission.audit_export"
+msgstr "Export audit log"
+
+msgid "authz.permission.diagnostics_manage"
+msgstr "Switch diagnostic mode"
 
 msgid "authz.permission.integrations_manage"
 msgstr "Manage integrations and secrets"
@@ -2969,15 +3002,6 @@ msgstr "Sending failed because of an unexpected mail server error. Try again lat
 msgid "admin.audit.filter"
 msgstr "Filter"
 
-msgid "admin.audit.source"
-msgstr "Kind"
-
-msgid "admin.audit.source.admin"
-msgstr "Admin actions"
-
-msgid "admin.audit.source.system"
-msgstr "System events"
-
 msgid "admin.audit.group"
 msgstr "Group"
 
@@ -3079,6 +3103,126 @@ msgstr "Remove personal data"
 
 msgid "audit.event.storage_check"
 msgstr "Check storage"
+
+msgid "admin.audit.diagnostics.title"
+msgstr "Diagnostic mode"
+
+msgid "admin.audit.diagnostics.intro"
+msgstr "While diagnostic mode is on, the platform writes extra debug entries about that group or organisation into this log. The group's admins see them too. The mode ends by itself after the set time (24 hours by default), and also when the disk is nearly full."
+
+msgid "admin.audit.diagnostics.active"
+msgstr "{target}: on until {until}"
+
+msgid "admin.audit.diagnostics.off"
+msgstr "Switch off"
+
+msgid "admin.audit.diagnostics.on"
+msgstr "Switch on"
+
+msgid "admin.audit.diagnostics.none"
+msgstr "Diagnostic mode is off everywhere."
+
+msgid "admin.audit.diagnostics.target"
+msgstr "Group or organisation"
+
+msgid "admin.done.diagnostics_on"
+msgstr "Diagnostic mode is on."
+
+msgid "admin.done.diagnostics_off"
+msgstr "Diagnostic mode is off."
+
+msgid "audit.event.job_run"
+msgstr "Job run (diagnostics)"
+
+msgid "audit.event.diagnostics_brake"
+msgstr "Diagnostic mode stopped"
+
+msgid "admin.audit.detail.diagnostics_on"
+msgstr "diagnostic mode on"
+
+msgid "admin.audit.detail.diagnostics_off"
+msgstr "diagnostic mode off"
+
+msgid "admin.audit.detail.modes"
+msgstr "{count} ended"
+
+msgid "admin.audit.level"
+msgstr "Minimum level"
+
+msgid "admin.audit.level.debug"
+msgstr "Debug"
+
+msgid "admin.audit.level.info"
+msgstr "Info"
+
+msgid "admin.audit.level.warning"
+msgstr "Warning"
+
+msgid "admin.audit.level.error"
+msgstr "Error"
+
+msgid "admin.audit.level.critical"
+msgstr "Critical"
+
+msgid "admin.audit.category"
+msgstr "Kind"
+
+msgid "admin.audit.category.audit"
+msgstr "Admin actions"
+
+msgid "admin.audit.category.system"
+msgstr "System"
+
+msgid "admin.audit.category.security"
+msgstr "Security"
+
+msgid "admin.audit.category.diagnostic"
+msgstr "Diagnostics"
+
+msgid "admin.audit.from"
+msgstr "From"
+
+msgid "admin.audit.to"
+msgstr "Up to and including"
+
+msgid "admin.audit.trace"
+msgstr "Trace id"
+
+msgid "admin.audit.trace_link"
+msgstr "Whole chain"
+
+msgid "admin.audit.export"
+msgstr "Export as CSV"
+
+msgid "admin.audit.export.too_many_days"
+msgstr "The export covers too many days. Choose a shorter period."
+
+msgid "admin.audit.export.too_many_rows"
+msgstr "The export has too many rows. Narrow the filter, for example with a shorter period."
+
+msgid "audit.event.webhook_rejected"
+msgstr "Webhook rejected"
+
+msgid "audit.event.token_refresh"
+msgstr "Renew Webex token"
+
+msgid "admin.audit.reason.invalid_signature"
+msgstr "Signature or timestamp does not verify."
+
+msgid "admin.audit.reason.unauthorized"
+msgstr "The service refuses our credentials."
+
+msgid "admin.audit.reason.unreachable"
+msgstr "The service cannot be reached."
+
+msgid "admin.audit.detail.suppressed"
+msgstr "{count} more since the previous entry"
+
+msgid "admin.audit.detail.source_webex"
+msgstr "from Webex"
+
+msgid "admin.audit.detail.source_wxcc"
+msgstr "from Webex Contact Center"
 
 msgid "audit.job.send_suspension"
 msgstr "Send closure notice"
@@ -3978,6 +4122,156 @@ msgstr "Own block with {count} contact options."
 
 msgid "admin.group_contacts.summary_default"
 msgstr "Organisation default: {count} contact options."
+
+msgid "authz.permission.system_maintenance"
+msgstr "Switch maintenance mode on and off"
+
+msgid "error.maintenance"
+msgstr "Maintenance mode: read only. The platform is under maintenance; changes are possible again once it is finished."
+
+msgid "admin.form.error.maintenance_from_environment"
+msgstr "Maintenance mode is switched on in the server configuration (MAINTENANCE_MODE). Only the server operator can switch it off."
+
+msgid "admin.form.error.expected_end"
+msgstr "Enter an expected end date and time in the future, or leave both empty."
+
+msgid "admin.done.maintenance_on"
+msgstr "Maintenance mode is on."
+
+msgid "admin.done.maintenance_off"
+msgstr "Maintenance mode is off."
+
+msgid "admin.nav.maintenance"
+msgstr "Maintenance"
+
+msgid "admin.maintenance.refused.title"
+msgstr "Maintenance mode: read only"
+
+msgid "admin.maintenance.bar.label"
+msgstr "Maintenance mode"
+
+msgid "admin.maintenance.bar.title"
+msgstr "Maintenance mode"
+
+msgid "admin.maintenance.bar.text"
+msgstr "Read only: changes are not possible for now."
+
+msgid "admin.maintenance.bar.since"
+msgstr "Since {moment}"
+
+msgid "admin.maintenance.bar.expected_end"
+msgstr "Expected end: {moment}"
+
+msgid "admin.maintenance.bar.environment"
+msgstr "Switched on by the server"
+
+msgid "admin.maintenance.title"
+msgstr "Maintenance mode"
+
+msgid "admin.maintenance.lead"
+msgstr "Put the whole installation on read only while you work on the platform. Citizens then cannot book or change appointments; confirmed appointments go ahead as planned."
+
+msgid "admin.maintenance.state"
+msgstr "Status"
+
+msgid "admin.maintenance.on"
+msgstr "On"
+
+msgid "admin.maintenance.off"
+msgstr "Off"
+
+msgid "admin.maintenance.since"
+msgstr "On since"
+
+msgid "admin.maintenance.by"
+msgstr "Switched on by"
+
+msgid "admin.maintenance.reason"
+msgstr "Reason"
+
+msgid "admin.maintenance.reason_hint"
+msgstr "Shown in the audit log and on this page."
+
+msgid "admin.maintenance.expected_end"
+msgstr "Expected end"
+
+msgid "admin.maintenance.expected_end_hint"
+msgstr "For information only: maintenance mode does not end by itself."
+
+msgid "admin.maintenance.no_expected_end"
+msgstr "Not given"
+
+msgid "admin.maintenance.environment"
+msgstr "Maintenance mode is switched on in the server configuration (MAINTENANCE_MODE). You cannot switch that off here."
+
+msgid "admin.maintenance.on_heading"
+msgstr "Switch maintenance mode on"
+
+msgid "admin.maintenance.change_heading"
+msgstr "Change the reason or expected end"
+
+msgid "admin.maintenance.on_lead"
+msgstr "During maintenance only the superuser can change integrations, updates and this switch. Everything else is read only, for the superuser too."
+
+msgid "admin.maintenance.change"
+msgstr "Save"
+
+msgid "admin.maintenance.switch_on"
+msgstr "Switch maintenance mode on"
+
+msgid "admin.maintenance.off_heading"
+msgstr "Switch maintenance mode off"
+
+msgid "admin.maintenance.off_lead"
+msgstr "Citizens and admins can then do everything they are used to again."
+
+msgid "admin.maintenance.off_lead_environment"
+msgstr "Switching off only clears the switch in the portal; maintenance mode stays on as long as the server switches it on."
+
+msgid "admin.maintenance.switch_off"
+msgstr "Switch maintenance mode off"
+
+msgid "admin.maintenance.reason.update"
+msgstr "Update"
+
+msgid "admin.maintenance.reason.restore"
+msgstr "Restore of an earlier version"
+
+msgid "admin.maintenance.reason.integration"
+msgstr "Repairing an integration"
+
+msgid "admin.maintenance.reason.incident"
+msgstr "Investigating an incident"
+
+msgid "admin.maintenance.reason.other"
+msgstr "Other maintenance"
+
+msgid "admin.audit.reason.maintenance"
+msgstr "Refused: maintenance mode"
+
+msgid "admin.audit.detail.maintenance_on"
+msgstr "Maintenance mode switched on"
+
+msgid "admin.audit.detail.maintenance_off"
+msgstr "Maintenance mode switched off"
+
+msgid "admin.audit.detail.maintenance_refused"
+msgstr "Change refused during maintenance"
+
+msgid "maintenance.title"
+msgstr "We are carrying out maintenance"
+
+msgid "maintenance.text"
+msgstr "That is why you cannot book, reschedule or cancel an appointment right now. Appointments that are already confirmed go ahead as planned."
+
+msgid "maintenance.expected_end"
+msgstr "We expect to be done on {moment}."
+
+msgid "maintenance.contacts_lead"
+msgstr "Do you need help now? You can also reach us in another way."
+
+msgid "maintenance.try_later"
+msgstr "Please try again later."
 
 # ADR 0046: staff directory
 
