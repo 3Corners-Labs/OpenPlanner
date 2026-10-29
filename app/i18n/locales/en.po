@@ -4736,6 +4736,153 @@ msgstr "emergency closure image removed"
 msgid "admin.audit.detail.file"
 msgstr "new file"
 
+msgid "admin.scenarios.title"
+msgstr "Scenarios"
+
+msgid "admin.scenarios.lead"
+msgstr "Prepared content for an emergency closure: notice, heading, alternative contact options and image. When closing you pick one and adjust it if needed."
+
+msgid "admin.scenarios.none"
+msgstr "Empty (no scenario)"
+
+msgid "admin.scenarios.organisation_option"
+msgstr "{name} (organisation)"
+
+msgid "admin.scenarios.pick"
+msgstr "Start from a scenario"
+
+msgid "admin.scenarios.pick_lead"
+msgstr "Choose a prepared scenario to fill in the form below. You can still adjust the text afterwards."
+
+msgid "admin.scenarios.scenario"
+msgstr "Scenario"
+
+msgid "admin.scenarios.use"
+msgstr "Use"
+
+msgid "admin.scenarios.use_label"
+msgstr "Start an emergency closure with {name}"
+
+msgid "admin.scenarios.manage"
+msgstr "Manage scenarios"
+
+msgid "admin.scenarios.chosen"
+msgstr "Chosen scenario: {name}. On closing, this scenario's contact options and image are copied; later changes to the scenario do not change this closure."
+
+msgid "admin.scenarios.name"
+msgstr "Name"
+
+msgid "admin.scenarios.name_hint"
+msgstr "For admins, for instance ‘Outage’ or ‘Strike’; citizens do not see this name. At most {limit} characters."
+
+msgid "admin.scenarios.own_group"
+msgstr "This team's scenarios"
+
+msgid "admin.scenarios.own_organisation"
+msgstr "The organisation's scenarios"
+
+msgid "admin.scenarios.own_lead"
+msgstr "You can change and delete these scenarios."
+
+msgid "admin.scenarios.empty"
+msgstr "No scenarios yet."
+
+msgid "admin.scenarios.shared"
+msgstr "The organisation's scenarios"
+
+msgid "admin.scenarios.shared_lead"
+msgstr "You can use these but not change them; an organisation admin does that."
+
+msgid "admin.scenarios.new"
+msgstr "New scenario"
+
+msgid "admin.scenarios.new_lead"
+msgstr "Start with the name and the notice. Add contact options and an image afterwards."
+
+msgid "admin.scenarios.create"
+msgstr "Create scenario"
+
+msgid "admin.scenarios.scenario_lead"
+msgstr "What this scenario shows in an emergency closure."
+
+msgid "admin.scenarios.shared_view_lead"
+msgstr "A scenario of the organisation. You can use it, not change it."
+
+msgid "admin.scenarios.all"
+msgstr "All scenarios"
+
+msgid "admin.scenarios.preview"
+msgstr "Preview"
+
+msgid "admin.scenarios.preview_lead"
+msgstr "This is how the closure page looks when you close with this scenario (in your language)."
+
+msgid "admin.scenarios.no_contacts"
+msgstr "No contact options of its own: on closing, those of the team or organisation apply."
+
+msgid "admin.scenarios.texts"
+msgstr "Name and notice"
+
+msgid "admin.scenarios.contacts_own"
+msgstr "Own block with {count} contact options."
+
+msgid "admin.scenarios.contacts_default"
+msgstr "No block of its own: on closing, the team's or organisation's block applies."
+
+msgid "admin.scenarios.image_lead"
+msgstr "One image for the closure page. Only admins see it until a closure with this scenario starts."
+
+msgid "admin.scenarios.delete"
+msgstr "Delete scenario"
+
+msgid "admin.scenarios.delete_lead"
+msgstr "Running closures keep their own copy and do not change."
+
+msgid "admin.scenarios.delete_button"
+msgstr "Delete"
+
+msgid "admin.scenarios.contacts_lead"
+msgstr "The alternative contact options of this scenario."
+
+msgid "admin.scenarios.back_to_scenario"
+msgstr "Back to the scenario"
+
+msgid "admin.scenarios.contacts_preview_lead"
+msgstr "This is how citizens see this scenario's block. Empty: on closing, the team's or organisation's block applies."
+
+msgid "admin.form.error.scenario_name"
+msgstr "Give the scenario a name of at most 80 characters on one line."
+
+msgid "admin.form.error.scenario_not_found"
+msgstr "This scenario does not exist (any more) or does not belong to this team."
+
+msgid "admin.done.scenario_created"
+msgstr "The scenario has been created. Add contact options and an image if needed."
+
+msgid "admin.done.scenario_deleted"
+msgstr "The scenario has been deleted."
+
+msgid "admin.audit.detail.scenario_create"
+msgstr "scenario created"
+
+msgid "admin.audit.detail.scenario_update"
+msgstr "scenario changed"
+
+msgid "admin.audit.detail.scenario_delete"
+msgstr "scenario deleted"
+
+msgid "admin.audit.detail.scenario_contacts"
+msgstr "scenario contact options saved"
+
+msgid "admin.audit.detail.scenario_image"
+msgstr "scenario image saved"
+
+msgid "admin.audit.detail.scenario_image_remove"
+msgstr "scenario image removed"
+
+msgid "admin.audit.detail.scenario"
+msgstr "scenario"
+
 msgid "authz.permission.system_maintenance"
 msgstr "Switch maintenance mode on and off"
 
