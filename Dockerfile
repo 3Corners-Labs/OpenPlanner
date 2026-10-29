@@ -12,15 +12,6 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY widget/src ./src
 RUN npm run build
 
-# The <gov-booking> Web Component (ADR 0035): bundled by esbuild here, never committed. Only
-# the bundle reaches the runtime image; node and node_modules stay in this stage.
-FROM node:22.20.0-bookworm-slim AS widget
-WORKDIR /widget
-COPY widget/package.json widget/package-lock.json ./
-RUN npm ci --ignore-scripts --no-audit --no-fund
-COPY widget/src ./src
-RUN npm run build
-
 FROM python:3.12-slim-bookworm AS build
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
