@@ -412,6 +412,33 @@ msgstr "Administration"
 msgid "admin.nav.label"
 msgstr "Administration menu"
 
+msgid "admin.nav.section.monitor"
+msgstr "Monitor"
+
+msgid "admin.nav.section.manage"
+msgstr "Manage"
+
+msgid "admin.nav.section.platform"
+msgstr "Platform"
+
+msgid "admin.nav.object.group"
+msgstr "Group"
+
+msgid "admin.profile.roles"
+msgstr "Your roles"
+
+msgid "admin.theme.label"
+msgstr "Appearance"
+
+msgid "admin.theme.system"
+msgstr "System"
+
+msgid "admin.theme.light"
+msgstr "Light"
+
+msgid "admin.theme.dark"
+msgstr "Dark"
+
 msgid "admin.nav.dashboard"
 msgstr "Overview"
 

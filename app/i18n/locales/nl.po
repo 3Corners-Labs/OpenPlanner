@@ -412,6 +412,33 @@ msgstr "Beheer"
 msgid "admin.nav.label"
 msgstr "Beheermenu"
 
+msgid "admin.nav.section.monitor"
+msgstr "Bewaken"
+
+msgid "admin.nav.section.manage"
+msgstr "Beheren"
+
+msgid "admin.nav.section.platform"
+msgstr "Platform"
+
+msgid "admin.nav.object.group"
+msgstr "Groep"
+
+msgid "admin.profile.roles"
+msgstr "Uw rollen"
+
+msgid "admin.theme.label"
+msgstr "Weergave"
+
+msgid "admin.theme.system"
+msgstr "Systeem"
+
+msgid "admin.theme.light"
+msgstr "Licht"
+
+msgid "admin.theme.dark"
+msgstr "Donker"
+
 msgid "admin.nav.dashboard"
 msgstr "Overzicht"
 
