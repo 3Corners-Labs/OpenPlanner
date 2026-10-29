@@ -42,6 +42,7 @@ from app.admin import (
     group_routes,
     help_routes,
     holiday_routes,
+    maintenance_routes,
     message_routes,
     organisation_routes,
     retention_routes,
@@ -53,6 +54,7 @@ from app.admin.authz import (
     AccessDenied,
     AdminContext,
     LoginRequired,
+    MaintenanceRefused,
     ReauthRequired,
     RequirePermission,
     admin_service,
@@ -382,6 +384,12 @@ def register_admin(app: FastAPI) -> None:
             )
         return _message(request, locale, 403, "admin.forbidden.title", "admin.forbidden.text")
 
+    async def maintenance_refused(request: Request, exc: Exception) -> Response:
+        locale = resolve_locale(request)
+        return _message(
+            request, locale, 503, "admin.maintenance.refused.title", "error.maintenance"
+        )
+
     async def reauth_required(request: Request, exc: Exception) -> Response:
         next_path = exc.next_path if isinstance(exc, ReauthRequired) else "/admin/"
         target = quote(safe_next(next_path), safe="/")
@@ -390,12 +398,17 @@ def register_admin(app: FastAPI) -> None:
     handlers: dict[type[Exception], Callable[[Request, Exception], object]] = {
         LoginRequired: login_required,
         AccessDenied: access_denied,
+        MaintenanceRefused: maintenance_refused,
         ReauthRequired: reauth_required,
     }
     for exc_type, handler in handlers.items():
         app.add_exception_handler(exc_type, handler)  # type: ignore[arg-type]
-    # The update banner (ADR 0029) is loaded for every admin page in one place.
-    banner = [Depends(update_routes.load_update_notice)]
+    # The update banner (ADR 0029) and the maintenance bar (ADR 0038) are loaded for every
+    # admin page in one place.
+    banner = [
+        Depends(update_routes.load_update_notice),
+        Depends(maintenance_routes.load_maintenance_notice),
+    ]
     for module_router in (
         router,
         audit_routes.router,
@@ -415,6 +428,7 @@ def register_admin(app: FastAPI) -> None:
         api_routes.router,
         simulator_routes.router,
         update_routes.router,
+        maintenance_routes.router,
         help_routes.router,
     ):
         app.include_router(module_router, dependencies=banner)

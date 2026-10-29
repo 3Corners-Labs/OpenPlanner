@@ -14,6 +14,8 @@ Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``)
     ``python -m app.cli update-report ID STATUS [REASON]``  record the outcome
     ``python -m app.cli backup-db [NAME] [--prune]``  back up the database, delete old backups
     ``python -m app.cli restore-db NAME``  put a backup back (application stopped)
+    ``python -m app.cli maintenance on|off|status [--reason R] [--by host-updater]``
+        maintenance mode of the whole installation (ADR 0038)
     ``python -m app.cli webhooks-list``  list every registration: current, stale or foreign
     ``python -m app.cli webhooks-reset [--yes] [--reregister]``  delete stale registrations
     ``python -m app.cli webhooks-health``  token expiry and a signed delivery self-test
@@ -30,7 +32,7 @@ import json
 import sys
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -62,8 +64,11 @@ from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.config import Settings
+from app.domain.admin import AdminService
 from app.domain.authorization import Scope
 from app.domain.errors import DomainError
+from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
+from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import Group
 from app.domain.update_service import UpdateService
@@ -287,6 +292,47 @@ async def _update_report(
     return f"{ended.status}\n", 0
 
 
+HOST_ACTORS = ("host-cli", "host-updater")
+"""Who a maintenance switch from the host is audited as; a fixed list, never free text."""
+
+
+def _maintenance_line(status: MaintenanceStatus) -> str:
+    """Return ``on``/``off`` with the source and the stored details, for scripts and people."""
+    state = status.state
+    if not status.active:
+        return "off\n"
+    parts = ["on"]
+    if status.environment:
+        parts.append("environment")
+    if state.on:
+        since = state.since.isoformat() if state.since else "?"
+        parts += [f"since={since}", f"by={state.by}"]
+        if state.reason:
+            parts.append(f"reason={state.reason}")
+    return " ".join(parts) + "\n"
+
+
+async def _maintenance(settings: Settings, action: str, reason: str, actor: str) -> str:
+    """Switch maintenance on or off, or report it; return the resulting state as one line."""
+    engine = create_engine(settings.database_url)
+    try:
+        uow, clock = SqlUnitOfWork(engine), SystemClock()
+        service = MaintenanceService(
+            uow,
+            clock,
+            AdminService(uow, clock),
+            environment=settings.maintenance_mode,
+            cache=timedelta(0),
+        )
+        if action == "on":
+            await service.switch_on_host(actor, MaintenanceReason(reason))
+        elif action == "off":
+            await service.switch_off_host(actor)
+        return _maintenance_line(await service.stored())
+    finally:
+        await engine.dispose()
+
+
 def _backup_dir(settings: Settings) -> tuple[Path, Path]:
     """Return the database file and its backup directory (``data/backups``)."""
     database = database_path(settings.database_url)
@@ -464,6 +510,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     backup_cmd.add_argument("--prune", action="store_true", help="delete backups older than 24 h")
     restore_cmd = commands.add_parser("restore-db", help="put a backup back (app stopped)")
     restore_cmd.add_argument("name")
+    maintenance_cmd = commands.add_parser(
+        "maintenance", help="maintenance mode of the whole installation (ADR 0038)"
+    )
+    maintenance_cmd.add_argument("action", choices=("on", "off", "status"))
+    maintenance_cmd.add_argument(
+        "--reason", choices=sorted(r.value for r in MaintenanceReason), default="other"
+    )
+    maintenance_cmd.add_argument("--by", choices=HOST_ACTORS, default=HOST_ACTORS[0])
     commands.add_parser("webhooks-list", help="list registrations: current, stale or foreign")
     reset = commands.add_parser("webhooks-reset", help="delete stale registrations (dry run)")
     reset.add_argument("--yes", action="store_true", help="really delete them")
@@ -490,6 +544,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "restore-db":
         sys.stdout.write(_restore(Settings(), args.name))
+        return 0
+    if args.command == "maintenance":
+        sys.stdout.write(asyncio.run(_maintenance(Settings(), args.action, args.reason, args.by)))
         return 0
     if args.command == "webhooks-list":
         return _write(asyncio.run(_webhooks_list(Settings())))
