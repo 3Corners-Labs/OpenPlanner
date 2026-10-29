@@ -13,6 +13,8 @@ SETTING_LABELS: dict[str, str] = {
     "worker_poll_seconds": "settings.field.worker_poll_seconds.label",
     "maintenance_cache_seconds": "settings.field.maintenance_cache_seconds.label",
     "maintenance_retry_after_seconds": "settings.field.maintenance_retry_after_seconds.label",
+    "maintenance_alert_hours": "settings.field.maintenance_alert_hours.label",
+    "maintenance_alert_repeat_hours": "settings.field.maintenance_alert_repeat_hours.label",
     "staff_last_seen_interval_seconds": "settings.field.staff_last_seen_interval_seconds.label",
     "system_event_retention_days": "settings.field.system_event_retention_days.label",
     "audit_retention_days": "settings.field.audit_retention_days.label",
@@ -20,6 +22,7 @@ SETTING_LABELS: dict[str, str] = {
     "diagnostic_event_retention_days": "settings.field.diagnostic_event_retention_days.label",
     "diagnostic_mode_hours": "settings.field.diagnostic_mode_hours.label",
     "security_event_window_minutes": "settings.field.security_event_window_minutes.label",
+    "security_event_max_sources": "settings.field.security_event_max_sources.label",
     "audit_export_max_rows": "settings.field.audit_export_max_rows.label",
     "audit_export_max_days": "settings.field.audit_export_max_days.label",
     "embedding_max_origins": "settings.field.embedding_max_origins.label",
@@ -59,6 +62,8 @@ SETTING_LABELS: dict[str, str] = {
     "staff_dormant_after_days": "settings.field.staff_dormant_after_days.label",
     "shortfall_horizon_days": "settings.field.shortfall_horizon_days.label",
     "planner_changes_alert_per_hour": "settings.field.planner_changes_alert_per_hour.label",
+    "planner_rebook_days": "settings.field.planner_rebook_days.label",
+    "planner_rebook_reminder_days": "settings.field.planner_rebook_reminder_days.label",
 }
 """The label of every class C and D setting, by key."""
 
