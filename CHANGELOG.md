@@ -87,6 +87,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - e2e: Calendar tests no longer depend on the day of the month (#100)
 - ci: Exempt authors with write access from the CLA box, also with a private membership (#104)
 - migrations: Join the heads 0042 (dispatch kind) and 0048 (platform settings)
+- migrations: Join the heads 0043 (own queue) and 0051 (organisation settings) (#112)
 
 ### Documentation
 
@@ -103,6 +104,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - ci: Keep every dependency current, fail on deprecations (ADR 0051) (#94)
 - tests: Run the test suite on every core with pytest-xdist (#101)
 - e2e: Keep the direct-call group away from midnight (#78)
+- ci: Run CI for the merge queue (#112)
 
 ## 0.2.0 (2026-10-28)
 
