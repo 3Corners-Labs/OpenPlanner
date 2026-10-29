@@ -1,0 +1,53 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import form_body with context %}
+{% from "admin/_image_form.html" import image_form with context %}
+{% from "_contact_block.html" import contact_block %}
+{% block title %}{{ scenario.name }} · {{ _("admin.scenarios.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% set page_title = scenario.name %}
+{% set page_lead = _("admin.scenarios.scenario_lead") if scenario.editable else _("admin.scenarios.shared_view_lead") %}
+{% include "admin/_scenario_header.html" %}
+{% include "_error_summary.html" %}
+<p><a href="{{ scenarios_url }}">{{ _("admin.scenarios.all") }}</a> · <a href="{{ scenario.use_url }}">{{ _("admin.scenarios.use") }}</a></p>
+<section class="card" aria-labelledby="preview-heading">
+  <div class="card__header">
+    <h2 id="preview-heading">{{ _("admin.scenarios.preview") }}</h2>
+    <p class="card__lead">{{ _("admin.scenarios.preview_lead") }}</p>
+  </div>
+  {% if preview_heading %}<p><strong>{{ preview_heading }}</strong></p>{% endif %}
+  <div class="notice notice--warning">
+    {% for paragraph in preview_paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
+  </div>
+  {% if image %}<img class="closure-image" src="{{ image.src }}" alt="{{ image.alt }}">{% endif %}
+  {% if contacts %}
+  {{ contact_block(contacts, level=3, id="scenario-contacts") }}
+  {% else %}
+  <p class="empty-state">{{ _("admin.scenarios.no_contacts") }}</p>
+  {% endif %}
+</section>
+{% if scenario.editable %}
+<form class="card" method="post" action="{{ scenario.url }}" novalidate aria-labelledby="texts-heading">
+  <div class="card__header">
+    <h2 id="texts-heading">{{ _("admin.scenarios.texts") }}</h2>
+  </div>
+  {{ form_body(fields, _("admin.save")) }}
+</form>
+<section class="card" aria-labelledby="scenario-contacts-heading">
+  <div class="card__header">
+    <h2 id="scenario-contacts-heading">{{ _("admin.contacts.title") }}</h2>
+    <p class="card__lead">{% if contact_count %}{{ _("admin.scenarios.contacts_own", count=contact_count) }}{% else %}{{ _("admin.scenarios.contacts_default") }}{% endif %}</p>
+  </div>
+  <p><a href="{{ scenario.url }}/contacts">{{ _("admin.contacts.manage") }}</a></p>
+</section>
+{{ image_form(scenario.url ~ "/image", image, image_fields, image_decorative, _("admin.scenarios.image_lead")) }}
+<form class="card" method="post" action="{{ scenario.url }}/delete" aria-labelledby="delete-heading">
+  <div class="card__header">
+    <h2 id="delete-heading">{{ _("admin.scenarios.delete") }}</h2>
+    <p class="card__lead">{{ _("admin.scenarios.delete_lead") }}</p>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button button--danger">{{ _("admin.scenarios.delete_button") }}</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

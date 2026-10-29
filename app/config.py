@@ -21,6 +21,12 @@ AGENT_API_PREFIX = "/api/agent/v1"
 SMTPS_PORT = 465
 """Mail submission over implicit TLS (RFC 8314); STARTTLS is never offered there."""
 
+DEV_ONLY_SECRET_PREFIX = "dev-only-"  # noqa: S105  # nosec B105 - a public prefix
+"""Marks the placeholder secrets in the repository (``.env.example``, the dev Keycloak realm).
+
+They are public, so production refuses any secret that starts with it.
+"""
+
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 
 
@@ -71,10 +77,14 @@ class Settings(BaseSettings):
     # ADR 0040 / 0034 (class B, deployment): name of this installation in every log line and
     # event record, so a log platform that receives several can tell them apart. Empty: none.
     installation_name: str = Field(default="", pattern=r"^[A-Za-z0-9_.-]{0,64}$")
-    # ADR 0034, AU-4 (class C, platform; env until the settings registry of ADR 0042): rejected
-    # webhooks and failing token refreshes are written as at most one security event per kind
-    # per this many minutes; the rest are counted into the next one.
+    # ADR 0034, AU-4 and ADR 0053 (class C, platform; env until the settings registry of ADR
+    # 0042): security events (rejected webhooks, failing token refreshes, attempts on public
+    # entry points) are written at most once per kind and caller per this many minutes; the
+    # rest are counted into the next one.
     security_event_window_minutes: int = Field(default=15, ge=1, le=1440)
+    # ADR 0053 (class C, platform; env until the settings registry of ADR 0042): how many
+    # windows (kind of event × caller) a process keeps; beyond that, callers count as "many".
+    security_event_max_sources: int = Field(default=1000, ge=10, le=100_000)
     # ADR 0040, part 3 (class C, platform; env until the settings registry of ADR 0042): one
     # CSV export of the audit log holds at most this many rows and covers at most this many
     # days; a larger one is refused, never cut short.
@@ -190,7 +200,10 @@ class Settings(BaseSettings):
     # Updates from the admin portal (ADR 0029). APP_VERSION is baked into release images by
     # main.yml; UPDATE_REPOSITORY (owner/name) switches the hourly release check on. The token
     # is only needed for a private repository and needs read access to its contents only.
+    # APP_COMMIT (class B, build: baked into every image by main.yml, ADR 0052) is the git
+    # commit the image was built from; empty for a local build.
     app_version: str = ""
+    app_commit: str = Field(default="", pattern=r"^([0-9a-f]{7,40})?$")
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
 
@@ -246,6 +259,12 @@ class Settings(BaseSettings):
                 raise ValueError("PUBLIC_BASE_URL must use https in production")
             if self.session_secret is None:
                 raise ValueError("SESSION_SECRET is required in production")
+            for name in type(self).model_fields:
+                value = getattr(self, name)
+                if isinstance(value, SecretStr) and value.get_secret_value().startswith(
+                    DEV_ONLY_SECRET_PREFIX
+                ):
+                    raise ValueError(f"{name.upper()} holds a development placeholder")
             if self.webhook_base_url is not None and not self.webhook_base_url.startswith(
                 "https://"
             ):
