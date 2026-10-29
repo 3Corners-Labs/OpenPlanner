@@ -2,12 +2,12 @@
 
 ``roles`` holds each custom role: its template (which fixes the reach), names in Dutch and
 English, the role claim value that links it to the identity provider, its permissions (space
-separated) and a version. No personal data. It follows 0034 (event schema), the head of main
+separated) and a version. No personal data. It follows 0035 (diagnostic modes), the head of main
 when it landed. The downgrade drops the table: whoever held a custom role then holds no role
 from it.
 
 Revision ID: 0030
-Revises: 0034
+Revises: 0035
 Create Date: 2026-10-28 23:30:00.000000
 """
 
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0030"
-down_revision: str | tuple[str, ...] | None = "0034"
+down_revision: str | tuple[str, ...] | None = "0035"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

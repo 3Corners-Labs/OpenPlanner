@@ -23,6 +23,7 @@ stays open to every role as usual.
 | View own rights (`rights.view`) | Portal | – | yes | yes | yes | yes |
 | View rights matrix (`matrix.view`) | Portal | – | yes | yes | yes | yes |
 | Manage organisations (`organisation.manage`) | Portal | locked | yes | – | – | – |
+| Switch diagnostic mode (`diagnostics.manage`) | Portal | locked | yes | – | – | – |
 | Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | locked | yes | – | – | – |
 | Manage API clients (`api_clients.manage`) | Portal | locked | yes | – | – | – |
 | Update the installation (`system.update`) | Portal | locked, maintenance | yes | – | – | – |
@@ -57,9 +58,9 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 
 | Template | Reach | Delegable permissions |
 |---|---|---|
-| Organisation admin | organisations | `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
-| Group admin | groups | `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `reminders.manage`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
-| Compliance and privacy (read-only) | organisations | `audit.view`, `dashboard.view`, `group.view`, `matrix.view`, `retention.view`, `rights.view`, `staff.view` |
+| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
+| Group admin | groups | `audit.export`, `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `reminders.manage`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
+| Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `matrix.view`, `retention.view`, `rights.view`, `staff.view` |
 
 ## Citizens
 
