@@ -19,6 +19,8 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Alternative contact options / contactalternatieven | [Contactalternatieven](nl/organisation-contacts.md) | [Alternative contact options](en/organisation-contacts.md) |
 | Embedding on websites / insluiten op websites | [Insluiten op websites](nl/embedding.md) | [Embedding on websites](en/embedding.md) |
 | A team's contact options / contactalternatieven van een team | [Contactalternatieven van een team](nl/group-contacts.md) | [A team's contact options](en/group-contacts.md) |
+| Emergency closure of a team / noodsluiting van een team | [Noodsluiting van een team](nl/group-closure.md) | [Emergency closure of a team](en/group-closure.md) |
+| Group agenda / agenda van de groep | [Agenda van de groep](nl/group-agenda.md) | [Group agenda](en/group-agenda.md) |
 | Maintenance mode / onderhoudsmodus | [Onderhoudsmodus](nl/maintenance.md) | [Maintenance mode](en/maintenance.md) |
 
 ## Writing a topic
