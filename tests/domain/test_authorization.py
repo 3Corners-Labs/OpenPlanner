@@ -56,6 +56,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.RIGHTS_VIEW,
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
+        Permission.AUDIT_EXPORT,  # ADR 0040
         Permission.HOLIDAYS_ASSIGN,  # ADR 0025
         Permission.GROUP_CREATE,
         Permission.GROUP_VIEW,
@@ -88,6 +89,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.RIGHTS_VIEW,
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
+        Permission.AUDIT_EXPORT,  # ADR 0040: the same log as a file
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
@@ -100,6 +102,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.RIGHTS_VIEW,
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
+        Permission.AUDIT_EXPORT,
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
@@ -117,6 +120,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.API_CLIENTS_MANAGE,
         Permission.SYSTEM_UPDATE,
         Permission.SYSTEM_MAINTENANCE,
+        Permission.DIAGNOSTICS_MANAGE,  # ADR 0040: product owner, 2026-10-29
     } == LOCKED_PERMISSIONS
     for permission in LOCKED_PERMISSIONS:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
