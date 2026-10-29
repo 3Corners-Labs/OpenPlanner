@@ -25,6 +25,7 @@ from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.config import Settings
 from app.domain.admin import AdminService
+from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock
@@ -80,10 +81,13 @@ async def run_worker(
         video=integrations.video,
         dispatcher=integrations.dispatcher,
         integration=IntegrationService(uow, clock, AdminService(uow, clock)),
-        retention=timedelta(days=settings.system_event_retention_days),
+        retention=settings.event_retention,
+    )
+    diagnostics = DiagnosticsService(
+        uow, clock, AdminService(uow, clock), timedelta(hours=settings.diagnostic_mode_hours)
     )
     housekeeping = Housekeeping.for_database(
-        engine, uow, clock, storage_limits(settings), settings.database_url
+        engine, uow, clock, storage_limits(settings), settings.database_url, diagnostics.brake
     )
     updates = update_service(settings, uow, clock, http)
     log.info(
