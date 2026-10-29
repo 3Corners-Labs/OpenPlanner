@@ -75,6 +75,7 @@ class RetentionQueries:
                 SlotRow.end,
                 BookingRow.cancelled_at,
                 ClosureRow.ends_at,
+                BookingRow.rebook_by,
             )
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
             .outerjoin(ClosureRow, ClosureRow.id == BookingRow.closure_id)
@@ -85,6 +86,7 @@ class RetentionQueries:
                     SlotRow.end < candidates_before,
                     BookingRow.cancelled_at < candidates_before,
                     BookingRow.status == BookingStatus.SUSPENDED.value,
+                    BookingRow.rebook_by < candidates_before,
                 ),
             )
         )
@@ -99,7 +101,9 @@ class RetentionQueries:
                 for g in groups
             ],
             [
-                PurgeCandidate(group_id, BookingStatus(status), end, cancelled_at, closure_end)
-                for group_id, status, end, cancelled_at, closure_end in rows
+                PurgeCandidate(
+                    group_id, BookingStatus(status), end, cancelled_at, closure_end, rebook_by
+                )
+                for group_id, status, end, cancelled_at, closure_end, rebook_by in rows
             ],
         )

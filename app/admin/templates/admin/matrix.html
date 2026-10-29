@@ -7,7 +7,13 @@
     <h1 id="page-title">{{ _("admin.matrix.title") }}</h1>
     <p class="page-header__lead">{{ _("admin.matrix.intro") }}</p>
   </div>
+  {% if can("roles.manage") %}
+  <div class="page-header__actions">
+    <a class="button" href="/admin/roles">{{ icon("settings") }}<span>{{ _("admin.roles.manage") }}</span></a>
+  </div>
+  {% endif %}
 </div>
+{% if custom_count %}<p>{{ _("admin.matrix.custom_intro", count=custom_count) }}</p>{% endif %}
 <div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
 <table class="data-table">
   <caption class="visually-hidden">{{ _("admin.matrix.title") }}</caption>
@@ -29,6 +35,31 @@
   </tbody>
 </table>
 </div>
+<h2 class="section-title" id="history-heading">{{ _("admin.matrix.history") }}</h2>
+<p>{{ _("admin.matrix.history_intro") }}</p>
+{% if history %}
+<div class="table-scroll" role="region" aria-labelledby="history-heading" tabindex="0">
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("admin.matrix.history") }}</caption>
+  <thead>
+    <tr>
+      <th scope="col">{{ _("admin.matrix.history.when") }}</th>
+      <th scope="col">{{ _("admin.matrix.history.role") }}</th>
+      <th scope="col">{{ _("admin.matrix.history.change") }}</th>
+      <th scope="col">{{ _("admin.roles.version") }}</th>
+      <th scope="col">{{ _("admin.matrix.history.actor") }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for change in history %}
+    <tr><td>{{ change.when }}</td><th scope="row">{{ change.role }}</th><td>{{ change.action }}{% if change.detail %}: {{ change.detail }}{% endif %}</td><td>{{ change.version }}</td><td>{{ change.actor }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="empty-state">{{ _("admin.matrix.history_none") }}</p>
+{% endif %}
 <h2 class="section-title">{{ _("admin.matrix.citizen") }}</h2>
 <div class="table-scroll">
 <table class="data-table">

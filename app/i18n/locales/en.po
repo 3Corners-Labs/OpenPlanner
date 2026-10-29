@@ -84,6 +84,75 @@ msgstr "Your video call on {date} has been cancelled"
 msgid "message.cancellation.intro"
 msgstr "Your video call with {group_name} on {date} at {time} has been cancelled. You can always make a new appointment."
 
+msgid "message.reason"
+msgstr "Reason"
+
+msgid "message.reason.staffing"
+msgstr "Not enough staff are available at that time."
+
+msgid "message.reason.technical"
+msgstr "There is a technical failure."
+
+msgid "message.reason.unforeseen"
+msgstr "Due to unforeseen circumstances the call cannot take place at that time."
+
+msgid "message.change.sms"
+msgstr "Dear {first_name}, your video call with {group_name} has moved to {date} at {time}. View or change: {manage_url}"
+
+msgid "message.cancellation.sms"
+msgstr "Dear {first_name}, your video call with {group_name} on {date} at {time} has been cancelled. {reason}"
+
+msgid "message.rebook_request.subject"
+msgstr "Please choose a new time for your video call"
+
+msgid "message.rebook_request.intro"
+msgstr "Your video call with {group_name} on {date} at {time} cannot take place. Please choose a new time that suits you; you do not need to enter your details again. If you do not choose a new time before {deadline}, the appointment lapses."
+
+msgid "message.rebook_request.sms"
+msgstr "Dear {first_name}, your video call with {group_name} on {date} at {time} cannot take place. {reason} Choose a new time before {deadline}: {manage_url}"
+
+msgid "message.rebook_reminder.subject"
+msgstr "Reminder: please choose a new time for your video call"
+
+msgid "message.rebook_reminder.intro"
+msgstr "You have not chosen a new time for your video call with {group_name} yet. If you do not choose a new time before {deadline}, the appointment lapses."
+
+msgid "message.rebook_reminder.sms"
+msgstr "Dear {first_name}, please still choose a new time for your video call with {group_name}, by {deadline}: {manage_url}"
+
+msgid "message.rebook_lapsed.subject"
+msgstr "Your appointment with {group_name} has lapsed"
+
+msgid "message.rebook_lapsed.intro"
+msgstr "You did not choose a new time for your video call with {group_name}. The appointment has lapsed. You can always make a new appointment."
+
+msgid "message.rebook_lapsed.sms"
+msgstr "Dear {first_name}, you did not choose a new time; your appointment with {group_name} has lapsed. You can always make a new appointment."
+
+msgid "message.manage_rebook"
+msgstr "Choose a new time or cancel the appointment, by {deadline} at the latest:"
+
+msgid "admin.messages.purpose_rebook_request"
+msgstr "Request to choose a new time (by a planner)"
+
+msgid "admin.messages.purpose_rebook_reminder"
+msgstr "Reminder to choose a new time"
+
+msgid "admin.messages.purpose_rebook_lapsed"
+msgstr "Appointment lapsed without a new time"
+
+msgid "admin.messages.purpose_reason"
+msgstr "Reasons for changes by a planner"
+
+msgid "admin.messages.part_reason_staffing"
+msgstr "Not enough agents"
+
+msgid "admin.messages.part_reason_technical"
+msgstr "Technical failure"
+
+msgid "admin.messages.part_reason_unforeseen"
+msgstr "Unforeseen circumstances"
+
 #. Booking pages.
 
 msgid "group.intro"
@@ -519,7 +588,7 @@ msgid "admin.matrix.title"
 msgstr "Rights matrix"
 
 msgid "admin.matrix.intro"
-msgstr "What each role may do, per organisation and per group. Permissions marked Superuser only are fixed. Permissions marked Personal data show citizens' data. Your organisation assigns roles in its identity provider."
+msgstr "What each role may do, per organisation and per group. Permissions marked Superuser only are fixed. Permissions marked Personal data show citizens' data. Only the superuser can adjust roles; every change is recorded and listed at the bottom of this page. Your organisation assigns roles in its identity provider."
 
 msgid "admin.matrix.level"
 msgstr "Level"
@@ -680,6 +749,9 @@ msgstr "Manage reminders"
 msgid "authz.permission.bookings_view"
 msgstr "View bookings"
 
+msgid "authz.permission.bookings_manage"
+msgstr "Change bookings"
+
 msgid "authz.citizen.availability_view"
 msgstr "View available times"
 
@@ -833,6 +905,12 @@ msgstr "Send to the queue (minutes before)"
 msgid "admin.field.dispatch_lead_minutes_hint"
 msgstr "From this moment the participant can no longer change the appointment. 0 to 60."
 
+msgid "admin.field.planner_change_min_lead_minutes"
+msgstr "Changes by a planner (minutes before)"
+
+msgid "admin.field.planner_change_min_lead_minutes_hint"
+msgstr "Until this moment a planner can move or cancel a booking; after it you call the participant. Not less than sending to the queue, at most 1440."
+
 msgid "admin.field.phone_mode"
 msgstr "Phone number on the form"
 
@@ -900,6 +978,15 @@ msgstr "Enter a number of days from 1 to 366."
 
 msgid "admin.form.error.dispatch_lead_minutes"
 msgstr "Enter a number of minutes from 0 to 60."
+
+msgid "admin.form.error.planner_change_min_lead_minutes"
+msgstr "Enter a number of minutes from the send-to-queue time up to 1440."
+
+msgid "admin.form.error.planner_too_late"
+msgstr "This booking starts soon or has already gone to the contact center. Call the participant."
+
+msgid "admin.form.error.move_causes_shortfall"
+msgstr "This slot would then have more bookings than agents. Confirm that you accept the shortfall, or choose another slot."
 
 msgid "admin.form.error.phone_mode"
 msgstr "Choose whether the phone number is hidden, optional or required."
@@ -1114,6 +1201,12 @@ msgstr "Start a call right away"
 
 msgid "admin.field.direct_call_enabled_hint"
 msgstr "Participants can start a call right away during a block with agents."
+
+msgid "admin.field.embedding_enabled"
+msgstr "Embed on websites"
+
+msgid "admin.field.embedding_enabled_hint"
+msgstr "Also shows the group in the widget on the websites the organisation allows under Embedding. Off: only the group's own page."
 
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Not picked up after (minutes)"
@@ -1414,6 +1507,201 @@ msgstr "Not picked up"
 
 msgid "admin.agenda.empty"
 msgstr "No appointments on this day."
+
+msgid "admin.agenda.view_week"
+msgstr "Week view"
+
+msgid "admin.agenda.view_day"
+msgstr "Day view"
+
+msgid "admin.agenda.weeks"
+msgstr "Another week"
+
+msgid "admin.agenda.previous_week"
+msgstr "Previous week"
+
+msgid "admin.agenda.this_week"
+msgstr "This week"
+
+msgid "admin.agenda.next_week"
+msgstr "Next week"
+
+msgid "admin.agenda.slot_staffing"
+msgstr "Agents: {agents}, bookings: {booked}"
+
+msgid "admin.agenda.shortfall"
+msgstr "Short: {count}"
+
+msgid "admin.agenda.closed"
+msgstr "Closed"
+
+msgid "admin.agenda.off_schedule"
+msgstr "Outside the staffing"
+
+msgid "admin.agenda.no_bookings"
+msgstr "No bookings in this slot."
+
+msgid "admin.agenda.direct"
+msgstr "Direct calls"
+
+msgid "admin.agenda.week_title"
+msgstr "Week of {day}"
+
+msgid "admin.agenda.week_caption"
+msgstr "Agents and bookings per slot, {week}"
+
+msgid "admin.agenda.week_shortfalls"
+msgstr "Slots with more bookings than agents this week: {count}."
+
+msgid "admin.agenda.week_no_shortfalls"
+msgstr "Every slot this week has enough agents."
+
+msgid "admin.agenda.week_empty"
+msgstr "No slots in this week."
+
+msgid "admin.agenda.no_slot"
+msgstr "No slot"
+
+msgid "admin.shortfall.some"
+msgstr "Slots with more bookings than agents in the next {days} days: {count}."
+
+msgid "admin.shortfall.first"
+msgstr "First shortfall: {when}"
+
+msgid "admin.shortfall.chip"
+msgstr "Shortfalls: {count}"
+
+msgid "admin.agenda.accepted"
+msgstr "Shortfall accepted"
+
+msgid "admin.agenda.accept"
+msgstr "Accept shortfall"
+
+msgid "admin.agenda.move"
+msgstr "Move"
+
+msgid "admin.agenda.cancel"
+msgstr "Cancel"
+
+msgid "admin.planner.move_title"
+msgstr "Move booking {reference}"
+
+msgid "admin.planner.move_lead"
+msgstr "{first_name}, {when}. Choose a free slot of this team."
+
+msgid "admin.planner.move_start"
+msgstr "New slot"
+
+msgid "admin.planner.move_hint"
+msgstr "Free slots in the next {days} days."
+
+msgid "admin.planner.move_button"
+msgstr "Move"
+
+msgid "admin.planner.move_none"
+msgstr "There is no free slot in the coming weeks. Raise the staffing or cancel the booking."
+
+msgid "admin.planner.accept_shortfall"
+msgstr "I accept that the new slot will then have more bookings than agents"
+
+msgid "admin.planner.accept_shortfall_hint"
+msgstr "Only needed if the chosen slot gets a shortfall as a result."
+
+msgid "admin.planner.citizen_told"
+msgstr "The citizen is always told by email, and by SMS when there is a phone number."
+
+msgid "admin.planner.back"
+msgstr "Back to the agenda"
+
+msgid "admin.planner.cancel_title"
+msgstr "Cancel booking {reference}"
+
+msgid "admin.planner.cancel_lead"
+msgstr "{first_name}, {when}. Choose the reason the citizen reads in the message."
+
+msgid "admin.planner.reason"
+msgstr "Reason"
+
+msgid "admin.planner.reason_hint"
+msgstr "A fixed text; the organisation can change the wording under Message texts."
+
+msgid "admin.planner.reason_staffing"
+msgstr "Not enough agents"
+
+msgid "admin.planner.reason_technical"
+msgstr "Technical failure"
+
+msgid "admin.planner.reason_unforeseen"
+msgstr "Unforeseen circumstances"
+
+msgid "admin.planner.cancel_button"
+msgstr "Cancel booking"
+
+msgid "admin.planner.keep"
+msgstr "Do not cancel"
+
+msgid "admin.agenda.waiting"
+msgstr "Awaiting a new time"
+
+msgid "admin.agenda.rebook"
+msgstr "Ask for a new time"
+
+msgid "admin.agenda.slot_rebook"
+msgstr "Ask citizens for a new time"
+
+msgid "admin.agenda.waiting_list"
+msgstr "Awaiting a new time"
+
+msgid "admin.planner.rebook_title"
+msgstr "Ask for a new time for {reference}"
+
+msgid "admin.planner.rebook_lead"
+msgstr "{first_name}, {when}. The citizen chooses a new time themselves."
+
+msgid "admin.planner.rebook_explain"
+msgstr "The place in this slot is freed at once. The citizen gets a message with the reason and a link to choose a new time, and a reminder {reminder} days before it lapses. If the citizen chooses nothing within {days} days after the original time, the appointment lapses."
+
+msgid "admin.planner.rebook_button"
+msgstr "Ask for a new time"
+
+msgid "admin.planner.slot_title"
+msgstr "Ask for a new time: slot {when}"
+
+msgid "admin.planner.slot_lead"
+msgstr "This slot has more bookings than agents. These most recently made bookings ({count}) get a request to choose a new time; their places are freed at once. Without a new time they lapse {days} days after this time."
+
+msgid "admin.planner.slot_bookings"
+msgstr "Bookings concerned"
+
+msgid "admin.planner.slot_button"
+msgstr "Ask for a new time ({count})"
+
+msgid "admin.planner.waiting_title"
+msgstr "Awaiting a new time"
+
+msgid "admin.planner.waiting_lead"
+msgstr "Bookings whose citizen was asked to choose a new time. You can move or cancel them yourself."
+
+msgid "admin.planner.waiting_booking"
+msgstr "Booking"
+
+msgid "admin.planner.waiting_was"
+msgstr "Original time"
+
+msgid "admin.planner.waiting_by"
+msgstr "Lapses on"
+
+msgid "admin.planner.waiting_empty"
+msgstr "No bookings are awaiting a new time."
+
+msgid "admin.done.rebook_requested"
+msgstr "Citizens asked to choose a new time: {count}. The places have been freed."
+
+msgid "admin.form.error.slot_changed"
+msgstr "This slot has changed in the meantime. Check the list and confirm again."
+
+msgid "admin.done.shortfall_accepted"
+msgstr "The shortfall is accepted. It shows again when the staffing or the bookings of this slot change."
 
 msgid "admin.booking.back"
 msgstr "Back to the agenda"
@@ -1815,6 +2103,12 @@ msgstr "Choose a new time below or cancel the appointment. Your details have bee
 msgid "manage.suspended.reschedule"
 msgstr "Choose a new time"
 
+msgid "manage.status.awaiting_rebook"
+msgstr "Waiting for your new time"
+
+msgid "manage.rebook_by"
+msgstr "If you do not choose a new time before {deadline}, the appointment lapses."
+
 msgid "error.group_closed"
 msgstr "This team is temporarily closed. Please choose another time."
 
@@ -1925,6 +2219,33 @@ msgstr "all appointments on hold cancelled"
 
 msgid "admin.audit.detail.booking_move"
 msgstr "appointment on hold moved"
+
+msgid "audit.event.planner_changes_alert"
+msgstr "Many changes by one planner"
+
+msgid "admin.audit.detail.planner_move"
+msgstr "booking moved by a planner"
+
+msgid "admin.audit.detail.planner_cancel"
+msgstr "booking cancelled by a planner"
+
+msgid "admin.audit.detail.planner_rebook"
+msgstr "citizen asked to choose a new time"
+
+msgid "admin.audit.detail.bulk"
+msgstr "for a whole slot"
+
+msgid "admin.audit.detail.shortfall_accept"
+msgstr "shortfall accepted"
+
+msgid "admin.audit.detail.changes"
+msgstr "changes in the past hour: {count}"
+
+msgid "admin.audit.detail.reason"
+msgstr "reason: {value}"
+
+msgid "admin.audit.detail.actor"
+msgstr "by: {value}"
 
 msgid "admin.audit.detail.bookings"
 msgstr "appointments: {count}"
@@ -3232,6 +3553,7 @@ msgstr "Send closure update"
 
 msgid "audit.job.send_reinstatement"
 msgstr "Send reinstatement notice"
+
 msgid "authz.permission.system_update"
 msgstr "Update the installation"
 
@@ -3911,6 +4233,12 @@ msgstr "Simulator is on"
 msgid "authz.permission.retention_view"
 msgstr "View retention"
 
+msgid "authz.permission.embedding_manage"
+msgstr "Manage embedding on websites"
+
+msgid "admin.nav.embedding"
+msgstr "Embedding"
+
 msgid "admin.nav.retention"
 msgstr "Retention"
 
@@ -4123,6 +4451,255 @@ msgstr "Own block with {count} contact options."
 msgid "admin.group_contacts.summary_default"
 msgstr "Organisation default: {count} contact options."
 
+msgid "authz.permission.roles_manage"
+msgstr "Adjust roles"
+
+msgid "audit.event.role_created"
+msgstr "Role created"
+
+msgid "audit.event.role_updated"
+msgstr "Role changed"
+
+msgid "audit.event.role_deleted"
+msgstr "Role deleted"
+
+msgid "admin.roles.manage"
+msgstr "Adjust roles"
+
+msgid "admin.roles.title"
+msgstr "Custom roles"
+
+msgid "admin.roles.lead"
+msgstr "Make a role to fit a team, as a copy of a built-in role. A custom role can never go beyond the bounds of that built-in role: permissions with a lock and permissions outside its reach cannot be chosen. Every change is recorded and visible to every admin in the rights matrix."
+
+msgid "admin.roles.copy"
+msgstr "New role"
+
+msgid "admin.roles.copy_lead"
+msgstr "Choose the built-in role to start from. Its reach (per organisation or per group) stays fixed afterwards."
+
+msgid "admin.roles.template"
+msgstr "Copy of"
+
+msgid "admin.roles.template_hint"
+msgstr "Organisation admin and Compliance and privacy work per organisation, group admin per group. A copy of Compliance and privacy stays read-only and without personal data."
+
+msgid "admin.roles.new"
+msgstr "Make a new role"
+
+msgid "admin.roles.custom"
+msgstr "Custom roles"
+
+msgid "admin.roles.name"
+msgstr "Name"
+
+msgid "admin.roles.claim_value"
+msgstr "Value in the identity provider"
+
+msgid "admin.roles.version"
+msgstr "Version"
+
+msgid "admin.roles.none"
+msgstr "There are no custom roles yet."
+
+msgid "admin.roles.copy_of"
+msgstr "Copy of {template}"
+
+msgid "admin.roles.definition"
+msgstr "Role"
+
+msgid "admin.roles.definition_lead"
+msgstr "Name, link to the identity provider and permissions."
+
+msgid "admin.roles.name_nl"
+msgstr "Name (Dutch)"
+
+msgid "admin.roles.name_en"
+msgstr "Name (English)"
+
+msgid "admin.roles.name_hint"
+msgstr "As admins see the role, for example Team lead. At most 80 characters."
+
+msgid "admin.roles.claim_value_hint"
+msgstr "The role value the identity provider sends, for example openplanner-team-lead. No spaces or commas. It may not equal the value of a built-in role or another custom role."
+
+msgid "admin.roles.claim_notice"
+msgstr "As long as the identity provider does not send this value, nobody holds this role. Ask the team that runs the identity provider to assign the value. A change of permissions works from the next page someone opens; a new or changed value after their next login."
+
+msgid "admin.roles.permissions"
+msgstr "Permissions"
+
+msgid "admin.roles.permissions_hint"
+msgstr "Only the permissions this role may get are listed. A permission that needs another one says so."
+
+msgid "admin.roles.permissions_hint_read_only"
+msgstr "A copy of Compliance and privacy can only read and never sees citizens' personal data."
+
+msgid "admin.roles.requires"
+msgstr "Needs: {permissions}"
+
+msgid "admin.roles.create"
+msgstr "Make role"
+
+msgid "admin.roles.unavailable"
+msgstr "Not available for this role"
+
+msgid "admin.roles.unavailable_lead"
+msgstr "These permissions are fixed in the code. They change only with a new version of OpenPlanner."
+
+msgid "admin.roles.reason_write"
+msgstr "changes something; this role only reads"
+
+msgid "admin.roles.reason_reach"
+msgstr "outside this role's reach"
+
+msgid "admin.roles.delete"
+msgstr "Delete role"
+
+msgid "admin.roles.delete_lead"
+msgstr "Whoever holds this role through the identity provider keeps no rights from it. Their other roles keep working. The deletion is recorded."
+
+msgid "admin.roles.error.template"
+msgstr "Choose a built-in role to start from."
+
+msgid "admin.roles.error.locked"
+msgstr "{permission} is for the superuser only."
+
+msgid "admin.roles.error.above_reach"
+msgstr "{permission} is outside this role's reach."
+
+msgid "admin.roles.error.pii"
+msgstr "{permission} shows personal data; a copy of Compliance and privacy may not."
+
+msgid "admin.roles.error.write"
+msgstr "{permission} changes something; a copy of Compliance and privacy only reads."
+
+msgid "admin.roles.error.requirement"
+msgstr "{permission} needs another permission that is still off."
+
+msgid "admin.roles.error.basics"
+msgstr "{permission} belongs to every admin; switch it on."
+
+msgid "admin.form.error.role_invalid"
+msgstr "This role goes beyond its bounds."
+
+msgid "admin.form.error.role_changed"
+msgstr "Someone else changed this role in the meantime. Look at the new version and try again."
+
+msgid "admin.form.error.claim_value_taken"
+msgstr "This value already belongs to a built-in role or another custom role."
+
+msgid "admin.form.error.role_name"
+msgstr "Enter a name of at most 80 characters."
+
+msgid "admin.form.error.claim_value"
+msgstr "Enter a value of at most 128 characters, without spaces or commas."
+
+msgid "admin.form.error.permissions"
+msgstr "Choose permissions from the list only."
+
+msgid "admin.matrix.custom_intro"
+msgstr "The last columns are custom roles ({count}), made by the superuser within the bounds of a built-in role."
+
+msgid "admin.matrix.history"
+msgstr "Changes to roles"
+
+msgid "admin.matrix.history_intro"
+msgstr "Who made, changed or deleted which custom role, and when. Visible to every admin."
+
+msgid "admin.matrix.history_none"
+msgstr "No roles have been changed yet."
+
+msgid "admin.matrix.history.when"
+msgstr "When"
+
+msgid "admin.matrix.history.role"
+msgstr "Role"
+
+msgid "admin.matrix.history.change"
+msgstr "Change"
+
+msgid "admin.matrix.history.actor"
+msgstr "By"
+
+msgid "admin.matrix.history.created"
+msgstr "Created"
+
+msgid "admin.matrix.history.updated"
+msgstr "Changed"
+
+msgid "admin.matrix.history.deleted"
+msgstr "Deleted"
+
+msgid "admin.matrix.history.added"
+msgstr "on: {permissions}"
+
+msgid "admin.matrix.history.removed"
+msgstr "off: {permissions}"
+
+msgid "admin.matrix.history.name"
+msgstr "name"
+
+msgid "admin.matrix.history.claim_value"
+msgstr "value in the identity provider"
+
+msgid "admin.matrix.history.count"
+msgstr "{count} permissions"
+
+msgid "admin.closure.image"
+msgstr "Image"
+
+msgid "admin.closure.image_lead"
+msgstr "One image on the closure page, below the notice, such as a pictogram for ‘closed’ or ‘outage’. Never put information in the image only: citizens who cannot see it read just the text."
+
+msgid "admin.closure.image_current"
+msgstr "This is how the image appears on the closure page now."
+
+msgid "admin.closure.image_file"
+msgstr "Image file"
+
+msgid "admin.closure.image_hint"
+msgstr "PNG, JPEG or WebP, at most {kb} kB. Data in the file (such as location or author) is removed. Leave empty to change only the text."
+
+msgid "admin.closure.image_alt_nl"
+msgstr "Description (Dutch)"
+
+msgid "admin.closure.image_alt_en"
+msgstr "Description (English)"
+
+msgid "admin.closure.image_alt_hint"
+msgstr "What the image shows, in one sentence of at most 250 characters. Required unless the image is decoration only."
+
+msgid "admin.closure.image_decorative"
+msgstr "This image is decoration only (no description needed)"
+
+msgid "admin.closure.image_save"
+msgstr "Save image"
+
+msgid "admin.closure.image_remove"
+msgstr "Remove image"
+
+msgid "admin.form.error.image"
+msgstr "Choose a PNG, JPEG or WebP image of at most {kb} kB. SVG is not possible."
+
+msgid "admin.form.error.image_alt"
+msgstr "Describe the image in one line of at most 250 characters, or tick that it is decoration only."
+
+msgid "admin.done.image_saved"
+msgstr "The image has been saved."
+
+msgid "admin.done.image_removed"
+msgstr "The image has been removed."
+
+msgid "admin.audit.detail.closure_image_update"
+msgstr "emergency closure image saved"
+
+msgid "admin.audit.detail.closure_image_remove"
+msgstr "emergency closure image removed"
+
+msgid "admin.audit.detail.file"
+msgstr "new file"
+
 msgid "authz.permission.system_maintenance"
 msgstr "Switch maintenance mode on and off"
 
@@ -4273,6 +4850,12 @@ msgstr "Do you need help now? You can also reach us in another way."
 msgid "maintenance.try_later"
 msgstr "Please try again later."
 
+msgid "audit.event.maintenance_overdue"
+msgstr "Maintenance mode on for long"
+
+msgid "admin.audit.detail.hours"
+msgstr "{count} hours"
+
 # ADR 0046: staff directory
 
 msgid "authz.permission.staff_view"
@@ -4391,3 +4974,90 @@ msgstr "The latest {count} events from the audit log within your own organisatio
 
 msgid "admin.staff.activity_empty"
 msgstr "No activity within your organisations or groups."
+
+msgid "admin.embedding.title"
+msgstr "Embedding on websites"
+
+msgid "admin.embedding.lead"
+msgstr "On which websites an organisation's groups may appear as a widget."
+
+msgid "admin.embedding.organisations"
+msgstr "Organisations"
+
+msgid "admin.embedding.col.origins"
+msgstr "Allowed websites"
+
+msgid "admin.embedding.col.groups"
+msgstr "Groups embedded"
+
+msgid "admin.embedding.none"
+msgstr "There are no organisations you may manage."
+
+msgid "admin.embedding.org_lead"
+msgstr "The websites on which the groups of {name} may appear as a widget. A group appears only once it switches embedding on in its own settings."
+
+msgid "admin.embedding.form"
+msgstr "Allowed websites"
+
+msgid "admin.embedding.summary"
+msgstr "{count} websites allowed."
+
+msgid "admin.embedding.empty"
+msgstr "No websites allowed yet: the widget works nowhere."
+
+msgid "admin.embedding.origins"
+msgstr "Websites, one per line"
+
+msgid "admin.embedding.origins_hint"
+msgstr "Only the start of the web address, such as https://www.gemeente.nl. No path, no asterisks; a subdomain counts as a website of its own. At most {count}."
+
+msgid "admin.embedding.origins_hint_local"
+msgstr "Only the start of the web address, such as https://www.gemeente.nl. No path, no asterisks; a subdomain counts as a website of its own. On this test installation http://localhost with a port is allowed too. At most {count}."
+
+msgid "admin.embedding.groups"
+msgstr "Groups"
+
+msgid "admin.embedding.groups_lead"
+msgstr "Whether a group appears in the widget is switched on under Group settings › Embed on websites."
+
+msgid "admin.embedding.col.embedded"
+msgstr "In the widget"
+
+msgid "admin.embedding.on"
+msgstr "On"
+
+msgid "admin.embedding.off"
+msgstr "Off"
+
+msgid "admin.embedding.no_groups"
+msgstr "This organisation has no groups yet."
+
+msgid "admin.embedding.error.origin"
+msgstr "Line {line} is not a website. Enter only the start of the web address, such as https://www.gemeente.nl."
+
+msgid "admin.embedding.error.count"
+msgstr "Enter at most {count} websites."
+
+msgid "widget.region"
+msgstr "Book an appointment"
+
+msgid "widget.loading"
+msgstr "Loading…"
+
+msgid "widget.unavailable"
+msgstr "The booking calendar is not available here right now."
+
+msgid "widget.maintenance"
+msgstr "We are carrying out maintenance, so you cannot book an appointment right now. Please try again later."
+
+msgid "widget.retry"
+msgstr "Try again"
+
+msgid "widget.more"
+msgstr "More options, such as starting a call right away, are on the page of {name}."
+
+msgid "widget.done_title"
+msgstr "Your appointment is booked"
+
+msgid "widget.error_summary"
+msgstr "Something was not filled in correctly"

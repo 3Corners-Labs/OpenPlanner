@@ -13,7 +13,8 @@ tijdelijk geen afspraken laten aannemen, gebruik dan een noodsluiting.
 - **Burgers** kunnen geen afspraak maken, verzetten of annuleren en geen direct gesprek
   starten. Ze zien een melding dat er onderhoud is, met de verwachte eindtijd als u die hebt
   ingevuld en de contactalternatieven van het team (of van de organisatie) als die er zijn.
-  Een afspraak bekijken en deelnemen aan een gesprek dat al vaststaat, kan wel.
+  Een afspraak bekijken en deelnemen aan een gesprek dat al vaststaat, kan wel. Een kalender
+  die op een website is ingesloten, toont dat afspraken maken even niet kan door onderhoud.
 - **Afspraken die al vaststaan** gaan gewoon door: herinneringen, werkitems en videogesprekken
   blijven werken. Persoonsgegevens worden op tijd verwijderd zoals altijd.
 - **Beheerders** kunnen alles lezen, maar niets wijzigen. Elke pagina toont bovenaan de balk
@@ -60,3 +61,7 @@ systeem zien. Zet hem dan pas uit als alles weer werkt.
 
 Had u de onderhoudsmodus zelf al aangezet voordat de update begon, dan staat hij na een
 geslaagde of teruggedraaide update toch uit. Zet hem dan opnieuw aan als u nog niet klaar bent.
+
+Staat de onderhoudsmodus langer dan vier uur aan (de standaardinstelling), dan komt er een
+systeemgebeurtenis **Onderhoudsmodus staat lang aan** in de auditlog, en daarna elke dag
+opnieuw zolang hij aan staat.

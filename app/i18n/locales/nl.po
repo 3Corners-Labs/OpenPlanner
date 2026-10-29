@@ -84,6 +84,75 @@ msgstr "Uw videogesprek op {date} is geannuleerd"
 msgid "message.cancellation.intro"
 msgstr "Uw videogesprek met {group_name} op {date} om {time} is geannuleerd. U kunt altijd een nieuwe afspraak maken."
 
+msgid "message.reason"
+msgstr "Reden"
+
+msgid "message.reason.staffing"
+msgstr "Er zijn op dat moment niet genoeg medewerkers beschikbaar."
+
+msgid "message.reason.technical"
+msgstr "Er is een technische storing."
+
+msgid "message.reason.unforeseen"
+msgstr "Door onvoorziene omstandigheden kan het gesprek op dat moment niet doorgaan."
+
+msgid "message.change.sms"
+msgstr "Beste {first_name}, uw videogesprek met {group_name} is verplaatst naar {date} om {time}. Bekijken of wijzigen: {manage_url}"
+
+msgid "message.cancellation.sms"
+msgstr "Beste {first_name}, uw videogesprek met {group_name} op {date} om {time} is geannuleerd. {reason}"
+
+msgid "message.rebook_request.subject"
+msgstr "Kies een nieuwe tijd voor uw videogesprek"
+
+msgid "message.rebook_request.intro"
+msgstr "Uw videogesprek met {group_name} op {date} om {time} kan niet doorgaan. Kies een nieuwe tijd die u uitkomt; uw gegevens hoeft u niet opnieuw in te vullen. Kiest u voor {deadline} geen nieuwe tijd, dan vervalt de afspraak."
+
+msgid "message.rebook_request.sms"
+msgstr "Beste {first_name}, uw videogesprek met {group_name} op {date} om {time} kan niet doorgaan. {reason} Kies voor {deadline} een nieuwe tijd: {manage_url}"
+
+msgid "message.rebook_reminder.subject"
+msgstr "Herinnering: kies een nieuwe tijd voor uw videogesprek"
+
+msgid "message.rebook_reminder.intro"
+msgstr "U heeft nog geen nieuwe tijd gekozen voor uw videogesprek met {group_name}. Kiest u voor {deadline} geen nieuwe tijd, dan vervalt de afspraak."
+
+msgid "message.rebook_reminder.sms"
+msgstr "Beste {first_name}, kies nog een nieuwe tijd voor uw videogesprek met {group_name}, uiterlijk {deadline}: {manage_url}"
+
+msgid "message.rebook_lapsed.subject"
+msgstr "Uw afspraak met {group_name} is vervallen"
+
+msgid "message.rebook_lapsed.intro"
+msgstr "U heeft geen nieuwe tijd gekozen voor uw videogesprek met {group_name}. De afspraak is vervallen. U kunt altijd een nieuwe afspraak maken."
+
+msgid "message.rebook_lapsed.sms"
+msgstr "Beste {first_name}, u heeft geen nieuwe tijd gekozen; uw afspraak met {group_name} is vervallen. U kunt altijd een nieuwe afspraak maken."
+
+msgid "message.manage_rebook"
+msgstr "Kies een nieuwe tijd of annuleer de afspraak, uiterlijk {deadline}:"
+
+msgid "admin.messages.purpose_rebook_request"
+msgstr "Vraag om een nieuwe tijd te kiezen (door een planner)"
+
+msgid "admin.messages.purpose_rebook_reminder"
+msgstr "Herinnering om een nieuwe tijd te kiezen"
+
+msgid "admin.messages.purpose_rebook_lapsed"
+msgstr "Afspraak vervallen zonder nieuwe tijd"
+
+msgid "admin.messages.purpose_reason"
+msgstr "Redenen bij wijzigingen door een planner"
+
+msgid "admin.messages.part_reason_staffing"
+msgstr "Te weinig medewerkers"
+
+msgid "admin.messages.part_reason_technical"
+msgstr "Technische storing"
+
+msgid "admin.messages.part_reason_unforeseen"
+msgstr "Onvoorziene omstandigheden"
+
 #. Booking pages.
 
 msgid "group.intro"
@@ -519,7 +588,7 @@ msgid "admin.matrix.title"
 msgstr "Rechtenmatrix"
 
 msgid "admin.matrix.intro"
-msgstr "Overzicht van wat elke rol mag, per organisatie en per groep. Rechten met het kenmerk Alleen superuser liggen vast. Rechten met het kenmerk Persoonsgegevens tonen gegevens van burgers. Welke rol iemand heeft, regelt uw organisatie in de identity provider."
+msgstr "Overzicht van wat elke rol mag, per organisatie en per groep. Rechten met het kenmerk Alleen superuser liggen vast. Rechten met het kenmerk Persoonsgegevens tonen gegevens van burgers. Alleen de superuser kan rollen aanpassen; elke wijziging wordt vastgelegd en staat onderaan deze pagina. Welke rol iemand heeft, regelt uw organisatie in de identity provider."
 
 msgid "admin.matrix.level"
 msgstr "Niveau"
@@ -680,6 +749,9 @@ msgstr "Herinneringen beheren"
 msgid "authz.permission.bookings_view"
 msgstr "Boekingen bekijken"
 
+msgid "authz.permission.bookings_manage"
+msgstr "Boekingen wijzigen"
+
 msgid "authz.citizen.availability_view"
 msgstr "Beschikbare tijden bekijken"
 
@@ -833,6 +905,12 @@ msgstr "Doorzetten naar de wachtrij (minuten vooraf)"
 msgid "admin.field.dispatch_lead_minutes_hint"
 msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de deelnemer. 0 tot 60."
 
+msgid "admin.field.planner_change_min_lead_minutes"
+msgstr "Wijzigen door een planner (minuten vooraf)"
+
+msgid "admin.field.planner_change_min_lead_minutes_hint"
+msgstr "Tot dit moment kan een planner een afspraak verplaatsen of annuleren; daarna belt u de deelnemer. Niet minder dan het doorzetten naar de wachtrij, hoogstens 1440."
+
 msgid "admin.field.phone_mode"
 msgstr "Telefoonnummer op het formulier"
 
@@ -900,6 +978,15 @@ msgstr "Vul een aantal dagen in van 1 tot 366."
 
 msgid "admin.form.error.dispatch_lead_minutes"
 msgstr "Vul een aantal minuten in van 0 tot 60."
+
+msgid "admin.form.error.planner_change_min_lead_minutes"
+msgstr "Vul een aantal minuten in van het doorzetten naar de wachtrij tot 1440."
+
+msgid "admin.form.error.planner_too_late"
+msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Bel de deelnemer."
+
+msgid "admin.form.error.move_causes_shortfall"
+msgstr "In dit tijdslot zijn dan meer afspraken dan medewerkers. Bevestig dat u het tekort accepteert, of kies een ander tijdslot."
 
 msgid "admin.form.error.phone_mode"
 msgstr "Kies of het telefoonnummer verborgen, optioneel of verplicht is."
@@ -1114,6 +1201,12 @@ msgstr "Direct gesprek starten"
 
 msgid "admin.field.direct_call_enabled_hint"
 msgstr "Deelnemers kunnen meteen een gesprek starten tijdens een tijdblok met medewerkers."
+
+msgid "admin.field.embedding_enabled"
+msgstr "Insluiten op websites"
+
+msgid "admin.field.embedding_enabled_hint"
+msgstr "Toont de groep ook in de widget op de websites die de organisatie onder Insluiten heeft toegestaan. Uit: alleen de eigen pagina van de groep."
 
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Niet opgepakt na (minuten)"
@@ -1414,6 +1507,201 @@ msgstr "Niet opgepakt"
 
 msgid "admin.agenda.empty"
 msgstr "Geen afspraken op deze dag."
+
+msgid "admin.agenda.view_week"
+msgstr "Weekoverzicht"
+
+msgid "admin.agenda.view_day"
+msgstr "Dagoverzicht"
+
+msgid "admin.agenda.weeks"
+msgstr "Andere week"
+
+msgid "admin.agenda.previous_week"
+msgstr "Vorige week"
+
+msgid "admin.agenda.this_week"
+msgstr "Deze week"
+
+msgid "admin.agenda.next_week"
+msgstr "Volgende week"
+
+msgid "admin.agenda.slot_staffing"
+msgstr "Medewerkers: {agents}, afspraken: {booked}"
+
+msgid "admin.agenda.shortfall"
+msgstr "Tekort: {count}"
+
+msgid "admin.agenda.closed"
+msgstr "Gesloten"
+
+msgid "admin.agenda.off_schedule"
+msgstr "Buiten de bezetting"
+
+msgid "admin.agenda.no_bookings"
+msgstr "Geen afspraken in dit tijdslot."
+
+msgid "admin.agenda.direct"
+msgstr "Direct gesprekken"
+
+msgid "admin.agenda.week_title"
+msgstr "Week van {day}"
+
+msgid "admin.agenda.week_caption"
+msgstr "Medewerkers en afspraken per tijdslot, {week}"
+
+msgid "admin.agenda.week_shortfalls"
+msgstr "Tijdsloten met meer afspraken dan medewerkers deze week: {count}."
+
+msgid "admin.agenda.week_no_shortfalls"
+msgstr "Deze week heeft elk tijdslot genoeg medewerkers."
+
+msgid "admin.agenda.week_empty"
+msgstr "Geen tijdsloten in deze week."
+
+msgid "admin.agenda.no_slot"
+msgstr "Geen tijdslot"
+
+msgid "admin.shortfall.some"
+msgstr "Tijdsloten met meer afspraken dan medewerkers in de komende {days} dagen: {count}."
+
+msgid "admin.shortfall.first"
+msgstr "Eerste tekort: {when}"
+
+msgid "admin.shortfall.chip"
+msgstr "Tekorten: {count}"
+
+msgid "admin.agenda.accepted"
+msgstr "Tekort geaccepteerd"
+
+msgid "admin.agenda.accept"
+msgstr "Tekort accepteren"
+
+msgid "admin.agenda.move"
+msgstr "Verplaatsen"
+
+msgid "admin.agenda.cancel"
+msgstr "Annuleren"
+
+msgid "admin.planner.move_title"
+msgstr "Afspraak {reference} verplaatsen"
+
+msgid "admin.planner.move_lead"
+msgstr "{first_name}, {when}. Kies een vrij tijdslot van dit team."
+
+msgid "admin.planner.move_start"
+msgstr "Nieuw tijdslot"
+
+msgid "admin.planner.move_hint"
+msgstr "Vrije tijdsloten in de komende {days} dagen."
+
+msgid "admin.planner.move_button"
+msgstr "Verplaatsen"
+
+msgid "admin.planner.move_none"
+msgstr "Er is geen vrij tijdslot in de komende weken. Verhoog de bezetting of annuleer de afspraak."
+
+msgid "admin.planner.accept_shortfall"
+msgstr "Ik accepteer dat het nieuwe tijdslot dan meer afspraken dan medewerkers heeft"
+
+msgid "admin.planner.accept_shortfall_hint"
+msgstr "Alleen nodig als het gekozen tijdslot daardoor een tekort krijgt."
+
+msgid "admin.planner.citizen_told"
+msgstr "De burger krijgt hiervan altijd bericht per e-mail, en per sms als er een telefoonnummer is."
+
+msgid "admin.planner.back"
+msgstr "Terug naar de agenda"
+
+msgid "admin.planner.cancel_title"
+msgstr "Afspraak {reference} annuleren"
+
+msgid "admin.planner.cancel_lead"
+msgstr "{first_name}, {when}. Kies de reden die de burger in het bericht leest."
+
+msgid "admin.planner.reason"
+msgstr "Reden"
+
+msgid "admin.planner.reason_hint"
+msgstr "Een vaste tekst; de organisatie kan de woorden aanpassen bij Berichtteksten."
+
+msgid "admin.planner.reason_staffing"
+msgstr "Te weinig medewerkers"
+
+msgid "admin.planner.reason_technical"
+msgstr "Technische storing"
+
+msgid "admin.planner.reason_unforeseen"
+msgstr "Onvoorziene omstandigheden"
+
+msgid "admin.planner.cancel_button"
+msgstr "Afspraak annuleren"
+
+msgid "admin.planner.keep"
+msgstr "Niet annuleren"
+
+msgid "admin.agenda.waiting"
+msgstr "Wacht op nieuwe tijd"
+
+msgid "admin.agenda.rebook"
+msgstr "Om nieuwe tijd vragen"
+
+msgid "admin.agenda.slot_rebook"
+msgstr "Burgers om een nieuwe tijd vragen"
+
+msgid "admin.agenda.waiting_list"
+msgstr "Wacht op nieuwe tijd"
+
+msgid "admin.planner.rebook_title"
+msgstr "Om een nieuwe tijd vragen voor {reference}"
+
+msgid "admin.planner.rebook_lead"
+msgstr "{first_name}, {when}. De burger kiest zelf een nieuwe tijd."
+
+msgid "admin.planner.rebook_explain"
+msgstr "De plek in dit tijdslot komt meteen vrij. De burger krijgt een bericht met de reden en een link om een nieuwe tijd te kiezen, en {reminder} dagen voor het verlopen een herinnering. Kiest de burger binnen {days} dagen na de oorspronkelijke tijd niets, dan vervalt de afspraak."
+
+msgid "admin.planner.rebook_button"
+msgstr "Om een nieuwe tijd vragen"
+
+msgid "admin.planner.slot_title"
+msgstr "Om een nieuwe tijd vragen: tijdslot {when}"
+
+msgid "admin.planner.slot_lead"
+msgstr "Dit tijdslot heeft meer afspraken dan medewerkers. Deze laatst gemaakte afspraken ({count}) krijgen een vraag om een nieuwe tijd te kiezen; hun plekken komen meteen vrij. Zonder nieuwe tijd vervallen ze {days} dagen na deze tijd."
+
+msgid "admin.planner.slot_bookings"
+msgstr "Betrokken afspraken"
+
+msgid "admin.planner.slot_button"
+msgstr "Om een nieuwe tijd vragen ({count})"
+
+msgid "admin.planner.waiting_title"
+msgstr "Wacht op nieuwe tijd"
+
+msgid "admin.planner.waiting_lead"
+msgstr "Afspraken waarvoor de burger is gevraagd een nieuwe tijd te kiezen. U kunt ze zelf verplaatsen of annuleren."
+
+msgid "admin.planner.waiting_booking"
+msgstr "Afspraak"
+
+msgid "admin.planner.waiting_was"
+msgstr "Oorspronkelijke tijd"
+
+msgid "admin.planner.waiting_by"
+msgstr "Vervalt op"
+
+msgid "admin.planner.waiting_empty"
+msgstr "Er wachten geen afspraken op een nieuwe tijd."
+
+msgid "admin.done.rebook_requested"
+msgstr "Burgers gevraagd een nieuwe tijd te kiezen: {count}. De plekken zijn vrijgekomen."
+
+msgid "admin.form.error.slot_changed"
+msgstr "Dit tijdslot is intussen veranderd. Controleer de lijst en bevestig opnieuw."
+
+msgid "admin.done.shortfall_accepted"
+msgstr "Het tekort is geaccepteerd. Het verschijnt weer als de bezetting of de afspraken van dit tijdslot veranderen."
 
 msgid "admin.booking.back"
 msgstr "Terug naar de agenda"
@@ -1815,6 +2103,12 @@ msgstr "Kies hieronder een nieuwe tijd of annuleer de afspraak. Uw gegevens zijn
 msgid "manage.suspended.reschedule"
 msgstr "Kies een nieuwe tijd"
 
+msgid "manage.status.awaiting_rebook"
+msgstr "Wacht op uw nieuwe tijd"
+
+msgid "manage.rebook_by"
+msgstr "Kiest u voor {deadline} geen nieuwe tijd, dan vervalt de afspraak."
+
 msgid "error.group_closed"
 msgstr "Dit team is op dit moment tijdelijk gesloten. Kies een ander moment."
 
@@ -1925,6 +2219,33 @@ msgstr "alle opgeschorte afspraken geannuleerd"
 
 msgid "admin.audit.detail.booking_move"
 msgstr "opgeschorte afspraak verzet"
+
+msgid "audit.event.planner_changes_alert"
+msgstr "Veel wijzigingen door één planner"
+
+msgid "admin.audit.detail.planner_move"
+msgstr "afspraak verplaatst door een planner"
+
+msgid "admin.audit.detail.planner_cancel"
+msgstr "afspraak geannuleerd door een planner"
+
+msgid "admin.audit.detail.planner_rebook"
+msgstr "burger gevraagd een nieuwe tijd te kiezen"
+
+msgid "admin.audit.detail.bulk"
+msgstr "voor een heel tijdslot"
+
+msgid "admin.audit.detail.shortfall_accept"
+msgstr "tekort geaccepteerd"
+
+msgid "admin.audit.detail.changes"
+msgstr "wijzigingen in het afgelopen uur: {count}"
+
+msgid "admin.audit.detail.reason"
+msgstr "reden: {value}"
+
+msgid "admin.audit.detail.actor"
+msgstr "door: {value}"
 
 msgid "admin.audit.detail.bookings"
 msgstr "afspraken: {count}"
@@ -3232,6 +3553,7 @@ msgstr "Update over sluiting versturen"
 
 msgid "audit.job.send_reinstatement"
 msgstr "Bericht over hervatting versturen"
+
 msgid "authz.permission.system_update"
 msgstr "Updates van de installatie uitvoeren"
 
@@ -3911,6 +4233,12 @@ msgstr "Simulator staat aan"
 msgid "authz.permission.retention_view"
 msgstr "Bewaartermijnen bekijken"
 
+msgid "authz.permission.embedding_manage"
+msgstr "Insluiten op websites beheren"
+
+msgid "admin.nav.embedding"
+msgstr "Insluiten"
+
 msgid "admin.nav.retention"
 msgstr "Bewaartermijnen"
 
@@ -4123,6 +4451,255 @@ msgstr "Eigen blok met {count} contactmogelijkheden."
 msgid "admin.group_contacts.summary_default"
 msgstr "Standaard van de organisatie: {count} contactmogelijkheden."
 
+msgid "authz.permission.roles_manage"
+msgstr "Rollen aanpassen"
+
+msgid "audit.event.role_created"
+msgstr "Rol gemaakt"
+
+msgid "audit.event.role_updated"
+msgstr "Rol gewijzigd"
+
+msgid "audit.event.role_deleted"
+msgstr "Rol verwijderd"
+
+msgid "admin.roles.manage"
+msgstr "Rollen aanpassen"
+
+msgid "admin.roles.title"
+msgstr "Eigen rollen"
+
+msgid "admin.roles.lead"
+msgstr "Maak een rol op maat voor een team, als kopie van een vaste rol. Een eigen rol kan nooit meer dan de grenzen van die vaste rol: rechten met een slotje en rechten buiten het bereik zijn niet te kiezen. Elke wijziging wordt vastgelegd en is voor alle beheerders zichtbaar in de rechtenmatrix."
+
+msgid "admin.roles.copy"
+msgstr "Nieuwe rol"
+
+msgid "admin.roles.copy_lead"
+msgstr "Kies de vaste rol die u als startpunt neemt. Het bereik van die rol (per organisatie of per groep) blijft daarna vast."
+
+msgid "admin.roles.template"
+msgstr "Kopie van"
+
+msgid "admin.roles.template_hint"
+msgstr "Organisatiebeheerder en Compliance en privacy werken per organisatie, groepsbeheerder per groep. Een kopie van Compliance en privacy blijft alleen-lezen en zonder persoonsgegevens."
+
+msgid "admin.roles.new"
+msgstr "Nieuwe rol maken"
+
+msgid "admin.roles.custom"
+msgstr "Eigen rollen"
+
+msgid "admin.roles.name"
+msgstr "Naam"
+
+msgid "admin.roles.claim_value"
+msgstr "Waarde in de identity provider"
+
+msgid "admin.roles.version"
+msgstr "Versie"
+
+msgid "admin.roles.none"
+msgstr "Er zijn nog geen eigen rollen."
+
+msgid "admin.roles.copy_of"
+msgstr "Kopie van {template}"
+
+msgid "admin.roles.definition"
+msgstr "Rol"
+
+msgid "admin.roles.definition_lead"
+msgstr "Naam, koppeling met de identity provider en rechten."
+
+msgid "admin.roles.name_nl"
+msgstr "Naam (Nederlands)"
+
+msgid "admin.roles.name_en"
+msgstr "Naam (Engels)"
+
+msgid "admin.roles.name_hint"
+msgstr "Zoals beheerders de rol zien, bijvoorbeeld Teamleider. Ten hoogste 80 tekens."
+
+msgid "admin.roles.claim_value_hint"
+msgstr "De rolwaarde die de identity provider meestuurt, bijvoorbeeld openplanner-teamleider. Zonder spaties of komma's. Mag niet gelijk zijn aan de waarde van een vaste rol of een andere eigen rol."
+
+msgid "admin.roles.claim_notice"
+msgstr "Zolang de identity provider deze waarde niet meestuurt, heeft niemand deze rol. Vraag het team dat de identity provider beheert om de waarde toe te kennen. Een wijziging van de rechten werkt bij de volgende pagina die iemand opent; een nieuwe of gewijzigde waarde na de volgende keer inloggen."
+
+msgid "admin.roles.permissions"
+msgstr "Rechten"
+
+msgid "admin.roles.permissions_hint"
+msgstr "Alleen de rechten die deze rol mag krijgen staan hier. Een recht dat een ander recht nodig heeft, zegt dat erbij."
+
+msgid "admin.roles.permissions_hint_read_only"
+msgstr "Een kopie van Compliance en privacy kan alleen lezen en ziet nooit persoonsgegevens van burgers."
+
+msgid "admin.roles.requires"
+msgstr "Heeft nodig: {permissions}"
+
+msgid "admin.roles.create"
+msgstr "Rol maken"
+
+msgid "admin.roles.unavailable"
+msgstr "Niet te kiezen voor deze rol"
+
+msgid "admin.roles.unavailable_lead"
+msgstr "Deze rechten liggen vast in de code. Ze veranderen alleen met een nieuwe versie van OpenPlanner."
+
+msgid "admin.roles.reason_write"
+msgstr "wijzigt iets; deze rol leest alleen"
+
+msgid "admin.roles.reason_reach"
+msgstr "buiten het bereik van deze rol"
+
+msgid "admin.roles.delete"
+msgstr "Rol verwijderen"
+
+msgid "admin.roles.delete_lead"
+msgstr "Wie deze rol via de identity provider heeft, houdt er geen rechten van over. Andere rollen van die persoon blijven gewoon werken. De verwijdering wordt vastgelegd."
+
+msgid "admin.roles.error.template"
+msgstr "Kies een vaste rol als startpunt."
+
+msgid "admin.roles.error.locked"
+msgstr "{permission} is alleen voor de superuser."
+
+msgid "admin.roles.error.above_reach"
+msgstr "{permission} valt buiten het bereik van deze rol."
+
+msgid "admin.roles.error.pii"
+msgstr "{permission} toont persoonsgegevens; een kopie van Compliance en privacy mag dat niet."
+
+msgid "admin.roles.error.write"
+msgstr "{permission} wijzigt iets; een kopie van Compliance en privacy leest alleen."
+
+msgid "admin.roles.error.requirement"
+msgstr "{permission} heeft een ander recht nodig dat nog uit staat."
+
+msgid "admin.roles.error.basics"
+msgstr "{permission} hoort bij elke beheerder; zet het aan."
+
+msgid "admin.form.error.role_invalid"
+msgstr "Deze rol gaat buiten de grenzen."
+
+msgid "admin.form.error.role_changed"
+msgstr "Iemand anders heeft deze rol intussen gewijzigd. Bekijk de nieuwe versie en probeer het opnieuw."
+
+msgid "admin.form.error.claim_value_taken"
+msgstr "Deze waarde hoort al bij een vaste rol of een andere eigen rol."
+
+msgid "admin.form.error.role_name"
+msgstr "Vul een naam in van ten hoogste 80 tekens."
+
+msgid "admin.form.error.claim_value"
+msgstr "Vul een waarde in van ten hoogste 128 tekens, zonder spaties of komma's."
+
+msgid "admin.form.error.permissions"
+msgstr "Kies alleen rechten uit de lijst."
+
+msgid "admin.matrix.custom_intro"
+msgstr "De laatste kolommen zijn eigen rollen ({count}), gemaakt door de superuser binnen de grenzen van een vaste rol."
+
+msgid "admin.matrix.history"
+msgstr "Wijzigingen van rollen"
+
+msgid "admin.matrix.history_intro"
+msgstr "Wie welke eigen rol wanneer heeft gemaakt, gewijzigd of verwijderd. Zichtbaar voor elke beheerder."
+
+msgid "admin.matrix.history_none"
+msgstr "Er zijn nog geen rollen gewijzigd."
+
+msgid "admin.matrix.history.when"
+msgstr "Wanneer"
+
+msgid "admin.matrix.history.role"
+msgstr "Rol"
+
+msgid "admin.matrix.history.change"
+msgstr "Wijziging"
+
+msgid "admin.matrix.history.actor"
+msgstr "Door"
+
+msgid "admin.matrix.history.created"
+msgstr "Gemaakt"
+
+msgid "admin.matrix.history.updated"
+msgstr "Gewijzigd"
+
+msgid "admin.matrix.history.deleted"
+msgstr "Verwijderd"
+
+msgid "admin.matrix.history.added"
+msgstr "aan: {permissions}"
+
+msgid "admin.matrix.history.removed"
+msgstr "uit: {permissions}"
+
+msgid "admin.matrix.history.name"
+msgstr "naam"
+
+msgid "admin.matrix.history.claim_value"
+msgstr "waarde in de identity provider"
+
+msgid "admin.matrix.history.count"
+msgstr "{count} rechten"
+
+msgid "admin.closure.image"
+msgstr "Afbeelding"
+
+msgid "admin.closure.image_lead"
+msgstr "Eén afbeelding op de sluitingspagina, onder de melding, zoals een pictogram voor ‘gesloten’ of ‘storing’. Zet nooit informatie alleen in de afbeelding: burgers die hem niet zien, lezen alleen de tekst."
+
+msgid "admin.closure.image_current"
+msgstr "Zo staat de afbeelding nu op de sluitingspagina."
+
+msgid "admin.closure.image_file"
+msgstr "Afbeeldingsbestand"
+
+msgid "admin.closure.image_hint"
+msgstr "PNG, JPEG of WebP, hoogstens {kb} kB. Gegevens in het bestand (zoals locatie of maker) halen we weg. Laat leeg om alleen de tekst aan te passen."
+
+msgid "admin.closure.image_alt_nl"
+msgstr "Beschrijving (Nederlands)"
+
+msgid "admin.closure.image_alt_en"
+msgstr "Beschrijving (Engels)"
+
+msgid "admin.closure.image_alt_hint"
+msgstr "Wat de afbeelding laat zien, in één zin van hoogstens 250 tekens. Nodig, tenzij de afbeelding alleen versiert."
+
+msgid "admin.closure.image_decorative"
+msgstr "Deze afbeelding is alleen versiering (geen beschrijving nodig)"
+
+msgid "admin.closure.image_save"
+msgstr "Afbeelding opslaan"
+
+msgid "admin.closure.image_remove"
+msgstr "Afbeelding verwijderen"
+
+msgid "admin.form.error.image"
+msgstr "Kies een PNG-, JPEG- of WebP-afbeelding van hoogstens {kb} kB. SVG kan niet."
+
+msgid "admin.form.error.image_alt"
+msgstr "Beschrijf de afbeelding in één regel van hoogstens 250 tekens, of vink aan dat hij alleen versiert."
+
+msgid "admin.done.image_saved"
+msgstr "De afbeelding is opgeslagen."
+
+msgid "admin.done.image_removed"
+msgstr "De afbeelding is verwijderd."
+
+msgid "admin.audit.detail.closure_image_update"
+msgstr "afbeelding van de noodsluiting opgeslagen"
+
+msgid "admin.audit.detail.closure_image_remove"
+msgstr "afbeelding van de noodsluiting verwijderd"
+
+msgid "admin.audit.detail.file"
+msgstr "nieuw bestand"
+
 msgid "authz.permission.system_maintenance"
 msgstr "Onderhoudsmodus aan- en uitzetten"
 
@@ -4273,6 +4850,12 @@ msgstr "Heeft u nu hulp nodig? U kunt ons ook op een andere manier bereiken."
 msgid "maintenance.try_later"
 msgstr "Probeer het later opnieuw."
 
+msgid "audit.event.maintenance_overdue"
+msgstr "Onderhoudsmodus staat lang aan"
+
+msgid "admin.audit.detail.hours"
+msgstr "{count} uur"
+
 # ADR 0046: staff directory
 
 msgid "authz.permission.staff_view"
@@ -4391,3 +4974,90 @@ msgstr "De laatste {count} gebeurtenissen uit de auditlog binnen uw eigen organi
 
 msgid "admin.staff.activity_empty"
 msgstr "Geen activiteit binnen uw organisaties of groepen."
+
+msgid "admin.embedding.title"
+msgstr "Insluiten op websites"
+
+msgid "admin.embedding.lead"
+msgstr "Op welke websites de groepen van een organisatie als widget mogen staan."
+
+msgid "admin.embedding.organisations"
+msgstr "Organisaties"
+
+msgid "admin.embedding.col.origins"
+msgstr "Toegestane websites"
+
+msgid "admin.embedding.col.groups"
+msgstr "Groepen ingesloten"
+
+msgid "admin.embedding.none"
+msgstr "Er zijn geen organisaties die u mag beheren."
+
+msgid "admin.embedding.org_lead"
+msgstr "De websites waarop de groepen van {name} als widget mogen staan. Een groep verschijnt pas als die in haar eigen instellingen insluiten aanzet."
+
+msgid "admin.embedding.form"
+msgstr "Toegestane websites"
+
+msgid "admin.embedding.summary"
+msgstr "{count} websites toegestaan."
+
+msgid "admin.embedding.empty"
+msgstr "Nog geen websites toegestaan: de widget werkt nergens."
+
+msgid "admin.embedding.origins"
+msgstr "Websites, één per regel"
+
+msgid "admin.embedding.origins_hint"
+msgstr "Alleen het begin van het webadres, zoals https://www.gemeente.nl. Geen pad, geen sterretjes; een subdomein telt als een eigen website. Maximaal {count}."
+
+msgid "admin.embedding.origins_hint_local"
+msgstr "Alleen het begin van het webadres, zoals https://www.gemeente.nl. Geen pad, geen sterretjes; een subdomein telt als een eigen website. Op deze testomgeving mag ook http://localhost met poort. Maximaal {count}."
+
+msgid "admin.embedding.groups"
+msgstr "Groepen"
+
+msgid "admin.embedding.groups_lead"
+msgstr "Of een groep in de widget verschijnt, zet u aan bij Groepsinstellingen › Insluiten op websites."
+
+msgid "admin.embedding.col.embedded"
+msgstr "In de widget"
+
+msgid "admin.embedding.on"
+msgstr "Aan"
+
+msgid "admin.embedding.off"
+msgstr "Uit"
+
+msgid "admin.embedding.no_groups"
+msgstr "Deze organisatie heeft nog geen groepen."
+
+msgid "admin.embedding.error.origin"
+msgstr "Regel {line} is geen website. Vul alleen het begin van het webadres in, zoals https://www.gemeente.nl."
+
+msgid "admin.embedding.error.count"
+msgstr "Vul maximaal {count} websites in."
+
+msgid "widget.region"
+msgstr "Afspraak maken"
+
+msgid "widget.loading"
+msgstr "Bezig met laden…"
+
+msgid "widget.unavailable"
+msgstr "De afsprakenkalender is hier nu niet beschikbaar."
+
+msgid "widget.maintenance"
+msgstr "We voeren onderhoud uit. Daarom kunt u nu geen afspraak maken. Probeer het later opnieuw."
+
+msgid "widget.retry"
+msgstr "Opnieuw proberen"
+
+msgid "widget.more"
+msgstr "Meer mogelijkheden, zoals direct een gesprek starten, vindt u op de pagina van {name}."
+
+msgid "widget.done_title"
+msgstr "Uw afspraak is gemaakt"
+
+msgid "widget.error_summary"
+msgstr "Er is iets niet goed ingevuld"

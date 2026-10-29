@@ -56,10 +56,17 @@ class JobType(StrEnum):
     SEND_SUSPENSION = "send_suspension"
     SEND_CLOSURE_UPDATE = "send_closure_update"
     SEND_REINSTATEMENT = "send_reinstatement"
+    SEND_REBOOK_REQUEST = "send_rebook_request"
+    SEND_REBOOK_REMINDER = "send_rebook_reminder"
+    SEND_REBOOK_LAPSED = "send_rebook_lapsed"
+    LAPSE_REBOOK = "lapse_rebook"
 
 
 CLOSURE_NOTICES = frozenset({JobType.SEND_SUSPENSION, JobType.SEND_CLOSURE_UPDATE})
 """Messages about an emergency closure; sent only while the booking is suspended."""
+
+REBOOK_NOTICES = frozenset({JobType.SEND_REBOOK_REQUEST, JobType.SEND_REBOOK_REMINDER})
+"""A planner's request to choose a new time (ADR 0044); sent only while it is unanswered."""
 
 
 @dataclass(frozen=True)
@@ -82,11 +89,14 @@ def plan_for_booking(
     now: datetime,
     dispatch_lead: timedelta,
     message: JobType = JobType.SEND_CONFIRMATION,
+    sms: bool = False,
 ) -> list[PlannedJob]:
     """Return the jobs of a newly confirmed booking, in execution order.
 
     ``message`` is the first email: the confirmation, ``send_change`` after a reschedule or
-    ``send_reinstatement`` when a suspended booking goes ahead after all. Reminders are skipped
+    ``send_reinstatement`` when a suspended booking goes ahead after all. ``sms`` sends it as
+    an SMS as well when the citizen is reachable there (a planner's move, ADR 0044). Reminders
+    are skipped
     when disabled, duplicated, not strictly in the future, or when the booking is not reachable
     on the channel.
     """
@@ -94,6 +104,8 @@ def plan_for_booking(
         PlannedJob(JobType.CREATE_VIDEO_ROOM, now, start),
         PlannedJob(message, now, start, ChannelKind.EMAIL),
     ]
+    if sms and reachable(ChannelKind.SMS, contact, consents):
+        jobs.append(PlannedJob(message, now, start, ChannelKind.SMS))
     seen: set[tuple[ChannelKind, int]] = set()
     reminders: list[PlannedJob] = []
     for rule in rules:
@@ -122,27 +134,37 @@ def is_stale(
 
     Pinned jobs only act on a confirmed booking whose start is unchanged and whose personal
     data still exists (CLAUDE.md). Closure notices only act on a booking that is still
-    suspended. Other unpinned jobs (cancellation mail, purge) always run.
+    suspended; requests to rebook only while the booking still awaits a new time. Other
+    unpinned jobs (cancellation mail, purge) always run.
     """
     if job_type in CLOSURE_NOTICES:
         return not booking.is_suspended or booking.contact is None
+    if job_type in REBOOK_NOTICES:
+        return not booking.awaits_rebook or booking.contact is None
     if pinned_start is None:
         return False
     return not booking.is_active or booking.start != pinned_start or booking.contact is None
 
 
-def plan_for_cancellation(*, cancelled_at: datetime, notify: bool = True) -> list[PlannedJob]:
+def plan_for_cancellation(
+    *, cancelled_at: datetime, notify: bool = True, sms: bool = False
+) -> list[PlannedJob]:
     """Return the jobs that replace all pending jobs of a cancelled booking.
 
     ``notify=False`` for the old booking of a reschedule: the citizen gets a change message
-    for the new booking instead of a cancellation. The work item is ended and the meeting
-    removed first (ADR 0021); those jobs do nothing when the booking never got them.
+    for the new booking instead of a cancellation. ``sms`` adds the SMS form of the
+    cancellation (a planner's change, ADR 0044; the caller checks the citizen is reachable).
+    The work item is ended and the meeting removed first (ADR 0021); those jobs do nothing
+    when the booking never got them.
     """
     end = PlannedJob(JobType.END_WXCC_TASK, cancelled_at, None)
     delete = PlannedJob(JobType.DELETE_VIDEO_ROOM, cancelled_at, None)
     message = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.EMAIL)
+    text = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.SMS)
     purge = PlannedJob(JobType.PURGE_PII, cancelled_at + PURGE_AFTER, None)
-    return [end, delete, message, purge] if notify else [end, delete, purge]
+    if not notify:
+        return [end, delete, purge]
+    return [end, delete, message, text, purge] if sms else [end, delete, message, purge]
 
 
 def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:
@@ -157,6 +179,43 @@ def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:
         PlannedJob(JobType.DISPATCH_WXCC_TASK, start, start),
         PlannedJob(JobType.PURGE_PII, end + PURGE_AFTER, None),
     ]
+
+
+def plan_for_rebook(
+    *, now: datetime, rebook_by: datetime, reminder_at: datetime | None, sms: bool
+) -> list[PlannedJob]:
+    """Return the jobs that replace all pending jobs of a booking awaiting a new time.
+
+    A planner asked the citizen to choose a new time (ADR 0044). The meeting goes (the
+    booking never goes ahead at this time) and so do the reminders and the planned task. The
+    citizen gets the request now and one reminder at ``reminder_at`` if that lies ahead; at
+    ``rebook_by`` an unanswered request lapses (``LAPSE_REBOOK`` cancels the booking and
+    sends the lapse message) and the personal data is purged ``PURGE_AFTER`` later. ``sms``
+    adds the SMS forms (the caller checks the citizen is reachable). Choosing a new time or
+    cancelling replaces all of these jobs.
+    """
+    channels = [ChannelKind.EMAIL, ChannelKind.SMS] if sms else [ChannelKind.EMAIL]
+    jobs = [
+        PlannedJob(JobType.END_WXCC_TASK, now, None),
+        PlannedJob(JobType.DELETE_VIDEO_ROOM, now, None),
+        *(PlannedJob(JobType.SEND_REBOOK_REQUEST, now, None, c) for c in channels),
+    ]
+    if reminder_at is not None and reminder_at > now:
+        jobs.extend(
+            PlannedJob(JobType.SEND_REBOOK_REMINDER, reminder_at, None, c) for c in channels
+        )
+    jobs.append(PlannedJob(JobType.LAPSE_REBOOK, rebook_by, None))
+    jobs.append(PlannedJob(JobType.PURGE_PII, rebook_by + PURGE_AFTER, None))
+    return jobs
+
+
+def plan_for_lapse(*, now: datetime, sms: bool) -> list[PlannedJob]:
+    """Return the message jobs when an unanswered request to rebook lapses (ADR 0044).
+
+    The purge planned with the request stays.
+    """
+    channels = [ChannelKind.EMAIL, ChannelKind.SMS] if sms else [ChannelKind.EMAIL]
+    return [PlannedJob(JobType.SEND_REBOOK_LAPSED, now, None, c) for c in channels]
 
 
 def plan_for_suspension(*, now: datetime, purge_at: datetime | None) -> list[PlannedJob]:

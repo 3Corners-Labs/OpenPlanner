@@ -69,6 +69,14 @@ bevestiging.
 Kies dit ruim genoeg dat een medewerker de taak kan oppakken voordat de burger in het
 videogesprek wacht, bijvoorbeeld 5 minuten.
 
+<!-- field: planner_change_min_lead_minutes -->
+### Wijzigen door een planner
+
+Tot hoeveel minuten voor de start een planner een afspraak vanuit de [agenda](group-agenda.md)
+mag verplaatsen of annuleren, standaard 60. Daarna krijgt de burger geen bericht meer op tijd:
+bel de burger dan. Het getal is nooit kleiner dan **Doorzetten naar de wachtrij** en hoogstens
+1440 (een dag).
+
 <!-- field: phone_mode -->
 ### Telefoonnummer op het formulier
 
@@ -143,3 +151,11 @@ opnieuw te proberen of een afspraak te maken.
 
 Leeg betekent geen grens: Webex Contact Center verdeelt dan alle gesprekken. Geplande afspraken
 tellen niet mee; die worden al door de tijdslots begrensd.
+
+<!-- field: embedding_enabled -->
+### Insluiten op websites
+
+Met **Ja** kan de groep ook als widget op de website van de organisatie staan, naast de eigen
+pagina van de groep. Dat werkt alleen op de websites die de organisatie heeft toegestaan onder
+[Insluiten op websites](embedding.md). Met **Nee** (de standaard) is de groep alleen via haar
+eigen pagina te boeken, ook als de widget op een toegestane website staat.

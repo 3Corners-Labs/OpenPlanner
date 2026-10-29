@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, time, timedelta
 
 import pytest
 
@@ -395,3 +395,13 @@ def test_slug_from_cuts_at_a_word_boundary_within_the_limit() -> None:
 
 def test_slug_from_cuts_a_single_long_word_hard() -> None:
     assert slug_from("a" * 100) == "a" * 64
+
+
+@pytest.mark.parametrize("minutes", [4, 1441])
+def test_the_planner_lead_lies_between_the_dispatch_lead_and_a_day(minutes: int) -> None:
+    with pytest.raises(DomainError, match="planner_change_min_lead_minutes"):
+        make_group(dispatch_lead_minutes=5, planner_change_min_lead_minutes=minutes)
+
+
+def test_the_planner_lead_defaults_to_an_hour() -> None:
+    assert make_group().planner_lead == timedelta(hours=1)

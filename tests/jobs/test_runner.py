@@ -8,6 +8,7 @@ from structlog.typing import EventDict, WrappedLogger
 
 from app.adapters.db.jobs import ClaimedJob
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
+from app.domain.booking import BookingStatus, ChangeReason
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.diagnostic_mode import DiagnosticMode
@@ -96,14 +97,14 @@ async def test_sends_confirmation(uow: InMemoryUnitOfWork, composer: MessageComp
     assert sender.sent[0].recipient == "ada@example.org"
 
 
-async def test_without_sender_only_purges_are_claimed(
+async def test_without_sender_only_purges_and_lapses_are_claimed(
     uow: InMemoryUnitOfWork, composer: MessageComposer
 ) -> None:
     queue = FakeQueue([])
 
     await JobRunner(queue, uow, FixedClock(NOW), None, composer).run_due()
 
-    assert queue.requested_types == {JobType.PURGE_PII}
+    assert queue.requested_types == {JobType.PURGE_PII, JobType.LAPSE_REBOOK}
 
 
 async def test_purge(uow: InMemoryUnitOfWork, composer: MessageComposer) -> None:
@@ -400,3 +401,53 @@ async def test_old_system_events_are_pruned_at_most_once_an_hour(
     clock.advance(timedelta(minutes=1))
     await runner.run_due()
     assert uow.state.audit == []
+
+
+async def _awaiting(uow: InMemoryUnitOfWork, bid: int) -> None:
+    booking = uow.state.bookings[bid]
+    uow.state.bookings[bid] = booking.request_rebook(
+        ChangeReason.STAFFING, SLOT_0900 + timedelta(days=14)
+    )
+
+
+async def test_an_unanswered_request_to_rebook_lapses(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    await _awaiting(uow, bid)
+    queue = FakeQueue([job(bid, JobType.LAPSE_REBOOK, pinned=None)])
+
+    await JobRunner(queue, uow, FixedClock(NOW), None, composer).run_due()
+
+    assert uow.state.bookings[bid].status is BookingStatus.CANCELLED
+    assert any(j.type is JobType.SEND_REBOOK_LAPSED for j in uow.state.jobs[bid])
+    assert queue.done == [1]
+
+
+async def test_a_lapse_after_a_new_time_was_chosen_is_skipped(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    queue = FakeQueue([job(bid, JobType.LAPSE_REBOOK, pinned=None)])
+
+    await JobRunner(queue, uow, FixedClock(NOW), None, composer).run_due()
+
+    assert uow.state.bookings[bid].status is BookingStatus.CONFIRMED
+    (event,) = [e for e in uow.state.audit if e.action == "job.lapse_rebook"]
+    assert event.outcome is Outcome.SKIPPED
+
+
+async def test_the_request_to_rebook_goes_only_while_it_is_open(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    await _awaiting(uow, bid)
+    sender = RecordingSender()
+    request = job(bid, JobType.SEND_REBOOK_REQUEST, pinned=None)
+
+    await JobRunner(FakeQueue([request]), uow, FixedClock(NOW), sender, composer).run_due()
+    uow.state.bookings[bid] = uow.state.bookings[bid].cancel(NOW)
+    await JobRunner(FakeQueue([request]), uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert len(sender.sent) == 1
+    assert sender.sent[0].subject == "Kies een nieuwe tijd voor uw videogesprek"

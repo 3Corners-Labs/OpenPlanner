@@ -10,6 +10,9 @@ Your organisation decides who has which role, and for which organisations or gro
 identity provider (in government usually PingFederate). The portal reads this when you log in.
 So you cannot assign roles in the portal; ask your identity management team.
 
+Besides the built-in roles below, the superuser can make [custom roles](roles.md), as a copy
+of a built-in role and within its bounds. They appear as extra columns in the matrix.
+
 | Role | Reach | What the role does |
 |---|---|---|
 | Superuser | everything | sets up the installation: organisations, integrations, holidays, updates |
@@ -44,3 +47,9 @@ confirmation email they can view their booking, and move or cancel it until the 
 deadline.
 Below that are the rights of connected systems, such as a contact-center bot. The superuser
 grants those per integration.
+
+## Changes to roles
+
+At the bottom of the page you see who made, changed or deleted which custom role, and when,
+with the version number and which permissions went on or off. Every admin sees this history:
+how roles are set up is not secret, and seeing who changed them is the point.

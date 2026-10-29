@@ -67,6 +67,14 @@ link in the confirmation.
 Choose enough time for an agent to pick up the task before the citizen waits in the video call,
 for example 5 minutes.
 
+<!-- field: planner_change_min_lead_minutes -->
+### Changes by a planner
+
+Up to how many minutes before the start a planner may move or cancel a booking from the
+[agenda](group-agenda.md), 60 by default. After that a message would not reach the citizen in
+time: call the citizen instead. The number is never less than **Send to the queue** and at most
+1440 (one day).
+
 <!-- field: phone_mode -->
 ### Phone number on the form
 
@@ -139,3 +147,11 @@ all agents are busy, with the choice to try again later or to book an appointmen
 
 Empty means no limit: Webex Contact Center then distributes every call. Scheduled appointments
 do not count; the slots already limit those.
+
+<!-- field: embedding_enabled -->
+### Embed on websites
+
+With **Yes**, the group can also appear as a widget on the organisation's website, next to the
+group's own page. This works only on the websites the organisation allows under
+[Embedding on websites](embedding.md). With **No** (the default), the group can only be booked
+on its own page, even when the widget is on an allowed website.

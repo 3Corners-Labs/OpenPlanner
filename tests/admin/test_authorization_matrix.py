@@ -50,6 +50,19 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 200, 403)},
+    # ADR 0039: the role editor is the superuser's (roles.manage is locked).
+    "GET /admin/roles": {"/admin/roles": statuses(200, 403, 403, 403, 403, 403)},
+    "GET /admin/roles/new": {"/admin/roles/new": statuses(200, 403, 403, 403, 403, 403)},
+    "POST /admin/roles": {"/admin/roles": statuses(422, 403, 403, 403, 403, 403)},
+    "GET /admin/roles/{role_id}": {
+        "/admin/roles/999999": statuses(404, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/roles/{role_id}": {
+        "/admin/roles/999999": statuses(404, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/roles/{role_id}/delete": {
+        "/admin/roles/999999/delete": statuses(404, 403, 403, 403, 403, 403),
+    },
     # ADR 0031: every role has a log; what it lists is exact per level (test_audit_routes).
     "GET /admin/audit": {"/admin/audit": statuses(200, 200, 200, 200, 200, 403)},
     # ADR 0040: the audit log as CSV, for compliance roles; not for group admins.
@@ -339,6 +352,51 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403, 403),
         "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403, 403),
     },
+    # ADR 0044: a planner's changes; an unknown booking is a 404, an empty form a 400.
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
+        "/admin/groups/demo/agenda/bookings/999999/move": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/bookings/999999/move": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
+        "/admin/groups/demo/agenda/bookings/999999/move": statuses(400, 400, 400, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
+        "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(404, 404, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
+        "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/bookings/999999/cancel": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/rebook": {
+        "/admin/groups/demo/agenda/bookings/999999/rebook": statuses(404, 404, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/rebook": {
+        "/admin/groups/demo/agenda/bookings/999999/rebook": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/bookings/999999/rebook": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/agenda/slot-rebook": {
+        "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/slot-rebook": {
+        "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/agenda/waiting": {
+        "/admin/groups/demo/agenda/waiting": statuses(200, 200, 200, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/waiting": statuses(200, 403, 403, 200, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/accept": {
+        "/admin/groups/demo/agenda/accept": statuses(400, 400, 400, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/agenda/week": {
+        "/admin/groups/demo/agenda/week": statuses(200, 200, 200, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/week": statuses(200, 403, 403, 200, 403, 403),
+    },
     "GET /admin/groups/{slug}/bookings/{booking_id}": {
         "/admin/groups/demo/bookings/999999": statuses(404, 404, 404, 403, 403, 403),
         "/admin/groups/andere-team/bookings/999999": statuses(404, 403, 403, 404, 403, 403),
@@ -372,6 +430,16 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/groups/{slug}/closure/lift": {
         "/admin/groups/demo/closure/lift": statuses(404, 404, 404, 403, 403, 403),
         "/admin/groups/andere-team/closure/lift": statuses(404, 403, 403, 404, 403, 403),
+    },
+    # The image of a closure (ADR 0037 §3): an empty form misses its alt text (422); without a
+    # closure there is nothing to remove (404).
+    "POST /admin/groups/{slug}/closure/image": {
+        "/admin/groups/demo/closure/image": statuses(422, 422, 422, 403, 403, 403),
+        "/admin/groups/andere-team/closure/image": statuses(422, 403, 403, 422, 403, 403),
+    },
+    "POST /admin/groups/{slug}/closure/image/remove": {
+        "/admin/groups/demo/closure/image/remove": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/closure/image/remove": statuses(404, 403, 403, 404, 403, 403),
     },
     "POST /admin/groups/{slug}/closure/reinstate": {
         "/admin/groups/demo/closure/reinstate": statuses(303, 303, 303, 403, 403, 403),
@@ -414,6 +482,18 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # Alternative contact options of the organisation (ADR 0037): with organisation.closure.
     # An empty form removes nothing that is not there, so an allowed POST redirects (303).
+    # ADR 0035: the websites allowed to embed the organisation's groups, embedding.manage.
+    # An empty form removes nothing that is not there, so an allowed POST redirects (303).
+    "GET /admin/embedding": {"/admin/embedding": statuses(200, 200, 403, 200, 403, 403)},
+    "GET /admin/organisations/{org}/embedding": {
+        "/admin/organisations/demo/embedding": statuses(200, 200, 403, 403, 403, 403),
+        "/admin/organisations/andere/embedding": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/organisations/nope/embedding": statuses(404, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/embedding": {
+        "/admin/organisations/demo/embedding": statuses(303, 303, 403, 403, 403, 403),
+        "/admin/organisations/andere/embedding": statuses(303, 403, 403, 303, 403, 403),
+    },
     "GET /admin/organisations/{org}/contacts": {
         "/admin/organisations/demo/contacts": statuses(200, 200, 403, 403, 403, 403),
         "/admin/organisations/andere/contacts": statuses(200, 403, 403, 200, 403, 403),

@@ -6,6 +6,7 @@ Server-rendered and usable without JavaScript. Every response goes through
     GET  /g/{slug}?month=&day=     slot picker: month calendar + times of one day (ADR 0020);
                                    the closure page instead while the team is closed (ADR 0037)
     GET  /g/{slug}/closure         closure page of an active or upcoming closure, else ─► 303
+    GET  /g/{slug}/closure/image   that closure's image (ADR 0037 §3), else 404
     GET  /g/{slug}/book?start=     contact form for one slot
     POST /g/{slug}/book            book ─► 303 /b/{token}?status=booked
     GET  /b/{token}                booking (read-only from the change deadline; a booking on
@@ -38,6 +39,7 @@ from app.web.errors import FormError, form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.protection import (
     RejectedRequest,
+    asset_limit,
     booking_limit,
     limiter,
     read_limit,
@@ -59,6 +61,7 @@ STATUS_LABELS: dict[BookingStatus, str] = {
     BookingStatus.COMPLETED: "manage.status.completed",
     BookingStatus.NO_SHOW: "manage.status.no_show",
     BookingStatus.SUSPENDED: "manage.status.suspended",
+    BookingStatus.AWAITING_REBOOK: "manage.status.awaiting_rebook",
 }
 
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
@@ -152,6 +155,22 @@ async def closure_page(request: Request, slug: str, locale: Locale) -> Response:
     return await citizen_page(request, locale, "closure.html", group, {"closure": banner})
 
 
+@router.get("/g/{slug}/closure/image")
+@limiter.limit(asset_limit)
+async def closure_image(request: Request, slug: str) -> Response:
+    """Serve the image of the group's visible closure, or 404 (ADR 0037 §3).
+
+    Only a visible closure's image is public. The type comes from the magic bytes checked on
+    upload; the default headers add ``nosniff`` and ``default-src 'none'``. ``no-cache``
+    makes browsers ask again, so an image stops being shown once its closure has ended.
+    """
+    service = _service(request)
+    found = await service.closure_image(await service.get_group(slug))
+    if found is None:
+        return Response(status_code=404)
+    return Response(found.data, media_type=found.media_type, headers={"cache-control": "no-cache"})
+
+
 def _book_context(
     group: Group,
     start: datetime,
@@ -223,6 +242,14 @@ def _manage_context(
     closure = details.closure
     return {
         "suspended": booking.is_suspended,
+        # ADR 0044: a planner asked for a new time; the request lapses at ``rebook_by``.
+        "awaiting_rebook": booking.awaits_rebook,
+        "rebook_by": (
+            f"{format_day(local_day(booking.rebook_by, group.tz), locale.code)}, "
+            f"{format_clock(booking.rebook_by, group.tz, locale.code)}"
+            if booking.rebook_by
+            else None
+        ),
         "closure": closure_view(closure, group, locale, now) if closure else None,
         "group": group,
         "slot_label": slot_label(booking.start, booking.end, group, locale),

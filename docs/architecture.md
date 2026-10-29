@@ -213,8 +213,11 @@ same commit and rollback behaviour as the SQL one.
 | Slot calculation (time zones, daylight saving) | `app/domain/availability.py` |
 | Bookings, contact validation | `app/domain/booking.py` |
 | Book, cancel, reschedule (use cases) | `app/domain/services.py` |
-| Emergency closure, bookings on hold (ADR 0024) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/web/closure_labels.py` |
+| Emergency closure, bookings on hold (ADR 0024) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/admin/closure_image_routes.py`, `app/web/closure_labels.py` |
+| Uploaded images: type from the bytes, metadata stripped, text alternative (ADR 0020, 0037 §3) | `app/domain/images.py`, `app/admin/uploads.py`, `app/adapters/db/images.py` |
 | Alternative contact options (ADR 0037) | `app/domain/contacts.py`, `app/domain/contact_service.py`, `app/admin/contact_routes.py`, `app/web/contact_labels.py`, `app/web/templates/_contact_block.html` |
+| Embedding on host websites: allowed origins, opt-in per group (ADR 0035) | `app/domain/embedding.py`, `app/domain/embedding_service.py`, `app/admin/embedding_routes.py` |
+| Widget API `/api/v1/widget` with CORS for allowed origins (ADR 0035) | `app/api/widget_api.py`, `app/api/widget_schemas.py` |
 | Which jobs, when | `app/domain/job_plan.py` |
 | Channels, reminder rules | `app/domain/channels.py` |
 | Management tokens | `app/domain/tokens.py` |
@@ -230,13 +233,17 @@ same commit and rollback behaviour as the SQL one.
 | Cap on open direct calls, place in line, usual wait (ADR 0026) | `app/domain/direct_queue.py` |
 | Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029); live steps (ADR 0048) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/web/static/update-progress.js`, `app/cli.py`, `scripts/updater/` |
 | Installing and repairing a host: packages, settings files, pinned release, host updater (ADR 0050) | `scripts/install.sh`, `docs/install.md` |
+| Maintenance mode: switch, cache, refusals in `RequirePermission`, disabled buttons, citizen and machine-API rules, alert (ADR 0038) | `app/domain/maintenance.py`, `app/domain/maintenance_service.py`, `app/adapters/db/maintenance_state.py`, `app/admin/maintenance_routes.py`, `app/admin/frozen_forms.py`, `app/api/maintenance.py`, `app/cli.py`, `scripts/updater/` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Operator commands: `webhooks-list`, `webhooks-reset`, `webhooks-health`; stored results | `app/cli.py`, `app/adapters/registrations.py`, `app/adapters/webhook_selftest.py`, `app/adapters/db/reports.py` |
 | Verify button "Koppeling controleren" | `app/domain/checks.py`, `app/domain/integration_check.py`, `app/adapters/group_check.py`, `app/admin/check_routes.py`, `app/web/check_labels.py` |
 | Simulator for platform events (not in production) | `app/domain/simulation.py`, `app/adapters/simulated_events.py`, `app/admin/simulator_routes.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
-| Agenda, booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
+| Agenda per slot with agents and shortfalls, day and week view (ADR 0044) | `app/domain/agenda.py`, `app/domain/agenda_service.py`, `app/admin/agenda_routes.py`, `app/admin/shortfalls.py` |
+| A planner's changes: move, cancel with a fixed reason, accept a shortfall (ADR 0044) | `app/domain/planner_service.py`, `app/admin/planner_routes.py` |
+| Cancelling on the citizen's behalf, shared by closure and planner; the planner's limits; asking to rebook and its lapse (ADR 0044) | `app/domain/booking_changes.py`, `app/jobs/runner.py` (`lapse_rebook`) |
+| Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
 | Machine API for bots: clients, credentials, tokens, scopes (ADR 0023) | `app/domain/api_clients.py`, `app/domain/api_access.py`, `app/adapters/db/api_clients.py` |
@@ -509,6 +516,26 @@ sequenceDiagram
 Every arrow back into OpenPlanner becomes a timeline event and updates the booking's call
 status; the agenda in the admin portal shows it per day.
 
+### Maintenance mode (ADR 0038)
+
+```mermaid
+flowchart LR
+    switch["maintenance_state row<br/>(portal, CLI, updater)"] --> status
+    env["MAINTENANCE_MODE<br/>(environment, no DB read)"] --> status
+    status{"on?<br/>cache ≤ 5 s"}
+    status -->|admin GET| read["every page readable<br/>bar + disabled buttons"]
+    status -->|admin POST| authz["RequirePermission:<br/>matrix, then<br/>decide_in_maintenance"]
+    authz -->|"integrations, updates, switch,<br/>'Koppeling controleren'<br/>(superuser only)"| allowed["change"]
+    authz -->|anything else| refused["503 'alleen lezen'<br/>audit maintenance.refused"]
+    status -->|citizen form or write| page["503 + Retry-After<br/>maintenance page, contact block"]
+    status -->|machine-API write| api["503 {error: maintenance}"]
+    status -.->|never asked| open["webhooks, join pages, health,<br/>worker jobs incl. purge_pii"]
+```
+
+The host updater switches maintenance on before its backup and off after a healthy result, a
+rollback or a restore; a failed update leaves it on. The worker reports maintenance that is on
+longer than `MAINTENANCE_ALERT_HOURS` as the system event `maintenance.overdue`.
+
 ### Booking status
 
 ```mermaid
@@ -673,7 +700,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0040 | Standard event schema, log levels, role tags, CSV export and storage limits (log rotation, SQLite space reclaim, disk watch) |
 | 0041 | Extended branding: allow-listed tokens with contrast checks, own WOFF2 fonts, header styles, theme file; no free CSS |
 | 0043 | Dispatch option per group: contact center or OpenPlanner's own queue (claim by agents, optional calendar invite to a group address) (proposed) |
-| 0044 | Planner: group agenda with shortfalls; move, ask to rebook, cancel or accept per booking (`bookings.manage`) (proposed) |
+| 0044 | Planner: group agenda with shortfalls; move, ask to rebook, cancel or accept per booking (`bookings.manage`) |
 | 0048 | Live progress of updates: the host updater reports each step, the updates page polls a fragment (proposed) |
 | 0050 | One host installer that installs, repairs and re-checks a host; one layout under `/home/<user>/openplanner` (proposed) |
 
@@ -705,7 +732,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 | ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | proposed |
 | ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
-| ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | in progress (CB-1, CL-1, CL-2 done) |
+| ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | in progress (CB-1, CL-1, CL-2, CL-3 done) |
 | ADR 0038 | Maintenance mode (backlog MM-1 to MM-5) | planned |
 | ADR 0039 | Rights: (1) auditor role, reach, matrix page text; (2) retention overview; (3) custom roles within bounds | in progress |
 | ADR 0040 | Logging and storage: step 1 rotation, reclaim and disk watch; steps 2–4 schema and levels, filters and CSV export, diagnostic mode and retention | step 1 done |
