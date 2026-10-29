@@ -21,6 +21,12 @@ AGENT_API_PREFIX = "/api/agent/v1"
 SMTPS_PORT = 465
 """Mail submission over implicit TLS (RFC 8314); STARTTLS is never offered there."""
 
+DEV_ONLY_SECRET_PREFIX = "dev-only-"  # noqa: S105  # nosec B105 - a public prefix
+"""Marks the placeholder secrets in the repository (``.env.example``, the dev Keycloak realm).
+
+They are public, so production refuses any secret that starts with it.
+"""
+
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 
 
@@ -246,6 +252,12 @@ class Settings(BaseSettings):
                 raise ValueError("PUBLIC_BASE_URL must use https in production")
             if self.session_secret is None:
                 raise ValueError("SESSION_SECRET is required in production")
+            for name in type(self).model_fields:
+                value = getattr(self, name)
+                if isinstance(value, SecretStr) and value.get_secret_value().startswith(
+                    DEV_ONLY_SECRET_PREFIX
+                ):
+                    raise ValueError(f"{name.upper()} holds a development placeholder")
             if self.webhook_base_url is not None and not self.webhook_base_url.startswith(
                 "https://"
             ):
