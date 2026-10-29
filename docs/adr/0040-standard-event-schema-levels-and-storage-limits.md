@@ -1,7 +1,8 @@
 # 0040. Standard event schema, log levels and storage limits
 
 Status: accepted (2026-10-27), requested by the product owner. Part 1 (storage limits) is
-implemented with this ADR; parts 2 to 4 are the agreed direction and get built in that order.
+implemented with this ADR, part 2 (one event schema) on 2026-10-28; parts 3 and 4 are the
+agreed direction and get built in that order.
 Extends ADR 0031 (audit log per level) and replaces the field list of ADR 0034 (still proposed)
 before it is built.
 
@@ -54,7 +55,7 @@ each role sees only its own lines, CSV export, and controls so no disk fills up.
    the web process out of service or to roll back an update (ADR 0029). Readiness still says
    nothing about why; the system event and the log do.
 
-### Part 2: one event schema (next)
+### Part 2: one event schema (built)
 
 5. **One schema for table, log line, CSV and log platform**, aligned with Elastic Common Schema
    and the OpenTelemetry log data model so platforms need no mapping: `event_id`,
@@ -73,6 +74,16 @@ each role sees only its own lines, CSV export, and controls so no disk fills up.
    `group` and `trace.id` as structlog context, so every stdout line can be filtered per tenant
    on the log platform. The portal still reads only the table: only there does the scope filter
    per role apply.
+
+As built: `app/domain/event_schema.py` holds the schema and `rfc3339`; the trace, organisation
+and group live in `app/domain/event_context.py` (context variables, so the domain stamps
+events without knowing about logging). Every HTTP request runs in its own trace (an incoming
+`traceparent` is not trusted); admin routes bind the target of their permission check, public
+`/g/{slug}` pages the group; the worker gives each round and each job its own trace, bound to
+the job's booking. `audit_events` gains `event_id`, `level`, `category`, `trace_id` and
+`service` (migration 0034); `service.version` and `installation` come from the settings when a
+record is written out. Log lines rename structlog's `event` and `level` to `message` and
+`log.level`, because a string `event` clashes with ECS's `event.*` object.
 
 ### Part 3: filters and CSV export
 
@@ -94,6 +105,18 @@ each role sees only its own lines, CSV export, and controls so no disk fills up.
     admin-action term, which is a records-policy choice (Archiefwet, BIO).*
 13. **Emergency brake**: at grade `critical` the worker stops writing diagnostic events and
     switches diagnostic mode off. Audit and system events are always written.
+
+## Settings
+
+| Key | Class | Default | Bounds | Permission | Note |
+|---|---|---|---|---|---|
+| `STORAGE_LOW_FREE_PERCENT` | B deployment | 15 | 0–100, above critical | env | part 1; tied to the host's volume |
+| `STORAGE_CRITICAL_FREE_PERCENT` | B deployment | 5 | 0–100 | env | part 1 |
+| `DATABASE_MAX_MB` | B deployment | none | ≥ 1 | env | part 1 |
+| `INSTALLATION_NAME` | B deployment | empty | `[A-Za-z0-9_.-]{0,64}` | env | part 2; names the host installation on a shared log platform, needed before the database works |
+
+**Fixed on purpose:** the schema's field names and the timestamp format (a change is a new
+schema version), the mapping of outcome to level, and the 32-hex shape of event and trace ids.
 
 ## Consequences
 
