@@ -5,7 +5,10 @@ from datetime import timedelta
 import pytest
 
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Level, Outcome, Source
+from app.domain.authorization import Scope
+from app.domain.event_context import TRACE_ID
+from app.domain.event_schema import rfc3339
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
 from tests.support.domain import NOW
 
@@ -111,6 +114,26 @@ async def test_a_denial_shows_its_reason(site: Site) -> None:
 
     assert "Buiten de eigen organisatie of groep." in text
     assert "<code>out_of_scope</code>" in text
+
+
+async def test_events_of_a_request_carry_its_trace_and_show_utc(site: Site) -> None:
+    # ADR 0040, part 2: one trace per request, the web service, the level from the outcome.
+    await site.login_as(GROUP_ADMIN)
+    await site.client.get("/admin/groups/andere-team")
+    await site.client.get("/admin/groups/andere-team")
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).read() as tx:
+        entries = await tx.list_audit_events(Scope(everything=True))
+
+    denials = [entry.event for entry in entries if entry.event.outcome is Outcome.DENIED]
+    assert len(denials) == 2
+    assert all(TRACE_ID.fullmatch(event.trace_id) for event in denials)
+    assert denials[0].trace_id != denials[1].trace_id
+    assert {(event.service, event.level) for event in denials} == {("web", Level.WARNING)}
+
+    await site.login_as(SUPER)
+    text = (await site.client.get("/admin/audit")).text
+    assert f'<time datetime="{rfc3339(denials[0].at)}">' in text
 
 
 @pytest.mark.parametrize(

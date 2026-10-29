@@ -382,6 +382,14 @@ REGISTRY: tuple[SettingSpec, ...] = (
     ),
     S("app_version", K.STRING, "", _B, T.HOST, "Baked into release images (ADR 0029)."),
     S(
+        "installation_name",
+        K.STRING,
+        "",
+        _B,
+        T.HOST,
+        "Name of this installation in every log line and event record (ADR 0040/0034).",
+    ),
+    S(
         "webex_api_base_url",
         K.URL,
         "https://webexapis.com/v1",
