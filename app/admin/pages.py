@@ -115,6 +115,13 @@ def admin_moment(request: Request, locale: RequestLocale, at: datetime) -> str:
     return moment_label(at, ZoneInfo(request.app.state.settings.admin_timezone), locale.code)
 
 
+def role_labels(principal: Principal, locale: RequestLocale) -> list[str]:
+    """Name the principal's roles: built-in ones translated, custom ones by their own name."""
+    built_in = [locale.gettext(ROLE_LABELS[role]) for role in Role if role in principal.roles]
+    custom = sorted(role.name(locale.code) for role in principal.custom_roles)
+    return built_in + custom
+
+
 def page(
     request: Request,
     locale: RequestLocale,
@@ -141,7 +148,6 @@ def page(
     ]
     nav = [section for section in sections if section.entries]
     top_links = [_nav_view(locale, link, home) for link in TOP_BAR if can(link.permission)]
-    role_labels = [locale.gettext(ROLE_LABELS[role]) for role in Role if role in principal.roles]
     theme = choose_theme(request, request.query_params.get(THEME_PARAM))
     maintenance = getattr(request.state, "maintenance_notice", None)
     response = render(
@@ -155,7 +161,7 @@ def page(
             "nav": nav,
             "top_links": top_links,
             "can": can,
-            "role_labels": role_labels,
+            "role_labels": role_labels(principal, locale),
             "theme": theme,
             "themes": theme_options(request, locale, theme),
             # A message page (refusal, not found) keeps ``help_topic`` None: no help link.
