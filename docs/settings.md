@@ -60,6 +60,9 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `MAINTENANCE_CACHE_SECONDS` | float | `5.0` | 0–5 | `settings.platform.manage` | How long the web process trusts its last read of the maintenance switch (ADR 0038). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
 | `SYSTEM_EVENT_RETENTION_DAYS` | int | `90` | 30–3650 | `settings.platform.manage` | Days after which system events leave the audit log (ADR 0031). |
+| `SECURITY_EVENT_WINDOW_MINUTES` | int | `15` | 1–1440 | `settings.platform.manage` | At most one security event per kind per this many minutes; the rest are counted into the next one (ADR 0034). |
+| `AUDIT_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Rows in one CSV export of the audit log; a larger export is refused (ADR 0040). |
+| `AUDIT_EXPORT_MAX_DAYS` | int | `366` | 1–3660 | `settings.platform.manage` | Days one CSV export of the audit log may cover (ADR 0040). |
 | `STORAGE_LOW_FREE_PERCENT` | float | `15.0` | 1–50 | `settings.platform.manage` | Free space below which storage is low (ADR 0040). |
 | `STORAGE_CRITICAL_FREE_PERCENT` | float | `5.0` | 1–50 | `settings.platform.manage` | Free space below which storage is critical; below the low limit. |
 | `DATABASE_MAX_MB` | int | — | empty or ≥ 100 | `settings.platform.manage` | Database size above which storage is degraded; empty means no limit. |
