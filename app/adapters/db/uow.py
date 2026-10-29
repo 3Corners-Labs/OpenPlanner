@@ -24,6 +24,7 @@ from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.images import ImageQueries, page_image
+from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
     AuditEventRow,
     BookingEventRow,
@@ -317,6 +318,7 @@ class SqlTransaction(
     UpdateQueries,
     RetentionQueries,
     StaffQueries,
+    MaintenanceQueries,
     ImageQueries,
     ScenarioQueries,
 ):
@@ -324,8 +326,9 @@ class SqlTransaction(
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
     from ``UpdateQueries`` (ADR 0029), those of the retention overview from
-    ``RetentionQueries`` (ADR 0039), those of closure images and scenarios from
-    ``ImageQueries`` and ``ScenarioQueries`` (ADR 0037).
+    ``RetentionQueries`` (ADR 0039), the staff directory from ``StaffQueries`` (ADR 0046),
+    the maintenance switch from ``MaintenanceQueries`` (ADR 0038), closure images and
+    scenarios from ``ImageQueries`` and ``ScenarioQueries`` (ADR 0037).
 
     Args:
         session: The open session.
