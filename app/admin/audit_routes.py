@@ -162,6 +162,8 @@ DETAIL_LABELS: dict[str, str] = {
     "closure.start": "admin.audit.detail.closure_start",
     "closure.update": "admin.audit.detail.closure_update",
     "closure.lift": "admin.audit.detail.closure_lift",
+    "closure.image.update": "admin.audit.detail.closure_image_update",
+    "closure.image.remove": "admin.audit.detail.closure_image_remove",
     "booking.reinstate": "admin.audit.detail.booking_reinstate",
     "booking.reinstate_all": "admin.audit.detail.booking_reinstate_all",
     "booking.cancel": "admin.audit.detail.booking_cancel",
@@ -196,6 +198,7 @@ DETAIL_LABELS: dict[str, str] = {
 COUNT_LABELS: dict[str, str] = {
     "bookings": "admin.audit.detail.bookings",
     "notified": "admin.audit.detail.notified",
+    "file": "admin.audit.detail.file",
     "attempt": "admin.audit.detail.attempt",
     "free_percent": "admin.audit.detail.free_percent",
     "database_mb": "admin.audit.detail.database_mb",

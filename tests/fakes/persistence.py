@@ -23,6 +23,7 @@ from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
+from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import PlannedJob
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
@@ -67,6 +68,7 @@ class State:
     group_holidays: dict[int, holiday_model.GroupHolidays] = field(default_factory=dict)
     closures: dict[int, Closure] = field(default_factory=dict)
     acceptances: dict[tuple[int, datetime], ShortfallAcceptance] = field(default_factory=dict)
+    closure_images: dict[int, ImageFile] = field(default_factory=dict)
     api_settings: ApiSettings = field(default_factory=ApiSettings)
     api_clients: dict[str, ApiClient] = field(default_factory=dict)
     access_tokens: dict[str, AccessToken] = field(default_factory=dict)
@@ -619,7 +621,26 @@ class InMemoryTransaction:
         return stored
 
     async def save_closure(self, closure: Closure) -> None:
-        self.state.closures[closure.id or 0] = closure
+        # As the SQL adapter: the image has its own calls and is kept.
+        current = self.state.closures.get(closure.id or 0)
+        image = current.image if current else None
+        self.state.closures[closure.id or 0] = replace(closure, image=image)
+
+    async def get_closure_image(self, closure_id: int) -> ImageFile | None:
+        return self.state.closure_images.get(closure_id)
+
+    async def save_closure_image(
+        self, closure_id: int, text: ImageText, image: ImageFile | None
+    ) -> None:
+        stored = image or self.state.closure_images[closure_id]
+        self.state.closure_images[closure_id] = stored
+        closure = self.state.closures[closure_id]
+        self.state.closures[closure_id] = replace(closure, image=stored.ref(text))
+
+    async def remove_closure_image(self, closure_id: int) -> None:
+        self.state.closure_images.pop(closure_id, None)
+        closure = self.state.closures[closure_id]
+        self.state.closures[closure_id] = replace(closure, image=None)
 
     async def find_confirmed_bookings(
         self, group_id: int, lower: datetime, upper: datetime | None
