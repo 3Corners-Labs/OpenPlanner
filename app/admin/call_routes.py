@@ -1,16 +1,15 @@
-"""Admin views of calls (ADR 0010): a group's agenda per day and a booking's timeline.
+"""Admin views of calls (ADR 0010): the agenda rows of bookings and a booking's timeline.
 
-Both need ``bookings.view`` on the group. The agenda shows the first name only (no email or
-phone), the meeting and work item state in words, whether the agent joined, the number of
-participants and a "not picked up" flag. The timeline lists every recorded event with its
-reason code; nothing about participants beyond counts.
+Both need ``bookings.view`` on the group. An agenda row (``agenda_routes`` shows them per
+slot) has the first name only (no email or phone), the meeting and work item state in words,
+whether the agent joined, the number of participants and a "not picked up" flag. The timeline
+lists every recorded event with its reason code; nothing about participants beyond counts.
 
-    GET /admin/groups/{slug}/agenda?day=YYYY-MM-DD       bookings.view
     GET /admin/groups/{slug}/bookings/{booking_id}       bookings.view
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -24,7 +23,6 @@ from app.domain.authorization import Permission
 from app.domain.calls import BookingOverview, CallStatus, EventKind, not_picked_up
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
-from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock, format_day
@@ -68,7 +66,7 @@ class AgendaRow:
     cancelled: bool
 
 
-def _integration(request: Request) -> IntegrationService:
+def integration_service(request: Request) -> IntegrationService:
     """Return the integration service."""
     service: IntegrationService = request.app.state.integration_service
     return service
@@ -81,7 +79,7 @@ def _chips(status: CallStatus, _: BoundGettext) -> tuple[Chip, Chip]:
     return Chip(_(call_key), call_tone), Chip(_(task_key), task_tone)
 
 
-def _row(
+def agenda_row(
     item: BookingOverview, group: Group, now: datetime, _: BoundGettext, code: str
 ) -> AgendaRow:
     """Turn a booking and its status into an agenda row."""
@@ -99,35 +97,6 @@ def _row(
         participants=status.participants,
         not_picked_up=booking.is_active and not_picked_up(status, booking.start, now, limit),
         cancelled=not booking.is_active,
-    )
-
-
-@router.get("/groups/{slug}/agenda", response_class=HTMLResponse)
-async def agenda(
-    request: Request, locale: Locale, slug: str, context: ViewBookings, day: str | None = None
-) -> HTMLResponse:
-    """Show the group's bookings of one day with their call status."""
-    _ = locale.gettext
-    group = context.group.group
-    clock: Clock = request.app.state.clock
-    now = clock.now()
-    try:
-        chosen = date.fromisoformat(day) if day else now.astimezone(group.tz).date()
-    except ValueError:
-        chosen = now.astimezone(group.tz).date()
-    rows = await _integration(request).day_overview(context.principal, slug, chosen)
-    return group_page(
-        request,
-        locale,
-        context,
-        "admin/group_agenda.html",
-        {
-            "day_label": format_day(chosen, locale.code),
-            "previous_day": (chosen - timedelta(days=1)).isoformat(),
-            "next_day": (chosen + timedelta(days=1)).isoformat(),
-            "today": now.astimezone(group.tz).date().isoformat(),
-            "rows": [_row(item, group, now, _, locale.code) for item in rows],
-        },
     )
 
 
@@ -149,7 +118,7 @@ async def booking_detail(
     _ = locale.gettext
     group = context.group.group
     try:
-        timeline = await _integration(request).timeline(context.principal, booking_id)
+        timeline = await integration_service(request).timeline(context.principal, booking_id)
     except DomainError as error:
         if error.code is ErrorCode.NOT_PERMITTED:
             raise AccessDenied from error
