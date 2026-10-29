@@ -60,6 +60,8 @@ DONE_MESSAGES: dict[str, str] = {
     "font_saved": "admin.done.font_saved",
     "font_removed": "admin.done.font_removed",
     "theme_saved": "admin.done.theme_saved",
+    "image_saved": "admin.done.image_saved",
+    "image_removed": "admin.done.image_removed",
     "checked": "admin.done.checked",
     "maintenance_on": "admin.done.maintenance_on",
     "maintenance_off": "admin.done.maintenance_off",
@@ -103,6 +105,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "wxcc_channel": "admin.form.error.integration_text",
     "wxcc_routing_value": "admin.form.error.integration_text",
     "direct_call_enabled": "admin.form.error.choice",
+    "embedding_enabled": "admin.form.error.choice",
     "not_picked_up_minutes": "admin.form.error.not_picked_up_minutes",
     "direct_call_max_concurrent": "admin.form.error.direct_call_max_concurrent",
     "display_name": "admin.form.error.display_name",
@@ -138,6 +141,8 @@ FIELD_MESSAGES: dict[str, str] = {
     "notice_en": "admin.form.error.notice",
     "heading_nl": "admin.form.error.closure_heading",
     "heading_en": "admin.form.error.closure_heading",
+    "alt_nl": "admin.form.error.image_alt",
+    "alt_en": "admin.form.error.image_alt",
     "start": "admin.form.error.start",
     "scopes": "admin.form.error.scopes",
     "groups": "admin.form.error.groups",
@@ -159,6 +164,11 @@ FIELD_MESSAGES: dict[str, str] = {
     "channel": "admin.form.error.reminder_channel",
     "minutes_before": "admin.form.error.reminder_offset",
     "reminders": "admin.form.error.reminder_limit",
+    "name_nl": "admin.form.error.role_name",
+    "name_en": "admin.form.error.role_name",
+    "claim_value": "admin.form.error.claim_value",
+    "permissions": "admin.form.error.permissions",
+    "template": "admin.form.error.choice",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -186,6 +196,7 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SAME_SLOT: "error.same_slot",
     ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",
     ErrorCode.INTEGRATION_NOT_READY: "admin.form.error.settings_key",
+    ErrorCode.ROLE_CHANGED: "admin.form.error.role_changed",
     ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
 }
 

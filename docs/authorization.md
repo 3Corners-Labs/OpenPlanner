@@ -28,22 +28,40 @@ stays open to every role as usual.
 | Manage API clients (`api_clients.manage`) | Portal | locked | yes | – | – | – |
 | Update the installation (`system.update`) | Portal | locked, maintenance | yes | – | – | – |
 | Switch maintenance mode on and off (`system.maintenance`) | Portal | locked, maintenance | yes | – | – | – |
+| Adjust roles (`roles.manage`) | Portal | locked | yes | – | – | – |
 | Manage integrations and secrets (`integrations.manage`) | Organisation | locked, maintenance | yes | – | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | – | yes | – | – | – |
 | Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | – | yes | yes | – | – |
 | Create groups (`group.create`) | Organisation | – | yes | yes | – | – |
-| Close every team of an organisation at once (`organisation.closure`) | Organisation | – | yes | yes | – | – |
+| Close every team of an organisation at once (`organisation.closure`) | Organisation | needs `closure.manage` | yes | yes | – | – |
 | View retention (`retention.view`) | Organisation | – | yes | yes | – | yes |
+| Manage embedding on websites (`embedding.manage`) | Organisation | – | yes | yes | – | – |
 | View audit log (`audit.view`) | Group | – | yes | yes | yes | yes |
 | Export audit log (`audit.export`) | Group | – | yes | yes | – | yes |
 | View group (`group.view`) | Group | – | yes | yes | yes | yes |
-| Change group settings (`group.edit`) | Group | – | yes | yes | – | – |
-| Manage staffing and staffing exceptions (`schedule.manage`) | Group | – | yes | yes | yes | – |
-| Manage texts (`texts.manage`) | Group | – | yes | yes | yes | – |
-| Manage reminders (`reminders.manage`) | Group | – | yes | yes | – | – |
+| Change group settings (`group.edit`) | Group | needs `group.view` | yes | yes | – | – |
+| Manage staffing and staffing exceptions (`schedule.manage`) | Group | needs `group.view` | yes | yes | yes | – |
+| Manage texts (`texts.manage`) | Group | needs `group.view` | yes | yes | yes | – |
+| Manage reminders (`reminders.manage`) | Group | needs `group.view` | yes | yes | – | – |
 | View bookings (`bookings.view`) | Group | personal data | yes | yes | yes | – |
-| Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | – | yes | yes | yes | – |
+| Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | needs `group.view` | yes | yes | yes | – |
 | View staff (`staff.view`) | Group | – | yes | yes | yes | yes |
+
+## Custom roles
+
+The superuser can make custom roles (ADR 0039): a copy of a template below, with a
+name, a role claim value of its own and delegable permissions switched on or off. A
+custom role keeps the reach of its template and never reaches everything. Every role
+holds the permissions every admin holds and the permissions its permissions need. A
+copy of the auditor only reads and never holds a personal-data permission. Custom
+roles are data; `decide` clips each one to these bounds again on every request.
+Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
+
+| Template | Reach | Delegable permissions |
+|---|---|---|
+| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
+| Group admin | groups | `audit.export`, `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `reminders.manage`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
+| Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `matrix.view`, `retention.view`, `rights.view`, `staff.view` |
 
 ## Citizens
 

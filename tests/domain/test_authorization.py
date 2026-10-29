@@ -69,6 +69,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.ORGANISATION_CLOSURE,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
+        Permission.EMBEDDING_MANAGE,  # ADR 0035
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -118,6 +119,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.INTEGRATIONS_MANAGE,
         Permission.API_CLIENTS_MANAGE,
         Permission.SYSTEM_UPDATE,
+        Permission.ROLES_MANAGE,  # ADR 0039 step 3
         Permission.SYSTEM_MAINTENANCE,
         Permission.DIAGNOSTICS_MANAGE,  # ADR 0040: product owner, 2026-10-29
     } == LOCKED_PERMISSIONS
@@ -184,6 +186,11 @@ def test_every_permission_has_a_level() -> None:
         (AUDITOR, Permission.STAFF_VIEW, OWN_GROUP, Decision(True, Reason.ORGANISATION)),
         (GROUP, Permission.STAFF_VIEW, OWN_GROUP, Decision(True, Reason.GROUP)),
         (GROUP, Permission.STAFF_VIEW, OTHER_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
+        # ADR 0035: the organisation decides where its groups may be embedded.
+        (ORG, Permission.EMBEDDING_MANAGE, OWN_ORG, Decision(True, Reason.ORGANISATION)),
+        (ORG, Permission.EMBEDDING_MANAGE, OTHER_ORG, Decision(False, Reason.OUT_OF_SCOPE)),
+        (GROUP, Permission.EMBEDDING_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
+        (AUDITOR, Permission.EMBEDDING_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
         # Roles combine: org admin elsewhere, group admin here.
         (MIXED, Permission.SCHEDULE_MANAGE, OWN_GROUP, Decision(True, Reason.GROUP)),
         (MIXED, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),

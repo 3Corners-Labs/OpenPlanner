@@ -13,6 +13,8 @@ the display name of admins, from the identity provider (ADR 0046).
     integration_reports (last webhook listing and delivery test; no secrets)
     staff 1──* staff_memberships (admins as last seen at login, ADR 0046; the name is joined
                                   into the audit log)
+    admin_profiles (name per identity-provider subject; joined into the audit log)
+    roles (custom roles of the superuser, ADR 0039; no foreign keys, linked by claim value)
     release_checks (one row), update_requests (ADR 0029; the installation, no personal data)
     maintenance_state (one row, ADR 0038; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
@@ -23,6 +25,7 @@ the display name of admins, from the identity provider (ADR 0046).
                          │  └───* schedule_overrides
                          │  └───* reminder_rules
                          │  └───* closures 1──* closure_notices (ADR 0024)
+                         │            └──? closure_images (ADR 0037 §3; one per closure)
                          │  └───* group_texts (message texts per locale and block)
                          └──* slots 1──* bookings 1──* jobs
                                          └──? closure (the one that suspended it)
@@ -66,6 +69,7 @@ __all__ = [
     "BookingRow",
     "GroupHolidayCalendarRow",
     "GroupHolidayOpenDayRow",
+    "ClosureImageRow",
     "ClosureNoticeRow",
     "ClosureRow",
     "GroupRow",
@@ -146,6 +150,18 @@ class OrganisationContactsRow(Base):
     body: Mapped[str] = mapped_column(Text)
 
 
+class OrganisationOriginRow(Base):
+    """A website allowed to embed the organisation's groups (ADR 0035); no personal data."""
+
+    __tablename__ = "organisation_origins"
+
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), primary_key=True
+    )
+    origin: Mapped[str] = mapped_column(String(200), primary_key=True)
+    position: Mapped[int] = mapped_column(Integer)
+
+
 class GroupRow(Base):
     """A bookable team mapped to a WxCC queue."""
 
@@ -170,6 +186,7 @@ class GroupRow(Base):
     not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
+    embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
 
     __table_args__ = (
@@ -407,6 +424,26 @@ class ClosureRow(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
     # The JSON copy of the contact block taken when the closure started (ADR 0037 §2).
     contacts: Mapped[str | None] = mapped_column(Text)
+    image_id: Mapped[int | None] = mapped_column(
+        ForeignKey("closure_images.id", ondelete="SET NULL")
+    )
+
+
+class ClosureImageRow(Base):
+    """An image of a closure with its text alternative (ADR 0037 §3); metadata already stripped.
+
+    Organisation data, not personal data: no purge. The type comes from the magic bytes.
+    """
+
+    __tablename__ = "closure_images"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    media_type: Mapped[str] = mapped_column(String(16))
+    digest: Mapped[str] = mapped_column(String(16))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    # The text alternative per locale as JSON; ``{}`` when decorative.
+    alts: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+    decorative: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
 
 
 class ClosureNoticeRow(Base):
@@ -758,3 +795,21 @@ class MaintenanceStateRow(Base):
     reason: Mapped[str | None] = mapped_column(String(16))
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class RoleRow(Base):
+    """A custom role (ADR 0039): a copy of a built-in template within its bounds.
+
+    ``permissions`` is space separated; a permission no longer known grants nothing. The
+    reach follows from ``template`` and never changes.
+    """
+
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    template: Mapped[str] = mapped_column(String(32))
+    name_nl: Mapped[str] = mapped_column(String(80))
+    name_en: Mapped[str] = mapped_column(String(80))
+    claim_value: Mapped[str] = mapped_column(String(128), unique=True)
+    permissions: Mapped[str] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer)

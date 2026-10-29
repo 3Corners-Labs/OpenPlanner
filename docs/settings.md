@@ -69,6 +69,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `SECURITY_EVENT_MAX_SOURCES` | int | `1000` | 10–100000 | `settings.platform.manage` | Windows (kind of event × caller) a process keeps; beyond that, callers count as many (ADR 0053). |
 | `AUDIT_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of the audit log may hold; more is refused (ADR 0040). |
 | `AUDIT_EXPORT_MAX_DAYS` | int | `366` | 1–3660 | `settings.platform.manage` | Most days one CSV export of the audit log may cover (ADR 0040). |
+| `EMBEDDING_MAX_ORIGINS` | int | `20` | 1–100 | `settings.platform.manage` | Most host websites one organisation may allow for the embedded widget (ADR 0035). |
 | `STORAGE_LOW_FREE_PERCENT` | float | `15.0` | 1–50 | `settings.platform.manage` | Free space below which storage is low (ADR 0040). |
 | `STORAGE_CRITICAL_FREE_PERCENT` | float | `5.0` | 1–50 | `settings.platform.manage` | Free space below which storage is critical; below the low limit. |
 | `DATABASE_MAX_MB` | int | — | empty or ≥ 100 | `settings.platform.manage` | Database size above which storage is degraded; empty means no limit. |
@@ -108,3 +109,4 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `TIME_FORMAT` | enum | `24h` | 24h, 12h, locale | `settings.organisation.manage` | How clock times are written. |
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
 | `STAFF_DORMANT_AFTER_DAYS` | int | `90` | 14–365 | `settings.organisation.manage` | Days without a login after which a person is marked dormant in the staff list (ADR 0046). |
+| `SHORTFALL_HORIZON_DAYS` | int | `14` | 1–60 | `settings.organisation.manage` | Days ahead the shortfall notice on group pages and the dashboard looks (ADR 0044). |
