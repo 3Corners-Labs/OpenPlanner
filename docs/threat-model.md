@@ -341,6 +341,25 @@ closure (CL-3): `POST /admin/groups/{slug}/closure/image` and `…/image/remove`
 | Elevation | Another organisation's admin sets or removes a team's closure image | One `RequirePermission(closure.manage)` on the group; `ClosureService` authorises again | `tests/admin/test_closure_image_routes.py::test_another_organisations_admin_is_refused`, `tests/domain/test_closure_image.py::test_another_organisations_admin_cannot_set_or_remove_the_image` |
 | Tampering (CSRF) | A third-party site uploads an image in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_closure_image_routes.py::test_cross_site_uploads_are_refused` |
 
+## Flow: embedded booking (ADR 0035, EM-2)
+
+Public, unauthenticated, called by `<gov-booking>` on a host website:
+`GET /api/v1/widget/{org}/{group}/`, `GET …/availability`, `POST …/bookings` and the CORS
+preflight `OPTIONS …/bookings`. Inputs from outside: path, `month`, `day`, `lang`, the JSON
+booking body and the `Origin` header.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Tampering (CSRF) / spoofing | A foreign origin, `null`, a lookalike or a script without `Origin` posts bookings | `require_allowed_origin`: a booking must carry an `Origin` exactly on the organisation's list (EM-1); no cookies are used, so there is no session to ride | `tests/api/test_widget_api.py::test_a_booking_from_any_other_origin_is_refused_and_books_nothing` |
+| Spoofing | A copied script tag on another site reads the calendar | Reads with a foreign `Origin` are refused; CORS answers only listed origins, never `*`, never with credentials | `tests/api/test_widget_api.py::test_reads_from_a_foreign_origin_are_refused`, `test_the_preflight_answers_only_allowed_origins` |
+| Information disclosure | The API reveals a group that is not embeddable or belongs to another organisation | One `404 group_not_found` for unknown, switched-off and other organisation's groups | `tests/api/test_widget_api.py::test_a_group_that_is_off_or_in_another_organisation_is_not_found`, `tests/domain/test_embedding_service.py::test_the_widget_group_needs_the_right_organisation_and_the_switch` |
+| Denial of service | Slot exhaustion from a host page | The same slowapi limits per IP as the standalone page (10 bookings/hour, 60 reads/minute), honeypot, body capped at 4 kB | `tests/api/test_widget_api.py::test_slot_exhaustion_from_a_host_page_hits_the_same_rate_limit`, `test_the_honeypot_and_malformed_bodies_are_refused` |
+| Information disclosure | The host page reads confirmation data: a management token or personal data | The answer holds start, end, a label and a fixed message; the management link goes by email only | `tests/api/test_widget_api.py::test_a_booking_from_an_allowed_origin_returns_no_token_and_no_personal_data` |
+| Information disclosure | PII through error responses | Errors are `{"error": code, "field": name}`; FastAPI's validation answer (which repeats input) is replaced; unknown body fields are refused | `tests/api/test_widget_api.py::test_a_bad_email_is_named_without_echoing_it`, `test_the_honeypot_and_malformed_bodies_are_refused` |
+| Tampering | A booking during an emergency closure or outside the horizon | The same `BookingService.book` as the standalone page: `group_closed`, `outside_booking_window`, `slot_full` | `tests/api/test_widget_api.py::test_a_taken_slot_is_a_conflict`, `tests/domain/test_services.py` |
+| Information disclosure | A cached answer of one origin served to another | `Cache-Control: no-store` and `Vary: Origin` on every answer | `tests/api/test_widget_api.py::test_the_group_comes_with_its_form_and_texts_for_an_allowed_origin` |
+| Tampering | A booking through the widget while maintenance mode is on (ADR 0038) | The maintenance rule closes the group, availability and booking routes (`503 maintenance`), as it closes `/g/{slug}`; a test fails when a public route is neither closed nor explicitly open | `tests/api/test_widget_api.py::test_during_maintenance_the_group_routes_close_but_texts_and_preflight_stay_open`, `tests/api/test_maintenance_pages.py::test_every_public_route_is_closed_or_explicitly_open` |
+
 ## Flow: allowed origins for embedding (ADR 0035, EM-1)
 
 Admins: `GET /admin/embedding` and `GET/POST /admin/organisations/{org}/embedding`
