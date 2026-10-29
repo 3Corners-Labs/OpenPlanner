@@ -59,6 +59,7 @@ OPEN_ROUTES = frozenset(
         "/api/v1/widget/texts",
         "/b/{token}",
         "/g/{slug}/closure",
+        "/g/{slug}/closure/image",
         "/b/{token}/wait",
         "/b/{token}/join",
         "/b/{token}/join/go",

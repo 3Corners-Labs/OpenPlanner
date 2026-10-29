@@ -1,4 +1,4 @@
-{#- The closure page (ADR 0037 §5): heading, period, notice and contact options, in that order.
+{#- The closure page (ADR 0037 §5): heading, period, notice, image and contact options, in that order.
     Replaces the calendar while the team is closed; before the start it is linked from the
     banner, and the calendar stays one link away. -#}
 {% extends "base.html" %}
@@ -13,6 +13,7 @@
   <p><strong>{{ closure.period }}</strong></p>
   {% for paragraph in closure.paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
 </div>
+{% if closure.image %}<img class="closure-image" src="{{ closure.image.src }}" alt="{{ closure.image.alt }}">{% endif %}
 {{ contact_block(closure.contacts, id="closure-contacts") }}
 {% if not closure.active %}
 <p><a class="button button--secondary" href="/g/{{ group.slug }}">{{ _("closure.page.calendar") }}</a></p>
