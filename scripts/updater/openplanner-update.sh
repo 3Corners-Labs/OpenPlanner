@@ -21,6 +21,9 @@
 # page instead of a half-working system until an operator has looked. A backup that fails
 # changed nothing, so maintenance is switched off again then.
 #
+# Before each step it reports the step (`update-progress`: pulling, verifying, backing_up,
+# migrating, starting, rolling_back) so the updates page can show where it is (ADR 0048).
+#
 # Configuration: /etc/openplanner/updater.env (see updater.env.example). The pinned image is
 # OPENPLANNER_IMAGE in $COMPOSE_DIR/.env.update; production compose commands pass
 # `--env-file .env.update`. Backups live in the data volume and expire after 24 hours.
@@ -59,6 +62,11 @@ report() { # report ID STATUS [REASON]; never fails the script (the old version 
   else
     log "request $1: $2 ${3:-} (could not be recorded in the portal)"
   fi
+}
+
+step() { # step ID STEP; never fails the script (a version before ADR 0048 lacks the command)
+  app update-progress "$@" >/dev/null 2>&1 || true
+  log "request $1: $2"
 }
 
 maintenance() { # maintenance on|off; never fails the script (a version before ADR 0038 lacks it)
@@ -109,16 +117,19 @@ resolve() { # resolve VERSION: pull the release image and print its digest refer
 do_update() { # do_update ID TARGET FROM
   local id=$1 target=$2 from=$3 previous digest revision backup="request-$1"
   previous=$(pinned)
+  step "$id" pulling
   if ! digest=$(resolve "$target"); then
     report "$id" failed image_not_found
     return
   fi
+  step "$id" verifying
   if ! cosign verify "$digest" \
     --certificate-identity-regexp "$CERT_IDENTITY_REGEXP" \
     --certificate-oidc-issuer "$OIDC_ISSUER" >/dev/null 2>&1; then
     report "$id" failed signature_invalid
     return
   fi
+  step "$id" backing_up
   revision=$(compose exec -T web alembic current 2>/dev/null | awk 'NR==1 {print $1}')
   if ! [[ $revision =~ $REVISION_RE && $previous =~ $IMAGE_RE ]]; then
     report "$id" failed backup_failed
@@ -133,6 +144,7 @@ do_update() { # do_update ID TARGET FROM
   printf 'PREVIOUS_IMAGE=%s\nPREVIOUS_REVISION=%s\nPREVIOUS_VERSION=%s\nNEWER_IMAGE=%s\n' \
     "$previous" "$revision" "$from" "$digest" >"$STATE_FILE"
   log "request $id: $from -> $target ($digest)"
+  step "$id" starting
   switch_to "$digest"
   if healthy; then
     report "$id" succeeded
@@ -140,6 +152,7 @@ do_update() { # do_update ID TARGET FROM
     return
   fi
   log "request $id: $target did not become healthy; rolling back"
+  step "$id" rolling_back
   if put_back "$backup" "$previous"; then
     report "$id" rolled_back health_check_failed
     maintenance off
@@ -166,12 +179,14 @@ do_restore() { # do_restore ID TARGET
     report "$id" failed updater_error
     return
   fi
+  step "$id" backing_up
   maintenance on restore
   if ! app backup-db "$backup" >/dev/null; then
     report "$id" failed backup_failed
     maintenance off
     return
   fi
+  step "$id" migrating
   compose stop web worker
   # The newer image knows its own migrations, so it takes the schema down.
   if ! offline alembic downgrade "$PREVIOUS_REVISION"; then
@@ -181,6 +196,8 @@ do_restore() { # do_restore ID TARGET
   fi
   log "request $id: back to $target ($PREVIOUS_IMAGE)"
   switch_to "$PREVIOUS_IMAGE"
+  # web was stopped for the downgrade, so the version we return to records this step.
+  step "$id" starting
   if healthy; then
     report "$id" succeeded
     maintenance off
@@ -188,6 +205,7 @@ do_restore() { # do_restore ID TARGET
     return
   fi
   log "request $id: $target did not become healthy; returning to the newer version"
+  step "$id" rolling_back
   pin "$NEWER_IMAGE"
   if put_back "$backup" "$NEWER_IMAGE"; then
     report "$id" rolled_back health_check_failed

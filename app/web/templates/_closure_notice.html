@@ -1,8 +1,11 @@
-{#- The notice of an emergency closure (ADR 0024): a warning, never only a colour. -#}
+{#- The notice of an emergency closure (ADR 0024): a warning, never only a colour. With
+    ``closure_page`` set, it links to the full closure page with the contact options (ADR 0037). -#}
 {% if closure %}
 <section class="notice notice--warning" aria-labelledby="closure-heading">
   <h2 id="closure-heading">{{ closure.title }}</h2>
+  {% if closure.heading %}<p><strong>{{ closure.heading }}</strong></p>{% endif %}
   <p><strong>{{ closure.period }}</strong></p>
   {% for paragraph in closure.paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
+  {% if closure_page is defined %}<p><a href="{{ closure_page }}">{{ _("closure.banner.more") }}</a></p>{% endif %}
 </section>
 {% endif %}
