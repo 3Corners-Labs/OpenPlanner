@@ -76,3 +76,16 @@ async def test_keep_current_refreshes_until_cancelled() -> None:
     task.cancel()
 
     assert live.settings.admin_session_hours == 2
+
+
+async def test_values_that_break_a_rule_together_are_refused_together() -> None:
+    uow = InMemoryUnitOfWork()
+    uow.state.settings_version = 1
+    # Each within its bounds, but critical is not below low (base: low 15, critical 5).
+    uow.state.platform_settings = {"storage_critical_free_percent": 20.0}
+    live = _live(uow, [])
+
+    await live.refresh()
+
+    assert live.refused
+    assert live.settings.storage_critical_free_percent == 5.0

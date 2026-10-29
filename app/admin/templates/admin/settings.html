@@ -7,6 +7,9 @@
     <p class="page-header__lead">{{ _("admin.settings.intro") }}</p>
   </div>
 </div>
+{% if refused %}
+<div class="alert alert--error"><p>{{ _("admin.settings.refused") }}</p></div>
+{% endif %}
 <section class="card" aria-labelledby="status-heading">
   <h2 id="status-heading">{{ _("admin.settings.status.title") }}</h2>
   <p>{{ _("admin.settings.status.intro") }}</p>

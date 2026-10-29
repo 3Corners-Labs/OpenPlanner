@@ -110,6 +110,7 @@ async def advanced_settings(
         context.principal,
         {
             "environment": current.environment,
+            "refused": live.refused,
             "status": status,
             "problems": problems,
             "sections": _sections(states, locale),

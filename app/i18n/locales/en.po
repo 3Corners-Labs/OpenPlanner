@@ -5586,3 +5586,6 @@ msgstr "Alert above changes per planner per hour"
 
 msgid "admin.settings.problem.dev_placeholder"
 msgstr "holds a development placeholder; production refuses it."
+
+msgid "admin.settings.refused"
+msgstr "The stored values contradict each other (for example critical storage not below low storage). So none of them applies: the defaults and the server's values stay."
