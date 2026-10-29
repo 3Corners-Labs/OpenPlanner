@@ -55,6 +55,11 @@ MAX_DIRECT_CALLS = MAX_CAPACITY
 
 DEFAULT_DISPATCH_LEAD_MINUTES = 5
 MAX_DISPATCH_LEAD_MINUTES = 60
+DEFAULT_QUEUE_CHANGE_WORKING_DAYS = 1
+"""Own queue: a citizen can change or cancel until this many working days before the start."""
+MAX_QUEUE_CHANGE_WORKING_DAYS = 5
+WORKING_DAYS = frozenset(range(5))
+"""Monday to Friday; holidays do not count as non-working days here (ADR 0043)."""
 MAX_PLANNER_LEAD_MINUTES = 1440
 """ADR 0044: upper bound of ``planner_change_min_lead_minutes`` (one day)."""
 
@@ -104,6 +109,15 @@ def check_name_and_slug(name: str, slug: str) -> None:
     check_name(name)
     if not is_slug(slug):
         raise _invalid("slug")
+
+
+class DispatchKind(StrEnum):
+    """How a group's bookings reach its staff (ADR 0043)."""
+
+    CONTACT_CENTER = "contact_center"
+    """A task in the contact-center queue at the dispatch lead (WxCC today, ADR 0007)."""
+    OPENPLANNER_QUEUE = "openplanner_queue"
+    """OpenPlanner's own queue: agents sign in and pick up a booking."""
 
 
 class PhoneMode(StrEnum):
@@ -157,7 +171,12 @@ class Group:
             it to WxCC (ADR 0026).
         dispatch_lead_minutes: How long before the start the WxCC task is created; from
             that moment the booking is read-only (``job_plan.change_deadline``). At most
-            ``min_notice_minutes``, so no booking is read-only when it is made.
+            ``min_notice_minutes``, so no booking is read-only when it is made. Used only
+            with ``DispatchKind.CONTACT_CENTER``.
+        dispatch_kind: Contact center or OpenPlanner's own queue (ADR 0043).
+        queue_change_working_days: With the own queue, how many working days (Monday to
+            Friday) before the start the booking becomes read-only, at the same local time.
+            A booking made later than that is read-only from the start.
         planner_change_min_lead_minutes: How long before the start a planner may still move
             or cancel a booking (ADR 0044, class D per group). Never below
             ``dispatch_lead_minutes``: a dispatched booking needs a phone call, not a mail.
@@ -185,6 +204,8 @@ class Group:
     not_picked_up_minutes: int = DEFAULT_NOT_PICKED_UP_MINUTES
     direct_call_max_concurrent: int | None = None
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
+    dispatch_kind: DispatchKind = DispatchKind.CONTACT_CENTER
+    queue_change_working_days: int = DEFAULT_QUEUE_CHANGE_WORKING_DAYS
     planner_change_min_lead_minutes: int = 60
     embedding_enabled: bool = False
 
@@ -205,6 +226,8 @@ class Group:
             raise _invalid("dispatch_lead_minutes")
         if self.min_notice_minutes < self.dispatch_lead_minutes:
             raise _invalid("min_notice_minutes")
+        if not 1 <= self.queue_change_working_days <= MAX_QUEUE_CHANGE_WORKING_DAYS:
+            raise _invalid("queue_change_working_days")
         planner_lead = self.planner_change_min_lead_minutes
         if not self.dispatch_lead_minutes <= planner_lead <= MAX_PLANNER_LEAD_MINUTES:
             raise _invalid("planner_change_min_lead_minutes")
@@ -230,7 +253,11 @@ class Group:
     @property
     def dispatch_enabled(self) -> bool:
         """Whether this group's bookings are sent to WxCC as work items."""
-        return self.wxcc_business_address is not None and self.wxcc_channel is not None
+        return (
+            self.dispatch_kind is DispatchKind.CONTACT_CENTER
+            and self.wxcc_business_address is not None
+            and self.wxcc_channel is not None
+        )
 
     @property
     def routing_value(self) -> str:
@@ -255,6 +282,30 @@ class Group:
     def planner_lead(self) -> timedelta:
         """How long before the start a planner may last change a booking (ADR 0044)."""
         return timedelta(minutes=self.planner_change_min_lead_minutes)
+
+    def change_deadline(self, start: datetime) -> datetime:
+        """Return the moment a booking starting at ``start`` becomes read-only.
+
+        Contact center: when its task is dispatched, since an agent may pick it up from then
+        on. Own queue: ``queue_change_working_days`` working days earlier (ADR 0043).
+        """
+        if self.dispatch_kind is DispatchKind.OPENPLANNER_QUEUE:
+            return working_days_before(start, self.queue_change_working_days, self.tz)
+        return start - self.dispatch_lead
+
+
+def working_days_before(moment: datetime, days: int, tz: ZoneInfo) -> datetime:
+    """Return ``moment`` moved back ``days`` working days, at the same local time in ``tz``.
+
+    Weekend days are skipped; from a weekend day the first step lands on Friday.
+    """
+    local = moment.astimezone(tz)
+    day = local.date()
+    while days:
+        day -= timedelta(days=1)
+        if day.weekday() in WORKING_DAYS:
+            days -= 1
+    return datetime.combine(day, local.time(), tz).astimezone(moment.tzinfo)
 
 
 @dataclass(frozen=True)

@@ -20,7 +20,7 @@ from urllib.parse import urlsplit
 from app.domain.booking import Booking, ChangeReason
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
-from app.domain.job_plan import JobType, change_deadline
+from app.domain.job_plan import JobType
 from app.domain.message_texts import GroupTexts
 from app.domain.ports import Attachment, OutboundMessage
 from app.domain.scheduling import Group
@@ -158,7 +158,7 @@ def _deadline(kind: MessageKind, booking: Booking, group: Group) -> datetime:
     """Return the deadline the message names: the lapse of a request, else the change one."""
     if kind.rebook and booking.rebook_by is not None:
         return booking.rebook_by
-    return change_deadline(booking.start, group.dispatch_lead)
+    return group.change_deadline(booking.start)
 
 
 def _reason(booking: Booking, _: "_Texts") -> str | None:

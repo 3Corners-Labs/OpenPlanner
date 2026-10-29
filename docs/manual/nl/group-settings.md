@@ -59,6 +59,30 @@ geboekt zijn voordat hij naar het contactcenter gaat.
 Hoeveel dagen vooruit burgers kunnen kiezen, van 1 tot 366. Houd dit in lijn met hoe ver het
 rooster van het team vaststaat: een tijdslot dat te boeken is, moet ook bemand zijn.
 
+<!-- field: dispatch_kind -->
+### Hoe afspraken bij medewerkers komen
+
+- **Contactcenter**: kort voor de start (zie **Doorzetten naar de wachtrij**) komt de afspraak
+  als taak in de wachtrij van het team in het contactcenter. De eerste vrije medewerker pakt hem
+  op. Dit is de standaard.
+- **Eigen wachtrij van OpenPlanner**: voor teams zonder contactcenter. Medewerkers loggen in op
+  OpenPlanner en pakken een wachtende afspraak op. De burger krijgt altijd de eerste vrije
+  medewerker. Er gaat geen taak naar het contactcenter, ook niet als de velden hieronder zijn
+  ingevuld.
+
+Een wijziging geldt voor afspraken die nog niet zijn doorgezet. Een afspraak die al als taak in
+het contactcenter staat, blijft daar. Lukt het contactcenter niet (storing van Webex Connect of
+Webex Contact Center), dan kunt u de groep tijdelijk op de eigen wachtrij zetten.
+
+<!-- field: queue_change_working_days -->
+### Wijzigen tot (werkdagen vooraf, eigen wachtrij)
+
+Alleen bij de eigen wachtrij. Tot hoeveel werkdagen voor de start de burger de afspraak kan
+wijzigen of annuleren, van 1 tot 5, op dezelfde tijd van de dag. Werkdagen zijn maandag tot en
+met vrijdag; feestdagen tellen hier als werkdag. Voorbeeld met 1: een afspraak op maandag om
+10:00 kan tot vrijdag 10:00 worden gewijzigd. Een afspraak die later wordt geboekt, kan de
+burger niet meer zelf wijzigen.
+
 <!-- field: dispatch_lead_minutes -->
 ### Doorzetten naar de wachtrij
 

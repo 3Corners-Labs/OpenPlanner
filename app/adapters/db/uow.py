@@ -67,6 +67,7 @@ from app.adapters.db.models import (
     StaffRow,
     WebhookEventRow,
 )
+from app.adapters.db.platform_settings import PlatformSettingsQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.scenarios import ScenarioQueries
@@ -128,6 +129,7 @@ from app.domain.images import PageImage
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.ports import EventSink
 from app.domain.scheduling import (
+    DispatchKind,
     Group,
     GroupSummary,
     Organisation,
@@ -188,6 +190,8 @@ def _group(row: GroupRow) -> Group:
         not_picked_up_minutes=row.not_picked_up_minutes,
         direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
+        dispatch_kind=DispatchKind(row.dispatch_kind),
+        queue_change_working_days=row.queue_change_working_days,
         planner_change_min_lead_minutes=row.planner_change_min_lead_minutes,
         embedding_enabled=row.embedding_enabled,
     )
@@ -253,6 +257,8 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "not_picked_up_minutes": group.not_picked_up_minutes,
         "direct_call_max_concurrent": group.direct_call_max_concurrent,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
+        "dispatch_kind": group.dispatch_kind.value,
+        "queue_change_working_days": group.queue_change_working_days,
         "planner_change_min_lead_minutes": group.planner_change_min_lead_minutes,
         "embedding_enabled": group.embedding_enabled,
     }
@@ -350,6 +356,7 @@ class SqlTransaction(
     RoleQueries,
     ImageQueries,
     ScenarioQueries,
+    PlatformSettingsQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
@@ -358,7 +365,8 @@ class SqlTransaction(
     ``RetentionQueries`` (ADR 0039), the staff directory from ``StaffQueries`` (ADR 0046),
     the maintenance switch from ``MaintenanceQueries`` (ADR 0038), custom roles from
     ``RoleQueries`` (ADR 0039), closure images and scenarios from ``ImageQueries`` and
-    ``ScenarioQueries`` (ADR 0037).
+    ``ScenarioQueries`` (ADR 0037), portal settings from ``PlatformSettingsQueries``
+    (ADR 0042).
 
     Args:
         session: The open session.
