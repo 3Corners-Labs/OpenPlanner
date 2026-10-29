@@ -12,6 +12,7 @@
 4. **Which test would fail if this change were wrong?**
 5. **Is a dependency added, and why?**
 6. **Which settings does this add or change (key, class A–D, default, bounds, permission), and which tunable value stays hard-coded, and why?** <!-- ADR 0042 -->
+7. **Which admin screen or setting is new or moved, where does it live (scope → object → tab), and why does it fit there?** <!-- ADR 0047; a new section, top-level entry or seventh tab needs an ADR -->
 
 ## Security review
 <!-- Paste the findings of the security-review skill. -->
