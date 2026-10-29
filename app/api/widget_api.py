@@ -128,7 +128,6 @@ TEXT_KEYS = (
     "error.field.email",
     "error.field.phone",
     "error.invalid_answer",
-    "form.choose",
 )
 """Catalogue keys the Web Component shows; sent with the group in the requested locale."""
 

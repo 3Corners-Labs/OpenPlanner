@@ -5811,8 +5811,6 @@ msgstr "Voornaam"
 msgid "form.last_name"
 msgstr "Achternaam"
 
-msgid "form.choose"
-msgstr "Maak een keuze"
 
 msgid "error.field.first_name"
 msgstr "Vul uw voornaam in, maximaal 100 tekens."

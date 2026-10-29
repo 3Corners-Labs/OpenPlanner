@@ -5811,8 +5811,6 @@ msgstr "First name"
 msgid "form.last_name"
 msgstr "Last name"
 
-msgid "form.choose"
-msgstr "Choose one"
 
 msgid "error.field.first_name"
 msgstr "Enter your first name, at most 100 characters."

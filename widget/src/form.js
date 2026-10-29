@@ -65,19 +65,47 @@ function fieldBlock(field, value, error, t) {
   const hint = field.hint ? h('p', { class: 'hint', id: `${id}-hint` }, field.hint) : null;
   const message = error ? h('p', { class: 'error', id: `${id}-error`, part: 'error' }, error) : null;
   const classes = ['field', error ? 'field--error' : '', field.kind === 'checkbox' ? 'field--checkbox' : ''].filter(Boolean).join(' ');
+  if (field.kind === 'radio') {
+    return h('div', { class: classes }, radios(field, value, hint, message, t));
+  }
   if (field.kind === 'checkbox') {
     return h('div', { class: classes }, message, h('input', { ...common, type: 'checkbox', value: 'on', checked: Boolean(value) }), label, hint);
   }
-  return h('div', { class: classes }, label, hint, message, control(field, value, common, t));
+  return h('div', { class: classes }, label, hint, message, control(field, value, common));
 }
 
-function control(field, value, common, t) {
+/**
+ * A choice as radio buttons in a fieldset (a select inside a shadow root breaks a strict host
+ * CSP in WebKit). The first radio carries the field's id, so the error summary's link lands in
+ * the group.
+ */
+function radios(field, value, hint, message, t) {
+  const id = `op-${field.name}`;
+  const described = [field.hint ? `${id}-hint` : '', message ? `${id}-error` : ''].filter(Boolean).join(' ');
+  const choices = (field.options ?? []).map((option, index) => {
+    const optionId = index === 0 ? id : `${id}-${index + 1}`;
+    return h('div', { class: 'choice' },
+      h('input', {
+        id: optionId,
+        name: field.name,
+        type: 'radio',
+        value: option.value,
+        checked: option.value === value,
+        required: field.required,
+        part: 'input',
+        'aria-invalid': message ? 'true' : null,
+      }),
+      h('label', { for: optionId, part: 'label' }, option.label),
+    );
+  });
+  return h('fieldset', { class: 'choices', 'aria-describedby': described || null },
+    h('legend', { part: 'label' }, field.label, field.required ? null : h('span', { class: 'optional' }, ` ${t('form.optional')}`)),
+    hint, message, ...choices);
+}
+
+function control(field, value, common) {
   if (field.kind === 'textarea') {
     return h('textarea', { ...common, rows: '5', autocomplete: field.autocomplete }, value);
-  }
-  if (field.kind === 'select') {
-    const options = (field.options ?? []).map((option) => h('option', { value: option.value, selected: option.value === value }, option.label));
-    return h('select', { ...common, autocomplete: field.autocomplete }, h('option', { value: '' }, t('form.choose')), ...options);
   }
   return h('input', {
     ...common,

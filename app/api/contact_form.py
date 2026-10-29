@@ -39,7 +39,9 @@ _INPUTS: dict[FieldType, tuple[str, str, str, str | None]] = {
     FieldType.NUMBER: ("input", "text", "off", "numeric"),
     FieldType.DATE: ("input", "date", "off", None),
     FieldType.POSTCODE_NL: ("input", "text", "postal-code", None),
-    FieldType.CHOICE: ("select", "", "off", None),
+    # Radio buttons, not a select: easier to use (GOV.UK, NL Design System), and WebKit's
+    # select inside the widget's shadow root breaks a strict host CSP (ADR 0055).
+    FieldType.CHOICE: ("radio", "radio", "off", None),
     FieldType.CHECKBOX: ("checkbox", "checkbox", "off", None),
 }
 
@@ -48,8 +50,8 @@ _INPUTS: dict[FieldType, tuple[str, str, str, str | None]] = {
 class FieldView:
     """One input of the contact form, fully prepared for the template.
 
-    ``kind`` is ``input``, ``textarea``, ``select`` or ``checkbox``; ``options`` are the
-    ``(value, label)`` pairs of a select; ``minimum``/``maximum`` its ``min``/``max``.
+    ``kind`` is ``input``, ``textarea``, ``radio`` or ``checkbox``; ``options`` are the
+    ``(value, label)`` pairs of a radio group; ``minimum``/``maximum`` its ``min``/``max``.
     """
 
     name: str

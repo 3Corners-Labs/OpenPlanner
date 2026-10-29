@@ -93,8 +93,11 @@ consumer checking the tag itself. This ADR applies that pattern.
    (`given-name`, `family-name`, `email`, `tel`, `postal-code`; `off` for custom questions). A
    refused answer names its question in the error summary. Labels and help texts are stored
    per locale with the field (like contact blocks, ADR 0037); saving needs both `nl` and `en`;
-   the citizen sees the request locale, else Dutch. The demo group has two optional example
-   fields, so the keyboard and axe runs cover a select and a checkbox.
+   the citizen sees the request locale, else Dutch. A `choice` is a group of radio buttons in a
+   `fieldset` with a `legend`, not a select: easier to use (GOV.UK and NL Design System advise
+   it), and WebKit's select inside the widget's shadow root breaks a host page's strict
+   `style-src` CSP. The demo group has two optional example fields, so the keyboard and axe
+   runs cover a radio group and a checkbox.
 10. **Admin place (ADR 0047).** Group → *Settings* → *Booking form*
     (`/admin/groups/{slug}/settings/form`), a sub-page of the settings tab with the same
     permission `group.edit` (organisation admin and superuser). No new tab, section or
