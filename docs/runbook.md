@@ -599,8 +599,15 @@ command on the host passes `--env-file .env.update`, so the pinned digest is wha
 | Update | pull `<image>:<version>`, take its digest, `cosign verify` it (release tag of this repository), note the current digest and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digest, `up -d`, wait up to `HEALTH_TIMEOUT` for `/readyz` and a healthy worker | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digest, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
 | Restore previous version (≤ 24 h after an update) | switch maintenance on, back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digest, start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
 
-Every step is reported to the portal (`python -m app.cli update-report`) and audited as actor
-`host-updater`; the updater's own log is in the journal: `journalctl -u openplanner-updater`.
+Before each step the updater reports it (`python -m app.cli update-progress ID STEP`: pulling,
+verifying, backing_up, migrating, starting, rolling_back; ADR 0048), and at the end the outcome
+(`update-report`). The updates page shows the steps live; every step is audited as actor
+`host-updater`. A step report that fails (a version from before ADR 0048, or `web` restarting)
+does not stop the updater. The updater's own log is in the journal:
+`journalctl -u openplanner-updater`.
+
+A request that stays at "Waiting for the updater" is not picked up: check
+`systemctl list-timers openplanner-updater.timer` and the journal.
 
 ### When the portal shows `failed` with `restore_failed`
 

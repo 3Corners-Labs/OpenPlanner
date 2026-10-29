@@ -8,7 +8,7 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.update_service import UpdateService
-from app.domain.updates import Release, ReleaseCheck, UpdateStatus, Version
+from app.domain.updates import Release, ReleaseCheck, UpdateStatus, UpdateStep, Version
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.domain import NOW
 
@@ -150,3 +150,85 @@ async def test_waiting_request_is_shown_in_the_banner(site: Site) -> None:
     page = (await site.client.get("/admin/")).text
     assert BANNER in page
     assert "update-banner--progress" in page
+
+
+PROGRESS = "/admin/updates/progress"
+
+
+async def claimed_request(site: Site) -> int:
+    """Request an update as the superuser and let the updater claim it; return its id."""
+    await site.client.post("/admin/updates/update", headers=SAME_ORIGIN)
+    started = await updates(site).claim()
+    assert started is not None
+    return started.id or 0
+
+
+def poll_url(html: str) -> str | None:
+    """Return the fragment's poll URL, or ``None`` when it no longer polls."""
+    marker = 'data-poll="'
+    if marker not in html:
+        return None
+    return html.split(marker, 1)[1].split('"', 1)[0].replace("&amp;", "&")
+
+
+@pytest.mark.usefixtures("released")
+async def test_page_shows_the_steps_and_loads_the_poller_while_a_request_is_open(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+    before = await site.client.get("/admin/updates")
+    assert "update-progress.js" not in before.text
+    assert "script-src" not in before.headers["content-security-policy"]
+    await site.client.post("/admin/updates/update", headers=SAME_ORIGIN)
+    page = await site.client.get("/admin/updates")
+    assert '<script src="/static/update-progress.js" defer></script>' in page.text
+    assert "script-src 'self'" in page.headers["content-security-policy"]
+    assert "data-update-progress" in page.text
+    assert 'aria-current="step"' in page.text
+    assert "Wachten tot de updater het verzoek oppakt" in page.text
+    assert BANNER not in page.text  # the page itself shows the request
+
+
+@pytest.mark.usefixtures("released")
+async def test_progress_fragment_answers_only_when_something_changed(site: Site) -> None:
+    await site.login_as(SUPER)
+    request_id = await claimed_request(site)
+    first = await site.client.get(PROGRESS)
+    assert first.status_code == 200
+    assert "<html" not in first.text
+    url = poll_url(first.text)
+    assert url is not None
+    assert url.startswith(PROGRESS + "?seen=")
+    assert (await site.client.get(url)).status_code == 204
+    await updates(site).report_step(request_id, UpdateStep.BACKING_UP)
+    moved = await site.client.get(url)
+    assert moved.status_code == 200
+    assert "Back-up van de database maken" in moved.text
+    assert poll_url(moved.text) not in (None, url)
+
+
+@pytest.mark.usefixtures("released")
+async def test_progress_fragment_stops_polling_with_the_outcome(site: Site) -> None:
+    await site.login_as(SUPER)
+    request_id = await claimed_request(site)
+    await updates(site).report(request_id, UpdateStatus.ROLLED_BACK, "health_check_failed")
+    ended = await site.client.get(PROGRESS + "?seen=x")
+    assert ended.status_code == 200
+    assert poll_url(ended.text) is None
+    assert "Teruggedraaid" in ended.text
+    assert 'href="/admin/updates"' in ended.text
+
+
+@pytest.mark.usefixtures("released")
+async def test_banner_elsewhere_names_the_current_step(site: Site) -> None:
+    await site.login_as(SUPER)
+    request_id = await claimed_request(site)
+    await updates(site).report_step(request_id, UpdateStep.VERIFYING)
+    page = (await site.client.get("/admin/")).text
+    assert "update-banner--progress" in page
+    assert "Handtekening controleren" in page
+
+
+async def test_progress_fragment_refuses_an_organisation_admin(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    assert (await site.client.get(PROGRESS)).status_code == 403

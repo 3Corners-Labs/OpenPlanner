@@ -7,8 +7,9 @@ no route can forget it.
 
     closed    /g/{slug} (and /book, /direct), /b/{token}/cancel, /b/{token}/reschedule
               ─► 503 + Retry-After: the maintenance page instead of the form or the write
-    open      the booking page /b/{token}, waiting and join pages, health, brand assets,
-              webhooks (they record what happens in running calls)
+    open      the booking page /b/{token}, the closure page /g/{slug}/closure (ADR 0037),
+              waiting and join pages, health, brand assets, webhooks (they record what
+              happens in running calls)
     machine   every request that is not a read, except the token endpoint ─► 503
               ``{"error": "maintenance"}`` + Retry-After
 
@@ -44,6 +45,7 @@ OPEN_ROUTES = frozenset(
     {
         "/",
         "/b/{token}",
+        "/g/{slug}/closure",
         "/b/{token}/wait",
         "/b/{token}/join",
         "/b/{token}/join/go",
