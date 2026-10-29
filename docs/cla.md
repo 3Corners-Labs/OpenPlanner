@@ -3,7 +3,7 @@
 Version 1.0 (draft, to be reviewed by a lawyer before the repository is public). ADR 0054.
 
 This agreement is between you (the person, or the organisation you contribute for) and
-3Corners, the maintainer of OpenPlanner. It applies to every contribution you submit to the
+3Corners Internetworking Services BV ([3corners.nl](https://3corners.nl), "3Corners"), the maintainer of OpenPlanner. It applies to every contribution you submit to the
 OpenPlanner repository: code, documentation, translations, designs and other material.
 
 ## 1. You keep your copyright

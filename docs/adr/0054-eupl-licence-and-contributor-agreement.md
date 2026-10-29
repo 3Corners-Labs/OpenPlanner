@@ -31,8 +31,8 @@ agreement instead.
 ## Decision
 
 1. **Licence.** Every file in the repository is licensed under the European Union Public
-   Licence v1.2 only (`EUPL-1.2`, not "or later"), copyright 3Corners and the OpenPlanner
-   contributors. The official English text is in `LICENSE` and `LICENSES/EUPL-1.2.txt`,
+   Licence v1.2 only (`EUPL-1.2`, not "or later"), copyright 3Corners Internetworking Services BV
+   (https://3corners.nl, "3Corners") and the OpenPlanner contributors. The official English text is in `LICENSE` and `LICENSES/EUPL-1.2.txt`,
    unchanged. "Only" keeps a later EUPL version, published by the European Commission, from
    applying without a decision of ours.
 2. **Why EUPL over AGPL.** Same effect on hosted modifications (article 1 counts "providing
