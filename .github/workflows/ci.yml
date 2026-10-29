@@ -166,6 +166,10 @@ jobs:
         with:
           schema: http://127.0.0.1:8000/openapi.json
           args: --checks all
+          # renovate: datasource=pypi depName=schemathesis
+          version: "4.32.7"
+          # The coverage report goes to the step summary; a PR comment would need write access.
+          coverage-pr-comment: false
       - name: container logs
         if: always()
         run: docker logs app
