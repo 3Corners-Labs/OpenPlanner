@@ -68,6 +68,15 @@ class Level(StrEnum):
     CRITICAL = "critical"
 
 
+LEVEL_ORDER: tuple[Level, ...] = tuple(Level)
+"""Levels from least to most severe."""
+
+
+def at_least(level: Level) -> frozenset[Level]:
+    """Return ``level`` and every more severe level."""
+    return frozenset(LEVEL_ORDER[LEVEL_ORDER.index(level) :])
+
+
 LEVEL_BY_OUTCOME: dict[Outcome, Level] = {
     Outcome.SUCCESS: Level.INFO,
     Outcome.SKIPPED: Level.INFO,
@@ -145,6 +154,11 @@ class AuditFilter:
         group: Only events of this group (slug).
         booking_id: Only events about this booking.
         actor: Only events of this actor (subject); the staff detail page (ADR 0046).
+        min_level: Only events of this level or more severe (ADR 0040).
+        category: Only events of this category (ADR 0040).
+        since: Only events at or after this time (UTC).
+        until: Only events before this time (UTC).
+        trace_id: Only the events of this request or job: the whole chain (ADR 0040).
     """
 
     source: Source | None = None
@@ -152,6 +166,11 @@ class AuditFilter:
     group: str | None = None
     booking_id: int | None = None
     actor: str | None = None
+    min_level: Level | None = None
+    category: Category | None = None
+    since: datetime | None = None
+    until: datetime | None = None
+    trace_id: str | None = None
 
     def matches(self, event: AuditEvent) -> bool:
         """Return whether ``event`` passes the filter (the SQL adapter applies the same rules)."""
@@ -161,6 +180,11 @@ class AuditFilter:
             and (self.group is None or event.group == self.group)
             and (self.booking_id is None or event.booking_id == self.booking_id)
             and (self.actor is None or event.actor == self.actor)
+            and (self.min_level is None or event.log_level in at_least(self.min_level))
+            and (self.category is None or event.event_category is self.category)
+            and (self.since is None or event.at >= self.since)
+            and (self.until is None or event.at < self.until)
+            and (self.trace_id is None or event.trace_id == self.trace_id)
         )
 
 
