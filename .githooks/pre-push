@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Installed by `make setup` (git config core.hooksPath .githooks). Stops a push that CI would
+# refuse for a pin Renovate cannot update (ADR 0051); the full gate stays `make check` and CI.
+# Skip once with `git push --no-verify`.
+set -euo pipefail
+
+uv run --quiet python -m scripts.check_pins

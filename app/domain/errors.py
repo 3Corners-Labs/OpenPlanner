@@ -37,6 +37,7 @@ class ErrorCode(StrEnum):
     GROUP_CLOSED = "group_closed"
     CLOSURE_EXISTS = "closure_exists"
     CLOSURE_NOT_FOUND = "closure_not_found"
+    SCENARIO_NOT_FOUND = "scenario_not_found"
     API_CLIENT_NOT_FOUND = "api_client_not_found"
     CHANNEL_NOT_CONFIGURED = "channel_not_configured"
     REMINDER_EXISTS = "reminder_exists"

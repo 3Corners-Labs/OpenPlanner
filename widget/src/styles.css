@@ -1,0 +1,465 @@
+/*
+ * Styles of <gov-booking> inside its shadow root. Every colour, space, radius and size comes
+ * from a --booking-* custom property with the NL Design System default of the standalone
+ * pages (docs/widget.md); the host overrides them on the element or an ancestor. The font is
+ * inherited from the host page. No !important: the host styles through tokens and ::part().
+ */
+:host {
+  --_text: var(--booking-color-text, #1a1a1a);
+  --_muted: var(--booking-color-text-muted, #545454);
+  --_background: var(--booking-color-background, #ffffff);
+  --_surface: var(--booking-color-surface, #ffffff);
+  --_border: var(--booking-color-border, #d0d4d9);
+  --_border-strong: var(--booking-color-border-strong, #6b7178);
+  --_accent: var(--booking-color-accent, #01689b);
+  --_on-accent: var(--booking-color-on-accent, #ffffff);
+  --_accent-hover: var(--booking-color-accent-hover, color-mix(in srgb, var(--_accent) 82%, #000000));
+  --_accent-subtle: var(--booking-color-accent-subtle, color-mix(in srgb, var(--_accent) 8%, #ffffff));
+  --_focus: var(--booking-color-focus, #1a1a1a);
+  --_focus-background: var(--booking-color-focus-background, #ffbf47);
+  --_error: var(--booking-color-error, #c22a1e);
+  --_success: var(--booking-color-success, #2f7210);
+  --_unavailable: var(--booking-color-unavailable, #6b7178);
+  --_later: var(--booking-color-later, #545454);
+  --_later-background: var(--booking-color-later-background, #eceef0);
+  --_later-stripe: var(--booking-color-later-stripe, #dadde1);
+  --_space-xs: var(--booking-space-xs, 0.25rem);
+  --_space-s: var(--booking-space-s, 0.5rem);
+  --_space-m: var(--booking-space-m, 1rem);
+  --_space-l: var(--booking-space-l, 1.5rem);
+  --_radius: var(--booking-radius, 10px);
+  --_radius-small: var(--booking-radius-small, 6px);
+  --_target: var(--booking-target, 44px);
+
+  display: block;
+  color: var(--_text);
+  font-family: inherit;
+  font-size: var(--booking-font-size, 1em);
+  line-height: var(--booking-line-height, 1.6);
+}
+
+:host([hidden]) {
+  display: none;
+}
+
+@media (prefers-contrast: more) {
+  :host {
+    --_text: #000000;
+    --_muted: #000000;
+    --_border: #000000;
+    --_border-strong: #000000;
+    --_unavailable: #000000;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0 0 var(--_space-s);
+  font-family: var(--booking-font-family-heading, inherit);
+  font-weight: var(--booking-font-weight-heading, 700);
+  line-height: 1.25;
+}
+
+p {
+  margin: 0 0 var(--_space-s);
+}
+
+.lead {
+  color: var(--_muted);
+}
+
+:focus-visible {
+  outline: 3px solid var(--_focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--_focus-background);
+}
+
+[tabindex="-1"]:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.card {
+  margin-block: var(--_space-m);
+  padding: var(--_space-m);
+  border: 1px solid var(--_border);
+  border-radius: var(--_radius);
+  background: var(--_surface);
+}
+
+.button,
+.time {
+  min-width: var(--_target);
+  min-height: var(--_target);
+  padding: var(--_space-s) var(--_space-m);
+  border: 2px solid var(--_accent);
+  border-radius: var(--_radius-small);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button {
+  background: var(--_accent);
+  color: var(--_on-accent);
+  font-weight: 700;
+}
+
+.button:hover {
+  border-color: var(--_accent-hover);
+  background: var(--_accent-hover);
+}
+
+.button--large {
+  padding-inline: var(--_space-l);
+}
+
+.time {
+  background: var(--_background);
+  color: var(--_accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.time:hover {
+  background: var(--_accent-subtle);
+}
+
+.link {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--_accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+a {
+  color: var(--_accent);
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--_space-m);
+  margin: var(--_space-m) 0;
+  padding: 0;
+  list-style: none;
+  color: var(--_muted);
+}
+
+.steps [aria-current="step"] {
+  color: var(--_text);
+  font-weight: 700;
+  text-decoration: underline 2px;
+  text-underline-offset: 0.3em;
+}
+
+.notice {
+  margin-block: var(--_space-m);
+  padding: var(--_space-m);
+  border-left: 6px solid var(--_accent);
+  background: var(--_accent-subtle);
+}
+
+.notice--warning {
+  border-left-color: var(--_error);
+  background: var(--_background);
+}
+
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--_space-s) var(--_space-m);
+  align-items: center;
+}
+
+.quick p {
+  margin: 0;
+}
+
+.picker {
+  display: grid;
+  gap: var(--_space-m);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  align-items: start;
+}
+
+.picker .card {
+  margin: 0;
+}
+
+.calendar__nav {
+  display: flex;
+  gap: var(--_space-s);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.calendar__nav h2,
+.calendar__nav h3,
+.calendar__nav h4,
+.calendar__nav h5,
+.calendar__nav h6 {
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.calendar__step {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--_target);
+  min-height: var(--_target);
+  border: 2px solid var(--_border-strong);
+  border-radius: var(--_radius-small);
+  background: var(--_background);
+  color: var(--_text);
+  font: inherit;
+  font-size: 1.5em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.calendar__step--off {
+  border-color: var(--_border);
+  color: var(--_border);
+  cursor: default;
+}
+
+.calendar__grid {
+  width: 100%;
+  margin-block: var(--_space-m);
+  border-collapse: separate;
+  border-spacing: 2px;
+  table-layout: fixed;
+}
+
+.calendar__grid th {
+  font-weight: 400;
+  color: var(--_muted);
+}
+
+.calendar__grid abbr {
+  text-decoration: none;
+}
+
+.calendar__grid td {
+  padding: 0;
+}
+
+.calendar__day {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: var(--_target);
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--_radius-small);
+  background: none;
+  color: var(--_unavailable);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Free days: border, bold accent number and a dot; colour is never the only signal. */
+.calendar__day--free {
+  border-color: var(--_accent);
+  color: var(--_accent);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.calendar__day--free::after {
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+.calendar__day--free:hover {
+  background: var(--_accent-subtle);
+  color: var(--_accent-hover);
+}
+
+.calendar__day[aria-current="date"] {
+  background: var(--_accent);
+  color: var(--_on-accent);
+}
+
+.calendar__day:focus-visible {
+  background: var(--_focus-background);
+  color: var(--_text);
+}
+
+.calendar__day--today > span {
+  text-decoration: underline 2px;
+  text-underline-offset: 0.2em;
+}
+
+/* Beyond the booking horizon: stripes and a dashed border, so colour is not the only signal. */
+.calendar__day--later {
+  border: 2px dashed var(--_border-strong);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--_later-background) 0 6px,
+    var(--_later-stripe) 6px 9px
+  );
+  color: var(--_later);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--_space-xs) var(--_space-m);
+  margin: 0 0 var(--_space-s);
+  padding: 0;
+  list-style: none;
+}
+
+.legend li {
+  display: flex;
+  gap: var(--_space-xs);
+  align-items: center;
+}
+
+.swatch {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid var(--_accent);
+  border-radius: 3px;
+}
+
+.swatch--selected {
+  background: var(--_accent);
+}
+
+.swatch--later {
+  border-style: dashed;
+  border-color: var(--_border-strong);
+  background: var(--_later-stripe);
+}
+
+.calendar__legend {
+  color: var(--_muted);
+  font-size: 0.9em;
+}
+
+.times fieldset {
+  margin: 0 0 var(--_space-m);
+  padding: 0;
+  border: 0;
+}
+
+.times legend {
+  margin-bottom: var(--_space-xs);
+  font-weight: 700;
+}
+
+.times__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--_space-s);
+}
+
+.times__count {
+  color: var(--_muted);
+}
+
+.form-layout {
+  display: grid;
+  gap: var(--_space-m);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  align-items: start;
+}
+
+.summary {
+  padding-block: var(--_space-m);
+}
+
+.field {
+  margin-bottom: var(--_space-m);
+}
+
+.field label {
+  display: block;
+  font-weight: 700;
+}
+
+.optional,
+.hint {
+  color: var(--_muted);
+  font-weight: 400;
+}
+
+.field input {
+  width: 100%;
+  min-height: var(--_target);
+  padding: var(--_space-s);
+  border: 2px solid var(--_border-strong);
+  border-radius: var(--_radius-small);
+  background: var(--_background);
+  color: var(--_text);
+  font: inherit;
+}
+
+.field--error input {
+  border-color: var(--_error);
+}
+
+.error {
+  color: var(--_error);
+  font-weight: 700;
+}
+
+.error-summary {
+  margin-block: var(--_space-m);
+  padding: var(--_space-m);
+  border: 3px solid var(--_error);
+  border-radius: var(--_radius);
+  background: var(--_background);
+}
+
+.error-summary ul {
+  margin: 0;
+  padding-left: var(--_space-l);
+}
+
+.error-summary a {
+  color: var(--_error);
+  font-weight: 700;
+}
+
+.done {
+  border-left: 6px solid var(--_success);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button,
+  .time,
+  .calendar__day {
+    transition: background-color 120ms ease-out;
+  }
+}

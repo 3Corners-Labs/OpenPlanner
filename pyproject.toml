@@ -1,6 +1,6 @@
 [project]
 name = "openplanner"
-version = "0.1.0"
+version = "0.2.0"
 description = "Lightweight group-booking service with Webex Contact Center dispatch."
 readme = "README.md"
 license = "EUPL-1.2"

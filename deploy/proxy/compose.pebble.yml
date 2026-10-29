@@ -10,7 +10,7 @@ services:
     environment:
       ENVIRONMENT: dev
   pebble:
-    image: ghcr.io/letsencrypt/pebble:2.8.0
+    image: ghcr.io/letsencrypt/pebble:2.10.1
     profiles: [tls]
     environment:
       # Pebble cannot reach the test domain; it accepts every challenge instead.

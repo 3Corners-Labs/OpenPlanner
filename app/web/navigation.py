@@ -156,7 +156,12 @@ SECTIONS = (
                 "/admin/closures",
                 Permission.ORGANISATION_CLOSURE,
                 "alert",
-                ("/admin/organisations/{org}/closure",),
+                (
+                    "/admin/organisations/{org}/closure",
+                    "/admin/organisations/{org}/closure/scenarios",
+                    "/admin/organisations/{org}/closure/scenarios/{scenario_id}",
+                    "/admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts",
+                ),
             ),
             Screen(
                 "manage.staff",
@@ -313,7 +318,13 @@ OBJECTS = (
                 f"{_GROUP}/closure",
                 Permission.CLOSURE_MANAGE,
                 "alert",
-                (f"{_GROUP}/closure/bookings/{{booking_id}}/move", f"{_GROUP}/closure/contacts"),
+                (
+                    f"{_GROUP}/closure/bookings/{{booking_id}}/move",
+                    f"{_GROUP}/closure/contacts",
+                    f"{_GROUP}/closure/scenarios",
+                    f"{_GROUP}/closure/scenarios/{{scenario_id}}",
+                    f"{_GROUP}/closure/scenarios/{{scenario_id}}/contacts",
+                ),
             ),
         ),
     ),

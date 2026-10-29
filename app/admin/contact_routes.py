@@ -11,7 +11,9 @@ again, validates and audits.
     POST /admin/groups/{slug}/closure/contacts   closure.manage         save; empty: default applies
 
 The form has ``MAX_OPTIONS`` fixed rows (no JavaScript): kind, details, and a label and opening
-hours per locale. A row whose inputs are all empty is skipped.
+hours per locale. A row whose inputs are all empty is skipped. ``read_block``,
+``block_form_values`` and ``block_refusal`` are also used by the contact block of a closure
+scenario (``scenario_routes``).
 """
 
 import re
@@ -183,7 +185,7 @@ def _heading_fields(
     ]
 
 
-def _block(form: forms.FormData) -> ContactBlock:
+def read_block(form: forms.FormData) -> ContactBlock:
     """Return the submitted block; rows whose inputs are all empty are skipped.
 
     Raises:
@@ -201,7 +203,7 @@ def _block(form: forms.FormData) -> ContactBlock:
     return ContactBlock(tuple(options), headings)
 
 
-def _refusal(form: forms.FormData, error: DomainError, gettext: BoundGettext) -> None:
+def block_refusal(form: forms.FormData, error: DomainError, gettext: BoundGettext) -> None:
     """Add the message for a refused row or heading, linked to its input."""
     found = _ROW_FIELD.fullmatch(error.field or "")
     if error.code is ErrorCode.INVALID_CONFIGURATION and found and found[2] in PART_ERRORS:
@@ -214,7 +216,7 @@ def _refusal(form: forms.FormData, error: DomainError, gettext: BoundGettext) ->
         form.refusal(error)
 
 
-def _form_values(
+def block_form_values(
     block: ContactBlock | None, form: forms.FormData, locale: RequestLocale
 ) -> dict[str, object]:
     """Return the template values of the form, pre-filled from ``block`` or the submission."""
@@ -249,7 +251,7 @@ async def _form_page(
             "organisation": found.organisation,
             "preview": contact_view(found.block, locale),
             "done": done_message(request, locale.gettext),
-            **_form_values(found.block, form, locale),
+            **block_form_values(found.block, form, locale),
         },
     )
     response.status_code = status
@@ -275,7 +277,7 @@ async def _group_form_page(
             "own": found.block is not None,
             "default_count": len(default.options) if default else 0,
             "preview": contact_view(found.block or default, locale),
-            **_form_values(found.block, form, locale),
+            **block_form_values(found.block, form, locale),
         },
         status,
     )
@@ -294,10 +296,10 @@ async def save_contacts(
     """Save the contact block; with every row empty it is removed."""
     form = await read_form(request, locale)
     try:
-        changed = await contact_service(request).save(context.principal, org, _block(form))
+        changed = await contact_service(request).save(context.principal, org, read_block(form))
     except DomainError as error:
         raise_refusal(error)
-        _refusal(form, error, locale.gettext)
+        block_refusal(form, error, locale.gettext)
         return await _form_page(request, locale, context, org, form, 422)
     return redirect_done(_url(org), "saved" if changed else "unchanged")
 
@@ -317,9 +319,11 @@ async def save_group_contacts(
     """Save the group's own block; with every row empty the organisation default applies."""
     form = await read_form(request, locale)
     try:
-        changed = await contact_service(request).save_group(context.principal, slug, _block(form))
+        changed = await contact_service(request).save_group(
+            context.principal, slug, read_block(form)
+        )
     except DomainError as error:
         raise_refusal(error)
-        _refusal(form, error, locale.gettext)
+        block_refusal(form, error, locale.gettext)
         return await _group_form_page(request, locale, context, form, 422)
     return redirect_done(_group_url(slug), "saved" if changed else "unchanged")

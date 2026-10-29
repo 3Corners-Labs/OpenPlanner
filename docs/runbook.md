@@ -14,6 +14,49 @@ docker compose ps     # web and worker must report "healthy"
 `web` applies pending Alembic migrations before it starts serving. The worker starts after
 `web` is healthy.
 
+### First install: the bootstrap keys (ADR 0042 §9)
+
+A new installation needs three random keys: `SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`
+and `SESSION_SECRET`. Generate them once, before the first `up`:
+
+```bash
+mkdir -m 700 secrets
+```
+
+```bash
+docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -v "$PWD/secrets:/srv/secrets" web python -m app.cli init
+```
+
+`init` writes `secrets/secrets.env` (mode 0600), which `docker-compose.yml` reads next to
+`.env`, and lists the other class A and B variables to fill in (`docs/settings.md`). It prints
+no key, and it refuses to overwrite an existing file: a new `SETTINGS_ENCRYPTION_KEY` makes
+every secret stored in the database unreadable.
+
+- **Back up the keys apart from the database backup.** A backup that holds both the database
+  and `SETTINGS_ENCRYPTION_KEY` undoes the encryption at rest; losing the key loses every
+  stored integration secret.
+- Production never generates keys at start-up; only development does (`app/keys.py`).
+
+**From a secret store instead of a file.** Each of the three keys and `OIDC_CLIENT_SECRET`
+may come from a file named by `X_FILE`, e.g. a Docker or Kubernetes secret:
+
+```yaml
+services:
+  web:
+    environment:
+      SETTINGS_ENCRYPTION_KEY_FILE: /run/secrets/settings_encryption_key
+    secrets: [settings_encryption_key]
+secrets:
+  settings_encryption_key:
+    file: ./secrets/settings_encryption_key
+```
+
+The file holds the value (a trailing newline is ignored). The service refuses to start when
+both `X` and `X_FILE` are set, or when the file is missing or empty; a file that others can
+read is accepted with the warning `settings.secret_file_readable` (variable name only).
+Kubernetes mounts secrets with mode 0644 unless the volume sets `defaultMode: 0400`; set it.
+`settings list` shows such a secret with source `file`.
+
 ## Verifying the image signature
 
 Only deploy images signed by the `main` workflow of this repository:
@@ -613,6 +656,89 @@ when a rule's channel is not configured.
 link in mails already sent; bookings are unaffected. Rotate only after an incident, and tell the
 contact center that citizens may call about broken links.
 
+## Releasing a version (ADR 0052)
+
+A merge to `main` is **not** a release. An installation only sees a new version after a tag
+`vX.Y.Z` on `main` has gone through `main.yml`. You do two things by hand (a release PR, then a
+tag); everything after the tag is automatic and visible in the Actions tab.
+
+### What happens where
+
+| Event | What runs | Result | Offered to installations? |
+|---|---|---|---|
+| PR | `ci.yml` | checks only | no |
+| Merge to `main` | `main.yml`: ZAP, mutation, build, sign | image `:main` and `:sha-<commit>`, with `APP_COMMIT`, no version | no |
+| Tag `vX.Y.Z` pushed | `main.yml`: tag check, ZAP, mutation, build, sign, SBOM, GitHub release | image `:X.Y.Z` with `APP_VERSION` and `APP_COMMIT`; release page with SBOM | yes, within an hour |
+
+### Step 1: decide the number
+
+On an up-to-date `main` in your own checkout (not a worktree of another branch):
+
+```sh
+git switch main && git pull
+make release-plan
+```
+
+It prints the last release, every commit since then and the next version by the rules of
+ADR 0052 (breaking → MAJOR, from 1.0; `feat` → MINOR; anything else → PATCH). It changes
+nothing. Write the number down, for example `0.3.0`.
+
+### Step 2: the release PR
+
+On a branch `release/v0.3.0` (or ask Claude Code: "make the release PR for v0.3.0"):
+
+1. `pyproject.toml`: `version = "0.3.0"`, then `uv lock` (only the `openplanner` line changes).
+2. `CHANGELOG.md`: rename `## Unreleased` to `## 0.3.0 (2026-11-02)` and put a fresh empty
+   `## Unreleased` above it.
+3. Commit `chore(release): v0.3.0`, open the PR, merge it (squash) when CI is green.
+
+### Step 3: the tag
+
+On `main`, after the release PR is merged:
+
+```sh
+git switch main && git pull
+git log -1 --oneline        # must be "chore(release): v0.3.0 (#NN)"
+git tag -a v0.3.0 -m "v0.3.0: tagged on the instruction of <name> on <date>"
+git push origin v0.3.0
+```
+
+Do **not** use "Draft a new release" on GitHub: `main.yml` creates the release itself after
+the image is signed, and a hand-made release would make that step fail.
+
+### Step 4: watch it go out
+
+1. GitHub → *Actions* → workflow *main* for `v0.3.0`. First "release tag matches main and
+   pyproject.toml" (fails if the tag is not on `main` or `pyproject.toml` says another
+   version), then ZAP and mutation, then *build, push and sign image*.
+2. When it is green, GitHub → *Releases* shows `v0.3.0` with `sbom.cdx.json`.
+3. Within an hour the superuser sees the update banner in the portal and starts the update on
+   `/admin/updates` (section *Updates from the admin portal* below).
+
+### Step 5: check what runs
+
+- In the portal: `/admin/updates` → *Running now* `0.3.0` and *Commit* (links to GitHub).
+- On the host: `docker compose --env-file .env.update exec web python -m app.cli version`.
+- Has a given fix landed? In a checkout: `git tag --contains <fix commit>` lists every release
+  that holds it. If the running version is not in that list, the fix is not live.
+
+### When the tag was wrong
+
+If the tag check failed, nothing was published. Remove the tag and set it on the right commit:
+
+```sh
+git push --delete origin v0.3.0 && git tag -d v0.3.0
+```
+
+Once a release has been published, never move or reuse its tag: installations may already run
+it. Fix forward with the next number.
+
+### Security fixes
+
+Release on the day the fix is merged (ADR 0052 §6): run the same steps; `make release-plan`
+gives a PATCH when only fixes are waiting, otherwise a MINOR that also carries the features on
+`main`. Keep the release notes free of exploit details until installations have updated.
+
 ## Updates from the admin portal (ADR 0029)
 
 With `UPDATE_REPOSITORY=<owner>/<repo>` the worker looks up the latest GitHub release once an
@@ -684,8 +810,10 @@ deploy the old image. Every migration is reversible (enforced in CI).
 
 ## Rotating secrets
 
-Bootstrap secrets come from environment variables / the secret store; none are baked into the
-image. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
+Bootstrap secrets come from environment variables, `X_FILE` or `secrets/secrets.env`
+(`app.cli init`); none are baked into the image. To rotate `MANAGEMENT_TOKEN_KEY` or
+`SESSION_SECRET`, replace the value in that file or the secret store and restart `web` and
+`worker`; `init` never overwrites the file, so edit it or move it away first. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
 value on the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` makes every
 stored channel secret and Webex token unreadable: re-enter the channel secrets afterwards
 (ADR 0008).
@@ -806,6 +934,22 @@ room for the worker and its retries.
 There is no command yet to re-plan a failed or missing purge; until there is, report it to the
 developers with the error code. The nightly sweep from the privacy rules, which would catch such
 stragglers by itself, is not built yet either.
+
+## Widget on a host website (ADR 0035)
+
+A web editor reports that `<gov-booking>` says the calendar "is not available here".
+
+| Check | Where | Fix |
+|---|---|---|
+| The page's origin is on the organisation's list, exactly (`https`, `www.`, port) | Admin → **Insluiten** → the organisation | add it; the change is audited |
+| The group is switched on | Group settings → **Insluiten op websites** | set it to Yes |
+| The script loads | the browser console on the host page; `curl -sI https://<host>/widget/v1/gov-booking.js` must give `200` | a `404` means the image has no bundle: rebuild it (the `widget` stage of the Dockerfile) |
+| A pinned `integrity` matches | the console says the integrity check failed, typically right after an update | copy the new code from **Insluiten** |
+| The host's CSP allows our origin in `script-src` and `connect-src` | the console shows a CSP report | the host adds them (`docs/widget.md`, section 3) |
+
+Refused origins are logged as `widget.origin_refused` with the origin and the group (no
+personal data). Many refusals from one unknown origin mean a copied tag: nothing to do, it
+cannot book.
 
 ## Troubleshooting with the audit log (ADR 0031)
 

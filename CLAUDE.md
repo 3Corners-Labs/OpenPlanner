@@ -16,7 +16,7 @@ Lightweight group-booking service for a government contact center: embeddable wi
 - Jobs: own `jobs` table + worker loop in `app/jobs/`. No Celery, Redis, APScheduler.
 - Admin UI: Jinja2, server-rendered HTML forms without JavaScript; HTMX only per ADR 0016. No SPA framework.
 - Widget: one Web Component in vanilla JS under `widget/`, bundled with esbuild in CI only. No React/Vue. Shadow DOM; all colours, spacing, radius and font read from `--booking-*` CSS custom properties with NL Design System defaults; `font-family: inherit`; interactive elements exposed via `part="..."`. The host site styles the widget only through those tokens and parts; document them in `docs/widget.md`. No inline styles, no `!important`.
-- HTTP client: `httpx`. Logging: `structlog` (JSON). Settings: `pydantic-settings` from env only; no config files with secrets.
+- HTTP client: `httpx`. Logging: `structlog` (JSON). Settings: `pydantic-settings` from env only, or `X_FILE` for the bootstrap secrets (ADR 0042 §9); no config files with secrets in the repository.
 - Containers: `web`, `worker`. One `docker-compose.yml` for dev and prod shape.
 
 ## Architecture rules
@@ -58,7 +58,8 @@ On merge to `main`:
 - OWASP ZAP baseline scan against the started container.
 - `mutmut` on `app/domain/` and `app/i18n/`, mutation score ≥ 80%.
 - Image pushed to GHCR and signed keyless with `cosign`, SBOM attested; deployment verifies the signature (ADR 0006).
-Weekly: Renovate updates (security updates immediately), `trivy` on the running image, ZAP full scan against staging. Daily: alert if `purge_pii` backlog > 0.
+Per PR also: `make pins` (every pinned version tracked by Renovate, actions pinned as `<sha> # vX.Y.Z`; ADR 0051) and the job `no deprecation warnings` (any deprecation annotation fails the run).
+Weekly: Renovate updates (security updates immediately, majors as their own PR), `freshness` (Renovate still running, no update PR older than 14 days), `trivy` on the running image, ZAP full scan against staging. Daily: alert if `purge_pii` backlog > 0.
 
 ## Accessibility rules (WCAG 2.2 AA; axe is necessary, not sufficient)
 - All ARIA labels, roles and live regions live **inside** the shadow root; nothing relies on the host page.

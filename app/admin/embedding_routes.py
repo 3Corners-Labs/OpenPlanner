@@ -10,7 +10,9 @@ again, validates and audits.
     POST /admin/organisations/{org}/embedding  embedding.manage   save; empty removes all
 
 The origins are one textarea, one per line (no JavaScript). Whether a group appears is its
-own setting (``group.edit``); this page lists the groups and links to their settings.
+own setting (``group.edit``); this page lists the groups and links to their settings, and
+shows the code a host copies: the script tag with its SRI hash and one element per group
+that is switched on.
 """
 
 import re
@@ -28,6 +30,7 @@ from app.domain.embedding_service import EmbeddingService
 from app.domain.errors import DomainError, ErrorCode
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
+from app.web.widget_bundle import SCRIPT_URL_PATH, load_bundle
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -100,6 +103,8 @@ async def _form_page(
             "maxlength": str((MAX_ORIGIN_LENGTH + 1) * service.max_origins),
         },
     )
+    base = request.app.state.settings.public_base_url.rstrip("/")
+    bundle = load_bundle()
     response = page(
         request,
         locale,
@@ -109,6 +114,9 @@ async def _form_page(
             "organisation": found.organisation,
             "origins": found.allowed.origins,
             "groups": found.groups,
+            "embedded": found.embedded_groups,
+            "script_url": f"{base}{SCRIPT_URL_PATH}",
+            "integrity": bundle.integrity if bundle else None,
             "origins_field": with_manual(request, locale, [origins])[0],
             "errors": form.errors,
             "done": done_message(request, _),
