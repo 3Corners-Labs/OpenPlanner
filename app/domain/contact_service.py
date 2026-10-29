@@ -76,6 +76,11 @@ class ContactService:
         async with self._uow.read() as tx:
             return await tx.get_contact_block(organisation_id)
 
+    async def public_for_group(self, group: Group) -> ContactBlock | None:
+        """Return the contact block that applies to ``group`` for citizens (ADR 0038 §4)."""
+        async with self._uow.read() as tx:
+            return await effective_block(tx, group)
+
     async def view(self, principal: Principal, slug: str) -> OrganisationContacts:
         """Return the organisation with ``slug`` and its contact block.
 
