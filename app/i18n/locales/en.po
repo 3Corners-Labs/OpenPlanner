@@ -4312,6 +4312,21 @@ msgstr "Maintenance mode switched off"
 msgid "admin.audit.detail.maintenance_refused"
 msgstr "Change refused during maintenance"
 
+msgid "maintenance.title"
+msgstr "We are carrying out maintenance"
+
+msgid "maintenance.text"
+msgstr "That is why you cannot book, reschedule or cancel an appointment right now. Appointments that are already confirmed go ahead as planned."
+
+msgid "maintenance.expected_end"
+msgstr "We expect to be done on {moment}."
+
+msgid "maintenance.contacts_lead"
+msgstr "Do you need help now? You can also reach us in another way."
+
+msgid "maintenance.try_later"
+msgstr "Please try again later."
+
 # ADR 0046: staff directory
 
 msgid "authz.permission.staff_view"
