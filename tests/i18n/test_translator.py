@@ -45,11 +45,11 @@ def test_missing_key_returns_key_and_logs_once(log_stream: io.StringIO) -> None:
     records = [json.loads(line) for line in log_stream.getvalue().splitlines()]
     assert records == [
         {
-            "event": "i18n.missing_key",
+            "message": "i18n.missing_key",
             "key": "no.such.key",
             "locale": "en",
-            "level": "warning",
-            "timestamp": records[0]["timestamp"],
+            "log.level": "warning",
+            "@timestamp": records[0]["@timestamp"],
         }
     ]
 
