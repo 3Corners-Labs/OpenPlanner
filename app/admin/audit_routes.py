@@ -9,13 +9,23 @@ outcome, so a failing reminder says why. A booking id links to the booking's tim
 the admin may view it.
 
     GET /admin/audit?source=system&problems=1&group=demo&booking=42     audit.view
+    GET /admin/audit?level=warning&category=security&from=2026-10-01&to=2026-10-28&trace=…
+    GET /admin/audit/export.csv?<the same parameters>                    audit.export
+
+ADR 0040, part 3: filters for minimum level, category, period (days in ``ADMIN_TIMEZONE``) and
+trace id; a trace id shows the whole chain of one request or job. The export writes exactly
+the current filter inside the admin's scope as CSV (``app.domain.audit_export``) and is itself
+an audit event; an export over a limit is refused on the page, never cut short.
 """
 
 from dataclasses import dataclass
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated
+from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse
+from fastapi import APIRouter, Depends, Query, Request
+from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service
 from app.admin.forms import Option
@@ -24,7 +34,16 @@ from app.admin.pages import page as _page
 from app.domain import staff
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT, LOGOUT_EVENT
 from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
-from app.domain.audit import SYSTEM_ACTOR, AuditEntry, AuditFilter, Outcome, Source
+from app.domain.audit import (
+    SYSTEM_ACTOR,
+    AuditEntry,
+    AuditFilter,
+    Category,
+    Level,
+    Outcome,
+    Source,
+)
+from app.domain.audit_export import ExportLimits, ExportRefused
 from app.domain.authorization import (
     API_SCOPES,
     ApiScope,
@@ -35,8 +54,11 @@ from app.domain.authorization import (
     Target,
     decide,
 )
+from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
 from app.domain.maintenance import MaintenanceReason
+from app.domain.ports import Clock
+from app.domain.scheduling import GroupSummary
 from app.domain.security_log import INVALID_SIGNATURE, TOKEN_REFRESH_FAILED, WEBHOOK_REJECTED
 from app.domain.storage import (
     DATABASE_TOO_LARGE,
@@ -54,6 +76,8 @@ from app.web.authz_labels import (
 from app.web.locale import RequestLocale
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
+
+DATE_LENGTH = len("2026-10-28")
 
 EVENT_LABELS: dict[str, str] = {
     LOGIN_EVENT: "audit.event.login",
@@ -196,10 +220,28 @@ OUTCOME_TONES: dict[Outcome, str] = {
 }
 """Chip colour per audit outcome; the outcome is always also written out (WCAG 1.4.1)."""
 
-SOURCE_LABELS: dict[Source, str] = {
-    Source.ADMIN: "admin.audit.source.admin",
-    Source.SYSTEM: "admin.audit.source.system",
+LEVEL_LABELS: dict[Level, str] = {
+    Level.DEBUG: "admin.audit.level.debug",
+    Level.INFO: "admin.audit.level.info",
+    Level.WARNING: "admin.audit.level.warning",
+    Level.ERROR: "admin.audit.level.error",
+    Level.CRITICAL: "admin.audit.level.critical",
 }
+"""Label per minimum level in the filter (ADR 0040)."""
+
+CATEGORY_LABELS: dict[Category, str] = {
+    Category.AUDIT: "admin.audit.category.audit",
+    Category.SYSTEM: "admin.audit.category.system",
+    Category.SECURITY: "admin.audit.category.security",
+    Category.DIAGNOSTIC: "admin.audit.category.diagnostic",
+}
+"""Label per category in the filter (ADR 0040)."""
+
+EXPORT_REFUSALS: dict[str, str] = {
+    "too_many_days": "admin.audit.export.too_many_days",
+    "too_many_rows": "admin.audit.export.too_many_rows",
+}
+"""Why an export was refused, per refusal code."""
 
 
 @dataclass(frozen=True)
@@ -218,19 +260,27 @@ class AuditView:
     code: str
     booking_id: int | None
     booking_url: str | None
+    trace_url: str | None
 
 
 @dataclass(frozen=True)
 class FilterView:
     """The filter form: the choices and what is selected now."""
 
-    sources: tuple[Option, ...]
-    source: str
+    levels: tuple[Option, ...]
+    level: str
+    categories: tuple[Option, ...]
+    category: str
     groups: tuple[Option, ...]
     group: str
     problems: bool
     booking: str
+    date_from: str
+    date_to: str
+    trace: str
     active: bool
+    query: str
+    """The current filter as a query string, for the export link."""
 
 
 def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
@@ -285,19 +335,88 @@ def _booking_url(principal: Principal, entry: AuditEntry) -> str | None:
     return f"/admin/groups/{event.group}/bookings/{event.booking_id}"
 
 
-def _narrow(
-    source: str | None,
-    problems: str | None,
-    group: str | None,
-    booking: str | None,
-    groups: set[str],
-) -> AuditFilter:
-    """Turn the query parameters into a filter; unknown or empty values are ignored."""
-    return AuditFilter(
-        source=Source(source) if source in set(Source) else None,
-        problems_only=problems == "1",
-        group=group if group in groups else None,
-        booking_id=int(booking) if booking and booking.isdigit() and len(booking) <= 12 else None,
+def _date(value: str | None) -> date | None:
+    """Parse ``YYYY-MM-DD``; anything else is ignored."""
+    try:
+        return date.fromisoformat(value) if value and len(value) == DATE_LENGTH else None
+    except ValueError:
+        return None
+
+
+def _midnight(day: date | None, zone: ZoneInfo) -> datetime | None:
+    """Return the start of ``day`` in ``zone`` as UTC."""
+    if day is None:
+        return None
+    return datetime.combine(day, time(), zone).astimezone(UTC)
+
+
+@dataclass(frozen=True)
+class AuditQuery:
+    """The query parameters of the audit page and its export, as typed by the browser."""
+
+    source: str | None = None
+    problems: str | None = None
+    group: str | None = None
+    booking: str | None = None
+    level: str | None = None
+    category: str | None = None
+    date_from: str | None = Query(default=None, alias="from")
+    date_to: str | None = Query(default=None, alias="to")
+    trace: str | None = None
+
+    def narrow(self, groups: set[str], zone: ZoneInfo) -> AuditFilter:
+        """Turn the parameters into a filter; unknown or empty values are ignored.
+
+        Dates are days in the admin time zone; ``to`` includes the whole day.
+        """
+        until = _date(self.date_to)
+        return AuditFilter(
+            source=Source(self.source) if self.source in set(Source) else None,
+            problems_only=self.problems == "1",
+            group=self.group if self.group in groups else None,
+            booking_id=(
+                int(self.booking)
+                if self.booking and self.booking.isdigit() and len(self.booking) <= 12
+                else None
+            ),
+            min_level=Level(self.level) if self.level in set(Level) else None,
+            category=Category(self.category) if self.category in set(Category) else None,
+            since=_midnight(_date(self.date_from), zone),
+            until=_midnight(until + timedelta(days=1), zone) if until else None,
+            trace_id=self.trace if self.trace and TRACE_ID.fullmatch(self.trace) else None,
+        )
+
+
+def _filter_view(
+    narrow: AuditFilter, in_scope: list[GroupSummary], zone: ZoneInfo, _: BoundGettext
+) -> FilterView:
+    """Describe the filter form with what ``narrow`` selected."""
+    date_to = narrow.until.astimezone(zone).date() - timedelta(days=1) if narrow.until else None
+    values = {
+        "level": narrow.min_level.value if narrow.min_level else "",
+        "category": narrow.category.value if narrow.category else "",
+        "group": narrow.group or "",
+        "problems": "1" if narrow.problems_only else "",
+        "booking": str(narrow.booking_id) if narrow.booking_id else "",
+        "from": narrow.since.astimezone(zone).date().isoformat() if narrow.since else "",
+        "to": date_to.isoformat() if date_to else "",
+        "trace": narrow.trace_id or "",
+        "source": narrow.source.value if narrow.source else "",
+    }
+    return FilterView(
+        levels=tuple(Option(level.value, _(LEVEL_LABELS[level])) for level in Level),
+        level=values["level"],
+        categories=tuple(Option(c.value, _(CATEGORY_LABELS[c])) for c in Category),
+        category=values["category"],
+        groups=tuple(Option(g.group.slug, f"{g.group.name} ({g.group.slug})") for g in in_scope),
+        group=values["group"],
+        problems=narrow.problems_only,
+        booking=values["booking"],
+        date_from=values["from"],
+        date_to=values["to"],
+        trace=values["trace"],
+        active=narrow != AuditFilter(),
+        query=urlencode({key: value for key, value in values.items() if value}),
     )
 
 
@@ -320,10 +439,40 @@ def audit_views(
             e.reason,
             e.booking_id,
             _booking_url(principal, entry),
+            f"/admin/audit?trace={e.trace_id}" if e.trace_id else None,
         )
         for entry in entries
         for e in (entry.event,)
     ]
+
+
+async def _audit_page(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    query: AuditQuery,
+    error: str | None = None,
+) -> HTMLResponse:
+    """Render the audit page for ``query``, with an export refusal when there is one."""
+    service = admin_service(request)
+    zone = ZoneInfo(request.app.state.settings.admin_timezone)
+    in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
+    narrow = query.narrow({g.group.slug for g in in_scope}, zone)
+    events = await service.audit_log(context.principal, narrow)
+    response = _page(
+        request,
+        locale,
+        "admin/audit.html",
+        context.principal,
+        {
+            "events": audit_views(request, locale, context.principal, events),
+            "filters": _filter_view(narrow, in_scope, zone, locale.gettext),
+            "export_error": locale.gettext(EXPORT_REFUSALS[error]) if error else None,
+        },
+    )
+    if error:
+        response.status_code = 422
+    return response
 
 
 @router.get("/audit", response_class=HTMLResponse)
@@ -331,31 +480,39 @@ async def audit(
     request: Request,
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.AUDIT_VIEW))],
-    source: str | None = None,
-    problems: str | None = None,
-    group: str | None = None,
-    booking: str | None = None,
+    query: Annotated[AuditQuery, Depends()],
 ) -> HTMLResponse:
     """Show the newest audit events and system events in scope, optionally filtered."""
-    _ = locale.gettext
+    return await _audit_page(request, locale, context, query)
+
+
+@router.get("/audit/export.csv", response_model=None)
+async def export(
+    request: Request,
+    locale: Locale,
+    context: Annotated[AdminContext, Depends(RequirePermission(Permission.AUDIT_EXPORT))],
+    query: Annotated[AuditQuery, Depends()],
+) -> Response:
+    """Download exactly the current filter as CSV (ADR 0040, part 3); the export is audited."""
     service = admin_service(request)
-    in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
-    narrow = _narrow(source, problems, group, booking, {g.group.slug for g in in_scope})
-    events = await service.audit_log(context.principal, narrow)
-    views = audit_views(request, locale, context.principal, events)
-    filters = FilterView(
-        sources=tuple(Option(s.value, _(SOURCE_LABELS[s])) for s in Source),
-        source=narrow.source.value if narrow.source else "",
-        groups=tuple(Option(g.group.slug, f"{g.group.name} ({g.group.slug})") for g in in_scope),
-        group=narrow.group or "",
-        problems=narrow.problems_only,
-        booking=str(narrow.booking_id) if narrow.booking_id else "",
-        active=narrow != AuditFilter(),
-    )
-    return _page(
-        request,
-        locale,
-        "admin/audit.html",
-        context.principal,
-        {"events": views, "filters": filters},
+    settings = request.app.state.settings
+    zone = ZoneInfo(settings.admin_timezone)
+    in_scope = await service.groups(context.principal, Permission.AUDIT_EXPORT)
+    narrow = query.narrow({g.group.slug for g in in_scope}, zone)
+    limits = ExportLimits(settings.audit_export_max_rows, settings.audit_export_max_days)
+    try:
+        document, _rows = await service.export_audit(
+            context.principal, narrow, settings.event_envelope, limits
+        )
+    except ExportRefused as refused:
+        return await _audit_page(request, locale, context, query, refused.code)
+    clock: Clock = request.app.state.clock
+    name = f"audit-{clock.now():%Y%m%dT%H%M%SZ}.csv"
+    return Response(
+        document.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "content-disposition": f'attachment; filename="{name}"',
+            "cache-control": "no-store",
+        },
     )

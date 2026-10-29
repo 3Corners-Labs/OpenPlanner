@@ -68,6 +68,7 @@ class Permission(StrEnum):
     MATRIX_VIEW = "matrix.view"
     ORGANISATION_MANAGE = "organisation.manage"
     AUDIT_VIEW = "audit.view"
+    AUDIT_EXPORT = "audit.export"
     INTEGRATIONS_MANAGE = "integrations.manage"
     BRANDING_MANAGE = "branding.manage"
     HOLIDAYS_MANAGE = "holidays.manage"
@@ -99,6 +100,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.HOLIDAYS_ASSIGN: Level.ORGANISATION,
     Permission.GROUP_CREATE: Level.ORGANISATION,
     Permission.AUDIT_VIEW: Level.GROUP,  # ADR 0031: one log, exact per level
+    # ADR 0040: the same log as a CSV file, for compliance work outside the portal.
+    Permission.AUDIT_EXPORT: Level.GROUP,
     Permission.GROUP_VIEW: Level.GROUP,
     Permission.GROUP_EDIT: Level.GROUP,
     Permission.SCHEDULE_MANAGE: Level.GROUP,
@@ -151,6 +154,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     Role.ORG_ADMIN: _EVERY_ADMIN
     | {
         Permission.AUDIT_VIEW,
+        Permission.AUDIT_EXPORT,
         Permission.HOLIDAYS_ASSIGN,
         Permission.GROUP_CREATE,
         Permission.GROUP_VIEW,
@@ -185,6 +189,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     Role.AUDITOR: _EVERY_ADMIN
     | {
         Permission.AUDIT_VIEW,
+        Permission.AUDIT_EXPORT,
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         # ADR 0046: who has access, for an access review.
