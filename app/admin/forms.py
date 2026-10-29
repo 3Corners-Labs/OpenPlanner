@@ -167,6 +167,11 @@ FIELD_MESSAGES: dict[str, str] = {
     "channel": "admin.form.error.reminder_channel",
     "minutes_before": "admin.form.error.reminder_offset",
     "reminders": "admin.form.error.reminder_limit",
+    "name_nl": "admin.form.error.role_name",
+    "name_en": "admin.form.error.role_name",
+    "claim_value": "admin.form.error.claim_value",
+    "permissions": "admin.form.error.permissions",
+    "template": "admin.form.error.choice",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -197,6 +202,7 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SLOT_CHANGED: "admin.form.error.slot_changed",
     ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",
     ErrorCode.INTEGRATION_NOT_READY: "admin.form.error.settings_key",
+    ErrorCode.ROLE_CHANGED: "admin.form.error.role_changed",
     ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
 }
 

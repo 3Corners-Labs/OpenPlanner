@@ -121,6 +121,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.INTEGRATIONS_MANAGE,
         Permission.API_CLIENTS_MANAGE,
         Permission.SYSTEM_UPDATE,
+        Permission.ROLES_MANAGE,  # ADR 0039 step 3
         Permission.SYSTEM_MAINTENANCE,
         Permission.DIAGNOSTICS_MANAGE,  # ADR 0040: product owner, 2026-10-29
     } == LOCKED_PERMISSIONS
