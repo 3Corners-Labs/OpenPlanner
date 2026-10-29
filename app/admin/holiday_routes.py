@@ -31,6 +31,7 @@ from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import Field, FormData, done_message, raise_refusal, read_form, redirect_done
 from app.admin.group_routes import ManageGroup, group_page
 from app.admin.pages import Locale, SameOrigin, page
+from app.admin.shortfalls import group_shortfalls
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import DayState, HolidayService
@@ -414,6 +415,7 @@ async def _group_response(
         context,
         "admin/group_holidays.html",
         {
+            "shortfalls": await group_shortfalls(request, locale, context),
             "source": source,
             "inherited": [names[i] for i in sorted(view.inherited) if i in names],
             "options": _options(view.calendars, own),

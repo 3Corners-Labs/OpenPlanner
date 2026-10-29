@@ -1,0 +1,9 @@
+{% from "admin/_icons.html" import icon %}
+{% if shortfalls is defined and shortfalls %}
+{% if shortfalls.count %}
+<div class="alert alert--error" role="status">
+  <p>{{ icon("alert") }}<strong>{{ _("admin.shortfall.some", count=shortfalls.count, days=shortfalls.days) }}</strong>
+  <a href="{{ shortfalls.first_href }}">{{ _("admin.shortfall.first", when=shortfalls.first_label) }}</a></p>
+</div>
+{% endif %}
+{% endif %}
