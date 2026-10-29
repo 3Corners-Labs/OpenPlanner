@@ -4,8 +4,12 @@
 purge with the citizen's data); ``groups`` gains ``queue_visible_from_minutes`` (default 15)
 and ``queue_free_pick_allowed`` (default off).
 
+Also the merge point of ``0042`` (dispatch kind) and ``0048`` (platform settings), which were
+merged in parallel on ``0047``; merged migrations are never edited, so the two heads are joined
+here.
+
 Revision ID: 0043
-Revises: 0042
+Revises: 0042, 0048
 Create Date: 2026-10-29 00:30:00.000000
 """
 
@@ -15,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0043"
-down_revision: str | None = "0042"
+down_revision: str | tuple[str, ...] | None = ("0042", "0048")
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

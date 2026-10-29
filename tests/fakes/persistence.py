@@ -90,6 +90,8 @@ class State:
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     custom_roles: dict[int, CustomRole] = field(default_factory=dict)
+    settings_version: int = 0
+    platform_settings: dict[str, object] = field(default_factory=dict)
     purged_at: dict[int, datetime] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
     next_id: int = 1
@@ -834,6 +836,12 @@ class InMemoryTransaction:
 
     async def delete_custom_role(self, role_id: int) -> None:
         self.state.custom_roles.pop(role_id, None)
+
+    async def settings_version(self) -> int:
+        return self.state.settings_version
+
+    async def platform_settings(self) -> dict[str, object]:
+        return dict(self.state.platform_settings)
 
 
 class InMemoryUnitOfWork:

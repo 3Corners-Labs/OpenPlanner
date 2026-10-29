@@ -72,6 +72,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.EMBEDDING_MANAGE,  # ADR 0035
         Permission.QUEUE_WORK,  # ADR 0043
+        Permission.SETTINGS_ORGANISATION_MANAGE,  # ADR 0042: the own organisation's settings
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -105,6 +106,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
+        Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042: system status, read-only
     }
 
 
@@ -118,6 +120,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
+        Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042
     }
 
     assert not MATRIX[Role.AUDITOR] & PII_PERMISSIONS
@@ -134,6 +137,8 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.ROLES_MANAGE,  # ADR 0039 step 3
         Permission.SYSTEM_MAINTENANCE,
         Permission.DIAGNOSTICS_MANAGE,  # ADR 0040: product owner, 2026-10-29
+        Permission.SETTINGS_PLATFORM_MANAGE,  # ADR 0042 §5
+        Permission.SETTINGS_LOGIN_MANAGE,  # ADR 0042 §5: never grantable to another role
     } == LOCKED_PERMISSIONS
     for permission in LOCKED_PERMISSIONS:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
@@ -208,6 +213,49 @@ def test_every_permission_has_a_level() -> None:
         (ORG, Permission.EMBEDDING_MANAGE, OTHER_ORG, Decision(False, Reason.OUT_OF_SCOPE)),
         (GROUP, Permission.EMBEDDING_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
         (AUDITOR, Permission.EMBEDDING_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
+        # ADR 0042 §5: settings of the platform and of the own organisation.
+        (
+            AUDITOR,
+            Permission.SETTINGS_PLATFORM_VIEW,
+            Target.everything(),
+            Decision(True, Reason.ROLE),
+        ),
+        (
+            ORG,
+            Permission.SETTINGS_PLATFORM_VIEW,
+            Target.everything(),
+            Decision(False, Reason.NOT_PERMITTED),
+        ),
+        (
+            AUDITOR,
+            Permission.SETTINGS_PLATFORM_MANAGE,
+            Target.everything(),
+            Decision(False, Reason.NOT_PERMITTED),
+        ),
+        (
+            SUPER,
+            Permission.SETTINGS_LOGIN_MANAGE,
+            Target.everything(),
+            Decision(True, Reason.SUPERUSER),
+        ),
+        (
+            ORG,
+            Permission.SETTINGS_ORGANISATION_MANAGE,
+            OWN_ORG,
+            Decision(True, Reason.ORGANISATION),
+        ),
+        (
+            ORG,
+            Permission.SETTINGS_ORGANISATION_MANAGE,
+            OTHER_ORG,
+            Decision(False, Reason.OUT_OF_SCOPE),
+        ),
+        (
+            GROUP,
+            Permission.SETTINGS_ORGANISATION_MANAGE,
+            OWN_ORG,
+            Decision(False, Reason.NOT_PERMITTED),
+        ),
         # Roles combine: org admin elsewhere, group admin here.
         (MIXED, Permission.SCHEDULE_MANAGE, OWN_GROUP, Decision(True, Reason.GROUP)),
         (MIXED, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),

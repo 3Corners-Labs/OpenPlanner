@@ -860,6 +860,27 @@ class MaintenanceStateRow(Base):
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 
 
+class PlatformSettingRow(Base):
+    """The portal value of one class C setting (ADR 0042 §4), as JSON; never a secret."""
+
+    __tablename__ = "platform_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class SettingsVersionRow(Base):
+    """The counter that goes up with every settings change (ADR 0042 §6); at most one row."""
+
+    __tablename__ = "settings_version"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
 class RoleRow(Base):
     """A custom role (ADR 0039): a copy of a built-in template within its bounds.
 

@@ -191,6 +191,7 @@ async def test_oidc_check_prints_findings_and_the_mapping_with_its_source(
     assert mapping["OIDC_ROLE_CLAIM"] == ["memberOf", "env"]
     assert mapping["OIDC_GROUP_CLAIM"] == ["groups", "default"]
     assert mapping["OIDC_ROLE_AUDITOR"] == ["openplanner-auditor", "default"]
+    assert mapping["OIDC_ROLE_AGENT"] == ["openplanner-agent", "default"]
     assert all(request.method == "GET" for request in seen)
     assert not [r for r in seen if "authorize" in r.url.path or "token" in r.url.path]
 

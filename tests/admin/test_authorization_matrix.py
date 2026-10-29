@@ -47,8 +47,8 @@ def statuses(*codes: int) -> dict[str, int]:
 # "METHOD route template" -> concrete paths -> expected status per role (HANDOVER §6):
 #   superuser · org_admin (demo) · group_admin (demo) · org_admin (andere) · auditor (demo) ·
 #   agent (demo) · no role. The auditor (ADR 0039) reads: overview, rights, matrix, log,
-#   retention, staff, manual, group page. The agent (ADR 0043) reads overview, rights, matrix,
-#   manual and group page, and works the own queue of its groups.
+#   retention, staff, manual, group page, and the settings (ADR 0042). The agent (ADR 0043)
+#   reads overview, rights, matrix, manual and group page, and works the own queue of its groups.
 EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 200, 403)},
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 200, 403)},
@@ -82,6 +82,8 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # ADR 0039: retention counts per organisation; no group admins, never personal data.
     "GET /admin/retention": {"/admin/retention": statuses(200, 200, 403, 200, 200, 403, 403)},
+    # ADR 0042 §5, §11: System status and Advanced settings, read-only: superuser and auditor.
+    "GET /admin/settings": {"/admin/settings": statuses(200, 403, 403, 403, 200, 403, 403)},
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
     "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403, 403)},
     "GET /admin/staff/{member_id}": {

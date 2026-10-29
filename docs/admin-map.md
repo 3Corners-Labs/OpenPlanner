@@ -35,6 +35,7 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 | API clients | `/admin/api` | `api_clients.manage` | `/admin/api/clients/new`, `/admin/api/clients/{client_id}` |
 | Updates | `/admin/updates` | `system.update` | – |
 | Maintenance | `/admin/maintenance` | `system.maintenance` | – |
+| Advanced settings | `/admin/settings` | `settings.platform.view` | – |
 
 ## Top bar
 
