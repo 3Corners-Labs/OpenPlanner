@@ -4,7 +4,7 @@ import pytest
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import Outcome
-from app.domain.authorization import LOCKED_PERMISSIONS, Scope
+from app.domain.authorization import LOCKED_PERMISSIONS, PII_PERMISSIONS, Scope
 from tests.admin.conftest import (
     GROUP_ADMIN,
     NO_ROLE,
@@ -251,7 +251,7 @@ async def test_matrix_page_marks_the_bounds_and_shows_the_auditor(site: Site) ->
 
     assert "Compliance en privacy (alleen lezen)" in text
     assert text.count("Alleen superuser</span>") == len(LOCKED_PERMISSIONS)
-    assert text.count("Persoonsgegevens</span>") == 1
+    assert text.count("Persoonsgegevens</span>") == len(PII_PERMISSIONS)  # incl. bookings.manage
     assert "rechtstreeks uit de code" not in text
 
 

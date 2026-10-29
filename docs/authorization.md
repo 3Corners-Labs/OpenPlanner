@@ -44,6 +44,7 @@ stays open to every role as usual.
 | Manage texts (`texts.manage`) | Group | needs `group.view` | yes | yes | yes | – |
 | Manage reminders (`reminders.manage`) | Group | needs `group.view` | yes | yes | – | – |
 | View bookings (`bookings.view`) | Group | personal data | yes | yes | yes | – |
+| Change bookings (`bookings.manage`) | Group | personal data, needs `bookings.view`, `group.view` | yes | yes | yes | – |
 | Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | needs `group.view` | yes | yes | yes | – |
 | View staff (`staff.view`) | Group | – | yes | yes | yes | yes |
 
@@ -59,8 +60,8 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 
 | Template | Reach | Delegable permissions |
 |---|---|---|
-| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
-| Group admin | groups | `audit.export`, `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `reminders.manage`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
+| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
+| Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `reminders.manage`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
 | Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `matrix.view`, `retention.view`, `rights.view`, `staff.view` |
 
 ## Citizens

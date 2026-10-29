@@ -101,7 +101,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
   team's own (`closure.manage`) with name, notices, headings, an optional contact block and an
   image that only admins see. "Close the team" and "close the organisation" start from a
   scenario (or empty) and copy it; later edits never change a running closure. Audited as
-  `closure.start,scenario:N,bookings:N`. Migration 0041. Manual topic with examples to copy.
+  `closure.start,scenario:N,bookings:N`. Migration 0047. Manual topic with examples to copy.
 - Embedding on host websites (ADR 0035, EM-1): allowed origins per organisation under
   Insluiten (`embedding.manage`, organisation admin and superuser), exact `https` origins,
   localhost only outside production; a group's own switch "Insluiten op websites" (off by
