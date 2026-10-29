@@ -189,6 +189,8 @@ class GroupRow(Base):
     not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
+    dispatch_kind: Mapped[str] = mapped_column(String(32), server_default=text("'contact_center'"))
+    queue_change_working_days: Mapped[int] = mapped_column(Integer, server_default=text("1"))
     # ADR 0044: a planner changes bookings up to this long before the start.
     planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
@@ -197,6 +199,10 @@ class GroupRow(Base):
     __table_args__ = (
         CheckConstraint("phone_mode IN ('hidden', 'optional', 'required')", name="phone_mode"),
         CheckConstraint("dispatch_lead_minutes BETWEEN 0 AND 60", name="dispatch_lead"),
+        CheckConstraint(
+            "dispatch_kind IN ('contact_center', 'openplanner_queue')", name="dispatch_kind"
+        ),
+        CheckConstraint("queue_change_working_days BETWEEN 1 AND 5", name="queue_change_days"),
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
     )
@@ -845,6 +851,27 @@ class MaintenanceStateRow(Base):
     switched_by: Mapped[str] = mapped_column(String(255), server_default=text("''"))
     expected_end: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reason: Mapped[str | None] = mapped_column(String(16))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class PlatformSettingRow(Base):
+    """The portal value of one class C setting (ADR 0042 §4), as JSON; never a secret."""
+
+    __tablename__ = "platform_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class SettingsVersionRow(Base):
+    """The counter that goes up with every settings change (ADR 0042 §6); at most one row."""
+
+    __tablename__ = "settings_version"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, server_default=text("0"))
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 

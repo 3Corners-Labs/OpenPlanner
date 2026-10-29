@@ -117,11 +117,16 @@ section) nothing else is needed. Behind a reverse proxy of your own also set:
 docker compose exec web python -m app.cli settings list
 ```
 
-It shows each variable with its class, its source (`env` or `default`), whether the
-environment locks it, and its value; secrets show only `set` or `not set`.
+It shows each variable with its class, its source (`env`, `file`, `portal` or `default`),
+whether the environment locks it, and its value; secrets show only `set` or `not set`. The
+portal values come from the database; when it cannot be read, the first line says so. The same
+overview is in the portal under *Advanced settings* (superuser and auditor), with *System
+status* for the class A and B variables (set or not, never the value).
 `settings show RATE_LIMIT_BOOKINGS` shows one setting with its portal bounds. A value set in
 the environment outside the portal bounds still applies, but is marked
-`! outside portal bounds`.
+`! outside portal bounds`. A stored portal value that no longer meets the rules (for example a
+row edited by hand) is not applied and is marked `! stored portal value ignored`. A change
+applies within 10 seconds in `web` and in the next loop of the worker, without a restart.
 
 ## HTTPS certificate (ADR 0030)
 

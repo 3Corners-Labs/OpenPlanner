@@ -1,5 +1,6 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -7,7 +8,13 @@ from app.domain.booking import BookingStatus
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
-from app.domain.scheduling import PhoneMode, ScheduleOverride, ScheduleRule
+from app.domain.scheduling import (
+    DispatchKind,
+    PhoneMode,
+    ScheduleOverride,
+    ScheduleRule,
+    working_days_before,
+)
 from app.domain.services import BookingService, ContactInput
 from app.domain.tokens import derive_token, hash_token
 from tests.fakes.clock import FixedClock
@@ -406,9 +413,25 @@ async def test_booking_can_change_until_just_before_the_deadline(uow: InMemoryUn
 
 
 def test_change_deadline_is_the_dispatch_moment() -> None:
-    from app.domain.job_plan import change_deadline
+    from app.domain.job_plan import dispatch_moment
 
-    assert change_deadline(SLOT_0900, timedelta(minutes=15)) == SLOT_0900 - timedelta(minutes=15)
+    assert dispatch_moment(SLOT_0900, timedelta(minutes=15)) == SLOT_0900 - timedelta(minutes=15)
+
+
+async def test_own_queue_booking_is_read_only_a_working_day_ahead(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    uow.state.groups[1] = make_group(
+        id=1, slug="aangifte", dispatch_kind=DispatchKind.OPENPLANNER_QUEUE
+    )
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    deadline = working_days_before(SLOT_0900, 1, ZoneInfo("Europe/Amsterdam"))
+    before = BookingService(uow, FixedClock(deadline - timedelta(seconds=1)), TEST_TOKEN_KEY)
+    at = BookingService(uow, FixedClock(deadline), TEST_TOKEN_KEY)
+
+    assert (await before.find(receipt.management_token)).changeable
+    with pytest.raises(DomainError, match="booking_locked"):
+        await at.cancel(receipt.management_token)
 
 
 async def test_read_only_moment_follows_the_groups_dispatch_lead(uow: InMemoryUnitOfWork) -> None:

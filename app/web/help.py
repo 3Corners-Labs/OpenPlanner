@@ -102,6 +102,7 @@ TOPICS = (
         Permission.BOOKINGS_VIEW,
     ),
     HelpTopic("maintenance", ("/admin/maintenance",), Permission.SYSTEM_MAINTENANCE),
+    HelpTopic("advanced-settings", ("/admin/settings",), Permission.SETTINGS_PLATFORM_VIEW),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 

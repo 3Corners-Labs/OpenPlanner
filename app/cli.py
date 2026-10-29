@@ -93,6 +93,7 @@ from app.domain.closure_service import ClosureInput, ClosureService, GroupOutcom
 from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
+from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
@@ -704,14 +705,32 @@ def _init(out: Path) -> tuple[str, bool]:
 
 
 def _settings(settings: Settings, action: str, key: str | None) -> tuple[str, int]:
-    """Run ``settings list`` or ``settings show KEY``; return the report and exit code."""
-    states = describe(settings, environment())
-    if action == "list":
-        return format_list(states), 0
-    spec = lookup(key or "")
-    if spec is None:
+    """Run ``settings list`` or ``settings show KEY``; return the report and exit code.
+
+    The portal values come from the database; when it cannot be read, the report says so
+    and shows the environment and the defaults only.
+    """
+    spec = lookup(key or "") if action != "list" else None
+    if action != "list" and spec is None:
         return "Unknown setting; `settings list` shows every variable.\n", 2
-    return format_one(next(s for s in states if s.spec is spec)), 0
+    portal, note = asyncio.run(_portal_values(settings))
+    states = describe(settings, environment(), portal)
+    if spec is None:
+        return note + format_list(states), 0
+    return note + format_one(next(s for s in states if s.spec is spec)), 0
+
+
+async def _portal_values(settings: Settings) -> tuple[PortalValues, str]:
+    """Read the stored portal values; on failure return none and a note naming the error type."""
+    engine = create_engine(settings.database_url)
+    store = PlatformSettingsStore(SqlUnitOfWork(engine))
+    try:
+        await store.refresh()
+    except Exception as exc:  # no database, or not migrated: the environment still tells a lot
+        return EMPTY, f"Portal values not read ({type(exc).__name__}); showing env and defaults.\n"
+    finally:
+        await engine.dispose()
+    return store.current, ""
 
 
 def main(argv: Sequence[str] | None = None) -> int:

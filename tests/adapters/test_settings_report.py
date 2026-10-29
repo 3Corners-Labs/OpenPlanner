@@ -2,8 +2,15 @@
 
 from pydantic import SecretStr
 
-from app.adapters.settings_report import SettingState, describe, format_list, format_one
+from app.adapters.settings_report import (
+    SettingState,
+    describe,
+    effective,
+    format_list,
+    format_one,
+)
 from app.config import Settings
+from app.domain.platform_settings import PortalValues
 
 SECRET = "smtp-password-never-printed"  # noqa: S105 - test value
 
@@ -81,3 +88,54 @@ def test_a_secret_from_its_file_shows_the_file_as_source() -> None:
     state = _state(settings, {"SESSION_SECRET_FILE": "/run/secrets/session"}, "session_secret")
 
     assert (state.source, state.shown) == ("file", "set")
+
+
+# Portal values (ADR 0042 step 3).
+
+PORTAL = PortalValues(5, {"admin_session_hours": 4, "rate_limit_bookings": "99/hour"})
+
+
+def test_a_portal_value_is_reported_with_the_portal_as_source() -> None:
+    state = next(
+        s
+        for s in describe(Settings(environment="dev"), {}, PORTAL)
+        if s.spec.key == "admin_session_hours"
+    )
+
+    assert (state.source, state.locked, state.shown) == ("portal", False, "4")
+
+
+def test_a_portal_value_outside_the_rules_is_reported_as_ignored() -> None:
+    state = next(
+        s
+        for s in describe(Settings(environment="dev"), {}, PORTAL)
+        if s.spec.key == "rate_limit_bookings"
+    )
+
+    assert (state.source, state.shown, state.portal_ignored) == ("default", "10/hour", True)
+    assert "! stored portal value ignored" in format_list([state])
+
+
+def test_the_environment_wins_over_the_portal() -> None:
+    settings = Settings(environment="dev", admin_session_hours=6)
+    state = next(
+        s
+        for s in describe(settings, {"ADMIN_SESSION_HOURS": "6"}, PORTAL)
+        if s.spec.key == "admin_session_hours"
+    )
+
+    assert (state.source, state.locked, state.shown) == ("env", True, "6")
+
+
+def test_the_effective_settings_take_unlocked_portal_values_only() -> None:
+    settings = Settings(environment="dev", admin_reauth_minutes=30)
+    portal = PortalValues(
+        2, {"admin_session_hours": 4, "admin_reauth_minutes": 10, "public_base_url": "https://x"}
+    )
+
+    current = effective(settings, {"ADMIN_REAUTH_MINUTES": "30"}, portal)
+
+    assert current.admin_session_hours == 4
+    assert current.admin_reauth_minutes == 30  # locked by the environment
+    assert current.public_base_url == settings.public_base_url  # class B: never the portal
+    assert settings.admin_session_hours == 8  # the base is left alone

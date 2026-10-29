@@ -64,6 +64,8 @@ from app.domain.scheduling import (
     MAX_DIRECT_CALLS,
     MAX_LABEL_LENGTH,
     MAX_PLANNER_LEAD_MINUTES,
+    MAX_QUEUE_CHANGE_WORKING_DAYS,
+    DispatchKind,
     GroupSummary,
     PhoneMode,
     ScheduleOverride,
@@ -85,6 +87,11 @@ from app.web.navigation import object_page
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
+DISPATCH_LABELS: dict[DispatchKind, str] = {
+    DispatchKind.CONTACT_CENTER: "admin.group.dispatch_contact_center",
+    DispatchKind.OPENPLANNER_QUEUE: "admin.group.dispatch_openplanner_queue",
+}
+
 PHONE_LABELS: dict[PhoneMode, str] = {
     PhoneMode.HIDDEN: "admin.group.phone_hidden",
     PhoneMode.OPTIONAL: "admin.group.phone_optional",
@@ -98,6 +105,10 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
     "dispatch_lead_minutes": (
         "admin.field.dispatch_lead_minutes",
         "admin.field.dispatch_lead_minutes_hint",
+    ),
+    "queue_change_working_days": (
+        "admin.field.queue_change_working_days",
+        "admin.field.queue_change_working_days_hint",
     ),
     "planner_change_min_lead_minutes": (
         "admin.field.planner_change_min_lead_minutes",
@@ -474,6 +485,7 @@ def _settings_fields(
         )
 
     phone_options = tuple(Option(mode.value, _(PHONE_LABELS[mode])) for mode in PhoneMode)
+    dispatch_options = tuple(Option(kind.value, _(DISPATCH_LABELS[kind])) for kind in DispatchKind)
     planning = [
         Field(
             "name",
@@ -485,7 +497,21 @@ def _settings_fields(
         number("slot_minutes", current.slot_minutes, {"min": "5", "max": "480", "step": "5"}),
         number("min_notice_minutes", current.min_notice_minutes, {"min": "0", "step": "5"}),
         number("horizon_days", current.horizon_days, {"min": "1", "max": "366"}),
+        Field(
+            "dispatch_kind",
+            _("admin.field.dispatch_kind"),
+            "select",
+            value("dispatch_kind", current.dispatch_kind.value),
+            hint=_("admin.field.dispatch_kind_hint"),
+            error=form.error_for("dispatch_kind"),
+            options=dispatch_options,
+        ),
         number("dispatch_lead_minutes", current.dispatch_lead_minutes, {"min": "0", "max": "60"}),
+        number(
+            "queue_change_working_days",
+            current.queue_change_working_days,
+            {"min": "1", "max": str(MAX_QUEUE_CHANGE_WORKING_DAYS)},
+        ),
         number(
             "planner_change_min_lead_minutes",
             current.planner_change_min_lead_minutes,
@@ -588,12 +614,20 @@ async def save_settings(
     cap = form.optional_integer("direct_call_max_concurrent")
     phone = form.choice("phone_mode", {mode.value for mode in PhoneMode})
     direct = form.choice("direct_call_enabled", {"yes", "no"})
+    dispatch = form.choice("dispatch_kind", {kind.value for kind in DispatchKind})
     embedding = form.choice("embedding_enabled", {"yes", "no"})
-    if not form.errors and phone is not None and direct is not None and embedding is not None:
+    if (
+        not form.errors
+        and phone is not None
+        and direct is not None
+        and dispatch is not None
+        and embedding is not None
+    ):
         new = GroupSettings(
             name=form.text("name"),
             timezone=form.text("timezone"),
             phone_mode=PhoneMode(phone),
+            dispatch_kind=DispatchKind(dispatch),
             video_host_email=form.optional_text("video_host_email"),
             wxcc_business_address=form.optional_text("wxcc_business_address"),
             wxcc_channel=form.optional_text("wxcc_channel"),

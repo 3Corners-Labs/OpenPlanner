@@ -15,6 +15,8 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 
+from app.domain.authorization import Permission
+
 
 class SettingClass(StrEnum):
     """Where a setting lives and who changes it (ADR 0042 §1).
@@ -75,16 +77,16 @@ class Topic(StrEnum):
     PLANNER = "planner"
 
 
-PLATFORM_VIEW = "settings.platform.view"
+PLATFORM_VIEW = Permission.SETTINGS_PLATFORM_VIEW
 """Permission to see *System status* and *Advanced settings* (superuser, auditor; §5)."""
 
-PLATFORM_MANAGE = "settings.platform.manage"
+PLATFORM_MANAGE = Permission.SETTINGS_PLATFORM_MANAGE
 """Permission to change a class C setting (superuser only)."""
 
-LOGIN_MANAGE = "settings.login.manage"
+LOGIN_MANAGE = Permission.SETTINGS_LOGIN_MANAGE
 """Permission to change the OIDC claim mapping (superuser only, never grantable; §5, §8)."""
 
-ORGANISATION_MANAGE = "settings.organisation.manage"
+ORGANISATION_MANAGE = Permission.SETTINGS_ORGANISATION_MANAGE
 """Permission to change a class D setting (org admin for their own organisation, superuser)."""
 
 ADVANCED_SETTINGS_TOPIC = "advanced-settings"
@@ -165,7 +167,7 @@ class SettingSpec:
         return Apply.LIVE if self.in_portal else Apply.RESTART
 
     @property
-    def permission(self) -> str | None:
+    def permission(self) -> Permission | None:
         """The permission that changes this setting in the portal; ``None`` for A and B."""
         if self.class_ is SettingClass.ORGANISATION:
             return ORGANISATION_MANAGE

@@ -5,6 +5,8 @@ Run with ``python -m app.jobs.worker``. Each iteration checks the database, runs
 (``app.jobs.housekeeping``, ADR 0040), looks up the latest release when that is due (hourly,
 ADR 0029), reports maintenance that has been on too long (ADR 0038) and writes the heartbeat.
 The worker never pauses for maintenance: confirmed appointments and the privacy jobs go on.
+It reloads the portal settings when they changed (ADR 0042 §6); the poll interval follows at
+once.
 """
 
 import asyncio
@@ -22,6 +24,7 @@ from app.adapters.db.maintenance import storage_limits
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import build_integrations, secret_box
+from app.adapters.live_settings import LiveSettings
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.config import Settings, environment, loose_secret_files
@@ -30,6 +33,7 @@ from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.integration import IntegrationService
 from app.domain.maintenance_service import MaintenanceWatch
+from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock
 from app.domain.security_log import SecurityLog
 from app.domain.system_log import SystemLog
@@ -74,6 +78,8 @@ async def run_worker(
         timedelta(minutes=settings.security_event_window_minutes),
         max_sources=settings.security_event_max_sources,
     )
+    # ADR 0042 §6: portal values, reloaded once per loop when settings_version moved.
+    live = LiveSettings(settings, environment(), PlatformSettingsStore(uow))
     integrations = build_integrations(settings, engine, http, clock, security)
     fallback = fallback_mail(settings)
     runner = JobRunner(
@@ -116,6 +122,7 @@ async def run_worker(
     try:
         while not stop.is_set():
             if await is_reachable(engine):
+                await live.refresh()
                 # One trace per round for housekeeping; every job gets its own inside it.
                 with trace_scope():
                     try:
@@ -127,7 +134,7 @@ async def run_worker(
                     await _watch_maintenance(maintenance)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
-                await asyncio.wait_for(stop.wait(), timeout=settings.worker_poll_seconds)
+                await asyncio.wait_for(stop.wait(), timeout=live.settings.worker_poll_seconds)
     finally:
         await http.aclose()
         await engine.dispose()

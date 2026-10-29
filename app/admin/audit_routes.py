@@ -162,6 +162,8 @@ DETAIL_LABELS: dict[str, str] = {
     "horizon_days": "admin.field.horizon_days",
     "phone_mode": "admin.field.phone_mode",
     "dispatch_lead_minutes": "admin.field.dispatch_lead_minutes",
+    "dispatch_kind": "admin.field.dispatch_kind",
+    "queue_change_working_days": "admin.field.queue_change_working_days",
     "planner_change_min_lead_minutes": "admin.field.planner_change_min_lead_minutes",
     "video_host_email": "admin.field.video_host_email",
     "wxcc_business_address": "admin.field.wxcc_business_address",
