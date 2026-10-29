@@ -36,8 +36,14 @@ ADR 0013.
 
 ## Development (Python)
 
-pytest, pytest-asyncio, pytest-cov, ruff, mypy, import-linter, bandit, pip-audit, pip-licenses,
-mutmut: all active and standard in their field. They are never shipped in the image.
+pytest, pytest-asyncio, pytest-cov, pytest-xdist (+ execnet), ruff, mypy, import-linter,
+bandit, pip-audit, pip-licenses, mutmut: all active and standard in their field. They are never
+shipped in the image.
+
+pytest-xdist (MIT, pytest-dev; 3.8.0, 2025; execnet MIT, also pytest-dev) runs the test suite
+on every core (`make test` passes `-n auto`): one process per core, the coverage of all workers
+combined by pytest-cov. It is the pytest project's own plugin for this; there is no
+alternative in common use.
 
 ## Documentation tooling (local only)
 
