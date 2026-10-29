@@ -31,6 +31,7 @@ from app.api import (
 )
 from app.api.agent import create_agent_api
 from app.api.security_headers import SecurityHeadersMiddleware
+from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings
 from app.domain.admin import AdminService
 from app.domain.api_access import ApiAccessService
@@ -40,6 +41,7 @@ from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.closure_service import ClosureService
 from app.domain.contact_service import ContactService
+from app.domain.event_context import set_service
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
@@ -125,7 +127,8 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        configure_logging(settings.log_level)
+        set_service("web")
+        configure_logging(settings.log_level, envelope=settings.event_envelope)
         app.state.engine = create_engine(settings.database_url)
         uow = SqlUnitOfWork(app.state.engine, secret_box(settings))
         app.state.booking_service = BookingService(uow, clock, token_key)
@@ -208,6 +211,8 @@ def create_app(
         https_only=settings.environment == "prod",
     )
     app.add_middleware(SecurityHeadersMiddleware)
+    # Outermost: every request, its log lines and its audit events share one trace (ADR 0040).
+    app.add_middleware(TraceMiddleware)
     register_error_pages(app)
     register_admin(app)
     app.include_router(health.router)

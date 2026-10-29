@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: Run before opening any PR in this repo. Answers the six review questions, walks the abuse cases, and checks the PII, authorisation and configurability rules from CLAUDE.md against the diff. Use when asked to "review this PR", "security check", or before any `gh pr create`.
+description: Run before opening any PR in this repo. Answers the seven review questions, walks the abuse cases, and checks the PII, authorisation and configurability rules from CLAUDE.md against the diff. Use when asked to "review this PR", "security check", or before any `gh pr create`.
 ---
 
 # Security review (repo skill)
@@ -9,7 +9,7 @@ Review the diff of the current branch against `main` (`git diff main...HEAD`, pl
 changes). Read every changed file in full, not only the hunks. Report findings; do not fix them
 in this step.
 
-## 1. Six review questions
+## 1. Seven review questions
 
 Answer each with file:line references. "None" is a valid answer only after checking.
 
@@ -26,6 +26,19 @@ Answer each with file:line references. "None" is a valid answer only after check
    that `uv.lock` changed accordingly.
 6. Which settings does this add or change, and which tunable value stays hard-coded? See
    section 3 for the check; answer with a table: key, class A–D, default, bounds, permission.
+
+7. Which admin screen or setting is new or moved, and where does it live (scope → object → tab,
+   ADR 0047)? Check against the diff:
+   - every new `GET` route under `/admin` that returns HTML is a register entry, tab or sub-tab in
+     `app/web/navigation.py`, or a declared sub-page of one;
+   - a new section, top-level entry or seventh tab on an object comes with an ADR (finding:
+     medium if missing);
+   - a new setting has a `topic` on its own scope (class C → platform, D → organisation) and sits
+     next to settings of the same kind;
+   - no second home: a page that asks "which organisation?" or "which group?" before an edit form
+     is a finding (medium); cross-object pages are lists that link to the object's tab;
+   - a `return` key or legacy redirect resolves only through the register, never to a URL taken
+     from the request (high if it does).
 
 ## 2. Rule checks
 
@@ -78,7 +91,7 @@ A Markdown section ready to paste into the PR description:
 
 ```
 ### Security review
-**Q1–Q6:** ...
+**Q1–Q7:** ...
 **Settings:** table, or "none" after checking
 **Rule checks:** pass / findings
 **Abuse cases:** ...
