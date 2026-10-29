@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.config import Settings
+from app.domain.event_schema import Envelope
 from app.i18n.dates import ClockStyle
 
 
@@ -160,3 +161,16 @@ def test_storage_limits_must_be_ordered(monkeypatch: pytest.MonkeyPatch) -> None
 
     with pytest.raises(ValidationError, match="STORAGE_CRITICAL_FREE_PERCENT"):
         Settings(environment="dev")
+
+
+def test_the_installation_name_and_version_go_into_every_record() -> None:
+    # ADR 0040, part 2 (class B): names this installation on a shared log platform.
+    settings = Settings(environment="dev", app_version="1.4.0", installation_name="gemeente-prod")
+
+    assert settings.event_envelope == Envelope("1.4.0", "gemeente-prod")
+    assert Settings(environment="dev").event_envelope == Envelope("", "")
+
+
+def test_the_installation_name_is_a_plain_token() -> None:
+    with pytest.raises(ValidationError):
+        Settings(environment="dev", installation_name='prod\n{"x":1}')

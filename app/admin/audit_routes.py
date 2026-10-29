@@ -35,6 +35,7 @@ from app.domain.authorization import (
     Target,
     decide,
 )
+from app.domain.event_schema import rfc3339
 from app.domain.maintenance import MaintenanceReason
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.storage import (
@@ -202,6 +203,7 @@ class AuditView:
     """A translated audit event."""
 
     when: str
+    utc: str
     actor: str
     action: str
     outcome: str
@@ -303,6 +305,7 @@ def audit_views(
     return [
         AuditView(
             admin_moment(request, locale, e.at),
+            rfc3339(e.at),
             _actor_label(entry, _),
             _action_label(e.action, _),
             _(OUTCOME_LABELS[e.outcome]),

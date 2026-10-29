@@ -38,6 +38,7 @@ from app.domain.authorization import (
     decide_in_maintenance,
     scope_for,
 )
+from app.domain.event_context import bind_level
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import Clock
 from app.domain.roles import RoleService
@@ -237,6 +238,8 @@ class RequirePermission:
             allowed=authorization.decision.allowed,
             reason=authorization.decision.reason.value,
         )
+        # ADR 0040: the rest of the request's log lines carry the target it acts on.
+        bind_level(authorization.target.organisation, authorization.target.group)
         if not authorization.decision.allowed:
             raise AccessDenied
         if request.method not in READ_METHODS:
