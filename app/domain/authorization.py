@@ -16,7 +16,18 @@ A role grants a permission within its reach (``REACH``):
     group_admin  groups: those in the principal's group claim
 
 Some permissions are locked to the superuser (``LOCKED_PERMISSIONS``); some show citizens'
-personal data (``PII_PERMISSIONS``). The matrix page and the documentation mark both.
+personal data (``PII_PERMISSIONS``); some depend on others (``REQUIRES``). The matrix page and
+the documentation mark all three.
+
+Custom roles (ADR 0039) are data: the superuser copies a template (``TEMPLATES``) and switches
+delegable permissions on or off. ``validate_role`` keeps every definition inside the bounds;
+the database adapter stores it; a ``RoleCatalogue`` attaches the custom roles a principal
+holds through their role claim values, once per request. ``decide`` and ``scope_for`` read
+each role's reach, never a role's name, and clip a custom role to its bounds again::
+
+    role claim ──ClaimMapping──► built-in roles
+               └─ other values ─► RoleCatalogue.holding ─► custom roles (template, permissions)
+                                                             └─ granted = permissions ∩ delegable
 
 ``decide`` answers one question for routes; ``scope_for`` turns the same rules into a
 ``Scope`` that the database adapter applies to listings. Both are derived from ``MATRIX``,
@@ -31,7 +42,7 @@ scopes (``API_SCOPES``) within one organisation, optionally narrowed to some of 
 """
 
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
 
@@ -87,6 +98,7 @@ class Permission(StrEnum):
     SYSTEM_UPDATE = "system.update"
     SYSTEM_MAINTENANCE = "system.maintenance"
     RETENTION_VIEW = "retention.view"
+    ROLES_MANAGE = "roles.manage"
     STAFF_VIEW = "staff.view"
     EMBEDDING_MANAGE = "embedding.manage"
 
@@ -121,6 +133,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.SYSTEM_MAINTENANCE: Level.GLOBAL,
     # ADR 0039: per group, whether personal data is removed on time (counts only).
     Permission.RETENTION_VIEW: Level.ORGANISATION,
+    # ADR 0039: create, change and delete custom roles.
+    Permission.ROLES_MANAGE: Level.GLOBAL,
     # ADR 0046: who uses the portal; group level so a group admin sees their own team.
     Permission.STAFF_VIEW: Level.GROUP,
     # ADR 0035: on which websites the organisation's groups may be embedded.
@@ -134,6 +148,7 @@ LOCKED_PERMISSIONS = frozenset(
         Permission.INTEGRATIONS_MANAGE,
         Permission.API_CLIENTS_MANAGE,
         Permission.SYSTEM_UPDATE,
+        Permission.ROLES_MANAGE,
         Permission.SYSTEM_MAINTENANCE,
         Permission.DIAGNOSTICS_MANAGE,
     }
@@ -149,16 +164,42 @@ MAINTENANCE_WRITABLE = frozenset(
 """ADR 0038: the permissions that may still change something during maintenance, and then
 for the superuser only (``decide_in_maintenance``)."""
 
-_EVERY_ADMIN = frozenset(
-    {Permission.DASHBOARD_VIEW, Permission.RIGHTS_VIEW, Permission.MATRIX_VIEW}
+READ_PERMISSIONS = frozenset(
+    {
+        Permission.DASHBOARD_VIEW,
+        Permission.RIGHTS_VIEW,
+        Permission.MATRIX_VIEW,
+        Permission.AUDIT_VIEW,
+        Permission.AUDIT_EXPORT,
+        Permission.GROUP_VIEW,
+        Permission.BOOKINGS_VIEW,
+        Permission.RETENTION_VIEW,
+        Permission.STAFF_VIEW,
+    }
 )
+"""ADR 0039: permissions that only show; everything else changes something."""
+
+_NEEDS_GROUP_VIEW = frozenset({Permission.GROUP_VIEW})
+
+REQUIRES: dict[Permission, frozenset[Permission]] = {
+    Permission.GROUP_EDIT: _NEEDS_GROUP_VIEW,
+    Permission.SCHEDULE_MANAGE: _NEEDS_GROUP_VIEW,
+    Permission.TEXTS_MANAGE: _NEEDS_GROUP_VIEW,
+    Permission.REMINDERS_MANAGE: _NEEDS_GROUP_VIEW,
+    Permission.CLOSURE_MANAGE: _NEEDS_GROUP_VIEW,
+    Permission.ORGANISATION_CLOSURE: frozenset({Permission.CLOSURE_MANAGE}),
+}
+"""ADR 0039: permissions a permission depends on; a custom role must hold them too."""
+
+EVERY_ADMIN = frozenset({Permission.DASHBOARD_VIEW, Permission.RIGHTS_VIEW, Permission.MATRIX_VIEW})
+"""ADR 0039: what every admin holds, so every role (custom ones too) must hold it."""
 
 MATRIX: dict[Role, frozenset[Permission]] = {
     # HANDOVER §6: everything, including organisations, IdP, SMTP and WxCC credentials.
     Role.SUPERUSER: frozenset(Permission),
     # HANDOVER §6: own organisation: groups, rules, overrides, texts, bookings of its groups;
     # ADR 0025: which of the superuser's holiday calendars its groups follow.
-    Role.ORG_ADMIN: _EVERY_ADMIN
+    Role.ORG_ADMIN: EVERY_ADMIN
     | {
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,
@@ -181,7 +222,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.EMBEDDING_MANAGE,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
-    Role.GROUP_ADMIN: _EVERY_ADMIN
+    Role.GROUP_ADMIN: EVERY_ADMIN
     | {
         # ADR 0031: the audit and system events of the own groups, for troubleshooting.
         Permission.AUDIT_VIEW,
@@ -195,7 +236,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.STAFF_VIEW,
     },
     # ADR 0039: compliance and privacy (FG, CISO, auditors): reading only, no personal data.
-    Role.AUDITOR: _EVERY_ADMIN
+    Role.AUDITOR: EVERY_ADMIN
     | {
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,
@@ -212,6 +253,134 @@ REACH: dict[Role, Reach] = {
     Role.GROUP_ADMIN: Reach.GROUPS,
     Role.AUDITOR: Reach.ORGANISATIONS,
 }
+
+TEMPLATES: tuple[Role, ...] = (Role.ORG_ADMIN, Role.GROUP_ADMIN, Role.AUDITOR)
+"""ADR 0039: the built-in roles a custom role may copy; never the superuser."""
+
+HELD_BACK = frozenset({Permission.BRANDING_MANAGE})
+"""Not locked, but kept out of custom roles: ADR 0039 B3 leaves branding with the superuser
+through the built-in roles until O5 (branding per organisation) is settled."""
+
+READ_ONLY_TEMPLATES = frozenset({Role.AUDITOR})
+"""Templates whose copies stay read-only and without personal data (ADR 0039, item 10)."""
+
+
+def _within_reach(reach: Reach, permission: Permission) -> bool:
+    """Return whether a role of ``reach`` can hold ``permission`` at all."""
+    level = LEVELS[permission]
+    if reach is Reach.EVERYTHING:
+        return True
+    if level is Level.GLOBAL:
+        return permission in EVERY_ADMIN  # anything else global is about the installation
+    return level is Level.GROUP or reach is Reach.ORGANISATIONS
+
+
+def delegable(template: Role) -> frozenset[Permission]:
+    """Return the permissions a custom role copied from ``template`` may hold.
+
+    Not locked or held back, within the template's reach and, for a read-only template, only reading
+    permissions without personal data. Empty for a role that is not a template.
+    """
+    if template not in TEMPLATES:
+        return frozenset()
+    reach = REACH[template]
+    allowed = {
+        p for p in Permission if p not in LOCKED_PERMISSIONS | HELD_BACK and _within_reach(reach, p)
+    }
+    if template in READ_ONLY_TEMPLATES:
+        allowed &= READ_PERMISSIONS - PII_PERMISSIONS
+    return frozenset(allowed)
+
+
+class RoleRule(StrEnum):
+    """Why ``validate_role`` refuses a custom role definition (a code, never text)."""
+
+    TEMPLATE = "template"
+    LOCKED = "locked"
+    ABOVE_REACH = "above_reach"
+    PII = "pii"
+    WRITE = "write"
+    REQUIREMENT = "requirement"
+    BASICS = "basics"
+
+
+@dataclass(frozen=True)
+class Violation:
+    """One broken rule, with the permission concerned (``None`` for the template)."""
+
+    rule: RoleRule
+    permission: Permission | None
+
+
+def validate_role(template: Role, permissions: Iterable[Permission]) -> list[Violation]:
+    """Return every rule a custom role definition breaks; empty means it is valid.
+
+    The order is stable (rule, then permission), so the editor shows the same list each time.
+    """
+    if template not in TEMPLATES:
+        return [Violation(RoleRule.TEMPLATE, None)]
+    held = frozenset(permissions)
+    reach = REACH[template]
+    found: list[Violation] = []
+    for permission in sorted(held):
+        if permission in LOCKED_PERMISSIONS | HELD_BACK:
+            found.append(Violation(RoleRule.LOCKED, permission))
+        elif not _within_reach(reach, permission):
+            found.append(Violation(RoleRule.ABOVE_REACH, permission))
+        elif template in READ_ONLY_TEMPLATES and permission in PII_PERMISSIONS:
+            found.append(Violation(RoleRule.PII, permission))
+        elif template in READ_ONLY_TEMPLATES and permission not in READ_PERMISSIONS:
+            found.append(Violation(RoleRule.WRITE, permission))
+    found += [
+        Violation(RoleRule.REQUIREMENT, permission)
+        for permission in sorted(held)
+        if not REQUIRES.get(permission, frozenset()) <= held
+    ]
+    found += [Violation(RoleRule.BASICS, p) for p in sorted(EVERY_ADMIN - held)]
+    order = list(RoleRule)
+    return sorted(found, key=lambda v: (order.index(v.rule), v.permission or ""))
+
+
+@dataclass(frozen=True)
+class CustomRole:
+    """A role the superuser defined (ADR 0039), as stored.
+
+    Attributes:
+        id: Database id; ``key`` is derived from it.
+        template: The built-in role it was copied from; fixes its reach.
+        permissions: The permissions switched on (validated when saved, clipped when used).
+        claim_value: The role claim value of the identity provider that grants it.
+        name_nl: Name in Dutch.
+        name_en: Name in English.
+        version: Starts at 1 and goes up with every change.
+    """
+
+    id: int
+    template: Role
+    permissions: frozenset[Permission]
+    claim_value: str
+    name_nl: str
+    name_en: str
+    version: int = 1
+
+    @property
+    def key(self) -> str:
+        """Stable reference in audit events and logs, e.g. ``custom.3``."""
+        return f"custom.{self.id}"
+
+    @property
+    def reach(self) -> Reach:
+        """The reach of the template: ``organisations`` or ``groups``, never everything."""
+        return REACH[self.template] if self.template in TEMPLATES else Reach.GROUPS
+
+    @property
+    def granted(self) -> frozenset[Permission]:
+        """What ``decide`` honours: the definition clipped to its bounds once more."""
+        return self.permissions & delegable(self.template)
+
+    def name(self, locale: str) -> str:
+        """Return the name in ``locale``; English for any locale other than Dutch."""
+        return self.name_nl if locale == "nl" else self.name_en
 
 
 @dataclass(frozen=True)
@@ -273,9 +442,12 @@ class Principal:
     Attributes:
         subject: Stable identifier from the identity provider; used in logs and audit.
         display_name: For the page header only; never logged.
-        roles: Roles from the role claim.
-        organisations: Organisation slugs from the organisation claim (org_admin).
-        groups: Group slugs from the group claim (group_admin).
+        roles: Built-in roles from the role claim.
+        organisations: Organisation slugs from the organisation claim (organisation reach).
+        groups: Group slugs from the group claim (group reach).
+        role_claims: The other values of the role claim; custom roles are linked to these.
+        custom_roles: The custom roles those values grant, attached per request by a
+            ``RoleCatalogue`` (never stored in the session).
     """
 
     subject: str
@@ -283,6 +455,30 @@ class Principal:
     roles: frozenset[Role]
     organisations: frozenset[str]
     groups: frozenset[str]
+    role_claims: frozenset[str] = frozenset()
+    custom_roles: frozenset[CustomRole] = frozenset()
+
+
+@dataclass(frozen=True)
+class RoleCatalogue:
+    """The custom roles of the installation (ADR 0039, B2: one catalogue for all)."""
+
+    custom: tuple[CustomRole, ...] = ()
+
+    def holding(self, principal: Principal) -> Principal:
+        """Return ``principal`` with exactly the custom roles its role claim values grant."""
+        held = frozenset(r for r in self.custom if r.claim_value in principal.role_claims)
+        return replace(principal, custom_roles=held)
+
+
+def holds_a_role(principal: Principal) -> bool:
+    """Return whether the principal holds any built-in or custom role."""
+    return bool(principal.roles or principal.custom_roles)
+
+
+def role_keys(principal: Principal) -> list[str]:
+    """Return the principal's roles as stable keys (built-in values, then ``custom.<id>``)."""
+    return sorted(principal.roles) + sorted(r.key for r in principal.custom_roles)
 
 
 @dataclass(frozen=True)
@@ -349,15 +545,19 @@ class Scope:
         )
 
 
-def _granting_roles(principal: Principal, permission: Permission) -> set[Role]:
-    """Return the principal's roles that include ``permission``."""
-    return {role for role in principal.roles if permission in MATRIX[role]}
+def _grants(principal: Principal) -> list[tuple[frozenset[Permission], Reach]]:
+    """Return the permissions and reach of every role the principal holds."""
+    grants = [(MATRIX[role], REACH[role]) for role in principal.roles]
+    return grants + [(role.granted, role.reach) for role in principal.custom_roles]
 
 
 def reaches(principal: Principal, permission: Permission | None = None) -> set[Reach]:
     """Return the reach of the principal's roles (only those granting ``permission``, if given)."""
-    roles = principal.roles if permission is None else _granting_roles(principal, permission)
-    return {REACH[role] for role in roles}
+    return {
+        reach
+        for permissions, reach in _grants(principal)
+        if permission is None or permission in permissions
+    }
 
 
 def decide(principal: Principal, permission: Permission, target: Target) -> Decision:
@@ -368,12 +568,11 @@ def decide(principal: Principal, permission: Permission, target: Target) -> Deci
     """
     if target.level is not LEVELS[permission]:
         raise ValueError(f"{permission} needs a {LEVELS[permission]} level target")
-    if not principal.roles:
+    if not holds_a_role(principal):
         return Decision(False, Reason.NO_ROLE)
-    roles = _granting_roles(principal, permission)
-    if not roles:
+    reach = reaches(principal, permission)
+    if not reach:
         return Decision(False, Reason.NOT_PERMITTED)
-    reach = {REACH[role] for role in roles}
     if Reach.EVERYTHING in reach:
         return Decision(True, Reason.SUPERUSER)
     if target.level is Level.GLOBAL:
@@ -446,7 +645,7 @@ def permissions_for(principal: Principal) -> list[tuple[Permission, Scope | None
     """
     rights: list[tuple[Permission, Scope | None]] = []
     for permission in Permission:
-        if not _granting_roles(principal, permission):
+        if not reaches(principal, permission):
             continue
         if LEVELS[permission] is Level.GLOBAL:
             rights.append((permission, None))
