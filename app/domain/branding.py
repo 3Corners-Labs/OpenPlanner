@@ -6,17 +6,17 @@ text on white, so one rule covers both: at least 4.5:1 contrast with white (WCAG
 The colour reaches the browser only through a generated stylesheet of CSS custom properties;
 validation here is what makes that stylesheet safe to generate.
 
-Logos are PNG, JPEG or WebP, recognised from their bytes, never from a file name or a
-client-supplied type. SVG is refused: it can carry scripts. Fonts are WOFF2 only, recognised
-the same way (ADR 0041). The other design tokens live in ``app.domain.theme``.
+Logos are PNG, JPEG or WebP, recognised from their bytes by ``app.domain.images`` (shared
+with closure images), never from a file name or a client-supplied type. Fonts are WOFF2 only,
+recognised the same way (ADR 0041). The other design tokens live in ``app.domain.theme``.
 """
 
-import hashlib
 import re
 from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.images import content_digest, recognise
 from app.domain.theme import Theme, contrast, normalise_colour
 
 DEFAULT_ACCENT = "#01689B"
@@ -30,22 +30,10 @@ MAX_FONT_BYTES = 250_000
 _WOFF2 = b"wOF2"
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 
-_SIGNATURES: tuple[tuple[tuple[tuple[int, bytes], ...], str], ...] = (
-    (((0, b"\x89PNG\r\n\x1a\n"),), "image/png"),
-    (((0, b"\xff\xd8\xff"),), "image/jpeg"),
-    (((0, b"RIFF"), (8, b"WEBP")), "image/webp"),
-)
-"""Magic bytes at their offsets, and the media type they identify."""
-
 
 def _invalid(field: str) -> DomainError:
     """Return the error for an invalid branding ``field``."""
     return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
-
-
-def content_digest(data: bytes) -> str:
-    """Return the first 16 hex digits of the SHA-256 of ``data``; versions asset URLs."""
-    return hashlib.sha256(data).hexdigest()[:16]
 
 
 def contrast_with_white(colour: str) -> float:
@@ -167,12 +155,10 @@ class Logo:
             DomainError: ``invalid_configuration`` with ``logo`` for an empty, too large or
                 unsupported file.
         """
-        if not data or len(data) > MAX_LOGO_BYTES:
+        media_type = recognise(data)
+        if media_type is None or len(data) > MAX_LOGO_BYTES:
             raise _invalid("logo")
-        for parts, media_type in _SIGNATURES:
-            if all(data[at : at + len(magic)] == magic for at, magic in parts):
-                return cls(media_type, data)
-        raise _invalid("logo")
+        return cls(media_type, data)
 
     @property
     def digest(self) -> str:

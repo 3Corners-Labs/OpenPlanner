@@ -6,13 +6,15 @@ An empty holiday calendar ``nationaal`` is ready for the superuser to fill (ADR 
 organisation has chosen it, so it changes no opening hours.
 
 ``seed_closure_examples`` adds what the closure pages need (ADR 0037): a team that is closed
-now, a team with a planned closure and a booking on hold. Development and test only; the
-e2e pages of CL-2 are these.
+now (with an image, CL-3), a team with a planned closure (without one) and a booking on hold.
+Development and test only; the e2e pages of CL-2 are these.
 
 Used by ``python -m app.cli seed-demo`` and by tests. Idempotent: existing groups are left
 untouched.
 """
 
+import struct
+import zlib
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 
@@ -30,6 +32,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import Booking, BookingStatus, Contact, Slot
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
+from app.domain.images import ImageFile, ImageText
 from app.domain.ports import Transaction
 from app.domain.scheduling import Group, PhoneMode
 from app.domain.tokens import derive_token, hash_token, new_token_salt
@@ -49,6 +52,7 @@ EXAMPLE_NOTICES = {
     "We are working on a solution.",
 }
 EXAMPLE_HEADINGS = {"nl": "Storing bij het loket", "en": "Outage at the desk"}
+EXAMPLE_IMAGE_TEXT = ImageText({"nl": "Pictogram van een storing", "en": "Outage pictogram"})
 EXAMPLE_CONTACTS = ContactBlock(
     (
         ContactOption.create(
@@ -132,7 +136,9 @@ async def seed_closure_examples(
         closed_group = await _group(tx, CLOSED_GROUP_SLUG)
         if created:
             start = _local(closed_group, now, -1, time(8))
-            await tx.add_closure(_example_closure(closed_group, start, None, now))
+            stored = await tx.add_closure(_example_closure(closed_group, start, None, now))
+            image = ImageFile.from_upload(_example_png())
+            await tx.save_closure_image(stored.id or 0, EXAMPLE_IMAGE_TEXT, image)
         if planned:
             group = await _group(tx, PLANNED_GROUP_SLUG)
             start = _local(group, now, 14, time(8))
@@ -143,6 +149,23 @@ async def seed_closure_examples(
         closed_group=f"/g/{CLOSED_GROUP_SLUG}",
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
         suspended_booking=f"/b/{token}",
+    )
+
+
+def _example_png(size: int = 96) -> bytes:
+    """Return a square PNG in the NL Design System link blue, for the example closure page."""
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        crc = struct.pack(">I", zlib.crc32(kind + data))
+        return struct.pack(">I", len(data)) + kind + data + crc
+
+    rows = (b"\x00" + b"\x01\x68\x9b" * size) * size
+    header = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
     )
 
 

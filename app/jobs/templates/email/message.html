@@ -20,6 +20,9 @@
     {% for paragraph in notice.split("\n") if paragraph %}<p>{{ paragraph }}</p>
     {% endfor %}
     {% endif %}
+    {% if reason %}
+    <p><strong>{{ reason_label }}:</strong> {{ reason }}</p>
+    {% endif %}
     {% if join_url %}
     <p>{{ join_text }}</p>
     <p><a href="{{ join_url }}">{{ join_link }}</a></p>
