@@ -2,10 +2,8 @@
 
 from datetime import timedelta
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.db.models import ClosureImageRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.admin import AdminService
 from app.domain.authorization import Principal, Role
@@ -13,7 +11,7 @@ from app.domain.closure import Closure
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.images import ImageFile, ImageText
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
+from tests.adapters.db.conftest import count_images, seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.closures import NOTICES
 from tests.support.domain import NOW, TEST_TOKEN_KEY
@@ -35,13 +33,6 @@ async def _closure(engine: AsyncEngine) -> tuple[SqlUnitOfWork, Closure]:
         group = await tx.get_group("aangifte")
         assert group is not None
         return uow, (await tx.get_closures(group.id, NOW))[0]
-
-
-async def _rows(engine: AsyncEngine) -> int:
-    async with engine.connect() as connection:
-        return (await connection.execute(select(func.count()).select_from(ClosureImageRow))).one()[
-            0
-        ]
 
 
 async def test_an_image_round_trips_with_its_text(engine: AsyncEngine) -> None:
@@ -77,7 +68,7 @@ async def test_replacing_keeps_one_row_and_a_text_change_keeps_the_file(
         stored = await tx.get_closure(closure_id)
         data = await tx.get_closure_image(closure_id)
 
-    assert await _rows(engine) == 1
+    assert await count_images(engine) == 1
     assert stored is not None
     assert stored.image == second.ref(decorative)
     assert data == second
@@ -107,4 +98,4 @@ async def test_saving_the_closure_keeps_its_image_and_removing_deletes_the_row(
     assert removed is not None
     assert removed.image is None
     assert data is None
-    assert await _rows(engine) == 0
+    assert await count_images(engine) == 0
