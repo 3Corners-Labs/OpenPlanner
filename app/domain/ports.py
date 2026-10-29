@@ -46,6 +46,17 @@ from app.domain.staff import StaffFilter, StaffMember
 from app.domain.updates import Release, ReleaseCheck, UpdateRequest
 
 
+class EventSink(Protocol):
+    """Ships committed audit events to the log platform (ADR 0034).
+
+    Called once per committed transaction with the events it wrote, never after a rollback.
+    """
+
+    def emit(self, events: Sequence[AuditEvent]) -> None:
+        """Hand the events on; must not raise, a failure is only logged."""
+        ...
+
+
 class Clock(Protocol):
     """Source of the current time. Injected so that time-based rules are testable."""
 

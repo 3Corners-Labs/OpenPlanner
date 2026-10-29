@@ -15,6 +15,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import Integrations, build_integrations, secret_box
 from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider
 from app.adapters.releases import update_service
@@ -52,6 +53,7 @@ from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
+from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.simulation import SimulationService
 from app.i18n import Translator, load_catalogues
@@ -131,7 +133,13 @@ def create_app(
         set_service("web")
         configure_logging(settings.log_level, envelope=settings.event_envelope)
         app.state.engine = create_engine(settings.database_url)
-        uow = SqlUnitOfWork(app.state.engine, secret_box(settings))
+        # ADR 0034: committed audit events also go to stdout for the log platform.
+        uow = SqlUnitOfWork(
+            app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
+        )
+        app.state.security_log = SecurityLog(
+            uow, clock, timedelta(minutes=settings.security_event_window_minutes)
+        )
         app.state.booking_service = BookingService(uow, clock, token_key)
         app.state.admin_service = AdminService(uow, clock)
         # ADR 0038: read on every admin change (and citizen write), cached for a few seconds.
@@ -179,7 +187,9 @@ def create_app(
         if agent_api is not None:
             for name in ("api_access", "booking_service", "translator", "limiter", "clock"):
                 setattr(agent_api.state, name, getattr(app.state, name))
-        wired = integrations or build_integrations(settings, app.state.engine, http, clock)
+        wired = integrations or build_integrations(
+            settings, app.state.engine, http, clock, app.state.security_log
+        )
         app.state.integrations = wired
         app.state.call_service = CallService(
             uow, app.state.integration_service, wired.video, wired.dispatcher, agent_start_label
