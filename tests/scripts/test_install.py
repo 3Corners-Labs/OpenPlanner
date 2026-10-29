@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from app.adapters.bootstrap import GENERATED
+from app.domain.settings_registry import BY_KEY
 from tests.fakes import updater_host
 from tests.fakes.updater_host import digest
 
@@ -28,6 +30,7 @@ SYSTEM = (
     *("awk", "base64", "cat", "chmod", "cp", "date", "dirname", "env", "grep", "head"),
     *("hostname", "install", "mkdir", "mktemp", "mv", "rm", "sed", "sort", "tail", "tr", "uniq"),
 )
+KEYS = tuple(BY_KEY[key].env for key in GENERATED)
 PRODUCTION = {
     "TLS_DOMAIN": "afspraak.example.nl",
     "ACME_EMAIL": "ops@example.nl",
@@ -135,6 +138,9 @@ def host(tmp_path: Path) -> Host:
     return host
 
 
+SECRETS = "secrets/secrets.env"
+
+
 def mode(path: Path) -> int:
     return stat.S_IMODE(path.stat().st_mode)
 
@@ -171,10 +177,13 @@ def test_production_install_from_scratch(host: Host) -> None:
     assert env["PUBLIC_BASE_URL"] == "https://afspraak.example.nl"
     assert env["SMTP_PASSWORD"] == "pass word #1"
     assert env["UPDATE_REPOSITORY"] == "3Corners-Labs/OpenPlanner"
-    keys = [env["MANAGEMENT_TOKEN_KEY"], env["SESSION_SECRET"], env["SETTINGS_ENCRYPTION_KEY"]]
+    assert not set(KEYS) & set(env)
+    keys = [host.settings(SECRETS)[key] for key in KEYS]
     assert len(set(keys)) == 3
     assert all(len(key) >= 32 for key in keys)
     assert mode(host.file(".env")) == 0o600
+    assert mode(host.file(SECRETS)) == 0o600
+    assert mode(host.file("secrets")) == 0o700
     assert host.settings("proxy.env") == {
         "TLS_DOMAIN": "afspraak.example.nl",
         "ACME_EMAIL": "ops@example.nl",
@@ -236,13 +245,85 @@ def test_an_existing_env_is_repaired_where_no_person_is_needed(host: Host) -> No
         "PUBLIC_BASE_URL=https://afspraak.example.nl",
         "SMTP_HOST=b",
     ]
-    env = host.settings(".env")
-    for key in ("SESSION_SECRET", "MANAGEMENT_TOKEN_KEY", "SETTINGS_ENCRYPTION_KEY"):
-        assert len(env[key]) >= 32
+    for key in KEYS:
+        assert len(host.settings(SECRETS)[key]) >= 32
     assert mode(host.file(".env")) == 0o600
     (backup,) = host.checkout.glob(".env.bak.*")
     assert backup.read_text() == original
     assert mode(backup) == 0o600
+
+
+def test_keys_in_env_move_to_the_secrets_file_with_their_values(host: Host) -> None:
+    original = (
+        "ENVIRONMENT=prod\nPUBLIC_BASE_URL=https://afspraak.example.nl\n"
+        "SETTINGS_ENCRYPTION_KEY='key-that-encrypted-the-database'\nSESSION_SECRET=session\n"
+        "MANAGEMENT_TOKEN_KEY=tokens\n"
+    )
+    host.file(".env").write_text(original)
+
+    result = host.run("--mode", "production", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert {key: host.settings(SECRETS)[key] for key in KEYS} == {
+        "SETTINGS_ENCRYPTION_KEY": "key-that-encrypted-the-database",
+        "MANAGEMENT_TOKEN_KEY": "tokens",
+        "SESSION_SECRET": "session",
+    }
+    assert not set(KEYS) & set(host.settings(".env"))
+    assert host.settings(".env")["PUBLIC_BASE_URL"] == "https://afspraak.example.nl"
+    (backup,) = host.checkout.glob(".env.bak.*")
+    assert backup.read_text() == original
+
+
+def test_a_key_with_two_different_values_needs_a_person(host: Host) -> None:
+    host.file(".env").write_text(
+        "ENVIRONMENT=prod\nPUBLIC_BASE_URL=https://afspraak.example.nl\nSETTINGS_ENCRYPTION_KEY=a\n"
+    )
+    host.file("secrets").mkdir()
+    host.file(SECRETS).write_text("SETTINGS_ENCRYPTION_KEY=b\n")
+
+    result = host.run("--mode", "production", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 1
+    assert "SETTINGS_ENCRYPTION_KEY has different values" in result.stderr
+    assert host.file(SECRETS).read_text() == "SETTINGS_ENCRYPTION_KEY=b\n"
+    assert "SETTINGS_ENCRYPTION_KEY=a" in host.file(".env").read_text()
+    assert not host.ran("pull")
+
+
+def test_an_existing_secrets_file_is_completed_never_rewritten(host: Host) -> None:
+    host.file("secrets").mkdir(mode=0o755)
+    host.file(SECRETS).write_text("# made by app.cli init\nSETTINGS_ENCRYPTION_KEY=kept\n")
+
+    result = host.run("--mode", "production", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    lines = host.file(SECRETS).read_text().splitlines()
+    assert lines[:2] == ["# made by app.cli init", "SETTINGS_ENCRYPTION_KEY=kept"]
+    assert set(host.settings(SECRETS)) == set(KEYS)
+    assert mode(host.file("secrets")) == 0o700
+
+
+def test_a_key_from_a_file_is_not_generated(host: Host) -> None:
+    host.file(".env").write_text(
+        "ENVIRONMENT=prod\nPUBLIC_BASE_URL=https://afspraak.example.nl\n"
+        "SETTINGS_ENCRYPTION_KEY_FILE=/run/secrets/settings_key\n"
+    )
+
+    result = host.run("--mode", "production", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert "SETTINGS_ENCRYPTION_KEY" not in host.settings(SECRETS)
+
+
+def test_outside_production_an_existing_install_gets_only_a_session_secret(host: Host) -> None:
+    host.file(".env").write_text("ENVIRONMENT=test\nPUBLIC_BASE_URL=http://127.0.0.1:8000\n")
+
+    result = host.run("--mode", "lab", "--version", "1.4.0", "--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    # The others were generated in the data volume (ADR 0011); a new one would break links.
+    assert set(host.settings(SECRETS)) == {"SESSION_SECRET"}
 
 
 def test_what_needs_a_person_is_reported_and_nothing_starts(host: Host) -> None:
@@ -270,6 +351,7 @@ def test_an_invalid_signature_changes_nothing(host: Host) -> None:
 def test_a_rerun_keeps_the_settings_and_the_pinned_release(host: Host) -> None:
     assert host.run("--mode", "production", "--non-interactive", **PRODUCTION).returncode == 0
     env, pin = host.file(".env").read_text(), host.file(".env.update").read_text()
+    keys = host.file(SECRETS).read_text()
     host.given("latest", "v1.5.0\n")
     (host.fakes / "calls.jsonl").unlink()
 
@@ -278,6 +360,7 @@ def test_a_rerun_keeps_the_settings_and_the_pinned_release(host: Host) -> None:
     assert result.returncode == 0, result.stderr
     assert host.file(".env").read_text() == env
     assert host.file(".env.update").read_text() == pin
+    assert host.file(SECRETS).read_text() == keys
     assert not host.ran("pull")
 
 
@@ -357,3 +440,10 @@ def test_a_foreign_docker_key_stops_the_installation(host: Host) -> None:
     assert result.returncode == 1
     assert "expected 9DC858229FC7DD38854AE2D88D81803C0EBFCD88" in result.stderr
     assert not (host.staged / "etc/apt/sources.list.d/docker.list").exists()
+
+
+def test_the_installer_generates_the_keys_app_cli_init_generates() -> None:
+    script = (REPO / "scripts" / "install.sh").read_text()
+
+    (keys,) = re.findall(r"^BOOTSTRAP_KEYS=\((.*)\)$", script, flags=re.MULTILINE)
+    assert sorted(keys.split()) == sorted(KEYS)

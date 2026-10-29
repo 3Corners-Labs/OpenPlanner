@@ -27,7 +27,7 @@ home. On docker01 (2026-10-28) this cost an evening of interactive fixing:
    `/home/<user>/openplanner`. Nothing is placed in `/opt`. It uses `sudo` only for packages and
    the host updater, and refuses to run as root.
 2. Every run is safe to repeat. It repairs what needs no person (keys set twice: the last
-   value stays, after a backup; missing generated secrets; file modes; the updater's files and
+   value stays, after a backup; missing generated keys; file modes; the updater's files and
    units) and stops with a list for what does (an `http` address in production, a missing
    client secret, a mode that does not match `ENVIRONMENT`). It never overwrites a value a
    person chose.
@@ -47,9 +47,17 @@ home. On docker01 (2026-10-28) this cost an evening of interactive fixing:
 6. The updater's unit keeps `ProtectHome=yes`; the installer adds a drop-in that opens only the
    checkout (`ProtectHome=read-only`, `ReadWritePaths=<checkout>`) and gives the service its own
    `HOME` in `/var/lib/openplanner-updater`, with a copy of the operator's registry login.
-7. Values in written env files are single-quoted; secrets are read without echo and never put
+7. The bootstrap keys (`SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`, `SESSION_SECRET`) live
+   in `secrets/secrets.env` (mode 600, directory 700), the file `python -m app.cli init` writes
+   and Compose reads after `.env` (ADR 0042 §9); not in `.env`, which operators open, copy and
+   share far more often. The installer writes that file itself, so it also works with a release
+   that predates `init`; a test keeps its key list equal to `init`'s. Keys an older
+   installation kept in `.env` move there with their values. Nothing in the file is overwritten,
+   and a key with two different values stops the run (a new `SETTINGS_ENCRYPTION_KEY` makes
+   every stored secret unreadable). Decided by the product owner on 2026-10-29.
+8. Values in written env files are single-quoted; secrets are read without echo and never put
    on a command line.
-8. `docs/install.md` documents every path, who writes it and its mode, the modes, the
+9. `docs/install.md` documents every path, who writes it and its mode, the modes, the
    prerequisites, the options and every message the script stops with.
 
 ## Settings

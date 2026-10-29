@@ -22,7 +22,9 @@ starts after `web` is healthy.
 ### First install: the bootstrap keys (ADR 0042 §9)
 
 A new installation needs three random keys: `SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`
-and `SESSION_SECRET`. Generate them once, before the first `up`:
+and `SESSION_SECRET`. On a host, `scripts/install.sh` generates them into `secrets/secrets.env`
+and moves keys an older installation kept in `.env` there (`docs/install.md`). By hand, generate
+them once, before the first `up`:
 
 ```bash
 mkdir -m 700 secrets
