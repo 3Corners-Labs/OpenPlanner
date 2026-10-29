@@ -4,13 +4,14 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.agenda_service import MAX_AGENDA_DAYS, AgendaService
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Principal
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.errors import DomainError
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.admin import AUDITOR, GROUP_ADMIN, SUPER
 from tests.support.closures import NOTICES, three_groups
 from tests.support.domain import (
     MONDAY,
@@ -21,10 +22,6 @@ from tests.support.domain import (
     book,
     window,
 )
-
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
-AUDITOR = Principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
 
 
 @pytest.fixture

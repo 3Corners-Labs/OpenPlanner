@@ -43,5 +43,39 @@ en het dashboard melden hoeveel tijdsloten in de komende 14 dagen een tekort heb
 link naar het eerste. Zo ziet u direct na een wijziging van de bezetting of die een tekort
 geeft.
 
-Een tekort lost u op door de bezetting weer te verhogen, of door de burgers te bellen en een
-afspraak te verzetten. Afspraken wijzigen vanuit de agenda komt in een volgende versie.
+Een tekort lost u op door de bezetting weer te verhogen, of door afspraken te wijzigen (hieronder).
+
+## Afspraken wijzigen
+
+Met het recht **Boekingen wijzigen** (groepsbeheerders, organisatiebeheerders en een eigen
+rol Planner) staan in het dagoverzicht bij elke afspraak die nog kan worden gewijzigd de links
+**Verplaatsen** en **Annuleren**. De burger krijgt van elke wijziging altijd bericht: per
+e-mail, en per sms als de burger een telefoonnummer opgaf. U logt daarvoor soms opnieuw in.
+
+Een afspraak kan niet meer worden gewijzigd als die binnen de tijd van **Wijzigen door een
+planner** begint (instelling van de groep, standaard 60 minuten), als die al naar het
+contactcenter is gegaan, of als die al is geannuleerd. Bel de burger dan.
+
+### Verplaatsen
+
+Kies een vrij tijdslot van hetzelfde team in de komende 28 dagen. De burger krijgt een bericht
+met de nieuwe tijd en een nieuwe link om zelf nog te wijzigen. Heeft het gekozen tijdslot
+daarna meer afspraken dan medewerkers, dan vraagt OpenPlanner u dat eerst te bevestigen met
+het vinkje **Ik accepteer dat het nieuwe tijdslot dan meer afspraken dan medewerkers heeft**.
+
+### Annuleren
+
+Kies een van de vaste redenen: **Te weinig medewerkers**, **Technische storing** of
+**Onvoorziene omstandigheden**. De burger leest de bijbehorende tekst in het bericht. U kunt
+zelf geen tekst typen; de organisatie past de woorden aan bij **Berichtteksten**, onder
+**Redenen bij wijzigingen door een planner**.
+
+### Tekort accepteren
+
+Helpt er bijvoorbeeld een collega van een ander team, dan kiest u bij het tijdslot **Tekort
+accepteren**. Het tekort telt dan niet meer mee in de meldingen. Veranderen daarna de
+bezetting of de afspraken van dat tijdslot, dan verschijnt het tekort weer.
+
+Elke wijziging staat in de auditlog met wie, welk team, het afspraaknummer en de reden. Doet
+één persoon in een uur veel wijzigingen, dan meldt een systeemgebeurtenis dat aan de
+beheerders.

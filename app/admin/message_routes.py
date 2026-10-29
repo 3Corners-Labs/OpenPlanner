@@ -62,6 +62,7 @@ PURPOSE_LABELS: dict[str, str] = {
     "change": "admin.messages.purpose_change",
     "reminder": "admin.messages.purpose_reminder",
     "cancellation": "admin.messages.purpose_cancellation",
+    "reason": "admin.messages.purpose_reason",
     "all": "admin.messages.purpose_all",
 }
 
@@ -70,6 +71,9 @@ PART_LABELS: dict[str, str] = {
     "intro": "admin.messages.part_intro",
     "signoff": "admin.messages.part_signoff",
     "body": "admin.messages.part_sms",
+    "reason_staffing": "admin.messages.part_reason_staffing",
+    "reason_technical": "admin.messages.part_reason_technical",
+    "reason_unforeseen": "admin.messages.part_reason_unforeseen",
 }
 
 ManageReminders = Annotated[
