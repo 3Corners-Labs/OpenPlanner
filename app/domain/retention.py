@@ -10,6 +10,7 @@ A booking's purge moment follows the privacy rules (CLAUDE.md, ADR 0024):
     confirmed / completed / no show / direct call ─► slot end + 24 h
     cancelled                                      ─► cancellation + 24 h
     suspended                                      ─► closure end + 30 days (none while open)
+    awaiting a new time (ADR 0044)                 ─► rebook_by + 24 h (it lapses then)
 
 A booking counts as overdue once its purge moment lies more than ``PURGE_GRACE`` in the past,
 so a purge that is waiting for the worker or for a retry does not raise an alarm.
@@ -54,6 +55,7 @@ class PurgeCandidate:
         end: The end of its slot.
         cancelled_at: When it was cancelled, if it was.
         closure_ends_at: For a suspended booking, the end of its closure (``None`` while open).
+        rebook_by: For a booking awaiting a new time, when the request lapses (ADR 0044).
     """
 
     group_id: int
@@ -61,6 +63,7 @@ class PurgeCandidate:
     end: datetime
     cancelled_at: datetime | None
     closure_ends_at: datetime | None
+    rebook_by: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -123,6 +126,8 @@ def purge_moment(candidate: PurgeCandidate) -> datetime | None:
         if candidate.closure_ends_at is None:
             return None
         return candidate.closure_ends_at + RETENTION_AFTER_CLOSURE
+    if candidate.status is BookingStatus.AWAITING_REBOOK and candidate.rebook_by is not None:
+        return candidate.rebook_by + PURGE_AFTER
     return candidate.end + PURGE_AFTER
 
 
@@ -130,7 +135,8 @@ def candidates_before(now: datetime) -> datetime:
     """Return the moment before which a slot end or cancellation makes a booking a candidate.
 
     The adapter returns bookings with personal data whose slot ended or that were cancelled
-    before it, and every suspended one; ``summarise`` then applies ``purge_moment``.
+    before it, every suspended one and every one awaiting a new time; ``summarise`` then
+    applies ``purge_moment``.
     """
     return now - PURGE_AFTER - PURGE_GRACE
 

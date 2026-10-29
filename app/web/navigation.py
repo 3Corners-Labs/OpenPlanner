@@ -307,6 +307,9 @@ OBJECTS = (
                     f"{_GROUP}/agenda/week",
                     f"{_GROUP}/agenda/bookings/{{booking_id}}/move",
                     f"{_GROUP}/agenda/bookings/{{booking_id}}/cancel",
+                    f"{_GROUP}/agenda/bookings/{{booking_id}}/rebook",
+                    f"{_GROUP}/agenda/slot-rebook",
+                    f"{_GROUP}/agenda/waiting",
                 ),
             ),
             Screen(

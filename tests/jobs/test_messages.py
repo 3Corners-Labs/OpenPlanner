@@ -1,5 +1,6 @@
 import os
 from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -347,4 +348,57 @@ def test_a_planners_move_by_sms_has_the_new_time_and_the_link(composer: MessageC
     )
 
     assert "is verplaatst naar maandag 5 januari 2026 om 09:00" in message.text
+    assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}" in message.text
+
+
+def _waiting(booking: Booking = BOOKING) -> Booking:
+    return booking.request_rebook(ChangeReason.STAFFING, SLOT_0900 + timedelta(days=14))
+
+
+def test_a_request_to_rebook_names_the_reason_and_the_deadline(
+    composer: MessageComposer,
+) -> None:
+    message = composer.compose(JobType.SEND_REBOOK_REQUEST, _waiting(), GROUP, NOW)
+
+    assert message.subject == "Kies een nieuwe tijd voor uw videogesprek"
+    assert "Kiest u voor maandag 19 januari 2026, 09:00 geen nieuwe tijd" in message.text
+    assert "Reden: Er zijn op dat moment niet genoeg medewerkers beschikbaar." in message.text
+    assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}" in message.text
+    assert "/join" not in message.text
+    assert "METHOD:CANCEL" in message.attachments[0].data.decode()
+
+
+def test_the_reminder_to_rebook_has_no_calendar(composer: MessageComposer) -> None:
+    message = composer.compose(JobType.SEND_REBOOK_REMINDER, _waiting(), GROUP, NOW)
+
+    assert message.subject.startswith("Herinnering")
+    assert message.attachments == ()
+
+
+def test_a_lapsed_request_has_no_link(composer: MessageComposer) -> None:
+    lapsed = _waiting().cancel(NOW)
+
+    email = composer.compose(JobType.SEND_REBOOK_LAPSED, lapsed, GROUP, NOW)
+    sms = composer.compose(
+        JobType.SEND_REBOOK_LAPSED,
+        _waiting(SMS_BOOKING).cancel(NOW),
+        GROUP,
+        NOW,
+        channel=ChannelKind.SMS,
+    )
+
+    assert "is vervallen" in email.subject
+    assert "/b/" not in email.text
+    assert email.attachments == ()
+    assert "/b/" not in sms.text
+
+
+def test_the_sms_request_to_rebook_carries_reason_deadline_and_link(
+    composer: MessageComposer,
+) -> None:
+    message = composer.compose(
+        JobType.SEND_REBOOK_REQUEST, _waiting(SMS_BOOKING), GROUP, NOW, channel=ChannelKind.SMS
+    )
+
+    assert "niet genoeg medewerkers beschikbaar. Kies voor maandag 19 januari 2026" in message.text
     assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}" in message.text

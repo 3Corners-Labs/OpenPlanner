@@ -27,9 +27,8 @@ from app.admin.pages import Locale
 from app.admin.shortfalls import agenda_service
 from app.domain.agenda import AgendaSlot
 from app.domain.authorization import Permission
-from app.domain.booking import Booking, BookingKind
-from app.domain.booking_changes import ensure_planner_may_change
-from app.domain.errors import DomainError
+from app.domain.booking import BookingKind
+from app.domain.booking_changes import planner_may_change
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.i18n import BoundGettext
@@ -90,15 +89,6 @@ def _slot_view(
     )
 
 
-def _changeable(booking: Booking, group: Group, now: datetime) -> bool:
-    """Return whether a planner may still move or cancel ``booking`` now."""
-    try:
-        ensure_planner_may_change(booking, group, now)
-    except DomainError:
-        return False
-    return True
-
-
 REACH = timedelta(days=3660)
 """How far from today ``?day=`` and ``?week=`` may go; further is treated as invalid.
 
@@ -138,7 +128,7 @@ async def agenda(
     for item in overview:
         row = agenda_row(item, group, now, _, code)
         booking = item.booking
-        if manage and _changeable(booking, group, now):
+        if manage and planner_may_change(booking, group, now):
             changeable.add(row.id)
         if booking.kind is BookingKind.DIRECT:
             direct.append(row)
@@ -167,6 +157,7 @@ async def agenda(
             "slots": [slots[start] for start in sorted(slots)],
             "direct": direct,
             "changeable": changeable,
+            "manage": manage,
         },
     )
 

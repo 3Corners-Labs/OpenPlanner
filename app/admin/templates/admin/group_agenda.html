@@ -11,6 +11,7 @@
       <a href="?day={{ today }}">{{ _("admin.agenda.today") }}</a>
       <a href="?day={{ next_day }}">{{ _("admin.agenda.next") }}</a>
       <a href="{{ week_href }}">{{ _("admin.agenda.view_week") }}</a>
+      {% if manage %}<a href="/admin/groups/{{ summary.group.slug }}/agenda/waiting">{{ _("admin.agenda.waiting_list") }}</a>{% endif %}
     </nav>
   </div>
   {% if slots %}
@@ -39,6 +40,7 @@
           {% if slot.shortfall and slot.accepted %}<span class="chip">{{ icon("check") }}{{ _("admin.agenda.accepted") }}</span>
           {% elif slot.shortfall %}<span class="chip chip--danger">{{ icon("alert") }}{{ slot.shortfall }}</span>{% endif %}
           {% if slot.can_accept %}
+          <a class="button button--secondary button--small" href="/admin/groups/{{ summary.group.slug }}/agenda/slot-rebook?start={{ slot.start | urlencode }}">{{ _("admin.agenda.slot_rebook") }}<span class="visually-hidden"> {{ slot.time }}</span></a>
           <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/agenda/accept">
             <input type="hidden" name="start" value="{{ slot.start }}">
             <button type="submit" class="button button--secondary button--small">{{ _("admin.agenda.accept") }}<span class="visually-hidden"> {{ slot.time }}</span></button>
