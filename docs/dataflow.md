@@ -81,6 +81,11 @@ pages and on the page of a booking on hold (CL-2). A closure keeps a copy of the
 and an optional heading per locale (`closure_notices.heading`). Organisation data, not personal data of citizens;
 the admin page asks for general numbers and addresses only. No purge job; kept until changed.
 
+**Allowed origins for embedding (ADR 0035).** The websites on which an organisation's groups
+may appear as a widget (`organisation_origins`, such as `https://www.gemeente.nl`), entered by
+an organisation admin, and a switch per group (`groups.embedding_enabled`). Organisation data,
+not personal data; no purge job; kept until changed. The audit event holds counts only.
+
 ## Admin login and audit (WP7a)
 
 ```

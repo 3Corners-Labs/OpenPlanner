@@ -161,6 +161,8 @@ class Group:
         planner_change_min_lead_minutes: How long before the start a planner may still move
             or cancel a booking (ADR 0044, class D per group). Never below
             ``dispatch_lead_minutes``: a dispatched booking needs a phone call, not a mail.
+        embedding_enabled: Whether the group may appear in the widget on the websites its
+            organisation allows (ADR 0035); off until the group switches it on.
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -184,6 +186,7 @@ class Group:
     direct_call_max_concurrent: int | None = None
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
     planner_change_min_lead_minutes: int = 60
+    embedding_enabled: bool = False
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""
