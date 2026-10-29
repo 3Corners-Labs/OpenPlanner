@@ -35,6 +35,7 @@ stays open to every role as usual.
 | Create groups (`group.create`) | Organisation | – | yes | yes | – | – |
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | needs `closure.manage` | yes | yes | – | – |
 | View retention (`retention.view`) | Organisation | – | yes | yes | – | yes |
+| Manage embedding on websites (`embedding.manage`) | Organisation | – | yes | yes | – | – |
 | View audit log (`audit.view`) | Group | – | yes | yes | yes | yes |
 | Export audit log (`audit.export`) | Group | – | yes | yes | – | yes |
 | View group (`group.view`) | Group | – | yes | yes | yes | yes |
