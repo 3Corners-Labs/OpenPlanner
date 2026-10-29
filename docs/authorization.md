@@ -59,7 +59,7 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 
 | Template | Reach | Delegable permissions |
 |---|---|---|
-| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
+| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
 | Group admin | groups | `audit.export`, `audit.view`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `reminders.manage`, `rights.view`, `schedule.manage`, `staff.view`, `texts.manage` |
 | Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `matrix.view`, `retention.view`, `rights.view`, `staff.view` |
 
