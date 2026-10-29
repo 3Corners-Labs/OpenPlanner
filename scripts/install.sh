@@ -13,9 +13,11 @@
 #                      that restarts every container on the host; without it, waiting updates
 #                      are reported.
 #   1. prerequisites   tools, Docker access, Compose version, systemd; all problems at once
-#   2. .env            new: asked or from the environment, secrets generated, mode 600
-#                      existing: repaired where no person is needed (keys set twice, missing
-#                      generated secrets, mode; backup first), then checked; the rest is reported
+#   2. .env            new: asked or from the environment, mode 600
+#                      existing: repaired where no person is needed (keys set twice, mode;
+#                      backup first), then checked; the rest is reported
+#      secrets/        secrets.env: the bootstrap keys, apart from .env (ADR 0042 §9); moved
+#                      there from .env once, generated when missing, never overwritten
 #   3. proxy.env       production only: TLS_DOMAIN and ACME_EMAIL, same rules
 #   4. .env.update     pull <image>:<version> -> digest -> cosign verify -> pin digest, profiles
 #                      and mode; without --version an existing pin stays
@@ -34,6 +36,9 @@ ROOT=${INSTALL_ROOT:-}
 ENV_FILE=$DIR/.env
 PROXY_ENV=$DIR/proxy.env
 PIN_FILE=$DIR/.env.update
+SECRETS_FILE=$DIR/secrets/secrets.env
+# The keys `python -m app.cli init` generates (app/adapters/bootstrap.py); a test keeps them equal.
+BOOTSTRAP_KEYS=(SETTINGS_ENCRYPTION_KEY MANAGEMENT_TOKEN_KEY SESSION_SECRET)
 UPDATER_STATE=/var/lib/openplanner-updater
 UNIT_DIR=$ROOT/etc/systemd/system
 OIDC_ISSUER=https://token.actions.githubusercontent.com
@@ -296,12 +301,9 @@ new_env() {
   ask UPDATE_CHECK_TOKEN "GitHub token with read access to $REPOSITORY (empty: public repository)" '' optional-secret
   {
     printf '# Written by scripts/install.sh (%s mode). Every setting: .env.example.\n' "$MODE"
-    printf '# Holds secrets: mode 600, never copied off this host.\n'
+    printf '# Holds secrets: mode 600, never copied off this host. Keys: secrets/secrets.env.\n'
     put ENVIRONMENT "$environment"
     put PUBLIC_BASE_URL "$PUBLIC_BASE_URL"
-    put MANAGEMENT_TOKEN_KEY "$(secret)"
-    put SESSION_SECRET "$(secret)"
-    put SETTINGS_ENCRYPTION_KEY "$(secret)"
     put OIDC_DISCOVERY_URL "$OIDC_DISCOVERY_URL"
     put OIDC_CLIENT_ID "${OIDC_CLIENT_ID:-}"
     put OIDC_CLIENT_SECRET "${OIDC_CLIENT_SECRET:-}"
@@ -319,29 +321,78 @@ new_env() {
 
 env_keys() { sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$1"; }
 
+# Rewrite .env through awk, after a private backup; prints the backup's name.
+rewrite_env() {
+  local backup
+  backup=$ENV_FILE.bak.$(date -u +%Y%m%dT%H%M%SZ)
+  [[ -f $backup ]] || { cp "$ENV_FILE" "$backup" && chmod 600 "$backup"; }
+  awk "$@" "$ENV_FILE" | write_private "$ENV_FILE"
+  printf '%s' "$backup"
+}
+
 # What can be repaired without a person: keys set twice (the last one is the one Compose uses, so
-# the earlier ones go, after a backup), generated secrets that are missing, the file mode.
+# the earlier ones go, after a backup) and the file mode.
 repair_env() {
-  local duplicates backup key generated=(SESSION_SECRET)
+  local duplicates backup
   duplicates=$(env_keys "$ENV_FILE" | sort | uniq -d | tr '\n' ' ')
   if [[ -n $duplicates ]]; then
-    backup=$ENV_FILE.bak.$(date -u +%Y%m%dT%H%M%SZ)
-    cp "$ENV_FILE" "$backup" && chmod 600 "$backup"
-    awk '{ line[NR] = $0; key[NR] = "" }
+    # shellcheck disable=SC2016 # an awk program
+    backup=$(rewrite_env '{ line[NR] = $0; key[NR] = "" }
       /^[A-Za-z_][A-Za-z0-9_]*=/ { key[NR] = substr($0, 1, index($0, "=") - 1); last[key[NR]] = NR }
-      END { for (i = 1; i <= NR; i++) if (key[i] == "" || last[key[i]] == i) print line[i] }' "$ENV_FILE" \
-      | write_private "$ENV_FILE"
+      END { for (i = 1; i <= NR; i++) if (key[i] == "" || last[key[i]] == i) print line[i] }')
     warn "$ENV_FILE set ${duplicates% } more than once; kept the last value of each (the one in use), backup: $backup"
   fi
-  # Production never ran without these, so adding them invalidates nothing.
-  [[ $MODE != production ]] || generated+=(MANAGEMENT_TOKEN_KEY SETTINGS_ENCRYPTION_KEY)
-  for key in "${generated[@]}"; do
-    if [[ -z $(value "$ENV_FILE" "$key") ]]; then
-      put "$key" "$(secret)" >>"$ENV_FILE"
-      log "generated the missing $key"
+  chmod 600 "$ENV_FILE"
+}
+
+# The bootstrap keys live in secrets/secrets.env, which Compose reads after .env (ADR 0042 §9):
+# a key in .env moves there with its value; a missing one is generated, on a new installation
+# all three, on an existing one outside production only SESSION_SECRET (the others were made in
+# the data volume, and a new one would break booking links or stored secrets); a key read from
+# a file (KEY_FILE in .env) is left alone. Nothing in the file is ever overwritten, and a key
+# with two different values stops the installation: which one is right needs a person.
+bootstrap_keys() {
+  local fresh=$1 key in_env in_file conflicts=() moved=() added='' backup
+  for key in "${BOOTSTRAP_KEYS[@]}"; do
+    in_env=$(value "$ENV_FILE" "$key")
+    in_file=$(value "$SECRETS_FILE" "$key")
+    if [[ -n $in_env && -n $in_file && $in_env != "$in_file" ]]; then
+      conflicts+=("$key has different values in .env and secrets/secrets.env (Compose uses the latter)")
+    elif [[ -n $in_env ]]; then
+      moved+=("$key")
+      [[ -n $in_file ]] || added+=$(put "$key" "$in_env")$'\n'
+    elif [[ -z $in_file && -z $(value "$ENV_FILE" "${key}_FILE") ]] \
+      && { ((fresh)) || [[ $MODE == production || $key == SESSION_SECRET ]]; }; then
+      added+=$(put "$key" "$(secret)")$'\n'
+      log "generated $key"
     fi
   done
-  chmod 600 "$ENV_FILE"
+  if ((${#conflicts[@]})); then
+    die "the bootstrap keys need a person:" "${conflicts[@]/#/  - }" \
+      "  keep the value the database was encrypted with, remove the other, run this script again"
+  fi
+  install -d -m 700 "$(dirname "$SECRETS_FILE")"
+  chmod 700 "$(dirname "$SECRETS_FILE")"
+  if [[ -n $added ]]; then
+    {
+      if [[ -f $SECRETS_FILE ]]; then
+        cat "$SECRETS_FILE"
+      else
+        printf '# Written by scripts/install.sh (ADR 0042), as "python -m app.cli init" would.\n'
+        printf '# Keep a copy apart from the database backup: without SETTINGS_ENCRYPTION_KEY the\n'
+        printf '# secrets stored in the database cannot be read. Never commit this file.\n'
+      fi
+      printf '%s' "$added"
+    } | write_private "$SECRETS_FILE"
+  fi
+  [[ ! -f $SECRETS_FILE ]] || chmod 600 "$SECRETS_FILE"
+  if ((${#moved[@]})); then
+    # shellcheck disable=SC2016 # an awk program
+    backup=$(rewrite_env -v keys="${moved[*]}" 'BEGIN { split(keys, k, " "); for (i in k) drop[k[i]] = 1 }
+      !(substr($0, 1, index($0, "=") - 1) in drop)')
+    log "moved ${moved[*]} from .env to secrets/secrets.env (backup: $backup)"
+  fi
+  [[ -z $added && ${#moved[@]} == 0 ]] || log "back up secrets/secrets.env apart from the database backup"
 }
 
 # The rules the application enforces at start-up, checked before anything starts.
@@ -353,8 +404,10 @@ check_env() {
   if [[ $MODE == production ]]; then
     [[ ${environment:-prod} == prod ]] || problems+=("ENVIRONMENT=$environment, production needs prod")
     [[ $(value "$ENV_FILE" PUBLIC_BASE_URL) == https://* ]] || problems+=("PUBLIC_BASE_URL must start with https://")
-    [[ -n $(value "$ENV_FILE" MANAGEMENT_TOKEN_KEY) ]] || problems+=("MANAGEMENT_TOKEN_KEY is missing")
-    [[ -n $(value "$ENV_FILE" SESSION_SECRET) ]] || problems+=("SESSION_SECRET is missing")
+    for key in "${BOOTSTRAP_KEYS[@]}"; do
+      [[ -n $(value "$SECRETS_FILE" "$key") || -n $(value "$ENV_FILE" "${key}_FILE") ]] \
+        || problems+=("$key is missing")
+    done
     [[ $(value "$ENV_FILE" SIMULATOR_ENABLED) != true ]] || problems+=("SIMULATOR_ENABLED=true is refused in production")
     case $(value "$ENV_FILE" OIDC_DISCOVERY_URL) in
       '') ;;
@@ -381,12 +434,15 @@ settings() {
       ask TLS_DOMAIN "Host name for HTTPS (DNS must point at this host)" ''
     fi
   fi
+  local fresh=0
   if [[ -f $ENV_FILE ]]; then
     log "keeping $ENV_FILE; checking it"
     repair_env
   else
     new_env
+    fresh=1
   fi
+  bootstrap_keys "$fresh"
   check_env
   [[ $MODE == production ]] || return 0
   if [[ ! -f $PROXY_ENV ]]; then

@@ -14,7 +14,8 @@ wherever the checkout is, and writes that path into the updater's configuration.
 | Path | Written by | Holds | Mode |
 |---|---|---|---|
 | `~/openplanner/` | `git clone`, at a release tag | `docker-compose.yml`, `deploy/proxy/`, `scripts/` | |
-| `~/openplanner/.env` | installer, then you | the application's settings and secrets (`.env.example` lists every one) | 600 |
+| `~/openplanner/.env` | installer, then you | the application's settings and integration secrets (`.env.example` lists every one) | 600 |
+| `~/openplanner/secrets/secrets.env` | installer (or `app.cli init`) | the bootstrap keys `SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`, `SESSION_SECRET` (ADR 0042 §9); back it up apart from the database | 600, directory 700 |
 | `~/openplanner/proxy.env` | installer (production) | `TLS_DOMAIN`, `ACME_EMAIL` for the HTTPS proxy, no secrets | 600 |
 | `~/openplanner/.env.update` | installer, host updater | `OPENPLANNER_IMAGE` (pinned digest), `COMPOSE_PROFILES`, `OPENPLANNER_MODE` | 644 |
 | `~/openplanner/.env.bak.<time>` | installer, when it repaired `.env` | the `.env` as it was before | 600 |
@@ -96,8 +97,11 @@ system.
 
    It asks for the host name, the operations mailbox, the identity provider (discovery URL,
    client secret), the SMTP fallback and, for a private repository, a GitHub token for the
-   release check. It generates `MANAGEMENT_TOKEN_KEY`, `SESSION_SECRET` and
-   `SETTINGS_ENCRYPTION_KEY`. Secrets are read without echo.
+   release check. Secrets are read without echo. It generates `MANAGEMENT_TOKEN_KEY`,
+   `SESSION_SECRET` and `SETTINGS_ENCRYPTION_KEY` into `secrets/secrets.env`, apart from `.env`,
+   as `python -m app.cli init` does (no need to run that too). **Copy that file somewhere apart
+   from the database backup**: without `SETTINGS_ENCRYPTION_KEY` the secrets stored in the
+   database cannot be read, and a backup holding both undoes the encryption.
 
 3. If the script installed Docker, it adds you to the `docker` group and stops. Log out and in
    again, log in to the registry, and run it again:
@@ -149,7 +153,10 @@ Webex Contact Center*.
 | Found | The script |
 |---|---|
 | a key set twice in `.env` (Compose uses the last one) | keeps the last value of each, after a backup to `.env.bak.<time>` |
-| `SESSION_SECRET` missing; in production also `MANAGEMENT_TOKEN_KEY`, `SETTINGS_ENCRYPTION_KEY` | generates it |
+| a bootstrap key in `.env` (older installations, docker01) | moves it with its value to `secrets/secrets.env`, after a backup of `.env` |
+| a bootstrap key in `.env` and in `secrets/secrets.env` with different values | stops: keep the one the database was encrypted with, remove the other |
+| `SESSION_SECRET` missing; in production also `MANAGEMENT_TOKEN_KEY`, `SETTINGS_ENCRYPTION_KEY` | generates it into `secrets/secrets.env`, never overwriting a value there; a key read from a file (`KEY_FILE`) is left alone |
+| `secrets/` or `secrets.env` readable by others | sets modes 700 and 600 |
 | `.env` readable by others | sets mode 600 |
 | a host package missing or outdated, cosign older than the latest release | installs or upgrades it |
 | updater, units, drop-in or `updater.env` missing or changed | installs them again from the checkout |
