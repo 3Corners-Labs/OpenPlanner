@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.audit import AuditEvent, Outcome, Source
+from app.domain.audit import AuditEvent, Category, Outcome
 from app.domain.authorization import Scope
 from tests.support.domain import NOW
 
@@ -58,7 +58,7 @@ async def test_a_transaction_without_events_emits_nothing(engine: AsyncEngine) -
     sink = RecordingSink()
 
     async with SqlUnitOfWork(engine, sink=sink).locked() as tx:
-        await tx.delete_audit_events(Source.SYSTEM, NOW - timedelta(days=1))
+        await tx.delete_audit_events(Category.SYSTEM, NOW - timedelta(days=1))
     async with SqlUnitOfWork(engine, sink=sink).read() as tx:
         await tx.list_audit_events(Scope(everything=True))
 
