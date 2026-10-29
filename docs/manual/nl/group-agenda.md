@@ -70,6 +70,24 @@ Kies een van de vaste redenen: **Te weinig medewerkers**, **Technische storing**
 zelf geen tekst typen; de organisatie past de woorden aan bij **Berichtteksten**, onder
 **Redenen bij wijzigingen door een planner**.
 
+### Om een nieuwe tijd vragen
+
+Met **Om nieuwe tijd vragen** bij een afspraak kiest de burger zelf een nieuwe tijd. De plek in
+het tijdslot komt meteen vrij, dus het tekort verdwijnt direct. De burger krijgt een bericht
+met de reden en een link om een nieuwe tijd te kiezen, zonder de gegevens opnieuw in te
+vullen. Drie dagen voor het verlopen volgt één herinnering. Kiest de burger binnen 14 dagen na
+de oorspronkelijke tijd niets, dan vervalt de afspraak; de burger krijgt daarvan een kort
+bericht en de persoonsgegevens worden een dag later verwijderd.
+
+Bij een tijdslot met een tekort staat ook **Burgers om een nieuwe tijd vragen**. U ziet dan
+eerst welke afspraken het betreft: de laatst gemaakte, zoveel als het tekort. Na uw
+bevestiging krijgen precies die burgers de vraag. Is het tijdslot intussen veranderd, dan
+toont OpenPlanner de nieuwe lijst en vraagt het u opnieuw te bevestigen.
+
+De afspraken die op een nieuwe tijd wachten, staan in de lijst **Wacht op nieuwe tijd** bij de
+agenda, met de oorspronkelijke tijd, de reden en de datum waarop de vraag vervalt. Ook daar
+kunt u een afspraak zelf verplaatsen of annuleren.
+
 ### Tekort accepteren
 
 Helpt er bijvoorbeeld een collega van een ander team, dan kiest u bij het tijdslot **Tekort

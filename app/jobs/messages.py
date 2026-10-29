@@ -44,6 +44,9 @@ class MessageKind:
         manage_key: Text above the management link.
         closure_notice: Whether the closure's notice is part of the message (the appointment
             is on hold: no join link and no calendar attachment either).
+        rebook: A planner's request to choose a new time (ADR 0044): no join link, and the
+            deadline in the texts is when the request lapses (``Booking.rebook_by``).
+        calendar: Whether the email carries the calendar attachment.
     """
 
     subject_key: str
@@ -53,6 +56,8 @@ class MessageKind:
     sms_key: str | None = None
     manage_key: str = "message.manage"
     closure_notice: bool = False
+    rebook: bool = False
+    calendar: bool = True
 
 
 MESSAGE_KINDS: dict[JobType, MessageKind] = {
@@ -91,6 +96,36 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
     JobType.SEND_REINSTATEMENT: MessageKind(
         "message.reinstatement.subject", "message.reinstatement.intro", True, False
     ),
+    # ADR 0044: a planner asked the citizen to choose a new time; the old time is removed
+    # from their calendar with the request, and the request lapses at ``rebook_by``.
+    JobType.SEND_REBOOK_REQUEST: MessageKind(
+        "message.rebook_request.subject",
+        "message.rebook_request.intro",
+        True,
+        True,
+        "message.rebook_request.sms",
+        manage_key="message.manage_rebook",
+        rebook=True,
+    ),
+    JobType.SEND_REBOOK_REMINDER: MessageKind(
+        "message.rebook_reminder.subject",
+        "message.rebook_reminder.intro",
+        True,
+        True,
+        "message.rebook_reminder.sms",
+        manage_key="message.manage_rebook",
+        rebook=True,
+        calendar=False,
+    ),
+    JobType.SEND_REBOOK_LAPSED: MessageKind(
+        "message.rebook_lapsed.subject",
+        "message.rebook_lapsed.intro",
+        False,
+        True,
+        "message.rebook_lapsed.sms",
+        rebook=True,
+        calendar=False,
+    ),
 }
 
 
@@ -114,6 +149,13 @@ REASON_KEYS: dict[ChangeReason, str] = {
     ChangeReason.UNFORESEEN: "message.reason.unforeseen",
 }
 """The text block of each planner's reason (ADR 0044), written out for the catalogue test."""
+
+
+def _deadline(kind: MessageKind, booking: Booking, group: Group) -> datetime:
+    """Return the deadline the message names: the lapse of a request, else the change one."""
+    if kind.rebook and booking.rebook_by is not None:
+        return booking.rebook_by
+    return change_deadline(booking.start, group.dispatch_lead)
 
 
 def _reason(booking: Booking, _: "_Texts") -> str | None:
@@ -181,12 +223,19 @@ class MessageComposer:
         date = format_day(local_day(booking.start, tz), locale)
         start_time = format_clock(booking.start, tz, locale)
         end_time = format_clock(booking.end, tz, locale)
-        deadline = change_deadline(booking.start, group.dispatch_lead)
+        deadline = _deadline(kind, booking, group)
+        deadline_text = (
+            f"{format_day(local_day(deadline, tz), locale)}, {format_clock(deadline, tz, locale)}"
+        )
         params = {"date": date, "time": start_time, "group_name": group.name}
+        if kind.rebook:
+            params["deadline"] = deadline_text
         manage_url = self.manage_url(booking) if kind.includes_manage_link else None
         on_hold = kind.closure_notice
         join_url = (
-            f"{manage_url}/join" if manage_url and group.video_enabled and not on_hold else None
+            f"{manage_url}/join"
+            if manage_url and group.video_enabled and not on_hold and not kind.rebook
+            else None
         )
         context = {
             "locale": locale,
@@ -202,11 +251,7 @@ class MessageComposer:
             "notice": closure.notice(locale) if closure and on_hold else None,
             "reason_label": _("message.reason"),
             "reason": _reason(booking, _),
-            "manage_text": _(
-                kind.manage_key,
-                deadline=f"{format_day(local_day(deadline, tz), locale)}, "
-                f"{format_clock(deadline, tz, locale)}",
-            ),
+            "manage_text": _(kind.manage_key, deadline=deadline_text),
             "manage_link": _("message.manage_link"),
             "join_url": join_url,
             "join_text": _("message.join"),
@@ -214,7 +259,7 @@ class MessageComposer:
             "signoff": _("message.signoff", group_name=group.name),
         }
         attachments: tuple[Attachment, ...] = ()
-        if not on_hold:  # the appointment is on hold: leave the citizen's calendar alone
+        if not on_hold and kind.calendar:  # on hold: leave the citizen's calendar alone
             attachments = (self._calendar(kind, booking, group, now, manage_url, _),)
         return OutboundMessage(
             channel=ChannelKind.EMAIL,
@@ -260,5 +305,8 @@ class MessageComposer:
             group_name=group.name,
             manage_url=self.manage_url(booking),
             reason=_reason(booking, _) or "",
+            deadline=format_day(
+                local_day(_deadline(kind, booking, group), group.tz), booking.locale
+            ),
         )
         return OutboundMessage(ChannelKind.SMS, contact.phone, "", text)

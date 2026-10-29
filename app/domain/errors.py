@@ -47,6 +47,7 @@ class ErrorCode(StrEnum):
     UPDATE_REQUEST_NOT_FOUND = "update_request_not_found"
     PLANNER_TOO_LATE = "planner_too_late"
     MOVE_CAUSES_SHORTFALL = "move_causes_shortfall"
+    SLOT_CHANGED = "slot_changed"
     ROLE_NOT_FOUND = "role_not_found"
     ROLE_INVALID = "role_invalid"
     ROLE_CHANGED = "role_changed"

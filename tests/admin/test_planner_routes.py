@@ -180,3 +180,83 @@ async def test_an_accept_in_local_time_lands_on_the_same_slot(site: Site) -> Non
 
     assert response.status_code == 303
     assert response.headers["location"].endswith("#slot-20260102T0800")
+
+
+# --- ask to rebook ------------------------------------------------------------------------
+
+
+async def test_a_planner_asks_a_citizen_to_choose_a_new_time(site: Site) -> None:
+    booking_id = await _book(site)
+    await site.login_as(GROUP_ADMIN)
+    path = f"{AGENDA}/bookings/{booking_id}/rebook"
+
+    agenda = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
+    form = (await site.client.get(path)).text
+    response = await _post(site, path, {"reason": "staffing"})
+    after = (await site.client.get(response.headers["location"])).text
+    waiting = (await site.client.get(f"{AGENDA}/waiting")).text
+
+    assert f'href="{path}"' in agenda
+    assert "De plek in dit tijdslot komt meteen vrij" in form
+    assert response.status_code == 303
+    assert "Burgers gevraagd een nieuwe tijd te kiezen: 1" in after
+    assert "Wacht op nieuwe tijd</span>" in after
+    assert f"OP-{booking_id:06d} · Ada" in waiting
+    assert "vrijdag 16 januari 2026, 09:00" in waiting  # lapses 14 days after the start
+    assert (await _status(site, booking_id)) == (
+        BookingStatus.AWAITING_REBOOK,
+        ChangeReason.STAFFING,
+    )
+
+
+async def test_a_short_slot_is_asked_to_rebook_after_a_confirmation(site: Site) -> None:
+    await _book(site)
+    site.clock.advance(timedelta(minutes=1))
+    newest = await _book(site)
+    await _staff_friday(site, 1)
+    await site.login_as(GROUP_ADMIN)
+
+    agenda = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
+    confirm = await site.client.get(
+        f"{AGENDA}/slot-rebook", params={"start": FRIDAY_0900.isoformat()}
+    )
+    response = await _post(
+        site,
+        f"{AGENDA}/slot-rebook",
+        {"start": FRIDAY_0900.isoformat(), "ids": str(newest), "reason": "technical"},
+    )
+
+    assert "Burgers om een nieuwe tijd vragen" in agenda
+    assert confirm.status_code == 200
+    assert f"OP-{newest:06d} · Ada" in confirm.text
+    assert "Om een nieuwe tijd vragen (1)" in confirm.text
+    assert response.status_code == 303
+    assert (await _status(site, newest))[0] is BookingStatus.AWAITING_REBOOK
+
+
+async def test_a_bulk_request_for_a_changed_slot_shows_the_new_list(site: Site) -> None:
+    first = await _book(site)
+    site.clock.advance(timedelta(minutes=1))
+    await _book(site)
+    await _staff_friday(site, 1)
+    await site.login_as(GROUP_ADMIN)
+
+    response = await _post(
+        site,
+        f"{AGENDA}/slot-rebook",
+        {"start": FRIDAY_0900.isoformat(), "ids": str(first), "reason": "technical"},
+    )
+
+    assert response.status_code == 409
+    assert "Dit tijdslot is intussen veranderd" in response.text
+    assert (await _status(site, first))[0] is BookingStatus.CONFIRMED
+
+
+async def test_malformed_bulk_ids_are_rejected(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    response = await _post(
+        site, f"{AGENDA}/slot-rebook", {"start": FRIDAY_0900.isoformat(), "ids": "1,x"}
+    )
+
+    assert response.status_code == 400

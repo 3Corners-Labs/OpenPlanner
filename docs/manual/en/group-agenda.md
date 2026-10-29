@@ -66,6 +66,24 @@ circumstances**. The citizen reads the matching text in the message. You cannot 
 yourself; the organisation changes the wording under **Message texts**, in **Reasons for
 changes by a planner**.
 
+### Ask for a new time
+
+With **Ask for a new time** at a booking, the citizen chooses a new time themselves. The place
+in the slot is freed at once, so the shortfall goes away immediately. The citizen gets a
+message with the reason and a link to choose a new time, without entering their details
+again. One reminder follows three days before the request lapses. If the citizen chooses
+nothing within 14 days after the original time, the appointment lapses; the citizen gets a
+short message and the personal data is removed a day later.
+
+A slot with a shortfall also offers **Ask citizens for a new time**. You first see which
+bookings it concerns: the most recently made ones, as many as the shortfall. After your
+confirmation exactly those citizens get the request. If the slot has changed in the meantime,
+OpenPlanner shows the new list and asks you to confirm again.
+
+The bookings awaiting a new time are in the list **Awaiting a new time** in the agenda, with
+the original time, the reason and the date the request lapses. There too you can move or cancel
+a booking yourself.
+
 ### Accept a shortfall
 
 If, for example, a colleague from another team helps out, choose **Accept shortfall** at the
