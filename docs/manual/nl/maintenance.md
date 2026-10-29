@@ -50,3 +50,13 @@ direct weer alles wat ze gewend zijn.
 Staat de onderhoudsmodus aan **via de server**, dan heeft de beheerder van de server hem
 aangezet met de instelling `MAINTENANCE_MODE`, meestal omdat de database zelf onderhoud
 krijgt. Die kunt u hier niet uitzetten; vraag de beheerder van de server.
+
+## Updates
+
+Een update of herstel vanuit het scherm **Updates** zet de onderhoudsmodus zelf aan voordat
+de reservekopie wordt gemaakt, en weer uit als de update gelukt of teruggedraaid is. Mislukt
+een update helemaal, dan blijft de onderhoudsmodus aan, zodat burgers geen half werkend
+systeem zien. Zet hem dan pas uit als alles weer werkt.
+
+Had u de onderhoudsmodus zelf al aangezet voordat de update begon, dan staat hij na een
+geslaagde of teruggedraaide update toch uit. Zet hem dan opnieuw aan als u nog niet klaar bent.
