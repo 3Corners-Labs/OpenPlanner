@@ -13,8 +13,11 @@ from app.adapters.webex_auth import (
     WebexTokens,
     http_failure,
 )
+from app.domain.audit import Category
 from app.domain.ports import IntegrationError
+from app.domain.security_log import SecurityLog
 from tests.fakes.clock import FixedClock
+from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.fakes.tokens import MemoryTokenStore
 from tests.support.domain import NOW
 
@@ -98,6 +101,30 @@ async def test_refused_refresh_is_not_retryable(webex: FakeWebex) -> None:
     with pytest.raises(IntegrationError) as error:
         await tokens.access_token()
     assert (error.value.code, error.value.retryable) == ("unauthorized", False)
+
+
+@pytest.mark.parametrize(
+    ("status", "reason", "detail"),
+    [(400, "unauthorized", "status:400"), (503, "unreachable", "status:503")],
+)
+async def test_a_failing_refresh_is_a_security_event(
+    webex: FakeWebex, status: int, reason: str, detail: str
+) -> None:
+    # ADR 0034, AU-4: global, category security, one per window however often it fails.
+    webex.token_status = status
+    uow, clock = InMemoryUnitOfWork(State()), FixedClock(NOW)
+    http = httpx.AsyncClient(transport=httpx.MockTransport(webex.handler))
+    tokens = WebexTokens(
+        CONFIG, http, MemoryTokenStore(), clock, SecurityLog(uow, clock, timedelta(minutes=15))
+    )
+
+    for _ in range(3):
+        with pytest.raises(IntegrationError):
+            await tokens.access_token()
+
+    (event,) = uow.state.audit
+    assert (event.action, event.reason, event.detail) == ("webex.token_refresh", reason, detail)
+    assert (event.category, event.group) == (Category.SECURITY, None)
 
 
 async def test_health_warns_two_weeks_before_the_refresh_token_expires(webex: FakeWebex) -> None:
