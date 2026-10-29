@@ -9,6 +9,19 @@
 {{ notice_label }}:
 {{ notice }}
 {% endif %}
+{% if contacts %}
+
+{{ contacts.heading }}:
+{% for item in contacts.items %}
+- {{ item.term }}: {% if item.href and item.href.startswith("https:") %}{{ item.href }}{% elif item.href %}{{ item.text }}{% else %}{{ item.lines|join(", ") }}{% endif %}{% if item.hours %} ({{ item.hours }}){% endif %}
+
+{% endfor %}
+{% endif %}
+{% if closure_url %}
+
+{{ closure_text }}
+{{ closure_link }}: {{ closure_url }}
+{% endif %}
 {% if reason %}
 
 {{ reason_label }}: {{ reason }}

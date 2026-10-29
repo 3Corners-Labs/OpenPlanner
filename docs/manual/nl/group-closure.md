@@ -17,7 +17,9 @@ Zodra de sluiting begint:
 - ziet een burger op de pagina van het team de sluitingspagina in plaats van de agenda: de kop,
   de melding, de afbeelding en de contactalternatieven, in die volgorde;
 - worden bevestigde afspraken binnen de sluiting **opgeschort**, niet geannuleerd. De burger
-  krijgt een e-mail met de melding en kan zelf een nieuwe tijd kiezen of annuleren.
+  krijgt een e-mail met de kop en de melding, de contactalternatieven van de sluiting en een
+  link naar de sluitingspagina, en kan zelf een nieuwe tijd kiezen of annuleren. De afbeelding
+  gaat niet mee in de e-mail.
 
 Een sluiting die later begint, zien burgers vooraf als melding boven de agenda.
 
@@ -63,7 +65,8 @@ Met **Afbeelding verwijderen** haalt u hem direct weg. De afbeelding gaat niet m
 ## Aanpassen en opheffen
 
 Bij **Noodsluiting aanpassen** wijzigt u het einde, de melding en de kop. Vink aan of de burgers
-met een opgeschorte afspraak de nieuwe melding per e-mail krijgen. Komen er door een later
+met een opgeschorte afspraak de nieuwe melding per e-mail krijgen; die e-mail bevat ook de
+contactalternatieven van de sluiting. Komen er door een later
 einde meer afspraken binnen de sluiting, dan worden die ook opgeschort.
 
 Met **Noodsluiting opheffen** is het team direct weer open. Vink aan of de opgeschorte afspraken die
