@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.domain.booking import Booking, BookingStatus, Contact
+from app.domain.booking import Booking, BookingStatus, ChangeReason, Contact
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
@@ -309,3 +309,42 @@ def test_other_mails_have_no_contact_block_or_closure_link(composer: MessageComp
 
     assert "14 020" not in message.text
     assert "/closure" not in message.text
+
+
+def test_a_planners_cancellation_names_the_fixed_reason(composer: MessageComposer) -> None:
+    cancelled = replace(BOOKING, change_reason=ChangeReason.STAFFING)
+
+    message = composer.compose(JobType.SEND_CANCELLATION, cancelled, GROUP, NOW)
+
+    reason = "Er zijn op dat moment niet genoeg medewerkers beschikbaar."
+    assert f"Reden: {reason}" in message.text
+    assert message.html is not None
+    assert f"<strong>Reden:</strong> {reason}" in message.html
+
+
+def test_a_cancellation_without_a_reason_has_no_reason_line(composer: MessageComposer) -> None:
+    message = composer.compose(JobType.SEND_CANCELLATION, BOOKING, GROUP, NOW)
+
+    assert "Reden" not in message.text
+
+
+def test_a_planners_cancellation_by_sms_carries_the_reason_but_no_link(
+    composer: MessageComposer,
+) -> None:
+    cancelled = replace(SMS_BOOKING, change_reason=ChangeReason.TECHNICAL)
+
+    message = composer.compose(
+        JobType.SEND_CANCELLATION, cancelled, GROUP, NOW, channel=ChannelKind.SMS
+    )
+
+    assert message.text.endswith("is geannuleerd. Er is een technische storing.")
+    assert "/b/" not in message.text
+
+
+def test_a_planners_move_by_sms_has_the_new_time_and_the_link(composer: MessageComposer) -> None:
+    message = composer.compose(
+        JobType.SEND_CHANGE, SMS_BOOKING, GROUP, NOW, channel=ChannelKind.SMS
+    )
+
+    assert "is verplaatst naar maandag 5 januari 2026 om 09:00" in message.text
+    assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}" in message.text

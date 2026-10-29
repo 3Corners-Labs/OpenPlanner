@@ -352,6 +352,28 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403, 403),
         "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403, 403),
     },
+    # ADR 0044: a planner's changes; an unknown booking is a 404, an empty form a 400.
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
+        "/admin/groups/demo/agenda/bookings/999999/move": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/bookings/999999/move": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
+        "/admin/groups/demo/agenda/bookings/999999/move": statuses(400, 400, 400, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
+        "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(404, 404, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
+        "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/bookings/999999/cancel": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/accept": {
+        "/admin/groups/demo/agenda/accept": statuses(400, 400, 400, 403, 403, 403),
+    },
     "GET /admin/groups/{slug}/agenda/week": {
         "/admin/groups/demo/agenda/week": statuses(200, 200, 200, 403, 403, 403),
         "/admin/groups/andere-team/agenda/week": statuses(200, 403, 403, 200, 403, 403),

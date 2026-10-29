@@ -218,6 +218,7 @@ same commit and rollback behaviour as the SQL one.
 | Uploaded images: type from the bytes, metadata stripped, text alternative (ADR 0020, 0037 §3) | `app/domain/images.py`, `app/admin/uploads.py`, `app/adapters/db/images.py` |
 | Alternative contact options (ADR 0037) | `app/domain/contacts.py`, `app/domain/contact_service.py`, `app/admin/contact_routes.py`, `app/web/contact_labels.py`, `app/web/templates/_contact_block.html` |
 | Embedding on host websites: allowed origins, opt-in per group (ADR 0035) | `app/domain/embedding.py`, `app/domain/embedding_service.py`, `app/admin/embedding_routes.py` |
+| Widget API `/api/v1/widget` with CORS for allowed origins (ADR 0035) | `app/api/widget_api.py`, `app/api/widget_schemas.py` |
 | Which jobs, when | `app/domain/job_plan.py` |
 | Channels, reminder rules | `app/domain/channels.py` |
 | Management tokens | `app/domain/tokens.py` |
@@ -239,6 +240,8 @@ same commit and rollback behaviour as the SQL one.
 | Simulator for platform events (not in production) | `app/domain/simulation.py`, `app/adapters/simulated_events.py`, `app/admin/simulator_routes.py` |
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda per slot with agents and shortfalls, day and week view (ADR 0044) | `app/domain/agenda.py`, `app/domain/agenda_service.py`, `app/admin/agenda_routes.py`, `app/admin/shortfalls.py` |
+| A planner's changes: move, cancel with a fixed reason, accept a shortfall (ADR 0044) | `app/domain/planner_service.py`, `app/admin/planner_routes.py` |
+| Cancelling on the citizen's behalf, shared by closure and planner; the planner's limits | `app/domain/booking_changes.py` |
 | Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |

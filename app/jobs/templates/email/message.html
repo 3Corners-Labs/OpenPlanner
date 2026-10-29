@@ -31,6 +31,9 @@
     {% if closure_url %}
     <p>{{ closure_text }} <a href="{{ closure_url }}">{{ closure_link }}</a></p>
     {% endif %}
+    {% if reason %}
+    <p><strong>{{ reason_label }}:</strong> {{ reason }}</p>
+    {% endif %}
     {% if join_url %}
     <p>{{ join_text }}</p>
     <p><a href="{{ join_url }}">{{ join_link }}</a></p>

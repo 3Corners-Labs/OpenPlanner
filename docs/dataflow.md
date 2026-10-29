@@ -38,8 +38,12 @@ worker ──HTTPS──> SMS API of the organisation's provider ──> mobile 
 
 | Data item | Destination | When | Legal basis owner | Retention at the processor |
 |---|---|---|---|---|
-| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
+| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, and on a planner's move or cancellation (ADR 0044), only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
 | First name, date, time, team, management link | as above (message text) | as above | as above | as above |
+
+A planner's move or cancellation (ADR 0044) is sent by SMS as well, to bookings with a phone
+number, with the same data items; a cancellation adds the planner's reason, a fixed text of the
+organisation (never typed by the planner), and has no management link.
 
 Only groups whose booking form asks for a phone number can have SMS reminders. The text is
 built from the allow-listed placeholders only (ADR 0009); group admins cannot add other data.
@@ -78,6 +82,14 @@ of the organisation (`organisation_contacts`), entered by an organisation admin,
 pages, on the page of a booking on hold (CL-2) and in the suspension and update mails (CL-5). A closure keeps a copy of the block that applied when it started (`closures.contacts`)
 and an optional heading per locale (`closure_notices.heading`). Organisation data, not personal data of citizens;
 the admin page asks for general numbers and addresses only. No purge job; kept until changed.
+
+**Embedded booking (ADR 0035).** With `<gov-booking>` on a host website, the citizen's
+browser calls `/api/v1/widget/{org}/{group}/` directly: name, email and (optional) phone go
+from the browser to OpenPlanner over TLS, never through the host's servers. The host site
+does see that a citizen opened its page with the widget, and which group the tag names; it
+cannot read what is typed into the shadow root's form through our API, and the answer to a
+booking holds no personal data and no management token (the link goes by email only). The
+same personal data rules apply as for the standalone page.
 
 **Closure image (ADR 0037 §3, CL-3).** One image per closure (`closure_images`), uploaded by an
 admin with a text alternative in nl and en. Metadata a photo can carry about people (EXIF and

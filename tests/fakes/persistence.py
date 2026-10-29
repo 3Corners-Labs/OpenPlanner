@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
 from app.domain import holidays as holiday_model
+from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import CustomRole, Scope
@@ -67,6 +68,7 @@ class State:
     organisation_holidays: dict[int, frozenset[int]] = field(default_factory=dict)
     group_holidays: dict[int, holiday_model.GroupHolidays] = field(default_factory=dict)
     closures: dict[int, Closure] = field(default_factory=dict)
+    acceptances: dict[tuple[int, datetime], ShortfallAcceptance] = field(default_factory=dict)
     closure_images: dict[int, ImageFile] = field(default_factory=dict)
     scenarios: dict[int, ClosureScenario] = field(default_factory=dict)
     scenario_images: dict[int, ImageFile] = field(default_factory=dict)
@@ -584,6 +586,27 @@ class InMemoryTransaction:
     async def delete_pending_jobs(self, booking_id: int, types: Collection[object]) -> None:
         jobs = self.state.jobs.get(booking_id, [])
         self.state.jobs[booking_id] = [j for j in jobs if j.type not in types]
+
+    async def get_shortfall_acceptances(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[ShortfallAcceptance]:
+        return [
+            a
+            for (gid, start), a in sorted(self.state.acceptances.items())
+            if gid == group_id and lower <= start < upper
+        ]
+
+    async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
+        self.state.acceptances[(acceptance.group_id, acceptance.start)] = acceptance
+
+    async def count_audit_events(
+        self, actor: str, actions: Collection[str], since: datetime
+    ) -> int:
+        return sum(
+            1
+            for e in self.state.audit
+            if e.actor == actor and e.action in actions and e.at >= since
+        )
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
         found = [

@@ -22,6 +22,10 @@
 {{ closure_text }}
 {{ closure_link }}: {{ closure_url }}
 {% endif %}
+{% if reason %}
+
+{{ reason_label }}: {{ reason }}
+{% endif %}
 {% if join_url %}
 
 {{ join_text }}
