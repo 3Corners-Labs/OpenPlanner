@@ -19,6 +19,7 @@ process clears it at once, a switch made elsewhere (the CLI, another process) is
 ``cache``.
 """
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from app.domain.admin import AdminService, require
@@ -39,6 +40,7 @@ from app.domain.maintenance import (
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.system_log import SystemLog
+from app.domain.tunable import value_of
 
 _PERMISSION = Permission.SYSTEM_MAINTENANCE
 
@@ -61,7 +63,7 @@ class MaintenanceService:
         admin: AdminService,
         *,
         environment: bool,
-        cache: timedelta,
+        cache: timedelta | Callable[[], timedelta],
     ) -> None:
         """Store the collaborators; nothing is cached yet."""
         self._uow = uow
@@ -82,7 +84,7 @@ class MaintenanceService:
         if self._environment:
             return MaintenanceStatus(OFF, environment=True)
         now = self._clock.now()
-        if self._cached is not None and now - self._cached[0] < self._cache:
+        if self._cached is not None and now - self._cached[0] < value_of(self._cache):
             return MaintenanceStatus(self._cached[1])
         async with self._uow.read() as tx:
             state = await tx.get_maintenance_state()
@@ -208,8 +210,8 @@ class MaintenanceWatch:
         clock: Clock,
         system_log: SystemLog,
         *,
-        alert_after: timedelta,
-        repeat: timedelta,
+        alert_after: timedelta | Callable[[], timedelta],
+        repeat: timedelta | Callable[[], timedelta],
     ) -> None:
         """Store the collaborators; nothing has been reported yet."""
         self._uow = uow
@@ -228,12 +230,15 @@ class MaintenanceWatch:
         now = self._clock.now()
         async with self._uow.read() as tx:
             state = await tx.get_maintenance_state()
-        if not overdue(MaintenanceStatus(state), now, self._alert_after) or state.since is None:
+        if (
+            not overdue(MaintenanceStatus(state), now, value_of(self._alert_after))
+            or state.since is None
+        ):
             self._reported = None
             return None
         if self._reported is not None:
             since, at = self._reported
-            if since == state.since and now - at < self._repeat:
+            if since == state.since and now - at < value_of(self._repeat):
                 return None
         hours = int((now - state.since) / timedelta(hours=1))
         await self._system_log.record(

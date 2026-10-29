@@ -93,3 +93,63 @@ def test_init_refuses_an_existing_file(tmp_path: Path, capsys: pytest.CaptureFix
     assert main(["init", "--out", str(target)]) == 1
     assert "nothing written" in capsys.readouterr().out
     assert target.read_text() == "# keep\n"
+
+
+def test_set_and_reset_change_the_portal_value_from_the_host(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    migrated_database(tmp_path, monkeypatch, "cli-set")
+
+    assert main(["settings", "set", "admin_session_hours", "4"]) == 0
+    assert "ADMIN_SESSION_HOURS set to 4" in capsys.readouterr().out
+    assert main(["settings", "show", "ADMIN_SESSION_HOURS"]) == 0
+    assert "source:        portal" in capsys.readouterr().out
+
+    assert main(["settings", "reset", "ADMIN_SESSION_HOURS"]) == 0
+    assert "ADMIN_SESSION_HOURS reset" in capsys.readouterr().out
+
+
+def test_set_refuses_a_value_outside_the_bounds_by_name_only(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    migrated_database(tmp_path, monkeypatch, "cli-bad")
+
+    assert main(["settings", "set", "admin_session_hours", "99"]) == 2
+
+    out = capsys.readouterr().out
+    assert "Refused (setting_invalid): ADMIN_SESSION_HOURS" in out
+    assert "99" not in out
+
+
+def test_set_refuses_what_the_environment_locks(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    migrated_database(tmp_path, monkeypatch, "cli-lock")
+    monkeypatch.setenv("ADMIN_SESSION_HOURS", "6")
+
+    assert main(["settings", "set", "admin_session_hours", "4"]) == 2
+
+    assert "Refused (setting_locked)" in capsys.readouterr().out
+
+
+def test_the_log_level_set_from_the_host_expires(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    migrated_database(tmp_path, monkeypatch, "cli-log")
+
+    assert main(["settings", "set", "log_level", "debug"]) == 2
+    assert "setting_expiry" in capsys.readouterr().out
+    assert main(["settings", "set", "log_level", "debug", "--hours", "2"]) == 0
+
+
+def test_reset_all_removes_every_portal_value(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    migrated_database(tmp_path, monkeypatch, "cli-all")
+    main(["settings", "set", "admin_session_hours", "4"])
+    main(["settings", "set", "audit_retention_days", "400"])
+    capsys.readouterr()
+
+    assert main(["settings", "reset", "--all-class-c"]) == 0
+
+    assert "2 portal values removed" in capsys.readouterr().out

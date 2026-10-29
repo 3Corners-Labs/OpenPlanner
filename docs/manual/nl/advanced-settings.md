@@ -2,7 +2,8 @@
 
 Dit scherm laat zien hoe de installatie is ingesteld en waar elke waarde vandaan komt. U opent
 het via **Geavanceerde instellingen** in het menu. De superuser en de rol Compliance en privacy
-kunnen het bekijken. U kunt hier nog niets wijzigen; dat volgt in een latere versie.
+kunnen het bekijken. De superuser kan een deel van de instellingen wijzigen; de auditor leest
+alleen.
 
 Geheime waarden, zoals wachtwoorden en sleutels, worden nooit getoond: alleen of ze zijn
 ingesteld.
@@ -33,6 +34,28 @@ waarde en de bron:
 - **Bestand**: een geheim dat de server uit een bestand leest.
 
 Een gewijzigde waarde geldt binnen ongeveer tien seconden, zonder herstart.
+
+## Een instelling wijzigen
+
+De superuser wijzigt de instellingen voor bedrijfsvoering, bewaartermijnen, opslag,
+snelheidslimieten, sessies van het beheerportaal, medewerkers en de planner. De reservemailserver,
+Webex, updates en de inlogkoppeling volgen in een latere versie.
+
+- Vul onder **Wijzigen** de nieuwe waarde in en kies **Opslaan**. Het portaal accepteert alleen
+  waarden binnen zijn grenzen, bijvoorbeeld 1 tot 30 afspraken per uur per adres. Een waarde
+  daarbuiten wordt bij de regel geweigerd, met de reden.
+- Sommige instellingen hangen van elkaar af: kritieke opslag moet onder weinig opslag blijven, en
+  de herinnering om opnieuw te boeken moet vóór het vervallen komen. Een waarde die een andere
+  instelling tegenspreekt, wordt geweigerd.
+- **Standaardwaarde gebruiken** haalt de hier ingestelde waarde weg; dan geldt weer de
+  standaardwaarde (of de waarde van de server).
+- Een instelling die **vastgezet is door de beheerder van de server** heeft geen formulier:
+  wijzig die in de omgeving van de server, of vraag het de beheerder.
+- Het **logniveau** valt altijd vanzelf terug naar de standaard, na hooguit 24 uur. Vul in na
+  hoeveel uur. Persoonsgegevens blijven op elk niveau gemaskeerd in het log.
+
+Voor een wijziging moet u kort geleden zijn ingelogd. Elke wijziging staat in het auditlog met
+de oude en de nieuwe waarde; een geweigerde wijziging ook.
 
 ## Opmerkingen
 

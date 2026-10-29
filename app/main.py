@@ -66,14 +66,15 @@ from app.domain.roles import RoleService
 from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
+from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import client_pseudonym_key, management_token_key, session_secret
-from app.logging import configure_logging, warn_loose_secret_files
+from app.logging import configure_logging, set_log_level, warn_loose_secret_files
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
-from app.web.protection import configure_rate_limits, limiter
+from app.web.protection import configure_rate_limits, limiter, set_rate_limits
 from app.web.templates import STATIC_DIR
 
 
@@ -154,29 +155,49 @@ def create_app(
             app.state.settings = current
             if agent_api is not None:
                 agent_api.state.settings = current
+            set_rate_limits(
+                bookings=current.rate_limit_bookings,
+                reads=current.rate_limit_reads,
+                agent_tokens=current.rate_limit_agent_tokens,
+                agent_calls=current.rate_limit_agent_calls,
+            )
+            set_log_level(current.log_level)
+
+        def live() -> Settings:
+            now: Settings = app.state.settings
+            return now
 
         # ADR 0042 §2, §6: portal values on top of the environment, reloaded when they change.
-        # Values read on each request follow at once; services built here follow in step 4.
+        # Values read on each request follow at once; the services below read theirs through
+        # ``live`` each time they need them.
         app.state.live_settings = LiveSettings(
-            settings, environment(), PlatformSettingsStore(uow), apply
+            settings, environment(), PlatformSettingsStore(uow), clock, apply
         )
         await app.state.live_settings.refresh()
         reloader = asyncio.create_task(keep_current(app.state.live_settings))
         app.state.security_log = SecurityLog(
             uow,
             clock,
-            timedelta(minutes=settings.security_event_window_minutes),
-            max_sources=settings.security_event_max_sources,
+            lambda: timedelta(minutes=live().security_event_window_minutes),
+            max_sources=lambda: live().security_event_max_sources,
         )
         app.state.booking_service = BookingService(uow, clock, token_key)
         app.state.admin_service = AdminService(uow, clock)
+        # ADR 0042 step 4: class C settings changed in the portal, checked against the lock.
+        app.state.settings_service = SettingsService(
+            uow,
+            clock,
+            app.state.admin_service,
+            locked=app.state.live_settings.locked,
+            combination=app.state.live_settings.combination_problem,
+        )
         # ADR 0038: read on every admin change (and citizen write), cached for a few seconds.
         app.state.maintenance_service = MaintenanceService(
             uow,
             clock,
             app.state.admin_service,
             environment=settings.maintenance_mode,
-            cache=timedelta(seconds=settings.maintenance_cache_seconds),
+            cache=lambda: timedelta(seconds=live().maintenance_cache_seconds),
         )
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
@@ -187,7 +208,7 @@ def create_app(
             uow,
             clock,
             app.state.admin_service,
-            max_origins=settings.embedding_max_origins,
+            max_origins=lambda: live().embedding_max_origins,
             allow_local=settings.environment != "prod",
         )
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
@@ -195,7 +216,10 @@ def create_app(
             uow, clock, app.state.admin_service, settings.shortfall_horizon_days
         )
         app.state.diagnostics_service = DiagnosticsService(
-            uow, clock, app.state.admin_service, timedelta(hours=settings.diagnostic_mode_hours)
+            uow,
+            clock,
+            app.state.admin_service,
+            lambda: timedelta(hours=live().diagnostic_mode_hours),
         )
         # Test emails go through exactly the senders the worker uses (ADR 0022).
         senders = ConfiguredSenders(uow, http, fallback_mail(settings))
@@ -216,7 +240,7 @@ def create_app(
             clock,
             app.state.admin_service,
             app.state.booking_service,
-            settings.planner_changes_alert_per_hour,
+            lambda: live().planner_changes_alert_per_hour,
             rebook_days=settings.planner_rebook_days,
             reminder_days=settings.planner_rebook_reminder_days,
         )

@@ -1,6 +1,6 @@
 """Storage of portal values and ``settings_version`` (ADR 0042 §4)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
@@ -41,3 +41,26 @@ async def test_a_row_that_is_not_json_is_left_out(engine: AsyncEngine) -> None:
 
     async with SqlUnitOfWork(engine).read() as tx:
         assert await tx.platform_settings() == {}
+
+
+async def test_a_value_is_saved_replaced_and_deleted_with_the_version(engine: AsyncEngine) -> None:
+    uow = SqlUnitOfWork(engine)
+    later = NOW + timedelta(hours=2)
+    async with uow.locked() as tx:
+        await tx.save_platform_setting("admin_session_hours", 4, NOW, None)
+        await tx.save_platform_setting("log_level", "DEBUG", NOW, later)
+        assert await tx.bump_settings_version() == 1
+    async with uow.locked() as tx:
+        await tx.save_platform_setting("admin_session_hours", 3, NOW, None)
+        assert await tx.bump_settings_version() == 2
+
+    async with uow.read() as tx:
+        assert await tx.platform_settings() == {"admin_session_hours": 3, "log_level": "DEBUG"}
+        assert await tx.platform_setting_expiries() == {"log_level": later}
+        assert await tx.settings_version() == 2
+
+    async with uow.locked() as tx:
+        assert await tx.delete_platform_setting("log_level")
+        assert not await tx.delete_platform_setting("log_level")
+    async with uow.read() as tx:
+        assert await tx.platform_setting_expiries() == {}
