@@ -167,6 +167,8 @@ def create_app(
             app.state.admin_service,
             app.state.booking_service,
             settings.planner_changes_alert_per_hour,
+            rebook_days=settings.planner_rebook_days,
+            reminder_days=settings.planner_rebook_reminder_days,
         )
         app.state.api_access = ApiAccessService(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled

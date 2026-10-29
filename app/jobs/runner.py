@@ -26,6 +26,7 @@ from typing import Protocol
 import structlog
 
 from app.adapters.db.jobs import ClaimedJob
+from app.domain import booking_changes
 from app.domain.audit import Outcome
 from app.domain.call_service import CallService
 from app.domain.channels import ChannelKind
@@ -127,7 +128,7 @@ class JobRunner:
         self._clock = clock
         self._senders = senders
         self._composer = composer
-        self._types: set[JobType] = {JobType.PURGE_PII}
+        self._types: set[JobType] = {JobType.PURGE_PII, JobType.LAPSE_REBOOK}
         if senders is not None:
             self._types |= set(MESSAGE_KINDS)
         self._calls = (
@@ -166,6 +167,15 @@ class JobRunner:
             async with self._uow.locked() as tx:
                 await tx.purge_personal_data(job.booking_id, now)
             log.info("job.purged", job_id=job.id, booking_id=job.booking_id)
+            return None
+        if job.type is JobType.LAPSE_REBOOK:  # ADR 0044: no new time chosen in time
+            async with self._uow.locked() as tx:
+                booking = await tx.get_booking(job.booking_id)
+                lapsed = booking is not None and await booking_changes.lapse(tx, booking, now)
+            if not lapsed:
+                log.info("job.skipped", job_id=job.id, reason=STALE)
+                return STALE
+            log.info("job.lapsed", job_id=job.id, booking_id=job.booking_id)
             return None
         channel = job.channel or ChannelKind.EMAIL
         async with self._uow.read() as tx:

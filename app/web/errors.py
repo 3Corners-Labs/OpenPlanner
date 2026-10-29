@@ -45,6 +45,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.UPDATE_REQUEST_NOT_FOUND: "error.not_found.text",
     ErrorCode.PLANNER_TOO_LATE: "admin.form.error.planner_too_late",
     ErrorCode.MOVE_CAUSES_SHORTFALL: "admin.form.error.move_causes_shortfall",
+    ErrorCode.SLOT_CHANGED: "admin.form.error.slot_changed",
     ErrorCode.MAINTENANCE: "error.maintenance",
     ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
 }

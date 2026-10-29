@@ -59,6 +59,14 @@ def test_a_suspended_booking_waits_for_the_end_of_its_closure() -> None:
     assert purge_moment(lifted) == NOW
 
 
+def test_a_booking_awaiting_a_new_time_is_purged_a_day_after_the_request_lapses() -> None:
+    waiting = PurgeCandidate(
+        1, BookingStatus.AWAITING_REBOOK, NOW - 13 * DAY, None, None, rebook_by=NOW - DAY
+    )
+
+    assert purge_moment(waiting) == NOW
+
+
 def test_a_purge_within_its_grace_is_not_overdue() -> None:
     waiting = candidate(end_ago=DAY + PURGE_GRACE)
     late = candidate(end_ago=DAY + PURGE_GRACE + timedelta(seconds=1))
