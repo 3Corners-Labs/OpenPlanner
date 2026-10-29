@@ -81,6 +81,13 @@ tests/         mirrors app/; fakes for ports live in tests/fakes/.
 
 ## Pull requests
 
+Contributions are licensed under EUPL-1.2 and made under the
+[Contributor Licence Agreement](docs/cla.md) (ADR 0054): you keep your copyright, 3Corners may
+relicense, and every contribution stays available as open source. Tick its box in the pull
+request description; CI fails a pull request from outside the organisation without it. Code
+copied from elsewhere gets its own entry in `REUSE.toml` with its copyright and licence;
+CI runs `reuse lint`.
+
 Short-lived branch, Conventional Commit title, squash merge after one human approval and green
 CI. The PR template asks the seven review questions from `CLAUDE.md`; answer all of them.
 New ADRs start from `docs/adr/template.md`, including its *Settings* section (ADR 0042).

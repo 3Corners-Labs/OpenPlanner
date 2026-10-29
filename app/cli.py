@@ -9,6 +9,8 @@ Usage:
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
     ``python -m app.cli version``  the release and commit this image was built from (ADR 0051)
+    ``python -m app.cli client-pseudonym ADDRESS``  the pseudonym security events use for an
+        IP address the security team already has (ADR 0053); there is no way back
     ``python -m app.cli settings list``  every setting with its class, source and lock (ADR 0042)
     ``python -m app.cli settings show KEY``  one setting in detail; secrets only set/not set
     ``python -m app.cli settings-doc``  print the settings reference (docs/settings.md)
@@ -79,6 +81,7 @@ from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, r
 from app.config import Settings, environment
 from app.domain.admin import AdminService
 from app.domain.authorization import Principal, Role, Scope
+from app.domain.client_pseudonym import UNKNOWN_CLIENT, ClientPseudonyms
 from app.domain.closure_service import ClosureInput, ClosureService, GroupOutcome
 from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
@@ -90,7 +93,7 @@ from app.domain.settings_registry import lookup
 from app.domain.update_service import UpdateService
 from app.domain.updates import OUTCOMES, REPORTED_STEPS
 from app.i18n import Translator, load_catalogues
-from app.keys import management_token_key
+from app.keys import client_pseudonym_key, management_token_key
 from app.web import navigation
 from app.web.authz_report import render_markdown
 from app.web.settings_doc import render_markdown as render_settings_doc
@@ -720,6 +723,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--reregister", action="store_true", help="with --yes: run register-webhooks afterwards"
     )
     commands.add_parser("webhooks-health", help="token expiry and a signed delivery self-test")
+    pseudonym_cmd = commands.add_parser(
+        "client-pseudonym", help="pseudonym of an IP address in security events (ADR 0053)"
+    )
+    pseudonym_cmd.add_argument("address")
     commands.add_parser("oidc-check", help="check the login configuration (no login started)")
     _closure_parser(commands)
     settings_cmd = commands.add_parser("settings", help="show settings and their source")
@@ -732,6 +739,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "version":
         sys.stdout.write(_version(Settings()))
         return 0
+    if args.command == "client-pseudonym":
+        pseudonym = ClientPseudonyms(client_pseudonym_key(Settings())).of(args.address)
+        sys.stdout.write(f"{pseudonym}\n")
+        return 0 if pseudonym != UNKNOWN_CLIENT else 1
     if args.command == "oidc-check":
         return _write(asyncio.run(_oidc_check(Settings())))
     if args.command == "closure":

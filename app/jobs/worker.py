@@ -3,7 +3,8 @@
 Run with ``python -m app.jobs.worker``. Each iteration checks the database, runs due jobs
 (``app.jobs.runner``), watches the data volume and reclaims freed database pages
 (``app.jobs.housekeeping``, ADR 0040), looks up the latest release when that is due (hourly,
-ADR 0029) and writes the heartbeat.
+ADR 0029), reports maintenance that has been on too long (ADR 0038) and writes the heartbeat.
+The worker never pauses for maintenance: confirmed appointments and the privacy jobs go on.
 """
 
 import asyncio
@@ -28,8 +29,10 @@ from app.domain.admin import AdminService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.integration import IntegrationService
+from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.ports import Clock
 from app.domain.security_log import SecurityLog
+from app.domain.system_log import SystemLog
 from app.domain.update_service import UpdateService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
@@ -65,7 +68,12 @@ async def run_worker(
     http = httpx.AsyncClient(timeout=15.0, transport=transport)
     # ADR 0034: committed audit events also go to stdout for the log platform.
     uow = SqlUnitOfWork(engine, secret_box(settings), StdoutEventSink(settings.event_envelope))
-    security = SecurityLog(uow, clock, timedelta(minutes=settings.security_event_window_minutes))
+    security = SecurityLog(
+        uow,
+        clock,
+        timedelta(minutes=settings.security_event_window_minutes),
+        max_sources=settings.security_event_max_sources,
+    )
     integrations = build_integrations(settings, engine, http, clock, security)
     fallback = fallback_mail(settings)
     runner = JobRunner(
@@ -90,6 +98,13 @@ async def run_worker(
         engine, uow, clock, storage_limits(settings), settings.database_url, diagnostics.brake
     )
     updates = update_service(settings, uow, clock, http)
+    maintenance = MaintenanceWatch(
+        uow,
+        clock,
+        SystemLog(uow, clock),
+        alert_after=timedelta(hours=settings.maintenance_alert_hours),
+        repeat=timedelta(hours=settings.maintenance_alert_repeat_hours),
+    )
     log.info(
         "worker.started",
         poll_seconds=settings.worker_poll_seconds,
@@ -109,6 +124,7 @@ async def run_worker(
                         log.warning("worker.run_failed", error=type(exc).__name__)
                     await housekeeping.run()
                     await _check_releases(updates)
+                    await _watch_maintenance(maintenance)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=settings.worker_poll_seconds)
@@ -125,6 +141,17 @@ async def _check_releases(updates: UpdateService) -> None:
             log.info("updates.checked", current=str(updates.current or "none"))
     except Exception as exc:  # e.g. schema not migrated yet
         log.warning("updates.check_failed", error=type(exc).__name__)
+
+
+async def _watch_maintenance(watch: MaintenanceWatch) -> None:
+    """Report long maintenance; a failure is logged and never stops the loop."""
+    try:
+        hours = await watch.check()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("maintenance.watch_failed", error=type(exc).__name__)
+        return
+    if hours is not None:
+        log.warning("maintenance.overdue", hours=hours)
 
 
 async def _main() -> None:

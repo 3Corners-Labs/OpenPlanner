@@ -3,6 +3,8 @@ name = "openplanner"
 version = "0.2.0"
 description = "Lightweight group-booking service with Webex Contact Center dispatch."
 readme = "README.md"
+license = "EUPL-1.2"
+license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115",

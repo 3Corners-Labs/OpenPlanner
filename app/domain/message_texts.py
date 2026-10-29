@@ -24,6 +24,10 @@ MAX_SMS_LENGTH = 320
 EMAIL_PLACEHOLDERS = frozenset({"date", "time", "group_name"})
 SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name", "manage_url"})
 CANCELLATION_SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name", "reason"})
+REBOOK_EMAIL_PLACEHOLDERS = EMAIL_PLACEHOLDERS | {"deadline"}
+REBOOK_SMS_PLACEHOLDERS = SMS_PLACEHOLDERS | {"deadline", "reason"}
+LAPSED_SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name"})
+"""ADR 0044: a request to rebook names when it lapses; a lapsed one has no link left."""
 """A cancelled booking has nothing left to manage; a planner's reason may be added (ADR 0044)."""
 
 _TOKEN = re.compile(r"\{\{|\}\}|\{([^{}]*)\}?|\}")
@@ -38,8 +42,9 @@ class TextBlock:
 
     Attributes:
         key: Catalogue key of the default text, e.g. ``message.reminder.intro``.
-        purpose: ``confirmation``, ``change``, ``reminder``, ``cancellation``, ``reason``
-            (a planner's reasons, ADR 0044) or ``all``.
+        purpose: ``confirmation``, ``change``, ``reminder``, ``cancellation``, the planner's
+            ``rebook_request``, ``rebook_reminder``, ``rebook_lapsed`` and ``reason``
+            (ADR 0044), or ``all``.
         channel: The channel the block is sent on.
         part: ``subject``, ``intro``, ``signoff``, ``body`` (SMS) or ``reason_<code>``.
         placeholders: The ``{name}``s the text may use.
@@ -97,6 +102,37 @@ MESSAGE_BLOCKS: tuple[TextBlock, ...] = (
         "body",
         CANCELLATION_SMS_PLACEHOLDERS,
         MAX_SMS_LENGTH,
+    ),
+    # ADR 0044: a planner's request to choose a new time, its one reminder and its lapse.
+    *(
+        block
+        for purpose, email, sms in (
+            ("rebook_request", REBOOK_EMAIL_PLACEHOLDERS, REBOOK_SMS_PLACEHOLDERS),
+            ("rebook_reminder", REBOOK_EMAIL_PLACEHOLDERS, REBOOK_SMS_PLACEHOLDERS),
+            ("rebook_lapsed", EMAIL_PLACEHOLDERS, LAPSED_SMS_PLACEHOLDERS),
+        )
+        for block in (
+            TextBlock(
+                f"message.{purpose}.subject",
+                purpose,
+                ChannelKind.EMAIL,
+                "subject",
+                email,
+                MAX_SUBJECT_LENGTH,
+                single_line=True,
+            ),
+            TextBlock(
+                f"message.{purpose}.intro",
+                purpose,
+                ChannelKind.EMAIL,
+                "intro",
+                email,
+                MAX_BODY_LENGTH,
+            ),
+            TextBlock(
+                f"message.{purpose}.sms", purpose, ChannelKind.SMS, "body", sms, MAX_SMS_LENGTH
+            ),
+        )
     ),
     # ADR 0044: the fixed reasons a planner chooses from; never free text.
     *(

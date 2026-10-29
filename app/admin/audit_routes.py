@@ -65,12 +65,25 @@ from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
 from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
-from app.domain.maintenance import MaintenanceReason
+from app.domain.maintenance import OVERDUE_EVENT, MaintenanceReason
 from app.domain.planner_service import ALERT_ACTION
 from app.domain.ports import Clock
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.scheduling import GroupSummary
-from app.domain.security_log import INVALID_SIGNATURE, TOKEN_REFRESH_FAILED, WEBHOOK_REJECTED
+from app.domain.security_log import (
+    CROSS_SITE,
+    HONEYPOT,
+    INVALID_SIGNATURE,
+    ORIGIN_MISMATCH,
+    RATE_LIMITED,
+    REQUEST_REJECTED,
+    TOKEN_REFRESH_FAILED,
+    TOKEN_REJECTED,
+    TOO_MANY_REQUESTS,
+    UNKNOWN_MANAGEMENT_LINK,
+    UNKNOWN_TOKEN,
+    WEBHOOK_REJECTED,
+)
 from app.domain.storage import (
     DATABASE_TOO_LARGE,
     FREE_SPACE_CRITICAL,
@@ -120,9 +133,15 @@ EVENT_LABELS: dict[str, str] = {
     # Staff directory (ADR 0046): first login, and roles or memberships changed at login.
     staff.CREATED_EVENT: "audit.event.staff_created",
     staff.CHANGED_EVENT: "audit.event.staff_changed",
+    # ADR 0038: maintenance on longer than the alert threshold (global).
+    OVERDUE_EVENT: "audit.event.maintenance_overdue",
     # Security events (ADR 0034): global, deduplicated per window.
     WEBHOOK_REJECTED: "audit.event.webhook_rejected",
     TOKEN_REFRESH_FAILED: "audit.event.token_refresh",
+    # ADR 0053: attempts on public entry points.
+    RATE_LIMITED: "audit.event.rate_limited",
+    REQUEST_REJECTED: "audit.event.request_rejected",
+    TOKEN_REJECTED: "audit.event.token_rejected",
     # Diagnostic mode (ADR 0040, part 4).
     "job.run": "audit.event.job_run",
     BRAKE_EVENT: "audit.event.diagnostics_brake",
@@ -177,6 +196,8 @@ DETAIL_LABELS: dict[str, str] = {
     "booking.move": "admin.audit.detail.booking_move",
     "planner.move": "admin.audit.detail.planner_move",
     "planner.cancel": "admin.audit.detail.planner_cancel",
+    "planner.rebook": "admin.audit.detail.planner_rebook",
+    "bulk": "admin.audit.detail.bulk",
     "shortfall.accept": "admin.audit.detail.shortfall_accept",
     "client.create": "admin.audit.detail.client_create",
     "client.rotate": "admin.audit.detail.client_rotate",
@@ -196,6 +217,8 @@ DETAIL_LABELS: dict[str, str] = {
     "maintenance.refused": "admin.audit.detail.maintenance_refused",
     "source:webex": "admin.audit.detail.source_webex",
     "source:wxcc": "admin.audit.detail.source_wxcc",
+    "surface:web": "admin.audit.detail.surface_web",
+    "surface:agent": "admin.audit.detail.surface_agent",
     "diagnostics.on": "admin.audit.detail.diagnostics_on",
     "diagnostics.off": "admin.audit.detail.diagnostics_off",
 }
@@ -208,6 +231,7 @@ COUNT_LABELS: dict[str, str] = {
     "attempt": "admin.audit.detail.attempt",
     "free_percent": "admin.audit.detail.free_percent",
     "database_mb": "admin.audit.detail.database_mb",
+    "hours": "admin.audit.detail.hours",
     "changes": "admin.audit.detail.changes",
     "suppressed": "admin.audit.detail.suppressed",
     "modes": "admin.audit.detail.modes",
@@ -221,6 +245,7 @@ VALUE_LABELS: dict[str, str] = {
     staff.ORGANISATION_REMOVED: "admin.audit.detail.organisation_remove",
     staff.GROUP_ADDED: "admin.audit.detail.group_add",
     staff.GROUP_REMOVED: "admin.audit.detail.group_remove",
+    "client": "admin.audit.detail.client",
     "reason": "admin.audit.detail.reason",
     "actor": "admin.audit.detail.actor",
 }
@@ -243,6 +268,12 @@ REASON_LABELS: dict[str, str] = {
     INVALID_SIGNATURE: "admin.audit.reason.invalid_signature",
     "unauthorized": "admin.audit.reason.unauthorized",
     "unreachable": "admin.audit.reason.unreachable",
+    TOO_MANY_REQUESTS: "admin.audit.reason.too_many_requests",
+    HONEYPOT: "admin.audit.reason.honeypot",
+    CROSS_SITE: "admin.audit.reason.cross_site",
+    ORIGIN_MISMATCH: "admin.audit.reason.origin_mismatch",
+    UNKNOWN_TOKEN: "admin.audit.reason.unknown_token",
+    UNKNOWN_MANAGEMENT_LINK: "admin.audit.reason.unknown_management_link",
 }
 """Readable explanation per known reason; any other code (an error code) is shown as is."""
 

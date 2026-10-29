@@ -10,6 +10,10 @@ Three callers:
 ``refuse`` audits a change that the matrix allowed but maintenance does not
 (``maintenance.refused``, with the permission, never the form content).
 
+``MaintenanceWatch`` runs in the worker: maintenance has no automatic end (ADR 0038 §6), so
+maintenance that stays on longer than ``MAINTENANCE_ALERT_HOURS`` is recorded as a system event
+(``maintenance.overdue``) and again every ``MAINTENANCE_ALERT_REPEAT_HOURS`` while it lasts.
+
 The cache keeps the web process from reading the row on every request; a switch made in this
 process clears it at once, a switch made elsewhere (the CLI, another process) is seen within
 ``cache``.
@@ -25,13 +29,16 @@ from app.domain.maintenance import (
     OFF,
     OFF_DETAIL,
     ON_DETAIL,
+    OVERDUE_EVENT,
     REFUSED_DETAIL,
     MaintenanceReason,
     MaintenanceState,
     MaintenanceStatus,
+    overdue,
     switched_on,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.system_log import SystemLog
 
 _PERMISSION = Permission.SYSTEM_MAINTENANCE
 
@@ -182,3 +189,58 @@ async def _audit(tx: Transaction, at: datetime, actor: str, detail: str, reason:
     await tx.add_audit_event(
         AuditEvent(at, actor, _PERMISSION.value, Outcome.SUCCESS, reason, detail=detail)
     )
+
+
+class MaintenanceWatch:
+    """Reports maintenance that has been on too long, as a system event (worker).
+
+    Args:
+        uow: Reads the stored switch.
+        clock: Current time.
+        system_log: Where the events go (global: only the superuser sees them).
+        alert_after: How long maintenance may be on before it is reported.
+        repeat: How often a report is repeated while it stays on.
+    """
+
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        system_log: SystemLog,
+        *,
+        alert_after: timedelta,
+        repeat: timedelta,
+    ) -> None:
+        """Store the collaborators; nothing has been reported yet."""
+        self._uow = uow
+        self._clock = clock
+        self._system_log = system_log
+        self._alert_after = alert_after
+        self._repeat = repeat
+        self._reported: tuple[datetime | None, datetime] | None = None
+
+    async def check(self) -> int | None:
+        """Record the event when due; return the hours maintenance has been on, if reported.
+
+        The environment override has no start time and is the operator's own doing, so only
+        the stored switch is judged. A new window (another ``since``) is reported afresh.
+        """
+        now = self._clock.now()
+        async with self._uow.read() as tx:
+            state = await tx.get_maintenance_state()
+        if not overdue(MaintenanceStatus(state), now, self._alert_after) or state.since is None:
+            self._reported = None
+            return None
+        if self._reported is not None:
+            since, at = self._reported
+            if since == state.since and now - at < self._repeat:
+                return None
+        hours = int((now - state.since) / timedelta(hours=1))
+        await self._system_log.record(
+            OVERDUE_EVENT,
+            Outcome.FAILURE,
+            reason=state.reason.value if state.reason else "",
+            detail=f"hours:{hours}",
+        )
+        self._reported = (state.since, now)
+        return hours
