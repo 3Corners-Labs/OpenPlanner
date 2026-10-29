@@ -29,6 +29,10 @@ uv run python -m app.jobs.worker                         # worker
 import-linter, pytest with coverage (≥ 90% on `app/domain/`, ≥ 75% overall), bandit,
 pip-audit and `uv lock --check`.
 
+The tests run on every core (`pytest -n auto`, pytest-xdist). A single test or file still runs
+on its own: `uv run pytest tests/domain/test_booking.py`. A test must not depend on another
+test or on a shared path: use `tmp_path` and its own database (`tests/support/database.py`).
+
 `make check` also runs the copy-paste detector (`make duplication`, jscpd; needs Node) and
 shellcheck on `scripts/` and `.githooks/` (`make shellcheck`; the pinned `shellcheck-py` through `uvx`).
 The host updater script is tested by `tests/scripts/test_updater.py` against fake `docker`,

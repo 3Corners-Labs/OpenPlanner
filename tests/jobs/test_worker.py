@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 from datetime import timedelta
 from pathlib import Path
 
@@ -16,18 +17,25 @@ from app.jobs.worker import run_worker
 from tests.fakes.clock import FixedClock
 from tests.support.database import migrated_database
 
+DEADLINE = 15.0
+"""Seconds a worker may take for its first round; generous, since tests run in parallel."""
+
+
+async def _until(condition: Callable[[], bool]) -> None:
+    """Wait until ``condition`` holds, failing after ``DEADLINE`` seconds."""
+    async with asyncio.timeout(DEADLINE):
+        while not condition():  # noqa: ASYNC110 - polls a file the worker writes
+            await asyncio.sleep(0.01)
+
 
 async def test_worker_writes_heartbeat_and_stops_on_event(settings: Settings) -> None:
     stop = asyncio.Event()
     clock = FixedClock()
     task = asyncio.create_task(run_worker(settings, stop, clock=clock))
 
-    for _ in range(200):
-        if settings.worker_heartbeat_path.exists():
-            break
-        await asyncio.sleep(0.01)
+    await _until(settings.worker_heartbeat_path.exists)
     stop.set()
-    await asyncio.wait_for(task, timeout=2)
+    await asyncio.wait_for(task, timeout=DEADLINE)
 
     assert settings.worker_heartbeat_path.read_text() == clock.now().isoformat()
 
@@ -41,7 +49,7 @@ async def test_worker_skips_heartbeat_when_database_is_down(
 
     await asyncio.sleep(0.1)
     stop.set()
-    await asyncio.wait_for(task, timeout=2)
+    await asyncio.wait_for(task, timeout=DEADLINE)
 
     assert not broken.worker_heartbeat_path.exists()
 
@@ -96,13 +104,10 @@ async def test_worker_looks_up_the_latest_release_once_per_hour(
     task = asyncio.create_task(
         run_worker(configured, stop, clock=FixedClock(), transport=httpx.MockTransport(github))
     )
-    for _ in range(200):
-        if configured.worker_heartbeat_path.exists():
-            break
-        await asyncio.sleep(0.01)
+    await _until(configured.worker_heartbeat_path.exists)
     await asyncio.sleep(0.05)  # a few more iterations: the clock stands still, so no new check
     stop.set()
-    await asyncio.wait_for(task, timeout=2)
+    await asyncio.wait_for(task, timeout=DEADLINE)
 
     assert calls == ["/repos/acme/openplanner/releases/latest"]
     engine = create_engine(url)
