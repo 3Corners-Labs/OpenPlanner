@@ -64,6 +64,7 @@ class AgendaRow:
     participants: int
     not_picked_up: bool
     cancelled: bool
+    waiting: bool = False
 
 
 def integration_service(request: Request) -> IntegrationService:
@@ -96,7 +97,8 @@ def agenda_row(
         host_joined=status.host_joined,
         participants=status.participants,
         not_picked_up=booking.is_active and not_picked_up(status, booking.start, now, limit),
-        cancelled=not booking.is_active,
+        cancelled=not booking.is_active and not booking.awaits_rebook,
+        waiting=booking.awaits_rebook,
     )
 
 

@@ -45,14 +45,16 @@ existing bookings. OpenPlanner has no insight into agents' own calendars; that s
       the citizen's reschedule (new booking in the new slot, old one cancelled, jobs and
       dispatch hooks redone, ADR 0043). The citizen gets the change mail with the new time and
       can still change it via their own link.
-   2. **Ask the citizen to rebook.** The booking becomes `suspended` without a closure:
-      reminders and dispatch lapse and, unlike a closure (ADR 0024), **its place in the slot is
-      freed**, so the shortfall is gone at once. The citizen gets a message with a reason from
+   2. **Ask the citizen to rebook.** The booking gets its own status `awaiting_rebook` (not
+      the closure's `suspended`): reminders, dispatch and the meeting lapse and, unlike a
+      closure (ADR 0024), **its place in the slot is freed**, so the shortfall is gone at once. The citizen gets a message with a reason from
       a fixed list and a link to choose a new time without entering their details again. If
       the citizen chooses nothing, the booking lapses (is cancelled)
-      `planner_rebook_days` after its original start and its personal data is purged 24 h
-      later. Such bookings appear in the group's list of bookings on hold, with move and
-      cancel; reinstating is not offered, because the place is no longer reserved.
+      `planner_rebook_days` after its original start, the citizen gets a short message that
+      it lapsed, and its personal data is purged 24 h later. One reminder goes
+      `planner_rebook_reminder_days` before the lapse. Such bookings appear in the agenda's
+      own list *Awaiting a new time* (`bookings.manage`), with move and cancel; reinstating is
+      not offered, because the place is no longer reserved.
    3. **Cancel** with a reason from the same fixed list. The citizen gets the cancellation
       message with that reason.
    4. **Leave as is.** The planner marks the shortfall as accepted for that slot (for example
@@ -86,6 +88,7 @@ existing bookings. OpenPlanner has no insight into agents' own calendars; that s
 | `planner_change_min_lead_minutes` | D organisation (per group) | 60 | 0–1440 | `group.edit` | Not below `dispatch_lead_minutes`; validation enforces it. |
 | `shortfall_horizon_days` | D organisation | 14 | 1–60 | `settings.organisation.manage` | How far ahead the shortfall summary looks. |
 | `planner_rebook_days` | D organisation | 14 | 1–30 | `settings.organisation.manage` | Days after the original start after which an unanswered request to rebook lapses. |
+| `planner_rebook_reminder_days` | D organisation | 3 | 1–29, below `planner_rebook_days` | `settings.organisation.manage` | Days before the lapse at which the one reminder goes. |
 | `planner_changes_alert_per_hour` | C platform | 50 | 5–1000 | `settings.platform.manage` | Changes by one actor per hour above which a system event warns (abuse case). Raises an alert only; never blocks. |
 
 Change reasons are texts, edited under `texts.manage` (ADR 0009), not settings.
@@ -105,6 +108,13 @@ The product owner chose on 2026-10-28, out of the options put to them:
 - Three fixed reasons (above), not one general reason.
 - The citizen is informed through the existing channels (email, and SMS with consent), not by
   email only.
+
+For step 3 the product owner chose on 2026-10-29:
+
+- A citizen whose request lapses gets a short message (not a silent lapse).
+- One reminder before the lapse (`planner_rebook_reminder_days`), not none.
+- Planners see the bookings awaiting a new time in a list in the agenda (`bookings.manage`),
+  not in the closure's list of bookings on hold (which needs `closure.manage`).
 
 ## Delivery
 
