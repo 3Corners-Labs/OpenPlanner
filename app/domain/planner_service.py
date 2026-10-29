@@ -144,7 +144,9 @@ class PlannerService:
             group = await group_by_slug(tx, slug)
             booking = await self._changeable(tx, group, booking_id)
             now = self._clock.now()
-            await booking_changes.cancel(tx, booking, now, reason=reason, sms=True)
+            await booking_changes.cancel(
+                tx, booking, now, reason=reason, sms=True, team_invite=group.sends_team_invite
+            )
             detail = f"planner.cancel,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
 
@@ -257,6 +259,7 @@ class PlannerService:
             reason=reason,
             rebook_days=self.rebook_days(group.organisation_id),
             reminder_days=self.reminder_days(group.organisation_id),
+            team_invite=group.sends_team_invite,
         )
 
     async def _candidates(self, tx: Transaction, group: Group, start: datetime) -> list[Booking]:

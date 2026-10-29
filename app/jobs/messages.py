@@ -132,6 +132,13 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
 }
 
 
+TEAM_TEXTS: dict[JobType, tuple[str, str]] = {
+    JobType.SEND_TEAM_INVITE: ("message.team_invite.subject", "message.team_invite.intro"),
+    JobType.SEND_TEAM_CANCEL: ("message.team_cancel.subject", "message.team_cancel.intro"),
+}
+"""Subject and first paragraph of the team's invite and its withdrawal (ADR 0043)."""
+
+
 class _Texts:
     """``_()`` that prefers the group's own text of a block (ADR 0022)."""
 
@@ -279,6 +286,76 @@ class MessageComposer:
             text=self._environment.get_template("email/message.txt").render(context),
             html=self._environment.get_template("email/message.html").render(context),
             attachments=attachments,
+        )
+
+    def compose_team_invite(
+        self, job_type: JobType, booking: Booking, group: Group, now: datetime, locale: str
+    ) -> OutboundMessage:
+        """Return the calendar invite to an own-queue team, or its withdrawal (ADR 0043).
+
+        Sent to ``group.calendar_invite_address`` in the organisation's ``locale``, in the same
+        fixed layout as the citizen's mail. It carries the first name (the invite only), the
+        booking reference, the time and a link to the group's queue: never the meeting link,
+        which an agent gets by claiming, nor any other personal data.
+
+        Raises:
+            ValueError: If the group sends no invite or the booking has no contact details.
+        """
+        address = group.calendar_invite_address
+        if not group.sends_team_invite or address is None or booking.contact is None:
+            raise ValueError("no team invite for this booking")
+        cancel = job_type is JobType.SEND_TEAM_CANCEL
+        _ = self._translator.bind(locale, group.organisation_id)
+        tz = group.tz
+        date = format_day(local_day(booking.start, tz), locale)
+        start_time = format_clock(booking.start, tz, locale)
+        params = {
+            "date": date,
+            "time": start_time,
+            "group_name": group.name,
+            "reference": booking.reference,
+            "first_name": booking.contact.first_name,
+        }
+        subject_key, intro_key = TEAM_TEXTS[job_type]
+        queue_url = f"{self._base_url}/admin/groups/{group.slug}/queue"
+        context = {
+            "locale": locale,
+            "subject": _(subject_key, **params),
+            "greeting": _("message.team_invite.greeting"),
+            "intro": _(intro_key, **params),
+            "when_label": _("message.when"),
+            "when": f"{date}, {start_time}–{format_clock(booking.end, tz, locale)}",
+            "team_label": _("message.team"),
+            "group_name": group.name,
+            "notice": None,
+            "contacts": None,
+            "closure_url": None,
+            "reason": None,
+            "join_url": None,
+            "manage_url": None if cancel else queue_url,
+            "manage_text": _("message.team_invite.queue"),
+            "manage_link": _("message.team_invite.queue_link"),
+            "signoff": _("message.team_invite.signoff"),
+        }
+        calendar = build_ics(
+            uid=f"booking-{booking.id}-team@{urlsplit(self._base_url).hostname or 'openplanner'}",
+            start=booking.start,
+            end=booking.end,
+            summary=_("message.team_invite.summary", **params),
+            description=str(context["intro"]),
+            url=None if cancel else queue_url,
+            stamp=now,
+            cancelled=cancel,
+            invite=address,
+            sequence=int(now.timestamp()) // 60,
+        )
+        return OutboundMessage(
+            channel=ChannelKind.EMAIL,
+            recipient=address,
+            subject=str(context["subject"]),
+            text=self._environment.get_template("email/message.txt").render(context),
+            html=self._environment.get_template("email/message.html").render(context),
+            attachments=(Attachment("afspraak.ics", "text/calendar", calendar),),
         )
 
     def _calendar(
