@@ -21,7 +21,9 @@ jobs:
   python:
     name: lint, types, tests, migrations
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # The test suite alone takes about 26 minutes on main (the authorisation matrix starts an
+    # app per role and route); 30 left no headroom and cancelled runs that were passing.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -199,6 +201,8 @@ jobs:
             -e OIDC_CLIENT_SECRET=dev-only-openplanner-admin-secret
           docker exec app alembic upgrade head
           docker exec app python -m app.cli seed-demo
+          # Closure examples (ADR 0037); the booking on hold's link exists only in this output.
+          docker exec app python -m app.cli seed-closures > e2e/fixtures.json
       - name: install e2e tooling
         timeout-minutes: 10
         run: |

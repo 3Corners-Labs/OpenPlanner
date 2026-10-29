@@ -14,6 +14,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Branding / huisstijl | [Huisstijl](nl/branding.md) | [Branding](en/branding.md) |
 | Rights matrix / rechtenmatrix | [Rechtenmatrix](nl/rights-matrix.md) | [Rights matrix](en/rights-matrix.md) |
 | Retention / bewaartermijnen | [Bewaartermijnen](nl/retention.md) | [Retention](en/retention.md) |
+| Staff / medewerkers | [Medewerkers](nl/staff.md) | [Staff](en/staff.md) |
 | Alternative contact options / contactalternatieven | [Contactalternatieven](nl/organisation-contacts.md) | [Alternative contact options](en/organisation-contacts.md) |
 | A team's contact options / contactalternatieven van een team | [Contactalternatieven van een team](nl/group-contacts.md) | [A team's contact options](en/group-contacts.md) |
 | Maintenance mode / onderhoudsmodus | [Onderhoudsmodus](nl/maintenance.md) | [Maintenance mode](en/maintenance.md) |
