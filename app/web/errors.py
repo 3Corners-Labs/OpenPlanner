@@ -45,6 +45,8 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.UPDATE_REQUEST_NOT_FOUND: "error.not_found.text",
     ErrorCode.PLANNER_TOO_LATE: "admin.form.error.planner_too_late",
     ErrorCode.MOVE_CAUSES_SHORTFALL: "admin.form.error.move_causes_shortfall",
+    ErrorCode.MAINTENANCE: "error.maintenance",
+    ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {
@@ -68,6 +70,7 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.UPDATE_REQUEST_NOT_FOUND: 404,
     ErrorCode.NOT_PERMITTED: 403,
     ErrorCode.DATABASE_BUSY: 503,
+    ErrorCode.MAINTENANCE: 503,
     ErrorCode.INVALID_CONFIGURATION: 500,
 }
 """Codes not listed here are conflicts with the current state: HTTP 409."""
