@@ -1,0 +1,79 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
+{% block title %}{% if role %}{{ role.name(locale) }}{% else %}{{ _("admin.roles.new") }}{% endif %} – {{ _("admin.roles.title") }} – {{ _("admin.title") }}{% endblock %}
+{% macro error_text(name) -%}{% set message = error_for(name) %}{% if message %}<p class="error-message" id="{{ name }}-error">{{ message }}</p>{% endif %}{%- endmacro %}
+{% macro described(name) -%}{{ name }}-hint{% if error_for(name) %} {{ name }}-error{% endif %}{%- endmacro %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="page-header__lead"><a href="/admin/roles">{{ _("admin.roles.title") }}</a></p>
+    <h1>{% if role %}{{ role.name(locale) }}{% else %}{{ _("admin.roles.new") }}{% endif %}</h1>
+    <p class="page-header__lead">{{ _("admin.roles.copy_of", template=template_label) }}{% if role %} · {{ _("admin.roles.version") }} {{ role.version }}{% endif %}</p>
+  </div>
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="{% if role %}/admin/roles/{{ role.id }}{% else %}/admin/roles{% endif %}" novalidate aria-labelledby="definition-heading">
+  <input type="hidden" name="template" value="{{ template }}">
+  {% if role %}<input type="hidden" name="version" value="{{ role.version }}">{% endif %}
+  <div class="card__header">
+    <h2 id="definition-heading">{{ _("admin.roles.definition") }}</h2>
+    <p class="card__lead">{{ _("admin.roles.definition_lead") }}</p>
+  </div>
+  <div class="form-grid">
+    {% for name, label in (("name_nl", _("admin.roles.name_nl")), ("name_en", _("admin.roles.name_en"))) %}
+    <div class="field{% if error_for(name) %} field--error{% endif %}">
+      <label for="{{ name }}">{{ label }}</label>
+      <input id="{{ name }}" name="{{ name }}" type="text" value="{{ name_nl if name == 'name_nl' else name_en }}" required maxlength="{{ max_name }}" aria-describedby="{{ described(name) }}"{% if error_for(name) %} aria-invalid="true"{% endif %}>
+      <p class="hint" id="{{ name }}-hint">{{ _("admin.roles.name_hint") }}</p>
+      {{ error_text(name) }}
+    </div>
+    {% endfor %}
+    <div class="field{% if error_for('claim_value') %} field--error{% endif %}">
+      <label for="claim_value">{{ _("admin.roles.claim_value") }}</label>
+      <input id="claim_value" name="claim_value" type="text" value="{{ claim_value }}" required maxlength="128" pattern="{{ claim_pattern }}" autocomplete="off" spellcheck="false" aria-describedby="{{ described('claim_value') }}"{% if error_for('claim_value') %} aria-invalid="true"{% endif %}>
+      <p class="hint" id="claim_value-hint">{{ _("admin.roles.claim_value_hint") }}</p>
+      {{ error_text("claim_value") }}
+    </div>
+  </div>
+  <div class="alert alert--info"><p>{{ _("admin.roles.claim_notice") }}</p></div>
+  <fieldset class="field choice{% if error_for('permissions') %} field--error{% endif %}" id="permissions" aria-describedby="{{ described('permissions') }}">
+    <legend>{{ _("admin.roles.permissions") }}</legend>
+    <p class="hint" id="permissions-hint">{% if read_only %}{{ _("admin.roles.permissions_hint_read_only") }}{% else %}{{ _("admin.roles.permissions_hint") }}{% endif %}</p>
+    {{ error_text("permissions") }}
+    {% for choice in choices if choice.available %}
+    <div class="choice__option">
+      <input type="checkbox" id="{{ choice.name }}" name="{{ choice.name }}"{% if choice.checked %} checked{% endif %}{% if choice.requires or error_for(choice.name) %} aria-describedby="{% if choice.requires %}{{ choice.name }}-hint{% endif %}{% if error_for(choice.name) %} {{ choice.name }}-error{% endif %}"{% endif %}{% if error_for(choice.name) %} aria-invalid="true"{% endif %}>
+      <label for="{{ choice.name }}">{{ choice.label }} (<code>{{ choice.code }}</code>){% if choice.pii %} <span class="chip chip--warning">{{ icon("info") }}{{ _("admin.matrix.pii") }}</span>{% endif %}</label>
+      {% if choice.requires %}<p class="hint" id="{{ choice.name }}-hint">{{ _("admin.roles.requires", permissions=choice.requires) }}</p>{% endif %}
+      {{ error_text(choice.name) }}
+    </div>
+    {% endfor %}
+  </fieldset>
+  <div class="form-actions">
+    <button type="submit" class="button">{% if role %}{{ _("admin.save") }}{% else %}{{ _("admin.roles.create") }}{% endif %}</button>
+    <a href="/admin/roles">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+<section class="card" aria-labelledby="unavailable-heading">
+  <div class="card__header">
+    <h2 id="unavailable-heading">{{ _("admin.roles.unavailable") }}</h2>
+    <p class="card__lead">{{ _("admin.roles.unavailable_lead") }}</p>
+  </div>
+  <ul class="check-list">
+    {% for choice in choices if not choice.available %}
+    <li>{{ choice.label }} (<code>{{ choice.code }}</code>) — {% if choice.locked %}<span class="chip">{{ icon("lock") }}{{ _("admin.matrix.locked") }}</span>{% elif choice.pii %}<span class="chip chip--warning">{{ icon("info") }}{{ _("admin.matrix.pii") }}</span>{% elif read_only %}{{ _("admin.roles.reason_write") }}{% else %}{{ _("admin.roles.reason_reach") }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% if role %}
+<form class="card" method="post" action="/admin/roles/{{ role.id }}/delete" aria-labelledby="delete-heading">
+  <input type="hidden" name="version" value="{{ role.version }}">
+  <h2 id="delete-heading">{{ _("admin.roles.delete") }}</h2>
+  <p>{{ _("admin.roles.delete_lead") }}</p>
+  <div class="form-actions">
+    <button type="submit" class="button button--danger">{{ _("admin.roles.delete") }}</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
