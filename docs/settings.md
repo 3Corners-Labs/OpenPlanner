@@ -70,6 +70,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |
 | `SECURITY_EVENT_WINDOW_MINUTES` | int | `15` | 1–1440 | `settings.platform.manage` | One security event per source and reason per window; repeats are counted (ADR 0034). |
+| `SECURITY_EVENT_MAX_SOURCES` | int | `1000` | 10–100000 | `settings.platform.manage` | Windows (kind of event × caller) a process keeps; beyond that, callers count as many (ADR 0053). |
 | `AUDIT_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of the audit log may hold; more is refused (ADR 0040). |
 | `AUDIT_EXPORT_MAX_DAYS` | int | `366` | 1–3660 | `settings.platform.manage` | Most days one CSV export of the audit log may cover (ADR 0040). |
 | `EMBEDDING_MAX_ORIGINS` | int | `20` | 1–100 | `settings.platform.manage` | Most host websites one organisation may allow for the embedded widget (ADR 0035). |

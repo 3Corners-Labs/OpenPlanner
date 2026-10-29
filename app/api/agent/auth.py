@@ -21,6 +21,8 @@ from app.domain.api_access import ApiAccessService
 from app.domain.api_clients import ApiAuthError, ApiCaller
 from app.domain.authorization import API_SCOPES, ApiScope
 from app.domain.scheduling import GroupSummary
+from app.domain.security_log import TOKEN_REJECTED, UNKNOWN_TOKEN
+from app.web.security_events import report
 
 log = structlog.get_logger()
 
@@ -106,6 +108,8 @@ class RequireScope:
             caller = await service.authenticate(token, client_address(request))
         except ApiAuthError as error:
             log.info("agent_api.refused", reason=error.reason)
+            if error.reason == UNKNOWN_TOKEN:  # a guess: no client to audit it under (ADR 0053)
+                await report(request, TOKEN_REJECTED, UNKNOWN_TOKEN)
             raise
         request.state.agent_client_id = caller.client.client_id
         group = None

@@ -1,13 +1,15 @@
 """The citizen's contact form, shared by booking and direct calls (HANDOVER B15).
 
-Only name, email and (per group) phone; a hidden honeypot field catches simple bots. Values
-are capped and re-filled into the citizen's own form on errors, never echoed elsewhere.
+Only name, email and (per group) phone; a hidden honeypot field catches simple bots, which
+becomes a security event (ADR 0053). Values are capped and re-filled into the citizen's own
+form on errors, never echoed elsewhere.
 """
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 
 from app.domain.scheduling import Group, PhoneMode
+from app.domain.security_log import HONEYPOT
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
@@ -71,5 +73,5 @@ def read_contact(form: Mapping[str, object]) -> dict[str, str]:
         RejectedRequest: 400 if the honeypot field was filled in.
     """
     if form.get(HONEYPOT_FIELD):
-        raise RejectedRequest(400)
+        raise RejectedRequest(400, HONEYPOT)
     return {key: str(form.get(key, ""))[:MAX_VALUE_LENGTH] for key in ("name", "email", "phone")}

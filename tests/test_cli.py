@@ -405,3 +405,17 @@ async def test_seed_closures_refuses_production(settings: Settings) -> None:
 
     assert not ok
     assert report == "seed-closures adds a made-up booking; it runs only outside production\n"
+
+
+def test_client_pseudonym_prints_the_pseudonym_of_an_address(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "dev")
+    monkeypatch.setenv("MANAGEMENT_TOKEN_KEY", "k" * 40)
+
+    assert main(["client-pseudonym", "203.0.113.7"]) == 0
+    first = capsys.readouterr().out.strip()
+    assert main(["client-pseudonym", "not-an-address"]) == 1
+
+    assert len(first) == 16
+    assert "203.0.113.7" not in first

@@ -68,7 +68,12 @@ async def run_worker(
     http = httpx.AsyncClient(timeout=15.0, transport=transport)
     # ADR 0034: committed audit events also go to stdout for the log platform.
     uow = SqlUnitOfWork(engine, secret_box(settings), StdoutEventSink(settings.event_envelope))
-    security = SecurityLog(uow, clock, timedelta(minutes=settings.security_event_window_minutes))
+    security = SecurityLog(
+        uow,
+        clock,
+        timedelta(minutes=settings.security_event_window_minutes),
+        max_sources=settings.security_event_max_sources,
+    )
     integrations = build_integrations(settings, engine, http, clock, security)
     fallback = fallback_mail(settings)
     runner = JobRunner(
