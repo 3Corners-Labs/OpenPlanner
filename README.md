@@ -12,7 +12,8 @@ meeting; at T−5 (or at once for a direct call) a work item goes to the group's
 Contact Center. The citizen joins from the browser; the agent joins as cohost. Admins log in
 through OIDC and manage groups, opening hours, exceptions and integrations, and follow every
 call in the agenda (authorisation matrix: `docs/authorization.md`). Texts and reminders (WP7c)
-follow. See `docs/HANDOVER.md` §10.
+follow. A host website can embed a group's calendar with `<gov-booking>` on the origins its
+organisation allows (`docs/widget.md`, ADR 0035). See `docs/HANDOVER.md` §10.
 
 ## Quick start (demo)
 

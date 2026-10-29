@@ -119,3 +119,6 @@ All notable changes are listed here, generated from Conventional Commits on rele
   heading, live region; bundled by esbuild in the image build and CI; served at
   `/widget/v1/gov-booking.js` with its SRI hash shown in the admin portal. Test host page on
   another origin with a strict CSP; axe, Lighthouse and a keyboard-only flow in nl and en.
+- Documentation for host websites (ADR 0035, EM-5): `docs/widget.md` (allowing an origin,
+  the code, attributes, CSP, versions and integrity, tokens and parts, privacy,
+  troubleshooting) and a runbook section.
