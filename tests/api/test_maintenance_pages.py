@@ -18,6 +18,7 @@ from app.api.maintenance import (
     BOOKING_ROUTES,
     GROUP_ROUTES,
     OPEN_ROUTES,
+    WIDGET_ROUTES,
     citizen_gate,
     machine_gate,
     register_machine_maintenance,
@@ -181,7 +182,7 @@ def test_every_public_route_is_closed_or_explicitly_open(demo_settings: Settings
         if not route.path.startswith("/admin") and route.path != "/openapi.json"
     }
 
-    assert set(public) == GROUP_ROUTES | BOOKING_ROUTES | OPEN_ROUTES
+    assert set(public) == GROUP_ROUTES | BOOKING_ROUTES | WIDGET_ROUTES | OPEN_ROUTES
     assert [path for path, gated in public.items() if not gated] == []
 
 

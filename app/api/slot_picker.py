@@ -171,6 +171,9 @@ class MonthView:
     next: str | None
     horizon_days: int
     has_later: bool
+    iso: str = ""
+    previous_iso: str | None = None
+    next_iso: str | None = None
 
 
 @dataclass(frozen=True)
@@ -188,6 +191,7 @@ class DayTimes:
     heading: str
     count: str
     groups: list[TimeGroup]
+    iso: str = ""
 
 
 @dataclass(frozen=True)
@@ -266,6 +270,7 @@ def _times(group: Group, day: date, slots: list[AvailableSlot], locale: RequestL
             ]
             groups.append(TimeGroup(locale.gettext(key), views))
     return DayTimes(
+        iso=day.isoformat(),
         heading=format_day_short(day, locale.code),
         count=locale.gettext(
             "picker.count_one" if len(slots) == 1 else "picker.count", n=len(slots)
@@ -425,6 +430,9 @@ async def picker(
         next=href(("month", f"{following:%Y-%m}")) if shown < last_month else None,
         horizon_days=group.horizon_days,
         has_later=month_end > last,
+        iso=f"{shown:%Y-%m}",
+        previous_iso=f"{previous:%Y-%m}" if shown > first_month else None,
+        next_iso=f"{following:%Y-%m}" if shown < last_month else None,
     )
     times = _times(group, selected, by_day[selected], locale) if selected else None
     first = (
