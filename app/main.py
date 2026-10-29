@@ -194,7 +194,12 @@ def create_app(
             lambda: timedelta(minutes=live().security_event_window_minutes),
             max_sources=lambda: live().security_event_max_sources,
         )
-        app.state.booking_service = BookingService(uow, clock, token_key)
+        app.state.booking_service = BookingService(
+            uow,
+            clock,
+            token_key,
+            phone_region=lambda org: per_organisation(org).phone_default_region,
+        )
         app.state.admin_service = AdminService(uow, clock)
         # ADR 0042 step 4: class C settings changed in the portal, checked against the lock.
         app.state.settings_service = SettingsService(

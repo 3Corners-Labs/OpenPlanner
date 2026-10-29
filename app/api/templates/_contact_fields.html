@@ -1,13 +1,36 @@
-{#- Contact inputs with linked hints and errors, plus the hidden honeypot (HANDOVER B15). -#}
+{#- Contact inputs and custom fields (ADR 0055) with linked hints and errors, plus the hidden honeypot (HANDOVER B15). -#}
   {% for field in fields %}
-  <div class="field{% if field.error %} field--error{% endif %}">
+  {%- set aria %}
+    {%- if field.required %} required aria-required="true"{% endif %}
+    {%- if field.error %} aria-invalid="true"{% endif %}
+    {%- if field.described_by %} aria-describedby="{{ field.described_by }}"{% endif %}
+  {%- endset %}
+  <div class="field{% if field.error %} field--error{% endif %}{% if field.kind == 'checkbox' %} field--checkbox{% endif %}">
+    {% if field.kind == 'checkbox' %}
+    {% if field.error %}<p class="error-message" id="{{ field.name }}-error">{{ field.error }}</p>{% endif %}
+    <input id="{{ field.name }}" name="{{ field.name }}" type="checkbox" value="on"{% if field.value %} checked{% endif %}{{ aria }}>
+    <label for="{{ field.name }}">{{ field.label }}{% if not field.required %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</label>
+    {% if field.hint %}<p class="hint" id="{{ field.name }}-hint">{{ field.hint }}</p>{% endif %}
+    {% else %}
     <label for="{{ field.name }}">{{ field.label }}{% if not field.required %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</label>
     {% if field.hint %}<p class="hint" id="{{ field.name }}-hint">{{ field.hint }}</p>{% endif %}
     {% if field.error %}<p class="error-message" id="{{ field.name }}-error">{{ field.error }}</p>{% endif %}
+    {% if field.kind == 'textarea' %}
+    <textarea id="{{ field.name }}" name="{{ field.name }}" rows="5" autocomplete="{{ field.autocomplete }}"{{ aria }}>{{ field.value }}</textarea>
+    {% elif field.kind == 'select' %}
+    <select id="{{ field.name }}" name="{{ field.name }}" autocomplete="{{ field.autocomplete }}"{{ aria }}>
+      <option value="">{{ _("form.choose") }}</option>
+      {% for value, label in field.options %}
+      <option value="{{ value }}"{% if field.value == value %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    {% else %}
     <input id="{{ field.name }}" name="{{ field.name }}" type="{{ field.type }}" autocomplete="{{ field.autocomplete }}" value="{{ field.value }}"
-      {%- if field.required %} required aria-required="true"{% endif %}
-      {%- if field.error %} aria-invalid="true"{% endif %}
-      {%- if field.described_by %} aria-describedby="{{ field.described_by }}"{% endif %}>
+      {%- if field.inputmode %} inputmode="{{ field.inputmode }}"{% endif %}
+      {%- if field.minimum %} min="{{ field.minimum }}"{% endif %}
+      {%- if field.maximum %} max="{{ field.maximum }}"{% endif %}{{ aria }}>
+    {% endif %}
+    {% endif %}
   </div>
   {% endfor %}
   <div class="visually-hidden" aria-hidden="true">

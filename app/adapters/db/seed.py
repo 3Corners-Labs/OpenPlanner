@@ -77,7 +77,8 @@ EXAMPLE_CONTACTS = ContactBlock(
 )
 # A made-up citizen: the booking on hold exists only in development and test databases.
 EXAMPLE_CITIZEN = Contact.create(
-    name="Voorbeeld Inwoner",
+    first_name="Voorbeeld",
+    last_name="Inwoner",
     email="inwoner@example.org",
     phone=None,
     phone_mode=PhoneMode.OPTIONAL,

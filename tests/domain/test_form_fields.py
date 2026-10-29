@@ -13,6 +13,7 @@ from app.domain.form_fields import (
     check_label,
     normalise_email,
     normalise_phone,
+    raise_to_pii,
     validate_answers,
 )
 
@@ -20,20 +21,25 @@ TODAY = date(2026, 10, 29)
 
 
 def field(key: str = "customer_no", **overrides: object) -> FieldDefinition:
-    values: dict[str, object] = {"key": key, "type": FieldType.SHORT_TEXT}
+    values: dict[str, object] = {
+        "key": key,
+        "type": FieldType.SHORT_TEXT,
+        "labels": {"nl": "Vraag", "en": "Question"},
+    }
     values.update(overrides)
+    options = values.get("options", ())
+    if "option_labels" not in values and isinstance(options, tuple):
+        values["option_labels"] = {o: {"nl": o, "en": o} for o in options}
     return FieldDefinition.create(**values)  # type: ignore[arg-type]
 
 
-def form(*fields: FieldDefinition, free_text: bool = False) -> FormDefinition:
-    return FormDefinition.create(
-        version=3, fields=fields, max_custom_fields=5, free_text_enabled=free_text
-    )
+def form(*fields: FieldDefinition) -> FormDefinition:
+    return FormDefinition.create(version=3, fields=fields, max_custom_fields=5)
 
 
 def answer(definition: FieldDefinition, raw: str | None) -> object:
     answers = validate_answers(form(definition), {definition.key: raw}, today=TODAY, region="NL")
-    return answers.visible(Purpose.AGENT_VIEW).get(definition.key)
+    return answers.visible(Purpose.PLANNER_VIEW).get(definition.key)
 
 
 def refused(definition: FieldDefinition, raw: str | None) -> DomainError:
@@ -66,8 +72,8 @@ def test_system_keys_cannot_be_reused(key: str) -> None:
         field(key)
 
 
-@pytest.mark.parametrize("kind", [FieldType.EMAIL, FieldType.PHONE])
-def test_email_and_phone_are_always_pii(kind: FieldType) -> None:
+@pytest.mark.parametrize("kind", [FieldType.EMAIL, FieldType.PHONE, FieldType.LONG_TEXT])
+def test_contact_details_and_free_text_are_always_pii(kind: FieldType) -> None:
     with pytest.raises(DomainError):
         field("other_contact", type=kind, classification=Classification.NOT_PII)
 
@@ -118,19 +124,70 @@ def test_form_limits_custom_fields_and_duplicate_keys() -> None:
             version=1,
             fields=tuple(field(f"field_{i}") for i in range(3)),
             max_custom_fields=2,
-            free_text_enabled=False,
         )
     assert caught.value.code is ErrorCode.INVALID_FORM_FIELD
     with pytest.raises(DomainError):
         form(field("dup"), field("dup"))
 
 
-def test_long_text_needs_free_text_enabled() -> None:
-    long_text = field("remark", type=FieldType.LONG_TEXT)
+def test_retired_keys_cannot_be_used_again_and_do_not_count() -> None:
+    old = field("old_question")
+    current = FormDefinition.create(
+        version=2, fields=(field("a1"), field("a2")), max_custom_fields=2, retired=(old,)
+    )
 
+    assert current.get("old_question") is None
+    assert current.find("old_question") is not None
+    assert current.find("old_question").retired  # type: ignore[union-attr]
     with pytest.raises(DomainError):
-        form(long_text)
-    assert form(long_text, free_text=True).fields == (long_text,)
+        FormDefinition.create(
+            version=2, fields=(field("old_question"),), max_custom_fields=2, retired=(old,)
+        )
+
+
+@pytest.mark.parametrize("labels", [{"nl": "Vraag"}, {"en": "Question"}, {"nl": " ", "en": "Q"}])
+def test_labels_need_dutch_and_english(labels: dict[str, str]) -> None:
+    with pytest.raises(DomainError) as caught:
+        field(labels=labels)
+    assert str(caught.value) == "invalid_form_field: label"
+
+
+def test_labels_are_cleaned_and_bounded() -> None:
+    f = field(labels={"nl": "  Klant  nummer ", "en": "Customer number", "de": ""})
+
+    assert f.labels == {"nl": "Klant nummer", "en": "Customer number"}
+    with pytest.raises(DomainError):
+        field(labels={"nl": "x" * 201, "en": "x"})
+    with pytest.raises(DomainError):
+        field(labels={"nl": "a\x00b", "en": "x"})
+    with pytest.raises(DomainError):
+        field(labels={"nl": "Uw BSN", "en": "Number"})
+
+
+def test_texts_fall_back_to_dutch_then_the_key() -> None:
+    f = field(
+        "topic",
+        type=FieldType.CHOICE,
+        options=("rent",),
+        hints={"nl": "Kies er een"},
+        option_labels={"rent": {"nl": "Huur", "en": "Rent"}},
+    )
+
+    assert f.label("en") == "Question"
+    assert f.label("de") == "Vraag"
+    assert f.hint("en") == "Kies er een"
+    assert f.option_label("rent", "en") == "Rent"
+    assert f.option_label("other", "en") == "other"
+    assert field(hints={}).hint("nl") == ""
+
+
+def test_option_labels_belong_to_options_and_need_both_locales() -> None:
+    with pytest.raises(DomainError):
+        field("topic", type=FieldType.CHOICE, options=("rent",), option_labels={"x": {}})
+    with pytest.raises(DomainError):
+        field(
+            "topic", type=FieldType.CHOICE, options=("rent",), option_labels={"rent": {"nl": "H"}}
+        )
 
 
 # --- answers per type ------------------------------------------------------------------
@@ -146,11 +203,9 @@ def test_short_text_is_trimmed_and_bounded() -> None:
 
 def test_long_text_keeps_line_breaks() -> None:
     f = field("remark", type=FieldType.LONG_TEXT)
-    answers = validate_answers(
-        form(f, free_text=True), {"remark": " line 1\nline 2 "}, today=TODAY, region="NL"
-    )
+    answers = validate_answers(form(f), {"remark": " line 1\r\nline 2 "}, today=TODAY, region="NL")
 
-    assert answers.visible(Purpose.AGENT_VIEW)["remark"] == "line 1\nline 2"
+    assert answers.visible(Purpose.PLANNER_VIEW)["remark"] == "line 1\nline 2"
 
 
 def test_email_answer() -> None:
@@ -257,13 +312,13 @@ def _mixed_answers() -> Answers:
     )
 
 
-@pytest.mark.parametrize("purpose", [Purpose.AGENT_VIEW, Purpose.PLANNER_VIEW])
-def test_authorised_screens_see_everything(purpose: Purpose) -> None:
-    assert _mixed_answers().visible(purpose) == {"customer_no": "A-1", "topic": "rent"}
+def test_the_agenda_booking_page_sees_everything() -> None:
+    assert _mixed_answers().visible(Purpose.PLANNER_VIEW) == {"customer_no": "A-1", "topic": "rent"}
 
 
 @pytest.mark.parametrize(
-    "purpose", [Purpose.EXPORT, Purpose.MESSAGE_PLACEHOLDER, Purpose.AUDIT, Purpose.LOG]
+    "purpose",
+    [Purpose.AGENT_VIEW, Purpose.EXPORT, Purpose.MESSAGE_PLACEHOLDER, Purpose.AUDIT, Purpose.LOG],
 )
 def test_other_purposes_see_only_non_pii(purpose: Purpose) -> None:
     assert _mixed_answers().visible(purpose) == {"topic": "rent"}
@@ -284,31 +339,28 @@ def test_answers_never_show_values_in_repr() -> None:
 
 
 def test_storage_round_trip_keeps_version_and_classes() -> None:
-    answers = _mixed_answers()
-    stored = answers.to_storage()
+    stored = _mixed_answers().to_storage()
+    restored = Answers.from_storage(stored)
 
     assert stored["version"] == 3
-    restored = Answers.from_storage(
-        stored,
-        form(
-            field("customer_no"),
-            field(
-                "topic",
-                type=FieldType.CHOICE,
-                options=("rent",),
-                classification=Classification.NOT_PII,
-            ),
-        ),
-    )
     assert restored.visible(Purpose.LOG) == {"topic": "rent"}
+    assert restored.visible(Purpose.PLANNER_VIEW) == {"customer_no": "A-1", "topic": "rent"}
 
 
-def test_stored_answers_of_a_retired_field_count_as_pii() -> None:
-    stored = _mixed_answers().to_storage()
-    restored = Answers.from_storage(stored, form())
+def test_raising_a_tag_makes_stored_answers_pii() -> None:
+    stored = raise_to_pii(_mixed_answers().to_storage(), "topic")
 
-    assert restored.visible(Purpose.LOG) == {}
-    assert restored.visible(Purpose.AGENT_VIEW) == {"customer_no": "A-1", "topic": "rent"}
+    assert Answers.from_storage(stored).visible(Purpose.LOG) == {}
+
+
+def test_stored_garbage_counts_as_pii_and_odd_values_are_dropped() -> None:
+    restored = Answers.from_storage(
+        {"answers": {"a": "x", "b": ["list"]}, "not_pii": ["a", "ghost"]}
+    )
+
+    assert restored.version == 0
+    assert restored.visible(Purpose.PLANNER_VIEW) == {"a": "x"}
+    assert restored.visible(Purpose.LOG) == {"a": "x"}
 
 
 # --- shared normalisers -----------------------------------------------------------------

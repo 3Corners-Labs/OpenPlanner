@@ -30,7 +30,7 @@ SITE = "https://www.gemeente.example"
 EVIL = "https://evil.example"
 BASE = "/api/v1/widget/demo/demo"
 FRIDAY_0900 = "2026-01-02T08:00:00Z"
-ADA = {"start": FRIDAY_0900, "name": "Ada Lovelace", "email": "ada@example.org"}
+ADA = {"start": FRIDAY_0900, "first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org"}
 
 
 async def _embed(settings: Settings, *, enabled: bool = True) -> None:
@@ -81,7 +81,7 @@ async def test_the_group_comes_with_its_form_and_texts_for_an_allowed_origin(
     body = response.json()
     assert (body["name"], body["locale"], body["closure"]) == ("Demo: videogesprek", "en", None)
     assert body["page_url"].endswith("/g/demo")
-    assert [f["name"] for f in body["fields"]] == ["name", "email", "phone"]
+    assert [f["name"] for f in body["fields"]] == ["first_name", "last_name", "email", "phone"]
     assert body["honeypot"] == "website"
     assert body["texts"]["form.submit"] == "Book appointment"
     assert "Demo: videogesprek" in body["texts"]["widget.more"]

@@ -177,7 +177,7 @@ async def test_sms_reminder_goes_through_the_organisations_sms_sender(
 
     assert sender.asked == [(1, ChannelKind.SMS)]
     assert sender.sent[0].channel is ChannelKind.SMS
-    assert sender.sent[0].recipient == "0612345678"
+    assert sender.sent[0].recipient == "+31612345678"
     assert queue.done == [1]
 
 

@@ -1,7 +1,8 @@
 /**
- * Step 2: the contact form. Only the inputs the API describes (name, email and, per group,
- * phone), each with a visible label; hints and errors are linked with aria-describedby. The
- * error summary is focused after a refused submit and its links move focus to the input.
+ * Step 2: the contact form. Only the inputs the API describes (first and last name, email,
+ * per group phone, and the group's custom fields), each with a visible label; hints and errors
+ * are linked with aria-describedby. The error summary is focused after a refused submit and its
+ * links move focus to the input.
  */
 import { h, heading } from './dom.js';
 
@@ -51,23 +52,42 @@ export function renderForm(group, state, t, level, on) {
 function fieldBlock(field, value, error, t) {
   const id = `op-${field.name}`;
   const described = [field.hint ? `${id}-hint` : '', error ? `${id}-error` : ''].filter(Boolean).join(' ');
-  return h('div', { class: error ? 'field field--error' : 'field' },
-    h('label', { for: id, part: 'label' }, field.label, field.required ? null : h('span', { class: 'optional' }, ` ${t('form.optional')}`)),
-    field.hint ? h('p', { class: 'hint', id: `${id}-hint` }, field.hint) : null,
-    error ? h('p', { class: 'error', id: `${id}-error`, part: 'error' }, error) : null,
-    h('input', {
-      id,
-      name: field.name,
-      type: field.type,
-      autocomplete: field.autocomplete,
-      value,
-      part: 'input',
-      required: field.required,
-      'aria-required': field.required ? 'true' : null,
-      'aria-invalid': error ? 'true' : null,
-      'aria-describedby': described || null,
-    }),
-  );
+  const common = {
+    id,
+    name: field.name,
+    part: 'input',
+    required: field.required,
+    'aria-required': field.required ? 'true' : null,
+    'aria-invalid': error ? 'true' : null,
+    'aria-describedby': described || null,
+  };
+  const label = h('label', { for: id, part: 'label' }, field.label, field.required ? null : h('span', { class: 'optional' }, ` ${t('form.optional')}`));
+  const hint = field.hint ? h('p', { class: 'hint', id: `${id}-hint` }, field.hint) : null;
+  const message = error ? h('p', { class: 'error', id: `${id}-error`, part: 'error' }, error) : null;
+  const classes = ['field', error ? 'field--error' : '', field.kind === 'checkbox' ? 'field--checkbox' : ''].filter(Boolean).join(' ');
+  if (field.kind === 'checkbox') {
+    return h('div', { class: classes }, message, h('input', { ...common, type: 'checkbox', value: 'on', checked: Boolean(value) }), label, hint);
+  }
+  return h('div', { class: classes }, label, hint, message, control(field, value, common, t));
+}
+
+function control(field, value, common, t) {
+  if (field.kind === 'textarea') {
+    return h('textarea', { ...common, rows: '5', autocomplete: field.autocomplete }, value);
+  }
+  if (field.kind === 'select') {
+    const options = (field.options ?? []).map((option) => h('option', { value: option.value, selected: option.value === value }, option.label));
+    return h('select', { ...common, autocomplete: field.autocomplete }, h('option', { value: '' }, t('form.choose')), ...options);
+  }
+  return h('input', {
+    ...common,
+    type: field.type,
+    autocomplete: field.autocomplete,
+    inputmode: field.inputmode ?? null,
+    min: field.min ?? null,
+    max: field.max ?? null,
+    value,
+  });
 }
 
 function summary(errors, t, level, form) {

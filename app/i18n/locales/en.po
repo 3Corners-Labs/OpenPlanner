@@ -278,8 +278,6 @@ msgstr "Selected time"
 msgid "book.change_slot"
 msgstr "Choose another time"
 
-msgid "form.name"
-msgstr "Name"
 
 msgid "form.email"
 msgstr "Email address"
@@ -314,8 +312,6 @@ msgstr "There is a problem"
 msgid "error.title"
 msgstr "Something went wrong"
 
-msgid "error.field.name"
-msgstr "Enter your name, at most 100 characters."
 
 msgid "error.field.email"
 msgstr "Enter a valid email address, for example name@example.com."
@@ -5808,3 +5804,30 @@ msgstr "This field asks for data we may not ask for, such as a citizen service n
 
 msgid "error.invalid_answer"
 msgstr "Please check your answer to this question."
+
+msgid "form.first_name"
+msgstr "First name"
+
+msgid "form.last_name"
+msgstr "Last name"
+
+msgid "form.choose"
+msgstr "Choose one"
+
+msgid "error.field.first_name"
+msgstr "Enter your first name, at most 100 characters."
+
+msgid "error.field.last_name"
+msgstr "Enter your last name, at most 100 characters."
+
+msgid "error.invalid_answer_field"
+msgstr "Please check your answer to ‘{label}’."
+
+msgid "settings.topic.booking_form"
+msgstr "Booking form"
+
+msgid "settings.field.booking_form_max_custom_fields.label"
+msgstr "Custom fields per booking form (at most)"
+
+msgid "settings.field.phone_default_region.label"
+msgstr "Country of phone numbers without a country code"

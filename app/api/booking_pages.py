@@ -23,7 +23,13 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.api.citizen import citizen_page
-from app.api.contact_form import HONEYPOT_FIELD, contact_fields, read_contact
+from app.api.contact_form import (
+    HONEYPOT_FIELD,
+    ContactForm,
+    contact_input,
+    load_contact_form,
+    read_contact,
+)
 from app.api.labels import slot_label
 from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
@@ -32,7 +38,7 @@ from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
-from app.domain.services import BookingDetails, BookingService, ContactInput
+from app.domain.services import BookingDetails, BookingService
 from app.i18n.dates import format_clock, format_day, local_day
 from app.web.closure_labels import closure_view
 from app.web.errors import FormError, form_errors, status_for
@@ -176,7 +182,7 @@ async def closure_image(request: Request, slug: str) -> Response:
 
 
 def _book_context(
-    group: Group,
+    contact: ContactForm,
     start: datetime,
     slot: AvailableSlot | None,
     locale: RequestLocale,
@@ -184,11 +190,12 @@ def _book_context(
     values: dict[str, str],
 ) -> dict[str, object]:
     """Context of the contact form."""
+    group = contact.group
     return {
         "group": group,
         "start": slot_value(start),
         "slot_label": slot_label(start, slot.end, group, locale) if slot else "",
-        "fields": contact_fields(group, locale, errors, values),
+        "fields": contact.fields(locale, errors, values),
         "errors": errors,
         "honeypot": HONEYPOT_FIELD,
     }
@@ -206,7 +213,8 @@ async def booking_form(
     slot = await _available(service, group, parsed) if parsed else None
     if parsed is None or slot is None:
         return RedirectResponse(f"/g/{group.slug}?status=unavailable", status_code=303)
-    context = _book_context(group, parsed, slot, locale, [], {})
+    contact = await load_contact_form(service, group, _clock(request).now())
+    context = _book_context(contact, parsed, slot, locale, [], {})
     return await citizen_page(request, locale, "book.html", group, context)
 
 
@@ -225,14 +233,13 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
         receipt = await service.book(
             group_slug=group.slug,
             start=start,
-            contact=ContactInput(values["name"], values["email"], values["phone"] or None),
+            contact=contact_input(values),
             locale=locale.code,
         )
     except DomainError as error:
         slot = await _available(service, group, start)
-        context = _book_context(
-            group, start, slot, locale, form_errors(error, locale.gettext), values
-        )
+        contact = await load_contact_form(service, group, _clock(request).now())
+        context = _book_context(contact, start, slot, locale, contact.errors(error, locale), values)
         return await citizen_page(request, locale, "book.html", group, context, status_for(error))
     return RedirectResponse(_manage_url(receipt.management_token, "booked"), status_code=303)
 

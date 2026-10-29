@@ -22,8 +22,22 @@ from structlog.typing import EventDict, Processor, WrappedLogger
 from app.domain.event_context import current
 from app.domain.event_schema import Envelope, rfc3339
 
-# The PII columns of Booking (CLAUDE.md, privacy rules).
-PII_FIELDS = frozenset({"name", "email", "phone", "note", "guest_join_url", "host_join_url"})
+# The PII columns of Booking (CLAUDE.md, privacy rules), the answers to custom form fields
+# (ADR 0055) under every name they travel by.
+PII_FIELDS = frozenset(
+    {
+        "name",
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "note",
+        "guest_join_url",
+        "host_join_url",
+        "form_answers",
+        "answers",
+    }
+)
 MASK = "***"
 
 

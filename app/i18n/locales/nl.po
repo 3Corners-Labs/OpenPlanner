@@ -278,8 +278,6 @@ msgstr "Gekozen moment"
 msgid "book.change_slot"
 msgstr "Ander moment kiezen"
 
-msgid "form.name"
-msgstr "Naam"
 
 msgid "form.email"
 msgstr "E-mailadres"
@@ -314,8 +312,6 @@ msgstr "Er is een probleem"
 msgid "error.title"
 msgstr "Er ging iets mis"
 
-msgid "error.field.name"
-msgstr "Vul uw naam in, maximaal 100 tekens."
 
 msgid "error.field.email"
 msgstr "Vul een geldig e-mailadres in, bijvoorbeeld naam@voorbeeld.nl."
@@ -5808,3 +5804,30 @@ msgstr "Dit veld vraagt om gegevens die we niet mogen vragen, zoals een BSN, een
 
 msgid "error.invalid_answer"
 msgstr "Controleer uw antwoord op deze vraag."
+
+msgid "form.first_name"
+msgstr "Voornaam"
+
+msgid "form.last_name"
+msgstr "Achternaam"
+
+msgid "form.choose"
+msgstr "Maak een keuze"
+
+msgid "error.field.first_name"
+msgstr "Vul uw voornaam in, maximaal 100 tekens."
+
+msgid "error.field.last_name"
+msgstr "Vul uw achternaam in, maximaal 100 tekens."
+
+msgid "error.invalid_answer_field"
+msgstr "Controleer uw antwoord bij ‘{label}’."
+
+msgid "settings.topic.booking_form"
+msgstr "Boekingsformulier"
+
+msgid "settings.field.booking_form_max_custom_fields.label"
+msgstr "Eigen velden per boekingsformulier (maximaal)"
+
+msgid "settings.field.phone_default_region.label"
+msgstr "Land van telefoonnummers zonder landcode"

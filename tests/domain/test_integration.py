@@ -33,7 +33,7 @@ GROUP = make_group(
     wxcc_channel="openplanner-video",
 )
 ADA = Contact.create(
-    name="Ada Lovelace", email="ada@example.org", phone=None, phone_mode=PhoneMode.OPTIONAL
+    first_name="Ada", last_name="Lovelace", email="ada@example.org", phone=None, phone_mode=PhoneMode.OPTIONAL
 )
 GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
 OUTSIDER = Principal("x-1", "X", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())

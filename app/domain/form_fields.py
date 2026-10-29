@@ -11,7 +11,7 @@ name the field key only, never the value.
 
 import re
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from enum import StrEnum
 from types import MappingProxyType
@@ -26,6 +26,11 @@ LONG_TEXT_MAX_LENGTH = 1000
 MAX_EMAIL_LENGTH = 254
 MAX_CHOICE_OPTIONS = 30
 MAX_NUMBER_DIGITS = 12
+MAX_LABEL_LENGTH = 200
+MAX_HINT_LENGTH = 300
+REQUIRED_LOCALES = ("nl", "en")
+"""Every label needs these (CLAUDE.md: nl default, en required)."""
+FALLBACK_LOCALE = "nl"
 SYSTEM_KEYS = frozenset({"first_name", "last_name", "email", "phone"})
 UNKNOWN_FIELD = "unknown"
 """The field name in errors about keys the form does not have; the key itself is never echoed."""
@@ -94,7 +99,8 @@ class FieldType(StrEnum):
     CHECKBOX = "checkbox"
 
 
-ALWAYS_PII = frozenset({FieldType.EMAIL, FieldType.PHONE})
+ALWAYS_PII = frozenset({FieldType.EMAIL, FieldType.PHONE, FieldType.LONG_TEXT})
+"""Types that can never be tagged ``not_pii``: contact details and free text."""
 _BOUNDED = frozenset({FieldType.NUMBER, FieldType.DATE})
 
 
@@ -126,7 +132,9 @@ class _Visibility(StrEnum):
 # ADR 0055 point 7. Total over ``Purpose``: a test fails if a purpose has no rule.
 _VISIBILITY: Mapping[Purpose, _Visibility] = MappingProxyType(
     {
-        Purpose.AGENT_VIEW: _Visibility.ALL,
+        # ADR 0043: an agent in the own queue sees the first name only, so no PII answers.
+        Purpose.AGENT_VIEW: _Visibility.NOT_PII_ONLY,
+        # The booking page of the agenda, behind ``bookings.view`` (a PII permission).
         Purpose.PLANNER_VIEW: _Visibility.ALL,
         Purpose.EXPORT: _Visibility.NOT_PII_ONLY,
         Purpose.MESSAGE_PLACEHOLDER: _Visibility.NOT_PII_ONLY,
@@ -200,8 +208,10 @@ class FieldDefinition:
     """One custom field of a group's booking form. Build it with ``FieldDefinition.create``.
 
     ``minimum``/``maximum`` bound a ``number`` (the value) or a ``date`` (days relative to the
-    day of booking, negative is in the past). ``options`` are the keys of a ``choice``; their
-    labels are i18n text blocks. Label and help text live in i18n, not here.
+    day of booking, negative is in the past). ``options`` are the keys of a ``choice``.
+    ``labels``, ``hints`` and ``option_labels`` hold the administrator's text per locale; the
+    citizen sees the request locale, else Dutch. A retired field takes no new answers but keeps
+    its labels for the answers already given.
     """
 
     key: str
@@ -211,6 +221,10 @@ class FieldDefinition:
     options: tuple[str, ...]
     minimum: int | None
     maximum: int | None
+    labels: Mapping[str, str] = field(default_factory=dict)
+    hints: Mapping[str, str] = field(default_factory=dict)
+    option_labels: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
+    retired: bool = False
 
     @classmethod
     def create(
@@ -218,17 +232,20 @@ class FieldDefinition:
         *,
         key: str,
         type: FieldType,
+        labels: Mapping[str, str],
         required: bool = False,
         classification: Classification = Classification.PII,
         options: Iterable[str] = (),
         minimum: int | None = None,
         maximum: int | None = None,
+        hints: Mapping[str, str] | None = None,
+        option_labels: Mapping[str, Mapping[str, str]] | None = None,
     ) -> "FieldDefinition":
         """Validate a field definition.
 
         Raises:
             DomainError: ``invalid_form_field`` naming the attribute, or
-                ``form_field_forbidden`` for a key that asks for forbidden data.
+                ``form_field_forbidden`` for a key or label that asks for forbidden data.
         """
         if not _KEY.fullmatch(key) or key in SYSTEM_KEYS:
             raise _definition_error("key")
@@ -250,16 +267,86 @@ class FieldDefinition:
             raise _definition_error("minimum")
         if minimum is not None and maximum is not None and minimum > maximum:
             raise _definition_error("maximum")
-        return cls(key, type, required, classification, option_keys, minimum, maximum)
+        texts = option_labels or {}
+        if set(texts) - set(option_keys):
+            raise _definition_error("options")
+        return cls(
+            key,
+            type,
+            required,
+            classification,
+            option_keys,
+            minimum,
+            maximum,
+            _texts(labels, "label", MAX_LABEL_LENGTH, required_locales=REQUIRED_LOCALES),
+            _texts(hints or {}, "hint", MAX_HINT_LENGTH),
+            {
+                option: _texts(
+                    texts.get(option, {}),
+                    "options",
+                    MAX_LABEL_LENGTH,
+                    required_locales=REQUIRED_LOCALES,
+                )
+                for option in option_keys
+            },
+        )
+
+    def label(self, locale: str) -> str:
+        """Return the label in ``locale``, else Dutch, else the key."""
+        return _in_locale(self.labels, locale) or self.key
+
+    def hint(self, locale: str) -> str:
+        """Return the help text in ``locale``, else Dutch, else empty."""
+        return _in_locale(self.hints, locale)
+
+    def option_label(self, option: str, locale: str) -> str:
+        """Return the label of a ``choice`` option in ``locale``, else Dutch, else its key."""
+        return _in_locale(self.option_labels.get(option, {}), locale) or option
+
+
+def _texts(
+    texts: Mapping[str, str],
+    attribute: str,
+    max_length: int,
+    *,
+    required_locales: Iterable[str] = (),
+) -> dict[str, str]:
+    """Clean the per-locale texts of a field; blank ones are dropped.
+
+    Raises:
+        DomainError: ``invalid_form_field`` naming ``attribute`` for a missing locale, a too
+            long text or control characters; ``form_field_forbidden`` for a forbidden term.
+    """
+    cleaned: dict[str, str] = {}
+    for locale, raw in texts.items():
+        text = " ".join(raw.split())
+        if not text:
+            continue
+        if len(text) > max_length or _CONTROL_CHARS.search(raw):
+            raise _definition_error(attribute)
+        check_label(text)
+        cleaned[locale] = text
+    if any(locale not in cleaned for locale in required_locales):
+        raise _definition_error(attribute)
+    return cleaned
+
+
+def _in_locale(texts: Mapping[str, str], locale: str) -> str:
+    """Return the text in ``locale``, else the Dutch one, else empty."""
+    return texts.get(locale) or texts.get(FALLBACK_LOCALE) or ""
 
 
 @dataclass(frozen=True)
 class FormDefinition:
-    """The custom fields of one group's form at one ``version`` (bumped on every change)."""
+    """The custom fields of one group's form at one ``version`` (bumped on every change).
+
+    ``fields`` are the active fields in form order; ``retired`` are earlier fields kept for
+    their labels and to keep their keys from being used again.
+    """
 
     version: int
-    fields: tuple[FieldDefinition, ...]
-    free_text_enabled: bool
+    fields: tuple[FieldDefinition, ...] = ()
+    retired: tuple[FieldDefinition, ...] = ()
 
     @classmethod
     def create(
@@ -268,25 +355,29 @@ class FormDefinition:
         version: int,
         fields: Iterable[FieldDefinition],
         max_custom_fields: int,
-        free_text_enabled: bool,
+        retired: Iterable[FieldDefinition] = (),
     ) -> "FormDefinition":
-        """Check the form as a whole: field count, unique keys, free text only when enabled.
+        """Check the form as a whole: the number of active fields and unique keys.
 
         Raises:
-            DomainError: ``invalid_form_field`` naming ``fields``, ``key`` or ``type``.
+            DomainError: ``invalid_form_field`` naming ``fields`` or ``key``.
         """
         items = tuple(fields)
+        old = tuple(replace(f, retired=True) for f in retired)
         if version < 1 or len(items) > max_custom_fields:
             raise _definition_error("fields")
-        if len({f.key for f in items}) != len(items):
+        keys = [f.key for f in items + old]
+        if len(set(keys)) != len(keys):
             raise _definition_error("key")
-        if not free_text_enabled and any(f.type is FieldType.LONG_TEXT for f in items):
-            raise _definition_error("type")
-        return cls(version, items, free_text_enabled)
+        return cls(version, items, old)
 
     def get(self, key: str) -> FieldDefinition | None:
-        """Return the field with ``key``, or ``None``."""
+        """Return the active field with ``key``, or ``None``."""
         return next((f for f in self.fields if f.key == key), None)
+
+    def find(self, key: str) -> FieldDefinition | None:
+        """Return the active or retired field with ``key``, or ``None``."""
+        return self.get(key) or next((f for f in self.retired if f.key == key), None)
 
 
 @dataclass(frozen=True)
@@ -318,18 +409,30 @@ class Answers:
         }
 
     @classmethod
-    def from_storage(cls, stored: Mapping[str, Any], current: FormDefinition) -> "Answers":
-        """Rebuild answers; a value is ``not_pii`` only if it was then and its field still is.
+    def from_storage(cls, stored: Mapping[str, Any]) -> "Answers":
+        """Rebuild the answers stored by ``to_storage``.
 
-        A retired field, or one whose tag was raised to ``pii`` since, counts as PII.
+        Only keys listed as ``not_pii`` count as such; anything else, including a key another
+        version wrote, counts as PII.
         """
-        values: dict[str, AnswerValue] = dict(stored["answers"])
-        not_pii = set()
-        for key in stored.get("not_pii", ()):
-            definition = current.get(key)
-            if definition is not None and definition.classification is Classification.NOT_PII:
-                not_pii.add(key)
-        return cls(int(stored["version"]), MappingProxyType(values), frozenset(not_pii))
+        values: dict[str, AnswerValue] = {
+            str(k): v
+            for k, v in dict(stored.get("answers", {})).items()
+            if isinstance(v, str | int | bool)
+        }
+        not_pii = frozenset(str(k) for k in stored.get("not_pii", ())) & values.keys()
+        return cls(int(stored.get("version", 0)), MappingProxyType(values), not_pii)
+
+
+def raise_to_pii(stored: Mapping[str, Any], key: str) -> dict[str, Any]:
+    """Return stored answers in which ``key`` counts as PII again (tag raised or field retired).
+
+    The adapter applies this to every stored answer of the group, so a tag raised later also
+    covers the answers given before (ADR 0055 point 4).
+    """
+    updated = dict(stored)
+    updated["not_pii"] = [k for k in stored.get("not_pii", ()) if k != key]
+    return updated
 
 
 def validate_answers(
