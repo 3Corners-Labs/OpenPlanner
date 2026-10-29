@@ -146,6 +146,18 @@ class OrganisationContactsRow(Base):
     body: Mapped[str] = mapped_column(Text)
 
 
+class OrganisationOriginRow(Base):
+    """A website allowed to embed the organisation's groups (ADR 0035); no personal data."""
+
+    __tablename__ = "organisation_origins"
+
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), primary_key=True
+    )
+    origin: Mapped[str] = mapped_column(String(200), primary_key=True)
+    position: Mapped[int] = mapped_column(Integer)
+
+
 class GroupRow(Base):
     """A bookable team mapped to a WxCC queue."""
 
@@ -170,6 +182,7 @@ class GroupRow(Base):
     not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
+    embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
 
     __table_args__ = (
