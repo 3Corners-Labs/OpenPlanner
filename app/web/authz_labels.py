@@ -26,6 +26,7 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.MATRIX_VIEW: "authz.permission.matrix_view",
     Permission.ORGANISATION_MANAGE: "authz.permission.organisation_manage",
     Permission.AUDIT_VIEW: "authz.permission.audit_view",
+    Permission.AUDIT_EXPORT: "authz.permission.audit_export",
     Permission.RETENTION_VIEW: "authz.permission.retention_view",
     Permission.STAFF_VIEW: "authz.permission.staff_view",
     Permission.INTEGRATIONS_MANAGE: "authz.permission.integrations_manage",
