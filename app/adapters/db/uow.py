@@ -23,6 +23,7 @@ from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.images import ImageQueries
+from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
     AuditEventRow,
     BookingEventRow,
@@ -338,12 +339,21 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
     return f"channel:{organisation_id}:{channel.value}"
 
 
-class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, StaffQueries, ImageQueries):
+class SqlTransaction(
+    ApiClientQueries,
+    UpdateQueries,
+    RetentionQueries,
+    StaffQueries,
+    MaintenanceQueries,
+    ImageQueries,
+):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
     from ``UpdateQueries`` (ADR 0029), those of the retention overview from
-    ``RetentionQueries`` (ADR 0039), those of closure images from ``ImageQueries`` (ADR 0037).
+    ``RetentionQueries`` (ADR 0039), the staff directory from ``StaffQueries`` (ADR 0046),
+    the maintenance switch from ``MaintenanceQueries`` (ADR 0038), closure images from
+    ``ImageQueries`` (ADR 0037).
 
     Args:
         session: The open session.
