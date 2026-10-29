@@ -7,7 +7,7 @@ never free text. ``shortfall_acceptances`` holds a planner's "leave as is" per s
 counts it was given for and the planner's subject identifier. No personal data of citizens.
 
 Revision ID: 0039
-Revises: 0034
+Revises: 0035
 Create Date: 2026-10-29 09:00:00.000000
 """
 
@@ -19,7 +19,7 @@ from alembic import op
 from app.adapters.db.types import UTCDateTime
 
 revision: str = "0039"
-down_revision: str | None = "0034"
+down_revision: str | None = "0035"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

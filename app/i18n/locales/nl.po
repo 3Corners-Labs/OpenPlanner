@@ -656,6 +656,9 @@ msgstr "Auditlog bekijken"
 msgid "authz.permission.audit_export"
 msgstr "Auditlog exporteren"
 
+msgid "authz.permission.diagnostics_manage"
+msgstr "Diagnosemodus schakelen"
+
 msgid "authz.permission.integrations_manage"
 msgstr "Koppelingen en geheimen beheren"
 
@@ -3277,6 +3280,48 @@ msgstr "Persoonsgegevens verwijderen"
 
 msgid "audit.event.storage_check"
 msgstr "Opslag controleren"
+
+msgid "admin.audit.diagnostics.title"
+msgstr "Diagnosemodus"
+
+msgid "admin.audit.diagnostics.intro"
+msgstr "Zolang de diagnosemodus aan staat, schrijft het platform extra debugregels over die groep of organisatie in dit log. De beheerders van de groep zien ze ook. De modus gaat na de ingestelde tijd vanzelf uit (standaard 24 uur), en ook als de schijf bijna vol is."
+
+msgid "admin.audit.diagnostics.active"
+msgstr "{target}: aan tot {until}"
+
+msgid "admin.audit.diagnostics.off"
+msgstr "Uitzetten"
+
+msgid "admin.audit.diagnostics.on"
+msgstr "Aanzetten"
+
+msgid "admin.audit.diagnostics.none"
+msgstr "De diagnosemodus staat nergens aan."
+
+msgid "admin.audit.diagnostics.target"
+msgstr "Groep of organisatie"
+
+msgid "admin.done.diagnostics_on"
+msgstr "De diagnosemodus staat aan."
+
+msgid "admin.done.diagnostics_off"
+msgstr "De diagnosemodus staat uit."
+
+msgid "audit.event.job_run"
+msgstr "Taak uitgevoerd (diagnose)"
+
+msgid "audit.event.diagnostics_brake"
+msgstr "Diagnosemodus gestopt"
+
+msgid "admin.audit.detail.diagnostics_on"
+msgstr "diagnosemodus aan"
+
+msgid "admin.audit.detail.diagnostics_off"
+msgstr "diagnosemodus uit"
+
+msgid "admin.audit.detail.modes"
+msgstr "{count} keer beëindigd"
 
 msgid "admin.audit.level"
 msgstr "Minimaal niveau"

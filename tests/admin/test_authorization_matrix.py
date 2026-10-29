@@ -56,6 +56,14 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/audit/export.csv": {
         "/admin/audit/export.csv": statuses(200, 200, 403, 200, 200, 403)
     },
+    # ADR 0040, part 4: diagnostic mode, superuser only (product owner, 2026-10-29). An empty
+    # form names no target and changes nothing.
+    "POST /admin/audit/diagnostics": {
+        "/admin/audit/diagnostics": statuses(303, 403, 403, 403, 403, 403)
+    },
+    "POST /admin/audit/diagnostics/off": {
+        "/admin/audit/diagnostics/off": statuses(303, 403, 403, 403, 403, 403)
+    },
     # ADR 0039: retention counts per organisation; no group admins, never personal data.
     "GET /admin/retention": {"/admin/retention": statuses(200, 200, 403, 200, 200, 403)},
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.

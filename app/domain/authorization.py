@@ -69,6 +69,7 @@ class Permission(StrEnum):
     ORGANISATION_MANAGE = "organisation.manage"
     AUDIT_VIEW = "audit.view"
     AUDIT_EXPORT = "audit.export"
+    DIAGNOSTICS_MANAGE = "diagnostics.manage"
     INTEGRATIONS_MANAGE = "integrations.manage"
     BRANDING_MANAGE = "branding.manage"
     HOLIDAYS_MANAGE = "holidays.manage"
@@ -103,6 +104,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.AUDIT_VIEW: Level.GROUP,  # ADR 0031: one log, exact per level
     # ADR 0040: the same log as a CSV file, for compliance work outside the portal.
     Permission.AUDIT_EXPORT: Level.GROUP,
+    # ADR 0040: debug events for one group or organisation; superuser only (PO, 2026-10-29).
+    Permission.DIAGNOSTICS_MANAGE: Level.GLOBAL,
     Permission.GROUP_VIEW: Level.GROUP,
     Permission.GROUP_EDIT: Level.GROUP,
     Permission.SCHEDULE_MANAGE: Level.GROUP,
@@ -132,6 +135,7 @@ LOCKED_PERMISSIONS = frozenset(
         Permission.API_CLIENTS_MANAGE,
         Permission.SYSTEM_UPDATE,
         Permission.SYSTEM_MAINTENANCE,
+        Permission.DIAGNOSTICS_MANAGE,
     }
 )
 """ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
