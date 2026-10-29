@@ -13,7 +13,8 @@ from app.domain.audit import Outcome
 from app.domain.authorization import Permission, Target
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.maintenance import OFF, MaintenanceReason, MaintenanceState
-from app.domain.maintenance_service import MaintenanceService
+from app.domain.maintenance_service import MaintenanceService, MaintenanceWatch
+from app.domain.system_log import SystemLog
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.domain import DEMO_ORG_ADMIN, DEMO_SUPERUSER, NOW
@@ -167,3 +168,57 @@ async def test_refusal_is_audited_with_the_permission_only(
         "maintenance.refused",
     )
     assert (event.organisation, event.group) == ("demo", "demo")
+
+
+ALERT = timedelta(hours=4)
+REPEAT = timedelta(hours=24)
+
+
+def watch(uow: InMemoryUnitOfWork, clock: FixedClock) -> MaintenanceWatch:
+    return MaintenanceWatch(uow, clock, SystemLog(uow, clock), alert_after=ALERT, repeat=REPEAT)
+
+
+async def test_long_maintenance_is_reported_once_per_repeat_period(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    watcher = watch(uow, clock)
+    await service(uow, clock).switch_on_host("host-updater", MaintenanceReason.UPDATE)
+
+    clock.advance(ALERT)
+    assert await watcher.check() is None
+    clock.advance(timedelta(minutes=1))
+    assert await watcher.check() == 4
+    clock.advance(REPEAT - timedelta(minutes=1))
+    assert await watcher.check() is None
+    clock.advance(timedelta(minutes=1))
+    assert await watcher.check() == 28
+
+    overdue_events = [e for e in uow.state.audit if e.action == "maintenance.overdue"]
+    assert [(e.outcome, e.reason, e.detail, e.organisation) for e in overdue_events] == [
+        (Outcome.FAILURE, "update", "hours:4", None),
+        (Outcome.FAILURE, "update", "hours:28", None),
+    ]
+
+
+async def test_a_new_window_is_reported_afresh(uow: InMemoryUnitOfWork, clock: FixedClock) -> None:
+    watcher = watch(uow, clock)
+    maintenance = service(uow, clock)
+    await maintenance.switch_on_host("host-cli", MaintenanceReason.OTHER)
+    clock.advance(ALERT + timedelta(minutes=1))
+    assert await watcher.check() == 4
+
+    await maintenance.switch_off_host("host-cli")
+    assert await watcher.check() is None
+    await maintenance.switch_on_host("host-cli", MaintenanceReason.OTHER)
+    clock.advance(ALERT + timedelta(minutes=1))
+    assert await watcher.check() == 4
+
+
+async def test_short_maintenance_and_the_environment_are_not_reported(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    watcher = watch(uow, clock)
+    assert await watcher.check() is None
+    await service(uow, clock).switch_on_host("host-cli", MaintenanceReason.OTHER)
+    clock.advance(timedelta(hours=1))
+    assert await watcher.check() is None
