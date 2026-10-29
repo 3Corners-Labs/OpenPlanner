@@ -29,6 +29,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 
+from app.domain import booking_changes
 from app.domain.admin import AdminService, Authorization, record_change, require
 from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.booking import Booking
@@ -48,7 +49,6 @@ from app.domain.job_plan import (
     change_deadline,
     plan_closure_update,
     plan_for_booking,
-    plan_for_cancellation,
     plan_for_suspension,
     plan_purge,
 )
@@ -561,9 +561,7 @@ class ClosureService:
 
     async def _cancel(self, tx: Transaction, booking: Booking) -> None:
         """Cancel ``booking`` with the cancellation mail and the usual purge."""
-        now = self._clock.now()
-        await tx.save_booking(booking.cancel(now))
-        await tx.replace_jobs(_id(booking), plan_for_cancellation(cancelled_at=now))
+        await booking_changes.cancel(tx, booking, self._clock.now())
 
     async def _closure_bookings(
         self, tx: Transaction, principal: Principal, group: Group, closure: Closure

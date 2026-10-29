@@ -101,7 +101,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
   team's own (`closure.manage`) with name, notices, headings, an optional contact block and an
   image that only admins see. "Close the team" and "close the organisation" start from a
   scenario (or empty) and copy it; later edits never change a running closure. Audited as
-  `closure.start,scenario:N,bookings:N`. Migration 0041. Manual topic with examples to copy.
+  `closure.start,scenario:N,bookings:N`. Migration 0047. Manual topic with examples to copy.
 - Closure mails (ADR 0037, CL-5): the suspension and update mails carry the closure's heading,
   notice and copy of the contact options as a fixed block in the HTML and plain-text parts, and
   link to the closure page; the image is not mailed. Snapshot tests in nl and en.
@@ -109,3 +109,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
   Insluiten (`embedding.manage`, organisation admin and superuser), exact `https` origins,
   localhost only outside production; a group's own switch "Insluiten op websites" (off by
   default); audited with counts. ADR 0035 accepted.
+- Widget API (ADR 0035, EM-2): `/api/v1/widget/{org}/{group}/` with the group, its form and
+  texts, the month and the times of a day, and booking; CORS only for the organisation's
+  allowed origins, `require_allowed_origin` on bookings, the standalone page's rate limits and
+  honeypot, no token or personal data in answers.

@@ -90,7 +90,12 @@ TOPICS = (
     ),
     HelpTopic(
         "group-agenda",
-        ("/admin/groups/{slug}/agenda", "/admin/groups/{slug}/agenda/week"),
+        (
+            "/admin/groups/{slug}/agenda",
+            "/admin/groups/{slug}/agenda/week",
+            "/admin/groups/{slug}/agenda/bookings/{booking_id}/move",
+            "/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel",
+        ),
         Permission.BOOKINGS_VIEW,
     ),
     HelpTopic("maintenance", ("/admin/maintenance",), Permission.SYSTEM_MAINTENANCE),
