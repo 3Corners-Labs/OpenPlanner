@@ -9,7 +9,7 @@ from datetime import date, datetime
 
 from app.domain import holidays as holiday_model
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
-from app.domain.audit import AdminProfile, AuditEntry, AuditEvent, AuditFilter, Source
+from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Source
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingKind, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
@@ -21,6 +21,8 @@ from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock
 from app.domain.direct_queue import DirectCall
 from app.domain.job_plan import PlannedJob
+from app.domain.maintenance import OFF as MAINTENANCE_OFF
+from app.domain.maintenance import MaintenanceState
 from app.domain.retention import GroupRetentionCounts, PurgeCandidate, RetentionFacts
 from app.domain.scheduling import (
     Group,
@@ -29,6 +31,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
+from app.domain.staff import StaffFilter, StaffMember, visible
 from app.domain.updates import ReleaseCheck, UpdateRequest
 
 
@@ -47,7 +50,7 @@ class State:
     call_status: dict[int, CallStatus] = field(default_factory=dict)
     webhook_events: dict[tuple[str, str], datetime] = field(default_factory=dict)
     audit: list[AuditEvent] = field(default_factory=list)
-    admin_profiles: dict[str, AdminProfile] = field(default_factory=dict)
+    staff: dict[str, StaffMember] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
     fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
     contact_blocks: dict[int, ContactBlock] = field(default_factory=dict)
@@ -65,6 +68,7 @@ class State:
     channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
+    maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     purged_at: dict[int, datetime] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
@@ -109,9 +113,9 @@ class InMemoryTransaction:
             for e in self.state.audit
             if scope.contains(e.organisation, e.group) and narrow.matches(e)
         ]
-        profiles = self.state.admin_profiles
+        staff = self.state.staff
         return [
-            AuditEntry(e, profiles[e.actor].display_name if e.actor in profiles else None)
+            AuditEntry(e, staff[e.actor].display_name if e.actor in staff else None)
             for e in reversed(events)
         ][:limit]
 
@@ -121,8 +125,25 @@ class InMemoryTransaction:
         self.state.audit = kept
         return removed
 
-    async def save_admin_profile(self, profile: AdminProfile) -> None:
-        self.state.admin_profiles[profile.subject] = profile
+    async def get_staff(self, subject: str) -> StaffMember | None:
+        return self.state.staff.get(subject)
+
+    async def save_staff(self, member: StaffMember) -> None:
+        old = self.state.staff.get(member.subject)
+        member_id = old.id if old and old.id is not None else self._new_id()
+        self.state.staff[member.subject] = replace(member, id=member_id, recorded=True)
+
+    async def set_staff_seen(self, subject: str, at: datetime) -> None:
+        if subject in self.state.staff:
+            self.state.staff[subject] = replace(self.state.staff[subject], last_seen_at=at)
+
+    async def set_staff_logout(self, subject: str, at: datetime) -> None:
+        if subject in self.state.staff:
+            self.state.staff[subject] = replace(self.state.staff[subject], last_logout_at=at)
+
+    async def list_staff(self, scope: Scope, narrow: StaffFilter) -> list[StaffMember]:
+        found = [m for m in self.state.staff.values() if visible(m, scope) and narrow.matches(m)]
+        return sorted(found, key=lambda m: (m.display_name, m.subject))
 
     async def get_group(self, slug: str) -> Group | None:
         return next((g for g in self.state.groups.values() if g.slug == slug), None)
@@ -614,6 +635,12 @@ class InMemoryTransaction:
     async def save_release_check(self, check: ReleaseCheck) -> None:
         self.state.release_check = check
 
+    async def get_maintenance_state(self) -> MaintenanceState:
+        return self.state.maintenance
+
+    async def save_maintenance_state(self, state: MaintenanceState) -> None:
+        self.state.maintenance = state
+
     async def get_update_requests(self, limit: int = 20) -> list[UpdateRequest]:
         return sorted(self.state.update_requests.values(), key=lambda r: -(r.id or 0))[:limit]
 
@@ -633,9 +660,11 @@ class InMemoryUnitOfWork:
     def __init__(self, state: State | None = None) -> None:
         self.state = state or State()
         self._lock = asyncio.Lock()
+        self.reads = 0
 
     @asynccontextmanager
     async def read(self) -> AsyncIterator[InMemoryTransaction]:
+        self.reads += 1
         yield InMemoryTransaction(copy.deepcopy(self.state))
 
     @asynccontextmanager

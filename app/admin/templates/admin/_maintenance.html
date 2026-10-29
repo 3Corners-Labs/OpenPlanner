@@ -1,0 +1,10 @@
+{#- Maintenance bar (ADR 0038): on every admin page while maintenance is on, built like the environment bar. -#}
+{% if maintenance_notice is defined and maintenance_notice %}
+<div class="env-bar env-bar--maintenance" role="note" aria-label="{{ _("admin.maintenance.bar.label") }}" id="maintenance-bar">
+  <strong>{{ _("admin.maintenance.bar.title") }}</strong>
+  <span>{{ _("admin.maintenance.bar.text") }}</span>
+  {% if maintenance_notice.since %}<span class="env-bar__tag">{{ _("admin.maintenance.bar.since", moment=maintenance_notice.since) }}</span>{% endif %}
+  {% if maintenance_notice.expected_end %}<span class="env-bar__tag">{{ _("admin.maintenance.bar.expected_end", moment=maintenance_notice.expected_end) }}</span>{% endif %}
+  {% if maintenance_notice.environment %}<span class="env-bar__tag">{{ _("admin.maintenance.bar.environment") }}</span>{% endif %}
+</div>
+{% endif %}

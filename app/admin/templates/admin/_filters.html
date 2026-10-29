@@ -1,0 +1,10 @@
+{#- Controls of a GET filter form (audit log, staff list); no JavaScript (ADR 0016). -#}
+{% macro filter_select(id, name, label, options, selected) -%}
+<div class="field">
+  <label for="{{ id }}">{{ label }}</label>
+  <select id="{{ id }}" name="{{ name }}">
+    <option value="">{{ _("admin.filter.all") }}</option>
+    {% for option in options %}<option value="{{ option.value }}"{% if option.value == selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
+  </select>
+</div>
+{%- endmacro %}
