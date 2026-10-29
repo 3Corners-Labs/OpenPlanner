@@ -753,6 +753,14 @@ Public pages under `/g/{slug}` carry only `group`; admin routes carry what they 
 Timestamps are only as good as the host clock: keep NTP (`timedatectl` shows
 `System clock synchronized: yes`) on every host.
 
+### Filters and export (ADR 0040)
+
+The audit page filters on minimum level, kind (category), period and trace id; **Hele keten**
+on a row shows every event of that request or job, and the same `trace.id` finds its log
+lines on the platform. Organisation admins, the auditor and the superuser can download the
+current filter as CSV (`AUDIT_EXPORT_MAX_ROWS`, default 100 000; `AUDIT_EXPORT_MAX_DAYS`,
+default 366). A refused export says why on the page; every export is an `audit.export` event.
+
 ## Shipping audit events to a log platform (ADR 0034)
 
 After each commit, every audit, system and security event is written once more to stdout as
