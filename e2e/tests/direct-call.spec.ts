@@ -6,6 +6,9 @@
  * Without a Webex Service App the meeting and work item are skipped, so the waiting page keeps
  * "looking for an agent" without a join button: the citizen-facing flow is what is tested here.
  * Each browser creates its own group, so the parallel browsers do not collide.
+ *
+ * A staffing block cannot end at 24:00, so "around the clock" leaves 23:55–00:00 closed. The
+ * group therefore gets a time zone in which it is not near midnight while the test runs.
  */
 import { expect, type Page, test } from '@playwright/test';
 
@@ -15,6 +18,16 @@ import { loginAs, requireKeycloak } from '../keycloak';
 requireKeycloak();
 
 const WEEKDAYS = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'];
+
+/** Candidate zones 8 hours apart: when one is near midnight, the other is not. */
+const ZONES = ['Europe/Amsterdam', 'Asia/Tokyo'];
+
+/** Return the first zone whose local hour is between 01:00 and 22:00 right now. */
+function zoneAwayFromMidnight(): string {
+  const hourIn = (timeZone: string) =>
+    Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone }).format(new Date()));
+  return ZONES.find((zone) => hourIn(zone) >= 1 && hourIn(zone) < 22) ?? ZONES[0];
+}
 
 async function addAllDayHours(page: Page): Promise<void> {
   for (const day of WEEKDAYS) {
@@ -31,10 +44,11 @@ test('a citizen starts a call right away and the admin sees it', async ({ page, 
   const slug = `e2e-direct-${testInfo.project.name}-${Date.now().toString(36)}`;
   const tabs = page.getByRole('navigation', { name: 'Onderdelen van de groep' });
 
-  // Admin: group open around the clock, direct calls on.
+  // Admin: group open around the clock (but 23:55–00:00), direct calls on.
   await loginAs(page, 'orgadmin', '/admin/groups/new');
   await page.getByLabel('Naam', { exact: true }).fill(`Direct ${testInfo.project.name}`);
   await page.getByLabel('Webadres', { exact: true }).fill(slug);
+  await page.getByLabel('Tijdzone', { exact: true }).selectOption(zoneAwayFromMidnight());
   await page.getByRole('button', { name: 'Groep aanmaken' }).press('Enter');
   await expect(page.getByRole('status')).toContainText('De groep is aangemaakt');
   await tabs.getByRole('link', { name: 'Bezetting', exact: true }).click();
