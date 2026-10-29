@@ -13,7 +13,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
-from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Source
+from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import Principal, Scope
 from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
@@ -29,6 +29,7 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock
+from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.job_plan import JobType, PlannedJob
@@ -271,8 +272,26 @@ class Transaction(Protocol):
         """
         ...
 
-    async def delete_audit_events(self, source: Source, before: datetime) -> int:
-        """Delete the events of ``source`` older than ``before``; return how many (ADR 0031)."""
+    async def delete_audit_events(self, category: Category, before: datetime) -> int:
+        """Delete the events of ``category`` older than ``before``; return how many (ADR 0040)."""
+        ...
+
+    async def active_diagnostic_modes(self, now: datetime) -> list[DiagnosticMode]:
+        """Return the diagnostic modes that have not ended at ``now`` (ADR 0040)."""
+        ...
+
+    async def save_diagnostic_mode(self, mode: DiagnosticMode) -> None:
+        """Start ``mode``, replacing any mode for the same target."""
+        ...
+
+    async def end_diagnostic_mode(
+        self, organisation: str, group: str | None, now: datetime
+    ) -> bool:
+        """End the mode of one target; return whether one was active."""
+        ...
+
+    async def end_all_diagnostic_modes(self, now: datetime) -> int:
+        """End every active mode; return how many."""
         ...
 
     async def get_staff(self, subject: str) -> StaffMember | None:
