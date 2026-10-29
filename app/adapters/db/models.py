@@ -14,6 +14,7 @@ the display name of admins, from the identity provider (ADR 0046).
     staff 1──* staff_memberships (admins as last seen at login, ADR 0046; the name is joined
                                   into the audit log)
     release_checks (one row), update_requests (ADR 0029; the installation, no personal data)
+    maintenance_state (one row, ADR 0038; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
     organisations 1──n organisation_fonts (branding, ADR 0041)
     holiday_calendars 1──* holidays (ADR 0025; chosen through organisation_holiday_calendars
@@ -74,6 +75,7 @@ __all__ = [
     "OrganisationLogoRow",
     "OrganisationFontRow",
     "OrganisationRow",
+    "MaintenanceStateRow",
     "ReleaseCheckRow",
     "ReminderRuleRow",
     "ScheduleOverrideRow",
@@ -692,6 +694,8 @@ class UpdateRequestRow(Base):
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reason: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+    step: Mapped[str | None] = mapped_column(String(16))
+    step_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         Index("ix_update_requests_status", "status"),
@@ -700,4 +704,24 @@ class UpdateRequestRow(Base):
             "status IN ('requested', 'running', 'succeeded', 'rolled_back', 'failed', 'cancelled')",
             name="status",
         ),
+        CheckConstraint(
+            "step IS NULL OR step IN ('pulling', 'verifying', 'backing_up', 'migrating', "
+            "'starting', 'rolling_back')",
+            name="step",
+        ),
     )
+
+
+class MaintenanceStateRow(Base):
+    """The maintenance switch of the whole installation (ADR 0038); at most one row."""
+
+    __tablename__ = "maintenance_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    active: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    since: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    switched_by: Mapped[str] = mapped_column(String(255), server_default=text("''"))
+    expected_end: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    reason: Mapped[str | None] = mapped_column(String(16))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
