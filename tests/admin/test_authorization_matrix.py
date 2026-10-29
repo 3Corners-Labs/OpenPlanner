@@ -480,6 +480,144 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/organisations/{org}/closure/lift": {
         "/admin/organisations/demo/closure/lift": statuses(303, 303, 403, 403, 403, 403),
     },
+    # Closure scenarios (ADR 0037 §4): organisation ones with organisation.closure, a
+    # group's own with closure.manage. Empty forms are refused (422), unknown ids 404.
+    "GET /admin/organisations/{org}/closure/scenarios": {
+        "/admin/organisations/demo/closure/scenarios": statuses(200, 200, 403, 403, 403, 403),
+        "/admin/organisations/andere/closure/scenarios": statuses(200, 403, 403, 200, 403, 403),
+    },
+    "POST /admin/organisations/{org}/closure/scenarios": {
+        "/admin/organisations/demo/closure/scenarios": statuses(422, 422, 403, 403, 403, 403),
+        "/admin/organisations/andere/closure/scenarios": statuses(422, 403, 403, 422, 403, 403),
+    },
+    "GET /admin/organisations/{org}/closure/scenarios/{scenario_id}": {
+        "/admin/organisations/demo/closure/scenarios/999999": statuses(
+            404, 404, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/closure/scenarios/999999": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/closure/scenarios/{scenario_id}": {
+        "/admin/organisations/demo/closure/scenarios/999999": statuses(
+            404, 404, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/closure/scenarios/999999": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/closure/scenarios/{scenario_id}/delete": {
+        "/admin/organisations/demo/closure/scenarios/999999/delete": statuses(
+            404, 404, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/closure/scenarios/999999/delete": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "GET /admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts": {
+        "/admin/organisations/demo/closure/scenarios/999999/contacts": statuses(
+            404, 404, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/closure/scenarios/999999/contacts": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts": {
+        "/admin/organisations/demo/closure/scenarios/999999/contacts": statuses(
+            404, 404, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/closure/scenarios/999999/contacts": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/closure/scenarios/{scenario_id}/image": {
+        "/admin/organisations/demo/closure/scenarios/999999/image": statuses(
+            404, 404, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/closure/scenarios/999999/image": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/closure/scenarios/{scenario_id}/image/remove": {
+        "/admin/organisations/demo/closure/scenarios/999999/image/remove": statuses(
+            404, 404, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/closure/scenarios/999999/image/remove": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "GET /admin/organisations/{org}/closure/scenarios/{scenario_id}/image": {
+        "/admin/organisations/demo/closure/scenarios/999999/image": statuses(
+            404, 404, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/closure/scenarios/999999/image": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/closure/scenarios": {
+        "/admin/groups/demo/closure/scenarios": statuses(200, 200, 200, 403, 403, 403),
+        "/admin/groups/andere-team/closure/scenarios": statuses(200, 403, 403, 200, 403, 403),
+    },
+    "POST /admin/groups/{slug}/closure/scenarios": {
+        "/admin/groups/demo/closure/scenarios": statuses(422, 422, 422, 403, 403, 403),
+        "/admin/groups/andere-team/closure/scenarios": statuses(422, 403, 403, 422, 403, 403),
+    },
+    "GET /admin/groups/{slug}/closure/scenarios/{scenario_id}": {
+        "/admin/groups/demo/closure/scenarios/999999": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/closure/scenarios/999999": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/closure/scenarios/{scenario_id}": {
+        "/admin/groups/demo/closure/scenarios/999999": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/closure/scenarios/999999": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/closure/scenarios/{scenario_id}/delete": {
+        "/admin/groups/demo/closure/scenarios/999999/delete": statuses(
+            404, 404, 404, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/closure/scenarios/999999/delete": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/closure/scenarios/{scenario_id}/contacts": {
+        "/admin/groups/demo/closure/scenarios/999999/contacts": statuses(
+            404, 404, 404, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/closure/scenarios/999999/contacts": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/closure/scenarios/{scenario_id}/contacts": {
+        "/admin/groups/demo/closure/scenarios/999999/contacts": statuses(
+            404, 404, 404, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/closure/scenarios/999999/contacts": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/closure/scenarios/{scenario_id}/image": {
+        "/admin/groups/demo/closure/scenarios/999999/image": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/closure/scenarios/999999/image": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/closure/scenarios/{scenario_id}/image/remove": {
+        "/admin/groups/demo/closure/scenarios/999999/image/remove": statuses(
+            404, 404, 404, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/closure/scenarios/999999/image/remove": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/closure/scenarios/{scenario_id}/image": {
+        "/admin/groups/demo/closure/scenarios/999999/image": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/closure/scenarios/999999/image": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
     # Alternative contact options of the organisation (ADR 0037): with organisation.closure.
     # An empty form removes nothing that is not there, so an allowed POST redirects (303).
     # ADR 0035: the websites allowed to embed the organisation's groups, embedding.manage.

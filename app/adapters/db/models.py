@@ -26,6 +26,8 @@ the display name of admins, from the identity provider (ADR 0046).
                          │  └───* reminder_rules
                          │  └───* closures 1──* closure_notices (ADR 0024)
                          │            └──? closure_images (ADR 0037 §3; one per closure)
+    organisations 1──* closure_scenarios ──? closure_images (ADR 0037 §4; group_id NULL: the
+                         organisation's, else one group's)
                          │  └───* group_texts (message texts per locale and block)
                          └──* slots 1──* bookings 1──* jobs
                                          └──? closure (the one that suspended it)
@@ -71,6 +73,7 @@ __all__ = [
     "GroupHolidayOpenDayRow",
     "ClosureImageRow",
     "ClosureNoticeRow",
+    "ClosureScenarioRow",
     "ClosureRow",
     "GroupRow",
     "HolidayCalendarRow",
@@ -471,6 +474,28 @@ class ClosureImageRow(Base):
     # The text alternative per locale as JSON; ``{}`` when decorative.
     alts: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
     decorative: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+
+
+class ClosureScenarioRow(Base):
+    """A prepared closure content of an organisation or one group (ADR 0037 §4). No PII."""
+
+    __tablename__ = "closure_scenarios"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), index=True
+    )
+    # NULL: an organisation scenario, usable by every group of the organisation.
+    group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(80))
+    # Notices and headings per locale as JSON objects.
+    notices: Mapped[str] = mapped_column(Text)
+    headings: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+    # The scenario's own contact block as JSON; NULL takes the group's block at the start.
+    contacts: Mapped[str | None] = mapped_column(Text)
+    image_id: Mapped[int | None] = mapped_column(
+        ForeignKey("closure_images.id", ondelete="SET NULL")
+    )
 
 
 class ClosureNoticeRow(Base):

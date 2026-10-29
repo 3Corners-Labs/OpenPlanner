@@ -17,9 +17,9 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, two_organisations
+from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, three_groups
 from tests.support.closures import NOTICES
-from tests.support.domain import NOW, TEST_TOKEN_KEY, make_group
+from tests.support.domain import NOW, TEST_TOKEN_KEY
 
 ORGANISATION_BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "14 020"),))
 GROUP_BLOCK = ContactBlock(
@@ -30,9 +30,7 @@ HEADINGS = {"nl": "Storing", "en": "Outage"}
 
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
-    state = two_organisations(next_id=100)
-    state.groups[3] = make_group(id=3, organisation_id=1, slug="demo-twee", name="Demo twee")
-    return InMemoryUnitOfWork(state)
+    return three_groups()
 
 
 @pytest.fixture
