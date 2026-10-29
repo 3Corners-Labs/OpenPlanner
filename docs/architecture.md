@@ -148,7 +148,7 @@ flowchart TB
         cli["app.cli<br/>seed-demo, checks, webhooks"]
     end
 
-    web["app.web<br/>locale, templates, render(),<br/>protection, error pages"]
+    web["app.web<br/>locale, templates, render(),<br/>navigation register, protection, error pages"]
     adapters["app.adapters<br/>db (SQL, unit of work, job queue, scope filter),<br/>smtp, oidc, clock"]
     domain["app.domain<br/>pure business rules, authorisation matrix, ports"]
     i18n["app.i18n<br/>negotiation, translator,<br/>catalogues, dates"]
@@ -248,6 +248,7 @@ same commit and rollback behaviour as the SQL one.
 | Admin design (fixed look, no JavaScript, ADR 0016) | `app/web/static/admin.css`, `app/admin/templates/admin/` |
 | Manual and context-sensitive help (ADR 0033) | `docs/manual/`, `app/web/help.py`, `app/admin/help_routes.py`, `with_manual` in `app/admin/pages.py` |
 | Generated matrix document | `app/web/authz_report.py`, `app/cli.py` (`authz-matrix`) |
+| Admin structure: side navigation, top bar, object tabs (ADR 0047) | `app/web/navigation.py`, `page` and `group_page` in `app/admin/`, `docs/admin-map.md` via `app/cli.py` (`admin-map`) |
 | Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |
 | Transactions, write lock | `app/adapters/db/uow.py`, `app/adapters/db/engine.py` |
 | Job queue | `app/adapters/db/jobs.py` |
