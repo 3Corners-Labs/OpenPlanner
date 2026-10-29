@@ -65,10 +65,12 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.TEXTS_MANAGE,
         Permission.REMINDERS_MANAGE,
         Permission.BOOKINGS_VIEW,
+        Permission.BOOKINGS_MANAGE,  # ADR 0044
         Permission.CLOSURE_MANAGE,
         Permission.ORGANISATION_CLOSURE,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
+        Permission.EMBEDDING_MANAGE,  # ADR 0035
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -79,6 +81,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.SCHEDULE_MANAGE,
         Permission.TEXTS_MANAGE,
         Permission.BOOKINGS_VIEW,
+        Permission.BOOKINGS_MANAGE,  # ADR 0044: the team's own planner
         Permission.CLOSURE_MANAGE,
         Permission.STAFF_VIEW,  # ADR 0046: read-only, the own groups
     }
@@ -118,6 +121,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.INTEGRATIONS_MANAGE,
         Permission.API_CLIENTS_MANAGE,
         Permission.SYSTEM_UPDATE,
+        Permission.ROLES_MANAGE,  # ADR 0039 step 3
         Permission.SYSTEM_MAINTENANCE,
         Permission.DIAGNOSTICS_MANAGE,  # ADR 0040: product owner, 2026-10-29
     } == LOCKED_PERMISSIONS
@@ -125,8 +129,8 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
 
 
-def test_bookings_are_the_permission_that_shows_personal_data() -> None:
-    assert {Permission.BOOKINGS_VIEW} == PII_PERMISSIONS
+def test_bookings_are_the_permissions_that_show_personal_data() -> None:
+    assert {Permission.BOOKINGS_VIEW, Permission.BOOKINGS_MANAGE} == PII_PERMISSIONS
 
 
 def test_every_role_has_a_reach_and_only_the_superuser_reaches_everything() -> None:
@@ -184,6 +188,11 @@ def test_every_permission_has_a_level() -> None:
         (AUDITOR, Permission.STAFF_VIEW, OWN_GROUP, Decision(True, Reason.ORGANISATION)),
         (GROUP, Permission.STAFF_VIEW, OWN_GROUP, Decision(True, Reason.GROUP)),
         (GROUP, Permission.STAFF_VIEW, OTHER_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
+        # ADR 0035: the organisation decides where its groups may be embedded.
+        (ORG, Permission.EMBEDDING_MANAGE, OWN_ORG, Decision(True, Reason.ORGANISATION)),
+        (ORG, Permission.EMBEDDING_MANAGE, OTHER_ORG, Decision(False, Reason.OUT_OF_SCOPE)),
+        (GROUP, Permission.EMBEDDING_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
+        (AUDITOR, Permission.EMBEDDING_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
         # Roles combine: org admin elsewhere, group admin here.
         (MIXED, Permission.SCHEDULE_MANAGE, OWN_GROUP, Decision(True, Reason.GROUP)),
         (MIXED, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),

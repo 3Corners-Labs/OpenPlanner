@@ -10,6 +10,9 @@ no route can forget it.
     open      the booking page /b/{token}, the closure page /g/{slug}/closure (ADR 0037),
               waiting and join pages, health, brand assets, webhooks (they record what
               happens in running calls)
+    widget    the group, availability and booking routes of the embedded widget (ADR 0035)
+              ─► 503 ``{"error": "maintenance"}`` + Retry-After, readable by the host page;
+              its texts and the CORS preflight stay open
     machine   every request that is not a read, except the token endpoint ─► 503
               ``{"error": "maintenance"}`` + Retry-After
 
@@ -41,11 +44,22 @@ GROUP_ROUTES = frozenset({"/g/{slug}", "/g/{slug}/book", "/g/{slug}/direct"})
 BOOKING_ROUTES = frozenset({"/b/{token}/cancel", "/b/{token}/reschedule"})
 """Citizen routes under a management link that close (both the form and the write)."""
 
+WIDGET_ROUTES = frozenset(
+    {
+        "/api/v1/widget/{org}/{group}/",
+        "/api/v1/widget/{org}/{group}/availability",
+        "/api/v1/widget/{org}/{group}/bookings",
+    }
+)
+"""Routes of the embedded widget that close, as ``/g/{slug}`` does (ADR 0035)."""
+
 OPEN_ROUTES = frozenset(
     {
         "/",
+        "/api/v1/widget/texts",
         "/b/{token}",
         "/g/{slug}/closure",
+        "/g/{slug}/closure/image",
         "/b/{token}/wait",
         "/b/{token}/join",
         "/b/{token}/join/go",
@@ -79,6 +93,10 @@ class MaintenanceClosed(Exception):  # noqa: N818 - control flow, rendered as th
         self.slug = slug
 
 
+class WidgetMaintenance(Exception):  # noqa: N818 - control flow, rendered as JSON 503
+    """A widget route is closed for maintenance; the widget API answers it (ADR 0035)."""
+
+
 class MachineMaintenance(Exception):  # noqa: N818 - control flow, rendered as JSON 503
     """A machine-API write is refused for maintenance."""
 
@@ -99,12 +117,16 @@ async def citizen_gate(request: Request) -> None:
 
     Raises:
         MaintenanceClosed: For a route in ``GROUP_ROUTES`` or ``BOOKING_ROUTES``.
+        WidgetMaintenance: For a route in ``WIDGET_ROUTES``, except the CORS preflight.
     """
     route = _route_path(request)
-    if route not in GROUP_ROUTES and route not in BOOKING_ROUTES:
+    widget = route in WIDGET_ROUTES and request.method != "OPTIONS"
+    if route not in GROUP_ROUTES and route not in BOOKING_ROUTES and not widget:
         return
     if not (await _maintenance(request).status()).active:
         return
+    if widget:
+        raise WidgetMaintenance
     raise MaintenanceClosed(request.path_params.get("slug") if route in GROUP_ROUTES else None)
 
 
@@ -120,7 +142,7 @@ async def machine_gate(request: Request) -> None:
         raise MachineMaintenance
 
 
-def _retry_after(request: Request) -> dict[str, str]:
+def retry_after(request: Request) -> dict[str, str]:
     """Return the ``Retry-After`` header of a refusal."""
     return {"retry-after": str(request.app.state.settings.maintenance_retry_after_seconds)}
 
@@ -159,7 +181,7 @@ async def maintenance_page(request: Request, slug: str | None) -> HTMLResponse:
         block = await contact_service(request).public_for_group(group)
         context["contacts"] = contact_view(block, locale)
         response = await citizen_page(request, locale, "maintenance.html", group, context, 503)
-    response.headers.update(_retry_after(request))
+    response.headers.update(retry_after(request))
     return response
 
 
@@ -180,7 +202,7 @@ def register_machine_maintenance(app: FastAPI) -> None:
         return JSONResponse(
             {"error": "maintenance"},
             status_code=503,
-            headers={**_retry_after(request), "cache-control": "no-store"},
+            headers={**retry_after(request), "cache-control": "no-store"},
         )
 
     app.add_exception_handler(MachineMaintenance, refused)
