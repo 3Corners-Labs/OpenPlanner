@@ -1,7 +1,21 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_fields.html" import field with context %}
 {% from "admin/_page_header.html" import page_header with context %}
-{% block title %}{{ _("admin.embedding.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block title %}{{ _("admin.embedding.title") }} · {{ organisation.name }} – {{ _("admin.title") }}<section class="card" aria-labelledby="code-heading">
+  <div class="card__header">
+    <h2 id="code-heading">{{ _("admin.embedding.code") }}</h2>
+    <p class="card__lead">{{ _("admin.embedding.code_lead") }}</p>
+  </div>
+  {% if not integrity %}<div class="alert alert--info"><p>{{ _("admin.embedding.code_no_build") }}</p></div>{% endif %}
+  {% if embedded %}
+  <pre class="code-block"><code>&lt;script type="module" src="{{ script_url }}"{% if integrity %} integrity="{{ integrity }}"{% endif %} crossorigin="anonymous"&gt;&lt;/script&gt;
+{% for summary in embedded %}&lt;gov-booking organisation="{{ organisation.slug }}" group="{{ summary.group.slug }}"&gt;&lt;/gov-booking&gt;
+{% endfor %}</code></pre>
+  {% else %}
+  <p class="empty-state">{{ _("admin.embedding.code_none") }}</p>
+  {% endif %}
+</section>
+{% endblock %}
 {% block content %}
 {{ page_header("/admin/embedding", _("admin.embedding.title"), organisation.name, _("admin.embedding.title"), _("admin.embedding.org_lead", name=organisation.name)) }}
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}

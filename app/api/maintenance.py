@@ -12,7 +12,7 @@ no route can forget it.
               happens in running calls)
     widget    the group, availability and booking routes of the embedded widget (ADR 0035)
               ─► 503 ``{"error": "maintenance"}`` + Retry-After, readable by the host page;
-              its texts and the CORS preflight stay open
+              its texts, its script and the CORS preflight stay open
     machine   every request that is not a read, except the token endpoint ─► 503
               ``{"error": "maintenance"}`` + Retry-After
 
@@ -57,6 +57,7 @@ OPEN_ROUTES = frozenset(
     {
         "/",
         "/api/v1/widget/texts",
+        "/widget/v1/gov-booking.js",
         "/b/{token}",
         "/g/{slug}/closure",
         "/g/{slug}/closure/image",

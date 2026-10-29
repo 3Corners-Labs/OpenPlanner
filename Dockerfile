@@ -1,7 +1,16 @@
 # syntax=docker/dockerfile:1.7
 # Base images are pinned by tag; Renovate pins and updates their digests.
 
-FROM ghcr.io/astral-sh/uv:0.13.0 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
+
+# The <gov-booking> Web Component (ADR 0035): bundled by esbuild here, never committed. Only
+# the bundle reaches the runtime image; node and node_modules stay in this stage.
+FROM node:22.20.0-bookworm-slim AS widget
+WORKDIR /widget
+COPY widget/package.json widget/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY widget/src ./src
+RUN npm run build
 
 FROM python:3.12-slim-bookworm AS build
 COPY --from=uv /uv /usr/local/bin/uv
@@ -28,6 +37,7 @@ COPY --from=build /srv/.venv /srv/.venv
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY app ./app
+COPY --from=widget /widget/dist/gov-booking.js ./widget/dist/gov-booking.js
 # The manual is rendered in the portal (ADR 0033).
 COPY docs/manual ./docs/manual
 # The data volume (SQLite database, worker heartbeat) is the only writable path.

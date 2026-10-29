@@ -12,10 +12,17 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Every pinned version carries a `# renovate:` line so Renovate updates it (ADR 0051);
+# `make pins` fails on a version it cannot see.
 env:
-  UV_VERSION: "0.13.0"
+  # renovate: datasource=github-releases depName=astral-sh/uv
+  UV_VERSION: "0.13.6"
+  # renovate: datasource=python-version depName=python
   PYTHON_VERSION: "3.12"
+  # renovate: datasource=node-version depName=node versioning=node
   NODE_VERSION: "24"
+  # renovate: datasource=docker depName=ghcr.io/gitleaks/gitleaks
+  GITLEAKS_VERSION: "v8.30.1"
 
 jobs:
   python:
@@ -25,8 +32,8 @@ jobs:
     # app per role and route); 30 left no headroom and cancelled runs that were passing.
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
@@ -51,8 +58,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: jscpd
@@ -63,31 +70,36 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
       - name: uv lock --check
         run: make lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: every pinned version tracked by Renovate, renovate.json valid
+        run: make pins
       - run: uv sync --locked
       - name: pip-audit
         run: make audit
       - name: pip-licenses (runtime dependencies)
         run: make licenses
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
       - name: npm audit (e2e tooling)
         working-directory: e2e
         run: npm ci && npm audit --audit-level=moderate
+      - name: npm audit and build (widget, ADR 0035)
+        working-directory: widget
+        run: npm ci --ignore-scripts && npm audit --audit-level=moderate && npm run build
 
   semgrep:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     container: semgrep/semgrep:1.182.1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: repo rules self-test
         run: semgrep --test --config .semgrep/rules.yml .semgrep/rules.py
       - name: scan
@@ -100,35 +112,59 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       # The full history of the checked-out commit; other branches are scanned in their own PRs.
       - name: gitleaks
         run: >-
-          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0
+          docker run --rm -v "$PWD:/repo" "ghcr.io/gitleaks/gitleaks:$GITLEAKS_VERSION"
           git --redact --verbose --log-opts=HEAD /repo
+
+  licence:
+    name: licence and contributor agreement
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # ADR 0054: every file carries licence and copyright information (REUSE.toml).
+      - name: reuse lint
+        run: docker run --rm -v "$PWD:/data" fsfe/reuse:5.0.2 lint
+      # Outside contributors tick the CLA box (docs/cla.md). The body is read from the
+      # environment, never interpolated into the script.
+      - name: contributor licence agreement
+        if: >-
+          github.event_name == 'pull_request' &&
+          !contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) &&
+          github.event.pull_request.user.type != 'Bot'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if ! printf '%s' "$PR_BODY" | grep -qiE -- '- \[x\] I agree to the OpenPlanner Contributor Licence Agreement'; then
+            echo "::error::Tick 'I agree to the OpenPlanner Contributor Licence Agreement' in the pull request description (docs/cla.md)."
+            exit 1
+          fi
 
   container:
     name: image build, scan, SBOM, API fuzzing
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: hadolint/hadolint-action@v3.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: Dockerfile
       - name: build
         run: docker build -t openplanner:ci .
       - name: trivy (CVE)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: openplanner:ci
           exit-code: "1"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
       - name: trivy (misconfiguration)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: config
           scan-ref: .
@@ -136,13 +172,13 @@ jobs:
           severity: HIGH,CRITICAL
       # TLS proxy (ADR 0030): same lint and CVE gate as the app image, then a real ACME run
       # against Pebble (Let's Encrypt's test CA).
-      - uses: hadolint/hadolint-action@v3.1.0
+      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: deploy/proxy/Dockerfile
       - name: build proxy
         run: docker build -t openplanner-proxy:ci deploy/proxy
       - name: trivy (CVE, proxy)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: openplanner-proxy:ci
           exit-code: "1"
@@ -156,27 +192,31 @@ jobs:
       - name: migrate the database
         run: docker exec app alembic upgrade head
       - name: schemathesis
-        uses: schemathesis/action@v2
+        uses: schemathesis/action@b0cacf86f25caaa79ac110cc2077afd70fdd67ff # v3.1.0
         with:
           schema: http://127.0.0.1:8000/openapi.json
           args: --checks all
+          # renovate: datasource=pypi depName=schemathesis
+          version: "4.32.7"
+          # The coverage report goes to the step summary; a PR comment would need write access.
+          coverage-pr-comment: false
       - name: container logs
         if: always()
         run: docker logs app
       - name: SBOM (CycloneDX)
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: openplanner:ci
           format: cyclonedx-json
           output-file: sbom.cdx.json
       - name: grype
-        uses: anchore/scan-action@v6
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:
           sbom: sbom.cdx.json
           fail-build: true
           severity-cutoff: high
           only-fixed: true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom
           path: sbom.cdx.json
@@ -188,10 +228,11 @@ jobs:
     env:
       # Official image with browsers and their system packages preinstalled, so the job does not
       # depend on apt mirrors (`playwright install --with-deps` timed out on them). The tag must
-      # match the @playwright/test version in e2e/package.json.
+      # match the @playwright/test version in e2e/package.json; Renovate updates both together.
+      # renovate: datasource=docker depName=mcr.microsoft.com/playwright
       PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.64.1-noble
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: build and start the app with the development identity provider
         run: |
           docker build -t openplanner:e2e .
@@ -220,15 +261,38 @@ jobs:
       - name: Lighthouse accessibility >= 95
         run: >-
           docker run --rm --network host -e CI=true
-          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE" npm run lighthouse
+          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE"
+          sh -c "node host/serve.mjs & npm run lighthouse"
       # ADR 0038: maintenance closes every citizen page, so its page is checked last, alone.
       - name: maintenance page + axe (switches maintenance on and off again)
         run: >-
           docker run --rm --network host --ipc host -e CI=true -e MAINTENANCE_E2E=1
           -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE"
           npx playwright test tests/maintenance.spec.ts --project=chromium
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: playwright-traces
           path: e2e/test-results/
+
+  # ADR 0051: a deprecated runtime, action or input fails the build instead of leaving a warning
+  # annotation that nobody reads. Runs after every other job, also when one of them failed.
+  deprecations:
+    name: no deprecation warnings
+    needs: [python, duplication, dependencies, semgrep, gitleaks, container, e2e]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Job permissions replace the workflow's, so contents: read is repeated for the checkout.
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: deprecation annotations of this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/check-deprecations.sh

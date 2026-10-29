@@ -113,3 +113,8 @@ All notable changes are listed here, generated from Conventional Commits on rele
   texts, the month and the times of a day, and booking; CORS only for the organisation's
   allowed origins, `require_allowed_origin` on bookings, the standalone page's rate limits and
   honeypot, no token or personal data in answers.
+- `<gov-booking>` Web Component (ADR 0035, EM-3/EM-4): vanilla JS under `widget/`, Shadow DOM,
+  `--booking-*` tokens, `::part()`, ARIA grid with roving tabindex, focus to each step's
+  heading, live region; bundled by esbuild in the image build and CI; served at
+  `/widget/v1/gov-booking.js` with its SRI hash shown in the admin portal. Test host page on
+  another origin with a strict CSP; axe, Lighthouse and a keyboard-only flow in nl and en.
