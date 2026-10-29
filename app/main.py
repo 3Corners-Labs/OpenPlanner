@@ -29,6 +29,7 @@ from app.api import (
     join_pages,
     pages,
     webhooks,
+    widget_api,
 )
 from app.api.agent import create_agent_api
 from app.api.maintenance import citizen_gate, register_maintenance
@@ -271,6 +272,8 @@ def create_app(
         direct_pages.router,
         brand_assets.router,
         webhooks.router,
+        widget_api.texts_router,
+        widget_api.router,
     ):
         app.include_router(public_router, dependencies=gate)
     if agent_api is not None:
