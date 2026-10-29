@@ -31,6 +31,7 @@ from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
+from app.domain.embedding import AllowedOrigins
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobType, PlannedJob
@@ -379,6 +380,14 @@ class Transaction(Protocol):
 
     async def save_contact_block(self, organisation_id: int, block: ContactBlock | None) -> None:
         """Store or, with ``None``, remove the organisation's default contact block."""
+        ...
+
+    async def get_allowed_origins(self, organisation_id: int) -> AllowedOrigins:
+        """Return the websites allowed to embed the organisation's groups (ADR 0035)."""
+        ...
+
+    async def save_allowed_origins(self, organisation_id: int, allowed: AllowedOrigins) -> None:
+        """Replace the organisation's allowed origins; an empty list removes them all."""
         ...
 
     async def get_group_contact_block(self, group_id: int) -> ContactBlock | None:

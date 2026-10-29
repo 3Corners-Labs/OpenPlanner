@@ -84,6 +84,11 @@ stripped before the file is stored, so only the picture itself is kept. Served f
 origin and only while its closure is visible; never mailed, never sent to a third party.
 Organisation data; no purge job.
 
+**Allowed origins for embedding (ADR 0035).** The websites on which an organisation's groups
+may appear as a widget (`organisation_origins`, such as `https://www.gemeente.nl`), entered by
+an organisation admin, and a switch per group (`groups.embedding_enabled`). Organisation data,
+not personal data; no purge job; kept until changed. The audit event holds counts only.
+
 ## Admin login and audit (WP7a)
 
 ```

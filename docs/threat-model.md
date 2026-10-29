@@ -330,6 +330,23 @@ closure (CL-3): `POST /admin/groups/{slug}/closure/image` and `…/image/remove`
 | Elevation | Another organisation's admin sets or removes a team's closure image | One `RequirePermission(closure.manage)` on the group; `ClosureService` authorises again | `tests/admin/test_closure_image_routes.py::test_another_organisations_admin_is_refused`, `tests/domain/test_closure_image.py::test_another_organisations_admin_cannot_set_or_remove_the_image` |
 | Tampering (CSRF) | A third-party site uploads an image in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_closure_image_routes.py::test_cross_site_uploads_are_refused` |
 
+## Flow: allowed origins for embedding (ADR 0035, EM-1)
+
+Admins: `GET /admin/embedding` and `GET/POST /admin/organisations/{org}/embedding`
+(`embedding.manage`); a group's switch **Embed on websites** in its settings (`group.edit`).
+Input from outside: the origins textarea. The widget API that reads the list (EM-2) has its own
+flow, "embedded booking".
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Spoofing | A wildcard, a lookalike or a plain `http` origin lets another site use the widget API | Exact origins only: `https`, a host of letters, digits and hyphens, an optional port; no `*`, paths, credentials or non-ASCII; normalised to what a browser sends and compared exactly | `tests/domain/test_embedding.py::test_anything_else_is_not_an_origin`, `test_allows_is_an_exact_match` |
+| Spoofing | `http://localhost` allowed in production, so any local page on a citizen's machine passes | Local hosts only when `ENVIRONMENT` is `dev` or `test`; not a portal setting | `tests/domain/test_embedding.py::test_local_hosts_only_where_allowed`, `tests/domain/test_embedding_service.py::test_localhost_only_where_the_installation_allows_it` |
+| Elevation | A group admin or another organisation's admin puts a group on a website | One `RequirePermission(embedding.manage)` with the organisation; `EmbeddingService` authorises again; the group switch needs `group.edit` | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_embedding_service.py::test_group_admins_and_other_organisations_are_refused_and_audited` |
+| Elevation | A group appears on the website before anyone decided so | Both the organisation's list and the group's own switch are needed; the switch is off for every existing and new group | `tests/domain/test_embedding_service.py::test_a_group_is_allowed_only_when_switched_on_and_the_origin_is_listed`, `tests/test_migrations.py::test_existing_groups_are_not_embeddable_and_origins_go_on_downgrade` |
+| Tampering (CSRF) | A third-party site changes the list in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_embedding_routes.py::test_cross_site_posts_are_refused` |
+| Repudiation | Who added a website | Audited in the same transaction with the numbers added, removed and remaining | `tests/domain/test_embedding_service.py::test_organisation_admin_saves_origins_and_it_is_audited_with_counts` |
+| Denial of service | A huge list slows every widget request | At most `EMBEDDING_MAX_ORIGINS` (20, bounded 1–100) of at most 200 characters | `tests/domain/test_embedding.py::test_more_origins_than_the_limit_are_refused` |
+
 ## Flow: video meetings, work items and direct calls (WP5/WP6)
 
 Public: `GET /b/{token}/join`, `GET /b/{token}/join/go`, `GET/POST /g/{slug}/direct`,
