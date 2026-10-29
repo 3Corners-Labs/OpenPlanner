@@ -319,7 +319,10 @@ maintenance page follows in MM-3. Inputs from outside: kind, details, labels, op
 headings of up to six options; closure headings; on the citizen side only the slug and token
 in the path. The e2e examples come from `python -m app.cli seed-closures`. The image of a
 closure (CL-3): `POST /admin/groups/{slug}/closure/image` and `…/image/remove`
-(`closure.manage`, multipart), public `GET /g/{slug}/closure/image`.
+(`closure.manage`, multipart), public `GET /g/{slug}/closure/image`. Closure scenarios
+(CL-4): `/admin/organisations/{org}/closure/scenarios…` (`organisation.closure`) and
+`/admin/groups/{slug}/closure/scenarios…` (`closure.manage`), the closing forms with
+`?scenario=` and a hidden `scenario_id`.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -343,6 +346,12 @@ closure (CL-3): `POST /admin/groups/{slug}/closure/image` and `…/image/remove`
 | Information disclosure (privacy) | A third-party image host sees who opens the closure page | No external image URLs: only uploads, served from our origin; the CSP keeps `img-src 'self'` | `tests/admin/test_closure_image_routes.py::test_the_closure_page_keeps_its_csp` |
 | Elevation | Another organisation's admin sets or removes a team's closure image | One `RequirePermission(closure.manage)` on the group; `ClosureService` authorises again | `tests/admin/test_closure_image_routes.py::test_another_organisations_admin_is_refused`, `tests/domain/test_closure_image.py::test_another_organisations_admin_cannot_set_or_remove_the_image` |
 | Tampering (CSRF) | A third-party site uploads an image in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_closure_image_routes.py::test_cross_site_uploads_are_refused` |
+| Elevation | A group admin changes, deletes or re-illustrates an organisation scenario | Through the group only the group's own scenarios can be changed (`scenario_not_found` otherwise); through the organisation the matrix refuses `closure.manage`-only admins; `ScenarioService` authorises again | `tests/domain/test_scenarios.py::test_a_group_admin_cannot_change_an_organisation_scenario`, `tests/admin/test_scenario_routes.py::test_a_group_admin_uses_but_cannot_change_an_organisation_scenario`, `tests/admin/test_authorization_matrix.py::test_matrix` |
+| Information disclosure | An id in a URL or a hidden `scenario_id` reaches another group's or organisation's scenario (to read it or to start a closure with it) | Every lookup checks organisation and group; anything else is `scenario_not_found` (404), without saying it exists; listings take the permission's `Scope`, applied in SQL (`tests/adapters/db/test_scenario_queries.py::test_listing_follows_the_scope`) | `tests/domain/test_scenarios.py::test_another_groups_or_organisations_scenario_is_not_found`, `test_a_closure_cannot_use_another_groups_scenario`, `tests/admin/test_scenario_routes.py::test_an_unknown_or_foreign_scenario_cannot_start_a_closure` |
+| Information disclosure | A prepared scenario ("strike") leaks before it is used | Scenario images are served only on admin routes with the scenario's permission and `private, no-store`; nothing of a scenario is on a public page until a closure copies it | `tests/admin/test_scenario_routes.py::test_a_scenario_image_is_not_public` |
+| Tampering | Editing or deleting a scenario changes a running closure, so the page no longer matches the mail | The closure copies texts, contact block and image (its own image row) at the start | `tests/domain/test_scenarios.py::test_a_closure_copies_the_scenario_and_later_edits_leave_it_alone`, `tests/adapters/db/test_scenario_queries.py::test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with_it`, `tests/admin/test_scenario_routes.py::test_deleting_a_scenario_keeps_a_running_closure` |
+| Tampering (XSS) | A `javascript:` link, markup or an SVG in a scenario | Same validation as closures: `ContactBlock`, single-line headings and names, `ImageFile` by magic bytes; autoescape | `tests/admin/test_scenario_routes.py::test_scenario_errors_are_linked_to_their_fields` |
+| Repudiation | Who prepared or used a scenario | Audited with the scenario id and counts (`closure.start,scenario:N,bookings:N`), never names or texts | `tests/domain/test_scenarios.py::test_contacts_image_and_deletion`, `tests/admin/test_scenario_routes.py::test_start_closure_picks_a_scenario_and_copies_it` |
 
 ## Flow: embedded booking (ADR 0035, EM-2)
 
@@ -362,6 +371,17 @@ booking body and the `Origin` header.
 | Tampering | A booking during an emergency closure or outside the horizon | The same `BookingService.book` as the standalone page: `group_closed`, `outside_booking_window`, `slot_full` | `tests/api/test_widget_api.py::test_a_taken_slot_is_a_conflict`, `tests/domain/test_services.py` |
 | Information disclosure | A cached answer of one origin served to another | `Cache-Control: no-store` and `Vary: Origin` on every answer | `tests/api/test_widget_api.py::test_the_group_comes_with_its_form_and_texts_for_an_allowed_origin` |
 | Tampering | A booking through the widget while maintenance mode is on (ADR 0038) | The maintenance rule closes the group, availability and booking routes (`503 maintenance`), as it closes `/g/{slug}`; a test fails when a public route is neither closed nor explicitly open | `tests/api/test_widget_api.py::test_during_maintenance_the_group_routes_close_but_texts_and_preflight_stay_open`, `tests/api/test_maintenance_pages.py::test_every_public_route_is_closed_or_explicitly_open` |
+
+## Flow: widget script on host websites (ADR 0035, EM-3)
+
+Public: `GET /widget/v1/gov-booking.js`, loaded by host pages as a module script.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Tampering | A changed script runs on many government sites | The bundle is built in CI from `widget/src/` (no CDN, no runtime dependencies) and shipped in the signed image (ADR 0006); the admin portal gives hosts its SRI hash to pin | `tests/api/test_widget_script.py::test_the_integrity_is_the_sha384_of_the_file`, `tests/admin/test_embedding_routes.py::test_the_code_for_the_host_has_the_script_its_hash_and_each_embedded_group` |
+| Tampering (XSS) | Data from the API becomes markup inside the host page | The component builds DOM with text nodes only, never `innerHTML`; the shadow root keeps its markup apart from the host's | `e2e/tests/widget.spec.ts` (strict host CSP, no script errors) |
+| Elevation | The widget asks hosts to weaken their CSP (`unsafe-inline`, `unsafe-eval`) | A constructable stylesheet (not governed by `style-src`), no inline scripts, no `eval`: hosts add only `script-src` and `connect-src` for our origin | `e2e/tests/widget.spec.ts::book through the widget with the keyboard only` on a host page with exactly that CSP |
+| Information disclosure | The script response is readable by any origin | It is public code: `Access-Control-Allow-Origin: *` without credentials and `Cross-Origin-Resource-Policy: cross-origin` on this one path; every other response keeps `same-origin` | `tests/api/test_widget_script.py::test_the_script_is_served_for_any_host_page`, `tests/api/test_health.py::test_security_headers_on_every_response` |
 
 ## Flow: allowed origins for embedding (ADR 0035, EM-1)
 
@@ -475,6 +495,8 @@ database backups.
 | Elevation | An organisation or group admin updates or restores the installation | `system.update` is global and superuser only; route and `UpdateService` both decide; requests need a fresh login | `tests/admin/test_authorization_matrix.py::test_matrix`, `tests/domain/test_update_service.py::test_org_admin_cannot_request_an_update`, `tests/admin/test_update_routes.py::test_requests_need_a_fresh_login` |
 | Tampering | A downgrade disguised as an update, or two requests racing | Update targets must be newer than the running release build; at most one open request, checked under the write lock; a restore only to the version the latest update replaced, within 24 hours | `test_no_update_request_without_a_newer_release`, `test_only_one_open_request`, `test_no_restore_after_the_window` |
 | Spoofing | A forged release (other repository, foreign release page, odd tag) | `UPDATE_REPOSITORY` must be `owner/name`; tags must be `vX.Y.Z`; the release page must be this repository's GitHub page, else the release is ignored | `tests/adapters/test_releases.py::test_a_release_that_is_no_version_or_has_a_foreign_page_is_none`, `tests/test_config.py::test_update_repository_must_be_owner_and_name` |
+| Tampering | A release tag on a commit outside `main` (an unreviewed branch) is signed and offered to installations, or a release says another version than it contains | `main.yml` refuses a tag whose commit is not on `main` or does not match `pyproject.toml`, before it builds or pushes (ADR 0052); `main` is protected (PR, review, green CI) | CI step "release tag matches main and pyproject.toml" (workflow, no unit test); `tests/scripts/test_release_plan.py` for the numbering |
+| Information disclosure | The running commit tells an attacker which fixes are missing | Shown only to holders of `system.update` (superuser) and on the host CLI; never on public pages or in health responses | `tests/admin/test_update_routes.py::test_no_banner_and_no_page_for_an_organisation_admin`, `test_page_names_the_commit_the_image_was_built_from` |
 | Tampering | The updater (or anyone with a shell in the container) reports success for the wrong version | "succeeded" is only accepted from the target version; otherwise recorded as `failed`/`version_mismatch`; reasons must be short codes | `test_success_reported_by_the_wrong_version_is_recorded_as_failed`, `tests/domain/test_updates.py::test_finish_refuses_reasons_that_are_not_codes` |
 | Tampering (CSRF, open redirect) | A third-party site requests an update in an admin's browser; the snooze sends the admin elsewhere | Fetch Metadata check on every POST; the snooze's return path must be an admin path | `test_requests_need_the_same_origin`, `test_snooze_never_redirects_off_the_portal` |
 | Denial of service | A broken release takes the booking pages down | Backup before the switch; health wait of `HEALTH_TIMEOUT`; automatic return to the previous digest and the backup | `tests/scripts/test_updater.py::test_unhealthy_update_restores_the_backup_and_the_previous_digest`, `test_restore_downgrades_the_schema_then_runs_the_previous_digest`; runbook "Updates" |
@@ -511,3 +533,15 @@ identifier or a host actor, times and a reason code.
 | Tampering | A booking made between the updater's backup and a rollback disappears with the rollback | The updater switches maintenance on before the backup and off only after a healthy result, a rollback or a restore; a failed update leaves it on | `tests/scripts/test_updater.py::test_maintenance_is_on_before_the_backup_and_off_after_success`, `test_maintenance_is_off_after_a_rollback`, `test_maintenance_is_on_around_a_restore_and_off_after_it`, `test_a_failed_update_leaves_maintenance_on` |
 | Denial of service | Maintenance forgotten after the work: citizens cannot book for days | No automatic end (ADR 0038 §6), but the worker records `maintenance.overdue` after `MAINTENANCE_ALERT_HOURS` and repeats it every `MAINTENANCE_ALERT_REPEAT_HOURS`; runbook "Onderhoudsmodus" | `tests/domain/test_maintenance_service.py::test_long_maintenance_is_reported_once_per_repeat_period`, `tests/jobs/test_worker.py::test_worker_reports_maintenance_that_has_been_on_too_long` |
 | Denial of service | A switch made elsewhere (CLI, another process) is not seen, so writes slip through | The web process reads the switch with a cache of at most `MAINTENANCE_CACHE_SECONDS` (≤ 5 s); a switch in the same process clears the cache | `tests/domain/test_maintenance_service.py::test_status_is_cached_for_at_most_the_cache_period`, `test_a_switch_in_this_process_is_seen_at_once` |
+
+## Flow: build supply chain and dependency updates (ADR 0051)
+
+Renovate proposes every update as a PR; CI builds, scans and tests it; a human approves it.
+Actions are pinned by commit SHA, images by digest, Python and npm packages by lock file.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Tampering | An action's tag is moved to malicious code after we started using it | Every remote action pinned to a full commit SHA with a `# vX.Y.Z` comment; Renovate moves SHA and comment together | `tests/scripts/test_check_pins.py::test_action_on_a_tag_or_without_version_comment_fails`, `make pins` in CI |
+| Tampering | A freshly hijacked release is pulled in by the next update | `minimumReleaseAge` 3 days in `renovate.json` (security fixes excepted); every update still needs green CI (pip-audit, npm audit, trivy, grype) and human approval | `renovate-config-validator --strict` in `make pins`; review |
+| Elevation | A known-vulnerable or deprecated module stays because nobody sees the warning | Every pinned version tracked by Renovate (`make pins`); any deprecation annotation fails CI (`no deprecation warnings`); `freshness` fails when Renovate stops or an update PR rots | `tests/scripts/test_check_pins.py::test_repository_has_no_untracked_pins`; `scripts/check-deprecations.sh` (manual run against CI run 40849795763 found the Node 20 warning in all 7 jobs) |
+| Information disclosure | A CI job token is left on disk for later steps | The new jobs check out with `persist-credentials: false` and hold read-only permissions | review of `.github/workflows/` |

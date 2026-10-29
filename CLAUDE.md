@@ -58,7 +58,8 @@ On merge to `main`:
 - OWASP ZAP baseline scan against the started container.
 - `mutmut` on `app/domain/` and `app/i18n/`, mutation score ≥ 80%.
 - Image pushed to GHCR and signed keyless with `cosign`, SBOM attested; deployment verifies the signature (ADR 0006).
-Weekly: Renovate updates (security updates immediately), `trivy` on the running image, ZAP full scan against staging. Daily: alert if `purge_pii` backlog > 0.
+Per PR also: `make pins` (every pinned version tracked by Renovate, actions pinned as `<sha> # vX.Y.Z`; ADR 0051) and the job `no deprecation warnings` (any deprecation annotation fails the run).
+Weekly: Renovate updates (security updates immediately, majors as their own PR), `freshness` (Renovate still running, no update PR older than 14 days), `trivy` on the running image, ZAP full scan against staging. Daily: alert if `purge_pii` backlog > 0.
 
 ## Accessibility rules (WCAG 2.2 AA; axe is necessary, not sufficient)
 - All ARIA labels, roles and live regions live **inside** the shadow root; nothing relies on the host page.

@@ -30,6 +30,7 @@ from app.api import (
     pages,
     webhooks,
     widget_api,
+    widget_script,
 )
 from app.api.agent import create_agent_api
 from app.api.maintenance import citizen_gate, register_maintenance
@@ -59,6 +60,7 @@ from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.roles import RoleService
+from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.simulation import SimulationService
@@ -164,6 +166,7 @@ def create_app(
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
+        app.state.scenario_service = ScenarioService(uow, clock, app.state.admin_service)
         app.state.embedding_service = EmbeddingService(
             uow,
             clock,
@@ -293,6 +296,7 @@ def create_app(
         webhooks.router,
         widget_api.texts_router,
         widget_api.router,
+        widget_script.router,
     ):
         app.include_router(public_router, dependencies=gate)
     if agent_api is not None:
