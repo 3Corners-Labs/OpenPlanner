@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_contact_block.html" import contact_block %}
+{% block title %}{{ _("maintenance.title") }}{% if group is defined %} – {{ group.name }}{% endif %}{% endblock %}
+{% block content %}
+{% if group is defined %}<p class="eyebrow">{{ group.name }}</p>{% endif %}
+<h1>{{ _("maintenance.title") }}</h1>
+<div class="notice notice--warning" role="status">
+  <p>{{ _("maintenance.text") }}</p>
+  {% if expected_end %}<p>{{ _("maintenance.expected_end", moment=expected_end) }}</p>{% endif %}
+</div>
+{% if contacts %}
+<p>{{ _("maintenance.contacts_lead") }}</p>
+{{ contact_block(contacts) }}
+{% else %}
+<p>{{ _("maintenance.try_later") }}</p>
+{% endif %}
+{% endblock %}
