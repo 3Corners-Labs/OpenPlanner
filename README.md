@@ -1,18 +1,52 @@
 # OpenPlanner
 
-Lightweight group-booking service for a government contact center. Citizens pick a time slot
-for a *group* (a Webex Contact Center queue) on a standalone page per group, optionally
-embedded as a Web Component. Five minutes before the start, the service dispatches a task with
-a Webex video link to the group's queue via Webex Connect. Personal data is purged 24 hours
-after the appointment.
+**Video appointments with your team, booked in seconds, privacy by default.**
 
-Status: **work packages 5 and 6**. Citizens book, move and cancel appointments on the group
-page, or start a video call right away when the team is open. Each appointment gets a Webex
-meeting; at T−5 (or at once for a direct call) a work item goes to the group's queue in Webex
-Contact Center. The citizen joins from the browser; the agent joins as cohost. Admins log in
-through OIDC and manage groups, opening hours, exceptions and integrations, and follow every
-call in the agenda (authorisation matrix: `docs/authorization.md`). Texts and reminders (WP7c)
-follow. See `docs/HANDOVER.md` §10.
+OpenPlanner is an open-source scheduler for Webex video meetings. Your customers pick a free
+time on a branded booking page, get a confirmation with a calendar invite, and join the call
+from their browser: no account, no app, no login. Your team receives the meeting at the right
+moment, in the tool they already work in, and personal data is gone 24 hours after the call.
+
+It is built for teams that serve many people by video: customer service, advisory desks,
+helpdesks, intake and support teams. One installation serves several organisations, each with
+its own groups, branding, texts and administrators.
+
+## Why OpenPlanner
+
+- **Booking without friction.** One page per team at `/g/{slug}`: a month calendar, the free
+  times of a day, and a short form (email, name, optional phone). Move or cancel through a
+  personal link; no account needed. Works without JavaScript, fully by keyboard, WCAG 2.2 AA.
+- **Webex built in.** Every appointment gets its own Webex meeting. The end user joins from
+  the browser; the team member joins as cohost.
+- **Lands where your team works.** A few minutes before the start, the call goes as a work
+  item to the team's Webex Contact Center queue, so the first available person picks it up. A
+  team can also offer "talk now" when it is open, with a cap on how many people wait.
+- **Privacy by design.** Personal data lives only on the booking and is purged 24 hours after
+  the appointment. No personal data in logs, URLs, jobs or error messages.
+- **Your brand, your words, your language.** Colours, logo and fonts per organisation; every
+  text editable in the admin portal; Dutch and English out of the box, more locales possible.
+- **Admin with real roles.** Single sign-on through your own identity provider (OIDC), one
+  authorisation matrix for every screen and action, and an audit log of every change.
+- **Light to run.** Two containers and one SQLite file. Signed images, SBOM, a strict CI
+  pipeline, HTTPS with automatic certificates.
+
+## What it does today
+
+- End users book, move and cancel appointments, or start a video call right away when the
+  team is open.
+- Confirmation, change, reminder and cancellation messages by email (with `.ics`) and SMS.
+- Each appointment gets a Webex meeting, handed to the team as a Webex Contact Center work
+  item at T−5 (or at once for a direct call).
+- Admins manage organisations, groups, staffing, holidays and exceptions, branding, texts,
+  integrations and roles, and follow every call in the agenda and the planner.
+- Closing a group at short notice suspends bookings and asks end users to pick a new time;
+  maintenance mode shows a notice instead of the booking page.
+- A machine API lets a contact-center bot (such as the Webex AI Agent) offer free times
+  (`docs/agent-api.md`).
+
+On the roadmap: a built-in queue or calendar invite for teams without a contact center
+(ADR 0043), an embeddable Web Component for your own website (ADR 0035), changes through the
+bot API (ADR 0023) and staff provisioning through SCIM (ADR 0046).
 
 ## Quick start (demo)
 
@@ -24,7 +58,7 @@ docker compose exec web python -m app.cli seed-demo
 
 Then open:
 
-- http://127.0.0.1:8000/g/demo — book a video call as a citizen (Dutch; English via the
+- http://127.0.0.1:8000/g/demo — book a video call as an end user (Dutch; English via the
   language switcher).
 - http://127.0.0.1:8025 — Mailpit, which catches the confirmation, change, reminder and
   cancellation emails (with calendar attachment and the management link).
@@ -32,12 +66,12 @@ Then open:
   test user per role (`super`, `orgadmin`, `groupadmin`, `auditor`, `outsider`, `norole`; see
   `dev/keycloak/README.md`) to walk the portal as each role.
 
-The `dev` profile adds Mailpit and Keycloak (standing in for PingFederate); without it the shape
-is the production one (web + worker).
+The `dev` profile adds Mailpit and Keycloak (standing in for your own identity provider);
+without it the shape is the production one (web + worker).
 
 On a server with a public domain, `docker compose --profile tls up -d` adds HTTPS with a free
-Let's Encrypt certificate that renews itself (ADR 0030; set `TLS_DOMAIN` and `ACME_EMAIL` in `proxy.env`, see
-`docs/runbook.md`, "HTTPS certificate").
+Let's Encrypt certificate that renews itself (ADR 0030; set `TLS_DOMAIN` and `ACME_EMAIL` in
+`proxy.env`, see `docs/runbook.md`, "HTTPS certificate").
 
 Two containers share one SQLite volume: `web` (FastAPI, runs Alembic migrations on start) and
 `worker` (job loop). Both run as non-root with a read-only filesystem.
@@ -63,7 +97,7 @@ make check
 | `GET /b/{token}/join` | Join page for the video call (opens 15 minutes before the start). |
 | `GET/POST /g/{slug}/direct`, `GET /b/{token}/wait` | Start a video call right away; waiting page. |
 | `GET /o/{slug}/theme.css`, `GET /o/{slug}/logo` | Branding of an organisation (accent colour, logo). |
-| `POST /webhooks/webex`, `POST /webhooks/wxcc` | Signed events from Webex and WxCC (only with a secret configured). |
+| `POST /webhooks/webex`, `POST /webhooks/wxcc` | Signed events from Webex and Webex Contact Center (only with a secret configured). |
 | `GET /admin/` and below | Admin portal (OIDC login, every route bound to one permission of the matrix). |
 | `GET /healthz` | Liveness: the process is up. |
 | `GET /readyz` | Readiness: the database answers. `503` otherwise. |
@@ -72,14 +106,14 @@ make check
 ## Where to look next
 
 - `docs/architecture.md` — architecture with diagrams: context, containers, layers, domain
-  model, runtime flows, security, quality assurance, roadmap.
+  model, runtime flows, security, quality assurance.
 - `docs/manual/` — the admin manual, screen by screen (also shown in the portal).
-- `CLAUDE.md` — working agreements, architecture rules, quality gates.
-- `CONTRIBUTING.md` — dev setup, tests, PR checklist.
-- `docs/HANDOVER.md` — stakeholder design (Dutch).
-- `docs/adr/` — decisions.
+- `docs/widget.md` — styling tokens for the booking pages, and embedding (planned).
+- `docs/agent-api.md` — connecting a contact-center bot to the machine API.
 - `docs/runbook.md` — operating the service.
-- `docs/agent-api.md` — connecting a contact-center bot (WxCC AI Agent) to the machine API.
+- `docs/adr/` — decisions.
+- `CONTRIBUTING.md` — dev setup, tests, PR checklist.
+- `CLAUDE.md` — working agreements, architecture rules, quality gates.
 - `SECURITY.md` — reporting vulnerabilities.
 
 ## Licence
