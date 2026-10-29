@@ -4,7 +4,7 @@ import pytest
 from pydantic import SecretStr
 
 from app.config import Settings
-from app.keys import management_token_key, session_secret
+from app.keys import client_pseudonym_key, management_token_key, session_secret
 
 
 def test_environment_key_wins(tmp_path: Path) -> None:
@@ -49,3 +49,19 @@ def test_session_secret_follows_the_same_rules(tmp_path: Path) -> None:
     assert len(session_secret(dev)) >= 32
     with pytest.raises(RuntimeError, match="SESSION_SECRET"):
         session_secret(dev.model_copy(update={"environment": "prod"}))
+
+
+def test_the_pseudonym_key_is_derived_and_differs_from_the_token_key(tmp_path: Path) -> None:
+    def settings(value: str) -> Settings:
+        return Settings(
+            environment="dev",
+            management_token_key=SecretStr(value),
+            dev_token_key_path=tmp_path / "k",
+        )
+
+    key = client_pseudonym_key(settings("x" * 40))
+
+    assert len(key) == 32
+    assert key == client_pseudonym_key(settings("x" * 40))
+    assert key != b"x" * 32
+    assert key != client_pseudonym_key(settings("y" * 40))
