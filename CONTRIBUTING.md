@@ -110,6 +110,10 @@ CI. The PR template asks the seven review questions from `CLAUDE.md`; answer all
 New ADRs start from `docs/adr/template.md`, including its *Settings* section (ADR 0042).
 Run the `security-review` skill (`.claude/skills/security-review/`) before opening the PR.
 
+`main` merges through a merge queue (squash): the queue builds `main` with the queued pull
+requests on top and merges only when that build is green, so two pull requests that pass on
+their own (two Alembic heads, two ADRs with one number) cannot both land.
+
 ## Releases
 
 A merge to `main` is no release. Releases follow ADR 0052: `make release-plan` proposes the

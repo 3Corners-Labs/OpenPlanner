@@ -2,6 +2,9 @@ name: ci
 
 on:
   pull_request:
+  # The merge queue builds main plus the queued pull requests before it merges them, so two
+  # PRs that are green on their own (for example two Alembic heads) cannot both land.
+  merge_group:
   push:
     branches: [main]
 
