@@ -508,3 +508,15 @@ identifier or a host actor, times and a reason code.
 | Tampering | A booking made between the updater's backup and a rollback disappears with the rollback | The updater switches maintenance on before the backup and off only after a healthy result, a rollback or a restore; a failed update leaves it on | `tests/scripts/test_updater.py::test_maintenance_is_on_before_the_backup_and_off_after_success`, `test_maintenance_is_off_after_a_rollback`, `test_maintenance_is_on_around_a_restore_and_off_after_it`, `test_a_failed_update_leaves_maintenance_on` |
 | Denial of service | Maintenance forgotten after the work: citizens cannot book for days | No automatic end (ADR 0038 §6), but the worker records `maintenance.overdue` after `MAINTENANCE_ALERT_HOURS` and repeats it every `MAINTENANCE_ALERT_REPEAT_HOURS`; runbook "Onderhoudsmodus" | `tests/domain/test_maintenance_service.py::test_long_maintenance_is_reported_once_per_repeat_period`, `tests/jobs/test_worker.py::test_worker_reports_maintenance_that_has_been_on_too_long` |
 | Denial of service | A switch made elsewhere (CLI, another process) is not seen, so writes slip through | The web process reads the switch with a cache of at most `MAINTENANCE_CACHE_SECONDS` (≤ 5 s); a switch in the same process clears the cache | `tests/domain/test_maintenance_service.py::test_status_is_cached_for_at_most_the_cache_period`, `test_a_switch_in_this_process_is_seen_at_once` |
+
+## Flow: build supply chain and dependency updates (ADR 0051)
+
+Renovate proposes every update as a PR; CI builds, scans and tests it; a human approves it.
+Actions are pinned by commit SHA, images by digest, Python and npm packages by lock file.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Tampering | An action's tag is moved to malicious code after we started using it | Every remote action pinned to a full commit SHA with a `# vX.Y.Z` comment; Renovate moves SHA and comment together | `tests/scripts/test_check_pins.py::test_action_on_a_tag_or_without_version_comment_fails`, `make pins` in CI |
+| Tampering | A freshly hijacked release is pulled in by the next update | `minimumReleaseAge` 3 days in `renovate.json` (security fixes excepted); every update still needs green CI (pip-audit, npm audit, trivy, grype) and human approval | `renovate-config-validator --strict` in `make pins`; review |
+| Elevation | A known-vulnerable or deprecated module stays because nobody sees the warning | Every pinned version tracked by Renovate (`make pins`); any deprecation annotation fails CI (`no deprecation warnings`); `freshness` fails when Renovate stops or an update PR rots | `tests/scripts/test_check_pins.py::test_repository_has_no_untracked_pins`; `scripts/check-deprecations.sh` (manual run against CI run 40849795763 found the Node 20 warning in all 7 jobs) |
+| Information disclosure | A CI job token is left on disk for later steps | The new jobs check out with `persist-credentials: false` and hold read-only permissions | review of `.github/workflows/` |
