@@ -109,6 +109,30 @@ jobs:
           docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0
           git --redact --verbose --log-opts=HEAD /repo
 
+  licence:
+    name: licence and contributor agreement
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # ADR 0054: every file carries licence and copyright information (REUSE.toml).
+      - name: reuse lint
+        run: docker run --rm -v "$PWD:/data" fsfe/reuse:5.0.2 lint
+      # Outside contributors tick the CLA box (docs/cla.md). The body is read from the
+      # environment, never interpolated into the script.
+      - name: contributor licence agreement
+        if: >-
+          github.event_name == 'pull_request' &&
+          !contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) &&
+          github.event.pull_request.user.type != 'Bot'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if ! printf '%s' "$PR_BODY" | grep -qiE -- '- \[x\] I agree to the OpenPlanner Contributor Licence Agreement'; then
+            echo "::error::Tick 'I agree to the OpenPlanner Contributor Licence Agreement' in the pull request description (docs/cla.md)."
+            exit 1
+          fi
+
   container:
     name: image build, scan, SBOM, API fuzzing
     runs-on: ubuntu-24.04

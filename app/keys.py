@@ -1,14 +1,19 @@
-"""Resolve bootstrap keys from the environment (ADR 0008, ADR 0011, ADR 0013)."""
+"""Resolve bootstrap keys from the environment (ADR 0008, ADR 0011, ADR 0013, ADR 0053)."""
 
 import os
 import secrets
 from pathlib import Path
 
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from pydantic import SecretStr
 
 from app.config import Settings
 
 MIN_KEY_BYTES = 32
+
+CLIENT_PSEUDONYM_INFO = b"openplanner/client-pseudonym/v1"
+"""HKDF label of the key behind caller pseudonyms (ADR 0053); a new label means new pseudonyms."""
 
 
 def _bootstrap_key(settings: Settings, value: SecretStr | None, name: str, dev_path: Path) -> bytes:
@@ -40,6 +45,16 @@ def management_token_key(settings: Settings) -> bytes:
         "MANAGEMENT_TOKEN_KEY",
         settings.dev_token_key_path,
     )
+
+
+def client_pseudonym_key(settings: Settings) -> bytes:
+    """Return the key that turns caller addresses into pseudonyms (ADR 0053).
+
+    Derived from ``MANAGEMENT_TOKEN_KEY`` under its own label, so no new secret is needed and
+    neither key reveals the other. Rotating that key changes every pseudonym.
+    """
+    hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=CLIENT_PSEUDONYM_INFO)
+    return hkdf.derive(management_token_key(settings))
 
 
 def session_secret(settings: Settings) -> str:
