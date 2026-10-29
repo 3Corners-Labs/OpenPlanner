@@ -739,6 +739,28 @@ number. A booking id links to that booking's timeline.
 System events are deleted after `SYSTEM_EVENT_RETENTION_DAYS` (default 90). Admin actions are
 kept. Webhook rejections and Webex token-refresh failures are still only in the container logs.
 
+## Log lines and the event schema (ADR 0040)
+
+Every line on stdout is one JSON object in the field names of `openplanner.event/1`
+(`docs/audit-events.md`), so a log platform needs no mapping:
+
+| Field | Meaning |
+|---|---|
+| `@timestamp` | RFC 3339 in UTC with milliseconds, e.g. `2026-10-27T14:03:12.345Z` |
+| `log.level` | `debug`, `info`, `warning`, `error`, `critical` |
+| `message` | the event key, e.g. `job.sent`, `storage.degraded` |
+| `service.name`, `service.version` | `web` or `worker`, and `APP_VERSION` |
+| `installation` | `INSTALLATION_NAME`, when set |
+| `trace.id` | one id per HTTP request or worker job; the audit events it writes carry the same id |
+| `organisation`, `group` | slugs of the tenant the request or job is about, once known |
+
+Lines before this release had `timestamp`, `level` and `event`: change saved searches and
+alerts on the log platform to `@timestamp`, `log.level` and `message`. To follow one request
+or job, search for its `trace.id`; to see one tenant, filter on `organisation` or `group`.
+Public pages under `/g/{slug}` carry only `group`; admin routes carry what they act on.
+Timestamps are only as good as the host clock: keep NTP (`timedatectl` shows
+`System clock synchronized: yes`) on every host.
+
 ## Logs and disk space (ADR 0040)
 
 Three things keep the host from filling up:
