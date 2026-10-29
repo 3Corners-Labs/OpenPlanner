@@ -41,6 +41,7 @@ from app.domain.direct_queue import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import effective_schedule
+from app.domain.images import ImageFile
 from app.domain.job_plan import (
     JobType,
     change_deadline,
@@ -124,6 +125,17 @@ class BookingService:
         async with self._uow.read() as tx:
             closures = await tx.get_closures(group.id, self._clock.now())
         return closures[0] if closures else None
+
+    async def closure_image(self, group: Group) -> ImageFile | None:
+        """Return the image of the closure citizens of ``group`` see now, if it has one.
+
+        Only a visible (active or upcoming) closure's image is public (ADR 0037 §3).
+        """
+        async with self._uow.read() as tx:
+            closures = await tx.get_closures(group.id, self._clock.now())
+            if not closures or closures[0].image is None or closures[0].id is None:
+                return None
+            return await tx.get_closure_image(closures[0].id)
 
     async def availability(
         self, group_slug: str, first_day: date, last_day: date

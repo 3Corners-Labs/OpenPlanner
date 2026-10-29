@@ -304,7 +304,9 @@ Citizens (CL-2): the closure page `GET /g/{slug}/closure`, shown in place of the
 of a booking on hold (`GET /b/{token}`) shows the closure's copy above its actions. The
 maintenance page follows in MM-3. Inputs from outside: kind, details, labels, opening hours and
 headings of up to six options; closure headings; on the citizen side only the slug and token
-in the path. The e2e examples come from `python -m app.cli seed-closures`.
+in the path. The e2e examples come from `python -m app.cli seed-closures`. The image of a
+closure (CL-3): `POST /admin/groups/{slug}/closure/image` and `…/image/remove`
+(`closure.manage`, multipart), public `GET /g/{slug}/closure/image`.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -320,6 +322,14 @@ in the path. The e2e examples come from `python -m app.cli seed-closures`.
 | Information disclosure | The closure page reveals a closure citizens should not see yet, or a past one | It shows only what the banner shows (active, or upcoming and announced); the URL has only the slug, so past closures cannot be listed; without one it redirects to the calendar | `tests/api/test_closure_pages.py::test_the_closure_page_of_an_open_team_goes_back_to_the_calendar`, `test_an_upcoming_closure_keeps_the_calendar_and_links_to_its_page` |
 | Information disclosure | The page of a booking on hold shows the citizen's details next to the contact options | The management page shows the appointment, never contact details | `tests/api/test_closure_pages.py::test_a_booking_on_hold_shows_the_contact_options_above_its_actions` |
 | Information disclosure | The e2e example booking (a made-up citizen) ends up in a production database | `seed-closures` refuses when `ENVIRONMENT=prod` | `tests/test_cli.py::test_seed_closures_refuses_production` |
+| Tampering (stored XSS) | An HTML or SVG file named `.png` uploaded as closure image runs script on our origin | Type recognised from the magic bytes (PNG, JPEG, WebP only, `app/domain/images.py`, shared with the logo); served with that type, `nosniff` and `default-src 'none'`; the page links it only in an `<img>` | `tests/domain/test_images.py::test_html_svg_gif_and_other_files_are_refused`, `tests/admin/test_closure_image_routes.py::test_html_or_svg_named_png_is_refused`, `test_group_admin_adds_an_image_that_citizens_see_without_metadata` |
+| Denial of service | A huge upload fills memory or disk | `Content-Length` above 500 kB + 16 kB refused unread (413); one file read up to the limit; malformed files refused, never stored | `tests/admin/test_closure_image_routes.py::test_a_file_above_the_limit_is_refused_unread`, `tests/domain/test_images.py::test_malformed_files_are_refused` |
+| Information disclosure (privacy) | A photo publishes where it was taken or who took it (EXIF GPS, XMP creator, PNG text) | Metadata stripped on upload without decoding the image: PNG keeps only display chunks, JPEG drops APP1, APP3–13, APP15 and COM (also after a scan), WebP drops EXIF and XMP and their flags | `tests/domain/test_images.py::test_metadata_is_stripped`, `tests/admin/test_closure_image_routes.py::test_group_admin_adds_an_image_that_citizens_see_without_metadata` |
+| Information disclosure | An image is shown before its closure is announced, or after it ended | Served only for the group's visible closure, `no-cache` so browsers ask again; 404 otherwise | `tests/admin/test_closure_image_routes.py::test_the_image_of_a_lifted_closure_is_no_longer_public`, `test_without_a_closure_there_is_no_image`, `tests/domain/test_closure_image.py::test_the_image_of_an_ended_closure_is_no_longer_public` |
+| Information disclosure (accessibility) | Information only in the image, or an image without a text alternative | Alt text in nl and en required (one line, at most 250 characters) unless "decorative" (`alt=""`); the form and manual say never to put information in the image only | `tests/domain/test_images.py::test_alt_text_is_required_in_every_locale`, `tests/admin/test_closure_image_routes.py::test_an_image_without_a_text_alternative_is_refused`, `test_a_decorative_image_gets_an_empty_alt` |
+| Information disclosure (privacy) | A third-party image host sees who opens the closure page | No external image URLs: only uploads, served from our origin; the CSP keeps `img-src 'self'` | `tests/admin/test_closure_image_routes.py::test_the_closure_page_keeps_its_csp` |
+| Elevation | Another organisation's admin sets or removes a team's closure image | One `RequirePermission(closure.manage)` on the group; `ClosureService` authorises again | `tests/admin/test_closure_image_routes.py::test_another_organisations_admin_is_refused`, `tests/domain/test_closure_image.py::test_another_organisations_admin_cannot_set_or_remove_the_image` |
+| Tampering (CSRF) | A third-party site uploads an image in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_closure_image_routes.py::test_cross_site_uploads_are_refused` |
 
 ## Flow: allowed origins for embedding (ADR 0035, EM-1)
 

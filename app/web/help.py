@@ -73,6 +73,7 @@ TOPICS = (
     HelpTopic(
         "group-contacts", ("/admin/groups/{slug}/closure/contacts",), Permission.CLOSURE_MANAGE
     ),
+    HelpTopic("group-closure", ("/admin/groups/{slug}/closure",), Permission.CLOSURE_MANAGE),
     HelpTopic(
         "group-agenda",
         ("/admin/groups/{slug}/agenda", "/admin/groups/{slug}/agenda/week"),

@@ -20,8 +20,6 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.datastructures import UploadFile
-from starlette.formparsers import MultiPartException
 from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission
@@ -36,6 +34,7 @@ from app.admin.forms import (
 )
 from app.admin.pages import Locale, SameOrigin, with_manual
 from app.admin.pages import page as _page
+from app.admin.uploads import read_upload
 from app.domain.authorization import Permission
 from app.domain.branding import (
     MAX_FONT_BYTES,
@@ -64,16 +63,12 @@ from app.domain.theme import (
 from app.web.branding import brand_view, branding_service
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
-from app.web.protection import RejectedRequest
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
 LOGO_TYPES = "image/png,image/jpeg,image/webp"
 FONT_TYPES = ".woff2,font/woff2"
 THEME_TYPES = ".css,text/css"
-
-MAX_UPLOAD_OVERHEAD = 16 * 1024
-"""Room for multipart headers around an upload; larger bodies are refused unread."""
 
 FORM_TOKENS = tuple(spec for spec in TOKENS if spec.kind is not TokenKind.FONT_STACK)
 """Tokens on the form; font stacks are set by the theme file only."""
@@ -418,26 +413,6 @@ async def download_theme(request: Request, org: str, context: Manage) -> Respons
     )
 
 
-async def _upload(request: Request, name: str, limit: int) -> bytes:
-    """Read the one uploaded file ``name``, at most ``limit`` plus one byte.
-
-    Raises:
-        RejectedRequest: 413 when the declared body is far above the limit (refused before
-            anything is read); 400 for a malformed multipart body.
-    """
-    declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > limit + MAX_UPLOAD_OVERHEAD:
-        raise RejectedRequest(413)
-    try:
-        async with request.form(max_files=1, max_fields=2, max_part_size=limit + 1) as form:
-            upload = form.get(name)
-            if not isinstance(upload, UploadFile):
-                return b""
-            return await upload.read(limit + 1)
-    except MultiPartException as exc:
-        raise RejectedRequest(400) from exc
-
-
 async def _refused(
     request: Request,
     locale: RequestLocale,
@@ -457,7 +432,7 @@ async def upload_theme(
 ) -> Response:
     """Replace accent and tokens by an uploaded theme file (ADR 0041 §7)."""
     gettext = locale.gettext
-    data = await _upload(request, "theme_file", MAX_THEME_FILE_BYTES)
+    data = (await read_upload(request, "theme_file", MAX_THEME_FILE_BYTES)).data
     try:
         changed = await branding_service(request).apply_theme_file(context.principal, org, data)
     except ThemeFileError as error:
@@ -477,7 +452,7 @@ async def upload_logo(
     request: Request, locale: Locale, org: str, _: SameOrigin, context: Manage
 ) -> Response:
     """Store an uploaded logo; the domain checks size and type from the bytes."""
-    data = await _upload(request, "logo", MAX_LOGO_BYTES)
+    data = (await read_upload(request, "logo", MAX_LOGO_BYTES)).data
     try:
         await branding_service(request).set_logo(context.principal, org, Logo.from_upload(data))
     except DomainError as error:
@@ -504,7 +479,7 @@ async def upload_font(
     request: Request, locale: Locale, org: str, role: FontRole, _: SameOrigin, context: Manage
 ) -> Response:
     """Store an uploaded WOFF2 font for ``role``; the domain checks size and type."""
-    data = await _upload(request, "font", MAX_FONT_BYTES)
+    data = (await read_upload(request, "font", MAX_FONT_BYTES)).data
     try:
         font = FontFile.from_upload(role, data)
         await branding_service(request).set_font(context.principal, org, font)
