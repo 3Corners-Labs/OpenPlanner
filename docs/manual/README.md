@@ -17,6 +17,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Staff / medewerkers | [Medewerkers](nl/staff.md) | [Staff](en/staff.md) |
 | Audit log / auditlog | [Auditlog](nl/audit.md) | [Audit log](en/audit.md) |
 | Alternative contact options / contactalternatieven | [Contactalternatieven](nl/organisation-contacts.md) | [Alternative contact options](en/organisation-contacts.md) |
+| Embedding on websites / insluiten op websites | [Insluiten op websites](nl/embedding.md) | [Embedding on websites](en/embedding.md) |
 | A team's contact options / contactalternatieven van een team | [Contactalternatieven van een team](nl/group-contacts.md) | [A team's contact options](en/group-contacts.md) |
 | Maintenance mode / onderhoudsmodus | [Onderhoudsmodus](nl/maintenance.md) | [Maintenance mode](en/maintenance.md) |
 
