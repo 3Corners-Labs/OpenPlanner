@@ -49,3 +49,13 @@ do everything they are used to again.
 When maintenance mode is on **by the server**, the server operator switched it on with the
 setting `MAINTENANCE_MODE`, usually because the database itself is being worked on. You
 cannot switch that off here; ask the server operator.
+
+## Updates
+
+An update or restore from the **Updates** screen switches maintenance mode on before the
+backup is taken, and off again once the update succeeded or was rolled back. When an update
+fails completely, maintenance mode stays on, so citizens do not see a half-working system.
+Switch it off only once everything works again.
+
+If you had switched maintenance mode on yourself before the update started, it is off after an
+update that succeeded or was rolled back. Switch it on again if you are not done yet.
