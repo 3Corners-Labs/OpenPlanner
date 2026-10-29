@@ -65,7 +65,7 @@ from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
 from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
-from app.domain.maintenance import MaintenanceReason
+from app.domain.maintenance import OVERDUE_EVENT, MaintenanceReason
 from app.domain.planner_service import ALERT_ACTION
 from app.domain.ports import Clock
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
@@ -120,6 +120,8 @@ EVENT_LABELS: dict[str, str] = {
     # Staff directory (ADR 0046): first login, and roles or memberships changed at login.
     staff.CREATED_EVENT: "audit.event.staff_created",
     staff.CHANGED_EVENT: "audit.event.staff_changed",
+    # ADR 0038: maintenance on longer than the alert threshold (global).
+    OVERDUE_EVENT: "audit.event.maintenance_overdue",
     # Security events (ADR 0034): global, deduplicated per window.
     WEBHOOK_REJECTED: "audit.event.webhook_rejected",
     TOKEN_REFRESH_FAILED: "audit.event.token_refresh",
@@ -177,6 +179,8 @@ DETAIL_LABELS: dict[str, str] = {
     "booking.move": "admin.audit.detail.booking_move",
     "planner.move": "admin.audit.detail.planner_move",
     "planner.cancel": "admin.audit.detail.planner_cancel",
+    "planner.rebook": "admin.audit.detail.planner_rebook",
+    "bulk": "admin.audit.detail.bulk",
     "shortfall.accept": "admin.audit.detail.shortfall_accept",
     "client.create": "admin.audit.detail.client_create",
     "client.rotate": "admin.audit.detail.client_rotate",
@@ -208,6 +212,7 @@ COUNT_LABELS: dict[str, str] = {
     "attempt": "admin.audit.detail.attempt",
     "free_percent": "admin.audit.detail.free_percent",
     "database_mb": "admin.audit.detail.database_mb",
+    "hours": "admin.audit.detail.hours",
     "changes": "admin.audit.detail.changes",
     "suppressed": "admin.audit.detail.suppressed",
     "modes": "admin.audit.detail.modes",
