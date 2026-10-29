@@ -97,7 +97,9 @@ async def test_the_form_shows_every_custom_field_after_the_contact_fields(
     assert 'autocomplete="given-name"' in text
     assert 'autocomplete="family-name"' in text
     assert '<p class="hint" id="q_customer_no-hint">Staat op uw brief.</p>' in text
-    assert '<option value="rent">Huur</option>' in text
+    assert '<legend>Onderwerp <span class="optional">' in text
+    assert '<input id="q_topic" name="q_topic" type="radio" value="rent">' in text
+    assert '<label for="q_topic-2">Zorg</label>' in text
     assert 'type="checkbox" value="on"' in text
     assert "Nieuwsbrief" in text
 
@@ -134,7 +136,7 @@ async def test_a_refused_answer_names_the_question_and_keeps_the_input(
     text = response.text
     assert '<a href="#q_customer_no">Controleer uw antwoord bij ‘Klantnummer’.' in text
     assert 'aria-describedby="q_customer_no-hint q_customer_no-error"' in text
-    assert '<option value="care" selected>Zorg</option>' in text
+    assert 'id="q_topic-2" name="q_topic" type="radio" value="care" checked' in text
     assert await stored_answers(demo_settings) == []
 
 
@@ -163,7 +165,7 @@ async def test_the_widget_describes_the_custom_fields(site: httpx.AsyncClient) -
         "q_topic",
         "q_newsletter",
     ]
-    assert by_name["q_topic"]["kind"] == "select"
+    assert by_name["q_topic"]["kind"] == "radio"
     assert by_name["q_topic"]["options"] == [
         {"value": "rent", "label": "Huur"},
         {"value": "care", "label": "Zorg"},

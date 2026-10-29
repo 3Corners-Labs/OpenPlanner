@@ -39,7 +39,7 @@ class WidgetTexts(BaseModel):
 
 
 class WidgetOption(BaseModel):
-    """One choice of a select field."""
+    """One choice of a radio group."""
 
     value: str
     label: str
@@ -58,7 +58,7 @@ class WidgetField(BaseModel):
     label: str
     required: bool
     hint: str | None = None
-    kind: Literal["input", "textarea", "select", "checkbox"] = "input"
+    kind: Literal["input", "textarea", "radio", "checkbox"] = "input"
     options: list[WidgetOption] = []
     min: str | None = None
     max: str | None = None

@@ -6,7 +6,21 @@
     {%- if field.described_by %} aria-describedby="{{ field.described_by }}"{% endif %}
   {%- endset %}
   <div class="field{% if field.error %} field--error{% endif %}{% if field.kind == 'checkbox' %} field--checkbox{% endif %}">
-    {% if field.kind == 'checkbox' %}
+    {% if field.kind == 'radio' %}
+    {#- The first radio carries the field's id, so the error summary's link lands in the group. -#}
+    <fieldset class="choices"{% if field.described_by %} aria-describedby="{{ field.described_by }}"{% endif %}>
+      <legend>{{ field.label }}{% if not field.required %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</legend>
+      {% if field.hint %}<p class="hint" id="{{ field.name }}-hint">{{ field.hint }}</p>{% endif %}
+      {% if field.error %}<p class="error-message" id="{{ field.name }}-error">{{ field.error }}</p>{% endif %}
+      {% for value, label in field.options %}
+      {%- set input_id = field.name if loop.first else field.name ~ "-" ~ loop.index %}
+      <div class="choice">
+        <input id="{{ input_id }}" name="{{ field.name }}" type="radio" value="{{ value }}"{% if field.value == value %} checked{% endif %}{% if field.required %} required{% endif %}{% if field.error %} aria-invalid="true"{% endif %}>
+        <label for="{{ input_id }}">{{ label }}</label>
+      </div>
+      {% endfor %}
+    </fieldset>
+    {% elif field.kind == 'checkbox' %}
     {% if field.error %}<p class="error-message" id="{{ field.name }}-error">{{ field.error }}</p>{% endif %}
     <input id="{{ field.name }}" name="{{ field.name }}" type="checkbox" value="on"{% if field.value %} checked{% endif %}{{ aria }}>
     <label for="{{ field.name }}">{{ field.label }}{% if not field.required %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</label>
@@ -17,13 +31,6 @@
     {% if field.error %}<p class="error-message" id="{{ field.name }}-error">{{ field.error }}</p>{% endif %}
     {% if field.kind == 'textarea' %}
     <textarea id="{{ field.name }}" name="{{ field.name }}" rows="5" autocomplete="{{ field.autocomplete }}"{{ aria }}>{{ field.value }}</textarea>
-    {% elif field.kind == 'select' %}
-    <select id="{{ field.name }}" name="{{ field.name }}" autocomplete="{{ field.autocomplete }}"{{ aria }}>
-      <option value="">{{ _("form.choose") }}</option>
-      {% for value, label in field.options %}
-      <option value="{{ value }}"{% if field.value == value %} selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
     {% else %}
     <input id="{{ field.name }}" name="{{ field.name }}" type="{{ field.type }}" autocomplete="{{ field.autocomplete }}" value="{{ field.value }}"
       {%- if field.inputmode %} inputmode="{{ field.inputmode }}"{% endif %}
