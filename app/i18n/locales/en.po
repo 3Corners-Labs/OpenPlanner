@@ -4476,6 +4476,9 @@ msgstr "Loading…"
 msgid "widget.unavailable"
 msgstr "The booking calendar is not available here right now."
 
+msgid "widget.maintenance"
+msgstr "We are carrying out maintenance, so you cannot book an appointment right now. Please try again later."
+
 msgid "widget.retry"
 msgstr "Try again"
 
