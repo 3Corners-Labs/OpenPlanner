@@ -339,6 +339,10 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403, 403),
         "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403, 403),
     },
+    "GET /admin/groups/{slug}/agenda/week": {
+        "/admin/groups/demo/agenda/week": statuses(200, 200, 200, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/week": statuses(200, 403, 403, 200, 403, 403),
+    },
     "GET /admin/groups/{slug}/bookings/{booking_id}": {
         "/admin/groups/demo/bookings/999999": statuses(404, 404, 404, 403, 403, 403),
         "/admin/groups/andere-team/bookings/999999": statuses(404, 403, 403, 404, 403, 403),
