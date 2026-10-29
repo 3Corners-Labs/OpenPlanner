@@ -5799,3 +5799,12 @@ msgstr "Platformwaarde gebruiken"
 
 msgid "admin.settings.source.organisation"
 msgstr "Organisatie"
+
+msgid "admin.form.error.invalid_form_field"
+msgstr "Dit veld is niet goed ingesteld. Controleer de sleutel, de opties en de grenzen."
+
+msgid "admin.form.error.form_field_forbidden"
+msgstr "Dit veld vraagt om gegevens die we niet mogen vragen, zoals een BSN, een identiteitsbewijs of gegevens over gezondheid, geloof of afkomst."
+
+msgid "error.invalid_answer"
+msgstr "Controleer uw antwoord op deze vraag."

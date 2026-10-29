@@ -5799,3 +5799,12 @@ msgstr "Use the platform value"
 
 msgid "admin.settings.source.organisation"
 msgstr "Organisation"
+
+msgid "admin.form.error.invalid_form_field"
+msgstr "This field is not set up correctly. Check the key, the options and the limits."
+
+msgid "admin.form.error.form_field_forbidden"
+msgstr "This field asks for data we may not ask for, such as a citizen service number, an identity document, or data about health, religion or origin."
+
+msgid "error.invalid_answer"
+msgstr "Please check your answer to this question."

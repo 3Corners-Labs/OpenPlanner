@@ -17,10 +17,10 @@ from enum import StrEnum
 
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.form_fields import normalise_email
 from app.domain.scheduling import PhoneMode
 
 MAX_NAME_LENGTH = 100
-MAX_EMAIL_LENGTH = 254
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 _PHONE_SEPARATORS = re.compile(r"[\s\-().]")
 _PHONE = re.compile(r"^\+?[0-9]{8,15}$")
@@ -42,20 +42,8 @@ def _clean_name(raw: str) -> str:
 
 
 def _clean_email(raw: str) -> str:
-    """Basic structural check; full validation (MX, IDNA) happens at the HTTP edge."""
-    email = raw.strip()
-    local, at, domain = email.partition("@")
-    if (
-        not at
-        or not local
-        or "@" in domain
-        or "." not in domain.strip(".")
-        or len(email) > MAX_EMAIL_LENGTH
-        or any(ch.isspace() for ch in email)
-        or _CONTROL_CHARS.search(email)
-    ):
-        raise _invalid("email")
-    return email
+    """Basic structural check, shared with custom email fields (ADR 0055)."""
+    return normalise_email(raw, "email")
 
 
 def _clean_phone(raw: str | None, mode: PhoneMode) -> str | None:
