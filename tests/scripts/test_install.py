@@ -1,7 +1,6 @@
 """The host installer (docs/install.md), run against fake docker, cosign, curl, sudo and systemd."""
 
 import json
-import os
 import re
 import shutil
 import stat
@@ -22,6 +21,12 @@ RELEASE = digest(IMAGE, "1.4.0")
 TOOLS = (
     *("docker", "cosign", "curl", "flock", "sleep", "systemctl", "systemd-analyze"),
     *("apt-get", "apt", "dpkg", "gpg", "sha256sum", "id", "usermod"),
+)
+# The only real programs the script sees, linked into its PATH: a runner's own docker or flock
+# must never stand in for a fake the test removed.
+SYSTEM = (
+    *("awk", "base64", "cat", "chmod", "cp", "date", "dirname", "env", "grep", "head"),
+    *("hostname", "install", "mkdir", "mktemp", "mv", "rm", "sed", "sort", "tail", "tr", "uniq"),
 )
 PRODUCTION = {
     "TLS_DOMAIN": "afspraak.example.nl",
@@ -64,7 +69,7 @@ class Host:
 
     def run(self, *args: str, **settings: str) -> subprocess.CompletedProcess[str]:
         env = {
-            "PATH": f"{self.root / 'bin'}{os.pathsep}/usr/bin{os.pathsep}/bin",
+            "PATH": str(self.root / "bin"),
             "HOME": str(self.root / "home" / "operator"),
             "INSTALL_ROOT": str(self.staged),
             "HEALTH_TIMEOUT": "1",
@@ -112,6 +117,10 @@ def host(tmp_path: Path) -> Host:
     host.file("docker-compose.yml").write_text("services: {}\n")
     (tmp_path / "home/operator/.docker/config.json").write_text('{"auths": {"ghcr.io": {}}}\n')
     fake = f'"{sys.executable}" "{updater_host.__file__}"'
+    for tool in SYSTEM:
+        found = shutil.which(tool)
+        assert found, f"{tool} is needed to run the installer tests"
+        (tmp_path / "bin" / tool).symlink_to(found)
     for tool in TOOLS:
         wrapper = tmp_path / "bin" / tool
         wrapper.write_text(f'#!/bin/sh\nexec {fake} {tool} "$@"\n')
