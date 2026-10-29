@@ -6,8 +6,8 @@ portal (step 4 writes them); secrets never go here but sealed in ``integration_c
 watch to reload (ADR 0042 §6). No personal data. The downgrade drops both tables; every
 setting then comes from the environment or its default again, as before this feature.
 
-Revision ID: 0047
-Revises: 0045
+Revision ID: 0048
+Revises: 0047
 Create Date: 2026-10-29 15:00:00.000000
 """
 
@@ -18,8 +18,8 @@ from alembic import op
 
 from app.adapters.db.types import UTCDateTime
 
-revision: str = "0047"
-down_revision: str | None = "0045"
+revision: str = "0048"
+down_revision: str | None = "0047"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
