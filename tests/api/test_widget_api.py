@@ -20,6 +20,8 @@ from app.adapters.db.models import (
     OrganisationRow,
 )
 from app.config import Settings
+from app.domain.maintenance import MaintenanceReason
+from app.domain.maintenance_service import MaintenanceService
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
@@ -276,5 +278,37 @@ async def test_the_texts_before_the_group_are_public(site: httpx.AsyncClient) ->
         "widget.region",
         "widget.loading",
         "widget.unavailable",
+        "widget.maintenance",
         "widget.retry",
     }
+
+
+async def test_during_maintenance_the_group_routes_close_but_texts_and_preflight_stay_open(
+    site: httpx.AsyncClient, demo_settings: Settings
+) -> None:
+    # ADR 0038 with ADR 0035: the widget closes as /g/{slug} does, readable by the host page.
+    app = site._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    maintenance: MaintenanceService = app.state.maintenance_service
+    await maintenance.switch_on_host("host-cli", MaintenanceReason.OTHER)
+    headers = {"origin": SITE}
+
+    closed = [
+        await site.get(f"{BASE}/", headers=headers),
+        await site.get(f"{BASE}/availability", headers=headers),
+        await _book(site),
+    ]
+    texts = await site.get("/api/v1/widget/texts", headers=headers)
+    preflight = await site.options(
+        f"{BASE}/bookings",
+        headers={**headers, "access-control-request-method": "POST"},
+    )
+    foreign = await site.get(f"{BASE}/", headers={"origin": EVIL})
+
+    for response in closed:
+        assert response.status_code == 503
+        assert response.json() == {"error": "maintenance", "field": None}
+        assert response.headers["retry-after"] == str(demo_settings.maintenance_retry_after_seconds)
+        assert response.headers["access-control-allow-origin"] == SITE
+    assert await _bookings(demo_settings) == 0
+    assert (texts.status_code, preflight.status_code) == (200, 204)
+    assert foreign.status_code == 403  # the origin check comes first

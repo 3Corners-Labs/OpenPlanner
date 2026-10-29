@@ -189,6 +189,9 @@ class Settings(BaseSettings):
     # Class C (platform, ADR 0042): how long the web process trusts its last read of the
     # maintenance switch; ADR 0038 sets 5 seconds as the upper bound.
     maintenance_cache_seconds: float = Field(default=5.0, ge=0, le=5)
+    # Class C: the Retry-After of citizen pages and machine-API writes refused during
+    # maintenance (seconds); maintenance has no automatic end, so this is a polite guess.
+    maintenance_retry_after_seconds: int = Field(default=300, ge=30, le=3600)
 
     @model_validator(mode="after")
     def _storage_limits_are_ordered(self) -> "Settings":
