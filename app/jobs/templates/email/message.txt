@@ -9,6 +9,10 @@
 {{ notice_label }}:
 {{ notice }}
 {% endif %}
+{% if reason %}
+
+{{ reason_label }}: {{ reason }}
+{% endif %}
 {% if join_url %}
 
 {{ join_text }}
