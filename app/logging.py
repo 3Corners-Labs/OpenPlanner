@@ -36,6 +36,11 @@ def _mask(value: Any) -> Any:
     return value
 
 
+def mask_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Return ``record`` with every ``PII_FIELDS`` key masked at any depth."""
+    return {k: MASK if k in PII_FIELDS else _mask(v) for k, v in record.items()}
+
+
 def mask_pii(_logger: WrappedLogger, _method: str, event_dict: EventDict) -> EventDict:
     """Structlog processor: replace the value of every ``PII_FIELDS`` key with ``MASK``."""
     for key, value in event_dict.items():

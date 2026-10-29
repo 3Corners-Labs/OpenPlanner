@@ -3143,6 +3143,30 @@ msgstr "Persoonsgegevens verwijderen"
 msgid "audit.event.storage_check"
 msgstr "Opslag controleren"
 
+msgid "audit.event.webhook_rejected"
+msgstr "Webhook geweigerd"
+
+msgid "audit.event.token_refresh"
+msgstr "Webex-token vernieuwen"
+
+msgid "admin.audit.reason.invalid_signature"
+msgstr "Handtekening of tijdstempel klopt niet."
+
+msgid "admin.audit.reason.unauthorized"
+msgstr "De dienst weigert onze inloggegevens."
+
+msgid "admin.audit.reason.unreachable"
+msgstr "De dienst is niet bereikbaar."
+
+msgid "admin.audit.detail.suppressed"
+msgstr "nog {count} keer sinds de vorige melding"
+
+msgid "admin.audit.detail.source_webex"
+msgstr "van Webex"
+
+msgid "admin.audit.detail.source_wxcc"
+msgstr "van Webex Contact Center"
+
 msgid "audit.job.send_suspension"
 msgstr "Bericht over sluiting versturen"
 
