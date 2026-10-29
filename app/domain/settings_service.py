@@ -9,9 +9,12 @@ Every change and every refusal is audited with the key; a change also with the o
 new value (ADR 0042 §5). Setting values are numbers, rates and codes, never personal data.
 ``LOG_LEVEL`` set here always expires after at most ``LOG_LEVEL_MAX_EXPIRY_HOURS`` (§6).
 
-This step covers operations, retention, storage, rate limits, admin sessions, staff and the
-planner. The fallback mail server, Webex and updates follow with their secrets (step 6), the
-login mapping with its dry run (step 7), and organisation settings in step 5.
+This covers operations, retention, storage, rate limits, admin sessions, staff and the
+planner, and the platform default of every class D setting. An organisation admin sets a
+class D value for their own organisation (``change_organisation``, step 5); the environment
+lock binds only the platform value, never an organisation (§2). The fallback mail server,
+Webex and updates follow with their secrets (step 6), the login mapping with its dry run
+(step 7).
 """
 
 from collections.abc import Callable, Collection, Mapping
@@ -19,10 +22,11 @@ from datetime import datetime, timedelta
 
 from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, Outcome
-from app.domain.authorization import Permission, Principal
+from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.platform_settings import usable
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.scheduling import Organisation
 from app.domain.settings_registry import (
     BY_KEY,
     LOG_LEVEL_MAX_EXPIRY_HOURS,
@@ -52,15 +56,18 @@ EDITABLE_TOPICS = frozenset(
 LOG_LEVEL = "log_level"
 
 _PERMISSION = Permission.SETTINGS_PLATFORM_MANAGE
+_ORGANISATION = Permission.SETTINGS_ORGANISATION_MANAGE
 _TRUE = frozenset({"true", "on", "yes", "1"})
 _FALSE = frozenset({"false", "off", "no", "0"})
 
 
 def editable(spec: SettingSpec) -> bool:
-    """Return whether the portal and the CLI may change ``spec`` in this build step."""
-    return (
-        spec.class_ is SettingClass.PLATFORM and not spec.secret and spec.topic in EDITABLE_TOPICS
-    )
+    """Return whether the portal and the CLI may change ``spec``'s platform value."""
+    if spec.secret:
+        return False
+    if spec.class_ is SettingClass.ORGANISATION:
+        return True
+    return spec.class_ is SettingClass.PLATFORM and spec.topic in EDITABLE_TOPICS
 
 
 def parse(spec: SettingSpec, raw: str) -> object:
@@ -131,6 +138,8 @@ class SettingsService:
         locked: Returns the keys the environment locks (never changed here).
         combination: Returns the rule that the proposed portal values break together (the
             cross-field rules of the settings), or ``None``.
+        organisation_combination: The same for one organisation's proposed class D values
+            over the platform values; defaults to ``combination`` on those values alone.
     """
 
     def __init__(
@@ -141,6 +150,7 @@ class SettingsService:
         *,
         locked: Callable[[], Collection[str]],
         combination: Callable[[Mapping[str, object]], str | None],
+        organisation_combination: Callable[[int, Mapping[str, object]], str | None] | None = None,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -148,6 +158,9 @@ class SettingsService:
         self._admin = admin
         self._locked = locked
         self._combination = combination
+        self._organisation_combination = organisation_combination or (
+            lambda _, proposed: combination(proposed)
+        )
 
     # --- superuser -----------------------------------------------------------------------
 
@@ -179,6 +192,90 @@ class SettingsService:
             return await self._reset(principal.subject, [key])
         except DomainError as error:
             await self._refused(principal.subject, error, f"reset:{_known(key)}")
+            raise
+
+    # --- organisation admin --------------------------------------------------------------
+
+    async def organisations(self, principal: Principal) -> list[Organisation]:
+        """Return the organisations whose settings ``principal`` may change, by slug."""
+        async with self._uow.read() as tx:
+            return await tx.list_organisations(scope_for(principal, _ORGANISATION))
+
+    async def organisation(self, principal: Principal, slug: str) -> Organisation:
+        """Return one organisation whose settings ``principal`` may change.
+
+        Raises:
+            DomainError: ``not_permitted`` or ``organisation_not_found``.
+        """
+        require(await self._admin.authorize(principal, _ORGANISATION, organisation_slug=slug))
+        async with self._uow.read() as tx:
+            found = await tx.get_organisation(slug)
+        if found is None:
+            raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+        return found
+
+    async def change_organisation(
+        self, principal: Principal, organisation: str, key: str, raw: str
+    ) -> None:
+        """Set one organisation's value of a class D setting.
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found``,
+                ``setting_not_editable``, ``setting_invalid`` or ``setting_combination``.
+        """
+        require(
+            await self._admin.authorize(principal, _ORGANISATION, organisation_slug=organisation)
+        )
+        try:
+            spec = _class_d(key)
+            value = parse(spec, raw)
+            now = self._clock.now()
+            async with self._uow.locked() as tx:
+                organisation_id = await _organisation_id(tx, organisation)
+                stored = (await tx.organisation_settings()).get(organisation_id, {})
+                if self._organisation_combination(organisation_id, {**stored, key: value}):
+                    raise DomainError(ErrorCode.SETTING_COMBINATION, key)
+                old = stored.get(key, spec.default)
+                await tx.save_organisation_setting(organisation_id, key, value, now)
+                await tx.bump_settings_version()
+                detail = f"set:{key}:{_text(old)}->{_text(value)}"
+                await _audit(tx, now, principal.subject, detail, _ORGANISATION, organisation)
+        except DomainError as error:
+            await self._refused(
+                principal.subject, error, f"set:{_known(key)}", _ORGANISATION, organisation
+            )
+            raise
+
+    async def reset_organisation(self, principal: Principal, organisation: str, key: str) -> bool:
+        """Remove one organisation's value, so the platform value applies; return whether set.
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found``,
+                ``setting_not_editable`` or ``setting_combination``.
+        """
+        require(
+            await self._admin.authorize(principal, _ORGANISATION, organisation_slug=organisation)
+        )
+        try:
+            _class_d(key)
+            now = self._clock.now()
+            async with self._uow.locked() as tx:
+                organisation_id = await _organisation_id(tx, organisation)
+                stored = (await tx.organisation_settings()).get(organisation_id, {})
+                if key not in stored:
+                    return False
+                rest = {k: v for k, v in stored.items() if k != key}
+                if self._organisation_combination(organisation_id, rest):
+                    raise DomainError(ErrorCode.SETTING_COMBINATION, key)
+                await tx.delete_organisation_setting(organisation_id, key)
+                await tx.bump_settings_version()
+                detail = f"reset:{key}:{_text(stored[key])}"
+                await _audit(tx, now, principal.subject, detail, _ORGANISATION, organisation)
+            return True
+        except DomainError as error:
+            await self._refused(
+                principal.subject, error, f"reset:{_known(key)}", _ORGANISATION, organisation
+            )
             raise
 
     # --- host ----------------------------------------------------------------------------
@@ -274,15 +371,56 @@ class SettingsService:
             raise DomainError(ErrorCode.SETTING_EXPIRY, spec.key)
         return now + timedelta(hours=hours)
 
-    async def _refused(self, actor: str, error: DomainError, detail: str) -> None:
+    async def _refused(
+        self,
+        actor: str,
+        error: DomainError,
+        detail: str,
+        permission: Permission = _PERMISSION,
+        organisation: str | None = None,
+    ) -> None:
         """Audit a refused change with its code and the key, never the submitted text."""
+        known = organisation if error.code is not ErrorCode.ORGANISATION_NOT_FOUND else None
         await self._admin.record(
-            actor, _PERMISSION.value, Outcome.DENIED, error.code.value, detail=detail
+            actor, permission.value, Outcome.DENIED, error.code.value, known, detail=detail
         )
 
 
-async def _audit(tx: Transaction, at: datetime, actor: str, detail: str) -> None:
-    """Record a change: global, so only the superuser sees it in the audit log."""
+def _class_d(key: str) -> SettingSpec:
+    """Return the entry of a class D setting.
+
+    Raises:
+        DomainError: ``setting_not_editable`` for anything else.
+    """
+    spec = BY_KEY.get(key)
+    if spec is None or spec.class_ is not SettingClass.ORGANISATION:
+        raise DomainError(ErrorCode.SETTING_NOT_EDITABLE, key if spec else None)
+    return spec
+
+
+async def _organisation_id(tx: Transaction, slug: str) -> int:
+    """Return the id of the organisation with ``slug``.
+
+    Raises:
+        DomainError: ``organisation_not_found``.
+    """
+    found = await tx.get_organisation(slug)
+    if found is None:
+        raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+    return found.id
+
+
+async def _audit(
+    tx: Transaction,
+    at: datetime,
+    actor: str,
+    detail: str,
+    permission: Permission = _PERMISSION,
+    organisation: str | None = None,
+) -> None:
+    """Record a change: platform values for the superuser only, an organisation's for its own."""
     await tx.add_audit_event(
-        AuditEvent(at, actor, _PERMISSION.value, Outcome.SUCCESS, detail=detail)
+        AuditEvent(
+            at, actor, permission.value, Outcome.SUCCESS, organisation=organisation, detail=detail
+        )
     )

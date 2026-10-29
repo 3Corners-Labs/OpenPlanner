@@ -108,6 +108,11 @@ TOPICS = (
     ),
     HelpTopic("maintenance", ("/admin/maintenance",), Permission.SYSTEM_MAINTENANCE),
     HelpTopic("advanced-settings", ("/admin/settings",), Permission.SETTINGS_PLATFORM_VIEW),
+    HelpTopic(
+        "organisation-settings",
+        ("/admin/organisation-settings", "/admin/organisations/{org}/settings"),
+        Permission.SETTINGS_ORGANISATION_MANAGE,
+    ),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 

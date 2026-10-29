@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from app.adapters.db.models import PlatformSettingRow, SettingsVersionRow
+from app.adapters.db.models import OrganisationRow, PlatformSettingRow, SettingsVersionRow
 from app.adapters.db.uow import SqlUnitOfWork
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
@@ -64,3 +64,27 @@ async def test_a_value_is_saved_replaced_and_deleted_with_the_version(engine: As
         assert not await tx.delete_platform_setting("log_level")
     async with uow.read() as tx:
         assert await tx.platform_setting_expiries() == {}
+
+
+async def test_organisation_values_are_kept_per_organisation(engine: AsyncEngine) -> None:
+    async with AsyncSession(engine) as session, session.begin():
+        first = OrganisationRow(name="Eerste", slug="eerste")
+        other = OrganisationRow(name="Andere", slug="andere")
+        session.add_all([first, other])
+        await session.flush()
+        first_id, other_id = first.id, other.id
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        await tx.save_organisation_setting(first_id, "time_format", "12h", NOW)
+        await tx.save_organisation_setting(other_id, "shortfall_horizon_days", 30, NOW)
+        await tx.save_organisation_setting(first_id, "time_format", "locale", NOW)
+
+    async with uow.read() as tx:
+        values = await tx.organisation_settings()
+    assert values == {first_id: {"time_format": "locale"}, other_id: {"shortfall_horizon_days": 30}}
+
+    async with uow.locked() as tx:
+        assert await tx.delete_organisation_setting(first_id, "time_format")
+        assert not await tx.delete_organisation_setting(first_id, "time_format")
+    async with uow.read() as tx:
+        assert await tx.organisation_settings() == {other_id: {"shortfall_horizon_days": 30}}

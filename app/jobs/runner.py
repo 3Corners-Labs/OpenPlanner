@@ -51,6 +51,7 @@ from app.domain.ports import (
 )
 from app.domain.system_log import EventRetention, SystemLog
 from app.domain.tunable import value_of
+from app.i18n.dates import clock_scope, use_clock
 from app.jobs.calls import CALL_JOBS, STALE, CallJobs
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
 from app.web.call_labels import agent_start_label
@@ -111,6 +112,8 @@ class JobRunner:
         dispatcher: WxCC work items, or ``None`` when not configured.
         integration: Records call events; required when ``video`` is set.
         retention: How long each category of event is kept (ADR 0040, part 4).
+        clock_style: The time format of an organisation by id (ADR 0042 step 5); messages
+            write times in their group's organisation's format.
     """
 
     def __init__(
@@ -125,11 +128,13 @@ class JobRunner:
         dispatcher: ContactCenterDispatcher | None = None,
         integration: IntegrationService | None = None,
         retention: EventRetention | Callable[[], EventRetention] | None = None,
+        clock_style: Callable[[int], str] | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
         self._system_log = SystemLog(uow, clock)
         self._retention = retention or EventRetention()
+        self._clock_style = clock_style
         self._diagnostics = DiagnosticLog(uow, clock)
         self._pruned_at: datetime | None = None
         self._uow = uow
@@ -244,9 +249,12 @@ class JobRunner:
         sender = await self._senders.sender(group.organisation_id, channel)
         if sender is None:
             raise DomainError(ErrorCode.CHANNEL_NOT_CONFIGURED)
-        message = self._composer.compose(
-            job.type, booking, group, now, channel=channel, texts=texts, closure=closure
-        )
+        with clock_scope():
+            if self._clock_style is not None:
+                use_clock(self._clock_style(group.organisation_id))
+            message = self._composer.compose(
+                job.type, booking, group, now, channel=channel, texts=texts, closure=closure
+            )
         await sender.send(message)
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)
         return None

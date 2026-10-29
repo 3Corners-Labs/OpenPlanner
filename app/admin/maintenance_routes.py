@@ -38,6 +38,7 @@ from app.domain.authorization import Permission
 from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.web.locale import RequestLocale, resolve_locale
+from app.web.organisation_settings import settings_for
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -172,7 +173,7 @@ async def switch_on(request: Request, locale: Locale, _: SameOrigin, context: Ch
     """Switch maintenance on, or change its expected end and reason."""
     form = await read_form(request, locale)
     reason = form.choice("reason", {r.value for r in MaintenanceReason})
-    tz = ZoneInfo(request.app.state.settings.admin_timezone)
+    tz = ZoneInfo(settings_for(request).admin_timezone)
     expected_end = form.optional_moment("expected_end", tz)
     if form.errors or reason is None:
         return await _overview(request, locale, context, form, 422)

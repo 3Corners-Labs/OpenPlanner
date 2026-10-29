@@ -593,3 +593,19 @@ setting) and `settings_version`; written by `POST /admin/settings/{key}` and
 | Tampering | The portal overrules a value the operator locked in the environment | A locked key has no form and is refused by the domain (`setting_locked`), also from the CLI | `tests/domain/test_settings_service.py::test_a_locked_setting_is_refused_and_the_refusal_audited`, `tests/test_cli_settings.py::test_set_refuses_what_the_environment_locks`, `tests/admin/test_settings_routes.py::test_a_locked_setting_has_no_form` |
 | Tampering (CSRF) | A third-party site changes a setting in the superuser's browser | Fetch Metadata check (`SameOrigin`) and a recent login on both POST routes | `tests/admin/test_authorization_matrix.py` (POST rows), `tests/admin/test_settings_routes.py::test_the_superuser_changes_a_setting_and_it_applies_at_once` |
 | Repudiation / information disclosure | Who changed what is lost, or the audit log carries arbitrary text from a crafted request | `settings.platform.manage` events carry the key, old and new value (numbers, rates, codes; no personal data); a refusal carries the code and a registered key or `unknown`, never the submitted text | `tests/domain/test_settings_service.py::test_an_invalid_value_never_reaches_the_store_or_the_audit_detail`, `tests/test_cli_settings.py::test_set_refuses_a_value_outside_the_bounds_by_name_only` |
+
+## Flow: organisation settings (ADR 0042 step 5)
+
+Admin (org admin for the own organisations, superuser for all): `GET /admin/organisation-settings`,
+`GET /admin/organisations/{org}/settings`, `POST /admin/organisations/{org}/settings/{key}` and
+`/reset` (`settings.organisation.manage`, recent login for changes). Storage:
+`organisation_settings` (one JSON value per organisation and class D setting). The values follow
+a request (citizen page of a group, management link, the admin's single organisation) and a
+message job. No personal data.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation | An org admin changes another organisation's settings, or a group admin or the auditor changes any | One `RequirePermission(settings.organisation.manage, organisation_param="org")`; `SettingsService` authorises the organisation again | `tests/admin/test_authorization_matrix.py` (organisation-settings rows), `tests/domain/test_settings_service.py::test_an_org_admin_may_not_set_another_organisation` |
+| Tampering | A crafted time zone (`../../etc/passwd`) or format reaches the formatting code | Only class D keys; values pass the registry kind and bounds, a time zone must be an IANA zone known to the installation; a stored value that fails is ignored | `tests/domain/test_platform_settings.py::test_a_time_zone_must_be_a_real_iana_zone`, `tests/admin/test_organisation_settings_routes.py::test_an_invalid_time_zone_is_refused_at_its_row` |
+| Information disclosure | One organisation's time format or settings leak into another organisation's pages or mails | A clock scope per request (`ClockScopeMiddleware`) and per message job; outside a scope the platform style applies | `tests/i18n/test_dates.py::test_an_organisation_clock_applies_inside_its_scope_only`, `test_use_clock_outside_a_scope_changes_nothing` |
+| Repudiation | Who changed an organisation's setting | `settings.organisation.manage` audited with the organisation, key, old and new value; refusals with the code | `tests/domain/test_settings_service.py::test_an_org_admin_sets_a_value_for_their_own_organisation` |

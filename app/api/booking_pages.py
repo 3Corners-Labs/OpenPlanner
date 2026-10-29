@@ -37,6 +37,7 @@ from app.i18n.dates import format_clock, format_day, local_day
 from app.web.closure_labels import closure_view
 from app.web.errors import FormError, form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
+from app.web.organisation_settings import follow, follow_group_from_path
 from app.web.protection import (
     RejectedRequest,
     asset_limit,
@@ -47,7 +48,10 @@ from app.web.protection import (
 )
 from app.web.slot_values import parse_start
 
-router = APIRouter(include_in_schema=False, dependencies=[Depends(bind_group_from_path)])
+router = APIRouter(
+    include_in_schema=False,
+    dependencies=[Depends(bind_group_from_path), Depends(follow_group_from_path)],
+)
 
 STATUS_NOTICES: dict[str, str] = {
     "booked": "manage.notice.booked",
@@ -271,6 +275,7 @@ async def manage_page(
 ) -> HTMLResponse:
     """Show a booking; read-only once its change deadline has passed."""
     details = await _service(request).find(token)
+    follow(request, details.group.organisation_id)
     context = {**_manage_context(details, locale, status, _clock(request).now()), "token": token}
     return await citizen_page(request, locale, "manage.html", details.group, context)
 
@@ -280,6 +285,7 @@ async def manage_page(
 async def cancel_page(request: Request, token: str, locale: Locale) -> Response:
     """Ask for confirmation before cancelling."""
     details = await _service(request).find(token)
+    follow(request, details.group.organisation_id)
     if not details.changeable:
         return RedirectResponse(f"/b/{token}", status_code=303)
     context = {**_manage_context(details, locale, None, _clock(request).now()), "token": token}
@@ -311,6 +317,7 @@ async def _reschedule_response(
     """
     service = _service(request)
     details = await service.find(token)
+    follow(request, details.group.organisation_id)
     group = details.group
     if not details.changeable:
         return RedirectResponse(f"/b/{token}", status_code=303)

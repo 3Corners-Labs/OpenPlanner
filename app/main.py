@@ -80,6 +80,7 @@ from app.keys import (
 from app.logging import configure_logging, set_log_level, warn_loose_secret_files
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
+from app.web.organisation_settings import ClockScopeMiddleware
 from app.web.protection import configure_rate_limits, limiter, set_rate_limits
 from app.web.templates import STATIC_DIR
 
@@ -169,10 +170,15 @@ def create_app(
                 agent_calls=current.rate_limit_agent_calls,
             )
             set_log_level(current.log_level)
+            configure_clock(current.time_format)
 
         def live() -> Settings:
             now: Settings = app.state.settings
             return now
+
+        def per_organisation(organisation_id: int) -> Settings:
+            settings_of: Settings = app.state.live_settings.for_organisation(organisation_id)
+            return settings_of
 
         # ADR 0042 §2, §6: portal values on top of the environment, reloaded when they change.
         # Values read on each request follow at once; the services below read theirs through
@@ -223,7 +229,10 @@ def create_app(
         )
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
         app.state.agenda_service = AgendaService(
-            uow, clock, app.state.admin_service, settings.shortfall_horizon_days
+            uow,
+            clock,
+            app.state.admin_service,
+            lambda org: per_organisation(org).shortfall_horizon_days,
         )
         app.state.diagnostics_service = DiagnosticsService(
             uow,
@@ -251,8 +260,8 @@ def create_app(
             app.state.admin_service,
             app.state.booking_service,
             lambda: live().planner_changes_alert_per_hour,
-            rebook_days=settings.planner_rebook_days,
-            reminder_days=settings.planner_rebook_reminder_days,
+            rebook_days=lambda org: per_organisation(org).planner_rebook_days,
+            reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
         )
         app.state.role_service = RoleService(
             uow,
@@ -335,6 +344,8 @@ def create_app(
     app.add_middleware(SecurityHeadersMiddleware)
     # Outermost: every request, its log lines and its audit events share one trace (ADR 0040).
     app.add_middleware(TraceMiddleware)
+    # ADR 0042 step 5: one clock scope per request; routes fill in the organisation's style.
+    app.add_middleware(ClockScopeMiddleware)
     register_error_pages(app)
     register_admin(app)
     # ADR 0038: the fixed maintenance rules of app.api.maintenance guard every public router.

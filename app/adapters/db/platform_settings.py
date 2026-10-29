@@ -1,7 +1,8 @@
 """SQL queries of the portal settings and their version counter (ADR 0042 §4, §6).
 
 A mixin of ``SqlTransaction``. ``platform_settings`` holds one JSON value per class C
-setting, with an expiry for ``LOG_LEVEL``; ``settings_version`` holds at most one row, and
+setting, with an expiry for ``LOG_LEVEL``; ``organisation_settings`` one per organisation and
+class D setting; ``settings_version`` holds at most one row, and
 without it the version is 0. A value
 that no longer parses (a hand-edited row) is left out, so the default or the environment
 applies; the registry's rules are checked by the domain, never here.
@@ -13,7 +14,7 @@ from datetime import datetime
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import PlatformSettingRow, SettingsVersionRow
+from app.adapters.db.models import OrganisationSettingRow, PlatformSettingRow, SettingsVersionRow
 
 _VERSION_ID = 1
 
@@ -75,3 +76,38 @@ class PlatformSettingsQueries:
         row.version += 1
         await self._session.flush()
         return row.version
+
+    async def organisation_settings(self) -> dict[int, dict[str, object]]:
+        """Return every organisation's stored class D values that parse as JSON, by id."""
+        rows = await self._session.scalars(select(OrganisationSettingRow))
+        values: dict[int, dict[str, object]] = {}
+        for row in rows:
+            try:
+                values.setdefault(row.organisation_id, {})[row.key] = json.loads(row.value)
+            except ValueError:
+                continue
+        return values
+
+    async def save_organisation_setting(
+        self, organisation_id: int, key: str, value: object, updated_at: datetime
+    ) -> None:
+        """Store or replace one organisation's value of ``key`` as JSON."""
+        await self._session.merge(
+            OrganisationSettingRow(
+                organisation_id=organisation_id,
+                key=key,
+                value=json.dumps(value),
+                updated_at=updated_at,
+            )
+        )
+        await self._session.flush()
+
+    async def delete_organisation_setting(self, organisation_id: int, key: str) -> bool:
+        """Remove one organisation's value of ``key``; return whether there was one."""
+        result = await self._session.execute(
+            delete(OrganisationSettingRow).where(
+                OrganisationSettingRow.organisation_id == organisation_id,
+                OrganisationSettingRow.key == key,
+            )
+        )
+        return bool(getattr(result, "rowcount", 0))

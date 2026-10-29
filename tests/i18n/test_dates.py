@@ -6,6 +6,7 @@ import pytest
 
 from app.i18n.dates import (
     ClockStyle,
+    clock_scope,
     configure_clock,
     format_clock,
     format_day,
@@ -14,6 +15,7 @@ from app.i18n.dates import (
     format_month,
     format_time_of_day,
     local_day,
+    use_clock,
     weekday_abbreviations,
     weekday_names,
 )
@@ -118,3 +120,22 @@ def test_month_heading() -> None:
 def test_weekday_abbreviations_start_on_monday() -> None:
     assert weekday_abbreviations("nl") == ["ma", "di", "wo", "do", "vr", "za", "zo"]
     assert weekday_abbreviations("en")[0] == "Mo"
+
+
+def test_an_organisation_clock_applies_inside_its_scope_only() -> None:
+    nine = datetime(2026, 1, 5, 14, 5, tzinfo=UTC)
+    zone = ZoneInfo("Europe/Amsterdam")
+
+    with clock_scope():
+        use_clock(ClockStyle.H12)
+        inside = format_clock(nine, zone, "en")
+    outside = format_clock(nine, zone, "en")
+
+    assert inside == "3:05 PM" or inside == "3:05 PM"
+    assert outside == "15:05"
+
+
+def test_use_clock_outside_a_scope_changes_nothing() -> None:
+    use_clock(ClockStyle.H12)
+
+    assert format_clock(datetime(2026, 1, 5, 14, 5, tzinfo=UTC), ZoneInfo("UTC"), "en") == "14:05"

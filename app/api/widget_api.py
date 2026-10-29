@@ -66,6 +66,7 @@ from app.domain.services import BookingService, ContactInput
 from app.web.closure_labels import closure_view
 from app.web.errors import status_for
 from app.web.locale import RequestLocale, resolve_locale
+from app.web.organisation_settings import follow_group_from_path
 from app.web.protection import booking_limit, limiter, read_limit
 from app.web.slot_values import parse_start
 
@@ -243,7 +244,12 @@ class WidgetRoute(APIRoute):
         return route
 
 
-router = APIRouter(prefix=PREFIX, route_class=WidgetRoute, tags=["widget"])
+router = APIRouter(
+    prefix=PREFIX,
+    route_class=WidgetRoute,
+    tags=["widget"],
+    dependencies=[Depends(follow_group_from_path)],
+)
 texts_router = APIRouter(prefix=PREFIX, tags=["widget"])
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
 

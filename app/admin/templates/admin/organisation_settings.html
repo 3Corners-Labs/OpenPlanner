@@ -1,0 +1,41 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_setting_form.html" import setting_form with context %}
+{% block title %}{{ _("admin.org_settings.page_title", name=organisation.name) }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("admin.org_settings.page_title", name=organisation.name) }}</h1>
+    <p class="page-header__lead">{{ _("admin.org_settings.page_lead") }}</p>
+  </div>
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if unknown_error %}<div class="alert alert--error" role="alert"><p>{{ unknown_error }}</p></div>{% endif %}
+<section class="card" aria-labelledby="settings-heading">
+  <h2 id="settings-heading">{{ _("admin.org_settings.settings") }}</h2>
+  <div class="table-scroll" role="region" aria-labelledby="settings-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.org_settings.settings") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.settings.setting") }}</th>
+        <th scope="col">{{ _("admin.settings.value") }}</th>
+        <th scope="col">{{ _("admin.settings.source") }}</th>
+        <th scope="col">{{ _("admin.settings.change") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr id="setting-{{ row.key }}">
+        <th scope="row">{{ row.label }}</th>
+        <td>{{ row.value }}</td>
+        <td>{{ row.source }}{% if row.portal_ignored %}<p><span class="chip chip--warning">{{ _("admin.settings.portal_ignored") }}</span></p>{% endif %}</td>
+        <td>
+          {{ setting_form(row, "/admin/organisations/" ~ organisation.slug ~ "/settings/" ~ row.key, _("admin.org_settings.reset")) }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

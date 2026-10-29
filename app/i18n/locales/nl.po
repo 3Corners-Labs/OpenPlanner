@@ -5769,3 +5769,33 @@ msgstr "Deze waarde spreekt een andere instelling tegen (bijvoorbeeld kritieke o
 
 msgid "admin.form.error.setting_expiry"
 msgstr "Geef het aantal uren op waarna het logniveau terugvalt: 1 tot en met 24."
+
+msgid "admin.nav.organisation_settings"
+msgstr "Organisatie-instellingen"
+
+msgid "admin.org_settings.title"
+msgstr "Organisatie-instellingen"
+
+msgid "admin.org_settings.lead"
+msgstr "Tijdnotatie, tijdzone en termijnen per organisatie. Zonder eigen waarde geldt de waarde van het platform."
+
+msgid "admin.org_settings.organisations"
+msgstr "Organisaties"
+
+msgid "admin.org_settings.none"
+msgstr "Er zijn geen organisaties waarvan u de instellingen kunt wijzigen."
+
+msgid "admin.org_settings.page_title"
+msgstr "Instellingen van {name}"
+
+msgid "admin.org_settings.page_lead"
+msgstr "Deze waarden gelden voor de groepen, burgerpagina's, mails en beheerders van deze organisatie. Een wijziging geldt binnen tien seconden."
+
+msgid "admin.org_settings.settings"
+msgstr "Instellingen"
+
+msgid "admin.org_settings.reset"
+msgstr "Platformwaarde gebruiken"
+
+msgid "admin.settings.source.organisation"
+msgstr "Organisatie"

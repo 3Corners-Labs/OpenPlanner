@@ -1,4 +1,5 @@
 {% extends "admin/layout.html" %}
+{% from "admin/_setting_form.html" import setting_form with context %}
 {% block title %}{{ _("admin.settings.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -80,29 +81,7 @@
         </td>
         {% if manage %}
         <td>
-          {% if row.error %}<p class="error-message" id="error-{{ row.key }}">{{ row.error }}</p>{% endif %}
-          {% if row.editable %}
-          <form method="post" action="/admin/settings/{{ row.key }}" novalidate class="setting-form">
-            <label for="value-{{ row.key }}">{{ _("admin.settings.new_value") }}</label>
-            {% if row.choices %}
-            <select id="value-{{ row.key }}" name="value"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
-              {% for choice in row.choices %}<option value="{{ choice }}"{% if choice == row.input %} selected{% endif %}>{{ choice }}</option>{% endfor %}
-            </select>
-            {% else %}
-            <input id="value-{{ row.key }}" name="value" type="text" value="{{ row.input }}" size="12"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
-            {% endif %}
-            {% if row.expires %}
-            <label for="hours-{{ row.key }}">{{ _("admin.settings.hours", max=max_hours) }}</label>
-            <input id="hours-{{ row.key }}" name="hours" type="text" inputmode="numeric" value="1" size="3">
-            {% endif %}
-            <button type="submit" class="button button--small">{{ _("admin.settings.save") }}</button>
-          </form>
-          {% if row.from_portal %}
-          <form method="post" action="/admin/settings/{{ row.key }}/reset" class="setting-form">
-            <button type="submit" class="button button--secondary button--small">{{ _("admin.settings.reset") }}</button>
-          </form>
-          {% endif %}
-          {% endif %}
+          {% if row.editable %}{{ setting_form(row, "/admin/settings/" ~ row.key, _("admin.settings.reset"), max_hours) }}{% elif row.error %}<p class="error-message" id="error-{{ row.key }}">{{ row.error }}</p>{% endif %}
         </td>
         {% endif %}
       </tr>

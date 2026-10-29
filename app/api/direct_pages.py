@@ -34,9 +34,13 @@ from app.domain.scheduling import Group
 from app.domain.services import BookingService, ContactInput
 from app.web.errors import FormError, form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
+from app.web.organisation_settings import follow, follow_group_from_path
 from app.web.protection import booking_limit, limiter, read_limit, require_same_origin
 
-router = APIRouter(include_in_schema=False, dependencies=[Depends(bind_group_from_path)])
+router = APIRouter(
+    include_in_schema=False,
+    dependencies=[Depends(bind_group_from_path), Depends(follow_group_from_path)],
+)
 log = structlog.get_logger()
 
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
@@ -133,6 +137,7 @@ def _wait_state(status: CallStatus, group: Group, start: datetime, now: datetime
 async def wait_page(request: Request, token: str, locale: Locale) -> Response:
     """Show the status of a direct call, with the join button while it is open."""
     details = await _bookings(request).find(token)
+    follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
     if booking.kind is not BookingKind.DIRECT or booking.id is None:
         return RedirectResponse(f"/b/{token}", status_code=303)
