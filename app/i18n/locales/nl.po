@@ -544,6 +544,12 @@ msgstr "Telefoonnummer"
 msgid "admin.group.phone_hidden"
 msgstr "Niet gevraagd"
 
+msgid "admin.group.dispatch_contact_center"
+msgstr "Contactcenter (taak in de wachtrij van het team)"
+
+msgid "admin.group.dispatch_openplanner_queue"
+msgstr "Eigen wachtrij van OpenPlanner"
+
 msgid "admin.group.phone_optional"
 msgstr "Optioneel"
 
@@ -905,6 +911,18 @@ msgstr "Doorzetten naar de wachtrij (minuten vooraf)"
 msgid "admin.field.dispatch_lead_minutes_hint"
 msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de deelnemer. 0 tot 60."
 
+msgid "admin.field.dispatch_kind"
+msgstr "Hoe afspraken bij medewerkers komen"
+
+msgid "admin.field.dispatch_kind_hint"
+msgstr "Contactcenter: een taak in de wachtrij van het team, kort voor de start. Eigen wachtrij: medewerkers loggen in op OpenPlanner en pakken een afspraak op. Geldt voor afspraken die nog niet zijn doorgezet."
+
+msgid "admin.field.queue_change_working_days"
+msgstr "Wijzigen tot (werkdagen vooraf, eigen wachtrij)"
+
+msgid "admin.field.queue_change_working_days_hint"
+msgstr "Bij de eigen wachtrij kan de deelnemer de afspraak wijzigen of annuleren tot dit aantal werkdagen (maandag tot en met vrijdag) voor de start, op dezelfde tijd. 1 tot 5."
+
 msgid "admin.field.planner_change_min_lead_minutes"
 msgstr "Wijzigen door een planner (minuten vooraf)"
 
@@ -978,6 +996,9 @@ msgstr "Vul een aantal dagen in van 1 tot 366."
 
 msgid "admin.form.error.dispatch_lead_minutes"
 msgstr "Vul een aantal minuten in van 0 tot 60."
+
+msgid "admin.form.error.queue_change_working_days"
+msgstr "Vul een aantal werkdagen in van 1 tot 5."
 
 msgid "admin.form.error.planner_change_min_lead_minutes"
 msgstr "Vul een aantal minuten in van het doorzetten naar de wachtrij tot 1440."

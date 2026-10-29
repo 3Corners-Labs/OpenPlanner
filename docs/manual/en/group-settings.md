@@ -57,6 +57,29 @@ goes to the contact centre.
 How many days ahead citizens can choose, from 1 to 366. Keep this in line with how far ahead
 the team's roster is fixed: a slot that can be booked must also be staffed.
 
+<!-- field: dispatch_kind -->
+### How appointments reach staff
+
+- **Contact center**: shortly before the start (see **Send to the queue**) the appointment
+  becomes a task in the team's contact-center queue. The first free agent picks it up. This is
+  the default.
+- **OpenPlanner's own queue**: for teams without a contact center. Staff sign in to OpenPlanner
+  and pick up a waiting appointment. The citizen always gets the first free agent. No task goes
+  to the contact center, even when the fields below are filled in.
+
+A change applies to appointments not yet dispatched. An appointment already in the contact
+center as a task stays there. When the contact center fails (Webex Connect or Webex Contact
+Center outage), you can switch the group to the own queue for the time being.
+
+<!-- field: queue_change_working_days -->
+### Changes until (working days ahead, own queue)
+
+Only with the own queue. Until how many working days before the start the citizen can change or
+cancel the appointment, from 1 to 5, at the same time of day. Working days are Monday to Friday;
+public holidays count as working days here. Example with 1: an appointment on Monday at 10:00
+can be changed until Friday 10:00. A citizen cannot change an appointment booked later than
+that.
+
 <!-- field: dispatch_lead_minutes -->
 ### Send to the queue
 

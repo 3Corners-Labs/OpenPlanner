@@ -1,6 +1,7 @@
 # 0043. Dispatch option per group: contact center or OpenPlanner's own queue
 
-Status: proposed (2026-10-28), requested by the product owner. Extends ADR 0032 (provider-neutral
+Status: accepted (2026-10-28), decided by the product owner with the amendments under
+*Acceptance* below; built without ADR 0032. Extends ADR 0032 (provider-neutral
 contact center) and ADR 0039 (adjustable roles). Builds on ADR 0010 and 0017 (meeting status
 from Webex webhooks), ADR 0019 and 0026 (direct calls), and ADR 0042 (settings).
 
@@ -144,6 +145,7 @@ More contact-center platforms may follow (ADR 0032). The answer must not be a Wx
 | `calendar_invite_address` | D organisation (per group) | empty (no invite) | valid email address, max. 254 | `group.edit` | Only with `openplanner_queue`. An external address, so audited like other group fields. |
 | `queue_visible_from_minutes` | D organisation (per group) | 15 | 0–120 | `group.edit` | How long before the start a booking appears in the queue. |
 | `queue_free_pick_allowed` | D organisation (per group) | off | on/off | `group.edit` | Off: only "pick up next". Not a protection, a working agreement. |
+| `queue_change_working_days` | D organisation (per group) | 1 | 1–5 | `group.edit` | Own queue only: the citizen can change or cancel until this many working days (Mon–Fri) before the start, same local time. Added at acceptance. |
 | `queue_refresh_seconds` | C platform | 10 | 5–60 | `settings.platform.manage` | HTMX polling interval; bounded to protect the server. |
 
 Unchanged and reused: `not_picked_up_minutes` (per group, 1–120, default 10) and
@@ -152,6 +154,35 @@ Unchanged and reused: `not_picked_up_minutes` (per group, 1–120, default 10) a
 **Fixed on purpose:** the claim is atomic and the host link is shown only after a claim
 (protections, never switchable); the pseudonym of `claimed_by` uses HMAC-SHA256 with an
 HKDF-derived key (crypto parameters); the queue never shows email, phone or note (PII rule).
+
+## Acceptance (2026-10-28)
+
+The product owner accepted this ADR with these choices, so it can be built before ADR 0032:
+
+- **On today's dispatcher.** `contact_center` means the current WxCC integration: a group
+  dispatches when its WxCC fields are filled in (`Group.dispatch_enabled`), and that property is
+  false for `openplanner_queue`. There is no organisation connection yet, so point 1's
+  validation ("needs an organisation connection") waits for ADR 0032; until then a
+  `contact_center` group without WxCC fields dispatches nothing, as today. Job types keep their
+  names (`dispatch_wxcc_task`, `end_wxcc_task`); ADR 0032 renames them.
+- **Changing the kind (point 3) needs no job juggling.** The dispatch job stays planned for
+  every booking and does nothing for an own-queue group, because the dispatcher checks the
+  group's kind when the job runs. Switching either way therefore applies to every booking
+  whose job has not run yet, and a booking already dispatched keeps its task. The change is
+  audited as a `group.edit` with `dispatch_kind` in the detail.
+- **The `BookingDispatcher` port (point 2)** arrives with the calendar invite (point 9), its
+  first hooks that do something beyond today's WxCC calls (ADR 0005: extract at the second
+  use).
+- **Change deadline per kind.** Contact center: unchanged, the dispatch moment. Own queue:
+  `queue_change_working_days` working days before the start, at the same local time (product
+  owner: "1 werkdag van te voren"). Working days are Monday to Friday; public holidays are not
+  skipped (an assumption, recorded in the PR). A booking made later than that is read-only
+  from the start; the citizen can still phone the team.
+- **`claimed_by` stays the HMAC pseudonym** of point 6, not a reference to the staff
+  directory of ADR 0046. Agents of the own queue are portal users, which ADR 0046's
+  assumption "contact-center agents live in WxCC" does not cover.
+- **Three PRs:** dispatch kind and change deadline; the own queue (role `agent`, claim,
+  release, not picked up); the calendar invite.
 
 ## Consequences
 
