@@ -13,12 +13,15 @@ const files = {
   '/': ['index.html', 'text/html; charset=utf-8'],
   '/host.js': ['host.js', 'text/javascript; charset=utf-8'],
   '/host.css': ['host.css', 'text/css; charset=utf-8'],
+  // A host has its own icon; without one Firefox asks for /favicon.ico and logs the refusal.
+  '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
 };
 const csp = [
   "default-src 'none'",
   `script-src 'self' ${app}`,
   `connect-src ${app}`,
   "style-src 'self'",
+  "img-src 'self'",
   "base-uri 'none'",
   "form-action 'none'",
   "frame-ancestors 'none'",
