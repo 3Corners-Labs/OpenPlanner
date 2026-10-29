@@ -19,6 +19,7 @@ from app.adapters.db.engine import create_engine, is_reachable
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.maintenance import storage_limits
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import build_integrations, secret_box
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
@@ -27,6 +28,7 @@ from app.domain.admin import AdminService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock
+from app.domain.security_log import SecurityLog
 from app.domain.update_service import UpdateService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
@@ -60,8 +62,10 @@ async def run_worker(
     configure_clock(settings.time_format)
     engine = create_engine(settings.database_url)
     http = httpx.AsyncClient(timeout=15.0, transport=transport)
-    integrations = build_integrations(settings, engine, http, clock)
-    uow = SqlUnitOfWork(engine, secret_box(settings))
+    # ADR 0034: committed audit events also go to stdout for the log platform.
+    uow = SqlUnitOfWork(engine, secret_box(settings), StdoutEventSink(settings.event_envelope))
+    security = SecurityLog(uow, clock, timedelta(minutes=settings.security_event_window_minutes))
+    integrations = build_integrations(settings, engine, http, clock, security)
     fallback = fallback_mail(settings)
     runner = JobRunner(
         SqlJobQueue(engine),

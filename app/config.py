@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # ADR 0040 / 0034 (class B, deployment): name of this installation in every log line and
     # event record, so a log platform that receives several can tell them apart. Empty: none.
     installation_name: str = Field(default="", pattern=r"^[A-Za-z0-9_.-]{0,64}$")
+    # ADR 0034, AU-4 (class C, platform; env until the settings registry of ADR 0042): rejected
+    # webhooks and failing token refreshes are written as at most one security event per kind
+    # per this many minutes; the rest are counted into the next one.
+    security_event_window_minutes: int = Field(default=15, ge=1, le=1440)
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
