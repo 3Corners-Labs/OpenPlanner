@@ -6,8 +6,8 @@ the code of the fixed reason a planner gave (``staffing``, ``technical``, ``unfo
 never free text. ``shortfall_acceptances`` holds a planner's "leave as is" per slot with the
 counts it was given for and the planner's subject identifier. No personal data of citizens.
 
-Revision ID: 0037
-Revises: 0026
+Revision ID: 0039
+Revises: 0038
 Create Date: 2026-10-29 09:00:00.000000
 """
 
@@ -18,8 +18,8 @@ from alembic import op
 
 from app.adapters.db.types import UTCDateTime
 
-revision: str = "0037"
-down_revision: str | None = "0026"
+revision: str = "0039"
+down_revision: str | None = "0038"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
