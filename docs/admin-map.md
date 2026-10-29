@@ -57,5 +57,5 @@ Side navigation: *Overview*.
 | Holidays | `/admin/groups/{slug}/holidays` | `schedule.manage` | – |
 | Reminders | `/admin/groups/{slug}/reminders` | `reminders.manage` | – |
 | Message texts | `/admin/groups/{slug}/messages` | `texts.manage` | `/admin/groups/{slug}/messages/{text_locale}` |
-| Agenda | `/admin/groups/{slug}/agenda` | `bookings.view` | `/admin/groups/{slug}/bookings/{booking_id}`, `/admin/groups/{slug}/agenda/week`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/move`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel` |
+| Agenda | `/admin/groups/{slug}/agenda` | `bookings.view` | `/admin/groups/{slug}/bookings/{booking_id}`, `/admin/groups/{slug}/agenda/week`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/move`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/rebook`, `/admin/groups/{slug}/agenda/slot-rebook`, `/admin/groups/{slug}/agenda/waiting` |
 | Emergency closure | `/admin/groups/{slug}/closure` | `closure.manage` | `/admin/groups/{slug}/closure/bookings/{booking_id}/move`, `/admin/groups/{slug}/closure/contacts` |
