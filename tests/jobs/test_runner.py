@@ -3,11 +3,14 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 
 import pytest
+from structlog.testing import capture_logs
+from structlog.typing import EventDict, WrappedLogger
 
 from app.adapters.db.jobs import ClaimedJob
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
+from app.domain.event_context import TRACE_ID, current, current_trace_id
 from app.domain.job_plan import JobType
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
@@ -20,6 +23,11 @@ from tests.fakes.messaging import RecordingSender, RefusingSender
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.closures import NOTICES
 from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book, make_group, window
+
+
+def merge_context(_logger: WrappedLogger, _method: str, event_dict: EventDict) -> EventDict:
+    context = current()
+    return {**event_dict, "trace_id": context.trace_id, "group": context.group}
 
 
 class FakeQueue:
@@ -285,8 +293,12 @@ async def test_retries_and_the_final_failure_are_recorded_with_the_error_code(
     assert system_events(uow)[1][3] == "attempt:4,channel:email"
 
 
+@pytest.mark.parametrize("method", ["record", "bind_level"])
 async def test_a_failing_system_log_never_stops_a_job(
-    uow: InMemoryUnitOfWork, composer: MessageComposer, monkeypatch: pytest.MonkeyPatch
+    uow: InMemoryUnitOfWork,
+    composer: MessageComposer,
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
 ) -> None:
     bid = await booking_id(uow)
     queue, sender = FakeQueue([job(bid, JobType.SEND_CONFIRMATION)]), RecordingSender()
@@ -294,11 +306,30 @@ async def test_a_failing_system_log_never_stops_a_job(
     async def broken(*_args: object, **_kwargs: object) -> None:
         raise RuntimeError("database locked")
 
-    monkeypatch.setattr(SystemLog, "record", broken)
+    monkeypatch.setattr(SystemLog, method, broken)
     await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
 
     assert queue.done == [1]
     assert len(sender.sent) == 1
+
+
+async def test_each_job_runs_in_its_own_trace_tagged_with_its_group(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    # ADR 0040, part 2: the job's log lines and its system event share one trace id.
+    bid = await booking_id(uow)
+    queue = FakeQueue([job(bid, JobType.SEND_CONFIRMATION), job(bid, JobType.SEND_REMINDER)])
+
+    with capture_logs(processors=[merge_context]) as logs:
+        await JobRunner(queue, uow, FixedClock(NOW), RecordingSender(), composer).run_due()
+
+    first, second = (e for e in uow.state.audit if e.source is Source.SYSTEM)
+    assert TRACE_ID.fullmatch(first.trace_id)
+    assert first.trace_id != second.trace_id
+    sent = [entry for entry in logs if entry["event"] == "job.sent"]
+    assert [entry["trace_id"] for entry in sent] == [first.trace_id, second.trace_id]
+    assert {entry["group"] for entry in sent} == {"aangifte"}
+    assert current_trace_id() == ""
 
 
 async def test_old_system_events_are_pruned_at_most_once_an_hour(
