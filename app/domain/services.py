@@ -263,7 +263,7 @@ class BookingService:
                 else None
             )
         deadline = change_deadline(booking.start, group.dispatch_lead)
-        changeable = booking.is_suspended or (booking.is_active and self._clock.now() < deadline)
+        changeable = booking.on_hold or (booking.is_active and self._clock.now() < deadline)
         return BookingDetails(booking, group, deadline, changeable, closure)
 
     async def cancel(self, management_token: str) -> Booking:
@@ -317,7 +317,7 @@ class BookingService:
         Raises:
             DomainError: ``booking_not_active``, ``same_slot`` or any error of ``book``.
         """
-        if not old.holds_place or old.contact is None:
+        if not (old.holds_place or old.awaits_rebook) or old.contact is None:
             raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
         if new_start == old.start:
             raise DomainError(ErrorCode.SAME_SLOT)
@@ -439,9 +439,10 @@ class BookingService:
 def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
     """Refuse changes from the change deadline on; the booking is read-only from then.
 
-    A suspended booking has no deadline: it does not go ahead at its time anyway.
+    A booking on hold (suspended, or awaiting a new time) has no deadline: it does not go
+    ahead at its time anyway.
     """
-    if booking.is_suspended:
+    if booking.on_hold:
         return
     if now >= change_deadline(booking.start, group.dispatch_lead):
         raise DomainError(ErrorCode.BOOKING_LOCKED)

@@ -58,6 +58,7 @@ STATUS_LABELS: dict[BookingStatus, str] = {
     BookingStatus.COMPLETED: "manage.status.completed",
     BookingStatus.NO_SHOW: "manage.status.no_show",
     BookingStatus.SUSPENDED: "manage.status.suspended",
+    BookingStatus.AWAITING_REBOOK: "manage.status.awaiting_rebook",
 }
 
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
@@ -222,6 +223,14 @@ def _manage_context(
     closure = details.closure
     return {
         "suspended": booking.is_suspended,
+        # ADR 0044: a planner asked for a new time; the request lapses at ``rebook_by``.
+        "awaiting_rebook": booking.awaits_rebook,
+        "rebook_by": (
+            f"{format_day(local_day(booking.rebook_by, group.tz), locale.code)}, "
+            f"{format_clock(booking.rebook_by, group.tz, locale.code)}"
+            if booking.rebook_by
+            else None
+        ),
         "closure": closure_view(closure, group, locale, now) if closure else None,
         "group": group,
         "slot_label": slot_label(booking.start, booking.end, group, locale),

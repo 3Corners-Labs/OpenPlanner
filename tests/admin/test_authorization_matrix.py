@@ -346,6 +346,25 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             404, 403, 403, 404, 403, 403
         ),
     },
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/rebook": {
+        "/admin/groups/demo/agenda/bookings/999999/rebook": statuses(404, 404, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/rebook": {
+        "/admin/groups/demo/agenda/bookings/999999/rebook": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/bookings/999999/rebook": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/agenda/slot-rebook": {
+        "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/slot-rebook": {
+        "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/agenda/waiting": {
+        "/admin/groups/demo/agenda/waiting": statuses(200, 200, 200, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/waiting": statuses(200, 403, 403, 200, 403, 403),
+    },
     "POST /admin/groups/{slug}/agenda/accept": {
         "/admin/groups/demo/agenda/accept": statuses(400, 400, 400, 403, 403, 403),
     },
