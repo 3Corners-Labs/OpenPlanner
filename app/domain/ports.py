@@ -16,7 +16,7 @@ from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import CustomRole, Principal, Scope
-from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
+from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import (
     BookingEvent,
@@ -702,10 +702,14 @@ class Transaction(Protocol):
         """
         ...
 
-    async def list_suspended_bookings(self, scope: Scope, group_id: int) -> list[Booking]:
-        """Return the group's suspended bookings, earliest first.
+    async def list_suspended_bookings(
+        self, scope: Scope, group_id: int, status: BookingStatus = BookingStatus.SUSPENDED
+    ) -> list[Booking]:
+        """Return the group's bookings on hold with ``status``, earliest first.
 
-        The group must lie inside ``scope`` (ADR 0014); otherwise the list is empty.
+        ``status`` is ``suspended`` (a closure, ADR 0024) or ``awaiting_rebook`` (a planner's
+        request, ADR 0044). The group must lie inside ``scope`` (ADR 0014); otherwise the list
+        is empty.
         """
         ...
 

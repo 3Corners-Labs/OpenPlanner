@@ -110,3 +110,5 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
 | `STAFF_DORMANT_AFTER_DAYS` | int | `90` | 14–365 | `settings.organisation.manage` | Days without a login after which a person is marked dormant in the staff list (ADR 0046). |
 | `SHORTFALL_HORIZON_DAYS` | int | `14` | 1–60 | `settings.organisation.manage` | Days ahead the shortfall notice on group pages and the dashboard looks (ADR 0044). |
+| `PLANNER_REBOOK_DAYS` | int | `14` | 1–30 | `settings.organisation.manage` | Days after the original start after which an unanswered request to rebook lapses. |
+| `PLANNER_REBOOK_REMINDER_DAYS` | int | `3` | 1–29 | `settings.organisation.manage` | Days before the lapse at which the one reminder to rebook goes (below the lapse). |
