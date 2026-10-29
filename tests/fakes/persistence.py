@@ -21,6 +21,8 @@ from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock
 from app.domain.direct_queue import DirectCall
 from app.domain.job_plan import PlannedJob
+from app.domain.maintenance import OFF as MAINTENANCE_OFF
+from app.domain.maintenance import MaintenanceState
 from app.domain.retention import GroupRetentionCounts, PurgeCandidate, RetentionFacts
 from app.domain.scheduling import (
     Group,
@@ -66,6 +68,7 @@ class State:
     channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
+    maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     purged_at: dict[int, datetime] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
@@ -632,6 +635,12 @@ class InMemoryTransaction:
     async def save_release_check(self, check: ReleaseCheck) -> None:
         self.state.release_check = check
 
+    async def get_maintenance_state(self) -> MaintenanceState:
+        return self.state.maintenance
+
+    async def save_maintenance_state(self, state: MaintenanceState) -> None:
+        self.state.maintenance = state
+
     async def get_update_requests(self, limit: int = 20) -> list[UpdateRequest]:
         return sorted(self.state.update_requests.values(), key=lambda r: -(r.id or 0))[:limit]
 
@@ -651,9 +660,11 @@ class InMemoryUnitOfWork:
     def __init__(self, state: State | None = None) -> None:
         self.state = state or State()
         self._lock = asyncio.Lock()
+        self.reads = 0
 
     @asynccontextmanager
     async def read(self) -> AsyncIterator[InMemoryTransaction]:
+        self.reads += 1
         yield InMemoryTransaction(copy.deepcopy(self.state))
 
     @asynccontextmanager
