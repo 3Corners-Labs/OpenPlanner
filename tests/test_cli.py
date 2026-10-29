@@ -14,6 +14,7 @@ from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportS
 from app.adapters.wxcc_config import PROJECT_ID
 from app.cli import (
     _register_webhooks,
+    _seed_closures,
     _webhooks_health,
     _webhooks_list,
     _webhooks_reset,
@@ -370,3 +371,29 @@ async def _stored(settings: Settings, name: str) -> StoredReport | None:
         return await ReportStore(engine).get(name)
     finally:
         await engine.dispose()
+
+
+@pytest.fixture
+def migrated(settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
+    return settings.model_copy(
+        update={"database_url": migrated_database(tmp_path, monkeypatch, "cli")}
+    )
+
+
+async def test_seed_closures_prints_the_example_pages_as_json(migrated: Settings) -> None:
+    import json
+
+    report, ok = await _seed_closures(migrated)
+
+    paths = json.loads(report)
+    assert ok
+    assert paths["closed_group"] == "/g/demo-gesloten"
+    assert paths["planned_closure"] == "/g/demo-gepland/closure"
+    assert paths["suspended_booking"].startswith("/b/")
+
+
+async def test_seed_closures_refuses_production(settings: Settings) -> None:
+    report, ok = await _seed_closures(settings.model_copy(update={"environment": "prod"}))
+
+    assert not ok
+    assert report == "seed-closures adds a made-up booking; it runs only outside production\n"

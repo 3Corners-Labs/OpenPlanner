@@ -6,6 +6,7 @@ from app.domain.admin import AdminService
 from app.domain.audit import AuditFilter, Outcome, Source
 from app.domain.authorization import Decision, Permission, Principal, Reason, Role
 from app.domain.errors import DomainError
+from app.domain.staff import Membership, StaffFilter
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.closures import confirmed_booking
@@ -30,8 +31,13 @@ def uow() -> InMemoryUnitOfWork:
 
 
 @pytest.fixture
-def service(uow: InMemoryUnitOfWork) -> AdminService:
-    return AdminService(uow, FixedClock(NOW))
+def clock() -> FixedClock:
+    return FixedClock(NOW)
+
+
+@pytest.fixture
+def service(uow: InMemoryUnitOfWork, clock: FixedClock) -> AdminService:
+    return AdminService(uow, clock)
 
 
 async def test_allowed_group_permission(service: AdminService, uow: InMemoryUnitOfWork) -> None:
@@ -142,9 +148,11 @@ async def test_login_is_recorded_per_organisation_and_group_in_scope(
     assert _contexts(uow) == [
         ("b-1", "admin.login", "andere", None),
         ("b-1", "admin.login", "demo", "demo"),
+        ("b-1", "staff.created", "andere", None),
+        ("b-1", "staff.created", "demo", "demo"),
     ]
     assert {e.outcome for e in uow.state.audit} == {Outcome.SUCCESS}
-    assert {e.reason for e in uow.state.audit} == {"group_admin,org_admin"}
+    assert {e.reason for e in uow.state.audit[:2]} == {"group_admin,org_admin"}
 
 
 async def test_auditor_login_is_recorded_in_their_organisation(
@@ -155,7 +163,10 @@ async def test_auditor_login_is_recorded_in_their_organisation(
 
     await service.record_login(auditor)
 
-    assert _contexts(uow) == [("a-1", "admin.login", "demo", None)]
+    assert _contexts(uow) == [
+        ("a-1", "admin.login", "demo", None),
+        ("a-1", "staff.created", "demo", None),
+    ]
 
 
 async def test_claims_without_the_matching_role_give_no_context(
@@ -166,6 +177,7 @@ async def test_claims_without_the_matching_role_give_no_context(
 
     assert _contexts(uow) == [
         ("s-1", "admin.login", None, None),
+        ("s-1", "staff.created", None, None),
         ("n-1", "admin.logout", None, None),
     ]
 
@@ -181,6 +193,7 @@ async def test_org_admin_sees_logins_of_admins_in_their_organisation(
 
     assert [(e.event.action, e.actor_name) for e in entries] == [
         ("admin.logout", "G"),
+        ("staff.created", "G"),
         ("admin.login", "G"),
     ]
 
@@ -195,7 +208,7 @@ async def test_audit_log_shows_the_latest_known_name(service: AdminService) -> N
 
     names = [e.actor_name for e in await service.audit_log(SUPER)]
 
-    assert names == [None, "Gina Groep", "Gina Groep"]
+    assert names == [None, "Gina Groep", "Gina Groep", "Gina Groep"]
 
 
 async def test_retention_overview_counts_the_own_organisation_only(
@@ -220,3 +233,65 @@ async def test_retention_overview_counts_the_own_organisation_only(
 
 async def test_retention_overview_is_empty_without_the_permission(service: AdminService) -> None:
     assert (await service.retention(GROUP_ADMIN)).groups == ()
+
+
+async def test_a_login_records_the_staff_member_and_what_changed(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    # ADR 0046: just in time from the claims; a move to another group is audited there.
+    await service.record_login(GROUP_ADMIN)
+    uow.state.audit.clear()
+    moved = Principal("g-1", "G", GROUP_ADMIN.roles, frozenset(), frozenset({"andere-team"}))
+
+    await service.record_login(moved)
+
+    member = uow.state.staff["g-1"]
+    assert member.memberships == {Membership("andere", "andere-team")}
+    assert member.first_seen_at == member.last_login_at == member.last_seen_at == NOW
+    changes = [(e.organisation, e.group, e.detail) for e in uow.state.audit[1:]]
+    assert changes == [
+        ("andere", "andere-team", "group.add:andere-team"),
+        ("demo", "demo", "group.remove:demo"),
+    ]
+
+
+async def test_seen_and_logout_are_noted(
+    service: AdminService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await service.record_login(ORG_ADMIN)
+    clock.advance(timedelta(minutes=5))
+    await service.record_seen(ORG_ADMIN)
+    clock.advance(timedelta(minutes=5))
+    await service.record_logout(ORG_ADMIN)
+
+    member = uow.state.staff["o-1"]
+    assert member.last_seen_at == NOW + timedelta(minutes=5)
+    assert member.last_logout_at == NOW + timedelta(minutes=10)
+    assert member.last_login_at == NOW
+
+
+async def test_staff_are_listed_within_the_viewers_scope(service: AdminService) -> None:
+    for principal in (GROUP_ADMIN, ORG_ADMIN, OTHER_ADMIN, SUPER):
+        await service.record_login(principal)
+    elsewhere = Principal(
+        "e-1", "E", frozenset({Role.ORG_ADMIN}), frozenset({"demo", "andere"}), frozenset()
+    )
+    await service.record_login(elsewhere)
+
+    seen_by_org = await service.staff(ORG_ADMIN)
+    seen_by_group = await service.staff(GROUP_ADMIN)
+
+    assert [m.subject for m in seen_by_org] == ["e-1", "g-1", "o-1"]
+    # Where else a colleague works stays hidden from an organisation admin.
+    assert next(m for m in seen_by_org if m.subject == "e-1").organisations == ["demo"]
+    assert [m.subject for m in seen_by_group] == ["g-1"]
+    assert len(await service.staff(SUPER)) == 5
+
+
+async def test_a_person_outside_the_scope_is_not_found(service: AdminService) -> None:
+    await service.record_login(OTHER_ADMIN)
+    await service.record_login(SUPER)
+    super_id = (await service.staff(SUPER, StaffFilter(role=Role.SUPERUSER)))[0].id or 0
+
+    assert await service.staff_member(ORG_ADMIN, super_id) is None
+    assert await service.staff_member(SUPER, super_id) is not None
