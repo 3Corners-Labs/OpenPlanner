@@ -157,3 +157,9 @@ def configure_logging(
         uvicorn_logger.propagate = True
     # Access lines contain request paths, which will carry management tokens (/b/{token}).
     logging.getLogger("uvicorn.access").disabled = True
+
+
+def warn_loose_secret_files(variables: list[str]) -> None:
+    """Log one warning per ``X_FILE`` whose file others may read (ADR 0042 §9); names only."""
+    for variable in variables:
+        structlog.get_logger().warning("settings.secret_file_readable", variable=variable)

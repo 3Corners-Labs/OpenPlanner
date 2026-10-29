@@ -1,6 +1,7 @@
 """Webhook endpoints: verified before parsed, unknown events acknowledged, events recorded."""
 
 import json
+import re
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -146,10 +147,14 @@ async def test_a_flood_of_forged_webhooks_is_one_security_event_per_source(
         entries = await tx.list_audit_events(Scope(everything=True))
     await engine.dispose()
     events = sorted((e.event for e in entries), key=lambda e: e.detail)
-    assert [(e.action, e.reason, e.detail) for e in events] == [
+    assert [(e.action, e.reason, e.detail.split(",")[0]) for e in events] == [
         ("webhook.rejected", "invalid_signature", "source:webex"),
         ("webhook.rejected", "invalid_signature", "source:wxcc"),
     ]
+    # ADR 0053: the caller as a pseudonym, never the address.
+    clients = {e.detail.split(",")[1] for e in events}
+    assert len(clients) == 1
+    assert re.fullmatch(r"client:[0-9a-f]{16}", clients.pop())
     assert all(e.category is Category.SECURITY and e.organisation is None for e in events)
 
 

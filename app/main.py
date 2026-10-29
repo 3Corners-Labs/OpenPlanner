@@ -30,12 +30,13 @@ from app.api import (
     pages,
     webhooks,
     widget_api,
+    widget_script,
 )
 from app.api.agent import create_agent_api
 from app.api.maintenance import citizen_gate, register_maintenance
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
-from app.config import AGENT_API_PREFIX, Settings
+from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
 from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
@@ -43,6 +44,7 @@ from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
 from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
+from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
@@ -58,13 +60,14 @@ from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.roles import RoleService
+from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.simulation import SimulationService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
-from app.keys import management_token_key, session_secret
-from app.logging import configure_logging
+from app.keys import client_pseudonym_key, management_token_key, session_secret
+from app.logging import configure_logging, warn_loose_secret_files
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
 from app.web.protection import configure_rate_limits, limiter
@@ -137,13 +140,17 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_service("web")
         configure_logging(settings.log_level, envelope=settings.event_envelope)
+        warn_loose_secret_files(loose_secret_files(environment()))
         app.state.engine = create_engine(settings.database_url)
         # ADR 0034: committed audit events also go to stdout for the log platform.
         uow = SqlUnitOfWork(
             app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
         )
         app.state.security_log = SecurityLog(
-            uow, clock, timedelta(minutes=settings.security_event_window_minutes)
+            uow,
+            clock,
+            timedelta(minutes=settings.security_event_window_minutes),
+            max_sources=settings.security_event_max_sources,
         )
         app.state.booking_service = BookingService(uow, clock, token_key)
         app.state.admin_service = AdminService(uow, clock)
@@ -159,6 +166,7 @@ def create_app(
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
+        app.state.scenario_service = ScenarioService(uow, clock, app.state.admin_service)
         app.state.embedding_service = EmbeddingService(
             uow,
             clock,
@@ -221,6 +229,8 @@ def create_app(
                 "clock",
                 "maintenance_service",
                 "settings",
+                "security_log",
+                "client_pseudonyms",
             ):
                 setattr(agent_api.state, name, getattr(app.state, name))
         wired = integrations or build_integrations(
@@ -253,6 +263,8 @@ def create_app(
     app.state.settings = settings
     app.state.clock = clock
     app.state.limiter = limiter
+    # ADR 0053: security events name callers by pseudonym, never by address.
+    app.state.client_pseudonyms = ClientPseudonyms(client_pseudonym_key(settings))
     app.state.identity_provider = identity_provider or oidc_provider(settings, http)
     # Admin-edited overrides are wired in here once the database adapter exists (WP7).
     app.state.translator = Translator(load_catalogues())
@@ -284,6 +296,7 @@ def create_app(
         webhooks.router,
         widget_api.texts_router,
         widget_api.router,
+        widget_script.router,
     ):
         app.include_router(public_router, dependencies=gate)
     if agent_api is not None:

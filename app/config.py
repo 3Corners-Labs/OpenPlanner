@@ -1,15 +1,25 @@
-"""Application settings, read from the environment only."""
+"""Application settings, read from the environment only.
+
+A bootstrap secret ``X`` may instead come from the file that ``X_FILE`` names (ADR 0042 §9),
+so Docker secrets, Kubernetes secrets and secret-store sidecars work without an env file.
+"""
 
 import os
 import re
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic.fields import FieldInfo
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 from app.domain.event_schema import Envelope
+from app.domain.settings_registry import REGISTRY, SettingClass
 from app.domain.system_log import EventRetention
 from app.i18n.dates import ClockStyle
 
@@ -21,6 +31,12 @@ AGENT_API_PREFIX = "/api/agent/v1"
 SMTPS_PORT = 465
 """Mail submission over implicit TLS (RFC 8314); STARTTLS is never offered there."""
 
+DEV_ONLY_SECRET_PREFIX = "dev-only-"  # noqa: S105  # nosec B105 - a public prefix
+"""Marks the placeholder secrets in the repository (``.env.example``, the dev Keycloak realm).
+
+They are public, so production refuses any secret that starts with it.
+"""
+
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 
 
@@ -30,6 +46,72 @@ def environment() -> dict[str, str]:
     The only other place that reads the environment; ``settings list`` uses it (ADR 0042 §10).
     """
     return dict(os.environ)
+
+
+FILE_SECRETS: tuple[str, ...] = tuple(
+    spec.key
+    for spec in REGISTRY
+    if spec.secret and spec.class_ in (SettingClass.BOOTSTRAP, SettingClass.DEPLOYMENT)
+)
+"""Secrets that ``X_FILE`` may supply: the class A and B secrets of the registry (§9)."""
+
+_PRIVATE_MODE = 0o077
+"""Permission bits for group and others; a secret file with any of them set is reported."""
+
+
+def _lower(environ: dict[str, str]) -> dict[str, str]:
+    """Return the environment with lower-case names (pydantic-settings ignores case)."""
+    return {name.lower(): value for name, value in environ.items()}
+
+
+def _read_secret_file(name: str, path: Path) -> str:
+    """Return a secret file's contents without the trailing newline; refuse missing or empty.
+
+    Messages name the variable only: neither the path nor the contents reach a log.
+    """
+    variable = f"{name.upper()}_FILE"
+    try:
+        value = path.read_text(encoding="utf-8").removesuffix("\n").removesuffix("\r")
+    except (OSError, UnicodeDecodeError):
+        raise ValueError(f"{variable} names no readable file") from None
+    if not value:
+        raise ValueError(f"{variable} is empty")
+    return value
+
+
+def loose_secret_files(environ: dict[str, str]) -> list[str]:
+    """Return the ``X_FILE`` variables whose file others may read, for a warning at start-up."""
+    env = _lower(environ)
+    loose: list[str] = []
+    for name in FILE_SECRETS:
+        path = env.get(f"{name}_file")
+        try:
+            if path is not None and Path(path).stat().st_mode & _PRIVATE_MODE:
+                loose.append(f"{name.upper()}_FILE")
+        except OSError:
+            continue
+    return loose
+
+
+class _SecretFiles(PydanticBaseSettingsSource):
+    """Settings source for ``X_FILE`` (ADR 0042 §9): no ``secrets_dir`` and no implicit names."""
+
+    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
+        """Unused: ``__call__`` reads every file secret at once."""
+        return None, field_name, False
+
+    def __call__(self) -> dict[str, Any]:
+        """Return the secrets whose ``X_FILE`` is set; refuse ``X`` and ``X_FILE`` together."""
+        env = _lower(dict(os.environ))
+        values: dict[str, Any] = {}
+        for name in FILE_SECRETS:
+            path = env.get(f"{name}_file")
+            if path is None:
+                continue
+            if name in env:
+                raise ValueError(f"{name.upper()} and {name.upper()}_FILE are both set; set one")
+            values[name] = _read_secret_file(name, Path(path))
+        return values
 
 
 class Settings(BaseSettings):
@@ -46,6 +128,18 @@ class Settings(BaseSettings):
     # Validation error messages never echo the input: it holds the secrets from the environment.
     # ``errors()`` still returns it; callers that inspect errors pass ``include_input=False``.
     model_config = SettingsConfigDict(extra="ignore", frozen=True, hide_input_in_errors=True)
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Read ``X_FILE`` next to the environment; arguments still win (tests)."""
+        return (init_settings, _SecretFiles(settings_cls), env_settings, dotenv_settings)
 
     environment: Literal["dev", "test", "prod"] = "prod"
     database_url: str = "sqlite+aiosqlite:///data/booking.db"
@@ -71,10 +165,14 @@ class Settings(BaseSettings):
     # ADR 0040 / 0034 (class B, deployment): name of this installation in every log line and
     # event record, so a log platform that receives several can tell them apart. Empty: none.
     installation_name: str = Field(default="", pattern=r"^[A-Za-z0-9_.-]{0,64}$")
-    # ADR 0034, AU-4 (class C, platform; env until the settings registry of ADR 0042): rejected
-    # webhooks and failing token refreshes are written as at most one security event per kind
-    # per this many minutes; the rest are counted into the next one.
+    # ADR 0034, AU-4 and ADR 0053 (class C, platform; env until the settings registry of ADR
+    # 0042): security events (rejected webhooks, failing token refreshes, attempts on public
+    # entry points) are written at most once per kind and caller per this many minutes; the
+    # rest are counted into the next one.
     security_event_window_minutes: int = Field(default=15, ge=1, le=1440)
+    # ADR 0053 (class C, platform; env until the settings registry of ADR 0042): how many
+    # windows (kind of event × caller) a process keeps; beyond that, callers count as "many".
+    security_event_max_sources: int = Field(default=1000, ge=10, le=100_000)
     # ADR 0040, part 3 (class C, platform; env until the settings registry of ADR 0042): one
     # CSV export of the audit log holds at most this many rows and covers at most this many
     # days; a larger one is refused, never cut short.
@@ -190,7 +288,10 @@ class Settings(BaseSettings):
     # Updates from the admin portal (ADR 0029). APP_VERSION is baked into release images by
     # main.yml; UPDATE_REPOSITORY (owner/name) switches the hourly release check on. The token
     # is only needed for a private repository and needs read access to its contents only.
+    # APP_COMMIT (class B, build: baked into every image by main.yml, ADR 0052) is the git
+    # commit the image was built from; empty for a local build.
     app_version: str = ""
+    app_commit: str = Field(default="", pattern=r"^([0-9a-f]{7,40})?$")
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
 
@@ -246,6 +347,12 @@ class Settings(BaseSettings):
                 raise ValueError("PUBLIC_BASE_URL must use https in production")
             if self.session_secret is None:
                 raise ValueError("SESSION_SECRET is required in production")
+            for name in type(self).model_fields:
+                value = getattr(self, name)
+                if isinstance(value, SecretStr) and value.get_secret_value().startswith(
+                    DEV_ONLY_SECRET_PREFIX
+                ):
+                    raise ValueError(f"{name.upper()} holds a development placeholder")
             if self.webhook_base_url is not None and not self.webhook_base_url.startswith(
                 "https://"
             ):

@@ -91,12 +91,21 @@ All notable changes are listed here, generated from Conventional Commits on rele
   an upcoming closure links to that page at `/g/{slug}/closure`; the page of a booking on hold
   shows the contact options above its actions. `seed-closures` adds the examples that e2e checks
   (axe, Lighthouse, keyboard) in nl and en; refused in production.
+- Release and versioning policy (ADR 0052): version rules from Conventional Commits,
+  `make release-plan`, a release PR plus tag, CI refuses a tag off `main` or out of step with
+  `pyproject.toml`; every image carries its commit (`APP_COMMIT`), shown on `/admin/updates`
+  and by `python -m app.cli version`.
 - Closure image (ADR 0037, CL-3): a running or planned closure can carry one PNG, JPEG or WebP
   image (at most 500 kB, type from the magic bytes, metadata such as EXIF and XMP stripped),
   with a text alternative in nl and en or marked decorative; shown on the closure page and
   served from our origin only while the closure is visible. Magic-byte recognition and the
   multipart upload reader are shared with the logo (`app/domain/images.py`,
   `app/admin/uploads.py`). Migration 0040. Manual topic for the closure screen.
+- Closure scenarios (ADR 0037, CL-4): organisation scenarios (`organisation.closure`) and a
+  team's own (`closure.manage`) with name, notices, headings, an optional contact block and an
+  image that only admins see. "Close the team" and "close the organisation" start from a
+  scenario (or empty) and copy it; later edits never change a running closure. Audited as
+  `closure.start,scenario:N,bookings:N`. Migration 0047. Manual topic with examples to copy.
 - Embedding on host websites (ADR 0035, EM-1): allowed origins per organisation under
   Insluiten (`embedding.manage`, organisation admin and superuser), exact `https` origins,
   localhost only outside production; a group's own switch "Insluiten op websites" (off by
@@ -105,3 +114,11 @@ All notable changes are listed here, generated from Conventional Commits on rele
   texts, the month and the times of a day, and booking; CORS only for the organisation's
   allowed origins, `require_allowed_origin` on bookings, the standalone page's rate limits and
   honeypot, no token or personal data in answers.
+- `<gov-booking>` Web Component (ADR 0035, EM-3/EM-4): vanilla JS under `widget/`, Shadow DOM,
+  `--booking-*` tokens, `::part()`, ARIA grid with roving tabindex, focus to each step's
+  heading, live region; bundled by esbuild in the image build and CI; served at
+  `/widget/v1/gov-booking.js` with its SRI hash shown in the admin portal. Test host page on
+  another origin with a strict CSP; axe, Lighthouse and a keyboard-only flow in nl and en.
+- Documentation for host websites (ADR 0035, EM-5): `docs/widget.md` (allowing an origin,
+  the code, attributes, CSP, versions and integrity, tokens and parts, privacy,
+  troubleshooting) and a runbook section.
