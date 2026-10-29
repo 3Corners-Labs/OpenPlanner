@@ -61,6 +61,8 @@ from app.domain.audit import (
     AuditEntry,
     AuditEvent,
     AuditFilter,
+    Category,
+    Level,
     Outcome,
     Source,
 )
@@ -392,6 +394,11 @@ class SqlTransaction(
                 detail=event.detail[:255],
                 source=event.source.value,
                 booking_id=event.booking_id,
+                event_id=event.event_id,
+                level=event.log_level.value,
+                category=event.event_category.value,
+                trace_id=event.trace_id[:32],
+                service=event.service[:16],
             )
         )
         await self._session.flush()
@@ -432,6 +439,11 @@ class SqlTransaction(
                     detail=row.detail,
                     source=Source(row.source),
                     booking_id=row.booking_id,
+                    category=Category(row.category),
+                    level=Level(row.level),
+                    trace_id=row.trace_id,
+                    service=row.service,
+                    event_id=row.event_id,
                 ),
                 name,
             )
