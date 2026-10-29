@@ -382,6 +382,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Age after which the worker healthcheck fails.",
     ),
     S("app_version", K.STRING, "", _B, T.HOST, "Baked into release images (ADR 0029)."),
+    S("app_commit", K.STRING, "", _B, T.HOST, "Git commit baked into every image (ADR 0052)."),
     S(
         "installation_name",
         K.STRING,

@@ -16,7 +16,8 @@ export async function expectNoAxeViolations(page: Page): Promise<void> {
 /** Press Tab until `locator` has focus; fails if it is not reachable with the keyboard. */
 export async function tabTo(page: Page, locator: Locator): Promise<void> {
   for (let i = 0; i < 200; i++) {
-    if (await locator.evaluate((el) => el === document.activeElement)) return;
+    // Inside a shadow root (the widget) the root, not the document, knows the focused element.
+    if (await locator.evaluate((el) => el === (el.getRootNode() as Document | ShadowRoot).activeElement)) return;
     await page.keyboard.press('Tab');
   }
   throw new Error('element not reachable with Tab');

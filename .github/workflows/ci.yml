@@ -23,6 +23,8 @@ env:
   NODE_VERSION: "24"
   # renovate: datasource=docker depName=ghcr.io/gitleaks/gitleaks
   GITLEAKS_VERSION: "v8.30.1"
+  # renovate: datasource=docker depName=fsfe/reuse
+  REUSE_VERSION: "5.0.2"
 
 jobs:
   python:
@@ -90,6 +92,9 @@ jobs:
       - name: npm audit (e2e tooling)
         working-directory: e2e
         run: npm ci && npm audit --audit-level=moderate
+      - name: npm audit and build (widget, ADR 0035)
+        working-directory: widget
+        run: npm ci --ignore-scripts && npm audit --audit-level=moderate && npm run build
 
   semgrep:
     runs-on: ubuntu-24.04
@@ -126,10 +131,10 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # ADR 0054: every file carries licence and copyright information (REUSE.toml).
       - name: reuse lint
-        run: docker run --rm -v "$PWD:/data" fsfe/reuse:5.0.2 lint
+        run: docker run --rm -v "$PWD:/data" "fsfe/reuse:$REUSE_VERSION" lint
       # Outside contributors tick the CLA box (docs/cla.md). Whoever can write to this
       # repository is exempt: members (also with a private membership, which
       # author_association reports as CONTRIBUTOR) and collaborators. The permission and the
@@ -274,7 +279,8 @@ jobs:
       - name: Lighthouse accessibility >= 95
         run: >-
           docker run --rm --network host -e CI=true
-          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE" npm run lighthouse
+          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE"
+          sh -c "node host/serve.mjs & npm run lighthouse"
       # ADR 0038: maintenance closes every citizen page, so its page is checked last, alone.
       - name: maintenance page + axe (switches maintenance on and off again)
         run: >-

@@ -62,6 +62,14 @@ gitleaks (MIT), semgrep (LGPL-2.1, CI container) likewise.
 @playwright/test, @axe-core/playwright (MPL-2.0, required by CLAUDE.md), lighthouse,
 chrome-launcher: all active (ADR 0006).
 
+## Widget build (npm, CI and image build only)
+
+| Package | Purpose | License | Maintenance | Note |
+|---|---|---|---|---|
+| esbuild | Bundles `widget/src/` (and its CSS as text) into one ES module, `widget/dist/gov-booking.js` (ADR 0035) | MIT | very active (releases monthly, 0.25.12 checked 2026-10-28) | De facto standard bundler; the stack names it (CLAUDE.md). Runs in the `widget` stage of the Dockerfile and in CI; never in the runtime image. `npm audit` in CI. The image build uses `node:22.20.0-bookworm-slim` (MIT) for that stage only |
+
+The widget itself has no runtime dependencies: vanilla JavaScript, no framework.
+
 ## Containers (production)
 
 | Image | Purpose | License | Maintenance | Note |

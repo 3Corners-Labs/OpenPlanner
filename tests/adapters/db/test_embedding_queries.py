@@ -21,7 +21,7 @@ async def test_origins_round_trip_in_order_and_are_replaced_and_removed(
     async with uow.read() as tx:
         demo = await tx.get_organisation("demo")
         assert demo is not None
-        assert await tx.get_allowed_origins(demo.id) == AllowedOrigins()
+        assert await tx.get_allowed_origins(demo.id) == AllowedOrigins(("http://localhost:8001",))
 
     async with uow.locked() as tx:
         await tx.save_allowed_origins(demo.id, SITES)
@@ -44,13 +44,13 @@ async def test_the_embedding_switch_is_stored_with_the_group(engine: AsyncEngine
     await seed_demo(engine)
     uow = SqlUnitOfWork(engine)
     async with uow.read() as tx:
-        group = await tx.get_group("demo")
+        group = await tx.get_group("andere-team")
     assert group is not None
     assert not group.embedding_enabled
 
     async with uow.locked() as tx:
         await tx.save_group(replace(group, embedding_enabled=True))
     async with uow.read() as tx:
-        stored = await tx.get_group("demo")
+        stored = await tx.get_group("andere-team")
     assert stored is not None
     assert stored.embedding_enabled

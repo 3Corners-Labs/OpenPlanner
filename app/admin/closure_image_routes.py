@@ -17,15 +17,12 @@ from starlette.responses import HTMLResponse, Response
 
 from app.admin.closure_routes import ManageClosure, closure_page_response, closure_service
 from app.admin.forms import FormData, raise_refusal, redirect_done
+from app.admin.image_forms import image_refusal, read_image_form
 from app.admin.pages import Locale, SameOrigin
-from app.admin.uploads import read_upload
-from app.domain.errors import DomainError, ErrorCode
-from app.domain.images import ALT_LOCALES, MAX_IMAGE_BYTES, ImageFile, ImageText, alt_field
-from app.web.errors import FormError, status_for
+from app.domain.errors import DomainError
+from app.web.errors import status_for
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
-
-TEXT_FIELDS = (*(alt_field(code) for code in ALT_LOCALES), "decorative")
 
 
 def _url(slug: str) -> str:
@@ -38,24 +35,14 @@ async def save_image(
     request: Request, locale: Locale, slug: str, _: SameOrigin, context: ManageClosure
 ) -> Response:
     """Store an uploaded image with its text alternative, or change only the text."""
-    upload = await read_upload(request, "image", MAX_IMAGE_BYTES, TEXT_FIELDS)
-    form = FormData(upload.values, locale.gettext)
+    submitted = await read_image_form(request, locale)
     try:
-        text = ImageText(
-            {code: form.text(alt_field(code)) for code in ALT_LOCALES},
-            decorative=form.checked("decorative"),
-        )
-        image = ImageFile.from_upload(upload.data) if upload.data else None
+        text, image = submitted.parsed()
         await closure_service(request).set_image(context.principal, slug, text, image)
     except DomainError as error:
         raise_refusal(error)
-        if error.code is ErrorCode.INVALID_CONFIGURATION and error.field == "image":
-            message = locale.gettext("admin.form.error.image", kb=MAX_IMAGE_BYTES // 1000)
-            form.errors.append(FormError("image", message))
-        else:
-            form.refusal(error)
-        status = 422 if error.code is ErrorCode.INVALID_CONFIGURATION else status_for(error)
-        return await closure_page_response(request, locale, context, form, status)
+        status = image_refusal(submitted.form, error, locale) or status_for(error)
+        return await closure_page_response(request, locale, context, submitted.form, status)
     return redirect_done(_url(slug), "image_saved")
 
 

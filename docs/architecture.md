@@ -132,6 +132,8 @@ flowchart TB
   update or a restore in the portal; the host updater (outside the containers, with the Docker
   socket) verifies the signature, backs up, switches the pinned digest and rolls back on its
   own when the new version does not become healthy.
+- **Releases** (ADR 0052): only a tag `vX.Y.Z` on `main` is a version; a merge to `main` only
+  builds a test image. Every image carries its commit (`APP_COMMIT`), shown on `/admin/updates`.
 
 ## 5. Code structure
 
@@ -214,10 +216,12 @@ same commit and rollback behaviour as the SQL one.
 | Bookings, contact validation | `app/domain/booking.py` |
 | Book, cancel, reschedule (use cases) | `app/domain/services.py` |
 | Emergency closure, bookings on hold (ADR 0024) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/admin/closure_image_routes.py`, `app/web/closure_labels.py` |
+| Closure scenarios (ADR 0037 §4) | `app/domain/scenarios.py`, `app/domain/scenario_service.py`, `app/admin/scenario_routes.py`, `app/adapters/db/scenarios.py` |
 | Uploaded images: type from the bytes, metadata stripped, text alternative (ADR 0020, 0037 §3) | `app/domain/images.py`, `app/admin/uploads.py`, `app/adapters/db/images.py` |
 | Alternative contact options (ADR 0037) | `app/domain/contacts.py`, `app/domain/contact_service.py`, `app/admin/contact_routes.py`, `app/web/contact_labels.py`, `app/web/templates/_contact_block.html` |
 | Embedding on host websites: allowed origins, opt-in per group (ADR 0035) | `app/domain/embedding.py`, `app/domain/embedding_service.py`, `app/admin/embedding_routes.py` |
 | Widget API `/api/v1/widget` with CORS for allowed origins (ADR 0035) | `app/api/widget_api.py`, `app/api/widget_schemas.py` |
+| `<gov-booking>` Web Component, its script route and SRI hash, test host page (ADR 0035) | `widget/src/`, `app/api/widget_script.py`, `app/web/widget_bundle.py`, `e2e/host/` |
 | Which jobs, when | `app/domain/job_plan.py` |
 | Channels, reminder rules | `app/domain/channels.py` |
 | Management tokens | `app/domain/tokens.py` |
@@ -722,6 +726,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | ADR 0032 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns; backlog CC-0 to CC-6) | planned |
 | ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
 | ADR 0048 | Live update progress: steps reported by the host updater, shown live on the updates page | done |
+| ADR 0052 | Releases and version numbers: rules, release PR plus tag, tag check in CI, commit in every image | done |
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
 | ADR 0033 | Manual and context-sensitive help: group settings documented, other screens follow | in progress |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
@@ -730,7 +735,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 | ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | proposed |
 | ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
-| ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | in progress (CB-1, CL-1, CL-2, CL-3 done) |
+| ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | in progress (CB-1, CL-1 to CL-4 done) |
 | ADR 0038 | Maintenance mode (backlog MM-1 to MM-5) | planned |
 | ADR 0039 | Rights: (1) auditor role, reach, matrix page text; (2) retention overview; (3) custom roles within bounds | in progress |
 | ADR 0040 | Logging and storage: step 1 rotation, reclaim and disk watch; steps 2–4 schema and levels, filters and CSV export, diagnostic mode and retention | step 1 done |
