@@ -9,7 +9,11 @@ coverage.xml
 htmlcov/
 data/
 .env
+.env.bak.*
+.env.update
 proxy.env
+# Host-specific additions on an installed checkout (docs/install.md).
+docker-compose.override.yml
 # Bootstrap keys from `python -m app.cli init` (ADR 0042).
 secrets/
 .audit-requirements.txt
