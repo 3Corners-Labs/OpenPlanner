@@ -204,7 +204,10 @@ audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
 worker ──GET releases/latest (no data sent; optional read-only token)──> api.github.com
         <── tag and release page ── stored in release_checks
 superuser ──POST update / restore / cancel──> web ──SQL──> update_requests (versions, subject id)
-host updater ──docker exec python -m app.cli──> web ──SQL──> update_requests, audit_events
+superuser's browser ──GET /admin/updates/progress (every 5 s while open; ADR 0048)──> web
+        <── steps and status of the request (no personal data) ──
+host updater ──docker exec python -m app.cli (claim, progress, report)──> web ──SQL──>
+             update_requests (status, step), audit_events
              ──backup-db──> data/backups/request-<id>.db (copy of the whole database: PII)
 ```
 
@@ -213,6 +216,18 @@ backups the updater takes before every change contain the PII of `bookings`; the
 data volume with mode 600 and are deleted after 24 hours (`backup-db --prune` on every updater
 run). A backup that is put back is minutes old: purge jobs that ran after it are still pending
 in it and run again on the next worker cycle.
+
+## Maintenance mode (ADR 0038)
+
+```
+superuser ──POST /admin/maintenance/on|off (reason code, expected end)──> web ──SQL──> maintenance_state
+host (CLI, updater) ──docker exec python -m app.cli maintenance──> web ──SQL──> maintenance_state, audit_events
+operator ──MAINTENANCE_MODE (environment)──> web (no database read)
+admin ──POST (any change) during maintenance──> web ──refused──> audit_events (permission, target slugs)
+```
+
+The switch holds a subject identifier or a host actor, times and a reason code: no personal
+data. A refused change is audited with its permission and target only, never the form content.
 
 ## HTTPS certificate (ADR 0030)
 

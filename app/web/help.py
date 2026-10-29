@@ -77,6 +77,7 @@ TOPICS = (
         ),
         Permission.CLOSURE_MANAGE,
     ),
+    HelpTopic("maintenance", ("/admin/maintenance",), Permission.SYSTEM_MAINTENANCE),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 

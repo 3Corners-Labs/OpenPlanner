@@ -2,10 +2,11 @@
 
 ADR 0037 §3 (CL-3). ``closure_images`` holds the stripped image bytes, their type and digest
 and the text alternative per locale (or ``decorative``); ``closures.image_id`` points at the
-closure's image. Organisation data only; no personal data of citizens.
+closure's image. Organisation data only; no personal data of citizens. It also joins the
+two heads 0027 and 0029 that main has until a merge revision lands there (PR #91).
 
 Revision ID: 0028
-Revises: 0026
+Revises: 0027, 0029
 Create Date: 2026-10-28 23:30:00.000000
 """
 
@@ -15,7 +16,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0028"
-down_revision: str | None = "0026"
+down_revision: str | Sequence[str] | None = ("0027", "0029")
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
