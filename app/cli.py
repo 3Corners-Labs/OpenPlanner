@@ -25,6 +25,12 @@ Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``)
     ``python -m app.cli webhooks-reset [--yes] [--reregister]``  delete stale registrations
     ``python -m app.cli webhooks-health``  token expiry and a signed delivery self-test
 
+When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
+    ``python -m app.cli oidc-check``  check the login configuration and print the claim mapping
+    ``python -m app.cli closure start (--group SLUG | --organisation SLUG) --notice-nl TEXT
+    --notice-en TEXT [--end ISO]``  emergency closure (ADR 0024), audited as ``system:cli``
+    ``python -m app.cli closure lift (--group SLUG | --organisation SLUG)``  end it now
+
 Run them inside the ``web`` container (``docker compose exec web ...``): they share its
 database (one token store) and its secrets. The webhook commands store their last result for
 the admin portal's integrations page.
@@ -54,7 +60,8 @@ from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportS
 from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.diagnostics import CheckResult, format_report, passed, probes, run_checks
-from app.adapters.integrations import build_integrations
+from app.adapters.integrations import build_integrations, secret_box
+from app.adapters.oidc_check import OidcTarget, check_oidc
 from app.adapters.registrations import (
     Expected,
     Listing,
@@ -71,12 +78,14 @@ from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks,
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.config import Settings, environment
 from app.domain.admin import AdminService
-from app.domain.authorization import Scope
+from app.domain.authorization import Principal, Role, Scope
+from app.domain.closure_service import ClosureInput, ClosureService, GroupOutcome
 from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import Group
+from app.domain.services import BookingService
 from app.domain.settings_registry import lookup
 from app.domain.update_service import UpdateService
 from app.domain.updates import OUTCOMES, REPORTED_STEPS
@@ -502,6 +511,164 @@ def _token_expiry(health: TokenHealth) -> list[CheckResult]:
     ]
 
 
+# --- when nobody can log in (ADR 0042 §8, §10) ------------------------------------------------
+
+CLI_ACTOR = Principal(
+    subject="system:cli",
+    display_name="host CLI",
+    roles=frozenset({Role.SUPERUSER}),
+    organisations=frozenset(),
+    groups=frozenset(),
+)
+"""Who the host commands act as: access to the host is the authorisation (ADR 0042 §10).
+
+Used only inside this process to call the same domain services as the portal, so their
+rules and audit apply unchanged; it never becomes a session, a user or a role grant.
+"""
+
+CLAIM_SETTINGS = (
+    "oidc_role_claim",
+    "oidc_organisation_claim",
+    "oidc_group_claim",
+    "oidc_role_superuser",
+    "oidc_role_org_admin",
+    "oidc_role_group_admin",
+    "oidc_role_auditor",
+)
+"""The claim mapping ``oidc-check`` prints: claim names and role values, never secrets."""
+
+
+async def _oidc_check(
+    settings: Settings, transport: httpx.AsyncBaseTransport | None = None
+) -> tuple[str, bool]:
+    """Check the login configuration against the provider; print the effective claim mapping.
+
+    Two reads only (discovery and key set): no login is started and no secret is printed.
+    """
+    if settings.oidc_discovery_url is None:
+        return "OIDC_DISCOVERY_URL is not set: the admin portal is disabled.\n", False
+    target = OidcTarget(
+        discovery_url=settings.oidc_discovery_url,
+        redirect_uri=f"{settings.public_base_url.rstrip('/')}/admin/callback",
+        require_https=settings.environment == "prod",
+        client_secret_set=settings.oidc_client_secret is not None,
+    )
+    async with httpx.AsyncClient(timeout=15.0, transport=transport) as http:
+        results = await check_oidc(http, target)
+    width = max(len(name) for name in CLAIM_SETTINGS) + 1
+    mapping = "".join(
+        f"  {name.upper():<{width}}{getattr(settings, name)}  "
+        f"{'env' if name in settings.model_fields_set else 'default'}\n"
+        for name in CLAIM_SETTINGS
+    )
+    return format_report(results) + "\nClaim mapping (value, source):\n" + mapping, passed(results)
+
+
+@asynccontextmanager
+async def _closures(settings: Settings) -> AsyncIterator[ClosureService]:
+    """Yield the closure service wired as in the web process (same rules, mails, audit)."""
+    engine = create_engine(settings.database_url)
+    try:
+        uow = SqlUnitOfWork(engine, secret_box(settings))
+        clock = SystemClock()
+        bookings = BookingService(uow, clock, management_token_key(settings))
+        yield ClosureService(uow, clock, AdminService(uow, clock), bookings)
+    finally:
+        await engine.dispose()
+
+
+def _group_lines(verb: str, outcomes: list[GroupOutcome], suffix: str) -> str:
+    """Return one line per group of an organisation-wide closure or lift."""
+    return "".join(
+        f"{verb} {o.slug}{suffix.format(o.bookings)}\n"
+        if o.changed
+        else f"skipped {o.slug}: {'already closed' if verb == 'closed' else 'not closed'}\n"
+        for o in outcomes
+    )
+
+
+async def _closure_start(
+    settings: Settings,
+    *,
+    group: str | None,
+    organisation: str | None,
+    notices: dict[str, str],
+    ends_at: datetime | None,
+) -> tuple[str, bool]:
+    """Close a group or every group of an organisation now (ADR 0024) for an IdP outage."""
+    closure = ClosureInput(starts_at=None, ends_at=ends_at, notices=notices)
+    suffix = ": {} bookings on hold"
+    try:
+        async with _closures(settings) as service:
+            if group is not None:
+                count = await service.close_group(CLI_ACTOR, group, closure)
+                return f"closed {group}{suffix.format(count)}\n", True
+            # argparse requires one of the two; an empty slug is refused as not permitted.
+            outcomes = await service.close_organisation(CLI_ACTOR, organisation or "", closure)
+    except DomainError as error:
+        return f"refused: {error.code}\n", False
+    return _group_lines("closed", outcomes, suffix) or "no groups\n", True
+
+
+async def _closure_lift(
+    settings: Settings, *, group: str | None, organisation: str | None
+) -> tuple[str, bool]:
+    """End a closure now; bookings on hold stay on hold until an admin handles them."""
+    try:
+        async with _closures(settings) as service:
+            if group is not None:
+                await service.lift(CLI_ACTOR, group, reinstate=False)
+                return f"lifted {group}\n", True
+            outcomes = await service.lift_organisation(
+                CLI_ACTOR, organisation or "", reinstate=False
+            )
+    except DomainError as error:
+        return f"refused: {error.code}\n", False
+    return _group_lines("lifted", outcomes, "") or "no groups\n", True
+
+
+def _moment(value: str) -> datetime:
+    """Parse ``--end``: ISO 8601 with an offset, so the moment is never ambiguous."""
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("use ISO 8601, e.g. 2026-11-02T08:00+01:00") from exc
+    if parsed.tzinfo is None:
+        raise argparse.ArgumentTypeError("include the offset, e.g. 2026-11-02T08:00+01:00")
+    return parsed.astimezone(UTC)
+
+
+def _closure_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
+    """Add ``closure start`` and ``closure lift``, each for one group or one organisation."""
+    closure = commands.add_parser("closure", help="emergency closure while nobody can log in")
+    actions = closure.add_subparsers(dest="closure_action", required=True)
+    start = actions.add_parser("start", help="close now")
+    lift = actions.add_parser("lift", help="end the closure now")
+    for action in (start, lift):
+        target = action.add_mutually_exclusive_group(required=True)
+        target.add_argument("--group", metavar="SLUG")
+        target.add_argument("--organisation", metavar="SLUG")
+    start.add_argument("--notice-nl", required=True, metavar="TEXT")
+    start.add_argument("--notice-en", required=True, metavar="TEXT")
+    start.add_argument("--end", type=_moment, metavar="ISO", help="default: until lifted")
+
+
+def _closure(settings: Settings, args: argparse.Namespace) -> int:
+    """Run ``closure start`` or ``closure lift``."""
+    if args.closure_action == "start":
+        notices = {"nl": args.notice_nl, "en": args.notice_en}
+        outcome = _closure_start(
+            settings,
+            group=args.group,
+            organisation=args.organisation,
+            notices=notices,
+            ends_at=args.end,
+        )
+    else:
+        outcome = _closure_lift(settings, group=args.group, organisation=args.organisation)
+    return _write(asyncio.run(outcome))
+
+
 def _settings(settings: Settings, action: str, key: str | None) -> tuple[str, int]:
     """Run ``settings list`` or ``settings show KEY``; return the report and exit code."""
     states = describe(settings, environment())
@@ -553,6 +720,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--reregister", action="store_true", help="with --yes: run register-webhooks afterwards"
     )
     commands.add_parser("webhooks-health", help="token expiry and a signed delivery self-test")
+    commands.add_parser("oidc-check", help="check the login configuration (no login started)")
+    _closure_parser(commands)
     settings_cmd = commands.add_parser("settings", help="show settings and their source")
     settings_actions = settings_cmd.add_subparsers(dest="action", required=True)
     settings_actions.add_parser("list", help="every setting: class, source, lock, value")
@@ -563,6 +732,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "version":
         sys.stdout.write(_version(Settings()))
         return 0
+    if args.command == "oidc-check":
+        return _write(asyncio.run(_oidc_check(Settings())))
+    if args.command == "closure":
+        return _closure(Settings(), args)
     if args.command == "settings":
         text, code = _settings(Settings(), args.action, getattr(args, "key", None))
         sys.stdout.write(text)
