@@ -36,6 +36,7 @@ from app.admin.authz import AdminContext, RequirePermission, admin_service, can_
 from app.admin.forms import Option, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
+from app.admin.planner_routes import REASON_LABELS as CHANGE_REASON_LABELS
 from app.domain import staff
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT, LOGOUT_EVENT
 from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
@@ -59,11 +60,13 @@ from app.domain.authorization import (
     Target,
     decide,
 )
+from app.domain.booking import ChangeReason
 from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
 from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
 from app.domain.maintenance import MaintenanceReason
+from app.domain.planner_service import ALERT_ACTION
 from app.domain.ports import Clock
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.scheduling import GroupSummary
@@ -110,6 +113,8 @@ EVENT_LABELS: dict[str, str] = {
     "job.send_suspension": "audit.job.send_suspension",
     "job.send_closure_update": "audit.job.send_closure_update",
     "job.send_reinstatement": "audit.job.send_reinstatement",
+    # ADR 0044: one planner made many changes within an hour.
+    ALERT_ACTION: "audit.event.planner_changes_alert",
     # Storage watch (ADR 0040): global, so only the superuser sees it.
     STORAGE_EVENT: "audit.event.storage_check",
     # Staff directory (ADR 0046): first login, and roles or memberships changed at login.
@@ -138,6 +143,7 @@ DETAIL_LABELS: dict[str, str] = {
     "horizon_days": "admin.field.horizon_days",
     "phone_mode": "admin.field.phone_mode",
     "dispatch_lead_minutes": "admin.field.dispatch_lead_minutes",
+    "planner_change_min_lead_minutes": "admin.field.planner_change_min_lead_minutes",
     "video_host_email": "admin.field.video_host_email",
     "wxcc_business_address": "admin.field.wxcc_business_address",
     "wxcc_channel": "admin.field.wxcc_channel",
@@ -169,6 +175,9 @@ DETAIL_LABELS: dict[str, str] = {
     "booking.cancel": "admin.audit.detail.booking_cancel",
     "booking.cancel_all": "admin.audit.detail.booking_cancel_all",
     "booking.move": "admin.audit.detail.booking_move",
+    "planner.move": "admin.audit.detail.planner_move",
+    "planner.cancel": "admin.audit.detail.planner_cancel",
+    "shortfall.accept": "admin.audit.detail.shortfall_accept",
     "client.create": "admin.audit.detail.client_create",
     "client.rotate": "admin.audit.detail.client_rotate",
     "client.enable": "admin.audit.detail.client_enable",
@@ -199,6 +208,7 @@ COUNT_LABELS: dict[str, str] = {
     "attempt": "admin.audit.detail.attempt",
     "free_percent": "admin.audit.detail.free_percent",
     "database_mb": "admin.audit.detail.database_mb",
+    "changes": "admin.audit.detail.changes",
     "suppressed": "admin.audit.detail.suppressed",
     "modes": "admin.audit.detail.modes",
 }
@@ -211,6 +221,8 @@ VALUE_LABELS: dict[str, str] = {
     staff.ORGANISATION_REMOVED: "admin.audit.detail.organisation_remove",
     staff.GROUP_ADDED: "admin.audit.detail.group_add",
     staff.GROUP_REMOVED: "admin.audit.detail.group_remove",
+    "reason": "admin.audit.detail.reason",
+    "actor": "admin.audit.detail.actor",
 }
 """Readable label per audit detail with a code or slug, e.g. ``role.add:org_admin`` (ADR 0046)."""
 
@@ -336,7 +348,11 @@ def _detail_label(detail: str, _: BoundGettext) -> str:
         if name in COUNT_LABELS and count.isdigit():
             labels.append(_(COUNT_LABELS[name], count=int(count)))
         elif name in VALUE_LABELS:
-            value = _(ROLE_LABELS[Role(count)]) if count in set(Role) else count
+            value = count
+            if count in set(Role):
+                value = _(ROLE_LABELS[Role(count)])
+            elif name == "reason" and count in set(ChangeReason):
+                value = _(CHANGE_REASON_LABELS[ChangeReason(count)])
             labels.append(_(VALUE_LABELS[name], value=value))
         else:
             labels.append(_(DETAIL_LABELS[key]) if key in DETAIL_LABELS else key)

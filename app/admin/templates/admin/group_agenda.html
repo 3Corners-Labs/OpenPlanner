@@ -36,7 +36,14 @@
           {% if slot.closed %}<span class="chip">{{ icon("lock") }}{{ _("admin.agenda.closed") }}</span>
           {% elif slot.staffing %}<span class="muted">{{ slot.staffing }}</span>
           {% else %}<span class="muted">{{ _("admin.agenda.off_schedule") }}</span>{% endif %}
-          {% if slot.shortfall %}<span class="chip chip--danger">{{ icon("alert") }}{{ slot.shortfall }}</span>{% endif %}
+          {% if slot.shortfall and slot.accepted %}<span class="chip">{{ icon("check") }}{{ _("admin.agenda.accepted") }}</span>
+          {% elif slot.shortfall %}<span class="chip chip--danger">{{ icon("alert") }}{{ slot.shortfall }}</span>{% endif %}
+          {% if slot.can_accept %}
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/agenda/accept">
+            <input type="hidden" name="start" value="{{ slot.start }}">
+            <button type="submit" class="button button--secondary button--small">{{ _("admin.agenda.accept") }}<span class="visually-hidden"> {{ slot.time }}</span></button>
+          </form>
+          {% endif %}
         </th>
       </tr>
       {% for row in slot.rows %}
