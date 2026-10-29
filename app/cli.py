@@ -7,6 +7,7 @@ Usage:
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
+    ``python -m app.cli version``  the release and commit this image was built from (ADR 0051)
 
 Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
     ``python -m app.cli update-claim``  claim the waiting request: ``id action target from``
@@ -249,6 +250,12 @@ async def _updates(settings: Settings) -> AsyncIterator[UpdateService]:
             yield update_service(local, SqlUnitOfWork(engine), SystemClock(), http)
     finally:
         await engine.dispose()
+
+
+def _version(settings: Settings) -> str:
+    """Return the release and commit this image was built from (ADR 0051)."""
+    release = settings.app_version or "none (no release)"
+    return f"version {release}\ncommit {settings.app_commit or 'unknown'}\n"
 
 
 async def _update_claim(settings: Settings) -> str:
@@ -497,6 +504,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
+    commands.add_parser("version", help="print the release and commit of this image")
     commands.add_parser("update-claim", help="claim the waiting update request (host updater)")
     progress_cmd = commands.add_parser("update-progress", help="record the step an update starts")
     progress_cmd.add_argument("request_id", type=int)
@@ -526,6 +534,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     commands.add_parser("webhooks-health", help="token expiry and a signed delivery self-test")
     args = parser.parse_args(argv)
+    if args.command == "version":
+        sys.stdout.write(_version(Settings()))
+        return 0
     if args.command == "update-claim":
         sys.stdout.write(asyncio.run(_update_claim(Settings())))
         return 0

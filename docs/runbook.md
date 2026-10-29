@@ -568,6 +568,89 @@ when a rule's channel is not configured.
 link in mails already sent; bookings are unaffected. Rotate only after an incident, and tell the
 contact center that citizens may call about broken links.
 
+## Releasing a version (ADR 0051)
+
+A merge to `main` is **not** a release. An installation only sees a new version after a tag
+`vX.Y.Z` on `main` has gone through `main.yml`. You do two things by hand (a release PR, then a
+tag); everything after the tag is automatic and visible in the Actions tab.
+
+### What happens where
+
+| Event | What runs | Result | Offered to installations? |
+|---|---|---|---|
+| PR | `ci.yml` | checks only | no |
+| Merge to `main` | `main.yml`: ZAP, mutation, build, sign | image `:main` and `:sha-<commit>`, with `APP_COMMIT`, no version | no |
+| Tag `vX.Y.Z` pushed | `main.yml`: tag check, ZAP, mutation, build, sign, SBOM, GitHub release | image `:X.Y.Z` with `APP_VERSION` and `APP_COMMIT`; release page with SBOM | yes, within an hour |
+
+### Step 1: decide the number
+
+On an up-to-date `main` in your own checkout (not a worktree of another branch):
+
+```sh
+git switch main && git pull
+make release-plan
+```
+
+It prints the last release, every commit since then and the next version by the rules of
+ADR 0051 (breaking → MAJOR, from 1.0; `feat` → MINOR; anything else → PATCH). It changes
+nothing. Write the number down, for example `0.3.0`.
+
+### Step 2: the release PR
+
+On a branch `release/v0.3.0` (or ask Claude Code: "make the release PR for v0.3.0"):
+
+1. `pyproject.toml`: `version = "0.3.0"`, then `uv lock` (only the `openplanner` line changes).
+2. `CHANGELOG.md`: rename `## Unreleased` to `## 0.3.0 (2026-11-02)` and put a fresh empty
+   `## Unreleased` above it.
+3. Commit `chore(release): v0.3.0`, open the PR, merge it (squash) when CI is green.
+
+### Step 3: the tag
+
+On `main`, after the release PR is merged:
+
+```sh
+git switch main && git pull
+git log -1 --oneline        # must be "chore(release): v0.3.0 (#NN)"
+git tag -a v0.3.0 -m "v0.3.0: tagged on the instruction of <name> on <date>"
+git push origin v0.3.0
+```
+
+Do **not** use "Draft a new release" on GitHub: `main.yml` creates the release itself after
+the image is signed, and a hand-made release would make that step fail.
+
+### Step 4: watch it go out
+
+1. GitHub → *Actions* → workflow *main* for `v0.3.0`. First "release tag matches main and
+   pyproject.toml" (fails if the tag is not on `main` or `pyproject.toml` says another
+   version), then ZAP and mutation, then *build, push and sign image*.
+2. When it is green, GitHub → *Releases* shows `v0.3.0` with `sbom.cdx.json`.
+3. Within an hour the superuser sees the update banner in the portal and starts the update on
+   `/admin/updates` (section *Updates from the admin portal* below).
+
+### Step 5: check what runs
+
+- In the portal: `/admin/updates` → *Running now* `0.3.0` and *Commit* (links to GitHub).
+- On the host: `docker compose --env-file .env.update exec web python -m app.cli version`.
+- Has a given fix landed? In a checkout: `git tag --contains <fix commit>` lists every release
+  that holds it. If the running version is not in that list, the fix is not live.
+
+### When the tag was wrong
+
+If the tag check failed, nothing was published. Remove the tag and set it on the right commit:
+
+```sh
+git push --delete origin v0.3.0 && git tag -d v0.3.0
+```
+
+Once a release has been published, never move or reuse its tag: installations may already run
+it. Fix forward with the next number.
+
+### Security fixes
+
+Release on the day the fix is merged (ADR 0051 §6): run the same steps; `make release-plan`
+gives a PATCH when only fixes are waiting, otherwise a MINOR that also carries the features on
+`main`. Keep the release notes free of exploit details until installations have updated.
+
 ## Updates from the admin portal (ADR 0029)
 
 With `UPDATE_REPOSITORY=<owner>/<repo>` the worker looks up the latest GitHub release once an

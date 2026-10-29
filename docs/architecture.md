@@ -132,6 +132,8 @@ flowchart TB
   update or a restore in the portal; the host updater (outside the containers, with the Docker
   socket) verifies the signature, backs up, switches the pinned digest and rolls back on its
   own when the new version does not become healthy.
+- **Releases** (ADR 0051): only a tag `vX.Y.Z` on `main` is a version; a merge to `main` only
+  builds a test image. Every image carries its commit (`APP_COMMIT`), shown on `/admin/updates`.
 
 ## 5. Code structure
 
@@ -694,6 +696,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | ADR 0032 | Provider-neutral contact-center routing (migration off the `wxcc_*` columns; backlog CC-0 to CC-6) | planned |
 | ADR 0029 | Updates from the admin portal: hourly release check, banner, host updater with rollback | done |
 | ADR 0048 | Live update progress: steps reported by the host updater, shown live on the updates page | done |
+| ADR 0051 | Releases and version numbers: rules, release PR plus tag, tag check in CI, commit in every image | done |
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
 | ADR 0033 | Manual and context-sensitive help: group settings documented, other screens follow | in progress |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
