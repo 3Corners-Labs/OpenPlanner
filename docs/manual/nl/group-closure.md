@@ -21,6 +21,13 @@ Zodra de sluiting begint:
 
 Een sluiting die later begint, zien burgers vooraf als melding boven de agenda.
 
+### Beginnen met een scenario
+
+Hebt u een scenario voorbereid, kies het dan bij **Beginnen met een scenario** en klik op
+**Gebruiken**: het formulier wordt ingevuld met de melding en de kop van het scenario. Bij het
+sluiten neemt de sluiting ook de contactalternatieven en de afbeelding van het scenario over.
+Zie [Scenario's voor een noodsluiting](closure-scenarios.md).
+
 ## Afbeelding
 
 Een lopende of geplande sluiting kan één afbeelding hebben, zoals een pictogram voor

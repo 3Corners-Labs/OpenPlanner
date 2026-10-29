@@ -319,7 +319,10 @@ maintenance page follows in MM-3. Inputs from outside: kind, details, labels, op
 headings of up to six options; closure headings; on the citizen side only the slug and token
 in the path. The e2e examples come from `python -m app.cli seed-closures`. The image of a
 closure (CL-3): `POST /admin/groups/{slug}/closure/image` and `…/image/remove`
-(`closure.manage`, multipart), public `GET /g/{slug}/closure/image`.
+(`closure.manage`, multipart), public `GET /g/{slug}/closure/image`. Closure scenarios
+(CL-4): `/admin/organisations/{org}/closure/scenarios…` (`organisation.closure`) and
+`/admin/groups/{slug}/closure/scenarios…` (`closure.manage`), the closing forms with
+`?scenario=` and a hidden `scenario_id`.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -343,6 +346,12 @@ closure (CL-3): `POST /admin/groups/{slug}/closure/image` and `…/image/remove`
 | Information disclosure (privacy) | A third-party image host sees who opens the closure page | No external image URLs: only uploads, served from our origin; the CSP keeps `img-src 'self'` | `tests/admin/test_closure_image_routes.py::test_the_closure_page_keeps_its_csp` |
 | Elevation | Another organisation's admin sets or removes a team's closure image | One `RequirePermission(closure.manage)` on the group; `ClosureService` authorises again | `tests/admin/test_closure_image_routes.py::test_another_organisations_admin_is_refused`, `tests/domain/test_closure_image.py::test_another_organisations_admin_cannot_set_or_remove_the_image` |
 | Tampering (CSRF) | A third-party site uploads an image in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_closure_image_routes.py::test_cross_site_uploads_are_refused` |
+| Elevation | A group admin changes, deletes or re-illustrates an organisation scenario | Through the group only the group's own scenarios can be changed (`scenario_not_found` otherwise); through the organisation the matrix refuses `closure.manage`-only admins; `ScenarioService` authorises again | `tests/domain/test_scenarios.py::test_a_group_admin_cannot_change_an_organisation_scenario`, `tests/admin/test_scenario_routes.py::test_a_group_admin_uses_but_cannot_change_an_organisation_scenario`, `tests/admin/test_authorization_matrix.py::test_matrix` |
+| Information disclosure | An id in a URL or a hidden `scenario_id` reaches another group's or organisation's scenario (to read it or to start a closure with it) | Every lookup checks organisation and group; anything else is `scenario_not_found` (404), without saying it exists; listings take the permission's `Scope`, applied in SQL (`tests/adapters/db/test_scenario_queries.py::test_listing_follows_the_scope`) | `tests/domain/test_scenarios.py::test_another_groups_or_organisations_scenario_is_not_found`, `test_a_closure_cannot_use_another_groups_scenario`, `tests/admin/test_scenario_routes.py::test_an_unknown_or_foreign_scenario_cannot_start_a_closure` |
+| Information disclosure | A prepared scenario ("strike") leaks before it is used | Scenario images are served only on admin routes with the scenario's permission and `private, no-store`; nothing of a scenario is on a public page until a closure copies it | `tests/admin/test_scenario_routes.py::test_a_scenario_image_is_not_public` |
+| Tampering | Editing or deleting a scenario changes a running closure, so the page no longer matches the mail | The closure copies texts, contact block and image (its own image row) at the start | `tests/domain/test_scenarios.py::test_a_closure_copies_the_scenario_and_later_edits_leave_it_alone`, `tests/adapters/db/test_scenario_queries.py::test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with_it`, `tests/admin/test_scenario_routes.py::test_deleting_a_scenario_keeps_a_running_closure` |
+| Tampering (XSS) | A `javascript:` link, markup or an SVG in a scenario | Same validation as closures: `ContactBlock`, single-line headings and names, `ImageFile` by magic bytes; autoescape | `tests/admin/test_scenario_routes.py::test_scenario_errors_are_linked_to_their_fields` |
+| Repudiation | Who prepared or used a scenario | Audited with the scenario id and counts (`closure.start,scenario:N,bookings:N`), never names or texts | `tests/domain/test_scenarios.py::test_contacts_image_and_deletion`, `tests/admin/test_scenario_routes.py::test_start_closure_picks_a_scenario_and_copies_it` |
 
 ## Flow: embedded booking (ADR 0035, EM-2)
 

@@ -33,6 +33,13 @@ def two_organisations(next_id: int = 1) -> State:
     return state
 
 
+def three_groups(next_id: int = 100) -> InMemoryUnitOfWork:
+    """Return ``two_organisations`` with a second group ``demo-twee`` in ``demo``."""
+    state = two_organisations(next_id=next_id)
+    state.groups[3] = make_group(id=3, organisation_id=1, slug="demo-twee", name="Demo twee")
+    return InMemoryUnitOfWork(state)
+
+
 def audit_rows(uow: InMemoryUnitOfWork) -> list[tuple[str, str, Outcome, str, str | None]]:
     """Return (actor, action, outcome, detail, group) of every audit event, oldest first."""
     return [(e.actor, e.action, e.outcome, e.detail, e.group) for e in uow.state.audit]
