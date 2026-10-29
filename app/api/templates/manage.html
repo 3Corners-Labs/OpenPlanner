@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_steps.html" import steps with context %}
+{% from "_contact_block.html" import contact_block %}
 {% block title %}{{ _("manage.title") }} – {{ group.name }}{% endblock %}
 {% block content %}
 {% if notice %}<div class="notice notice--success" role="status"><p>{{ notice }}</p></div>{% endif %}
@@ -20,6 +21,7 @@
   <p>{{ _("manage.suspended.text") }}</p>
 </div>
 {% include "_closure_notice.html" %}
+{% if closure %}{{ contact_block(closure.contacts, id="closure-contacts") }}{% endif %}
 <ul class="actions">
   <li><a class="button" href="/b/{{ token }}/reschedule">{{ _("manage.suspended.reschedule") }}</a></li>
   <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
