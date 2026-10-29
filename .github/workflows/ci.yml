@@ -127,23 +127,39 @@ jobs:
     name: licence and contributor agreement
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # ADR 0054: every file carries licence and copyright information (REUSE.toml).
       - name: reuse lint
         run: docker run --rm -v "$PWD:/data" "fsfe/reuse:$REUSE_VERSION" lint
-      # Outside contributors tick the CLA box (docs/cla.md). The body is read from the
-      # environment, never interpolated into the script.
+      # Outside contributors tick the CLA box (docs/cla.md). Whoever can write to this
+      # repository is exempt: members (also with a private membership, which
+      # author_association reports as CONTRIBUTOR) and collaborators. The permission and the
+      # PR body are read from the API at run time, so re-running the job after ticking the box
+      # is enough. If the permission cannot be read, the box is required (fail closed). Values
+      # come from the environment, never interpolated into the script.
       - name: contributor licence agreement
-        if: >-
-          github.event_name == 'pull_request' &&
-          !contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) &&
-          github.event.pull_request.user.type != 'Bot'
+        if: github.event_name == 'pull_request' && github.event.pull_request.user.type != 'Bot'
         env:
-          PR_BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          if ! printf '%s' "$PR_BODY" | grep -qiE -- '- \[x\] I agree to the OpenPlanner Contributor Licence Agreement'; then
-            echo "::error::Tick 'I agree to the OpenPlanner Contributor Licence Agreement' in the pull request description (docs/cla.md)."
+          permission=$(gh api "repos/$REPO/collaborators/$AUTHOR/permission" --jq .permission 2>/dev/null || echo none)
+          case "$permission" in
+            admin|maintain|write)
+              echo "The author can write to this repository ($permission): no CLA needed."
+              exit 0
+              ;;
+          esac
+          echo "Author permission: $permission; the CLA box is required."
+          body=$(gh api "repos/$REPO/pulls/$NUMBER" --jq '.body // ""')
+          if ! printf '%s' "$body" | grep -qiE -- '- \[x\] I agree to the OpenPlanner Contributor Licence Agreement'; then
+            echo "::error::Tick 'I agree to the OpenPlanner Contributor Licence Agreement' in the pull request description (docs/cla.md), then re-run this job."
             exit 1
           fi
 
