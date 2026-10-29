@@ -412,3 +412,23 @@ database backups.
 | Elevation | An organisation admin reads the update progress | The fragment needs `system.update` like the page | `test_progress_fragment_refuses_an_organisation_admin`, `tests/admin/test_authorization_matrix.py::test_matrix` |
 | Repudiation | Who started an update and what the updater did | Requests and cancellations audited (`system.update`, `update.request`, `restore.request`, `request.cancel`); every updater step audited as `host-updater` with its reason | `test_cancel_a_waiting_request`, `test_updater_claims_the_waiting_request_once` |
 
+
+## Flow: maintenance mode (ADR 0038)
+
+Admin (superuser): `GET /admin/maintenance`, `POST /admin/maintenance/on` (reason code,
+optional expected end), `POST /admin/maintenance/off`. Host: `python -m app.cli maintenance
+on|off|status --reason R --by host-cli|host-updater` inside the web container. Environment:
+`MAINTENANCE_MODE`. While maintenance is on, every admin request that is not a GET passes
+`decide_in_maintenance` in `RequirePermission`. No personal data: the state holds a subject
+identifier or a host actor, times and a reason code.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Tampering | An organisation admin writes during maintenance (data that a rollback would lose) | `RequirePermission` refuses every non-GET request unless its permission is in `MAINTENANCE_WRITABLE` (or the route is `maintenance_safe`) and the principal reaches everything; one place, so no route can forget it | `tests/admin/test_authorization_matrix.py::test_matrix_during_maintenance` (every admin endpoint × role), `tests/domain/test_authorization.py::test_maintenance_freezes_every_other_role` |
+| Elevation | The superuser treated as a bypass: changing groups, closures or users during maintenance | The superuser too may only change integrations, updates and the switch, and run "Koppeling controleren" | `tests/domain/test_authorization.py::test_maintenance_freezes_everything_else_also_for_the_superuser`, `test_matrix_during_maintenance` |
+| Elevation | An organisation admin switches maintenance on (denial of service) or off (during an update) | `system.maintenance` is global, locked to the superuser; route and `MaintenanceService` both decide; a fresh login and the Fetch Metadata check | `tests/domain/test_maintenance_service.py::test_organisation_admin_cannot_switch`, `tests/admin/test_maintenance_routes.py::test_switching_needs_a_fresh_login`, `test_switching_is_refused_cross_site` |
+| Tampering | The portal switches off what the operator forced on with `MAINTENANCE_MODE` (database being restored) | The environment override is read without the database and cannot be switched off in the portal; the button is disabled with the reason | `tests/domain/test_maintenance_service.py::test_environment_override_cannot_be_switched_off_in_the_portal`, `tests/admin/test_maintenance_routes.py::test_the_environment_override_cannot_be_switched_off` |
+| Tampering | Free text in the audit log or the host's arguments (reason, actor) | Reasons and host actors are fixed codes (`MaintenanceReason`, `--by host-cli|host-updater`); the CLI refuses anything else | `tests/test_cli_maintenance.py::test_the_parser_refuses_free_text`, `tests/admin/test_maintenance_routes.py::test_an_unknown_reason_is_refused` |
+| Information disclosure | A refused change leaks the form content into the audit log | `maintenance.refused` records the permission and target only, never the input | `tests/domain/test_maintenance_service.py::test_refusal_is_audited_with_the_permission_only`, `tests/admin/test_maintenance_routes.py::test_a_refused_change_shows_the_maintenance_page_and_is_audited` |
+| Repudiation | Who switched maintenance and when | `maintenance.on` / `maintenance.off` audited with the actor (subject or host actor) and the reason; refusals as `maintenance.refused` | `tests/domain/test_maintenance_service.py::test_superuser_switches_on_and_off`, `test_host_switches_are_audited_as_the_actor` |
+| Denial of service | A switch made elsewhere (CLI, another process) is not seen, so writes slip through | The web process reads the switch with a cache of at most `MAINTENANCE_CACHE_SECONDS` (≤ 5 s); a switch in the same process clears the cache | `tests/domain/test_maintenance_service.py::test_status_is_cached_for_at_most_the_cache_period`, `test_a_switch_in_this_process_is_seen_at_once` |

@@ -5,6 +5,7 @@ Run with ``uvicorn app.main:create_app --factory``.
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 import httpx
 from fastapi import FastAPI
@@ -43,6 +44,7 @@ from app.domain.contact_service import ContactService
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
+from app.domain.maintenance_service import MaintenanceService
 from app.domain.messaging_service import MessagingService
 from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
@@ -129,6 +131,14 @@ def create_app(
         uow = SqlUnitOfWork(app.state.engine, secret_box(settings))
         app.state.booking_service = BookingService(uow, clock, token_key)
         app.state.admin_service = AdminService(uow, clock)
+        # ADR 0038: read on every admin change (and citizen write), cached for a few seconds.
+        app.state.maintenance_service = MaintenanceService(
+            uow,
+            clock,
+            app.state.admin_service,
+            environment=settings.maintenance_mode,
+            cache=timedelta(seconds=settings.maintenance_cache_seconds),
+        )
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)

@@ -46,6 +46,8 @@ class ErrorCode(StrEnum):
     UPDATE_REQUEST_NOT_FOUND = "update_request_not_found"
     PLANNER_TOO_LATE = "planner_too_late"
     MOVE_CAUSES_SHORTFALL = "move_causes_shortfall"
+    MAINTENANCE = "maintenance"
+    MAINTENANCE_FROM_ENVIRONMENT = "maintenance_from_environment"
 
 
 class DomainError(Exception):
