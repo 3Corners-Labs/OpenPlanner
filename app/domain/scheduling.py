@@ -175,6 +175,8 @@ class Group:
         queue_change_working_days: With the own queue, how many working days (Monday to
             Friday) before the start the booking becomes read-only, at the same local time.
             A booking made later than that is read-only from the start.
+        embedding_enabled: Whether the group may appear in the widget on the websites its
+            organisation allows (ADR 0035); off until the group switches it on.
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -199,6 +201,7 @@ class Group:
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
     dispatch_kind: DispatchKind = DispatchKind.CONTACT_CENTER
     queue_change_working_days: int = DEFAULT_QUEUE_CHANGE_WORKING_DAYS
+    embedding_enabled: bool = False
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""

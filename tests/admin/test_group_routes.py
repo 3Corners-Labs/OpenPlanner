@@ -64,7 +64,8 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     form = (await site.client.get(f"{GROUP}/settings")).text
 
     assert '<option value="Europe/Amsterdam" selected>' in form
-    assert form.count(" selected>") == 4  # time zone, dispatch kind, phone mode, direct call
+    assert form.count(" selected>") == 5  # time zone, dispatch kind, phone mode, direct call,
+    # embedding
 
 
 async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
@@ -203,6 +204,7 @@ async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None
         "wxcc_routing_value": "team-42",
         "direct_call_enabled": "yes",
         "not_picked_up_minutes": "10",
+        "embedding_enabled": "yes",
     }
 
     saved = await _post(site, f"{GROUP}/settings", form)
@@ -210,6 +212,11 @@ async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None
 
     assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
     assert again.headers["location"] == f"{GROUP}/settings?done=unchanged"  # type: ignore[attr-defined]
+    settings_page = (await site.client.get(f"{GROUP}/settings")).text
+    assert (
+        '<option value="yes" selected>Ja</option>'
+        in settings_page.split('id="embedding_enabled"')[1]
+    )
     overview = (await site.client.get(GROUP)).text
     assert "Demo-team" in overview
     assert "Gekoppeld · team-42" in overview
@@ -231,6 +238,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "queue_change_working_days": "2",
         "phone_mode": "optional",
         "direct_call_enabled": "no",
+        "embedding_enabled": "no",
         "not_picked_up_minutes": "10",
     }
 
@@ -268,6 +276,7 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, days: str, err
         "queue_change_working_days": days,
         "phone_mode": "optional",
         "direct_call_enabled": "no",
+        "embedding_enabled": "no",
         "not_picked_up_minutes": "10",
     }
 
@@ -295,6 +304,7 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "phone_mode": "optional",
             "direct_call_enabled": "no",
             "not_picked_up_minutes": "10",
+            "embedding_enabled": "no",
         },
     )
 
@@ -597,6 +607,7 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "phone_mode": "optional",
             "direct_call_enabled": "no",
             "not_picked_up_minutes": "10",
+            "embedding_enabled": "no",
         },
     )
 
@@ -630,6 +641,7 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "phone_mode": "optional",
         "direct_call_enabled": "yes",
         "not_picked_up_minutes": "10",
+        "embedding_enabled": "no",
     }
     field = 'id="direct_call_max_concurrent" name="direct_call_max_concurrent" type="number"'
 

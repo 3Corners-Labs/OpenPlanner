@@ -1,0 +1,32 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.embedding.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.embedding.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.embedding.lead") }}</p>
+  </div>
+</div>
+<section class="card" aria-labelledby="organisations-heading">
+  <h2 id="organisations-heading">{{ _("admin.embedding.organisations") }}</h2>
+  {% if organisations %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.embedding.organisations") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.field.organisation") }}</th><th scope="col">{{ _("admin.embedding.col.origins") }}</th><th scope="col">{{ _("admin.embedding.col.groups") }}</th></tr></thead>
+    <tbody>
+      {% for item in organisations %}
+      <tr>
+        <th scope="row"><a href="/admin/organisations/{{ item.organisation.slug }}/embedding">{{ item.organisation.name }}</a></th>
+        <td>{{ item.allowed.origins | length }}</td>
+        <td>{{ item.embedded_groups | length }} / {{ item.groups | length }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.embedding.none") }}</p>
+  {% endif %}
+</section>
+{% endblock %}
