@@ -7,6 +7,8 @@ Usage:
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
+    ``python -m app.cli client-pseudonym ADDRESS``  the pseudonym security events use for an
+        IP address the security team already has (ADR 0053); there is no way back
 
 Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
     ``python -m app.cli update-claim``  claim the waiting request: ``id action target from``
@@ -66,6 +68,7 @@ from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, r
 from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.authorization import Scope
+from app.domain.client_pseudonym import UNKNOWN_CLIENT, ClientPseudonyms
 from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
@@ -74,7 +77,7 @@ from app.domain.scheduling import Group
 from app.domain.update_service import UpdateService
 from app.domain.updates import OUTCOMES, REPORTED_STEPS
 from app.i18n import Translator, load_catalogues
-from app.keys import management_token_key
+from app.keys import client_pseudonym_key, management_token_key
 from app.web.authz_report import render_markdown
 
 
@@ -525,7 +528,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--reregister", action="store_true", help="with --yes: run register-webhooks afterwards"
     )
     commands.add_parser("webhooks-health", help="token expiry and a signed delivery self-test")
+    pseudonym_cmd = commands.add_parser(
+        "client-pseudonym", help="pseudonym of an IP address in security events (ADR 0053)"
+    )
+    pseudonym_cmd.add_argument("address")
     args = parser.parse_args(argv)
+    if args.command == "client-pseudonym":
+        pseudonym = ClientPseudonyms(client_pseudonym_key(Settings())).of(args.address)
+        sys.stdout.write(f"{pseudonym}\n")
+        return 0 if pseudonym != UNKNOWN_CLIENT else 1
     if args.command == "update-claim":
         sys.stdout.write(asyncio.run(_update_claim(Settings())))
         return 0

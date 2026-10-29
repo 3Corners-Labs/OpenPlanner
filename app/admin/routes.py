@@ -66,7 +66,6 @@ from app.admin.pages import message as _message
 from app.admin.pages import page as _page
 from app.admin.session import end_session, pop_login_start, save_login_start, start_session
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT
-from app.domain.audit import Outcome
 from app.domain.authorization import (
     API_SCOPES,
     CITIZEN_ACTIONS,
@@ -88,6 +87,7 @@ from app.web.authz_labels import (
 from app.web.authz_report import matrix_rows
 from app.web.locale import resolve_locale
 from app.web.protection import limiter, read_limit
+from app.web.security_events import report
 from app.web.templates import render
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -149,7 +149,7 @@ async def callback(
         or not state
         or not hmac.compare_digest(state, pending.get("state", ""))
     ):
-        await service.record(ANONYMOUS, LOGIN_EVENT, Outcome.FAILURE, "invalid_state")
+        await report(request, LOGIN_EVENT, "invalid_state", actor=ANONYMOUS)
         return _message(request, locale, 400, "admin.login_failed.title", "admin.login_failed.text")
     try:
         principal = await provider.finish_login(
@@ -159,7 +159,7 @@ async def callback(
             nonce=pending["nonce"],
         )
     except IdentityError as error:
-        await service.record(ANONYMOUS, LOGIN_EVENT, Outcome.FAILURE, error.code)
+        await report(request, LOGIN_EVENT, error.code, actor=ANONYMOUS)
         return _message(request, locale, 401, "admin.login_failed.title", "admin.login_failed.text")
     start_session(request, principal, _clock(request).now())
     await service.record_login(principal)
