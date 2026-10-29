@@ -3098,6 +3098,42 @@ msgstr "The service cannot be reached."
 msgid "admin.audit.detail.suppressed"
 msgstr "{count} more since the previous entry"
 
+msgid "audit.event.rate_limited"
+msgstr "Too many requests"
+
+msgid "audit.event.request_rejected"
+msgstr "Request refused"
+
+msgid "audit.event.token_rejected"
+msgstr "Unknown token or link"
+
+msgid "admin.audit.detail.surface_web"
+msgstr "on the web pages"
+
+msgid "admin.audit.detail.surface_agent"
+msgstr "on the machine API"
+
+msgid "admin.audit.detail.client"
+msgstr "caller {value}"
+
+msgid "admin.audit.reason.too_many_requests"
+msgstr "The same caller went over the request limit."
+
+msgid "admin.audit.reason.honeypot"
+msgstr "The hidden form field was filled in: probably a bot."
+
+msgid "admin.audit.reason.cross_site"
+msgstr "The form was sent from another website."
+
+msgid "admin.audit.reason.origin_mismatch"
+msgstr "The form came from another origin than this site."
+
+msgid "admin.audit.reason.unknown_token"
+msgstr "An access token that belongs to no API client."
+
+msgid "admin.audit.reason.unknown_management_link"
+msgstr "A change link that belongs to no booking."
+
 msgid "admin.audit.detail.source_webex"
 msgstr "from Webex"
 
