@@ -30,6 +30,7 @@ const ERROR_TEXTS = {
   group_closed: 'error.group_closed',
   database_busy: 'error.database_busy',
   rate_limited: 'error.rate_limited',
+  maintenance: 'widget.maintenance',
 };
 
 let sheet;
@@ -121,9 +122,11 @@ class GovBooking extends HTMLElement {
   }
 
   unavailable(error) {
-    const text = this.t('widget.unavailable');
+    // Maintenance (ADR 0038) ends by itself: say so, and let the citizen try again.
+    const code = error instanceof ApiError ? error.code : null;
+    const text = this.t(code === 'maintenance' ? 'widget.maintenance' : 'widget.unavailable');
     const content = h('div', { class: 'notice', part: 'notice' }, h('p', {}, text));
-    if (error instanceof ApiError && error.code === 'network') {
+    if (code === 'network' || code === 'maintenance') {
       const retry = h('button', { type: 'button', class: 'button', part: 'button' }, this.t('widget.retry'));
       retry.addEventListener('click', () => this.start());
       content.append(h('p', {}, retry));
