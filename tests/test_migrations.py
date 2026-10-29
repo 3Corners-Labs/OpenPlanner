@@ -247,7 +247,7 @@ def test_custom_roles_go_on_downgrade(alembic_config: Config, tmp_path: Path) ->
         )
         database.commit()
 
-    command.downgrade(alembic_config, "0026")
+    command.downgrade(alembic_config, "0029")
 
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}

@@ -13,6 +13,7 @@ from app.domain.authorization import (
     HELD_BACK,
     LEVELS,
     LOCKED_PERMISSIONS,
+    MAINTENANCE_WRITABLE,
     MATRIX,
     PII_PERMISSIONS,
     REACH,
@@ -81,14 +82,23 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
         "Bounds (ADR 0039): *locked* permissions belong to the superuser only; *personal data*",
         "permissions show citizens' data and are never held by the auditor.",
         "",
+        "Maintenance (ADR 0038): while maintenance mode is on, every change is refused except",
+        "for the permissions marked *maintenance*, and those only for the superuser. Reading",
+        "stays open to every role as usual.",
+        "",
         "| Permission | Level | Bounds | " + " | ".join(_(ROLE_LABELS[r]) for r in roles) + " |",
         "|---|---|---|" + "---|" * len(roles),
     ]
     for row in matrix_rows():
         marks = " | ".join("yes" if row.granted[r] else "–" for r in roles)
         needs = sorted(REQUIRES.get(row.permission, frozenset()))
+        flags = (
+            ("locked", row.locked),
+            ("personal data", row.pii),
+            ("maintenance", row.permission in MAINTENANCE_WRITABLE),
+        )
         bounds = ", ".join(
-            [label for label, on in (("locked", row.locked), ("personal data", row.pii)) if on]
+            [label for label, on in flags if on]
             + ([f"needs {', '.join(f'`{p}`' for p in needs)}"] if needs else [])
         )
         lines.append(

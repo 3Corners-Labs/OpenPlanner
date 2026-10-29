@@ -32,6 +32,7 @@ from app.domain.contacts import ContactBlock
 from app.domain.direct_queue import DirectCall
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.job_plan import JobType, PlannedJob
+from app.domain.maintenance import MaintenanceState
 from app.domain.retention import RetentionFacts
 from app.domain.scheduling import (
     Group,
@@ -723,6 +724,13 @@ class Transaction(Protocol):
 
     async def delete_custom_role(self, role_id: int) -> None:
         """Delete a custom role."""
+
+    async def get_maintenance_state(self) -> MaintenanceState:
+        """Return the maintenance switch of the installation (ADR 0038); off if never set."""
+        ...
+
+    async def save_maintenance_state(self, state: MaintenanceState) -> None:
+        """Replace the maintenance switch."""
         ...
 
 

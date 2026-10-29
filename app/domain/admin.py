@@ -137,9 +137,12 @@ class AdminService:
         reason: str = "",
         organisation: str | None = None,
         group: str | None = None,
+        detail: str = "",
     ) -> None:
         """Write an audit event (logins, denials, changes)."""
-        event = AuditEvent(self._clock.now(), actor, action, outcome, reason, organisation, group)
+        event = AuditEvent(
+            self._clock.now(), actor, action, outcome, reason, organisation, group, detail
+        )
         async with self._uow.locked() as tx:
             await tx.add_audit_event(event)
 

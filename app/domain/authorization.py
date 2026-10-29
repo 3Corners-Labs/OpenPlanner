@@ -94,6 +94,7 @@ class Permission(StrEnum):
     ORGANISATION_CLOSURE = "organisation.closure"
     API_CLIENTS_MANAGE = "api_clients.manage"
     SYSTEM_UPDATE = "system.update"
+    SYSTEM_MAINTENANCE = "system.maintenance"
     RETENTION_VIEW = "retention.view"
     ROLES_MANAGE = "roles.manage"
     STAFF_VIEW = "staff.view"
@@ -121,6 +122,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.API_CLIENTS_MANAGE: Level.GLOBAL,
     # ADR 0029: update or restore the installation itself.
     Permission.SYSTEM_UPDATE: Level.GLOBAL,
+    # ADR 0038: switch maintenance mode of the whole installation on or off.
+    Permission.SYSTEM_MAINTENANCE: Level.GLOBAL,
     # ADR 0039: per group, whether personal data is removed on time (counts only).
     Permission.RETENTION_VIEW: Level.ORGANISATION,
     # ADR 0039: create, change and delete custom roles.
@@ -137,12 +140,19 @@ LOCKED_PERMISSIONS = frozenset(
         Permission.API_CLIENTS_MANAGE,
         Permission.SYSTEM_UPDATE,
         Permission.ROLES_MANAGE,
+        Permission.SYSTEM_MAINTENANCE,
     }
 )
 """ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
 
 PII_PERMISSIONS = frozenset({Permission.BOOKINGS_VIEW})
 """ADR 0039: permissions that show citizens' personal data; never held by the auditor."""
+
+MAINTENANCE_WRITABLE = frozenset(
+    {Permission.INTEGRATIONS_MANAGE, Permission.SYSTEM_UPDATE, Permission.SYSTEM_MAINTENANCE}
+)
+"""ADR 0038: the permissions that may still change something during maintenance, and then
+for the superuser only (``decide_in_maintenance``)."""
 
 READ_PERMISSIONS = frozenset(
     {
@@ -399,6 +409,7 @@ class Reason(StrEnum):
     NO_ROLE = "no_role"
     NOT_PERMITTED = "not_permitted"
     OUT_OF_SCOPE = "out_of_scope"
+    MAINTENANCE = "maintenance"
 
 
 @dataclass(frozen=True)
@@ -556,6 +567,21 @@ def decide(principal: Principal, permission: Permission, target: Target) -> Deci
     if target.level is Level.GROUP and Reach.GROUPS in reach and target.group in principal.groups:
         return Decision(True, Reason.GROUP)
     return Decision(False, Reason.OUT_OF_SCOPE)
+
+
+def decide_in_maintenance(
+    principal: Principal, permission: Permission, *, maintenance_safe: bool = False
+) -> Decision:
+    """Decide whether a change that ``decide`` allowed may go ahead during maintenance (ADR 0038).
+
+    Only permissions in ``MAINTENANCE_WRITABLE``, or a route that declares itself
+    ``maintenance_safe`` (it writes nothing but its own report), and only for a role that
+    reaches everything. The superuser is not an exception beyond that.
+    """
+    writable = permission in MAINTENANCE_WRITABLE or maintenance_safe
+    if writable and Reach.EVERYTHING in reaches(principal, permission):
+        return Decision(True, Reason.SUPERUSER)
+    return Decision(False, Reason.MAINTENANCE)
 
 
 def decide_client(grant: ClientGrant, api_scope: ApiScope, target: Target) -> Decision:
