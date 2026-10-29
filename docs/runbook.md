@@ -60,6 +60,19 @@ section) nothing else is needed. Behind a reverse proxy of your own also set:
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 - No access log on the proxy: paths carry management tokens.
 
+**What is configured, and from where?** Every setting and its class (ADR 0042) is listed in
+`docs/settings.md`. On the host, without sending anyone the `.env`:
+
+```bash
+docker compose exec web python -m app.cli settings list
+```
+
+It shows each variable with its class, its source (`env` or `default`), whether the
+environment locks it, and its value; secrets show only `set` or `not set`.
+`settings show RATE_LIMIT_BOOKINGS` shows one setting with its portal bounds. A value set in
+the environment outside the portal bounds still applies, but is marked
+`! outside portal bounds`.
+
 ## HTTPS certificate (ADR 0030)
 
 The `proxy` service (Caddy, profile `tls`) gets a certificate from Let's Encrypt over ACME and
@@ -756,7 +769,12 @@ number. A booking id links to that booking's timeline.
 | Failed, other `<code>` | Gave up after the last attempt, or a refusal | look up the code under the integration's section of this runbook |
 
 System events are deleted after `SYSTEM_EVENT_RETENTION_DAYS` (default 90). Admin actions are
-kept. Webhook rejections and Webex token-refresh failures are still only in the container logs.
+kept. Webhook rejections and Webex token-refresh failures are global security events (ADR
+0034), so only the superuser sees them: at most one per kind per
+`SECURITY_EVENT_WINDOW_MINUTES` (default 15), the next one saying how many were held back.
+Many *Webhook geweigerd* entries mean someone is probing the webhook URL or a secret was
+rotated on one side only; *Webex-token vernieuwen* with `unauthorized` means the Service App
+must be reconnected (see *Webex or WxCC is down*).
 
 ## Log lines and the event schema (ADR 0040)
 
@@ -779,6 +797,76 @@ or job, search for its `trace.id`; to see one tenant, filter on `organisation` o
 Public pages under `/g/{slug}` carry only `group`; admin routes carry what they act on.
 Timestamps are only as good as the host clock: keep NTP (`timedatectl` shows
 `System clock synchronized: yes`) on every host.
+
+### Filters and export (ADR 0040)
+
+The audit page filters on minimum level, kind (category), period and trace id; **Hele keten**
+on a row shows every event of that request or job, and the same `trace.id` finds its log
+lines on the platform. Organisation admins, the auditor and the superuser can download the
+current filter as CSV (`AUDIT_EXPORT_MAX_ROWS`, default 100 000; `AUDIT_EXPORT_MAX_DAYS`,
+default 366). A refused export says why on the page; every export is an `audit.export` event.
+
+## Shipping audit events to a log platform (ADR 0034)
+
+After each commit, every audit, system and security event is written once more to stdout as
+one JSON line with `"log_type": "audit"` and the fields of `docs/audit-events.md`. Diagnostic
+events never are. The line ignores `LOG_LEVEL`. OpenPlanner holds no credential for the
+platform: the host ships the container log. Route `log_type = audit` to its own index and
+alert on `event.category = security` and on `outcome = denied`.
+
+Docker's `splunk` driver, in `docker-compose.override.yml` (token from the host's secret
+store, never committed):
+
+```yaml
+services:
+  web: &splunk
+    logging:
+      driver: splunk
+      options:
+        splunk-url: https://splunk.example.org:8088
+        splunk-token: ${SPLUNK_HEC_TOKEN}
+        splunk-format: raw
+        splunk-sourcetype: _json
+        splunk-index: openplanner
+        tag: "{{.Name}}"
+  worker: *splunk
+```
+
+This replaces the rotating `json-file` driver, so `docker compose logs` shows nothing; keep
+`json-file` and use a forwarder if operations reads logs on the host.
+
+Splunk Universal Forwarder on the host, reading the rotated `json-file` logs
+(`inputs.conf`):
+
+```ini
+[monitor:///var/lib/docker/containers/*/*-json.log]
+sourcetype = docker:json
+index = openplanner
+```
+
+Fluent Bit (also for OpenTelemetry collectors or Elastic):
+
+```ini
+[INPUT]
+    Name   tail
+    Path   /var/lib/docker/containers/*/*-json.log
+    Parser docker
+[FILTER]
+    Name   parser
+    Match  *
+    Key_Name log
+    Parser json
+[OUTPUT]
+    Name   es
+    Match  *
+    Logstash_Prefix openplanner
+```
+
+Check after setup: log in to the portal and find your own `admin.login` with your subject in
+`actor` on the platform; its `event_id` equals the row in the portal's audit log. Events of the
+host CLI (`docker exec ... python -m app.cli`) are only in the table. If the process dies
+between commit and emit, that one event is missing on the platform; compare `event_id`s when
+in doubt. Retention on the platform is the organisation's policy, not OpenPlanner's.
 
 ## Logs and disk space (ADR 0040)
 
