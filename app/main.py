@@ -56,6 +56,7 @@ from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
+from app.domain.roles import RoleService
 from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.simulation import SimulationService
@@ -191,6 +192,17 @@ def create_app(
             app.state.admin_service,
             app.state.booking_service,
             settings.planner_changes_alert_per_hour,
+        )
+        app.state.role_service = RoleService(
+            uow,
+            clock,
+            app.state.admin_service,
+            (
+                settings.oidc_role_superuser,
+                settings.oidc_role_org_admin,
+                settings.oidc_role_group_admin,
+                settings.oidc_role_auditor,
+            ),
         )
         app.state.api_access = ApiAccessService(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled

@@ -1,10 +1,11 @@
 """The admin session: who is logged in, and the OIDC login in progress (ADR 0013).
 
 Stored in Starlette's signed session cookie (``op_admin``, path ``/admin``). Holds the
-principal's subject, display name, roles, organisations and groups, the login time, when
-activity was last written to the staff record (ADR 0046) and the chosen theme. The absolute
-lifetime is enforced here; the cookie's own expiry slides with every response. The theme lives
-here so that it needs no cookie of its own.
+principal's subject, display name, roles, organisations and groups, the other role claim
+values (custom roles link to them, ADR 0039; the roles themselves are looked up per request),
+the login time, when activity was last written to the staff record (ADR 0046) and the chosen
+theme. The absolute lifetime is enforced here; the cookie's own expiry slides with every
+response. The theme lives here so that it needs no cookie of its own.
 """
 
 from datetime import datetime, timedelta
@@ -14,6 +15,7 @@ from fastapi import Request
 
 from app.domain.authorization import Principal, Role
 from app.domain.ports import LoginStart
+from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 
 _PRINCIPAL = "principal"
 _LOGIN_AT = "login_at"
@@ -56,6 +58,7 @@ def start_session(request: Request, principal: Principal, now: datetime) -> None
         "roles": sorted(principal.roles),
         "organisations": sorted(principal.organisations),
         "groups": sorted(principal.groups),
+        "claims": sorted(principal.role_claims),
     }
     request.session[_LOGIN_AT] = now.isoformat()
     request.session[_SEEN_AT] = now.isoformat()
@@ -75,6 +78,9 @@ def current_principal(request: Request, now: datetime, lifetime: timedelta) -> P
             roles=frozenset(Role(r) for r in data["roles"]),
             organisations=frozenset(str(o) for o in data["organisations"]),
             groups=frozenset(str(g) for g in data["groups"]),
+            role_claims=frozenset(
+                str(c) for c in data.get("claims", [])[:MAX_ROLE_CLAIMS] if is_claim_value(str(c))
+            ),
         )
     except (KeyError, TypeError, ValueError):
         request.session.clear()
