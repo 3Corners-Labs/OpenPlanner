@@ -12,7 +12,8 @@ from taking appointments for a while, use an emergency closure instead.
 
 - **Citizens** cannot book, reschedule or cancel an appointment, nor start a direct call. They
   see a notice that maintenance is in progress, with the expected end if you entered one and
-  the team's alternative contact options (or the organisation's), if there are any. Viewing an appointment and joining a call that is already confirmed still work.
+  the team's alternative contact options (or the organisation's), if there are any. Viewing an appointment and joining a call that is already confirmed still work. A calendar
+  embedded on a website says that booking is briefly unavailable because of maintenance.
 - **Confirmed appointments** go ahead: reminders, work items and video calls keep working.
   Personal data is removed on time as always.
 - **Admins** can read everything but change nothing. Every page shows the **Maintenance mode**

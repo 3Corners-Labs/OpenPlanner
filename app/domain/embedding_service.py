@@ -10,6 +10,7 @@ in the same transaction with counts, never the origins themselves.
     view            embedding.manage   one organisation: origins and its groups
     save            embedding.manage   replace the origins; an empty list removes them
     allows          public             whether a group may be embedded on an origin
+    widget_group    public             the group behind a widget URL, and the origin check
 """
 
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ from dataclasses import dataclass
 from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.embedding import AllowedOrigins, parse_origins
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.scheduling import Group, GroupSummary, Organisation
@@ -43,6 +45,14 @@ def origins_detail(before: AllowedOrigins, after: AllowedOrigins) -> str:
     added = len(set(after.origins) - set(before.origins))
     removed = len(set(before.origins) - set(after.origins))
     return f"origins.update,added:{added},removed:{removed},total:{len(after.origins)}"
+
+
+@dataclass(frozen=True)
+class WidgetAccess:
+    """The group behind a widget request and whether the request's origin may use it."""
+
+    group: Group
+    origin_allowed: bool
 
 
 class EmbeddingService:
@@ -139,6 +149,30 @@ class EmbeddingService:
             return False
         async with self._uow.read() as tx:
             return (await tx.get_allowed_origins(group.organisation_id)).allows(origin)
+
+    async def widget_group(
+        self, organisation_slug: str, group_slug: str, origin: str | None
+    ) -> WidgetAccess:
+        """Return the group of a widget request, and whether ``origin`` is on the list.
+
+        A group that does not exist, belongs to another organisation or is not switched on
+        for embedding is answered the same way, so the widget API reveals nothing about it.
+
+        Raises:
+            DomainError: ``group_not_found``.
+        """
+        async with self._uow.read() as tx:
+            group = await tx.get_group(group_slug)
+            organisation = await tx.get_organisation(organisation_slug)
+            if (
+                group is None
+                or organisation is None
+                or group.organisation_id != organisation.id
+                or not group.embedding_enabled
+            ):
+                raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+            allowed = await tx.get_allowed_origins(organisation.id)
+        return WidgetAccess(group, allowed.allows(origin))
 
     async def _authorize(self, principal: Principal, slug: str) -> None:
         """Raise ``not_permitted`` unless the matrix grants ``embedding.manage`` on ``slug``."""
