@@ -1,5 +1,7 @@
 """Portal values, the environment lock and reloading by ``settings_version`` (ADR 0042 §2, §6)."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from app.domain.platform_settings import (
@@ -127,3 +129,28 @@ async def test_an_unchanged_version_reads_no_values() -> None:
 
 def test_the_reload_interval_is_the_adr_bound() -> None:
     assert RELOAD_SECONDS == 10
+
+
+def test_an_expired_portal_value_no_longer_applies() -> None:
+    now = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
+    portal = PortalValues(1, {"log_level": "DEBUG"}, {"log_level": now + timedelta(hours=1)})
+
+    before = resolve(LEVEL, "INFO", None, portal, now)
+    after = resolve(LEVEL, "INFO", None, portal, now + timedelta(hours=1))
+
+    assert (before.value, before.source) == ("DEBUG", Source.PORTAL)
+    assert (after.value, after.source, after.portal_ignored) == ("INFO", Source.DEFAULT, False)
+    assert portal.next_expiry(now) == now + timedelta(hours=1)
+    assert portal.next_expiry(now + timedelta(hours=1)) is None
+
+
+async def test_the_store_reads_the_expiries_too() -> None:
+    uow = InMemoryUnitOfWork()
+    at = datetime(2026, 10, 29, 13, 0, tzinfo=UTC)
+    uow.state.platform_settings = {"log_level": "DEBUG"}
+    uow.state.platform_expiries = {"log_level": at}
+    store = PlatformSettingsStore(uow)
+
+    await store.refresh()
+
+    assert store.current.expires == {"log_level": at}

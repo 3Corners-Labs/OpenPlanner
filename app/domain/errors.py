@@ -54,6 +54,11 @@ class ErrorCode(StrEnum):
     CLAIM_VALUE_TAKEN = "claim_value_taken"
     MAINTENANCE = "maintenance"
     MAINTENANCE_FROM_ENVIRONMENT = "maintenance_from_environment"
+    SETTING_NOT_EDITABLE = "setting_not_editable"
+    SETTING_LOCKED = "setting_locked"
+    SETTING_INVALID = "setting_invalid"
+    SETTING_COMBINATION = "setting_combination"
+    SETTING_EXPIRY = "setting_expiry"
 
 
 class DomainError(Exception):

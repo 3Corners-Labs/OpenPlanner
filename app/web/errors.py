@@ -53,6 +53,11 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.CLAIM_VALUE_TAKEN: "admin.form.error.claim_value_taken",
     ErrorCode.MAINTENANCE: "error.maintenance",
     ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
+    ErrorCode.SETTING_NOT_EDITABLE: "admin.form.error.setting_not_editable",
+    ErrorCode.SETTING_LOCKED: "admin.form.error.setting_locked",
+    ErrorCode.SETTING_INVALID: "admin.form.error.setting_invalid",
+    ErrorCode.SETTING_COMBINATION: "admin.form.error.setting_combination",
+    ErrorCode.SETTING_EXPIRY: "admin.form.error.setting_expiry",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {

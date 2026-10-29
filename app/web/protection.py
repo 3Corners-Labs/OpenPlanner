@@ -94,6 +94,17 @@ def configure_rate_limits(
     limiter.reset()
 
 
+def set_rate_limits(*, bookings: str, reads: str, agent_tokens: str, agent_calls: str) -> None:
+    """Apply changed limits to the next request, keeping the counters (ADR 0042 §6).
+
+    The switch ``RATE_LIMIT_ENABLED`` is deployment-only and stays as it was.
+    """
+    LIMITS.bookings = bookings
+    LIMITS.reads = reads
+    LIMITS.agent_tokens = agent_tokens
+    LIMITS.agent_calls = agent_calls
+
+
 def booking_limit() -> str:
     """Limit for writes: booking, cancelling, rescheduling."""
     return LIMITS.bookings
