@@ -91,7 +91,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
   an upcoming closure links to that page at `/g/{slug}/closure`; the page of a booking on hold
   shows the contact options above its actions. `seed-closures` adds the examples that e2e checks
   (axe, Lighthouse, keyboard) in nl and en; refused in production.
-- Release and versioning policy (ADR 0051): version rules from Conventional Commits,
+- Release and versioning policy (ADR 0052): version rules from Conventional Commits,
   `make release-plan`, a release PR plus tag, CI refuses a tag off `main` or out of step with
   `pyproject.toml`; every image carries its commit (`APP_COMMIT`), shown on `/admin/updates`
   and by `python -m app.cli version`.

@@ -1,7 +1,7 @@
-"""Propose the next release from the Conventional Commits since the last tag (ADR 0051).
+"""Propose the next release from the Conventional Commits since the last tag (ADR 0052).
 
 Run ``make release-plan`` on an up-to-date ``main``. It prints the last release, the commits
-since then and the version the rules of ADR 0051 give, so the product owner decides on a
+since then and the version the rules of ADR 0052 give, so the product owner decides on a
 release with the list in front of them. It changes nothing: no file, no tag, no push.
 """
 

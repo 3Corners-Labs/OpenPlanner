@@ -108,7 +108,7 @@ def test_main_rejects_an_unknown_status(capsys: pytest.CaptureFixture[str]) -> N
 def test_version_prints_release_and_commit(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    # ADR 0051: the operator's check of what runs on the host, without the portal.
+    # ADR 0052: the operator's check of what runs on the host, without the portal.
     monkeypatch.setenv("ENVIRONMENT", "dev")
     monkeypatch.setenv("APP_VERSION", "0.3.0")
     monkeypatch.setenv("APP_COMMIT", "ce5602a8f4e1b2c3d4e5f60718293a4b5c6d7e8f")

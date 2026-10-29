@@ -10,7 +10,7 @@ We acknowledge within 5 working days.
 ## Supported versions
 
 Only the latest released version receives security fixes until the first production release.
-Security fixes are released on the day they are merged (ADR 0051); `/admin/updates` shows the
+Security fixes are released on the day they are merged (ADR 0052); `/admin/updates` shows the
 running version and commit, and `git tag --contains <commit>` tells which releases hold a fix.
 
 ## What CI checks

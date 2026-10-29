@@ -210,7 +210,7 @@ def test_the_security_event_window_has_bounds(minutes: int) -> None:
 
 
 def test_the_build_commit_must_be_a_git_sha() -> None:
-    # ADR 0051: APP_COMMIT is baked in by main.yml; anything else is a broken build.
+    # ADR 0052: APP_COMMIT is baked in by main.yml; anything else is a broken build.
     assert Settings(environment="dev", app_commit="ce5602a").app_commit == "ce5602a"
     assert Settings(environment="dev").app_commit == ""
     with pytest.raises(ValidationError):

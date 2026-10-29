@@ -247,7 +247,7 @@ def _history(
 
 @dataclass(frozen=True)
 class CommitView:
-    """The commit this image was built from (ADR 0051).
+    """The commit this image was built from (ADR 0052).
 
     Attributes:
         short: The first 12 characters, as the page shows them.

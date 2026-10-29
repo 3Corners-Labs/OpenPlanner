@@ -1,4 +1,4 @@
-"""The next release number from the Conventional Commits since the last tag (ADR 0051)."""
+"""The next release number from the Conventional Commits since the last tag (ADR 0052)."""
 
 from pathlib import Path
 
