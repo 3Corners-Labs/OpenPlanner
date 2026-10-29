@@ -336,6 +336,35 @@ def _in_locale(texts: Mapping[str, str], locale: str) -> str:
     return texts.get(locale) or texts.get(FALLBACK_LOCALE) or ""
 
 
+def parse_options(text: str) -> tuple[tuple[str, ...], dict[str, dict[str, str]]]:
+    """Parse the options of a ``choice`` from the admin form: ``key; Dutch; English`` per line.
+
+    Blank lines are skipped. ``FieldDefinition.create`` validates the result.
+
+    Raises:
+        DomainError: ``invalid_form_field`` naming ``options`` for a line without three parts.
+    """
+    keys: list[str] = []
+    labels: dict[str, dict[str, str]] = {}
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        parts = [part.strip() for part in line.split(";")]
+        if len(parts) != len(REQUIRED_LOCALES) + 1 or not all(parts):
+            raise _definition_error("options")
+        keys.append(parts[0])
+        labels[parts[0]] = dict(zip(REQUIRED_LOCALES, parts[1:], strict=True))
+    return tuple(keys), labels
+
+
+def format_options(field: "FieldDefinition") -> str:
+    """Return a field's options in the admin form's format (the reverse of ``parse_options``)."""
+    return "\n".join(
+        "; ".join([o, *(field.option_labels.get(o, {}).get(lo, "") for lo in REQUIRED_LOCALES)])
+        for o in field.options
+    )
+
+
 @dataclass(frozen=True)
 class FormDefinition:
     """The custom fields of one group's form at one ``version`` (bumped on every change).
@@ -422,6 +451,43 @@ class Answers:
         }
         not_pii = frozenset(str(k) for k in stored.get("not_pii", ())) & values.keys()
         return cls(int(stored.get("version", 0)), MappingProxyType(values), not_pii)
+
+
+@dataclass(frozen=True)
+class LabelledAnswer:
+    """One answer as a screen shows it: the question's label and the value.
+
+    A choice shows its option's label; a checkbox stays a ``bool`` for the screen to word.
+    """
+
+    label: str
+    value: str | int | bool = field(repr=False)
+
+
+def labelled_answers(
+    answers: Answers | None, form: FormDefinition, purpose: Purpose, locale: str
+) -> tuple[LabelledAnswer, ...]:
+    """Return the answers ``purpose`` may see, in form order, with the labels of ``form``.
+
+    Answers to retired fields come last, with the label they had; a key ``form`` does not
+    know shows as the key itself.
+    """
+    if answers is None:
+        return ()
+    values = answers.visible(purpose)
+    order = [f.key for f in form.fields + form.retired]
+    keys = sorted(values, key=lambda k: order.index(k) if k in order else len(order))
+    result = []
+    for key in keys:
+        definition = form.find(key)
+        value = values[key]
+        if definition is None:
+            result.append(LabelledAnswer(key, value))
+            continue
+        if definition.type is FieldType.CHOICE and isinstance(value, str):
+            value = definition.option_label(value, locale)
+        result.append(LabelledAnswer(definition.label(locale), value))
+    return tuple(result)
 
 
 def raise_to_pii(stored: Mapping[str, Any], key: str) -> dict[str, Any]:

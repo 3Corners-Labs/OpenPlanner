@@ -26,7 +26,11 @@ BOOKING = Booking(
     end=SLOT_0930,
     status=BookingStatus.CONFIRMED,
     contact=Contact.create(
-        first_name="Ada", last_name="Lovelace", email="ada@example.org", phone=None, phone_mode=PhoneMode.OPTIONAL
+        first_name="Ada",
+        last_name="Lovelace",
+        email="ada@example.org",
+        phone=None,
+        phone_mode=PhoneMode.OPTIONAL,
     ),
     locale="nl",
     token_hash="h",
@@ -122,7 +126,8 @@ def test_join_link_only_for_groups_with_video(composer: MessageComposer) -> None
 SMS_BOOKING = replace(
     BOOKING,
     contact=Contact.create(
-        first_name="Ada", last_name="Lovelace",
+        first_name="Ada",
+        last_name="Lovelace",
         email="ada@example.org",
         phone="06 1234 5678",
         phone_mode=PhoneMode.OPTIONAL,
