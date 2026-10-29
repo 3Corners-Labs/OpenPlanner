@@ -1,6 +1,8 @@
 """The settings screens' labels cover the registry and the start-up check (ADR 0042)."""
 
-from app.config import Settings
+from pydantic import SecretStr
+
+from app.config import DEV_ONLY_SECRET_PREFIX, Settings
 from app.domain.platform_settings import Source
 from app.domain.settings_registry import REGISTRY, SettingClass, Topic
 from app.web.settings_labels import (
@@ -29,6 +31,7 @@ def test_every_production_problem_has_a_label() -> None:
         webhook_base_url="http://tunnel.example",
         webex_client_id="client",
         oidc_discovery_url="http://idp.example",
+        settings_encryption_key=SecretStr(DEV_ONLY_SECRET_PREFIX + "x" * 32),
     )
 
     assert {p.code for p in everything_wrong.production_problems()} == set(PROBLEM_LABELS)

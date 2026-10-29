@@ -5589,3 +5589,18 @@ msgstr "bevat een plaatsvervanger voor ontwikkeling; productie weigert die."
 
 msgid "admin.settings.refused"
 msgstr "De opgeslagen waarden spreken elkaar tegen (bijvoorbeeld kritieke opslag niet onder weinig opslag). Daarom geldt geen enkele: de standaardwaarden en de waarden van de server blijven gelden."
+
+msgid "settings.field.maintenance_alert_hours.label"
+msgstr "Melding bij lang onderhoud na (uren)"
+
+msgid "settings.field.maintenance_alert_repeat_hours.label"
+msgstr "Melding lang onderhoud herhalen elke (uren)"
+
+msgid "settings.field.security_event_max_sources.label"
+msgstr "Maximaal aantal bijgehouden bronnen voor beveiligingsgebeurtenissen"
+
+msgid "settings.field.planner_rebook_days.label"
+msgstr "Verzoek om opnieuw te boeken vervalt na (dagen)"
+
+msgid "settings.field.planner_rebook_reminder_days.label"
+msgstr "Herinnering om opnieuw te boeken (dagen voor het vervallen)"

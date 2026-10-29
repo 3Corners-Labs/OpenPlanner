@@ -5589,3 +5589,18 @@ msgstr "holds a development placeholder; production refuses it."
 
 msgid "admin.settings.refused"
 msgstr "The stored values contradict each other (for example critical storage not below low storage). So none of them applies: the defaults and the server's values stay."
+
+msgid "settings.field.maintenance_alert_hours.label"
+msgstr "Report long maintenance after (hours)"
+
+msgid "settings.field.maintenance_alert_repeat_hours.label"
+msgstr "Repeat the long-maintenance report every (hours)"
+
+msgid "settings.field.security_event_max_sources.label"
+msgstr "Most sources tracked for security events"
+
+msgid "settings.field.planner_rebook_days.label"
+msgstr "Request to rebook lapses after (days)"
+
+msgid "settings.field.planner_rebook_reminder_days.label"
+msgstr "Rebook reminder (days before the lapse)"
