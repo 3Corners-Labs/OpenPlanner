@@ -3,7 +3,7 @@
 Forms carry no CSRF token. The primary signal is Fetch Metadata: browsers send
 ``Sec-Fetch-Site`` with every request and pages cannot forge it. Only when it is missing
 (older browsers) is ``Origin`` compared instead. A cross-site POST is refused
-(``RejectedRequest``).
+(``RejectedRequest``) and becomes a security event (ADR 0053).
 
 Rate limits use slowapi, keyed by client IP (behind a proxy, uvicorn's ``--proxy-headers``
 supplies the real address).
@@ -16,6 +16,8 @@ from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.domain.security_log import CROSS_SITE, ORIGIN_MISMATCH
+
 log = structlog.get_logger()
 
 
@@ -24,12 +26,15 @@ class RejectedRequest(Exception):  # noqa: N818 - reads as an outcome, like HTTP
 
     Args:
         status: HTTP status of the error page.
+        reason: Reason of a ``request.rejected`` security event (ADR 0053); empty when the
+            refusal is ordinary bad input rather than an attempt.
     """
 
-    def __init__(self, status: int = 400) -> None:
-        """Store the status."""
+    def __init__(self, status: int = 400, reason: str = "") -> None:
+        """Store the status and the reason."""
         super().__init__(status)
         self.status = status
+        self.reason = reason
 
 
 def require_same_origin(request: Request) -> None:
@@ -46,16 +51,14 @@ def require_same_origin(request: Request) -> None:
     if site is not None:
         if site in ("same-origin", "none"):
             return
-        log.info("request.rejected", reason="cross_site", sec_fetch_site=site[:32])
-        raise RejectedRequest(403)
+        log.info("request.rejected", reason=CROSS_SITE, sec_fetch_site=site[:32])
+        raise RejectedRequest(403, CROSS_SITE)
     origin = request.headers.get("origin")
     expected = f"{request.url.scheme}://{request.url.netloc}"
     if origin is not None and origin != expected:
         # Origins are not personal data; logging them makes misconfigured proxies visible.
-        log.info(
-            "request.rejected", reason="origin_mismatch", origin=origin[:200], expected=expected
-        )
-        raise RejectedRequest(403)
+        log.info("request.rejected", reason=ORIGIN_MISMATCH, origin=origin[:200], expected=expected)
+        raise RejectedRequest(403, ORIGIN_MISMATCH)
 
 
 @dataclass
