@@ -1,13 +1,41 @@
 {#- Forms shared by the group's and the organisation's closure pages (ADR 0024). -#}
 {% from "admin/_fields.html" import field with context %}
 
-{#- Close: start, end and the notices, with a danger button. -#}
-{% macro start_form(action, heading, lead, button, fields) -%}
+{#- Choose a prepared scenario (ADR 0037 §4): a GET form that prefills the closing form. -#}
+{% macro scenario_picker(action, choice) -%}
+<form class="card" method="get" action="{{ action }}" aria-labelledby="scenario-heading">
+  <div class="card__header">
+    <h2 id="scenario-heading">{{ _("admin.scenarios.pick") }}</h2>
+    <p class="card__lead">{{ _("admin.scenarios.pick_lead") }}</p>
+  </div>
+  <div class="form-grid">
+    <div class="field">
+      <label for="scenario">{{ _("admin.scenarios.scenario") }}</label>
+      <select id="scenario" name="scenario">
+        {%- for option in choice.options %}
+        <option value="{{ option.value }}"{% if choice.chosen and option.value == choice.chosen.id|string %} selected{% endif %}>{{ option.label }}</option>
+        {%- endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button button--secondary">{{ _("admin.scenarios.use") }}</button>
+    <a href="{{ choice.manage_url }}">{{ _("admin.scenarios.manage") }}</a>
+  </div>
+</form>
+{%- endmacro %}
+
+{#- Close: start, end and the notices, with a danger button; ``scenario`` is copied on start. -#}
+{% macro start_form(action, heading, lead, button, fields, scenario=none) -%}
 <form class="card" method="post" action="{{ action }}" novalidate aria-labelledby="start-heading">
   <div class="card__header">
     <h2 id="start-heading">{{ heading }}</h2>
     <p class="card__lead">{{ lead }}</p>
   </div>
+  {% if scenario %}
+  <input type="hidden" name="scenario_id" value="{{ scenario.id }}">
+  <div class="alert alert--info"><p>{{ _("admin.scenarios.chosen", name=scenario.name) }}</p></div>
+  {% endif %}
   <div class="form-grid">
     {% for f in fields %}{{ field(f) }}{% endfor %}
   </div>
