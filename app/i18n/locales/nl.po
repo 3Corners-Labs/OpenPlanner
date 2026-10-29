@@ -102,6 +102,45 @@ msgstr "Beste {first_name}, uw videogesprek met {group_name} is verplaatst naar 
 msgid "message.cancellation.sms"
 msgstr "Beste {first_name}, uw videogesprek met {group_name} op {date} om {time} is geannuleerd. {reason}"
 
+msgid "message.rebook_request.subject"
+msgstr "Kies een nieuwe tijd voor uw videogesprek"
+
+msgid "message.rebook_request.intro"
+msgstr "Uw videogesprek met {group_name} op {date} om {time} kan niet doorgaan. Kies een nieuwe tijd die u uitkomt; uw gegevens hoeft u niet opnieuw in te vullen. Kiest u voor {deadline} geen nieuwe tijd, dan vervalt de afspraak."
+
+msgid "message.rebook_request.sms"
+msgstr "Beste {first_name}, uw videogesprek met {group_name} op {date} om {time} kan niet doorgaan. {reason} Kies voor {deadline} een nieuwe tijd: {manage_url}"
+
+msgid "message.rebook_reminder.subject"
+msgstr "Herinnering: kies een nieuwe tijd voor uw videogesprek"
+
+msgid "message.rebook_reminder.intro"
+msgstr "U heeft nog geen nieuwe tijd gekozen voor uw videogesprek met {group_name}. Kiest u voor {deadline} geen nieuwe tijd, dan vervalt de afspraak."
+
+msgid "message.rebook_reminder.sms"
+msgstr "Beste {first_name}, kies nog een nieuwe tijd voor uw videogesprek met {group_name}, uiterlijk {deadline}: {manage_url}"
+
+msgid "message.rebook_lapsed.subject"
+msgstr "Uw afspraak met {group_name} is vervallen"
+
+msgid "message.rebook_lapsed.intro"
+msgstr "U heeft geen nieuwe tijd gekozen voor uw videogesprek met {group_name}. De afspraak is vervallen. U kunt altijd een nieuwe afspraak maken."
+
+msgid "message.rebook_lapsed.sms"
+msgstr "Beste {first_name}, u heeft geen nieuwe tijd gekozen; uw afspraak met {group_name} is vervallen. U kunt altijd een nieuwe afspraak maken."
+
+msgid "message.manage_rebook"
+msgstr "Kies een nieuwe tijd of annuleer de afspraak, uiterlijk {deadline}:"
+
+msgid "admin.messages.purpose_rebook_request"
+msgstr "Vraag om een nieuwe tijd te kiezen (door een planner)"
+
+msgid "admin.messages.purpose_rebook_reminder"
+msgstr "Herinnering om een nieuwe tijd te kiezen"
+
+msgid "admin.messages.purpose_rebook_lapsed"
+msgstr "Afspraak vervallen zonder nieuwe tijd"
+
 msgid "admin.messages.purpose_reason"
 msgstr "Redenen bij wijzigingen door een planner"
 
@@ -1622,6 +1661,66 @@ msgstr "Afspraak annuleren"
 msgid "admin.planner.keep"
 msgstr "Niet annuleren"
 
+msgid "admin.agenda.waiting"
+msgstr "Wacht op nieuwe tijd"
+
+msgid "admin.agenda.rebook"
+msgstr "Om nieuwe tijd vragen"
+
+msgid "admin.agenda.slot_rebook"
+msgstr "Burgers om een nieuwe tijd vragen"
+
+msgid "admin.agenda.waiting_list"
+msgstr "Wacht op nieuwe tijd"
+
+msgid "admin.planner.rebook_title"
+msgstr "Om een nieuwe tijd vragen voor {reference}"
+
+msgid "admin.planner.rebook_lead"
+msgstr "{first_name}, {when}. De burger kiest zelf een nieuwe tijd."
+
+msgid "admin.planner.rebook_explain"
+msgstr "De plek in dit tijdslot komt meteen vrij. De burger krijgt een bericht met de reden en een link om een nieuwe tijd te kiezen, en {reminder} dagen voor het verlopen een herinnering. Kiest de burger binnen {days} dagen na de oorspronkelijke tijd niets, dan vervalt de afspraak."
+
+msgid "admin.planner.rebook_button"
+msgstr "Om een nieuwe tijd vragen"
+
+msgid "admin.planner.slot_title"
+msgstr "Om een nieuwe tijd vragen: tijdslot {when}"
+
+msgid "admin.planner.slot_lead"
+msgstr "Dit tijdslot heeft meer afspraken dan medewerkers. Deze laatst gemaakte afspraken ({count}) krijgen een vraag om een nieuwe tijd te kiezen; hun plekken komen meteen vrij. Zonder nieuwe tijd vervallen ze {days} dagen na deze tijd."
+
+msgid "admin.planner.slot_bookings"
+msgstr "Betrokken afspraken"
+
+msgid "admin.planner.slot_button"
+msgstr "Om een nieuwe tijd vragen ({count})"
+
+msgid "admin.planner.waiting_title"
+msgstr "Wacht op nieuwe tijd"
+
+msgid "admin.planner.waiting_lead"
+msgstr "Afspraken waarvoor de burger is gevraagd een nieuwe tijd te kiezen. U kunt ze zelf verplaatsen of annuleren."
+
+msgid "admin.planner.waiting_booking"
+msgstr "Afspraak"
+
+msgid "admin.planner.waiting_was"
+msgstr "Oorspronkelijke tijd"
+
+msgid "admin.planner.waiting_by"
+msgstr "Vervalt op"
+
+msgid "admin.planner.waiting_empty"
+msgstr "Er wachten geen afspraken op een nieuwe tijd."
+
+msgid "admin.done.rebook_requested"
+msgstr "Burgers gevraagd een nieuwe tijd te kiezen: {count}. De plekken zijn vrijgekomen."
+
+msgid "admin.form.error.slot_changed"
+msgstr "Dit tijdslot is intussen veranderd. Controleer de lijst en bevestig opnieuw."
+
 msgid "admin.done.shortfall_accepted"
 msgstr "Het tekort is geaccepteerd. Het verschijnt weer als de bezetting of de afspraken van dit tijdslot veranderen."
 
@@ -2025,6 +2124,12 @@ msgstr "Kies hieronder een nieuwe tijd of annuleer de afspraak. Uw gegevens zijn
 msgid "manage.suspended.reschedule"
 msgstr "Kies een nieuwe tijd"
 
+msgid "manage.status.awaiting_rebook"
+msgstr "Wacht op uw nieuwe tijd"
+
+msgid "manage.rebook_by"
+msgstr "Kiest u voor {deadline} geen nieuwe tijd, dan vervalt de afspraak."
+
 msgid "error.group_closed"
 msgstr "Dit team is op dit moment tijdelijk gesloten. Kies een ander moment."
 
@@ -2144,6 +2249,12 @@ msgstr "afspraak verplaatst door een planner"
 
 msgid "admin.audit.detail.planner_cancel"
 msgstr "afspraak geannuleerd door een planner"
+
+msgid "admin.audit.detail.planner_rebook"
+msgstr "burger gevraagd een nieuwe tijd te kiezen"
+
+msgid "admin.audit.detail.bulk"
+msgstr "voor een heel tijdslot"
 
 msgid "admin.audit.detail.shortfall_accept"
 msgstr "tekort geaccepteerd"

@@ -17,33 +17,16 @@ from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM
-from tests.support.closures import three_groups
 from tests.support.domain import (
     ADA,
     MONDAY,
     NOW,
     SLOT_0900,
     SLOT_0930,
-    TEST_TOKEN_KEY,
     window,
 )
 
 SMS = frozenset({ChannelKind.SMS})
-
-
-@pytest.fixture
-def uow() -> InMemoryUnitOfWork:
-    return InMemoryUnitOfWork(three_groups())
-
-
-@pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
-def bookings(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
-    return BookingService(uow, clock, TEST_TOKEN_KEY)
 
 
 @pytest.fixture
@@ -260,3 +243,86 @@ async def test_many_changes_by_one_planner_raise_one_system_event(
     )
     assert alert.detail == "actor:g-1,changes:2"
     assert all(b.status is BookingStatus.CANCELLED for b in uow.state.bookings.values())
+
+
+# --- ask to rebook ------------------------------------------------------------------------
+
+
+async def test_asking_to_rebook_frees_the_place_and_tells_the_citizen(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    booking_id = await _book(bookings, consents=SMS)
+
+    waiting = await planner.request_rebook(GROUP_ADMIN, "demo", booking_id, ChangeReason.STAFFING)
+
+    assert waiting.status is BookingStatus.AWAITING_REBOOK
+    assert waiting.rebook_by == SLOT_0900 + timedelta(days=14)
+    assert (JobType.SEND_REBOOK_REQUEST, ChannelKind.SMS) in _messages(uow, booking_id)
+    assert [b.id for b in await planner.waiting(GROUP_ADMIN, "demo")] == [booking_id]
+    (event,) = [e for e in uow.state.audit if e.action == "bookings.manage"]
+    assert (event.detail, event.booking_id) == ("planner.rebook,reason:staffing", booking_id)
+
+
+async def test_a_booking_awaiting_a_new_time_can_still_be_moved_or_cancelled(
+    planner: PlannerService, bookings: BookingService, clock: FixedClock
+) -> None:
+    first = await _book(bookings)
+    second = await _book(bookings)
+    for booking_id in (first, second):
+        await planner.request_rebook(GROUP_ADMIN, "demo", booking_id, ChangeReason.STAFFING)
+    clock.advance(SLOT_0900 - NOW)  # its old time has come: it does not go ahead anyway
+
+    moved = await planner.move(GROUP_ADMIN, "demo", first, SLOT_0930 + timedelta(days=7))
+    await planner.cancel(GROUP_ADMIN, "demo", second, ChangeReason.UNFORESEEN)
+
+    assert moved.status is BookingStatus.CONFIRMED
+    with pytest.raises(DomainError, match="booking_not_active"):
+        await planner.request_rebook(GROUP_ADMIN, "demo", second, ChangeReason.STAFFING)
+
+
+async def test_a_bulk_request_takes_the_last_made_bookings_as_many_as_short(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    ids = []
+    for _ in range(2):
+        ids.append(await _book(bookings))
+        clock.advance(timedelta(minutes=1))
+    _staff(uow, 1)
+
+    candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
+    done = await planner.rebook_slot(
+        GROUP_ADMIN, "demo", SLOT_0900, ChangeReason.STAFFING, frozenset({ids[1]})
+    )
+
+    assert [b.id for b in candidates] == [ids[1]]  # the newest one
+    assert [b.id for b in done] == [ids[1]]
+    assert uow.state.bookings[ids[0]].status is BookingStatus.CONFIRMED
+    with pytest.raises(DomainError, match="slot_unavailable"):  # no shortfall left
+        await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
+
+
+async def test_a_bulk_request_refuses_when_the_slot_changed_since_the_confirmation(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    first = await _book(bookings)
+    await _book(bookings)
+    _staff(uow, 1)
+
+    with pytest.raises(DomainError, match="slot_changed"):
+        await planner.rebook_slot(
+            GROUP_ADMIN, "demo", SLOT_0900, ChangeReason.STAFFING, frozenset({first})
+        )
+    assert all(b.status is BookingStatus.CONFIRMED for b in uow.state.bookings.values())
+
+
+async def test_only_who_may_manage_asks_to_rebook(
+    planner: PlannerService, bookings: BookingService
+) -> None:
+    booking_id = await _book(bookings)
+
+    with pytest.raises(DomainError, match="not_permitted"):
+        await planner.request_rebook(OTHER_TEAM, "demo", booking_id, ChangeReason.STAFFING)
+    with pytest.raises(DomainError, match="not_permitted"):
+        await planner.slot_candidates(AUDITOR, "demo", SLOT_0900)
+    with pytest.raises(DomainError, match="not_permitted"):
+        await planner.waiting(AUDITOR, "demo")
