@@ -846,14 +846,21 @@ Client secrets live only in the contact center's vault; OpenPlanner keeps their 
 
 When a team cannot hold its appointments (outage, illness, closed building):
 
-1. **Close.** Admin portal → the group → tab *Noodsluiting*. Leave *Begin* empty to close now;
+0. **Prepare (before any emergency).** Fill in the organisation's *Contactalternatieven* and
+   prepare a few *scenario's* (outage, strike, building closed) under *Noodsluiting →
+   Scenario's beheren*: notice and heading in Dutch and English, if needed their own contact
+   options and an image. The manual topic *Scenario's voor een noodsluiting* has examples to
+   copy. New installations have none.
+1. **Close.** Optionally start from a scenario (*Beginnen met een scenario* → *Gebruiken*): it
+   fills in the form, and its contact options and image are copied into the closure. Admin portal → the group → tab *Noodsluiting*. Leave *Begin* empty to close now;
    leave *Einde* empty for "until further notice". Write the notice in Dutch and English (plain
    text; no names or other personal data). For every team of an organisation at once:
    *Noodsluiting* in the main menu (organisation admins).
 2. **What happens.** Nothing can be booked inside the closure and direct calls are off. Every
    confirmed appointment inside it is put on hold: reminders and the WxCC task are cancelled and
-   the citizen gets an email with the notice and a link to choose a new time or cancel. The
-   group page shows the notice. Nothing is deleted.
+   the citizen gets an email with the notice, the closure's contact options, a link to the
+   closure page and a link to choose a new time or cancel (ADR 0037 §5; the image is not
+   mailed). The group page shows the closure page. Nothing is deleted.
 3. **Keep citizens informed.** Change the notice or the end on the same tab and tick *Stuur de
    nieuwe toelichting…* to mail everyone still on hold.
 4. **Handle appointments.** In *Opgeschorte afspraken*: move one to a free time (the citizen
@@ -939,6 +946,22 @@ room for the worker and its retries.
 There is no command yet to re-plan a failed or missing purge; until there is, report it to the
 developers with the error code. The nightly sweep from the privacy rules, which would catch such
 stragglers by itself, is not built yet either.
+
+## Widget on a host website (ADR 0035)
+
+A web editor reports that `<gov-booking>` says the calendar "is not available here".
+
+| Check | Where | Fix |
+|---|---|---|
+| The page's origin is on the organisation's list, exactly (`https`, `www.`, port) | Admin → **Insluiten** → the organisation | add it; the change is audited |
+| The group is switched on | Group settings → **Insluiten op websites** | set it to Yes |
+| The script loads | the browser console on the host page; `curl -sI https://<host>/widget/v1/gov-booking.js` must give `200` | a `404` means the image has no bundle: rebuild it (the `widget` stage of the Dockerfile) |
+| A pinned `integrity` matches | the console says the integrity check failed, typically right after an update | copy the new code from **Insluiten** |
+| The host's CSP allows our origin in `script-src` and `connect-src` | the console shows a CSP report | the host adds them (`docs/widget.md`, section 3) |
+
+Refused origins are logged as `widget.origin_refused` with the origin and the group (no
+personal data). Many refusals from one unknown origin mean a copied tag: nothing to do, it
+cannot book.
 
 ## Troubleshooting with the audit log (ADR 0031)
 
