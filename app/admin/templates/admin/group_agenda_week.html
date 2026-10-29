@@ -1,0 +1,52 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
+{% block title %}{{ _("admin.tab.agenda") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+<section class="card" aria-labelledby="week-heading">
+  <div class="card__header">
+    <h2 id="week-heading">{{ week_label }}</h2>
+    <nav class="day-nav" aria-label="{{ _("admin.agenda.weeks") }}">
+      <a href="?week={{ previous_week }}">{{ _("admin.agenda.previous_week") }}</a>
+      <a href="?week={{ this_week }}">{{ _("admin.agenda.this_week") }}</a>
+      <a href="?week={{ next_week }}">{{ _("admin.agenda.next_week") }}</a>
+      <a href="{{ day_href }}">{{ _("admin.agenda.view_day") }}</a>
+    </nav>
+  </div>
+  <p class="card__lead">{% if week_shortfalls %}{{ icon("alert") }}{{ _("admin.agenda.week_shortfalls", count=week_shortfalls) }}{% else %}{{ _("admin.agenda.week_no_shortfalls") }}{% endif %}</p>
+  {% if rows %}
+  <div class="table-scroll" role="region" aria-labelledby="week-heading" tabindex="0">
+  <table class="data-table agenda-week">
+    <caption class="visually-hidden">{{ _("admin.agenda.week_caption", week=week_label) }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.agenda.time") }}</th>
+        {% for label, href in day_headers %}
+        <th scope="col"><a href="{{ href }}">{{ label }}</a></th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <th scope="row" class="nowrap">{{ row.time }}</th>
+        {% for cell in row.cells %}
+        {% if cell %}
+        <td{% if cell.shortfall %} class="agenda-week__short"{% endif %}>
+          <a href="{{ cell.href }}">{% if cell.closed %}{{ _("admin.agenda.closed") }}{% else %}{{ cell.staffing }}{% endif %}</a>
+          {% if cell.shortfall %}<br><span class="chip chip--danger">{{ icon("alert") }}{{ cell.shortfall }}</span>{% endif %}
+        </td>
+        {% else %}
+        <td><span aria-hidden="true">–</span><span class="visually-hidden">{{ _("admin.agenda.no_slot") }}</span></td>
+        {% endif %}
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.agenda.week_empty") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

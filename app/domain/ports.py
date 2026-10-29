@@ -14,7 +14,7 @@ from typing import Protocol
 
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
-from app.domain.authorization import Principal, Scope
+from app.domain.authorization import CustomRole, Principal, Scope
 from app.domain.booking import Booking, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import (
@@ -33,6 +33,7 @@ from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
+from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.maintenance import MaintenanceState
 from app.domain.retention import RetentionFacts
@@ -658,6 +659,23 @@ class Transaction(Protocol):
         """Store the end and the notices of an existing closure."""
         ...
 
+    async def get_closure_image(self, closure_id: int) -> ImageFile | None:
+        """Return the stored image of the closure, if it has one."""
+        ...
+
+    async def save_closure_image(
+        self, closure_id: int, text: ImageText, image: ImageFile | None
+    ) -> None:
+        """Store the closure's image with ``text``; ``image`` ``None`` keeps the stored file.
+
+        Replacing a file deletes the old one: a closure has one image at most.
+        """
+        ...
+
+    async def remove_closure_image(self, closure_id: int) -> None:
+        """Delete the closure's image, if it has one."""
+        ...
+
     async def find_confirmed_bookings(
         self, group_id: int, lower: datetime, upper: datetime | None
     ) -> list[Booking]:
@@ -737,6 +755,32 @@ class Transaction(Protocol):
     async def save_update_request(self, request: UpdateRequest) -> None:
         """Store the status, times and reason of an existing request."""
         ...
+
+    async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+        """Return the newest audit events with one of ``actions``, with the actors' names.
+
+        Only for events every admin may see, such as role changes (ADR 0039 item 7).
+        """
+        ...
+
+    async def get_custom_roles(self) -> list[CustomRole]:
+        """Return every custom role, ordered by id (ADR 0039)."""
+        ...
+
+    async def get_custom_role(self, role_id: int) -> CustomRole | None:
+        """Return the custom role with ``role_id``."""
+        ...
+
+    async def add_custom_role(self, role: CustomRole) -> CustomRole:
+        """Store a new custom role (its id is ignored) and return it with its id."""
+        ...
+
+    async def save_custom_role(self, role: CustomRole) -> None:
+        """Store names, claim value, permissions and version of an existing custom role."""
+        ...
+
+    async def delete_custom_role(self, role_id: int) -> None:
+        """Delete a custom role."""
 
     async def get_maintenance_state(self) -> MaintenanceState:
         """Return the maintenance switch of the installation (ADR 0038); off if never set."""
