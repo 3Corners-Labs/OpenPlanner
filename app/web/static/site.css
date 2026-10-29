@@ -916,6 +916,15 @@ a.calendar__day:focus-visible {
   border-bottom: 2px solid var(--booking-color-text);
 }
 
+/* The image of a closure (ADR 0037 §3): never wider than the text, never the only signal. */
+.closure-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-block: var(--booking-space-m);
+  border-radius: var(--booking-radius);
+}
+
 /* Alternative contact options of the organisation (ADR 0037): kind in words, large targets. */
 .contact-block__list {
   display: grid;

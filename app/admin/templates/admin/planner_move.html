@@ -1,0 +1,29 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field as render_field with context %}
+{% block title %}{{ _("admin.planner.move_title", reference=booking.reference) }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ booking.id }}/move" novalidate aria-labelledby="move-heading">
+  <div class="card__header">
+    <h2 id="move-heading">{{ _("admin.planner.move_title", reference=booking.reference) }}</h2>
+    <p class="card__lead">{{ _("admin.planner.move_lead", first_name=booking.first_name, when=booking.when) }}</p>
+  </div>
+  {% if has_slots %}
+  <div class="form-grid">{{ render_field(field) }}</div>
+  <div class="choice__option">
+    <input type="checkbox" id="accept_shortfall" name="accept_shortfall" value="yes" aria-describedby="accept_shortfall-hint">
+    <label for="accept_shortfall">{{ _("admin.planner.accept_shortfall") }}</label>
+  </div>
+  <p id="accept_shortfall-hint" class="hint">{{ _("admin.planner.accept_shortfall_hint") }}</p>
+  <p>{{ _("admin.planner.citizen_told") }}</p>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.planner.move_button") }}</button>
+    <a href="{{ back }}">{{ _("admin.cancel") }}</a>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.planner.move_none") }}</p>
+  <p><a href="{{ back }}">{{ _("admin.planner.back") }}</a></p>
+  {% endif %}
+</form>
+{% endblock %}

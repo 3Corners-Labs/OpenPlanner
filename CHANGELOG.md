@@ -91,3 +91,17 @@ All notable changes are listed here, generated from Conventional Commits on rele
   an upcoming closure links to that page at `/g/{slug}/closure`; the page of a booking on hold
   shows the contact options above its actions. `seed-closures` adds the examples that e2e checks
   (axe, Lighthouse, keyboard) in nl and en; refused in production.
+- Closure image (ADR 0037, CL-3): a running or planned closure can carry one PNG, JPEG or WebP
+  image (at most 500 kB, type from the magic bytes, metadata such as EXIF and XMP stripped),
+  with a text alternative in nl and en or marked decorative; shown on the closure page and
+  served from our origin only while the closure is visible. Magic-byte recognition and the
+  multipart upload reader are shared with the logo (`app/domain/images.py`,
+  `app/admin/uploads.py`). Migration 0040. Manual topic for the closure screen.
+- Embedding on host websites (ADR 0035, EM-1): allowed origins per organisation under
+  Insluiten (`embedding.manage`, organisation admin and superuser), exact `https` origins,
+  localhost only outside production; a group's own switch "Insluiten op websites" (off by
+  default); audited with counts. ADR 0035 accepted.
+- Widget API (ADR 0035, EM-2): `/api/v1/widget/{org}/{group}/` with the group, its form and
+  texts, the month and the times of a day, and booking; CORS only for the organisation's
+  allowed origins, `require_allowed_origin` on bookings, the standalone page's rate limits and
+  honeypot, no token or personal data in answers.

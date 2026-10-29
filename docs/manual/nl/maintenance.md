@@ -13,7 +13,8 @@ tijdelijk geen afspraken laten aannemen, gebruik dan een noodsluiting.
 - **Burgers** kunnen geen afspraak maken, verzetten of annuleren en geen direct gesprek
   starten. Ze zien een melding dat er onderhoud is, met de verwachte eindtijd als u die hebt
   ingevuld en de contactalternatieven van het team (of van de organisatie) als die er zijn.
-  Een afspraak bekijken en deelnemen aan een gesprek dat al vaststaat, kan wel.
+  Een afspraak bekijken en deelnemen aan een gesprek dat al vaststaat, kan wel. Een kalender
+  die op een website is ingesloten, toont dat afspraken maken even niet kan door onderhoud.
 - **Afspraken die al vaststaan** gaan gewoon door: herinneringen, werkitems en videogesprekken
   blijven werken. Persoonsgegevens worden op tijd verwijderd zoals altijd.
 - **Beheerders** kunnen alles lezen, maar niets wijzigen. Elke pagina toont bovenaan de balk
@@ -50,3 +51,13 @@ direct weer alles wat ze gewend zijn.
 Staat de onderhoudsmodus aan **via de server**, dan heeft de beheerder van de server hem
 aangezet met de instelling `MAINTENANCE_MODE`, meestal omdat de database zelf onderhoud
 krijgt. Die kunt u hier niet uitzetten; vraag de beheerder van de server.
+
+## Updates
+
+Een update of herstel vanuit het scherm **Updates** zet de onderhoudsmodus zelf aan voordat
+de reservekopie wordt gemaakt, en weer uit als de update gelukt of teruggedraaid is. Mislukt
+een update helemaal, dan blijft de onderhoudsmodus aan, zodat burgers geen half werkend
+systeem zien. Zet hem dan pas uit als alles weer werkt.
+
+Had u de onderhoudsmodus zelf al aangezet voordat de update begon, dan staat hij na een
+geslaagde of teruggedraaide update toch uit. Zet hem dan opnieuw aan als u nog niet klaar bent.
