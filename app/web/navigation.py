@@ -142,6 +142,15 @@ SECTIONS = (
                 "code",
                 ("/admin/organisations/{org}/embedding",),
             ),
+            # ADR 0042 step 5: the class D settings of the own organisations.
+            Screen(
+                "manage.organisation_settings",
+                "admin.nav.organisation_settings",
+                "/admin/organisation-settings",
+                Permission.SETTINGS_ORGANISATION_MANAGE,
+                "sliders",
+                ("/admin/organisations/{org}/settings",),
+            ),
             Screen(
                 "manage.holidays",
                 "admin.nav.holidays",

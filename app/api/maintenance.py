@@ -36,6 +36,7 @@ from app.domain.services import BookingService
 from app.i18n.dates import format_clock, format_day, local_day
 from app.web.contact_labels import contact_service, contact_view
 from app.web.locale import RequestLocale, resolve_locale
+from app.web.organisation_settings import settings_for
 from app.web.templates import render
 
 GROUP_ROUTES = frozenset({"/g/{slug}", "/g/{slug}/book", "/g/{slug}/direct"})
@@ -170,7 +171,7 @@ async def maintenance_page(request: Request, slug: str | None) -> HTMLResponse:
     status = await _maintenance(request).status()
     group = await _group(request, slug)
     end = status.state.expected_end
-    tz = group.tz if group else ZoneInfo(request.app.state.settings.admin_timezone)
+    tz = group.tz if group else ZoneInfo(settings_for(request).admin_timezone)
     context: dict[str, object] = {
         "expected_end": _moment(end, tz, locale.code) if end else "",
         "contacts": None,

@@ -138,6 +138,21 @@ class AdminService:
             return Authorization(Decision(False, reason), Target.everything())
         return Authorization(Decision(True, Reason.ROLE), Target.everything())
 
+    async def home_organisation(self, principal: Principal) -> str | None:
+        """Return the one organisation ``principal`` belongs to, or ``None`` (ADR 0042 step 5).
+
+        Its class D settings (time format, time zone) then apply on the admin's pages. The
+        superuser, and an admin of more than one organisation, follow the platform values.
+        """
+        if Reach.EVERYTHING in reaches(principal):
+            return None
+        slugs = set(principal.organisations)
+        if principal.groups:
+            async with self._uow.read() as tx:
+                groups = await tx.list_groups(Scope(groups=frozenset(principal.groups)))
+            slugs |= {g.organisation_slug for g in groups}
+        return next(iter(slugs)) if len(slugs) == 1 else None
+
     async def record(
         self,
         actor: str,

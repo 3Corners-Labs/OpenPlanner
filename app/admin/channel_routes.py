@@ -44,6 +44,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.i18n import BoundGettext
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
+from app.web.organisation_settings import settings_for
 from app.web.protection import RejectedRequest, booking_limit, limiter
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -285,7 +286,7 @@ async def _form_page(
     """Render both channel forms and the test email form with the stored settings."""
     overview: ChannelOverview = await channel_service(request).overview(context.principal, org)
     _ = locale.gettext
-    tz = ZoneInfo(request.app.state.settings.admin_timezone)
+    tz = ZoneInfo(settings_for(request).admin_timezone)
     email = submitted.get(ChannelKind.EMAIL) or FormData({}, _)
     sms = submitted.get(ChannelKind.SMS) or FormData({}, _)
     test = test or FormData({}, _)

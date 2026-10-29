@@ -11,6 +11,7 @@ from app.domain.platform_settings import (
     PortalValues,
     Source,
     resolve,
+    resolve_for_organisation,
     usable,
 )
 from app.domain.settings_registry import BY_KEY
@@ -154,3 +155,59 @@ async def test_the_store_reads_the_expiries_too() -> None:
     await store.refresh()
 
     assert store.current.expires == {"log_level": at}
+
+
+ZONE = BY_KEY["admin_timezone"]  # class D string: must be an IANA time zone
+CLOCK = BY_KEY["time_format"]  # class D enum
+
+
+def test_a_time_zone_must_be_a_real_iana_zone() -> None:
+    assert usable(ZONE, "Europe/Amsterdam")
+    assert usable(ZONE, "America/Curacao")
+    assert not usable(ZONE, "Mars/Olympus")
+    assert not usable(ZONE, "../../etc/passwd")
+
+
+def test_an_organisation_value_overrides_the_platform_value() -> None:
+    portal = PortalValues(1, {"time_format": "12h"}, organisations={7: {"time_format": "locale"}})
+
+    own = resolve_for_organisation(CLOCK, "12h", Source.PORTAL, portal, 7)
+    other = resolve_for_organisation(CLOCK, "12h", Source.PORTAL, portal, 8)
+
+    assert (own.value, own.source) == ("locale", Source.ORGANISATION)
+    assert (other.value, other.source) == ("12h", Source.PORTAL)
+
+
+def test_the_environment_lock_does_not_bind_an_organisation() -> None:
+    # ADR 0042 §2: env locks apply to the platform default, not to individual organisations.
+    portal = PortalValues(1, organisations={7: {"time_format": "locale"}})
+
+    resolved = resolve_for_organisation(CLOCK, "24h", Source.ENV, portal, 7)
+
+    assert (resolved.value, resolved.source, resolved.locked) == (
+        "locale",
+        Source.ORGANISATION,
+        False,
+    )
+
+
+def test_an_invalid_organisation_value_falls_back_to_the_platform() -> None:
+    portal = PortalValues(1, organisations={7: {"admin_timezone": "Mars/Olympus"}})
+
+    resolved = resolve_for_organisation(ZONE, "Europe/Amsterdam", Source.DEFAULT, portal, 7)
+
+    assert (resolved.value, resolved.source, resolved.portal_ignored) == (
+        "Europe/Amsterdam",
+        Source.DEFAULT,
+        True,
+    )
+
+
+async def test_the_store_reads_the_organisation_values() -> None:
+    uow = InMemoryUnitOfWork()
+    uow.state.organisation_settings = {7: {"time_format": "12h"}}
+    store = PlatformSettingsStore(uow)
+
+    await store.refresh()
+
+    assert store.current.organisations == {7: {"time_format": "12h"}}

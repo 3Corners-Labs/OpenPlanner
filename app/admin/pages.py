@@ -25,6 +25,7 @@ from app.web.authz_labels import ROLE_LABELS
 from app.web.help import HelpTopic, shipped_manual, topic_for_path
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.navigation import SECTIONS, TOP_BAR, Home, Screen, home_of
+from app.web.organisation_settings import settings_for
 from app.web.protection import require_same_origin
 from app.web.templates import create_templates, render, switch_href
 
@@ -112,7 +113,7 @@ def with_manual(request: Request, locale: RequestLocale, fields: Sequence[Field]
 
 def admin_moment(request: Request, locale: RequestLocale, at: datetime) -> str:
     """Return a compact local date and time in the admin time zone (``ADMIN_TIMEZONE``)."""
-    return moment_label(at, ZoneInfo(request.app.state.settings.admin_timezone), locale.code)
+    return moment_label(at, ZoneInfo(settings_for(request).admin_timezone), locale.code)
 
 
 def role_labels(principal: Principal, locale: RequestLocale) -> list[str]:

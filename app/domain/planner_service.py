@@ -37,7 +37,7 @@ from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
-from app.domain.tunable import value_of
+from app.domain.tunable import value_for, value_of
 
 ALERT_ACTION = "planner.changes_alert"
 """System event key of the warning about many changes by one planner."""
@@ -69,8 +69,8 @@ class PlannerService:
         bookings: BookingService,
         alert_per_hour: int | Callable[[], int],
         *,
-        rebook_days: int = 14,
-        reminder_days: int = 3,
+        rebook_days: int | Callable[[int], int] = 14,
+        reminder_days: int | Callable[[int], int] = 3,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -81,15 +81,13 @@ class PlannerService:
         self._rebook_days = rebook_days
         self._reminder_days = reminder_days
 
-    @property
-    def rebook_days(self) -> int:
+    def rebook_days(self, organisation_id: int) -> int:
         """Days after the start after which an unanswered request to rebook lapses."""
-        return self._rebook_days
+        return value_for(self._rebook_days, organisation_id)
 
-    @property
-    def reminder_days(self) -> int:
+    def reminder_days(self, organisation_id: int) -> int:
         """Days before the lapse at which the one reminder goes."""
-        return self._reminder_days
+        return value_for(self._reminder_days, organisation_id)
 
     async def booking(self, principal: Principal, slug: str, booking_id: int) -> Booking:
         """Return one booking of the group that the planner may still change (for a form).
@@ -163,7 +161,7 @@ class PlannerService:
         async with self._uow.locked() as tx:
             group = await group_by_slug(tx, slug)
             booking = await self._changeable(tx, group, booking_id)
-            waiting = await self._request(tx, booking, reason)
+            waiting = await self._request(tx, group, booking, reason)
             detail = f"planner.rebook,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
         return waiting
@@ -210,7 +208,7 @@ class PlannerService:
                 raise DomainError(ErrorCode.SLOT_CHANGED)
             waiting = []
             for booking in candidates:
-                waiting.append(await self._request(tx, booking, reason))
+                waiting.append(await self._request(tx, group, booking, reason))
                 detail = f"planner.rebook,reason:{reason.value},bulk"
                 await self._audit(tx, principal, authorization, detail, booking.id)
         return waiting
@@ -248,15 +246,17 @@ class PlannerService:
             )
             await self._audit(tx, principal, authorization, "shortfall.accept", None)
 
-    async def _request(self, tx: Transaction, booking: Booking, reason: ChangeReason) -> Booking:
+    async def _request(
+        self, tx: Transaction, group: Group, booking: Booking, reason: ChangeReason
+    ) -> Booking:
         """Put ``booking`` on hold for a new time, with this service's periods."""
         return await booking_changes.request_rebook(
             tx,
             booking,
             self._clock.now(),
             reason=reason,
-            rebook_days=self._rebook_days,
-            reminder_days=self._reminder_days,
+            rebook_days=self.rebook_days(group.organisation_id),
+            reminder_days=self.reminder_days(group.organisation_id),
         )
 
     async def _candidates(self, tx: Transaction, group: Group, start: datetime) -> list[Booking]:

@@ -9,6 +9,7 @@ from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Principal, Role
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.scheduling import Organisation
 from app.domain.settings_registry import BY_KEY
 from app.domain.settings_service import CLI_ACTOR, SettingsService, editable, parse
 from tests.fakes.clock import FixedClock
@@ -59,7 +60,7 @@ def test_operations_retention_storage_rates_and_sessions_are_editable() -> None:
 
 
 def test_login_mapping_secrets_mail_and_environment_settings_are_not() -> None:
-    for key in ("oidc_role_claim", "smtp_password", "smtp_host", "public_base_url", "time_format"):
+    for key in ("oidc_role_claim", "smtp_password", "smtp_host", "public_base_url"):
         assert not editable(BY_KEY[key]), key
 
 
@@ -236,3 +237,134 @@ async def test_the_cli_changes_and_resets_as_the_host_actor(
 
     assert uow.state.platform_settings == {}
     assert {e.actor for e in uow.state.audit} == {CLI_ACTOR}
+
+
+# Organisation values (ADR 0042 step 5).
+
+ORG = Principal("sub-org", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+
+
+def _organisations(uow: InMemoryUnitOfWork) -> None:
+    uow.state.organisations[7] = Organisation(7, "Demo", "demo")
+    uow.state.organisations[8] = Organisation(8, "Andere", "andere")
+
+
+async def test_an_org_admin_sets_a_value_for_their_own_organisation(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    _organisations(uow)
+
+    await _service(uow, clock).change_organisation(ORG, "demo", "time_format", "12h")
+
+    assert uow.state.organisation_settings == {7: {"time_format": "12h"}}
+    assert uow.state.settings_version == 1
+    event = uow.state.audit[-1]
+    assert (event.actor, event.action, event.organisation, event.detail) == (
+        "sub-org",
+        "settings.organisation.manage",
+        "demo",
+        "set:time_format:24h->12h",
+    )
+
+
+async def test_an_org_admin_may_not_set_another_organisation(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    _organisations(uow)
+
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change_organisation(ORG, "andere", "time_format", "12h")
+
+    assert caught.value.code is ErrorCode.NOT_PERMITTED
+    assert uow.state.organisation_settings == {}
+
+
+async def test_only_class_d_settings_are_set_per_organisation(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    _organisations(uow)
+
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change_organisation(ORG, "demo", "admin_session_hours", "4")
+
+    assert caught.value.code is ErrorCode.SETTING_NOT_EDITABLE
+
+
+async def test_an_unknown_time_zone_is_refused(uow: InMemoryUnitOfWork, clock: FixedClock) -> None:
+    _organisations(uow)
+
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change_organisation(
+            ORG, "demo", "admin_timezone", "Mars/Olympus"
+        )
+
+    assert caught.value.code is ErrorCode.SETTING_INVALID
+
+
+async def test_the_environment_lock_does_not_stop_an_organisation(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    _organisations(uow)
+    service = _service(uow, clock, locked=frozenset({"time_format"}))
+
+    await service.change_organisation(ORG, "demo", "time_format", "12h")
+
+    assert uow.state.organisation_settings == {7: {"time_format": "12h"}}
+
+
+async def test_rebook_periods_are_checked_together_per_organisation(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    _organisations(uow)
+    service = _service(uow, clock, combination="PLANNER_REBOOK_REMINDER_DAYS must be below")
+
+    with pytest.raises(DomainError) as caught:
+        await service.change_organisation(ORG, "demo", "planner_rebook_reminder_days", "20")
+
+    assert caught.value.code is ErrorCode.SETTING_COMBINATION
+
+
+async def test_reset_returns_the_organisation_to_the_platform_value(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    _organisations(uow)
+    service = _service(uow, clock)
+    await service.change_organisation(ORG, "demo", "shortfall_horizon_days", "30")
+
+    assert await service.reset_organisation(ORG, "demo", "shortfall_horizon_days")
+    assert not await service.reset_organisation(ORG, "demo", "shortfall_horizon_days")
+
+    assert uow.state.organisation_settings == {7: {}}
+    assert uow.state.audit[-1].detail == "reset:shortfall_horizon_days:30"
+
+
+async def test_an_unknown_organisation_is_not_found(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    super_service = _service(uow, clock)
+
+    with pytest.raises(DomainError) as caught:
+        await super_service.change_organisation(SUPER, "nope", "time_format", "12h")
+
+    assert caught.value.code is ErrorCode.ORGANISATION_NOT_FOUND
+
+
+def test_the_platform_default_of_a_class_d_setting_is_editable() -> None:
+    assert editable(BY_KEY["time_format"])
+    assert editable(BY_KEY["planner_rebook_days"])
+
+
+async def test_an_org_admin_lists_and_opens_only_their_own_organisations(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    _organisations(uow)
+    service = _service(uow, clock)
+
+    listed = await service.organisations(ORG)
+    opened = await service.organisation(ORG, "demo")
+
+    assert [o.slug for o in listed] == ["demo"]
+    assert opened.id == 7
+    with pytest.raises(DomainError) as caught:
+        await service.organisation(ORG, "andere")
+    assert caught.value.code is ErrorCode.NOT_PERMITTED
