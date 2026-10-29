@@ -1421,6 +1421,69 @@ msgstr "Not picked up"
 msgid "admin.agenda.empty"
 msgstr "No appointments on this day."
 
+msgid "admin.agenda.view_week"
+msgstr "Week view"
+
+msgid "admin.agenda.view_day"
+msgstr "Day view"
+
+msgid "admin.agenda.weeks"
+msgstr "Another week"
+
+msgid "admin.agenda.previous_week"
+msgstr "Previous week"
+
+msgid "admin.agenda.this_week"
+msgstr "This week"
+
+msgid "admin.agenda.next_week"
+msgstr "Next week"
+
+msgid "admin.agenda.slot_staffing"
+msgstr "Agents: {agents}, bookings: {booked}"
+
+msgid "admin.agenda.shortfall"
+msgstr "Short: {count}"
+
+msgid "admin.agenda.closed"
+msgstr "Closed"
+
+msgid "admin.agenda.off_schedule"
+msgstr "Outside the staffing"
+
+msgid "admin.agenda.no_bookings"
+msgstr "No bookings in this slot."
+
+msgid "admin.agenda.direct"
+msgstr "Direct calls"
+
+msgid "admin.agenda.week_title"
+msgstr "Week of {day}"
+
+msgid "admin.agenda.week_caption"
+msgstr "Agents and bookings per slot, {week}"
+
+msgid "admin.agenda.week_shortfalls"
+msgstr "Slots with more bookings than agents this week: {count}."
+
+msgid "admin.agenda.week_no_shortfalls"
+msgstr "Every slot this week has enough agents."
+
+msgid "admin.agenda.week_empty"
+msgstr "No slots in this week."
+
+msgid "admin.agenda.no_slot"
+msgstr "No slot"
+
+msgid "admin.shortfall.some"
+msgstr "Slots with more bookings than agents in the next {days} days: {count}."
+
+msgid "admin.shortfall.first"
+msgstr "First shortfall: {when}"
+
+msgid "admin.shortfall.chip"
+msgstr "Shortfalls: {count}"
+
 msgid "admin.booking.back"
 msgstr "Back to the agenda"
 
@@ -4330,6 +4393,60 @@ msgstr "value in the identity provider"
 
 msgid "admin.matrix.history.count"
 msgstr "{count} permissions"
+
+msgid "admin.closure.image"
+msgstr "Image"
+
+msgid "admin.closure.image_lead"
+msgstr "One image on the closure page, below the notice, such as a pictogram for ‘closed’ or ‘outage’. Never put information in the image only: citizens who cannot see it read just the text."
+
+msgid "admin.closure.image_current"
+msgstr "This is how the image appears on the closure page now."
+
+msgid "admin.closure.image_file"
+msgstr "Image file"
+
+msgid "admin.closure.image_hint"
+msgstr "PNG, JPEG or WebP, at most {kb} kB. Data in the file (such as location or author) is removed. Leave empty to change only the text."
+
+msgid "admin.closure.image_alt_nl"
+msgstr "Description (Dutch)"
+
+msgid "admin.closure.image_alt_en"
+msgstr "Description (English)"
+
+msgid "admin.closure.image_alt_hint"
+msgstr "What the image shows, in one sentence of at most 250 characters. Required unless the image is decoration only."
+
+msgid "admin.closure.image_decorative"
+msgstr "This image is decoration only (no description needed)"
+
+msgid "admin.closure.image_save"
+msgstr "Save image"
+
+msgid "admin.closure.image_remove"
+msgstr "Remove image"
+
+msgid "admin.form.error.image"
+msgstr "Choose a PNG, JPEG or WebP image of at most {kb} kB. SVG is not possible."
+
+msgid "admin.form.error.image_alt"
+msgstr "Describe the image in one line of at most 250 characters, or tick that it is decoration only."
+
+msgid "admin.done.image_saved"
+msgstr "The image has been saved."
+
+msgid "admin.done.image_removed"
+msgstr "The image has been removed."
+
+msgid "admin.audit.detail.closure_image_update"
+msgstr "emergency closure image saved"
+
+msgid "admin.audit.detail.closure_image_remove"
+msgstr "emergency closure image removed"
+
+msgid "admin.audit.detail.file"
+msgstr "new file"
 
 msgid "authz.permission.system_maintenance"
 msgstr "Switch maintenance mode on and off"

@@ -89,6 +89,10 @@ class Settings(BaseSettings):
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)
 
+    # ADR 0044: how many days ahead the shortfall summary (group page, dashboard) looks.
+    # Class D organisation (ADR 0042, settings registry).
+    shortfall_horizon_days: int = Field(default=14, ge=1, le=60)
+
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
     # Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL: an https tunnel or staging

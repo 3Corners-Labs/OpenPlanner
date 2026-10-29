@@ -78,6 +78,12 @@ TOPICS = (
     HelpTopic(
         "group-contacts", ("/admin/groups/{slug}/closure/contacts",), Permission.CLOSURE_MANAGE
     ),
+    HelpTopic("group-closure", ("/admin/groups/{slug}/closure",), Permission.CLOSURE_MANAGE),
+    HelpTopic(
+        "group-agenda",
+        ("/admin/groups/{slug}/agenda", "/admin/groups/{slug}/agenda/week"),
+        Permission.BOOKINGS_VIEW,
+    ),
     HelpTopic("maintenance", ("/admin/maintenance",), Permission.SYSTEM_MAINTENANCE),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
