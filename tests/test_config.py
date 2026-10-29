@@ -227,3 +227,21 @@ def test_each_category_has_its_own_retention() -> None:
         Settings(environment="dev", audit_retention_days=364)
     with pytest.raises(ValidationError):
         Settings(environment="dev", diagnostic_mode_hours=73)
+
+
+def test_a_development_installation_lists_what_production_would_refuse() -> None:
+    problems = Settings(environment="dev", simulator_enabled=True).production_problems()
+
+    assert [p.code for p in problems] == [
+        "simulator_enabled",
+        "management_token_key",
+        "public_base_url",
+        "session_secret",
+    ]
+    assert problems[0].variable == "SIMULATOR_ENABLED"
+    assert problems[0].message == "SIMULATOR_ENABLED is not allowed in production"
+
+
+def test_production_refuses_with_the_first_problem_in_the_same_words() -> None:
+    with pytest.raises(ValueError, match="MANAGEMENT_TOKEN_KEY is required in production"):
+        Settings(environment="prod")
