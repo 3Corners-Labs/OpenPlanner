@@ -3979,6 +3979,141 @@ msgstr "Eigen blok met {count} contactmogelijkheden."
 msgid "admin.group_contacts.summary_default"
 msgstr "Standaard van de organisatie: {count} contactmogelijkheden."
 
+msgid "authz.permission.system_maintenance"
+msgstr "Onderhoudsmodus aan- en uitzetten"
+
+msgid "error.maintenance"
+msgstr "Onderhoudsmodus: alleen lezen. Er wordt onderhoud aan het platform uitgevoerd; wijzigen kan pas als het onderhoud klaar is."
+
+msgid "admin.form.error.maintenance_from_environment"
+msgstr "De onderhoudsmodus staat aan via de serverconfiguratie (MAINTENANCE_MODE). Alleen de beheerder van de server kan hem uitzetten."
+
+msgid "admin.form.error.expected_end"
+msgstr "Vul een verwachte einddatum en -tijd in de toekomst in, of laat beide leeg."
+
+msgid "admin.done.maintenance_on"
+msgstr "De onderhoudsmodus staat aan."
+
+msgid "admin.done.maintenance_off"
+msgstr "De onderhoudsmodus staat uit."
+
+msgid "admin.nav.maintenance"
+msgstr "Onderhoud"
+
+msgid "admin.maintenance.refused.title"
+msgstr "Onderhoudsmodus: alleen lezen"
+
+msgid "admin.maintenance.bar.label"
+msgstr "Onderhoudsmodus"
+
+msgid "admin.maintenance.bar.title"
+msgstr "Onderhoudsmodus"
+
+msgid "admin.maintenance.bar.text"
+msgstr "Alleen lezen: wijzigingen zijn tijdelijk niet mogelijk."
+
+msgid "admin.maintenance.bar.since"
+msgstr "Sinds {moment}"
+
+msgid "admin.maintenance.bar.expected_end"
+msgstr "Verwacht klaar: {moment}"
+
+msgid "admin.maintenance.bar.environment"
+msgstr "Aangezet via de server"
+
+msgid "admin.maintenance.title"
+msgstr "Onderhoudsmodus"
+
+msgid "admin.maintenance.lead"
+msgstr "Zet de hele installatie op alleen lezen terwijl u aan het platform werkt. Burgers kunnen dan geen afspraken maken of wijzigen; afspraken die al vaststaan gaan gewoon door."
+
+msgid "admin.maintenance.state"
+msgstr "Status"
+
+msgid "admin.maintenance.on"
+msgstr "Aan"
+
+msgid "admin.maintenance.off"
+msgstr "Uit"
+
+msgid "admin.maintenance.since"
+msgstr "Aan sinds"
+
+msgid "admin.maintenance.by"
+msgstr "Aangezet door"
+
+msgid "admin.maintenance.reason"
+msgstr "Reden"
+
+msgid "admin.maintenance.reason_hint"
+msgstr "Wordt getoond in de auditlog en op deze pagina."
+
+msgid "admin.maintenance.expected_end"
+msgstr "Verwacht klaar"
+
+msgid "admin.maintenance.expected_end_hint"
+msgstr "Alleen ter informatie: de onderhoudsmodus gaat niet vanzelf uit."
+
+msgid "admin.maintenance.no_expected_end"
+msgstr "Niet opgegeven"
+
+msgid "admin.maintenance.environment"
+msgstr "De onderhoudsmodus staat aan via de serverconfiguratie (MAINTENANCE_MODE). Die kunt u hier niet uitzetten."
+
+msgid "admin.maintenance.on_heading"
+msgstr "Onderhoudsmodus aanzetten"
+
+msgid "admin.maintenance.change_heading"
+msgstr "Reden of verwacht einde aanpassen"
+
+msgid "admin.maintenance.on_lead"
+msgstr "Tijdens onderhoud kan alleen de superuser koppelingen, updates en deze schakelaar wijzigen. Al het andere is alleen te lezen, ook voor de superuser."
+
+msgid "admin.maintenance.change"
+msgstr "Opslaan"
+
+msgid "admin.maintenance.switch_on"
+msgstr "Onderhoudsmodus aanzetten"
+
+msgid "admin.maintenance.off_heading"
+msgstr "Onderhoudsmodus uitzetten"
+
+msgid "admin.maintenance.off_lead"
+msgstr "Burgers en beheerders kunnen daarna weer alles wat ze gewend zijn."
+
+msgid "admin.maintenance.off_lead_environment"
+msgstr "Uitzetten haalt alleen de schakelaar in het portaal weg; de onderhoudsmodus blijft aan zolang de server hem aanzet."
+
+msgid "admin.maintenance.switch_off"
+msgstr "Onderhoudsmodus uitzetten"
+
+msgid "admin.maintenance.reason.update"
+msgstr "Update"
+
+msgid "admin.maintenance.reason.restore"
+msgstr "Herstel van een eerdere versie"
+
+msgid "admin.maintenance.reason.integration"
+msgstr "Koppeling herstellen"
+
+msgid "admin.maintenance.reason.incident"
+msgstr "Onderzoek van een incident"
+
+msgid "admin.maintenance.reason.other"
+msgstr "Overig onderhoud"
+
+msgid "admin.audit.reason.maintenance"
+msgstr "Geweigerd: onderhoudsmodus"
+
+msgid "admin.audit.detail.maintenance_on"
+msgstr "Onderhoudsmodus aangezet"
+
+msgid "admin.audit.detail.maintenance_off"
+msgstr "Onderhoudsmodus uitgezet"
+
+msgid "admin.audit.detail.maintenance_refused"
+msgstr "Wijziging geweigerd tijdens onderhoud"
+
 # ADR 0046: staff directory
 
 msgid "authz.permission.staff_view"
