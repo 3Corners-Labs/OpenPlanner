@@ -76,7 +76,7 @@ class AgendaService:
             raise DomainError(ErrorCode.INVALID_RANGE)
         async with self._uow.read() as tx:
             group = await group_by_slug(tx, slug)
-            return await _days(tx, group, first_day, days, self._clock.now())
+            return await agenda_days(tx, group, first_day, days, self._clock.now())
 
     async def shortfalls(self, principal: Principal, slug: str) -> ShortfallSummary:
         """Return the group's slots short of agents from now to the horizon.
@@ -97,8 +97,8 @@ class AgendaService:
     async def _summary(self, tx: Transaction, group: Group) -> ShortfallSummary:
         """Return ``group``'s shortfall summary at the current time."""
         now = self._clock.now()
-        days = await _days(tx, group, group.today(now), self._horizon_days, now)
-        short = [s for d in days for s in d.slots if s.shortfall and s.start >= now]
+        days = await agenda_days(tx, group, group.today(now), self._horizon_days, now)
+        short = [s for d in days for s in d.slots if s.open_shortfall and s.start >= now]
         return ShortfallSummary(len(short), first_shortfall(short, now), self._horizon_days)
 
     async def _authorize(self, principal: Principal, slug: str) -> None:
@@ -106,7 +106,7 @@ class AgendaService:
         require(await self._admin.authorize(principal, Permission.BOOKINGS_VIEW, group_slug=slug))
 
 
-async def _days(
+async def agenda_days(
     tx: Transaction, group: Group, first_day: date, days: int, now: datetime
 ) -> list[AgendaDay]:
     """Return ``days`` agenda days of ``group`` from ``first_day``."""
@@ -115,9 +115,11 @@ async def _days(
     lower, upper = utc_bounds(group, first_day, last_day)
     booked = Counter(b.start for b in await tx.find_confirmed_bookings(group.id, lower, upper))
     closures = await tx.get_closures(group.id, now)
+    accepted = {a.start: a for a in await tx.get_shortfall_acceptances(group.id, lower, upper)}
     result = []
     for offset in range(days):
         day = first_day + timedelta(days=offset)
         windows = windows_on(day, rules, overrides)
-        result.append(AgendaDay(day, agenda_day(group, day, windows, booked, closures)))
+        slots = agenda_day(group, day, windows, booked, closures, accepted)
+        result.append(AgendaDay(day, slots))
     return result
