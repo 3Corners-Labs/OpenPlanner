@@ -60,3 +60,7 @@ Switch it off only once everything works again.
 
 If you had switched maintenance mode on yourself before the update started, it is off after an
 update that succeeded or was rolled back. Switch it on again if you are not done yet.
+
+When maintenance mode has been on for more than four hours (the default setting), the system
+event **Maintenance mode on for long** is added to the audit log, and again every day while it
+stays on.
