@@ -210,6 +210,11 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.INTEGRATION_NOT_READY: "admin.form.error.settings_key",
     ErrorCode.ROLE_CHANGED: "admin.form.error.role_changed",
     ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
+    ErrorCode.SETTING_NOT_EDITABLE: "admin.form.error.setting_not_editable",
+    ErrorCode.SETTING_LOCKED: "admin.form.error.setting_locked",
+    ErrorCode.SETTING_INVALID: "admin.form.error.setting_invalid",
+    ErrorCode.SETTING_COMBINATION: "admin.form.error.setting_combination",
+    ErrorCode.SETTING_EXPIRY: "admin.form.error.setting_expiry",
 }
 
 

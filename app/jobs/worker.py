@@ -44,7 +44,7 @@ from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from app.keys import management_token_key
-from app.logging import configure_logging, warn_loose_secret_files
+from app.logging import configure_logging, set_log_level, warn_loose_secret_files
 
 log = structlog.get_logger()
 
@@ -72,14 +72,21 @@ async def run_worker(
     http = httpx.AsyncClient(timeout=15.0, transport=transport)
     # ADR 0034: committed audit events also go to stdout for the log platform.
     uow = SqlUnitOfWork(engine, secret_box(settings), StdoutEventSink(settings.event_envelope))
+    # ADR 0042 §6: portal values, reloaded once per loop when settings_version moved; the
+    # services below read theirs through ``live`` each time they need them.
+    live = LiveSettings(
+        settings,
+        environment(),
+        PlatformSettingsStore(uow),
+        clock,
+        lambda current: set_log_level(current.log_level),
+    )
     security = SecurityLog(
         uow,
         clock,
-        timedelta(minutes=settings.security_event_window_minutes),
-        max_sources=settings.security_event_max_sources,
+        lambda: timedelta(minutes=live.settings.security_event_window_minutes),
+        max_sources=lambda: live.settings.security_event_max_sources,
     )
-    # ADR 0042 §6: portal values, reloaded once per loop when settings_version moved.
-    live = LiveSettings(settings, environment(), PlatformSettingsStore(uow))
     integrations = build_integrations(settings, engine, http, clock, security)
     fallback = fallback_mail(settings)
     runner = JobRunner(
@@ -95,21 +102,29 @@ async def run_worker(
         video=integrations.video,
         dispatcher=integrations.dispatcher,
         integration=IntegrationService(uow, clock, AdminService(uow, clock)),
-        retention=settings.event_retention,
+        retention=lambda: live.settings.event_retention,
     )
     diagnostics = DiagnosticsService(
-        uow, clock, AdminService(uow, clock), timedelta(hours=settings.diagnostic_mode_hours)
+        uow,
+        clock,
+        AdminService(uow, clock),
+        lambda: timedelta(hours=live.settings.diagnostic_mode_hours),
     )
     housekeeping = Housekeeping.for_database(
-        engine, uow, clock, storage_limits(settings), settings.database_url, diagnostics.brake
+        engine,
+        uow,
+        clock,
+        lambda: storage_limits(live.settings),
+        settings.database_url,
+        diagnostics.brake,
     )
     updates = update_service(settings, uow, clock, http)
     maintenance = MaintenanceWatch(
         uow,
         clock,
         SystemLog(uow, clock),
-        alert_after=timedelta(hours=settings.maintenance_alert_hours),
-        repeat=timedelta(hours=settings.maintenance_alert_repeat_hours),
+        alert_after=lambda: timedelta(hours=live.settings.maintenance_alert_hours),
+        repeat=lambda: timedelta(hours=live.settings.maintenance_alert_repeat_hours),
     )
     log.info(
         "worker.started",

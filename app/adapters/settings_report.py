@@ -11,14 +11,15 @@ unlocked, valid portal value applied on top.
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
 from pydantic import SecretStr
 
 from app.config import Settings
-from app.domain.platform_settings import EMPTY, PortalValues, Resolved, Source, resolve
-from app.domain.settings_registry import REGISTRY, SettingSpec, bounds_text
+from app.domain.platform_settings import EMPTY, PortalValues, Resolved, Source, resolve, usable
+from app.domain.settings_registry import BY_KEY, REGISTRY, SettingSpec, bounds_text
 
 
 @dataclass(frozen=True)
@@ -53,7 +54,10 @@ class SettingState:
 
 
 def describe(
-    settings: Settings, environ: Mapping[str, str], portal: PortalValues = EMPTY
+    settings: Settings,
+    environ: Mapping[str, str],
+    portal: PortalValues = EMPTY,
+    now: datetime | None = None,
 ) -> list[SettingState]:
     """Return the state of every registered setting, in registry order.
 
@@ -61,12 +65,18 @@ def describe(
         settings: What the environment gave the process (never already ``effective``).
         environ: The process environment, to tell a variable from a default.
         portal: The stored portal values.
+        now: The current time; lapsed values (``LOG_LEVEL``) no longer apply.
     """
     names = {name.lower() for name in environ}
-    return [_state(_resolve(spec, settings, environ, names, portal)) for spec in REGISTRY]
+    return [_state(_resolve(spec, settings, environ, names, portal, now)) for spec in REGISTRY]
 
 
-def effective(settings: Settings, environ: Mapping[str, str], portal: PortalValues) -> Settings:
+def effective(
+    settings: Settings,
+    environ: Mapping[str, str],
+    portal: PortalValues,
+    now: datetime | None = None,
+) -> Settings:
     """Return ``settings`` with every unlocked, valid portal value applied (ADR 0042 §2).
 
     Each value was checked against the registry's bounds by ``resolve``. When the values
@@ -79,7 +89,8 @@ def effective(settings: Settings, environ: Mapping[str, str], portal: PortalValu
         spec.key: resolved.value
         for spec in REGISTRY
         if spec.in_config
-        and (resolved := _resolve(spec, settings, environ, names, portal)).source is Source.PORTAL
+        and (resolved := _resolve(spec, settings, environ, names, portal, now)).source
+        is Source.PORTAL
     }
     if not update:
         return settings
@@ -88,11 +99,40 @@ def effective(settings: Settings, environ: Mapping[str, str], portal: PortalValu
 
 
 def combination_refused(
-    settings: Settings, environ: Mapping[str, str], portal: PortalValues
+    settings: Settings,
+    environ: Mapping[str, str],
+    portal: PortalValues,
+    now: datetime | None = None,
 ) -> bool:
     """Return whether the portal values are valid one by one but refused together."""
-    return effective(settings, environ, portal) is settings and any(
-        state.source is Source.PORTAL for state in describe(settings, environ, portal)
+    return effective(settings, environ, portal, now) is settings and any(
+        state.source is Source.PORTAL for state in describe(settings, environ, portal, now)
+    )
+
+
+def combination_problem(
+    settings: Settings, environ: Mapping[str, str], proposed: Mapping[str, object]
+) -> str | None:
+    """Return the cross-field rule that ``proposed`` portal values would break, if any.
+
+    Only unlocked, valid values count, as ``effective`` would apply them.
+    """
+    locked = locked_keys(environ)
+    update = {
+        key: value
+        for key, value in proposed.items()
+        if key in BY_KEY and key not in locked and usable(BY_KEY[key], value)
+    }
+    return settings.model_copy(update=update).cross_field_problem()
+
+
+def locked_keys(environ: Mapping[str, str]) -> frozenset[str]:
+    """Return the keys of the class C and D settings the environment locks."""
+    names = {name.lower() for name in environ}
+    return frozenset(
+        spec.key
+        for spec in REGISTRY
+        if spec.lockable and ({spec.key, f"{spec.key}_file", *spec.aliases} & names)
     )
 
 
@@ -102,6 +142,7 @@ def _resolve(
     environ: Mapping[str, str],
     names: set[str],
     portal: PortalValues,
+    now: datetime | None,
 ) -> Resolved:
     """Resolve one setting from the environment and the portal."""
     from_file = f"{spec.key}_file" in names
@@ -109,7 +150,7 @@ def _resolve(
     source = Source.FILE if from_file else Source.ENV if from_env else None
     value = getattr(settings, spec.key) if spec.in_config else _env_value(spec, environ)
     plain = value if isinstance(value, SecretStr) else _plain(value)
-    return resolve(spec, plain, source, portal)
+    return resolve(spec, plain, source, portal, now)
 
 
 def _state(resolved: Resolved) -> SettingState:

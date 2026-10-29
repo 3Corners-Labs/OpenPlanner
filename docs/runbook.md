@@ -115,7 +115,19 @@ whether the environment locks it, and its value; secrets show only `set` or `not
 portal values come from the database; when it cannot be read, the first line says so. The same
 overview is in the portal under *Advanced settings* (superuser and auditor), with *System
 status* for the class A and B variables (set or not, never the value).
-`settings show RATE_LIMIT_BOOKINGS` shows one setting with its portal bounds. A value set in
+`settings show RATE_LIMIT_BOOKINGS` shows one setting with its portal bounds.
+
+Change or reset a class C setting from the host, audited as `system:cli`, within the same
+bounds as the portal (ADR 0042 §10):
+
+```bash
+docker compose exec web python -m app.cli settings set ADMIN_SESSION_HOURS 4
+docker compose exec web python -m app.cli settings set LOG_LEVEL DEBUG --hours 2
+docker compose exec web python -m app.cli settings reset ADMIN_SESSION_HOURS
+docker compose exec web python -m app.cli settings reset --all-class-c
+```
+
+A setting the environment locks is refused; change the variable and restart instead. A value set in
 the environment outside the portal bounds still applies, but is marked
 `! outside portal bounds`. A stored portal value that no longer meets the rules (for example a
 row edited by hand) is not applied and is marked `! stored portal value ignored`. A change

@@ -13,6 +13,7 @@ in the same transaction with counts, never the origins themselves.
     widget_group    public             the group behind a widget URL, and the origin check
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change, require
@@ -22,6 +23,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.scheduling import Group, GroupSummary, Organisation
+from app.domain.tunable import value_of
 
 _PERMISSION = Permission.EMBEDDING_MANAGE
 
@@ -72,15 +74,20 @@ class EmbeddingService:
         clock: Clock,
         admin: AdminService,
         *,
-        max_origins: int,
+        max_origins: int | Callable[[], int],
         allow_local: bool,
     ) -> None:
         """Store the collaborators and the limits."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
-        self.max_origins = max_origins
+        self._max_origins = max_origins
         self.allow_local = allow_local
+
+    @property
+    def max_origins(self) -> int:
+        """How many origins one organisation may keep now."""
+        return value_of(self._max_origins)
 
     async def organisations(self, principal: Principal) -> list[OrganisationEmbedding]:
         """Return every organisation ``principal`` may manage embedding for, by name."""
