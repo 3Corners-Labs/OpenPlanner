@@ -3,8 +3,9 @@
 Run with ``uvicorn app.main:create_app --factory``.
 """
 
+import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
 
 import httpx
@@ -17,6 +18,7 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import Integrations, build_integrations, secret_box
+from app.adapters.live_settings import LiveSettings, keep_current
 from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
@@ -58,6 +60,7 @@ from app.domain.messaging_service import MessagingService
 from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
+from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.queue_service import QueueService
 from app.domain.roles import RoleService
@@ -153,6 +156,19 @@ def create_app(
         uow = SqlUnitOfWork(
             app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
         )
+
+        def apply(current: Settings) -> None:
+            app.state.settings = current
+            if agent_api is not None:
+                agent_api.state.settings = current
+
+        # ADR 0042 §2, §6: portal values on top of the environment, reloaded when they change.
+        # Values read on each request follow at once; services built here follow in step 4.
+        app.state.live_settings = LiveSettings(
+            settings, environment(), PlatformSettingsStore(uow), apply
+        )
+        await app.state.live_settings.refresh()
+        reloader = asyncio.create_task(keep_current(app.state.live_settings))
         app.state.security_log = SecurityLog(
             uow,
             clock,
@@ -223,6 +239,7 @@ def create_app(
                 settings.oidc_role_org_admin,
                 settings.oidc_role_group_admin,
                 settings.oidc_role_auditor,
+                settings.oidc_role_agent,
             ),
         )
         app.state.api_access = ApiAccessService(
@@ -238,11 +255,11 @@ def create_app(
                 "limiter",
                 "clock",
                 "maintenance_service",
-                "settings",
                 "security_log",
                 "client_pseudonyms",
             ):
                 setattr(agent_api.state, name, getattr(app.state, name))
+            agent_api.state.settings = app.state.settings
         wired = integrations or build_integrations(
             settings, app.state.engine, http, clock, app.state.security_log
         )
@@ -265,6 +282,9 @@ def create_app(
         try:
             yield
         finally:
+            reloader.cancel()
+            with suppress(asyncio.CancelledError):
+                await reloader
             await http.aclose()
             await app.state.engine.dispose()
 

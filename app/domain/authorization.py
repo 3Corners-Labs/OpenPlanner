@@ -105,6 +105,10 @@ class Permission(StrEnum):
     STAFF_VIEW = "staff.view"
     EMBEDDING_MANAGE = "embedding.manage"
     QUEUE_WORK = "queue.work"
+    SETTINGS_PLATFORM_VIEW = "settings.platform.view"
+    SETTINGS_PLATFORM_MANAGE = "settings.platform.manage"
+    SETTINGS_LOGIN_MANAGE = "settings.login.manage"
+    SETTINGS_ORGANISATION_MANAGE = "settings.organisation.manage"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -147,6 +151,14 @@ LEVELS: dict[Permission, Level] = {
     Permission.EMBEDDING_MANAGE: Level.ORGANISATION,
     # ADR 0043: see and claim the bookings in a group's own queue.
     Permission.QUEUE_WORK: Level.GROUP,
+    # ADR 0042 §5, §11: System status and Advanced settings, read-only.
+    Permission.SETTINGS_PLATFORM_VIEW: Level.GLOBAL,
+    # ADR 0042 §5: change a platform setting (class C); the login mapping has its own.
+    Permission.SETTINGS_PLATFORM_MANAGE: Level.GLOBAL,
+    # ADR 0042 §8: the OIDC claim and role mapping, which can lock everyone out.
+    Permission.SETTINGS_LOGIN_MANAGE: Level.GLOBAL,
+    # ADR 0042 §5: the settings of one organisation (class D).
+    Permission.SETTINGS_ORGANISATION_MANAGE: Level.ORGANISATION,
 }
 
 LOCKED_PERMISSIONS = frozenset(
@@ -159,6 +171,8 @@ LOCKED_PERMISSIONS = frozenset(
         Permission.ROLES_MANAGE,
         Permission.SYSTEM_MAINTENANCE,
         Permission.DIAGNOSTICS_MANAGE,
+        Permission.SETTINGS_PLATFORM_MANAGE,
+        Permission.SETTINGS_LOGIN_MANAGE,
     }
 )
 """ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
@@ -185,6 +199,7 @@ READ_PERMISSIONS = frozenset(
         Permission.BOOKINGS_VIEW,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,
+        Permission.SETTINGS_PLATFORM_VIEW,
     }
 )
 """ADR 0039: permissions that only show; everything else changes something."""
@@ -205,6 +220,10 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
 
 EVERY_ADMIN = frozenset({Permission.DASHBOARD_VIEW, Permission.RIGHTS_VIEW, Permission.MATRIX_VIEW})
 """ADR 0039: what every admin holds, so every role (custom ones too) must hold it."""
+
+GLOBAL_FOR_ANY_REACH = EVERY_ADMIN | {Permission.SETTINGS_PLATFORM_VIEW}
+"""Global permissions a role without the superuser's reach may hold: the basics, and the
+read-only System status and Advanced settings (ADR 0042 §5, no secret values shown)."""
 
 MATRIX: dict[Role, frozenset[Permission]] = {
     # HANDOVER §6: everything, including organisations, IdP, SMTP and WxCC credentials.
@@ -236,6 +255,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.EMBEDDING_MANAGE,
         # ADR 0043: can step in as an agent in the own queue.
         Permission.QUEUE_WORK,
+        # ADR 0042 §5: the settings of the own organisation (class D).
+        Permission.SETTINGS_ORGANISATION_MANAGE,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: EVERY_ADMIN
@@ -264,6 +285,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.RETENTION_VIEW,
         # ADR 0046: who has access, for an access review.
         Permission.STAFF_VIEW,
+        # ADR 0042 §5: how the installation is configured, without secret values.
+        Permission.SETTINGS_PLATFORM_VIEW,
     },
     # ADR 0043: picks up bookings in the own queue of its groups; sees first names only.
     Role.AGENT: EVERY_ADMIN | {Permission.GROUP_VIEW, Permission.QUEUE_WORK},
@@ -294,7 +317,7 @@ def _within_reach(reach: Reach, permission: Permission) -> bool:
     if reach is Reach.EVERYTHING:
         return True
     if level is Level.GLOBAL:
-        return permission in EVERY_ADMIN  # anything else global is about the installation
+        return permission in GLOBAL_FOR_ANY_REACH  # anything else global changes the installation
     return level is Level.GROUP or reach is Reach.ORGANISATIONS
 
 

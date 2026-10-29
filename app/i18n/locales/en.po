@@ -5391,3 +5391,351 @@ msgstr "This installation has no build of the widget script; the code is shown w
 
 msgid "admin.embedding.code_none"
 msgstr "First switch on Embed on websites for a group."
+
+msgid "admin.nav.settings"
+msgstr "Advanced settings"
+
+msgid "admin.settings.title"
+msgstr "Advanced settings"
+
+msgid "admin.settings.intro"
+msgstr "How this installation is configured and where each value comes from. Secret values are never shown. Nothing can be changed on this screen yet."
+
+msgid "admin.settings.status.title"
+msgstr "System status"
+
+msgid "admin.settings.status.intro"
+msgstr "The settings only the server operator sets, in the environment or in a file. You see whether they are set, never their value."
+
+msgid "admin.settings.status.environment"
+msgstr "Environment"
+
+msgid "admin.settings.status.problems"
+msgstr "This installation does not run as production. In production it would not start, because:"
+
+msgid "admin.settings.status.state"
+msgstr "Set"
+
+msgid "admin.settings.variable"
+msgstr "Variable"
+
+msgid "admin.settings.class"
+msgstr "Class"
+
+msgid "admin.settings.source"
+msgstr "Source"
+
+msgid "admin.settings.setting"
+msgstr "Setting"
+
+msgid "admin.settings.value"
+msgstr "Value"
+
+msgid "admin.settings.notes"
+msgstr "Notes"
+
+msgid "admin.settings.locked"
+msgstr "Locked by the server operator"
+
+msgid "admin.settings.outside_bounds"
+msgstr "Outside the portal bounds"
+
+msgid "admin.settings.portal_ignored"
+msgstr "Stored value breaks the rules and is ignored"
+
+msgid "admin.settings.value.set"
+msgstr "Set"
+
+msgid "admin.settings.value.not_set"
+msgstr "Not set"
+
+msgid "admin.settings.value.empty"
+msgstr "Empty"
+
+msgid "admin.settings.value.on"
+msgstr "On"
+
+msgid "admin.settings.value.off"
+msgstr "Off"
+
+msgid "admin.settings.source.default"
+msgstr "Default"
+
+msgid "admin.settings.source.portal"
+msgstr "Admin portal"
+
+msgid "admin.settings.source.env"
+msgstr "Environment"
+
+msgid "admin.settings.source.file"
+msgstr "File"
+
+msgid "admin.settings.class.bootstrap"
+msgstr "A · bootstrap"
+
+msgid "admin.settings.class.deployment"
+msgstr "B · deployment"
+
+msgid "admin.settings.class.platform"
+msgstr "C · platform"
+
+msgid "admin.settings.class.organisation"
+msgstr "D · organisation"
+
+msgid "admin.settings.problem.simulator_enabled"
+msgstr "the simulator is not allowed in production."
+
+msgid "admin.settings.problem.management_token_key"
+msgstr "MANAGEMENT_TOKEN_KEY is required in production."
+
+msgid "admin.settings.problem.public_base_url"
+msgstr "PUBLIC_BASE_URL must use https in production."
+
+msgid "admin.settings.problem.session_secret"
+msgstr "SESSION_SECRET is required in production."
+
+msgid "admin.settings.problem.webhook_base_url"
+msgstr "WEBHOOK_BASE_URL must use https in production."
+
+msgid "admin.settings.problem.webex_incomplete"
+msgstr "Webex needs WEBEX_CLIENT_SECRET, WEBEX_REFRESH_TOKEN and SETTINGS_ENCRYPTION_KEY in production."
+
+msgid "admin.settings.problem.oidc_incomplete"
+msgstr "login (OIDC) needs an https discovery URL and a client secret in production."
+
+msgid "authz.permission.settings_platform_view"
+msgstr "View system status and advanced settings"
+
+msgid "authz.permission.settings_platform_manage"
+msgstr "Change platform settings"
+
+msgid "authz.permission.settings_login_manage"
+msgstr "Change the login mapping (claims and roles)"
+
+msgid "authz.permission.settings_organisation_manage"
+msgstr "Change the organisation's settings"
+
+msgid "settings.topic.bootstrap"
+msgstr "Bootstrap"
+
+msgid "settings.topic.login"
+msgstr "Login"
+
+msgid "settings.topic.host"
+msgstr "Host"
+
+msgid "settings.topic.switches"
+msgstr "Switches"
+
+msgid "settings.topic.development"
+msgstr "Development"
+
+msgid "settings.topic.operations"
+msgstr "Operations"
+
+msgid "settings.topic.retention"
+msgstr "Retention"
+
+msgid "settings.topic.storage"
+msgstr "Storage"
+
+msgid "settings.topic.rate_limits"
+msgstr "Rate limits"
+
+msgid "settings.topic.admin_session"
+msgstr "Admin session"
+
+msgid "settings.topic.login_mapping"
+msgstr "Login mapping"
+
+msgid "settings.topic.mail"
+msgstr "Fallback mail server"
+
+msgid "settings.topic.webex"
+msgstr "Webex and Webex Contact Center"
+
+msgid "settings.topic.updates"
+msgstr "Updates"
+
+msgid "settings.topic.display"
+msgstr "Display"
+
+msgid "settings.topic.staff"
+msgstr "Staff"
+
+msgid "settings.topic.planner"
+msgstr "Planner"
+
+msgid "settings.field.log_level.label"
+msgstr "Log level"
+
+msgid "settings.field.worker_poll_seconds.label"
+msgstr "Interval of the background worker (seconds)"
+
+msgid "settings.field.maintenance_cache_seconds.label"
+msgstr "Maintenance switch cache (seconds)"
+
+msgid "settings.field.maintenance_retry_after_seconds.label"
+msgstr "Retry after maintenance (seconds)"
+
+msgid "settings.field.staff_last_seen_interval_seconds.label"
+msgstr "Last-seen update interval (seconds)"
+
+msgid "settings.field.system_event_retention_days.label"
+msgstr "Keep system events (days)"
+
+msgid "settings.field.audit_retention_days.label"
+msgstr "Keep admin actions (days)"
+
+msgid "settings.field.security_event_retention_days.label"
+msgstr "Keep security events (days)"
+
+msgid "settings.field.diagnostic_event_retention_days.label"
+msgstr "Keep diagnostic events (days)"
+
+msgid "settings.field.diagnostic_mode_hours.label"
+msgstr "Diagnostic mode ends after (hours)"
+
+msgid "settings.field.security_event_window_minutes.label"
+msgstr "Security event window (minutes)"
+
+msgid "settings.field.audit_export_max_rows.label"
+msgstr "Most rows per export"
+
+msgid "settings.field.audit_export_max_days.label"
+msgstr "Most days per export"
+
+msgid "settings.field.embedding_max_origins.label"
+msgstr "Most websites per organisation"
+
+msgid "settings.field.storage_low_free_percent.label"
+msgstr "Low free space below (%)"
+
+msgid "settings.field.storage_critical_free_percent.label"
+msgstr "Critical free space below (%)"
+
+msgid "settings.field.database_max_mb.label"
+msgstr "Maximum database size (MB)"
+
+msgid "settings.field.rate_limit_bookings.label"
+msgstr "Bookings per IP address"
+
+msgid "settings.field.rate_limit_reads.label"
+msgstr "Availability reads per IP address"
+
+msgid "settings.field.rate_limit_agent_tokens.label"
+msgstr "Machine API token requests per client"
+
+msgid "settings.field.rate_limit_agent_calls.label"
+msgstr "Machine API calls per client"
+
+msgid "settings.field.admin_session_hours.label"
+msgstr "Admin session lifetime (hours)"
+
+msgid "settings.field.admin_reauth_minutes.label"
+msgstr "Log in again for a change after (minutes)"
+
+msgid "settings.field.oidc_role_claim.label"
+msgstr "Claim with the roles"
+
+msgid "settings.field.oidc_organisation_claim.label"
+msgstr "Claim with the organisations"
+
+msgid "settings.field.oidc_group_claim.label"
+msgstr "Claim with the groups"
+
+msgid "settings.field.oidc_role_superuser.label"
+msgstr "Role value superuser"
+
+msgid "settings.field.oidc_role_org_admin.label"
+msgstr "Role value organisation admin"
+
+msgid "settings.field.oidc_role_group_admin.label"
+msgstr "Role value group admin"
+
+msgid "settings.field.oidc_role_auditor.label"
+msgstr "Role value compliance and privacy"
+
+msgid "settings.field.oidc_role_agent.label"
+msgstr "Role value own-queue agent"
+
+msgid "settings.field.smtp_host.label"
+msgstr "Mail server"
+
+msgid "settings.field.smtp_port.label"
+msgstr "Port"
+
+msgid "settings.field.smtp_starttls.label"
+msgstr "STARTTLS"
+
+msgid "settings.field.smtp_tls.label"
+msgstr "Implicit TLS"
+
+msgid "settings.field.smtp_username.label"
+msgstr "Username"
+
+msgid "settings.field.smtp_password.label"
+msgstr "Password"
+
+msgid "settings.field.mail_from.label"
+msgstr "Sender"
+
+msgid "settings.field.webex_client_id.label"
+msgstr "Service App client ID"
+
+msgid "settings.field.webex_client_secret.label"
+msgstr "Service App client secret"
+
+msgid "settings.field.webex_refresh_token.label"
+msgstr "Refresh token"
+
+msgid "settings.field.webex_webhook_secret.label"
+msgstr "Webex webhook secret"
+
+msgid "settings.field.wxcc_api_base_url.label"
+msgstr "Webex Contact Center API address"
+
+msgid "settings.field.wxcc_webhook_secret.label"
+msgstr "Webex Contact Center webhook secret"
+
+msgid "settings.field.update_repository.label"
+msgstr "Release repository"
+
+msgid "settings.field.update_check_token.label"
+msgstr "Repository read token"
+
+msgid "settings.field.time_format.label"
+msgstr "Time format"
+
+msgid "settings.field.admin_timezone.label"
+msgstr "Admin portal time zone"
+
+msgid "settings.field.staff_dormant_after_days.label"
+msgstr "Staff member dormant after (days)"
+
+msgid "settings.field.shortfall_horizon_days.label"
+msgstr "Shortfall look-ahead (days)"
+
+msgid "settings.field.planner_changes_alert_per_hour.label"
+msgstr "Alert above changes per planner per hour"
+
+msgid "admin.settings.problem.dev_placeholder"
+msgstr "holds a development placeholder; production refuses it."
+
+msgid "admin.settings.refused"
+msgstr "The stored values contradict each other (for example critical storage not below low storage). So none of them applies: the defaults and the server's values stay."
+
+msgid "settings.field.maintenance_alert_hours.label"
+msgstr "Report long maintenance after (hours)"
+
+msgid "settings.field.maintenance_alert_repeat_hours.label"
+msgstr "Repeat the long-maintenance report every (hours)"
+
+msgid "settings.field.security_event_max_sources.label"
+msgstr "Most sources tracked for security events"
+
+msgid "settings.field.planner_rebook_days.label"
+msgstr "Request to rebook lapses after (days)"
+
+msgid "settings.field.planner_rebook_reminder_days.label"
+msgstr "Rebook reminder (days before the lapse)"
