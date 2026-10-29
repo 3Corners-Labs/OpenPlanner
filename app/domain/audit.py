@@ -11,7 +11,7 @@ An event sits at exactly one level: global (no organisation), an organisation (n
 a group. The audit log shows each admin the levels of their own scope and nothing above it.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
