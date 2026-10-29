@@ -62,6 +62,9 @@ PURPOSE_LABELS: dict[str, str] = {
     "change": "admin.messages.purpose_change",
     "reminder": "admin.messages.purpose_reminder",
     "cancellation": "admin.messages.purpose_cancellation",
+    "rebook_request": "admin.messages.purpose_rebook_request",
+    "rebook_reminder": "admin.messages.purpose_rebook_reminder",
+    "rebook_lapsed": "admin.messages.purpose_rebook_lapsed",
     "reason": "admin.messages.purpose_reason",
     "all": "admin.messages.purpose_all",
 }

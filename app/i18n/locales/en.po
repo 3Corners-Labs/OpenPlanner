@@ -102,6 +102,45 @@ msgstr "Dear {first_name}, your video call with {group_name} has moved to {date}
 msgid "message.cancellation.sms"
 msgstr "Dear {first_name}, your video call with {group_name} on {date} at {time} has been cancelled. {reason}"
 
+msgid "message.rebook_request.subject"
+msgstr "Please choose a new time for your video call"
+
+msgid "message.rebook_request.intro"
+msgstr "Your video call with {group_name} on {date} at {time} cannot take place. Please choose a new time that suits you; you do not need to enter your details again. If you do not choose a new time before {deadline}, the appointment lapses."
+
+msgid "message.rebook_request.sms"
+msgstr "Dear {first_name}, your video call with {group_name} on {date} at {time} cannot take place. {reason} Choose a new time before {deadline}: {manage_url}"
+
+msgid "message.rebook_reminder.subject"
+msgstr "Reminder: please choose a new time for your video call"
+
+msgid "message.rebook_reminder.intro"
+msgstr "You have not chosen a new time for your video call with {group_name} yet. If you do not choose a new time before {deadline}, the appointment lapses."
+
+msgid "message.rebook_reminder.sms"
+msgstr "Dear {first_name}, please still choose a new time for your video call with {group_name}, by {deadline}: {manage_url}"
+
+msgid "message.rebook_lapsed.subject"
+msgstr "Your appointment with {group_name} has lapsed"
+
+msgid "message.rebook_lapsed.intro"
+msgstr "You did not choose a new time for your video call with {group_name}. The appointment has lapsed. You can always make a new appointment."
+
+msgid "message.rebook_lapsed.sms"
+msgstr "Dear {first_name}, you did not choose a new time; your appointment with {group_name} has lapsed. You can always make a new appointment."
+
+msgid "message.manage_rebook"
+msgstr "Choose a new time or cancel the appointment, by {deadline} at the latest:"
+
+msgid "admin.messages.purpose_rebook_request"
+msgstr "Request to choose a new time (by a planner)"
+
+msgid "admin.messages.purpose_rebook_reminder"
+msgstr "Reminder to choose a new time"
+
+msgid "admin.messages.purpose_rebook_lapsed"
+msgstr "Appointment lapsed without a new time"
+
 msgid "admin.messages.purpose_reason"
 msgstr "Reasons for changes by a planner"
 
@@ -1601,6 +1640,66 @@ msgstr "Cancel booking"
 msgid "admin.planner.keep"
 msgstr "Do not cancel"
 
+msgid "admin.agenda.waiting"
+msgstr "Awaiting a new time"
+
+msgid "admin.agenda.rebook"
+msgstr "Ask for a new time"
+
+msgid "admin.agenda.slot_rebook"
+msgstr "Ask citizens for a new time"
+
+msgid "admin.agenda.waiting_list"
+msgstr "Awaiting a new time"
+
+msgid "admin.planner.rebook_title"
+msgstr "Ask for a new time for {reference}"
+
+msgid "admin.planner.rebook_lead"
+msgstr "{first_name}, {when}. The citizen chooses a new time themselves."
+
+msgid "admin.planner.rebook_explain"
+msgstr "The place in this slot is freed at once. The citizen gets a message with the reason and a link to choose a new time, and a reminder {reminder} days before it lapses. If the citizen chooses nothing within {days} days after the original time, the appointment lapses."
+
+msgid "admin.planner.rebook_button"
+msgstr "Ask for a new time"
+
+msgid "admin.planner.slot_title"
+msgstr "Ask for a new time: slot {when}"
+
+msgid "admin.planner.slot_lead"
+msgstr "This slot has more bookings than agents. These most recently made bookings ({count}) get a request to choose a new time; their places are freed at once. Without a new time they lapse {days} days after this time."
+
+msgid "admin.planner.slot_bookings"
+msgstr "Bookings concerned"
+
+msgid "admin.planner.slot_button"
+msgstr "Ask for a new time ({count})"
+
+msgid "admin.planner.waiting_title"
+msgstr "Awaiting a new time"
+
+msgid "admin.planner.waiting_lead"
+msgstr "Bookings whose citizen was asked to choose a new time. You can move or cancel them yourself."
+
+msgid "admin.planner.waiting_booking"
+msgstr "Booking"
+
+msgid "admin.planner.waiting_was"
+msgstr "Original time"
+
+msgid "admin.planner.waiting_by"
+msgstr "Lapses on"
+
+msgid "admin.planner.waiting_empty"
+msgstr "No bookings are awaiting a new time."
+
+msgid "admin.done.rebook_requested"
+msgstr "Citizens asked to choose a new time: {count}. The places have been freed."
+
+msgid "admin.form.error.slot_changed"
+msgstr "This slot has changed in the meantime. Check the list and confirm again."
+
 msgid "admin.done.shortfall_accepted"
 msgstr "The shortfall is accepted. It shows again when the staffing or the bookings of this slot change."
 
@@ -2004,6 +2103,12 @@ msgstr "Choose a new time below or cancel the appointment. Your details have bee
 msgid "manage.suspended.reschedule"
 msgstr "Choose a new time"
 
+msgid "manage.status.awaiting_rebook"
+msgstr "Waiting for your new time"
+
+msgid "manage.rebook_by"
+msgstr "If you do not choose a new time before {deadline}, the appointment lapses."
+
 msgid "error.group_closed"
 msgstr "This team is temporarily closed. Please choose another time."
 
@@ -2123,6 +2228,12 @@ msgstr "booking moved by a planner"
 
 msgid "admin.audit.detail.planner_cancel"
 msgstr "booking cancelled by a planner"
+
+msgid "admin.audit.detail.planner_rebook"
+msgstr "citizen asked to choose a new time"
+
+msgid "admin.audit.detail.bulk"
+msgstr "for a whole slot"
 
 msgid "admin.audit.detail.shortfall_accept"
 msgstr "shortfall accepted"
@@ -4738,6 +4849,12 @@ msgstr "Do you need help now? You can also reach us in another way."
 
 msgid "maintenance.try_later"
 msgstr "Please try again later."
+
+msgid "audit.event.maintenance_overdue"
+msgstr "Maintenance mode on for long"
+
+msgid "admin.audit.detail.hours"
+msgstr "{count} hours"
 
 # ADR 0046: staff directory
 

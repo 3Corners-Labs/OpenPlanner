@@ -99,6 +99,7 @@ Weekly: Renovate updates (security updates immediately), `trivy` on the running 
   6. Which settings does this add or change (key, class A–D, default, bounds, permission), and which tunable value stays hard-coded, and why?
   7. Which admin screen or setting is new or moved, where does it live in the admin structure (scope → object → tab, ADR 0047), and why does it fit there? A new section, top-level entry or seventh tab needs an ADR.
 - If a `security-review` skill exists in `.claude/skills/`, run it before opening the PR and paste its findings into the description.
+- Licence (ADR 0054): EUPL-1.2 only, declared for every file in `REUSE.toml`; CI runs `reuse lint`. A file copied from elsewhere gets its own annotation there. Outside contributions come under `docs/cla.md`.
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `security:`). `CHANGELOG.md` updated from commits on release.
 - One ADR per decision in `docs/adr/NNNN-title.md` (status, context, decision, settings, consequences; start from `docs/adr/template.md`). Numbered, never rewritten; superseded ADRs are marked.
 - Every PR description: what, why, how tested, screenshots for UI, i18n checked (nl/en), migration reversible (yes/no).
