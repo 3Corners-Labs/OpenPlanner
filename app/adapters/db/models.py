@@ -52,6 +52,7 @@ from app.adapters.db.types import UTCDateTime
 
 __all__ = [
     "ApiAccessTokenRow",
+    "DiagnosticModeRow",
     "ApiClientGroupRow",
     "ApiClientRow",
     "ApiSettingsRow",
@@ -500,6 +501,7 @@ class AuditEventRow(Base):
         Index("ix_audit_events_source_at", "source", "at"),
         Index("ix_audit_events_event_id", "event_id", unique=True),
         Index("ix_audit_events_trace_id", "trace_id"),
+        Index("ix_audit_events_category_at", "category", "at"),
         CheckConstraint(
             "outcome IN ('success', 'denied', 'failure', 'retry', 'skipped')", name="outcome"
         ),
@@ -509,6 +511,25 @@ class AuditEventRow(Base):
             "category IN ('audit', 'system', 'security', 'diagnostic')", name="category"
         ),
     )
+
+
+class DiagnosticModeRow(Base):
+    """Diagnostic mode of one group or a whole organisation (ADR 0040, part 4).
+
+    Slugs, not foreign keys, as in ``audit_events``: the mode ends by itself and is about the
+    events, not the configuration. ``group`` is empty for a whole organisation, so one unique
+    key covers both kinds of target.
+    """
+
+    __tablename__ = "diagnostic_modes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation: Mapped[str] = mapped_column(String(64))
+    group: Mapped[str] = mapped_column(String(64), server_default=text("''"))
+    until: Mapped[datetime] = mapped_column(UTCDateTime())
+    started_by: Mapped[str] = mapped_column(String(255))
+
+    __table_args__ = (UniqueConstraint("organisation", "group", name="uq_diagnostic_modes_target"),)
 
 
 class StaffRow(Base):

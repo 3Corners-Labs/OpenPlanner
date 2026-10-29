@@ -29,10 +29,10 @@ ADR 0040 part 2 replaced the field list of 0034 with `openplanner.event/1` befor
 
 | ID | Item | Size | Done when |
 |---|---|---|---|
-| AU-1 | Post-commit emit of every audit event as `log_type: "audit"`, schema `openplanner.event/1` (ADR 0040), in the audit adapter | S | Tests: once after commit, never after rollback, only schema fields, PII masked |
+| AU-1 | Post-commit emit of every audit event as `log_type: "audit"`, schema `openplanner.event/1` (ADR 0040), in the audit adapter | S | **Done** (ADR 0034 accepted 2026-10-28): tests once after commit, never after rollback, only schema fields, PII masked |
 | AU-2 | Setting `INSTALLATION_NAME`; schema documented in `docs/audit-events.md` | S | **Done with ADR 0040 part 2**: setting, `.env.example` and the schema document exist |
-| AU-3 | Runbook: shipping with Docker's `splunk` logging driver, Universal Forwarder or Fluent Bit; `docs/dataflow.md` names the log platform as recipient of admin subjects | S | Runbook section reviewed by the client's security team |
-| AU-4 | Webhook rejections and Webex token-refresh failures as deduplicated global system events (left open by ADR 0031) | M | Flood of invalid webhooks gives one event per window, test included |
+| AU-3 | Runbook: shipping with Docker's `splunk` logging driver, Universal Forwarder or Fluent Bit; `docs/dataflow.md` names the log platform as recipient of admin subjects | S | Written; **open:** review by the client's security team |
+| AU-4 | Webhook rejections and Webex token-refresh failures as deduplicated global system events (left open by ADR 0031) | M | **Done**: category `security`, one per kind per `SECURITY_EVENT_WINDOW_MINUTES`, flood test included |
 
 ## 3. Embedding on a host website — ADR 0035 (WP3c)
 

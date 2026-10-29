@@ -20,7 +20,6 @@ NOT_YET_DOCUMENTED: frozenset[str] = frozenset(
         "/admin/api",
         "/admin/api/clients/new",
         "/admin/api/clients/{client_id}",
-        "/admin/audit",
         "/admin/branding",
         "/admin/closures",
         "/admin/groups/new",

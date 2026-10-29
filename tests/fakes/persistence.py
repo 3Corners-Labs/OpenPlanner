@@ -9,7 +9,7 @@ from datetime import date, datetime
 
 from app.domain import holidays as holiday_model
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
-from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Source
+from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingKind, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
@@ -19,6 +19,7 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import GroupCheck
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock
+from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import PlannedJob
@@ -51,6 +52,7 @@ class State:
     call_status: dict[int, CallStatus] = field(default_factory=dict)
     webhook_events: dict[tuple[str, str], datetime] = field(default_factory=dict)
     audit: list[AuditEvent] = field(default_factory=list)
+    diagnostic_modes: list[DiagnosticMode] = field(default_factory=list)
     staff: dict[str, StaffMember] = field(default_factory=dict)
     logos: dict[int, Logo] = field(default_factory=dict)
     fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
@@ -121,11 +123,37 @@ class InMemoryTransaction:
             for e in reversed(events)
         ][:limit]
 
-    async def delete_audit_events(self, source: Source, before: datetime) -> int:
-        kept = [e for e in self.state.audit if e.source is not source or e.at >= before]
+    async def delete_audit_events(self, category: Category, before: datetime) -> int:
+        kept = [e for e in self.state.audit if e.event_category is not category or e.at >= before]
         removed = len(self.state.audit) - len(kept)
         self.state.audit = kept
         return removed
+
+    async def active_diagnostic_modes(self, now: datetime) -> list[DiagnosticMode]:
+        return [m for m in self.state.diagnostic_modes if m.until > now]
+
+    async def save_diagnostic_mode(self, mode: DiagnosticMode) -> None:
+        self.state.diagnostic_modes = [
+            m
+            for m in self.state.diagnostic_modes
+            if (m.organisation, m.group) != (mode.organisation, mode.group)
+        ] + [mode]
+
+    async def end_diagnostic_mode(
+        self, organisation: str, group: str | None, now: datetime
+    ) -> bool:
+        active = [
+            m
+            for m in self.state.diagnostic_modes
+            if (m.organisation, m.group) == (organisation, group) and m.until > now
+        ]
+        self.state.diagnostic_modes = [m for m in self.state.diagnostic_modes if m not in active]
+        return bool(active)
+
+    async def end_all_diagnostic_modes(self, now: datetime) -> int:
+        active = [m for m in self.state.diagnostic_modes if m.until > now]
+        self.state.diagnostic_modes = []
+        return len(active)
 
     async def get_staff(self, subject: str) -> StaffMember | None:
         return self.state.staff.get(subject)
