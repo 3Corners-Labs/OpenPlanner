@@ -6,8 +6,11 @@ follow one request or job) and ``service`` (``web`` or ``worker``). Existing row
 event id, the level that follows from their outcome and the category that follows from their
 source; they have no trace or service. Ids and codes only; no personal data of citizens.
 
+It also joins the two heads 0027 (update steps) and 0029 (maintenance state) that main had
+when it was written.
+
 Revision ID: 0034
-Revises: 0026
+Revises: 0027, 0029
 Create Date: 2026-10-28 23:00:00.000000
 """
 
@@ -17,7 +20,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0034"
-down_revision: str | None = "0026"
+down_revision: str | Sequence[str] | None = ("0027", "0029")
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
