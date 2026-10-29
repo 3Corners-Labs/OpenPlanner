@@ -44,6 +44,7 @@ NAVIGATION = (
     NavItem("admin.nav.dashboard", "/admin/", Permission.DASHBOARD_VIEW, "dashboard"),
     NavItem("admin.nav.audit", "/admin/audit", Permission.AUDIT_VIEW, "audit"),
     NavItem("admin.nav.retention", "/admin/retention", Permission.RETENTION_VIEW, "clock"),
+    NavItem("admin.nav.staff", "/admin/staff", Permission.STAFF_VIEW, "people"),
     NavItem("admin.nav.rights", "/admin/rights", Permission.RIGHTS_VIEW, "rights"),
     NavItem("admin.nav.matrix", "/admin/matrix", Permission.MATRIX_VIEW, "matrix"),
     NavItem(
@@ -135,8 +136,14 @@ def page(
     name: str,
     principal: Principal,
     context: dict[str, object],
+    *,
+    scripts: bool = False,
 ) -> HTMLResponse:
-    """Render an admin page with navigation and ``can()`` from the matrix."""
+    """Render an admin page with navigation and ``can()`` from the matrix.
+
+    ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``); only pages that enhance
+    themselves under an ADR do (the updates page, ADR 0048).
+    """
     can = can_function(principal)
     nav = [
         NavView(locale.gettext(item.label_key), item.href, _is_current(request, item), item.icon)
@@ -160,6 +167,7 @@ def page(
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
             "update_banner": getattr(request.state, "update_notice", None),
         },
+        scripts=scripts,
     )
 
 

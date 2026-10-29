@@ -9,7 +9,7 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``claim``: what ``app.cli update-claim`` prints.
 - ``revision``: what ``alembic current`` prints as the revision.
 - ``fail``: one operation per line that exits 1 (``pull``, ``cosign``, ``backup-db``,
-  ``restore-db``, ``downgrade``, ``docker-info``).
+  ``restore-db``, ``downgrade``, ``docker-info``, ``update-progress``).
 - ``compose-version``: what ``docker compose version --short`` prints (default 2.40.3).
 - ``latest``: the tag of the latest GitHub release (default none: the API call fails).
 - ``unhealthy``: one image reference per line; the worker reports ``unhealthy`` while it is
@@ -81,8 +81,8 @@ def _compose(args: list[str]) -> int:
             sys.stdout.write((_host() / "claim").read_text())
         elif command[3] == "backup-db" and command[4:] != ["--prune"]:
             return _failing("backup-db")
-        elif command[3] == "restore-db":
-            return _failing("restore-db")
+        elif command[3] in ("restore-db", "update-progress"):
+            return _failing(command[3])
     return 0
 
 
