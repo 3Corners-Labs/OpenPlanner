@@ -72,7 +72,7 @@ the log platform would put personal data of citizens in a place CLAUDE.md forbid
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `SECURITY_EVENT_MAX_SOURCES` | C platform | 1000 | 10–100000 | superuser (env until the ADR 0042 registry exists) | windows kept per process (point 4) |
+| `SECURITY_EVENT_MAX_SOURCES` | C platform | 1000 | 10–100000 | `settings.platform.manage` (settings registry, ADR 0042) | windows kept per process (point 4) |
 
 `SECURITY_EVENT_WINDOW_MINUTES` (ADR 0034) now also applies to the new events.
 

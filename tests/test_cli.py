@@ -374,6 +374,13 @@ async def _stored(settings: Settings, name: str) -> StoredReport | None:
         await engine.dispose()
 
 
+def test_admin_map_prints_the_navigation_register(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["admin-map"]) == 0
+
+    doc = Path(__file__).resolve().parents[1] / "docs" / "admin-map.md"
+    assert capsys.readouterr().out == doc.read_text()
+
+
 @pytest.fixture
 def migrated(settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
     return settings.model_copy(
