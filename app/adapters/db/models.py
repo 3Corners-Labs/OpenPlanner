@@ -692,6 +692,8 @@ class UpdateRequestRow(Base):
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reason: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+    step: Mapped[str | None] = mapped_column(String(16))
+    step_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         Index("ix_update_requests_status", "status"),
@@ -699,5 +701,10 @@ class UpdateRequestRow(Base):
         CheckConstraint(
             "status IN ('requested', 'running', 'succeeded', 'rolled_back', 'failed', 'cancelled')",
             name="status",
+        ),
+        CheckConstraint(
+            "step IS NULL OR step IN ('pulling', 'verifying', 'backing_up', 'migrating', "
+            "'starting', 'rolling_back')",
+            name="step",
         ),
     )

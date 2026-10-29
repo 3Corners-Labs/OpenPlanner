@@ -13,6 +13,7 @@ from app.domain.updates import (
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
+    UpdateStep,
     Version,
 )
 from tests.support.domain import NOW
@@ -57,6 +58,8 @@ async def test_update_requests_newest_first_and_saved_changes(uow: SqlUnitOfWork
         started_at=NOW,
         finished_at=NOW + timedelta(minutes=3),
         reason="health_check_failed",
+        step=UpdateStep.ROLLING_BACK,
+        step_at=NOW + timedelta(minutes=2),
     )
     async with uow.locked() as tx:
         await tx.save_update_request(done)
