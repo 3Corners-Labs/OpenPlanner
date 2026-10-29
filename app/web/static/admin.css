@@ -1539,6 +1539,16 @@ fieldset.card {
   letter-spacing: 0.04em;
 }
 
+/* Maintenance (ADR 0038): the same bar, in the danger colour; the text says it in words. */
+.env-bar--maintenance {
+  border-bottom-color: var(--adm-danger);
+  background: var(--adm-danger-soft);
+}
+
+.env-bar--maintenance .env-bar__tag {
+  border-color: var(--adm-danger);
+}
+
 .env-bar__tag {
   padding: 0.1rem 0.5rem;
   border: 1px solid var(--adm-warning);
