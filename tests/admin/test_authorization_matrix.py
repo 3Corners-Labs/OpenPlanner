@@ -10,6 +10,8 @@ from fastapi.routing import APIRoute
 from app.admin.authz import RequirePermission
 from app.admin.routes import PUBLIC_ADMIN_PATHS
 from app.domain.authorization import Principal
+from app.domain.maintenance import MaintenanceReason
+from app.domain.maintenance_service import MaintenanceService
 from tests.admin.conftest import (
     AUDITOR,
     GROUP_ADMIN,
@@ -197,6 +199,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     # Updates of the installation (ADR 0029): superuser only. Without a release there is
     # nothing to update or restore (409); an unknown request is 404.
     "GET /admin/updates": {"/admin/updates": statuses(200, 403, 403, 403, 403, 403)},
+    "GET /admin/updates/progress": {
+        "/admin/updates/progress": statuses(200, 403, 403, 403, 403, 403),
+    },
     "POST /admin/updates/update": {"/admin/updates/update": statuses(409, 403, 403, 403, 403, 403)},
     "POST /admin/updates/restore": {
         "/admin/updates/restore": statuses(409, 403, 403, 403, 403, 403),
@@ -205,6 +210,15 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/updates/requests/999999/cancel": statuses(404, 403, 403, 403, 403, 403),
     },
     "POST /admin/updates/snooze": {"/admin/updates/snooze": statuses(303, 403, 403, 403, 403, 403)},
+    # Maintenance mode (ADR 0038): superuser only. An empty form has no reason (422); switching
+    # off what is off just returns to the page.
+    "GET /admin/maintenance": {"/admin/maintenance": statuses(200, 403, 403, 403, 403, 403)},
+    "POST /admin/maintenance/on": {
+        "/admin/maintenance/on": statuses(422, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/maintenance/off": {
+        "/admin/maintenance/off": statuses(303, 403, 403, 403, 403, 403),
+    },
     # Message channels (SMTP, SMS gateway) per organisation: secrets, so superuser only.
     "GET /admin/organisations/{org}/channels": {
         "/admin/organisations/demo/channels": statuses(200, 403, 403, 403, 403, 403),
@@ -431,14 +445,73 @@ CASES = [
 
 @pytest.mark.parametrize(("role", "method", "path", "status"), CASES)
 async def test_matrix(site: Site, role: str, method: str, path: str, status: int) -> None:
+    assert await answer(site, role, method, path) == status, (role, method, path)
+
+
+async def answer(site: Site, role: str, method: str, path: str) -> int:
+    """Log in as ``role`` and return the status of an empty request to ``path``."""
     await site.login_as(ROLES[role])
-
     if method == "GET":
-        response = await site.client.get(path)
-    else:
-        response = await site.client.post(path, headers=SAME_ORIGIN)
+        return (await site.client.get(path)).status_code
+    return (await site.client.post(path, headers=SAME_ORIGIN)).status_code
 
-    assert response.status_code == status, (role, method, path)
+
+# Maintenance (ADR 0038 §2-3), written out by hand from the ADR's table: while it is on, only
+# these changes go ahead, and only for the superuser. Integrations (SMTP, SMS, the test mail),
+# updates, the switch itself and "Koppeling controleren" (maintenance_safe).
+WRITABLE_IN_MAINTENANCE = frozenset(
+    {
+        "POST /admin/organisations/{org}/channels/email",
+        "POST /admin/organisations/{org}/channels/email/test",
+        "POST /admin/organisations/{org}/channels/sms",
+        "POST /admin/organisations/{org}/channels/{channel}/remove",
+        "POST /admin/updates/update",
+        "POST /admin/updates/restore",
+        "POST /admin/updates/requests/{request_id}/cancel",
+        "POST /admin/updates/snooze",
+        "POST /admin/maintenance/on",
+        "POST /admin/maintenance/off",
+        "POST /admin/groups/{slug}/check",
+    }
+)
+
+
+def in_maintenance(key: str, role: str, status: int) -> int:
+    """The expected status while maintenance is on: the matrix refuses first (403); of what
+    it allows, only the writable changes of the superuser go ahead; the rest is 503."""
+    if status == 403 or key.startswith("GET "):
+        return status
+    if key in WRITABLE_IN_MAINTENANCE and role == "superuser":
+        return status
+    return 503
+
+
+MAINTENANCE_CASES = [
+    (role, key.split(" ", 1)[0], path, in_maintenance(key, role, status))
+    for key, routes in EXPECTED.items()
+    for path, by_role in routes.items()
+    for role, status in by_role.items()
+]
+
+
+@pytest.mark.parametrize(("role", "method", "path", "status"), MAINTENANCE_CASES)
+async def test_matrix_during_maintenance(
+    site: Site, role: str, method: str, path: str, status: int
+) -> None:
+    await maintenance_on(site)
+
+    assert await answer(site, role, method, path) == status, (role, method, path)
+
+
+def test_writable_routes_exist() -> None:
+    assert WRITABLE_IN_MAINTENANCE <= set(EXPECTED)
+
+
+async def maintenance_on(site: Site) -> None:
+    """Switch maintenance on as the host would (``python -m app.cli maintenance on``)."""
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    service: MaintenanceService = app.state.maintenance_service
+    await service.switch_on_host("host-cli", MaintenanceReason.OTHER)
 
 
 GET_PATHS = [p for key, routes in EXPECTED.items() if key.startswith("GET ") for p in routes]

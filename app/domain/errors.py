@@ -48,6 +48,8 @@ class ErrorCode(StrEnum):
     ROLE_INVALID = "role_invalid"
     ROLE_CHANGED = "role_changed"
     CLAIM_VALUE_TAKEN = "claim_value_taken"
+    MAINTENANCE = "maintenance"
+    MAINTENANCE_FROM_ENVIRONMENT = "maintenance_from_environment"
 
 
 class DomainError(Exception):
