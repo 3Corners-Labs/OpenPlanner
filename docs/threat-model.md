@@ -333,6 +333,7 @@ booking body and the `Origin` header.
 | Information disclosure | PII through error responses | Errors are `{"error": code, "field": name}`; FastAPI's validation answer (which repeats input) is replaced; unknown body fields are refused | `tests/api/test_widget_api.py::test_a_bad_email_is_named_without_echoing_it`, `test_the_honeypot_and_malformed_bodies_are_refused` |
 | Tampering | A booking during an emergency closure or outside the horizon | The same `BookingService.book` as the standalone page: `group_closed`, `outside_booking_window`, `slot_full` | `tests/api/test_widget_api.py::test_a_taken_slot_is_a_conflict`, `tests/domain/test_services.py` |
 | Information disclosure | A cached answer of one origin served to another | `Cache-Control: no-store` and `Vary: Origin` on every answer | `tests/api/test_widget_api.py::test_the_group_comes_with_its_form_and_texts_for_an_allowed_origin` |
+| Tampering | A booking through the widget while maintenance mode is on (ADR 0038) | The maintenance rule closes the group, availability and booking routes (`503 maintenance`), as it closes `/g/{slug}`; a test fails when a public route is neither closed nor explicitly open | `tests/api/test_widget_api.py::test_during_maintenance_the_group_routes_close_but_texts_and_preflight_stay_open`, `tests/api/test_maintenance_pages.py::test_every_public_route_is_closed_or_explicitly_open` |
 
 ## Flow: allowed origins for embedding (ADR 0035, EM-1)
 

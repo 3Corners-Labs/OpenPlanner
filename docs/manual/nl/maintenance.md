@@ -13,7 +13,8 @@ tijdelijk geen afspraken laten aannemen, gebruik dan een noodsluiting.
 - **Burgers** kunnen geen afspraak maken, verzetten of annuleren en geen direct gesprek
   starten. Ze zien een melding dat er onderhoud is, met de verwachte eindtijd als u die hebt
   ingevuld en de contactalternatieven van het team (of van de organisatie) als die er zijn.
-  Een afspraak bekijken en deelnemen aan een gesprek dat al vaststaat, kan wel.
+  Een afspraak bekijken en deelnemen aan een gesprek dat al vaststaat, kan wel. Een kalender
+  die op een website is ingesloten, toont dat afspraken maken even niet kan door onderhoud.
 - **Afspraken die al vaststaan** gaan gewoon door: herinneringen, werkitems en videogesprekken
   blijven werken. Persoonsgegevens worden op tijd verwijderd zoals altijd.
 - **Beheerders** kunnen alles lezen, maar niets wijzigen. Elke pagina toont bovenaan de balk

@@ -4476,6 +4476,9 @@ msgstr "Bezig met laden…"
 msgid "widget.unavailable"
 msgstr "De afsprakenkalender is hier nu niet beschikbaar."
 
+msgid "widget.maintenance"
+msgstr "We voeren onderhoud uit. Daarom kunt u nu geen afspraak maken. Probeer het later opnieuw."
+
 msgid "widget.retry"
 msgstr "Opnieuw proberen"
 
