@@ -29,6 +29,10 @@ uv run python -m app.jobs.worker                         # worker
 import-linter, pytest with coverage (≥ 90% on `app/domain/`, ≥ 75% overall), bandit,
 pip-audit and `uv lock --check`.
 
+The tests run on every core (`pytest -n auto`, pytest-xdist). A single test or file still runs
+on its own: `uv run pytest tests/domain/test_booking.py`. A test must not depend on another
+test or on a shared path: use `tmp_path` and its own database (`tests/support/database.py`).
+
 `make check` also runs the copy-paste detector (`make duplication`, jscpd; needs Node) and
 shellcheck on `scripts/` and `.githooks/` (`make shellcheck`; the pinned `shellcheck-py` through `uvx`).
 The host updater script is tested by `tests/scripts/test_updater.py` against fake `docker`,
@@ -94,7 +98,10 @@ tests/         mirrors app/; fakes for ports live in tests/fakes/.
 Contributions are licensed under EUPL-1.2 and made under the
 [Contributor Licence Agreement](docs/cla.md) (ADR 0054): you keep your copyright, 3Corners may
 relicense, and every contribution stays available as open source. Tick its box in the pull
-request description; CI fails a pull request from outside the organisation without it. Code
+request description; CI fails a pull request without it unless its author can write to this
+repository (organisation members, also with a private membership, and collaborators). After
+ticking the box, re-run the job *licence and contributor agreement*; it reads the description
+again. Code
 copied from elsewhere gets its own entry in `REUSE.toml` with its copyright and licence;
 CI runs `reuse lint`.
 
