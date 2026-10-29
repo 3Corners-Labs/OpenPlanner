@@ -69,6 +69,14 @@ bevestiging.
 Kies dit ruim genoeg dat een medewerker de taak kan oppakken voordat de burger in het
 videogesprek wacht, bijvoorbeeld 5 minuten.
 
+<!-- field: planner_change_min_lead_minutes -->
+### Wijzigen door een planner
+
+Tot hoeveel minuten voor de start een planner een afspraak vanuit de [agenda](group-agenda.md)
+mag verplaatsen of annuleren, standaard 60. Daarna krijgt de burger geen bericht meer op tijd:
+bel de burger dan. Het getal is nooit kleiner dan **Doorzetten naar de wachtrij** en hoogstens
+1440 (een dag).
+
 <!-- field: phone_mode -->
 ### Telefoonnummer op het formulier
 

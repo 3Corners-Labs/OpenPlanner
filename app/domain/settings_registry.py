@@ -889,6 +889,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         minimum=1,
         maximum=60,
     ),
+    S(
+        "planner_changes_alert_per_hour",
+        K.INT,
+        50,
+        _C,
+        T.PLANNER,
+        "Changes by one planner per hour above which a system event warns (ADR 0044).",
+        minimum=5,
+        maximum=1000,
+    ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""
 

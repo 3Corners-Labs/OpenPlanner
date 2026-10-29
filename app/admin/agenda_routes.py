@@ -6,6 +6,10 @@ its number of confirmed bookings and, below it, the bookings (first name and cal
 with the same counts; each cell links to its slot in the day view. A shortfall (more bookings
 than agents) is written out with an icon, never shown by colour alone. No JavaScript.
 
+With ``bookings.manage`` (ADR 0044) the day view links each booking a planner may still
+change to its move and cancel forms (``planner_routes``) and offers "leave as is" on a slot
+with an open shortfall.
+
     GET /admin/groups/{slug}/agenda?day=YYYY-MM-DD          bookings.view
     GET /admin/groups/{slug}/agenda/week?week=YYYY-MM-DD    bookings.view
 """
@@ -16,12 +20,16 @@ from datetime import date, datetime, time, timedelta
 from fastapi import APIRouter, Request
 from starlette.responses import HTMLResponse
 
+from app.admin.authz import can_function
 from app.admin.call_routes import AgendaRow, ViewBookings, agenda_row, integration_service
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale
 from app.admin.shortfalls import agenda_service
 from app.domain.agenda import AgendaSlot
-from app.domain.booking import BookingKind
+from app.domain.authorization import Permission
+from app.domain.booking import Booking, BookingKind
+from app.domain.booking_changes import ensure_planner_may_change
+from app.domain.errors import DomainError
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.i18n import BoundGettext
@@ -46,6 +54,9 @@ class SlotView:
     shortfall: str
     closed: bool
     rows: list[AgendaRow] = field(default_factory=list)
+    start: str = ""
+    accepted: bool = False
+    can_accept: bool = False
 
 
 def _anchor(start: datetime) -> str:
@@ -53,8 +64,19 @@ def _anchor(start: datetime) -> str:
     return f"slot-{start:%Y%m%dT%H%M}"
 
 
-def _slot_view(slot: AgendaSlot, group: Group, code: str, _: BoundGettext) -> SlotView:
-    """Return the view of one agenda slot, without its bookings."""
+def _slot_view(
+    slot: AgendaSlot,
+    group: Group,
+    code: str,
+    _: BoundGettext,
+    *,
+    manage: bool = False,
+    now: datetime | None = None,
+) -> SlotView:
+    """Return the view of one agenda slot, without its bookings.
+
+    ``manage`` (with ``now``) offers "leave as is" on an open shortfall that lies ahead.
+    """
     tz = group.tz
     return SlotView(
         anchor=_anchor(slot.start),
@@ -62,7 +84,19 @@ def _slot_view(slot: AgendaSlot, group: Group, code: str, _: BoundGettext) -> Sl
         staffing=_("admin.agenda.slot_staffing", agents=slot.agents, booked=slot.booked),
         shortfall=_("admin.agenda.shortfall", count=slot.shortfall) if slot.shortfall else "",
         closed=slot.closed,
+        start=slot.start.isoformat(),
+        accepted=slot.accepted,
+        can_accept=manage and now is not None and bool(slot.open_shortfall) and slot.start >= now,
     )
+
+
+def _changeable(booking: Booking, group: Group, now: datetime) -> bool:
+    """Return whether a planner may still move or cancel ``booking`` now."""
+    try:
+        ensure_planner_may_change(booking, group, now)
+    except DomainError:
+        return False
+    return True
 
 
 REACH = timedelta(days=3660)
@@ -95,11 +129,17 @@ async def agenda(
     chosen = _chosen(day, today)
     (agenda_day,) = await agenda_service(request).days(context.principal, slug, chosen, 1)
     overview = await integration_service(request).day_overview(context.principal, slug, chosen)
-    slots = {s.start: _slot_view(s, group, code, _) for s in agenda_day.slots}
+    manage = can_function(context.principal)(Permission.BOOKINGS_MANAGE, context.group)
+    slots = {
+        s.start: _slot_view(s, group, code, _, manage=manage, now=now) for s in agenda_day.slots
+    }
     direct: list[AgendaRow] = []
+    changeable: set[int] = set()
     for item in overview:
         row = agenda_row(item, group, now, _, code)
         booking = item.booking
+        if manage and _changeable(booking, group, now):
+            changeable.add(row.id)
         if booking.kind is BookingKind.DIRECT:
             direct.append(row)
             continue
@@ -126,6 +166,7 @@ async def agenda(
             "week_href": f"/admin/groups/{slug}/agenda/week?week={chosen.isoformat()}",
             "slots": [slots[start] for start in sorted(slots)],
             "direct": direct,
+            "changeable": changeable,
         },
     )
 
