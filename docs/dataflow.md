@@ -85,6 +85,13 @@ cannot read what is typed into the shadow root's form through our API, and the a
 booking holds no personal data and no management token (the link goes by email only). The
 same personal data rules apply as for the standalone page.
 
+**Closure image (ADR 0037 §3, CL-3).** One image per closure (`closure_images`), uploaded by an
+admin with a text alternative in nl and en. Metadata a photo can carry about people (EXIF and
+XMP, such as a GPS position or the photographer's name; PNG text chunks; JPEG comments) is
+stripped before the file is stored, so only the picture itself is kept. Served from our own
+origin and only while its closure is visible; never mailed, never sent to a third party.
+Organisation data; no purge job.
+
 **Allowed origins for embedding (ADR 0035).** The websites on which an organisation's groups
 may appear as a widget (`organisation_origins`, such as `https://www.gemeente.nl`), entered by
 an organisation admin, and a switch per group (`groups.embedding_enabled`). Organisation data,
@@ -119,6 +126,12 @@ and the booking id. Each admin sees them at their own level only (group admin: t
 organisation admin and auditor: their organisation and its groups; superuser: everything).
 The auditor role (ADR 0039) is read-only and holds no permission that shows citizens' data; it
 does see admin names in the audit log, which is the accountability it exists for.
+
+Custom roles (ADR 0039 step 3) live in `roles`: template, names, the role claim value and the
+permission codes, no personal data. The session cookie keeps, next to the built-in roles, at
+most 20 other role claim values (group or role names from the IdP, no personal data); the
+custom roles they grant are looked up per request. Changes are audited as `role.*` events
+with codes only and shown on the matrix page with the actor's display name.
 
 The retention overview (`/admin/retention`, ADR 0039) reads `bookings` only to count, per group,
 how many still hold personal data, how many are past their purge moment and how many purges

@@ -65,6 +65,7 @@ from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
 from app.domain.maintenance import MaintenanceReason
 from app.domain.ports import Clock
+from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.scheduling import GroupSummary
 from app.domain.security_log import INVALID_SIGNATURE, TOKEN_REFRESH_FAILED, WEBHOOK_REJECTED
 from app.domain.storage import (
@@ -91,6 +92,11 @@ EVENT_LABELS: dict[str, str] = {
     LOGOUT_EVENT: "audit.event.logout",
     TOKEN_EVENT: "audit.event.api_token",
     CALL_EVENT: "audit.event.api_call",
+    # ADR 0039: changes to custom roles (global, so only the superuser sees them here; the
+    # matrix page shows the same history to every admin).
+    ROLE_CREATED: "audit.event.role_created",
+    ROLE_UPDATED: "audit.event.role_updated",
+    ROLE_DELETED: "audit.event.role_deleted",
     # System events (ADR 0031): one per job type.
     "job.create_video_room": "audit.job.create_video_room",
     "job.delete_video_room": "audit.job.delete_video_room",
@@ -156,6 +162,8 @@ DETAIL_LABELS: dict[str, str] = {
     "closure.start": "admin.audit.detail.closure_start",
     "closure.update": "admin.audit.detail.closure_update",
     "closure.lift": "admin.audit.detail.closure_lift",
+    "closure.image.update": "admin.audit.detail.closure_image_update",
+    "closure.image.remove": "admin.audit.detail.closure_image_remove",
     "booking.reinstate": "admin.audit.detail.booking_reinstate",
     "booking.reinstate_all": "admin.audit.detail.booking_reinstate_all",
     "booking.cancel": "admin.audit.detail.booking_cancel",
@@ -187,6 +195,7 @@ DETAIL_LABELS: dict[str, str] = {
 COUNT_LABELS: dict[str, str] = {
     "bookings": "admin.audit.detail.bookings",
     "notified": "admin.audit.detail.notified",
+    "file": "admin.audit.detail.file",
     "attempt": "admin.audit.detail.attempt",
     "free_percent": "admin.audit.detail.free_percent",
     "database_mb": "admin.audit.detail.database_mb",

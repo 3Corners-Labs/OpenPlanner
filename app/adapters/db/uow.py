@@ -14,7 +14,17 @@ from dataclasses import asdict
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, case, delete, func, insert, or_, select, update
+from sqlalchemy import (
+    ColumnElement,
+    Select,
+    case,
+    delete,
+    func,
+    insert,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -22,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.engine import BEGIN_MODE_OPTION
+from app.adapters.db.images import ImageQueries
 from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
     AuditEventRow,
@@ -55,6 +66,7 @@ from app.adapters.db.models import (
     WebhookEventRow,
 )
 from app.adapters.db.retention import RetentionQueries
+from app.adapters.db.roles import RoleQueries
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
@@ -107,6 +119,7 @@ from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
+from app.domain.images import PageImage
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.ports import EventSink
 from app.domain.scheduling import (
@@ -295,8 +308,10 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
     )
 
 
-def _closure(row: ClosureRow, notices: Sequence[ClosureNoticeRow]) -> Closure:
-    """Map a closure row with its notices, headings and copy of the contact block."""
+def _closure(
+    row: ClosureRow, notices: Sequence[ClosureNoticeRow], image: PageImage | None
+) -> Closure:
+    """Map a closure row with its notices, headings, copy of the contact block and image."""
     return Closure(
         id=row.id,
         group_id=row.group_id,
@@ -306,6 +321,7 @@ def _closure(row: ClosureRow, notices: Sequence[ClosureNoticeRow]) -> Closure:
         created_at=row.created_at,
         headings={n.locale: n.heading for n in notices if n.heading},
         contacts=_contacts_block(row.contacts) if row.contacts else None,
+        image=image,
     )
 
 
@@ -345,14 +361,21 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 
 
 class SqlTransaction(
-    ApiClientQueries, UpdateQueries, RetentionQueries, StaffQueries, MaintenanceQueries
+    ApiClientQueries,
+    UpdateQueries,
+    RetentionQueries,
+    StaffQueries,
+    MaintenanceQueries,
+    RoleQueries,
+    ImageQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
     from ``UpdateQueries`` (ADR 0029), those of the retention overview from
     ``RetentionQueries`` (ADR 0039), the staff directory from ``StaffQueries`` (ADR 0046),
-    the maintenance switch from ``MaintenanceQueries`` (ADR 0038).
+    the maintenance switch from ``MaintenanceQueries`` (ADR 0038), custom roles from
+    ``RoleQueries`` (ADR 0039), closure images from ``ImageQueries`` (ADR 0037).
 
     Args:
         session: The open session.
@@ -445,6 +468,19 @@ class SqlTransaction(
             query = query.where(AuditEventRow.at < narrow.until)
         if narrow.trace_id is not None:
             query = query.where(AuditEventRow.trace_id == narrow.trace_id)
+        return await self._entries(query, limit)
+
+    async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+        """Return the newest audit events with one of ``actions``, with the actors' names."""
+        query = (
+            select(AuditEventRow, StaffRow.display_name)
+            .outerjoin(StaffRow, StaffRow.subject == AuditEventRow.actor)
+            .where(AuditEventRow.action.in_(list(actions)))
+        )
+        return await self._entries(query, limit)
+
+    async def _entries(self, query: Select[AuditEventRow, str], limit: int) -> list[AuditEntry]:
+        """Run an audit query newest first and map the rows with the actors' names."""
         rows = await self._session.execute(
             query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
         )
@@ -1495,7 +1531,7 @@ class SqlTransaction(
         notices = await self._session.scalars(
             select(ClosureNoticeRow).where(ClosureNoticeRow.closure_id == row.id)
         )
-        return _closure(row, list(notices))
+        return _closure(row, list(notices), await self.page_image(row.image_id))
 
     async def _save_notices(self, closure_id: int, closure: Closure) -> None:
         """Replace the notices and headings of ``closure_id`` with those of ``closure``."""

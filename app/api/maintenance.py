@@ -60,6 +60,7 @@ OPEN_ROUTES = frozenset(
         "/widget/v1/gov-booking.js",
         "/b/{token}",
         "/g/{slug}/closure",
+        "/g/{slug}/closure/image",
         "/b/{token}/wait",
         "/b/{token}/join",
         "/b/{token}/join/go",
