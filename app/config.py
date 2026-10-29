@@ -1,5 +1,6 @@
 """Application settings, read from the environment only."""
 
+import os
 import re
 from pathlib import Path
 from typing import Literal
@@ -19,6 +20,14 @@ SMTPS_PORT = 465
 """Mail submission over implicit TLS (RFC 8314); STARTTLS is never offered there."""
 
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
+
+
+def environment() -> dict[str, str]:
+    """Return a copy of the process environment, for reporting where a setting came from.
+
+    The only other place that reads the environment; ``settings list`` uses it (ADR 0042 §10).
+    """
+    return dict(os.environ)
 
 
 class Settings(BaseSettings):
@@ -105,10 +114,10 @@ class Settings(BaseSettings):
     # which refreshes the roles (invisible with an active SSO session).
     admin_reauth_minutes: int = 60
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
-    # seconds (class C, platform; here until the ADR 0042 registry exists).
+    # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
     # Without a login for this many days, a person is marked dormant in the staff list
-    # (class D, organisation; one value for every organisation until the registry exists).
+    # (class D, organisation; one value for every organisation until the portal stores it).
     staff_dormant_after_days: int = Field(default=90, ge=14, le=365)
     admin_timezone: str = "Europe/Amsterdam"
     oidc_discovery_url: str | None = None
