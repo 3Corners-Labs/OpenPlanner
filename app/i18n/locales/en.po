@@ -4785,3 +4785,27 @@ msgstr "Line {line} is not a website. Enter only the start of the web address, s
 
 msgid "admin.embedding.error.count"
 msgstr "Enter at most {count} websites."
+
+msgid "widget.region"
+msgstr "Book an appointment"
+
+msgid "widget.loading"
+msgstr "Loading…"
+
+msgid "widget.unavailable"
+msgstr "The booking calendar is not available here right now."
+
+msgid "widget.maintenance"
+msgstr "We are carrying out maintenance, so you cannot book an appointment right now. Please try again later."
+
+msgid "widget.retry"
+msgstr "Try again"
+
+msgid "widget.more"
+msgstr "More options, such as starting a call right away, are on the page of {name}."
+
+msgid "widget.done_title"
+msgstr "Your appointment is booked"
+
+msgid "widget.error_summary"
+msgstr "Something was not filled in correctly"
