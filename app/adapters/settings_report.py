@@ -69,8 +69,10 @@ def describe(
 def effective(settings: Settings, environ: Mapping[str, str], portal: PortalValues) -> Settings:
     """Return ``settings`` with every unlocked, valid portal value applied (ADR 0042 §2).
 
-    The values were validated against the registry's bounds by ``resolve``; ``settings``
-    itself is left unchanged.
+    Each value was checked against the registry's bounds by ``resolve``. When the values
+    together break a rule of ``Settings`` (critical storage below low, an SMTP login needs
+    TLS), none applies and ``settings`` is returned: the environment's values stay. Call
+    ``combination_refused`` to tell. ``settings`` itself is never changed.
     """
     names = {name.lower() for name in environ}
     update = {
@@ -79,7 +81,19 @@ def effective(settings: Settings, environ: Mapping[str, str], portal: PortalValu
         if spec.in_config
         and (resolved := _resolve(spec, settings, environ, names, portal)).source is Source.PORTAL
     }
-    return settings.model_copy(update=update) if update else settings
+    if not update:
+        return settings
+    combined = settings.model_copy(update=update)
+    return settings if combined.cross_field_problem() else combined
+
+
+def combination_refused(
+    settings: Settings, environ: Mapping[str, str], portal: PortalValues
+) -> bool:
+    """Return whether the portal values are valid one by one but refused together."""
+    return effective(settings, environ, portal) is settings and any(
+        state.source is Source.PORTAL for state in describe(settings, environ, portal)
+    )
 
 
 def _resolve(

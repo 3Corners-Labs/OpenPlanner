@@ -327,29 +327,29 @@ class Settings(BaseSettings):
     maintenance_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
 
     @model_validator(mode="after")
-    def _storage_limits_are_ordered(self) -> "Settings":
-        """Refuse a critical free-space limit that is not below the low one."""
+    def _cross_field_rules(self) -> "Settings":
+        """Refuse values that are each valid but not together."""
+        problem = self.cross_field_problem()
+        if problem:
+            raise ValueError(problem)
+        return self
+
+    def cross_field_problem(self) -> str | None:
+        """Return the first rule that combined values break, or ``None``.
+
+        Also checked on the effective settings once portal values apply (ADR 0042 §4).
+        """
         if self.storage_critical_free_percent >= self.storage_low_free_percent:
-            raise ValueError("STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT")
-        return self
-
-    @model_validator(mode="after")
-    def _rebook_reminder_comes_first(self) -> "Settings":
-        """Refuse a reminder to rebook that would not come before the request lapses."""
+            return "STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT"
         if self.planner_rebook_reminder_days >= self.planner_rebook_days:
-            raise ValueError("PLANNER_REBOOK_REMINDER_DAYS must be below PLANNER_REBOOK_DAYS")
-        return self
-
-    @model_validator(mode="after")
-    def _smtp_login_is_encrypted(self) -> "Settings":
-        """Refuse an SMTP login that would send the password in clear text."""
+            return "PLANNER_REBOOK_REMINDER_DAYS must be below PLANNER_REBOOK_DAYS"
         if (
             self.smtp_host
             and self.smtp_username
             and not (self.smtp_starttls or self.smtp_implicit_tls)
         ):
-            raise ValueError("SMTP_USERNAME needs SMTP_STARTTLS or SMTP_TLS")
-        return self
+            return "SMTP_USERNAME needs SMTP_STARTTLS or SMTP_TLS"
+        return None
 
     @model_validator(mode="after")
     def _production_requirements(self) -> "Settings":

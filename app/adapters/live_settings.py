@@ -16,7 +16,7 @@ from collections.abc import Callable, Mapping
 
 import structlog
 
-from app.adapters.settings_report import SettingState, describe, effective
+from app.adapters.settings_report import SettingState, combination_refused, describe, effective
 from app.config import Settings
 from app.domain.platform_settings import RELOAD_SECONDS, PlatformSettingsStore
 
@@ -46,6 +46,8 @@ class LiveSettings:
         self._store = store
         self._apply = apply
         self.settings = base
+        self.refused = False
+        """Whether the stored values together break a rule, so none of them applies."""
 
     async def refresh(self) -> bool:
         """Reload the portal values if they changed and apply them; return whether they did."""
@@ -55,7 +57,11 @@ class LiveSettings:
             log.warning("settings.reload_failed", error=type(exc).__name__)
             return False
         if changed:
-            self.settings = effective(self._base, self._environ, self._store.current)
+            portal = self._store.current
+            self.settings = effective(self._base, self._environ, portal)
+            self.refused = combination_refused(self._base, self._environ, portal)
+            if self.refused:
+                log.warning("settings.portal_values_refused", version=portal.version)
             self._apply(self.settings)
         return changed
 

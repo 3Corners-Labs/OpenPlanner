@@ -5586,3 +5586,6 @@ msgstr "Waarschuwing bij wijzigingen per planner per uur"
 
 msgid "admin.settings.problem.dev_placeholder"
 msgstr "bevat een plaatsvervanger voor ontwikkeling; productie weigert die."
+
+msgid "admin.settings.refused"
+msgstr "De opgeslagen waarden spreken elkaar tegen (bijvoorbeeld kritieke opslag niet onder weinig opslag). Daarom geldt geen enkele: de standaardwaarden en de waarden van de server blijven gelden."
