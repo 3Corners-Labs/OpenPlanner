@@ -76,7 +76,7 @@ class LiveSettings:
         self._clock = clock
         self._apply = apply
         self._lapse: datetime | None = None
-        self._by_organisation: dict[tuple[int, int, int], Settings] = {}
+        self._by_organisation: dict[int, Settings] = {}
         self.settings = base
         self.refused = False
         """Whether the stored values together break a rule, so none of them applies."""
@@ -97,6 +97,7 @@ class LiveSettings:
             if self.refused:
                 log.warning("settings.portal_values_refused", version=portal.version)
             self._lapse = portal.next_expiry(now)
+            self._by_organisation.clear()
             self._apply(self.settings)
         return changed or lapsed
 
@@ -121,7 +122,7 @@ class LiveSettings:
         own = self._store.current.organisations.get(organisation_id or 0)
         if not own:
             return self.settings
-        key = (self._store.current.version, organisation_id or 0, id(self.settings))
+        key = organisation_id or 0
         if key not in self._by_organisation:
             update = {
                 spec.key: own[spec.key]
