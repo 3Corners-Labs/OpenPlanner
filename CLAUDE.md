@@ -16,7 +16,7 @@ Lightweight group-booking service for a government contact center: embeddable wi
 - Jobs: own `jobs` table + worker loop in `app/jobs/`. No Celery, Redis, APScheduler.
 - Admin UI: Jinja2, server-rendered HTML forms without JavaScript; HTMX only per ADR 0016. No SPA framework.
 - Widget: one Web Component in vanilla JS under `widget/`, bundled with esbuild in CI only. No React/Vue. Shadow DOM; all colours, spacing, radius and font read from `--booking-*` CSS custom properties with NL Design System defaults; `font-family: inherit`; interactive elements exposed via `part="..."`. The host site styles the widget only through those tokens and parts; document them in `docs/widget.md`. No inline styles, no `!important`.
-- HTTP client: `httpx`. Logging: `structlog` (JSON). Settings: `pydantic-settings` from env only; no config files with secrets.
+- HTTP client: `httpx`. Logging: `structlog` (JSON). Settings: `pydantic-settings` from env only, or `X_FILE` for the bootstrap secrets (ADR 0042 §9); no config files with secrets in the repository.
 - Containers: `web`, `worker`. One `docker-compose.yml` for dev and prod shape.
 
 ## Architecture rules

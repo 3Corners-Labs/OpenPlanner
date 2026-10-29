@@ -10,6 +10,8 @@ htmlcov/
 data/
 .env
 proxy.env
+# Bootstrap keys from `python -m app.cli init` (ADR 0042).
+secrets/
 .audit-requirements.txt
 .DS_Store
 mutants/
