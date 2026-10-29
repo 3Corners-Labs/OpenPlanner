@@ -1,4 +1,4 @@
-{#- Logged-in portal: top bar with user and language, side navigation from the matrix. -#}
+{#- Logged-in portal: top bar (help, language, profile) and side navigation in sections, both from the navigation register (ADR 0047) through the matrix. -#}
 {% extends "admin/_shell.html" %}
 {% from "admin/_icons.html" import icon %}
 {% block page %}
@@ -9,30 +9,56 @@
     {#- Without a menu (no role) the overview would only loop back to the refusal. -#}
     {% if nav %}<a class="admin-brand" href="/admin/">{% else %}<span class="admin-brand">{% endif %}<span class="admin-brand__mark" aria-hidden="true">OP</span><span>{{ _("admin.title") }}</span>{% if nav %}</a>{% else %}</span>{% endif %}
     <div class="admin-topbar__end">
+      {% if help_topic %}
+      <a class="admin-topbar__link page-help" href="/admin/help/{{ help_topic.slug }}">{{ icon("help") }}<span>{{ _("help.page_link") }}</span></a>
+      {% else %}
+      {% for link in top_links %}
+      <a class="admin-topbar__link" href="{{ link.href }}"{% if link.current %} aria-current="page"{% endif %}>{{ icon(link.icon) }}<span>{{ link.label }}</span></a>
+      {% endfor %}
+      {% endif %}
       {% include "_language_switcher.html" %}
-      <div class="admin-user">
-        <span class="admin-user__name">{{ _("admin.signed_in_as", name=principal.display_name) }}</span>
-        {% for label in role_labels %}<span class="chip">{{ label }}</span>{% endfor %}
-        <form method="post" action="/admin/logout">
-          <button type="submit" class="button button--ghost">{{ _("admin.logout") }}</button>
-        </form>
-      </div>
+      <details class="admin-profile">
+        <summary>
+          <span class="admin-profile__avatar" aria-hidden="true">{% for part in principal.display_name.split()[:2] %}{{ part[:1]|upper }}{% endfor %}</span>
+          <span class="admin-profile__name"><span class="visually-hidden">{{ _("admin.signed_in_as", name="") }}</span>{{ principal.display_name }}</span>
+        </summary>
+        <div class="admin-profile__panel">
+          <p class="admin-profile__signed-in">{{ _("admin.signed_in_as", name=principal.display_name) }}</p>
+          {% if role_labels %}
+          <p class="admin-profile__roles-label">{{ _("admin.profile.roles") }}</p>
+          <ul class="admin-profile__roles">
+            {% for label in role_labels %}<li class="chip">{{ label }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+          <nav class="admin-profile__themes" aria-labelledby="theme-label">
+            <p class="admin-profile__roles-label" id="theme-label">{{ _("admin.theme.label") }}</p>
+            <ul>
+              {% for option in themes %}<li><a href="{{ option.href }}"{% if option.current %} aria-current="true"{% endif %}>{{ option.label }}</a></li>{% endfor %}
+            </ul>
+          </nav>
+          <form method="post" action="/admin/logout">
+            <button type="submit" class="button button--secondary">{{ _("admin.logout") }}</button>
+          </form>
+        </div>
+      </details>
     </div>
   </header>
   {% if nav %}
   <nav aria-label="{{ _("admin.nav.label") }}" class="admin-nav">
-    <ul>
-      {% for item in nav %}
-      <li><a href="{{ item.href }}"{% if item.current %} aria-current="page"{% endif %}>{{ icon(item.icon) }}<span>{{ item.label }}</span></a></li>
-      {% endfor %}
-    </ul>
+    {% for section in nav %}
+    <div class="admin-nav__section">
+      <span class="admin-nav__heading" id="nav-{{ section.key }}">{{ section.label }}</span>
+      <ul aria-labelledby="nav-{{ section.key }}">
+        {% for item in section.entries %}
+        <li><a href="{{ item.href }}"{% if item.current %} aria-current="page"{% endif %}>{{ icon(item.icon) }}<span>{{ item.label }}</span></a></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
   </nav>
   {% endif %}
   <main id="content" tabindex="-1" class="admin-main">
     {% if update_banner %}{% include "admin/_update_banner.html" %}{% endif %}
-    {% if help_topic %}
-    <p class="page-help"><a href="/admin/help/{{ help_topic.slug }}">{{ icon("help") }}<span>{{ _("help.page_link") }}</span></a></p>
-    {% endif %}
     {% block content %}{% endblock %}
   </main>
 </div>
