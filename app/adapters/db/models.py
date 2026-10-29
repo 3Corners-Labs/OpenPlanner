@@ -14,6 +14,7 @@ the display name of admins, from the identity provider (ADR 0046).
     staff 1──* staff_memberships (admins as last seen at login, ADR 0046; the name is joined
                                   into the audit log)
     release_checks (one row), update_requests (ADR 0029; the installation, no personal data)
+    maintenance_state (one row, ADR 0038; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
     organisations 1──n organisation_fonts (branding, ADR 0041)
     holiday_calendars 1──* holidays (ADR 0025; chosen through organisation_holiday_calendars
@@ -50,6 +51,7 @@ from app.adapters.db.types import UTCDateTime
 
 __all__ = [
     "ApiAccessTokenRow",
+    "DiagnosticModeRow",
     "ApiClientGroupRow",
     "ApiClientRow",
     "ApiSettingsRow",
@@ -74,6 +76,7 @@ __all__ = [
     "OrganisationLogoRow",
     "OrganisationFontRow",
     "OrganisationRow",
+    "MaintenanceStateRow",
     "ReleaseCheckRow",
     "ReminderRuleRow",
     "ScheduleOverrideRow",
@@ -462,17 +465,49 @@ class AuditEventRow(Base):
     detail: Mapped[str] = mapped_column(String(255), server_default=text("''"))
     source: Mapped[str] = mapped_column(String(16), server_default=text("'admin'"))
     booking_id: Mapped[int | None] = mapped_column(Integer)
+    # ADR 0040, part 2: the fields of the one event schema that are not derived on export.
+    event_id: Mapped[str] = mapped_column(String(32))
+    level: Mapped[str] = mapped_column(String(16), server_default=text("'info'"))
+    category: Mapped[str] = mapped_column(String(16), server_default=text("'audit'"))
+    trace_id: Mapped[str] = mapped_column(String(32), server_default=text("''"))
+    service: Mapped[str] = mapped_column(String(16), server_default=text("''"))
 
     __table_args__ = (
         Index("ix_audit_events_at", "at"),
         Index("ix_audit_events_organisation", "organisation"),
         Index("ix_audit_events_group", "group"),
         Index("ix_audit_events_source_at", "source", "at"),
+        Index("ix_audit_events_event_id", "event_id", unique=True),
+        Index("ix_audit_events_trace_id", "trace_id"),
+        Index("ix_audit_events_category_at", "category", "at"),
         CheckConstraint(
             "outcome IN ('success', 'denied', 'failure', 'retry', 'skipped')", name="outcome"
         ),
         CheckConstraint("source IN ('admin', 'system')", name="source"),
+        CheckConstraint("level IN ('debug', 'info', 'warning', 'error', 'critical')", name="level"),
+        CheckConstraint(
+            "category IN ('audit', 'system', 'security', 'diagnostic')", name="category"
+        ),
     )
+
+
+class DiagnosticModeRow(Base):
+    """Diagnostic mode of one group or a whole organisation (ADR 0040, part 4).
+
+    Slugs, not foreign keys, as in ``audit_events``: the mode ends by itself and is about the
+    events, not the configuration. ``group`` is empty for a whole organisation, so one unique
+    key covers both kinds of target.
+    """
+
+    __tablename__ = "diagnostic_modes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation: Mapped[str] = mapped_column(String(64))
+    group: Mapped[str] = mapped_column(String(64), server_default=text("''"))
+    until: Mapped[datetime] = mapped_column(UTCDateTime())
+    started_by: Mapped[str] = mapped_column(String(255))
+
+    __table_args__ = (UniqueConstraint("organisation", "group", name="uq_diagnostic_modes_target"),)
 
 
 class StaffRow(Base):
@@ -708,3 +743,18 @@ class UpdateRequestRow(Base):
             name="step",
         ),
     )
+
+
+class MaintenanceStateRow(Base):
+    """The maintenance switch of the whole installation (ADR 0038); at most one row."""
+
+    __tablename__ = "maintenance_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    active: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    since: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    switched_by: Mapped[str] = mapped_column(String(255), server_default=text("''"))
+    expected_end: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    reason: Mapped[str | None] = mapped_column(String(16))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)

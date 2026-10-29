@@ -1,7 +1,9 @@
 # 0040. Standard event schema, log levels and storage limits
 
 Status: accepted (2026-10-27), requested by the product owner. Part 1 (storage limits) is
-implemented with this ADR; parts 2 to 4 are the agreed direction and get built in that order.
+implemented with this ADR; parts 2 (one event schema), 3 (filters and CSV export) and 4
+(diagnostic mode and retention per category) on 2026-10-28 and 29. The product owner set the
+admin-action term to 2 years and made diagnostic mode the superuser's on 2026-10-29.
 Extends ADR 0031 (audit log per level) and replaces the field list of ADR 0034 (still proposed)
 before it is built.
 
@@ -54,7 +56,7 @@ each role sees only its own lines, CSV export, and controls so no disk fills up.
    the web process out of service or to roll back an update (ADR 0029). Readiness still says
    nothing about why; the system event and the log do.
 
-### Part 2: one event schema (next)
+### Part 2: one event schema (built)
 
 5. **One schema for table, log line, CSV and log platform**, aligned with Elastic Common Schema
    and the OpenTelemetry log data model so platforms need no mapping: `event_id`,
@@ -74,7 +76,17 @@ each role sees only its own lines, CSV export, and controls so no disk fills up.
    on the log platform. The portal still reads only the table: only there does the scope filter
    per role apply.
 
-### Part 3: filters and CSV export
+As built: `app/domain/event_schema.py` holds the schema and `rfc3339`; the trace, organisation
+and group live in `app/domain/event_context.py` (context variables, so the domain stamps
+events without knowing about logging). Every HTTP request runs in its own trace (an incoming
+`traceparent` is not trusted); admin routes bind the target of their permission check, public
+`/g/{slug}` pages the group; the worker gives each round and each job its own trace, bound to
+the job's booking. `audit_events` gains `event_id`, `level`, `category`, `trace_id` and
+`service` (migration 0034); `service.version` and `installation` come from the settings when a
+record is written out. Log lines rename structlog's `event` and `level` to `message` and
+`log.level`, because a string `event` clashes with ECS's `event.*` object.
+
+### Part 3: filters and CSV export (built)
 
 9. The audit page gets filters for minimum level, category, date range and trace id; a trace
    id shows the whole chain of one request or job.
@@ -84,7 +96,17 @@ each role sees only its own lines, CSV export, and controls so no disk fills up.
     `=`, `+`, `-` or `@` get a leading `'` against formula injection. At most 100 000 rows or
     366 days per export.
 
-### Part 4: diagnostic mode and retention per category
+As built: `AuditFilter` gains minimum level, category, period and trace id, applied in SQL
+(`app/adapters/db/uow.py`); dates are whole days in `ADMIN_TIMEZONE`, `to` inclusive. Each row
+links to its whole chain. `GET /admin/audit/export.csv` takes the same parameters, behind
+`audit.export`, which the organisation admin, the auditor (ADR 0039) and the superuser hold
+and the group admin does not; *assumption until the product owner says otherwise*. Without a
+period the export covers the last `AUDIT_EXPORT_MAX_DAYS`; an export over a limit is refused on
+the page with the reason and is itself audited as a failed `audit.export`. The export event
+sits at the group of the filter, else at the admin's one organisation, else global. The
+columns are `openplanner.event/1` in schema order; `actor` is the subject, not the name.
+
+### Part 4: diagnostic mode and retention per category (built)
 
 11. Debug events reach the table only while an admin has switched on **diagnostic mode** for
     one group or organisation; it switches itself off after 24 hours, and switching it is
@@ -94,6 +116,38 @@ each role sees only its own lines, CSV export, and controls so no disk fills up.
     admin-action term, which is a records-policy choice (Archiefwet, BIO).*
 13. **Emergency brake**: at grade `critical` the worker stops writing diagnostic events and
     switches diagnostic mode off. Audit and system events are always written.
+
+As built: the product owner decided on 2026-10-29 that **only the superuser** switches
+diagnostic mode (`diagnostics.manage`, global, locked to the superuser), and confirmed **2
+years** for admin actions. The superuser switches it on the audit page for a group or a whole
+organisation (`diagnostic_modes`, migration 0035); switching is audited as
+`diagnostics.manage` with `diagnostics.on` or `diagnostics.off`. Debug events go through
+`DiagnosticLog` (`app/domain/diagnostics.py`); the first debug point is the worker's `job.run`
+per job (type, attempt, duration), and further points use the same call. Pruning runs per
+category over `ix_audit_events_category_at`. At grade `critical` housekeeping calls the brake
+every loop: all modes end and one global system event `diagnostics.brake` says how many.
+Debug events are never shipped to the log platform (ADR 0034).
+
+## Settings
+
+| Key | Class | Default | Bounds | Permission | Note |
+|---|---|---|---|---|---|
+| `STORAGE_LOW_FREE_PERCENT` | B deployment | 15 | 0–100, above critical | env | part 1; tied to the host's volume |
+| `STORAGE_CRITICAL_FREE_PERCENT` | B deployment | 5 | 0–100 | env | part 1 |
+| `DATABASE_MAX_MB` | B deployment | none | ≥ 1 | env | part 1 |
+| `AUDIT_EXPORT_MAX_ROWS` | C platform | 100 000 | 1 000–1 000 000 | superuser; env until the ADR 0042 registry exists | part 3 |
+| `AUDIT_EXPORT_MAX_DAYS` | C platform | 366 | 1–3660 | superuser; env until the ADR 0042 registry exists | part 3 |
+| `AUDIT_RETENTION_DAYS` | C platform | 730 | 365–3650 | superuser; env until the ADR 0042 registry exists | part 4, admin actions (product owner) |
+| `SECURITY_EVENT_RETENTION_DAYS` | C platform | 365 | 30–3650 | as above | part 4 |
+| `DIAGNOSTIC_EVENT_RETENTION_DAYS` | C platform | 7 | 1–90 | as above | part 4 |
+| `DIAGNOSTIC_MODE_HOURS` | C platform | 24 | 1–72 | as above | part 4 |
+| `SYSTEM_EVENT_RETENTION_DAYS` | C platform | 90 | 1–3650 | as above | existing (ADR 0031) |
+| `INSTALLATION_NAME` | B deployment | empty | `[A-Za-z0-9_.-]{0,64}` | env | part 2; names the host installation on a shared log platform, needed before the database works |
+
+**Fixed on purpose:** the schema's field names and the timestamp format (a change is a new
+schema version), the mapping of outcome to level, and the 32-hex shape of event and trace ids;
+the CSV dialect (BOM, `;`, RFC 4180) and the formula guard, which is a protection; the
+emergency brake at grade critical (a protection, never switchable).
 
 ## Consequences
 
