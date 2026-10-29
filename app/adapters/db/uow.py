@@ -31,6 +31,7 @@ from app.adapters.db.models import (
     ChannelSettingsRow,
     ClosureNoticeRow,
     ClosureRow,
+    DiagnosticModeRow,
     GroupContactsRow,
     GroupHolidayCalendarRow,
     GroupHolidayOpenDayRow,
@@ -103,6 +104,7 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
+from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
@@ -472,14 +474,63 @@ class SqlTransaction(
             for row, name in rows
         ]
 
-    async def delete_audit_events(self, source: Source, before: datetime) -> int:
-        """Delete the events of ``source`` older than ``before``; return how many."""
+    async def delete_audit_events(self, category: Category, before: datetime) -> int:
+        """Delete the events of ``category`` older than ``before``; return how many."""
         result = await self._session.execute(
             delete(AuditEventRow).where(
-                AuditEventRow.source == source.value, AuditEventRow.at < before
+                AuditEventRow.category == category.value, AuditEventRow.at < before
             )
         )
         return int(getattr(result, "rowcount", 0) or 0)
+
+    async def active_diagnostic_modes(self, now: datetime) -> list[DiagnosticMode]:
+        """Return the diagnostic modes that have not ended at ``now`` (ADR 0040)."""
+        rows = await self._session.scalars(
+            select(DiagnosticModeRow)
+            .where(DiagnosticModeRow.until > now)
+            .order_by(DiagnosticModeRow.organisation, DiagnosticModeRow.group)
+        )
+        return [
+            DiagnosticMode(row.organisation, row.group or None, row.until, row.started_by)
+            for row in rows
+        ]
+
+    async def save_diagnostic_mode(self, mode: DiagnosticMode) -> None:
+        """Start ``mode``, replacing any mode for the same target."""
+        await self._session.execute(
+            sqlite_insert(DiagnosticModeRow)
+            .values(
+                organisation=mode.organisation,
+                group=mode.group or "",
+                until=mode.until,
+                started_by=mode.started_by[:255],
+            )
+            .on_conflict_do_update(
+                index_elements=["organisation", "group"],
+                set_={"until": mode.until, "started_by": mode.started_by[:255]},
+            )
+        )
+
+    async def end_diagnostic_mode(
+        self, organisation: str, group: str | None, now: datetime
+    ) -> bool:
+        """End the mode of one target; return whether one was active."""
+        result = await self._session.execute(
+            delete(DiagnosticModeRow).where(
+                DiagnosticModeRow.organisation == organisation,
+                DiagnosticModeRow.group == (group or ""),
+                DiagnosticModeRow.until > now,
+            )
+        )
+        return bool(getattr(result, "rowcount", 0))
+
+    async def end_all_diagnostic_modes(self, now: datetime) -> int:
+        """End every active mode (and forget ended ones); return how many were active."""
+        active = await self._session.scalar(
+            select(func.count()).select_from(DiagnosticModeRow).where(DiagnosticModeRow.until > now)
+        )
+        await self._session.execute(delete(DiagnosticModeRow))
+        return int(active or 0)
 
     async def get_group(self, slug: str) -> Group | None:
         """Return the group with ``slug``."""

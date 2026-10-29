@@ -11,11 +11,16 @@ the admin may view it.
     GET /admin/audit?source=system&problems=1&group=demo&booking=42     audit.view
     GET /admin/audit?level=warning&category=security&from=2026-10-01&to=2026-10-28&trace=…
     GET /admin/audit/export.csv?<the same parameters>                    audit.export
+    POST /admin/audit/diagnostics        target=group:<slug>|org:<slug>   diagnostics.manage
+    POST /admin/audit/diagnostics/off    target=…                         diagnostics.manage
 
 ADR 0040, part 3: filters for minimum level, category, period (days in ``ADMIN_TIMEZONE``) and
 trace id; a trace id shows the whole chain of one request or job. The export writes exactly
 the current filter inside the admin's scope as CSV (``app.domain.audit_export``) and is itself
 an audit event; an export over a limit is refused on the page, never cut short.
+
+ADR 0040, part 4: the superuser switches diagnostic mode on for one group or organisation
+(``app.domain.diagnostics``); the page lists the modes that are on, each with when it ends.
 """
 
 from dataclasses import dataclass
@@ -27,9 +32,9 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse, Response
 
-from app.admin.authz import AdminContext, RequirePermission, admin_service
-from app.admin.forms import Option
-from app.admin.pages import Locale, admin_moment
+from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
+from app.admin.forms import Option, done_message, raise_refusal, read_form, redirect_done
+from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.planner_routes import REASON_LABELS as CHANGE_REASON_LABELS
 from app.domain import staff
@@ -56,6 +61,8 @@ from app.domain.authorization import (
     decide,
 )
 from app.domain.booking import ChangeReason
+from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
+from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
 from app.domain.maintenance import MaintenanceReason
@@ -110,6 +117,9 @@ EVENT_LABELS: dict[str, str] = {
     # Security events (ADR 0034): global, deduplicated per window.
     WEBHOOK_REJECTED: "audit.event.webhook_rejected",
     TOKEN_REFRESH_FAILED: "audit.event.token_refresh",
+    # Diagnostic mode (ADR 0040, part 4).
+    "job.run": "audit.event.job_run",
+    BRAKE_EVENT: "audit.event.diagnostics_brake",
 }
 """Readable label per event key that is not a permission."""
 
@@ -177,6 +187,8 @@ DETAIL_LABELS: dict[str, str] = {
     "maintenance.refused": "admin.audit.detail.maintenance_refused",
     "source:webex": "admin.audit.detail.source_webex",
     "source:wxcc": "admin.audit.detail.source_wxcc",
+    "diagnostics.on": "admin.audit.detail.diagnostics_on",
+    "diagnostics.off": "admin.audit.detail.diagnostics_off",
 }
 """Readable label per audit detail key (changed field names and schedule actions)."""
 
@@ -188,6 +200,7 @@ COUNT_LABELS: dict[str, str] = {
     "database_mb": "admin.audit.detail.database_mb",
     "changes": "admin.audit.detail.changes",
     "suppressed": "admin.audit.detail.suppressed",
+    "modes": "admin.audit.detail.modes",
 }
 """Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0024)."""
 
@@ -273,6 +286,19 @@ class AuditView:
     booking_id: int | None
     booking_url: str | None
     trace_url: str | None
+
+
+@dataclass(frozen=True)
+class DiagnosticsView:
+    """Diagnostic mode on the audit page, for the superuser.
+
+    Attributes:
+        active: The modes that are on: target label, value for the off button, end.
+        targets: Every organisation and group it can be switched on for.
+    """
+
+    active: tuple[tuple[str, str, str], ...]
+    targets: tuple[Option, ...]
 
 
 @dataclass(frozen=True)
@@ -484,11 +510,87 @@ async def _audit_page(
             "events": audit_views(request, locale, context.principal, events),
             "filters": _filter_view(narrow, in_scope, zone, locale.gettext),
             "export_error": locale.gettext(EXPORT_REFUSALS[error]) if error else None,
+            "diagnostics": await _diagnostics_view(request, locale, context),
+            "done": done_message(request, locale.gettext),
         },
     )
     if error:
         response.status_code = 422
     return response
+
+
+async def _diagnostics_view(
+    request: Request, locale: RequestLocale, context: AdminContext
+) -> DiagnosticsView | None:
+    """Describe diagnostic mode for the superuser; ``None`` for everyone else."""
+    if not can_function(context.principal)(Permission.DIAGNOSTICS_MANAGE):
+        return None
+    service: DiagnosticsService = request.app.state.diagnostics_service
+    groups = await admin_service(request).groups(context.principal, Permission.GROUP_VIEW)
+    organisations = sorted({(g.organisation_slug, g.organisation_name) for g in groups})
+    targets = [Option(f"org:{slug}", f"{name} ({slug})") for slug, name in organisations] + [
+        Option(f"group:{g.group.slug}", f"{g.organisation_name} / {g.group.name}") for g in groups
+    ]
+    labels = {option.value: option.label for option in targets}
+    active = []
+    for mode in await service.active():
+        value = f"group:{mode.group}" if mode.group else f"org:{mode.organisation}"
+        active.append((labels.get(value, value), value, admin_moment(request, locale, mode.until)))
+    return DiagnosticsView(tuple(active), tuple(targets))
+
+
+def _target(value: str, groups: list[GroupSummary]) -> tuple[str, str | None] | None:
+    """Turn ``group:<slug>`` or ``org:<slug>`` into (organisation, group); else ``None``."""
+    kind, _sep, slug = value.partition(":")
+    for summary in groups:
+        if kind == "group" and summary.group.slug == slug:
+            return summary.organisation_slug, slug
+        if kind == "org" and summary.organisation_slug == slug:
+            return slug, None
+    return None
+
+
+async def _switch(
+    request: Request, locale: RequestLocale, context: AdminContext, on: bool
+) -> Response:
+    """Switch diagnostic mode for the posted target; an unknown target changes nothing."""
+    form = await read_form(request, locale)
+    groups = await admin_service(request).groups(context.principal, Permission.GROUP_VIEW)
+    target = _target(form.text("target"), groups)
+    if target is None:
+        return redirect_done("/admin/audit", "unchanged", anchor="diagnostics")
+    service: DiagnosticsService = request.app.state.diagnostics_service
+    try:
+        if on:
+            await service.switch_on(context.principal, *target)
+        else:
+            await service.switch_off(context.principal, *target)
+    except DomainError as error:
+        raise_refusal(error)
+        return redirect_done("/admin/audit", "unchanged", anchor="diagnostics")
+    done = "diagnostics_on" if on else "diagnostics_off"
+    return redirect_done("/admin/audit", done, anchor="diagnostics")
+
+
+ManageDiagnostics = Annotated[
+    AdminContext, Depends(RequirePermission(Permission.DIAGNOSTICS_MANAGE, fresh=True))
+]
+
+
+@router.post("/audit/diagnostics", response_model=None)
+async def diagnostics_on(
+    request: Request, locale: Locale, _: SameOrigin, context: ManageDiagnostics
+) -> Response:
+    """Switch diagnostic mode on for one group or organisation (ADR 0040, part 4)."""
+    return await _switch(request, locale, context, on=True)
+
+
+@router.post("/audit/diagnostics/off", response_model=None)
+async def diagnostics_off(
+    request: Request, locale: Locale, _: SameOrigin, context: ManageDiagnostics
+) -> Response:
+    """Switch diagnostic mode off for one group or organisation."""
+    return await _switch(request, locale, context, on=False)
 
 
 @router.get("/audit", response_class=HTMLResponse)

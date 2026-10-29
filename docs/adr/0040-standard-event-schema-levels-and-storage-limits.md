@@ -1,8 +1,9 @@
 # 0040. Standard event schema, log levels and storage limits
 
 Status: accepted (2026-10-27), requested by the product owner. Part 1 (storage limits) is
-implemented with this ADR, part 2 (one event schema) and part 3 (filters and CSV export) on
-2026-10-28; part 4 is the agreed direction.
+implemented with this ADR; parts 2 (one event schema), 3 (filters and CSV export) and 4
+(diagnostic mode and retention per category) on 2026-10-28 and 29. The product owner set the
+admin-action term to 2 years and made diagnostic mode the superuser's on 2026-10-29.
 Extends ADR 0031 (audit log per level) and replaces the field list of ADR 0034 (still proposed)
 before it is built.
 
@@ -105,7 +106,7 @@ the page with the reason and is itself audited as a failed `audit.export`. The e
 sits at the group of the filter, else at the admin's one organisation, else global. The
 columns are `openplanner.event/1` in schema order; `actor` is the subject, not the name.
 
-### Part 4: diagnostic mode and retention per category
+### Part 4: diagnostic mode and retention per category (built)
 
 11. Debug events reach the table only while an admin has switched on **diagnostic mode** for
     one group or organisation; it switches itself off after 24 hours, and switching it is
@@ -116,6 +117,17 @@ columns are `openplanner.event/1` in schema order; `actor` is the subject, not t
 13. **Emergency brake**: at grade `critical` the worker stops writing diagnostic events and
     switches diagnostic mode off. Audit and system events are always written.
 
+As built: the product owner decided on 2026-10-29 that **only the superuser** switches
+diagnostic mode (`diagnostics.manage`, global, locked to the superuser), and confirmed **2
+years** for admin actions. The superuser switches it on the audit page for a group or a whole
+organisation (`diagnostic_modes`, migration 0035); switching is audited as
+`diagnostics.manage` with `diagnostics.on` or `diagnostics.off`. Debug events go through
+`DiagnosticLog` (`app/domain/diagnostics.py`); the first debug point is the worker's `job.run`
+per job (type, attempt, duration), and further points use the same call. Pruning runs per
+category over `ix_audit_events_category_at`. At grade `critical` housekeeping calls the brake
+every loop: all modes end and one global system event `diagnostics.brake` says how many.
+Debug events are never shipped to the log platform (ADR 0034).
+
 ## Settings
 
 | Key | Class | Default | Bounds | Permission | Note |
@@ -125,11 +137,17 @@ columns are `openplanner.event/1` in schema order; `actor` is the subject, not t
 | `DATABASE_MAX_MB` | B deployment | none | ≥ 1 | env | part 1 |
 | `AUDIT_EXPORT_MAX_ROWS` | C platform | 100 000 | 1 000–1 000 000 | superuser; env until the ADR 0042 registry exists | part 3 |
 | `AUDIT_EXPORT_MAX_DAYS` | C platform | 366 | 1–3660 | superuser; env until the ADR 0042 registry exists | part 3 |
+| `AUDIT_RETENTION_DAYS` | C platform | 730 | 365–3650 | superuser; env until the ADR 0042 registry exists | part 4, admin actions (product owner) |
+| `SECURITY_EVENT_RETENTION_DAYS` | C platform | 365 | 30–3650 | as above | part 4 |
+| `DIAGNOSTIC_EVENT_RETENTION_DAYS` | C platform | 7 | 1–90 | as above | part 4 |
+| `DIAGNOSTIC_MODE_HOURS` | C platform | 24 | 1–72 | as above | part 4 |
+| `SYSTEM_EVENT_RETENTION_DAYS` | C platform | 90 | 1–3650 | as above | existing (ADR 0031) |
 | `INSTALLATION_NAME` | B deployment | empty | `[A-Za-z0-9_.-]{0,64}` | env | part 2; names the host installation on a shared log platform, needed before the database works |
 
 **Fixed on purpose:** the schema's field names and the timestamp format (a change is a new
 schema version), the mapping of outcome to level, and the 32-hex shape of event and trace ids;
-the CSV dialect (BOM, `;`, RFC 4180) and the formula guard, which is a protection.
+the CSV dialect (BOM, `;`, RFC 4180) and the formula guard, which is a protection; the
+emergency brake at grade critical (a protection, never switchable).
 
 ## Consequences
 
