@@ -29,6 +29,7 @@ from app.domain.storage import (
     assess,
 )
 from app.domain.system_log import SystemLog
+from app.domain.tunable import value_of
 
 log = structlog.get_logger()
 
@@ -56,7 +57,7 @@ class Housekeeping:
         engine: AsyncEngine,
         uow: UnitOfWork,
         clock: Clock,
-        limits: StorageLimits,
+        limits: StorageLimits | Callable[[], StorageLimits],
         measure: Callable[[], StorageUsage | None],
         brake: Callable[[str], Awaitable[int]] | None = None,
     ) -> None:
@@ -76,7 +77,7 @@ class Housekeeping:
         engine: AsyncEngine,
         uow: UnitOfWork,
         clock: Clock,
-        limits: StorageLimits,
+        limits: StorageLimits | Callable[[], StorageLimits],
         database_url: str,
         brake: Callable[[str], Awaitable[int]] | None = None,
     ) -> "Housekeeping":
@@ -94,7 +95,7 @@ class Housekeeping:
         usage = self._measure()
         if usage is None:
             return
-        grade, reason = assess(usage, self._limits)
+        grade, reason = assess(usage, value_of(self._limits))
         self._log(now, usage, grade, reason)
         if grade is StorageGrade.CRITICAL and self._brake is not None:
             try:

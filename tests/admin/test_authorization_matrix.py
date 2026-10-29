@@ -84,6 +84,14 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/retention": {"/admin/retention": statuses(200, 200, 403, 200, 200, 403, 403)},
     # ADR 0042 §5, §11: System status and Advanced settings, read-only: superuser and auditor.
     "GET /admin/settings": {"/admin/settings": statuses(200, 403, 403, 403, 200, 403, 403)},
+    # ADR 0042 step 4: changing is the superuser's (settings.platform.manage is locked). An
+    # empty value is outside the bounds (422); resetting what is not set returns to the page.
+    "POST /admin/settings/{key}": {
+        "/admin/settings/admin_session_hours": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/{key}/reset": {
+        "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
+    },
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
     "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403, 403)},
     "GET /admin/staff/{member_id}": {

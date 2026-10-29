@@ -6,7 +6,8 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import PlatformSettingRow, SettingsVersionRow
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, SUPER, Site
+from app.web.protection import booking_limit
+from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
 
@@ -87,3 +88,82 @@ async def test_an_org_admin_may_not_see_the_platform_settings(site: Site) -> Non
     await site.login_as(ORG_ADMIN)
 
     assert (await site.client.get("/admin/settings")).status_code == 403
+
+
+# Changing (ADR 0042 step 4).
+
+
+async def test_the_superuser_changes_a_setting_and_it_applies_at_once(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+
+    response = await site.client.post(
+        "/admin/settings/admin_session_hours", data={"value": "4"}, headers=SAME_ORIGIN
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/admin/settings?done=saved")
+    page = (await site.client.get("/admin/settings")).text
+    assert app.state.settings.admin_session_hours == 4
+    assert 'action="/admin/settings/admin_session_hours/reset"' in page
+
+
+async def test_a_value_outside_the_bounds_is_refused_at_its_row(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    response = await site.client.post(
+        "/admin/settings/admin_session_hours", data={"value": "99"}, headers=SAME_ORIGIN
+    )
+
+    assert response.status_code == 422
+    assert 'id="error-admin_session_hours"' in response.text
+    assert "past niet binnen de grenzen van het portaal" in response.text
+
+
+async def test_reset_brings_back_the_default(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    await site.client.post(
+        "/admin/settings/admin_session_hours", data={"value": "4"}, headers=SAME_ORIGIN
+    )
+
+    response = await site.client.post(
+        "/admin/settings/admin_session_hours/reset", headers=SAME_ORIGIN
+    )
+
+    assert response.status_code == 303
+    await site.client.get("/admin/settings")
+    assert app.state.settings.admin_session_hours == 8
+
+
+async def test_rate_limits_follow_a_change_without_a_restart(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    await site.client.post(
+        "/admin/settings/rate_limit_bookings", data={"value": "5/hour"}, headers=SAME_ORIGIN
+    )
+    await site.client.get("/admin/settings")
+
+    assert booking_limit() == "5/hour"
+
+
+async def test_the_auditor_sees_no_forms_and_may_not_post(site: Site) -> None:
+    await site.login_as(AUDITOR)
+
+    page = (await site.client.get("/admin/settings")).text
+    response = await site.client.post(
+        "/admin/settings/admin_session_hours", data={"value": "4"}, headers=SAME_ORIGIN
+    )
+
+    assert 'action="/admin/settings/' not in page
+    assert response.status_code == 403
+
+
+@pytest.mark.usefixtures("lock_session_hours")
+async def test_a_locked_setting_has_no_form(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    page = (await site.client.get("/admin/settings")).text
+
+    assert 'action="/admin/settings/admin_session_hours"' not in page
+    assert 'action="/admin/settings/admin_reauth_minutes"' in page

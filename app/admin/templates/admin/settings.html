@@ -7,6 +7,8 @@
     <p class="page-header__lead">{{ _("admin.settings.intro") }}</p>
   </div>
 </div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if unknown_error %}<div class="alert alert--error" role="alert"><p>{{ unknown_error }}</p></div>{% endif %}
 {% if refused %}
 <div class="alert alert--error"><p>{{ _("admin.settings.refused") }}</p></div>
 {% endif %}
@@ -62,11 +64,12 @@
         <th scope="col">{{ _("admin.settings.value") }}</th>
         <th scope="col">{{ _("admin.settings.source") }}</th>
         <th scope="col">{{ _("admin.settings.notes") }}</th>
+        {% if manage %}<th scope="col">{{ _("admin.settings.change") }}</th>{% endif %}
       </tr>
     </thead>
     <tbody>
       {% for row in section.rows %}
-      <tr>
+      <tr id="setting-{{ row.key }}">
         <th scope="row">{{ row.label }}<br><code class="muted">{{ row.variable }}</code></th>
         <td>{{ row.value }}</td>
         <td>{{ row.source }}</td>
@@ -75,6 +78,33 @@
           {% if row.outside_bounds %}<p><span class="chip chip--warning">{{ _("admin.settings.outside_bounds") }}</span></p>{% endif %}
           {% if row.portal_ignored %}<p><span class="chip chip--warning">{{ _("admin.settings.portal_ignored") }}</span></p>{% endif %}
         </td>
+        {% if manage %}
+        <td>
+          {% if row.error %}<p class="error-message" id="error-{{ row.key }}">{{ row.error }}</p>{% endif %}
+          {% if row.editable %}
+          <form method="post" action="/admin/settings/{{ row.key }}" novalidate class="setting-form">
+            <label for="value-{{ row.key }}">{{ _("admin.settings.new_value") }}</label>
+            {% if row.choices %}
+            <select id="value-{{ row.key }}" name="value"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
+              {% for choice in row.choices %}<option value="{{ choice }}"{% if choice == row.input %} selected{% endif %}>{{ choice }}</option>{% endfor %}
+            </select>
+            {% else %}
+            <input id="value-{{ row.key }}" name="value" type="text" value="{{ row.input }}" size="12"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
+            {% endif %}
+            {% if row.expires %}
+            <label for="hours-{{ row.key }}">{{ _("admin.settings.hours", max=max_hours) }}</label>
+            <input id="hours-{{ row.key }}" name="hours" type="text" inputmode="numeric" value="1" size="3">
+            {% endif %}
+            <button type="submit" class="button button--small">{{ _("admin.settings.save") }}</button>
+          </form>
+          {% if row.from_portal %}
+          <form method="post" action="/admin/settings/{{ row.key }}/reset" class="setting-form">
+            <button type="submit" class="button button--secondary button--small">{{ _("admin.settings.reset") }}</button>
+          </form>
+          {% endif %}
+          {% endif %}
+        </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>

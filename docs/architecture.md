@@ -237,6 +237,7 @@ same commit and rollback behaviour as the SQL one.
 | Cap on open direct calls, place in line, usual wait (ADR 0026) | `app/domain/direct_queue.py` |
 | Own queue: visible bookings, next up, claims, release, agent pseudonym (ADR 0043) | `app/domain/own_queue.py`, `app/domain/queue_service.py`, `app/admin/queue_routes.py`, `app/keys.py` |
 | Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029); live steps (ADR 0048) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/web/static/update-progress.js`, `app/cli.py`, `scripts/updater/` |
+| Installing and repairing a host: packages, settings files, pinned release, host updater (ADR 0050) | `scripts/install.sh`, `docs/install.md` |
 | Maintenance mode: switch, cache, refusals in `RequirePermission`, disabled buttons, citizen and machine-API rules, alert (ADR 0038) | `app/domain/maintenance.py`, `app/domain/maintenance_service.py`, `app/adapters/db/maintenance_state.py`, `app/admin/maintenance_routes.py`, `app/admin/frozen_forms.py`, `app/api/maintenance.py`, `app/cli.py`, `scripts/updater/` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
@@ -719,6 +720,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0043 | Dispatch option per group: contact center or OpenPlanner's own queue (claim by agents, optional calendar invite to a group address) (proposed) |
 | 0044 | Planner: group agenda with shortfalls; move, ask to rebook, cancel or accept per booking (`bookings.manage`) |
 | 0048 | Live progress of updates: the host updater reports each step, the updates page polls a fragment (proposed) |
+| 0050 | One host installer that installs, repairs and re-checks a host; one layout under `/home/<user>/openplanner` (proposed) |
 
 ## 12. Status and roadmap
 

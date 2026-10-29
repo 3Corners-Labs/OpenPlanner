@@ -58,6 +58,11 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.ALREADY_CLAIMED: "error.already_claimed",
     ErrorCode.FREE_PICK_NOT_ALLOWED: "error.free_pick_not_allowed",
     ErrorCode.NOT_CLAIMED: "error.not_claimed",
+    ErrorCode.SETTING_NOT_EDITABLE: "admin.form.error.setting_not_editable",
+    ErrorCode.SETTING_LOCKED: "admin.form.error.setting_locked",
+    ErrorCode.SETTING_INVALID: "admin.form.error.setting_invalid",
+    ErrorCode.SETTING_COMBINATION: "admin.form.error.setting_combination",
+    ErrorCode.SETTING_EXPIRY: "admin.form.error.setting_expiry",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {

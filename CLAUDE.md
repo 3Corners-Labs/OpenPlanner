@@ -74,7 +74,7 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 - SBOM (CycloneDX) produced on every release and attached to the GitHub/GitLab release.
 
 ## Security baseline
-- Rate limiting on public endpoints (`slowapi`): 10 bookings/IP/hour, 60 availability reads/IP/minute. Honeypot field on the booking form. Optional Cloudflare Turnstile behind a feature flag; never Google reCAPTCHA.
+- Rate limiting on public endpoints (`slowapi`): by default 10 bookings/IP/hour, 60 availability reads/IP/minute; the superuser may change them within the ceilings of ADR 0042 §7 (1–30 per hour, 10–300 per minute), and the off switch `RATE_LIMIT_ENABLED` stays in the environment. Honeypot field on the booking form. Optional Cloudflare Turnstile behind a feature flag; never Google reCAPTCHA.
 - CSP, HSTS, `X-Frame-Options` (admin), CORS allow-list from settings. Widget endpoints allow only configured origins.
 - Calls to WxCC use OAuth tokens of a service app (ADR 0007). Every inbound webhook from WxCC is verified (signature or token, per WxCC's mechanism); reject if |now − ts| > 300 s.
 - Bootstrap secrets (settings encryption key, management token key, OIDC client secret, session secret) via env/secret store only; `.env.example` has placeholders. Integration secrets (SMTP, WxCC, messaging) are entered in the admin UI, stored AES-256-GCM encrypted, write-only, audited (ADR 0008). `gitleaks` blocks commits.

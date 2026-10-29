@@ -5,7 +5,7 @@ purge with the citizen's data); ``groups`` gains ``queue_visible_from_minutes`` 
 and ``queue_free_pick_allowed`` (default off).
 
 Revision ID: 0043
-Revises: 0049
+Revises: 0050
 Create Date: 2026-10-29 00:30:00.000000
 """
 
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0043"
-down_revision: str | None = "0049"
+down_revision: str | None = "0050"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
