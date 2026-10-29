@@ -67,6 +67,7 @@ from app.adapters.db.models import (
     StaffRow,
     WebhookEventRow,
 )
+from app.adapters.db.platform_settings import PlatformSettingsQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.scenarios import ScenarioQueries
@@ -350,6 +351,7 @@ class SqlTransaction(
     RoleQueries,
     ImageQueries,
     ScenarioQueries,
+    PlatformSettingsQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
@@ -358,7 +360,8 @@ class SqlTransaction(
     ``RetentionQueries`` (ADR 0039), the staff directory from ``StaffQueries`` (ADR 0046),
     the maintenance switch from ``MaintenanceQueries`` (ADR 0038), custom roles from
     ``RoleQueries`` (ADR 0039), closure images and scenarios from ``ImageQueries`` and
-    ``ScenarioQueries`` (ADR 0037).
+    ``ScenarioQueries`` (ADR 0037), portal settings from ``PlatformSettingsQueries``
+    (ADR 0042).
 
     Args:
         session: The open session.

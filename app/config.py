@@ -6,6 +6,7 @@ so Docker secrets, Kubernetes secrets and secret-store sidecars work without an 
 
 import os
 import re
+from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal
@@ -112,6 +113,21 @@ class _SecretFiles(PydanticBaseSettingsSource):
                 raise ValueError(f"{name.upper()} and {name.upper()}_FILE are both set; set one")
             values[name] = _read_secret_file(name, Path(path))
         return values
+
+
+@dataclass(frozen=True)
+class ProductionProblem:
+    """One reason production refuses to start, with a stable code for the portal's text.
+
+    Attributes:
+        code: Stable identifier; *System status* shows ``admin.settings.problem.<code>``.
+        variable: The environment variable to fix.
+        message: The start-up check's own words (English, for the operator's log).
+    """
+
+    code: str
+    variable: str
+    message: str
 
 
 class Settings(BaseSettings):
@@ -338,40 +354,85 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _production_requirements(self) -> "Settings":
         """In production, refuse to start with development defaults."""
-        if self.environment == "prod":
-            if self.simulator_enabled:
-                raise ValueError("SIMULATOR_ENABLED is not allowed in production")
-            if self.management_token_key is None:
-                raise ValueError("MANAGEMENT_TOKEN_KEY is required in production")
-            if not self.public_base_url.startswith("https://"):
-                raise ValueError("PUBLIC_BASE_URL must use https in production")
-            if self.session_secret is None:
-                raise ValueError("SESSION_SECRET is required in production")
-            for name in type(self).model_fields:
-                value = getattr(self, name)
-                if isinstance(value, SecretStr) and value.get_secret_value().startswith(
-                    DEV_ONLY_SECRET_PREFIX
-                ):
-                    raise ValueError(f"{name.upper()} holds a development placeholder")
-            if self.webhook_base_url is not None and not self.webhook_base_url.startswith(
-                "https://"
-            ):
-                raise ValueError("WEBHOOK_BASE_URL must use https in production")
-            if self.webex_client_id is not None and (
+        problems = self.production_problems()
+        if self.environment == "prod" and problems:
+            raise ValueError(problems[0].message)
+        return self
+
+    def production_problems(self) -> list["ProductionProblem"]:
+        """Return what production would refuse, in the words of the start-up check.
+
+        Production never starts with any of these; *System status* shows them for a
+        development or test installation (ADR 0042 §11).
+        """
+        found: list[ProductionProblem] = []
+
+        def check(failed: bool, code: str, variable: str, message: str) -> None:
+            if failed:
+                found.append(ProductionProblem(code, variable, message))
+
+        check(
+            self.simulator_enabled,
+            "simulator_enabled",
+            "SIMULATOR_ENABLED",
+            "SIMULATOR_ENABLED is not allowed in production",
+        )
+        check(
+            self.management_token_key is None,
+            "management_token_key",
+            "MANAGEMENT_TOKEN_KEY",
+            "MANAGEMENT_TOKEN_KEY is required in production",
+        )
+        check(
+            not self.public_base_url.startswith("https://"),
+            "public_base_url",
+            "PUBLIC_BASE_URL",
+            "PUBLIC_BASE_URL must use https in production",
+        )
+        check(
+            self.session_secret is None,
+            "session_secret",
+            "SESSION_SECRET",
+            "SESSION_SECRET is required in production",
+        )
+        for name in type(self).model_fields:
+            value = getattr(self, name)
+            check(
+                isinstance(value, SecretStr)
+                and value.get_secret_value().startswith(DEV_ONLY_SECRET_PREFIX),
+                "dev_placeholder",
+                name.upper(),
+                f"{name.upper()} holds a development placeholder",
+            )
+        check(
+            self.webhook_base_url is not None and not self.webhook_base_url.startswith("https://"),
+            "webhook_base_url",
+            "WEBHOOK_BASE_URL",
+            "WEBHOOK_BASE_URL must use https in production",
+        )
+        check(
+            self.webex_client_id is not None
+            and (
                 self.webex_client_secret is None
                 or self.webex_refresh_token is None
                 or self.settings_encryption_key is None
-            ):
-                raise ValueError(
-                    "Webex needs WEBEX_CLIENT_SECRET, WEBEX_REFRESH_TOKEN and "
-                    "SETTINGS_ENCRYPTION_KEY in production"
-                )
-            if self.oidc_discovery_url is not None and (
+            ),
+            "webex_incomplete",
+            "WEBEX_CLIENT_ID",
+            "Webex needs WEBEX_CLIENT_SECRET, WEBEX_REFRESH_TOKEN and "
+            "SETTINGS_ENCRYPTION_KEY in production",
+        )
+        check(
+            self.oidc_discovery_url is not None
+            and (
                 not self.oidc_discovery_url.startswith("https://")
                 or self.oidc_client_secret is None
-            ):
-                raise ValueError("OIDC needs an https discovery URL and a client secret")
-        return self
+            ),
+            "oidc_incomplete",
+            "OIDC_DISCOVERY_URL",
+            "OIDC needs an https discovery URL and a client secret",
+        )
+        return found
 
     @property
     def event_retention(self) -> EventRetention:

@@ -11,7 +11,7 @@ ones are listed in ``PUBLIC_ADMIN_PATHS`` and the route-coverage test checks bot
     GET  /admin/matrix       matrix.view      the whole matrix (same data as the docs)
 
 The audit log lives in ``audit_routes``, the retention overview in ``retention_routes``, the
-staff directory in ``staff_routes``,
+staff directory in ``staff_routes``, System status and Advanced settings in ``settings_routes``,
 groups and their planning in ``group_routes``, organisations in ``organisation_routes`` and
 their branding in ``branding_routes``.
 """
@@ -51,6 +51,7 @@ from app.admin import (
     retention_routes,
     role_routes,
     scenario_routes,
+    settings_routes,
     simulator_routes,
     staff_routes,
     update_routes,
@@ -493,6 +494,7 @@ def register_admin(app: FastAPI) -> None:
         router,
         audit_routes.router,
         retention_routes.router,
+        settings_routes.router,
         role_routes.router,
         staff_routes.router,
         group_routes.router,

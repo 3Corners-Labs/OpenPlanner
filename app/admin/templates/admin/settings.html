@@ -1,0 +1,82 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.settings.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("admin.settings.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.settings.intro") }}</p>
+  </div>
+</div>
+<section class="card" aria-labelledby="status-heading">
+  <h2 id="status-heading">{{ _("admin.settings.status.title") }}</h2>
+  <p>{{ _("admin.settings.status.intro") }}</p>
+  <dl class="facts">
+    <div><dt>{{ _("admin.settings.status.environment") }}</dt><dd><code>{{ environment }}</code></dd></div>
+  </dl>
+  {% if problems %}
+  <div class="alert alert--info">
+    <p>{{ _("admin.settings.status.problems") }}</p>
+    <ul>
+      {% for problem in problems %}
+      <li><code>{{ problem.variable }}</code>: {{ problem.text }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  <div class="table-scroll" role="region" aria-labelledby="status-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.settings.status.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.settings.variable") }}</th>
+        <th scope="col">{{ _("admin.settings.class") }}</th>
+        <th scope="col">{{ _("admin.settings.status.state") }}</th>
+        <th scope="col">{{ _("admin.settings.source") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in status %}
+      <tr>
+        <th scope="row"><code>{{ row.variable }}</code></th>
+        <td>{{ row.class_label }}</td>
+        <td>{% if row.is_set %}{{ _("admin.settings.value.set") }}{% else %}{{ _("admin.settings.value.not_set") }}{% endif %}</td>
+        <td>{{ row.source }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% for section in sections %}
+<section class="card" aria-labelledby="topic-{{ section.key }}">
+  <h2 id="topic-{{ section.key }}">{{ section.heading }}</h2>
+  <div class="table-scroll" role="region" aria-labelledby="topic-{{ section.key }}" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ section.heading }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.settings.setting") }}</th>
+        <th scope="col">{{ _("admin.settings.value") }}</th>
+        <th scope="col">{{ _("admin.settings.source") }}</th>
+        <th scope="col">{{ _("admin.settings.notes") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in section.rows %}
+      <tr>
+        <th scope="row">{{ row.label }}<br><code class="muted">{{ row.variable }}</code></th>
+        <td>{{ row.value }}</td>
+        <td>{{ row.source }}</td>
+        <td>
+          {% if row.locked %}<p>{{ _("admin.settings.locked") }}: <code>{{ row.variable }}</code></p>{% endif %}
+          {% if row.outside_bounds %}<p><span class="chip chip--warning">{{ _("admin.settings.outside_bounds") }}</span></p>{% endif %}
+          {% if row.portal_ignored %}<p><span class="chip chip--warning">{{ _("admin.settings.portal_ignored") }}</span></p>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}
