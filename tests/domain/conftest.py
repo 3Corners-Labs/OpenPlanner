@@ -1,10 +1,13 @@
-"""Default fixtures of the domain tests: the three-group store, a fixed clock, bookings.
+"""Fixtures shared by the domain tests: a fixed clock, bookings and closures.
 
-A test module that defines its own ``uow``, ``clock`` or ``bookings`` overrides these.
+``uow`` defaults to the three-group store of ``tests.support.closures``; a test module that
+defines its own ``uow`` (or ``clock``, ``bookings``) overrides it.
 """
 
 import pytest
 
+from app.domain.admin import AdminService
+from app.domain.closure_service import ClosureService
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -20,11 +23,16 @@ def uow() -> InMemoryUnitOfWork:
 
 @pytest.fixture
 def clock() -> FixedClock:
-    """Return a clock fixed at ``NOW``."""
     return FixedClock(NOW)
 
 
 @pytest.fixture
 def bookings(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
-    """Return the citizens' booking service over the store."""
     return BookingService(uow, clock, TEST_TOKEN_KEY)
+
+
+@pytest.fixture
+def closures(
+    uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
+) -> ClosureService:
+    return ClosureService(uow, clock, AdminService(uow, clock), bookings)

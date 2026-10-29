@@ -5,8 +5,8 @@ A planner can ask the citizen to choose a new time. The booking frees its place,
 cancelled and its personal data purged 24 h later). ``rebook_by`` is a time, not personal
 data.
 
-Revision ID: 0040
-Revises: 0039
+Revision ID: 0046
+Revises: 0045
 Create Date: 2026-10-29 12:00:00.000000
 """
 
@@ -17,8 +17,8 @@ from alembic import op
 
 from app.adapters.db.types import UTCDateTime
 
-revision: str = "0040"
-down_revision: str | None = "0039"
+revision: str = "0046"
+down_revision: str | None = "0045"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
