@@ -1,0 +1,19 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field as render_field with context %}
+{% block title %}{{ _("admin.planner.cancel_title", reference=booking.reference) }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ booking.id }}/cancel" novalidate aria-labelledby="cancel-heading">
+  <div class="card__header">
+    <h2 id="cancel-heading">{{ _("admin.planner.cancel_title", reference=booking.reference) }}</h2>
+    <p class="card__lead">{{ _("admin.planner.cancel_lead", first_name=booking.first_name, when=booking.when) }}</p>
+  </div>
+  <div class="form-grid">{{ render_field(field) }}</div>
+  <p>{{ _("admin.planner.citizen_told") }}</p>
+  <div class="form-actions">
+    <button type="submit" class="button button--danger">{{ _("admin.planner.cancel_button") }}</button>
+    <a href="{{ back }}">{{ _("admin.planner.keep") }}</a>
+  </div>
+</form>
+{% endblock %}

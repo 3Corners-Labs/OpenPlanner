@@ -197,6 +197,7 @@ async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None
         "dispatch_lead_minutes": "5",
         "dispatch_kind": "contact_center",
         "queue_change_working_days": "1",
+        "planner_change_min_lead_minutes": "60",
         "phone_mode": "required",
         "video_host_email": "host-demo@example.nl",
         "wxcc_business_address": "openplanner@example.biz",
@@ -239,6 +240,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "phone_mode": "optional",
         "direct_call_enabled": "no",
         "embedding_enabled": "no",
+        "planner_change_min_lead_minutes": "60",
         "not_picked_up_minutes": "10",
     }
 
@@ -277,6 +279,7 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, days: str, err
         "phone_mode": "optional",
         "direct_call_enabled": "no",
         "embedding_enabled": "no",
+        "planner_change_min_lead_minutes": "60",
         "not_picked_up_minutes": "10",
     }
 
@@ -301,6 +304,7 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "dispatch_lead_minutes": "5",
             "dispatch_kind": "contact_center",
             "queue_change_working_days": "1",
+            "planner_change_min_lead_minutes": "60",
             "phone_mode": "optional",
             "direct_call_enabled": "no",
             "not_picked_up_minutes": "10",
@@ -604,6 +608,7 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "dispatch_lead_minutes": "5",
             "dispatch_kind": "contact_center",
             "queue_change_working_days": "1",
+            "planner_change_min_lead_minutes": "60",
             "phone_mode": "optional",
             "direct_call_enabled": "no",
             "not_picked_up_minutes": "10",
@@ -638,6 +643,7 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "dispatch_lead_minutes": "5",
         "dispatch_kind": "contact_center",
         "queue_change_working_days": "1",
+        "planner_change_min_lead_minutes": "60",
         "phone_mode": "optional",
         "direct_call_enabled": "yes",
         "not_picked_up_minutes": "10",

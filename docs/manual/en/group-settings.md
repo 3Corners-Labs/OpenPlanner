@@ -90,6 +90,14 @@ link in the confirmation.
 Choose enough time for an agent to pick up the task before the citizen waits in the video call,
 for example 5 minutes.
 
+<!-- field: planner_change_min_lead_minutes -->
+### Changes by a planner
+
+Up to how many minutes before the start a planner may move or cancel a booking from the
+[agenda](group-agenda.md), 60 by default. After that a message would not reach the citizen in
+time: call the citizen instead. The number is never less than **Send to the queue** and at most
+1440 (one day).
+
 <!-- field: phone_mode -->
 ### Phone number on the form
 

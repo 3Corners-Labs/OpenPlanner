@@ -5,7 +5,9 @@ comes from the group's own texts first, then the i18n chain (organisation overri
 catalogue). Placeholders are filled by the safe formatter in ``app.i18n``. A message carries
 the first name, date, time, team and the management link; nothing else. Messages
 about an emergency closure (ADR 0024) add the closure's notice: plain text an admin wrote,
-escaped like every other value and never a template.
+escaped like every other value and never a template. A planner's cancellation (ADR 0044)
+adds the fixed reason the planner chose, as a text block (``message.reason.<code>``); a
+planner's move or cancellation also has an SMS form.
 """
 
 from dataclasses import dataclass
@@ -13,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from app.domain.booking import Booking
+from app.domain.booking import Booking, ChangeReason
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.job_plan import JobType
@@ -57,12 +59,18 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
     JobType.SEND_CONFIRMATION: MessageKind(
         "message.confirmation.subject", "message.confirmation.intro", True, False
     ),
-    JobType.SEND_CHANGE: MessageKind("message.change.subject", "message.change.intro", True, False),
+    JobType.SEND_CHANGE: MessageKind(
+        "message.change.subject", "message.change.intro", True, False, "message.change.sms"
+    ),
     JobType.SEND_REMINDER: MessageKind(
         "message.reminder.subject", "message.reminder.intro", True, False, "message.reminder.sms"
     ),
     JobType.SEND_CANCELLATION: MessageKind(
-        "message.cancellation.subject", "message.cancellation.intro", False, True
+        "message.cancellation.subject",
+        "message.cancellation.intro",
+        False,
+        True,
+        "message.cancellation.sms",
     ),
     JobType.SEND_SUSPENSION: MessageKind(
         "message.suspension.subject",
@@ -98,6 +106,19 @@ class _Texts:
         """Return the group's text for ``key`` if it has one, else the i18n text."""
         own = self._texts.get((self._.locale, key))
         return format_message(own, params) if own is not None else self._(key, **params)
+
+
+REASON_KEYS: dict[ChangeReason, str] = {
+    ChangeReason.STAFFING: "message.reason.staffing",
+    ChangeReason.TECHNICAL: "message.reason.technical",
+    ChangeReason.UNFORESEEN: "message.reason.unforeseen",
+}
+"""The text block of each planner's reason (ADR 0044), written out for the catalogue test."""
+
+
+def _reason(booking: Booking, _: "_Texts") -> str | None:
+    """Return the text of the planner's reason for ``booking``, if it has one."""
+    return _(REASON_KEYS[booking.change_reason]) if booking.change_reason else None
 
 
 class MessageComposer:
@@ -179,6 +200,8 @@ class MessageComposer:
             "manage_url": manage_url,
             "notice_label": _("message.closure_notice"),
             "notice": closure.notice(locale) if closure and on_hold else None,
+            "reason_label": _("message.reason"),
+            "reason": _reason(booking, _),
             "manage_text": _(
                 kind.manage_key,
                 deadline=f"{format_day(local_day(deadline, tz), locale)}, "
@@ -236,5 +259,6 @@ class MessageComposer:
             time=format_clock(booking.start, group.tz, booking.locale),
             group_name=group.name,
             manage_url=self.manage_url(booking),
+            reason=_reason(booking, _) or "",
         )
         return OutboundMessage(ChannelKind.SMS, contact.phone, "", text)

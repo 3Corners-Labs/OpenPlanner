@@ -16,7 +16,8 @@ owner on 2026-10-25), instead of 24 hours after the slot.
 
 Besides the notice a closure may carry a heading per locale and its own copy of a contact block
 (ADR 0037 §2): the block that applied when it started, so what citizens were mailed stays what
-the closure shows when an organisation or group later edits its block.
+the closure shows when an organisation or group later edits its block. It may also carry one
+image with its text alternative (ADR 0037 §3), public only while the closure is visible.
 """
 
 import re
@@ -26,6 +27,7 @@ from datetime import datetime, timedelta
 
 from app.domain.contacts import ContactBlock
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.images import PageImage
 
 MAX_NOTICE_LENGTH = 1000
 """Longest notice text per locale; enough for a few sentences, short enough for a banner."""
@@ -103,6 +105,8 @@ class Closure:
         headings: Optional heading per locale; empty means the page's default heading.
         contacts: The copy of the contact block taken when the closure started (or refreshed
             by an update); ``None`` when no block applied.
+        image: The closure's image with its text alternative, if any; the bytes are read
+            separately (``Transaction.get_closure_image``).
 
     Raises:
         DomainError: ``invalid_configuration`` for a naive time, an end before the start, a
@@ -117,6 +121,7 @@ class Closure:
     created_at: datetime
     headings: Mapping[str, str] = field(default_factory=dict, compare=False)
     contacts: ContactBlock | None = field(default=None, compare=False)
+    image: PageImage | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         """Validate the window, the notices and the headings; keep only non-empty headings."""

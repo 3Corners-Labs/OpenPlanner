@@ -36,8 +36,12 @@ worker ──HTTPS──> SMS API of the organisation's provider ──> mobile 
 
 | Data item | Destination | When | Legal basis owner | Retention at the processor |
 |---|---|---|---|---|
-| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
+| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, and on a planner's move or cancellation (ADR 0044), only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
 | First name, date, time, team, management link | as above (message text) | as above | as above | as above |
+
+A planner's move or cancellation (ADR 0044) is sent by SMS as well, to bookings with a phone
+number, with the same data items; a cancellation adds the planner's reason, a fixed text of the
+organisation (never typed by the planner), and has no management link.
 
 Only groups whose booking form asks for a phone number can have SMS reminders. The text is
 built from the allow-listed placeholders only (ADR 0009); group admins cannot add other data.
@@ -77,6 +81,21 @@ pages and on the page of a booking on hold (CL-2). A closure keeps a copy of the
 and an optional heading per locale (`closure_notices.heading`). Organisation data, not personal data of citizens;
 the admin page asks for general numbers and addresses only. No purge job; kept until changed.
 
+**Embedded booking (ADR 0035).** With `<gov-booking>` on a host website, the citizen's
+browser calls `/api/v1/widget/{org}/{group}/` directly: name, email and (optional) phone go
+from the browser to OpenPlanner over TLS, never through the host's servers. The host site
+does see that a citizen opened its page with the widget, and which group the tag names; it
+cannot read what is typed into the shadow root's form through our API, and the answer to a
+booking holds no personal data and no management token (the link goes by email only). The
+same personal data rules apply as for the standalone page.
+
+**Closure image (ADR 0037 §3, CL-3).** One image per closure (`closure_images`), uploaded by an
+admin with a text alternative in nl and en. Metadata a photo can carry about people (EXIF and
+XMP, such as a GPS position or the photographer's name; PNG text chunks; JPEG comments) is
+stripped before the file is stored, so only the picture itself is kept. Served from our own
+origin and only while its closure is visible; never mailed, never sent to a third party.
+Organisation data; no purge job.
+
 **Allowed origins for embedding (ADR 0035).** The websites on which an organisation's groups
 may appear as a widget (`organisation_origins`, such as `https://www.gemeente.nl`), entered by
 an organisation admin, and a switch per group (`groups.embedding_enabled`). Organisation data,
@@ -111,6 +130,12 @@ and the booking id. Each admin sees them at their own level only (group admin: t
 organisation admin and auditor: their organisation and its groups; superuser: everything).
 The auditor role (ADR 0039) is read-only and holds no permission that shows citizens' data; it
 does see admin names in the audit log, which is the accountability it exists for.
+
+Custom roles (ADR 0039 step 3) live in `roles`: template, names, the role claim value and the
+permission codes, no personal data. The session cookie keeps, next to the built-in roles, at
+most 20 other role claim values (group or role names from the IdP, no personal data); the
+custom roles they grant are looked up per request. Changes are audited as `role.*` events
+with codes only and shown on the matrix page with the actor's display name.
 
 The retention overview (`/admin/retention`, ADR 0039) reads `bookings` only to count, per group,
 how many still hold personal data, how many are past their purge moment and how many purges

@@ -25,7 +25,7 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 | Emergency closure | `/admin/closures` | `organisation.closure` | `/admin/organisations/{org}/closure` |
 | Staff | `/admin/staff` | `staff.view` | `/admin/staff/{member_id}` |
 | My rights | `/admin/rights` | `rights.view` | – |
-| Rights matrix | `/admin/matrix` | `matrix.view` | – |
+| Rights matrix | `/admin/matrix` | `matrix.view` | `/admin/roles`, `/admin/roles/new`, `/admin/roles/{role_id}` |
 
 ### Platform
 
@@ -57,5 +57,5 @@ Side navigation: *Overview*.
 | Holidays | `/admin/groups/{slug}/holidays` | `schedule.manage` | – |
 | Reminders | `/admin/groups/{slug}/reminders` | `reminders.manage` | – |
 | Message texts | `/admin/groups/{slug}/messages` | `texts.manage` | `/admin/groups/{slug}/messages/{text_locale}` |
-| Agenda | `/admin/groups/{slug}/agenda` | `bookings.view` | `/admin/groups/{slug}/bookings/{booking_id}` |
+| Agenda | `/admin/groups/{slug}/agenda` | `bookings.view` | `/admin/groups/{slug}/bookings/{booking_id}`, `/admin/groups/{slug}/agenda/week`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/move`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel` |
 | Emergency closure | `/admin/groups/{slug}/closure` | `closure.manage` | `/admin/groups/{slug}/closure/bookings/{booking_id}/move`, `/admin/groups/{slug}/closure/contacts` |

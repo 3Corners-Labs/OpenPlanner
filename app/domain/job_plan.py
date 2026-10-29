@@ -83,11 +83,14 @@ def plan_for_booking(
     now: datetime,
     dispatch_lead: timedelta,
     message: JobType = JobType.SEND_CONFIRMATION,
+    sms: bool = False,
 ) -> list[PlannedJob]:
     """Return the jobs of a newly confirmed booking, in execution order.
 
     ``message`` is the first email: the confirmation, ``send_change`` after a reschedule or
-    ``send_reinstatement`` when a suspended booking goes ahead after all. Reminders are skipped
+    ``send_reinstatement`` when a suspended booking goes ahead after all. ``sms`` sends it as
+    an SMS as well when the citizen is reachable there (a planner's move, ADR 0044). Reminders
+    are skipped
     when disabled, duplicated, not strictly in the future, or when the booking is not reachable
     on the channel.
     """
@@ -95,6 +98,8 @@ def plan_for_booking(
         PlannedJob(JobType.CREATE_VIDEO_ROOM, now, start),
         PlannedJob(message, now, start, ChannelKind.EMAIL),
     ]
+    if sms and reachable(ChannelKind.SMS, contact, consents):
+        jobs.append(PlannedJob(message, now, start, ChannelKind.SMS))
     seen: set[tuple[ChannelKind, int]] = set()
     reminders: list[PlannedJob] = []
     for rule in rules:
@@ -132,18 +137,25 @@ def is_stale(
     return not booking.is_active or booking.start != pinned_start or booking.contact is None
 
 
-def plan_for_cancellation(*, cancelled_at: datetime, notify: bool = True) -> list[PlannedJob]:
+def plan_for_cancellation(
+    *, cancelled_at: datetime, notify: bool = True, sms: bool = False
+) -> list[PlannedJob]:
     """Return the jobs that replace all pending jobs of a cancelled booking.
 
     ``notify=False`` for the old booking of a reschedule: the citizen gets a change message
-    for the new booking instead of a cancellation. The work item is ended and the meeting
-    removed first (ADR 0021); those jobs do nothing when the booking never got them.
+    for the new booking instead of a cancellation. ``sms`` adds the SMS form of the
+    cancellation (a planner's change, ADR 0044; the caller checks the citizen is reachable).
+    The work item is ended and the meeting removed first (ADR 0021); those jobs do nothing
+    when the booking never got them.
     """
     end = PlannedJob(JobType.END_WXCC_TASK, cancelled_at, None)
     delete = PlannedJob(JobType.DELETE_VIDEO_ROOM, cancelled_at, None)
     message = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.EMAIL)
+    text = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.SMS)
     purge = PlannedJob(JobType.PURGE_PII, cancelled_at + PURGE_AFTER, None)
-    return [end, delete, message, purge] if notify else [end, delete, purge]
+    if not notify:
+        return [end, delete, purge]
+    return [end, delete, message, text, purge] if sms else [end, delete, message, purge]
 
 
 def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:

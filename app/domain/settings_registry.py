@@ -72,6 +72,7 @@ class Topic(StrEnum):
     UPDATES = "updates"
     DISPLAY = "display"
     STAFF = "staff"
+    PLANNER = "planner"
 
 
 PLATFORM_VIEW = "settings.platform.view"
@@ -877,6 +878,26 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Days without a login after which a person is marked dormant in the staff list (ADR 0046).",
         minimum=14,
         maximum=365,
+    ),
+    S(
+        "shortfall_horizon_days",
+        K.INT,
+        14,
+        _D,
+        T.PLANNER,
+        "Days ahead the shortfall notice on group pages and the dashboard looks (ADR 0044).",
+        minimum=1,
+        maximum=60,
+    ),
+    S(
+        "planner_changes_alert_per_hour",
+        K.INT,
+        50,
+        _C,
+        T.PLANNER,
+        "Changes by one planner per hour above which a system event warns (ADR 0044).",
+        minimum=5,
+        maximum=1000,
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

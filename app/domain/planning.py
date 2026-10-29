@@ -68,6 +68,7 @@ class GroupSettings:
     dispatch_lead_minutes: int
     dispatch_kind: DispatchKind
     queue_change_working_days: int
+    planner_change_min_lead_minutes: int
     video_host_email: str | None
     wxcc_business_address: str | None
     wxcc_channel: str | None

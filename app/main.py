@@ -29,6 +29,7 @@ from app.api import (
     join_pages,
     pages,
     webhooks,
+    widget_api,
 )
 from app.api.agent import create_agent_api
 from app.api.maintenance import citizen_gate, register_maintenance
@@ -36,6 +37,7 @@ from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings
 from app.domain.admin import AdminService
+from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
 from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
@@ -52,8 +54,10 @@ from app.domain.integration_check import IntegrationCheckService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.messaging_service import MessagingService
 from app.domain.organisations import OrganisationService
+from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
+from app.domain.roles import RoleService
 from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.simulation import SimulationService
@@ -163,6 +167,9 @@ def create_app(
             allow_local=settings.environment != "prod",
         )
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
+        app.state.agenda_service = AgendaService(
+            uow, clock, app.state.admin_service, settings.shortfall_horizon_days
+        )
         app.state.diagnostics_service = DiagnosticsService(
             uow, clock, app.state.admin_service, timedelta(hours=settings.diagnostic_mode_hours)
         )
@@ -179,6 +186,24 @@ def create_app(
         )
         app.state.closure_service = ClosureService(
             uow, clock, app.state.admin_service, app.state.booking_service
+        )
+        app.state.planner_service = PlannerService(
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.booking_service,
+            settings.planner_changes_alert_per_hour,
+        )
+        app.state.role_service = RoleService(
+            uow,
+            clock,
+            app.state.admin_service,
+            (
+                settings.oidc_role_superuser,
+                settings.oidc_role_org_admin,
+                settings.oidc_role_group_admin,
+                settings.oidc_role_auditor,
+            ),
         )
         app.state.api_access = ApiAccessService(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled
@@ -255,6 +280,8 @@ def create_app(
         direct_pages.router,
         brand_assets.router,
         webhooks.router,
+        widget_api.texts_router,
+        widget_api.router,
     ):
         app.include_router(public_router, dependencies=gate)
     if agent_api is not None:
