@@ -30,6 +30,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.integrations import Integrations
 from app.admin import (
+    agenda_routes,
     api_routes,
     audit_routes,
     branding_routes,
@@ -68,6 +69,7 @@ from app.admin.pages import Locale, SameOrigin, admin_moment, templates
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
 from app.admin.session import end_session, pop_login_start, save_login_start, start_session
+from app.admin.shortfalls import agenda_service, shortfall_view
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT
 from app.domain.audit import Outcome
 from app.domain.authorization import (
@@ -202,9 +204,21 @@ async def dashboard(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.DASHBOARD_VIEW))],
 ) -> HTMLResponse:
-    """List the groups in the admin's scope."""
+    """List the groups in the admin's scope, with their shortfalls ahead (ADR 0044)."""
     groups = await admin_service(request).groups(context.principal)
-    return _page(request, locale, "admin/dashboard.html", context.principal, {"groups": groups})
+    summaries = await agenda_service(request).summaries(context.principal)
+    shortfalls = {
+        g.group.slug: shortfall_view(summaries[g.group.slug], g.group, locale)
+        for g in groups
+        if g.group.slug in summaries and summaries[g.group.slug].count
+    }
+    return _page(
+        request,
+        locale,
+        "admin/dashboard.html",
+        context.principal,
+        {"groups": groups, "shortfalls": shortfalls},
+    )
 
 
 def _scope_text(scope: Scope | None, _: BoundGettext) -> str:
@@ -405,6 +419,7 @@ def register_admin(app: FastAPI) -> None:
         staff_routes.router,
         group_routes.router,
         call_routes.router,
+        agenda_routes.router,
         check_routes.router,
         branding_routes.router,
         holiday_routes.router,
