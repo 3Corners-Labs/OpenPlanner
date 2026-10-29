@@ -13,6 +13,8 @@ the display name of admins, from the identity provider (ADR 0046).
     integration_reports (last webhook listing and delivery test; no secrets)
     staff 1──* staff_memberships (admins as last seen at login, ADR 0046; the name is joined
                                   into the audit log)
+    admin_profiles (name per identity-provider subject; joined into the audit log)
+    roles (custom roles of the superuser, ADR 0039; no foreign keys, linked by claim value)
     release_checks (one row), update_requests (ADR 0029; the installation, no personal data)
     maintenance_state (one row, ADR 0038; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
@@ -818,3 +820,21 @@ class MaintenanceStateRow(Base):
     reason: Mapped[str | None] = mapped_column(String(16))
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class RoleRow(Base):
+    """A custom role (ADR 0039): a copy of a built-in template within its bounds.
+
+    ``permissions`` is space separated; a permission no longer known grants nothing. The
+    reach follows from ``template`` and never changes.
+    """
+
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    template: Mapped[str] = mapped_column(String(32))
+    name_nl: Mapped[str] = mapped_column(String(80))
+    name_en: Mapped[str] = mapped_column(String(80))
+    claim_value: Mapped[str] = mapped_column(String(128), unique=True)
+    permissions: Mapped[str] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer)
