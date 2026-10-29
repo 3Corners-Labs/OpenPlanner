@@ -86,8 +86,8 @@ class Settings(BaseSettings):
     # blocks). Class C platform (ADR 0042, settings registry).
     planner_changes_alert_per_hour: int = Field(default=50, ge=5, le=1000)
     # ADR 0044: a planner's request to choose a new time lapses this many days after the
-    # original start, with one reminder this many days before. Class D organisation until the
-    # settings registry holds them.
+    # original start, with one reminder this many days before. Class D organisation (ADR 0042,
+    # settings registry).
     planner_rebook_days: int = Field(default=14, ge=1, le=30)
     planner_rebook_reminder_days: int = Field(default=3, ge=1, le=29)
 
