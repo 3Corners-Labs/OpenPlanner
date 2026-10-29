@@ -8,11 +8,13 @@ Usage:
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
+    ``python -m app.cli version``  the release and commit this image was built from (ADR 0052)
     ``python -m app.cli client-pseudonym ADDRESS``  the pseudonym security events use for an
         IP address the security team already has (ADR 0053); there is no way back
     ``python -m app.cli settings list``  every setting with its class, source and lock (ADR 0042)
     ``python -m app.cli settings show KEY``  one setting in detail; secrets only set/not set
     ``python -m app.cli settings-doc``  print the settings reference (docs/settings.md)
+    ``python -m app.cli init [--out PATH]``  generate the bootstrap keys (secrets/secrets.env)
 
 Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
     ``python -m app.cli update-claim``  claim the waiting request: ``id action target from``
@@ -49,6 +51,12 @@ from pathlib import Path
 
 import httpx
 
+from app.adapters.bootstrap import (
+    DEFAULT_PATH,
+    InitRefusedError,
+    remaining_variables,
+    write_secrets,
+)
 from app.adapters.clock import SystemClock
 from app.adapters.db.backup import (
     backup_database,
@@ -269,6 +277,12 @@ async def _updates(settings: Settings) -> AsyncIterator[UpdateService]:
             yield update_service(local, SqlUnitOfWork(engine), SystemClock(), http)
     finally:
         await engine.dispose()
+
+
+def _version(settings: Settings) -> str:
+    """Return the release and commit this image was built from (ADR 0052)."""
+    release = settings.app_version or "none (no release)"
+    return f"version {release}\ncommit {settings.app_commit or 'unknown'}\n"
 
 
 async def _update_claim(settings: Settings) -> str:
@@ -665,6 +679,30 @@ def _closure(settings: Settings, args: argparse.Namespace) -> int:
     return _write(asyncio.run(outcome))
 
 
+def _init(out: Path) -> tuple[str, bool]:
+    """Generate the bootstrap keys into ``out``; list what the operator still sets (§9).
+
+    Needs no settings: it runs before the environment is complete. Never prints a key.
+    """
+    try:
+        write_secrets(out)
+    except InitRefusedError:
+        return (
+            f"{out} exists; nothing written. A new SETTINGS_ENCRYPTION_KEY would make every "
+            "secret stored in the database unreadable.\n",
+            False,
+        )
+    width = max(len(spec.env) for spec in remaining_variables()) + 2
+    todo = "".join(f"  {spec.env:<{width}}{spec.description}\n" for spec in remaining_variables())
+    return (
+        f"Wrote {out} (mode 0600): SETTINGS_ENCRYPTION_KEY, MANAGEMENT_TOKEN_KEY, "
+        "SESSION_SECRET.\n"
+        "Keep a copy of this file apart from the database backup.\n\n"
+        "Still to set in .env or the secret store (class A and B; docs/settings.md):\n" + todo,
+        True,
+    )
+
+
 def _settings(settings: Settings, action: str, key: str | None) -> tuple[str, int]:
     """Run ``settings list`` or ``settings show KEY``; return the report and exit code."""
     states = describe(settings, environment())
@@ -687,6 +725,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
+    commands.add_parser("version", help="print the release and commit of this image")
     commands.add_parser("update-claim", help="claim the waiting update request (host updater)")
     progress_cmd = commands.add_parser("update-progress", help="record the step an update starts")
     progress_cmd.add_argument("request_id", type=int)
@@ -727,7 +766,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     show_cmd = settings_actions.add_parser("show", help="one setting in detail")
     show_cmd.add_argument("key", help="variable name, e.g. RATE_LIMIT_BOOKINGS")
     commands.add_parser("settings-doc", help="print the settings reference as Markdown")
+    init_cmd = commands.add_parser("init", help="generate the bootstrap keys (first install)")
+    init_cmd.add_argument("--out", type=Path, default=DEFAULT_PATH, metavar="PATH")
     args = parser.parse_args(argv)
+    if args.command == "init":
+        return _write(_init(args.out))
+    if args.command == "version":
+        sys.stdout.write(_version(Settings()))
+        return 0
     if args.command == "client-pseudonym":
         pseudonym = ClientPseudonyms(client_pseudonym_key(Settings())).of(args.address)
         sys.stdout.write(f"{pseudonym}\n")

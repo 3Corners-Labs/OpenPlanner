@@ -209,6 +209,14 @@ def test_the_security_event_window_has_bounds(minutes: int) -> None:
         Settings(environment="dev", security_event_window_minutes=minutes)
 
 
+def test_the_build_commit_must_be_a_git_sha() -> None:
+    # ADR 0052: APP_COMMIT is baked in by main.yml; anything else is a broken build.
+    assert Settings(environment="dev", app_commit="ce5602a").app_commit == "ce5602a"
+    assert Settings(environment="dev").app_commit == ""
+    with pytest.raises(ValidationError):
+        Settings(environment="dev", app_commit="main; rm -rf /")
+
+
 def test_each_category_has_its_own_retention() -> None:
     # ADR 0040, part 4 (class C): admin actions 2 years (product owner, 2026-10-29).
     retention = Settings(environment="dev").event_retention

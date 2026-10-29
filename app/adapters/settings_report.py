@@ -2,7 +2,8 @@
 
 Reads the effective ``Settings`` and the process environment. Secrets are reported as ``set``
 or ``not set``, never their value. Until the portal stores values (build step 3) the source is
-``env`` or ``default``; a class C or D setting from the environment is reported as locked.
+``env``, ``file`` (``X_FILE``, ADR 0042 §9) or ``default``; a class C or D setting from the
+environment is reported as locked.
 """
 
 from collections.abc import Mapping, Sequence
@@ -22,7 +23,8 @@ class SettingState:
 
     Attributes:
         spec: The registry entry.
-        source: ``env`` when an environment variable sets it, else ``default``.
+        source: ``env`` when an environment variable sets it, ``file`` when ``X_FILE`` does,
+            else ``default``.
         locked: Whether the environment locks a portal setting (class C or D).
         shown: The value to print: ``set``/``not set`` for a secret.
         outside_bounds: Whether an environment value lies outside the portal bounds; accepted,
@@ -46,7 +48,9 @@ def _state(
     spec: SettingSpec, settings: Settings, environ: Mapping[str, str], names: set[str]
 ) -> SettingState:
     """Describe one setting."""
-    from_env = bool({spec.key, *spec.aliases} & names)
+    from_file = f"{spec.key}_file" in names
+    from_env = bool({spec.key, *spec.aliases} & names) or from_file
+    source = "file" if from_file else "env" if from_env else "default"
     value = getattr(settings, spec.key) if spec.in_config else _env_value(spec, environ)
     if spec.secret:
         shown = "set" if value is not None else "not set"
@@ -54,9 +58,7 @@ def _state(
         shown = _text(value)
     plain = None if isinstance(value, SecretStr) else _plain(value)
     outside = from_env and spec.in_portal and not spec.secret and not within_bounds(spec, plain)
-    return SettingState(
-        spec, "env" if from_env else "default", from_env and spec.lockable, shown, outside
-    )
+    return SettingState(spec, source, from_env and spec.lockable, shown, outside)
 
 
 def _env_value(spec: SettingSpec, environ: Mapping[str, str]) -> str | None:

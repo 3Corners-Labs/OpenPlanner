@@ -25,6 +25,7 @@ its own groups, branding, texts and administrators.
   the appointment. No personal data in logs, URLs, jobs or error messages.
 - **Your brand, your words, your language.** Colours, logo and fonts per organisation; every
   text editable in the admin portal; Dutch and English out of the box, more locales possible.
+  Embed the calendar on your own website as a Web Component, on the origins you allow.
 - **Admin with real roles.** Single sign-on through your own identity provider (OIDC), one
   authorisation matrix for every screen and action, and an audit log of every change.
 - **Light to run.** Two containers and one SQLite file. Signed images, SBOM, a strict CI
@@ -41,12 +42,14 @@ its own groups, branding, texts and administrators.
   integrations and roles, and follow every call in the agenda and the planner.
 - Closing a group at short notice suspends bookings and asks end users to pick a new time;
   maintenance mode shows a notice instead of the booking page.
+- A website can embed a group's calendar as a Web Component, styled through CSS tokens, on
+  the origins its organisation allows (`docs/widget.md`, ADR 0035).
 - A machine API lets a contact-center bot (such as the Webex AI Agent) offer free times
   (`docs/agent-api.md`).
 
 On the roadmap: a built-in queue or calendar invite for teams without a contact center
-(ADR 0043), an embeddable Web Component for your own website (ADR 0035), changes through the
-bot API (ADR 0023) and staff provisioning through SCIM (ADR 0046).
+(ADR 0043), changes through the bot API (ADR 0023) and staff provisioning through SCIM
+(ADR 0046).
 
 ## Quick start (demo)
 
@@ -108,7 +111,7 @@ make check
 - `docs/architecture.md` — architecture with diagrams: context, containers, layers, domain
   model, runtime flows, security, quality assurance.
 - `docs/manual/` — the admin manual, screen by screen (also shown in the portal).
-- `docs/widget.md` — styling tokens for the booking pages, and embedding (planned).
+- `docs/widget.md` — embedding the calendar on your website, and its styling tokens.
 - `docs/agent-api.md` — connecting a contact-center bot to the machine API.
 - `docs/runbook.md` — operating the service.
 - `docs/adr/` — decisions.
