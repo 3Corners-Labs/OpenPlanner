@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.engine import BEGIN_MODE_OPTION
+from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
     AuditEventRow,
     BookingEventRow,
@@ -30,6 +31,7 @@ from app.adapters.db.models import (
     ChannelSettingsRow,
     ClosureNoticeRow,
     ClosureRow,
+    DiagnosticModeRow,
     GroupContactsRow,
     GroupHolidayCalendarRow,
     GroupHolidayOpenDayRow,
@@ -61,8 +63,11 @@ from app.domain.audit import (
     AuditEntry,
     AuditEvent,
     AuditFilter,
+    Category,
+    Level,
     Outcome,
     Source,
+    at_least,
 )
 from app.domain.authorization import Scope
 from app.domain.booking import (
@@ -97,11 +102,13 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
+from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.job_plan import JobType, PlannedJob
+from app.domain.ports import EventSink
 from app.domain.scheduling import (
     Group,
     GroupSummary,
@@ -337,12 +344,15 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
     return f"channel:{organisation_id}:{channel.value}"
 
 
-class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, StaffQueries):
+class SqlTransaction(
+    ApiClientQueries, UpdateQueries, RetentionQueries, StaffQueries, MaintenanceQueries
+):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
     from ``UpdateQueries`` (ADR 0029), those of the retention overview from
-    ``RetentionQueries`` (ADR 0039).
+    ``RetentionQueries`` (ADR 0039), the staff directory from ``StaffQueries`` (ADR 0046),
+    the maintenance switch from ``MaintenanceQueries`` (ADR 0038).
 
     Args:
         session: The open session.
@@ -353,6 +363,8 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, StaffQue
         """Wrap ``session``."""
         self._session = session
         self._box = box
+        self.written_events: list[AuditEvent] = []
+        """Audit events added in this transaction, for the post-commit emit (ADR 0034)."""
 
     async def list_groups(self, scope: Scope) -> list[GroupSummary]:
         """Return the groups inside ``scope``, ordered by organisation and name."""
@@ -392,9 +404,15 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, StaffQue
                 detail=event.detail[:255],
                 source=event.source.value,
                 booking_id=event.booking_id,
+                event_id=event.event_id,
+                level=event.log_level.value,
+                category=event.event_category.value,
+                trace_id=event.trace_id[:32],
+                service=event.service[:16],
             )
         )
         await self._session.flush()
+        self.written_events.append(event)
 
     async def list_audit_events(
         self, scope: Scope, limit: int = 100, narrow: AuditFilter | None = None
@@ -416,6 +434,17 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, StaffQue
             query = query.where(AuditEventRow.booking_id == narrow.booking_id)
         if narrow.actor is not None:
             query = query.where(AuditEventRow.actor == narrow.actor)
+        if narrow.min_level is not None:
+            levels = sorted(level.value for level in at_least(narrow.min_level))
+            query = query.where(AuditEventRow.level.in_(levels))
+        if narrow.category is not None:
+            query = query.where(AuditEventRow.category == narrow.category.value)
+        if narrow.since is not None:
+            query = query.where(AuditEventRow.at >= narrow.since)
+        if narrow.until is not None:
+            query = query.where(AuditEventRow.at < narrow.until)
+        if narrow.trace_id is not None:
+            query = query.where(AuditEventRow.trace_id == narrow.trace_id)
         rows = await self._session.execute(
             query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
         )
@@ -432,20 +461,74 @@ class SqlTransaction(ApiClientQueries, UpdateQueries, RetentionQueries, StaffQue
                     detail=row.detail,
                     source=Source(row.source),
                     booking_id=row.booking_id,
+                    category=Category(row.category),
+                    level=Level(row.level),
+                    trace_id=row.trace_id,
+                    service=row.service,
+                    event_id=row.event_id,
                 ),
                 name,
             )
             for row, name in rows
         ]
 
-    async def delete_audit_events(self, source: Source, before: datetime) -> int:
-        """Delete the events of ``source`` older than ``before``; return how many."""
+    async def delete_audit_events(self, category: Category, before: datetime) -> int:
+        """Delete the events of ``category`` older than ``before``; return how many."""
         result = await self._session.execute(
             delete(AuditEventRow).where(
-                AuditEventRow.source == source.value, AuditEventRow.at < before
+                AuditEventRow.category == category.value, AuditEventRow.at < before
             )
         )
         return int(getattr(result, "rowcount", 0) or 0)
+
+    async def active_diagnostic_modes(self, now: datetime) -> list[DiagnosticMode]:
+        """Return the diagnostic modes that have not ended at ``now`` (ADR 0040)."""
+        rows = await self._session.scalars(
+            select(DiagnosticModeRow)
+            .where(DiagnosticModeRow.until > now)
+            .order_by(DiagnosticModeRow.organisation, DiagnosticModeRow.group)
+        )
+        return [
+            DiagnosticMode(row.organisation, row.group or None, row.until, row.started_by)
+            for row in rows
+        ]
+
+    async def save_diagnostic_mode(self, mode: DiagnosticMode) -> None:
+        """Start ``mode``, replacing any mode for the same target."""
+        await self._session.execute(
+            sqlite_insert(DiagnosticModeRow)
+            .values(
+                organisation=mode.organisation,
+                group=mode.group or "",
+                until=mode.until,
+                started_by=mode.started_by[:255],
+            )
+            .on_conflict_do_update(
+                index_elements=["organisation", "group"],
+                set_={"until": mode.until, "started_by": mode.started_by[:255]},
+            )
+        )
+
+    async def end_diagnostic_mode(
+        self, organisation: str, group: str | None, now: datetime
+    ) -> bool:
+        """End the mode of one target; return whether one was active."""
+        result = await self._session.execute(
+            delete(DiagnosticModeRow).where(
+                DiagnosticModeRow.organisation == organisation,
+                DiagnosticModeRow.group == (group or ""),
+                DiagnosticModeRow.until > now,
+            )
+        )
+        return bool(getattr(result, "rowcount", 0))
+
+    async def end_all_diagnostic_modes(self, now: datetime) -> int:
+        """End every active mode (and forget ended ones); return how many were active."""
+        active = await self._session.scalar(
+            select(func.count()).select_from(DiagnosticModeRow).where(DiagnosticModeRow.until > now)
+        )
+        await self._session.execute(delete(DiagnosticModeRow))
+        return int(active or 0)
 
     async def get_group(self, slug: str) -> Group | None:
         """Return the group with ``slug``."""
@@ -1447,22 +1530,31 @@ def _is_lock_timeout(exc: OperationalError) -> bool:
 class SqlUnitOfWork:
     """``UnitOfWork`` over an ``AsyncEngine``.
 
+    After a transaction commits, the audit events it wrote go to ``sink`` once (ADR 0034);
+    after a rollback they go nowhere, as the rows they describe.
+
     Args:
         engine: Engine created by ``app.adapters.db.engine.create_engine``.
         box: Seals channel secrets (ADR 0008); without it they cannot be stored or read.
+        sink: Receives committed audit events; ``None`` ships nothing (tests, the CLI).
     """
 
-    def __init__(self, engine: AsyncEngine, box: SecretBox | None = None) -> None:
-        """Store the engine and the secret box."""
+    def __init__(
+        self, engine: AsyncEngine, box: SecretBox | None = None, sink: EventSink | None = None
+    ) -> None:
+        """Store the engine, the secret box and the sink."""
         self._engine = engine
         self._box = box
+        self._sink = sink
 
     @asynccontextmanager
     async def read(self) -> AsyncIterator[SqlTransaction]:
         """Open a read transaction (deferred ``BEGIN``)."""
         async with AsyncSession(self._engine, expire_on_commit=False) as session:
             async with session.begin():
-                yield SqlTransaction(session, self._box)
+                tx = SqlTransaction(session, self._box)
+                yield tx
+        self._emit(tx)
 
     @asynccontextmanager
     async def locked(self) -> AsyncIterator[SqlTransaction]:
@@ -1472,7 +1564,14 @@ class SqlUnitOfWork:
             DomainError: ``database_busy`` if the write lock is not obtained in time.
         """
         async with locked_session(self._engine) as session:
-            yield SqlTransaction(session, self._box)
+            tx = SqlTransaction(session, self._box)
+            yield tx
+        self._emit(tx)
+
+    def _emit(self, tx: SqlTransaction) -> None:
+        """Hand the committed transaction's audit events to the sink."""
+        if self._sink is not None and tx.written_events:
+            self._sink.emit(tx.written_events)
 
 
 @asynccontextmanager

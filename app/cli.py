@@ -4,15 +4,22 @@ Usage:
     ``python -m app.cli seed-demo``     create the demo organisations and groups
     ``python -m app.cli seed-closures``  add the closure examples (e2e pages); not in production
     ``python -m app.cli authz-matrix``  print the authorisation matrix (docs/authorization.md)
+    ``python -m app.cli admin-map``  print the admin structure (docs/admin-map.md, ADR 0047)
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
+    ``python -m app.cli settings list``  every setting with its class, source and lock (ADR 0042)
+    ``python -m app.cli settings show KEY``  one setting in detail; secrets only set/not set
+    ``python -m app.cli settings-doc``  print the settings reference (docs/settings.md)
 
 Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
     ``python -m app.cli update-claim``  claim the waiting request: ``id action target from``
+    ``python -m app.cli update-progress ID STEP``  record the step it starts (ADR 0048)
     ``python -m app.cli update-report ID STATUS [REASON]``  record the outcome
     ``python -m app.cli backup-db [NAME] [--prune]``  back up the database, delete old backups
     ``python -m app.cli restore-db NAME``  put a backup back (application stopped)
+    ``python -m app.cli maintenance on|off|status [--reason R] [--by host-updater]``
+        maintenance mode of the whole installation (ADR 0038)
     ``python -m app.cli webhooks-list``  list every registration: current, stale or foreign
     ``python -m app.cli webhooks-reset [--yes] [--reregister]``  delete stale registrations
     ``python -m app.cli webhooks-health``  token expiry and a signed delivery self-test
@@ -29,7 +36,7 @@ import json
 import sys
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -56,20 +63,27 @@ from app.adapters.registrations import (
     listing_to_report,
 )
 from app.adapters.releases import update_service
+from app.adapters.settings_report import describe, format_list, format_one
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
-from app.config import Settings
+from app.config import Settings, environment
+from app.domain.admin import AdminService
 from app.domain.authorization import Scope
 from app.domain.errors import DomainError
+from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
+from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import Group
+from app.domain.settings_registry import lookup
 from app.domain.update_service import UpdateService
-from app.domain.updates import OUTCOMES
+from app.domain.updates import OUTCOMES, REPORTED_STEPS
 from app.i18n import Translator, load_catalogues
 from app.keys import management_token_key
+from app.web import navigation
 from app.web.authz_report import render_markdown
+from app.web.settings_doc import render_markdown as render_settings_doc
 
 
 async def _seed_demo(settings: Settings) -> str:
@@ -258,6 +272,19 @@ async def _update_claim(settings: Settings) -> str:
     return f"{started.id} {started.action} {started.target} {started.from_version}\n"
 
 
+async def _update_progress(settings: Settings, request_id: int, step: str) -> tuple[str, int]:
+    """Record the step a running request has reached; return the stored step and an exit code."""
+    steps = {s.value: s for s in REPORTED_STEPS}
+    if step not in steps:
+        return f"unknown step: {step}\n", 2
+    try:
+        async with _updates(settings) as updates:
+            moved = await updates.report_step(request_id, steps[step])
+    except DomainError as error:
+        return f"refused: {error}\n", 1
+    return f"{moved.step}\n", 0
+
+
 async def _update_report(
     settings: Settings, request_id: int, status: str, reason: str
 ) -> tuple[str, int]:
@@ -271,6 +298,47 @@ async def _update_report(
     except DomainError as error:
         return f"refused: {error}\n", 1
     return f"{ended.status}\n", 0
+
+
+HOST_ACTORS = ("host-cli", "host-updater")
+"""Who a maintenance switch from the host is audited as; a fixed list, never free text."""
+
+
+def _maintenance_line(status: MaintenanceStatus) -> str:
+    """Return ``on``/``off`` with the source and the stored details, for scripts and people."""
+    state = status.state
+    if not status.active:
+        return "off\n"
+    parts = ["on"]
+    if status.environment:
+        parts.append("environment")
+    if state.on:
+        since = state.since.isoformat() if state.since else "?"
+        parts += [f"since={since}", f"by={state.by}"]
+        if state.reason:
+            parts.append(f"reason={state.reason}")
+    return " ".join(parts) + "\n"
+
+
+async def _maintenance(settings: Settings, action: str, reason: str, actor: str) -> str:
+    """Switch maintenance on or off, or report it; return the resulting state as one line."""
+    engine = create_engine(settings.database_url)
+    try:
+        uow, clock = SqlUnitOfWork(engine), SystemClock()
+        service = MaintenanceService(
+            uow,
+            clock,
+            AdminService(uow, clock),
+            environment=settings.maintenance_mode,
+            cache=timedelta(0),
+        )
+        if action == "on":
+            await service.switch_on_host(actor, MaintenanceReason(reason))
+        elif action == "off":
+            await service.switch_off_host(actor)
+        return _maintenance_line(await service.stored())
+    finally:
+        await engine.dispose()
 
 
 def _backup_dir(settings: Settings) -> tuple[Path, Path]:
@@ -427,6 +495,17 @@ def _token_expiry(health: TokenHealth) -> list[CheckResult]:
     ]
 
 
+def _settings(settings: Settings, action: str, key: str | None) -> tuple[str, int]:
+    """Run ``settings list`` or ``settings show KEY``; return the report and exit code."""
+    states = describe(settings, environment())
+    if action == "list":
+        return format_list(states), 0
+    spec = lookup(key or "")
+    if spec is None:
+        return "Unknown setting; `settings list` shows every variable.\n", 2
+    return format_one(next(s for s in states if s.spec is spec)), 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse the command line and run the chosen command; return the exit code."""
     parser = argparse.ArgumentParser(prog="python -m app.cli")
@@ -434,10 +513,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("seed-demo", help="create the demo organisations and groups")
     commands.add_parser("seed-closures", help="add the closure examples (not in production)")
     commands.add_parser("authz-matrix", help="print the authorisation matrix as Markdown")
+    commands.add_parser("admin-map", help="print the admin structure as Markdown")
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
     commands.add_parser("update-claim", help="claim the waiting update request (host updater)")
+    progress_cmd = commands.add_parser("update-progress", help="record the step an update starts")
+    progress_cmd.add_argument("request_id", type=int)
+    progress_cmd.add_argument("step", choices=sorted(s.value for s in REPORTED_STEPS))
     report_cmd = commands.add_parser("update-report", help="record an update's outcome")
     report_cmd.add_argument("request_id", type=int)
     report_cmd.add_argument("status", choices=sorted(s.value for s in OUTCOMES))
@@ -447,6 +530,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     backup_cmd.add_argument("--prune", action="store_true", help="delete backups older than 24 h")
     restore_cmd = commands.add_parser("restore-db", help="put a backup back (app stopped)")
     restore_cmd.add_argument("name")
+    maintenance_cmd = commands.add_parser(
+        "maintenance", help="maintenance mode of the whole installation (ADR 0038)"
+    )
+    maintenance_cmd.add_argument("action", choices=("on", "off", "status"))
+    maintenance_cmd.add_argument(
+        "--reason", choices=sorted(r.value for r in MaintenanceReason), default="other"
+    )
+    maintenance_cmd.add_argument("--by", choices=HOST_ACTORS, default=HOST_ACTORS[0])
     commands.add_parser("webhooks-list", help="list registrations: current, stale or foreign")
     reset = commands.add_parser("webhooks-reset", help="delete stale registrations (dry run)")
     reset.add_argument("--yes", action="store_true", help="really delete them")
@@ -454,10 +545,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--reregister", action="store_true", help="with --yes: run register-webhooks afterwards"
     )
     commands.add_parser("webhooks-health", help="token expiry and a signed delivery self-test")
+    settings_cmd = commands.add_parser("settings", help="show settings and their source")
+    settings_actions = settings_cmd.add_subparsers(dest="action", required=True)
+    settings_actions.add_parser("list", help="every setting: class, source, lock, value")
+    show_cmd = settings_actions.add_parser("show", help="one setting in detail")
+    show_cmd.add_argument("key", help="variable name, e.g. RATE_LIMIT_BOOKINGS")
+    commands.add_parser("settings-doc", help="print the settings reference as Markdown")
     args = parser.parse_args(argv)
+    if args.command == "settings":
+        text, code = _settings(Settings(), args.action, getattr(args, "key", None))
+        sys.stdout.write(text)
+        return code
+    if args.command == "settings-doc":
+        sys.stdout.write(render_settings_doc())
+        return 0
     if args.command == "update-claim":
         sys.stdout.write(asyncio.run(_update_claim(Settings())))
         return 0
+    if args.command == "update-progress":
+        text, code = asyncio.run(_update_progress(Settings(), args.request_id, args.step))
+        sys.stdout.write(text)
+        return code
     if args.command == "update-report":
         text, code = asyncio.run(
             _update_report(Settings(), args.request_id, args.status, args.reason)
@@ -469,6 +577,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "restore-db":
         sys.stdout.write(_restore(Settings(), args.name))
+        return 0
+    if args.command == "maintenance":
+        sys.stdout.write(asyncio.run(_maintenance(Settings(), args.action, args.reason, args.by)))
         return 0
     if args.command == "webhooks-list":
         return _write(asyncio.run(_webhooks_list(Settings())))
@@ -482,6 +593,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _write(asyncio.run(_seed_closures(Settings())))
     if args.command == "authz-matrix":
         sys.stdout.write(render_markdown(Translator(load_catalogues())))
+        return 0
+    if args.command == "admin-map":
+        sys.stdout.write(navigation.render_markdown(Translator(load_catalogues())))
         return 0
     if args.command == "wxcc-check":
         report, passed = asyncio.run(_wxcc_check(Settings()))

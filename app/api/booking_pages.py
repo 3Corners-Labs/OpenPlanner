@@ -25,6 +25,7 @@ from app.api.citizen import citizen_page
 from app.api.contact_form import HONEYPOT_FIELD, contact_fields, read_contact
 from app.api.labels import slot_label
 from app.api.slot_picker import parse_filter, picker, slot_value
+from app.api.trace import bind_group_from_path
 from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError
@@ -44,7 +45,7 @@ from app.web.protection import (
 )
 from app.web.slot_values import parse_start
 
-router = APIRouter(include_in_schema=False)
+router = APIRouter(include_in_schema=False, dependencies=[Depends(bind_group_from_path)])
 
 STATUS_NOTICES: dict[str, str] = {
     "booked": "manage.notice.booked",

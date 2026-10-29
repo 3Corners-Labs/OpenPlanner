@@ -5,6 +5,9 @@
 The check reads Webex and WxCC and sends signed test events to our own webhook endpoints; it
 changes nothing at the platforms. The latest result is shown on the group's settings page
 (``check_view``). Platforms can be slow, so the button is limited per address.
+
+It writes nothing but its own report, so it is the one ``maintenance_safe`` route: during
+maintenance the superuser can still check a repaired integration (ADR 0038).
 """
 
 from dataclasses import dataclass
@@ -31,7 +34,11 @@ router = APIRouter(prefix="/admin", include_in_schema=False)
 
 Edit = Annotated[
     AdminContext,
-    Depends(RequirePermission(Permission.GROUP_EDIT, group_param="slug", fresh=True)),
+    Depends(
+        RequirePermission(
+            Permission.GROUP_EDIT, group_param="slug", fresh=True, maintenance_safe=True
+        )
+    ),
 ]
 
 
