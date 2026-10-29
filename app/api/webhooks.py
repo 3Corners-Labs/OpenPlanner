@@ -18,8 +18,10 @@ from fastapi import APIRouter, Request
 from starlette.responses import Response
 
 from app.adapters.webhooks import parse_webex, parse_wxcc, verify_webex, verify_wxcc
+from app.domain.audit import Outcome
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock
+from app.domain.security_log import INVALID_SIGNATURE, WEBHOOK_REJECTED, SecurityLog
 from app.web.protection import limiter
 
 router = APIRouter(prefix="/webhooks", include_in_schema=False)
@@ -50,6 +52,21 @@ def _service(request: Request) -> IntegrationService:
     return service
 
 
+async def _record_rejection(request: Request, source: str) -> None:
+    """Record a rejected webhook as a deduplicated security event (ADR 0034, AU-4).
+
+    Only the source is recorded, never anything from the request. A failure here is logged;
+    the caller still gets its 401.
+    """
+    security: SecurityLog = request.app.state.security_log
+    try:
+        await security.record(
+            WEBHOOK_REJECTED, Outcome.DENIED, reason=INVALID_SIGNATURE, detail=f"source:{source}"
+        )
+    except Exception as exc:  # the rejection itself must not turn into a 500
+        log.warning("security_log.failed", error=type(exc).__name__)
+
+
 @router.post("/webex")
 @limiter.limit(WEBHOOK_LIMIT)
 async def webex(request: Request) -> Response:
@@ -62,6 +79,7 @@ async def webex(request: Request) -> Response:
         return Response(status_code=413)
     if not verify_webex(body, request.headers.get("x-spark-signature"), secret.get_secret_value()):
         log.warning("webhook.rejected", source="webex")
+        await _record_rejection(request, "webex")
         return Response(status_code=401)
     payload = _json_object(body)
     if payload is None:
@@ -95,6 +113,7 @@ async def wxcc(request: Request) -> Response:
         clock.now(),
     ):
         log.warning("webhook.rejected", source="wxcc")
+        await _record_rejection(request, "wxcc")
         return Response(status_code=401)
     payload = _json_object(body)
     if payload is None:  # pragma: no cover - verify_wxcc already requires an object

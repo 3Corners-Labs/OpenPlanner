@@ -1,11 +1,12 @@
 """The audit log page (ADR 0031): exact per level, system events, filters, reasons."""
 
+import json
 from datetime import timedelta
 
 import pytest
 
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Level, Outcome, Source
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Level, Outcome, Source
 from app.domain.authorization import Scope
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
@@ -195,3 +196,51 @@ async def test_a_storage_event_explains_itself_to_the_superuser_only(site: Site)
     assert "Er is weinig schijfruimte over voor de gegevens." in text
     assert "12% vrij, database 340 MB" in text
     assert "free_space_low" not in hidden
+
+
+async def test_a_security_event_explains_itself_to_the_superuser_only(site: Site) -> None:
+    # ADR 0034, AU-4: rejected webhooks are global, with the number held back.
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        await tx.add_audit_event(
+            AuditEvent(
+                NOW,
+                SYSTEM_ACTOR,
+                "webhook.rejected",
+                Outcome.DENIED,
+                "invalid_signature",
+                detail="source:wxcc,suppressed:41",
+                source=Source.SYSTEM,
+                category=Category.SECURITY,
+            )
+        )
+
+    await site.login_as(SUPER)
+    text = (await site.client.get("/admin/audit")).text
+    await site.login_as(ORG_ADMIN)
+    hidden = (await site.client.get("/admin/audit")).text
+
+    assert "Webhook geweigerd" in text
+    assert "Handtekening of tijdstempel klopt niet." in text
+    assert "van Webex Contact Center, nog 41 keer sinds de vorige melding" in text
+    assert "invalid_signature" not in hidden
+
+
+async def test_an_admin_action_is_shipped_once_as_an_audit_line(
+    site: Site, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # ADR 0034, AU-1: after commit, one JSON line per event with log_type audit, subject only.
+    capsys.readouterr()
+    await site.login_as(GROUP_ADMIN)
+    await site.client.get("/admin/groups/andere-team")
+
+    lines = [
+        json.loads(line) for line in capsys.readouterr().out.splitlines() if line.startswith("{")
+    ]
+    shipped = [line for line in lines if line.get("log_type") == "audit"]
+    denied = [line for line in shipped if line["outcome"] == "denied"]
+    assert len(denied) == 1
+    assert denied[0]["schema"] == "openplanner.event/1"
+    assert denied[0]["service.name"] == "web"
+    assert denied[0]["actor"] == GROUP_ADMIN.subject
+    assert len({line["event_id"] for line in shipped}) == len(shipped)
