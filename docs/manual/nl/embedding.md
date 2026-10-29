@@ -39,3 +39,15 @@ Elke wijziging komt in de auditlog, met het aantal toegevoegde en verwijderde we
 
 Onder de lijst ziet u per groep van de organisatie of die in de widget verschijnt. De naam
 van de groep linkt naar haar instellingen, waar u **Insluiten op websites** aan- of uitzet.
+
+## Code voor uw website
+
+Onderaan staat de code die de webredactie in een pagina plakt: één regel met het script en
+per groep die aan staat een element `<gov-booking>`. Het script hoeft maar één keer op een
+pagina te staan, ook als u meer groepen toont.
+
+Het script heeft een `integrity`-waarde. Daarmee controleert de browser dat het script niet
+is veranderd. Na elke update van OpenPlanner verandert die waarde: neemt de webredactie de
+code met `integrity` over, dan moet ze de nieuwe waarde na een update overnemen, anders laadt
+de kalender niet meer. Wilt u dat niet, laat `integrity="…"` dan weg. De technische uitleg
+voor de webredactie staat in `docs/widget.md`.

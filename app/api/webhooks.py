@@ -18,11 +18,11 @@ from fastapi import APIRouter, Request
 from starlette.responses import Response
 
 from app.adapters.webhooks import parse_webex, parse_wxcc, verify_webex, verify_wxcc
-from app.domain.audit import Outcome
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock
-from app.domain.security_log import INVALID_SIGNATURE, WEBHOOK_REJECTED, SecurityLog
+from app.domain.security_log import INVALID_SIGNATURE, WEBHOOK_REJECTED
 from app.web.protection import limiter
+from app.web.security_events import report
 
 router = APIRouter(prefix="/webhooks", include_in_schema=False)
 log = structlog.get_logger()
@@ -53,18 +53,12 @@ def _service(request: Request) -> IntegrationService:
 
 
 async def _record_rejection(request: Request, source: str) -> None:
-    """Record a rejected webhook as a deduplicated security event (ADR 0034, AU-4).
+    """Record a rejected webhook as a deduplicated security event (ADR 0034 AU-4, ADR 0053).
 
-    Only the source is recorded, never anything from the request. A failure here is logged;
-    the caller still gets its 401.
+    Only the source and the caller's pseudonym are recorded, never anything from the request.
+    A failure there is logged; the caller still gets its 401.
     """
-    security: SecurityLog = request.app.state.security_log
-    try:
-        await security.record(
-            WEBHOOK_REJECTED, Outcome.DENIED, reason=INVALID_SIGNATURE, detail=f"source:{source}"
-        )
-    except Exception as exc:  # the rejection itself must not turn into a 500
-        log.warning("security_log.failed", error=type(exc).__name__)
+    await report(request, WEBHOOK_REJECTED, INVALID_SIGNATURE, detail=f"source:{source}")
 
 
 @router.post("/webex")

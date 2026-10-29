@@ -96,6 +96,12 @@ stripped before the file is stored, so only the picture itself is kept. Served f
 origin and only while its closure is visible; never mailed, never sent to a third party.
 Organisation data; no purge job.
 
+**Closure scenarios (ADR 0037 §4, CL-4).** Prepared closure content per organisation or team
+(`closure_scenarios`): an admin-facing name, notices and headings, optionally a contact block
+and an image (`closure_images`, stripped as above). Admin-only until a closure starts from it;
+then the closure gets its own copy, so deleting or editing the scenario never changes what
+citizens were told. Organisation data; no personal data of citizens; no purge job.
+
 **Allowed origins for embedding (ADR 0035).** The websites on which an organisation's groups
 may appear as a widget (`organisation_origins`, such as `https://www.gemeente.nl`), entered by
 an organisation admin, and a switch per group (`groups.embedding_enabled`). Organisation data,
@@ -121,6 +127,7 @@ web ──SQL──> staff, staff_memberships (sub, display name, roles, organis
 | Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
 | System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
 | Audit events on the log platform (ADR 0034) | one JSON line per audit, system and security event on stdout, shipped by the host to the organisation's log platform (SIEM) | web, worker | the organisation's log policy | no citizen data; **admin subjects** (personal data of employees): the log platform is a recipient |
+| Caller pseudonym in security events (ADR 0053) | `audit_events.detail` as `client:<16 hex>`, and on the log platform | web (from the request's IP address; the address itself is never stored) | as the security event (`SECURITY_EVENT_RETENTION_DAYS`; the organisation's log policy on the platform) | pseudonymised personal data of the caller: HMAC-SHA256 under a key derived from `MANAGEMENT_TOKEN_KEY`, IPv6 by /64; only reversible by trying a known address on the host (`python -m app.cli client-pseudonym`) |
 | Audit log export (ADR 0040) | CSV download of the audit log in the admin's scope: ids, codes, admin subjects | web → admin's browser | the organisation's policy; every export is an audit event | no citizen data; admin subjects |
 | Diagnostic mode (ADR 0040) | `diagnostic_modes`: organisation and group slug, end time, superuser's subject; debug events in `audit_events` (category `diagnostic`: job type, attempt, duration) | web (superuser), worker | mode: until it ends; debug events `DIAGNOSTIC_EVENT_RETENTION_DAYS` (7) | no |
 | Event schema fields (ADR 0040) | `audit_events.event_id`, `level`, `category`, `trace_id`, `service`; the same trace id on stdout | web, worker | as the event they belong to | no: random ids and codes |

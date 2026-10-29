@@ -37,6 +37,20 @@ the installation. Security events (`event.category = security`): `webhook.reject
 per kind per window, with `suppressed:<n>` for the ones held back. Shipping is described in
 `docs/runbook.md`.
 
+ADR 0053 adds the attempts on public entry points, all with outcome `denied` and a caller
+pseudonym `client:<16 hex>` in `detail` (also on `webhook.rejected`); the window then counts
+per kind and caller:
+
+| `event.action` | `reason` | `detail` |
+|---|---|---|
+| `request.rate_limited` | `too_many_requests` | `surface:web` or `surface:agent`, `client:…` |
+| `request.rejected` | `honeypot`, `cross_site`, `origin_mismatch` | `client:…` |
+| `admin.login` (actor `anonymous`) | the identity error code, e.g. `invalid_state`, `invalid_token`, `nonce_mismatch` | `client:…` |
+| `token.rejected` | `unknown_token` (machine API), `unknown_management_link` (`/b/…`) | `client:…` |
+
+The pseudonym is an HMAC of the IP address (IPv6 by /64), never the address; `unknown` when
+there is none, `many` once `SECURITY_EVENT_MAX_SOURCES` callers are tracked.
+
 ## What never appears
 
 No personal data of citizens (name, email, phone, note, join links) and no admin display

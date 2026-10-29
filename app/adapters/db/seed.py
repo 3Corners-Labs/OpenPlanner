@@ -5,6 +5,11 @@ role can be tested against an organisation and group that are *not* theirs (ADR 
 An empty holiday calendar ``nationaal`` is ready for the superuser to fill (ADR 0025); no
 organisation has chosen it, so it changes no opening hours.
 
+The demo group is switched on for embedding and the demo organisation allows
+``DEMO_WIDGET_HOST`` (ADR 0035): the end-to-end host page (``e2e/host/``) runs there. A
+localhost origin is refused in the admin portal of a production installation; seed-demo is
+for development and CI only.
+
 ``seed_closure_examples`` adds what the closure pages need (ADR 0037): a team that is closed
 now (with an image, CL-3), a team with a planned closure (without one) and a booking on hold.
 Development and test only; the e2e pages of CL-2 are these.
@@ -24,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.adapters.db.models import (
     GroupRow,
     HolidayCalendarRow,
+    OrganisationOriginRow,
     OrganisationRow,
     ReminderRuleRow,
     ScheduleRuleRow,
@@ -43,6 +49,7 @@ OTHER_GROUP_SLUG = "andere-team"
 DEMO_WINDOWS = ((time(9), time(12)), (time(13), time(17)))
 DEMO_CAPACITY = 2
 DEMO_CALENDAR_SLUG = "nationaal"
+DEMO_WIDGET_HOST = "http://localhost:8001"
 CLOSED_GROUP_SLUG = "demo-gesloten"
 PLANNED_GROUP_SLUG = "demo-gepland"
 EXAMPLE_NOTICES = {
@@ -94,7 +101,9 @@ class ClosureExamples:
 
 async def seed_demo(engine: AsyncEngine) -> bool:
     """Create the demo organisations and groups; return ``False`` if they already exist."""
-    created = await _seed_group(engine, DEMO_SLUG, "Demo-gemeente", DEMO_SLUG, "Demo: videogesprek")
+    created = await _seed_group(
+        engine, DEMO_SLUG, "Demo-gemeente", DEMO_SLUG, "Demo: videogesprek", embed=True
+    )
     await _seed_group(
         engine, OTHER_ORGANISATION_SLUG, "Andere gemeente", OTHER_GROUP_SLUG, "Andere: team"
     )
@@ -225,9 +234,19 @@ async def _suspended_booking(
 
 
 async def _seed_group(
-    engine: AsyncEngine, organisation_slug: str, organisation_name: str, slug: str, name: str
+    engine: AsyncEngine,
+    organisation_slug: str,
+    organisation_name: str,
+    slug: str,
+    name: str,
+    *,
+    embed: bool = False,
 ) -> bool:
-    """Create a group open on weekdays, and its organisation if needed; skip if the group exists."""
+    """Create a group open on weekdays, and its organisation if needed; skip if the group exists.
+
+    With ``embed`` the group is switched on for the widget and the organisation allows
+    ``DEMO_WIDGET_HOST`` (ADR 0035).
+    """
     async with AsyncSession(engine) as session, session.begin():
         existing = await session.scalar(select(GroupRow.id).where(GroupRow.slug == slug))
         if existing is not None:
@@ -250,8 +269,15 @@ async def _seed_group(
             horizon_days=60,
             phone_mode="optional",
             dispatch_lead_minutes=5,
+            embedding_enabled=embed,
         )
         session.add(group)
+        if embed:
+            session.add(
+                OrganisationOriginRow(
+                    organisation_id=organisation_id, origin=DEMO_WIDGET_HOST, position=0
+                )
+            )
         await session.flush()
         for weekday in range(5):
             for opens, closes in DEMO_WINDOWS:

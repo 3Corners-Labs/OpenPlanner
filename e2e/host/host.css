@@ -1,0 +1,18 @@
+/* A host's house style: only --booking-* tokens and ::part() reach the widget (docs/widget.md). */
+body {
+  margin: 0 auto;
+  max-width: 60rem;
+  padding: 1rem;
+  font-family: Georgia, serif;
+}
+
+gov-booking {
+  --booking-color-accent: #8a1538;
+  --booking-color-on-accent: #ffffff;
+  --booking-radius: 2px;
+  --booking-radius-small: 2px;
+}
+
+gov-booking::part(heading) {
+  letter-spacing: 0.01em;
+}

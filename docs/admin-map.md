@@ -22,7 +22,7 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 | Branding | `/admin/branding` | `branding.manage` | `/admin/organisations/{org}/branding` |
 | Embedding | `/admin/embedding` | `embedding.manage` | `/admin/organisations/{org}/embedding` |
 | Holidays | `/admin/holidays` | `holidays.assign` | `/admin/holidays/{calendar}`, `/admin/organisations/{org}/holidays` |
-| Emergency closure | `/admin/closures` | `organisation.closure` | `/admin/organisations/{org}/closure` |
+| Emergency closure | `/admin/closures` | `organisation.closure` | `/admin/organisations/{org}/closure`, `/admin/organisations/{org}/closure/scenarios`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts` |
 | Staff | `/admin/staff` | `staff.view` | `/admin/staff/{member_id}` |
 | My rights | `/admin/rights` | `rights.view` | – |
 | Rights matrix | `/admin/matrix` | `matrix.view` | `/admin/roles`, `/admin/roles/new`, `/admin/roles/{role_id}` |
@@ -58,4 +58,4 @@ Side navigation: *Overview*.
 | Reminders | `/admin/groups/{slug}/reminders` | `reminders.manage` | – |
 | Message texts | `/admin/groups/{slug}/messages` | `texts.manage` | `/admin/groups/{slug}/messages/{text_locale}` |
 | Agenda | `/admin/groups/{slug}/agenda` | `bookings.view` | `/admin/groups/{slug}/bookings/{booking_id}`, `/admin/groups/{slug}/agenda/week`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/move`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/rebook`, `/admin/groups/{slug}/agenda/slot-rebook`, `/admin/groups/{slug}/agenda/waiting` |
-| Emergency closure | `/admin/groups/{slug}/closure` | `closure.manage` | `/admin/groups/{slug}/closure/bookings/{booking_id}/move`, `/admin/groups/{slug}/closure/contacts` |
+| Emergency closure | `/admin/groups/{slug}/closure` | `closure.manage` | `/admin/groups/{slug}/closure/bookings/{booking_id}/move`, `/admin/groups/{slug}/closure/contacts`, `/admin/groups/{slug}/closure/scenarios`, `/admin/groups/{slug}/closure/scenarios/{scenario_id}`, `/admin/groups/{slug}/closure/scenarios/{scenario_id}/contacts` |
