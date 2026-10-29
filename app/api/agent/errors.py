@@ -17,6 +17,8 @@ from starlette.responses import JSONResponse, Response
 
 from app.domain.api_clients import ApiAuthError
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.security_log import RATE_LIMITED, TOO_MANY_REQUESTS
+from app.web.security_events import report
 
 log = structlog.get_logger()
 
@@ -114,6 +116,7 @@ def register_errors(app: FastAPI) -> None:
         return problem(code, status)
 
     async def rate_limited(request: Request, exc: Exception) -> Response:
+        await report(request, RATE_LIMITED, TOO_MANY_REQUESTS, detail="surface:agent")
         return problem("rate_limited", 429, {"retry-after": "60"})
 
     handlers: dict[type[Exception], Callable[[Request, Exception], object]] = {
