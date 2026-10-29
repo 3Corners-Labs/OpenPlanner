@@ -118,6 +118,19 @@ class MeetingRef:
     link: str | None = field(default=None, repr=False)
 
 
+class ChangeReason(StrEnum):
+    """Why a planner cancelled a booking or asked to rebook it (ADR 0044).
+
+    A fixed list, never free text, so no personal data reaches a message through a planner's
+    typing. Each reason is an i18n text block ``message.reason.<value>`` with organisation
+    overrides.
+    """
+
+    STAFFING = "staffing"
+    TECHNICAL = "technical"
+    UNFORESEEN = "unforeseen"
+
+
 class BookingStatus(StrEnum):
     """Lifecycle of a booking."""
 
@@ -178,6 +191,7 @@ class Booking:
     wxcc_task_id: str | None = None
     kind: BookingKind = BookingKind.SCHEDULED
     closure_id: int | None = None
+    change_reason: ChangeReason | None = None
 
     @property
     def reference(self) -> str:
@@ -203,15 +217,15 @@ class Booking:
         """
         return self.status in HOLDS_PLACE
 
-    def cancel(self, now: datetime) -> "Booking":
-        """Return the cancelled booking.
+    def cancel(self, now: datetime, reason: ChangeReason | None = None) -> "Booking":
+        """Return the cancelled booking; ``reason`` when a planner cancelled it (ADR 0044).
 
         Raises:
             DomainError: ``booking_not_active`` if it is neither confirmed nor suspended.
         """
         if not self.holds_place:
             raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
-        return replace(self, status=BookingStatus.CANCELLED, cancelled_at=now)
+        return replace(self, status=BookingStatus.CANCELLED, cancelled_at=now, change_reason=reason)
 
     def suspend(self, closure_id: int) -> "Booking":
         """Return the booking put on hold by closure ``closure_id``.

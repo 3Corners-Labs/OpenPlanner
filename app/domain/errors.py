@@ -44,6 +44,12 @@ class ErrorCode(StrEnum):
     UPDATE_NOT_AVAILABLE = "update_not_available"
     UPDATE_IN_PROGRESS = "update_in_progress"
     UPDATE_REQUEST_NOT_FOUND = "update_request_not_found"
+    PLANNER_TOO_LATE = "planner_too_late"
+    MOVE_CAUSES_SHORTFALL = "move_causes_shortfall"
+    ROLE_NOT_FOUND = "role_not_found"
+    ROLE_INVALID = "role_invalid"
+    ROLE_CHANGED = "role_changed"
+    CLAIM_VALUE_TAKEN = "claim_value_taken"
     MAINTENANCE = "maintenance"
     MAINTENANCE_FROM_ENVIRONMENT = "maintenance_from_environment"
 

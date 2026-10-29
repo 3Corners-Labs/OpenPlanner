@@ -1,0 +1,59 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
+{% block title %}{{ _("admin.roles.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="page-header__lead"><a href="/admin/matrix">{{ _("admin.matrix.title") }}</a></p>
+    <h1>{{ _("admin.roles.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.roles.lead") }}</p>
+  </div>
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+<form class="card" method="get" action="/admin/roles/new" aria-labelledby="copy-heading">
+  <div class="card__header">
+    <h2 id="copy-heading">{{ _("admin.roles.copy") }}</h2>
+    <p class="card__lead">{{ _("admin.roles.copy_lead") }}</p>
+  </div>
+  <div class="field">
+    <label for="template">{{ _("admin.roles.template") }}</label>
+    <select id="template" name="template" aria-describedby="template-hint">
+      {% for value, label in templates %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+    </select>
+    <p class="hint" id="template-hint">{{ _("admin.roles.template_hint") }}</p>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ icon("plus") }}<span>{{ _("admin.roles.new") }}</span></button>
+  </div>
+</form>
+<section class="card" aria-labelledby="roles-heading">
+  <div class="card__header">
+    <h2 id="roles-heading">{{ _("admin.roles.custom") }}</h2>
+  </div>
+  {% if roles %}
+  <div class="table-scroll" role="region" aria-labelledby="roles-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.roles.custom") }}</caption>
+    <thead><tr>
+      <th scope="col">{{ _("admin.roles.name") }}</th>
+      <th scope="col">{{ _("admin.roles.template") }}</th>
+      <th scope="col">{{ _("admin.roles.claim_value") }}</th>
+      <th scope="col">{{ _("admin.roles.version") }}</th>
+    </tr></thead>
+    <tbody>
+      {% for row in roles %}
+      <tr>
+        <th scope="row"><a href="/admin/roles/{{ row.role.id }}">{{ row.name }}</a></th>
+        <td>{{ row.template }}</td>
+        <td><code>{{ row.role.claim_value }}</code></td>
+        <td>{{ row.role.version }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.roles.none") }}</p>
+  {% endif %}
+</section>
+{% endblock %}
