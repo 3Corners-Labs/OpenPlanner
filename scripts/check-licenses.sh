@@ -9,6 +9,7 @@ IGNORED="certifi"  # MPL-2.0, ADR 0003
 venv="$(mktemp -d)/venv"
 trap 'rm -rf "$(dirname "$venv")"' EXIT
 
+# not a pin: Python 3.12 is the stack (CLAUDE.md); a newer minor needs an ADR.
 uv venv -q --python 3.12 "$venv"
 uv export --frozen --no-dev --no-emit-project --format requirements-txt \
   | uv pip install -q --python "$venv/bin/python" -r /dev/stdin

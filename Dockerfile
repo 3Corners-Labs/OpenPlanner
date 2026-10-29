@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # Base images are pinned by tag; Renovate pins and updates their digests.
 
-FROM ghcr.io/astral-sh/uv:0.13.0 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
 
 FROM python:3.12-slim-bookworm AS build
 COPY --from=uv /uv /usr/local/bin/uv

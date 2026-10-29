@@ -3,12 +3,17 @@
 ## Setup
 
 - [uv](https://docs.astral.sh/uv/) 0.13+, which installs Python 3.12 for you.
+- Node.js, the LTS version in `NODE_VERSION` of `.github/workflows/ci.yml` (jscpd, e2e tooling,
+  Renovate config check).
 - Docker (for `docker compose up` and the container checks).
 
 ```sh
-uv sync            # creates .venv with runtime + dev dependencies from uv.lock
-cp .env.example .env
+make setup         # uv sync --locked, e2e npm ci, .env from .env.example, pre-push hook
 ```
+
+`make setup` points git at `.githooks/`; its `pre-push` hook runs the pin check of ADR 0051, so
+a version Renovate cannot update is caught before CI. Every tool `make check` needs is pinned
+and tracked by Renovate (shellcheck comes from PyPI through `uvx`, no Docker needed).
 
 ## Running
 
@@ -25,9 +30,14 @@ import-linter, pytest with coverage (≥ 90% on `app/domain/`, ≥ 75% overall),
 pip-audit and `uv lock --check`.
 
 `make check` also runs the copy-paste detector (`make duplication`, jscpd; needs Node) and
-shellcheck on `scripts/` (`make shellcheck`; a local `shellcheck`, otherwise its Docker image).
+shellcheck on `scripts/` and `.githooks/` (`make shellcheck`; the pinned `shellcheck-py` through `uvx`).
 The host updater script is tested by `tests/scripts/test_updater.py` against fake `docker`,
 `cosign`, `curl` and `flock` executables (`tests/fakes/updater_host.py`).
+
+`make check` also runs `make pins` (ADR 0051): every action is pinned as `<sha> # vX.Y.Z`,
+and any other version in a workflow, the Makefile, a shell script (the host installer and updater
+among them) or a git hook has a `# renovate: datasource=… depName=…` line above it, or, for a
+minimum version that must not follow the latest release, `# not a pin: <reason>`, so Renovate keeps it current. CI additionally fails on any deprecation warning.
 
 Further targets: `make migrations` (Alembic up/down/up on a fresh database), `make licenses`
 (runtime dependency licenses against the allow-list), `make semgrep` (repo rules self-test
