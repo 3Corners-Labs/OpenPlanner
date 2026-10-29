@@ -9,13 +9,43 @@ without a known booking is global and only the superuser sees it.
                                         ─► AuditEvent(source=system) at that level
 
 System events carry codes only (job type, error code, attempt, channel): no personal data, no
-message text, no addresses. They are pruned after a retention period; admin actions are kept.
+message text, no addresses. Every category of event is pruned after its own retention period
+(ADR 0040, part 4): diagnostic 7 days, system 90 days, security 1 year, admin actions 2 years
+by default, each a setting.
 """
 
+from dataclasses import dataclass
 from datetime import timedelta
 
-from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
+from app.domain.event_context import bind_level
 from app.domain.ports import Clock, Transaction, UnitOfWork
+
+
+@dataclass(frozen=True)
+class EventRetention:
+    """How long each category of event is kept (ADR 0040, part 4).
+
+    Attributes:
+        audit: Admin actions (``AUDIT_RETENTION_DAYS``; product owner, 2026-10-29).
+        system: System events (``SYSTEM_EVENT_RETENTION_DAYS``).
+        security: Security events (``SECURITY_EVENT_RETENTION_DAYS``).
+        diagnostic: Debug events (``DIAGNOSTIC_EVENT_RETENTION_DAYS``).
+    """
+
+    audit: timedelta = timedelta(days=730)
+    system: timedelta = timedelta(days=90)
+    security: timedelta = timedelta(days=365)
+    diagnostic: timedelta = timedelta(days=7)
+
+    def of(self, category: Category) -> timedelta:
+        """Return the retention period of ``category``."""
+        return {
+            Category.AUDIT: self.audit,
+            Category.SYSTEM: self.system,
+            Category.SECURITY: self.security,
+            Category.DIAGNOSTIC: self.diagnostic,
+        }[category]
 
 
 class SystemLog:
@@ -66,10 +96,19 @@ class SystemLog:
                 )
             )
 
-    async def prune(self, retention: timedelta) -> int:
-        """Delete system events older than ``retention``; return how many were removed."""
+    async def bind_level(self, booking_id: int | None) -> None:
+        """Tag the current trace with the organisation and group of ``booking_id`` (ADR 0040)."""
+        async with self._uow.read() as tx:
+            bind_level(*await _level(tx, booking_id))
+
+    async def prune(self, retention: EventRetention) -> int:
+        """Delete every event older than its category's retention; return how many."""
+        now = self._clock.now()
         async with self._uow.locked() as tx:
-            return await tx.delete_audit_events(Source.SYSTEM, self._clock.now() - retention)
+            removed = 0
+            for category in Category:
+                removed += await tx.delete_audit_events(category, now - retention.of(category))
+            return removed
 
 
 async def _level(tx: Transaction, booking_id: int | None) -> tuple[str | None, str | None]:

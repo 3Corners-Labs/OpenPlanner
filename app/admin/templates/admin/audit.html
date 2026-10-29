@@ -8,16 +8,61 @@
     <p class="page-header__lead">{{ _("admin.audit.intro") }}</p>
   </div>
 </div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if diagnostics %}
+<section class="card" id="diagnostics" aria-labelledby="diagnostics-heading">
+  <h2 id="diagnostics-heading">{{ _("admin.audit.diagnostics.title") }}</h2>
+  <p>{{ _("admin.audit.diagnostics.intro") }}</p>
+  {% if diagnostics.active %}
+  <ul>
+    {% for label, value, until in diagnostics.active %}
+    <li>{{ _("admin.audit.diagnostics.active", target=label, until=until) }}
+      <form class="inline-form" method="post" action="/admin/audit/diagnostics/off">
+        <input type="hidden" name="target" value="{{ value }}">
+        <button type="submit" class="button button--secondary">{{ _("admin.audit.diagnostics.off") }}</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">{{ _("admin.audit.diagnostics.none") }}</p>
+  {% endif %}
+  <form method="post" action="/admin/audit/diagnostics">
+    <div class="inline-forms">
+      <div class="field">
+        <label for="diagnostics-target">{{ _("admin.audit.diagnostics.target") }}</label>
+        <select id="diagnostics-target" name="target">
+          {% for option in diagnostics.targets %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="button">{{ _("admin.audit.diagnostics.on") }}</button>
+    </div>
+  </form>
+</section>
+{% endif %}
 <form class="card" method="get" action="/admin/audit" aria-labelledby="filter-heading">
   <h2 id="filter-heading" class="visually-hidden">{{ _("admin.audit.filter") }}</h2>
   <div class="inline-forms">
-    {{ filter_select("audit-source", "source", _("admin.audit.source"), filters.sources, filters.source) }}
+    {{ filter_select("audit-level", "level", _("admin.audit.level"), filters.levels, filters.level) }}
+    {{ filter_select("audit-category", "category", _("admin.audit.category"), filters.categories, filters.category) }}
     {% if filters.groups | length > 1 %}
     {{ filter_select("audit-group", "group", _("admin.audit.group"), filters.groups, filters.group) }}
     {% endif %}
     <div class="field">
       <label for="audit-booking">{{ _("admin.audit.booking") }}</label>
       <input type="text" id="audit-booking" name="booking" inputmode="numeric" pattern="[0-9]*" maxlength="12" value="{{ filters.booking }}">
+    </div>
+    <div class="field">
+      <label for="audit-from">{{ _("admin.audit.from") }}</label>
+      <input type="date" id="audit-from" name="from" value="{{ filters.date_from }}">
+    </div>
+    <div class="field">
+      <label for="audit-to">{{ _("admin.audit.to") }}</label>
+      <input type="date" id="audit-to" name="to" value="{{ filters.date_to }}">
+    </div>
+    <div class="field">
+      <label for="audit-trace">{{ _("admin.audit.trace") }}</label>
+      <input type="text" id="audit-trace" name="trace" maxlength="32" pattern="[0-9a-f]{32}" spellcheck="false" autocomplete="off" value="{{ filters.trace }}">
     </div>
     <div class="choice__option">
       <input type="checkbox" id="audit-problems" name="problems" value="1"{% if filters.problems %} checked{% endif %}>
@@ -26,7 +71,9 @@
     <button type="submit" class="button button--secondary">{{ _("admin.audit.apply") }}</button>
     {% if filters.active %}<a href="/admin/audit">{{ _("admin.audit.clear") }}</a>{% endif %}
   </div>
+  {% if can("audit.export") %}<p><a href="/admin/audit/export.csv{% if filters.query %}?{{ filters.query }}{% endif %}" download>{{ _("admin.audit.export") }}</a></p>{% endif %}
 </form>
+{% if export_error %}<p class="error-message" role="alert">{{ export_error }}</p>{% endif %}
 {% if events %}
 {% set caption = _("admin.audit.title") %}{% include "admin/_audit_table.html" %}
 {% else %}

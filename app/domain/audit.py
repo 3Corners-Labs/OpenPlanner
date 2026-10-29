@@ -11,9 +11,11 @@ An event sits at exactly one level: global (no organisation), an organisation (n
 a group. The audit log shows each admin the levels of their own scope and nothing above it.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+
+from app.domain.event_context import current_service, current_trace_id, new_id
 
 
 class Outcome(StrEnum):
@@ -43,6 +45,48 @@ SYSTEM_ACTOR = "system"
 """Actor recorded for system events."""
 
 
+class Category(StrEnum):
+    """What kind of event it is, for filtering, retention and the log platform (ADR 0040)."""
+
+    AUDIT = "audit"
+    """An admin action: login, denial, change."""
+    SYSTEM = "system"
+    """What the platform did on its own: jobs, storage checks."""
+    SECURITY = "security"
+    """A rejected webhook or a failing credential."""
+    DIAGNOSTIC = "diagnostic"
+    """Debug detail, only while diagnostic mode is on."""
+
+
+class Level(StrEnum):
+    """Log level, the syslog levels Python has (ADR 0040)."""
+
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
+LEVEL_ORDER: tuple[Level, ...] = tuple(Level)
+"""Levels from least to most severe."""
+
+
+def at_least(level: Level) -> frozenset[Level]:
+    """Return ``level`` and every more severe level."""
+    return frozenset(LEVEL_ORDER[LEVEL_ORDER.index(level) :])
+
+
+LEVEL_BY_OUTCOME: dict[Outcome, Level] = {
+    Outcome.SUCCESS: Level.INFO,
+    Outcome.SKIPPED: Level.INFO,
+    Outcome.RETRY: Level.WARNING,
+    Outcome.DENIED: Level.WARNING,
+    Outcome.FAILURE: Level.ERROR,
+}
+"""The level of an audit or system event follows from its outcome."""
+
+
 @dataclass(frozen=True)
 class AuditEvent:
     """One audited action.
@@ -59,6 +103,11 @@ class AuditEvent:
             values, so no personal data.
         source: Admin action or system event.
         booking_id: The booking a system event is about, if any (an id, not personal data).
+        category: Kind of event; ``None`` follows the source (admin: audit, system: system).
+        level: Log level; ``None`` follows the outcome (``LEVEL_BY_OUTCOME``).
+        trace_id: The request or job that caused it; taken from the current context.
+        service: ``web`` or ``worker``; taken from the current context.
+        event_id: Unique id, so a copy on the log platform can be matched to the table.
     """
 
     at: datetime
@@ -71,6 +120,28 @@ class AuditEvent:
     detail: str = ""
     source: Source = Source.ADMIN
     booking_id: int | None = None
+    category: Category | None = None
+    level: Level | None = None
+    trace_id: str = field(default_factory=current_trace_id, compare=False)
+    service: str = field(default_factory=current_service, compare=False)
+    event_id: str = field(default_factory=new_id, compare=False)
+
+    def __post_init__(self) -> None:
+        """Fill in the derived category and level, so a stored event equals the one read back."""
+        object.__setattr__(self, "category", self.event_category)
+        object.__setattr__(self, "level", self.log_level)
+
+    @property
+    def event_category(self) -> Category:
+        """The category, derived from the source when not set."""
+        if self.category is not None:
+            return self.category
+        return Category.AUDIT if self.source is Source.ADMIN else Category.SYSTEM
+
+    @property
+    def log_level(self) -> Level:
+        """The level, derived from the outcome when not set."""
+        return self.level if self.level is not None else LEVEL_BY_OUTCOME[self.outcome]
 
 
 @dataclass(frozen=True)
@@ -83,6 +154,11 @@ class AuditFilter:
         group: Only events of this group (slug).
         booking_id: Only events about this booking.
         actor: Only events of this actor (subject); the staff detail page (ADR 0046).
+        min_level: Only events of this level or more severe (ADR 0040).
+        category: Only events of this category (ADR 0040).
+        since: Only events at or after this time (UTC).
+        until: Only events before this time (UTC).
+        trace_id: Only the events of this request or job: the whole chain (ADR 0040).
     """
 
     source: Source | None = None
@@ -90,6 +166,11 @@ class AuditFilter:
     group: str | None = None
     booking_id: int | None = None
     actor: str | None = None
+    min_level: Level | None = None
+    category: Category | None = None
+    since: datetime | None = None
+    until: datetime | None = None
+    trace_id: str | None = None
 
     def matches(self, event: AuditEvent) -> bool:
         """Return whether ``event`` passes the filter (the SQL adapter applies the same rules)."""
@@ -99,6 +180,11 @@ class AuditFilter:
             and (self.group is None or event.group == self.group)
             and (self.booking_id is None or event.booking_id == self.booking_id)
             and (self.actor is None or event.actor == self.actor)
+            and (self.min_level is None or event.log_level in at_least(self.min_level))
+            and (self.category is None or event.event_category is self.category)
+            and (self.since is None or event.at >= self.since)
+            and (self.until is None or event.at < self.until)
+            and (self.trace_id is None or event.trace_id == self.trace_id)
         )
 
 
