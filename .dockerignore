@@ -5,4 +5,8 @@
 !app/
 !migrations/
 !docs/manual/
+# The widget sources for the esbuild stage (ADR 0035); node_modules and dist stay out.
+!widget/package.json
+!widget/package-lock.json
+!widget/src/
 **/__pycache__

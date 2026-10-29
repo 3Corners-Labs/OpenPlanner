@@ -288,7 +288,10 @@ class Settings(BaseSettings):
     # Updates from the admin portal (ADR 0029). APP_VERSION is baked into release images by
     # main.yml; UPDATE_REPOSITORY (owner/name) switches the hourly release check on. The token
     # is only needed for a private repository and needs read access to its contents only.
+    # APP_COMMIT (class B, build: baked into every image by main.yml, ADR 0052) is the git
+    # commit the image was built from; empty for a local build.
     app_version: str = ""
+    app_commit: str = Field(default="", pattern=r"^([0-9a-f]{7,40})?$")
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
 

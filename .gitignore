@@ -24,3 +24,7 @@ mutants/
 
 # Local gstack reports (security audits stay on the machine)
 .gstack/
+
+# The widget bundle is built by esbuild in CI and in the image (ADR 0035).
+widget/node_modules/
+widget/dist/

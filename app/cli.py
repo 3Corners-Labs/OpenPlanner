@@ -8,6 +8,7 @@ Usage:
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
+    ``python -m app.cli version``  the release and commit this image was built from (ADR 0052)
     ``python -m app.cli client-pseudonym ADDRESS``  the pseudonym security events use for an
         IP address the security team already has (ADR 0053); there is no way back
     ``python -m app.cli settings list``  every setting with its class, source and lock (ADR 0042)
@@ -276,6 +277,12 @@ async def _updates(settings: Settings) -> AsyncIterator[UpdateService]:
             yield update_service(local, SqlUnitOfWork(engine), SystemClock(), http)
     finally:
         await engine.dispose()
+
+
+def _version(settings: Settings) -> str:
+    """Return the release and commit this image was built from (ADR 0052)."""
+    release = settings.app_version or "none (no release)"
+    return f"version {release}\ncommit {settings.app_commit or 'unknown'}\n"
 
 
 async def _update_claim(settings: Settings) -> str:
@@ -718,6 +725,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
+    commands.add_parser("version", help="print the release and commit of this image")
     commands.add_parser("update-claim", help="claim the waiting update request (host updater)")
     progress_cmd = commands.add_parser("update-progress", help="record the step an update starts")
     progress_cmd.add_argument("request_id", type=int)
@@ -763,6 +771,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "init":
         return _write(_init(args.out))
+    if args.command == "version":
+        sys.stdout.write(_version(Settings()))
+        return 0
     if args.command == "client-pseudonym":
         pseudonym = ClientPseudonyms(client_pseudonym_key(Settings())).of(args.address)
         sys.stdout.write(f"{pseudonym}\n")

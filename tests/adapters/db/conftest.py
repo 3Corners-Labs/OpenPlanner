@@ -5,10 +5,12 @@ from datetime import time
 from pathlib import Path
 
 import pytest
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import (
+    ClosureImageRow,
     GroupRow,
     OrganisationRow,
     ReminderRuleRow,
@@ -80,3 +82,10 @@ async def seed_group(
 async def close_day(engine: AsyncEngine, group_id: int, day: object) -> None:
     async with AsyncSession(engine) as session, session.begin():
         session.add(ScheduleOverrideRow(group_id=group_id, day=day))
+
+
+async def count_images(engine: AsyncEngine) -> int:
+    """Return how many image rows there are (closure and scenario images, ADR 0037)."""
+    async with engine.connect() as connection:
+        result = await connection.execute(select(func.count()).select_from(ClosureImageRow))
+        return int(result.scalar_one())

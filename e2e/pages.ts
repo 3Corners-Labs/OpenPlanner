@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'node:fs';
 export interface PageUnderTest {
   /** Human-readable name, used in test titles. */
   name: string;
-  /** Path relative to BASE_URL, e.g. "/g/aangifte-2025", or a "{fixture}" placeholder. */
+  /** Path relative to BASE_URL, e.g. "/g/aangifte-2025", a "{fixture}" placeholder, or an absolute URL (the widget host page). */
   path: string;
   /** Locales the page must pass in; each is requested with ?lang=<locale>. */
   locales: string[];

@@ -1,7 +1,8 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_fields.html" import field with context %}
-{% from "admin/_closure_forms.html" import start_form, lift_form with context %}
+{% from "admin/_closure_forms.html" import scenario_picker, start_form, lift_form with context %}
 {% from "_contact_block.html" import contact_block %}
+{% from "admin/_image_form.html" import image_form with context %}
 {% block title %}{{ _("admin.tab.closure") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
@@ -39,34 +40,11 @@
     <button type="submit" class="button">{{ _("admin.closure.update_button") }}</button>
   </div>
 </form>
-<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/image" enctype="multipart/form-data" novalidate aria-labelledby="image-heading">
-  <div class="card__header">
-    <h2 id="image-heading">{{ _("admin.closure.image") }}</h2>
-    <p class="card__lead">{{ _("admin.closure.image_lead") }}</p>
-  </div>
-  {% if closure.image %}
-  <p>{{ _("admin.closure.image_current") }}</p>
-  <img class="closure-image" src="{{ closure.image.src }}" alt="{{ closure.image.alt }}">
-  {% endif %}
-  <div class="form-grid">
-    {% for f in image_fields %}{{ field(f) }}{% endfor %}
-  </div>
-  <div class="choice__option">
-    <input type="checkbox" id="decorative" name="decorative" value="yes"{% if image_decorative %} checked{% endif %}>
-    <label for="decorative">{{ _("admin.closure.image_decorative") }}</label>
-  </div>
-  <div class="form-actions">
-    <button type="submit" class="button">{{ _("admin.closure.image_save") }}</button>
-  </div>
-</form>
-{% if closure.image %}
-<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/closure/image/remove" aria-label="{{ _("admin.closure.image_remove") }}">
-  <button type="submit" class="button button--secondary">{{ _("admin.closure.image_remove") }}</button>
-</form>
-{% endif %}
+{{ image_form("/admin/groups/" ~ summary.group.slug ~ "/closure/image", closure.image, image_fields, image_decorative, _("admin.closure.image_lead")) }}
 {{ lift_form("/admin/groups/" ~ summary.group.slug ~ "/closure/lift", _("admin.closure.lift"), _("admin.closure.lift_button")) }}
 {% else %}
-{{ start_form("/admin/groups/" ~ summary.group.slug ~ "/closure", _("admin.closure.start"), _("admin.closure.start_lead", count=confirmed_ahead), _("admin.closure.start_button"), fields) }}
+{{ scenario_picker("/admin/groups/" ~ summary.group.slug ~ "/closure", scenarios) }}
+{{ start_form("/admin/groups/" ~ summary.group.slug ~ "/closure", _("admin.closure.start"), _("admin.closure.start_lead", count=confirmed_ahead), _("admin.closure.start_button"), fields, scenarios.chosen) }}
 {% endif %}
 <section class="card" aria-labelledby="contacts-heading">
   <div class="card__header">
