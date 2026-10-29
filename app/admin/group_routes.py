@@ -48,6 +48,7 @@ from app.admin.forms import (
     redirect_done,
 )
 from app.admin.pages import Locale, NavView, SameOrigin, current_home, page, with_manual
+from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
 from app.domain.errors import DomainError, ErrorCode
@@ -427,6 +428,7 @@ async def group(
             "week": _week(schedule, locale),
             "exceptions": _exceptions(schedule, locale),
             "preview": _preview(preview, summary, locale),
+            "shortfalls": await group_shortfalls(request, locale, context),
         },
     )
 
@@ -511,6 +513,15 @@ def _settings_fields(
             current.direct_call_max_concurrent,
             {"min": "1", "max": str(MAX_DIRECT_CALLS)},
         ),
+        Field(
+            "embedding_enabled",
+            _("admin.field.embedding_enabled"),
+            "select",
+            value("embedding_enabled", "yes" if current.embedding_enabled else "no"),
+            hint=_("admin.field.embedding_enabled_hint"),
+            error=form.error_for("embedding_enabled"),
+            options=yes_no,
+        ),
     ]
     return planning, integrations
 
@@ -567,7 +578,8 @@ async def save_settings(
     cap = form.optional_integer("direct_call_max_concurrent")
     phone = form.choice("phone_mode", {mode.value for mode in PhoneMode})
     direct = form.choice("direct_call_enabled", {"yes", "no"})
-    if not form.errors and phone is not None and direct is not None:
+    embedding = form.choice("embedding_enabled", {"yes", "no"})
+    if not form.errors and phone is not None and direct is not None and embedding is not None:
         new = GroupSettings(
             name=form.text("name"),
             timezone=form.text("timezone"),
@@ -578,6 +590,7 @@ async def save_settings(
             wxcc_routing_value=form.optional_text("wxcc_routing_value"),
             direct_call_enabled=direct == "yes",
             direct_call_max_concurrent=cap,
+            embedding_enabled=embedding == "yes",
             **{name: value for name, value in numbers.items() if value is not None},
         )
         try:
@@ -721,6 +734,7 @@ async def _hours_response(
             "week": _week(schedule, locale),
             "fields": _hours_fields(form, locale),
             "errors": form.errors,
+            "shortfalls": await group_shortfalls(request, locale, context),
         },
         status,
     )
@@ -986,6 +1000,7 @@ async def _exceptions_response(
             "kind": form.text("kind") or "closed",
             "kind_error": form.error_for("kind"),
             "errors": form.errors,
+            "shortfalls": await group_shortfalls(request, locale, context),
         },
         status,
     )

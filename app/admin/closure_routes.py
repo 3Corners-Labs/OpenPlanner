@@ -22,7 +22,8 @@ authorises again, validates and audits.
 
 The closing and update forms also take an optional heading per locale; the closure copies the
 contact block that applies to the group (ADR 0037 §2), edited on its own page
-(``contact_routes``) and shown here as a preview with a count.
+(``contact_routes``) and shown here as a preview with a count. The image of a running closure
+(ADR 0037 §3) has its own form on this page, posted to ``closure_image_routes``.
 """
 
 from collections.abc import Sequence
@@ -44,7 +45,7 @@ from app.admin.forms import (
     slot_options,
 )
 from app.admin.group_routes import group_page
-from app.admin.pages import Locale, SameOrigin, page
+from app.admin.pages import Locale, SameOrigin, page, with_manual
 from app.domain.authorization import Permission
 from app.domain.booking import Booking
 from app.domain.closure import (
@@ -57,6 +58,7 @@ from app.domain.closure import (
 )
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.errors import DomainError
+from app.domain.images import ALT_LOCALES, IMAGE_TYPES, MAX_ALT_LENGTH, MAX_IMAGE_BYTES, alt_field
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
@@ -216,6 +218,52 @@ def _closure_fields(
     return fields
 
 
+ALT_LABELS: dict[str, str] = {
+    "nl": "admin.closure.image_alt_nl",
+    "en": "admin.closure.image_alt_en",
+}
+"""Label key of the image's text alternative per locale (literal for the catalogue test)."""
+
+
+def _image_fields(form: FormData, locale: RequestLocale, current: Closure | None) -> list[Field]:
+    """Return the inputs of the image form: the file and the text alternative per locale."""
+    _ = locale.gettext
+    image = current.image if current else None
+    fields = [
+        Field(
+            "image",
+            _("admin.closure.image_file"),
+            "file",
+            hint=_("admin.closure.image_hint", kb=MAX_IMAGE_BYTES // 1000),
+            error=form.error_for("image"),
+            required=image is None,
+            attributes={"accept": ",".join(IMAGE_TYPES)},
+        )
+    ]
+    for code in ALT_LOCALES:
+        name = alt_field(code)
+        stored = image.text.alts.get(code, "") if image else ""
+        fields.append(
+            Field(
+                name,
+                _(ALT_LABELS[code]),
+                value=form.values.get(name, stored),
+                hint=_("admin.closure.image_alt_hint"),
+                error=form.error_for(name),
+                required=False,
+                attributes={"maxlength": str(MAX_ALT_LENGTH)},
+            )
+        )
+    return fields
+
+
+def _decorative(form: FormData, current: Closure | None) -> bool:
+    """Return whether the "decorative" box is ticked: as submitted, else as stored."""
+    if form.values:
+        return form.checked("decorative")
+    return bool(current and current.image and current.image.text.decorative)
+
+
 def _notices(form: FormData) -> dict[str, str]:
     """Return the submitted notice per required locale."""
     return {code: form.values.get(notice_field(code), "") for code in NOTICE_LOCALES}
@@ -239,7 +287,7 @@ def _closure_input(form: FormData, group: Group) -> ClosureInput:
 # --- one group ------------------------------------------------------------------------------
 
 
-async def _group_response(
+async def closure_page_response(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
@@ -266,6 +314,10 @@ async def _group_response(
             "suspended": _suspended(overview.suspended, group, locale.code),
             "confirmed_ahead": overview.confirmed_ahead,
             "closure_contacts": banner.contacts if banner else None,
+            "image_fields": with_manual(
+                request, locale, _image_fields(form, locale, overview.closure)
+            ),
+            "image_decorative": _decorative(form, overview.closure),
             "own_contacts": contacts.block is not None,
             "contact_count": len(applies.options) if applies else 0,
             "errors": form.errors,
@@ -281,7 +333,7 @@ async def _refused(
     raise_refusal(error)
     form = FormData({}, locale.gettext)
     form.refusal(error)
-    return await _group_response(request, locale, context, form, status_for(error))
+    return await closure_page_response(request, locale, context, form, status_for(error))
 
 
 @router.get("/groups/{slug}/closure", response_class=HTMLResponse)
@@ -289,7 +341,7 @@ async def closure_page(
     request: Request, locale: Locale, slug: str, context: ManageClosure
 ) -> HTMLResponse:
     """Show the group's closure, the bookings on hold and the forms."""
-    return await _group_response(request, locale, context, FormData({}, locale.gettext))
+    return await closure_page_response(request, locale, context, FormData({}, locale.gettext))
 
 
 @router.post("/groups/{slug}/closure", response_class=HTMLResponse)
@@ -307,7 +359,7 @@ async def start_closure(
             form.refusal(error)
         else:
             return redirect_done(_url(slug), "closure_started", count)
-    return await _group_response(request, locale, context, form, 422)
+    return await closure_page_response(request, locale, context, form, 422)
 
 
 @router.post("/groups/{slug}/closure/update", response_class=HTMLResponse)
@@ -333,7 +385,7 @@ async def update_closure(
             form.refusal(error)
         else:
             return redirect_done(_url(slug), "closure_updated", outcome.notified)
-    return await _group_response(request, locale, context, form, 422)
+    return await closure_page_response(request, locale, context, form, 422)
 
 
 @router.post("/groups/{slug}/closure/lift", response_class=HTMLResponse)

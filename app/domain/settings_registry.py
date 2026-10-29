@@ -72,6 +72,7 @@ class Topic(StrEnum):
     UPDATES = "updates"
     DISPLAY = "display"
     STAFF = "staff"
+    PLANNER = "planner"
 
 
 PLATFORM_VIEW = "settings.platform.view"
@@ -597,6 +598,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=3660,
     ),
     S(
+        "embedding_max_origins",
+        K.INT,
+        20,
+        _C,
+        T.OPERATIONS,
+        "Most host websites one organisation may allow for the embedded widget (ADR 0035).",
+        minimum=1,
+        maximum=100,
+    ),
+    S(
         "storage_low_free_percent",
         K.FLOAT,
         15.0,
@@ -878,6 +889,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Days without a login after which a person is marked dormant in the staff list (ADR 0046).",
         minimum=14,
         maximum=365,
+    ),
+    S(
+        "shortfall_horizon_days",
+        K.INT,
+        14,
+        _D,
+        T.PLANNER,
+        "Days ahead the shortfall notice on group pages and the dashboard looks (ADR 0044).",
+        minimum=1,
+        maximum=60,
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

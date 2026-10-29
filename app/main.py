@@ -36,6 +36,7 @@ from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings
 from app.domain.admin import AdminService
+from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
 from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
@@ -45,6 +46,7 @@ from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
+from app.domain.embedding_service import EmbeddingService
 from app.domain.event_context import set_service
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
@@ -54,6 +56,7 @@ from app.domain.messaging_service import MessagingService
 from app.domain.organisations import OrganisationService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
+from app.domain.roles import RoleService
 from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.simulation import SimulationService
@@ -158,7 +161,17 @@ def create_app(
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
+        app.state.embedding_service = EmbeddingService(
+            uow,
+            clock,
+            app.state.admin_service,
+            max_origins=settings.embedding_max_origins,
+            allow_local=settings.environment != "prod",
+        )
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
+        app.state.agenda_service = AgendaService(
+            uow, clock, app.state.admin_service, settings.shortfall_horizon_days
+        )
         app.state.diagnostics_service = DiagnosticsService(
             uow, clock, app.state.admin_service, timedelta(hours=settings.diagnostic_mode_hours)
         )
@@ -175,6 +188,17 @@ def create_app(
         )
         app.state.closure_service = ClosureService(
             uow, clock, app.state.admin_service, app.state.booking_service
+        )
+        app.state.role_service = RoleService(
+            uow,
+            clock,
+            app.state.admin_service,
+            (
+                settings.oidc_role_superuser,
+                settings.oidc_role_org_admin,
+                settings.oidc_role_group_admin,
+                settings.oidc_role_auditor,
+            ),
         )
         app.state.api_access = ApiAccessService(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled

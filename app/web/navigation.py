@@ -135,6 +135,14 @@ SECTIONS = (
                 ("/admin/organisations/{org}/branding",),
             ),
             Screen(
+                "manage.embedding",
+                "admin.nav.embedding",
+                "/admin/embedding",
+                Permission.EMBEDDING_MANAGE,
+                "code",
+                ("/admin/organisations/{org}/embedding",),
+            ),
+            Screen(
                 "manage.holidays",
                 "admin.nav.holidays",
                 "/admin/holidays",
@@ -171,6 +179,8 @@ SECTIONS = (
                 "/admin/matrix",
                 Permission.MATRIX_VIEW,
                 "matrix",
+                # The role editor opens from the matrix (ADR 0039 step 3).
+                ("/admin/roles", "/admin/roles/new", "/admin/roles/{role_id}"),
             ),
         ),
     ),
@@ -287,7 +297,7 @@ OBJECTS = (
                 f"{_GROUP}/agenda",
                 Permission.BOOKINGS_VIEW,
                 "agenda",
-                (f"{_GROUP}/bookings/{{booking_id}}",),
+                (f"{_GROUP}/bookings/{{booking_id}}", f"{_GROUP}/agenda/week"),
             ),
             Screen(
                 "group.closure",

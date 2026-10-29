@@ -1364,6 +1364,21 @@ fieldset.card {
   padding: 0.25rem 0;
 }
 
+/* Agenda (ADR 0044): a header row per slot; a shortfall also has text and an icon. */
+.admin .agenda-slot > th {
+  background: var(--adm-surface-muted);
+  font-weight: 600;
+}
+
+.admin .agenda-slot > th > * + * {
+  margin-left: 0.75rem;
+}
+
+.admin .agenda-slot--short > th,
+.admin .agenda-week__short {
+  background: var(--adm-danger-soft);
+}
+
 .timeline {
   margin: 0;
   padding: 0 0 0 1.25rem;

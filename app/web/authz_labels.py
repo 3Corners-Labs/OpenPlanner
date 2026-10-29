@@ -30,6 +30,7 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.DIAGNOSTICS_MANAGE: "authz.permission.diagnostics_manage",
     Permission.RETENTION_VIEW: "authz.permission.retention_view",
     Permission.STAFF_VIEW: "authz.permission.staff_view",
+    Permission.EMBEDDING_MANAGE: "authz.permission.embedding_manage",
     Permission.INTEGRATIONS_MANAGE: "authz.permission.integrations_manage",
     Permission.BRANDING_MANAGE: "authz.permission.branding_manage",
     Permission.HOLIDAYS_MANAGE: "authz.permission.holidays_manage",
@@ -45,6 +46,7 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.ORGANISATION_CLOSURE: "authz.permission.organisation_closure",
     Permission.API_CLIENTS_MANAGE: "authz.permission.api_clients_manage",
     Permission.SYSTEM_UPDATE: "authz.permission.system_update",
+    Permission.ROLES_MANAGE: "authz.permission.roles_manage",
     Permission.SYSTEM_MAINTENANCE: "authz.permission.system_maintenance",
 }
 
