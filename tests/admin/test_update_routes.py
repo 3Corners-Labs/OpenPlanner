@@ -84,6 +84,29 @@ async def test_page_says_when_nobody_checks_for_releases(site: Site) -> None:
     assert NOT_CHECKING in (await site.client.get("/admin/updates")).text
 
 
+COMMIT = "ce5602a8f4e1b2c3d4e5f60718293a4b5c6d7e8f"
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [{"app_commit": COMMIT, "update_repository": "acme/openplanner"}],
+    indirect=True,
+)
+async def test_page_names_the_commit_the_image_was_built_from(site: Site) -> None:
+    # ADR 0052: version and commit together say which fixes run here.
+    await site.login_as(SUPER)
+    page = (await site.client.get("/admin/updates")).text
+    assert "<code>ce5602a8f4e1</code>" in page
+    assert f'href="https://github.com/acme/openplanner/commit/{COMMIT}"' in page
+
+
+async def test_page_says_when_the_commit_is_unknown(site: Site) -> None:
+    await site.login_as(SUPER)
+    page = (await site.client.get("/admin/updates")).text
+    assert "Commit" in page
+    assert "/commit/" not in page
+
+
 async def test_snooze_never_redirects_off_the_portal(site: Site) -> None:
     await site.login_as(SUPER)
     snoozed = await site.client.post(
