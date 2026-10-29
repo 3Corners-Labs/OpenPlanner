@@ -20,7 +20,7 @@ from pydantic_settings import (
 )
 
 from app.domain.event_schema import Envelope
-from app.domain.settings_registry import REGISTRY, SettingClass
+from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
 from app.domain.system_log import EventRetention
 from app.i18n.dates import ClockStyle
 
@@ -214,6 +214,10 @@ class Settings(BaseSettings):
     # settings registry).
     planner_rebook_days: int = Field(default=14, ge=1, le=30)
     planner_rebook_reminder_days: int = Field(default=3, ge=1, le=29)
+    # ADR 0055: custom fields per group's booking form at most (class C platform), and the
+    # country of phone numbers typed without a country code (class D organisation).
+    booking_form_max_custom_fields: int = Field(default=5, ge=0, le=15)
+    phone_default_region: str = Field(default="NL", pattern=r"^[A-Z]{2}$")
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
@@ -478,6 +482,14 @@ class Settings(BaseSettings):
             not _REPOSITORY.fullmatch(value) or {".", ".."} & set(value.split("/"))
         ):
             raise ValueError("UPDATE_REPOSITORY must be owner/name")
+        return value
+
+    @field_validator("phone_default_region")
+    @classmethod
+    def _known_phone_region(cls, value: str) -> str:
+        """Accept only a region the phone number library knows (ADR 0055)."""
+        if value not in PHONE_REGIONS:
+            raise ValueError("PHONE_DEFAULT_REGION must be a known ISO 3166-1 region")
         return value
 
     @field_validator("log_level", mode="before")

@@ -11,7 +11,8 @@ NOW = datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
 
 def contact(**overrides: object) -> Contact:
     fields: dict[str, object] = {
-        "name": "Ada Lovelace",
+        "first_name": "Ada",
+        "last_name": "Lovelace",
         "email": "ada@example.org",
         "phone": None,
         "phone_mode": PhoneMode.OPTIONAL,
@@ -21,12 +22,18 @@ def contact(**overrides: object) -> Contact:
 
 
 def test_contact_is_normalised() -> None:
-    c = contact(name="  Ada   Lovelace ", email=" ada@Example.org ", phone="06-1234 5678")
+    c = contact(
+        first_name="  Ada  Augusta ",
+        last_name=" Lovelace ",
+        email=" ada@Example.org ",
+        phone="06-1234 5678",
+    )
 
-    assert c.name == "Ada Lovelace"
+    assert c.name == "Ada Augusta Lovelace"
     assert c.email == "ada@Example.org"
-    assert c.phone == "0612345678"
-    assert c.first_name == "Ada"
+    assert c.phone == "+31612345678"
+    assert c.first_name == "Ada Augusta"
+    assert c.last_name == "Lovelace"
 
 
 @pytest.mark.parametrize(
@@ -34,20 +41,27 @@ def test_contact_is_normalised() -> None:
     [
         ("+31 6 12345678", "+31612345678"),
         ("0031 6 1234 5678", "+31612345678"),
-        ("(020) 123.45.67", "0201234567"),
+        ("(020) 123.45.67", "+31201234567"),
+        ("+32 470 12 34 56", "+32470123456"),
     ],
 )
-def test_phone_numbers_are_normalised(phone: str, expected: str) -> None:
+def test_phone_numbers_are_stored_in_e164(phone: str, expected: str) -> None:
     assert contact(phone=phone).phone == expected
+
+
+def test_the_organisation_region_reads_numbers_without_a_country_code() -> None:
+    assert contact(phone="0470 12 34 56", region="BE").phone == "+32470123456"
 
 
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("name", ""),
-        ("name", "   "),
-        ("name", "x" * 101),
-        ("name", "Ada\x00"),
+        ("first_name", ""),
+        ("first_name", "   "),
+        ("first_name", "x" * 101),
+        ("first_name", "Ada\x00"),
+        ("last_name", ""),
+        ("last_name", "x" * 101),
         ("email", "no-at-sign"),
         ("email", "two@@example.org"),
         ("email", "@example.org"),
@@ -72,7 +86,7 @@ def test_invalid_contact_names_the_field_only(field: str, value: str) -> None:
 def test_longest_allowed_values_pass() -> None:
     longest_email = "a" * 242 + "@example.org"  # 254 characters
 
-    c = contact(name="x" * 100, email=longest_email)
+    c = contact(first_name="x" * 100, last_name="y" * 100, email=longest_email)
 
     assert c.email == longest_email
 

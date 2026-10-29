@@ -69,7 +69,8 @@ ERROR_KEYS: dict[ErrorCode, str] = {
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {
-    "name": "error.field.name",
+    "first_name": "error.field.first_name",
+    "last_name": "error.field.last_name",
     "email": "error.field.email",
     "phone": "error.field.phone",
 }

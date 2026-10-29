@@ -31,6 +31,7 @@ from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
+from app.domain.form_fields import Answers, FormDefinition, raise_to_pii
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import PlannedJob
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
@@ -95,6 +96,7 @@ class State:
     platform_expiries: dict[str, datetime] = field(default_factory=dict)
     organisation_settings: dict[int, dict[str, object]] = field(default_factory=dict)
     purged_at: dict[int, datetime] = field(default_factory=dict)
+    forms: dict[int, FormDefinition] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
     next_id: int = 1
 
@@ -200,6 +202,26 @@ class InMemoryTransaction:
 
     async def get_group_by_id(self, group_id: int) -> Group | None:
         return self.state.groups.get(group_id)
+
+    async def get_form(self, group_id: int) -> FormDefinition:
+        return self.state.forms.get(group_id, FormDefinition(1))
+
+    async def save_form(self, group_id: int, form: FormDefinition) -> None:
+        self.state.forms[group_id] = form
+
+    async def raise_answers_to_pii(self, group_id: int, key: str) -> int:
+        changed = 0
+        for booking_id, booking in self.state.bookings.items():
+            contact = booking.contact
+            if booking.group_id != group_id or contact is None or contact.answers is None:
+                continue
+            stored = raise_to_pii(contact.answers.to_storage(), key)
+            answers = Answers.from_storage(stored)
+            self.state.bookings[booking_id] = replace(
+                booking, contact=replace(contact, answers=answers)
+            )
+            changed += 1
+        return changed
 
     async def get_schedule(
         self, group_id: int, first_day: date, last_day: date

@@ -33,6 +33,7 @@ from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
+from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, answers_json
 from app.adapters.db.images import ImageQueries, page_image
 from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
@@ -272,8 +273,14 @@ def _group_columns(group: Group) -> dict[str, Any]:
 def _booking(row: BookingRow, slot: SlotRow) -> Booking:
     """Map a booking row and its slot; a purged booking has no contact."""
     contact = (
-        Contact(name=row.name, email=row.email, phone=row.phone)
-        if row.name is not None and row.email is not None
+        Contact(
+            first_name=row.first_name,
+            last_name=row.last_name or "",
+            email=row.email,
+            phone=row.phone,
+            answers=answers_from_json(row.form_answers),
+        )
+        if row.first_name is not None and row.email is not None
         else None
     )
     return Booking(
@@ -365,6 +372,7 @@ class SqlTransaction(
     ImageQueries,
     ScenarioQueries,
     PlatformSettingsQueries,
+    FormFieldQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
@@ -1370,9 +1378,11 @@ class SqlTransaction(
             slot_id=booking.slot_id,
             group_id=booking.group_id,
             status=booking.status.value,
-            name=contact.name if contact else None,
+            first_name=contact.first_name if contact else None,
+            last_name=contact.last_name if contact else None,
             email=contact.email if contact else None,
             phone=contact.phone if contact else None,
+            form_answers=answers_json(contact.answers) if contact else None,
             locale=booking.locale,
             consents=",".join(sorted(booking.consents)),
             management_token_hash=booking.token_hash,
@@ -1401,9 +1411,11 @@ class SqlTransaction(
             update(BookingRow)
             .where(BookingRow.id == booking_id)
             .values(
-                name=None,
+                first_name=None,
+                last_name=None,
                 email=None,
                 phone=None,
+                form_answers=None,
                 guest_join_url=None,
                 host_join_url=None,
                 claimed_by=None,

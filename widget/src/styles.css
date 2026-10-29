@@ -414,7 +414,9 @@ a {
   font-weight: 400;
 }
 
-.field input {
+.field input,
+.field select,
+.field textarea {
   width: 100%;
   min-height: var(--_target);
   padding: var(--_space-s);
@@ -425,8 +427,37 @@ a {
   font: inherit;
 }
 
-.field--error input {
+.field--error input,
+.field--error select,
+.field--error textarea {
   border-color: var(--_error);
+}
+
+/* ADR 0055: a checkbox sits before its label; the box itself is a 24 px target (2.5.8). */
+.field--checkbox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--_space-s);
+}
+
+.field--checkbox input {
+  width: 1.5rem;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  min-height: 1.5rem;
+  margin: 0;
+  padding: 0;
+}
+
+.field--checkbox label {
+  flex: 1 1 0;
+  align-self: center;
+}
+
+.field--checkbox .hint,
+.field--checkbox .error {
+  flex-basis: 100%;
 }
 
 .error {
