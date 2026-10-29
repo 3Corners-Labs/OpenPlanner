@@ -83,7 +83,7 @@ system.
 1. Clone the release you want into the operator's home:
 
    ```sh
-   git clone --branch v0.2.0 https://github.com/3Corners-Labs/OpenPlanner.git ~/openplanner
+   git clone --branch v0.3.0 https://github.com/3Corners-Labs/OpenPlanner.git ~/openplanner
    cd ~/openplanner
    ```
 
@@ -129,7 +129,7 @@ setting and add `--non-interactive`:
 TLS_DOMAIN=afspraak.example.nl ACME_EMAIL=ops@example.nl \
 OIDC_DISCOVERY_URL=https://idp.example.nl/.well-known/openid-configuration \
 OIDC_CLIENT_SECRET=... SMTP_HOST=smtp.example.nl SMTP_USERNAME=... SMTP_PASSWORD=... \
-UPDATE_CHECK_TOKEN=... ./scripts/install.sh --mode production --version 0.2.0 --non-interactive
+UPDATE_CHECK_TOKEN=... ./scripts/install.sh --mode production --version 0.3.0 --non-interactive
 ```
 
 Webex and Webex Contact Center are configured afterwards: `docs/runbook.md`, *Webex meetings and
@@ -186,7 +186,7 @@ in place; `.env`, `proxy.env`, `.env.update` and an override stay, as git ignore
 ```sh
 cd ~/openplanner
 git init -q && git remote add origin https://github.com/3Corners-Labs/OpenPlanner.git
-git fetch --depth 1 origin tag v0.2.0 && git checkout -f v0.2.0
+git fetch --depth 1 origin tag v0.3.0 && git checkout -f v0.3.0
 ./scripts/install.sh --mode lab
 ```
 
