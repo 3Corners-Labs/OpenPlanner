@@ -3629,6 +3629,9 @@ msgstr "Draait nu"
 msgid "admin.updates.no_release_build"
 msgstr "Geen releaseversie (ontwikkelversie); updates worden niet aangeboden."
 
+msgid "admin.updates.commit"
+msgstr "Commit"
+
 msgid "admin.updates.latest"
 msgstr "Nieuwste versie"
 

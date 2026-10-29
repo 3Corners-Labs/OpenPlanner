@@ -245,6 +245,30 @@ def _history(
     ]
 
 
+@dataclass(frozen=True)
+class CommitView:
+    """The commit this image was built from (ADR 0052).
+
+    Attributes:
+        short: The first 12 characters, as the page shows them.
+        url: The commit on GitHub; empty when ``UPDATE_REPOSITORY`` is not set.
+    """
+
+    short: str
+    url: str
+
+
+def _commit(request: Request) -> CommitView | None:
+    """Return the running image's commit; ``None`` for a build without ``APP_COMMIT``."""
+    settings = request.app.state.settings
+    sha: str = settings.app_commit
+    if not sha:
+        return None
+    repository = settings.update_repository
+    url = f"https://github.com/{repository}/commit/{sha}" if repository else ""
+    return CommitView(sha[:12], url)
+
+
 async def _overview(
     request: Request,
     locale: RequestLocale,
@@ -262,6 +286,7 @@ async def _overview(
         context.principal,
         {
             "overview": found,
+            "commit": _commit(request),
             "checked_at": admin_moment(request, locale, check.checked_at) if check else None,
             "check_error": check.error if check else "",
             "history": _history(request, locale, found.history),
