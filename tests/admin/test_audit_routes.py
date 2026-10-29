@@ -1,6 +1,7 @@
 """The audit log page (ADR 0031): exact per level, system events, filters, reasons."""
 
 import json
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
@@ -61,6 +62,17 @@ async def logged(site: Site) -> Site:
     async with SqlUnitOfWork(app.state.engine).locked() as tx:
         for event in (GLOBAL_FAILURE, ORG_CHANGE, GROUP_RETRY, OTHER_GROUP):
             await tx.add_audit_event(event)
+    return site
+
+
+@pytest.fixture
+async def traced(site: Site) -> Site:
+    """The four events of ``logged``; the group's retry has a trace id."""
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        for event in (GLOBAL_FAILURE, ORG_CHANGE, OTHER_GROUP):
+            await tx.add_audit_event(event)
+        await tx.add_audit_event(replace(GROUP_RETRY, trace_id="c" * 32))
     return site
 
 
@@ -244,3 +256,88 @@ async def test_an_admin_action_is_shipped_once_as_an_audit_line(
     assert denied[0]["service.name"] == "web"
     assert denied[0]["actor"] == GROUP_ADMIN.subject
     assert len({line["event_id"] for line in shipped}) == len(shipped)
+
+
+@pytest.mark.parametrize(
+    ("params", "visible"),
+    [
+        ({"level": "error"}, {"global_marker"}),
+        ({"level": "warning"}, {"global_marker", "smtp_unreachable"}),
+        ({"category": "audit"}, {"org_marker"}),
+        ({"category": "system"}, {"global_marker", "smtp_unreachable", "other_marker"}),
+        ({"trace": "c" * 32}, {"smtp_unreachable"}),
+        # ADR 0040: days in ADMIN_TIMEZONE; NOW is 2026-01-01 09:00 in Amsterdam.
+        ({"from": "2026-01-02"}, set()),
+        ({"to": "2025-12-31"}, set()),
+        ({"from": "2026-01-01", "to": "2026-01-01"}, None),
+        # Malformed values are ignored, never an error.
+        ({"level": "loud", "trace": "x", "from": "yesterday", "to": "2026-13-01"}, None),
+    ],
+)
+async def test_level_category_period_and_trace_narrow_the_list(
+    traced: Site, params: dict[str, str], visible: set[str] | None
+) -> None:
+    await traced.login_as(SUPER)
+    response = await traced.client.get("/admin/audit", params=params)
+
+    assert response.status_code == 200
+    markers = {"global_marker", "org_marker", "smtp_unreachable", "other_marker"}
+    expected = markers if visible is None else visible
+    assert {m for m in markers if m in response.text} == expected
+
+
+async def test_each_event_links_to_its_whole_chain(traced: Site) -> None:
+    await traced.login_as(SUPER)
+    text = (await traced.client.get("/admin/audit")).text
+
+    assert f'href="/admin/audit?trace={"c" * 32}"' in text
+
+
+async def test_the_export_is_the_current_filter_inside_the_scope(traced: Site) -> None:
+    await traced.login_as(ORG_ADMIN)
+    page = (await traced.client.get("/admin/audit", params={"category": "system"})).text
+    assert 'href="/admin/audit/export.csv?category=system"' in page
+
+    response = await traced.client.get("/admin/audit/export.csv", params={"category": "system"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert response.headers["content-disposition"].startswith('attachment; filename="audit-')
+    assert response.headers["cache-control"] == "no-store"
+    assert response.content.startswith("﻿".encode())
+    text = response.content.decode("utf-8")
+    assert "smtp_unreachable" in text
+    assert "org_marker" not in text  # filtered out: category audit
+    assert "other_marker" not in text  # outside the scope
+    assert "global_marker" not in text
+
+
+async def test_every_export_is_itself_an_audit_event(traced: Site) -> None:
+    await traced.login_as(AUDITOR)
+    await traced.client.get("/admin/audit/export.csv")
+    await traced.login_as(SUPER)
+
+    text = (await traced.client.get("/admin/audit", params={"category": "audit"})).text
+
+    assert "Auditlog exporteren" in text
+
+
+async def test_the_group_admin_may_view_but_not_export(traced: Site) -> None:
+    await traced.login_as(GROUP_ADMIN)
+    page = (await traced.client.get("/admin/audit")).text
+    response = await traced.client.get("/admin/audit/export.csv")
+
+    assert "export.csv" not in page
+    assert response.status_code == 403
+
+
+async def test_an_export_over_the_period_limit_is_refused_on_the_page(traced: Site) -> None:
+    await traced.login_as(SUPER)
+
+    response = await traced.client.get(
+        "/admin/audit/export.csv", params={"from": "2024-01-01", "to": "2026-01-01"}
+    )
+
+    assert response.status_code == 422
+    assert response.headers["content-type"].startswith("text/html")
+    assert "De export beslaat te veel dagen." in response.text

@@ -35,6 +35,7 @@ stays open to every role as usual.
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | needs `closure.manage` | yes | yes | – | – |
 | View retention (`retention.view`) | Organisation | – | yes | yes | – | yes |
 | View audit log (`audit.view`) | Group | – | yes | yes | yes | yes |
+| Export audit log (`audit.export`) | Group | – | yes | yes | – | yes |
 | View group (`group.view`) | Group | – | yes | yes | yes | yes |
 | Change group settings (`group.edit`) | Group | needs `group.view` | yes | yes | – | – |
 | Manage staffing and staffing exceptions (`schedule.manage`) | Group | needs `group.view` | yes | yes | yes | – |
