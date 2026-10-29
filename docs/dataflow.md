@@ -189,7 +189,10 @@ audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
 worker ──GET releases/latest (no data sent; optional read-only token)──> api.github.com
         <── tag and release page ── stored in release_checks
 superuser ──POST update / restore / cancel──> web ──SQL──> update_requests (versions, subject id)
-host updater ──docker exec python -m app.cli──> web ──SQL──> update_requests, audit_events
+superuser's browser ──GET /admin/updates/progress (every 5 s while open; ADR 0048)──> web
+        <── steps and status of the request (no personal data) ──
+host updater ──docker exec python -m app.cli (claim, progress, report)──> web ──SQL──>
+             update_requests (status, step), audit_events
              ──backup-db──> data/backups/request-<id>.db (copy of the whole database: PII)
 ```
 

@@ -14,7 +14,9 @@ const AGENDA = '/admin/groups/demo/agenda';
 
 for (const lang of ['nl', 'en']) {
   test(`group admin reads the day and week agenda (${lang})`, async ({ page }) => {
-    await loginAs(page, 'groupadmin', `${AGENDA}?lang=${lang}`);
+    await loginAs(page, 'groupadmin', AGENDA);
+    // The login redirect keeps the path only; choose the language on the page itself.
+    await page.goto(`${AGENDA}?lang=${lang}`);
     await expectNoAxeViolations(page);
 
     const week = page.getByRole('link', { name: lang === 'nl' ? 'Weekoverzicht' : 'Week view' });

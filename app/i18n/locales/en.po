@@ -3209,7 +3209,7 @@ msgid "admin.updates.open"
 msgstr "Open request"
 
 msgid "admin.updates.open_lead"
-msgstr "To version {version}. The page shows the outcome as soon as the updater reports it."
+msgstr "To version {version}. The updater looks for requests every minute and reports each step; this list updates itself."
 
 msgid "admin.updates.unclaimed"
 msgstr "No updater has picked up this request after 10 minutes. Check that the updater is installed on the server (see the runbook)."
@@ -3327,6 +3327,57 @@ msgstr "Go to updates"
 
 msgid "admin.updates.banner.snooze"
 msgstr "Remind me in 60 minutes"
+
+msgid "admin.updates.step.waiting"
+msgstr "Waiting for the updater to pick up the request"
+
+msgid "admin.updates.step.pulling"
+msgstr "Downloading version {version}"
+
+msgid "admin.updates.step.verifying"
+msgstr "Checking the signature"
+
+msgid "admin.updates.step.backing_up"
+msgstr "Backing up the database"
+
+msgid "admin.updates.step.migrating"
+msgstr "Taking the database back to version {version}"
+
+msgid "admin.updates.step.starting"
+msgstr "Starting version {version} and checking it"
+
+msgid "admin.updates.step.rolling_back"
+msgstr "Rolling back to the previous version and the backup"
+
+msgid "admin.updates.step_state.done"
+msgstr "done"
+
+msgid "admin.updates.step_state.current"
+msgstr "in progress"
+
+msgid "admin.updates.step_state.pending"
+msgstr "not yet"
+
+msgid "admin.updates.step.since"
+msgstr "since {time}"
+
+msgid "admin.updates.steps"
+msgstr "Steps"
+
+msgid "admin.updates.progress.status"
+msgstr "Now: {step}"
+
+msgid "admin.updates.progress.ended"
+msgstr "Request to version {version}: {status}."
+
+msgid "admin.updates.progress.refresh"
+msgstr "Refresh status"
+
+msgid "admin.updates.progress.reload"
+msgstr "Reload the page"
+
+msgid "admin.updates.banner.step"
+msgstr "The update to version {version} is running: {step}."
 
 #. Context-sensitive help and the manual (ADR 0033).
 msgid "admin.nav.help"
