@@ -37,6 +37,7 @@ dev = [
     "pip-audit>=2.7",
     "pip-licenses>=5.0",
     "mutmut>=3.8.0",
+    "pytest-xdist>=3.8.0",
 ]
 
 # An application, not a library: run from the source tree, never built as a wheel.
@@ -84,7 +85,14 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = "--strict-markers --strict-config"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # aiosqlite hands every error inside its connection thread to the awaiting code; the
+    # thread itself only fails when it cannot post the result because the event loop of a
+    # finished test is closed. Nobody awaits that result any more. Under pytest-xdist's load
+    # the thread can outlive its test, and pytest then fails whichever test runs next.
+    "ignore:Exception in thread .*\\(_connection_worker_thread\\):pytest.PytestUnhandledThreadExceptionWarning",
+]
 
 [tool.coverage.run]
 source = ["app"]

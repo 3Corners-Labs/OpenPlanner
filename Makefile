@@ -26,7 +26,7 @@ imports:
 	$(UV) lint-imports
 
 test:
-	$(UV) pytest --cov --cov-report=term --cov-fail-under=75
+	$(UV) pytest -n auto --cov --cov-report=term --cov-fail-under=75
 	$(UV) coverage report --include='app/domain/*,app/i18n/*' --fail-under=90
 
 security:
