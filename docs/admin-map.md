@@ -20,6 +20,7 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 |---|---|---|---|
 | Organisations | `/admin/organisations` | `organisation.manage` | `/admin/organisations/new`, `/admin/organisations/{org}`, `/admin/organisations/{org}/contacts` |
 | Branding | `/admin/branding` | `branding.manage` | `/admin/organisations/{org}/branding` |
+| Embedding | `/admin/embedding` | `embedding.manage` | `/admin/organisations/{org}/embedding` |
 | Holidays | `/admin/holidays` | `holidays.assign` | `/admin/holidays/{calendar}`, `/admin/organisations/{org}/holidays` |
 | Emergency closure | `/admin/closures` | `organisation.closure` | `/admin/organisations/{org}/closure` |
 | Staff | `/admin/staff` | `staff.view` | `/admin/staff/{member_id}` |

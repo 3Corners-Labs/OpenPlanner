@@ -151,3 +151,11 @@ opnieuw te proberen of een afspraak te maken.
 
 Leeg betekent geen grens: Webex Contact Center verdeelt dan alle gesprekken. Geplande afspraken
 tellen niet mee; die worden al door de tijdslots begrensd.
+
+<!-- field: embedding_enabled -->
+### Insluiten op websites
+
+Met **Ja** kan de groep ook als widget op de website van de organisatie staan, naast de eigen
+pagina van de groep. Dat werkt alleen op de websites die de organisatie heeft toegestaan onder
+[Insluiten op websites](embedding.md). Met **Nee** (de standaard) is de groep alleen via haar
+eigen pagina te boeken, ook als de widget op een toegestane website staat.
