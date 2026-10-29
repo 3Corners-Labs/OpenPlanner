@@ -31,6 +31,7 @@ from app.domain.scheduling import GroupSummary
 from app.domain.staff import StaffFilter, StaffMember
 from app.web.authz_labels import ROLE_LABELS
 from app.web.locale import RequestLocale
+from app.web.organisation_settings import settings_for
 from app.web.protection import RejectedRequest
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -78,7 +79,7 @@ class StaffFilterView:
 
 def _dormant_after(request: Request) -> timedelta:
     """The period without a login after which a person is dormant (ADR 0046 setting)."""
-    return timedelta(days=request.app.state.settings.staff_dormant_after_days)
+    return timedelta(days=settings_for(request).staff_dormant_after_days)
 
 
 def _names(in_scope: list[GroupSummary]) -> tuple[dict[str, str], dict[str, str]]:
@@ -175,7 +176,7 @@ async def staff_list(
         {
             "people": [_view(request, locale, m, names, now) for m in members],
             "filters": filters,
-            "dormant_days": request.app.state.settings.staff_dormant_after_days,
+            "dormant_days": settings_for(request).staff_dormant_after_days,
         },
     )
 

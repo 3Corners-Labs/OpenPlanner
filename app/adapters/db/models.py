@@ -866,6 +866,19 @@ class PlatformSettingRow(Base):
     expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
+class OrganisationSettingRow(Base):
+    """The value of one class D setting for one organisation (ADR 0042 step 5), as JSON."""
+
+    __tablename__ = "organisation_settings"
+
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), primary_key=True
+    )
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
 class SettingsVersionRow(Base):
     """The counter that goes up with every settings change (ADR 0042 §6); at most one row."""
 

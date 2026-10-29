@@ -879,6 +879,20 @@ class Transaction(Protocol):
         """Raise ``settings_version`` by one and return the new value (ADR 0042 §6)."""
         ...
 
+    async def organisation_settings(self) -> dict[int, dict[str, object]]:
+        """Return every organisation's stored class D values by organisation id (step 5)."""
+        ...
+
+    async def save_organisation_setting(
+        self, organisation_id: int, key: str, value: object, updated_at: datetime
+    ) -> None:
+        """Store or replace one organisation's value of ``key`` (a plain JSON value)."""
+        ...
+
+    async def delete_organisation_setting(self, organisation_id: int, key: str) -> bool:
+        """Remove one organisation's value of ``key``; return whether there was one."""
+        ...
+
 
 class UnitOfWork(Protocol):
     """Opens transactions. Leaving the context commits; an exception rolls back."""

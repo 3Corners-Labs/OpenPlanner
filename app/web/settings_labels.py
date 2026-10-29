@@ -91,6 +91,7 @@ TOPIC_LABELS: dict[Topic, str] = {
 SOURCE_LABELS: dict[Source, str] = {
     Source.DEFAULT: "admin.settings.source.default",
     Source.PORTAL: "admin.settings.source.portal",
+    Source.ORGANISATION: "admin.settings.source.organisation",
     Source.ENV: "admin.settings.source.env",
     Source.FILE: "admin.settings.source.file",
 }

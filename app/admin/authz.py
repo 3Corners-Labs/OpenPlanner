@@ -43,6 +43,7 @@ from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import Clock
 from app.domain.roles import RoleService
 from app.domain.scheduling import GroupSummary
+from app.web.organisation_settings import follow
 
 log = structlog.get_logger()
 
@@ -121,6 +122,10 @@ async def load_principal(request: Request) -> None:
     principal = _cookie_principal(request)
     if principal is not None:
         principal = await role_service(request).attach(principal)
+        # ADR 0042 step 5: the admin's own organisation's time format and zone apply.
+        live = getattr(request.app.state, "live_settings", None)
+        home = await admin_service(request).home_organisation(principal)
+        follow(request, live.organisation_id(home) if live else None)
     request.state.admin_principal = principal
 
 

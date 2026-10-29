@@ -6,6 +6,7 @@ from datetime import timedelta
 from app.adapters.live_settings import LiveSettings, keep_current
 from app.config import Settings
 from app.domain.platform_settings import PlatformSettingsStore
+from app.domain.scheduling import Organisation
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 
@@ -123,3 +124,53 @@ async def test_locked_keys_and_combinations_follow_the_environment() -> None:
     assert "admin_session_hours" in live.locked()
     assert live.combination_problem({"storage_critical_free_percent": 20.0}) is not None
     assert live.combination_problem({"storage_critical_free_percent": 2.0}) is None
+
+
+# Organisation values (ADR 0042 step 5).
+
+
+async def _with_organisations(values: dict[int, dict[str, object]]) -> LiveSettings:
+    uow = InMemoryUnitOfWork()
+    uow.state.organisations[7] = Organisation(7, "Demo", "demo")
+    uow.state.organisations[8] = Organisation(8, "Andere", "andere")
+    uow.state.settings_version = 1
+    uow.state.organisation_settings = values
+    live = _live(uow, [])
+    await live.refresh()
+    return live
+
+
+async def test_an_organisation_gets_its_own_values_over_the_platform() -> None:
+    live = await _with_organisations({7: {"time_format": "12h", "shortfall_horizon_days": 30}})
+
+    own = live.for_organisation(live.organisation_id("demo"))
+    other = live.for_organisation(live.organisation_id("andere"))
+
+    assert (own.time_format, own.shortfall_horizon_days) == ("12h", 30)
+    assert (other.time_format, other.shortfall_horizon_days) == ("24h", 14)
+    assert live.for_organisation(None) is live.settings
+
+
+async def test_organisation_values_that_break_a_rule_together_do_not_apply() -> None:
+    live = await _with_organisations({7: {"planner_rebook_reminder_days": 20}})  # lapse 14
+
+    assert live.for_organisation(7).planner_rebook_reminder_days == 3
+    assert live.organisation_combination_problem(7, {"planner_rebook_reminder_days": 20})
+    assert live.organisation_combination_problem(7, {"planner_rebook_reminder_days": 2}) is None
+
+
+async def test_the_organisation_states_show_the_source() -> None:
+    live = await _with_organisations({7: {"time_format": "12h"}})
+
+    states = {s.spec.key: s for s in live.organisation_states(7)}
+
+    assert set(states) == {
+        "time_format",
+        "admin_timezone",
+        "staff_dormant_after_days",
+        "shortfall_horizon_days",
+        "planner_rebook_days",
+        "planner_rebook_reminder_days",
+    }
+    assert (states["time_format"].source, states["time_format"].shown) == ("organisation", "12h")
+    assert states["admin_timezone"].source == "default"

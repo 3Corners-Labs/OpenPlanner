@@ -79,7 +79,7 @@ async def run_worker(
         environment(),
         PlatformSettingsStore(uow),
         clock,
-        lambda current: set_log_level(current.log_level),
+        _apply,
     )
     security = SecurityLog(
         uow,
@@ -103,6 +103,7 @@ async def run_worker(
         dispatcher=integrations.dispatcher,
         integration=IntegrationService(uow, clock, AdminService(uow, clock)),
         retention=lambda: live.settings.event_retention,
+        clock_style=lambda organisation: live.for_organisation(organisation).time_format,
     )
     diagnostics = DiagnosticsService(
         uow,
@@ -154,6 +155,12 @@ async def run_worker(
         await http.aclose()
         await engine.dispose()
         log.info("worker.stopped")
+
+
+def _apply(current: Settings) -> None:
+    """Follow changed portal values that live outside the services: log level, clock style."""
+    set_log_level(current.log_level)
+    configure_clock(current.time_format)
 
 
 async def _check_releases(updates: UpdateService) -> None:
