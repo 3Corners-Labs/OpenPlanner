@@ -59,6 +59,7 @@ TOPICS = (
     HelpTopic("rights-matrix", ("/admin/matrix",), Permission.MATRIX_VIEW),
     HelpTopic("retention", ("/admin/retention",), Permission.RETENTION_VIEW),
     HelpTopic("staff", ("/admin/staff", "/admin/staff/{member_id}"), Permission.STAFF_VIEW),
+    HelpTopic("audit", ("/admin/audit",), Permission.AUDIT_VIEW),
     HelpTopic(
         "embedding",
         ("/admin/embedding", "/admin/organisations/{org}/embedding"),

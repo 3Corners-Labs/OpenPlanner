@@ -84,7 +84,7 @@ The product owner chose, when accepting this ADR:
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `EMBEDDING_MAX_ORIGINS` | C platform | 20 | 1–100 | `settings.platform.manage` (ADR 0042) | Origins per organisation. From the environment until the ADR 0042 registry exists. |
+| `EMBEDDING_MAX_ORIGINS` | C platform | 20 | 1–100 | `settings.platform.manage` (ADR 0042) | Origins per organisation. In the ADR 0042 registry (`app/domain/settings_registry.py`). |
 | `Group.embedding_enabled` | group setting | off | on/off | `group.edit` | Whether a group appears in the widget. |
 | Allowed origins | organisation data | none | `EMBEDDING_MAX_ORIGINS` | `embedding.manage` | The list itself. |
 
