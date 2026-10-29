@@ -9,7 +9,7 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``claim``: what ``app.cli update-claim`` prints.
 - ``revision``: what ``alembic current`` prints as the revision.
 - ``fail``: one operation per line that exits 1 (``pull``, ``cosign``, ``backup-db``,
-  ``restore-db``, ``downgrade``, ``update-progress``).
+  ``restore-db``, ``downgrade``, ``update-progress``, ``maintenance``).
 - ``unhealthy``: one image reference per line; the worker reports ``unhealthy`` while it is
   pinned.
 """
@@ -70,7 +70,7 @@ def _compose(args: list[str]) -> int:
             sys.stdout.write((_host() / "claim").read_text())
         elif command[3] == "backup-db" and command[4:] != ["--prune"]:
             return _failing("backup-db")
-        elif command[3] in ("restore-db", "update-progress"):
+        elif command[3] in ("restore-db", "update-progress", "maintenance"):
             return _failing(command[3])
     return 0
 
