@@ -36,7 +36,7 @@ from app.api.agent import create_agent_api
 from app.api.maintenance import citizen_gate, register_maintenance
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
-from app.config import AGENT_API_PREFIX, Settings
+from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
 from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
@@ -67,7 +67,7 @@ from app.domain.simulation import SimulationService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import client_pseudonym_key, management_token_key, session_secret
-from app.logging import configure_logging
+from app.logging import configure_logging, warn_loose_secret_files
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
 from app.web.protection import configure_rate_limits, limiter
@@ -140,6 +140,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_service("web")
         configure_logging(settings.log_level, envelope=settings.event_envelope)
+        warn_loose_secret_files(loose_secret_files(environment()))
         app.state.engine = create_engine(settings.database_url)
         # ADR 0034: committed audit events also go to stdout for the log platform.
         uow = SqlUnitOfWork(

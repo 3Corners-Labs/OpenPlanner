@@ -1,15 +1,25 @@
-"""Application settings, read from the environment only."""
+"""Application settings, read from the environment only.
+
+A bootstrap secret ``X`` may instead come from the file that ``X_FILE`` names (ADR 0042 §9),
+so Docker secrets, Kubernetes secrets and secret-store sidecars work without an env file.
+"""
 
 import os
 import re
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic.fields import FieldInfo
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 from app.domain.event_schema import Envelope
+from app.domain.settings_registry import REGISTRY, SettingClass
 from app.domain.system_log import EventRetention
 from app.i18n.dates import ClockStyle
 
@@ -38,6 +48,72 @@ def environment() -> dict[str, str]:
     return dict(os.environ)
 
 
+FILE_SECRETS: tuple[str, ...] = tuple(
+    spec.key
+    for spec in REGISTRY
+    if spec.secret and spec.class_ in (SettingClass.BOOTSTRAP, SettingClass.DEPLOYMENT)
+)
+"""Secrets that ``X_FILE`` may supply: the class A and B secrets of the registry (§9)."""
+
+_PRIVATE_MODE = 0o077
+"""Permission bits for group and others; a secret file with any of them set is reported."""
+
+
+def _lower(environ: dict[str, str]) -> dict[str, str]:
+    """Return the environment with lower-case names (pydantic-settings ignores case)."""
+    return {name.lower(): value for name, value in environ.items()}
+
+
+def _read_secret_file(name: str, path: Path) -> str:
+    """Return a secret file's contents without the trailing newline; refuse missing or empty.
+
+    Messages name the variable only: neither the path nor the contents reach a log.
+    """
+    variable = f"{name.upper()}_FILE"
+    try:
+        value = path.read_text(encoding="utf-8").removesuffix("\n").removesuffix("\r")
+    except (OSError, UnicodeDecodeError):
+        raise ValueError(f"{variable} names no readable file") from None
+    if not value:
+        raise ValueError(f"{variable} is empty")
+    return value
+
+
+def loose_secret_files(environ: dict[str, str]) -> list[str]:
+    """Return the ``X_FILE`` variables whose file others may read, for a warning at start-up."""
+    env = _lower(environ)
+    loose: list[str] = []
+    for name in FILE_SECRETS:
+        path = env.get(f"{name}_file")
+        try:
+            if path is not None and Path(path).stat().st_mode & _PRIVATE_MODE:
+                loose.append(f"{name.upper()}_FILE")
+        except OSError:
+            continue
+    return loose
+
+
+class _SecretFiles(PydanticBaseSettingsSource):
+    """Settings source for ``X_FILE`` (ADR 0042 §9): no ``secrets_dir`` and no implicit names."""
+
+    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
+        """Unused: ``__call__`` reads every file secret at once."""
+        return None, field_name, False
+
+    def __call__(self) -> dict[str, Any]:
+        """Return the secrets whose ``X_FILE`` is set; refuse ``X`` and ``X_FILE`` together."""
+        env = _lower(dict(os.environ))
+        values: dict[str, Any] = {}
+        for name in FILE_SECRETS:
+            path = env.get(f"{name}_file")
+            if path is None:
+                continue
+            if name in env:
+                raise ValueError(f"{name.upper()} and {name.upper()}_FILE are both set; set one")
+            values[name] = _read_secret_file(name, Path(path))
+        return values
+
+
 class Settings(BaseSettings):
     """Typed configuration. Each field maps to the upper-case environment variable.
 
@@ -52,6 +128,18 @@ class Settings(BaseSettings):
     # Validation error messages never echo the input: it holds the secrets from the environment.
     # ``errors()`` still returns it; callers that inspect errors pass ``include_input=False``.
     model_config = SettingsConfigDict(extra="ignore", frozen=True, hide_input_in_errors=True)
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Read ``X_FILE`` next to the environment; arguments still win (tests)."""
+        return (init_settings, _SecretFiles(settings_cls), env_settings, dotenv_settings)
 
     environment: Literal["dev", "test", "prod"] = "prod"
     database_url: str = "sqlite+aiosqlite:///data/booking.db"
