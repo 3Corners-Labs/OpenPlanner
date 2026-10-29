@@ -299,12 +299,20 @@ class BookingService:
             return await self.relocate(tx, old, group, new_start)
 
     async def relocate(
-        self, tx: Transaction, old: Booking, group: Group, new_start: datetime
+        self,
+        tx: Transaction,
+        old: Booking,
+        group: Group,
+        new_start: datetime,
+        *,
+        sms: bool = False,
     ) -> BookingReceipt:
         """Move ``old`` to ``new_start`` inside the caller's locked transaction.
 
-        Shared by the citizen's reschedule and an admin moving a suspended booking
-        (``ClosureService.move``); the caller checks who may do it.
+        Shared by the citizen's reschedule, an admin moving a suspended booking
+        (``ClosureService.move``) and a planner (``PlannerService.move``, which passes
+        ``sms`` so the change also goes out as an SMS where the citizen agreed to it); the
+        caller checks who may do it.
 
         Raises:
             DomainError: ``booking_not_active``, ``same_slot`` or any error of ``book``.
@@ -317,7 +325,7 @@ class BookingService:
         await tx.save_booking(old.cancel(now))
         await tx.replace_jobs(_id(old), plan_for_cancellation(cancelled_at=now, notify=False))
         return await self._place(
-            tx, group, new_start, old.contact, old.locale, old.consents, _id(old)
+            tx, group, new_start, old.contact, old.locale, old.consents, _id(old), sms=sms
         )
 
     async def _direct_open(self, tx: Transaction, group: Group, now: datetime) -> bool:
@@ -367,6 +375,8 @@ class BookingService:
         locale: str,
         consents: frozenset[ChannelKind],
         rescheduled_from: int | None,
+        *,
+        sms: bool = False,
     ) -> BookingReceipt:
         """Reserve a place at ``start`` and store the booking with its jobs."""
         if start.tzinfo is None:
@@ -420,6 +430,7 @@ class BookingService:
             now=now,
             dispatch_lead=group.dispatch_lead,
             message=JobType.SEND_CHANGE if rescheduled_from else JobType.SEND_CONFIRMATION,
+            sms=sms,
         )
         await tx.replace_jobs(_id(booking), jobs)
         return BookingReceipt(booking, token)

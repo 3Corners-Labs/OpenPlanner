@@ -39,5 +39,38 @@ The group's overview, the **Staffing**, **Staffing exceptions** and **Holidays**
 say how many slots in the next 14 days are short, with a link to the first one. So right after
 a staffing change you see whether it causes a shortfall.
 
-Solve a shortfall by raising the staffing again, or by calling the citizens to move a booking.
-Changing bookings from the agenda comes in a later version.
+Solve a shortfall by raising the staffing again, or by changing bookings (below).
+
+## Changing bookings
+
+With the right **Change bookings** (group admins, organisation admins and a custom Planner
+role), the day view shows the links **Move** and **Cancel** next to every booking that can
+still be changed. The citizen is always told about a change: by email, and by SMS when they
+gave a phone number. You may be asked to log in again first.
+
+A booking can no longer be changed when it starts within the group's **Changes by a planner**
+time (60 minutes by default), when it has already gone to the contact center, or when it is
+cancelled. Call the citizen instead.
+
+### Move
+
+Choose a free slot of the same team in the next 28 days. The citizen gets a message with the
+new time and a new link to change it themselves. If the chosen slot would then have more
+bookings than agents, OpenPlanner first asks you to confirm with the box **I accept that the
+new slot will then have more bookings than agents**.
+
+### Cancel
+
+Choose one of the fixed reasons: **Not enough agents**, **Technical failure** or **Unforeseen
+circumstances**. The citizen reads the matching text in the message. You cannot type a text
+yourself; the organisation changes the wording under **Message texts**, in **Reasons for
+changes by a planner**.
+
+### Accept a shortfall
+
+If, for example, a colleague from another team helps out, choose **Accept shortfall** at the
+slot. The shortfall then no longer counts in the notices. When the staffing or the bookings of
+that slot change afterwards, the shortfall shows again.
+
+Every change is in the audit log with who, which team, the booking number and the reason. When
+one person makes many changes in an hour, a system event tells the admins.

@@ -79,6 +79,7 @@ class Permission(StrEnum):
     TEXTS_MANAGE = "texts.manage"
     REMINDERS_MANAGE = "reminders.manage"
     BOOKINGS_VIEW = "bookings.view"
+    BOOKINGS_MANAGE = "bookings.manage"
     CLOSURE_MANAGE = "closure.manage"
     ORGANISATION_CLOSURE = "organisation.closure"
     API_CLIENTS_MANAGE = "api_clients.manage"
@@ -104,6 +105,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.TEXTS_MANAGE: Level.GROUP,
     Permission.REMINDERS_MANAGE: Level.GROUP,
     Permission.BOOKINGS_VIEW: Level.GROUP,
+    # ADR 0044: a planner moves, cancels or accepts a shortfall per booking or slot.
+    Permission.BOOKINGS_MANAGE: Level.GROUP,
     Permission.CLOSURE_MANAGE: Level.GROUP,
     Permission.ORGANISATION_CLOSURE: Level.ORGANISATION,
     Permission.API_CLIENTS_MANAGE: Level.GLOBAL,
@@ -126,7 +129,7 @@ LOCKED_PERMISSIONS = frozenset(
 )
 """ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
 
-PII_PERMISSIONS = frozenset({Permission.BOOKINGS_VIEW})
+PII_PERMISSIONS = frozenset({Permission.BOOKINGS_VIEW, Permission.BOOKINGS_MANAGE})
 """ADR 0039: permissions that show citizens' personal data; never held by the auditor."""
 
 _EVERY_ADMIN = frozenset(
@@ -149,6 +152,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.TEXTS_MANAGE,
         Permission.REMINDERS_MANAGE,
         Permission.BOOKINGS_VIEW,
+        # ADR 0044: change existing bookings from the agenda.
+        Permission.BOOKINGS_MANAGE,
         # ADR 0024: close one group or every group of the organisation at once.
         Permission.CLOSURE_MANAGE,
         Permission.ORGANISATION_CLOSURE,
@@ -166,6 +171,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.SCHEDULE_MANAGE,
         Permission.TEXTS_MANAGE,
         Permission.BOOKINGS_VIEW,
+        # ADR 0044: the team's own planner changes its bookings.
+        Permission.BOOKINGS_MANAGE,
         # ADR 0024: the team itself can close in an emergency and handle its bookings.
         Permission.CLOSURE_MANAGE,
         # ADR 0046: who else administers the own groups, read-only.

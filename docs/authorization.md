@@ -35,6 +35,7 @@ permissions show citizens' data and are never held by the auditor.
 | Manage texts (`texts.manage`) | Group | – | yes | yes | yes | – |
 | Manage reminders (`reminders.manage`) | Group | – | yes | yes | – | – |
 | View bookings (`bookings.view`) | Group | personal data | yes | yes | yes | – |
+| Change bookings (`bookings.manage`) | Group | personal data | yes | yes | yes | – |
 | Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | – | yes | yes | yes | – |
 | View staff (`staff.view`) | Group | – | yes | yes | yes | yes |
 

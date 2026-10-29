@@ -55,6 +55,8 @@ MAX_DIRECT_CALLS = MAX_CAPACITY
 
 DEFAULT_DISPATCH_LEAD_MINUTES = 5
 MAX_DISPATCH_LEAD_MINUTES = 60
+MAX_PLANNER_LEAD_MINUTES = 1440
+"""ADR 0044: upper bound of ``planner_change_min_lead_minutes`` (one day)."""
 
 
 def _invalid(field: str) -> DomainError:
@@ -151,6 +153,9 @@ class Group:
         dispatch_lead_minutes: How long before the start the WxCC task is created; from
             that moment the booking is read-only (``job_plan.change_deadline``). At most
             ``min_notice_minutes``, so no booking is read-only when it is made.
+        planner_change_min_lead_minutes: How long before the start a planner may still move
+            or cancel a booking (ADR 0044, class D per group). Never below
+            ``dispatch_lead_minutes``: a dispatched booking needs a phone call, not a mail.
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -173,6 +178,7 @@ class Group:
     not_picked_up_minutes: int = DEFAULT_NOT_PICKED_UP_MINUTES
     direct_call_max_concurrent: int | None = None
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
+    planner_change_min_lead_minutes: int = 60
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""
@@ -191,6 +197,9 @@ class Group:
             raise _invalid("dispatch_lead_minutes")
         if self.min_notice_minutes < self.dispatch_lead_minutes:
             raise _invalid("min_notice_minutes")
+        planner_lead = self.planner_change_min_lead_minutes
+        if not self.dispatch_lead_minutes <= planner_lead <= MAX_PLANNER_LEAD_MINUTES:
+            raise _invalid("planner_change_min_lead_minutes")
         if self.video_host_email is not None and not _EMAIL.fullmatch(self.video_host_email):
             raise _invalid("video_host_email")
         for name, limit in INTEGRATION_TEXT_LIMITS.items():
@@ -233,6 +242,11 @@ class Group:
     def dispatch_lead(self) -> timedelta:
         """How long before the start the WxCC task is created."""
         return timedelta(minutes=self.dispatch_lead_minutes)
+
+    @property
+    def planner_lead(self) -> timedelta:
+        """How long before the start a planner may last change a booking (ADR 0044)."""
+        return timedelta(minutes=self.planner_change_min_lead_minutes)
 
 
 @dataclass(frozen=True)
