@@ -300,7 +300,7 @@ OBJECTS = (
                 f"{_GROUP}/agenda",
                 Permission.BOOKINGS_VIEW,
                 "agenda",
-                (f"{_GROUP}/bookings/{{booking_id}}",),
+                (f"{_GROUP}/bookings/{{booking_id}}", f"{_GROUP}/agenda/week"),
             ),
             Screen(
                 "group.closure",

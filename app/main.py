@@ -36,6 +36,7 @@ from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings
 from app.domain.admin import AdminService
+from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
 from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
@@ -165,6 +166,9 @@ def create_app(
             allow_local=settings.environment != "prod",
         )
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
+        app.state.agenda_service = AgendaService(
+            uow, clock, app.state.admin_service, settings.shortfall_horizon_days
+        )
         app.state.diagnostics_service = DiagnosticsService(
             uow, clock, app.state.admin_service, timedelta(hours=settings.diagnostic_mode_hours)
         )
