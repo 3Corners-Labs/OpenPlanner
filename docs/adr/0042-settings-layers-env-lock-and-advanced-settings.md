@@ -1,6 +1,6 @@
 # 0042. Settings layers: code default, admin portal, environment lock
 
-Status: proposed (2026-10-28), requested by the product owner. Refines ADR 0008 (which
+Status: accepted (2026-10-28), requested and accepted by the product owner. Refines ADR 0008 (which
 secrets stay in the environment) and the CLAUDE.md stack rule "Settings: `pydantic-settings`
 from env only". Builds on ADR 0014/0039 (permissions), ADR 0015 (fresh login), ADR 0031
 (audit), ADR 0033 (manual) and ADR 0032 (contact-center connection per organisation).
@@ -293,6 +293,7 @@ Every field of `app/config.py` and `proxy.env.example` on 2026-10-28, with its c
 | `ADMIN_SESSION_HOURS`, `ADMIN_REAUTH_MINUTES` | §7. |
 | `OIDC_ROLE_CLAIM`, `OIDC_ORGANISATION_CLAIM`, `OIDC_GROUP_CLAIM` | §8, `settings.login.manage`. |
 | `OIDC_ROLE_SUPERUSER`, `OIDC_ROLE_ORG_ADMIN`, `OIDC_ROLE_GROUP_ADMIN` | idem |
+| `OIDC_ROLE_AUDITOR` | idem (ADR 0039; added on acceptance). |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_TLS`, `SMTP_USERNAME` | The platform's fallback mail server (ADR 0022). |
 | `SMTP_PASSWORD` | Secret, write-only. |
 | `MAIL_FROM` | Fallback sender. |
@@ -365,9 +366,23 @@ Each step is its own PR. Each one leaves the service working with the existing `
 8. Lockout diagnostics (§8 rule 4), `oidc-check` and the `closure` commands of §10. These
    do not depend on steps 1–7 and can be built at any time.
 
-## Assumptions to confirm
+## Assumptions confirmed
 
-- The bounds in §7 and the inventory are proposals. The product owner may move any setting
-  between C and D, or tighten a bound.
-- The permission names assume ADR 0039 is merged. If not, they go into the fixed matrix of
-  ADR 0014 with the same holders.
+Confirmed by the product owner on 2026-10-28, when the ADR was accepted:
+
+- The bounds in §7 stand as proposed.
+- **An environment lock outside the portal bounds is accepted**, so an existing `.env` keeps
+  working (e.g. `SYSTEM_EVENT_RETENTION_DAYS=7`, while the portal accepts 30–3650). It is
+  flagged "outside portal bounds" by `settings list` and on *System status*. The bounds in
+  `app/config.py` stay what the environment may set; the registry holds the portal bounds.
+- The C/D split of the inventory stands: only `time_format` and `admin_timezone` are class D;
+  the Webex/WxCC block stays class C until ADR 0032 is built. `OIDC_ROLE_AUDITOR` joins the
+  login mapping (class C, `settings.login.manage`).
+- The permission names of §5 stand. They are added in step 3 to the matrix as it is on `main`
+  then; `settings.login.manage` is one of the permissions ADR 0039 can never grant to another
+  role.
+
+## Settings
+
+This ADR adds no setting; it classifies every existing one. The classification is
+`app/domain/settings_registry.py`, published as `docs/settings.md`.
