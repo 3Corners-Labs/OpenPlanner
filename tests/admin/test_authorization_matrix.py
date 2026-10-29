@@ -42,8 +42,8 @@ def statuses(*codes: int) -> dict[str, int]:
 # Allowed POSTs answer 422 (empty form) or 404 (unknown item id); refused ones 403.
 # "METHOD route template" -> concrete paths -> expected status per role (HANDOVER §6):
 #   superuser · org_admin (demo) · group_admin (demo) · org_admin (andere) · auditor (demo) ·
-#   no role. The auditor (ADR 0039) reads: overview, rights, matrix, log, retention, manual,
-#   group page.
+#   no role. The auditor (ADR 0039) reads: overview, rights, matrix, log, retention, staff,
+#   manual, group page.
 EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 403)},
@@ -52,6 +52,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/audit": {"/admin/audit": statuses(200, 200, 200, 200, 200, 403)},
     # ADR 0039: retention counts per organisation; no group admins, never personal data.
     "GET /admin/retention": {"/admin/retention": statuses(200, 200, 403, 200, 200, 403)},
+    # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
+    "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403)},
+    "GET /admin/staff/{member_id}": {"/admin/staff/999": statuses(404, 404, 404, 404, 404, 403)},
     # ADR 0033: the manual is public, every admin may read every topic.
     "GET /admin/help": {"/admin/help": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/help/{topic}": {
@@ -181,6 +184,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     # Updates of the installation (ADR 0029): superuser only. Without a release there is
     # nothing to update or restore (409); an unknown request is 404.
     "GET /admin/updates": {"/admin/updates": statuses(200, 403, 403, 403, 403, 403)},
+    "GET /admin/updates/progress": {
+        "/admin/updates/progress": statuses(200, 403, 403, 403, 403, 403),
+    },
     "POST /admin/updates/update": {"/admin/updates/update": statuses(409, 403, 403, 403, 403, 403)},
     "POST /admin/updates/restore": {
         "/admin/updates/restore": statuses(409, 403, 403, 403, 403, 403),

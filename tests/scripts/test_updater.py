@@ -1,4 +1,4 @@
-"""The host updater script (ADR 0029), run against fake docker, cosign, curl and flock."""
+"""The host updater script (ADR 0029, ADR 0048), run against fake docker, cosign, curl and flock."""
 
 import json
 import os
@@ -95,6 +95,12 @@ def cli(*args: str) -> str:
 
 
 UP = "docker compose up -d web worker"
+
+
+def steps(host: Host, request_id: str) -> list[str]:
+    """Return the steps the updater reported for ``request_id``, in order."""
+    prefix = cli("update-progress", request_id, "")
+    return [c.removeprefix(prefix) for c in host.commands() if c.startswith(prefix)]
 
 
 @pytest.fixture
@@ -249,6 +255,47 @@ def test_the_state_file_is_never_sourced(host: Host) -> None:
     assert not host.marker.exists()
     assert host.pinned() == OLD
     assert host.commands()[-1] == cli("update-report", "8", "succeeded")
+
+
+def test_update_reports_each_step_before_taking_it(host: Host) -> None:
+    updated(host)
+
+    assert steps(host, "7") == ["pulling", "verifying", "backing_up", "starting"]
+    assert host.index(cli("update-progress", "7", "verifying")) < host.index(
+        f"cosign verify {NEW} --certificate-identity-regexp ^https://github.com/acme/openplanner/"
+        " --certificate-oidc-issuer https://token.actions.githubusercontent.com"
+    )
+    assert host.index(cli("update-progress", "7", "backing_up")) < host.index(
+        cli("backup-db", "request-7")
+    )
+    assert host.index(cli("update-progress", "7", "starting")) < host.index(UP, pinned=NEW)
+
+
+def test_unhealthy_update_reports_rolling_back(host: Host) -> None:
+    host.given("unhealthy", f"{NEW}\n")
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+
+    host.run()
+
+    assert steps(host, "7") == ["pulling", "verifying", "backing_up", "starting", "rolling_back"]
+
+
+def test_restore_reports_its_steps(host: Host) -> None:
+    updated(host)
+    host.given("claim", "8 restore 1.3.0 1.4.0\n")
+
+    host.run()
+
+    assert steps(host, "8") == ["backing_up", "migrating", "starting"]
+    assert host.index(UP, pinned=OLD) < host.index(cli("update-progress", "8", "starting"))
+
+
+def test_a_version_without_steps_does_not_stop_the_update(host: Host) -> None:
+    host.given("fail", "update-progress\n")
+
+    updated(host)
+
+    assert host.commands()[-1] == cli("update-report", "7", "succeeded")
 
 
 def test_an_update_keeps_the_installers_settings_in_the_pin_file(host: Host) -> None:

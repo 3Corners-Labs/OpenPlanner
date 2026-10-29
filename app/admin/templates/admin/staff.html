@@ -1,0 +1,62 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_filters.html" import filter_select with context %}
+{% block title %}{{ _("admin.staff.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("admin.staff.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.staff.intro") }}</p>
+  </div>
+</div>
+<form class="card" method="get" action="/admin/staff" aria-labelledby="filter-heading">
+  <h2 id="filter-heading" class="visually-hidden">{{ _("admin.staff.filter") }}</h2>
+  <div class="inline-forms">
+    {% if filters.organisations | length > 1 %}
+    {{ filter_select("staff-organisation", "organisation", _("admin.staff.organisation"), filters.organisations, filters.organisation) }}
+    {% endif %}
+    {% if filters.groups | length > 1 %}
+    {{ filter_select("staff-group", "group", _("admin.staff.group"), filters.groups, filters.group) }}
+    {% endif %}
+    {{ filter_select("staff-role", "role", _("admin.staff.role"), filters.roles, filters.role) }}
+    <div class="choice__option">
+      <input type="checkbox" id="staff-dormant" name="dormant" value="1"{% if filters.dormant %} checked{% endif %}>
+      <label for="staff-dormant">{{ _("admin.staff.dormant_only", days=dormant_days) }}</label>
+    </div>
+    <button type="submit" class="button button--secondary">{{ _("admin.staff.apply") }}</button>
+    {% if filters.active %}<a href="/admin/staff">{{ _("admin.staff.clear") }}</a>{% endif %}
+  </div>
+</form>
+{% if people %}
+<div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("admin.staff.title") }}</caption>
+  <thead>
+    <tr>
+      <th scope="col">{{ _("admin.staff.name") }}</th>
+      <th scope="col">{{ _("admin.staff.roles") }}</th>
+      <th scope="col">{{ _("admin.staff.places") }}</th>
+      <th scope="col">{{ _("admin.staff.last_login") }}</th>
+      <th scope="col">{{ _("admin.staff.last_seen") }}</th>
+      <th scope="col">{{ _("admin.staff.last_logout") }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for person in people %}
+    <tr>
+      <th scope="row"><a href="/admin/staff/{{ person.id }}">{{ person.name }}</a>
+        {%- if person.dormant %}<br><span class="chip chip--warning">{{ _("admin.staff.dormant") }}</span>{% endif %}</th>
+      <td>{{ person.roles | join(", ") if person.roles else _("admin.staff.no_role") }}</td>
+      <td>{% for place in person.places %}{{ place.organisation }}{% if place.groups %}: {{ place.groups | join(", ") }}{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}</td>
+      <td class="nowrap">{{ person.last_login }}</td>
+      <td class="nowrap">{{ person.last_seen }}</td>
+      <td class="nowrap">{{ person.last_logout }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted">{{ _("admin.staff.source") }}</p>
+{% else %}
+<p class="empty-state">{{ _("admin.staff.empty") }}</p>
+{% endif %}
+{% endblock %}
