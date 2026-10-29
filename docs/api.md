@@ -27,3 +27,7 @@ with an `Origin` must come from the organisation's allowed origins, else
 | GET | `/api/v1/widget/{org}/{group}/availability?month=YYYY-MM&day=YYYY-MM-DD` | `200` month grid, free times of the day, first free moment |
 | POST | `/api/v1/widget/{org}/{group}/bookings` | `201 {"status": "booked", "start", "end", "label", "message"}`; `400` honeypot, `409` slot taken or group closed, `413`, `422 invalid_request` or `invalid_contact` with `field`, `429 rate_limited` |
 | OPTIONS | `/api/v1/widget/{org}/{group}/bookings` | `204` CORS preflight for allowed origins (not in the spec) |
+
+While maintenance mode is on (ADR 0038), the group, availability and booking routes answer
+`503 {"error": "maintenance"}` with `Retry-After`, readable by an allowed origin; `/texts` and
+the preflight stay open.

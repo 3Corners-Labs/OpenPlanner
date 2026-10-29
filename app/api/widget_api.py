@@ -23,6 +23,8 @@ origin. ``WidgetRoute`` wraps every group route:
 - Allowed origins get ``Access-Control-Allow-Origin`` on every answer, errors included,
   never ``*`` and never with credentials: the widget sends no cookies.
 - Errors are JSON codes (``WidgetError``); they never echo input.
+- During maintenance (ADR 0038) the group routes answer ``503 maintenance`` with
+  ``Retry-After``, by the rule in ``app.api.maintenance``; ``/texts`` and the preflight stay open.
 """
 
 import json
@@ -39,6 +41,7 @@ from starlette.responses import JSONResponse, Response
 
 from app.api.contact_form import HONEYPOT_FIELD, contact_fields
 from app.api.labels import slot_label
+from app.api.maintenance import WidgetMaintenance, retry_after
 from app.api.slot_picker import PickerView, picker, slot_value
 from app.api.widget_schemas import (
     WidgetAvailability,
@@ -78,6 +81,7 @@ TEXT_KEYS = (
     "widget.region",
     "widget.loading",
     "widget.unavailable",
+    "widget.maintenance",
     "widget.retry",
     "widget.more",
     "widget.done_title",
@@ -122,14 +126,22 @@ TEXT_KEYS = (
 )
 """Catalogue keys the Web Component shows; sent with the group in the requested locale."""
 
-BASIC_TEXT_KEYS = ("widget.region", "widget.loading", "widget.unavailable", "widget.retry")
-"""What ``/texts`` returns: enough to say that the calendar is loading or not available."""
+BASIC_TEXT_KEYS = (
+    "widget.region",
+    "widget.loading",
+    "widget.unavailable",
+    "widget.maintenance",
+    "widget.retry",
+)
+"""What ``/texts`` returns: enough to say that the calendar is loading, closed for maintenance
+or not available."""
 
 _ERRORS: dict[int | str, dict[str, Any]] = {
     403: {"model": WidgetError, "description": "`origin_not_allowed`."},
     404: {"model": WidgetError, "description": "`group_not_found`: unknown or not embeddable."},
     422: {"model": WidgetError, "description": "`invalid_request`."},
     429: {"model": WidgetError, "description": "`rate_limited`."},
+    503: {"model": WidgetError, "description": "`maintenance`, with `Retry-After`."},
 }
 
 
@@ -218,6 +230,9 @@ class WidgetRoute(APIRoute):
             except RateLimitExceeded:
                 response = problem("rate_limited", 429)
                 response.headers["retry-after"] = "60"
+            except WidgetMaintenance:
+                response = problem("maintenance", 503)
+                response.headers.update(retry_after(request))
             response.headers["cache-control"] = "no-store"
             response.headers.setdefault("vary", "Origin")
             origin = request.headers.get("origin")
