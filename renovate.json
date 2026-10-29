@@ -1,15 +1,74 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": ["Dependency currency, ADR 0051. Every pinned version in the repository is tracked here; `make pins` fails on one Renovate cannot see."],
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
     "docker:pinDigests",
-    ":semanticCommits"
+    ":semanticCommits",
+    ":dependencyDashboard"
   ],
+  "labels": ["dependencies"],
+  "timezone": "Europe/Amsterdam",
   "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "prConcurrentLimit": 0,
+  "prHourlyLimit": 0,
   "lockFileMaintenance": { "enabled": true, "schedule": ["before 6am on monday"] },
-  "vulnerabilityAlerts": { "enabled": true, "schedule": ["at any time"], "labels": ["security"] },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"],
+    "minimumReleaseAge": null,
+    "labels": ["security"]
+  },
+  "osvVulnerabilityAlerts": true,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Versions annotated with `# renovate: datasource=… depName=…` on the line above (workflows, Makefile, shell scripts, git hooks).",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/",
+        "/(^|/)Makefile$/",
+        "/^scripts/.+\\.sh$/",
+        "/^\\.githooks//"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?\\s*\\n[^\\n]*?(?::=|:|=)\\s+\"?(?:[^\\s\":]+:)?(?<currentValue>[^\\s\"]+)\"?\\s*\\n"
+      ]
+    }
+  ],
   "packageRules": [
-    { "matchUpdateTypes": ["major"], "dependencyDashboardApproval": true }
+    {
+      "description": "Majors arrive as their own PR, never behind a dashboard click: waiting is how actions stayed on Node 20.",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major"]
+    },
+    {
+      "description": "Python 3.12 is a stack decision (CLAUDE.md); a newer minor needs an ADR.",
+      "matchDepNames": ["python"],
+      "allowedVersions": "/^3\\.12(\\.|-|$)/"
+    },
+    {
+      "description": "The Playwright image tag must equal @playwright/test (checked in ci.yml).",
+      "matchDepNames": ["@playwright/test", "mcr.microsoft.com/playwright"],
+      "groupName": "playwright"
+    },
+    {
+      "description": "One uv version in CI and in the image.",
+      "matchDepNames": ["astral-sh/uv", "ghcr.io/astral-sh/uv"],
+      "groupName": "uv"
+    },
+    {
+      "description": "Caddy builder and runtime image move together (deploy/proxy).",
+      "matchDepNames": ["caddy"],
+      "groupName": "caddy"
+    },
+    {
+      "description": "CI tooling: actions and their pinned digests in one weekly PR, unless a major.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "groupName": "github actions"
+    }
   ]
 }

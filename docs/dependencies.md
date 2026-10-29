@@ -48,6 +48,15 @@ mutmut: all active and standard in their field. They are never shipped in the im
 `make diagrams` also calls the draw.io desktop app (Apache-2.0) and Chrome on the developer's
 machine; neither is a dependency of the project.
 
+## CI tooling
+
+All kept current by Renovate (ADR 0051): GitHub Actions pinned by SHA, tool versions with a
+`# renovate:` line. renovate (AGPL-3.0) runs only as `renovate-config-validator` through `npx`
+in `make pins` and as the hosted Renovate app; it is never installed in the project or the
+image. jscpd (MIT), shellcheck (GPL-3.0, run as a separate binary through `shellcheck-py` (MIT) and
+`uvx`, never linked),
+gitleaks (MIT), semgrep (LGPL-2.1, CI container) likewise.
+
 ## Browser tests (npm, CI only)
 
 @playwright/test, @axe-core/playwright (MPL-2.0, required by CLAUDE.md), lighthouse,

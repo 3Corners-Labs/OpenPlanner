@@ -44,6 +44,7 @@ from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
 from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
+from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
@@ -64,7 +65,7 @@ from app.domain.services import BookingService
 from app.domain.simulation import SimulationService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
-from app.keys import management_token_key, session_secret
+from app.keys import client_pseudonym_key, management_token_key, session_secret
 from app.logging import configure_logging
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
@@ -144,7 +145,10 @@ def create_app(
             app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
         )
         app.state.security_log = SecurityLog(
-            uow, clock, timedelta(minutes=settings.security_event_window_minutes)
+            uow,
+            clock,
+            timedelta(minutes=settings.security_event_window_minutes),
+            max_sources=settings.security_event_max_sources,
         )
         app.state.booking_service = BookingService(uow, clock, token_key)
         app.state.admin_service = AdminService(uow, clock)
@@ -222,6 +226,8 @@ def create_app(
                 "clock",
                 "maintenance_service",
                 "settings",
+                "security_log",
+                "client_pseudonyms",
             ):
                 setattr(agent_api.state, name, getattr(app.state, name))
         wired = integrations or build_integrations(
@@ -254,6 +260,8 @@ def create_app(
     app.state.settings = settings
     app.state.clock = clock
     app.state.limiter = limiter
+    # ADR 0053: security events name callers by pseudonym, never by address.
+    app.state.client_pseudonyms = ClientPseudonyms(client_pseudonym_key(settings))
     app.state.identity_provider = identity_provider or oidc_provider(settings, http)
     # Admin-edited overrides are wired in here once the database adapter exists (WP7).
     app.state.translator = Translator(load_catalogues())

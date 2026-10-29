@@ -17,7 +17,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-pebble_container="$(docker create ghcr.io/letsencrypt/pebble:2.8.0)"
+# One source for the Pebble version: the compose overlay, which Renovate updates (ADR 0051).
+pebble_image="$(sed -n 's|^ *image: *\(ghcr.io/letsencrypt/pebble:[^ ]*\)$|\1|p' deploy/proxy/compose.pebble.yml)"
+[ -n "$pebble_image" ] || { echo "no Pebble image in deploy/proxy/compose.pebble.yml" >&2; exit 1; }
+pebble_container="$(docker create "$pebble_image")"
 docker cp "$pebble_container:/test/certs/pebble.minica.pem" "$certs/"
 docker rm "$pebble_container" >/dev/null
 # The proxy runs as uid 10001: mktemp -d makes a 0700 directory it could not enter on Linux.
