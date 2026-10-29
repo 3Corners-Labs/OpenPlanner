@@ -152,6 +152,9 @@ jobs:
         run: scripts/check-proxy.sh
       - name: start read-only, non-root
         run: scripts/run-app-container.sh openplanner:ci
+      # The widget API (ADR 0035) reads the database: give schemathesis a migrated, empty one.
+      - name: migrate the database
+        run: docker exec app alembic upgrade head
       - name: schemathesis
         uses: schemathesis/action@v2
         with:
