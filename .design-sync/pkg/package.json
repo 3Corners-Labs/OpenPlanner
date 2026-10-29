@@ -1,0 +1,7 @@
+{
+  "name": "openplanner-styles",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Sync-only package for /design-sync: the OpenPlanner look (site.css + admin.css) as a tokens-and-CSS design system. No components.",
+  "main": "index.js"
+}
