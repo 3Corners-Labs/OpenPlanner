@@ -6,10 +6,10 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { demoMonthPath, expectNoAxeViolations, tabTo } from '../helpers';
+import { expectNoAxeViolations, tabTo } from '../helpers';
 
 test('book, move and cancel with the keyboard only', async ({ page }) => {
-  await page.goto(demoMonthPath());
+  await page.goto('/g/demo');
   await expectNoAxeViolations(page);
 
   // The calendar is one tab stop (an ARIA grid); arrow keys move between days.
@@ -84,7 +84,7 @@ test('book, move and cancel with the keyboard only', async ({ page }) => {
 test('the calendar works without JavaScript', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false, locale: 'nl-NL' });
   const page = await context.newPage();
-  await page.goto(demoMonthPath());
+  await page.goto('/g/demo');
 
   // Without the script the calendar is a plain table of links, not a grid.
   await expect(page.getByRole('grid')).toHaveCount(0);
