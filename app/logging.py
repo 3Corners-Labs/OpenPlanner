@@ -106,6 +106,20 @@ def _schema_names(_logger: WrappedLogger, _method: str, event_dict: EventDict) -
 _IGNORED_RECORD_ATTRS = frozenset(vars(logging.makeLogRecord({}))) | {"message", "color_message"}
 
 
+_CONFIGURED: list[tuple[TextIO, Envelope | None]] = []
+"""The stream and envelope of the last ``configure_logging``, for ``set_log_level``."""
+
+
+def set_log_level(level: str) -> None:
+    """Change the minimum level live, keeping stream and envelope (ADR 0042 §6).
+
+    The PII masking applies at every level. Before ``configure_logging`` it does nothing.
+    """
+    if _CONFIGURED:
+        stream, envelope = _CONFIGURED[-1]
+        configure_logging(level, stream, envelope)
+
+
 def configure_logging(
     level: str, stream: TextIO | None = None, envelope: Envelope | None = None
 ) -> None:
@@ -119,6 +133,7 @@ def configure_logging(
         envelope: Release and installation name added to every line.
     """
     out = stream or sys.stdout
+    _CONFIGURED[:] = [(out, envelope)]
     shared: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,

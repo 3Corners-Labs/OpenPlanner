@@ -5399,7 +5399,7 @@ msgid "admin.settings.title"
 msgstr "Geavanceerde instellingen"
 
 msgid "admin.settings.intro"
-msgstr "Hoe deze installatie is ingesteld en waar elke waarde vandaan komt. Geheime waarden worden nooit getoond. Op dit scherm kunt u nog niets wijzigen."
+msgstr "Hoe deze installatie is ingesteld en waar elke waarde vandaan komt. Geheime waarden worden nooit getoond. De superuser wijzigt hier bedrijfsvoering, bewaartermijnen, opslag, snelheidslimieten en sessies; een wijziging geldt binnen tien seconden."
 
 msgid "admin.settings.status.title"
 msgstr "Systeemstatus"
@@ -5739,3 +5739,33 @@ msgstr "Verzoek om opnieuw te boeken vervalt na (dagen)"
 
 msgid "settings.field.planner_rebook_reminder_days.label"
 msgstr "Herinnering om opnieuw te boeken (dagen voor het vervallen)"
+
+msgid "admin.settings.change"
+msgstr "Wijzigen"
+
+msgid "admin.settings.new_value"
+msgstr "Nieuwe waarde"
+
+msgid "admin.settings.hours"
+msgstr "Terug naar standaard na (uren, hooguit {max})"
+
+msgid "admin.settings.save"
+msgstr "Opslaan"
+
+msgid "admin.settings.reset"
+msgstr "Standaardwaarde gebruiken"
+
+msgid "admin.form.error.setting_not_editable"
+msgstr "Deze instelling kunt u hier (nog) niet wijzigen."
+
+msgid "admin.form.error.setting_locked"
+msgstr "De beheerder van de server heeft deze instelling vastgezet; wijzig die in de omgeving van de server."
+
+msgid "admin.form.error.setting_invalid"
+msgstr "Deze waarde past niet binnen de grenzen van het portaal."
+
+msgid "admin.form.error.setting_combination"
+msgstr "Deze waarde spreekt een andere instelling tegen (bijvoorbeeld kritieke opslag niet onder weinig opslag)."
+
+msgid "admin.form.error.setting_expiry"
+msgstr "Geef het aantal uren op waarna het logniveau terugvalt: 1 tot en met 24."

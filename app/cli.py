@@ -28,6 +28,11 @@ Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``)
     ``python -m app.cli webhooks-reset [--yes] [--reregister]``  delete stale registrations
     ``python -m app.cli webhooks-health``  token expiry and a signed delivery self-test
 
+Settings (ADR 0042 §10; changes audited as ``system:cli``):
+    ``python -m app.cli settings list|show KEY``  every setting with class, source and lock
+    ``python -m app.cli settings set KEY VALUE [--hours N]``  change a class C setting
+    ``python -m app.cli settings reset KEY|--all-class-c``  back to the default
+
 When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
     ``python -m app.cli oidc-check``  check the login configuration and print the claim mapping
     ``python -m app.cli closure start (--group SLUG | --organisation SLUG) --notice-nl TEXT
@@ -80,7 +85,13 @@ from app.adapters.registrations import (
     listing_to_report,
 )
 from app.adapters.releases import update_service
-from app.adapters.settings_report import describe, format_list, format_one
+from app.adapters.settings_report import (
+    combination_problem,
+    describe,
+    format_list,
+    format_one,
+    locked_keys,
+)
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
@@ -98,6 +109,7 @@ from app.domain.ports import IntegrationError
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.domain.settings_registry import lookup
+from app.domain.settings_service import SettingsService
 from app.domain.update_service import UpdateService
 from app.domain.updates import OUTCOMES, REPORTED_STEPS
 from app.i18n import Translator, load_catalogues
@@ -721,6 +733,41 @@ def _settings(settings: Settings, action: str, key: str | None) -> tuple[str, in
     return note + format_one(next(s for s in states if s.spec is spec)), 0
 
 
+async def _change_setting(settings: Settings, args: argparse.Namespace) -> tuple[str, int]:
+    """Run ``settings set`` or ``settings reset``; audited as ``system:cli`` (ADR 0042 §10).
+
+    Refusals name the code and the variable, never the submitted value. The processes pick
+    the change up within 10 seconds (web) or one loop (worker).
+    """
+    spec = lookup(args.key or "") if args.key else None
+    if args.key and spec is None:
+        return "Unknown setting; `settings list` shows every variable.\n", 2
+    environ = environment()
+    engine = create_engine(settings.database_url)
+    uow = SqlUnitOfWork(engine)
+    clock = SystemClock()
+    service = SettingsService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        locked=lambda: locked_keys(environ),
+        combination=lambda proposed: combination_problem(settings, environ, proposed),
+    )
+    try:
+        if args.action == "set" and spec is not None:
+            await service.change_host(spec.key, args.value, hours=args.hours)
+            return f"{spec.env} set to {args.value.strip()}.\n", 0
+        if spec is not None:
+            removed = await service.reset_host(spec.key)
+            return f"{spec.env} reset.\n" if removed else f"{spec.env} had no portal value.\n", 0
+        return f"{await service.reset_all_host()} portal values removed.\n", 0
+    except DomainError as error:
+        name = spec.env if spec else "setting"
+        return f"Refused ({error.code.value}): {name}.\n", 2
+    finally:
+        await engine.dispose()
+
+
 async def _portal_values(settings: Settings) -> tuple[PortalValues, str]:
     """Read the stored portal values; on failure return none and a note naming the error type."""
     engine = create_engine(settings.database_url)
@@ -785,6 +832,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     settings_actions.add_parser("list", help="every setting: class, source, lock, value")
     show_cmd = settings_actions.add_parser("show", help="one setting in detail")
     show_cmd.add_argument("key", help="variable name, e.g. RATE_LIMIT_BOOKINGS")
+    set_cmd = settings_actions.add_parser("set", help="change a class C setting (audited)")
+    set_cmd.add_argument("key", help="variable name, e.g. ADMIN_SESSION_HOURS")
+    set_cmd.add_argument("value", help="the new value, within the portal bounds")
+    set_cmd.add_argument("--hours", type=int, help="expiry of LOG_LEVEL (1-24 hours)")
+    reset_cmd = settings_actions.add_parser("reset", help="remove portal values (audited)")
+    target = reset_cmd.add_mutually_exclusive_group(required=True)
+    target.add_argument("key", nargs="?", help="variable name")
+    target.add_argument("--all-class-c", action="store_true", help="every changeable value")
     commands.add_parser("settings-doc", help="print the settings reference as Markdown")
     init_cmd = commands.add_parser("init", help="generate the bootstrap keys (first install)")
     init_cmd.add_argument("--out", type=Path, default=DEFAULT_PATH, metavar="PATH")
@@ -802,6 +857,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _write(asyncio.run(_oidc_check(Settings())))
     if args.command == "closure":
         return _closure(Settings(), args)
+    if args.command == "settings" and args.action in ("set", "reset"):
+        text, code = asyncio.run(_change_setting(Settings(), args))
+        sys.stdout.write(text)
+        return code
     if args.command == "settings":
         text, code = _settings(Settings(), args.action, getattr(args, "key", None))
         sys.stdout.write(text)

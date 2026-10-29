@@ -59,6 +59,11 @@ class ErrorCode(StrEnum):
     ALREADY_CLAIMED = "already_claimed"
     FREE_PICK_NOT_ALLOWED = "free_pick_not_allowed"
     NOT_CLAIMED = "not_claimed"
+    SETTING_NOT_EDITABLE = "setting_not_editable"
+    SETTING_LOCKED = "setting_locked"
+    SETTING_INVALID = "setting_invalid"
+    SETTING_COMBINATION = "setting_combination"
+    SETTING_EXPIRY = "setting_expiry"
 
 
 class DomainError(Exception):
