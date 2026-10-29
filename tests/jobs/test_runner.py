@@ -7,15 +7,16 @@ from structlog.testing import capture_logs
 from structlog.typing import EventDict, WrappedLogger
 
 from app.adapters.db.jobs import ClaimedJob
-from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
 from app.domain.booking import BookingStatus, ChangeReason
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
+from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.event_context import TRACE_ID, current, current_trace_id
 from app.domain.job_plan import JobType
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
-from app.domain.system_log import SystemLog
+from app.domain.system_log import EventRetention, SystemLog
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
 from app.jobs.runner import BACKOFF, JobRunner
@@ -333,6 +334,41 @@ async def test_each_job_runs_in_its_own_trace_tagged_with_its_group(
     assert current_trace_id() == ""
 
 
+async def test_a_job_of_a_group_in_diagnostic_mode_writes_a_debug_event(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    # ADR 0040, part 4: one debug event per job, at the job's group, with its trace.
+    bid = await booking_id(uow)
+    uow.state.diagnostic_modes = [
+        DiagnosticMode("org", "aangifte", NOW + timedelta(hours=1), "s-1")
+    ]
+    queue = FakeQueue([job(bid, JobType.SEND_CONFIRMATION)])
+
+    await JobRunner(queue, uow, FixedClock(NOW), RecordingSender(), composer).run_due()
+
+    (debug,) = [e for e in uow.state.audit if e.category is Category.DIAGNOSTIC]
+    (done,) = [e for e in uow.state.audit if e.category is Category.SYSTEM]
+    assert (debug.action, debug.group, debug.booking_id) == ("job.run", "aangifte", bid)
+    assert debug.detail.startswith("type:send_confirmation,attempt:1,ms:")
+    assert debug.trace_id == done.trace_id
+
+
+async def test_without_diagnostic_mode_no_debug_event_is_written(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+
+    await JobRunner(
+        FakeQueue([job(bid, JobType.SEND_CONFIRMATION)]),
+        uow,
+        FixedClock(NOW),
+        RecordingSender(),
+        composer,
+    ).run_due()
+
+    assert all(e.category is not Category.DIAGNOSTIC for e in uow.state.audit)
+
+
 async def test_old_system_events_are_pruned_at_most_once_an_hour(
     uow: InMemoryUnitOfWork, composer: MessageComposer
 ) -> None:
@@ -345,7 +381,14 @@ async def test_old_system_events_are_pruned_at_most_once_an_hour(
     )
     uow.state.audit = [old]
     clock = FixedClock(NOW)
-    runner = JobRunner(FakeQueue([]), uow, clock, None, composer, retention=timedelta(days=30))
+    runner = JobRunner(
+        FakeQueue([]),
+        uow,
+        clock,
+        None,
+        composer,
+        retention=EventRetention(system=timedelta(days=30)),
+    )
 
     await runner.run_due()
     assert uow.state.audit == []

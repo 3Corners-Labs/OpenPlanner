@@ -45,3 +45,23 @@ admins cannot.
 
 An export contains the identifiers (subjects) of admins. Keep the file according to your
 organisation's policy.
+
+## Diagnostic mode
+
+Only the superuser sees the **Diagnostic mode** block at the top. Choose a group or a whole
+organisation and click **Switch on**. While the mode is on, the platform writes extra entries
+of the kind *Diagnostics* about that group, for example *Job run (diagnostics)* with the kind
+of job, the attempt and the duration. The group's admins see those entries too.
+
+The mode ends by itself after 24 hours (adjustable), with **Switch off**, or when the disk is
+nearly full. Switching on and off is logged.
+
+## How long entries stay
+
+- Admin actions: 2 years.
+- System: 90 days.
+- Security: 1 year.
+- Diagnostics: 7 days.
+
+The operator of the installation can change these periods. Older entries are then removed for
+good.
