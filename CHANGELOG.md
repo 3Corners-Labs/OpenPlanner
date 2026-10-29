@@ -97,3 +97,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
   served from our origin only while the closure is visible. Magic-byte recognition and the
   multipart upload reader are shared with the logo (`app/domain/images.py`,
   `app/admin/uploads.py`). Migration 0040. Manual topic for the closure screen.
+- Embedding on host websites (ADR 0035, EM-1): allowed origins per organisation under
+  Insluiten (`embedding.manage`, organisation admin and superuser), exact `https` origins,
+  localhost only outside production; a group's own switch "Insluiten op websites" (off by
+  default); audited with counts. ADR 0035 accepted.
