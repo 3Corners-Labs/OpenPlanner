@@ -15,11 +15,14 @@ its channel fails at once as ``channel_not_configured`` (ADR 0022).
 
 Every outcome (sent, skipped with its reason, retry, failed with its error code) is also a
 system event in the audit log at the booking's group (ADR 0031), so admins can troubleshoot
-their own groups without reading the container logs. Old system events are pruned at most
+their own groups without reading the container logs. Expired events are pruned at most
 once an hour. Writing the event never decides the job's fate: if it fails, it is logged.
 
 Each job runs in its own trace, bound to its booking's organisation and group, so its log
 lines and its system event share one ``trace.id`` and can be filtered per tenant (ADR 0040).
+While that group or its organisation is in diagnostic mode, each job also writes a debug event
+``job.run`` with its type, attempt and duration. Pruning removes every category of event after
+its own retention period.
 """
 
 from collections.abc import Collection
@@ -32,8 +35,9 @@ from app.adapters.db.jobs import ClaimedJob
 from app.domain.audit import Outcome
 from app.domain.call_service import CallService
 from app.domain.channels import ChannelKind
+from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.event_context import trace_scope
+from app.domain.event_context import current, trace_scope
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType, is_stale
 from app.domain.ports import (
@@ -44,7 +48,7 @@ from app.domain.ports import (
     UnitOfWork,
     VideoProvider,
 )
-from app.domain.system_log import SystemLog
+from app.domain.system_log import EventRetention, SystemLog
 from app.jobs.calls import CALL_JOBS, STALE, CallJobs
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
 from app.web.call_labels import agent_start_label
@@ -54,11 +58,9 @@ log = structlog.get_logger()
 BACKOFF = (timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=15))
 """Delay before attempt 2, 3 and 4; after that the job fails."""
 
-RETENTION = timedelta(days=90)
-"""Default age after which system events are pruned (``SYSTEM_EVENT_RETENTION_DAYS``)."""
 
 PRUNE_EVERY = timedelta(hours=1)
-"""How often the runner prunes old system events."""
+"""How often the runner prunes expired events."""
 
 
 class JobQueue(Protocol):
@@ -106,7 +108,7 @@ class JobRunner:
         video: Webex meetings, or ``None`` when not configured.
         dispatcher: WxCC work items, or ``None`` when not configured.
         integration: Records call events; required when ``video`` is set.
-        retention: Age after which system events are pruned.
+        retention: How long each category of event is kept (ADR 0040, part 4).
     """
 
     def __init__(
@@ -120,12 +122,13 @@ class JobRunner:
         video: VideoProvider | None = None,
         dispatcher: ContactCenterDispatcher | None = None,
         integration: IntegrationService | None = None,
-        retention: timedelta = RETENTION,
+        retention: EventRetention | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
         self._system_log = SystemLog(uow, clock)
-        self._retention = retention
+        self._retention = retention or EventRetention()
+        self._diagnostics = DiagnosticLog(uow, clock)
         self._pruned_at: datetime | None = None
         self._uow = uow
         self._clock = clock
@@ -150,8 +153,27 @@ class JobRunner:
         for job in jobs:
             with trace_scope():
                 await self._bind(job)
+                started = self._clock.now()
                 await self._handle(job, now)
+                await self._debug(job, self._clock.now() - started)
         return len(jobs)
+
+    async def _debug(self, job: ClaimedJob, took: timedelta) -> None:
+        """Write a debug event for the job when its group is in diagnostic mode (ADR 0040)."""
+        context = current()
+        detail = (
+            f"type:{job.type.value},attempt:{job.attempts},ms:{took // timedelta(milliseconds=1)}"
+        )
+        try:
+            await self._diagnostics.debug(
+                "job.run",
+                context.organisation,
+                context.group,
+                booking_id=job.booking_id,
+                detail=detail,
+            )
+        except Exception as exc:  # debug detail never stops a job
+            log.warning("diagnostics.failed", job_id=job.id, error=type(exc).__name__)
 
     async def _handle(self, job: ClaimedJob, now: datetime) -> None:
         """Run one job and settle it: done, skipped, retried or failed, with its event."""
@@ -250,7 +272,7 @@ class JobRunner:
             log.warning("system_log.failed", job_id=job.id, error=type(exc).__name__)
 
     async def _prune(self, now: datetime) -> None:
-        """Delete expired system events, at most once per ``PRUNE_EVERY``."""
+        """Delete expired events of every category, at most once per ``PRUNE_EVERY``."""
         if self._pruned_at is not None and now - self._pruned_at < PRUNE_EVERY:
             return
         self._pruned_at = now

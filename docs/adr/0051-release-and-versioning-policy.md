@@ -66,7 +66,7 @@ short. The product owner asked for one clear procedure, without steps that happe
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `APP_COMMIT` | A bootstrap (build) | empty | 7–40 lower-case hex, or empty | none (baked into the image) | Set by `main.yml`; describes the build, so it cannot come from the database. |
+| `APP_COMMIT` | B deployment (build) | empty | 7–40 lower-case hex, or empty | none (baked into the image) | Set by `main.yml`; describes the image itself, like `APP_VERSION` (also B), so it cannot come from the database. |
 
 **Fixed on purpose:** the version rules of point 2, the 12-character short commit on the page,
 the same-day rule for security releases and "only the latest release is supported". They are

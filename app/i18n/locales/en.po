@@ -382,6 +382,33 @@ msgstr "Administration"
 msgid "admin.nav.label"
 msgstr "Administration menu"
 
+msgid "admin.nav.section.monitor"
+msgstr "Monitor"
+
+msgid "admin.nav.section.manage"
+msgstr "Manage"
+
+msgid "admin.nav.section.platform"
+msgstr "Platform"
+
+msgid "admin.nav.object.group"
+msgstr "Group"
+
+msgid "admin.profile.roles"
+msgstr "Your roles"
+
+msgid "admin.theme.label"
+msgstr "Appearance"
+
+msgid "admin.theme.system"
+msgstr "System"
+
+msgid "admin.theme.light"
+msgstr "Light"
+
+msgid "admin.theme.dark"
+msgstr "Dark"
+
 msgid "admin.nav.dashboard"
 msgstr "Overview"
 
@@ -622,6 +649,12 @@ msgstr "Manage organisations"
 
 msgid "authz.permission.audit_view"
 msgstr "View audit log"
+
+msgid "authz.permission.audit_export"
+msgstr "Export audit log"
+
+msgid "authz.permission.diagnostics_manage"
+msgstr "Switch diagnostic mode"
 
 msgid "authz.permission.integrations_manage"
 msgstr "Manage integrations and secrets"
@@ -2969,15 +3002,6 @@ msgstr "Sending failed because of an unexpected mail server error. Try again lat
 msgid "admin.audit.filter"
 msgstr "Filter"
 
-msgid "admin.audit.source"
-msgstr "Kind"
-
-msgid "admin.audit.source.admin"
-msgstr "Admin actions"
-
-msgid "admin.audit.source.system"
-msgstr "System events"
-
 msgid "admin.audit.group"
 msgstr "Group"
 
@@ -3079,6 +3103,102 @@ msgstr "Remove personal data"
 
 msgid "audit.event.storage_check"
 msgstr "Check storage"
+
+msgid "admin.audit.diagnostics.title"
+msgstr "Diagnostic mode"
+
+msgid "admin.audit.diagnostics.intro"
+msgstr "While diagnostic mode is on, the platform writes extra debug entries about that group or organisation into this log. The group's admins see them too. The mode ends by itself after the set time (24 hours by default), and also when the disk is nearly full."
+
+msgid "admin.audit.diagnostics.active"
+msgstr "{target}: on until {until}"
+
+msgid "admin.audit.diagnostics.off"
+msgstr "Switch off"
+
+msgid "admin.audit.diagnostics.on"
+msgstr "Switch on"
+
+msgid "admin.audit.diagnostics.none"
+msgstr "Diagnostic mode is off everywhere."
+
+msgid "admin.audit.diagnostics.target"
+msgstr "Group or organisation"
+
+msgid "admin.done.diagnostics_on"
+msgstr "Diagnostic mode is on."
+
+msgid "admin.done.diagnostics_off"
+msgstr "Diagnostic mode is off."
+
+msgid "audit.event.job_run"
+msgstr "Job run (diagnostics)"
+
+msgid "audit.event.diagnostics_brake"
+msgstr "Diagnostic mode stopped"
+
+msgid "admin.audit.detail.diagnostics_on"
+msgstr "diagnostic mode on"
+
+msgid "admin.audit.detail.diagnostics_off"
+msgstr "diagnostic mode off"
+
+msgid "admin.audit.detail.modes"
+msgstr "{count} ended"
+
+msgid "admin.audit.level"
+msgstr "Minimum level"
+
+msgid "admin.audit.level.debug"
+msgstr "Debug"
+
+msgid "admin.audit.level.info"
+msgstr "Info"
+
+msgid "admin.audit.level.warning"
+msgstr "Warning"
+
+msgid "admin.audit.level.error"
+msgstr "Error"
+
+msgid "admin.audit.level.critical"
+msgstr "Critical"
+
+msgid "admin.audit.category"
+msgstr "Kind"
+
+msgid "admin.audit.category.audit"
+msgstr "Admin actions"
+
+msgid "admin.audit.category.system"
+msgstr "System"
+
+msgid "admin.audit.category.security"
+msgstr "Security"
+
+msgid "admin.audit.category.diagnostic"
+msgstr "Diagnostics"
+
+msgid "admin.audit.from"
+msgstr "From"
+
+msgid "admin.audit.to"
+msgstr "Up to and including"
+
+msgid "admin.audit.trace"
+msgstr "Trace id"
+
+msgid "admin.audit.trace_link"
+msgstr "Whole chain"
+
+msgid "admin.audit.export"
+msgstr "Export as CSV"
+
+msgid "admin.audit.export.too_many_days"
+msgstr "The export covers too many days. Choose a shorter period."
+
+msgid "admin.audit.export.too_many_rows"
+msgstr "The export has too many rows. Narrow the filter, for example with a shorter period."
 
 msgid "audit.event.webhook_rejected"
 msgstr "Webhook rejected"
@@ -4140,6 +4260,21 @@ msgstr "Maintenance mode switched off"
 
 msgid "admin.audit.detail.maintenance_refused"
 msgstr "Change refused during maintenance"
+
+msgid "maintenance.title"
+msgstr "We are carrying out maintenance"
+
+msgid "maintenance.text"
+msgstr "That is why you cannot book, reschedule or cancel an appointment right now. Appointments that are already confirmed go ahead as planned."
+
+msgid "maintenance.expected_end"
+msgstr "We expect to be done on {moment}."
+
+msgid "maintenance.contacts_lead"
+msgstr "Do you need help now? You can also reach us in another way."
+
+msgid "maintenance.try_later"
+msgstr "Please try again later."
 
 # ADR 0046: staff directory
 

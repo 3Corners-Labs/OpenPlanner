@@ -1,4 +1,5 @@
-{#- Shared frame of every admin page: the admin stylesheet and the portal's name. -#}
+{#- Shared frame of every admin page: the admin stylesheet, the portal's name and its theme. -#}
 {% extends "base.html" %}
 {% block head_extra %}<link rel="stylesheet" href="/static/admin.css">{% block admin_head %}{% endblock %}{% endblock %}
-{% block body_attributes %} class="admin"{% endblock %}
+{#- ``theme`` comes from the admin session; without one the portal follows the device setting. -#}
+{% block body_attributes %} class="admin" data-theme="{{ theme if theme is defined else "system" }}"{% endblock %}
