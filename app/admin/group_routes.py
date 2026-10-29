@@ -47,7 +47,7 @@ from app.admin.forms import (
     read_form,
     redirect_done,
 )
-from app.admin.pages import Locale, SameOrigin, page, with_manual
+from app.admin.pages import Locale, NavView, SameOrigin, current_home, page, with_manual
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
@@ -80,6 +80,7 @@ from app.i18n.dates import (
 )
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.locale import RequestLocale
+from app.web.navigation import object_page
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -119,39 +120,6 @@ INTEGRATION_LABELS: dict[str, str] = {
 }
 
 
-@dataclass(frozen=True)
-class Tab:
-    """A section of the group pages, shown only if the matrix allows it for this group."""
-
-    label_key: str
-    suffix: str
-    permission: Permission
-    icon: str
-
-
-TABS = (
-    Tab("admin.tab.overview", "", Permission.GROUP_VIEW, "dashboard"),
-    Tab("admin.tab.settings", "/settings", Permission.GROUP_EDIT, "settings"),
-    Tab("admin.tab.hours", "/staffing", Permission.SCHEDULE_MANAGE, "clock"),
-    Tab("admin.tab.exceptions", "/exceptions", Permission.SCHEDULE_MANAGE, "calendar"),
-    Tab("admin.tab.holidays", "/holidays", Permission.SCHEDULE_MANAGE, "holiday"),
-    Tab("admin.tab.reminders", "/reminders", Permission.REMINDERS_MANAGE, "bell"),
-    Tab("admin.tab.messages", "/messages", Permission.TEXTS_MANAGE, "mail"),
-    Tab("admin.tab.agenda", "/agenda", Permission.BOOKINGS_VIEW, "agenda"),
-    Tab("admin.tab.closure", "/closure", Permission.CLOSURE_MANAGE, "alert"),
-)
-
-
-@dataclass(frozen=True)
-class TabView:
-    """A visible tab."""
-
-    label: str
-    href: str
-    current: bool
-    icon: str
-
-
 def planning_service(request: Request) -> PlanningService:
     """Return the application's planning service."""
     service: PlanningService = request.app.state.planning_service
@@ -169,16 +137,15 @@ def group_page(
     """Render a group page with header, the tabs the matrix allows, and any confirmation."""
     summary = context.group
     can = can_function(context.principal)
-    base = f"/admin/groups/{summary.group.slug}"
+    home = current_home(request)
     tabs = [
-        TabView(
+        NavView(
             locale.gettext(t.label_key),
-            base + t.suffix,
-            request.url.path == base + t.suffix
-            or bool(t.suffix and request.url.path.startswith(f"{base}{t.suffix}/")),
+            t.path.replace("{slug}", summary.group.slug),
+            home is not None and home.tab == t.key,
             t.icon,
         )
-        for t in TABS
+        for t in object_page("group").tabs
         if can(t.permission, summary)
     ]
     response = page(
