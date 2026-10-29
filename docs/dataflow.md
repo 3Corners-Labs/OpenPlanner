@@ -36,10 +36,10 @@ worker ──HTTPS──> SMS API of the organisation's provider ──> mobile 
 
 | Data item | Destination | When | Legal basis owner | Retention at the processor |
 |---|---|---|---|---|
-| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, and on a planner's move or cancellation (ADR 0044), only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
+| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, and on a planner's move, cancellation or request to rebook (ADR 0044), only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
 | First name, date, time, team, management link | as above (message text) | as above | as above | as above |
 
-A planner's move or cancellation (ADR 0044) is sent by SMS as well, to bookings with a phone
+A planner's move, cancellation or request to choose a new time, its one reminder and its lapse (ADR 0044) are sent by SMS as well, to bookings with a phone
 number, with the same data items; a cancellation adds the planner's reason, a fixed text of the
 organisation (never typed by the planner), and has no management link.
 
@@ -121,6 +121,7 @@ web ──SQL──> staff, staff_memberships (sub, display name, roles, organis
 | Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
 | System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
 | Audit events on the log platform (ADR 0034) | one JSON line per audit, system and security event on stdout, shipped by the host to the organisation's log platform (SIEM) | web, worker | the organisation's log policy | no citizen data; **admin subjects** (personal data of employees): the log platform is a recipient |
+| Caller pseudonym in security events (ADR 0053) | `audit_events.detail` as `client:<16 hex>`, and on the log platform | web (from the request's IP address; the address itself is never stored) | as the security event (`SECURITY_EVENT_RETENTION_DAYS`; the organisation's log policy on the platform) | pseudonymised personal data of the caller: HMAC-SHA256 under a key derived from `MANAGEMENT_TOKEN_KEY`, IPv6 by /64; only reversible by trying a known address on the host (`python -m app.cli client-pseudonym`) |
 | Audit log export (ADR 0040) | CSV download of the audit log in the admin's scope: ids, codes, admin subjects | web → admin's browser | the organisation's policy; every export is an audit event | no citizen data; admin subjects |
 | Diagnostic mode (ADR 0040) | `diagnostic_modes`: organisation and group slug, end time, superuser's subject; debug events in `audit_events` (category `diagnostic`: job type, attempt, duration) | web (superuser), worker | mode: until it ends; debug events `DIAGNOSTIC_EVENT_RETENTION_DAYS` (7) | no |
 | Event schema fields (ADR 0040) | `audit_events.event_id`, `level`, `category`, `trace_id`, `service`; the same trace id on stdout | web, worker | as the event they belong to | no: random ids and codes |

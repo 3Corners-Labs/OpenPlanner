@@ -62,9 +62,7 @@ async def test_bad_state_or_missing_code_fails(site: Site, params: dict[str, str
 
     assert response.status_code == 400
     assert "Inloggen mislukt" in response.text
-    assert ("anonymous", "admin.login", Outcome.FAILURE, "invalid_state") in await audit_events(
-        site
-    )
+    assert ("anonymous", "admin.login", Outcome.DENIED, "invalid_state") in await audit_events(site)
 
 
 async def test_callback_without_login_in_progress_fails(site: Site) -> None:
@@ -88,9 +86,7 @@ async def test_identity_errors_are_audited(site: Site) -> None:
     response = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
 
     assert response.status_code == 401
-    assert ("anonymous", "admin.login", Outcome.FAILURE, "invalid_token") in await audit_events(
-        site
-    )
+    assert ("anonymous", "admin.login", Outcome.DENIED, "invalid_token") in await audit_events(site)
 
 
 @pytest.mark.parametrize(

@@ -234,6 +234,7 @@ same commit and rollback behaviour as the SQL one.
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
 | Cap on open direct calls, place in line, usual wait (ADR 0026) | `app/domain/direct_queue.py` |
 | Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029); live steps (ADR 0048) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/web/static/update-progress.js`, `app/cli.py`, `scripts/updater/` |
+| Maintenance mode: switch, cache, refusals in `RequirePermission`, disabled buttons, citizen and machine-API rules, alert (ADR 0038) | `app/domain/maintenance.py`, `app/domain/maintenance_service.py`, `app/adapters/db/maintenance_state.py`, `app/admin/maintenance_routes.py`, `app/admin/frozen_forms.py`, `app/api/maintenance.py`, `app/cli.py`, `scripts/updater/` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Operator commands: `webhooks-list`, `webhooks-reset`, `webhooks-health`; stored results | `app/cli.py`, `app/adapters/registrations.py`, `app/adapters/webhook_selftest.py`, `app/adapters/db/reports.py` |
@@ -242,7 +243,7 @@ same commit and rollback behaviour as the SQL one.
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda per slot with agents and shortfalls, day and week view (ADR 0044) | `app/domain/agenda.py`, `app/domain/agenda_service.py`, `app/admin/agenda_routes.py`, `app/admin/shortfalls.py` |
 | A planner's changes: move, cancel with a fixed reason, accept a shortfall (ADR 0044) | `app/domain/planner_service.py`, `app/admin/planner_routes.py` |
-| Cancelling on the citizen's behalf, shared by closure and planner; the planner's limits | `app/domain/booking_changes.py` |
+| Cancelling on the citizen's behalf, shared by closure and planner; the planner's limits; asking to rebook and its lapse (ADR 0044) | `app/domain/booking_changes.py`, `app/jobs/runner.py` (`lapse_rebook`) |
 | Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
@@ -515,6 +516,26 @@ sequenceDiagram
 
 Every arrow back into OpenPlanner becomes a timeline event and updates the booking's call
 status; the agenda in the admin portal shows it per day.
+
+### Maintenance mode (ADR 0038)
+
+```mermaid
+flowchart LR
+    switch["maintenance_state row<br/>(portal, CLI, updater)"] --> status
+    env["MAINTENANCE_MODE<br/>(environment, no DB read)"] --> status
+    status{"on?<br/>cache ≤ 5 s"}
+    status -->|admin GET| read["every page readable<br/>bar + disabled buttons"]
+    status -->|admin POST| authz["RequirePermission:<br/>matrix, then<br/>decide_in_maintenance"]
+    authz -->|"integrations, updates, switch,<br/>'Koppeling controleren'<br/>(superuser only)"| allowed["change"]
+    authz -->|anything else| refused["503 'alleen lezen'<br/>audit maintenance.refused"]
+    status -->|citizen form or write| page["503 + Retry-After<br/>maintenance page, contact block"]
+    status -->|machine-API write| api["503 {error: maintenance}"]
+    status -.->|never asked| open["webhooks, join pages, health,<br/>worker jobs incl. purge_pii"]
+```
+
+The host updater switches maintenance on before its backup and off after a healthy result, a
+rollback or a restore; a failed update leaves it on. The worker reports maintenance that is on
+longer than `MAINTENANCE_ALERT_HOURS` as the system event `maintenance.overdue`.
 
 ### Booking status
 

@@ -60,6 +60,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WORKER_POLL_SECONDS` | float | `30.0` | 5–300 | `settings.platform.manage` | Interval of the worker loop. |
 | `MAINTENANCE_CACHE_SECONDS` | float | `5.0` | 0–5 | `settings.platform.manage` | How long the web process trusts its last read of the maintenance switch (ADR 0038). |
 | `MAINTENANCE_RETRY_AFTER_SECONDS` | int | `300` | 30–3600 | `settings.platform.manage` | Retry-After of the 503 that citizens and the machine API get during maintenance (ADR 0038). |
+| `MAINTENANCE_ALERT_HOURS` | int | `4` | 1–72 | `settings.platform.manage` | Maintenance on longer than this is reported as a system event (ADR 0038). |
+| `MAINTENANCE_ALERT_REPEAT_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The overdue maintenance event repeats at this interval while it lasts (ADR 0038). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
 | `SYSTEM_EVENT_RETENTION_DAYS` | int | `90` | 30–3650 | `settings.platform.manage` | Days after which system events leave the audit log (ADR 0031). |
 | `AUDIT_RETENTION_DAYS` | int | `730` | 365–3650 | `settings.platform.manage` | Days after which admin actions leave the audit log (ADR 0040). |
@@ -67,6 +69,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |
 | `SECURITY_EVENT_WINDOW_MINUTES` | int | `15` | 1–1440 | `settings.platform.manage` | One security event per source and reason per window; repeats are counted (ADR 0034). |
+| `SECURITY_EVENT_MAX_SOURCES` | int | `1000` | 10–100000 | `settings.platform.manage` | Windows (kind of event × caller) a process keeps; beyond that, callers count as many (ADR 0053). |
 | `AUDIT_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of the audit log may hold; more is refused (ADR 0040). |
 | `AUDIT_EXPORT_MAX_DAYS` | int | `366` | 1–3660 | `settings.platform.manage` | Most days one CSV export of the audit log may cover (ADR 0040). |
 | `EMBEDDING_MAX_ORIGINS` | int | `20` | 1–100 | `settings.platform.manage` | Most host websites one organisation may allow for the embedded widget (ADR 0035). |
@@ -111,3 +114,5 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
 | `STAFF_DORMANT_AFTER_DAYS` | int | `90` | 14–365 | `settings.organisation.manage` | Days without a login after which a person is marked dormant in the staff list (ADR 0046). |
 | `SHORTFALL_HORIZON_DAYS` | int | `14` | 1–60 | `settings.organisation.manage` | Days ahead the shortfall notice on group pages and the dashboard looks (ADR 0044). |
+| `PLANNER_REBOOK_DAYS` | int | `14` | 1–30 | `settings.organisation.manage` | Days after the original start after which an unanswered request to rebook lapses. |
+| `PLANNER_REBOOK_REMINDER_DAYS` | int | `3` | 1–29 | `settings.organisation.manage` | Days before the lapse at which the one reminder to rebook goes (below the lapse). |

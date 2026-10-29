@@ -45,6 +45,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.UPDATE_REQUEST_NOT_FOUND: "error.not_found.text",
     ErrorCode.PLANNER_TOO_LATE: "admin.form.error.planner_too_late",
     ErrorCode.MOVE_CAUSES_SHORTFALL: "admin.form.error.move_causes_shortfall",
+    ErrorCode.SLOT_CHANGED: "admin.form.error.slot_changed",
     ErrorCode.ROLE_NOT_FOUND: "error.not_found.text",
     ErrorCode.ROLE_INVALID: "admin.form.error.role_invalid",
     ErrorCode.ROLE_CHANGED: "admin.form.error.role_changed",

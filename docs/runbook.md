@@ -724,8 +724,8 @@ command on the host passes `--env-file .env.update`, so the pinned digest is wha
 
 | Request | Steps | When something fails |
 |---|---|---|
-| Update | pull `<image>:<version>`, take its digest, `cosign verify` it (release tag of this repository), note the current digest and Alembic revision in `/var/lib/openplanner-updater/previous.env`, back up the database (`data/backups/request-<id>.db`), pin the new digest, `up -d`, wait up to `HEALTH_TIMEOUT` for `/readyz` and a healthy worker | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digest, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
-| Restore previous version (≤ 24 h after an update) | back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digest, start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
+| Update | pull `<image>:<version>`, take its digest, `cosign verify` it (release tag of this repository), note the current digest and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digest, `up -d`, wait up to `HEALTH_TIMEOUT` for `/readyz` and a healthy worker | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digest, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
+| Restore previous version (≤ 24 h after an update) | switch maintenance on, back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digest, start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
 
 Before each step the updater reports it (`python -m app.cli update-progress ID STEP`: pulling,
 verifying, backing_up, migrating, starting, rolling_back; ADR 0048), and at the end the outcome
@@ -814,6 +814,64 @@ When a team cannot hold its appointments (outage, illness, closed building):
 6. **Retention.** Appointments still on hold lose their personal data 30 days after the end of
    the closure. An open-ended closure keeps it until it is lifted, so lift or end it promptly.
 
+## Onderhoudsmodus (ADR 0038)
+
+Maintenance mode freezes the data of the whole installation (every organisation at once) while
+an operator works on the platform. It is not an emergency closure: for one team or one
+organisation that cannot take appointments, use the section above.
+
+**When to switch it on**
+
+- An update or restore: the host updater does it itself (below); nothing to do by hand.
+- Repairing an integration: expired SMTP credentials, a rotated WxCC or SMS key, webhook
+  registrations to renew. Citizens then do not book appointments whose confirmation or work
+  item would not arrive.
+- Investigating an incident with data that must not change underneath.
+- Work on the database itself (restore by hand, moving the volume): use the environment
+  override, see below.
+
+**How**
+
+- Portal: *Onderhoud* in the menu (`/admin/maintenance`, superuser, fresh login). Choose a
+  reason and, if you know it, the expected end. The end is information only: maintenance never
+  ends by itself.
+- Host: `docker compose --env-file .env.update exec web python -m app.cli maintenance on --reason incident`,
+  `... maintenance off`, `... maintenance status` (prints `on since=… by=… reason=…` or `off`).
+  Audited as `host-cli`.
+- Database unavailable or being restored: set `MAINTENANCE_MODE=true` for `web` and restart it
+  (`docker compose --env-file .env.update up -d web`). The web process then does not read the
+  database to decide, and the portal shows that the server switched it on and cannot switch it
+  off. Remove the variable and restart to end it.
+
+**What still works**
+
+| Area | During maintenance |
+|---|---|
+| Citizens: book, reschedule, cancel, start a direct call | closed: `503` with `Retry-After` (`MAINTENANCE_RETRY_AFTER_SECONDS`), the maintenance page with the expected end and the team's (or organisation's) contact options |
+| Citizens: view an appointment, join a confirmed call, waiting page | open |
+| Machine API | reads and the token endpoint open; writes `503 {"error": "maintenance"}` |
+| Worker: reminders, work items, meetings, `purge_pii` and the nightly sweep | continue; the worker never pauses |
+| Webhooks from Webex and WxCC | open |
+| `/healthz`, `/readyz` | unchanged |
+| Admin portal | every page readable; changes refused with "Onderhoudsmodus: alleen lezen" (audited as `maintenance.refused`) |
+| Superuser | can still change integrations (SMTP, SMS, Webex/WxCC), use "Koppeling controleren" and the test mail, request updates and switch maintenance |
+
+Maintenance switched on by the server stays on whatever the portal says. An emergency closure
+cannot be started or changed during maintenance: end maintenance first if one is needed.
+
+**Updates.** The updater switches maintenance on right before its backup (so the backup has it
+on too) and off after `succeeded` or `rolled_back`. A `failed` update after the backup leaves it
+on: citizens see the maintenance page instead of a half-working system. After fixing it (see
+*When the portal shows `failed`* above), switch maintenance off in the portal or with the CLI.
+The updater also switches off maintenance that a superuser had switched on before the update;
+switch it on again if the work is not done.
+
+**Alert.** Maintenance that is on longer than `MAINTENANCE_ALERT_HOURS` (default 4) is recorded
+as the system event *Onderhoudsmodus staat lang aan* in the audit log (global, superuser) and
+logged as `maintenance.overdue` (warning), and again every `MAINTENANCE_ALERT_REPEAT_HOURS`
+(default 24) while it lasts. Alert on that log event in monitoring. The environment override
+is not judged: it is the operator's own doing.
+
 ## Personal data not removed on time (ADR 0039)
 
 **Retention** in the admin portal (organisation admins, the compliance role and the superuser)
@@ -861,6 +919,24 @@ older rows for good at the next prune, so agree it with the records officer firs
 Many *Webhook geweigerd* entries mean someone is probing the webhook URL or a secret was
 rotated on one side only; *Webex-token vernieuwen* with `unauthorized` means the Service App
 must be reconnected (see *Webex or WxCC is down*).
+
+Attempts on the public entry points are security events too (ADR 0053), each naming its
+caller by pseudonym (`client:<16 hex>`), never by IP address:
+
+| Entry | Means | What to do |
+|---|---|---|
+| *Te veel verzoeken*, `too_many_requests` (`surface:web` or `surface:agent`) | one caller went over a rate limit | many from one caller: a scanner or bot, block it at the proxy or firewall; from `many` callers: a distributed attack |
+| *Verzoek geweigerd*, `honeypot` | a bot filled in the hidden field of the booking form | nothing for one; a stream: consider Turnstile (feature flag) |
+| *Verzoek geweigerd*, `cross_site` / `origin_mismatch` | a form post from another site (CSRF attempt), or a proxy that rewrites `Origin` | check the proxy if it comes from all callers |
+| *Inloggen*, outcome denied, `invalid_state` / `invalid_token` / `nonce_mismatch` | a failed admin login | one: an expired login tab; many from one caller: an attack on the login |
+| *Onbekende sleutel of link*, `unknown_token` | a bearer token on the machine API that matches nothing | many: token guessing; check the API clients |
+| *Onbekende sleutel of link*, `unknown_management_link` | a `/b/...` link that matches no booking | one per caller is normal (purged or mistyped link); a stream from one caller is link guessing |
+
+To check whether an IP address from a firewall or proxy log is the caller in an event, run
+`docker compose exec web python -m app.cli client-pseudonym 203.0.113.7` and compare. There
+is no way from a pseudonym back to an address. Rotating `MANAGEMENT_TOKEN_KEY` changes every
+pseudonym (and every management link). At most `SECURITY_EVENT_MAX_SOURCES` callers (default
+1000) are tracked per window and process; beyond that, events count under `client:many`.
 
 ## Log lines and the event schema (ADR 0040)
 
