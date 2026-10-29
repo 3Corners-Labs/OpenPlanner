@@ -8,6 +8,7 @@ from app.domain.authorization import (
     API_SCOPES,
     LEVELS,
     LOCKED_PERMISSIONS,
+    MAINTENANCE_WRITABLE,
     MATRIX,
     PII_PERMISSIONS,
     REACH,
@@ -24,6 +25,7 @@ from app.domain.authorization import (
     Target,
     decide,
     decide_client,
+    decide_in_maintenance,
     permissions_for,
     scope_for,
 )
@@ -114,6 +116,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.INTEGRATIONS_MANAGE,
         Permission.API_CLIENTS_MANAGE,
         Permission.SYSTEM_UPDATE,
+        Permission.SYSTEM_MAINTENANCE,
     } == LOCKED_PERMISSIONS
     for permission in LOCKED_PERMISSIONS:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
@@ -336,3 +339,38 @@ def test_decide_client(grant: ClientGrant, target: Target, expected: Decision) -
 def test_decide_client_refuses_a_target_of_the_wrong_level() -> None:
     with pytest.raises(ValueError, match="group level target"):
         decide_client(WHOLE_ORG, READ, OWN_ORG)
+
+
+def test_maintenance_writable_is_the_adr_list() -> None:
+    # ADR 0038 §3, written out by hand: integrations, updates and the switch itself.
+    assert {
+        Permission.INTEGRATIONS_MANAGE,
+        Permission.SYSTEM_UPDATE,
+        Permission.SYSTEM_MAINTENANCE,
+    } == MAINTENANCE_WRITABLE
+
+
+@pytest.mark.parametrize("permission", sorted(MAINTENANCE_WRITABLE))
+def test_maintenance_lets_the_superuser_change_what_is_writable(permission: Permission) -> None:
+    assert decide_in_maintenance(SUPER, permission) == Decision(True, Reason.SUPERUSER)
+
+
+@pytest.mark.parametrize("permission", sorted(set(Permission) - MAINTENANCE_WRITABLE))
+def test_maintenance_freezes_everything_else_also_for_the_superuser(
+    permission: Permission,
+) -> None:
+    assert decide_in_maintenance(SUPER, permission) == Decision(False, Reason.MAINTENANCE)
+
+
+@pytest.mark.parametrize("principal", [ORG, GROUP, AUDITOR, NOBODY, MIXED])
+@pytest.mark.parametrize("permission", sorted(Permission))
+def test_maintenance_freezes_every_other_role(principal: Principal, permission: Permission) -> None:
+    assert not decide_in_maintenance(principal, permission).allowed
+    assert not decide_in_maintenance(principal, permission, maintenance_safe=True).allowed
+
+
+def test_a_maintenance_safe_route_is_open_to_the_superuser_only() -> None:
+    allowed = decide_in_maintenance(SUPER, Permission.GROUP_EDIT, maintenance_safe=True)
+
+    assert allowed == Decision(True, Reason.SUPERUSER)
+    assert not decide_in_maintenance(ORG, Permission.GROUP_EDIT, maintenance_safe=True).allowed

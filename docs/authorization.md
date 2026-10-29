@@ -13,6 +13,10 @@ groups of their claim. The auditor reads only and never sees personal data (ADR 
 Bounds (ADR 0039): *locked* permissions belong to the superuser only; *personal data*
 permissions show citizens' data and are never held by the auditor.
 
+Maintenance (ADR 0038): while maintenance mode is on, every change is refused except
+for the permissions marked *maintenance*, and those only for the superuser. Reading
+stays open to every role as usual.
+
 | Permission | Level | Bounds | Superuser | Organisation admin | Group admin | Compliance and privacy (read-only) |
 |---|---|---|---|---|---|---|
 | View overview (`dashboard.view`) | Portal | – | yes | yes | yes | yes |
@@ -21,8 +25,9 @@ permissions show citizens' data and are never held by the auditor.
 | Manage organisations (`organisation.manage`) | Portal | locked | yes | – | – | – |
 | Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | locked | yes | – | – | – |
 | Manage API clients (`api_clients.manage`) | Portal | locked | yes | – | – | – |
-| Update the installation (`system.update`) | Portal | locked | yes | – | – | – |
-| Manage integrations and secrets (`integrations.manage`) | Organisation | locked | yes | – | – | – |
+| Update the installation (`system.update`) | Portal | locked, maintenance | yes | – | – | – |
+| Switch maintenance mode on and off (`system.maintenance`) | Portal | locked, maintenance | yes | – | – | – |
+| Manage integrations and secrets (`integrations.manage`) | Organisation | locked, maintenance | yes | – | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | – | yes | – | – | – |
 | Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | – | yes | yes | – | – |
 | Create groups (`group.create`) | Organisation | – | yes | yes | – | – |

@@ -35,6 +35,8 @@ from app.domain.authorization import (
     Target,
     decide,
 )
+from app.domain.event_schema import rfc3339
+from app.domain.maintenance import MaintenanceReason
 from app.domain.storage import (
     DATABASE_TOO_LARGE,
     FREE_SPACE_CRITICAL,
@@ -133,6 +135,10 @@ DETAIL_LABELS: dict[str, str] = {
     "api.docs_public": "admin.api.docs_public",
     "channel:email": "admin.audit.detail.channel_email",
     "channel:sms": "admin.audit.detail.channel_sms",
+    # ADR 0038: switching maintenance mode, and changes refused while it is on.
+    "maintenance.on": "admin.audit.detail.maintenance_on",
+    "maintenance.off": "admin.audit.detail.maintenance_off",
+    "maintenance.refused": "admin.audit.detail.maintenance_refused",
 }
 """Readable label per audit detail key (changed field names and schedule actions)."""
 
@@ -159,6 +165,9 @@ REASON_LABELS: dict[str, str] = {
     Reason.NO_ROLE: "admin.audit.reason.no_role",
     Reason.NOT_PERMITTED: "admin.audit.reason.not_permitted",
     Reason.OUT_OF_SCOPE: "admin.audit.reason.out_of_scope",
+    Reason.MAINTENANCE: "admin.audit.reason.maintenance",
+    # ADR 0038: why maintenance was switched on (the reason codes of the switch).
+    **{reason.value: f"admin.maintenance.reason.{reason.value}" for reason in MaintenanceReason},
     "stale": "admin.audit.reason.stale",
     "no_recipient": "admin.audit.reason.no_recipient",
     "no_booking": "admin.audit.reason.no_booking",
@@ -189,6 +198,7 @@ class AuditView:
     """A translated audit event."""
 
     when: str
+    utc: str
     actor: str
     action: str
     outcome: str
@@ -290,6 +300,7 @@ def audit_views(
     return [
         AuditView(
             admin_moment(request, locale, e.at),
+            rfc3339(e.at),
             _actor_label(entry, _),
             _action_label(e.action, _),
             _(OUTCOME_LABELS[e.outcome]),
