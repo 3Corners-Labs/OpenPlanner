@@ -105,3 +105,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - Closure mails (ADR 0037, CL-5): the suspension and update mails carry the closure's heading,
   notice and copy of the contact options as a fixed block in the HTML and plain-text parts, and
   link to the closure page; the image is not mailed. Snapshot tests in nl and en.
+- Embedding on host websites (ADR 0035, EM-1): allowed origins per organisation under
+  Insluiten (`embedding.manage`, organisation admin and superuser), exact `https` origins,
+  localhost only outside production; a group's own switch "Insluiten op websites" (off by
+  default); audited with counts. ADR 0035 accepted.
