@@ -2978,9 +2978,6 @@ msgstr "Admin actions"
 msgid "admin.audit.source.system"
 msgstr "System events"
 
-msgid "admin.audit.all"
-msgstr "All"
-
 msgid "admin.audit.group"
 msgstr "Group"
 
@@ -3149,7 +3146,7 @@ msgid "admin.updates.open"
 msgstr "Open request"
 
 msgid "admin.updates.open_lead"
-msgstr "To version {version}. The page shows the outcome as soon as the updater reports it."
+msgstr "To version {version}. The updater looks for requests every minute and reports each step; this list updates itself."
 
 msgid "admin.updates.unclaimed"
 msgstr "No updater has picked up this request after 10 minutes. Check that the updater is installed on the server (see the runbook)."
@@ -3267,6 +3264,57 @@ msgstr "Go to updates"
 
 msgid "admin.updates.banner.snooze"
 msgstr "Remind me in 60 minutes"
+
+msgid "admin.updates.step.waiting"
+msgstr "Waiting for the updater to pick up the request"
+
+msgid "admin.updates.step.pulling"
+msgstr "Downloading version {version}"
+
+msgid "admin.updates.step.verifying"
+msgstr "Checking the signature"
+
+msgid "admin.updates.step.backing_up"
+msgstr "Backing up the database"
+
+msgid "admin.updates.step.migrating"
+msgstr "Taking the database back to version {version}"
+
+msgid "admin.updates.step.starting"
+msgstr "Starting version {version} and checking it"
+
+msgid "admin.updates.step.rolling_back"
+msgstr "Rolling back to the previous version and the backup"
+
+msgid "admin.updates.step_state.done"
+msgstr "done"
+
+msgid "admin.updates.step_state.current"
+msgstr "in progress"
+
+msgid "admin.updates.step_state.pending"
+msgstr "not yet"
+
+msgid "admin.updates.step.since"
+msgstr "since {time}"
+
+msgid "admin.updates.steps"
+msgstr "Steps"
+
+msgid "admin.updates.progress.status"
+msgstr "Now: {step}"
+
+msgid "admin.updates.progress.ended"
+msgstr "Request to version {version}: {status}."
+
+msgid "admin.updates.progress.refresh"
+msgstr "Refresh status"
+
+msgid "admin.updates.progress.reload"
+msgstr "Reload the page"
+
+msgid "admin.updates.banner.step"
+msgstr "The update to version {version} is running: {step}."
 
 #. Context-sensitive help and the manual (ADR 0033).
 msgid "admin.nav.help"
@@ -3930,3 +3978,257 @@ msgstr "Own block with {count} contact options."
 
 msgid "admin.group_contacts.summary_default"
 msgstr "Organisation default: {count} contact options."
+
+msgid "authz.permission.system_maintenance"
+msgstr "Switch maintenance mode on and off"
+
+msgid "error.maintenance"
+msgstr "Maintenance mode: read only. The platform is under maintenance; changes are possible again once it is finished."
+
+msgid "admin.form.error.maintenance_from_environment"
+msgstr "Maintenance mode is switched on in the server configuration (MAINTENANCE_MODE). Only the server operator can switch it off."
+
+msgid "admin.form.error.expected_end"
+msgstr "Enter an expected end date and time in the future, or leave both empty."
+
+msgid "admin.done.maintenance_on"
+msgstr "Maintenance mode is on."
+
+msgid "admin.done.maintenance_off"
+msgstr "Maintenance mode is off."
+
+msgid "admin.nav.maintenance"
+msgstr "Maintenance"
+
+msgid "admin.maintenance.refused.title"
+msgstr "Maintenance mode: read only"
+
+msgid "admin.maintenance.bar.label"
+msgstr "Maintenance mode"
+
+msgid "admin.maintenance.bar.title"
+msgstr "Maintenance mode"
+
+msgid "admin.maintenance.bar.text"
+msgstr "Read only: changes are not possible for now."
+
+msgid "admin.maintenance.bar.since"
+msgstr "Since {moment}"
+
+msgid "admin.maintenance.bar.expected_end"
+msgstr "Expected end: {moment}"
+
+msgid "admin.maintenance.bar.environment"
+msgstr "Switched on by the server"
+
+msgid "admin.maintenance.title"
+msgstr "Maintenance mode"
+
+msgid "admin.maintenance.lead"
+msgstr "Put the whole installation on read only while you work on the platform. Citizens then cannot book or change appointments; confirmed appointments go ahead as planned."
+
+msgid "admin.maintenance.state"
+msgstr "Status"
+
+msgid "admin.maintenance.on"
+msgstr "On"
+
+msgid "admin.maintenance.off"
+msgstr "Off"
+
+msgid "admin.maintenance.since"
+msgstr "On since"
+
+msgid "admin.maintenance.by"
+msgstr "Switched on by"
+
+msgid "admin.maintenance.reason"
+msgstr "Reason"
+
+msgid "admin.maintenance.reason_hint"
+msgstr "Shown in the audit log and on this page."
+
+msgid "admin.maintenance.expected_end"
+msgstr "Expected end"
+
+msgid "admin.maintenance.expected_end_hint"
+msgstr "For information only: maintenance mode does not end by itself."
+
+msgid "admin.maintenance.no_expected_end"
+msgstr "Not given"
+
+msgid "admin.maintenance.environment"
+msgstr "Maintenance mode is switched on in the server configuration (MAINTENANCE_MODE). You cannot switch that off here."
+
+msgid "admin.maintenance.on_heading"
+msgstr "Switch maintenance mode on"
+
+msgid "admin.maintenance.change_heading"
+msgstr "Change the reason or expected end"
+
+msgid "admin.maintenance.on_lead"
+msgstr "During maintenance only the superuser can change integrations, updates and this switch. Everything else is read only, for the superuser too."
+
+msgid "admin.maintenance.change"
+msgstr "Save"
+
+msgid "admin.maintenance.switch_on"
+msgstr "Switch maintenance mode on"
+
+msgid "admin.maintenance.off_heading"
+msgstr "Switch maintenance mode off"
+
+msgid "admin.maintenance.off_lead"
+msgstr "Citizens and admins can then do everything they are used to again."
+
+msgid "admin.maintenance.off_lead_environment"
+msgstr "Switching off only clears the switch in the portal; maintenance mode stays on as long as the server switches it on."
+
+msgid "admin.maintenance.switch_off"
+msgstr "Switch maintenance mode off"
+
+msgid "admin.maintenance.reason.update"
+msgstr "Update"
+
+msgid "admin.maintenance.reason.restore"
+msgstr "Restore of an earlier version"
+
+msgid "admin.maintenance.reason.integration"
+msgstr "Repairing an integration"
+
+msgid "admin.maintenance.reason.incident"
+msgstr "Investigating an incident"
+
+msgid "admin.maintenance.reason.other"
+msgstr "Other maintenance"
+
+msgid "admin.audit.reason.maintenance"
+msgstr "Refused: maintenance mode"
+
+msgid "admin.audit.detail.maintenance_on"
+msgstr "Maintenance mode switched on"
+
+msgid "admin.audit.detail.maintenance_off"
+msgstr "Maintenance mode switched off"
+
+msgid "admin.audit.detail.maintenance_refused"
+msgstr "Change refused during maintenance"
+
+# ADR 0046: staff directory
+
+msgid "authz.permission.staff_view"
+msgstr "View staff"
+
+msgid "admin.nav.staff"
+msgstr "Staff"
+
+msgid "audit.event.staff_created"
+msgstr "First login"
+
+msgid "audit.event.staff_changed"
+msgstr "Roles or memberships changed"
+
+msgid "admin.audit.detail.role_add"
+msgstr "role added: {value}"
+
+msgid "admin.audit.detail.role_remove"
+msgstr "role removed: {value}"
+
+msgid "admin.audit.detail.organisation_add"
+msgstr "organisation added: {value}"
+
+msgid "admin.audit.detail.organisation_remove"
+msgstr "organisation removed: {value}"
+
+msgid "admin.audit.detail.group_add"
+msgstr "group added: {value}"
+
+msgid "admin.audit.detail.group_remove"
+msgstr "group removed: {value}"
+
+msgid "admin.staff.title"
+msgstr "Staff"
+
+msgid "admin.staff.intro"
+msgstr "Who uses the admin portal, with which role and for which organisations and groups. You only see staff within your own organisations or groups."
+
+msgid "admin.staff.filter"
+msgstr "Filter staff"
+
+msgid "admin.staff.organisation"
+msgstr "Organisation"
+
+msgid "admin.staff.group"
+msgstr "Group"
+
+msgid "admin.staff.role"
+msgstr "Role"
+
+msgid "admin.filter.all"
+msgstr "All"
+
+msgid "admin.staff.dormant_only"
+msgstr "Only people without a login for {days} days"
+
+msgid "admin.staff.apply"
+msgstr "Filter"
+
+msgid "admin.staff.clear"
+msgstr "Clear filters"
+
+msgid "admin.staff.name"
+msgstr "Name"
+
+msgid "admin.staff.roles"
+msgstr "Roles"
+
+msgid "admin.staff.places"
+msgstr "Organisations and groups"
+
+msgid "admin.staff.first_seen"
+msgstr "First login"
+
+msgid "admin.staff.last_login"
+msgstr "Last login"
+
+msgid "admin.staff.last_seen"
+msgstr "Last active"
+
+msgid "admin.staff.last_logout"
+msgstr "Last logout"
+
+msgid "admin.staff.never"
+msgstr "Not yet"
+
+msgid "admin.staff.dormant"
+msgstr "No recent login"
+
+msgid "admin.staff.no_role"
+msgstr "No role"
+
+msgid "admin.staff.whole_organisation"
+msgstr "Whole organisation"
+
+msgid "admin.staff.source"
+msgstr "Roles, organisations and groups come from the identity provider and were updated at the last login. Change them there."
+
+msgid "admin.staff.empty"
+msgstr "No staff match this selection."
+
+msgid "admin.staff.back"
+msgstr "Back to staff"
+
+msgid "admin.staff.access"
+msgstr "Access"
+
+msgid "admin.staff.times"
+msgstr "Logins and logouts"
+
+msgid "admin.staff.activity"
+msgstr "Recent activity"
+
+msgid "admin.staff.activity_intro"
+msgstr "The latest {count} events from the audit log within your own organisations or groups."
+
+msgid "admin.staff.activity_empty"
+msgstr "No activity within your organisations or groups."

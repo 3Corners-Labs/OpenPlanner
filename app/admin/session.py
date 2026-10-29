@@ -1,8 +1,9 @@
 """The admin session: who is logged in, and the OIDC login in progress (ADR 0013).
 
 Stored in Starlette's signed session cookie (``op_admin``, path ``/admin``). Holds the
-principal's subject, display name, roles, organisations and groups, and the login time. The
-absolute lifetime is enforced here; the cookie's own expiry slides with every response.
+principal's subject, display name, roles, organisations and groups, the login time and when
+activity was last written to the staff record (ADR 0046). The absolute lifetime is enforced
+here; the cookie's own expiry slides with every response.
 """
 
 from datetime import datetime, timedelta
@@ -15,6 +16,7 @@ from app.domain.ports import LoginStart
 
 _PRINCIPAL = "principal"
 _LOGIN_AT = "login_at"
+_SEEN_AT = "seen_at"
 _OIDC = "oidc"
 
 
@@ -45,6 +47,7 @@ def start_session(request: Request, principal: Principal, now: datetime) -> None
         "groups": sorted(principal.groups),
     }
     request.session[_LOGIN_AT] = now.isoformat()
+    request.session[_SEEN_AT] = now.isoformat()
 
 
 def current_principal(request: Request, now: datetime, lifetime: timedelta) -> Principal | None:
@@ -80,6 +83,22 @@ def login_age(request: Request, now: datetime) -> timedelta | None:
         return now - datetime.fromisoformat(login_at)
     except ValueError:
         return None
+
+
+def activity_due(request: Request, now: datetime, interval: timedelta) -> bool:
+    """Return whether activity is due to be written, and if so remember ``now`` as written.
+
+    Keeps the write to the staff record at most once per ``interval`` without a database
+    read on every request.
+    """
+    seen_at: Any = request.session.get(_SEEN_AT)
+    try:
+        due = not isinstance(seen_at, str) or now - datetime.fromisoformat(seen_at) >= interval
+    except ValueError:
+        due = True
+    if due:
+        request.session[_SEEN_AT] = now.isoformat()
+    return due
 
 
 def end_session(request: Request) -> None:
