@@ -21,6 +21,7 @@ from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
+from app.domain.embedding import AllowedOrigins
 from app.domain.job_plan import PlannedJob
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
@@ -56,6 +57,7 @@ class State:
     logos: dict[int, Logo] = field(default_factory=dict)
     fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
     contact_blocks: dict[int, ContactBlock] = field(default_factory=dict)
+    allowed_origins: dict[int, AllowedOrigins] = field(default_factory=dict)
     group_contact_blocks: dict[int, ContactBlock] = field(default_factory=dict)
     group_checks: dict[int, GroupCheck] = field(default_factory=dict)
     holiday_calendars: dict[int, holiday_model.HolidayCalendar] = field(default_factory=dict)
@@ -254,6 +256,12 @@ class InMemoryTransaction:
             self.state.contact_blocks.pop(organisation_id, None)
         else:
             self.state.contact_blocks[organisation_id] = block
+
+    async def get_allowed_origins(self, organisation_id: int) -> AllowedOrigins:
+        return self.state.allowed_origins.get(organisation_id, AllowedOrigins())
+
+    async def save_allowed_origins(self, organisation_id: int, allowed: AllowedOrigins) -> None:
+        self.state.allowed_origins[organisation_id] = allowed
 
     async def get_group_contact_block(self, group_id: int) -> ContactBlock | None:
         return self.state.group_contact_blocks.get(group_id)

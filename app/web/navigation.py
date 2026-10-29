@@ -135,6 +135,14 @@ SECTIONS = (
                 ("/admin/organisations/{org}/branding",),
             ),
             Screen(
+                "manage.embedding",
+                "admin.nav.embedding",
+                "/admin/embedding",
+                Permission.EMBEDDING_MANAGE,
+                "code",
+                ("/admin/organisations/{org}/embedding",),
+            ),
+            Screen(
                 "manage.holidays",
                 "admin.nav.holidays",
                 "/admin/holidays",

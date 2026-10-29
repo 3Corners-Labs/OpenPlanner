@@ -606,6 +606,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=3660,
     ),
     S(
+        "embedding_max_origins",
+        K.INT,
+        20,
+        _C,
+        T.OPERATIONS,
+        "Most host websites one organisation may allow for the embedded widget (ADR 0035).",
+        minimum=1,
+        maximum=100,
+    ),
+    S(
         "storage_low_free_percent",
         K.FLOAT,
         15.0,
