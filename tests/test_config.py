@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import pytest
 from pydantic import ValidationError
 
@@ -182,3 +184,15 @@ def test_the_security_event_window_has_bounds(minutes: int) -> None:
     assert Settings(environment="dev").security_event_window_minutes == 15
     with pytest.raises(ValidationError):
         Settings(environment="dev", security_event_window_minutes=minutes)
+
+
+def test_each_category_has_its_own_retention() -> None:
+    # ADR 0040, part 4 (class C): admin actions 2 years (product owner, 2026-10-29).
+    retention = Settings(environment="dev").event_retention
+
+    assert (retention.audit, retention.system) == (timedelta(days=730), timedelta(days=90))
+    assert (retention.security, retention.diagnostic) == (timedelta(days=365), timedelta(days=7))
+    with pytest.raises(ValidationError):
+        Settings(environment="dev", audit_retention_days=364)
+    with pytest.raises(ValidationError):
+        Settings(environment="dev", diagnostic_mode_hours=73)
