@@ -1,0 +1,12 @@
+{
+  "name": "openplanner-widget",
+  "private": true,
+  "description": "<gov-booking> Web Component (ADR 0035). Bundled by esbuild in CI and in the image build only.",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/gov-booking.js --bundle --format=esm --target=es2022 --minify --legal-comments=none --loader:.css=text --outfile=dist/gov-booking.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

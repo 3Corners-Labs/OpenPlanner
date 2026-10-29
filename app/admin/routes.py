@@ -50,6 +50,7 @@ from app.admin import (
     planner_routes,
     retention_routes,
     role_routes,
+    scenario_routes,
     simulator_routes,
     staff_routes,
     update_routes,
@@ -74,7 +75,7 @@ from app.admin.pages import page as _page
 from app.admin.session import end_session, pop_login_start, save_login_start, start_session
 from app.admin.shortfalls import agenda_service, shortfall_view
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT
-from app.domain.audit import AuditEntry, Outcome
+from app.domain.audit import AuditEntry
 from app.domain.authorization import (
     API_SCOPES,
     CITIZEN_ACTIONS,
@@ -98,6 +99,7 @@ from app.web.authz_labels import (
 from app.web.authz_report import matrix_rows
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.protection import limiter, read_limit
+from app.web.security_events import report
 from app.web.templates import render
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -159,7 +161,7 @@ async def callback(
         or not state
         or not hmac.compare_digest(state, pending.get("state", ""))
     ):
-        await service.record(ANONYMOUS, LOGIN_EVENT, Outcome.FAILURE, "invalid_state")
+        await report(request, LOGIN_EVENT, "invalid_state", actor=ANONYMOUS)
         return _message(request, locale, 400, "admin.login_failed.title", "admin.login_failed.text")
     try:
         principal = await provider.finish_login(
@@ -169,7 +171,7 @@ async def callback(
             nonce=pending["nonce"],
         )
     except IdentityError as error:
-        await service.record(ANONYMOUS, LOGIN_EVENT, Outcome.FAILURE, error.code)
+        await report(request, LOGIN_EVENT, error.code, actor=ANONYMOUS)
         return _message(request, locale, 401, "admin.login_failed.title", "admin.login_failed.text")
     principal = await role_service(request).attach(principal)
     start_session(request, principal, _clock(request).now())
@@ -505,6 +507,7 @@ def register_admin(app: FastAPI) -> None:
         organisation_routes.router,
         closure_routes.router,
         closure_image_routes.router,
+        scenario_routes.router,
         contact_routes.router,
         embedding_routes.router,
         api_routes.router,

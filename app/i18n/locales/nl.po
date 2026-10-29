@@ -3560,6 +3560,42 @@ msgstr "De dienst is niet bereikbaar."
 msgid "admin.audit.detail.suppressed"
 msgstr "nog {count} keer sinds de vorige melding"
 
+msgid "audit.event.rate_limited"
+msgstr "Te veel verzoeken"
+
+msgid "audit.event.request_rejected"
+msgstr "Verzoek geweigerd"
+
+msgid "audit.event.token_rejected"
+msgstr "Onbekende sleutel of link"
+
+msgid "admin.audit.detail.surface_web"
+msgstr "op de webpagina's"
+
+msgid "admin.audit.detail.surface_agent"
+msgstr "op de machine-API"
+
+msgid "admin.audit.detail.client"
+msgstr "afzender {value}"
+
+msgid "admin.audit.reason.too_many_requests"
+msgstr "Dezelfde afzender ging over de limiet voor het aantal verzoeken."
+
+msgid "admin.audit.reason.honeypot"
+msgstr "Het verborgen formulierveld was ingevuld: waarschijnlijk een bot."
+
+msgid "admin.audit.reason.cross_site"
+msgstr "Het formulier werd verstuurd vanaf een andere website."
+
+msgid "admin.audit.reason.origin_mismatch"
+msgstr "Het formulier kwam van een andere herkomst dan deze site."
+
+msgid "admin.audit.reason.unknown_token"
+msgstr "Een toegangssleutel die bij geen enkele koppeling hoort."
+
+msgid "admin.audit.reason.unknown_management_link"
+msgstr "Een wijzigingslink die bij geen enkele afspraak hoort."
+
 msgid "admin.audit.detail.source_webex"
 msgstr "van Webex"
 
@@ -3613,6 +3649,9 @@ msgstr "Draait nu"
 
 msgid "admin.updates.no_release_build"
 msgstr "Geen releaseversie (ontwikkelversie); updates worden niet aangeboden."
+
+msgid "admin.updates.commit"
+msgstr "Commit"
 
 msgid "admin.updates.latest"
 msgstr "Nieuwste versie"
@@ -4721,6 +4760,153 @@ msgstr "afbeelding van de noodsluiting verwijderd"
 msgid "admin.audit.detail.file"
 msgstr "nieuw bestand"
 
+msgid "admin.scenarios.title"
+msgstr "Scenario's"
+
+msgid "admin.scenarios.lead"
+msgstr "Voorbereide inhoud voor een noodsluiting: melding, kop, contactalternatieven en afbeelding. Bij het sluiten kiest u er een en past u hem zo nodig aan."
+
+msgid "admin.scenarios.none"
+msgstr "Leeg (geen scenario)"
+
+msgid "admin.scenarios.organisation_option"
+msgstr "{name} (organisatie)"
+
+msgid "admin.scenarios.pick"
+msgstr "Beginnen met een scenario"
+
+msgid "admin.scenarios.pick_lead"
+msgstr "Kies een voorbereid scenario om het formulier hieronder in te vullen. U kunt de tekst daarna nog aanpassen."
+
+msgid "admin.scenarios.scenario"
+msgstr "Scenario"
+
+msgid "admin.scenarios.use"
+msgstr "Gebruiken"
+
+msgid "admin.scenarios.use_label"
+msgstr "Noodsluiting beginnen met {name}"
+
+msgid "admin.scenarios.manage"
+msgstr "Scenario's beheren"
+
+msgid "admin.scenarios.chosen"
+msgstr "Gekozen scenario: {name}. Bij het sluiten worden de contactalternatieven en de afbeelding van dit scenario overgenomen; latere wijzigingen van het scenario veranderen deze sluiting niet."
+
+msgid "admin.scenarios.name"
+msgstr "Naam"
+
+msgid "admin.scenarios.name_hint"
+msgstr "Voor beheerders, bijvoorbeeld ‘Storing’ of ‘Staking’; burgers zien deze naam niet. Hoogstens {limit} tekens."
+
+msgid "admin.scenarios.own_group"
+msgstr "Scenario's van dit team"
+
+msgid "admin.scenarios.own_organisation"
+msgstr "Scenario's van de organisatie"
+
+msgid "admin.scenarios.own_lead"
+msgstr "Deze scenario's kunt u wijzigen en verwijderen."
+
+msgid "admin.scenarios.empty"
+msgstr "Nog geen scenario's."
+
+msgid "admin.scenarios.shared"
+msgstr "Scenario's van de organisatie"
+
+msgid "admin.scenarios.shared_lead"
+msgstr "Deze kunt u gebruiken maar niet wijzigen; dat doet een organisatiebeheerder."
+
+msgid "admin.scenarios.new"
+msgstr "Nieuw scenario"
+
+msgid "admin.scenarios.new_lead"
+msgstr "Begin met de naam en de melding. Contactalternatieven en een afbeelding voegt u daarna toe."
+
+msgid "admin.scenarios.create"
+msgstr "Scenario aanmaken"
+
+msgid "admin.scenarios.scenario_lead"
+msgstr "Wat dit scenario bij een noodsluiting laat zien."
+
+msgid "admin.scenarios.shared_view_lead"
+msgstr "Een scenario van de organisatie. U kunt het gebruiken, niet wijzigen."
+
+msgid "admin.scenarios.all"
+msgstr "Alle scenario's"
+
+msgid "admin.scenarios.preview"
+msgstr "Voorbeeld"
+
+msgid "admin.scenarios.preview_lead"
+msgstr "Zo ziet de sluitingspagina eruit als u met dit scenario sluit (in uw taal)."
+
+msgid "admin.scenarios.no_contacts"
+msgstr "Geen eigen contactalternatieven: bij het sluiten gelden die van het team of de organisatie."
+
+msgid "admin.scenarios.texts"
+msgstr "Naam en melding"
+
+msgid "admin.scenarios.contacts_own"
+msgstr "Eigen blok met {count} contactmogelijkheden."
+
+msgid "admin.scenarios.contacts_default"
+msgstr "Geen eigen blok: bij het sluiten geldt het blok van het team of de organisatie."
+
+msgid "admin.scenarios.image_lead"
+msgstr "Eén afbeelding voor de sluitingspagina. Alleen beheerders zien hem, tot een sluiting met dit scenario begint."
+
+msgid "admin.scenarios.delete"
+msgstr "Scenario verwijderen"
+
+msgid "admin.scenarios.delete_lead"
+msgstr "Lopende sluitingen houden hun eigen kopie en veranderen niet."
+
+msgid "admin.scenarios.delete_button"
+msgstr "Verwijderen"
+
+msgid "admin.scenarios.contacts_lead"
+msgstr "De contactalternatieven van dit scenario."
+
+msgid "admin.scenarios.back_to_scenario"
+msgstr "Terug naar het scenario"
+
+msgid "admin.scenarios.contacts_preview_lead"
+msgstr "Zo zien burgers het blok van dit scenario. Leeg: bij het sluiten geldt het blok van het team of de organisatie."
+
+msgid "admin.form.error.scenario_name"
+msgstr "Geef het scenario een naam van hoogstens 80 tekens op één regel."
+
+msgid "admin.form.error.scenario_not_found"
+msgstr "Dit scenario bestaat niet (meer) of hoort niet bij dit team."
+
+msgid "admin.done.scenario_created"
+msgstr "Het scenario is aangemaakt. Voeg zo nodig contactalternatieven en een afbeelding toe."
+
+msgid "admin.done.scenario_deleted"
+msgstr "Het scenario is verwijderd."
+
+msgid "admin.audit.detail.scenario_create"
+msgstr "scenario aangemaakt"
+
+msgid "admin.audit.detail.scenario_update"
+msgstr "scenario gewijzigd"
+
+msgid "admin.audit.detail.scenario_delete"
+msgstr "scenario verwijderd"
+
+msgid "admin.audit.detail.scenario_contacts"
+msgstr "contactalternatieven van scenario opgeslagen"
+
+msgid "admin.audit.detail.scenario_image"
+msgstr "afbeelding van scenario opgeslagen"
+
+msgid "admin.audit.detail.scenario_image_remove"
+msgstr "afbeelding van scenario verwijderd"
+
+msgid "admin.audit.detail.scenario"
+msgstr "scenario"
+
 msgid "authz.permission.system_maintenance"
 msgstr "Onderhoudsmodus aan- en uitzetten"
 
@@ -5082,3 +5268,15 @@ msgstr "Uw afspraak is gemaakt"
 
 msgid "widget.error_summary"
 msgstr "Er is iets niet goed ingevuld"
+
+msgid "admin.embedding.code"
+msgstr "Code voor uw website"
+
+msgid "admin.embedding.code_lead"
+msgstr "Plaats het script één keer per pagina en het element waar de kalender moet komen. Laat integrity weg als u het script niet bij elke update opnieuw wilt vastleggen; zie de handleiding."
+
+msgid "admin.embedding.code_no_build"
+msgstr "Op deze installatie is het widgetscript niet gebouwd; de code staat hier zonder integrity."
+
+msgid "admin.embedding.code_none"
+msgstr "Zet eerst bij een groep Insluiten op websites aan."

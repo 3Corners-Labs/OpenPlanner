@@ -1,0 +1,11 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_contact_form.html" import contact_form with context %}
+{% block title %}{{ _("admin.contacts.title") }} · {{ scenario.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% set page_title = scenario.name %}
+{% set page_lead = _("admin.scenarios.contacts_lead") %}
+{% include "admin/_scenario_header.html" %}
+{% include "_error_summary.html" %}
+<p><a href="{{ scenario.url }}">{{ _("admin.scenarios.back_to_scenario") }}</a></p>
+{{ contact_form(scenario.url ~ "/contacts", preview, _("admin.scenarios.contacts_preview_lead"), heading_fields, rows) }}
+{% endblock %}

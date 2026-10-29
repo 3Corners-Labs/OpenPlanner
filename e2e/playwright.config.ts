@@ -17,6 +17,11 @@ export default defineConfig({
     // Dutch browser by default; specs that test detection override it.
     locale: 'nl-NL',
   },
+  webServer: {
+    command: 'node host/serve.mjs',
+    url: process.env.WIDGET_HOST_URL ?? 'http://localhost:8001/',
+    reuseExistingServer: true,
+  },
   projects: [
     {
       name: 'chromium',

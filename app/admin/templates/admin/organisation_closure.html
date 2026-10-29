@@ -1,5 +1,5 @@
 {% extends "admin/layout.html" %}
-{% from "admin/_closure_forms.html" import start_form, lift_form with context %}
+{% from "admin/_closure_forms.html" import scenario_picker, start_form, lift_form with context %}
 {% block title %}{{ _("admin.closures.title") }} · {{ organisation_name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
@@ -48,7 +48,8 @@
   <p><a href="/admin/organisations/{{ organisation_slug }}/contacts">{{ _("admin.contacts.manage") }}</a></p>
 </section>
 {% if fields %}
-{{ start_form("/admin/organisations/" ~ organisation_slug ~ "/closure", _("admin.closures.start"), _("admin.closures.start_lead"), _("admin.closures.start_button"), fields) }}
+{{ scenario_picker("/admin/organisations/" ~ organisation_slug ~ "/closure", scenarios) }}
+{{ start_form("/admin/organisations/" ~ organisation_slug ~ "/closure", _("admin.closures.start"), _("admin.closures.start_lead"), _("admin.closures.start_button"), fields, scenarios.chosen) }}
 {% endif %}
 {% if any_closed %}
 {{ lift_form("/admin/organisations/" ~ organisation_slug ~ "/closure/lift", _("admin.closures.lift"), _("admin.closures.lift_button")) }}

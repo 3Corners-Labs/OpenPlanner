@@ -1,0 +1,27 @@
+name: freshness
+
+# ADR 0051: proves weekly that Renovate still runs and that its PRs do not rot. The Monday
+# Renovate run comes first; this checks on Tuesday morning.
+on:
+  schedule:
+    - cron: "0 7 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  renovate:
+    name: Renovate is running, no stale update PRs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: dashboard refreshed within 8 days, update PRs younger than 14 days
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/check-renovate-alive.sh 8 14
