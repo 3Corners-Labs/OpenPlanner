@@ -27,7 +27,9 @@ On merge to `main`: OWASP ZAP baseline scan, mutation testing on the domain (≥
 pushed to GHCR, signed keyless with cosign and SBOM attested (`docs/runbook.md` shows how to
 verify).
 
-Weekly: Renovate dependency updates; security updates are opened immediately.
+Weekly: Renovate dependency updates; security updates are opened immediately. Every pinned
+version is tracked by Renovate (`make pins`), deprecation warnings fail CI, and a weekly
+`freshness` workflow fails when Renovate stops running (ADR 0051).
 
 The image runs as a non-root user (uid 10001) with a read-only root filesystem; only the data
 volume is writable.
