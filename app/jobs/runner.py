@@ -17,6 +17,9 @@ Every outcome (sent, skipped with its reason, retry, failed with its error code)
 system event in the audit log at the booking's group (ADR 0031), so admins can troubleshoot
 their own groups without reading the container logs. Old system events are pruned at most
 once an hour. Writing the event never decides the job's fate: if it fails, it is logged.
+
+Each job runs in its own trace, bound to its booking's organisation and group, so its log
+lines and its system event share one ``trace.id`` and can be filtered per tenant (ADR 0040).
 """
 
 from collections.abc import Collection
@@ -31,6 +34,7 @@ from app.domain.audit import Outcome
 from app.domain.call_service import CallService
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.event_context import trace_scope
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType, is_stale
 from app.domain.ports import (
@@ -145,19 +149,32 @@ class JobRunner:
         await self._prune(now)
         jobs = await self._queue.claim_due(now, self._types, MESSAGE_CHANNELS)
         for job in jobs:
-            try:
-                skipped = await self._run(job, now)
-            except IntegrationError as exc:
-                await self._handle_failure(job, now, exc.code, retryable=exc.retryable)
-            except DomainError as exc:  # e.g. integration_not_ready: retrying will not help
-                await self._handle_failure(job, now, exc.code.value, retryable=False)
-            except Exception as exc:  # any failure is retried; the type is logged, not the text
-                await self._handle_failure(job, now, type(exc).__name__)
-            else:
-                await self._queue.complete(job.id)
-                outcome = Outcome.SUCCESS if skipped is None else Outcome.SKIPPED
-                await self._record(job, outcome, skipped or "")
+            with trace_scope():
+                await self._bind(job)
+                await self._handle(job, now)
         return len(jobs)
+
+    async def _handle(self, job: ClaimedJob, now: datetime) -> None:
+        """Run one job and settle it: done, skipped, retried or failed, with its event."""
+        try:
+            skipped = await self._run(job, now)
+        except IntegrationError as exc:
+            await self._handle_failure(job, now, exc.code, retryable=exc.retryable)
+        except DomainError as exc:  # e.g. integration_not_ready: retrying will not help
+            await self._handle_failure(job, now, exc.code.value, retryable=False)
+        except Exception as exc:  # any failure is retried; the type is logged, not the text
+            await self._handle_failure(job, now, type(exc).__name__)
+        else:
+            await self._queue.complete(job.id)
+            outcome = Outcome.SUCCESS if skipped is None else Outcome.SKIPPED
+            await self._record(job, outcome, skipped or "")
+
+    async def _bind(self, job: ClaimedJob) -> None:
+        """Tag the job's trace with its booking's organisation and group; a failure is logged."""
+        try:
+            await self._system_log.bind_level(job.booking_id)
+        except Exception as exc:  # tagging helps troubleshooting; it never stops a job
+            log.warning("system_log.bind_failed", job_id=job.id, error=type(exc).__name__)
 
     async def _run(self, job: ClaimedJob, now: datetime) -> str | None:
         """Execute one job; return why it was skipped, or ``None`` when it was done."""

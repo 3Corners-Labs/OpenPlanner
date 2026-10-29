@@ -15,6 +15,7 @@ message text, no addresses. They are pruned after a retention period; admin acti
 from datetime import timedelta
 
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
+from app.domain.event_context import bind_level
 from app.domain.ports import Clock, Transaction, UnitOfWork
 
 
@@ -65,6 +66,11 @@ class SystemLog:
                     booking_id,
                 )
             )
+
+    async def bind_level(self, booking_id: int | None) -> None:
+        """Tag the current trace with the organisation and group of ``booking_id`` (ADR 0040)."""
+        async with self._uow.read() as tx:
+            bind_level(*await _level(tx, booking_id))
 
     async def prune(self, retention: timedelta) -> int:
         """Delete system events older than ``retention``; return how many were removed."""
