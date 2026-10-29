@@ -22,6 +22,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.api.citizen import citizen_page
 from app.api.contact_form import HONEYPOT_FIELD, contact_fields, read_contact
+from app.api.trace import bind_group_from_path
 from app.domain.booking import BookingKind
 from app.domain.call_service import CallService
 from app.domain.calls import CallStatus, JoinState, TaskState, join_state, not_picked_up
@@ -35,7 +36,7 @@ from app.web.errors import FormError, form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.protection import booking_limit, limiter, read_limit, require_same_origin
 
-router = APIRouter(include_in_schema=False)
+router = APIRouter(include_in_schema=False, dependencies=[Depends(bind_group_from_path)])
 log = structlog.get_logger()
 
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
