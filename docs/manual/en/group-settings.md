@@ -139,3 +139,11 @@ all agents are busy, with the choice to try again later or to book an appointmen
 
 Empty means no limit: Webex Contact Center then distributes every call. Scheduled appointments
 do not count; the slots already limit those.
+
+<!-- field: embedding_enabled -->
+### Embed on websites
+
+With **Yes**, the group can also appear as a widget on the organisation's website, next to the
+group's own page. This works only on the websites the organisation allows under
+[Embedding on websites](embedding.md). With **No** (the default), the group can only be booked
+on its own page, even when the widget is on an allowed website.
