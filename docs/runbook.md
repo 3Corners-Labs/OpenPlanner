@@ -173,6 +173,38 @@ If PingFederate is down, admins cannot log in; booking, reminders and dispatch k
 Rotating `SESSION_SECRET` logs every admin out. Rotating the client secret needs the new value
 in `OIDC_CLIENT_SECRET` and a restart of `web`.
 
+### Nobody can log in (ADR 0042 §8)
+
+There is no login bypass, fallback IdP or local account. Diagnose and act from the host:
+
+1. **Check the configuration** without logging in:
+   `docker compose exec web python -m app.cli oidc-check`. It reads the discovery document and
+   the signing keys only, and reports the signing algorithms, PKCE, the redirect URL
+   (`https://<host>/admin/callback`, https in production) and whether a client secret is set,
+   followed by the effective claim mapping (`OIDC_ROLE_CLAIM` … `OIDC_ROLE_AUDITOR`) with its
+   source (`env` or `default`). It prints no secrets. Exit code 1 means a required check failed.
+2. **Logged in, but "no role".** The web log has `oidc.no_role` (or `oidc.no_scope` for an
+   organisation or group admin without organisations or groups) with `missing_claim`, the
+   claim the mapping looked for and did not find, `role_values_seen`, how many role values
+   came in but matched none of `OIDC_ROLE_*`, and `claims_present`, the *names* of the
+   claims in the ID token. Values are never logged. Typical cause: the claim or a role value
+   was renamed at PingFederate. Fix it there, or set the matching `OIDC_*` variable and
+   restart `web`.
+3. **Teams must close while the IdP is down** (ADR 0024, same rules, mails and audit as the
+   portal; the audit log shows the actor `system:cli`):
+
+   ```sh
+   docker compose exec web python -m app.cli closure start --group SLUG \
+     --notice-nl "Door een storing …" --notice-en "Due to an outage …" [--end 2026-11-02T08:00+01:00]
+   docker compose exec web python -m app.cli closure lift --group SLUG
+   ```
+
+   Use `--organisation SLUG` instead of `--group` for every team of an organisation (teams
+   that already have a closure are skipped). `--end` needs an offset; without it the closure
+   lasts until it is lifted. Lifting from the host never reinstates appointments: moving,
+   reinstating and cancelling wait until someone can log in to the portal (*Noodsluiting*).
+   The notices are shown to citizens and mailed: plain text, no names or other personal data.
+
 ## Webex meetings and Webex Contact Center
 
 Without a Webex Service App OpenPlanner runs without video and WxCC; bookings keep working.
@@ -609,8 +641,8 @@ command on the host passes `--env-file .env.update`, so the pinned digest is wha
 
 | Request | Steps | When something fails |
 |---|---|---|
-| Update | pull `<image>:<version>`, take its digest, `cosign verify` it (release tag of this repository), note the current digest and Alembic revision in `/var/lib/openplanner-updater/previous.env`, back up the database (`data/backups/request-<id>.db`), pin the new digest, `up -d`, wait up to `HEALTH_TIMEOUT` for `/readyz` and a healthy worker | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digest, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
-| Restore previous version (≤ 24 h after an update) | back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digest, start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
+| Update | pull `<image>:<version>`, take its digest, `cosign verify` it (release tag of this repository), note the current digest and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digest, `up -d`, wait up to `HEALTH_TIMEOUT` for `/readyz` and a healthy worker | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digest, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
+| Restore previous version (≤ 24 h after an update) | switch maintenance on, back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digest, start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
 
 Before each step the updater reports it (`python -m app.cli update-progress ID STEP`: pulling,
 verifying, backing_up, migrating, starting, rolling_back; ADR 0048), and at the end the outcome
@@ -698,6 +730,64 @@ When a team cannot hold its appointments (outage, illness, closed building):
    ahead (before its dispatch lead and outside any closure).
 6. **Retention.** Appointments still on hold lose their personal data 30 days after the end of
    the closure. An open-ended closure keeps it until it is lifted, so lift or end it promptly.
+
+## Onderhoudsmodus (ADR 0038)
+
+Maintenance mode freezes the data of the whole installation (every organisation at once) while
+an operator works on the platform. It is not an emergency closure: for one team or one
+organisation that cannot take appointments, use the section above.
+
+**When to switch it on**
+
+- An update or restore: the host updater does it itself (below); nothing to do by hand.
+- Repairing an integration: expired SMTP credentials, a rotated WxCC or SMS key, webhook
+  registrations to renew. Citizens then do not book appointments whose confirmation or work
+  item would not arrive.
+- Investigating an incident with data that must not change underneath.
+- Work on the database itself (restore by hand, moving the volume): use the environment
+  override, see below.
+
+**How**
+
+- Portal: *Onderhoud* in the menu (`/admin/maintenance`, superuser, fresh login). Choose a
+  reason and, if you know it, the expected end. The end is information only: maintenance never
+  ends by itself.
+- Host: `docker compose --env-file .env.update exec web python -m app.cli maintenance on --reason incident`,
+  `... maintenance off`, `... maintenance status` (prints `on since=… by=… reason=…` or `off`).
+  Audited as `host-cli`.
+- Database unavailable or being restored: set `MAINTENANCE_MODE=true` for `web` and restart it
+  (`docker compose --env-file .env.update up -d web`). The web process then does not read the
+  database to decide, and the portal shows that the server switched it on and cannot switch it
+  off. Remove the variable and restart to end it.
+
+**What still works**
+
+| Area | During maintenance |
+|---|---|
+| Citizens: book, reschedule, cancel, start a direct call | closed: `503` with `Retry-After` (`MAINTENANCE_RETRY_AFTER_SECONDS`), the maintenance page with the expected end and the team's (or organisation's) contact options |
+| Citizens: view an appointment, join a confirmed call, waiting page | open |
+| Machine API | reads and the token endpoint open; writes `503 {"error": "maintenance"}` |
+| Worker: reminders, work items, meetings, `purge_pii` and the nightly sweep | continue; the worker never pauses |
+| Webhooks from Webex and WxCC | open |
+| `/healthz`, `/readyz` | unchanged |
+| Admin portal | every page readable; changes refused with "Onderhoudsmodus: alleen lezen" (audited as `maintenance.refused`) |
+| Superuser | can still change integrations (SMTP, SMS, Webex/WxCC), use "Koppeling controleren" and the test mail, request updates and switch maintenance |
+
+Maintenance switched on by the server stays on whatever the portal says. An emergency closure
+cannot be started or changed during maintenance: end maintenance first if one is needed.
+
+**Updates.** The updater switches maintenance on right before its backup (so the backup has it
+on too) and off after `succeeded` or `rolled_back`. A `failed` update after the backup leaves it
+on: citizens see the maintenance page instead of a half-working system. After fixing it (see
+*When the portal shows `failed`* above), switch maintenance off in the portal or with the CLI.
+The updater also switches off maintenance that a superuser had switched on before the update;
+switch it on again if the work is not done.
+
+**Alert.** Maintenance that is on longer than `MAINTENANCE_ALERT_HOURS` (default 4) is recorded
+as the system event *Onderhoudsmodus staat lang aan* in the audit log (global, superuser) and
+logged as `maintenance.overdue` (warning), and again every `MAINTENANCE_ALERT_REPEAT_HOURS`
+(default 24) while it lasts. Alert on that log event in monitoring. The environment override
+is not judged: it is the operator's own doing.
 
 ## Personal data not removed on time (ADR 0039)
 

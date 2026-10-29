@@ -89,6 +89,18 @@ class Settings(BaseSettings):
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)
 
+    # ADR 0044: how many days ahead the shortfall summary (group page, dashboard) looks.
+    # Class D organisation (ADR 0042, settings registry).
+    shortfall_horizon_days: int = Field(default=14, ge=1, le=60)
+    # ADR 0044: changes by one planner per hour above which a system event warns (never
+    # blocks). Class C platform (ADR 0042, settings registry).
+    planner_changes_alert_per_hour: int = Field(default=50, ge=5, le=1000)
+    # ADR 0044: a planner's request to choose a new time lapses this many days after the
+    # original start, with one reminder this many days before. Class D organisation (ADR 0042,
+    # settings registry).
+    planner_rebook_days: int = Field(default=14, ge=1, le=30)
+    planner_rebook_reminder_days: int = Field(default=3, ge=1, le=29)
+
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
     # Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL: an https tunnel or staging
@@ -192,12 +204,23 @@ class Settings(BaseSettings):
     # Class C: the Retry-After of citizen pages and machine-API writes refused during
     # maintenance (seconds); maintenance has no automatic end, so this is a polite guess.
     maintenance_retry_after_seconds: int = Field(default=300, ge=30, le=3600)
+    # Class C: maintenance on longer than this many hours is reported as a system event by the
+    # worker (ADR 0038 §6), and again every MAINTENANCE_ALERT_REPEAT_HOURS while it lasts.
+    maintenance_alert_hours: int = Field(default=4, ge=1, le=72)
+    maintenance_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
 
     @model_validator(mode="after")
     def _storage_limits_are_ordered(self) -> "Settings":
         """Refuse a critical free-space limit that is not below the low one."""
         if self.storage_critical_free_percent >= self.storage_low_free_percent:
             raise ValueError("STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT")
+        return self
+
+    @model_validator(mode="after")
+    def _rebook_reminder_comes_first(self) -> "Settings":
+        """Refuse a reminder to rebook that would not come before the request lapses."""
+        if self.planner_rebook_reminder_days >= self.planner_rebook_days:
+            raise ValueError("PLANNER_REBOOK_REMINDER_DAYS must be below PLANNER_REBOOK_DAYS")
         return self
 
     @model_validator(mode="after")

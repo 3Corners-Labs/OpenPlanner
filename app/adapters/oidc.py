@@ -27,6 +27,7 @@ import structlog
 
 from app.domain.authorization import Principal, Role
 from app.domain.ports import IdentityError, LoginStart
+from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 
 log = structlog.get_logger()
 
@@ -75,20 +76,71 @@ def _values(claim: object) -> frozenset[str]:
 
 
 def principal_from_claims(claims: Mapping[str, Any], mapping: ClaimMapping) -> Principal:
-    """Map verified ID-token claims to a ``Principal``; unknown role values are ignored."""
-    roles = frozenset(
-        mapping.role_values[value]
-        for value in _values(claims.get(mapping.role_claim))
-        if value in mapping.role_values
-    )
+    """Map verified ID-token claims to a ``Principal``.
+
+    Values of built-in roles become roles. The other role values are kept as
+    ``role_claims`` (custom roles link to them, ADR 0039): only values shaped like a claim
+    value, at most ``MAX_ROLE_CLAIMS`` of them in a stable order, so the session stays small.
+    A login that resolves to no built-in role, or to a scoped role without its scope claim, is
+    logged for the operator (``_log_lockout``); custom roles are attached after this, so such a
+    login may still hold one.
+    """
+    seen = _values(claims.get(mapping.role_claim))
+    roles = frozenset(mapping.role_values[value] for value in seen if value in mapping.role_values)
+    others = sorted(v for v in seen if v not in mapping.role_values and is_claim_value(v))
     name = claims.get("name") or claims.get("preferred_username") or claims["sub"]
-    return Principal(
+    principal = Principal(
         subject=str(claims["sub"]),
         display_name=str(name)[:200],
         roles=roles,
         organisations=_values(claims.get(mapping.organisation_claim)),
         groups=_values(claims.get(mapping.group_claim)),
+        role_claims=frozenset(others[:MAX_ROLE_CLAIMS]),
     )
+    _log_lockout(claims, mapping, principal, len(seen))
+    return principal
+
+
+MAX_LOGGED_CLAIMS = 50
+MAX_CLAIM_NAME = 64
+
+
+def _claim_names(claims: Mapping[str, Any]) -> list[str]:
+    """Return the names of the claims present, sorted and bounded; never their values."""
+    return sorted(str(name)[:MAX_CLAIM_NAME] for name in claims)[:MAX_LOGGED_CLAIMS]
+
+
+def _log_lockout(
+    claims: Mapping[str, Any], mapping: ClaimMapping, principal: Principal, seen: int
+) -> None:
+    """Log why a login grants nothing (ADR 0042 §8 rule 4), so the operator can fix it.
+
+    The log names the configured claim that was missing and the *names* of the claims that
+    were present, and counts the role values that matched nothing. Claim values (names,
+    addresses, role and organisation values) are never logged.
+    """
+    if not principal.roles:
+        missing = None if mapping.role_claim in claims else mapping.role_claim
+        log.warning(
+            "oidc.no_role",
+            actor=principal.subject,
+            missing_claim=missing,
+            role_values_seen=seen,
+            claims_present=_claim_names(claims),
+        )
+        return
+    scope_claims = (
+        (Role.ORG_ADMIN, principal.organisations, mapping.organisation_claim),
+        (Role.GROUP_ADMIN, principal.groups, mapping.group_claim),
+    )
+    for role, scope, claim in scope_claims:
+        if principal.roles == {role} and not scope:
+            log.warning(
+                "oidc.no_scope",
+                actor=principal.subject,
+                missing_claim=claim if claim not in claims else None,
+                claims_present=_claim_names(claims),
+            )
 
 
 def _code_challenge(verifier: str) -> str:

@@ -38,7 +38,9 @@ from app.domain.authorization import (
     Scope,
     Target,
     decide,
+    holds_a_role,
     reaches,
+    role_keys,
     scope_for,
 )
 from app.domain.errors import DomainError, ErrorCode
@@ -131,7 +133,7 @@ class AdminService:
         if LEVELS[permission] is Level.GLOBAL:
             return await self.authorize(principal, permission)
         if scope_for(principal, permission).is_empty:
-            reason = Reason.NO_ROLE if not principal.roles else Reason.OUT_OF_SCOPE
+            reason = Reason.OUT_OF_SCOPE if holds_a_role(principal) else Reason.NO_ROLE
             await self.record(principal.subject, permission.value, Outcome.DENIED, reason.value)
             return Authorization(Decision(False, reason), Target.everything())
         return Authorization(Decision(True, Reason.ROLE), Target.everything())
@@ -190,7 +192,7 @@ class AdminService:
         self, tx: Transaction, principal: Principal, action: str, memberships: list[Membership]
     ) -> None:
         """Write ``action`` once per membership of ``principal`` (global without any)."""
-        roles = ",".join(sorted(principal.roles))
+        roles = ",".join(role_keys(principal))
         now = self._clock.now()
         contexts: list[tuple[str | None, str | None]] = [
             (m.organisation, m.group) for m in memberships
