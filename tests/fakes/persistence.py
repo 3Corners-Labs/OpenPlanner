@@ -8,9 +8,10 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
 from app.domain import holidays as holiday_model
+from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
-from app.domain.authorization import Scope
+from app.domain.authorization import CustomRole, Scope
 from app.domain.booking import Booking, BookingKind, BookingStatus, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
@@ -21,6 +22,8 @@ from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
+from app.domain.embedding import AllowedOrigins
+from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import PlannedJob
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
@@ -56,6 +59,7 @@ class State:
     logos: dict[int, Logo] = field(default_factory=dict)
     fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
     contact_blocks: dict[int, ContactBlock] = field(default_factory=dict)
+    allowed_origins: dict[int, AllowedOrigins] = field(default_factory=dict)
     group_contact_blocks: dict[int, ContactBlock] = field(default_factory=dict)
     group_checks: dict[int, GroupCheck] = field(default_factory=dict)
     holiday_calendars: dict[int, holiday_model.HolidayCalendar] = field(default_factory=dict)
@@ -63,6 +67,8 @@ class State:
     organisation_holidays: dict[int, frozenset[int]] = field(default_factory=dict)
     group_holidays: dict[int, holiday_model.GroupHolidays] = field(default_factory=dict)
     closures: dict[int, Closure] = field(default_factory=dict)
+    acceptances: dict[tuple[int, datetime], ShortfallAcceptance] = field(default_factory=dict)
+    closure_images: dict[int, ImageFile] = field(default_factory=dict)
     api_settings: ApiSettings = field(default_factory=ApiSettings)
     api_clients: dict[str, ApiClient] = field(default_factory=dict)
     access_tokens: dict[str, AccessToken] = field(default_factory=dict)
@@ -72,6 +78,7 @@ class State:
     release_check: ReleaseCheck | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
+    custom_roles: dict[int, CustomRole] = field(default_factory=dict)
     purged_at: dict[int, datetime] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
     next_id: int = 1
@@ -254,6 +261,12 @@ class InMemoryTransaction:
             self.state.contact_blocks.pop(organisation_id, None)
         else:
             self.state.contact_blocks[organisation_id] = block
+
+    async def get_allowed_origins(self, organisation_id: int) -> AllowedOrigins:
+        return self.state.allowed_origins.get(organisation_id, AllowedOrigins())
+
+    async def save_allowed_origins(self, organisation_id: int, allowed: AllowedOrigins) -> None:
+        self.state.allowed_origins[organisation_id] = allowed
 
     async def get_group_contact_block(self, group_id: int) -> ContactBlock | None:
         return self.state.group_contact_blocks.get(group_id)
@@ -571,6 +584,27 @@ class InMemoryTransaction:
         jobs = self.state.jobs.get(booking_id, [])
         self.state.jobs[booking_id] = [j for j in jobs if j.type not in types]
 
+    async def get_shortfall_acceptances(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[ShortfallAcceptance]:
+        return [
+            a
+            for (gid, start), a in sorted(self.state.acceptances.items())
+            if gid == group_id and lower <= start < upper
+        ]
+
+    async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
+        self.state.acceptances[(acceptance.group_id, acceptance.start)] = acceptance
+
+    async def count_audit_events(
+        self, actor: str, actions: Collection[str], since: datetime
+    ) -> int:
+        return sum(
+            1
+            for e in self.state.audit
+            if e.actor == actor and e.action in actions and e.at >= since
+        )
+
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
         found = [
             c
@@ -588,7 +622,26 @@ class InMemoryTransaction:
         return stored
 
     async def save_closure(self, closure: Closure) -> None:
-        self.state.closures[closure.id or 0] = closure
+        # As the SQL adapter: the image has its own calls and is kept.
+        current = self.state.closures.get(closure.id or 0)
+        image = current.image if current else None
+        self.state.closures[closure.id or 0] = replace(closure, image=image)
+
+    async def get_closure_image(self, closure_id: int) -> ImageFile | None:
+        return self.state.closure_images.get(closure_id)
+
+    async def save_closure_image(
+        self, closure_id: int, text: ImageText, image: ImageFile | None
+    ) -> None:
+        stored = image or self.state.closure_images[closure_id]
+        self.state.closure_images[closure_id] = stored
+        closure = self.state.closures[closure_id]
+        self.state.closures[closure_id] = replace(closure, image=stored.ref(text))
+
+    async def remove_closure_image(self, closure_id: int) -> None:
+        self.state.closure_images.pop(closure_id, None)
+        closure = self.state.closures[closure_id]
+        self.state.closures[closure_id] = replace(closure, image=None)
 
     async def find_confirmed_bookings(
         self, group_id: int, lower: datetime, upper: datetime | None
@@ -680,6 +733,31 @@ class InMemoryTransaction:
 
     async def save_update_request(self, request: UpdateRequest) -> None:
         self.state.update_requests[request.id or 0] = request
+
+    async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+        staff = self.state.staff
+        return [
+            AuditEntry(e, staff[e.actor].display_name if e.actor in staff else None)
+            for e in reversed(self.state.audit)
+            if e.action in actions
+        ][:limit]
+
+    async def get_custom_roles(self) -> list[CustomRole]:
+        return [self.state.custom_roles[k] for k in sorted(self.state.custom_roles)]
+
+    async def get_custom_role(self, role_id: int) -> CustomRole | None:
+        return self.state.custom_roles.get(role_id)
+
+    async def add_custom_role(self, role: CustomRole) -> CustomRole:
+        stored = replace(role, id=self._new_id())
+        self.state.custom_roles[stored.id] = stored
+        return stored
+
+    async def save_custom_role(self, role: CustomRole) -> None:
+        self.state.custom_roles[role.id] = role
+
+    async def delete_custom_role(self, role_id: int) -> None:
+        self.state.custom_roles.pop(role_id, None)
 
 
 class InMemoryUnitOfWork:

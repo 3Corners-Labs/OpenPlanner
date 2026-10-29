@@ -11,6 +11,9 @@ identity provider (bij grote organisaties meestal PingFederate). Het portaal lee
 inloggen. U kunt rollen dus niet in het portaal toekennen; vraag daarvoor uw
 identiteitsbeheerder.
 
+Naast de vaste rollen hieronder kan de superuser [eigen rollen](roles.md) maken, als kopie
+van een vaste rol en binnen de grenzen daarvan. Die staan als extra kolommen in de matrix.
+
 | Rol | Bereik | Wat de rol doet |
 |---|---|---|
 | Superuser | alles | richt de installatie in: organisaties, koppelingen, feestdagen, updates |
@@ -44,3 +47,10 @@ Onder de matrix staat wat deelnemers kunnen zonder in te loggen: met de link uit
 bevestigingsmail kunnen ze hun afspraak bekijken, en tot de wijzigingstermijn verzetten of
 annuleren. Daaronder staan de rechten van gekoppelde systemen, zoals een bot van het
 contactcenter. Die rechten kent de superuser per koppeling toe.
+
+## Wijzigingen van rollen
+
+Onder aan de pagina staat wie welke eigen rol wanneer heeft gemaakt, gewijzigd of verwijderd,
+met het versienummer en welke rechten aan of uit gingen. Iedere beheerder ziet die
+geschiedenis: hoe rollen zijn ingericht is niet geheim, en zien wie ze wijzigde is juist de
+bedoeling.
