@@ -3146,7 +3146,7 @@ msgid "admin.updates.open"
 msgstr "Lopend verzoek"
 
 msgid "admin.updates.open_lead"
-msgstr "Naar versie {version}. De pagina toont de uitkomst zodra de updater die meldt."
+msgstr "Naar versie {version}. De updater kijkt elke minuut of er een verzoek is en meldt elke stap; deze lijst werkt zichzelf bij."
 
 msgid "admin.updates.unclaimed"
 msgstr "Geen updater heeft dit verzoek na 10 minuten opgepakt. Controleer of de updater op de server is geïnstalleerd (zie het runbook)."
@@ -3264,6 +3264,57 @@ msgstr "Naar updates"
 
 msgid "admin.updates.banner.snooze"
 msgstr "Herinner me over 60 minuten"
+
+msgid "admin.updates.step.waiting"
+msgstr "Wachten tot de updater het verzoek oppakt"
+
+msgid "admin.updates.step.pulling"
+msgstr "Versie {version} downloaden"
+
+msgid "admin.updates.step.verifying"
+msgstr "Handtekening controleren"
+
+msgid "admin.updates.step.backing_up"
+msgstr "Back-up van de database maken"
+
+msgid "admin.updates.step.migrating"
+msgstr "Database terugzetten naar versie {version}"
+
+msgid "admin.updates.step.starting"
+msgstr "Versie {version} starten en controleren"
+
+msgid "admin.updates.step.rolling_back"
+msgstr "Terugdraaien naar de vorige versie en de back-up"
+
+msgid "admin.updates.step_state.done"
+msgstr "klaar"
+
+msgid "admin.updates.step_state.current"
+msgstr "bezig"
+
+msgid "admin.updates.step_state.pending"
+msgstr "nog niet"
+
+msgid "admin.updates.step.since"
+msgstr "sinds {time}"
+
+msgid "admin.updates.steps"
+msgstr "Stappen"
+
+msgid "admin.updates.progress.status"
+msgstr "Nu: {step}"
+
+msgid "admin.updates.progress.ended"
+msgstr "Verzoek naar versie {version}: {status}."
+
+msgid "admin.updates.progress.refresh"
+msgstr "Stand bijwerken"
+
+msgid "admin.updates.progress.reload"
+msgstr "Pagina vernieuwen"
+
+msgid "admin.updates.banner.step"
+msgstr "Update naar versie {version} is bezig: {step}."
 
 #. Context-sensitive help and the manual (ADR 0033).
 msgid "admin.nav.help"
