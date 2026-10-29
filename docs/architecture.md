@@ -240,7 +240,7 @@ same commit and rollback behaviour as the SQL one.
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda per slot with agents and shortfalls, day and week view (ADR 0044) | `app/domain/agenda.py`, `app/domain/agenda_service.py`, `app/admin/agenda_routes.py`, `app/admin/shortfalls.py` |
 | A planner's changes: move, cancel with a fixed reason, accept a shortfall (ADR 0044) | `app/domain/planner_service.py`, `app/admin/planner_routes.py` |
-| Cancelling on the citizen's behalf, shared by closure and planner; the planner's limits | `app/domain/booking_changes.py` |
+| Cancelling on the citizen's behalf, shared by closure and planner; the planner's limits; asking to rebook and its lapse (ADR 0044) | `app/domain/booking_changes.py`, `app/jobs/runner.py` (`lapse_rebook`) |
 | Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
