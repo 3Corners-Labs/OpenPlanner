@@ -57,6 +57,33 @@ msgstr "View or change appointment"
 msgid "message.signoff"
 msgstr "Kind regards, {group_name}"
 
+msgid "message.team_invite.subject"
+msgstr "Video appointment {date} {time}, {group_name} ({reference})"
+
+msgid "message.team_invite.greeting"
+msgstr "Dear colleagues,"
+
+msgid "message.team_invite.intro"
+msgstr "A video appointment was booked with {group_name}: {first_name}, reference {reference}. An agent picks it up in OpenPlanner's queue."
+
+msgid "message.team_invite.queue"
+msgstr "You get the link to the call when you pick up the appointment."
+
+msgid "message.team_invite.queue_link"
+msgstr "Go to the queue"
+
+msgid "message.team_invite.summary"
+msgstr "Video appointment {group_name} ({reference})"
+
+msgid "message.team_invite.signoff"
+msgstr "This message was sent automatically by OpenPlanner."
+
+msgid "message.team_cancel.subject"
+msgstr "Cancelled: video appointment {date} {time}, {group_name} ({reference})"
+
+msgid "message.team_cancel.intro"
+msgstr "The video appointment {reference} with {group_name} does not take place at this time. It was removed from your calendar."
+
 msgid "message.calendar_summary"
 msgstr "Video call with {group_name}"
 
@@ -550,6 +577,9 @@ msgstr "Task to the queue and appointment fixed"
 msgid "admin.group.dispatch_value"
 msgstr "{minutes} minutes before the start"
 
+msgid "admin.group.no_invite"
+msgstr "No invite"
+
 msgid "admin.group.phone"
 msgstr "Phone number"
 
@@ -935,6 +965,12 @@ msgstr "How appointments reach staff"
 msgid "admin.field.dispatch_kind_hint"
 msgstr "Contact center: a task in the team's queue, shortly before the start. Own queue: staff sign in to OpenPlanner and pick up an appointment. Applies to appointments not yet dispatched."
 
+msgid "admin.field.calendar_invite_address"
+msgstr "Calendar invite to (own queue)"
+
+msgid "admin.field.calendar_invite_address_hint"
+msgstr "Optional. A shared mailbox or mailing list of the team. Each appointment sends it a calendar invite with first name and reference, without a link to the call. Check the address carefully: the invite is outside OpenPlanner's retention."
+
 msgid "admin.field.queue_visible_from_minutes"
 msgstr "Visible in the queue (minutes ahead, own queue)"
 
@@ -1038,6 +1074,9 @@ msgstr "This booking starts soon or has already gone to the contact center. Call
 
 msgid "admin.form.error.move_causes_shortfall"
 msgstr "This slot would then have more bookings than agents. Confirm that you accept the shortfall, or choose another slot."
+
+msgid "admin.form.error.calendar_invite_address"
+msgstr "Enter a valid email address, or leave the field empty."
 
 msgid "admin.form.error.queue_visible_from_minutes"
 msgstr "Enter a number of minutes from 0 to 120."

@@ -71,6 +71,7 @@ class GroupSettings:
     planner_change_min_lead_minutes: int
     queue_visible_from_minutes: int
     queue_free_pick_allowed: bool
+    calendar_invite_address: str | None
     video_host_email: str | None
     wxcc_business_address: str | None
     wxcc_channel: str | None
