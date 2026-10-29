@@ -1,6 +1,6 @@
 # 0051. Releases, version numbers and knowing what runs
 
-Status: proposed (2026-10-29), requested by the product owner. Builds on ADR 0006 (signed
+Status: accepted (2026-10-29), requested by the product owner. Builds on ADR 0006 (signed
 images), ADR 0012 (actions on explicit instruction) and ADR 0029 (updates from the portal).
 
 ## Context
