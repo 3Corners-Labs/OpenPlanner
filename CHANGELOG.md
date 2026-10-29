@@ -91,3 +91,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
   an upcoming closure links to that page at `/g/{slug}/closure`; the page of a booking on hold
   shows the contact options above its actions. `seed-closures` adds the examples that e2e checks
   (axe, Lighthouse, keyboard) in nl and en; refused in production.
+- Embedding on host websites (ADR 0035, EM-1): allowed origins per organisation under
+  Insluiten (`embedding.manage`, organisation admin and superuser), exact `https` origins,
+  localhost only outside production; a group's own switch "Insluiten op websites" (off by
+  default); audited with counts. ADR 0035 accepted.

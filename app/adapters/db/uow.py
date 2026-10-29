@@ -45,6 +45,7 @@ from app.adapters.db.models import (
     OrganisationFontRow,
     OrganisationHolidayCalendarRow,
     OrganisationLogoRow,
+    OrganisationOriginRow,
     OrganisationRow,
     ReminderRuleRow,
     ScheduleOverrideRow,
@@ -103,6 +104,7 @@ from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
+from app.domain.embedding import AllowedOrigins
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.job_plan import JobType, PlannedJob
@@ -196,6 +198,7 @@ def _group(row: GroupRow) -> Group:
         not_picked_up_minutes=row.not_picked_up_minutes,
         direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
+        embedding_enabled=row.embedding_enabled,
     )
 
 
@@ -259,6 +262,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "not_picked_up_minutes": group.not_picked_up_minutes,
         "direct_call_max_concurrent": group.direct_call_max_concurrent,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
+        "embedding_enabled": group.embedding_enabled,
     }
 
 
@@ -723,6 +727,27 @@ class SqlTransaction(
             self._session.add(
                 OrganisationContactsRow(organisation_id=organisation_id, body=_contacts_json(block))
             )
+
+    async def get_allowed_origins(self, organisation_id: int) -> AllowedOrigins:
+        """Return the organisation's allowed origins in the order they were entered."""
+        rows = await self._session.scalars(
+            select(OrganisationOriginRow.origin)
+            .where(OrganisationOriginRow.organisation_id == organisation_id)
+            .order_by(OrganisationOriginRow.position)
+        )
+        return AllowedOrigins(tuple(rows))
+
+    async def save_allowed_origins(self, organisation_id: int, allowed: AllowedOrigins) -> None:
+        """Replace the organisation's allowed origins; an empty list removes them all."""
+        await self._session.execute(
+            delete(OrganisationOriginRow).where(
+                OrganisationOriginRow.organisation_id == organisation_id
+            )
+        )
+        self._session.add_all(
+            OrganisationOriginRow(organisation_id=organisation_id, origin=origin, position=n)
+            for n, origin in enumerate(allowed.origins)
+        )
 
     async def get_group_contact_block(self, group_id: int) -> ContactBlock | None:
         """Return the group's own contact block, if it has one."""
