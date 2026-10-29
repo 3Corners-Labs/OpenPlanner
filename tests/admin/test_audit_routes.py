@@ -9,6 +9,7 @@ import pytest
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Level, Outcome, Source
 from app.domain.authorization import Scope
+from app.domain.diagnostics import DiagnosticLog
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
@@ -341,3 +342,41 @@ async def test_an_export_over_the_period_limit_is_refused_on_the_page(traced: Si
     assert response.status_code == 422
     assert response.headers["content-type"].startswith("text/html")
     assert "De export beslaat te veel dagen." in response.text
+
+
+async def test_the_superuser_switches_diagnostic_mode_and_the_group_sees_its_debug_lines(
+    site: Site,
+) -> None:
+    # ADR 0040, part 4: superuser only; the group admin reads the debug lines of their group.
+    await site.login_as(SUPER)
+    page = (await site.client.get("/admin/audit")).text
+    assert "De diagnosemodus staat nergens aan." in page
+
+    switched = await site.client.post("/admin/audit/diagnostics", data={"target": "group:demo"})
+    assert switched.status_code == 303
+    assert switched.headers["location"] == "/admin/audit?done=diagnostics_on#diagnostics"
+    page = (await site.client.get(switched.headers["location"])).text
+    assert "De diagnosemodus staat aan." in page
+    assert 'name="target" value="group:demo"' in page
+
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    log = DiagnosticLog(SqlUnitOfWork(app.state.engine), app.state.clock)
+    assert await log.debug("job.run", "demo", "demo", detail="type:send_reminder")
+
+    await site.login_as(GROUP_ADMIN)
+    page = (await site.client.get("/admin/audit", params={"category": "diagnostic"})).text
+    assert "Taak uitgevoerd (diagnose)" in page
+    assert "Diagnosemodus" not in page  # the switch is the superuser's
+
+    await site.login_as(SUPER)
+    off = await site.client.post("/admin/audit/diagnostics/off", data={"target": "group:demo"})
+    assert off.headers["location"] == "/admin/audit?done=diagnostics_off#diagnostics"
+    assert not await log.debug("job.run", "demo", "demo")
+
+
+async def test_an_unknown_diagnostics_target_changes_nothing(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    response = await site.client.post("/admin/audit/diagnostics", data={"target": "group:x"})
+
+    assert response.headers["location"] == "/admin/audit?done=unchanged#diagnostics"
