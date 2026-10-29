@@ -35,8 +35,13 @@ export async function loginAs(page: Page, user: TestUser, path = '/admin/'): Pro
   await page.waitForURL((url) => url.pathname.startsWith('/admin'));
 }
 
-/** Log out with the keyboard, confirm at Keycloak and land on the logged-out page. */
+/**
+ * Log out with the keyboard: open the profile menu in the top bar (ADR 0047), press the log-out
+ * button, confirm at Keycloak and land on the logged-out page.
+ */
 export async function logout(page: Page): Promise<void> {
+  await tabTo(page, page.locator('details.admin-profile > summary'));
+  await page.keyboard.press('Enter');
   await tabTo(page, page.getByRole('button', { name: 'Uitloggen' }));
   await page.keyboard.press('Enter');
   await page.waitForURL(new RegExp(`^${KEYCLOAK_URL}/.*/logout`));
