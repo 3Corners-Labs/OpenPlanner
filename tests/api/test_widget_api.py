@@ -86,7 +86,14 @@ async def test_the_group_comes_with_its_form_and_texts_for_an_allowed_origin(
     body = response.json()
     assert (body["name"], body["locale"], body["closure"]) == ("Demo: videogesprek", "en", None)
     assert body["page_url"].endswith("/g/demo")
-    assert [f["name"] for f in body["fields"]] == ["first_name", "last_name", "email", "phone"]
+    assert [f["name"] for f in body["fields"]] == [
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "q_onderwerp",  # the demo's example fields (ADR 0055)
+        "q_tolk",
+    ]
     assert body["honeypot"] == "website"
     assert body["texts"]["form.submit"] == "Book appointment"
     assert "Demo: videogesprek" in body["texts"]["widget.more"]

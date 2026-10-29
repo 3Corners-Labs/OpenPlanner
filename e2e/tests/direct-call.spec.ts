@@ -68,7 +68,8 @@ test('a participant starts a call right away and the admin sees it', async ({ pa
   await participant.getByRole('link', { name: 'Nu een gesprek starten' }).click();
   await expect(participant.getByRole('heading', { level: 1 })).toHaveText('Nu een videogesprek starten');
   await expectNoAxeViolations(participant);
-  await participant.getByLabel('Naam').fill('Ada Lovelace');
+  await participant.getByLabel('Voornaam').fill('Ada');
+  await participant.getByLabel('Achternaam').fill('Lovelace');
   await participant.getByLabel('E-mailadres').fill('ada@example.org');
   await participant.getByRole('button', { name: 'Gesprek starten' }).press('Enter');
   await expect(participant).toHaveURL(/\/b\/[A-Za-z0-9_-]+\/wait$/);
