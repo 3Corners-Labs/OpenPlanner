@@ -10,15 +10,17 @@ from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import (
     SYSTEM_ACTOR,
-    AdminProfile,
     AuditEntry,
     AuditEvent,
     AuditFilter,
+    Category,
+    Level,
     Outcome,
     Source,
 )
 from app.domain.authorization import Scope
 from app.domain.ports import Transaction
+from app.domain.staff import StaffMember
 from tests.support.domain import NOW
 
 EVERYTHING = Scope(everything=True)
@@ -104,14 +106,18 @@ async def test_audit_entries_carry_the_latest_profile_name(engine: AsyncEngine) 
     async with uow.locked() as tx:
         await tx.add_audit_event(AuditEvent(NOW, "sub-1", "admin.login", Outcome.SUCCESS))
         await tx.add_audit_event(AuditEvent(NOW, "sub-2", "admin.login", Outcome.SUCCESS))
-        await tx.save_admin_profile(AdminProfile("sub-1", "Old Name", NOW))
+        await tx.save_staff(_staff("Old Name"))
     async with uow.locked() as tx:
-        await tx.save_admin_profile(AdminProfile("sub-1", "Gina Groep", NOW + timedelta(hours=1)))
+        await tx.save_staff(_staff("Gina Groep"))
 
     async with uow.read() as tx:
         entries = await tx.list_audit_events(EVERYTHING)
 
     assert {e.event.actor: e.actor_name for e in entries} == {"sub-1": "Gina Groep", "sub-2": None}
+
+
+def _staff(name: str) -> StaffMember:
+    return StaffMember("sub-1", name, frozenset(), frozenset(), NOW, NOW, NOW)
 
 
 def _system(at_offset: int, outcome: Outcome, org: str | None, group: str | None) -> AuditEvent:
@@ -218,3 +224,28 @@ def test_every_listing_query_requires_a_scope() -> None:
         assert "scope" in parameters, name
         assert parameters["scope"].annotation in (Scope, "Scope"), name
         assert parameters["scope"].default is inspect.Parameter.empty, name
+
+
+async def test_audit_events_keep_the_event_schema_fields(engine: AsyncEngine) -> None:
+    # ADR 0040, part 2: id, level, category, trace and service survive the round trip.
+    uow = SqlUnitOfWork(engine)
+    event = AuditEvent(
+        NOW,
+        SYSTEM_ACTOR,
+        "webhook.rejected",
+        Outcome.FAILURE,
+        source=Source.SYSTEM,
+        category=Category.SECURITY,
+        trace_id="b" * 32,
+        service="web",
+    )
+    async with uow.locked() as tx:
+        await tx.add_audit_event(event)
+
+    async with uow.read() as tx:
+        (entry,) = await tx.list_audit_events(EVERYTHING)
+
+    stored = entry.event
+    assert stored == event
+    assert (stored.event_id, stored.trace_id, stored.service) == (event.event_id, "b" * 32, "web")
+    assert (stored.category, stored.level) == (Category.SECURITY, Level.ERROR)

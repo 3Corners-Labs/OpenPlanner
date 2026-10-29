@@ -1,10 +1,13 @@
 import io
 import json
 import logging
+import re
 
 import pytest
 import structlog
 
+from app.domain.event_context import bind_level, set_service, trace_scope
+from app.domain.event_schema import Envelope
 from app.logging import MASK, PII_FIELDS, configure_logging
 
 
@@ -59,8 +62,8 @@ def test_stdlib_loggers_are_rendered_as_masked_json(stream: io.StringIO) -> None
     logging.getLogger("thirdparty").warning("hello", extra={"email": "lib@example.org"})
 
     record = _records(stream)[0]
-    assert record["event"] == "hello"
-    assert record["level"] == "warning"
+    assert record["message"] == "hello"
+    assert record["log.level"] == "warning"
     assert "lib@example.org" not in stream.getvalue()
 
 
@@ -69,7 +72,7 @@ def test_uvicorn_logs_are_json_and_access_log_is_off(stream: io.StringIO) -> Non
     logging.getLogger("uvicorn.access").info('"GET /b/secret-token HTTP/1.1" 200')
 
     records = _records(stream)
-    assert [r["event"] for r in records] == ["server started"]
+    assert [r["message"] for r in records] == ["server started"]
     assert "secret-token" not in stream.getvalue()
 
 
@@ -77,8 +80,10 @@ def test_output_is_json_with_utc_timestamp(stream: io.StringIO) -> None:
     structlog.get_logger().info("tick")
 
     record = _records(stream)[0]
-    assert record["event"] == "tick"
-    assert str(record["timestamp"]).endswith("Z")
+    assert record["message"] == "tick"
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z", str(record["@timestamp"]))
+    assert record["log.level"] == "info"
+    assert "event" not in record
 
 
 def test_respects_log_level() -> None:
@@ -90,3 +95,31 @@ def test_respects_log_level() -> None:
     finally:
         structlog.reset_defaults()
         logging.getLogger().handlers.clear()
+
+
+def test_lines_carry_the_service_and_the_trace_of_their_request() -> None:
+    # ADR 0040, part 2: every line can be filtered per tenant and followed per request.
+    out = io.StringIO()
+    configure_logging("INFO", stream=out, envelope=Envelope("1.4.0", "gemeente-test"))
+    set_service("web")
+    try:
+        with trace_scope() as trace_id:
+            bind_level("gemeente", "burgerzaken")
+            structlog.get_logger().info("inside")
+            logging.getLogger("thirdparty").warning("library")
+            structlog.get_logger().info("own", group="other")
+        structlog.get_logger().info("outside")
+    finally:
+        set_service("")
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    inside, library, own, outside = _records(out)
+    for record in (inside, library):
+        assert record["trace.id"] == trace_id
+        assert (record["organisation"], record["group"]) == ("gemeente", "burgerzaken")
+        assert record["service.name"] == "web"
+        assert (record["service.version"], record["installation"]) == ("1.4.0", "gemeente-test")
+    assert own["group"] == "other"
+    assert "trace.id" not in outside
+    assert "organisation" not in outside

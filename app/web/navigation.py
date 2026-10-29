@@ -151,6 +151,14 @@ SECTIONS = (
                 ("/admin/organisations/{org}/closure",),
             ),
             Screen(
+                "manage.staff",
+                "admin.nav.staff",
+                "/admin/staff",
+                Permission.STAFF_VIEW,
+                "people",
+                ("/admin/staff/{member_id}",),
+            ),
+            Screen(
                 "manage.rights",
                 "admin.nav.rights",
                 "/admin/rights",
@@ -192,6 +200,13 @@ SECTIONS = (
                 "/admin/updates",
                 Permission.SYSTEM_UPDATE,
                 "refresh",
+            ),
+            Screen(
+                "platform.maintenance",
+                "admin.nav.maintenance",
+                "/admin/maintenance",
+                Permission.SYSTEM_MAINTENANCE,
+                "lock",
             ),
         ),
     ),

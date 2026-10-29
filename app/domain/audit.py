@@ -4,8 +4,8 @@ Written for every login, every denied authorisation decision and every change (A
 and, as system events, for what the platform did on its own: every message, meeting, work
 item and purge job with its result (ADR 0031). An event never contains personal data of
 citizens; the actor is the subject identifier from the identity provider, or ``system``. The
-admin's display name lives once in ``AdminProfile`` and is joined in when the log is read, so
-events stay immutable and a name is stored in one place only.
+admin's display name lives once in their ``StaffMember`` record (ADR 0046) and is joined in
+when the log is read, so events stay immutable and a name is stored in one place only.
 
 An event sits at exactly one level: global (no organisation), an organisation (no group) or
 a group. The audit log shows each admin the levels of their own scope and nothing above it.
@@ -14,6 +14,8 @@ a group. The audit log shows each admin the levels of their own scope and nothin
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+
+from app.domain.event_context import current_service, current_trace_id, new_id
 
 
 class Outcome(StrEnum):
@@ -43,6 +45,39 @@ SYSTEM_ACTOR = "system"
 """Actor recorded for system events."""
 
 
+class Category(StrEnum):
+    """What kind of event it is, for filtering, retention and the log platform (ADR 0040)."""
+
+    AUDIT = "audit"
+    """An admin action: login, denial, change."""
+    SYSTEM = "system"
+    """What the platform did on its own: jobs, storage checks."""
+    SECURITY = "security"
+    """A rejected webhook or a failing credential."""
+    DIAGNOSTIC = "diagnostic"
+    """Debug detail, only while diagnostic mode is on."""
+
+
+class Level(StrEnum):
+    """Log level, the syslog levels Python has (ADR 0040)."""
+
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
+LEVEL_BY_OUTCOME: dict[Outcome, Level] = {
+    Outcome.SUCCESS: Level.INFO,
+    Outcome.SKIPPED: Level.INFO,
+    Outcome.RETRY: Level.WARNING,
+    Outcome.DENIED: Level.WARNING,
+    Outcome.FAILURE: Level.ERROR,
+}
+"""The level of an audit or system event follows from its outcome."""
+
+
 @dataclass(frozen=True)
 class AuditEvent:
     """One audited action.
@@ -59,6 +94,11 @@ class AuditEvent:
             values, so no personal data.
         source: Admin action or system event.
         booking_id: The booking a system event is about, if any (an id, not personal data).
+        category: Kind of event; ``None`` follows the source (admin: audit, system: system).
+        level: Log level; ``None`` follows the outcome (``LEVEL_BY_OUTCOME``).
+        trace_id: The request or job that caused it; taken from the current context.
+        service: ``web`` or ``worker``; taken from the current context.
+        event_id: Unique id, so a copy on the log platform can be matched to the table.
     """
 
     at: datetime
@@ -71,6 +111,28 @@ class AuditEvent:
     detail: str = ""
     source: Source = Source.ADMIN
     booking_id: int | None = None
+    category: Category | None = None
+    level: Level | None = None
+    trace_id: str = field(default_factory=current_trace_id, compare=False)
+    service: str = field(default_factory=current_service, compare=False)
+    event_id: str = field(default_factory=new_id, compare=False)
+
+    def __post_init__(self) -> None:
+        """Fill in the derived category and level, so a stored event equals the one read back."""
+        object.__setattr__(self, "category", self.event_category)
+        object.__setattr__(self, "level", self.log_level)
+
+    @property
+    def event_category(self) -> Category:
+        """The category, derived from the source when not set."""
+        if self.category is not None:
+            return self.category
+        return Category.AUDIT if self.source is Source.ADMIN else Category.SYSTEM
+
+    @property
+    def log_level(self) -> Level:
+        """The level, derived from the outcome when not set."""
+        return self.level if self.level is not None else LEVEL_BY_OUTCOME[self.outcome]
 
 
 @dataclass(frozen=True)
@@ -82,12 +144,14 @@ class AuditFilter:
         problems_only: Only denials, failures and retries.
         group: Only events of this group (slug).
         booking_id: Only events about this booking.
+        actor: Only events of this actor (subject); the staff detail page (ADR 0046).
     """
 
     source: Source | None = None
     problems_only: bool = False
     group: str | None = None
     booking_id: int | None = None
+    actor: str | None = None
 
     def matches(self, event: AuditEvent) -> bool:
         """Return whether ``event`` passes the filter (the SQL adapter applies the same rules)."""
@@ -96,6 +160,7 @@ class AuditFilter:
             and (not self.problems_only or event.outcome in PROBLEMS)
             and (self.group is None or event.group == self.group)
             and (self.booking_id is None or event.booking_id == self.booking_id)
+            and (self.actor is None or event.actor == self.actor)
         )
 
 
@@ -110,18 +175,3 @@ class AuditEntry:
 
     event: AuditEvent
     actor_name: str | None = None
-
-
-@dataclass(frozen=True)
-class AdminProfile:
-    """What the portal remembers about an admin, refreshed at every login.
-
-    Attributes:
-        subject: Subject identifier from the identity provider.
-        display_name: Name from the identity provider, for the audit log.
-        last_login_at: Time of the latest login (UTC).
-    """
-
-    subject: str
-    display_name: str = field(repr=False)
-    last_login_at: datetime

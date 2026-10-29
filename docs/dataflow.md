@@ -8,7 +8,8 @@ no entry point collects it yet (booking endpoints arrive in WP3).
 ```
 operator ──HTTP──> web (/healthz, /readyz) ──SQL──> SQLite volume (no tables with data)
                    worker ──SQL──> SQLite volume (heartbeat only)
-web, worker ──stdout──> container log (JSON, PII fields masked)
+web, worker ──stdout──> container log (JSON, PII fields masked; trace id, organisation and
+                         group slugs, service and installation name per line, ADR 0040)
 visitor ──HTTP──> web (GET /, ?lang=) ──> HTML page in the negotiated language
 web ──Set-Cookie: lang=<locale>──> visitor browser (functional preference, 1 year, no PII)
 ```
@@ -72,7 +73,7 @@ be confirmed in the DPIA (O7). The closure notice is admin text without personal
 **Alternative contact options (ADR 0037).** Phone numbers, email addresses, links and addresses
 of the organisation (`organisation_contacts`), entered by an organisation admin, or of one team
 (`group_contacts`), entered by its group admin, and shown publicly on closure and maintenance
-pages. A closure keeps a copy of the block that applied when it started (`closures.contacts`)
+pages and on the page of a booking on hold (CL-2). A closure keeps a copy of the block that applied when it started (`closures.contacts`)
 and an optional heading per locale (`closure_notices.heading`). Organisation data, not personal data of citizens;
 the admin page asks for general numbers and addresses only. No purge job; kept until changed.
 
@@ -84,14 +85,18 @@ identity provider ──ID token (sub, name, roles, organisations, groups)──
 web ──signed session cookie op_admin (sub, name, roles, scope; 8 h)──> admin browser
 web ──SQL──> audit_events (sub, action, outcome, organisation, group)
 worker ──SQL──> audit_events (source=system: job type, outcome, error code, booking id; ADR 0031)
-web ──SQL──> admin_profiles (sub, display name, last login)
+web ──SQL──> staff, staff_memberships (sub, display name, roles, organisation and group slugs,
+             first/last login, last seen, last logout; ADR 0046)
 ```
 
 | Data item | Table.column / place | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| Admin subject identifier | `audit_events.actor`, `admin_profiles.subject`, session cookie | identity provider | audit events: kept as the audit trail (retention to be set with the hosting owner, O7) | no |
-| Admin display name | `admin_profiles.display_name`, session cookie | identity provider | replaced at every login; to be removed for admins inactive longer than the audit retention (WP8) | no |
+| Admin subject identifier | `audit_events.actor`, `staff.subject`, session cookie | identity provider | audit events: kept as the audit trail (retention to be set with the hosting owner, O7) | no |
+| Admin display name | `staff.display_name`, session cookie | identity provider | replaced at every login; to be erased for admins inactive longer than `staff_retention_days` (ADR 0046, step 2) | no |
+| Admin roles and memberships | `staff.roles`, `staff_memberships` (organisation and group slugs) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed` | no |
+| Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
 | System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
+| Event schema fields (ADR 0040) | `audit_events.event_id`, `level`, `category`, `trace_id`, `service`; the same trace id on stdout | web, worker | as the event they belong to | no: random ids and codes |
 
 System events hold no personal data: no names, addresses, message text or join links, only codes
 and the booking id. Each admin sees them at their own level only (group admin: their groups;
@@ -186,7 +191,10 @@ audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
 worker ──GET releases/latest (no data sent; optional read-only token)──> api.github.com
         <── tag and release page ── stored in release_checks
 superuser ──POST update / restore / cancel──> web ──SQL──> update_requests (versions, subject id)
-host updater ──docker exec python -m app.cli──> web ──SQL──> update_requests, audit_events
+superuser's browser ──GET /admin/updates/progress (every 5 s while open; ADR 0048)──> web
+        <── steps and status of the request (no personal data) ──
+host updater ──docker exec python -m app.cli (claim, progress, report)──> web ──SQL──>
+             update_requests (status, step), audit_events
              ──backup-db──> data/backups/request-<id>.db (copy of the whole database: PII)
 ```
 
@@ -195,6 +203,18 @@ backups the updater takes before every change contain the PII of `bookings`; the
 data volume with mode 600 and are deleted after 24 hours (`backup-db --prune` on every updater
 run). A backup that is put back is minutes old: purge jobs that ran after it are still pending
 in it and run again on the next worker cycle.
+
+## Maintenance mode (ADR 0038)
+
+```
+superuser ──POST /admin/maintenance/on|off (reason code, expected end)──> web ──SQL──> maintenance_state
+host (CLI, updater) ──docker exec python -m app.cli maintenance──> web ──SQL──> maintenance_state, audit_events
+operator ──MAINTENANCE_MODE (environment)──> web (no database read)
+admin ──POST (any change) during maintenance──> web ──refused──> audit_events (permission, target slugs)
+```
+
+The switch holds a subject identifier or a host actor, times and a reason code: no personal
+data. A refused change is audited with its permission and target only, never the form content.
 
 ## HTTPS certificate (ADR 0030)
 

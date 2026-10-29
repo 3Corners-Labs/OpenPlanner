@@ -120,8 +120,14 @@ def page(
     name: str,
     principal: Principal,
     context: dict[str, object],
+    *,
+    scripts: bool = False,
 ) -> HTMLResponse:
-    """Render an admin page with navigation and ``can()`` from the matrix."""
+    """Render an admin page with navigation and ``can()`` from the matrix.
+
+    ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``); only pages that enhance
+    themselves under an ADR do (the updates page, ADR 0048).
+    """
     can = can_function(principal)
     home = current_home(request)
     sections = [
@@ -154,7 +160,10 @@ def page(
             "help_topic": context["help_topic"] if "help_topic" in context else page_topic(request),
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
             "update_banner": getattr(request.state, "update_notice", None),
+            # Set by ``maintenance_routes.load_maintenance_notice`` (ADR 0038).
+            "maintenance_notice": getattr(request.state, "maintenance_notice", None),
         },
+        scripts=scripts,
     )
 
 

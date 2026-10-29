@@ -1,7 +1,8 @@
 """ORM tables. Importing this module registers every table on ``Base.metadata``.
 
 Rows are persistence shapes only; ``app.adapters.db.uow`` maps them to domain objects.
-PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
+PII columns of citizens exist only on ``bookings`` (CLAUDE.md privacy rules). ``staff`` holds
+the display name of admins, from the identity provider (ADR 0046).
 
     audit_events (no foreign keys: events outlive what they describe)
     booking_events, call_status (per booking; no personal data, kept after the purge)
@@ -10,8 +11,10 @@ PII columns exist only on ``bookings`` (CLAUDE.md privacy rules).
                                                  └──* api_client_groups *──1 groups (ADR 0023)
     organisations 1──* channel_settings (SMTP and SMS per organisation, secret encrypted)
     integration_reports (last webhook listing and delivery test; no secrets)
-    admin_profiles (name per identity-provider subject; joined into the audit log)
+    staff 1──* staff_memberships (admins as last seen at login, ADR 0046; the name is joined
+                                  into the audit log)
     release_checks (one row), update_requests (ADR 0029; the installation, no personal data)
+    maintenance_state (one row, ADR 0038; the installation, no personal data)
     organisations 1──1 organisation_logos (branding, WP3b)
     organisations 1──n organisation_fonts (branding, ADR 0041)
     holiday_calendars 1──* holidays (ADR 0025; chosen through organisation_holiday_calendars
@@ -47,7 +50,6 @@ from app.adapters.db.base import Base
 from app.adapters.db.types import UTCDateTime
 
 __all__ = [
-    "AdminProfileRow",
     "ApiAccessTokenRow",
     "ApiClientGroupRow",
     "ApiClientRow",
@@ -73,11 +75,14 @@ __all__ = [
     "OrganisationLogoRow",
     "OrganisationFontRow",
     "OrganisationRow",
+    "MaintenanceStateRow",
     "ReleaseCheckRow",
     "ReminderRuleRow",
     "ScheduleOverrideRow",
     "ScheduleRuleRow",
     "SlotRow",
+    "StaffMembershipRow",
+    "StaffRow",
     "UpdateRequestRow",
 ]
 
@@ -459,27 +464,65 @@ class AuditEventRow(Base):
     detail: Mapped[str] = mapped_column(String(255), server_default=text("''"))
     source: Mapped[str] = mapped_column(String(16), server_default=text("'admin'"))
     booking_id: Mapped[int | None] = mapped_column(Integer)
+    # ADR 0040, part 2: the fields of the one event schema that are not derived on export.
+    event_id: Mapped[str] = mapped_column(String(32))
+    level: Mapped[str] = mapped_column(String(16), server_default=text("'info'"))
+    category: Mapped[str] = mapped_column(String(16), server_default=text("'audit'"))
+    trace_id: Mapped[str] = mapped_column(String(32), server_default=text("''"))
+    service: Mapped[str] = mapped_column(String(16), server_default=text("''"))
 
     __table_args__ = (
         Index("ix_audit_events_at", "at"),
         Index("ix_audit_events_organisation", "organisation"),
         Index("ix_audit_events_group", "group"),
         Index("ix_audit_events_source_at", "source", "at"),
+        Index("ix_audit_events_event_id", "event_id", unique=True),
+        Index("ix_audit_events_trace_id", "trace_id"),
         CheckConstraint(
             "outcome IN ('success', 'denied', 'failure', 'retry', 'skipped')", name="outcome"
         ),
         CheckConstraint("source IN ('admin', 'system')", name="source"),
+        CheckConstraint("level IN ('debug', 'info', 'warning', 'error', 'critical')", name="level"),
+        CheckConstraint(
+            "category IN ('audit', 'system', 'security', 'diagnostic')", name="category"
+        ),
     )
 
 
-class AdminProfileRow(Base):
-    """An admin's display name per identity-provider subject, refreshed at every login."""
+class StaffRow(Base):
+    """An admin as last seen at login (ADR 0046); never a source of rights.
 
-    __tablename__ = "admin_profiles"
+    ``roles`` is the comma-separated role list of the last login, ``NULL`` for a record
+    carried over from ``admin_profiles`` whose roles are not known yet.
+    """
 
-    subject: Mapped[str] = mapped_column(String(255), primary_key=True)
+    __tablename__ = "staff"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subject: Mapped[str] = mapped_column(String(255), unique=True)
     display_name: Mapped[str] = mapped_column(String(255))
+    roles: Mapped[str | None] = mapped_column(String(255))
+    first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
     last_login_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    last_logout_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+
+class StaffMembershipRow(Base):
+    """An organisation, or a group with its organisation, that an admin's roles reach."""
+
+    __tablename__ = "staff_memberships"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    staff_id: Mapped[int] = mapped_column(ForeignKey("staff.id", ondelete="CASCADE"))
+    organisation: Mapped[str] = mapped_column(String(64))
+    group: Mapped[str | None] = mapped_column(String(64))
+
+    __table_args__ = (
+        Index("ix_staff_memberships_staff_id", "staff_id"),
+        Index("ix_staff_memberships_organisation", "organisation"),
+        Index("ix_staff_memberships_group", "group"),
+    )
 
 
 class BookingEventRow(Base):
@@ -663,6 +706,8 @@ class UpdateRequestRow(Base):
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reason: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+    step: Mapped[str | None] = mapped_column(String(16))
+    step_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         Index("ix_update_requests_status", "status"),
@@ -671,4 +716,24 @@ class UpdateRequestRow(Base):
             "status IN ('requested', 'running', 'succeeded', 'rolled_back', 'failed', 'cancelled')",
             name="status",
         ),
+        CheckConstraint(
+            "step IS NULL OR step IN ('pulling', 'verifying', 'backing_up', 'migrating', "
+            "'starting', 'rolling_back')",
+            name="step",
+        ),
     )
+
+
+class MaintenanceStateRow(Base):
+    """The maintenance switch of the whole installation (ADR 0038); at most one row."""
+
+    __tablename__ = "maintenance_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    active: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    since: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    switched_by: Mapped[str] = mapped_column(String(255), server_default=text("''"))
+    expected_end: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    reason: Mapped[str | None] = mapped_column(String(16))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)

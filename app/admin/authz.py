@@ -7,6 +7,11 @@ object is inspectable, so a test can prove that no admin route lacks one.
 
 Templates receive ``can(permission, group=None)`` to show only the actions the matrix allows;
 hiding is a convenience, the server always decides again.
+
+During maintenance (ADR 0038) every request that is not a GET also passes
+``decide_in_maintenance``: only the permissions in ``MAINTENANCE_WRITABLE`` and routes declared
+``maintenance_safe`` go ahead, and only for the superuser. A refusal is logged, audited as
+``maintenance.refused`` and raised as ``MaintenanceRefused`` (a 503 page).
 """
 
 from collections.abc import Callable
@@ -16,7 +21,7 @@ from datetime import timedelta
 import structlog
 from fastapi import Request
 
-from app.admin.session import current_principal, login_age
+from app.admin.session import activity_due, current_principal, login_age
 from app.domain.admin import AdminService, Authorization
 from app.domain.authorization import (
     LEVELS,
@@ -25,8 +30,11 @@ from app.domain.authorization import (
     Principal,
     Target,
     decide,
+    decide_in_maintenance,
     scope_for,
 )
+from app.domain.event_context import bind_level
+from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import Clock
 from app.domain.scheduling import GroupSummary
 
@@ -39,6 +47,14 @@ class LoginRequired(Exception):  # noqa: N818 - control flow, rendered as a redi
 
 class AccessDenied(Exception):  # noqa: N818 - control flow, rendered as a 403 page
     """The matrix refused the request."""
+
+
+class MaintenanceRefused(Exception):  # noqa: N818 - control flow, rendered as a 503 page
+    """Maintenance is on and this change is not one that may go ahead (ADR 0038)."""
+
+
+READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+"""Methods that never change anything; maintenance leaves them alone."""
 
 
 class ReauthRequired(Exception):  # noqa: N818 - control flow, rendered as a redirect
@@ -75,11 +91,25 @@ def admin_service(request: Request) -> AdminService:
     return service
 
 
+def maintenance_service(request: Request) -> MaintenanceService:
+    """Return the application's maintenance service."""
+    service: MaintenanceService = request.app.state.maintenance_service
+    return service
+
+
 def session_principal(request: Request) -> Principal | None:
     """Return the logged-in principal of ``request``, honouring the absolute lifetime."""
     clock: Clock = request.app.state.clock
     hours: int = request.app.state.settings.admin_session_hours
     return current_principal(request, clock.now(), timedelta(hours=hours))
+
+
+async def _note_activity(request: Request, principal: Principal) -> None:
+    """Write the admin's "last seen" to the staff record, at most once per interval."""
+    clock: Clock = request.app.state.clock
+    seconds: int = request.app.state.settings.staff_last_seen_interval_seconds
+    if activity_due(request, clock.now(), timedelta(seconds=seconds)):
+        await admin_service(request).record_seen(principal)
 
 
 def can_function(principal: Principal) -> Callable[..., bool]:
@@ -121,6 +151,9 @@ class RequirePermission:
             held for at least one target.
         fresh: For changes and their forms: the login may be at most
             ``ADMIN_REAUTH_MINUTES`` old, so revoked roles stop working within that time.
+        maintenance_safe: The route writes nothing but its own report, so the superuser may
+            use it during maintenance although its permission is not in
+            ``MAINTENANCE_WRITABLE`` (only "Koppeling controleren", ADR 0038).
     """
 
     def __init__(
@@ -130,12 +163,14 @@ class RequirePermission:
         *,
         organisation_param: str | None = None,
         fresh: bool = False,
+        maintenance_safe: bool = False,
     ) -> None:
         """Store the declaration; it is also read by the route-coverage test."""
         self.permission = permission
         self.group_param = group_param
         self.organisation_param = organisation_param
         self.fresh = fresh
+        self.maintenance_safe = maintenance_safe
 
     async def __call__(self, request: Request) -> AdminContext:
         """Resolve the principal and decide.
@@ -143,10 +178,12 @@ class RequirePermission:
         Raises:
             LoginRequired: Without a valid session.
             AccessDenied: When the matrix refuses.
+            MaintenanceRefused: When the matrix allows a change but maintenance does not.
         """
         principal = session_principal(request)
         if principal is None:
             raise LoginRequired
+        await _note_activity(request, principal)
         if self.fresh:
             self._require_recent_login(request)
         service = admin_service(request)
@@ -169,9 +206,35 @@ class RequirePermission:
             allowed=authorization.decision.allowed,
             reason=authorization.decision.reason.value,
         )
+        # ADR 0040: the rest of the request's log lines carry the target it acts on.
+        bind_level(authorization.target.organisation, authorization.target.group)
         if not authorization.decision.allowed:
             raise AccessDenied
+        if request.method not in READ_METHODS:
+            await self._check_maintenance(request, principal, authorization.target)
         return AdminContext(principal, authorization)
+
+    async def _check_maintenance(
+        self, request: Request, principal: Principal, target: Target
+    ) -> None:
+        """Raise ``MaintenanceRefused`` for a change that maintenance does not allow."""
+        maintenance = maintenance_service(request)
+        if not (await maintenance.status()).active:
+            return
+        decision = decide_in_maintenance(
+            principal, self.permission, maintenance_safe=self.maintenance_safe
+        )
+        if decision.allowed:
+            return
+        log.info(
+            "authz.maintenance_refused",
+            actor=principal.subject,
+            permission=self.permission.value,
+            target_group=target.group,
+            target_organisation=target.organisation,
+        )
+        await maintenance.refuse(principal, self.permission, target)
+        raise MaintenanceRefused
 
     @staticmethod
     def _require_recent_login(request: Request) -> None:
