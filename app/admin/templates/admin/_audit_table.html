@@ -14,7 +14,7 @@
   <tbody>
     {% for event in events %}
     <tr>
-      <td class="nowrap">{{ event.when }}</td>
+      <td class="nowrap">{{ event.when }}<br><span class="muted"><time datetime="{{ event.utc }}">{{ event.utc }}</time></span></td>
       <td>{{ event.actor }}</td>
       <td>{{ event.action }}
         {%- if event.detail %}<br><span class="muted">{{ event.detail }}</span>{% endif %}
