@@ -98,7 +98,10 @@ tests/         mirrors app/; fakes for ports live in tests/fakes/.
 Contributions are licensed under EUPL-1.2 and made under the
 [Contributor Licence Agreement](docs/cla.md) (ADR 0054): you keep your copyright, 3Corners may
 relicense, and every contribution stays available as open source. Tick its box in the pull
-request description; CI fails a pull request from outside the organisation without it. Code
+request description; CI fails a pull request without it unless its author can write to this
+repository (organisation members, also with a private membership, and collaborators). After
+ticking the box, re-run the job *licence and contributor agreement*; it reads the description
+again. Code
 copied from elsewhere gets its own entry in `REUSE.toml` with its copyright and licence;
 CI runs `reuse lint`.
 
