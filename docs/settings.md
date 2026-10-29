@@ -58,6 +58,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `LOG_LEVEL` | enum | `INFO` | DEBUG, INFO, WARNING, ERROR, CRITICAL | `settings.platform.manage` | Log level; set in the portal it expires after at most 24 hours. |
 | `WORKER_POLL_SECONDS` | float | `30.0` | 5–300 | `settings.platform.manage` | Interval of the worker loop. |
 | `MAINTENANCE_CACHE_SECONDS` | float | `5.0` | 0–5 | `settings.platform.manage` | How long the web process trusts its last read of the maintenance switch (ADR 0038). |
+| `MAINTENANCE_RETRY_AFTER_SECONDS` | int | `300` | 30–3600 | `settings.platform.manage` | Retry-After of the 503 that citizens and the machine API get during maintenance (ADR 0038). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
 | `SYSTEM_EVENT_RETENTION_DAYS` | int | `90` | 30–3650 | `settings.platform.manage` | Days after which system events leave the audit log (ADR 0031). |
 | `STORAGE_LOW_FREE_PERCENT` | float | `15.0` | 1–50 | `settings.platform.manage` | Free space below which storage is low (ADR 0040). |

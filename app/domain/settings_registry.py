@@ -485,6 +485,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=5,
     ),
     S(
+        "maintenance_retry_after_seconds",
+        K.INT,
+        300,
+        _C,
+        T.OPERATIONS,
+        "Retry-After of the 503 that citizens and the machine API get during maintenance "
+        "(ADR 0038).",
+        minimum=30,
+        maximum=3600,
+    ),
+    S(
         "staff_last_seen_interval_seconds",
         K.INT,
         300,
