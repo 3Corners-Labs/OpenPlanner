@@ -100,6 +100,7 @@ class Permission(StrEnum):
     RETENTION_VIEW = "retention.view"
     ROLES_MANAGE = "roles.manage"
     STAFF_VIEW = "staff.view"
+    EMBEDDING_MANAGE = "embedding.manage"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -136,6 +137,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.ROLES_MANAGE: Level.GLOBAL,
     # ADR 0046: who uses the portal; group level so a group admin sees their own team.
     Permission.STAFF_VIEW: Level.GROUP,
+    # ADR 0035: on which websites the organisation's groups may be embedded.
+    Permission.EMBEDDING_MANAGE: Level.ORGANISATION,
 }
 
 LOCKED_PERMISSIONS = frozenset(
@@ -215,6 +218,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.RETENTION_VIEW,
         # ADR 0046: the staff of the own organisations.
         Permission.STAFF_VIEW,
+        # ADR 0035: the host websites allowed to embed the organisation's groups.
+        Permission.EMBEDDING_MANAGE,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: EVERY_ADMIN

@@ -234,16 +234,30 @@ def test_closure_content_goes_on_downgrade_and_the_notices_stay(
     assert "group_contacts" not in tables
 
 
-def test_custom_roles_go_on_downgrade(alembic_config: Config, tmp_path: Path) -> None:
-    # ADR 0039: the downgrade drops custom roles; their holders fall back to no role.
+def test_existing_groups_are_not_embeddable_and_origins_go_on_downgrade(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0035: the migration makes nothing embeddable; downgrading drops the lists.
     import sqlite3
     from contextlib import closing
 
-    command.upgrade(alembic_config, "0030")
+    command.upgrade(alembic_config, "0035")
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO organisations (id, name, slug) VALUES (1, 'Gemeente', 'gemeente');
+            INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+                min_notice_minutes, horizon_days, phone_mode)
+                VALUES (1, 1, 'Team', 'team', 'Europe/Amsterdam', 30, 60, 60, 'optional');
+            """
+        )
+
+    command.upgrade(alembic_config, "0037")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        assert database.execute("SELECT embedding_enabled FROM groups").fetchall() == [(0,)]
         database.execute(
-            "INSERT INTO roles (template, name_nl, name_en, claim_value, permissions, version)"
-            " VALUES ('group_admin', 'Teamleider', 'Team lead', 'lead', 'group.view', 1)"
+            "INSERT INTO organisation_origins (organisation_id, origin, position)"
+            " VALUES (1, 'https://www.gemeente.nl', 0)"
         )
         database.commit()
 
@@ -251,7 +265,9 @@ def test_custom_roles_go_on_downgrade(alembic_config: Config, tmp_path: Path) ->
 
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
-    assert "roles" not in tables
+        columns = {r[1] for r in database.execute("PRAGMA table_info(groups)")}
+    assert "organisation_origins" not in tables
+    assert "embedding_enabled" not in columns
 
 
 def test_existing_audit_events_get_an_id_level_and_category(
@@ -299,3 +315,23 @@ def test_diagnostic_modes_go_on_downgrade(alembic_config: Config, tmp_path: Path
         tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
     assert "diagnostic_modes" not in tables
     assert "ix_audit_events_category_at" not in tables
+
+
+def test_custom_roles_go_on_downgrade(alembic_config: Config, tmp_path: Path) -> None:
+    # ADR 0039: the downgrade drops custom roles; their holders fall back to no role.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0030")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.execute(
+            "INSERT INTO roles (template, name_nl, name_en, claim_value, permissions, version)"
+            " VALUES ('group_admin', 'Teamleider', 'Team lead', 'lead', 'group.view', 1)"
+        )
+        database.commit()
+
+    command.downgrade(alembic_config, "0037")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
+    assert "roles" not in tables

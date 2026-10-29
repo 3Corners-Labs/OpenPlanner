@@ -1115,6 +1115,12 @@ msgstr "Start a call right away"
 msgid "admin.field.direct_call_enabled_hint"
 msgstr "Participants can start a call right away during a block with agents."
 
+msgid "admin.field.embedding_enabled"
+msgstr "Embed on websites"
+
+msgid "admin.field.embedding_enabled_hint"
+msgstr "Also shows the group in the widget on the websites the organisation allows under Embedding. Off: only the group's own page."
+
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Not picked up after (minutes)"
 
@@ -3912,6 +3918,12 @@ msgstr "Simulator is on"
 msgid "authz.permission.retention_view"
 msgstr "View retention"
 
+msgid "authz.permission.embedding_manage"
+msgstr "Manage embedding on websites"
+
+msgid "admin.nav.embedding"
+msgstr "Embedding"
+
 msgid "admin.nav.retention"
 msgstr "Retention"
 
@@ -4587,3 +4599,66 @@ msgstr "The latest {count} events from the audit log within your own organisatio
 
 msgid "admin.staff.activity_empty"
 msgstr "No activity within your organisations or groups."
+
+msgid "admin.embedding.title"
+msgstr "Embedding on websites"
+
+msgid "admin.embedding.lead"
+msgstr "On which websites an organisation's groups may appear as a widget."
+
+msgid "admin.embedding.organisations"
+msgstr "Organisations"
+
+msgid "admin.embedding.col.origins"
+msgstr "Allowed websites"
+
+msgid "admin.embedding.col.groups"
+msgstr "Groups embedded"
+
+msgid "admin.embedding.none"
+msgstr "There are no organisations you may manage."
+
+msgid "admin.embedding.org_lead"
+msgstr "The websites on which the groups of {name} may appear as a widget. A group appears only once it switches embedding on in its own settings."
+
+msgid "admin.embedding.form"
+msgstr "Allowed websites"
+
+msgid "admin.embedding.summary"
+msgstr "{count} websites allowed."
+
+msgid "admin.embedding.empty"
+msgstr "No websites allowed yet: the widget works nowhere."
+
+msgid "admin.embedding.origins"
+msgstr "Websites, one per line"
+
+msgid "admin.embedding.origins_hint"
+msgstr "Only the start of the web address, such as https://www.gemeente.nl. No path, no asterisks; a subdomain counts as a website of its own. At most {count}."
+
+msgid "admin.embedding.origins_hint_local"
+msgstr "Only the start of the web address, such as https://www.gemeente.nl. No path, no asterisks; a subdomain counts as a website of its own. On this test installation http://localhost with a port is allowed too. At most {count}."
+
+msgid "admin.embedding.groups"
+msgstr "Groups"
+
+msgid "admin.embedding.groups_lead"
+msgstr "Whether a group appears in the widget is switched on under Group settings › Embed on websites."
+
+msgid "admin.embedding.col.embedded"
+msgstr "In the widget"
+
+msgid "admin.embedding.on"
+msgstr "On"
+
+msgid "admin.embedding.off"
+msgstr "Off"
+
+msgid "admin.embedding.no_groups"
+msgstr "This organisation has no groups yet."
+
+msgid "admin.embedding.error.origin"
+msgstr "Line {line} is not a website. Enter only the start of the web address, such as https://www.gemeente.nl."
+
+msgid "admin.embedding.error.count"
+msgstr "Enter at most {count} websites."
