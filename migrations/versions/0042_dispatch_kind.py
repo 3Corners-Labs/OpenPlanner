@@ -5,7 +5,7 @@ WxCC dispatch) and ``queue_change_working_days`` (own queue: how many working da
 start a booking becomes read-only). Group settings only; no personal data.
 
 Revision ID: 0042
-Revises: 0045
+Revises: 0046
 Create Date: 2026-10-28 23:30:00.000000
 """
 
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0042"
-down_revision: str | None = "0045"
+down_revision: str | None = "0046"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
