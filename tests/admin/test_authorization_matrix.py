@@ -86,6 +86,22 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/{key}": {
         "/admin/settings/admin_session_hours": statuses(422, 403, 403, 403, 403, 403),
     },
+    # ADR 0042 step 5: the own organisation's class D settings; org admins and the superuser.
+    "GET /admin/organisation-settings": {
+        "/admin/organisation-settings": statuses(200, 200, 403, 200, 403, 403),
+    },
+    "GET /admin/organisations/{org}/settings": {
+        "/admin/organisations/demo/settings": statuses(200, 200, 403, 403, 403, 403),
+        "/admin/organisations/andere/settings": statuses(200, 403, 403, 200, 403, 403),
+    },
+    "POST /admin/organisations/{org}/settings/{key}": {
+        "/admin/organisations/demo/settings/time_format": statuses(422, 422, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/settings/{key}/reset": {
+        "/admin/organisations/demo/settings/time_format/reset": statuses(
+            303, 303, 403, 403, 403, 403
+        ),
+    },
     "POST /admin/settings/{key}/reset": {
         "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403),
     },

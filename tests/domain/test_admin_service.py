@@ -295,3 +295,18 @@ async def test_a_person_outside_the_scope_is_not_found(service: AdminService) ->
 
     assert await service.staff_member(ORG_ADMIN, super_id) is None
     assert await service.staff_member(SUPER, super_id) is not None
+
+
+# The admin's own organisation (ADR 0042 step 5).
+
+
+async def test_the_home_organisation_is_the_one_organisation_an_admin_belongs_to() -> None:
+    uow = InMemoryUnitOfWork()
+    service = AdminService(uow, FixedClock())
+    org_admin = Principal("o", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+    two = Principal("t", "T", frozenset({Role.ORG_ADMIN}), frozenset({"demo", "b"}), frozenset())
+    superuser = Principal("s", "S", frozenset({Role.SUPERUSER}), frozenset({"demo"}), frozenset())
+
+    assert await service.home_organisation(org_admin) == "demo"
+    assert await service.home_organisation(two) is None
+    assert await service.home_organisation(superuser) is None

@@ -10,6 +10,7 @@ agenda counts bookings and shows no contact data; the day view adds first names 
 """
 
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
@@ -22,6 +23,7 @@ from app.domain.holiday_service import effective_schedule
 from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, windows_on
+from app.domain.tunable import value_for
 
 MAX_AGENDA_DAYS = 31
 """Largest number of days one agenda request may cover (a week view uses 7)."""
@@ -55,7 +57,11 @@ class AgendaService:
     """
 
     def __init__(
-        self, uow: UnitOfWork, clock: Clock, admin: AdminService, horizon_days: int
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        admin: AdminService,
+        horizon_days: int | Callable[[int], int],
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -97,9 +103,10 @@ class AgendaService:
     async def _summary(self, tx: Transaction, group: Group) -> ShortfallSummary:
         """Return ``group``'s shortfall summary at the current time."""
         now = self._clock.now()
-        days = await agenda_days(tx, group, group.today(now), self._horizon_days, now)
+        horizon = value_for(self._horizon_days, group.organisation_id)
+        days = await agenda_days(tx, group, group.today(now), horizon, now)
         short = [s for d in days for s in d.slots if s.open_shortfall and s.start >= now]
-        return ShortfallSummary(len(short), first_shortfall(short, now), self._horizon_days)
+        return ShortfallSummary(len(short), first_shortfall(short, now), horizon)
 
     async def _authorize(self, principal: Principal, slug: str) -> None:
         """Require ``bookings.view`` on the group."""

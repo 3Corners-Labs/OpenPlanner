@@ -17,7 +17,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from functools import cache
+from zoneinfo import available_timezones
 
+from app.domain.authorization import Scope
 from app.domain.ports import UnitOfWork
 from app.domain.settings_registry import Kind, SettingSpec, within_bounds
 
@@ -30,6 +33,7 @@ class Source(StrEnum):
 
     DEFAULT = "default"
     PORTAL = "portal"
+    ORGANISATION = "organisation"
     ENV = "env"
     FILE = "file"
 
@@ -42,11 +46,15 @@ class PortalValues:
         version: The counter at the time of reading; 0 means nothing was ever changed.
         values: Plain JSON values by setting key; secrets are never among them.
         expires: When a value lapses, for the keys that have an expiry (``LOG_LEVEL``).
+        organisations: Class D values per organisation id (ADR 0042 step 5).
+        organisation_ids: The id of every organisation by slug (the admin's claim names slugs).
     """
 
     version: int
     values: Mapping[str, object] = field(default_factory=dict)
     expires: Mapping[str, datetime] = field(default_factory=dict)
+    organisations: Mapping[int, Mapping[str, object]] = field(default_factory=dict)
+    organisation_ids: Mapping[str, int] = field(default_factory=dict)
 
     def applies(self, key: str, now: datetime | None) -> bool:
         """Return whether a value is stored for ``key`` and has not lapsed at ``now``."""
@@ -98,6 +106,10 @@ _TYPES: dict[Kind, tuple[type, ...]] = {
 }
 
 
+TIMEZONE_KEYS = frozenset({"admin_timezone"})
+"""String settings whose value must be an IANA time zone known to this installation."""
+
+
 def usable(spec: SettingSpec, value: object) -> bool:
     """Return whether ``value`` may be applied as the portal value of ``spec``.
 
@@ -111,7 +123,15 @@ def usable(spec: SettingSpec, value: object) -> bool:
     types = _TYPES.get(spec.kind, ())
     if isinstance(value, bool) and spec.kind is not Kind.BOOL:
         return False
+    if spec.key in TIMEZONE_KEYS and not (isinstance(value, str) and value in _zones()):
+        return False
     return isinstance(value, types) and within_bounds(spec, value)
+
+
+@cache
+def _zones() -> frozenset[str]:
+    """Return the IANA time zones this installation knows (read once)."""
+    return frozenset(available_timezones())
 
 
 def resolve(
@@ -142,6 +162,25 @@ def resolve(
     return Resolved(spec, env_value, Source.DEFAULT, False, portal_ignored=ignored)
 
 
+def resolve_for_organisation(
+    spec: SettingSpec,
+    platform_value: object,
+    platform_source: Source,
+    portal: PortalValues,
+    organisation_id: int,
+) -> Resolved:
+    """Resolve a class D setting for one organisation over its platform value (ADR 0042 §2).
+
+    The organisation's own value wins when it is stored and within the rules; the
+    environment lock binds only the platform value, never an organisation.
+    """
+    own = portal.organisations.get(organisation_id, {})
+    stored = spec.key in own
+    if stored and usable(spec, own[spec.key]):
+        return Resolved(spec, own[spec.key], Source.ORGANISATION, False)
+    return Resolved(spec, platform_value, platform_source, False, portal_ignored=stored)
+
+
 class PlatformSettingsStore:
     """Keeps the stored portal values in memory and reloads them when they change (§6).
 
@@ -166,6 +205,8 @@ class PlatformSettingsStore:
                 return False
             values = await tx.platform_settings()
             expires = await tx.platform_setting_expiries()
-        self.current = PortalValues(version, values, expires)
+            organisations = await tx.organisation_settings()
+            ids = {o.slug: o.id for o in await tx.list_organisations(Scope(everything=True))}
+        self.current = PortalValues(version, values, expires, organisations, ids)
         self._loaded = True
         return True

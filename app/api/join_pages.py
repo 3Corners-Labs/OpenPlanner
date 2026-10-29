@@ -20,6 +20,7 @@ from app.domain.ports import Clock
 from app.domain.services import BookingService
 from app.i18n.dates import format_clock
 from app.web.locale import resolve_locale
+from app.web.organisation_settings import follow
 from app.web.protection import limiter, read_limit
 
 router = APIRouter(include_in_schema=False)
@@ -41,6 +42,7 @@ async def join_page(request: Request, token: str) -> HTMLResponse:
     bookings, integration, clock = _services(request)
     locale = resolve_locale(request)
     details = await bookings.find(token)
+    follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
     state = join_state(booking, clock.now())
     if state is JoinState.OPEN and booking.id is not None:
@@ -62,6 +64,7 @@ async def join_go(request: Request, token: str) -> Response:
     """Send the citizen to the meeting, or back to the status page when it is not open."""
     bookings, integration, clock = _services(request)
     details = await bookings.find(token)
+    follow(request, details.group.organisation_id)
     booking = details.booking
     link = booking.meeting.link if booking.meeting else None
     if join_state(booking, clock.now()) is not JoinState.OPEN or not link or booking.id is None:

@@ -98,6 +98,7 @@ from app.web.authz_labels import (
     ROLE_LABELS,
 )
 from app.web.locale import RequestLocale
+from app.web.organisation_settings import settings_for
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -547,7 +548,7 @@ async def _audit_page(
 ) -> HTMLResponse:
     """Render the audit page for ``query``, with an export refusal when there is one."""
     service = admin_service(request)
-    zone = ZoneInfo(request.app.state.settings.admin_timezone)
+    zone = ZoneInfo(settings_for(request).admin_timezone)
     in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
     narrow = query.narrow({g.group.slug for g in in_scope}, zone)
     events = await service.audit_log(context.principal, narrow)
@@ -663,7 +664,7 @@ async def export(
 ) -> Response:
     """Download exactly the current filter as CSV (ADR 0040, part 3); the export is audited."""
     service = admin_service(request)
-    settings = request.app.state.settings
+    settings = settings_for(request)
     zone = ZoneInfo(settings.admin_timezone)
     in_scope = await service.groups(context.principal, Permission.AUDIT_EXPORT)
     narrow = query.narrow({g.group.slug for g in in_scope}, zone)

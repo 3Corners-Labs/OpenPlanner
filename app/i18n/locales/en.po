@@ -5661,3 +5661,33 @@ msgstr "This value contradicts another setting (for example critical storage not
 
 msgid "admin.form.error.setting_expiry"
 msgstr "Enter the hours after which the log level falls back: 1 to 24."
+
+msgid "admin.nav.organisation_settings"
+msgstr "Organisation settings"
+
+msgid "admin.org_settings.title"
+msgstr "Organisation settings"
+
+msgid "admin.org_settings.lead"
+msgstr "Time format, time zone and periods per organisation. Without a value of its own, the platform value applies."
+
+msgid "admin.org_settings.organisations"
+msgstr "Organisations"
+
+msgid "admin.org_settings.none"
+msgstr "There are no organisations whose settings you can change."
+
+msgid "admin.org_settings.page_title"
+msgstr "Settings of {name}"
+
+msgid "admin.org_settings.page_lead"
+msgstr "These values apply to this organisation's groups, citizen pages, emails and admins. A change applies within ten seconds."
+
+msgid "admin.org_settings.settings"
+msgstr "Settings"
+
+msgid "admin.org_settings.reset"
+msgstr "Use the platform value"
+
+msgid "admin.settings.source.organisation"
+msgstr "Organisation"
