@@ -65,6 +65,7 @@ from app.domain.audit import (
     Level,
     Outcome,
     Source,
+    at_least,
 )
 from app.domain.authorization import Scope
 from app.domain.booking import (
@@ -427,6 +428,17 @@ class SqlTransaction(
             query = query.where(AuditEventRow.booking_id == narrow.booking_id)
         if narrow.actor is not None:
             query = query.where(AuditEventRow.actor == narrow.actor)
+        if narrow.min_level is not None:
+            levels = sorted(level.value for level in at_least(narrow.min_level))
+            query = query.where(AuditEventRow.level.in_(levels))
+        if narrow.category is not None:
+            query = query.where(AuditEventRow.category == narrow.category.value)
+        if narrow.since is not None:
+            query = query.where(AuditEventRow.at >= narrow.since)
+        if narrow.until is not None:
+            query = query.where(AuditEventRow.at < narrow.until)
+        if narrow.trace_id is not None:
+            query = query.where(AuditEventRow.trace_id == narrow.trace_id)
         rows = await self._session.execute(
             query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
         )

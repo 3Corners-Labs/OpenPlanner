@@ -249,3 +249,39 @@ async def test_audit_events_keep_the_event_schema_fields(engine: AsyncEngine) ->
     assert stored == event
     assert (stored.event_id, stored.trace_id, stored.service) == (event.event_id, "b" * 32, "web")
     assert (stored.category, stored.level) == (Category.SECURITY, Level.ERROR)
+
+
+async def test_the_sql_filter_narrows_by_level_category_period_and_trace(
+    engine: AsyncEngine,
+) -> None:
+    # ADR 0040, part 3: the adapter applies the same rules as AuditFilter.matches.
+    uow = SqlUnitOfWork(engine)
+    events = [
+        AuditEvent(NOW, "sub-1", "admin.login", Outcome.SUCCESS, trace_id="a" * 32),
+        AuditEvent(
+            NOW + timedelta(minutes=1),
+            SYSTEM_ACTOR,
+            "webhook.rejected",
+            Outcome.DENIED,
+            source=Source.SYSTEM,
+            category=Category.SECURITY,
+        ),
+        AuditEvent(
+            NOW + timedelta(minutes=2), SYSTEM_ACTOR, "job.x", Outcome.FAILURE, source=Source.SYSTEM
+        ),
+    ]
+    async with uow.locked() as tx:
+        for event in events:
+            await tx.add_audit_event(event)
+
+    filters = [
+        AuditFilter(min_level=Level.WARNING),
+        AuditFilter(category=Category.SECURITY),
+        AuditFilter(since=NOW + timedelta(minutes=1), until=NOW + timedelta(minutes=2)),
+        AuditFilter(trace_id="a" * 32),
+    ]
+    async with uow.read() as tx:
+        for narrow in filters:
+            found = [e.event for e in await tx.list_audit_events(EVERYTHING, narrow=narrow)]
+            assert found == [e for e in reversed(events) if narrow.matches(e)]
+            assert found
