@@ -8,6 +8,38 @@
     <p class="page-header__lead">{{ _("admin.audit.intro") }}</p>
   </div>
 </div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if diagnostics %}
+<section class="card" id="diagnostics" aria-labelledby="diagnostics-heading">
+  <h2 id="diagnostics-heading">{{ _("admin.audit.diagnostics.title") }}</h2>
+  <p>{{ _("admin.audit.diagnostics.intro") }}</p>
+  {% if diagnostics.active %}
+  <ul>
+    {% for label, value, until in diagnostics.active %}
+    <li>{{ _("admin.audit.diagnostics.active", target=label, until=until) }}
+      <form class="inline-form" method="post" action="/admin/audit/diagnostics/off">
+        <input type="hidden" name="target" value="{{ value }}">
+        <button type="submit" class="button button--secondary">{{ _("admin.audit.diagnostics.off") }}</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">{{ _("admin.audit.diagnostics.none") }}</p>
+  {% endif %}
+  <form method="post" action="/admin/audit/diagnostics">
+    <div class="inline-forms">
+      <div class="field">
+        <label for="diagnostics-target">{{ _("admin.audit.diagnostics.target") }}</label>
+        <select id="diagnostics-target" name="target">
+          {% for option in diagnostics.targets %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="button">{{ _("admin.audit.diagnostics.on") }}</button>
+    </div>
+  </form>
+</section>
+{% endif %}
 <form class="card" method="get" action="/admin/audit" aria-labelledby="filter-heading">
   <h2 id="filter-heading" class="visually-hidden">{{ _("admin.audit.filter") }}</h2>
   <div class="inline-forms">

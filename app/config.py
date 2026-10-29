@@ -2,6 +2,7 @@
 
 import os
 import re
+from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -9,6 +10,7 @@ from pydantic import AliasChoices, Field, SecretStr, field_validator, model_vali
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.domain.event_schema import Envelope
+from app.domain.system_log import EventRetention
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -78,6 +80,14 @@ class Settings(BaseSettings):
     # days; a larger one is refused, never cut short.
     audit_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
     audit_export_max_days: int = Field(default=366, ge=1, le=3660)
+    # ADR 0040, part 4 (class C, platform; env until the settings registry of ADR 0042): how
+    # long each category of audit event is kept. Admin actions 2 years (product owner,
+    # 2026-10-29), security 1 year, debug events 7 days; system events above. Diagnostic mode
+    # ends by itself after DIAGNOSTIC_MODE_HOURS.
+    audit_retention_days: int = Field(default=730, ge=365, le=3650)
+    security_event_retention_days: int = Field(default=365, ge=30, le=3650)
+    diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
+    diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
@@ -233,6 +243,16 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("OIDC needs an https discovery URL and a client secret")
         return self
+
+    @property
+    def event_retention(self) -> EventRetention:
+        """How long each category of audit event is kept (ADR 0040, part 4)."""
+        return EventRetention(
+            audit=timedelta(days=self.audit_retention_days),
+            system=timedelta(days=self.system_event_retention_days),
+            security=timedelta(days=self.security_event_retention_days),
+            diagnostic=timedelta(days=self.diagnostic_event_retention_days),
+        )
 
     @property
     def event_envelope(self) -> Envelope:
