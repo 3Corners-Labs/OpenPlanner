@@ -919,6 +919,26 @@ REGISTRY: tuple[SettingSpec, ...] = (
         minimum=5,
         maximum=1000,
     ),
+    S(
+        "planner_rebook_days",
+        K.INT,
+        14,
+        _D,
+        T.PLANNER,
+        "Days after the original start after which an unanswered request to rebook lapses.",
+        minimum=1,
+        maximum=30,
+    ),
+    S(
+        "planner_rebook_reminder_days",
+        K.INT,
+        3,
+        _D,
+        T.PLANNER,
+        "Days before the lapse at which the one reminder to rebook goes (below the lapse).",
+        minimum=1,
+        maximum=29,
+    ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""
 

@@ -1,0 +1,20 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field as render_field with context %}
+{% block title %}{{ _("admin.planner.rebook_title", reference=booking.reference) }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ booking.id }}/rebook" novalidate aria-labelledby="rebook-heading">
+  <div class="card__header">
+    <h2 id="rebook-heading">{{ _("admin.planner.rebook_title", reference=booking.reference) }}</h2>
+    <p class="card__lead">{{ _("admin.planner.rebook_lead", first_name=booking.first_name, when=booking.when) }}</p>
+  </div>
+  <p>{{ _("admin.planner.rebook_explain", days=rebook_days, reminder=reminder_days) }}</p>
+  <div class="form-grid">{{ render_field(field) }}</div>
+  <p>{{ _("admin.planner.citizen_told") }}</p>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.planner.rebook_button") }}</button>
+    <a href="{{ back }}">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

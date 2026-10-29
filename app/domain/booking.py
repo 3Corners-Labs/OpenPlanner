@@ -139,6 +139,8 @@ class BookingStatus(StrEnum):
     COMPLETED = "completed"
     NO_SHOW = "no_show"
     SUSPENDED = "suspended"
+    AWAITING_REBOOK = "awaiting_rebook"
+    """A planner asked the citizen to choose a new time (ADR 0044); the place is freed."""
 
 
 @dataclass(frozen=True)
@@ -192,6 +194,7 @@ class Booking:
     kind: BookingKind = BookingKind.SCHEDULED
     closure_id: int | None = None
     change_reason: ChangeReason | None = None
+    rebook_by: datetime | None = None
 
     @property
     def reference(self) -> str:
@@ -209,6 +212,21 @@ class Booking:
         return self.status is BookingStatus.SUSPENDED
 
     @property
+    def awaits_rebook(self) -> bool:
+        """Whether a planner asked the citizen to choose a new time (ADR 0044)."""
+        return self.status is BookingStatus.AWAITING_REBOOK
+
+    @property
+    def on_hold(self) -> bool:
+        """Whether the booking does not go ahead at its time until the citizen or staff act.
+
+        Suspended by a closure (ADR 0024) or awaiting a new time from the citizen (ADR 0044):
+        either way there is no change deadline, and the citizen can choose a new time or
+        cancel.
+        """
+        return self.is_suspended or self.awaits_rebook
+
+    @property
     def holds_place(self) -> bool:
         """Whether the booking takes a place in its slot: confirmed, or on hold.
 
@@ -220,12 +238,35 @@ class Booking:
     def cancel(self, now: datetime, reason: ChangeReason | None = None) -> "Booking":
         """Return the cancelled booking; ``reason`` when a planner cancelled it (ADR 0044).
 
+        A booking awaiting a new time keeps the reason it was given when it is cancelled.
+
         Raises:
-            DomainError: ``booking_not_active`` if it is neither confirmed nor suspended.
+            DomainError: ``booking_not_active`` if it is not confirmed, suspended or awaiting
+                a new time.
         """
-        if not self.holds_place:
+        if not self.holds_place and not self.awaits_rebook:
             raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
-        return replace(self, status=BookingStatus.CANCELLED, cancelled_at=now, change_reason=reason)
+        return replace(
+            self,
+            status=BookingStatus.CANCELLED,
+            cancelled_at=now,
+            change_reason=reason or self.change_reason,
+        )
+
+    def request_rebook(self, reason: ChangeReason, by: datetime) -> "Booking":
+        """Return the booking awaiting a new time from the citizen until ``by`` (ADR 0044).
+
+        Its place in the slot is freed at once; the booking keeps its contact details, so the
+        citizen can choose a new time without entering them again.
+
+        Raises:
+            DomainError: ``booking_not_active`` if it is not confirmed.
+        """
+        if not self.is_active:
+            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        return replace(
+            self, status=BookingStatus.AWAITING_REBOOK, change_reason=reason, rebook_by=by
+        )
 
     def suspend(self, closure_id: int) -> "Booking":
         """Return the booking put on hold by closure ``closure_id``.
