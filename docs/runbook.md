@@ -14,6 +14,49 @@ docker compose ps     # web and worker must report "healthy"
 `web` applies pending Alembic migrations before it starts serving. The worker starts after
 `web` is healthy.
 
+### First install: the bootstrap keys (ADR 0042 §9)
+
+A new installation needs three random keys: `SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`
+and `SESSION_SECRET`. Generate them once, before the first `up`:
+
+```bash
+mkdir -m 700 secrets
+```
+
+```bash
+docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -v "$PWD/secrets:/srv/secrets" web python -m app.cli init
+```
+
+`init` writes `secrets/secrets.env` (mode 0600), which `docker-compose.yml` reads next to
+`.env`, and lists the other class A and B variables to fill in (`docs/settings.md`). It prints
+no key, and it refuses to overwrite an existing file: a new `SETTINGS_ENCRYPTION_KEY` makes
+every secret stored in the database unreadable.
+
+- **Back up the keys apart from the database backup.** A backup that holds both the database
+  and `SETTINGS_ENCRYPTION_KEY` undoes the encryption at rest; losing the key loses every
+  stored integration secret.
+- Production never generates keys at start-up; only development does (`app/keys.py`).
+
+**From a secret store instead of a file.** Each of the three keys and `OIDC_CLIENT_SECRET`
+may come from a file named by `X_FILE`, e.g. a Docker or Kubernetes secret:
+
+```yaml
+services:
+  web:
+    environment:
+      SETTINGS_ENCRYPTION_KEY_FILE: /run/secrets/settings_encryption_key
+    secrets: [settings_encryption_key]
+secrets:
+  settings_encryption_key:
+    file: ./secrets/settings_encryption_key
+```
+
+The file holds the value (a trailing newline is ignored). The service refuses to start when
+both `X` and `X_FILE` are set, or when the file is missing or empty; a file that others can
+read is accepted with the warning `settings.secret_file_readable` (variable name only).
+Kubernetes mounts secrets with mode 0644 unless the volume sets `defaultMode: 0400`; set it.
+`settings list` shows such a secret with source `file`.
+
 ## Verifying the image signature
 
 Only deploy images signed by the `main` workflow of this repository:
@@ -767,8 +810,10 @@ deploy the old image. Every migration is reversible (enforced in CI).
 
 ## Rotating secrets
 
-Bootstrap secrets come from environment variables / the secret store; none are baked into the
-image. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
+Bootstrap secrets come from environment variables, `X_FILE` or `secrets/secrets.env`
+(`app.cli init`); none are baked into the image. To rotate `MANAGEMENT_TOKEN_KEY` or
+`SESSION_SECRET`, replace the value in that file or the secret store and restart `web` and
+`worker`; `init` never overwrites the file, so edit it or move it away first. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
 value on the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` makes every
 stored channel secret and Webex token unreadable: re-enter the channel secrets afterwards
 (ADR 0008).
