@@ -25,6 +25,7 @@ from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.config import Settings
 from app.domain.admin import AdminService
+from app.domain.event_context import set_service, trace_scope
 from app.domain.integration import IntegrationService
 from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.ports import Clock
@@ -102,13 +103,15 @@ async def run_worker(
     try:
         while not stop.is_set():
             if await is_reachable(engine):
-                try:
-                    await runner.run_due()
-                except Exception as exc:  # e.g. schema not migrated yet; keep the loop alive
-                    log.warning("worker.run_failed", error=type(exc).__name__)
-                await housekeeping.run()
-                await _check_releases(updates)
-                await _watch_maintenance(maintenance)
+                # One trace per round for housekeeping; every job gets its own inside it.
+                with trace_scope():
+                    try:
+                        await runner.run_due()
+                    except Exception as exc:  # e.g. schema not migrated yet; keep the loop alive
+                        log.warning("worker.run_failed", error=type(exc).__name__)
+                    await housekeeping.run()
+                    await _check_releases(updates)
+                    await _watch_maintenance(maintenance)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=settings.worker_poll_seconds)
@@ -141,7 +144,8 @@ async def _watch_maintenance(watch: MaintenanceWatch) -> None:
 async def _main() -> None:
     """Configure logging, install SIGTERM/SIGINT handlers and run the loop."""
     settings = Settings()
-    configure_logging(settings.log_level)
+    set_service("worker")
+    configure_logging(settings.log_level, envelope=settings.event_envelope)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
