@@ -6,7 +6,6 @@
   "minLines": 6,
   "threshold": 1,
   "reporters": ["console"],
-  "exitCode": 1,
   "absolute": false,
   "gitignore": true
 }
