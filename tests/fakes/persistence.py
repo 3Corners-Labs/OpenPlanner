@@ -712,13 +712,13 @@ class InMemoryTransaction:
         ]
         return sorted(found, key=lambda b: (b.start, b.id or 0))
 
-    async def list_suspended_bookings(self, scope: Scope, group_id: int) -> list[Booking]:
+    async def list_suspended_bookings(
+        self, scope: Scope, group_id: int, status: BookingStatus = BookingStatus.SUSPENDED
+    ) -> list[Booking]:
         if not self._in_scope(scope, group_id):
             return []
         found = [
-            b
-            for b in self.state.bookings.values()
-            if b.group_id == group_id and b.status is BookingStatus.SUSPENDED
+            b for b in self.state.bookings.values() if b.group_id == group_id and b.status is status
         ]
         return sorted(found, key=lambda b: (b.start, b.id or 0))
 

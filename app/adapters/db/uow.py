@@ -285,6 +285,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
+        rebook_by=row.rebook_by,
     )
 
 
@@ -1392,6 +1393,7 @@ class SqlTransaction(
                 cancelled_at=booking.cancelled_at,
                 closure_id=booking.closure_id,
                 change_reason=booking.change_reason.value if booking.change_reason else None,
+                rebook_by=booking.rebook_by,
             )
         )
 
@@ -1539,8 +1541,10 @@ class SqlTransaction(
         rows = await self._session.execute(query.order_by(SlotRow.start, BookingRow.id))
         return [_booking(booking, slot) for booking, slot in rows]
 
-    async def list_suspended_bookings(self, scope: Scope, group_id: int) -> list[Booking]:
-        """Return the group's suspended bookings, earliest first, inside ``scope``."""
+    async def list_suspended_bookings(
+        self, scope: Scope, group_id: int, status: BookingStatus = BookingStatus.SUSPENDED
+    ) -> list[Booking]:
+        """Return the group's bookings on hold with ``status``, earliest first, in ``scope``."""
         rows = await self._session.execute(
             select(BookingRow, SlotRow)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
@@ -1548,7 +1552,7 @@ class SqlTransaction(
             .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
             .where(
                 BookingRow.group_id == group_id,
-                BookingRow.status == BookingStatus.SUSPENDED.value,
+                BookingRow.status == status.value,
                 scope_filter(scope, OrganisationRow.slug, GroupRow.slug),
             )
             .order_by(SlotRow.start, BookingRow.id)

@@ -1,0 +1,43 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.planner.waiting_title") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+<section class="card" aria-labelledby="waiting-heading">
+  <div class="card__header">
+    <h2 id="waiting-heading">{{ _("admin.planner.waiting_title") }}</h2>
+    <p class="card__lead">{{ _("admin.planner.waiting_lead") }}</p>
+  </div>
+  {% if rows %}
+  <div class="table-scroll" role="region" aria-labelledby="waiting-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.planner.waiting_title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.planner.waiting_booking") }}</th>
+        <th scope="col">{{ _("admin.planner.waiting_was") }}</th>
+        <th scope="col">{{ _("admin.planner.reason") }}</th>
+        <th scope="col">{{ _("admin.planner.waiting_by") }}</th>
+        <th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <th scope="row">{{ row.booking.reference }} · {{ row.booking.first_name }}</th>
+        <td>{{ row.booking.when }}</td>
+        <td>{{ row.reason }}</td>
+        <td>{{ row.rebook_by }}</td>
+        <td>
+          <a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.booking.id }}/move">{{ _("admin.agenda.move") }}<span class="visually-hidden"> {{ row.booking.reference }}</span></a>
+          <br><a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.booking.id }}/cancel">{{ _("admin.agenda.cancel") }}<span class="visually-hidden"> {{ row.booking.reference }}</span></a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.planner.waiting_empty") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

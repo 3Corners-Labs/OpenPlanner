@@ -408,13 +408,16 @@ class BookingRow(Base):
     closure_id: Mapped[int | None] = mapped_column(ForeignKey("closures.id", ondelete="SET NULL"))
     # ADR 0044: the fixed reason a planner gave; a code, never free text.
     change_reason: Mapped[str | None] = mapped_column(String(16))
+    # ADR 0044: when an unanswered request to choose a new time lapses.
+    rebook_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),
         Index("ix_bookings_video_room_id", "video_room_id"),
         Index("ix_bookings_wxcc_task_id", "wxcc_task_id"),
         CheckConstraint(
-            "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended')",
+            "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended', "
+            "'awaiting_rebook')",
             name="status",
         ),
         CheckConstraint(
