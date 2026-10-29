@@ -1,0 +1,10 @@
+{
+  "projectId": "26bc7d5b-b1fc-460e-b7a1-b754793ed91f",
+  "shape": "package",
+  "pkg": "openplanner-styles",
+  "globalName": "OpenPlanner",
+  "buildCmd": "./.design-sync/build.sh",
+  "entry": ".design-sync/pkg/index.js",
+  "cssEntry": "dist/openplanner.css",
+  "readmeHeader": ".design-sync/conventions.md"
+}
