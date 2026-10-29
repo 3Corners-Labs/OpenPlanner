@@ -67,6 +67,7 @@ from app.domain.audit import (
     Level,
     Outcome,
     Source,
+    at_least,
 )
 from app.domain.authorization import Scope
 from app.domain.booking import (
@@ -106,6 +107,7 @@ from app.domain.direct_queue import DirectCall
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.job_plan import JobType, PlannedJob
+from app.domain.ports import EventSink
 from app.domain.scheduling import (
     Group,
     GroupSummary,
@@ -362,6 +364,8 @@ class SqlTransaction(
         """Wrap ``session``."""
         self._session = session
         self._box = box
+        self.written_events: list[AuditEvent] = []
+        """Audit events added in this transaction, for the post-commit emit (ADR 0034)."""
 
     async def list_groups(self, scope: Scope) -> list[GroupSummary]:
         """Return the groups inside ``scope``, ordered by organisation and name."""
@@ -409,6 +413,7 @@ class SqlTransaction(
             )
         )
         await self._session.flush()
+        self.written_events.append(event)
 
     async def list_audit_events(
         self, scope: Scope, limit: int = 100, narrow: AuditFilter | None = None
@@ -430,6 +435,17 @@ class SqlTransaction(
             query = query.where(AuditEventRow.booking_id == narrow.booking_id)
         if narrow.actor is not None:
             query = query.where(AuditEventRow.actor == narrow.actor)
+        if narrow.min_level is not None:
+            levels = sorted(level.value for level in at_least(narrow.min_level))
+            query = query.where(AuditEventRow.level.in_(levels))
+        if narrow.category is not None:
+            query = query.where(AuditEventRow.category == narrow.category.value)
+        if narrow.since is not None:
+            query = query.where(AuditEventRow.at >= narrow.since)
+        if narrow.until is not None:
+            query = query.where(AuditEventRow.at < narrow.until)
+        if narrow.trace_id is not None:
+            query = query.where(AuditEventRow.trace_id == narrow.trace_id)
         rows = await self._session.execute(
             query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
         )
@@ -1495,22 +1511,31 @@ def _is_lock_timeout(exc: OperationalError) -> bool:
 class SqlUnitOfWork:
     """``UnitOfWork`` over an ``AsyncEngine``.
 
+    After a transaction commits, the audit events it wrote go to ``sink`` once (ADR 0034);
+    after a rollback they go nowhere, as the rows they describe.
+
     Args:
         engine: Engine created by ``app.adapters.db.engine.create_engine``.
         box: Seals channel secrets (ADR 0008); without it they cannot be stored or read.
+        sink: Receives committed audit events; ``None`` ships nothing (tests, the CLI).
     """
 
-    def __init__(self, engine: AsyncEngine, box: SecretBox | None = None) -> None:
-        """Store the engine and the secret box."""
+    def __init__(
+        self, engine: AsyncEngine, box: SecretBox | None = None, sink: EventSink | None = None
+    ) -> None:
+        """Store the engine, the secret box and the sink."""
         self._engine = engine
         self._box = box
+        self._sink = sink
 
     @asynccontextmanager
     async def read(self) -> AsyncIterator[SqlTransaction]:
         """Open a read transaction (deferred ``BEGIN``)."""
         async with AsyncSession(self._engine, expire_on_commit=False) as session:
             async with session.begin():
-                yield SqlTransaction(session, self._box)
+                tx = SqlTransaction(session, self._box)
+                yield tx
+        self._emit(tx)
 
     @asynccontextmanager
     async def locked(self) -> AsyncIterator[SqlTransaction]:
@@ -1520,7 +1545,14 @@ class SqlUnitOfWork:
             DomainError: ``database_busy`` if the write lock is not obtained in time.
         """
         async with locked_session(self._engine) as session:
-            yield SqlTransaction(session, self._box)
+            tx = SqlTransaction(session, self._box)
+            yield tx
+        self._emit(tx)
+
+    def _emit(self, tx: SqlTransaction) -> None:
+        """Hand the committed transaction's audit events to the sink."""
+        if self._sink is not None and tx.written_events:
+            self._sink.emit(tx.written_events)
 
 
 @asynccontextmanager

@@ -21,7 +21,9 @@ from typing import Any, Protocol
 import httpx
 import structlog
 
+from app.domain.audit import Outcome
 from app.domain.ports import Clock, IntegrationError
+from app.domain.security_log import TOKEN_REFRESH_FAILED, SecurityLog
 
 log = structlog.get_logger()
 
@@ -73,12 +75,19 @@ class WebexTokens:
         http: Shared HTTP client.
         store: Encrypted token storage.
         clock: Current time.
+        security: Records a failing refresh as a security event (ADR 0034); ``None``: log only.
     """
 
     def __init__(
-        self, config: ServiceAppConfig, http: httpx.AsyncClient, store: TokenStore, clock: Clock
+        self,
+        config: ServiceAppConfig,
+        http: httpx.AsyncClient,
+        store: TokenStore,
+        clock: Clock,
+        security: SecurityLog | None = None,
     ) -> None:
         """Store the collaborators."""
+        self._security = security
         self._config = config
         self._http = http
         self._store = store
@@ -129,6 +138,17 @@ class WebexTokens:
             refresh_at - self._clock.now() < EXPIRY_WARNING,
         )
 
+    async def _report(self, reason: str, detail: str) -> None:
+        """Record a failed refresh as a security event; a failure here is only logged."""
+        if self._security is None:
+            return
+        try:
+            await self._security.record(
+                TOKEN_REFRESH_FAILED, Outcome.FAILURE, reason=reason, detail=detail
+            )
+        except Exception as exc:  # the refresh error itself is what the caller must see
+            log.warning("security_log.failed", error=type(exc).__name__)
+
     async def _refresh(self, refresh_token: str, now: datetime) -> dict[str, Any]:
         """Exchange the refresh token for new tokens."""
         try:
@@ -143,12 +163,15 @@ class WebexTokens:
             )
         except httpx.HTTPError as exc:
             log.warning("webex.token_refresh_failed", error=type(exc).__name__)
+            await self._report("unreachable", type(exc).__name__)
             raise IntegrationError("unreachable", retryable=True) from exc
         if response.status_code in (400, 401):
             log.error("webex.token_refresh_refused", status=response.status_code)
+            await self._report("unauthorized", f"status:{response.status_code}")
             raise IntegrationError("unauthorized", retryable=False)
         if response.status_code >= 300:
             log.warning("webex.token_refresh_failed", status=response.status_code)
+            await self._report("unreachable", f"status:{response.status_code}")
             raise IntegrationError("unreachable", retryable=True)
         body = response.json()
         return {
