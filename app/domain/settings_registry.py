@@ -72,6 +72,7 @@ class Topic(StrEnum):
     UPDATES = "updates"
     DISPLAY = "display"
     STAFF = "staff"
+    PLANNER = "planner"
 
 
 PLATFORM_VIEW = "settings.platform.view"
@@ -496,6 +497,26 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=3600,
     ),
     S(
+        "maintenance_alert_hours",
+        K.INT,
+        4,
+        _C,
+        T.OPERATIONS,
+        "Maintenance on longer than this is reported as a system event (ADR 0038).",
+        minimum=1,
+        maximum=72,
+    ),
+    S(
+        "maintenance_alert_repeat_hours",
+        K.INT,
+        24,
+        _C,
+        T.OPERATIONS,
+        "The overdue maintenance event repeats at this interval while it lasts (ADR 0038).",
+        minimum=1,
+        maximum=168,
+    ),
+    S(
         "staff_last_seen_interval_seconds",
         K.INT,
         300,
@@ -877,6 +898,46 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Days without a login after which a person is marked dormant in the staff list (ADR 0046).",
         minimum=14,
         maximum=365,
+    ),
+    S(
+        "shortfall_horizon_days",
+        K.INT,
+        14,
+        _D,
+        T.PLANNER,
+        "Days ahead the shortfall notice on group pages and the dashboard looks (ADR 0044).",
+        minimum=1,
+        maximum=60,
+    ),
+    S(
+        "planner_changes_alert_per_hour",
+        K.INT,
+        50,
+        _C,
+        T.PLANNER,
+        "Changes by one planner per hour above which a system event warns (ADR 0044).",
+        minimum=5,
+        maximum=1000,
+    ),
+    S(
+        "planner_rebook_days",
+        K.INT,
+        14,
+        _D,
+        T.PLANNER,
+        "Days after the original start after which an unanswered request to rebook lapses.",
+        minimum=1,
+        maximum=30,
+    ),
+    S(
+        "planner_rebook_reminder_days",
+        K.INT,
+        3,
+        _D,
+        T.PLANNER,
+        "Days before the lapse at which the one reminder to rebook goes (below the lapse).",
+        minimum=1,
+        maximum=29,
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

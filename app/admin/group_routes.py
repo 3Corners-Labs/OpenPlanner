@@ -48,6 +48,7 @@ from app.admin.forms import (
     redirect_done,
 )
 from app.admin.pages import Locale, NavView, SameOrigin, current_home, page, with_manual
+from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
 from app.domain.errors import DomainError, ErrorCode
@@ -62,6 +63,7 @@ from app.domain.planning import (
 from app.domain.scheduling import (
     MAX_DIRECT_CALLS,
     MAX_LABEL_LENGTH,
+    MAX_PLANNER_LEAD_MINUTES,
     GroupSummary,
     PhoneMode,
     ScheduleOverride,
@@ -96,6 +98,10 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
     "dispatch_lead_minutes": (
         "admin.field.dispatch_lead_minutes",
         "admin.field.dispatch_lead_minutes_hint",
+    ),
+    "planner_change_min_lead_minutes": (
+        "admin.field.planner_change_min_lead_minutes",
+        "admin.field.planner_change_min_lead_minutes_hint",
     ),
     "not_picked_up_minutes": (
         "admin.field.not_picked_up_minutes",
@@ -427,6 +433,7 @@ async def group(
             "week": _week(schedule, locale),
             "exceptions": _exceptions(schedule, locale),
             "preview": _preview(preview, summary, locale),
+            "shortfalls": await group_shortfalls(request, locale, context),
         },
     )
 
@@ -479,6 +486,11 @@ def _settings_fields(
         number("min_notice_minutes", current.min_notice_minutes, {"min": "0", "step": "5"}),
         number("horizon_days", current.horizon_days, {"min": "1", "max": "366"}),
         number("dispatch_lead_minutes", current.dispatch_lead_minutes, {"min": "0", "max": "60"}),
+        number(
+            "planner_change_min_lead_minutes",
+            current.planner_change_min_lead_minutes,
+            {"min": "0", "max": str(MAX_PLANNER_LEAD_MINUTES), "step": "5"},
+        ),
         Field(
             "phone_mode",
             _("admin.field.phone_mode"),
@@ -732,6 +744,7 @@ async def _hours_response(
             "week": _week(schedule, locale),
             "fields": _hours_fields(form, locale),
             "errors": form.errors,
+            "shortfalls": await group_shortfalls(request, locale, context),
         },
         status,
     )
@@ -997,6 +1010,7 @@ async def _exceptions_response(
             "kind": form.text("kind") or "closed",
             "kind_error": form.error_for("kind"),
             "errors": form.errors,
+            "shortfalls": await group_shortfalls(request, locale, context),
         },
         status,
     )

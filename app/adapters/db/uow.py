@@ -14,7 +14,17 @@ from dataclasses import asdict
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, case, delete, func, insert, or_, select, update
+from sqlalchemy import (
+    ColumnElement,
+    Select,
+    case,
+    delete,
+    func,
+    insert,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -22,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.engine import BEGIN_MODE_OPTION
+from app.adapters.db.images import ImageQueries
 from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
     AuditEventRow,
@@ -50,14 +61,17 @@ from app.adapters.db.models import (
     ReminderRuleRow,
     ScheduleOverrideRow,
     ScheduleRuleRow,
+    ShortfallAcceptanceRow,
     SlotRow,
     StaffRow,
     WebhookEventRow,
 )
 from app.adapters.db.retention import RetentionQueries
+from app.adapters.db.roles import RoleQueries
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
+from app.domain.agenda import ShortfallAcceptance
 from app.domain.audit import (
     PROBLEMS,
     AuditEntry,
@@ -75,6 +89,7 @@ from app.domain.booking import (
     Booking,
     BookingKind,
     BookingStatus,
+    ChangeReason,
     Contact,
     MeetingRef,
     Slot,
@@ -107,6 +122,7 @@ from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
+from app.domain.images import PageImage
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.ports import EventSink
 from app.domain.scheduling import (
@@ -198,6 +214,7 @@ def _group(row: GroupRow) -> Group:
         not_picked_up_minutes=row.not_picked_up_minutes,
         direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
+        planner_change_min_lead_minutes=row.planner_change_min_lead_minutes,
         embedding_enabled=row.embedding_enabled,
     )
 
@@ -262,6 +279,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "not_picked_up_minutes": group.not_picked_up_minutes,
         "direct_call_max_concurrent": group.direct_call_max_concurrent,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
+        "planner_change_min_lead_minutes": group.planner_change_min_lead_minutes,
         "embedding_enabled": group.embedding_enabled,
     }
 
@@ -292,11 +310,15 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         wxcc_task_id=row.wxcc_task_id,
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
+        change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
+        rebook_by=row.rebook_by,
     )
 
 
-def _closure(row: ClosureRow, notices: Sequence[ClosureNoticeRow]) -> Closure:
-    """Map a closure row with its notices, headings and copy of the contact block."""
+def _closure(
+    row: ClosureRow, notices: Sequence[ClosureNoticeRow], image: PageImage | None
+) -> Closure:
+    """Map a closure row with its notices, headings, copy of the contact block and image."""
     return Closure(
         id=row.id,
         group_id=row.group_id,
@@ -306,6 +328,7 @@ def _closure(row: ClosureRow, notices: Sequence[ClosureNoticeRow]) -> Closure:
         created_at=row.created_at,
         headings={n.locale: n.heading for n in notices if n.heading},
         contacts=_contacts_block(row.contacts) if row.contacts else None,
+        image=image,
     )
 
 
@@ -345,14 +368,21 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 
 
 class SqlTransaction(
-    ApiClientQueries, UpdateQueries, RetentionQueries, StaffQueries, MaintenanceQueries
+    ApiClientQueries,
+    UpdateQueries,
+    RetentionQueries,
+    StaffQueries,
+    MaintenanceQueries,
+    RoleQueries,
+    ImageQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
     The machine API's queries come from ``ApiClientQueries`` (ADR 0023), those of updates
     from ``UpdateQueries`` (ADR 0029), those of the retention overview from
     ``RetentionQueries`` (ADR 0039), the staff directory from ``StaffQueries`` (ADR 0046),
-    the maintenance switch from ``MaintenanceQueries`` (ADR 0038).
+    the maintenance switch from ``MaintenanceQueries`` (ADR 0038), custom roles from
+    ``RoleQueries`` (ADR 0039), closure images from ``ImageQueries`` (ADR 0037).
 
     Args:
         session: The open session.
@@ -445,6 +475,19 @@ class SqlTransaction(
             query = query.where(AuditEventRow.at < narrow.until)
         if narrow.trace_id is not None:
             query = query.where(AuditEventRow.trace_id == narrow.trace_id)
+        return await self._entries(query, limit)
+
+    async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
+        """Return the newest audit events with one of ``actions``, with the actors' names."""
+        query = (
+            select(AuditEventRow, StaffRow.display_name)
+            .outerjoin(StaffRow, StaffRow.subject == AuditEventRow.actor)
+            .where(AuditEventRow.action.in_(list(actions)))
+        )
+        return await self._entries(query, limit)
+
+    async def _entries(self, query: Select[AuditEventRow, str], limit: int) -> list[AuditEntry]:
+        """Run an audit query newest first and map the rows with the actors' names."""
         rows = await self._session.execute(
             query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
         )
@@ -1365,7 +1408,7 @@ class SqlTransaction(
         return _booking(*found) if found else None
 
     async def save_booking(self, booking: Booking) -> None:
-        """Persist the mutable fields of a booking (status, cancellation time, closure)."""
+        """Persist the mutable fields of a booking (status, cancellation, closure, reason)."""
         await self._session.execute(
             update(BookingRow)
             .where(BookingRow.id == booking.id)
@@ -1373,6 +1416,8 @@ class SqlTransaction(
                 status=booking.status.value,
                 cancelled_at=booking.cancelled_at,
                 closure_id=booking.closure_id,
+                change_reason=booking.change_reason.value if booking.change_reason else None,
+                rebook_by=booking.rebook_by,
             )
         )
 
@@ -1409,6 +1454,52 @@ class SqlTransaction(
                 JobRow.type.in_(sorted(t.value for t in types)),
             )
         )
+
+    async def get_shortfall_acceptances(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[ShortfallAcceptance]:
+        """Return the group's accepted shortfalls of slots starting in [lower, upper)."""
+        rows = await self._session.scalars(
+            select(ShortfallAcceptanceRow)
+            .where(
+                ShortfallAcceptanceRow.group_id == group_id,
+                ShortfallAcceptanceRow.start >= lower,
+                ShortfallAcceptanceRow.start < upper,
+            )
+            .order_by(ShortfallAcceptanceRow.start)
+        )
+        return [
+            ShortfallAcceptance(r.group_id, r.start, r.agents, r.booked, r.accepted_at, r.actor)
+            for r in rows
+        ]
+
+    async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
+        """Store a planner's acceptance; it replaces an earlier one for the same slot."""
+        await self._session.merge(
+            ShortfallAcceptanceRow(
+                group_id=acceptance.group_id,
+                start=acceptance.start,
+                agents=acceptance.agents,
+                booked=acceptance.booked,
+                accepted_at=acceptance.accepted_at,
+                actor=acceptance.actor,
+            )
+        )
+
+    async def count_audit_events(
+        self, actor: str, actions: Collection[str], since: datetime
+    ) -> int:
+        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
+        count = await self._session.scalar(
+            select(func.count())
+            .select_from(AuditEventRow)
+            .where(
+                AuditEventRow.actor == actor,
+                AuditEventRow.action.in_(list(actions)),
+                AuditEventRow.at >= since,
+            )
+        )
+        return int(count or 0)
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
         """Return the group's closures that have not ended at ``now``, earliest first."""
@@ -1474,8 +1565,10 @@ class SqlTransaction(
         rows = await self._session.execute(query.order_by(SlotRow.start, BookingRow.id))
         return [_booking(booking, slot) for booking, slot in rows]
 
-    async def list_suspended_bookings(self, scope: Scope, group_id: int) -> list[Booking]:
-        """Return the group's suspended bookings, earliest first, inside ``scope``."""
+    async def list_suspended_bookings(
+        self, scope: Scope, group_id: int, status: BookingStatus = BookingStatus.SUSPENDED
+    ) -> list[Booking]:
+        """Return the group's bookings on hold with ``status``, earliest first, in ``scope``."""
         rows = await self._session.execute(
             select(BookingRow, SlotRow)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
@@ -1483,7 +1576,7 @@ class SqlTransaction(
             .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
             .where(
                 BookingRow.group_id == group_id,
-                BookingRow.status == BookingStatus.SUSPENDED.value,
+                BookingRow.status == status.value,
                 scope_filter(scope, OrganisationRow.slug, GroupRow.slug),
             )
             .order_by(SlotRow.start, BookingRow.id)
@@ -1495,7 +1588,7 @@ class SqlTransaction(
         notices = await self._session.scalars(
             select(ClosureNoticeRow).where(ClosureNoticeRow.closure_id == row.id)
         )
-        return _closure(row, list(notices))
+        return _closure(row, list(notices), await self.page_image(row.image_id))
 
     async def _save_notices(self, closure_id: int, closure: Closure) -> None:
         """Replace the notices and headings of ``closure_id`` with those of ``closure``."""

@@ -65,6 +65,7 @@ class GroupSettings:
     horizon_days: int
     phone_mode: PhoneMode
     dispatch_lead_minutes: int
+    planner_change_min_lead_minutes: int
     video_host_email: str | None
     wxcc_business_address: str | None
     wxcc_channel: str | None

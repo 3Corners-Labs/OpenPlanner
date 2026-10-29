@@ -57,6 +57,11 @@ TOPICS = (
     HelpTopic("group-settings", ("/admin/groups/{slug}/settings",), Permission.GROUP_EDIT),
     HelpTopic("branding", ("/admin/organisations/{org}/branding",), Permission.BRANDING_MANAGE),
     HelpTopic("rights-matrix", ("/admin/matrix",), Permission.MATRIX_VIEW),
+    HelpTopic(
+        "roles",
+        ("/admin/roles", "/admin/roles/new", "/admin/roles/{role_id}"),
+        Permission.ROLES_MANAGE,
+    ),
     HelpTopic("retention", ("/admin/retention",), Permission.RETENTION_VIEW),
     HelpTopic("staff", ("/admin/staff", "/admin/staff/{member_id}"), Permission.STAFF_VIEW),
     HelpTopic("audit", ("/admin/audit",), Permission.AUDIT_VIEW),
@@ -72,6 +77,20 @@ TOPICS = (
     ),
     HelpTopic(
         "group-contacts", ("/admin/groups/{slug}/closure/contacts",), Permission.CLOSURE_MANAGE
+    ),
+    HelpTopic("group-closure", ("/admin/groups/{slug}/closure",), Permission.CLOSURE_MANAGE),
+    HelpTopic(
+        "group-agenda",
+        (
+            "/admin/groups/{slug}/agenda",
+            "/admin/groups/{slug}/agenda/week",
+            "/admin/groups/{slug}/agenda/bookings/{booking_id}/move",
+            "/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel",
+            "/admin/groups/{slug}/agenda/bookings/{booking_id}/rebook",
+            "/admin/groups/{slug}/agenda/slot-rebook",
+            "/admin/groups/{slug}/agenda/waiting",
+        ),
+        Permission.BOOKINGS_VIEW,
     ),
     HelpTopic("maintenance", ("/admin/maintenance",), Permission.SYSTEM_MAINTENANCE),
 )
