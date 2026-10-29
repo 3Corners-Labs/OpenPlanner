@@ -215,4 +215,7 @@ to your page hold no personal data and no management token.
   `crossorigin="anonymous"` is on the script tag.
 - After an update with a pinned `integrity`: copy the new code from the Insluiten page.
 
+During maintenance of OpenPlanner (ADR 0038) the widget says instead that booking is briefly
+unavailable because of maintenance, with a retry button; the standalone page shows the same.
+
 The API behind the widget is described in `docs/api.md` (`/api/v1/widget`).
