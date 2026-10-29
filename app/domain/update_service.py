@@ -5,8 +5,8 @@ Three callers, three paths:
     worker         check_if_due ─► ReleaseSource.latest (at most hourly) ─► release_checks
     superuser      notice (banner) · overview · request_update · request_restore · cancel
                    (system.update, every change audited)
-    host updater   claim ─► running ─► report(succeeded | rolled_back | failed, reason)
-                   (through ``python -m app.cli``; audited as ``host-updater``)
+    host updater   claim ─► running ─► report_step(step)* ─► report(succeeded | rolled_back
+                   | failed, reason) (through ``python -m app.cli``; audited as ``host-updater``)
 
 The service never touches containers or images: it only records what is asked and what
 happened. The host updater does the work and checks the image signature.
@@ -25,12 +25,14 @@ from app.domain.updates import (
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
+    UpdateStep,
     Version,
     available_update,
     check_due,
     claimed,
     finished,
     open_request,
+    progressed,
     recent_outcome,
     restore_candidate,
     unclaimed,
@@ -271,6 +273,22 @@ class UpdateService:
             await _audit_updater(tx, started, Outcome.SUCCESS, f"{started.action}.start")
         return started
 
+    async def report_step(self, request_id: int, step: UpdateStep) -> UpdateRequest:
+        """Record the step a running request has reached (ADR 0048); a repeat changes nothing.
+
+        Raises:
+            DomainError: ``update_request_not_found``; ``update_in_progress`` when it is not
+                running; ``invalid_configuration`` for a step outside its plan or going back.
+        """
+        now = self._clock.now()
+        async with self._uow.locked() as tx:
+            running = await _request(tx, request_id)
+            moved = progressed(running, step, now)
+            if moved != running:
+                await tx.save_update_request(moved)
+                await _audit_updater(tx, moved, Outcome.SUCCESS, f"{moved.action}.{step}")
+        return moved
+
     async def report(self, request_id: int, status: UpdateStatus, reason: str) -> UpdateRequest:
         """Record the outcome of a running request.
 
@@ -317,7 +335,7 @@ async def _audit_updater(
 ) -> None:
     """Record a step of the host updater (global: only the superuser sees it)."""
     event = AuditEvent(
-        request.finished_at or request.started_at or request.requested_at,
+        request.finished_at or request.step_at or request.started_at or request.requested_at,
         UPDATER_ACTOR,
         _PERMISSION.value,
         outcome,

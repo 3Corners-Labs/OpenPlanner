@@ -138,8 +138,14 @@ def page(
     name: str,
     principal: Principal,
     context: dict[str, object],
+    *,
+    scripts: bool = False,
 ) -> HTMLResponse:
-    """Render an admin page with navigation and ``can()`` from the matrix."""
+    """Render an admin page with navigation and ``can()`` from the matrix.
+
+    ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``); only pages that enhance
+    themselves under an ADR do (the updates page, ADR 0048).
+    """
     can = can_function(principal)
     nav = [
         NavView(locale.gettext(item.label_key), item.href, _is_current(request, item), item.icon)
@@ -166,6 +172,7 @@ def page(
             # Set by ``maintenance_routes.load_maintenance_notice`` (ADR 0038).
             "maintenance_notice": maintenance,
         },
+        scripts=scripts,
     )
     if maintenance is not None:
         _freeze(request, principal, response)

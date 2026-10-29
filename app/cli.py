@@ -10,6 +10,7 @@ Usage:
 
 Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
     ``python -m app.cli update-claim``  claim the waiting request: ``id action target from``
+    ``python -m app.cli update-progress ID STEP``  record the step it starts (ADR 0048)
     ``python -m app.cli update-report ID STATUS [REASON]``  record the outcome
     ``python -m app.cli backup-db [NAME] [--prune]``  back up the database, delete old backups
     ``python -m app.cli restore-db NAME``  put a backup back (application stopped)
@@ -71,7 +72,7 @@ from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import Group
 from app.domain.update_service import UpdateService
-from app.domain.updates import OUTCOMES
+from app.domain.updates import OUTCOMES, REPORTED_STEPS
 from app.i18n import Translator, load_catalogues
 from app.keys import management_token_key
 from app.web.authz_report import render_markdown
@@ -261,6 +262,19 @@ async def _update_claim(settings: Settings) -> str:
     if started is None:
         return ""
     return f"{started.id} {started.action} {started.target} {started.from_version}\n"
+
+
+async def _update_progress(settings: Settings, request_id: int, step: str) -> tuple[str, int]:
+    """Record the step a running request has reached; return the stored step and an exit code."""
+    steps = {s.value: s for s in REPORTED_STEPS}
+    if step not in steps:
+        return f"unknown step: {step}\n", 2
+    try:
+        async with _updates(settings) as updates:
+            moved = await updates.report_step(request_id, steps[step])
+    except DomainError as error:
+        return f"refused: {error}\n", 1
+    return f"{moved.step}\n", 0
 
 
 async def _update_report(
@@ -484,6 +498,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
     commands.add_parser("update-claim", help="claim the waiting update request (host updater)")
+    progress_cmd = commands.add_parser("update-progress", help="record the step an update starts")
+    progress_cmd.add_argument("request_id", type=int)
+    progress_cmd.add_argument("step", choices=sorted(s.value for s in REPORTED_STEPS))
     report_cmd = commands.add_parser("update-report", help="record an update's outcome")
     report_cmd.add_argument("request_id", type=int)
     report_cmd.add_argument("status", choices=sorted(s.value for s in OUTCOMES))
@@ -512,6 +529,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "update-claim":
         sys.stdout.write(asyncio.run(_update_claim(Settings())))
         return 0
+    if args.command == "update-progress":
+        text, code = asyncio.run(_update_progress(Settings(), args.request_id, args.step))
+        sys.stdout.write(text)
+        return code
     if args.command == "update-report":
         text, code = asyncio.run(
             _update_report(Settings(), args.request_id, args.status, args.reason)
