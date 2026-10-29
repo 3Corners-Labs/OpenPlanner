@@ -1,7 +1,10 @@
+from datetime import timedelta
+
 import pytest
 from pydantic import ValidationError
 
 from app.config import Settings
+from app.domain.event_schema import Envelope
 from app.i18n.dates import ClockStyle
 
 
@@ -160,3 +163,36 @@ def test_storage_limits_must_be_ordered(monkeypatch: pytest.MonkeyPatch) -> None
 
     with pytest.raises(ValidationError, match="STORAGE_CRITICAL_FREE_PERCENT"):
         Settings(environment="dev")
+
+
+def test_the_installation_name_and_version_go_into_every_record() -> None:
+    # ADR 0040, part 2 (class B): names this installation on a shared log platform.
+    settings = Settings(environment="dev", app_version="1.4.0", installation_name="gemeente-prod")
+
+    assert settings.event_envelope == Envelope("1.4.0", "gemeente-prod")
+    assert Settings(environment="dev").event_envelope == Envelope("", "")
+
+
+def test_the_installation_name_is_a_plain_token() -> None:
+    with pytest.raises(ValidationError):
+        Settings(environment="dev", installation_name='prod\n{"x":1}')
+
+
+@pytest.mark.parametrize("minutes", [0, 1441])
+def test_the_security_event_window_has_bounds(minutes: int) -> None:
+    # ADR 0034, AU-4 (class C): 1 minute to 1 day, default 15.
+    assert Settings(environment="dev").security_event_window_minutes == 15
+    with pytest.raises(ValidationError):
+        Settings(environment="dev", security_event_window_minutes=minutes)
+
+
+def test_each_category_has_its_own_retention() -> None:
+    # ADR 0040, part 4 (class C): admin actions 2 years (product owner, 2026-10-29).
+    retention = Settings(environment="dev").event_retention
+
+    assert (retention.audit, retention.system) == (timedelta(days=730), timedelta(days=90))
+    assert (retention.security, retention.diagnostic) == (timedelta(days=365), timedelta(days=7))
+    with pytest.raises(ValidationError):
+        Settings(environment="dev", audit_retention_days=364)
+    with pytest.raises(ValidationError):
+        Settings(environment="dev", diagnostic_mode_hours=73)

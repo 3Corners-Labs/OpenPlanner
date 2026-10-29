@@ -382,6 +382,33 @@ msgstr "Beheer"
 msgid "admin.nav.label"
 msgstr "Beheermenu"
 
+msgid "admin.nav.section.monitor"
+msgstr "Bewaken"
+
+msgid "admin.nav.section.manage"
+msgstr "Beheren"
+
+msgid "admin.nav.section.platform"
+msgstr "Platform"
+
+msgid "admin.nav.object.group"
+msgstr "Groep"
+
+msgid "admin.profile.roles"
+msgstr "Uw rollen"
+
+msgid "admin.theme.label"
+msgstr "Weergave"
+
+msgid "admin.theme.system"
+msgstr "Systeem"
+
+msgid "admin.theme.light"
+msgstr "Licht"
+
+msgid "admin.theme.dark"
+msgstr "Donker"
+
 msgid "admin.nav.dashboard"
 msgstr "Overzicht"
 
@@ -622,6 +649,12 @@ msgstr "Organisaties beheren"
 
 msgid "authz.permission.audit_view"
 msgstr "Auditlog bekijken"
+
+msgid "authz.permission.audit_export"
+msgstr "Auditlog exporteren"
+
+msgid "authz.permission.diagnostics_manage"
+msgstr "Diagnosemodus schakelen"
 
 msgid "authz.permission.integrations_manage"
 msgstr "Koppelingen en geheimen beheren"
@@ -2975,15 +3008,6 @@ msgstr "Het versturen is mislukt door een onverwachte fout van de mailserver. Pr
 msgid "admin.audit.filter"
 msgstr "Filter"
 
-msgid "admin.audit.source"
-msgstr "Soort"
-
-msgid "admin.audit.source.admin"
-msgstr "Acties van beheerders"
-
-msgid "admin.audit.source.system"
-msgstr "Systeemgebeurtenissen"
-
 msgid "admin.audit.group"
 msgstr "Groep"
 
@@ -3086,6 +3110,126 @@ msgstr "Persoonsgegevens verwijderen"
 msgid "audit.event.storage_check"
 msgstr "Opslag controleren"
 
+msgid "admin.audit.diagnostics.title"
+msgstr "Diagnosemodus"
+
+msgid "admin.audit.diagnostics.intro"
+msgstr "Zolang de diagnosemodus aan staat, schrijft het platform extra debugregels over die groep of organisatie in dit log. De beheerders van de groep zien ze ook. De modus gaat na de ingestelde tijd vanzelf uit (standaard 24 uur), en ook als de schijf bijna vol is."
+
+msgid "admin.audit.diagnostics.active"
+msgstr "{target}: aan tot {until}"
+
+msgid "admin.audit.diagnostics.off"
+msgstr "Uitzetten"
+
+msgid "admin.audit.diagnostics.on"
+msgstr "Aanzetten"
+
+msgid "admin.audit.diagnostics.none"
+msgstr "De diagnosemodus staat nergens aan."
+
+msgid "admin.audit.diagnostics.target"
+msgstr "Groep of organisatie"
+
+msgid "admin.done.diagnostics_on"
+msgstr "De diagnosemodus staat aan."
+
+msgid "admin.done.diagnostics_off"
+msgstr "De diagnosemodus staat uit."
+
+msgid "audit.event.job_run"
+msgstr "Taak uitgevoerd (diagnose)"
+
+msgid "audit.event.diagnostics_brake"
+msgstr "Diagnosemodus gestopt"
+
+msgid "admin.audit.detail.diagnostics_on"
+msgstr "diagnosemodus aan"
+
+msgid "admin.audit.detail.diagnostics_off"
+msgstr "diagnosemodus uit"
+
+msgid "admin.audit.detail.modes"
+msgstr "{count} keer beëindigd"
+
+msgid "admin.audit.level"
+msgstr "Minimaal niveau"
+
+msgid "admin.audit.level.debug"
+msgstr "Debug"
+
+msgid "admin.audit.level.info"
+msgstr "Info"
+
+msgid "admin.audit.level.warning"
+msgstr "Waarschuwing"
+
+msgid "admin.audit.level.error"
+msgstr "Fout"
+
+msgid "admin.audit.level.critical"
+msgstr "Kritiek"
+
+msgid "admin.audit.category"
+msgstr "Soort"
+
+msgid "admin.audit.category.audit"
+msgstr "Beheeracties"
+
+msgid "admin.audit.category.system"
+msgstr "Systeem"
+
+msgid "admin.audit.category.security"
+msgstr "Beveiliging"
+
+msgid "admin.audit.category.diagnostic"
+msgstr "Diagnose"
+
+msgid "admin.audit.from"
+msgstr "Van"
+
+msgid "admin.audit.to"
+msgstr "Tot en met"
+
+msgid "admin.audit.trace"
+msgstr "Keten-id"
+
+msgid "admin.audit.trace_link"
+msgstr "Hele keten"
+
+msgid "admin.audit.export"
+msgstr "Exporteren als CSV"
+
+msgid "admin.audit.export.too_many_days"
+msgstr "De export beslaat te veel dagen. Kies een kortere periode."
+
+msgid "admin.audit.export.too_many_rows"
+msgstr "De export bevat te veel regels. Maak het filter nauwer, bijvoorbeeld met een kortere periode."
+
+msgid "audit.event.webhook_rejected"
+msgstr "Webhook geweigerd"
+
+msgid "audit.event.token_refresh"
+msgstr "Webex-token vernieuwen"
+
+msgid "admin.audit.reason.invalid_signature"
+msgstr "Handtekening of tijdstempel klopt niet."
+
+msgid "admin.audit.reason.unauthorized"
+msgstr "De dienst weigert onze inloggegevens."
+
+msgid "admin.audit.reason.unreachable"
+msgstr "De dienst is niet bereikbaar."
+
+msgid "admin.audit.detail.suppressed"
+msgstr "nog {count} keer sinds de vorige melding"
+
+msgid "admin.audit.detail.source_webex"
+msgstr "van Webex"
+
+msgid "admin.audit.detail.source_wxcc"
+msgstr "van Webex Contact Center"
+
 msgid "audit.job.send_suspension"
 msgstr "Bericht over sluiting versturen"
 
@@ -3152,7 +3296,7 @@ msgid "admin.updates.open"
 msgstr "Lopend verzoek"
 
 msgid "admin.updates.open_lead"
-msgstr "Naar versie {version}. De pagina toont de uitkomst zodra de updater die meldt."
+msgstr "Naar versie {version}. De updater kijkt elke minuut of er een verzoek is en meldt elke stap; deze lijst werkt zichzelf bij."
 
 msgid "admin.updates.unclaimed"
 msgstr "Geen updater heeft dit verzoek na 10 minuten opgepakt. Controleer of de updater op de server is geïnstalleerd (zie het runbook)."
@@ -3270,6 +3414,57 @@ msgstr "Naar updates"
 
 msgid "admin.updates.banner.snooze"
 msgstr "Herinner me over 60 minuten"
+
+msgid "admin.updates.step.waiting"
+msgstr "Wachten tot de updater het verzoek oppakt"
+
+msgid "admin.updates.step.pulling"
+msgstr "Versie {version} downloaden"
+
+msgid "admin.updates.step.verifying"
+msgstr "Handtekening controleren"
+
+msgid "admin.updates.step.backing_up"
+msgstr "Back-up van de database maken"
+
+msgid "admin.updates.step.migrating"
+msgstr "Database terugzetten naar versie {version}"
+
+msgid "admin.updates.step.starting"
+msgstr "Versie {version} starten en controleren"
+
+msgid "admin.updates.step.rolling_back"
+msgstr "Terugdraaien naar de vorige versie en de back-up"
+
+msgid "admin.updates.step_state.done"
+msgstr "klaar"
+
+msgid "admin.updates.step_state.current"
+msgstr "bezig"
+
+msgid "admin.updates.step_state.pending"
+msgstr "nog niet"
+
+msgid "admin.updates.step.since"
+msgstr "sinds {time}"
+
+msgid "admin.updates.steps"
+msgstr "Stappen"
+
+msgid "admin.updates.progress.status"
+msgstr "Nu: {step}"
+
+msgid "admin.updates.progress.ended"
+msgstr "Verzoek naar versie {version}: {status}."
+
+msgid "admin.updates.progress.refresh"
+msgstr "Stand bijwerken"
+
+msgid "admin.updates.progress.reload"
+msgstr "Pagina vernieuwen"
+
+msgid "admin.updates.banner.step"
+msgstr "Update naar versie {version} is bezig: {step}."
 
 #. Context-sensitive help and the manual (ADR 0033).
 msgid "admin.nav.help"
@@ -3939,6 +4134,141 @@ msgstr "Eigen blok met {count} contactmogelijkheden."
 
 msgid "admin.group_contacts.summary_default"
 msgstr "Standaard van de organisatie: {count} contactmogelijkheden."
+
+msgid "authz.permission.system_maintenance"
+msgstr "Onderhoudsmodus aan- en uitzetten"
+
+msgid "error.maintenance"
+msgstr "Onderhoudsmodus: alleen lezen. Er wordt onderhoud aan het platform uitgevoerd; wijzigen kan pas als het onderhoud klaar is."
+
+msgid "admin.form.error.maintenance_from_environment"
+msgstr "De onderhoudsmodus staat aan via de serverconfiguratie (MAINTENANCE_MODE). Alleen de beheerder van de server kan hem uitzetten."
+
+msgid "admin.form.error.expected_end"
+msgstr "Vul een verwachte einddatum en -tijd in de toekomst in, of laat beide leeg."
+
+msgid "admin.done.maintenance_on"
+msgstr "De onderhoudsmodus staat aan."
+
+msgid "admin.done.maintenance_off"
+msgstr "De onderhoudsmodus staat uit."
+
+msgid "admin.nav.maintenance"
+msgstr "Onderhoud"
+
+msgid "admin.maintenance.refused.title"
+msgstr "Onderhoudsmodus: alleen lezen"
+
+msgid "admin.maintenance.bar.label"
+msgstr "Onderhoudsmodus"
+
+msgid "admin.maintenance.bar.title"
+msgstr "Onderhoudsmodus"
+
+msgid "admin.maintenance.bar.text"
+msgstr "Alleen lezen: wijzigingen zijn tijdelijk niet mogelijk."
+
+msgid "admin.maintenance.bar.since"
+msgstr "Sinds {moment}"
+
+msgid "admin.maintenance.bar.expected_end"
+msgstr "Verwacht klaar: {moment}"
+
+msgid "admin.maintenance.bar.environment"
+msgstr "Aangezet via de server"
+
+msgid "admin.maintenance.title"
+msgstr "Onderhoudsmodus"
+
+msgid "admin.maintenance.lead"
+msgstr "Zet de hele installatie op alleen lezen terwijl u aan het platform werkt. Burgers kunnen dan geen afspraken maken of wijzigen; afspraken die al vaststaan gaan gewoon door."
+
+msgid "admin.maintenance.state"
+msgstr "Status"
+
+msgid "admin.maintenance.on"
+msgstr "Aan"
+
+msgid "admin.maintenance.off"
+msgstr "Uit"
+
+msgid "admin.maintenance.since"
+msgstr "Aan sinds"
+
+msgid "admin.maintenance.by"
+msgstr "Aangezet door"
+
+msgid "admin.maintenance.reason"
+msgstr "Reden"
+
+msgid "admin.maintenance.reason_hint"
+msgstr "Wordt getoond in de auditlog en op deze pagina."
+
+msgid "admin.maintenance.expected_end"
+msgstr "Verwacht klaar"
+
+msgid "admin.maintenance.expected_end_hint"
+msgstr "Alleen ter informatie: de onderhoudsmodus gaat niet vanzelf uit."
+
+msgid "admin.maintenance.no_expected_end"
+msgstr "Niet opgegeven"
+
+msgid "admin.maintenance.environment"
+msgstr "De onderhoudsmodus staat aan via de serverconfiguratie (MAINTENANCE_MODE). Die kunt u hier niet uitzetten."
+
+msgid "admin.maintenance.on_heading"
+msgstr "Onderhoudsmodus aanzetten"
+
+msgid "admin.maintenance.change_heading"
+msgstr "Reden of verwacht einde aanpassen"
+
+msgid "admin.maintenance.on_lead"
+msgstr "Tijdens onderhoud kan alleen de superuser koppelingen, updates en deze schakelaar wijzigen. Al het andere is alleen te lezen, ook voor de superuser."
+
+msgid "admin.maintenance.change"
+msgstr "Opslaan"
+
+msgid "admin.maintenance.switch_on"
+msgstr "Onderhoudsmodus aanzetten"
+
+msgid "admin.maintenance.off_heading"
+msgstr "Onderhoudsmodus uitzetten"
+
+msgid "admin.maintenance.off_lead"
+msgstr "Burgers en beheerders kunnen daarna weer alles wat ze gewend zijn."
+
+msgid "admin.maintenance.off_lead_environment"
+msgstr "Uitzetten haalt alleen de schakelaar in het portaal weg; de onderhoudsmodus blijft aan zolang de server hem aanzet."
+
+msgid "admin.maintenance.switch_off"
+msgstr "Onderhoudsmodus uitzetten"
+
+msgid "admin.maintenance.reason.update"
+msgstr "Update"
+
+msgid "admin.maintenance.reason.restore"
+msgstr "Herstel van een eerdere versie"
+
+msgid "admin.maintenance.reason.integration"
+msgstr "Koppeling herstellen"
+
+msgid "admin.maintenance.reason.incident"
+msgstr "Onderzoek van een incident"
+
+msgid "admin.maintenance.reason.other"
+msgstr "Overig onderhoud"
+
+msgid "admin.audit.reason.maintenance"
+msgstr "Geweigerd: onderhoudsmodus"
+
+msgid "admin.audit.detail.maintenance_on"
+msgstr "Onderhoudsmodus aangezet"
+
+msgid "admin.audit.detail.maintenance_off"
+msgstr "Onderhoudsmodus uitgezet"
+
+msgid "admin.audit.detail.maintenance_refused"
+msgstr "Wijziging geweigerd tijdens onderhoud"
 
 # ADR 0046: staff directory
 

@@ -1,12 +1,16 @@
 """Application settings, read from the environment only."""
 
+import os
 import re
+from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.domain.event_schema import Envelope
+from app.domain.system_log import EventRetention
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -18,6 +22,14 @@ SMTPS_PORT = 465
 """Mail submission over implicit TLS (RFC 8314); STARTTLS is never offered there."""
 
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
+
+
+def environment() -> dict[str, str]:
+    """Return a copy of the process environment, for reporting where a setting came from.
+
+    The only other place that reads the environment; ``settings list`` uses it (ADR 0042 §10).
+    """
+    return dict(os.environ)
 
 
 class Settings(BaseSettings):
@@ -56,6 +68,26 @@ class Settings(BaseSettings):
     storage_low_free_percent: float = Field(default=15.0, gt=0, lt=100)
     storage_critical_free_percent: float = Field(default=5.0, gt=0, lt=100)
     database_max_mb: int | None = Field(default=None, ge=1)
+    # ADR 0040 / 0034 (class B, deployment): name of this installation in every log line and
+    # event record, so a log platform that receives several can tell them apart. Empty: none.
+    installation_name: str = Field(default="", pattern=r"^[A-Za-z0-9_.-]{0,64}$")
+    # ADR 0034, AU-4 (class C, platform; env until the settings registry of ADR 0042): rejected
+    # webhooks and failing token refreshes are written as at most one security event per kind
+    # per this many minutes; the rest are counted into the next one.
+    security_event_window_minutes: int = Field(default=15, ge=1, le=1440)
+    # ADR 0040, part 3 (class C, platform; env until the settings registry of ADR 0042): one
+    # CSV export of the audit log holds at most this many rows and covers at most this many
+    # days; a larger one is refused, never cut short.
+    audit_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
+    audit_export_max_days: int = Field(default=366, ge=1, le=3660)
+    # ADR 0040, part 4 (class C, platform; env until the settings registry of ADR 0042): how
+    # long each category of audit event is kept. Admin actions 2 years (product owner,
+    # 2026-10-29), security 1 year, debug events 7 days; system events above. Diagnostic mode
+    # ends by itself after DIAGNOSTIC_MODE_HOURS.
+    audit_retention_days: int = Field(default=730, ge=365, le=3650)
+    security_event_retention_days: int = Field(default=365, ge=30, le=3650)
+    diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
+    diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
@@ -92,10 +124,10 @@ class Settings(BaseSettings):
     # which refreshes the roles (invisible with an active SSO session).
     admin_reauth_minutes: int = 60
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
-    # seconds (class C, platform; here until the ADR 0042 registry exists).
+    # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
     # Without a login for this many days, a person is marked dormant in the staff list
-    # (class D, organisation; one value for every organisation until the registry exists).
+    # (class D, organisation; one value for every organisation until the portal stores it).
     staff_dormant_after_days: int = Field(default=90, ge=14, le=365)
     admin_timezone: str = "Europe/Amsterdam"
     oidc_discovery_url: str | None = None
@@ -134,8 +166,7 @@ class Settings(BaseSettings):
     rate_limit_bookings: str = "10/hour"
     rate_limit_reads: str = "60/minute"
 
-    # ADR 0035: how many host websites one organisation may allow for the widget. Class C
-    # (platform, superuser) once the ADR 0042 registry exists; until then from the environment.
+    # ADR 0035: how many host websites one organisation may allow for the widget. Class C.
     embedding_max_origins: int = Field(default=20, ge=1, le=100)
 
     # Machine API for contact-center bots (ADR 0023). Off: the routes do not exist. On: the
@@ -150,6 +181,14 @@ class Settings(BaseSettings):
     app_version: str = ""
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
+
+    # Maintenance mode (ADR 0038). MAINTENANCE_MODE (class B, deployment: needed while the
+    # database is unavailable or being restored) switches it on from the environment; the
+    # portal shows that and cannot switch it off.
+    maintenance_mode: bool = False
+    # Class C (platform, ADR 0042): how long the web process trusts its last read of the
+    # maintenance switch; ADR 0038 sets 5 seconds as the upper bound.
+    maintenance_cache_seconds: float = Field(default=5.0, ge=0, le=5)
 
     @model_validator(mode="after")
     def _storage_limits_are_ordered(self) -> "Settings":
@@ -200,6 +239,21 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("OIDC needs an https discovery URL and a client secret")
         return self
+
+    @property
+    def event_retention(self) -> EventRetention:
+        """How long each category of audit event is kept (ADR 0040, part 4)."""
+        return EventRetention(
+            audit=timedelta(days=self.audit_retention_days),
+            system=timedelta(days=self.system_event_retention_days),
+            security=timedelta(days=self.security_event_retention_days),
+            diagnostic=timedelta(days=self.diagnostic_event_retention_days),
+        )
+
+    @property
+    def event_envelope(self) -> Envelope:
+        """Release and installation name for every log line and event record (ADR 0040)."""
+        return Envelope(self.app_version, self.installation_name)
 
     @property
     def smtp_implicit_tls(self) -> bool:

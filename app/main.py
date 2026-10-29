@@ -5,6 +5,7 @@ Run with ``uvicorn app.main:create_app --factory``.
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 import httpx
 from fastapi import FastAPI
@@ -14,6 +15,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import Integrations, build_integrations, secret_box
 from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider
 from app.adapters.releases import update_service
@@ -32,6 +34,7 @@ from app.api import (
 )
 from app.api.agent import create_agent_api
 from app.api.security_headers import SecurityHeadersMiddleware
+from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings
 from app.domain.admin import AdminService
 from app.domain.api_access import ApiAccessService
@@ -41,14 +44,18 @@ from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.closure_service import ClosureService
 from app.domain.contact_service import ContactService
+from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
+from app.domain.event_context import set_service
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
+from app.domain.maintenance_service import MaintenanceService
 from app.domain.messaging_service import MessagingService
 from app.domain.organisations import OrganisationService
 from app.domain.planning import PlanningService
 from app.domain.ports import Clock, IdentityProvider
+from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.simulation import SimulationService
 from app.i18n import Translator, load_catalogues
@@ -125,11 +132,26 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        configure_logging(settings.log_level)
+        set_service("web")
+        configure_logging(settings.log_level, envelope=settings.event_envelope)
         app.state.engine = create_engine(settings.database_url)
-        uow = SqlUnitOfWork(app.state.engine, secret_box(settings))
+        # ADR 0034: committed audit events also go to stdout for the log platform.
+        uow = SqlUnitOfWork(
+            app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
+        )
+        app.state.security_log = SecurityLog(
+            uow, clock, timedelta(minutes=settings.security_event_window_minutes)
+        )
         app.state.booking_service = BookingService(uow, clock, token_key)
         app.state.admin_service = AdminService(uow, clock)
+        # ADR 0038: read on every admin change (and citizen write), cached for a few seconds.
+        app.state.maintenance_service = MaintenanceService(
+            uow,
+            clock,
+            app.state.admin_service,
+            environment=settings.maintenance_mode,
+            cache=timedelta(seconds=settings.maintenance_cache_seconds),
+        )
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
@@ -142,6 +164,9 @@ def create_app(
             allow_local=settings.environment != "prod",
         )
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
+        app.state.diagnostics_service = DiagnosticsService(
+            uow, clock, app.state.admin_service, timedelta(hours=settings.diagnostic_mode_hours)
+        )
         # Test emails go through exactly the senders the worker uses (ADR 0022).
         senders = ConfiguredSenders(uow, http, fallback_mail(settings))
         app.state.channel_service = ChannelSettingsService(
@@ -164,7 +189,9 @@ def create_app(
         if agent_api is not None:
             for name in ("api_access", "booking_service", "translator", "limiter", "clock"):
                 setattr(agent_api.state, name, getattr(app.state, name))
-        wired = integrations or build_integrations(settings, app.state.engine, http, clock)
+        wired = integrations or build_integrations(
+            settings, app.state.engine, http, clock, app.state.security_log
+        )
         app.state.integrations = wired
         app.state.call_service = CallService(
             uow, app.state.integration_service, wired.video, wired.dispatcher, agent_start_label
@@ -206,6 +233,8 @@ def create_app(
         https_only=settings.environment == "prod",
     )
     app.add_middleware(SecurityHeadersMiddleware)
+    # Outermost: every request, its log lines and its audit events share one trace (ADR 0040).
+    app.add_middleware(TraceMiddleware)
     register_error_pages(app)
     register_admin(app)
     app.include_router(health.router)

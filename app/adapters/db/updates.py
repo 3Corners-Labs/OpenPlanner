@@ -16,6 +16,7 @@ from app.domain.updates import (
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
+    UpdateStep,
     Version,
 )
 
@@ -54,6 +55,8 @@ def _request(row: UpdateRequestRow) -> UpdateRequest:
         started_at=row.started_at,
         finished_at=row.finished_at,
         reason=row.reason,
+        step=UpdateStep(row.step) if row.step else None,
+        step_at=row.step_at,
     )
 
 
@@ -103,13 +106,15 @@ class UpdateQueries:
             started_at=request.started_at,
             finished_at=request.finished_at,
             reason=request.reason,
+            step=request.step.value if request.step else None,
+            step_at=request.step_at,
         )
         self._session.add(row)
         await self._session.flush()
         return _request(row)
 
     async def save_update_request(self, request: UpdateRequest) -> None:
-        """Store the status, times and reason of an existing request."""
+        """Store the status, times, reason and step of an existing request."""
         row = await self._session.get(UpdateRequestRow, request.id)
         if row is None:  # pragma: no cover - the service read it in this transaction
             raise LookupError("update request not found")
@@ -117,4 +122,6 @@ class UpdateQueries:
         row.started_at = request.started_at
         row.finished_at = request.finished_at
         row.reason = request.reason
+        row.step = request.step.value if request.step else None
+        row.step_at = request.step_at
         await self._session.flush()

@@ -11,6 +11,8 @@ from pydantic import SecretStr
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
+from app.domain.audit import Category
+from app.domain.authorization import Scope
 from app.domain.booking import MeetingRef
 from app.domain.calls import CallState, TaskState
 from app.domain.services import BookingService
@@ -119,6 +121,36 @@ async def test_forged_or_stale_webhooks_are_refused(
     )
 
     assert (forged.status_code, replayed.status_code, webex.status_code) == (401, 401, 401)
+
+
+async def test_a_flood_of_forged_webhooks_is_one_security_event_per_source(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    # ADR 0034, AU-4: global security events, deduplicated per window; nothing from the request.
+    for _ in range(20):
+        response = await client.post(
+            "/webhooks/webex",
+            content=b'{"email": "a@example.org"}',
+            headers={"x-spark-signature": "bad"},
+        )
+        assert response.status_code == 401
+    body = wxcc_body("task:connected", at=NOW)
+    await client.post(
+        "/webhooks/wxcc",
+        content=body,
+        headers={"x-webexcc-signature": "0" * 64, "x-webexcc-timestamp": timestamp(body)},
+    )
+
+    engine = create_engine(database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        entries = await tx.list_audit_events(Scope(everything=True))
+    await engine.dispose()
+    events = sorted((e.event for e in entries), key=lambda e: e.detail)
+    assert [(e.action, e.reason, e.detail) for e in events] == [
+        ("webhook.rejected", "invalid_signature", "source:webex"),
+        ("webhook.rejected", "invalid_signature", "source:wxcc"),
+    ]
+    assert all(e.category is Category.SECURITY and e.organisation is None for e in events)
 
 
 async def test_unknown_tasks_are_acknowledged_and_ignored(

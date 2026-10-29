@@ -86,25 +86,31 @@ def create_templates(page_dirs: Sequence[Path]) -> Jinja2Templates:
     return Jinja2Templates(env=create_environment([*page_dirs, SHARED_TEMPLATE_DIR]))
 
 
-def language_options(request: Request, locale: RequestLocale) -> list[LanguageOption]:
-    """Build the language switcher for ``request``, keeping only ``KEPT_QUERY_PARAMS``."""
+def switch_href(request: Request, param: str, value: str) -> str:
+    """Return a query-only link (``?lang=en``) that sets ``param`` on the current page.
+
+    Keeps only ``KEPT_QUERY_PARAMS``, so arbitrary input is never reflected, and never contains
+    the request path, so a crafted path cannot turn it into a link to another host.
+    """
     kept = [
         (key, value)
         for key, value in request.query_params.multi_items()
         if key in KEPT_QUERY_PARAMS
     ]
-    options = []
-    for code in locale.translator.locales:
-        query = urlencode([*kept, (LANG_PARAM, code)])
-        options.append(
-            LanguageOption(
-                code=code,
-                autonym=locale.translator.gettext(code, "language.autonym"),
-                href=f"?{query}",
-                current=code == locale.code,
-            )
+    return f"?{urlencode([*kept, (param, value)])}"
+
+
+def language_options(request: Request, locale: RequestLocale) -> list[LanguageOption]:
+    """Build the language switcher for ``request``."""
+    return [
+        LanguageOption(
+            code=code,
+            autonym=locale.translator.gettext(code, "language.autonym"),
+            href=switch_href(request, LANG_PARAM, code),
+            current=code == locale.code,
         )
-    return options
+        for code in locale.translator.locales
+    ]
 
 
 @dataclass(frozen=True)
