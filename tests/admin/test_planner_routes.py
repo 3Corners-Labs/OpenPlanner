@@ -168,3 +168,15 @@ async def test_the_audit_log_names_the_change_and_the_reason_in_words(site: Site
 
     assert "afspraak geannuleerd door een planner, reden: Onvoorziene omstandigheden" in text
     assert "Ada" not in text
+
+
+async def test_an_accept_in_local_time_lands_on_the_same_slot(site: Site) -> None:
+    await _book(site)
+    await _book(site)
+    await _staff_friday(site, 1)
+    await site.login_as(GROUP_ADMIN)
+
+    response = await _post(site, f"{AGENDA}/accept", {"start": "2026-01-02T09:00:00+01:00"})
+
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("#slot-20260102T0800")

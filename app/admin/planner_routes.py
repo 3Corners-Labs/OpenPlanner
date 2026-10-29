@@ -13,7 +13,7 @@ never typed. After a change the planner lands back on the day in the agenda.
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -283,7 +283,7 @@ async def accept(
         raise_refusal(error)
         raise
     group = context.group.group
-    anchor = f"slot-{start:%Y%m%dT%H%M}"
+    anchor = f"slot-{start.astimezone(UTC):%Y%m%dT%H%M}"  # as the agenda: UTC
     return redirect_done(
         _agenda(slug, local_day(start, group.tz)), "shortfall_accepted", anchor=anchor
     )
