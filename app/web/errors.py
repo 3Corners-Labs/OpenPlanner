@@ -44,6 +44,10 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.UPDATE_NOT_AVAILABLE: "admin.form.error.update_not_available",
     ErrorCode.UPDATE_IN_PROGRESS: "admin.form.error.update_in_progress",
     ErrorCode.UPDATE_REQUEST_NOT_FOUND: "error.not_found.text",
+    ErrorCode.ROLE_NOT_FOUND: "error.not_found.text",
+    ErrorCode.ROLE_INVALID: "admin.form.error.role_invalid",
+    ErrorCode.ROLE_CHANGED: "admin.form.error.role_changed",
+    ErrorCode.CLAIM_VALUE_TAKEN: "admin.form.error.claim_value_taken",
     ErrorCode.MAINTENANCE: "error.maintenance",
     ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
 }
@@ -68,6 +72,7 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.SCENARIO_NOT_FOUND: 404,
     ErrorCode.API_CLIENT_NOT_FOUND: 404,
     ErrorCode.UPDATE_REQUEST_NOT_FOUND: 404,
+    ErrorCode.ROLE_NOT_FOUND: 404,
     ErrorCode.NOT_PERMITTED: 403,
     ErrorCode.DATABASE_BUSY: 503,
     ErrorCode.MAINTENANCE: 503,
