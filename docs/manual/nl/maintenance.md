@@ -61,3 +61,7 @@ systeem zien. Zet hem dan pas uit als alles weer werkt.
 
 Had u de onderhoudsmodus zelf al aangezet voordat de update begon, dan staat hij na een
 geslaagde of teruggedraaide update toch uit. Zet hem dan opnieuw aan als u nog niet klaar bent.
+
+Staat de onderhoudsmodus langer dan vier uur aan (de standaardinstelling), dan komt er een
+systeemgebeurtenis **Onderhoudsmodus staat lang aan** in de auditlog, en daarna elke dag
+opnieuw zolang hij aan staat.
