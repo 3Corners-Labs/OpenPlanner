@@ -80,7 +80,7 @@ test('organisation admin sees the logins of their own admins, by name', async ({
   await expectForbidden(page, '/admin/groups/andere-team');
 });
 
-test('auditor reads the matrix, the own log and retention, but no bookings and no changes', async ({ page }) => {
+test('auditor reads the matrix, the own log, retention and the settings, but no bookings and no changes', async ({ page }) => {
   // ADR 0039: compliance and privacy, read-only, never personal data.
   await loginAs(page, 'auditor');
 
@@ -104,6 +104,13 @@ test('auditor reads the matrix, the own log and retention, but no bookings and n
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bewaartermijnen');
   await expect(page.getByRole('rowheader', { name: /videogesprek/ })).toBeVisible();
   await expect(page.getByRole('rowheader', { name: /Andere/ })).toHaveCount(0);
+  await expectNoAxeViolations(page);
+
+  // ADR 0042: how the installation is configured, read-only, never a secret value.
+  await adminMenu(page).getByRole('link', { name: 'Geavanceerde instellingen' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Geavanceerde instellingen');
+  await expect(page.getByRole('heading', { name: 'Systeemstatus' })).toBeVisible();
+  await expect(page.getByRole('rowheader', { name: /SETTINGS_ENCRYPTION_KEY/ })).toBeVisible();
   await expectNoAxeViolations(page);
 
   await expectForbidden(page, '/admin/groups/demo/agenda');

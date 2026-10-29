@@ -223,6 +223,14 @@ SECTIONS = (
                 Permission.SYSTEM_MAINTENANCE,
                 "lock",
             ),
+            # ADR 0042 §11: System status and Advanced settings; the auditor reads them too.
+            Screen(
+                "platform.settings",
+                "admin.nav.settings",
+                "/admin/settings",
+                Permission.SETTINGS_PLATFORM_VIEW,
+                "sliders",
+            ),
         ),
     ),
 )
