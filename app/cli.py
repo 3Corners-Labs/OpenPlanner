@@ -7,6 +7,9 @@ Usage:
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
+    ``python -m app.cli settings list``  every setting with its class, source and lock (ADR 0042)
+    ``python -m app.cli settings show KEY``  one setting in detail; secrets only set/not set
+    ``python -m app.cli settings-doc``  print the settings reference (docs/settings.md)
 
 Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
     ``python -m app.cli update-claim``  claim the waiting request: ``id action target from``
@@ -66,11 +69,12 @@ from app.adapters.registrations import (
     listing_to_report,
 )
 from app.adapters.releases import update_service
+from app.adapters.settings_report import describe, format_list, format_one
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
-from app.config import Settings
+from app.config import Settings, environment
 from app.domain.admin import AdminService
 from app.domain.authorization import Principal, Role, Scope
 from app.domain.closure_service import ClosureInput, ClosureService, GroupOutcome
@@ -80,11 +84,13 @@ from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
+from app.domain.settings_registry import lookup
 from app.domain.update_service import UpdateService
 from app.domain.updates import OUTCOMES, REPORTED_STEPS
 from app.i18n import Translator, load_catalogues
 from app.keys import management_token_key
 from app.web.authz_report import render_markdown
+from app.web.settings_doc import render_markdown as render_settings_doc
 
 
 async def _seed_demo(settings: Settings) -> str:
@@ -654,6 +660,17 @@ def _closure(settings: Settings, args: argparse.Namespace) -> int:
     return _write(asyncio.run(outcome))
 
 
+def _settings(settings: Settings, action: str, key: str | None) -> tuple[str, int]:
+    """Run ``settings list`` or ``settings show KEY``; return the report and exit code."""
+    states = describe(settings, environment())
+    if action == "list":
+        return format_list(states), 0
+    spec = lookup(key or "")
+    if spec is None:
+        return "Unknown setting; `settings list` shows every variable.\n", 2
+    return format_one(next(s for s in states if s.spec is spec)), 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse the command line and run the chosen command; return the exit code."""
     parser = argparse.ArgumentParser(prog="python -m app.cli")
@@ -694,11 +711,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("webhooks-health", help="token expiry and a signed delivery self-test")
     commands.add_parser("oidc-check", help="check the login configuration (no login started)")
     _closure_parser(commands)
+    settings_cmd = commands.add_parser("settings", help="show settings and their source")
+    settings_actions = settings_cmd.add_subparsers(dest="action", required=True)
+    settings_actions.add_parser("list", help="every setting: class, source, lock, value")
+    show_cmd = settings_actions.add_parser("show", help="one setting in detail")
+    show_cmd.add_argument("key", help="variable name, e.g. RATE_LIMIT_BOOKINGS")
+    commands.add_parser("settings-doc", help="print the settings reference as Markdown")
     args = parser.parse_args(argv)
     if args.command == "oidc-check":
         return _write(asyncio.run(_oidc_check(Settings())))
     if args.command == "closure":
         return _closure(Settings(), args)
+    if args.command == "settings":
+        text, code = _settings(Settings(), args.action, getattr(args, "key", None))
+        sys.stdout.write(text)
+        return code
+    if args.command == "settings-doc":
+        sys.stdout.write(render_settings_doc())
+        return 0
     if args.command == "update-claim":
         sys.stdout.write(asyncio.run(_update_claim(Settings())))
         return 0
