@@ -6,7 +6,7 @@ data, no personal data. ``groups.embedding_enabled`` is off for every existing g
 nothing becomes embeddable by this migration.
 
 Revision ID: 0037
-Revises: 0026
+Revises: 0035
 Create Date: 2026-10-28 23:30:00.000000
 """
 
@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0037"
-down_revision: str | None = "0026"
+down_revision: str | None = "0035"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

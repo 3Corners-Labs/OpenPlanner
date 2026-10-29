@@ -241,7 +241,7 @@ def test_existing_groups_are_not_embeddable_and_origins_go_on_downgrade(
     import sqlite3
     from contextlib import closing
 
-    command.upgrade(alembic_config, "0026")
+    command.upgrade(alembic_config, "0035")
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         database.executescript(
             """
@@ -261,10 +261,57 @@ def test_existing_groups_are_not_embeddable_and_origins_go_on_downgrade(
         )
         database.commit()
 
-    command.downgrade(alembic_config, "0026")
+    command.downgrade(alembic_config, "0035")
 
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
         columns = {r[1] for r in database.execute("PRAGMA table_info(groups)")}
     assert "organisation_origins" not in tables
     assert "embedding_enabled" not in columns
+
+
+def test_existing_audit_events_get_an_id_level_and_category(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0040, part 2: rows from before the event schema are filled from outcome and source.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0025")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO audit_events (at, actor, action, outcome, source)
+                VALUES ('2026-10-01 08:00:00', 'sub-1', 'admin.login', 'denied', 'admin'),
+                       ('2026-10-01 08:01:00', 'system', 'job.send_reminder', 'failure', 'system'),
+                       ('2026-10-01 08:02:00', 'system', 'job.purge_pii', 'success', 'system');
+            """
+        )
+
+    command.upgrade(alembic_config, "head")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        rows = database.execute(
+            "SELECT event_id, level, category, trace_id FROM audit_events ORDER BY at"
+        ).fetchall()
+    assert [(level, category) for _, level, category, _ in rows] == [
+        ("warning", "audit"),
+        ("error", "system"),
+        ("info", "system"),
+    ]
+    assert len({event_id for event_id, *_ in rows}) == 3
+    assert all(len(event_id) == 32 and trace == "" for event_id, _, _, trace in rows)
+
+
+def test_diagnostic_modes_go_on_downgrade(alembic_config: Config, tmp_path: Path) -> None:
+    # ADR 0040, part 4.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "head")
+    command.downgrade(alembic_config, "0034")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
+    assert "diagnostic_modes" not in tables
+    assert "ix_audit_events_category_at" not in tables
