@@ -22,6 +22,8 @@
     <div class="group-card__meta">
       <span class="chip">{{ summary.organisation_name }}</span>
       <span class="chip chip--accent">{{ icon("clock") }}{{ _("admin.group.minutes", minutes=summary.group.slot_minutes) }}</span>
+      {% set short = shortfalls.get(summary.group.slug) %}
+      {% if short %}<a class="chip chip--danger" href="{{ short.first_href }}">{{ icon("alert") }}{{ _("admin.shortfall.chip", count=short.count) }}</a>{% endif %}
     </div>
     <div class="group-card__footer">
       <a class="link-with-icon" href="/g/{{ summary.group.slug }}">{{ icon("external") }}<span>/g/{{ summary.group.slug }}</span></a>
