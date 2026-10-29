@@ -73,6 +73,7 @@ class GroupSettings:
     direct_call_enabled: bool
     not_picked_up_minutes: int
     direct_call_max_concurrent: int | None
+    embedding_enabled: bool
 
 
 def settings_of(group: Group) -> GroupSettings:
