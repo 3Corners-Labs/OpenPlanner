@@ -4,10 +4,10 @@ from datetime import timedelta
 
 import pytest
 
-from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
-from app.domain.system_log import SystemLog
+from app.domain.system_log import EventRetention, SystemLog
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book, make_group, window
@@ -67,10 +67,38 @@ async def test_prune_removes_old_system_events_only(uow: InMemoryUnitOfWork) -> 
         AuditEvent(NOW, SYSTEM_ACTOR, "job.send_reminder", Outcome.SUCCESS, source=Source.SYSTEM),
     ]
 
-    removed = await SystemLog(uow, FixedClock(NOW)).prune(timedelta(days=90))
+    removed = await SystemLog(uow, FixedClock(NOW)).prune(EventRetention())
 
     assert removed == 1
     assert [(e.at, e.source) for e in uow.state.audit] == [
         (old, Source.ADMIN),
         (NOW, Source.SYSTEM),
     ]
+
+
+async def test_every_category_has_its_own_retention(uow: InMemoryUnitOfWork) -> None:
+    # ADR 0040, part 4: admin actions 2 years (product owner), security 1 year, debug 7 days.
+    def event(days: int, category: Category) -> AuditEvent:
+        source = Source.ADMIN if category is Category.AUDIT else Source.SYSTEM
+        return AuditEvent(
+            NOW - timedelta(days=days),
+            "x",
+            f"{category.value}.{days}",
+            Outcome.SUCCESS,
+            source=source,
+            category=category,
+        )
+
+    uow.state.audit = [
+        event(731, Category.AUDIT),
+        event(729, Category.AUDIT),
+        event(366, Category.SECURITY),
+        event(364, Category.SECURITY),
+        event(8, Category.DIAGNOSTIC),
+        event(6, Category.DIAGNOSTIC),
+    ]
+
+    removed = await SystemLog(uow, FixedClock(NOW)).prune(EventRetention())
+
+    assert removed == 3
+    assert [e.action for e in uow.state.audit] == ["audit.729", "security.364", "diagnostic.6"]
