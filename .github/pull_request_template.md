@@ -20,6 +20,7 @@
 ## How tested
 
 ## Checklist
+- [ ] I agree to the OpenPlanner Contributor Licence Agreement (`docs/cla.md`)
 - [ ] `make check` green
 - [ ] Screenshots for UI changes
 - [ ] i18n checked (nl/en)
