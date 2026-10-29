@@ -2,6 +2,7 @@
 
 Usage:
     ``python -m app.cli seed-demo``     create the demo organisations and groups
+    ``python -m app.cli seed-closures``  add the closure examples (e2e pages); not in production
     ``python -m app.cli authz-matrix``  print the authorisation matrix (docs/authorization.md)
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
@@ -25,6 +26,8 @@ the admin portal's integrations page.
 
 import argparse
 import asyncio
+import dataclasses
+import json
 import sys
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
@@ -42,7 +45,7 @@ from app.adapters.db.backup import (
 )
 from app.adapters.db.engine import create_engine
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
-from app.adapters.db.seed import DEMO_SLUG, seed_demo
+from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.diagnostics import CheckResult, format_report, passed, probes, run_checks
 from app.adapters.integrations import build_integrations
@@ -70,6 +73,7 @@ from app.domain.scheduling import Group
 from app.domain.update_service import UpdateService
 from app.domain.updates import OUTCOMES
 from app.i18n import Translator, load_catalogues
+from app.keys import management_token_key
 from app.web.authz_report import render_markdown
 
 
@@ -82,6 +86,24 @@ async def _seed_demo(settings: Settings) -> str:
         await engine.dispose()
     state = "created" if created else "already present"
     return f"Demo group {state}: {settings.public_base_url.rstrip('/')}/g/{DEMO_SLUG}\n"
+
+
+async def _seed_closures(settings: Settings) -> tuple[str, bool]:
+    """Seed the demo and its closure examples; report their paths as JSON (ADR 0037).
+
+    Refused in production: the examples include a booking of a made-up citizen.
+    """
+    if settings.environment == "prod":
+        return "seed-closures adds a made-up booking; it runs only outside production\n", False
+    engine = create_engine(settings.database_url)
+    try:
+        await seed_demo(engine)
+        examples = await seed_closure_examples(
+            engine, SystemClock().now(), management_token_key(settings)
+        )
+    finally:
+        await engine.dispose()
+    return json.dumps(dataclasses.asdict(examples), indent=2) + "\n", True
 
 
 @asynccontextmanager
@@ -456,6 +478,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("seed-demo", help="create the demo organisations and groups")
+    commands.add_parser("seed-closures", help="add the closure examples (not in production)")
     commands.add_parser("authz-matrix", help="print the authorisation matrix as Markdown")
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
@@ -512,6 +535,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     if args.command == "webhooks-health":
         return _write(asyncio.run(_webhooks_health(Settings())))
+    if args.command == "seed-closures":
+        return _write(asyncio.run(_seed_closures(Settings())))
     if args.command == "authz-matrix":
         sys.stdout.write(render_markdown(Translator(load_catalogues())))
         return 0
