@@ -8,6 +8,7 @@ from app.domain.authorization import (
     API_SCOPES,
     LEVELS,
     LOCKED_PERMISSIONS,
+    MAINTENANCE_WRITABLE,
     MATRIX,
     PII_PERMISSIONS,
     REACH,
@@ -24,6 +25,7 @@ from app.domain.authorization import (
     Target,
     decide,
     decide_client,
+    decide_in_maintenance,
     permissions_for,
     scope_for,
 )
@@ -65,6 +67,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.CLOSURE_MANAGE,
         Permission.ORGANISATION_CLOSURE,
         Permission.RETENTION_VIEW,
+        Permission.STAFF_VIEW,  # ADR 0046
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -76,6 +79,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.TEXTS_MANAGE,
         Permission.BOOKINGS_VIEW,
         Permission.CLOSURE_MANAGE,
+        Permission.STAFF_VIEW,  # ADR 0046: read-only, the own groups
     }
     # ADR 0039: compliance and privacy, read-only, never personal data.
     assert MATRIX[Role.AUDITOR] == {
@@ -85,6 +89,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.AUDIT_VIEW,
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
+        Permission.STAFF_VIEW,  # ADR 0046
     }
 
 
@@ -96,6 +101,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.AUDIT_VIEW,
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
+        Permission.STAFF_VIEW,  # ADR 0046
     }
 
     assert not MATRIX[Role.AUDITOR] & PII_PERMISSIONS
@@ -109,6 +115,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.INTEGRATIONS_MANAGE,
         Permission.API_CLIENTS_MANAGE,
         Permission.SYSTEM_UPDATE,
+        Permission.SYSTEM_MAINTENANCE,
     } == LOCKED_PERMISSIONS
     for permission in LOCKED_PERMISSIONS:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
@@ -169,6 +176,10 @@ def test_every_permission_has_a_level() -> None:
         (AUDITOR, Permission.RETENTION_VIEW, OWN_ORG, Decision(True, Reason.ORGANISATION)),
         (ORG, Permission.RETENTION_VIEW, OTHER_ORG, Decision(False, Reason.OUT_OF_SCOPE)),
         (GROUP, Permission.RETENTION_VIEW, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
+        # ADR 0046: staff of the own organisation or group.
+        (AUDITOR, Permission.STAFF_VIEW, OWN_GROUP, Decision(True, Reason.ORGANISATION)),
+        (GROUP, Permission.STAFF_VIEW, OWN_GROUP, Decision(True, Reason.GROUP)),
+        (GROUP, Permission.STAFF_VIEW, OTHER_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
         # Roles combine: org admin elsewhere, group admin here.
         (MIXED, Permission.SCHEDULE_MANAGE, OWN_GROUP, Decision(True, Reason.GROUP)),
         (MIXED, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
@@ -213,6 +224,13 @@ def test_retention_scope_is_the_organisation() -> None:
     assert auditor == scope_for(ORG, Permission.RETENTION_VIEW)
     assert scope_for(GROUP, Permission.RETENTION_VIEW).is_empty
     assert scope_for(SUPER, Permission.RETENTION_VIEW) == Scope(everything=True)
+
+
+def test_staff_scope_is_the_organisation_or_the_groups() -> None:
+    # ADR 0046: a group admin sees the staff of their own groups.
+    assert scope_for(ORG, Permission.STAFF_VIEW) == Scope(organisations=frozenset({"demo"}))
+    assert scope_for(GROUP, Permission.STAFF_VIEW) == Scope(groups=frozenset({"demo"}))
+    assert scope_for(SUPER, Permission.STAFF_VIEW) == Scope(everything=True)
 
 
 def test_scope_for_rejects_global_permissions() -> None:
@@ -315,3 +333,38 @@ def test_decide_client(grant: ClientGrant, target: Target, expected: Decision) -
 def test_decide_client_refuses_a_target_of_the_wrong_level() -> None:
     with pytest.raises(ValueError, match="group level target"):
         decide_client(WHOLE_ORG, READ, OWN_ORG)
+
+
+def test_maintenance_writable_is_the_adr_list() -> None:
+    # ADR 0038 §3, written out by hand: integrations, updates and the switch itself.
+    assert {
+        Permission.INTEGRATIONS_MANAGE,
+        Permission.SYSTEM_UPDATE,
+        Permission.SYSTEM_MAINTENANCE,
+    } == MAINTENANCE_WRITABLE
+
+
+@pytest.mark.parametrize("permission", sorted(MAINTENANCE_WRITABLE))
+def test_maintenance_lets_the_superuser_change_what_is_writable(permission: Permission) -> None:
+    assert decide_in_maintenance(SUPER, permission) == Decision(True, Reason.SUPERUSER)
+
+
+@pytest.mark.parametrize("permission", sorted(set(Permission) - MAINTENANCE_WRITABLE))
+def test_maintenance_freezes_everything_else_also_for_the_superuser(
+    permission: Permission,
+) -> None:
+    assert decide_in_maintenance(SUPER, permission) == Decision(False, Reason.MAINTENANCE)
+
+
+@pytest.mark.parametrize("principal", [ORG, GROUP, AUDITOR, NOBODY, MIXED])
+@pytest.mark.parametrize("permission", sorted(Permission))
+def test_maintenance_freezes_every_other_role(principal: Principal, permission: Permission) -> None:
+    assert not decide_in_maintenance(principal, permission).allowed
+    assert not decide_in_maintenance(principal, permission, maintenance_safe=True).allowed
+
+
+def test_a_maintenance_safe_route_is_open_to_the_superuser_only() -> None:
+    allowed = decide_in_maintenance(SUPER, Permission.GROUP_EDIT, maintenance_safe=True)
+
+    assert allowed == Decision(True, Reason.SUPERUSER)
+    assert not decide_in_maintenance(ORG, Permission.GROUP_EDIT, maintenance_safe=True).allowed

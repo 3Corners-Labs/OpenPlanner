@@ -62,7 +62,7 @@ from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.i18n.dates import local_day
 from app.web.closure_labels import ClosureView, closure_view, moment_label
-from app.web.contact_labels import ContactBlockView, contact_service, contact_view
+from app.web.contact_labels import contact_service
 from app.web.errors import status_for
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
@@ -255,9 +255,6 @@ async def _group_response(
     )
     contacts = await contact_service(request).view_group(context.principal, group.slug)
     applies = contacts.block or contacts.organisation_default
-    copy: ContactBlockView | None = (
-        contact_view(overview.closure.contacts, locale) if overview.closure else None
-    )
     return group_page(
         request,
         locale,
@@ -268,7 +265,7 @@ async def _group_response(
             "fields": _closure_fields(form, locale, group, overview.closure),
             "suspended": _suspended(overview.suspended, group, locale.code),
             "confirmed_ahead": overview.confirmed_ahead,
-            "closure_contacts": copy,
+            "closure_contacts": banner.contacts if banner else None,
             "own_contacts": contacts.block is not None,
             "contact_count": len(applies.options) if applies else 0,
             "errors": form.errors,

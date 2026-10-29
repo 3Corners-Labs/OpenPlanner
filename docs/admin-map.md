@@ -22,6 +22,7 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 | Branding | `/admin/branding` | `branding.manage` | `/admin/organisations/{org}/branding` |
 | Holidays | `/admin/holidays` | `holidays.assign` | `/admin/holidays/{calendar}`, `/admin/organisations/{org}/holidays` |
 | Emergency closure | `/admin/closures` | `organisation.closure` | `/admin/organisations/{org}/closure` |
+| Staff | `/admin/staff` | `staff.view` | `/admin/staff/{member_id}` |
 | My rights | `/admin/rights` | `rights.view` | – |
 | Rights matrix | `/admin/matrix` | `matrix.view` | – |
 
@@ -32,6 +33,7 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 | Integrations | `/admin/integrations` | `integrations.manage` | `/admin/organisations/{org}/channels` |
 | API clients | `/admin/api` | `api_clients.manage` | `/admin/api/clients/new`, `/admin/api/clients/{client_id}` |
 | Updates | `/admin/updates` | `system.update` | – |
+| Maintenance | `/admin/maintenance` | `system.maintenance` | – |
 
 ## Top bar
 

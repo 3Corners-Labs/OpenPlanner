@@ -1,5 +1,5 @@
 {
-  "$comment": "Public pages under test. Single source for axe (tests/a11y.spec.ts) and Lighthouse (scripts/lighthouse.mjs). Each page is checked in every listed locale via ?lang=. /g/demo needs the demo seed (python -m app.cli seed-demo).",
+  "$comment": "Public pages under test. Single source for axe (tests/a11y.spec.ts) and Lighthouse (scripts/lighthouse.mjs). Each page is checked in every listed locale via ?lang=. /g/demo needs the demo seed (python -m app.cli seed-demo); the closure pages (ADR 0037) need python -m app.cli seed-closures > e2e/fixtures.json, which also resolves \"{name}\" paths.",
   "pages": [
     {
       "name": "home",
@@ -20,6 +20,38 @@
     {
       "name": "direct call",
       "path": "/g/demo/direct",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "closed group",
+      "path": "/g/demo-gesloten",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "upcoming closure banner",
+      "path": "/g/demo-gepland",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "upcoming closure page",
+      "path": "/g/demo-gepland/closure",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "suspended booking",
+      "path": "{suspended_booking}",
       "locales": [
         "nl",
         "en"

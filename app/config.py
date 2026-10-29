@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.domain.event_schema import Envelope
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -56,6 +57,9 @@ class Settings(BaseSettings):
     storage_low_free_percent: float = Field(default=15.0, gt=0, lt=100)
     storage_critical_free_percent: float = Field(default=5.0, gt=0, lt=100)
     database_max_mb: int | None = Field(default=None, ge=1)
+    # ADR 0040 / 0034 (class B, deployment): name of this installation in every log line and
+    # event record, so a log platform that receives several can tell them apart. Empty: none.
+    installation_name: str = Field(default="", pattern=r"^[A-Za-z0-9_.-]{0,64}$")
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
@@ -91,6 +95,12 @@ class Settings(BaseSettings):
     # A change needs a login of at most this age; older sessions are sent to the IdP first,
     # which refreshes the roles (invisible with an active SSO session).
     admin_reauth_minutes: int = 60
+    # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
+    # seconds (class C, platform; here until the ADR 0042 registry exists).
+    staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
+    # Without a login for this many days, a person is marked dormant in the staff list
+    # (class D, organisation; one value for every organisation until the registry exists).
+    staff_dormant_after_days: int = Field(default=90, ge=14, le=365)
     admin_timezone: str = "Europe/Amsterdam"
     oidc_discovery_url: str | None = None
     oidc_client_id: str = "openplanner-admin"
@@ -141,6 +151,14 @@ class Settings(BaseSettings):
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
 
+    # Maintenance mode (ADR 0038). MAINTENANCE_MODE (class B, deployment: needed while the
+    # database is unavailable or being restored) switches it on from the environment; the
+    # portal shows that and cannot switch it off.
+    maintenance_mode: bool = False
+    # Class C (platform, ADR 0042): how long the web process trusts its last read of the
+    # maintenance switch; ADR 0038 sets 5 seconds as the upper bound.
+    maintenance_cache_seconds: float = Field(default=5.0, ge=0, le=5)
+
     @model_validator(mode="after")
     def _storage_limits_are_ordered(self) -> "Settings":
         """Refuse a critical free-space limit that is not below the low one."""
@@ -190,6 +208,11 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("OIDC needs an https discovery URL and a client secret")
         return self
+
+    @property
+    def event_envelope(self) -> Envelope:
+        """Release and installation name for every log line and event record (ADR 0040)."""
+        return Envelope(self.app_version, self.installation_name)
 
     @property
     def smtp_implicit_tls(self) -> bool:
