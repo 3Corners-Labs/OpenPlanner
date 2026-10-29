@@ -72,6 +72,7 @@ class Topic(StrEnum):
     UPDATES = "updates"
     DISPLAY = "display"
     STAFF = "staff"
+    AUDIT = "audit"
 
 
 PLATFORM_VIEW = "settings.platform.view"
@@ -503,6 +504,37 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Days after which system events leave the audit log (ADR 0031).",
         minimum=30,
         maximum=3650,
+    ),
+    S(
+        "security_event_window_minutes",
+        K.INT,
+        15,
+        _C,
+        T.AUDIT,
+        "At most one security event per kind per this many minutes; the rest are counted "
+        "into the next one (ADR 0034).",
+        minimum=1,
+        maximum=1440,
+    ),
+    S(
+        "audit_export_max_rows",
+        K.INT,
+        100_000,
+        _C,
+        T.AUDIT,
+        "Rows in one CSV export of the audit log; a larger export is refused (ADR 0040).",
+        minimum=1_000,
+        maximum=1_000_000,
+    ),
+    S(
+        "audit_export_max_days",
+        K.INT,
+        366,
+        _C,
+        T.AUDIT,
+        "Days one CSV export of the audit log may cover (ADR 0040).",
+        minimum=1,
+        maximum=3660,
     ),
     S(
         "storage_low_free_percent",

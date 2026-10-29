@@ -69,11 +69,11 @@ class Settings(BaseSettings):
     # ADR 0040 / 0034 (class B, deployment): name of this installation in every log line and
     # event record, so a log platform that receives several can tell them apart. Empty: none.
     installation_name: str = Field(default="", pattern=r"^[A-Za-z0-9_.-]{0,64}$")
-    # ADR 0034, AU-4 (class C, platform; env until the settings registry of ADR 0042): rejected
+    # ADR 0034, AU-4 (class C, platform; ADR 0042 registry): rejected
     # webhooks and failing token refreshes are written as at most one security event per kind
     # per this many minutes; the rest are counted into the next one.
     security_event_window_minutes: int = Field(default=15, ge=1, le=1440)
-    # ADR 0040, part 3 (class C, platform; env until the settings registry of ADR 0042): one
+    # ADR 0040, part 3 (class C, platform; ADR 0042 registry): one
     # CSV export of the audit log holds at most this many rows and covers at most this many
     # days; a larger one is refused, never cut short.
     audit_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
