@@ -23,6 +23,7 @@ stays open to every role as usual.
 | View own rights (`rights.view`) | Portal | – | yes | yes | yes | yes |
 | View rights matrix (`matrix.view`) | Portal | – | yes | yes | yes | yes |
 | Manage organisations (`organisation.manage`) | Portal | locked | yes | – | – | – |
+| Switch diagnostic mode (`diagnostics.manage`) | Portal | locked | yes | – | – | – |
 | Maintain holiday calendars (for every organisation) (`holidays.manage`) | Portal | locked | yes | – | – | – |
 | Manage API clients (`api_clients.manage`) | Portal | locked | yes | – | – | – |
 | Update the installation (`system.update`) | Portal | locked, maintenance | yes | – | – | – |
