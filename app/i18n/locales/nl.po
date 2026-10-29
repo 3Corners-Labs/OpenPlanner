@@ -1115,6 +1115,12 @@ msgstr "Direct gesprek starten"
 msgid "admin.field.direct_call_enabled_hint"
 msgstr "Deelnemers kunnen meteen een gesprek starten tijdens een tijdblok met medewerkers."
 
+msgid "admin.field.embedding_enabled"
+msgstr "Insluiten op websites"
+
+msgid "admin.field.embedding_enabled_hint"
+msgstr "Toont de groep ook in de widget op de websites die de organisatie onder Insluiten heeft toegestaan. Uit: alleen de eigen pagina van de groep."
+
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Niet opgepakt na (minuten)"
 
@@ -3911,6 +3917,12 @@ msgstr "Simulator staat aan"
 msgid "authz.permission.retention_view"
 msgstr "Bewaartermijnen bekijken"
 
+msgid "authz.permission.embedding_manage"
+msgstr "Insluiten op websites beheren"
+
+msgid "admin.nav.embedding"
+msgstr "Insluiten"
+
 msgid "admin.nav.retention"
 msgstr "Bewaartermijnen"
 
@@ -4459,6 +4471,21 @@ msgstr "Onderhoudsmodus uitgezet"
 msgid "admin.audit.detail.maintenance_refused"
 msgstr "Wijziging geweigerd tijdens onderhoud"
 
+msgid "maintenance.title"
+msgstr "We voeren onderhoud uit"
+
+msgid "maintenance.text"
+msgstr "Daarom kunt u nu geen afspraak maken, verzetten of annuleren. Afspraken die al vaststaan gaan gewoon door."
+
+msgid "maintenance.expected_end"
+msgstr "We verwachten klaar te zijn op {moment}."
+
+msgid "maintenance.contacts_lead"
+msgstr "Heeft u nu hulp nodig? U kunt ons ook op een andere manier bereiken."
+
+msgid "maintenance.try_later"
+msgstr "Probeer het later opnieuw."
+
 # ADR 0046: staff directory
 
 msgid "authz.permission.staff_view"
@@ -4577,3 +4604,66 @@ msgstr "De laatste {count} gebeurtenissen uit de auditlog binnen uw eigen organi
 
 msgid "admin.staff.activity_empty"
 msgstr "Geen activiteit binnen uw organisaties of groepen."
+
+msgid "admin.embedding.title"
+msgstr "Insluiten op websites"
+
+msgid "admin.embedding.lead"
+msgstr "Op welke websites de groepen van een organisatie als widget mogen staan."
+
+msgid "admin.embedding.organisations"
+msgstr "Organisaties"
+
+msgid "admin.embedding.col.origins"
+msgstr "Toegestane websites"
+
+msgid "admin.embedding.col.groups"
+msgstr "Groepen ingesloten"
+
+msgid "admin.embedding.none"
+msgstr "Er zijn geen organisaties die u mag beheren."
+
+msgid "admin.embedding.org_lead"
+msgstr "De websites waarop de groepen van {name} als widget mogen staan. Een groep verschijnt pas als die in haar eigen instellingen insluiten aanzet."
+
+msgid "admin.embedding.form"
+msgstr "Toegestane websites"
+
+msgid "admin.embedding.summary"
+msgstr "{count} websites toegestaan."
+
+msgid "admin.embedding.empty"
+msgstr "Nog geen websites toegestaan: de widget werkt nergens."
+
+msgid "admin.embedding.origins"
+msgstr "Websites, één per regel"
+
+msgid "admin.embedding.origins_hint"
+msgstr "Alleen het begin van het webadres, zoals https://www.gemeente.nl. Geen pad, geen sterretjes; een subdomein telt als een eigen website. Maximaal {count}."
+
+msgid "admin.embedding.origins_hint_local"
+msgstr "Alleen het begin van het webadres, zoals https://www.gemeente.nl. Geen pad, geen sterretjes; een subdomein telt als een eigen website. Op deze testomgeving mag ook http://localhost met poort. Maximaal {count}."
+
+msgid "admin.embedding.groups"
+msgstr "Groepen"
+
+msgid "admin.embedding.groups_lead"
+msgstr "Of een groep in de widget verschijnt, zet u aan bij Groepsinstellingen › Insluiten op websites."
+
+msgid "admin.embedding.col.embedded"
+msgstr "In de widget"
+
+msgid "admin.embedding.on"
+msgstr "Aan"
+
+msgid "admin.embedding.off"
+msgstr "Uit"
+
+msgid "admin.embedding.no_groups"
+msgstr "Deze organisatie heeft nog geen groepen."
+
+msgid "admin.embedding.error.origin"
+msgstr "Regel {line} is geen website. Vul alleen het begin van het webadres in, zoals https://www.gemeente.nl."
+
+msgid "admin.embedding.error.count"
+msgstr "Vul maximaal {count} websites in."

@@ -90,6 +90,11 @@ and an image (`closure_images`, stripped as above). Admin-only until a closure s
 then the closure gets its own copy, so deleting or editing the scenario never changes what
 citizens were told. Organisation data; no personal data of citizens; no purge job.
 
+**Allowed origins for embedding (ADR 0035).** The websites on which an organisation's groups
+may appear as a widget (`organisation_origins`, such as `https://www.gemeente.nl`), entered by
+an organisation admin, and a switch per group (`groups.embedding_enabled`). Organisation data,
+not personal data; no purge job; kept until changed. The audit event holds counts only.
+
 ## Admin login and audit (WP7a)
 
 ```
@@ -227,6 +232,8 @@ superuser ──POST /admin/maintenance/on|off (reason code, expected end)──
 host (CLI, updater) ──docker exec python -m app.cli maintenance──> web ──SQL──> maintenance_state, audit_events
 operator ──MAINTENANCE_MODE (environment)──> web (no database read)
 admin ──POST (any change) during maintenance──> web ──refused──> audit_events (permission, target slugs)
+citizen ──GET/POST /g/{slug}…, /b/{token}/cancel|reschedule──> web ──503 maintenance page (no write)
+bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error": "maintenance"} (no write)
 ```
 
 The switch holds a subject identifier or a host actor, times and a reason code: no personal

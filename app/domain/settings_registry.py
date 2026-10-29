@@ -485,6 +485,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=5,
     ),
     S(
+        "maintenance_retry_after_seconds",
+        K.INT,
+        300,
+        _C,
+        T.OPERATIONS,
+        "Retry-After of the 503 that citizens and the machine API get during maintenance "
+        "(ADR 0038).",
+        minimum=30,
+        maximum=3600,
+    ),
+    S(
         "staff_last_seen_interval_seconds",
         K.INT,
         300,
@@ -573,6 +584,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Most days one CSV export of the audit log may cover (ADR 0040).",
         minimum=1,
         maximum=3660,
+    ),
+    S(
+        "embedding_max_origins",
+        K.INT,
+        20,
+        _C,
+        T.OPERATIONS,
+        "Most host websites one organisation may allow for the embedded widget (ADR 0035).",
+        minimum=1,
+        maximum=100,
     ),
     S(
         "storage_low_free_percent",
