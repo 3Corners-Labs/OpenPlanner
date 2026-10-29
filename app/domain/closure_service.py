@@ -11,6 +11,7 @@ are on hold; an admin resolves them one by one or all at once.
     update   end, notices and headings; newly covered bookings suspended; optional update
              mail to all; optionally take over the contact block that applies now
     lift     end now; optionally reinstate what can still go ahead
+    set_image / remove_image   the closure's one image and its text alternative (ADR 0037 §3)
     reinstate / cancel / move        one suspended booking (or all: reinstate_all, cancel_all)
 
 A closure copies the contact block that applies to its group when it starts (ADR 0037 §2,
@@ -39,6 +40,7 @@ from app.domain.closure import (
 )
 from app.domain.contact_service import effective_block
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import (
     JobType,
     change_deadline,
@@ -244,6 +246,41 @@ class ClosureService:
                 tx, principal, authorization, slug, f"closure.lift,bookings:{outcome.done}"
             )
         return outcome
+
+    async def set_image(
+        self, principal: Principal, slug: str, text: ImageText, image: ImageFile | None
+    ) -> None:
+        """Give the group's visible closure an image, or change the text of the one it has.
+
+        ``image`` ``None`` keeps the stored file and changes only its text alternative. The
+        image is public as long as the closure is visible (``BookingService.closure_image``).
+
+        Raises:
+            DomainError: ``not_permitted``, ``closure_not_found`` or ``invalid_configuration``
+                with ``image`` when there is neither a new nor a stored file.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await _group(tx, slug)
+            current = await _visible(tx, group, self._clock.now())
+            if image is None and current.image is None:
+                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "image")
+            await tx.save_closure_image(_id(current), text, image)
+            detail = f"closure.image.update,file:{int(image is not None)}"
+            await self._audit(tx, principal, authorization, slug, detail)
+
+    async def remove_image(self, principal: Principal, slug: str) -> None:
+        """Remove the image of the group's visible closure.
+
+        Raises:
+            DomainError: ``not_permitted`` or ``closure_not_found``.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await _group(tx, slug)
+            current = await _visible(tx, group, self._clock.now())
+            await tx.remove_closure_image(_id(current))
+            await self._audit(tx, principal, authorization, slug, "closure.image.remove")
 
     async def reinstate(self, principal: Principal, slug: str, booking_id: int) -> None:
         """Confirm a suspended booking again at its original time.

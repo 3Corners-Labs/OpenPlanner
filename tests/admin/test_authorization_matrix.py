@@ -352,6 +352,10 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403, 403),
         "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403, 403),
     },
+    "GET /admin/groups/{slug}/agenda/week": {
+        "/admin/groups/demo/agenda/week": statuses(200, 200, 200, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/week": statuses(200, 403, 403, 200, 403, 403),
+    },
     "GET /admin/groups/{slug}/bookings/{booking_id}": {
         "/admin/groups/demo/bookings/999999": statuses(404, 404, 404, 403, 403, 403),
         "/admin/groups/andere-team/bookings/999999": statuses(404, 403, 403, 404, 403, 403),
@@ -385,6 +389,16 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/groups/{slug}/closure/lift": {
         "/admin/groups/demo/closure/lift": statuses(404, 404, 404, 403, 403, 403),
         "/admin/groups/andere-team/closure/lift": statuses(404, 403, 403, 404, 403, 403),
+    },
+    # The image of a closure (ADR 0037 §3): an empty form misses its alt text (422); without a
+    # closure there is nothing to remove (404).
+    "POST /admin/groups/{slug}/closure/image": {
+        "/admin/groups/demo/closure/image": statuses(422, 422, 422, 403, 403, 403),
+        "/admin/groups/andere-team/closure/image": statuses(422, 403, 403, 422, 403, 403),
+    },
+    "POST /admin/groups/{slug}/closure/image/remove": {
+        "/admin/groups/demo/closure/image/remove": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/closure/image/remove": statuses(404, 403, 403, 404, 403, 403),
     },
     "POST /admin/groups/{slug}/closure/reinstate": {
         "/admin/groups/demo/closure/reinstate": statuses(303, 303, 303, 403, 403, 403),

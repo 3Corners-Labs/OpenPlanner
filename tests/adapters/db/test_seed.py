@@ -38,6 +38,9 @@ async def test_a_closed_team_a_planned_closure_and_a_suspended_booking(
     assert active.is_active(NOW)
     assert active.heading("en")
     assert active.contacts is not None
+    assert active.image is not None  # the closure page with an image (CL-3)
+    assert active.image.text.alt("en")
+    assert upcoming.image is None  # and one without
     assert not upcoming.is_active(NOW)
     assert upcoming.is_visible(NOW)
     assert upcoming.starts_at - NOW > timedelta(days=1)
