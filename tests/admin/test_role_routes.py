@@ -169,8 +169,10 @@ async def test_an_auditor_copy_cannot_get_personal_data(site: Site) -> None:
     assert (await site.client.get("/admin/groups/demo/agenda")).status_code == 403
 
 
-@pytest.mark.parametrize("claim", ["openplanner-superuser", "OpenPlanner-Superuser"])
-async def test_a_claim_value_of_the_superuser_is_refused(site: Site, claim: str) -> None:
+@pytest.mark.parametrize(
+    "claim", ["openplanner-superuser", "OpenPlanner-Superuser", "openplanner-agent"]
+)
+async def test_a_built_in_claim_value_is_refused(site: Site, claim: str) -> None:
     await site.login_as(SUPER)
     form = role_form(Role.ORG_ADMIN, MATRIX[Role.ORG_ADMIN], claim=claim)
     response = await site.client.post("/admin/roles", data=form, headers=SAME_ORIGIN)

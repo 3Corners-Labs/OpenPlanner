@@ -763,6 +763,14 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Role value of an auditor (ADR 0039).",
     ),
     S(
+        "oidc_role_agent",
+        K.STRING,
+        "openplanner-agent",
+        _C,
+        T.LOGIN_MAPPING,
+        "Role value of an agent who works a group's own queue (ADR 0043).",
+    ),
+    S(
         "smtp_host",
         K.STRING,
         None,

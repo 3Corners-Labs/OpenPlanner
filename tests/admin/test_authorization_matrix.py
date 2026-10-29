@@ -13,6 +13,7 @@ from app.domain.authorization import Principal
 from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
 from tests.admin.conftest import (
+    AGENT,
     AUDITOR,
     GROUP_ADMIN,
     NO_ROLE,
@@ -30,6 +31,7 @@ ROLES = {
     "group_admin (demo)": GROUP_ADMIN,
     "org_admin (andere)": OUTSIDER,
     "auditor (demo)": AUDITOR,
+    "agent (demo)": AGENT,
     "no role": NO_ROLE,
 }
 
@@ -44,621 +46,703 @@ def statuses(*codes: int) -> dict[str, int]:
 # Allowed POSTs answer 422 (empty form) or 404 (unknown item id); refused ones 403.
 # "METHOD route template" -> concrete paths -> expected status per role (HANDOVER §6):
 #   superuser · org_admin (demo) · group_admin (demo) · org_admin (andere) · auditor (demo) ·
-#   no role. The auditor (ADR 0039) reads: overview, rights, matrix, log, retention, staff,
-#   manual, group page, and the settings (ADR 0042).
+#   agent (demo) · no role. The auditor (ADR 0039) reads: overview, rights, matrix, log,
+#   retention, staff, manual, group page, and the settings (ADR 0042). The agent (ADR 0043)
+#   reads overview, rights, matrix, manual and group page, and works the own queue of its groups.
 EXPECTED: dict[str, dict[str, dict[str, int]]] = {
-    "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 403)},
-    "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 403)},
-    "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 200, 403)},
+    "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 200, 403)},
+    "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 200, 403)},
+    "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 200, 200, 403)},
     # ADR 0039: the role editor is the superuser's (roles.manage is locked).
-    "GET /admin/roles": {"/admin/roles": statuses(200, 403, 403, 403, 403, 403)},
-    "GET /admin/roles/new": {"/admin/roles/new": statuses(200, 403, 403, 403, 403, 403)},
-    "POST /admin/roles": {"/admin/roles": statuses(422, 403, 403, 403, 403, 403)},
+    "GET /admin/roles": {"/admin/roles": statuses(200, 403, 403, 403, 403, 403, 403)},
+    "GET /admin/roles/new": {"/admin/roles/new": statuses(200, 403, 403, 403, 403, 403, 403)},
+    "POST /admin/roles": {"/admin/roles": statuses(422, 403, 403, 403, 403, 403, 403)},
     "GET /admin/roles/{role_id}": {
-        "/admin/roles/999999": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/roles/999999": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/roles/{role_id}": {
-        "/admin/roles/999999": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/roles/999999": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/roles/{role_id}/delete": {
-        "/admin/roles/999999/delete": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/roles/999999/delete": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     # ADR 0031: every role has a log; what it lists is exact per level (test_audit_routes).
-    "GET /admin/audit": {"/admin/audit": statuses(200, 200, 200, 200, 200, 403)},
+    "GET /admin/audit": {"/admin/audit": statuses(200, 200, 200, 200, 200, 403, 403)},
     # ADR 0040: the audit log as CSV, for compliance roles; not for group admins.
     "GET /admin/audit/export.csv": {
-        "/admin/audit/export.csv": statuses(200, 200, 403, 200, 200, 403)
+        "/admin/audit/export.csv": statuses(200, 200, 403, 200, 200, 403, 403)
     },
     # ADR 0040, part 4: diagnostic mode, superuser only (product owner, 2026-10-29). An empty
     # form names no target and changes nothing.
     "POST /admin/audit/diagnostics": {
-        "/admin/audit/diagnostics": statuses(303, 403, 403, 403, 403, 403)
+        "/admin/audit/diagnostics": statuses(303, 403, 403, 403, 403, 403, 403)
     },
     "POST /admin/audit/diagnostics/off": {
-        "/admin/audit/diagnostics/off": statuses(303, 403, 403, 403, 403, 403)
+        "/admin/audit/diagnostics/off": statuses(303, 403, 403, 403, 403, 403, 403)
     },
     # ADR 0039: retention counts per organisation; no group admins, never personal data.
-    "GET /admin/retention": {"/admin/retention": statuses(200, 200, 403, 200, 200, 403)},
+    "GET /admin/retention": {"/admin/retention": statuses(200, 200, 403, 200, 200, 403, 403)},
     # ADR 0042 §5, §11: System status and Advanced settings, read-only: superuser and auditor.
-    "GET /admin/settings": {"/admin/settings": statuses(200, 403, 403, 403, 200, 403)},
+    "GET /admin/settings": {"/admin/settings": statuses(200, 403, 403, 403, 200, 403, 403)},
     # ADR 0042 step 4: changing is the superuser's (settings.platform.manage is locked). An
     # empty value is outside the bounds (422); resetting what is not set returns to the page.
     "POST /admin/settings/{key}": {
-        "/admin/settings/admin_session_hours": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/settings/admin_session_hours": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/settings/{key}/reset": {
-        "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403),
+        "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
     },
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
-    "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403)},
-    "GET /admin/staff/{member_id}": {"/admin/staff/999": statuses(404, 404, 404, 404, 404, 403)},
+    "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403, 403)},
+    "GET /admin/staff/{member_id}": {
+        "/admin/staff/999": statuses(404, 404, 404, 404, 404, 403, 403)
+    },
     # ADR 0033: the manual is public, every admin may read every topic.
-    "GET /admin/help": {"/admin/help": statuses(200, 200, 200, 200, 200, 403)},
+    "GET /admin/help": {"/admin/help": statuses(200, 200, 200, 200, 200, 200, 403)},
     "GET /admin/help/{topic}": {
-        "/admin/help/group-settings": statuses(200, 200, 200, 200, 200, 403),
-        "/admin/help/nope": statuses(404, 404, 404, 404, 404, 403),
+        "/admin/help/group-settings": statuses(200, 200, 200, 200, 200, 200, 403),
+        "/admin/help/nope": statuses(404, 404, 404, 404, 404, 404, 403),
     },
     # Integrations and secrets: superuser only.
-    "GET /admin/integrations": {"/admin/integrations": statuses(200, 403, 403, 403, 403, 403)},
+    "GET /admin/integrations": {"/admin/integrations": statuses(200, 403, 403, 403, 403, 403, 403)},
     # Organisations: create and edit, superuser only (HANDOVER §6).
-    "GET /admin/organisations": {"/admin/organisations": statuses(200, 403, 403, 403, 403, 403)},
-    "GET /admin/organisations/new": {
-        "/admin/organisations/new": statuses(200, 403, 403, 403, 403, 403),
+    "GET /admin/organisations": {
+        "/admin/organisations": statuses(200, 403, 403, 403, 403, 403, 403)
     },
-    "POST /admin/organisations": {"/admin/organisations": statuses(422, 403, 403, 403, 403, 403)},
+    "GET /admin/organisations/new": {
+        "/admin/organisations/new": statuses(200, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations": {
+        "/admin/organisations": statuses(422, 403, 403, 403, 403, 403, 403)
+    },
     "GET /admin/organisations/{org}": {
-        "/admin/organisations/demo": statuses(200, 403, 403, 403, 403, 403),
-        "/admin/organisations/andere": statuses(200, 403, 403, 403, 403, 403),
-        "/admin/organisations/nope": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/nope": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}": {
-        "/admin/organisations/demo": statuses(422, 403, 403, 403, 403, 403),
-        "/admin/organisations/nope": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo": statuses(422, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/nope": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     # Branding per organisation: superuser only (HANDOVER §6), also for the own organisation.
-    "GET /admin/branding": {"/admin/branding": statuses(200, 403, 403, 403, 403, 403)},
+    "GET /admin/branding": {"/admin/branding": statuses(200, 403, 403, 403, 403, 403, 403)},
     "GET /admin/organisations/{org}/branding": {
-        "/admin/organisations/demo/branding": statuses(200, 403, 403, 403, 403, 403),
-        "/admin/organisations/andere/branding": statuses(200, 403, 403, 403, 403, 403),
-        "/admin/organisations/nope/branding": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/branding": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/branding": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/nope/branding": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/branding": {
-        "/admin/organisations/demo/branding": statuses(422, 403, 403, 403, 403, 403),
-        "/admin/organisations/andere/branding": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/branding": statuses(422, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/branding": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/branding/logo": {
-        "/admin/organisations/demo/branding/logo": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/branding/logo": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/branding/logo/remove": {
-        "/admin/organisations/demo/branding/logo/remove": statuses(303, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/branding/logo/remove": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
     },
     # ADR 0041: theme file, fonts. Same rule: superuser only.
     "GET /admin/organisations/{org}/branding/theme.css": {
-        "/admin/organisations/demo/branding/theme.css": statuses(200, 403, 403, 403, 403, 403),
-        "/admin/organisations/andere/branding/theme.css": statuses(200, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/branding/theme.css": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/branding/theme.css": statuses(
+            200, 403, 403, 403, 403, 403, 403
+        ),
     },
     "POST /admin/organisations/{org}/branding/theme": {
-        "/admin/organisations/demo/branding/theme": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/branding/theme": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/branding/font/{role}": {
-        "/admin/organisations/demo/branding/font/text": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/branding/font/text": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/branding/font/{role}/remove": {
         "/admin/organisations/demo/branding/font/heading/remove": statuses(
-            303, 403, 403, 403, 403, 403
+            303, 403, 403, 403, 403, 403, 403
         ),
     },
     # Holiday calendars (ADR 0025): the superuser maintains them; organisation admins choose
     # them for their own organisation; group admins choose for their own groups (below).
-    "GET /admin/holidays": {"/admin/holidays": statuses(200, 200, 403, 200, 403, 403)},
-    "POST /admin/holidays": {"/admin/holidays": statuses(422, 403, 403, 403, 403, 403)},
+    "GET /admin/holidays": {"/admin/holidays": statuses(200, 200, 403, 200, 403, 403, 403)},
+    "POST /admin/holidays": {"/admin/holidays": statuses(422, 403, 403, 403, 403, 403, 403)},
     "GET /admin/holidays/{calendar}": {
-        "/admin/holidays/nationaal": statuses(200, 403, 403, 403, 403, 403),
-        "/admin/holidays/nope": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/holidays/nationaal": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/holidays/nope": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/holidays/{calendar}/days": {
-        "/admin/holidays/nationaal/days": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/holidays/nationaal/days": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/holidays/{calendar}/national": {
-        "/admin/holidays/nationaal/national": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/holidays/nationaal/national": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/holidays/{calendar}/days/{holiday_id}/delete": {
-        "/admin/holidays/nationaal/days/999999/delete": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/holidays/nationaal/days/999999/delete": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/holidays/{calendar}/delete": {
-        "/admin/holidays/nope/delete": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/holidays/nope/delete": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "GET /admin/organisations/{org}/holidays": {
-        "/admin/organisations/demo/holidays": statuses(200, 200, 403, 403, 403, 403),
-        "/admin/organisations/andere/holidays": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/organisations/demo/holidays": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/holidays": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/holidays": {
-        "/admin/organisations/demo/holidays": statuses(303, 303, 403, 403, 403, 403),
-        "/admin/organisations/andere/holidays": statuses(303, 403, 403, 303, 403, 403),
+        "/admin/organisations/demo/holidays": statuses(303, 303, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/holidays": statuses(303, 403, 403, 303, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/holidays": {
-        "/admin/groups/demo/holidays": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/andere-team/holidays": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/holidays": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/holidays": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/holidays": {
-        "/admin/groups/demo/holidays": statuses(422, 422, 422, 403, 403, 403),
-        "/admin/groups/andere-team/holidays": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/groups/demo/holidays": statuses(422, 422, 422, 403, 403, 403, 403),
+        "/admin/groups/andere-team/holidays": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/holidays/{day}/open": {
-        "/admin/groups/demo/holidays/2026-12-25/open": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/holidays/2026-12-25/open": statuses(404, 404, 404, 403, 403, 403, 403),
         "/admin/groups/andere-team/holidays/2026-12-25/open": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/groups/{slug}/holidays/{day}/close": {
-        "/admin/groups/demo/holidays/2026-12-25/close": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/holidays/2026-12-25/close": statuses(404, 404, 404, 403, 403, 403, 403),
         "/admin/groups/andere-team/holidays/2026-12-25/close": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     # Machine API clients and switches (ADR 0023): superuser only. Unknown client ids: 404.
-    "GET /admin/api": {"/admin/api": statuses(200, 403, 403, 403, 403, 403)},
-    "POST /admin/api/settings": {"/admin/api/settings": statuses(303, 403, 403, 403, 403, 403)},
-    "GET /admin/api/clients/new": {
-        "/admin/api/clients/new": statuses(200, 403, 403, 403, 403, 403)
+    "GET /admin/api": {"/admin/api": statuses(200, 403, 403, 403, 403, 403, 403)},
+    "POST /admin/api/settings": {
+        "/admin/api/settings": statuses(303, 403, 403, 403, 403, 403, 403)
     },
-    "POST /admin/api/clients": {"/admin/api/clients": statuses(422, 403, 403, 403, 403, 403)},
+    "GET /admin/api/clients/new": {
+        "/admin/api/clients/new": statuses(200, 403, 403, 403, 403, 403, 403)
+    },
+    "POST /admin/api/clients": {"/admin/api/clients": statuses(422, 403, 403, 403, 403, 403, 403)},
     "GET /admin/api/clients/{client_id}": {
-        "/admin/api/clients/opc_unknown-client-0000": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/api/clients/opc_unknown-client-0000": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/api/clients/{client_id}": {
-        "/admin/api/clients/opc_unknown-client-0000": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/api/clients/opc_unknown-client-0000": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/api/clients/{client_id}/rotate": {
-        "/admin/api/clients/opc_unknown-client-0000/rotate": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/api/clients/opc_unknown-client-0000/rotate": statuses(
+            404, 403, 403, 403, 403, 403, 403
+        ),
     },
     "POST /admin/api/clients/{client_id}/enable": {
-        "/admin/api/clients/opc_unknown-client-0000/enable": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/api/clients/opc_unknown-client-0000/enable": statuses(
+            404, 403, 403, 403, 403, 403, 403
+        ),
     },
     "POST /admin/api/clients/{client_id}/revoke": {
-        "/admin/api/clients/opc_unknown-client-0000/revoke": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/api/clients/opc_unknown-client-0000/revoke": statuses(
+            404, 403, 403, 403, 403, 403, 403
+        ),
     },
     # Updates of the installation (ADR 0029): superuser only. Without a release there is
     # nothing to update or restore (409); an unknown request is 404.
-    "GET /admin/updates": {"/admin/updates": statuses(200, 403, 403, 403, 403, 403)},
+    "GET /admin/updates": {"/admin/updates": statuses(200, 403, 403, 403, 403, 403, 403)},
     "GET /admin/updates/progress": {
-        "/admin/updates/progress": statuses(200, 403, 403, 403, 403, 403),
+        "/admin/updates/progress": statuses(200, 403, 403, 403, 403, 403, 403),
     },
-    "POST /admin/updates/update": {"/admin/updates/update": statuses(409, 403, 403, 403, 403, 403)},
+    "POST /admin/updates/update": {
+        "/admin/updates/update": statuses(409, 403, 403, 403, 403, 403, 403)
+    },
     "POST /admin/updates/restore": {
-        "/admin/updates/restore": statuses(409, 403, 403, 403, 403, 403),
+        "/admin/updates/restore": statuses(409, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/updates/requests/{request_id}/cancel": {
-        "/admin/updates/requests/999999/cancel": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/updates/requests/999999/cancel": statuses(404, 403, 403, 403, 403, 403, 403),
     },
-    "POST /admin/updates/snooze": {"/admin/updates/snooze": statuses(303, 403, 403, 403, 403, 403)},
+    "POST /admin/updates/snooze": {
+        "/admin/updates/snooze": statuses(303, 403, 403, 403, 403, 403, 403)
+    },
     # Maintenance mode (ADR 0038): superuser only. An empty form has no reason (422); switching
     # off what is off just returns to the page.
-    "GET /admin/maintenance": {"/admin/maintenance": statuses(200, 403, 403, 403, 403, 403)},
+    "GET /admin/maintenance": {"/admin/maintenance": statuses(200, 403, 403, 403, 403, 403, 403)},
     "POST /admin/maintenance/on": {
-        "/admin/maintenance/on": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/maintenance/on": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/maintenance/off": {
-        "/admin/maintenance/off": statuses(303, 403, 403, 403, 403, 403),
+        "/admin/maintenance/off": statuses(303, 403, 403, 403, 403, 403, 403),
     },
     # Message channels (SMTP, SMS gateway) per organisation: secrets, so superuser only.
     "GET /admin/organisations/{org}/channels": {
-        "/admin/organisations/demo/channels": statuses(200, 403, 403, 403, 403, 403),
-        "/admin/organisations/andere/channels": statuses(200, 403, 403, 403, 403, 403),
-        "/admin/organisations/nope/channels": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/channels": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/channels": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/nope/channels": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/channels/email": {
-        "/admin/organisations/demo/channels/email": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/channels/email": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/channels/email/test": {
-        "/admin/organisations/demo/channels/email/test": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/channels/email/test": statuses(
+            422, 403, 403, 403, 403, 403, 403
+        ),
     },
     "POST /admin/organisations/{org}/channels/sms": {
-        "/admin/organisations/demo/channels/sms": statuses(422, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/channels/sms": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/channels/{channel}/remove": {
-        "/admin/organisations/demo/channels/sms/remove": statuses(409, 403, 403, 403, 403, 403),
-        "/admin/organisations/demo/channels/fax/remove": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/channels/sms/remove": statuses(
+            409, 403, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/demo/channels/fax/remove": statuses(
+            404, 403, 403, 403, 403, 403, 403
+        ),
     },
     # Group creation: organisation admins (in their own organisation) and the superuser.
-    "GET /admin/groups/new": {"/admin/groups/new": statuses(200, 200, 403, 200, 403, 403)},
-    "POST /admin/groups": {"/admin/groups": statuses(422, 422, 403, 422, 403, 403)},
+    "GET /admin/groups/new": {"/admin/groups/new": statuses(200, 200, 403, 200, 403, 403, 403)},
+    "POST /admin/groups": {"/admin/groups": statuses(422, 422, 403, 422, 403, 403, 403)},
     "GET /admin/groups/{slug}": {
-        "/admin/groups/demo": statuses(200, 200, 200, 403, 200, 403),
-        "/admin/groups/andere-team": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo": statuses(200, 200, 200, 403, 200, 200, 403),
+        "/admin/groups/andere-team": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     # Group settings (incl. routing to the WxCC queue): not for group admins.
     "GET /admin/groups/{slug}/settings": {
-        "/admin/groups/demo/settings": statuses(200, 200, 403, 403, 403, 403),
-        "/admin/groups/andere-team/settings": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/settings": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/settings": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/settings": {
-        "/admin/groups/demo/settings": statuses(422, 422, 403, 403, 403, 403),
-        "/admin/groups/andere-team/settings": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/groups/demo/settings": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/settings": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     # "Koppeling controleren": whoever edits the group's settings (incl. routing) may check them.
     "POST /admin/groups/{slug}/check": {
-        "/admin/groups/demo/check": statuses(303, 303, 403, 403, 403, 403),
-        "/admin/groups/andere-team/check": statuses(303, 403, 403, 303, 403, 403),
+        "/admin/groups/demo/check": statuses(303, 303, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/check": statuses(303, 403, 403, 303, 403, 403, 403),
     },
     # Staffing blocks and staffing exceptions: group admins too, for their own groups.
     "GET /admin/groups/{slug}/staffing": {
-        "/admin/groups/demo/staffing": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/andere-team/staffing": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/staffing": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/staffing": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/staffing": {
-        "/admin/groups/demo/staffing": statuses(422, 422, 422, 403, 403, 403),
-        "/admin/groups/andere-team/staffing": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/groups/demo/staffing": statuses(422, 422, 422, 403, 403, 403, 403),
+        "/admin/groups/andere-team/staffing": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/staffing/{rule_id}": {
-        "/admin/groups/demo/staffing/999999": statuses(404, 404, 404, 403, 403, 403),
-        "/admin/groups/andere-team/staffing/999999": statuses(404, 403, 403, 404, 403, 403),
+        "/admin/groups/demo/staffing/999999": statuses(404, 404, 404, 403, 403, 403, 403),
+        "/admin/groups/andere-team/staffing/999999": statuses(404, 403, 403, 404, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/staffing/{rule_id}": {
-        "/admin/groups/demo/staffing/999999": statuses(422, 422, 422, 403, 403, 403),
-        "/admin/groups/andere-team/staffing/999999": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/groups/demo/staffing/999999": statuses(422, 422, 422, 403, 403, 403, 403),
+        "/admin/groups/andere-team/staffing/999999": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/staffing/{rule_id}/split": {
-        "/admin/groups/demo/staffing/999999/split": statuses(404, 404, 404, 403, 403, 403),
-        "/admin/groups/andere-team/staffing/999999/split": statuses(404, 403, 403, 404, 403, 403),
+        "/admin/groups/demo/staffing/999999/split": statuses(404, 404, 404, 403, 403, 403, 403),
+        "/admin/groups/andere-team/staffing/999999/split": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
     },
     "POST /admin/groups/{slug}/staffing/{rule_id}/split": {
-        "/admin/groups/demo/staffing/999999/split": statuses(404, 404, 404, 403, 403, 403),
-        "/admin/groups/andere-team/staffing/999999/split": statuses(404, 403, 403, 404, 403, 403),
+        "/admin/groups/demo/staffing/999999/split": statuses(404, 404, 404, 403, 403, 403, 403),
+        "/admin/groups/andere-team/staffing/999999/split": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
     },
     "POST /admin/groups/{slug}/staffing/{rule_id}/delete": {
-        "/admin/groups/demo/staffing/999999/delete": statuses(404, 404, 404, 403, 403, 403),
-        "/admin/groups/andere-team/staffing/999999/delete": statuses(404, 403, 403, 404, 403, 403),
+        "/admin/groups/demo/staffing/999999/delete": statuses(404, 404, 404, 403, 403, 403, 403),
+        "/admin/groups/andere-team/staffing/999999/delete": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
     },
     # The old opening-hours paths (before ADR 0027) redirect permanently, behind the same check.
     "GET /admin/groups/{slug}/hours": {
-        "/admin/groups/demo/hours": statuses(301, 301, 301, 403, 403, 403),
-        "/admin/groups/andere-team/hours": statuses(301, 403, 403, 301, 403, 403),
+        "/admin/groups/demo/hours": statuses(301, 301, 301, 403, 403, 403, 403),
+        "/admin/groups/andere-team/hours": statuses(301, 403, 403, 301, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/hours/{rule_id}": {
-        "/admin/groups/demo/hours/999999": statuses(301, 301, 301, 403, 403, 403),
-        "/admin/groups/andere-team/hours/999999": statuses(301, 403, 403, 301, 403, 403),
+        "/admin/groups/demo/hours/999999": statuses(301, 301, 301, 403, 403, 403, 403),
+        "/admin/groups/andere-team/hours/999999": statuses(301, 403, 403, 301, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/exceptions": {
-        "/admin/groups/demo/exceptions": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/andere-team/exceptions": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/exceptions": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/exceptions": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/exceptions": {
-        "/admin/groups/demo/exceptions": statuses(422, 422, 422, 403, 403, 403),
-        "/admin/groups/andere-team/exceptions": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/groups/demo/exceptions": statuses(422, 422, 422, 403, 403, 403, 403),
+        "/admin/groups/andere-team/exceptions": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     # Reminder rules: organisation admins and the superuser, not group admins (HANDOVER §6).
     "GET /admin/groups/{slug}/reminders": {
-        "/admin/groups/demo/reminders": statuses(200, 200, 403, 403, 403, 403),
-        "/admin/groups/andere-team/reminders": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/reminders": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/reminders": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/reminders": {
-        "/admin/groups/demo/reminders": statuses(422, 422, 403, 403, 403, 403),
-        "/admin/groups/andere-team/reminders": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/groups/demo/reminders": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/reminders": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/reminders/{channel}/{minutes}/delete": {
-        "/admin/groups/demo/reminders/sms/999/delete": statuses(404, 404, 403, 403, 403, 403),
+        "/admin/groups/demo/reminders/sms/999/delete": statuses(404, 404, 403, 403, 403, 403, 403),
         "/admin/groups/andere-team/reminders/sms/999/delete": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     # Message texts: group admins too, for their own groups ("mail texts", HANDOVER §6).
     "GET /admin/groups/{slug}/messages": {
-        "/admin/groups/demo/messages": statuses(303, 303, 303, 403, 403, 403),
-        "/admin/groups/andere-team/messages": statuses(303, 403, 403, 303, 403, 403),
+        "/admin/groups/demo/messages": statuses(303, 303, 303, 403, 403, 403, 403),
+        "/admin/groups/andere-team/messages": statuses(303, 403, 403, 303, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/messages/{text_locale}": {
-        "/admin/groups/demo/messages/nl": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/demo/messages/en": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/demo/messages/de": statuses(404, 404, 404, 403, 403, 403),
-        "/admin/groups/andere-team/messages/nl": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/messages/nl": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/demo/messages/en": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/demo/messages/de": statuses(404, 404, 404, 403, 403, 403, 403),
+        "/admin/groups/andere-team/messages/nl": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/messages/{text_locale}": {
-        "/admin/groups/demo/messages/nl": statuses(303, 303, 303, 403, 403, 403),
-        "/admin/groups/andere-team/messages/nl": statuses(303, 403, 403, 303, 403, 403),
+        "/admin/groups/demo/messages/nl": statuses(303, 303, 303, 403, 403, 403, 403),
+        "/admin/groups/andere-team/messages/nl": statuses(303, 403, 403, 303, 403, 403, 403),
     },
     # Agenda and timeline: bookings.view, also for group admins on their own groups.
     "GET /admin/groups/{slug}/agenda": {
-        "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     # ADR 0044: a planner's changes; an unknown booking is a 404, an empty form a 400.
     "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
-        "/admin/groups/demo/agenda/bookings/999999/move": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/agenda/bookings/999999/move": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
         "/admin/groups/andere-team/agenda/bookings/999999/move": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
-        "/admin/groups/demo/agenda/bookings/999999/move": statuses(400, 400, 400, 403, 403, 403),
+        "/admin/groups/demo/agenda/bookings/999999/move": statuses(
+            400, 400, 400, 403, 403, 403, 403
+        ),
     },
     "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
-        "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
     },
     "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
-        "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
         "/admin/groups/andere-team/agenda/bookings/999999/cancel": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/rebook": {
-        "/admin/groups/demo/agenda/bookings/999999/rebook": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/agenda/bookings/999999/rebook": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
     },
     "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/rebook": {
-        "/admin/groups/demo/agenda/bookings/999999/rebook": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/agenda/bookings/999999/rebook": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
         "/admin/groups/andere-team/agenda/bookings/999999/rebook": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "GET /admin/groups/{slug}/agenda/slot-rebook": {
-        "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403),
+        "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/agenda/slot-rebook": {
-        "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403),
+        "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/agenda/waiting": {
-        "/admin/groups/demo/agenda/waiting": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/andere-team/agenda/waiting": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/agenda/waiting": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/waiting": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/agenda/accept": {
-        "/admin/groups/demo/agenda/accept": statuses(400, 400, 400, 403, 403, 403),
+        "/admin/groups/demo/agenda/accept": statuses(400, 400, 400, 403, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/agenda/week": {
-        "/admin/groups/demo/agenda/week": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/andere-team/agenda/week": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/agenda/week": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/week": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/bookings/{booking_id}": {
-        "/admin/groups/demo/bookings/999999": statuses(404, 404, 404, 403, 403, 403),
-        "/admin/groups/andere-team/bookings/999999": statuses(404, 403, 403, 404, 403, 403),
+        "/admin/groups/demo/bookings/999999": statuses(404, 404, 404, 403, 403, 403, 403),
+        "/admin/groups/andere-team/bookings/999999": statuses(404, 403, 403, 404, 403, 403, 403),
     },
     # Simulator (not in production): whoever edits the group; an empty form is refused (400).
     "POST /admin/groups/{slug}/bookings/{booking_id}/simulate": {
-        "/admin/groups/demo/bookings/999999/simulate": statuses(400, 400, 403, 403, 403, 403),
+        "/admin/groups/demo/bookings/999999/simulate": statuses(400, 400, 403, 403, 403, 403, 403),
         "/admin/groups/andere-team/bookings/999999/simulate": statuses(
-            400, 403, 403, 400, 403, 403
+            400, 403, 403, 400, 403, 403, 403
         ),
     },
     "POST /admin/groups/{slug}/exceptions/{override_id}/delete": {
-        "/admin/groups/demo/exceptions/999999/delete": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/exceptions/999999/delete": statuses(404, 404, 404, 403, 403, 403, 403),
         "/admin/groups/andere-team/exceptions/999999/delete": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     # Emergency closure of one group (ADR 0024): the team's own admins and organisation admins.
     "GET /admin/groups/{slug}/closure": {
-        "/admin/groups/demo/closure": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/andere-team/closure": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/closure": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/closure": {
-        "/admin/groups/demo/closure": statuses(422, 422, 422, 403, 403, 403),
-        "/admin/groups/andere-team/closure": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/groups/demo/closure": statuses(422, 422, 422, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     # Without a closure there is nothing to update (422) or lift (404).
     "POST /admin/groups/{slug}/closure/update": {
-        "/admin/groups/demo/closure/update": statuses(422, 422, 422, 403, 403, 403),
+        "/admin/groups/demo/closure/update": statuses(422, 422, 422, 403, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/closure/lift": {
-        "/admin/groups/demo/closure/lift": statuses(404, 404, 404, 403, 403, 403),
-        "/admin/groups/andere-team/closure/lift": statuses(404, 403, 403, 404, 403, 403),
+        "/admin/groups/demo/closure/lift": statuses(404, 404, 404, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure/lift": statuses(404, 403, 403, 404, 403, 403, 403),
     },
     # The image of a closure (ADR 0037 §3): an empty form misses its alt text (422); without a
     # closure there is nothing to remove (404).
     "POST /admin/groups/{slug}/closure/image": {
-        "/admin/groups/demo/closure/image": statuses(422, 422, 422, 403, 403, 403),
-        "/admin/groups/andere-team/closure/image": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/groups/demo/closure/image": statuses(422, 422, 422, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure/image": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/closure/image/remove": {
-        "/admin/groups/demo/closure/image/remove": statuses(404, 404, 404, 403, 403, 403),
-        "/admin/groups/andere-team/closure/image/remove": statuses(404, 403, 403, 404, 403, 403),
+        "/admin/groups/demo/closure/image/remove": statuses(404, 404, 404, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure/image/remove": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
     },
     "POST /admin/groups/{slug}/closure/reinstate": {
-        "/admin/groups/demo/closure/reinstate": statuses(303, 303, 303, 403, 403, 403),
+        "/admin/groups/demo/closure/reinstate": statuses(303, 303, 303, 403, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/closure/cancel": {
-        "/admin/groups/demo/closure/cancel": statuses(303, 303, 303, 403, 403, 403),
-        "/admin/groups/andere-team/closure/cancel": statuses(303, 403, 403, 303, 403, 403),
+        "/admin/groups/demo/closure/cancel": statuses(303, 303, 303, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure/cancel": statuses(303, 403, 403, 303, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/closure/bookings/{booking_id}/reinstate": {
         "/admin/groups/demo/closure/bookings/999999/reinstate": statuses(
-            404, 404, 404, 403, 403, 403
+            404, 404, 404, 403, 403, 403, 403
         ),
     },
     "POST /admin/groups/{slug}/closure/bookings/{booking_id}/cancel": {
-        "/admin/groups/demo/closure/bookings/999999/cancel": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/closure/bookings/999999/cancel": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
         "/admin/groups/andere-team/closure/bookings/999999/cancel": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "GET /admin/groups/{slug}/closure/bookings/{booking_id}/move": {
-        "/admin/groups/demo/closure/bookings/999999/move": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/closure/bookings/999999/move": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
     },
     # An empty move form has no slot: 400 before anything is looked up.
     "POST /admin/groups/{slug}/closure/bookings/{booking_id}/move": {
-        "/admin/groups/demo/closure/bookings/999999/move": statuses(400, 400, 400, 403, 403, 403),
+        "/admin/groups/demo/closure/bookings/999999/move": statuses(
+            400, 400, 400, 403, 403, 403, 403
+        ),
     },
     # Emergency closure of a whole organisation: organisation admins and the superuser.
-    "GET /admin/closures": {"/admin/closures": statuses(200, 200, 403, 200, 403, 403)},
+    "GET /admin/closures": {"/admin/closures": statuses(200, 200, 403, 200, 403, 403, 403)},
     "GET /admin/organisations/{org}/closure": {
-        "/admin/organisations/demo/closure": statuses(200, 200, 403, 403, 403, 403),
-        "/admin/organisations/andere/closure": statuses(200, 403, 403, 200, 403, 403),
-        "/admin/organisations/nope/closure": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/closure": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/closure": statuses(200, 403, 403, 200, 403, 403, 403),
+        "/admin/organisations/nope/closure": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/closure": {
-        "/admin/organisations/demo/closure": statuses(422, 422, 403, 403, 403, 403),
-        "/admin/organisations/andere/closure": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/organisations/demo/closure": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/closure": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/closure/lift": {
-        "/admin/organisations/demo/closure/lift": statuses(303, 303, 403, 403, 403, 403),
+        "/admin/organisations/demo/closure/lift": statuses(303, 303, 403, 403, 403, 403, 403),
     },
     # Closure scenarios (ADR 0037 §4): organisation ones with organisation.closure, a
     # group's own with closure.manage. Empty forms are refused (422), unknown ids 404.
     "GET /admin/organisations/{org}/closure/scenarios": {
-        "/admin/organisations/demo/closure/scenarios": statuses(200, 200, 403, 403, 403, 403),
-        "/admin/organisations/andere/closure/scenarios": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/organisations/demo/closure/scenarios": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/closure/scenarios": statuses(
+            200, 403, 403, 200, 403, 403, 403
+        ),
     },
     "POST /admin/organisations/{org}/closure/scenarios": {
-        "/admin/organisations/demo/closure/scenarios": statuses(422, 422, 403, 403, 403, 403),
-        "/admin/organisations/andere/closure/scenarios": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/organisations/demo/closure/scenarios": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/closure/scenarios": statuses(
+            422, 403, 403, 422, 403, 403, 403
+        ),
     },
     "GET /admin/organisations/{org}/closure/scenarios/{scenario_id}": {
         "/admin/organisations/demo/closure/scenarios/999999": statuses(
-            404, 404, 403, 403, 403, 403
+            404, 404, 403, 403, 403, 403, 403
         ),
         "/admin/organisations/andere/closure/scenarios/999999": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/organisations/{org}/closure/scenarios/{scenario_id}": {
         "/admin/organisations/demo/closure/scenarios/999999": statuses(
-            404, 404, 403, 403, 403, 403
+            404, 404, 403, 403, 403, 403, 403
         ),
         "/admin/organisations/andere/closure/scenarios/999999": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/organisations/{org}/closure/scenarios/{scenario_id}/delete": {
         "/admin/organisations/demo/closure/scenarios/999999/delete": statuses(
-            404, 404, 403, 403, 403, 403
+            404, 404, 403, 403, 403, 403, 403
         ),
         "/admin/organisations/andere/closure/scenarios/999999/delete": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "GET /admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts": {
         "/admin/organisations/demo/closure/scenarios/999999/contacts": statuses(
-            404, 404, 403, 403, 403, 403
+            404, 404, 403, 403, 403, 403, 403
         ),
         "/admin/organisations/andere/closure/scenarios/999999/contacts": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts": {
         "/admin/organisations/demo/closure/scenarios/999999/contacts": statuses(
-            404, 404, 403, 403, 403, 403
+            404, 404, 403, 403, 403, 403, 403
         ),
         "/admin/organisations/andere/closure/scenarios/999999/contacts": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/organisations/{org}/closure/scenarios/{scenario_id}/image": {
         "/admin/organisations/demo/closure/scenarios/999999/image": statuses(
-            404, 404, 403, 403, 403, 403
+            404, 404, 403, 403, 403, 403, 403
         ),
         "/admin/organisations/andere/closure/scenarios/999999/image": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/organisations/{org}/closure/scenarios/{scenario_id}/image/remove": {
         "/admin/organisations/demo/closure/scenarios/999999/image/remove": statuses(
-            404, 404, 403, 403, 403, 403
+            404, 404, 403, 403, 403, 403, 403
         ),
         "/admin/organisations/andere/closure/scenarios/999999/image/remove": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "GET /admin/organisations/{org}/closure/scenarios/{scenario_id}/image": {
         "/admin/organisations/demo/closure/scenarios/999999/image": statuses(
-            404, 404, 403, 403, 403, 403
+            404, 404, 403, 403, 403, 403, 403
         ),
         "/admin/organisations/andere/closure/scenarios/999999/image": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "GET /admin/groups/{slug}/closure/scenarios": {
-        "/admin/groups/demo/closure/scenarios": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/andere-team/closure/scenarios": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/closure/scenarios": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure/scenarios": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/closure/scenarios": {
-        "/admin/groups/demo/closure/scenarios": statuses(422, 422, 422, 403, 403, 403),
-        "/admin/groups/andere-team/closure/scenarios": statuses(422, 403, 403, 422, 403, 403),
+        "/admin/groups/demo/closure/scenarios": statuses(422, 422, 422, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure/scenarios": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/closure/scenarios/{scenario_id}": {
-        "/admin/groups/demo/closure/scenarios/999999": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/closure/scenarios/999999": statuses(404, 404, 404, 403, 403, 403, 403),
         "/admin/groups/andere-team/closure/scenarios/999999": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/groups/{slug}/closure/scenarios/{scenario_id}": {
-        "/admin/groups/demo/closure/scenarios/999999": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/closure/scenarios/999999": statuses(404, 404, 404, 403, 403, 403, 403),
         "/admin/groups/andere-team/closure/scenarios/999999": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/groups/{slug}/closure/scenarios/{scenario_id}/delete": {
         "/admin/groups/demo/closure/scenarios/999999/delete": statuses(
-            404, 404, 404, 403, 403, 403
+            404, 404, 404, 403, 403, 403, 403
         ),
         "/admin/groups/andere-team/closure/scenarios/999999/delete": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "GET /admin/groups/{slug}/closure/scenarios/{scenario_id}/contacts": {
         "/admin/groups/demo/closure/scenarios/999999/contacts": statuses(
-            404, 404, 404, 403, 403, 403
+            404, 404, 404, 403, 403, 403, 403
         ),
         "/admin/groups/andere-team/closure/scenarios/999999/contacts": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/groups/{slug}/closure/scenarios/{scenario_id}/contacts": {
         "/admin/groups/demo/closure/scenarios/999999/contacts": statuses(
-            404, 404, 404, 403, 403, 403
+            404, 404, 404, 403, 403, 403, 403
         ),
         "/admin/groups/andere-team/closure/scenarios/999999/contacts": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/groups/{slug}/closure/scenarios/{scenario_id}/image": {
-        "/admin/groups/demo/closure/scenarios/999999/image": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/closure/scenarios/999999/image": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
         "/admin/groups/andere-team/closure/scenarios/999999/image": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "POST /admin/groups/{slug}/closure/scenarios/{scenario_id}/image/remove": {
         "/admin/groups/demo/closure/scenarios/999999/image/remove": statuses(
-            404, 404, 404, 403, 403, 403
+            404, 404, 404, 403, 403, 403, 403
         ),
         "/admin/groups/andere-team/closure/scenarios/999999/image/remove": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     "GET /admin/groups/{slug}/closure/scenarios/{scenario_id}/image": {
-        "/admin/groups/demo/closure/scenarios/999999/image": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/demo/closure/scenarios/999999/image": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
         "/admin/groups/andere-team/closure/scenarios/999999/image": statuses(
-            404, 403, 403, 404, 403, 403
+            404, 403, 403, 404, 403, 403, 403
         ),
     },
     # Alternative contact options of the organisation (ADR 0037): with organisation.closure.
     # An empty form removes nothing that is not there, so an allowed POST redirects (303).
     # ADR 0035: the websites allowed to embed the organisation's groups, embedding.manage.
     # An empty form removes nothing that is not there, so an allowed POST redirects (303).
-    "GET /admin/embedding": {"/admin/embedding": statuses(200, 200, 403, 200, 403, 403)},
+    "GET /admin/embedding": {"/admin/embedding": statuses(200, 200, 403, 200, 403, 403, 403)},
     "GET /admin/organisations/{org}/embedding": {
-        "/admin/organisations/demo/embedding": statuses(200, 200, 403, 403, 403, 403),
-        "/admin/organisations/andere/embedding": statuses(200, 403, 403, 200, 403, 403),
-        "/admin/organisations/nope/embedding": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/embedding": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/embedding": statuses(200, 403, 403, 200, 403, 403, 403),
+        "/admin/organisations/nope/embedding": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/embedding": {
-        "/admin/organisations/demo/embedding": statuses(303, 303, 403, 403, 403, 403),
-        "/admin/organisations/andere/embedding": statuses(303, 403, 403, 303, 403, 403),
+        "/admin/organisations/demo/embedding": statuses(303, 303, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/embedding": statuses(303, 403, 403, 303, 403, 403, 403),
     },
     "GET /admin/organisations/{org}/contacts": {
-        "/admin/organisations/demo/contacts": statuses(200, 200, 403, 403, 403, 403),
-        "/admin/organisations/andere/contacts": statuses(200, 403, 403, 200, 403, 403),
-        "/admin/organisations/nope/contacts": statuses(404, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/contacts": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/contacts": statuses(200, 403, 403, 200, 403, 403, 403),
+        "/admin/organisations/nope/contacts": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/contacts": {
-        "/admin/organisations/demo/contacts": statuses(303, 303, 403, 403, 403, 403),
-        "/admin/organisations/andere/contacts": statuses(303, 403, 403, 303, 403, 403),
+        "/admin/organisations/demo/contacts": statuses(303, 303, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/contacts": statuses(303, 403, 403, 303, 403, 403, 403),
+    },
+    # ADR 0043: the own queue needs queue.work (agents, group and organisation admins). The
+    # demo group dispatches to the contact center, so allowed requests find no queue (404).
+    "GET /admin/groups/{slug}/queue": {
+        "/admin/groups/demo/queue": statuses(404, 404, 404, 403, 403, 404, 403),
+        "/admin/groups/andere-team/queue": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/queue/next": {
+        "/admin/groups/demo/queue/next": statuses(404, 404, 404, 403, 403, 404, 403),
+        "/admin/groups/andere-team/queue/next": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/queue/{booking_id}": {
+        "/admin/groups/demo/queue/999999": statuses(404, 404, 404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/queue/{booking_id}/claim": {
+        "/admin/groups/demo/queue/999999/claim": statuses(404, 404, 404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/queue/{booking_id}/release": {
+        "/admin/groups/demo/queue/999999/release": statuses(404, 404, 404, 403, 403, 404, 403),
     },
     # A group's own contact block: closure.manage, like the rest of its closure page.
     "GET /admin/groups/{slug}/closure/contacts": {
-        "/admin/groups/demo/closure/contacts": statuses(200, 200, 200, 403, 403, 403),
-        "/admin/groups/andere-team/closure/contacts": statuses(200, 403, 403, 200, 403, 403),
+        "/admin/groups/demo/closure/contacts": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure/contacts": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     "POST /admin/groups/{slug}/closure/contacts": {
-        "/admin/groups/demo/closure/contacts": statuses(303, 303, 303, 403, 403, 403),
-        "/admin/groups/andere-team/closure/contacts": statuses(303, 403, 403, 303, 403, 403),
+        "/admin/groups/demo/closure/contacts": statuses(303, 303, 303, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure/contacts": statuses(303, 403, 403, 303, 403, 403, 403),
     },
 }
 

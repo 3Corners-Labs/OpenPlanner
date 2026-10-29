@@ -165,6 +165,8 @@ DETAIL_LABELS: dict[str, str] = {
     "dispatch_kind": "admin.field.dispatch_kind",
     "queue_change_working_days": "admin.field.queue_change_working_days",
     "planner_change_min_lead_minutes": "admin.field.planner_change_min_lead_minutes",
+    "queue_visible_from_minutes": "admin.field.queue_visible_from_minutes",
+    "queue_free_pick_allowed": "admin.field.queue_free_pick_allowed",
     "video_host_email": "admin.field.video_host_email",
     "wxcc_business_address": "admin.field.wxcc_business_address",
     "wxcc_channel": "admin.field.wxcc_channel",

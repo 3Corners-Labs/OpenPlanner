@@ -1,10 +1,16 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from pydantic import SecretStr
 
 from app.config import Settings
-from app.keys import client_pseudonym_key, management_token_key, session_secret
+from app.keys import (
+    agent_pseudonym_key,
+    client_pseudonym_key,
+    management_token_key,
+    session_secret,
+)
 
 
 def test_environment_key_wins(tmp_path: Path) -> None:
@@ -51,7 +57,10 @@ def test_session_secret_follows_the_same_rules(tmp_path: Path) -> None:
         session_secret(dev.model_copy(update={"environment": "prod"}))
 
 
-def test_the_pseudonym_key_is_derived_and_differs_from_the_token_key(tmp_path: Path) -> None:
+@pytest.mark.parametrize("derive", [client_pseudonym_key, agent_pseudonym_key])
+def test_pseudonym_keys_are_derived_and_differ_from_the_token_key(
+    tmp_path: Path, derive: Callable[[Settings], bytes]
+) -> None:
     def settings(value: str) -> Settings:
         return Settings(
             environment="dev",
@@ -59,9 +68,19 @@ def test_the_pseudonym_key_is_derived_and_differs_from_the_token_key(tmp_path: P
             dev_token_key_path=tmp_path / "k",
         )
 
-    key = client_pseudonym_key(settings("x" * 40))
+    key = derive(settings("x" * 40))
 
     assert len(key) == 32
-    assert key == client_pseudonym_key(settings("x" * 40))
+    assert key == derive(settings("x" * 40))
     assert key != b"x" * 32
-    assert key != client_pseudonym_key(settings("y" * 40))
+    assert key != derive(settings("y" * 40))
+
+
+def test_each_purpose_has_its_own_key(tmp_path: Path) -> None:
+    settings = Settings(
+        environment="dev",
+        management_token_key=SecretStr("m" * 40),
+        dev_token_key_path=tmp_path / "k",
+    )
+
+    assert agent_pseudonym_key(settings) != client_pseudonym_key(settings)

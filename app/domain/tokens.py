@@ -42,3 +42,13 @@ def hash_token(token: str) -> str:
 def token_matches(token: str, token_hash: str) -> bool:
     """Return whether ``token`` hashes to ``token_hash``, in constant time."""
     return hmac.compare_digest(hash_token(token), token_hash)
+
+
+def agent_pseudonym(key: bytes, subject: str) -> str:
+    """Return the pseudonym that records which agent claimed a booking (ADR 0043).
+
+    HMAC-SHA256 of the identity provider's subject under ``key`` (``keys.agent_pseudonym_key``,
+    never the token key itself), as hex. The same agent always gets the same pseudonym, so
+    "claimed by me" can be recognised, but the subject cannot be read back from it.
+    """
+    return hmac.new(key, subject.encode(), hashlib.sha256).hexdigest()

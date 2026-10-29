@@ -16,7 +16,7 @@ from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import CustomRole, Principal, Scope
-from app.domain.booking import Booking, BookingStatus, MeetingRef, Slot, SlotUsage
+from app.domain.booking import Booking, BookingStatus, Claim, MeetingRef, Slot, SlotUsage
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import (
     BookingEvent,
@@ -508,6 +508,18 @@ class Transaction(Protocol):
 
     async def get_booking_by_task(self, task_id: str) -> Booking | None:
         """Return the booking whose WxCC task has ``task_id``."""
+        ...
+
+    async def claim_booking(self, booking_id: int, claim: Claim) -> bool:
+        """Record ``claim`` if the booking is confirmed and unclaimed (ADR 0043).
+
+        Returns ``False`` when another agent claimed it first or it is no longer confirmed.
+        Must run in a locked transaction.
+        """
+        ...
+
+    async def release_claim(self, booking_id: int) -> None:
+        """Clear the booking's claim, so it returns to the own queue (ADR 0043)."""
         ...
 
     async def claim_webhook_event(self, source: str, key: str, at: datetime) -> bool:

@@ -557,6 +557,7 @@ CLAIM_SETTINGS = (
     "oidc_role_org_admin",
     "oidc_role_group_admin",
     "oidc_role_auditor",
+    "oidc_role_agent",
 )
 """The claim mapping ``oidc-check`` prints: claim names and role values, never secrets."""
 
