@@ -1,0 +1,13 @@
+version = 1
+SPDX-PackageName = "OpenPlanner"
+SPDX-PackageSupplier = "3Corners"
+SPDX-PackageDownloadLocation = "https://github.com/3Corners-Labs/OpenPlanner"
+
+# ADR 0054: the whole repository is EUPL-1.2, copyright 3Corners and the contributors.
+# A file from elsewhere gets its own [[annotations]] entry (or SPDX header) with its own
+# copyright and license; that entry must come after this one, which it then overrides.
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 3Corners and the OpenPlanner contributors"
+SPDX-License-Identifier = "EUPL-1.2"

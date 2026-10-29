@@ -81,3 +81,16 @@ make check
 - `docs/runbook.md` — operating the service.
 - `docs/agent-api.md` — connecting a contact-center bot (WxCC AI Agent) to the machine API.
 - `SECURITY.md` — reporting vulnerabilities.
+
+## Licence
+
+OpenPlanner is licensed under the [European Union Public Licence v1.2](LICENSE) only
+(`EUPL-1.2`, ADR 0054). You may use, change, host and sell it; whoever distributes or hosts a
+modified version publishes its source under the same terms. `REUSE.toml` declares the licence
+and copyright of every file.
+
+Contributions are welcome under the [Contributor Licence Agreement](docs/cla.md); see
+`CONTRIBUTING.md`.
+
+"OpenPlanner" and "3Corners" are trademarks of 3Corners. The licence grants no right to use
+them: a fork carries another name.
