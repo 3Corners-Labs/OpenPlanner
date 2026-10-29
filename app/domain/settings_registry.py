@@ -71,6 +71,7 @@ class Topic(StrEnum):
     WEBEX = "webex"
     UPDATES = "updates"
     DISPLAY = "display"
+    STAFF = "staff"
 
 
 PLATFORM_VIEW = "settings.platform.view"
@@ -413,6 +414,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Off switch for every rate limit; never in the portal.",
     ),
     S(
+        "maintenance_mode",
+        K.BOOL,
+        False,
+        _B,
+        T.SWITCHES,
+        "Maintenance mode from the host, also while the database is unavailable (ADR 0038); "
+        "the portal cannot switch it off.",
+    ),
+    S(
         "dev_token_key_path",
         K.PATH,
         "data/dev-token.key",
@@ -455,6 +465,26 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Interval of the worker loop.",
         minimum=5,
         maximum=300,
+    ),
+    S(
+        "maintenance_cache_seconds",
+        K.FLOAT,
+        5.0,
+        _C,
+        T.OPERATIONS,
+        "How long the web process trusts its last read of the maintenance switch (ADR 0038).",
+        minimum=0,
+        maximum=5,
+    ),
+    S(
+        "staff_last_seen_interval_seconds",
+        K.INT,
+        300,
+        _C,
+        T.STAFF,
+        "An admin's last-seen time is written at most once per this interval (ADR 0046).",
+        minimum=60,
+        maximum=3600,
     ),
     S(
         "system_event_retention_days",
@@ -738,6 +768,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _D,
         T.DISPLAY,
         "IANA time zone of the admin portal.",
+    ),
+    S(
+        "staff_dormant_after_days",
+        K.INT,
+        90,
+        _D,
+        T.STAFF,
+        "Days without a login after which a person is marked dormant in the staff list (ADR 0046).",
+        minimum=14,
+        maximum=365,
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

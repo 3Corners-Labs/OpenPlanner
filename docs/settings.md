@@ -45,6 +45,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `SIMULATOR_ENABLED` | bool | `false` | Platform-event simulator on admin booking pages; refused in production. |
 | `AGENT_API_ENABLED` | bool | `false` | Machine API for contact-center bots; off means the routes do not exist (ADR 0023). |
 | `RATE_LIMIT_ENABLED` | bool | `true` | Off switch for every rate limit; never in the portal. |
+| `MAINTENANCE_MODE` | bool | `false` | Maintenance mode from the host, also while the database is unavailable (ADR 0038); the portal cannot switch it off. |
 | `DEV_TOKEN_KEY_PATH` | path | `data/dev-token.key` | Development management-token key file. |
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
 | `DEV_SETTINGS_KEY_PATH` | path | `data/dev-settings.key` | Development settings key file. |
@@ -55,6 +56,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 |---|---|---|---|---|---|
 | `LOG_LEVEL` | enum | `INFO` | DEBUG, INFO, WARNING, ERROR, CRITICAL | `settings.platform.manage` | Log level; set in the portal it expires after at most 24 hours. |
 | `WORKER_POLL_SECONDS` | float | `30.0` | 5–300 | `settings.platform.manage` | Interval of the worker loop. |
+| `MAINTENANCE_CACHE_SECONDS` | float | `5.0` | 0–5 | `settings.platform.manage` | How long the web process trusts its last read of the maintenance switch (ADR 0038). |
+| `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
 | `SYSTEM_EVENT_RETENTION_DAYS` | int | `90` | 30–3650 | `settings.platform.manage` | Days after which system events leave the audit log (ADR 0031). |
 | `STORAGE_LOW_FREE_PERCENT` | float | `15.0` | 1–50 | `settings.platform.manage` | Free space below which storage is low (ADR 0040). |
 | `STORAGE_CRITICAL_FREE_PERCENT` | float | `5.0` | 1–50 | `settings.platform.manage` | Free space below which storage is critical; below the low limit. |
@@ -94,3 +97,4 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 |---|---|---|---|---|---|
 | `TIME_FORMAT` | enum | `24h` | 24h, 12h, locale | `settings.organisation.manage` | How clock times are written. |
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
+| `STAFF_DORMANT_AFTER_DAYS` | int | `90` | 14–365 | `settings.organisation.manage` | Days without a login after which a person is marked dormant in the staff list (ADR 0046). |
