@@ -74,3 +74,10 @@ def test_show_lists_the_details() -> None:
     assert "portal bounds: 1–30 per hour" in text
     assert "permission:    settings.platform.manage" in text
     assert "class:         C (platform)" in text
+
+
+def test_a_secret_from_its_file_shows_the_file_as_source() -> None:
+    settings = Settings(environment="dev", session_secret=SecretStr(SECRET))
+    state = _state(settings, {"SESSION_SECRET_FILE": "/run/secrets/session"}, "session_secret")
+
+    assert (state.source, state.shown) == ("file", "set")

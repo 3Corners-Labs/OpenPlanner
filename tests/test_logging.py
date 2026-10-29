@@ -8,7 +8,7 @@ import structlog
 
 from app.domain.event_context import bind_level, set_service, trace_scope
 from app.domain.event_schema import Envelope
-from app.logging import MASK, PII_FIELDS, configure_logging
+from app.logging import MASK, PII_FIELDS, configure_logging, warn_loose_secret_files
 
 
 @pytest.fixture
@@ -123,3 +123,11 @@ def test_lines_carry_the_service_and_the_trace_of_their_request() -> None:
     assert own["group"] == "other"
     assert "trace.id" not in outside
     assert "organisation" not in outside
+
+
+def test_a_loose_secret_file_is_reported_by_variable_name_only(stream: io.StringIO) -> None:
+    warn_loose_secret_files(["SESSION_SECRET_FILE"])
+
+    (record,) = _records(stream)
+    assert record["message"] == "settings.secret_file_readable"
+    assert record["variable"] == "SESSION_SECRET_FILE"
