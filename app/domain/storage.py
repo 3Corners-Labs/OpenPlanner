@@ -8,11 +8,13 @@ a steady grade records nothing, so a full disk cannot flood the audit log.
             ─► grade changed? ─► system event storage.check (failure, or success on recovery)
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.audit import Outcome
 from app.domain.system_log import SystemLog
+from app.domain.tunable import value_of
 
 MIB = 1024 * 1024
 """Bytes per mebibyte, the unit of ``DATABASE_MAX_MB`` and of the event detail."""
@@ -114,7 +116,9 @@ class StorageWatch:
         limits: The grade boundaries.
     """
 
-    def __init__(self, system_log: SystemLog, limits: StorageLimits) -> None:
+    def __init__(
+        self, system_log: SystemLog, limits: StorageLimits | Callable[[], StorageLimits]
+    ) -> None:
         """Start at grade ok."""
         self._system_log = system_log
         self._limits = limits
@@ -129,7 +133,7 @@ class StorageWatch:
         Raises:
             Exception: Whatever writing the event raises.
         """
-        grade, reason = assess(usage, self._limits)
+        grade, reason = assess(usage, value_of(self._limits))
         changed = reason != self._reason
         if changed:
             await self._system_log.record(

@@ -1,15 +1,18 @@
 """Live settings: portal values applied on top of the environment, reloaded on change (§6)."""
 
 import asyncio
+from datetime import timedelta
 
 from app.adapters.live_settings import LiveSettings, keep_current
 from app.config import Settings
 from app.domain.platform_settings import PlatformSettingsStore
+from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 
 
 def _live(uow: InMemoryUnitOfWork, applied: list[Settings]) -> LiveSettings:
-    return LiveSettings(Settings(environment="dev"), {}, PlatformSettingsStore(uow), applied.append)
+    store = PlatformSettingsStore(uow)
+    return LiveSettings(Settings(environment="dev"), {}, store, FixedClock(), applied.append)
 
 
 async def test_a_change_is_applied_and_handed_to_the_callback() -> None:
@@ -89,3 +92,34 @@ async def test_values_that_break_a_rule_together_are_refused_together() -> None:
 
     assert live.refused
     assert live.settings.storage_critical_free_percent == 5.0
+
+
+async def test_a_log_level_falls_back_once_its_expiry_passes() -> None:
+    uow, clock, applied = InMemoryUnitOfWork(), FixedClock(), []
+    uow.state.settings_version = 1
+    uow.state.platform_settings = {"log_level": "DEBUG"}
+    uow.state.platform_expiries = {"log_level": clock.now() + timedelta(hours=1)}
+    live = LiveSettings(
+        Settings(environment="dev"), {}, PlatformSettingsStore(uow), clock, applied.append
+    )
+    await live.refresh()
+    assert live.settings.log_level == "DEBUG"
+
+    clock.advance(timedelta(hours=1))
+
+    assert await live.refresh()  # no new version, but the value lapsed
+    assert live.settings.log_level == "INFO"
+    assert applied[-1].log_level == "INFO"
+
+
+async def test_locked_keys_and_combinations_follow_the_environment() -> None:
+    live = LiveSettings(
+        Settings(environment="dev"),
+        {"ADMIN_SESSION_HOURS": "6"},
+        PlatformSettingsStore(InMemoryUnitOfWork()),
+        FixedClock(),
+    )
+
+    assert "admin_session_hours" in live.locked()
+    assert live.combination_problem({"storage_critical_free_percent": 20.0}) is not None
+    assert live.combination_problem({"storage_critical_free_percent": 2.0}) is None
