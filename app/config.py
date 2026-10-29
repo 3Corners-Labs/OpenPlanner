@@ -1,5 +1,6 @@
 """Application settings, read from the environment only."""
 
+import os
 import re
 from pathlib import Path
 from typing import Literal
@@ -19,6 +20,14 @@ SMTPS_PORT = 465
 """Mail submission over implicit TLS (RFC 8314); STARTTLS is never offered there."""
 
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
+
+
+def environment() -> dict[str, str]:
+    """Return a copy of the process environment, for reporting where a setting came from.
+
+    The only other place that reads the environment; ``settings list`` uses it (ADR 0042 §10).
+    """
+    return dict(os.environ)
 
 
 class Settings(BaseSettings):
@@ -64,12 +73,17 @@ class Settings(BaseSettings):
     # webhooks and failing token refreshes are written as at most one security event per kind
     # per this many minutes; the rest are counted into the next one.
     security_event_window_minutes: int = Field(default=15, ge=1, le=1440)
+    # ADR 0040, part 3 (class C, platform; env until the settings registry of ADR 0042): one
+    # CSV export of the audit log holds at most this many rows and covers at most this many
+    # days; a larger one is refused, never cut short.
+    audit_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
+    audit_export_max_days: int = Field(default=366, ge=1, le=3660)
 
     # ADR 0044: how many days ahead the shortfall summary (group page, dashboard) looks.
-    # Class D organisation (ADR 0042) until the settings registry holds it.
+    # Class D organisation (ADR 0042, settings registry).
     shortfall_horizon_days: int = Field(default=14, ge=1, le=60)
     # ADR 0044: changes by one planner per hour above which a system event warns (never
-    # blocks). Class C platform until the settings registry holds it.
+    # blocks). Class C platform (ADR 0042, settings registry).
     planner_changes_alert_per_hour: int = Field(default=50, ge=5, le=1000)
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
@@ -107,10 +121,10 @@ class Settings(BaseSettings):
     # which refreshes the roles (invisible with an active SSO session).
     admin_reauth_minutes: int = 60
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
-    # seconds (class C, platform; here until the ADR 0042 registry exists).
+    # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
     # Without a login for this many days, a person is marked dormant in the staff list
-    # (class D, organisation; one value for every organisation until the registry exists).
+    # (class D, organisation; one value for every organisation until the portal stores it).
     staff_dormant_after_days: int = Field(default=90, ge=14, le=365)
     admin_timezone: str = "Europe/Amsterdam"
     oidc_discovery_url: str | None = None
