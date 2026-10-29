@@ -1,23 +1,55 @@
 """``python -m app.cli settings`` and ``settings-doc`` (ADR 0042 §10)."""
 
+import sqlite3
 from pathlib import Path
 
 import pytest
 
 from app.cli import main
+from tests.support.database import migrated_database
 
 
 @pytest.fixture(autouse=True)
-def _dev(monkeypatch: pytest.MonkeyPatch) -> None:
+def _dev(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("ENVIRONMENT", "dev")
+    # A directory is no SQLite file: the portal values cannot be read here.
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}")
 
 
 def test_settings_list(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["settings", "list"]) == 0
     out = capsys.readouterr().out
 
-    assert out.startswith("VARIABLE")
+    assert "\nVARIABLE" in out
     assert "RATE_LIMIT_BOOKINGS" in out
+
+
+def test_without_a_database_the_list_says_so_and_still_shows_everything(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["settings", "list"]) == 0
+    out = capsys.readouterr().out
+
+    assert out.startswith("Portal values not read (")
+    assert "ADMIN_SESSION_HOURS" in out
+
+
+def test_a_stored_portal_value_is_listed_with_its_source(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = migrated_database(tmp_path, monkeypatch, "cli")
+    with sqlite3.connect(url.removeprefix("sqlite+aiosqlite:///")) as db:
+        db.execute(
+            "INSERT INTO platform_settings (key, value, updated_at) "
+            "VALUES ('admin_session_hours', '4', '2026-10-29 12:00:00')"
+        )
+        db.execute("INSERT INTO settings_version (id, version) VALUES (1, 1)")
+
+    assert main(["settings", "show", "ADMIN_SESSION_HOURS"]) == 0
+    out = capsys.readouterr().out
+
+    assert "value:         4" in out
+    assert "source:        portal" in out
 
 
 def test_settings_show_accepts_any_case(capsys: pytest.CaptureFixture[str]) -> None:

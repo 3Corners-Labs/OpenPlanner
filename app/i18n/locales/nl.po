@@ -5286,3 +5286,348 @@ msgstr "Op deze installatie is het widgetscript niet gebouwd; de code staat hier
 
 msgid "admin.embedding.code_none"
 msgstr "Zet eerst bij een groep Insluiten op websites aan."
+
+msgid "admin.nav.settings"
+msgstr "Geavanceerde instellingen"
+
+msgid "admin.settings.title"
+msgstr "Geavanceerde instellingen"
+
+msgid "admin.settings.intro"
+msgstr "Hoe deze installatie is ingesteld en waar elke waarde vandaan komt. Geheime waarden worden nooit getoond. Op dit scherm kunt u nog niets wijzigen."
+
+msgid "admin.settings.status.title"
+msgstr "Systeemstatus"
+
+msgid "admin.settings.status.intro"
+msgstr "De instellingen die alleen de beheerder van de server zet, in de omgeving of in een bestand. U ziet of ze zijn ingesteld, nooit de waarde."
+
+msgid "admin.settings.status.environment"
+msgstr "Omgeving"
+
+msgid "admin.settings.status.problems"
+msgstr "Deze installatie draait niet als productie. In productie zou ze niet starten, omdat:"
+
+msgid "admin.settings.status.state"
+msgstr "Ingesteld"
+
+msgid "admin.settings.variable"
+msgstr "Variabele"
+
+msgid "admin.settings.class"
+msgstr "Soort"
+
+msgid "admin.settings.source"
+msgstr "Bron"
+
+msgid "admin.settings.setting"
+msgstr "Instelling"
+
+msgid "admin.settings.value"
+msgstr "Waarde"
+
+msgid "admin.settings.notes"
+msgstr "Opmerkingen"
+
+msgid "admin.settings.locked"
+msgstr "Vastgezet door de beheerder van de server"
+
+msgid "admin.settings.outside_bounds"
+msgstr "Buiten de grenzen van het portaal"
+
+msgid "admin.settings.portal_ignored"
+msgstr "Opgeslagen waarde voldoet niet aan de regels en wordt genegeerd"
+
+msgid "admin.settings.value.set"
+msgstr "Ingesteld"
+
+msgid "admin.settings.value.not_set"
+msgstr "Niet ingesteld"
+
+msgid "admin.settings.value.empty"
+msgstr "Leeg"
+
+msgid "admin.settings.value.on"
+msgstr "Aan"
+
+msgid "admin.settings.value.off"
+msgstr "Uit"
+
+msgid "admin.settings.source.default"
+msgstr "Standaardwaarde"
+
+msgid "admin.settings.source.portal"
+msgstr "Beheerportaal"
+
+msgid "admin.settings.source.env"
+msgstr "Omgeving"
+
+msgid "admin.settings.source.file"
+msgstr "Bestand"
+
+msgid "admin.settings.class.bootstrap"
+msgstr "A · opstart"
+
+msgid "admin.settings.class.deployment"
+msgstr "B · installatie"
+
+msgid "admin.settings.class.platform"
+msgstr "C · platform"
+
+msgid "admin.settings.class.organisation"
+msgstr "D · organisatie"
+
+msgid "admin.settings.problem.simulator_enabled"
+msgstr "de simulator mag in productie niet aan staan."
+
+msgid "admin.settings.problem.management_token_key"
+msgstr "MANAGEMENT_TOKEN_KEY is in productie verplicht."
+
+msgid "admin.settings.problem.public_base_url"
+msgstr "PUBLIC_BASE_URL moet in productie https gebruiken."
+
+msgid "admin.settings.problem.session_secret"
+msgstr "SESSION_SECRET is in productie verplicht."
+
+msgid "admin.settings.problem.webhook_base_url"
+msgstr "WEBHOOK_BASE_URL moet in productie https gebruiken."
+
+msgid "admin.settings.problem.webex_incomplete"
+msgstr "Webex heeft in productie WEBEX_CLIENT_SECRET, WEBEX_REFRESH_TOKEN en SETTINGS_ENCRYPTION_KEY nodig."
+
+msgid "admin.settings.problem.oidc_incomplete"
+msgstr "inloggen (OIDC) heeft in productie een https-adres en een client secret nodig."
+
+msgid "authz.permission.settings_platform_view"
+msgstr "Systeemstatus en geavanceerde instellingen bekijken"
+
+msgid "authz.permission.settings_platform_manage"
+msgstr "Platforminstellingen wijzigen"
+
+msgid "authz.permission.settings_login_manage"
+msgstr "Inlogkoppeling (claims en rollen) wijzigen"
+
+msgid "authz.permission.settings_organisation_manage"
+msgstr "Instellingen van de organisatie wijzigen"
+
+msgid "settings.topic.bootstrap"
+msgstr "Opstart"
+
+msgid "settings.topic.login"
+msgstr "Inloggen"
+
+msgid "settings.topic.host"
+msgstr "Server"
+
+msgid "settings.topic.switches"
+msgstr "Schakelaars"
+
+msgid "settings.topic.development"
+msgstr "Ontwikkeling"
+
+msgid "settings.topic.operations"
+msgstr "Bedrijfsvoering"
+
+msgid "settings.topic.retention"
+msgstr "Bewaartermijnen"
+
+msgid "settings.topic.storage"
+msgstr "Opslag"
+
+msgid "settings.topic.rate_limits"
+msgstr "Snelheidslimieten"
+
+msgid "settings.topic.admin_session"
+msgstr "Sessie beheerportaal"
+
+msgid "settings.topic.login_mapping"
+msgstr "Inlogkoppeling"
+
+msgid "settings.topic.mail"
+msgstr "Reservemailserver"
+
+msgid "settings.topic.webex"
+msgstr "Webex en Webex Contact Center"
+
+msgid "settings.topic.updates"
+msgstr "Updates"
+
+msgid "settings.topic.display"
+msgstr "Weergave"
+
+msgid "settings.topic.staff"
+msgstr "Medewerkers"
+
+msgid "settings.topic.planner"
+msgstr "Planner"
+
+msgid "settings.field.log_level.label"
+msgstr "Logniveau"
+
+msgid "settings.field.worker_poll_seconds.label"
+msgstr "Interval van de achtergrondverwerking (seconden)"
+
+msgid "settings.field.maintenance_cache_seconds.label"
+msgstr "Onderhoudsstand onthouden (seconden)"
+
+msgid "settings.field.maintenance_retry_after_seconds.label"
+msgstr "Opnieuw proberen na onderhoud (seconden)"
+
+msgid "settings.field.staff_last_seen_interval_seconds.label"
+msgstr "Laatst gezien bijwerken (seconden)"
+
+msgid "settings.field.system_event_retention_days.label"
+msgstr "Systeemgebeurtenissen bewaren (dagen)"
+
+msgid "settings.field.audit_retention_days.label"
+msgstr "Beheeracties bewaren (dagen)"
+
+msgid "settings.field.security_event_retention_days.label"
+msgstr "Beveiligingsgebeurtenissen bewaren (dagen)"
+
+msgid "settings.field.diagnostic_event_retention_days.label"
+msgstr "Diagnosegebeurtenissen bewaren (dagen)"
+
+msgid "settings.field.diagnostic_mode_hours.label"
+msgstr "Diagnosemodus stopt na (uren)"
+
+msgid "settings.field.security_event_window_minutes.label"
+msgstr "Venster voor beveiligingsgebeurtenissen (minuten)"
+
+msgid "settings.field.audit_export_max_rows.label"
+msgstr "Maximaal aantal rijen per export"
+
+msgid "settings.field.audit_export_max_days.label"
+msgstr "Maximaal aantal dagen per export"
+
+msgid "settings.field.embedding_max_origins.label"
+msgstr "Maximaal aantal websites per organisatie"
+
+msgid "settings.field.storage_low_free_percent.label"
+msgstr "Weinig vrije ruimte onder (%)"
+
+msgid "settings.field.storage_critical_free_percent.label"
+msgstr "Kritiek weinig vrije ruimte onder (%)"
+
+msgid "settings.field.database_max_mb.label"
+msgstr "Maximale grootte database (MB)"
+
+msgid "settings.field.rate_limit_bookings.label"
+msgstr "Afspraken per IP-adres"
+
+msgid "settings.field.rate_limit_reads.label"
+msgstr "Beschikbaarheid opvragen per IP-adres"
+
+msgid "settings.field.rate_limit_agent_tokens.label"
+msgstr "Tokenaanvragen machine-API per client"
+
+msgid "settings.field.rate_limit_agent_calls.label"
+msgstr "Aanroepen machine-API per client"
+
+msgid "settings.field.admin_session_hours.label"
+msgstr "Sessieduur beheerportaal (uren)"
+
+msgid "settings.field.admin_reauth_minutes.label"
+msgstr "Opnieuw inloggen voor een wijziging na (minuten)"
+
+msgid "settings.field.oidc_role_claim.label"
+msgstr "Claim met de rollen"
+
+msgid "settings.field.oidc_organisation_claim.label"
+msgstr "Claim met de organisaties"
+
+msgid "settings.field.oidc_group_claim.label"
+msgstr "Claim met de groepen"
+
+msgid "settings.field.oidc_role_superuser.label"
+msgstr "Rolwaarde superuser"
+
+msgid "settings.field.oidc_role_org_admin.label"
+msgstr "Rolwaarde beheerder organisatie"
+
+msgid "settings.field.oidc_role_group_admin.label"
+msgstr "Rolwaarde beheerder groep"
+
+msgid "settings.field.oidc_role_auditor.label"
+msgstr "Rolwaarde compliance en privacy"
+
+msgid "settings.field.smtp_host.label"
+msgstr "Mailserver"
+
+msgid "settings.field.smtp_port.label"
+msgstr "Poort"
+
+msgid "settings.field.smtp_starttls.label"
+msgstr "STARTTLS"
+
+msgid "settings.field.smtp_tls.label"
+msgstr "TLS vanaf de start"
+
+msgid "settings.field.smtp_username.label"
+msgstr "Gebruikersnaam"
+
+msgid "settings.field.smtp_password.label"
+msgstr "Wachtwoord"
+
+msgid "settings.field.mail_from.label"
+msgstr "Afzender"
+
+msgid "settings.field.webex_client_id.label"
+msgstr "Client-ID Service App"
+
+msgid "settings.field.webex_client_secret.label"
+msgstr "Client secret Service App"
+
+msgid "settings.field.webex_refresh_token.label"
+msgstr "Refresh token"
+
+msgid "settings.field.webex_webhook_secret.label"
+msgstr "Webhookgeheim Webex"
+
+msgid "settings.field.wxcc_api_base_url.label"
+msgstr "API-adres Webex Contact Center"
+
+msgid "settings.field.wxcc_webhook_secret.label"
+msgstr "Webhookgeheim Webex Contact Center"
+
+msgid "settings.field.update_repository.label"
+msgstr "Repository met releases"
+
+msgid "settings.field.update_check_token.label"
+msgstr "Leestoken repository"
+
+msgid "settings.field.time_format.label"
+msgstr "Tijdnotatie"
+
+msgid "settings.field.admin_timezone.label"
+msgstr "Tijdzone beheerportaal"
+
+msgid "settings.field.staff_dormant_after_days.label"
+msgstr "Medewerker inactief na (dagen)"
+
+msgid "settings.field.shortfall_horizon_days.label"
+msgstr "Tekorten vooruitkijken (dagen)"
+
+msgid "settings.field.planner_changes_alert_per_hour.label"
+msgstr "Waarschuwing bij wijzigingen per planner per uur"
+
+msgid "admin.settings.problem.dev_placeholder"
+msgstr "bevat een plaatsvervanger voor ontwikkeling; productie weigert die."
+
+msgid "admin.settings.refused"
+msgstr "De opgeslagen waarden spreken elkaar tegen (bijvoorbeeld kritieke opslag niet onder weinig opslag). Daarom geldt geen enkele: de standaardwaarden en de waarden van de server blijven gelden."
+
+msgid "settings.field.maintenance_alert_hours.label"
+msgstr "Melding bij lang onderhoud na (uren)"
+
+msgid "settings.field.maintenance_alert_repeat_hours.label"
+msgstr "Melding lang onderhoud herhalen elke (uren)"
+
+msgid "settings.field.security_event_max_sources.label"
+msgstr "Maximaal aantal bijgehouden bronnen voor beveiligingsgebeurtenissen"
+
+msgid "settings.field.planner_rebook_days.label"
+msgstr "Verzoek om opnieuw te boeken vervalt na (dagen)"
+
+msgid "settings.field.planner_rebook_reminder_days.label"
+msgstr "Herinnering om opnieuw te boeken (dagen voor het vervallen)"

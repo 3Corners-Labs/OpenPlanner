@@ -853,6 +853,14 @@ class Transaction(Protocol):
         """Replace the maintenance switch."""
         ...
 
+    async def settings_version(self) -> int:
+        """Return the counter that goes up with every settings change (ADR 0042); 0 if never."""
+        ...
+
+    async def platform_settings(self) -> dict[str, object]:
+        """Return the stored portal values of class C settings by key, as plain JSON values."""
+        ...
+
 
 class UnitOfWork(Protocol):
     """Opens transactions. Leaving the context commits; an exception rolls back."""
