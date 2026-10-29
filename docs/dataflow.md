@@ -8,7 +8,8 @@ no entry point collects it yet (booking endpoints arrive in WP3).
 ```
 operator ──HTTP──> web (/healthz, /readyz) ──SQL──> SQLite volume (no tables with data)
                    worker ──SQL──> SQLite volume (heartbeat only)
-web, worker ──stdout──> container log (JSON, PII fields masked)
+web, worker ──stdout──> container log (JSON, PII fields masked; trace id, organisation and
+                         group slugs, service and installation name per line, ADR 0040)
 visitor ──HTTP──> web (GET /, ?lang=) ──> HTML page in the negotiated language
 web ──Set-Cookie: lang=<locale>──> visitor browser (functional preference, 1 year, no PII)
 ```
@@ -108,6 +109,7 @@ web ──SQL──> staff, staff_memberships (sub, display name, roles, organis
 | Admin roles and memberships | `staff.roles`, `staff_memberships` (organisation and group slugs) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed` | no |
 | Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
 | System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
+| Event schema fields (ADR 0040) | `audit_events.event_id`, `level`, `category`, `trace_id`, `service`; the same trace id on stdout | web, worker | as the event they belong to | no: random ids and codes |
 
 System events hold no personal data: no names, addresses, message text or join links, only codes
 and the booking id. Each admin sees them at their own level only (group admin: their groups;
