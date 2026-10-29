@@ -287,7 +287,12 @@ OBJECTS = (
                 f"{_GROUP}/agenda",
                 Permission.BOOKINGS_VIEW,
                 "agenda",
-                (f"{_GROUP}/bookings/{{booking_id}}", f"{_GROUP}/agenda/week"),
+                (
+                    f"{_GROUP}/bookings/{{booking_id}}",
+                    f"{_GROUP}/agenda/week",
+                    f"{_GROUP}/agenda/bookings/{{booking_id}}/move",
+                    f"{_GROUP}/agenda/bookings/{{booking_id}}/cancel",
+                ),
             ),
             Screen(
                 "group.closure",
