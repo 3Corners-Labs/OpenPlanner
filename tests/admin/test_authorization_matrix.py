@@ -50,6 +50,19 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 403)},
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 200, 403)},
+    # ADR 0039: the role editor is the superuser's (roles.manage is locked).
+    "GET /admin/roles": {"/admin/roles": statuses(200, 403, 403, 403, 403, 403)},
+    "GET /admin/roles/new": {"/admin/roles/new": statuses(200, 403, 403, 403, 403, 403)},
+    "POST /admin/roles": {"/admin/roles": statuses(422, 403, 403, 403, 403, 403)},
+    "GET /admin/roles/{role_id}": {
+        "/admin/roles/999999": statuses(404, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/roles/{role_id}": {
+        "/admin/roles/999999": statuses(404, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/roles/{role_id}/delete": {
+        "/admin/roles/999999/delete": statuses(404, 403, 403, 403, 403, 403),
+    },
     # ADR 0031: every role has a log; what it lists is exact per level (test_audit_routes).
     "GET /admin/audit": {"/admin/audit": statuses(200, 200, 200, 200, 200, 403)},
     # ADR 0040: the audit log as CSV, for compliance roles; not for group admins.
@@ -338,6 +351,28 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/groups/{slug}/agenda": {
         "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403, 403),
         "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403, 403),
+    },
+    # ADR 0044: a planner's changes; an unknown booking is a 404, an empty form a 400.
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
+        "/admin/groups/demo/agenda/bookings/999999/move": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/bookings/999999/move": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
+        "/admin/groups/demo/agenda/bookings/999999/move": statuses(400, 400, 400, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
+        "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(404, 404, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
+        "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(404, 404, 404, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/bookings/999999/cancel": statuses(
+            404, 403, 403, 404, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/accept": {
+        "/admin/groups/demo/agenda/accept": statuses(400, 400, 400, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/agenda/week": {
         "/admin/groups/demo/agenda/week": statuses(200, 200, 200, 403, 403, 403),
