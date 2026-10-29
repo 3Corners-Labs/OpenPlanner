@@ -84,6 +84,36 @@ msgstr "Your video call on {date} has been cancelled"
 msgid "message.cancellation.intro"
 msgstr "Your video call with {group_name} on {date} at {time} has been cancelled. You can always make a new appointment."
 
+msgid "message.reason"
+msgstr "Reason"
+
+msgid "message.reason.staffing"
+msgstr "Not enough staff are available at that time."
+
+msgid "message.reason.technical"
+msgstr "There is a technical failure."
+
+msgid "message.reason.unforeseen"
+msgstr "Due to unforeseen circumstances the call cannot take place at that time."
+
+msgid "message.change.sms"
+msgstr "Dear {first_name}, your video call with {group_name} has moved to {date} at {time}. View or change: {manage_url}"
+
+msgid "message.cancellation.sms"
+msgstr "Dear {first_name}, your video call with {group_name} on {date} at {time} has been cancelled. {reason}"
+
+msgid "admin.messages.purpose_reason"
+msgstr "Reasons for changes by a planner"
+
+msgid "admin.messages.part_reason_staffing"
+msgstr "Not enough agents"
+
+msgid "admin.messages.part_reason_technical"
+msgstr "Technical failure"
+
+msgid "admin.messages.part_reason_unforeseen"
+msgstr "Unforeseen circumstances"
+
 #. Booking pages.
 
 msgid "group.intro"
@@ -680,6 +710,9 @@ msgstr "Manage reminders"
 msgid "authz.permission.bookings_view"
 msgstr "View bookings"
 
+msgid "authz.permission.bookings_manage"
+msgstr "Change bookings"
+
 msgid "authz.citizen.availability_view"
 msgstr "View available times"
 
@@ -833,6 +866,12 @@ msgstr "Send to the queue (minutes before)"
 msgid "admin.field.dispatch_lead_minutes_hint"
 msgstr "From this moment the participant can no longer change the appointment. 0 to 60."
 
+msgid "admin.field.planner_change_min_lead_minutes"
+msgstr "Changes by a planner (minutes before)"
+
+msgid "admin.field.planner_change_min_lead_minutes_hint"
+msgstr "Until this moment a planner can move or cancel a booking; after it you call the participant. Not less than sending to the queue, at most 1440."
+
 msgid "admin.field.phone_mode"
 msgstr "Phone number on the form"
 
@@ -900,6 +939,15 @@ msgstr "Enter a number of days from 1 to 366."
 
 msgid "admin.form.error.dispatch_lead_minutes"
 msgstr "Enter a number of minutes from 0 to 60."
+
+msgid "admin.form.error.planner_change_min_lead_minutes"
+msgstr "Enter a number of minutes from the send-to-queue time up to 1440."
+
+msgid "admin.form.error.planner_too_late"
+msgstr "This booking starts soon or has already gone to the contact center. Call the participant."
+
+msgid "admin.form.error.move_causes_shortfall"
+msgstr "This slot would then have more bookings than agents. Confirm that you accept the shortfall, or choose another slot."
 
 msgid "admin.form.error.phone_mode"
 msgstr "Choose whether the phone number is hidden, optional or required."
@@ -1484,6 +1532,78 @@ msgstr "First shortfall: {when}"
 msgid "admin.shortfall.chip"
 msgstr "Shortfalls: {count}"
 
+msgid "admin.agenda.accepted"
+msgstr "Shortfall accepted"
+
+msgid "admin.agenda.accept"
+msgstr "Accept shortfall"
+
+msgid "admin.agenda.move"
+msgstr "Move"
+
+msgid "admin.agenda.cancel"
+msgstr "Cancel"
+
+msgid "admin.planner.move_title"
+msgstr "Move booking {reference}"
+
+msgid "admin.planner.move_lead"
+msgstr "{first_name}, {when}. Choose a free slot of this team."
+
+msgid "admin.planner.move_start"
+msgstr "New slot"
+
+msgid "admin.planner.move_hint"
+msgstr "Free slots in the next {days} days."
+
+msgid "admin.planner.move_button"
+msgstr "Move"
+
+msgid "admin.planner.move_none"
+msgstr "There is no free slot in the coming weeks. Raise the staffing or cancel the booking."
+
+msgid "admin.planner.accept_shortfall"
+msgstr "I accept that the new slot will then have more bookings than agents"
+
+msgid "admin.planner.accept_shortfall_hint"
+msgstr "Only needed if the chosen slot gets a shortfall as a result."
+
+msgid "admin.planner.citizen_told"
+msgstr "The citizen is always told by email, and by SMS when there is a phone number."
+
+msgid "admin.planner.back"
+msgstr "Back to the agenda"
+
+msgid "admin.planner.cancel_title"
+msgstr "Cancel booking {reference}"
+
+msgid "admin.planner.cancel_lead"
+msgstr "{first_name}, {when}. Choose the reason the citizen reads in the message."
+
+msgid "admin.planner.reason"
+msgstr "Reason"
+
+msgid "admin.planner.reason_hint"
+msgstr "A fixed text; the organisation can change the wording under Message texts."
+
+msgid "admin.planner.reason_staffing"
+msgstr "Not enough agents"
+
+msgid "admin.planner.reason_technical"
+msgstr "Technical failure"
+
+msgid "admin.planner.reason_unforeseen"
+msgstr "Unforeseen circumstances"
+
+msgid "admin.planner.cancel_button"
+msgstr "Cancel booking"
+
+msgid "admin.planner.keep"
+msgstr "Do not cancel"
+
+msgid "admin.done.shortfall_accepted"
+msgstr "The shortfall is accepted. It shows again when the staffing or the bookings of this slot change."
+
 msgid "admin.booking.back"
 msgstr "Back to the agenda"
 
@@ -1994,6 +2114,27 @@ msgstr "all appointments on hold cancelled"
 
 msgid "admin.audit.detail.booking_move"
 msgstr "appointment on hold moved"
+
+msgid "audit.event.planner_changes_alert"
+msgstr "Many changes by one planner"
+
+msgid "admin.audit.detail.planner_move"
+msgstr "booking moved by a planner"
+
+msgid "admin.audit.detail.planner_cancel"
+msgstr "booking cancelled by a planner"
+
+msgid "admin.audit.detail.shortfall_accept"
+msgstr "shortfall accepted"
+
+msgid "admin.audit.detail.changes"
+msgstr "changes in the past hour: {count}"
+
+msgid "admin.audit.detail.reason"
+msgstr "reason: {value}"
+
+msgid "admin.audit.detail.actor"
+msgstr "by: {value}"
 
 msgid "admin.audit.detail.bookings"
 msgstr "appointments: {count}"
@@ -4815,3 +4956,27 @@ msgstr "Line {line} is not a website. Enter only the start of the web address, s
 
 msgid "admin.embedding.error.count"
 msgstr "Enter at most {count} websites."
+
+msgid "widget.region"
+msgstr "Book an appointment"
+
+msgid "widget.loading"
+msgstr "Loading…"
+
+msgid "widget.unavailable"
+msgstr "The booking calendar is not available here right now."
+
+msgid "widget.maintenance"
+msgstr "We are carrying out maintenance, so you cannot book an appointment right now. Please try again later."
+
+msgid "widget.retry"
+msgstr "Try again"
+
+msgid "widget.more"
+msgstr "More options, such as starting a call right away, are on the page of {name}."
+
+msgid "widget.done_title"
+msgstr "Your appointment is booked"
+
+msgid "widget.error_summary"
+msgstr "Something was not filled in correctly"
