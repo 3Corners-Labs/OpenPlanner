@@ -4,6 +4,7 @@ Called once per worker loop, after the due jobs:
 
     measure ─► grade ─► not ok? ─► log storage.degraded (on change, then hourly)
                      ─► changed? ─► system event storage.check (superuser's audit log)
+    critical ─► brake: every diagnostic mode ends, so no debug events are written (part 4)
     hourly ─► PRAGMA incremental_vacuum ─► pages back to the file system
 
 The stdout log does not depend on the database: when the disk is full, writing the system
@@ -11,7 +12,7 @@ event may fail, and monitoring must still see the problem. Housekeeping never st
 every failure is logged with its type only.
 """
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 
 import structlog
@@ -47,6 +48,7 @@ class Housekeeping:
         clock: Current time.
         limits: Storage grade boundaries.
         measure: Returns the current usage, or ``None`` when unknown (tests pass a fake).
+        brake: Ends diagnostic mode, with the reason; called every loop at grade critical.
     """
 
     def __init__(
@@ -56,8 +58,10 @@ class Housekeeping:
         clock: Clock,
         limits: StorageLimits,
         measure: Callable[[], StorageUsage | None],
+        brake: Callable[[str], Awaitable[int]] | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged or reclaimed yet."""
+        self._brake = brake
         self._engine = engine
         self._clock = clock
         self._limits = limits
@@ -74,9 +78,10 @@ class Housekeeping:
         clock: Clock,
         limits: StorageLimits,
         database_url: str,
+        brake: Callable[[str], Awaitable[int]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
-        return cls(engine, uow, clock, limits, lambda: measure_storage(database_url))
+        return cls(engine, uow, clock, limits, lambda: measure_storage(database_url), brake)
 
     async def run(self) -> None:
         """Watch the storage, then reclaim pages when due."""
@@ -91,6 +96,14 @@ class Housekeeping:
             return
         grade, reason = assess(usage, self._limits)
         self._log(now, usage, grade, reason)
+        if grade is StorageGrade.CRITICAL and self._brake is not None:
+            try:
+                ended = await self._brake(reason)
+            except Exception as exc:  # the disk may be too full even for this
+                log.warning("diagnostics.brake_failed", error=type(exc).__name__)
+            else:
+                if ended:
+                    log.warning("diagnostics.braked", modes=ended)
         try:
             await self._watch.observe(usage)
         except Exception as exc:  # e.g. the disk is too full to write the event
