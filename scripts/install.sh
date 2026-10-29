@@ -39,7 +39,8 @@ UNIT_DIR=$ROOT/etc/systemd/system
 OIDC_ISSUER=https://token.actions.githubusercontent.com
 READY_URL=http://127.0.0.1:8000/readyz
 HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-300}
-COMPOSE_MIN=2.24.0 # env_file with path/required
+# not a pin: the oldest Compose that reads env_file with path/required; packages stay newest
+COMPOSE_MIN=2.24.0
 VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$'
 REPOSITORY_RE='^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
 
