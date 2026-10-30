@@ -182,6 +182,8 @@ FIELD_MESSAGES: dict[str, str] = {
     "smtp_credential": "admin.form.error.smtp_credential",
     "sender_address": "admin.form.error.sender_address",
     "sender_name": "admin.form.error.sender_name",
+    "reply_to_address": "admin.form.error.reply_to_address",
+    "dkim_selector": "admin.form.error.dkim_selector",
     "sms_provider": "admin.form.error.sms_provider",
     "sms_api_base_url": "admin.form.error.sms_api_base_url",
     "sms_api_key": "admin.form.error.sms_api_key",

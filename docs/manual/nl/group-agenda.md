@@ -24,6 +24,30 @@ ziet u alleen op de detailpagina van een afspraak (**Details**).
 Met **Vorige dag**, **Vandaag** en **Volgende dag** bladert u. **Weekoverzicht** opent de
 week van de gekozen dag.
 
+### De stand van de meetings blijft actueel
+
+De kolommen **Meeting**, **Medewerker** en **Deelnemers** verversen zichzelf, zonder dat de
+pagina opnieuw laadt. Een schermlezer hoort daarbij één korte zin ("Status bijgewerkt: 1
+gesprekken bezig, 0 niet opgepakt"); de focus verspringt alleen als die in de tabel stond.
+Vandaag en in de toekomst gebeurt dat elke 30 seconden; een dag in het verleden verandert
+niet meer en ververst dus niet. De superuser stelt de 30 seconden in bij de
+platforminstellingen (**Meetingstatus in de agenda verversen**, 10 tot 300 seconden).
+
+De stand komt in de eerste plaats van Webex zelf, dat een gebeurtenis stuurt zodra een meeting
+begint of eindigt of iemand erbij komt of weggaat. Komt zo'n gebeurtenis niet aan, dan vraagt
+OpenPlanner Webex om de stand zodra die ouder is dan de verversingstijd, en alleen voor
+afspraken die een lopende meeting kunnen hebben: bevestigd, met een meeting, vanaf 15 minuten
+voor het begin tot 30 minuten na het einde. Een gemiste gebeurtenis ziet u dus binnen een halve
+minuut gecorrigeerd. In **Verloop** staat zo'n gebeurtenis met de toevoeging *polled*.
+
+Werkt Webex niet, dan blijft de agenda zoals hij was. Op de detailpagina van de afspraak staat
+bij **Verloop** een gebeurtenis *Koppeling mislukt* met de code (bijvoorbeeld
+`polled:rejected_403`) en, onder *Antwoord van Webex*, wat Webex zelf als reden gaf. Dat
+staat er één keer per soort fout, niet bij elke verversing.
+
+Werkt uw browser zonder scripts of staat JavaScript uit, dan staat de agenda er zoals hij
+laadde en ververst de link **Vernieuwen** hem.
+
 ## Een afspraak uitzoeken
 
 Op de detailpagina van een afspraak (**Details**) staat alles wat nodig is als een

@@ -1,6 +1,7 @@
 """ConfiguredSenders: the sender per organisation and channel comes from the stored settings."""
 
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -91,6 +92,10 @@ def test_adapter_configs_follow_the_settings() -> None:
         False,
     )
     assert mail.sender == "Demo <noreply@demo.nl>"
+    assert mail.reply_to is None
+    assert smtp_config(replace(SMTP, reply_to_address="info@demo.nl"), "pw").reply_to == (
+        "info@demo.nl"
+    )
     sms = sms_config(SMS, "key")
     assert (sms.sender_id, sms.country_code, sms.api_key) == ("GemDemo", "32", "key")
 

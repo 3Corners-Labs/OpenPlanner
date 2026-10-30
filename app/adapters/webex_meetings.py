@@ -15,13 +15,13 @@ becomes the moment of the request. The booking keeps its own start.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from app.adapters.webex_auth import AuthorizedClient
 from app.domain.booking import MeetingRef
-from app.domain.calls import MeetingRequest
+from app.domain.calls import CallState, MeetingRequest, MeetingStatus
 from app.domain.ports import Clock, IntegrationError
 
 MEETING_OPTIONS: dict[str, Any] = {
@@ -64,8 +64,21 @@ class ProbeMeeting:
         return {k: v for k, v in self.stored.items() if v != TRIAL_OPTIONS[k]}
 
 
+MEETING_STATES: dict[str, CallState] = {
+    "inProgress": CallState.IN_PROGRESS,
+    "ended": CallState.ENDED,
+    "missed": CallState.ENDED,
+    "expired": CallState.ENDED,
+}
+"""Webex meeting ``state`` to ours; every other state (``scheduled``, ``ready``, ``lobby``,
+``active``) is a meeting that has not started."""
+
+PARTICIPANT_LIMIT = "100"
+"""Page size of the participant list; a group call has a handful of participants."""
+
+
 class WebexMeetings:
-    """Creates and deletes meetings.
+    """Creates, deletes and reports on meetings.
 
     Args:
         client: Authorised API client.
@@ -107,6 +120,60 @@ class WebexMeetings:
             params={"hostEmail": host_email, "sendEmail": "false"},
             ok=(200, 204, 404),
         )
+
+    async def meeting_status(self, meeting_id: str, host_email: str) -> MeetingStatus:
+        """Return the meeting's state and, once it started, who is in it, as aggregates (ADR 0010).
+
+        Two reads on behalf of the group's host: the meeting (``state``) and, if it started,
+        its participants. Names and addresses in the participant list are not looked at: the
+        answer is a count, whether a host or cohost joined, and the first join and last leave.
+
+        Raises:
+            IntegrationError: If Webex refuses or cannot be reached.
+        """
+        params = {"hostEmail": host_email}
+        meeting = await self._client.request(
+            "GET", f"{self._base}/meetings/{meeting_id}", params=params, explain=True
+        )
+        state = MEETING_STATES.get(str(meeting.json().get("state")), CallState.SCHEDULED)
+        if state is CallState.SCHEDULED:
+            return MeetingStatus(state)
+        participants = await self._client.request(
+            "GET",
+            f"{self._base}/meetingParticipants",
+            params={"meetingId": meeting_id, "max": PARTICIPANT_LIMIT, **params},
+            ok=(200, 404),
+            explain=True,
+        )
+        items = participants.json().get("items", []) if participants.status_code == 200 else []
+        return _aggregate(state, [i for i in items if isinstance(i, dict)])
+
+
+def _aggregate(state: CallState, items: list[dict[str, Any]]) -> MeetingStatus:
+    """Reduce Webex's participant list to counts and times; nothing else is read."""
+    present = [i for i in items if i.get("state") == "joined"]
+    joined = [i for i in items if i.get("state") in ("joined", "end")]
+    host = any(i.get("host") is True or i.get("coHost") is True for i in joined)
+    started = [t for t in (_time(i.get("joinedTime")) for i in joined) if t]
+    left = [t for t in (_time(i.get("leftTime")) for i in items) if t]
+    return MeetingStatus(
+        state,
+        participants=0 if state is CallState.ENDED else len(present),
+        host_joined=host,
+        started_at=min(started, default=None),
+        ended_at=max(left, default=None) if state is CallState.ENDED else None,
+    )
+
+
+def _time(value: object) -> datetime | None:
+    """Return a Webex timestamp (ISO 8601, ``Z``) as an aware datetime, or ``None``."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
 
 def meeting_body(request: MeetingRequest, now: datetime) -> dict[str, Any]:
