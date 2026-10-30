@@ -92,7 +92,7 @@ def migrated_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     return migrated_database(tmp_path, monkeypatch, "releases")
 
 
-async def test_worker_looks_up_the_latest_release_once_per_hour(
+async def test_worker_lists_the_releases_once_per_hour(
     settings: Settings, migrated_url: str
 ) -> None:
     url = migrated_url
@@ -104,7 +104,8 @@ async def test_worker_looks_up_the_latest_release_once_per_hour(
     def github(request: httpx.Request) -> httpx.Response:
         calls.append(request.url.path)
         page = "https://github.com/acme/openplanner/releases/tag/v1.4.0"
-        return httpx.Response(200, json={"tag_name": "v1.4.0", "html_url": page})
+        # ADR 0067: the worker lists the releases; the channel is applied by the domain.
+        return httpx.Response(200, json=[{"tag_name": "v1.4.0", "html_url": page, "body": ""}])
 
     stop = asyncio.Event()
     task = asyncio.create_task(
@@ -115,7 +116,7 @@ async def test_worker_looks_up_the_latest_release_once_per_hour(
     stop.set()
     await asyncio.wait_for(task, timeout=DEADLINE)
 
-    assert calls == ["/repos/acme/openplanner/releases/latest"]
+    assert calls == ["/repos/acme/openplanner/releases"]
     engine = create_engine(url)
     try:
         async with SqlUnitOfWork(engine).read() as tx:

@@ -8,8 +8,10 @@ with the names of what changed, never the values (ADR 0008).
     overview        integrations.manage   stored settings, whether a secret is set
     save / remove   integrations.manage   change or remove one channel
     send_test_email integrations.manage   one email through the server the worker would use
+    check_sender_domain integrations.manage   SPF, DKIM and DMARC of the sender in effect (ADR 0073)
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, fields
 
 from app.domain.admin import AdminService, record_change, require
@@ -18,16 +20,19 @@ from app.domain.channel_settings import (
     CONFIGURABLE_CHANNELS,
     ChannelConfig,
     ChannelSettings,
+    SmtpSettings,
     secret_field,
     validate_secret,
     validate_test_recipient,
 )
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.mail_domain import DomainReport, check_domain, sender_domain
 from app.domain.organisations import organisation_by_slug
 from app.domain.ports import (
     Clock,
     IntegrationError,
+    MailDomainResolver,
     OutboundMessage,
     SenderDirectory,
     Transaction,
@@ -55,6 +60,10 @@ class ChannelSettingsService:
         clock: Current time, for ``updated_at`` and audit events.
         admin: Authorises changes and audits refusals.
         senders: The senders the worker uses, for test emails; ``None`` has nothing to test.
+        resolver: Looks up DNS records for the sender domain check (ADR 0073); ``None`` has
+            nothing to check.
+        fallback_sender: Returns the installation's fallback ``From`` (``SMTP_HOST`` /
+            ``MAIL_FROM``) or ``None``, read at each check so portal changes apply live.
     """
 
     def __init__(
@@ -63,12 +72,16 @@ class ChannelSettingsService:
         clock: Clock,
         admin: AdminService,
         senders: SenderDirectory | None = None,
+        resolver: MailDomainResolver | None = None,
+        fallback_sender: Callable[[], str | None] | None = None,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
         self._senders = senders
+        self._resolver = resolver
+        self._fallback_sender = fallback_sender
 
     async def organisations(self, principal: Principal) -> list[Organisation]:
         """Return the organisations whose channels ``principal`` may configure."""
@@ -187,6 +200,42 @@ class ChannelSettingsService:
         async with self._uow.locked() as tx:
             await self._audit(tx, principal, slug, f"smtp.test.{failure or 'ok'}")
         return failure
+
+    async def check_sender_domain(self, principal: Principal, slug: str) -> DomainReport:
+        """Look up SPF, DKIM and DMARC of the sender domain in effect (ADR 0073).
+
+        The organisation's own SMTP settings give the domain and the DKIM selector; without
+        them the installation's fallback sender gives the domain and DKIM stays unchecked. The
+        audit event names the finding (``smtp.domain_check.<verdict>``), not the records.
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found`` or
+                ``channel_not_configured`` (no sender at all, or nothing to resolve with).
+        """
+        await self._authorize(principal, slug)
+        async with self._uow.read() as tx:
+            organisation = await organisation_by_slug(tx, slug)
+            stored = next(
+                (
+                    s.config
+                    for s in await tx.get_channel_settings(organisation.id)
+                    if isinstance(s.config, SmtpSettings)
+                ),
+                None,
+            )
+        fallback = self._fallback_sender() if self._fallback_sender else None
+        if stored is not None:
+            address, selector = stored.sender_address, stored.dkim_selector
+        elif fallback:
+            address, selector = fallback, None
+        else:
+            raise DomainError(ErrorCode.CHANNEL_NOT_CONFIGURED)
+        if self._resolver is None:
+            raise DomainError(ErrorCode.CHANNEL_NOT_CONFIGURED)
+        report = await check_domain(self._resolver, sender_domain(address), selector)
+        async with self._uow.locked() as tx:
+            await self._audit(tx, principal, slug, f"smtp.domain_check.{report.finding}")
+        return report
 
     async def _authorize(self, principal: Principal, slug: str) -> None:
         """Raise ``not_permitted`` unless the matrix grants ``integrations.manage``."""
