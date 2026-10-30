@@ -21,6 +21,7 @@ class ErrorCode(StrEnum):
     OUTSIDE_BOOKING_WINDOW = "outside_booking_window"
     BOOKING_NOT_FOUND = "booking_not_found"
     BOOKING_NOT_ACTIVE = "booking_not_active"
+    BOOKING_NOT_PENDING = "booking_not_pending"
     BOOKING_LOCKED = "booking_locked"
     SAME_SLOT = "same_slot"
     DATABASE_BUSY = "database_busy"
@@ -65,6 +66,9 @@ class ErrorCode(StrEnum):
     SETTING_INVALID = "setting_invalid"
     SETTING_COMBINATION = "setting_combination"
     SETTING_EXPIRY = "setting_expiry"
+    SETTING_NO_KEY = "setting_no_key"
+    SETTING_NOT_LOCKED = "setting_not_locked"
+    LOGIN_LOCKOUT = "login_lockout"
 
 
 class DomainError(Exception):

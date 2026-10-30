@@ -21,6 +21,7 @@ _PRINCIPAL = "principal"
 _LOGIN_AT = "login_at"
 _SEEN_AT = "seen_at"
 _OIDC = "oidc"
+_TRIAL = "login_trial"
 _THEME = "theme"
 
 THEMES = ("system", "light", "dark")
@@ -35,6 +36,40 @@ def save_login_start(request: Request, start: LoginStart, next_url: str) -> None
         "verifier": start.code_verifier,
         "next": next_url,
     }
+
+
+def save_login_trial(request: Request, subject: str, values: dict[str, str], now: datetime) -> None:
+    """Remember a proposed login mapping until the dry run of the next login (ADR 0042 §8).
+
+    The session cookie is signed; the values are claim names and role values, not secrets.
+    """
+    request.session[_TRIAL] = {"subject": subject, "values": values, "at": now.isoformat()}
+
+
+def has_login_trial(request: Request) -> bool:
+    """Return whether a proposed login mapping waits for its dry run."""
+    return isinstance(request.session.get(_TRIAL), dict)
+
+
+def pop_login_trial(
+    request: Request, now: datetime, max_age: timedelta
+) -> tuple[str, dict[str, str]] | None:
+    """Return and forget the proposed mapping (each one is tried once).
+
+    A proposal older than ``max_age`` (the re-login limit) is dropped: an abandoned dry run
+    must not be completed by a login days later.
+    """
+    value = request.session.pop(_TRIAL, None)
+    if not isinstance(value, dict) or not isinstance(value.get("values"), dict):
+        return None
+    try:
+        made = datetime.fromisoformat(str(value.get("at", "")))
+    except ValueError:
+        return None
+    if made.tzinfo is None or now - made > max_age:
+        return None
+    values = {str(k): str(v) for k, v in value["values"].items()}
+    return str(value.get("subject", "")), values
 
 
 def pop_login_start(request: Request) -> dict[str, str] | None:

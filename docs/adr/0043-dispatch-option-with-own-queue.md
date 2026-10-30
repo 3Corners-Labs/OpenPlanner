@@ -196,6 +196,18 @@ Built in step 2 with these limits, each a follow-up:
 - **Releasing others' claims** is allowed to whoever holds `bookings.view` on the group (group
   and organisation admins), since group admins do not hold `group.edit`.
 
+Built in step 3 (the calendar invite, point 9) with these choices:
+
+- **Message jobs instead of the `BookingDispatcher` port.** The invite and its withdrawal are
+  two email jobs (`send_team_invite`, `send_team_cancel`) planned with the booking's other
+  jobs, like every message (ADR 0009). The WxCC task already has its jobs, so no hook is left
+  for a port to carry; ADR 0032 can still introduce one when a second contact center arrives.
+- **Organizer and attendee are the team's address.** The mail is sent from the organisation's
+  sender (`From`), but the sender port does not expose that address, so the `REQUEST` names
+  the team mailbox as organizer and attendee: the event lands in the team's calendar without
+  answers. `SEQUENCE` is the minute of sending, so it always rises.
+- **No invite for direct calls**: they start at once.
+
 ## Consequences
 
 - New port `BookingDispatcher` and adapters `app/adapters/dispatch_contact_center.py` and

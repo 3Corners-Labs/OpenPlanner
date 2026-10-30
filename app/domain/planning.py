@@ -72,6 +72,7 @@ class GroupSettings:
     queue_visible_from_minutes: int
     queue_free_pick_allowed: bool
     max_bookings_per_email: int
+    calendar_invite_address: str | None
     video_host_email: str | None
     wxcc_business_address: str | None
     wxcc_channel: str | None

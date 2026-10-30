@@ -48,6 +48,8 @@ class PortalValues:
         expires: When a value lapses, for the keys that have an expiry (``LOG_LEVEL``).
         organisations: Class D values per organisation id (ADR 0042 step 5).
         organisation_ids: The id of every organisation by slug (the admin's claim names slugs).
+        secrets: Class C secrets set in the portal, opened from their sealed store (ADR 0008,
+            step 6); never in ``repr``, never logged.
     """
 
     version: int
@@ -55,6 +57,7 @@ class PortalValues:
     expires: Mapping[str, datetime] = field(default_factory=dict)
     organisations: Mapping[int, Mapping[str, object]] = field(default_factory=dict)
     organisation_ids: Mapping[str, int] = field(default_factory=dict)
+    secrets: Mapping[str, str] = field(default_factory=dict, repr=False)
 
     def applies(self, key: str, now: datetime | None) -> bool:
         """Return whether a value is stored for ``key`` and has not lapsed at ``now``."""
@@ -152,6 +155,8 @@ def resolve(
         now: The current time; a value that lapsed before it no longer applies. ``None``
             applies every stored value.
     """
+    if spec.secret:
+        return _resolve_secret(spec, env_value, env_source, portal)
     stored = portal.applies(spec.key, now)
     ignored = stored and spec.in_portal and not usable(spec, portal.values[spec.key])
     if env_source is not None:
@@ -159,6 +164,22 @@ def resolve(
         return Resolved(spec, env_value, env_source, spec.lockable, outside, ignored)
     if stored and not ignored and spec.in_portal:
         return Resolved(spec, portal.values[spec.key], Source.PORTAL, False)
+    return Resolved(spec, env_value, Source.DEFAULT, False, portal_ignored=ignored)
+
+
+def _resolve_secret(
+    spec: SettingSpec, env_value: object, env_source: Source | None, portal: PortalValues
+) -> Resolved:
+    """Resolve a secret: the environment lock, else the sealed portal value, else unset.
+
+    A secret is never taken from the JSON table of portal values; one found there is ignored.
+    """
+    ignored = spec.key in portal.values
+    if env_source is not None:
+        return Resolved(spec, env_value, env_source, spec.lockable, False, ignored)
+    sealed = portal.secrets.get(spec.key)
+    if spec.in_portal and isinstance(sealed, str) and sealed:
+        return Resolved(spec, sealed, Source.PORTAL, False)
     return Resolved(spec, env_value, Source.DEFAULT, False, portal_ignored=ignored)
 
 
@@ -207,6 +228,7 @@ class PlatformSettingsStore:
             expires = await tx.platform_setting_expiries()
             organisations = await tx.organisation_settings()
             ids = {o.slug: o.id for o in await tx.list_organisations(Scope(everything=True))}
-        self.current = PortalValues(version, values, expires, organisations, ids)
+            secrets = await tx.platform_secrets()
+        self.current = PortalValues(version, values, expires, organisations, ids, secrets)
         self._loaded = True
         return True

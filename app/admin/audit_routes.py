@@ -169,6 +169,7 @@ DETAIL_LABELS: dict[str, str] = {
     "queue_visible_from_minutes": "admin.field.queue_visible_from_minutes",
     "queue_free_pick_allowed": "admin.field.queue_free_pick_allowed",
     "max_bookings_per_email": "admin.field.max_bookings_per_email",
+    "calendar_invite_address": "admin.field.calendar_invite_address",
     "video_host_email": "admin.field.video_host_email",
     "wxcc_business_address": "admin.field.wxcc_business_address",
     "wxcc_channel": "admin.field.wxcc_channel",
