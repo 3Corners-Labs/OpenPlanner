@@ -131,7 +131,9 @@ class TrialCallService:
         link = client_link(booking.trial.meeting.link if booking.trial else None, group.join_client)
         if trial_state(booking, group, self._clock.now()) is not TrialState.ACTIVE or not link:
             return None
-        await self._integration.record(_id(booking), EventKind.TRIAL_JOINED)
+        await self._integration.record(
+            _id(booking), EventKind.TRIAL_JOINED, detail=group.join_client.value
+        )
         return link
 
     def _view(self, booking: Booking, group: Group) -> TrialView:

@@ -42,6 +42,8 @@ EVENT_LABELS: dict[EventKind, str] = {
     EventKind.JOIN_CLICKED: "call.event.join_clicked",
     EventKind.TRIAL_CREATED: "call.event.trial_created",
     EventKind.TRIAL_JOINED: "call.event.trial_joined",
+    EventKind.TRIAL_ENTERED: "call.event.trial_entered",
+    EventKind.TRIAL_LEFT: "call.event.trial_left",
     EventKind.TRIAL_FAILED: "call.event.trial_failed",
     EventKind.TRIAL_DELETED: "call.event.trial_deleted",
     EventKind.TASK_CREATED: "call.event.task_created",
