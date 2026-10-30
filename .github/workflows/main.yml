@@ -49,8 +49,63 @@ jobs:
       - run: uv sync --locked
       - run: make mutation
 
+  # ADR 0059: every merge to main becomes a release candidate X.Y.Z-rc.N, offered to
+  # installations on the `rc` channel. It waits for the ZAP baseline only: the merge queue ran
+  # the full lane on this commit (ADR 0058), and the mutation test above measures the tests,
+  # not the image. One candidate at a time, so two merges never claim the same number.
+  candidate:
+    name: release candidate from main
+    if: github.ref_type == 'branch'
+    needs: [zap-baseline]
+    concurrency:
+      group: release-candidate
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write   # the rc tag and its pre-release
+      packages: write   # push to ghcr.io
+      id-token: write   # keyless cosign signature via GitHub OIDC
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the candidate number needs the tags and main's history
+      # Registry paths must be lower case; the repository name is not.
+      - id: image
+        run: echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
+      - id: candidate
+        name: next candidate number
+        run: |
+          version="$(python3 -m scripts.release_plan --candidate)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "::notice::release candidate $version"
+      - id: publish
+        uses: ./.github/actions/publish-image
+        with:
+          image: ${{ steps.image.outputs.name }}
+          version: ${{ steps.candidate.outputs.version }}
+          registry-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            type=raw,value=${{ steps.candidate.outputs.version }}
+            type=sha,format=long
+            type=ref,event=branch
+      # The tag comes after the image: a failed build leaves no tag and no pre-release. A tag
+      # pushed with GITHUB_TOKEN starts no workflow, so this never triggers the release job.
+      - name: tag and pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "v$VERSION: release candidate of main @ $GITHUB_SHA ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
+          git push origin "refs/tags/v$VERSION"
+          gh release create "v$VERSION" sbom.cdx.json --prerelease --verify-tag --generate-notes \
+            --title "v$VERSION (release candidate)"
+
   publish:
-    name: build, push and sign image
+    name: build, push and sign the release
+    if: github.ref_type == 'tag'
     needs: [zap-baseline, mutation]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -63,60 +118,31 @@ jobs:
         with:
           fetch-depth: 0   # the release check below needs main's history
       # ADR 0052: a release tag must sit on main and match pyproject.toml, or nothing is pushed.
+      # ADR 0059: release candidates are tagged by the candidate job, never by hand.
       - name: release tag matches main and pyproject.toml
-        if: startsWith(github.ref, 'refs/tags/v')
         run: |
+          case "$GITHUB_REF_NAME" in
+            *-rc.*) echo "::error::$GITHUB_REF_NAME: release candidates are made by CI (ADR 0059)"; exit 1 ;;
+          esac
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
             || { echo "::error::$GITHUB_REF_NAME is not a commit on main"; exit 1; }
           project="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
           [ "v$project" = "$GITHUB_REF_NAME" ] \
             || { echo "::error::tag $GITHUB_REF_NAME but pyproject.toml says $project"; exit 1; }
-      # Registry paths must be lower case; the repository name is not.
       - id: image
-        run: echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        run: |
+          echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - id: publish
+        uses: ./.github/actions/publish-image
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ${{ steps.image.outputs.name }}
+          image: ${{ steps.image.outputs.name }}
+          version: ${{ steps.image.outputs.version }}
+          registry-token: ${{ secrets.GITHUB_TOKEN }}
           tags: |
             type=sha,format=long
             type=semver,pattern={{version}}
-            type=ref,event=branch
-      - id: build
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # ADR 0029: "1.4.0" on a v1.4.0 tag; "main" on a branch, which is no release.
-          # ADR 0052: every image also knows the commit it was built from.
-          build-args: |
-            APP_VERSION=${{ steps.meta.outputs.version }}
-            APP_COMMIT=${{ github.sha }}
-          provenance: mode=max
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-      - name: sign image (keyless)
-        run: cosign sign --yes "${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}"
-      - name: SBOM (CycloneDX)
-        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
-        with:
-          image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-          format: cyclonedx-json
-          output-file: sbom.cdx.json
-          upload-artifact: false
-      - name: attest SBOM
-        run: >-
-          cosign attest --yes --type cyclonedx --predicate sbom.cdx.json
-          "${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}"
       - name: attach SBOM to the release
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" sbom.cdx.json --verify-tag --generate-notes
@@ -124,7 +150,7 @@ jobs:
   # ADR 0051: same gate as in ci.yml, for the jobs that run only on main.
   deprecations:
     name: no deprecation warnings
-    needs: [zap-baseline, mutation, publish]
+    needs: [zap-baseline, mutation, candidate, publish]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10

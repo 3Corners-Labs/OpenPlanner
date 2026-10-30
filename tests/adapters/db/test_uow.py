@@ -25,6 +25,7 @@ from tests.support.domain import (
     TUESDAY_0900,
     book,
     book_pending,
+    citizen,
 )
 
 
@@ -268,3 +269,24 @@ async def test_the_confirmation_moments_round_trip(
     assert pending.confirm_by.tzinfo is UTC
     assert (found.status, found.confirmed_at) == (BookingStatus.CONFIRMED, NOW)
     assert found == confirmed
+
+
+async def test_upcoming_starts_for_email_counts_place_holding_bookings_only(
+    engine: AsyncEngine, service: BookingService
+) -> None:
+    group_id = await seed_group(engine, capacity=3)
+    await seed_group(engine, slug="toeslagen", capacity=3)
+    kept = await book(service)
+    cancelled = await book(service, SLOT_0930, contact=citizen(2))
+    await service.cancel(cancelled.management_token)
+    await book(service, SLOT_0930, contact=citizen(3))
+    await book(service, SLOT_0930, "toeslagen")
+
+    async with SqlUnitOfWork(engine).read() as tx:
+        ada = await tx.upcoming_starts_for_email(group_id, "ADA@example.ORG", NOW)
+        gone = await tx.upcoming_starts_for_email(group_id, "citizen2@example.org", NOW)
+        ended = await tx.upcoming_starts_for_email(group_id, "ada@example.org", SLOT_0930)
+
+    assert ada == [kept.booking.start]
+    assert gone == []
+    assert ended == []

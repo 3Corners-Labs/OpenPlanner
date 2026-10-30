@@ -1,3 +1,4 @@
+import itertools
 from dataclasses import replace
 from datetime import timedelta
 
@@ -24,6 +25,7 @@ from tests.support.domain import (
     SLOT_0900,
     SLOT_0930,
     book_confirmed,
+    citizen,
     window,
     with_team_invite,
 )
@@ -36,11 +38,20 @@ def planner(uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
     return PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=50)
 
 
+_CITIZENS = itertools.count(1)
+"""Each booking of ``_book`` is another citizen, so the address limit (ADR 0059) stays out."""
+
+
 async def _book(
     bookings: BookingService, start=SLOT_0900, slug: str = "demo", consents=frozenset()
 ) -> int:
     receipt = await book_confirmed(
-        bookings, group_slug=slug, start=start, contact=ADA, locale="nl", consents=consents
+        bookings,
+        group_slug=slug,
+        start=start,
+        contact=citizen(next(_CITIZENS)),
+        locale="nl",
+        consents=consents,
     )
     return receipt.booking.id or 0
 

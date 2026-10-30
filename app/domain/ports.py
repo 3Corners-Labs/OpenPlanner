@@ -658,6 +658,16 @@ class Transaction(Protocol):
         """Return the number of confirmed bookings in the slot."""
         ...
 
+    async def upcoming_starts_for_email(
+        self, group_id: int, email: str, after: datetime
+    ) -> list[datetime]:
+        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0059).
+
+        Only bookings that hold a place and end after ``after`` count. The address is
+        compared without regard to (ASCII) case; only start times leave the adapter.
+        """
+        ...
+
     async def add_booking(self, booking: Booking) -> Booking:
         """Store a new booking and return it with its ID."""
         ...

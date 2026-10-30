@@ -65,6 +65,10 @@ WORKING_DAYS = frozenset(range(5))
 """Monday to Friday; holidays do not count as non-working days here (ADR 0043)."""
 MAX_PLANNER_LEAD_MINUTES = 1440
 """ADR 0044: upper bound of ``planner_change_min_lead_minutes`` (one day)."""
+DEFAULT_MAX_BOOKINGS_PER_EMAIL = 3
+"""ADR 0059: future bookings one email address may hold in a group; room to book for others."""
+MAX_BOOKINGS_PER_EMAIL = 10
+"""ADR 0059: upper bound of ``max_bookings_per_email``; there is no "unlimited" (a protection)."""
 
 
 def _invalid(field: str) -> DomainError:
@@ -188,6 +192,10 @@ class Group:
         queue_visible_from_minutes: Own queue: how long before its start a booking appears.
         queue_free_pick_allowed: Own queue: whether agents may claim any row, not only the
             next one (a working agreement against cherry picking, not a protection).
+        max_bookings_per_email: How many future bookings that hold a place one email address
+            may have in this group, 1 to ``MAX_BOOKINGS_PER_EMAIL`` (ADR 0059). Above 1 so
+            citizens can book on behalf of others; the same address twice in one slot is
+            always refused.
         calendar_invite_address: Own queue: the team's shared mailbox or list that gets an
             iCalendar invite per booking (ADR 0043 point 9); ``None`` sends none.
 
@@ -218,6 +226,7 @@ class Group:
     embedding_enabled: bool = False
     queue_visible_from_minutes: int = DEFAULT_QUEUE_VISIBLE_FROM_MINUTES
     queue_free_pick_allowed: bool = False
+    max_bookings_per_email: int = DEFAULT_MAX_BOOKINGS_PER_EMAIL
     calendar_invite_address: str | None = None
 
     def __post_init__(self) -> None:
@@ -244,6 +253,8 @@ class Group:
             raise _invalid("planner_change_min_lead_minutes")
         if not 0 <= self.queue_visible_from_minutes <= MAX_QUEUE_VISIBLE_FROM_MINUTES:
             raise _invalid("queue_visible_from_minutes")
+        if not 1 <= self.max_bookings_per_email <= MAX_BOOKINGS_PER_EMAIL:
+            raise _invalid("max_bookings_per_email")
         if self.video_host_email is not None and not _EMAIL.fullmatch(self.video_host_email):
             raise _invalid("video_host_email")
         invite = self.calendar_invite_address

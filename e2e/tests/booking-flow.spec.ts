@@ -8,10 +8,10 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { expectNoAxeViolations, tabTo } from '../helpers';
+import { citizenEmail, expectNoAxeViolations, tabTo } from '../helpers';
 import { fixture } from '../pages';
 
-test('book, confirm, move and cancel with the keyboard only', async ({ page }) => {
+test('book, confirm, move and cancel with the keyboard only', async ({ page }, testInfo) => {
   await page.goto('/g/demo');
   await expectNoAxeViolations(page);
 
@@ -58,7 +58,7 @@ test('book, confirm, move and cancel with the keyboard only', async ({ page }) =
 
   await page.getByLabel('E-mailadres').focus();
   await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.type('ada@example.org');
+  await page.keyboard.type(citizenEmail(testInfo));
   await tabTo(page, page.getByRole('button', { name: 'Afspraak maken' }));
   await page.keyboard.press('Enter');
 

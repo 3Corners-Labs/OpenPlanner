@@ -65,14 +65,25 @@ async def book_confirmed(service: BookingService, **arguments: Any) -> BookingRe
 
 
 async def book_pending(
-    service: BookingService, start: datetime = SLOT_0900, slug: str = "aangifte"
+    service: BookingService,
+    start: datetime = SLOT_0900,
+    slug: str = "aangifte",
+    contact: ContactInput = ADA,
 ) -> BookingReceipt:
-    """Book ``start`` for Ada in group ``slug``; it awaits her confirmation (ADR 0056)."""
-    return await service.book(group_slug=slug, start=start, contact=ADA, locale="nl")
+    """Book ``start`` for ``contact`` (Ada) in group ``slug``; it awaits confirmation."""
+    return await service.book(group_slug=slug, start=start, contact=contact, locale="nl")
+
+
+def citizen(number: int) -> ContactInput:
+    """Return Ada's details under address ``number``: another citizen for the address limit."""
+    return replace(ADA, email=f"citizen{number}@example.org")
 
 
 async def book(
-    service: BookingService, start: datetime = SLOT_0900, slug: str = "aangifte"
+    service: BookingService,
+    start: datetime = SLOT_0900,
+    slug: str = "aangifte",
+    contact: ContactInput = ADA,
 ) -> BookingReceipt:
-    """Book ``start`` for Ada in group ``slug`` and confirm it, as she would by email link."""
-    return await book_confirmed(service, group_slug=slug, start=start, contact=ADA, locale="nl")
+    """Book ``start`` for ``contact`` (Ada) in ``slug`` and confirm it, as by email link."""
+    return await book_confirmed(service, group_slug=slug, start=start, contact=contact, locale="nl")
