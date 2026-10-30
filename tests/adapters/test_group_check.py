@@ -179,7 +179,7 @@ async def test_the_probe_meeting_is_scheduled_as_a_booking_would_and_deleted_aga
     assert [(r.method, r.url.path) for r in webex] == [
         ("POST", "/v1/meetings"),
         ("DELETE", "/v1/meetings/probe-1"),
-        ("POST", "/v1/meetings"),  # then the trial call's probe (ADR 0070)
+        ("POST", "/v1/meetings"),  # then the trial call's probe (ADR 0071)
         ("DELETE", "/v1/meetings/probe-1"),
     ]
     body = json.loads(webex[0].content)

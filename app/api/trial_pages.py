@@ -1,4 +1,4 @@
-"""The participant's trial call on Webex (ADR 0070): ``/b/{token}/test``.
+"""The participant's trial call on Webex (ADR 0071): ``/b/{token}/test``.
 
 Participants, often first-timers, can try camera, microphone, speakers and browser in a real Webex
 meeting on the group's site, well before the appointment. The page offers a button that opens

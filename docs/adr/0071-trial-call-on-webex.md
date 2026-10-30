@@ -1,4 +1,4 @@
-# 0070. A trial call on Webex ahead of the appointment
+# 0071. A trial call on Webex ahead of the appointment
 
 Status: accepted (2026-10-30), requested by the product owner. Extends ADR 0017 (video through
 the Webex Meetings API). Settings per ADR 0042. Touches open point O8 (accessibility of the

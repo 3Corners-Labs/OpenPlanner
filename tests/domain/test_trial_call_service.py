@@ -1,4 +1,4 @@
-"""Opening, joining and deleting a trial call (ADR 0070)."""
+"""Opening, joining and deleting a trial call (ADR 0071)."""
 
 from datetime import timedelta
 
