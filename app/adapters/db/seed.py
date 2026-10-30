@@ -38,6 +38,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import Booking, BookingStatus, Contact, Slot
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
+from app.domain.form_fields import Classification, FieldDefinition, FieldType, FormDefinition
 from app.domain.images import ImageFile, ImageText
 from app.domain.ports import Transaction
 from app.domain.scheduling import Group, PhoneMode
@@ -81,7 +82,8 @@ EXAMPLE_CONTACTS = ContactBlock(
 )
 # A made-up citizen: the booking on hold exists only in development and test databases.
 EXAMPLE_CITIZEN = Contact.create(
-    name="Voorbeeld Inwoner",
+    first_name="Voorbeeld",
+    last_name="Inwoner",
     email="inwoner@example.org",
     phone=None,
     phone_mode=PhoneMode.OPTIONAL,
@@ -117,7 +119,41 @@ async def seed_demo(engine: AsyncEngine) -> bool:
         engine, OTHER_ORGANISATION_SLUG, "Andere gemeente", OTHER_GROUP_SLUG, "Andere: team"
     )
     await _seed_calendar(engine)
+    if created:
+        await _seed_form(engine)
     return created
+
+
+DEMO_FORM_FIELDS = (
+    FieldDefinition.create(
+        key="onderwerp",
+        type=FieldType.CHOICE,
+        labels={"nl": "Waar gaat uw vraag over?", "en": "What is your question about?"},
+        hints={"nl": "Dan bereidt de medewerker zich voor.", "en": "So the agent can prepare."},
+        options=("toeslagen", "belastingen", "anders"),
+        option_labels={
+            "toeslagen": {"nl": "Toeslagen", "en": "Benefits"},
+            "belastingen": {"nl": "Belastingen", "en": "Taxes"},
+            "anders": {"nl": "Iets anders", "en": "Something else"},
+        },
+        classification=Classification.NOT_PII,
+    ),
+    FieldDefinition.create(
+        key="tolk",
+        type=FieldType.CHECKBOX,
+        labels={"nl": "Ik wil graag een tolk", "en": "I would like an interpreter"},
+    ),
+)
+"""Two optional example fields on the demo group's form (ADR 0055), so the demo and the
+accessibility checks show a choice list and a checkbox."""
+
+
+async def _seed_form(engine: AsyncEngine) -> None:
+    """Give the new demo group its example form fields."""
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        group = await _group(tx, DEMO_SLUG)
+        await tx.save_form(group.id, FormDefinition(2, DEMO_FORM_FIELDS))
 
 
 async def _seed_calendar(engine: AsyncEngine) -> None:

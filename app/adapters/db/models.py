@@ -198,6 +198,7 @@ class GroupRow(Base):
     queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     calendar_invite_address: Mapped[str | None] = mapped_column(String(254))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
+    form_version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
 
     __table_args__ = (
         CheckConstraint("phone_mode IN ('hidden', 'optional', 'required')", name="phone_mode"),
@@ -209,6 +210,36 @@ class GroupRow(Base):
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
         CheckConstraint("queue_visible_from_minutes BETWEEN 0 AND 120", name="queue_visible_from"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
+    )
+
+
+class GroupFormFieldRow(Base):
+    """A custom field of a group's booking form (ADR 0055); no personal data.
+
+    Retired fields stay, so their labels explain earlier answers and their keys are not used
+    again. Texts are JSON objects of locale to text; options a JSON list of keys.
+    """
+
+    __tablename__ = "group_form_fields"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    key: Mapped[str] = mapped_column(String(40))
+    position: Mapped[int] = mapped_column(Integer)
+    type: Mapped[str] = mapped_column(String(16))
+    required: Mapped[bool] = mapped_column(Boolean)
+    classification: Mapped[str] = mapped_column(String(8))
+    options: Mapped[str] = mapped_column(Text, server_default=text("'[]'"))
+    minimum: Mapped[int | None] = mapped_column(Integer)
+    maximum: Mapped[int | None] = mapped_column(Integer)
+    labels: Mapped[str] = mapped_column(Text)
+    hints: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+    option_labels: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+    retired: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "key"),
+        CheckConstraint("classification IN ('pii', 'not_pii')", name="classification"),
     )
 
 
@@ -398,7 +429,8 @@ class BookingRow(Base):
     slot_id: Mapped[int] = mapped_column(ForeignKey("slots.id", ondelete="RESTRICT"))
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="RESTRICT"), index=True)
     status: Mapped[str] = mapped_column(String(24))
-    name: Mapped[str | None] = mapped_column(String(100))
+    first_name: Mapped[str | None] = mapped_column(String(100))
+    last_name: Mapped[str | None] = mapped_column(String(100))
     email: Mapped[str | None] = mapped_column(String(254))
     phone: Mapped[str | None] = mapped_column(String(16))
     locale: Mapped[str] = mapped_column(String(16))
@@ -425,6 +457,8 @@ class BookingRow(Base):
     # ADR 0056: the deadline to confirm by email link, and when the citizen did.
     confirm_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
     confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0055: answers to the group's custom fields as JSON; PII, purged as a whole.
+    form_answers: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),

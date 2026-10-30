@@ -17,7 +17,9 @@ MONDAY = date(2026, 1, 5)
 SLOT_0900 = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)  # 09:00 Amsterdam (CET)
 SLOT_0930 = datetime(2026, 1, 5, 8, 30, tzinfo=UTC)
 TUESDAY_0900 = datetime(2026, 1, 6, 8, 0, tzinfo=UTC)
-ADA = ContactInput(name="Ada Lovelace", email="ada@example.org", phone="06 1234 5678")
+ADA = ContactInput(
+    first_name="Ada", last_name="Lovelace", email="ada@example.org", phone="06 1234 5678"
+)
 DEMO_SUPERUSER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 DEMO_ORG_ADMIN = Principal(
     "o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset()

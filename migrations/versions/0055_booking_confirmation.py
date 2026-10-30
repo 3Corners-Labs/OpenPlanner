@@ -5,7 +5,7 @@ confirmed or lapses at ``confirm_by``. ``confirmed_at`` records when the citizen
 which is also when the email address was verified. Both are times, not personal data.
 
 Revision ID: 0055
-Revises: 0044
+Revises: 0053
 Create Date: 2026-10-30 14:00:00.000000
 """
 
@@ -17,7 +17,7 @@ from alembic import op
 from app.adapters.db.types import UTCDateTime
 
 revision: str = "0055"
-down_revision: str | None = "0044"
+down_revision: str | None = "0053"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -16,7 +16,7 @@ from tests.support.admin import SUPER
 from tests.support.domain import NOW
 
 FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam, a free slot of the demo group
-ADA = {"name": "Ada Lovelace", "email": "ada@example.org", "phone": ""}
+ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 CLIENT = re.compile(r"client:[0-9a-f]{16}")
 

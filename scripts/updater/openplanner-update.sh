@@ -82,16 +82,17 @@ maintenance() { # maintenance on|off; never fails the script (a version before A
 }
 
 healthy() { # web answers /readyz and the worker container reports healthy
+  # Check before looking at the deadline: SECONDS may tick past it before the first check.
   local deadline=$((SECONDS + HEALTH_TIMEOUT)) worker
-  while ((SECONDS < deadline)); do
+  while true; do
     worker=$(compose ps -q worker)
     if curl -fsS -o /dev/null "$READY_URL" \
       && [[ -n $worker && $(docker inspect -f '{{.State.Health.Status}}' "$worker") == healthy ]]; then
       return 0
     fi
+    ((SECONDS < deadline)) || return 1
     sleep 5
   done
-  return 1
 }
 
 switch_to() { # pin an image and (re)start web and worker

@@ -32,6 +32,8 @@ def _records(stream: io.StringIO) -> list[dict[str, object]]:
 
 def test_pii_fields_cover_the_booking_pii_columns() -> None:
     assert {"name", "email", "phone", "note", "guest_join_url", "host_join_url"} <= PII_FIELDS
+    # ADR 0055: the split name and the answers to custom fields.
+    assert {"first_name", "last_name", "form_answers", "answers"} <= PII_FIELDS
 
 
 def test_structlog_masks_every_pii_field(stream: io.StringIO) -> None:

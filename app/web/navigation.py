@@ -275,6 +275,8 @@ OBJECTS = (
                 f"{_GROUP}/settings",
                 Permission.GROUP_EDIT,
                 "settings",
+                # ADR 0055: the booking form is a sub-page of the settings.
+                (f"{_GROUP}/settings/form", f"{_GROUP}/settings/form/{{key}}"),
             ),
             Screen(
                 "group.staffing",

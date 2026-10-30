@@ -25,6 +25,7 @@ dependencies = [
     "cryptography>=44",
     "tzdata>=2025.2",
     "markdown-it-py>=4.0",
+    "phonenumbers>=9.0",
 ]
 
 [dependency-groups]

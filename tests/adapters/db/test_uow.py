@@ -61,7 +61,7 @@ async def test_book_persists_slot_booking_and_jobs(
     assert found.start == SLOT_0900
     assert found.start.tzinfo is UTC
     assert found.contact is not None
-    assert found.contact.phone == "0612345678"
+    assert found.contact.phone == "+31612345678"
     assert found.status is BookingStatus.CONFIRMED
     async with engine.connect() as conn:
         stored = (await conn.execute(select(BookingRow.management_token_hash))).scalar_one()
@@ -237,17 +237,19 @@ async def test_salt_is_stored_and_purge_clears_personal_data(
         row = (
             await conn.execute(
                 select(
-                    BookingRow.name,
+                    BookingRow.first_name,
+                    BookingRow.last_name,
                     BookingRow.email,
                     BookingRow.phone,
+                    BookingRow.form_answers,
                     BookingRow.guest_join_url,
                     BookingRow.host_join_url,
                     BookingRow.pii_purged_at,
                 )
             )
         ).one()
-    assert row[:5] == (None, None, None, None, None)
-    assert row[5] == NOW
+    assert row[:7] == (None,) * 7
+    assert row[7] == NOW
 
 
 async def test_the_confirmation_moments_round_trip(

@@ -24,7 +24,7 @@ from tests.support.domain import NOW
 FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam
 FRIDAY_0930 = "2026-01-02T08:30:00Z"
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
-ADA = {"name": "Ada Lovelace", "email": "ada@example.org", "phone": ""}
+ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
 
 
 @pytest.fixture
@@ -197,7 +197,7 @@ async def test_invalid_input_is_explained_and_kept(site: httpx.AsyncClient) -> N
     assert '<a href="#email">Vul een geldig e-mailadres in' in text
     assert 'aria-invalid="true"' in text
     assert 'aria-describedby="email-hint email-error"' in text
-    assert 'value="Ada Lovelace"' in text
+    assert 'value="Lovelace"' in text
 
 
 async def test_full_slot_is_reported(site: httpx.AsyncClient) -> None:

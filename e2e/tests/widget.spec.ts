@@ -42,8 +42,10 @@ test('book through the widget with the keyboard only', async ({ page }, info) =>
   await expectNoAxeViolations(page);
 
   // An invalid email: the error summary is focused and linked to the field.
-  await tabTo(page, widget.getByLabel('Naam'));
-  await page.keyboard.type('Ada Lovelace');
+  await tabTo(page, widget.getByLabel('Voornaam'));
+  await page.keyboard.type('Ada');
+  await tabTo(page, widget.getByLabel('Achternaam'));
+  await page.keyboard.type('Lovelace');
   await tabTo(page, widget.getByLabel('E-mailadres'));
   await page.keyboard.type('not-an-email');
   await tabTo(page, widget.getByRole('button', { name: 'Afspraak maken' }));
