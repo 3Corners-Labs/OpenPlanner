@@ -93,6 +93,7 @@ class State:
     channel_settings: dict[tuple[int, ChannelKind], ChannelSettings] = field(default_factory=dict)
     channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
+    organisation_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
     running_versions: list[RunningVersion] = field(default_factory=list)
     release_listing: list[ListedRelease] = field(default_factory=list)
@@ -588,6 +589,25 @@ class InMemoryTransaction:
             texts.pop((locale, key), None)
         else:
             texts[(locale, key)] = text
+
+    async def get_organisation_texts(self, organisation_id: int) -> dict[tuple[str, str], str]:
+        return dict(self.state.organisation_texts.get(organisation_id, {}))
+
+    async def save_organisation_text(
+        self, organisation_id: int, locale: str, key: str, text: str | None
+    ) -> None:
+        texts = self.state.organisation_texts.setdefault(organisation_id, {})
+        if text is None:
+            texts.pop((locale, key), None)
+        else:
+            texts[(locale, key)] = text
+
+    async def get_all_organisation_texts(self) -> dict[tuple[int, str, str], str]:
+        return {
+            (org, locale, key): text
+            for org, texts in self.state.organisation_texts.items()
+            for (locale, key), text in texts.items()
+        }
 
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime

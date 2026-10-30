@@ -2,8 +2,8 @@
 
 Lookup chain, first hit wins (ADR 0004):
 
-1. organisation override (when an organisation is given)
-2. global override
+1. organisation override (when an organisation is given; ADR 0074)
+2. global override (not built)
 3. shipped catalogue of the requested locale
 4. shipped catalogue of the default locale (Dutch)
 5. the key itself, logged once per key and locale as ``i18n.missing_key``
@@ -30,13 +30,20 @@ class OverrideSource(Protocol):
         """
         ...
 
+    async def refresh(self) -> None:
+        """Make ``get`` reflect recent changes; cheap when called often (it may cache)."""
+        ...
+
 
 class NoOverrides:
-    """``OverrideSource`` without any overrides; used until the admin editor exists."""
+    """``OverrideSource`` without any overrides; used by tools that need no database."""
 
     def get(self, locale: str, key: str, organisation_id: int | None) -> str | None:
         """Return ``None``: there are no overrides."""
         return None
+
+    async def refresh(self) -> None:
+        """Do nothing: there is nothing to refresh."""
 
 
 class Translator:
@@ -64,6 +71,10 @@ class Translator:
         self._overrides: OverrideSource = overrides or NoOverrides()
         self._default = default_locale
         self._reported_missing: set[tuple[str, str]] = set()
+
+    async def refresh(self) -> None:
+        """Bring the override source up to date; call once per request or job."""
+        await self._overrides.refresh()
 
     @property
     def locales(self) -> tuple[str, ...]:
