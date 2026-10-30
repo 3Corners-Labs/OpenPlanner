@@ -35,6 +35,7 @@ from app.domain.booking import Booking, BookingStatus, ChangeReason
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.rebooking import last_made
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.domain.tunable import value_for, value_of
@@ -272,8 +273,7 @@ class PlannerService:
             group.id, slot.start, slot.start + timedelta(seconds=1)
         )
         changeable = [b for b in confirmed if booking_changes.planner_may_change(b, group, now)]
-        newest_first = sorted(changeable, key=lambda b: (b.created_at, b.id or 0), reverse=True)
-        return newest_first[: slot.open_shortfall]
+        return last_made(changeable, slot.open_shortfall)
 
     async def _changeable(self, tx: Transaction, group: Group, booking_id: int) -> Booking:
         """Return the group's booking ``booking_id`` if a planner may change it now."""

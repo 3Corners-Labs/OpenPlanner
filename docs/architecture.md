@@ -256,6 +256,7 @@ same commit and rollback behaviour as the SQL one.
 | Agenda per slot with agents and shortfalls, day and week view (ADR 0044) | `app/domain/agenda.py`, `app/domain/agenda_service.py`, `app/admin/agenda_routes.py`, `app/admin/shortfalls.py` |
 | A planner's changes: move, cancel with a fixed reason, accept a shortfall (ADR 0044) | `app/domain/planner_service.py`, `app/admin/planner_routes.py` |
 | Cancelling on the citizen's behalf, shared by closure and planner; the planner's limits; asking to rebook and its lapse (ADR 0044) | `app/domain/booking_changes.py`, `app/jobs/runner.py` (`lapse_rebook`) |
+| Rebooking assistant: which bookings of a short slot move and which slot each is proposed, same time on the nearest day first (ADR 0057) | `app/domain/rebooking.py` |
 | Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
@@ -739,6 +740,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0048 | Live progress of updates: the host updater reports each step, the updates page polls a fragment (proposed) |
 | 0050 | One host installer that installs, repairs and re-checks a host; one layout under `/home/<user>/openplanner` (proposed) |
 | 0056 | A citizen confirms a new booking by email link; it holds its place until `confirm_by`, then lapses |
+| 0057 | Rebooking assistant: propose a new time for the excess of a short slot, held until the citizen confirms (proposed) |
 
 ## 12. Status and roadmap
 
