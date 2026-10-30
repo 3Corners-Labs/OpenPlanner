@@ -5,6 +5,7 @@ import hashlib
 import json
 import time
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
@@ -23,6 +24,7 @@ from app.adapters.oidc import (
 )
 from app.domain.authorization import Role
 from app.domain.ports import IdentityError
+from app.domain.settings_registry import lookup
 
 ISSUER = "https://idp.example.nl"
 CLIENT = "openplanner-admin"
@@ -453,3 +455,55 @@ def test_the_mapping_follows_the_settings_at_every_login() -> None:
 
     assert mapping.role_claim == "realm_roles"
     assert mapping.role_values["op-agent"] is Role.AGENT
+
+
+DEV_REALM = Path(__file__).resolve().parents[2] / "dev" / "keycloak" / "openplanner-realm.json"
+"""The Keycloak realm of the ``dev`` compose profile (ADR 0013 §6)."""
+
+
+def _default_mapping() -> ClaimMapping:
+    """Return the mapping of the login settings at their defaults (what a fresh install uses)."""
+    keys = (
+        "oidc_role_claim",
+        "oidc_organisation_claim",
+        "oidc_group_claim",
+        "oidc_role_superuser",
+        "oidc_role_org_admin",
+        "oidc_role_group_admin",
+        "oidc_role_auditor",
+        "oidc_role_agent",
+    )
+    values: dict[str, str] = {}
+    for key in keys:
+        spec = lookup(key)
+        assert spec is not None, key
+        values[key] = str(spec.default)
+    return claim_mapping(values)
+
+
+def test_a_login_holding_every_role_value_holds_every_built_in_role() -> None:
+    mapping = _default_mapping()
+    claims = {
+        "sub": "u",
+        mapping.role_claim: sorted(mapping.role_values),
+        mapping.organisation_claim: ["demo"],
+        mapping.group_claim: ["demo"],
+    }
+
+    principal = principal_from_claims(claims, mapping)
+
+    assert principal.roles == frozenset(Role)
+    assert (principal.organisations, principal.groups) == ({"demo"}, {"demo"})
+    assert principal.role_claims == frozenset()  # every value is a built-in role, none is left
+
+
+def test_the_dev_realm_super_user_holds_every_built_in_role() -> None:
+    """``super`` in the dev realm walks the portal as an admin with every role at once."""
+    realm = json.loads(DEV_REALM.read_text(encoding="utf-8"))
+    mapping = _default_mapping()
+    (sanne,) = [u for u in realm["users"] if u["username"] == "super"]
+    attributes = sanne["attributes"]
+
+    assert set(attributes[mapping.role_claim]) == set(mapping.role_values)
+    assert attributes[mapping.organisation_claim] == ["demo"]
+    assert attributes[mapping.group_claim] == ["demo"]
