@@ -27,7 +27,10 @@ OVER_TAB_LIMIT = frozenset({"group"})
 
 
 def _page_routes(settings: Settings) -> set[str]:
-    """Return every admin GET route that renders a portal page."""
+    """Return every admin GET route that renders a portal page.
+
+    A widget fragment (``FragmentResponse``, ADR 0061) is part of the overview, not a page.
+    """
     return {
         route.path
         for route in all_routes(create_app(settings).routes)

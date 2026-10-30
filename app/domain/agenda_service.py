@@ -7,6 +7,7 @@ agenda counts bookings and shows no contact data; the day view adds first names 
     days        bookings.view   group level   slots of up to MAX_AGENDA_DAYS days
     shortfalls  bookings.view   group level   slots short of agents within the horizon
     summaries   bookings.view   every group in scope (dashboard)
+    counts_today bookings.view  confirmed bookings today per group in scope (ADR 0061 widget)
 """
 
 from collections import Counter
@@ -99,6 +100,23 @@ class AgendaService:
         async with self._uow.read() as tx:
             groups = await tx.list_groups(scope_for(principal, Permission.BOOKINGS_VIEW))
             return {g.group.slug: await self._summary(tx, g.group) for g in groups}
+
+    async def counts_today(self, principal: Principal) -> dict[str, int]:
+        """Return today's confirmed bookings per group whose bookings ``principal`` may view.
+
+        Counts only, keyed by group slug; "today" is each group's own local day (ADR 0061
+        §8: the overview shows counts, group names and times, never booking fields).
+        """
+        now = self._clock.now()
+        async with self._uow.read() as tx:
+            groups = await tx.list_groups(scope_for(principal, Permission.BOOKINGS_VIEW))
+            counts = {}
+            for summary in groups:
+                today = summary.group.today(now)
+                lower, upper = utc_bounds(summary.group, today, today)
+                found = await tx.find_confirmed_bookings(summary.group.id, lower, upper)
+                counts[summary.group.slug] = len(found)
+            return counts
 
     async def _summary(self, tx: Transaction, group: Group) -> ShortfallSummary:
         """Return ``group``'s shortfall summary at the current time."""
