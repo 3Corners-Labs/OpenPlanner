@@ -53,6 +53,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DEV_TOKEN_KEY_PATH` | path | `data/dev-token.key` | Development management-token key file. |
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
 | `DEV_SETTINGS_KEY_PATH` | path | `data/dev-settings.key` | Development settings key file. |
+| `UPDATE_CHANNEL` | enum | `release` | What the installation follows (ADR 0059): releases only, or release candidates (`rc`) too; `rc` is refused in production. |
+| `UPDATE_AUTO_APPLY` | bool | `false` | The worker requests a newer version itself as soon as the check finds one (ADR 0059); refused in production. |
 
 ## C. Platform (portal, *Advanced settings*; lockable by env)
 
