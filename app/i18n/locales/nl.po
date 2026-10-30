@@ -577,8 +577,35 @@ msgstr "Platform"
 msgid "admin.nav.object.group"
 msgstr "Groep"
 
-msgid "admin.profile.roles"
-msgstr "Uw rollen"
+msgid "admin.profile.source"
+msgstr "Uw rol komt uit uw organisatie-account en is hier niet te wijzigen."
+
+msgid "admin.profile.my_rights"
+msgstr "Mijn rechten bekijken"
+
+msgid "admin.alerts.label"
+msgstr "Meldingen"
+
+msgid "admin.alerts.banner"
+msgstr "Balk tonen bij storingen"
+
+msgid "admin.alerts.popups.label"
+msgstr "Pop-ups"
+
+msgid "admin.alerts.popups.all"
+msgstr "Alle meldingen"
+
+msgid "admin.alerts.popups.warnings"
+msgstr "Waarschuwingen en storingen"
+
+msgid "admin.alerts.popups.outages"
+msgstr "Alleen storingen"
+
+msgid "admin.alerts.popups.off"
+msgstr "Geen"
+
+msgid "admin.alerts.save"
+msgstr "Opslaan"
 
 msgid "admin.theme.label"
 msgstr "Weergave"
@@ -2107,6 +2134,9 @@ msgstr "Taak kon niet worden beëindigd"
 
 msgid "call.event.task_marked_cancelled"
 msgstr "Taak als geannuleerd gemarkeerd"
+
+msgid "call.event.citizen_left"
+msgstr "Burger stopte met wachten"
 
 msgid "admin.booking.end_not_possible"
 msgstr "De afspraak is geannuleerd en de taak is via de v2-API als geannuleerd gemarkeerd (Soort: cancelled; zie de tijdlijn), maar WxCC liet OpenPlanner de taak niet beëindigen. Beëindig de taak in Agent Desktop als die nog openstaat."
@@ -3944,6 +3974,9 @@ msgstr "Er loopt al een updateverzoek. Wacht tot het klaar is of trek het in."
 msgid "admin.done.update_requested"
 msgstr "De update is aangevraagd. De updater op de server voert hem binnen een minuut uit."
 
+msgid "admin.done.check_requested"
+msgstr "De controle is aangevraagd. De worker kijkt binnen een halve minuut of er een nieuwe versie is."
+
 msgid "admin.done.restore_requested"
 msgstr "Terugzetten is aangevraagd. De updater op de server voert het binnen een minuut uit."
 
@@ -3994,6 +4027,15 @@ msgstr "Laatst gecontroleerd"
 
 msgid "admin.updates.never"
 msgstr "Nog niet"
+
+msgid "admin.updates.check_requested"
+msgstr "Controle aangevraagd"
+
+msgid "admin.updates.check_interval"
+msgstr "De server controleert elke {minutes} minuten of er een nieuwe versie is. Dit interval staat bij Geavanceerde instellingen, onderwerp Updates."
+
+msgid "admin.updates.check_now"
+msgstr "Nu controleren"
 
 msgid "admin.updates.check_failed"
 msgstr "Controle mislukt ({code})"
@@ -6058,6 +6100,9 @@ msgstr "Updatekanaal"
 msgid "settings.field.update_auto_apply.label"
 msgstr "Automatisch bijwerken"
 
+msgid "settings.field.update_check_minutes.label"
+msgstr "Minuten tussen twee versiecontroles"
+
 msgid "settings.field.time_format.label"
 msgstr "Tijdnotatie"
 
@@ -7170,6 +7215,36 @@ msgstr "De privésleutel van het geplaatste certificaat staat niet op deze serve
 
 msgid "admin.form.error.tls_volume_unwritable"
 msgstr "De server kan de sleutel niet wegschrijven naar het volume van de proxy. Waarschuw de serverbeheerder."
+
+msgid "wait.inactive"
+msgstr "Dit gesprek is beëindigd."
+
+msgid "wait.leave.link"
+msgstr "Stoppen met wachten"
+
+msgid "wait.leave.title"
+msgstr "Stoppen met wachten?"
+
+msgid "wait.leave.question.waiting"
+msgstr "Weet u zeker dat u wilt stoppen? Uw plaats in de rij vervalt en we laten het team weten dat u niet meer wacht. U kunt daarna opnieuw een gesprek starten of een afspraak maken."
+
+msgid "wait.leave.question.agent"
+msgstr "Een medewerker heeft uw gesprek al aangenomen. Als u stopt, werkt deze link niet meer. De medewerker blijft in het gesprek en wordt op de hoogte gebracht. U kunt daarna opnieuw een gesprek starten of een afspraak maken."
+
+msgid "wait.leave.confirm"
+msgstr "Ja, stoppen met wachten"
+
+msgid "wait.leave.back"
+msgstr "Nee, ik blijf wachten"
+
+msgid "wait.left.waiting"
+msgstr "U wacht niet meer. Er is geen gesprek meer aangevraagd en het team weet dat u niet meer wacht. U kunt later opnieuw een gesprek starten of een afspraak maken."
+
+msgid "wait.left.agent"
+msgstr "U hebt het gesprek verlaten. Deze link werkt niet meer en het team is op de hoogte. U kunt later opnieuw een gesprek starten of een afspraak maken."
+
+msgid "admin.agenda.meeting_id"
+msgstr "Meeting-ID"
 
 msgid "admin.channels.reply_to_address"
 msgstr "Antwoordadres"

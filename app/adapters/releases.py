@@ -11,7 +11,7 @@ The optional token is for a private repository and needs read access to its cont
 
 import re
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
@@ -189,4 +189,5 @@ def update_service(
         checking=settings.update_repository is not None,
         channel=channel,
         auto_apply=lambda: current().update_auto_apply,
+        interval=lambda: timedelta(minutes=current().update_check_minutes),
     )

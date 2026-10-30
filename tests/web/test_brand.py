@@ -160,7 +160,8 @@ async def test_the_admin_top_bar_shows_the_mark_for_every_role(site: Site, role:
 async def test_the_portal_has_no_citizen_footer_in_any_theme(site: Site) -> None:
     await site.login_as(ROLE_PRINCIPALS["superuser"])
     for theme in ("light", "dark"):
-        page = (await site.client.get(f"/admin/?theme={theme}")).text
+        await site.client.get(f"/admin/preferences?theme={theme}")
+        page = (await site.client.get("/admin/")).text
         assert f'data-theme="{theme}"' in page
         assert '<footer class="site-footer">' not in page
         assert "/static/brand/mark.svg" in page
