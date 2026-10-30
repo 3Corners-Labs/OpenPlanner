@@ -328,9 +328,10 @@ class Settings(BaseSettings):
     app_commit: str = Field(default="", pattern=r"^([0-9a-f]{7,40})?$")
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
-    # ADR 0059: UPDATE_CHANNEL (class B, deployment: what this host is for, like the installer
-    # mode) says whether release candidates are offered too; UPDATE_AUTO_APPLY (B) lets the
-    # worker request an update itself. Neither is allowed in production.
+    # ADR 0059, 0065: UPDATE_CHANNEL (class C) says whether release candidates are offered too;
+    # UPDATE_AUTO_APPLY (C) lets the worker request an update itself. The superuser sets both
+    # in the portal; here they are the code defaults and, when set, the environment lock.
+    # Neither is allowed in production, from the environment or from the portal.
     update_channel: Literal["release", "rc"] = "release"
     update_auto_apply: bool = False
 

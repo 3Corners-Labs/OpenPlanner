@@ -258,6 +258,7 @@ def create_app(
             locked=app.state.live_settings.locked,
             combination=app.state.live_settings.combination_problem,
             environment_value=app.state.live_settings.environment_value,
+            production=settings.environment == "prod",
         )
         app.state.certificate_status = CertificateStatus(uow)
         # ADR 0068: the certificate source of the bundled proxy, with the pair handed to the
