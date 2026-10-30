@@ -6576,3 +6576,147 @@ msgstr "Warn when the certificate is valid for fewer than (days)"
 
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Repeat the certificate report every (hours)"
+
+msgid "admin.settings.tls.check_now"
+msgstr "Check now"
+
+msgid "admin.settings.tls.check_now_hint"
+msgstr "Checks the certificate of the public address at once and stores the result."
+
+msgid "admin.settings.tls.source.title"
+msgstr "Certificate source"
+
+msgid "admin.settings.tls.source.intro"
+msgstr "The bundled HTTPS proxy gets its certificate from Let's Encrypt (renewed automatically) or serves the own certificate placed here. The private key stays on this server, in the proxy's volume, and never enters the database or a backup of it. A switch takes effect within about half a minute; then choose Check now."
+
+msgid "admin.settings.tls.source.not_applicable"
+msgstr "Not applicable: HTTPS ends at a reverse proxy or load balancer of your own. The certificate is managed there; above is what visitors see."
+
+msgid "admin.settings.tls.source.current"
+msgstr "Current source"
+
+msgid "admin.settings.tls.source.acme"
+msgstr "Let's Encrypt (automatic)"
+
+msgid "admin.settings.tls.source.own"
+msgstr "Own certificate (uploaded)"
+
+msgid "admin.settings.tls.source.locked"
+msgstr "The server operator manages the certificate on the server; it cannot be uploaded here."
+
+msgid "admin.settings.tls.source.uploaded_title"
+msgstr "Uploaded certificate"
+
+msgid "admin.settings.tls.source.fingerprint"
+msgstr "Fingerprint (SHA-256)"
+
+msgid "admin.settings.tls.source.subject"
+msgstr "Subject"
+
+msgid "admin.settings.tls.source.names"
+msgstr "Names"
+
+msgid "admin.settings.tls.source.uploaded_at"
+msgstr "Uploaded on"
+
+msgid "admin.settings.tls.source.none_uploaded"
+msgstr "No own certificate has been uploaded."
+
+msgid "admin.settings.tls.source.choose"
+msgstr "Source"
+
+msgid "admin.settings.tls.source.upload_title"
+msgstr "Place or replace the certificate chain"
+
+msgid "admin.settings.tls.source.upload_hint"
+msgstr "PEM files of at most 64 KB each. The chain (server certificate first, then the intermediates) must belong to a key on this server: the request above, or the key already in use. The certificate must be valid for the public address."
+
+msgid "admin.settings.tls.source.chain_file"
+msgstr "Certificate chain (PEM)"
+
+msgid "admin.settings.tls.source.key_file"
+msgstr "Private key (PEM, only when migrating)"
+
+msgid "admin.settings.tls.source.upload"
+msgstr "Save certificate"
+
+msgid "admin.settings.tls.source.remove"
+msgstr "Remove the uploaded certificate"
+
+msgid "admin.settings.tls.source.in_use"
+msgstr "This certificate is in use; choose Let's Encrypt as the source first to remove it."
+
+msgid "admin.done.certificate_uploaded"
+msgstr "The certificate has been saved."
+
+msgid "admin.done.certificate_removed"
+msgstr "The uploaded certificate has been removed."
+
+msgid "admin.done.certificate_checked"
+msgstr "The certificate has been checked. The result is below."
+
+msgid "admin.form.error.tls_certificate_unreadable"
+msgstr "This file is not a readable PEM file (or the key is protected by a password). Check the file and try again."
+
+msgid "admin.form.error.tls_key_mismatch"
+msgstr "The chain does not belong to a key on this server: make a request first, or migrate the existing certificate with its private key. A key given here must belong to the server certificate."
+
+msgid "admin.form.error.tls_name_mismatch"
+msgstr "The certificate is not valid for the public address of this installation."
+
+msgid "admin.form.error.tls_certificate_expired"
+msgstr "The certificate has expired."
+
+msgid "admin.form.error.tls_certificate_not_yet_valid"
+msgstr "The certificate is not valid yet."
+
+msgid "admin.form.error.tls_certificate_missing"
+msgstr "Upload an own certificate first before choosing it as the source."
+
+msgid "admin.form.error.tls_certificate_in_use"
+msgstr "The certificate is in use; choose Let's Encrypt as the source first."
+
+msgid "admin.form.error.tls_source_not_applicable"
+msgstr "This installation uses a reverse proxy of its own; the certificate is managed there."
+
+msgid "settings.field.tls_certificate_source.label"
+msgstr "Source of the bundled proxy's certificate"
+
+msgid "admin.settings.tls.source.key_on_host"
+msgstr "Private key on this server"
+
+msgid "admin.settings.tls.source.key_present"
+msgstr "Present"
+
+msgid "admin.settings.tls.source.key_missing"
+msgstr "Missing on this server"
+
+msgid "admin.settings.tls.source.key_missing_hint"
+msgstr "The database was restored on another server; the key does not travel with it. Make a new request and place the new certificate, or migrate the existing certificate with its key. Until then the proxy uses Let's Encrypt."
+
+msgid "admin.settings.tls.source.csr_title"
+msgstr "Request for an own certificate"
+
+msgid "admin.settings.tls.source.csr_hint"
+msgstr "Make a new key on this server with a certificate signing request (CSR) for the public address. Hand the request to your certificate authority (for example PKIoverheid) and place the chain you receive below. The key never leaves this server. A request does not disturb a certificate in use; a new request replaces an earlier one."
+
+msgid "admin.settings.tls.source.csr_pending"
+msgstr "Request waiting for its certificate"
+
+msgid "admin.settings.tls.source.csr_download"
+msgstr "Download the request (openplanner.csr)"
+
+msgid "admin.settings.tls.source.csr_generate"
+msgstr "Make a new key and request"
+
+msgid "admin.settings.tls.source.key_hint"
+msgstr "Only to migrate an existing certificate with its key: the key goes straight to the proxy's volume without a password, is never shown and is not kept in the database."
+
+msgid "admin.done.csr_generated"
+msgstr "The key and the request have been made. Hand the request to the certificate authority, then place the chain."
+
+msgid "admin.form.error.tls_key_missing"
+msgstr "The private key of the placed certificate is not on this server. Make a new request or migrate the certificate with its key."
+
+msgid "admin.form.error.tls_volume_unwritable"
+msgstr "The server cannot write the key to the proxy's volume. Tell the server operator."

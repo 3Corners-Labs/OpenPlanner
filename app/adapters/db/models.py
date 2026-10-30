@@ -977,3 +977,26 @@ class RoleRow(Base):
     claim_value: Mapped[str] = mapped_column(String(128), unique=True)
     permissions: Mapped[str] = mapped_column(Text)
     version: Mapped[int] = mapped_column(Integer)
+
+
+class OwnCertificateRow(Base):
+    """The own certificate uploaded in the portal (ADR 0070); at most one row.
+
+    The chain is public and stored as text with the leaf's public key; the private key is never
+    in the database (it lives on the volume the proxy reads), so a backup never carries it.
+    """
+
+    __tablename__ = "own_certificates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chain_pem: Mapped[str] = mapped_column(Text)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    subject: Mapped[str] = mapped_column(String(255))
+    issuer: Mapped[str] = mapped_column(String(255))
+    not_before: Mapped[datetime] = mapped_column(UTCDateTime())
+    not_after: Mapped[datetime] = mapped_column(UTCDateTime())
+    names: Mapped[str] = mapped_column(Text, server_default=text("'[]'"))
+    uploaded_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
