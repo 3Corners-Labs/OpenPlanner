@@ -12,6 +12,7 @@ The service never touches containers or images: it only records what is asked an
 happened. The host updater does the work and checks the image signature.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change, require
@@ -46,6 +47,11 @@ SYSTEM_ACTOR = "system"
 """Audit actor of an update the worker requested itself (``UPDATE_AUTO_APPLY``, ADR 0059)."""
 
 _PERMISSION = Permission.SYSTEM_UPDATE
+
+
+def _constant[T](value: T) -> Callable[[], T]:
+    """Return a callable that always returns ``value``."""
+    return lambda: value
 
 
 @dataclass(frozen=True)
@@ -104,8 +110,11 @@ class UpdateService:
             and in the web process, which leaves the lookup to the worker.
         checking: Whether the installation checks for releases (``UPDATE_REPOSITORY``), also
             when this process does not look them up itself; defaults to ``releases`` being set.
-        channel: ``release`` offers releases only; ``rc`` release candidates too (ADR 0059).
-        auto_apply: Whether a check that finds a newer version requests the update itself.
+        channel: ``release`` offers releases only; ``rc`` release candidates too (ADR 0059);
+            a value, or a callable read on every use so a portal change applies live
+            (ADR 0067).
+        auto_apply: Whether a check that finds a newer version requests the update itself;
+            a value or a callable, as ``channel``.
     """
 
     def __init__(
@@ -117,8 +126,8 @@ class UpdateService:
         current: Version | None,
         releases: ReleaseSource | None,
         checking: bool | None = None,
-        channel: UpdateChannel = UpdateChannel.RELEASE,
-        auto_apply: bool = False,
+        channel: UpdateChannel | Callable[[], UpdateChannel] = UpdateChannel.RELEASE,
+        auto_apply: bool | Callable[[], bool] = False,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -127,8 +136,8 @@ class UpdateService:
         self._current = current
         self._releases = releases
         self._checking = releases is not None if checking is None else checking
-        self._channel = channel
-        self._auto_apply = auto_apply
+        self._channel = channel if callable(channel) else _constant(channel)
+        self._auto_apply = auto_apply if callable(auto_apply) else _constant(auto_apply)
 
     @property
     def current(self) -> Version | None:
@@ -159,14 +168,14 @@ class UpdateService:
         async with self._uow.locked() as tx:
             await tx.save_release_check(check)
             release = self._available(check)
-            if self._auto_apply and release is not None and self._current is not None:
+            if self._auto_apply() and release is not None and self._current is not None:
                 if open_request(await tx.get_update_requests()) is None:
                     await self._add(tx, None, UpdateAction.UPDATE, release.version)
         return True
 
     def _available(self, check: ReleaseCheck | None) -> Release | None:
         """Return the newer version the channel offers, if any."""
-        return available_update(self._current, check, self._channel)
+        return available_update(self._current, check, self._channel())
 
     # --- superuser ---------------------------------------------------------------------
 
@@ -204,8 +213,8 @@ class UpdateService:
         current = open_request(history)
         return UpdateOverview(
             enabled=self._checking,
-            channel=self._channel,
-            auto_apply=self._auto_apply,
+            channel=self._channel(),
+            auto_apply=self._auto_apply(),
             current=self._current,
             check=check,
             available=None if current else self._available(check),
