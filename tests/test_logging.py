@@ -8,6 +8,8 @@ import structlog
 
 from app.domain.event_context import bind_level, set_service, trace_scope
 from app.domain.event_schema import Envelope
+from app.domain.privacy import ALIASES
+from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 from app.logging import (
     MASK,
     PII_FIELDS,
@@ -34,6 +36,8 @@ def test_pii_fields_cover_the_booking_pii_columns() -> None:
     assert {"name", "email", "phone", "note", "guest_join_url", "host_join_url"} <= PII_FIELDS
     # ADR 0055: the split name and the answers to custom fields.
     assert {"first_name", "last_name", "form_answers", "answers"} <= PII_FIELDS
+    # ADR 0063: one home for the list; the mask adds only the other names the data travels by.
+    assert PII_FIELDS == PII_COLUMNS | ALIASES
 
 
 def test_structlog_masks_every_pii_field(stream: io.StringIO) -> None:
