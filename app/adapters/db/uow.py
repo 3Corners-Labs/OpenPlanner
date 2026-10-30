@@ -69,6 +69,7 @@ from app.adapters.db.models import (
     StaffRow,
     WebhookEventRow,
 )
+from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
@@ -387,6 +388,7 @@ class SqlTransaction(
     PlatformSettingsQueries,
     FormFieldQueries,
     CertificateQueries,
+    OwnCertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
