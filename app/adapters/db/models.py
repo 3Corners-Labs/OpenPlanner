@@ -700,6 +700,8 @@ class BookingEventRow(Base):
     kind: Mapped[str] = mapped_column(String(32))
     detail: Mapped[str] = mapped_column(String(128), server_default=text("''"))
     message: Mapped[str] = mapped_column(String(300), server_default=text("''"))
+    # ADR 0068: the APP_VERSION of the process that wrote the event.
+    version: Mapped[str] = mapped_column(String(40), server_default=text("''"))
 
     __table_args__ = (Index("ix_booking_events_booking_id", "booking_id"),)
 

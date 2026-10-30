@@ -7,11 +7,12 @@ transaction, so a replayed or redelivered event changes nothing the second time.
 Admins see a booking's timeline only with ``bookings.view`` on its group (ADR 0014).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import StrEnum
 
 from app.domain.admin import AdminService
+from app.domain.audit import AuditEvent, AuditFilter
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.availability import utc_bounds
 from app.domain.booking import Booking
@@ -24,12 +25,17 @@ from app.domain.calls import (
     new_status,
 )
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.job_plan import JobSummary
 from app.domain.ports import REASON_LIMIT, Clock, Transaction, UnitOfWork
+from app.domain.request_log import REQUEST_EVENT
 
 WEBHOOK_MEMORY = timedelta(days=30)
 """How long a Webex event key is remembered; older keys are forgotten on the next event."""
 
 WEBEX_SOURCE = "webex"
+
+REQUEST_LIMIT = 100
+"""How many of a booking's request events its page lists (the newest; ADR 0068)."""
 
 
 class EventOutcome(StrEnum):
@@ -44,11 +50,17 @@ class EventOutcome(StrEnum):
 
 @dataclass(frozen=True)
 class Timeline:
-    """A booking with its events and call status, for the admin portal."""
+    """A booking with its events and call status, for the admin portal.
+
+    ``jobs`` and ``requests`` (ADR 0068) are the booking's jobs and the requests the platform
+    made for it, so an admin sees what ran, what failed and what Webex answered.
+    """
 
     booking: Booking
     events: list[BookingEvent]
     status: CallStatus
+    jobs: list[JobSummary] = field(default_factory=list)
+    requests: list[AuditEvent] = field(default_factory=list)
 
 
 class IntegrationService:
@@ -58,13 +70,17 @@ class IntegrationService:
         uow: Opens database transactions.
         clock: Current time.
         admin: Authorises admin views (``bookings.view``) and audits refusals.
+        version: ``APP_VERSION`` of this process, stamped on every timeline event (ADR 0068).
     """
 
-    def __init__(self, uow: UnitOfWork, clock: Clock, admin: AdminService) -> None:
+    def __init__(
+        self, uow: UnitOfWork, clock: Clock, admin: AdminService, version: str = ""
+    ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
+        self._version = version
 
     async def record(
         self,
@@ -159,10 +175,17 @@ class IntegrationService:
         )
         if not authorization.decision.allowed:
             raise DomainError(ErrorCode.NOT_PERMITTED)
+        permission = Permission.BOOKINGS_VIEW
         async with self._uow.read() as tx:
             events = await tx.get_booking_events(booking_id)
             status = await tx.get_call_status(booking_id) or new_status(booking_id)
-        return Timeline(booking, events, status)
+            jobs = await tx.get_booking_jobs(booking_id)
+            requests = await tx.list_audit_events(
+                scope_for(principal, permission),
+                REQUEST_LIMIT,
+                AuditFilter(booking_id=booking_id, action=REQUEST_EVENT),
+            )
+        return Timeline(booking, events, status, jobs, [r.event for r in reversed(requests)])
 
     async def _record(
         self,
@@ -175,7 +198,7 @@ class IntegrationService:
     ) -> None:
         """Write the event and the updated status in the caller's transaction."""
         await tx.add_booking_event(
-            BookingEvent(booking_id, at, kind, detail[:128], message[:REASON_LIMIT])
+            BookingEvent(booking_id, at, kind, detail[:128], message[:REASON_LIMIT], self._version)
         )
         status = await tx.get_call_status(booking_id) or new_status(booking_id)
         await tx.save_call_status(apply_event(status, kind, at))
