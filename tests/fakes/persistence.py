@@ -50,7 +50,7 @@ from app.domain.scheduling import (
 from app.domain.staff import StaffFilter, StaffMember, visible
 from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
-from app.domain.updates import ReleaseCheck, RunningVersion, UpdateRequest
+from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -95,6 +95,7 @@ class State:
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
     running_versions: list[RunningVersion] = field(default_factory=list)
+    release_listing: list[ListedRelease] = field(default_factory=list)
     certificate_check: CertificateCheck | None = None
     own_certificate: OwnCertificate | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
@@ -889,6 +890,12 @@ class InMemoryTransaction:
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
         self.state.release_check = check
+
+    async def get_release_listing(self) -> list[ListedRelease]:
+        return sorted(self.state.release_listing, key=lambda item: item.version, reverse=True)
+
+    async def save_release_listing(self, listing: Sequence[ListedRelease]) -> None:
+        self.state.release_listing = list(listing)
 
     async def get_running_versions(self, limit: int = 2) -> list[RunningVersion]:
         return list(reversed(self.state.running_versions))[:limit]

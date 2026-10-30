@@ -5,12 +5,20 @@ other one. Versions are stored as ``MAJOR.MINOR.PATCH`` text; a stored value tha
 parses (a hand-edited row) makes the release unknown rather than failing the page.
 """
 
-from sqlalchemy import select
+from collections.abc import Sequence
+
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import ReleaseCheckRow, RunningVersionRow, UpdateRequestRow
+from app.adapters.db.models import (
+    ReleaseCheckRow,
+    ReleaseListingRow,
+    RunningVersionRow,
+    UpdateRequestRow,
+)
 from app.domain.errors import DomainError
 from app.domain.updates import (
+    ListedRelease,
     Release,
     ReleaseCheck,
     RunningVersion,
@@ -86,6 +94,34 @@ class UpdateQueries:
                 error=check.error,
             )
         )
+        await self._session.flush()
+
+    async def get_release_listing(self) -> list[ListedRelease]:
+        """Return the stored listing, newest first; rows that no longer parse are skipped."""
+        rows = await self._session.scalars(select(ReleaseListingRow))
+        listed = []
+        for row in rows:
+            version = Version.parse(row.version)
+            if version is None:
+                continue
+            try:
+                listed.append(ListedRelease(version, row.release_url, row.published_at, row.notes))
+            except DomainError:
+                continue
+        return sorted(listed, key=lambda item: item.version, reverse=True)
+
+    async def save_release_listing(self, listing: Sequence[ListedRelease]) -> None:
+        """Replace the stored listing."""
+        await self._session.execute(delete(ReleaseListingRow))
+        for item in listing:
+            self._session.add(
+                ReleaseListingRow(
+                    version=str(item.version),
+                    release_url=item.url,
+                    published_at=item.published_at,
+                    notes=item.notes,
+                )
+            )
         await self._session.flush()
 
     async def get_running_versions(self, limit: int = 2) -> list[RunningVersion]:

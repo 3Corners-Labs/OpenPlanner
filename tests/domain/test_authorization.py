@@ -27,6 +27,7 @@ from app.domain.authorization import (
     decide_client,
     decide_in_maintenance,
     permissions_for,
+    role_keys,
     scope_for,
 )
 
@@ -42,6 +43,15 @@ MIXED = Principal(
     frozenset({"andere"}),
     frozenset({"demo"}),
 )
+
+EVERY_ROLE = Principal(
+    "e",
+    "Every role",
+    frozenset(Role),
+    frozenset({"demo"}),
+    frozenset({"demo"}),
+)
+"""The dev realm's ``super``: the superuser reach wins, the other roles add nothing."""
 
 OWN_GROUP = Target.for_group("demo", "demo")
 OTHER_GROUP = Target.for_group("toeslagen", "andere")
@@ -324,7 +334,7 @@ def test_scope_contains() -> None:
     assert not Scope().contains("a", "b")
 
 
-PRINCIPALS = [SUPER, ORG, GROUP, AUDITOR, NOBODY, MIXED]
+PRINCIPALS = [SUPER, ORG, GROUP, AUDITOR, NOBODY, MIXED, EVERY_ROLE]
 GROUP_TARGETS = [OWN_GROUP, OTHER_GROUP, Target.for_group("losse", "demo")]
 GROUP_PERMISSIONS = [p for p in Permission if LEVELS[p] is Level.GROUP]
 
@@ -341,6 +351,22 @@ def test_database_scope_and_decision_never_disagree(
     visible = scope_for(principal, permission).contains(target.organisation, target.group)
 
     assert allowed == visible
+
+
+@pytest.mark.parametrize("permission", list(Permission))
+def test_holding_every_role_decides_and_lists_like_the_superuser(permission: Permission) -> None:
+    level = LEVELS[permission]
+    target = {
+        Level.GLOBAL: Target.everything(),
+        Level.ORGANISATION: OTHER_ORG,
+        Level.GROUP: OTHER_GROUP,
+    }[level]
+
+    assert decide(EVERY_ROLE, permission, target) == decide(SUPER, permission, target)
+    assert decide(EVERY_ROLE, permission, target).reason is Reason.SUPERUSER
+    if level is not Level.GLOBAL:
+        assert scope_for(EVERY_ROLE, permission) == Scope(everything=True)
+    assert role_keys(EVERY_ROLE) == sorted(Role)
 
 
 def test_permissions_for_lists_rights_with_their_scope() -> None:

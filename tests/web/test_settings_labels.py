@@ -28,6 +28,8 @@ def test_every_production_problem_has_a_label() -> None:
     everything_wrong = Settings(
         environment="dev",
         simulator_enabled=True,
+        update_channel="rc",  # ADR 0067: production follows releases
+        update_auto_apply=True,
         webhook_base_url="http://tunnel.example",
         webex_client_id="client",
         oidc_discovery_url="http://idp.example",
