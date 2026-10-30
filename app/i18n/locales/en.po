@@ -577,8 +577,35 @@ msgstr "Platform"
 msgid "admin.nav.object.group"
 msgstr "Group"
 
-msgid "admin.profile.roles"
-msgstr "Your roles"
+msgid "admin.profile.source"
+msgstr "Your role comes from your organisation account and cannot be changed here."
+
+msgid "admin.profile.my_rights"
+msgstr "View my rights"
+
+msgid "admin.alerts.label"
+msgstr "Alerts"
+
+msgid "admin.alerts.banner"
+msgstr "Show the bar for outages"
+
+msgid "admin.alerts.popups.label"
+msgstr "Pop-ups"
+
+msgid "admin.alerts.popups.all"
+msgstr "All alerts"
+
+msgid "admin.alerts.popups.warnings"
+msgstr "Warnings and outages"
+
+msgid "admin.alerts.popups.outages"
+msgstr "Outages only"
+
+msgid "admin.alerts.popups.off"
+msgstr "None"
+
+msgid "admin.alerts.save"
+msgstr "Save"
 
 msgid "admin.theme.label"
 msgstr "Appearance"

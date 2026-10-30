@@ -54,3 +54,21 @@ upright. The line for the queue connects the groups, so it is not a development 
 Each role starts with its own order: an agent sees the queue first, the Compliance and privacy
 role the changes and the system status. A personal layout comes later (ADR 0062). On a tablet
 at most two widgets sit side by side, on a phone one.
+
+## Your profile menu
+
+At the top right, your name or initials open the profile menu. It is on every admin page and
+works without JavaScript. From top to bottom:
+
+- **Your name and role**, and where the role comes from: your organisation account, so it cannot
+  be changed here. **View my rights** opens the page with what your role allows and where.
+- **Appearance**: System (follows your device), Light or Dark. The choice brings you back to the
+  page you were on, holds for this session and survives signing in again; signing out puts it
+  back to System.
+- **Choose a language**: Nederlands or English. The browser remembers the choice.
+- **Alerts**: whether the bar for outages shows and which alerts pop up (all, warnings and
+  outages, outages only, none). **Save** keeps the choice for this session. The alerts themselves
+  follow in a later version (ADR 0061); the choice is ready by then.
+- **Sign out**.
+
+On a phone the bar keeps only its icons and your initials; your name is in the menu.
