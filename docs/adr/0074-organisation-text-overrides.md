@@ -74,7 +74,7 @@ on rows is needed.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1 | Table, allow-list, cached `OverrideSource`, wiring in pages and messages, editor, manual, threat model | #168 | in PR |
+| 1 | Table, allow-list, cached `OverrideSource`, wiring in pages and messages, editor, manual, threat model | #168 | merged |
 | 2 | Global (superuser) layer, `.po` export and import, revision counter | | follow-up |
 
 ## Consequences
