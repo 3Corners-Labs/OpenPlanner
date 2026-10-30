@@ -102,7 +102,17 @@
       "email": "super@openplanner.test",
       "attributes": {
         "roles": [
-          "openplanner-superuser"
+          "openplanner-superuser",
+          "openplanner-org-admin",
+          "openplanner-group-admin",
+          "openplanner-auditor",
+          "openplanner-agent"
+        ],
+        "organisations": [
+          "demo"
+        ],
+        "groups": [
+          "demo"
         ]
       },
       "credentials": [
