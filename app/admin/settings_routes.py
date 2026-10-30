@@ -137,7 +137,7 @@ async def try_login_mapping(
         values = validate_mapping({key: form.text(key) for key in LOGIN_KEYS})
     except DomainError as error:
         return await _overview(request, locale, context, (error.field or "", error), 422)
-    save_login_trial(request, context.principal.subject, values)
+    save_login_trial(request, context.principal.subject, values, request.app.state.clock.now())
     return RedirectResponse("/admin/login?next=/admin/settings&fresh=1", status_code=303)
 
 

@@ -1,6 +1,6 @@
 """System status and Advanced settings, read-only (ADR 0042 §11, build step 3)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -301,3 +301,20 @@ async def test_only_the_superuser_sees_and_posts_the_login_mapping(site: Site) -
 
     assert 'action="/admin/settings/login/test"' not in page
     assert response.status_code == 403
+
+
+async def test_a_proposal_older_than_the_reauth_limit_is_dropped(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    response = await site.client.post(
+        "/admin/settings/login/test", data=LOGIN_FORM, headers=SAME_ORIGIN
+    )
+    site.clock.advance(timedelta(minutes=app.state.settings.admin_reauth_minutes + 1))
+    site.idp.trial_principal = SUPER
+    await site.client.get(response.headers["location"])
+
+    done = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+    await site.client.get("/admin/settings")
+
+    assert "login_mapping" not in done.headers["location"]
+    assert app.state.settings.oidc_role_claim == "roles"
