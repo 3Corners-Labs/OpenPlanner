@@ -3737,6 +3737,9 @@ msgstr "Create video meeting"
 msgid "audit.job.delete_video_room"
 msgstr "Delete video meeting"
 
+msgid "audit.job.delete_trial_call"
+msgstr "Delete trial call"
+
 msgid "audit.job.send_confirmation"
 msgstr "Send confirmation"
 

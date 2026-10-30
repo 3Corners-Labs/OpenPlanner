@@ -3737,6 +3737,9 @@ msgstr "Videogesprek aanmaken"
 msgid "audit.job.delete_video_room"
 msgstr "Videogesprek verwijderen"
 
+msgid "audit.job.delete_trial_call"
+msgstr "Proefgesprek verwijderen"
+
 msgid "audit.job.send_confirmation"
 msgstr "Bevestiging versturen"
 
