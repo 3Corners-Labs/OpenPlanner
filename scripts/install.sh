@@ -80,7 +80,7 @@ parse_args() {
       --mode) MODE=${2:?--mode needs a value} && shift ;;
       --version) VERSION=${2:?--version needs a value} && shift ;;
       --repository) REPOSITORY=${2:?--repository needs a value} && shift ;;
-      --channel) die "--channel is gone (ADR 0065): the superuser chooses the channel on /admin/updates" ;;
+      --channel) die "--channel is gone (ADR 0067): the superuser chooses the channel on /admin/updates" ;;
       --non-interactive) INTERACTIVE=0 ;;
       --acme-staging) ACME_STAGING=1 ;;
       --no-updater) UPDATER=0 ;;
@@ -99,7 +99,7 @@ parse_args() {
     '') usage >&2 && die "--mode is required on the first run" ;;
     *) die "--mode must be production, test or lab, not '$MODE'" ;;
   esac
-  # ADR 0065: a release candidate may be pinned on a test or lab host; production runs releases.
+  # ADR 0067: a release candidate may be pinned on a test or lab host; production runs releases.
   [[ -z $VERSION || $VERSION =~ $VERSION_RE ]] || die "--version must look like 1.2.3 (or 1.2.3-rc.4 outside production)"
   [[ -z $VERSION || $MODE != production || $VERSION =~ $RELEASE_RE ]] \
     || die "--version $VERSION is a release candidate; production runs releases only"
@@ -414,8 +414,8 @@ check_env() {
         || problems+=("$key is missing")
     done
     [[ $(value "$ENV_FILE" SIMULATOR_ENABLED) != true ]] || problems+=("SIMULATOR_ENABLED=true is refused in production")
-    [[ $(value "$ENV_FILE" UPDATE_CHANNEL) != rc ]] || problems+=("UPDATE_CHANNEL=rc is refused in production (ADR 0065)")
-    [[ $(value "$ENV_FILE" UPDATE_AUTO_APPLY) != true ]] || problems+=("UPDATE_AUTO_APPLY=true is refused in production (ADR 0065)")
+    [[ $(value "$ENV_FILE" UPDATE_CHANNEL) != rc ]] || problems+=("UPDATE_CHANNEL=rc is refused in production (ADR 0067)")
+    [[ $(value "$ENV_FILE" UPDATE_AUTO_APPLY) != true ]] || problems+=("UPDATE_AUTO_APPLY=true is refused in production (ADR 0067)")
     case $(value "$ENV_FILE" OIDC_DISCOVERY_URL) in
       '') ;;
       https://*)
@@ -474,7 +474,7 @@ settings() {
 image_name() { printf 'ghcr.io/%s' "$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"; }
 # What the host's cosign accepts (ADR 0006): images signed by main.yml for a release tag. Test
 # and lab hosts also trust those signed on main, where release candidates are built; the
-# installer mode is the host team's trust decision, the channel is the superuser's (ADR 0065).
+# installer mode is the host team's trust decision, the channel is the superuser's (ADR 0067).
 identity_regexp() {
   local ref='tags/v[0-9]+\.[0-9]+\.[0-9]+' # through %s: single backslashes here
   [[ $MODE == production ]] || ref="(heads/main|$ref)"

@@ -112,7 +112,7 @@ class UpdateService:
             when this process does not look them up itself; defaults to ``releases`` being set.
         channel: ``release`` offers releases only; ``rc`` release candidates too (ADR 0059);
             a value, or a callable read on every use so a portal change applies live
-            (ADR 0065).
+            (ADR 0067).
         auto_apply: Whether a check that finds a newer version requests the update itself;
             a value or a callable, as ``channel``.
     """

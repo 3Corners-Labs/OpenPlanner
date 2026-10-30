@@ -256,7 +256,7 @@ async def test_the_store_reads_the_sealed_secrets() -> None:
 
 
 def test_production_never_applies_candidates_or_auto_apply_from_the_portal() -> None:
-    """ADR 0065: production follows releases on a superuser's click, whatever is stored."""
+    """ADR 0067: production follows releases on a superuser's click, whatever is stored."""
     channel, auto = BY_KEY["update_channel"], BY_KEY["update_auto_apply"]
     portal = PortalValues(5, {"update_channel": "rc", "update_auto_apply": True})
 

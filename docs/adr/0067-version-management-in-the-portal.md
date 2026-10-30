@@ -1,4 +1,4 @@
-# 0065. Version management in the portal: channel, chosen version, history
+# 0067. Version management in the portal: channel, chosen version, history
 
 Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0059 (points 4 and
 6: the channel and auto-apply move from class B to class C; the updater's identity follows the
