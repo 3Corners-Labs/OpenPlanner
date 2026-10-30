@@ -16,13 +16,18 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change, require
-from app.domain.audit import AuditEvent, Outcome
-from app.domain.authorization import Permission, Principal, Target, decide
+from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Outcome, Source
+from app.domain.authorization import Permission, Principal, Scope, Target, decide
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, IntegrationError, ReleaseSource, Transaction, UnitOfWork
 from app.domain.updates import (
+    HISTORY_ACTIONS,
+    HISTORY_DETAILS,
+    HOST_ACTOR,
+    VERSION_ACTION,
     Release,
     ReleaseCheck,
+    RunningVersion,
     UpdateAction,
     UpdateChannel,
     UpdateRequest,
@@ -32,12 +37,14 @@ from app.domain.updates import (
     available_update,
     check_due,
     claimed,
+    detail_key,
     finished,
     open_request,
     progressed,
     recent_outcome,
     restore_candidate,
     unclaimed,
+    version_changed,
 )
 
 UPDATER_ACTOR = "host-updater"
@@ -84,6 +91,8 @@ class UpdateOverview:
         unclaimed: Whether ``open`` has waited so long that no updater seems installed.
         restore: The update whose previous version can be restored now.
         history: The newest requests, newest first.
+        outside_change: The running version when it came from outside the portal (installer,
+            by hand) and is the latest change (ADR 0065 point 6); else ``None``.
     """
 
     enabled: bool
@@ -96,6 +105,7 @@ class UpdateOverview:
     unclaimed: bool
     restore: UpdateRequest | None
     history: list[UpdateRequest]
+    outside_change: RunningVersion | None = None
 
 
 class UpdateService:
@@ -210,7 +220,9 @@ class UpdateService:
         async with self._uow.read() as tx:
             check = await tx.get_release_check()
             history = await tx.get_update_requests()
+            versions = await tx.get_running_versions(2)
         current = open_request(history)
+        outside = versions[0] if len(versions) > 1 and versions[0].request_id is None else None
         return UpdateOverview(
             enabled=self._checking,
             channel=self._channel(),
@@ -222,7 +234,62 @@ class UpdateService:
             unclaimed=current is not None and unclaimed(current, now),
             restore=None if current else restore_candidate(history, self._current, now),
             history=history,
+            outside_change=outside,
         )
+
+    async def history(self, principal: Principal, limit: int = 30) -> list[AuditEntry]:
+        """Return the update history from the audit log: the milestones, newest first.
+
+        Requests, outcomes, cancellations and version changes (``HISTORY_DETAILS``); the
+        updater's steps stay in the audit log itself (ADR 0065 point 5).
+
+        Raises:
+            DomainError: ``not_permitted``.
+        """
+        require(await self._admin.authorize(principal, _PERMISSION))
+        narrow = AuditFilter(actions=HISTORY_ACTIONS)
+        async with self._uow.read() as tx:
+            entries = await tx.list_audit_events(Scope(everything=True), limit * 4, narrow)
+        return [e for e in entries if detail_key(e.event.detail) in HISTORY_DETAILS][:limit]
+
+    # --- web process, at start-up ----------------------------------------------------------
+
+    async def note_running(self, version: str, commit: str) -> RunningVersion | None:
+        """Record the running version when it differs from the last one seen (ADR 0065).
+
+        Returns the new record, or ``None`` when nothing changed. A change the updater made
+        (a running request for this version) is noted with its request; any other change
+        is audited as actor ``host``: installer or by hand. The first record is never an
+        event: there is nothing to compare it with.
+        """
+        now = self._clock.now()
+        async with self._uow.locked() as tx:
+            versions = await tx.get_running_versions(1)
+            last = versions[0] if versions else None
+            current = RunningVersion(version, commit, now)
+            if not version_changed(last, current):
+                return None
+            running = open_request(await tx.get_update_requests())
+            by_updater = (
+                running is not None
+                and running.status is UpdateStatus.RUNNING
+                and str(running.target) == version
+            )
+            stored = await tx.add_running_version(
+                RunningVersion(version, commit, now, running.id if by_updater and running else None)
+            )
+            if last is not None:
+                event = AuditEvent(
+                    now,
+                    UPDATER_ACTOR if by_updater else HOST_ACTOR,
+                    VERSION_ACTION,
+                    Outcome.SUCCESS,
+                    "",
+                    detail=f"version.changed,from:{last.version},to:{version},commit:{commit[:12]}",
+                    source=Source.SYSTEM,
+                )
+                await tx.add_audit_event(event)
+        return stored
 
     async def request_update(self, principal: Principal) -> UpdateRequest:
         """Ask the host updater to move to the latest release.
@@ -293,6 +360,7 @@ class UpdateService:
                 status=UpdateStatus.REQUESTED,
             )
         )
+        versions = f"from:{self._current},to:{target}"
         if principal is None:
             event = AuditEvent(
                 now,
@@ -300,11 +368,14 @@ class UpdateService:
                 _PERMISSION.value,
                 Outcome.SUCCESS,
                 "",
-                detail="update.auto_request",
+                detail=f"update.auto_request,{versions}",
+                source=Source.SYSTEM,
             )
             await tx.add_audit_event(event)
         else:
-            await record_change(tx, now, principal, _PERMISSION, None, None, f"{action}.request")
+            await record_change(
+                tx, now, principal, _PERMISSION, None, None, f"{action}.request,{versions}"
+            )
         return created
 
     # --- host updater ------------------------------------------------------------------
@@ -383,13 +454,17 @@ async def _request(tx: Transaction, request_id: int) -> UpdateRequest:
 async def _audit_updater(
     tx: Transaction, request: UpdateRequest, outcome: Outcome, detail: str
 ) -> None:
-    """Record a step of the host updater (global: only the superuser sees it)."""
+    """Record a step of the host updater (global: only the superuser sees it).
+
+    The detail names the versions too (``from``, ``to``), so the history can be read from
+    the audit log alone (ADR 0065).
+    """
     event = AuditEvent(
         request.finished_at or request.step_at or request.started_at or request.requested_at,
         UPDATER_ACTOR,
         _PERMISSION.value,
         outcome,
         request.reason,
-        detail=detail,
+        detail=f"{detail},from:{request.from_version},to:{request.target}",
     )
     await tx.add_audit_event(event)

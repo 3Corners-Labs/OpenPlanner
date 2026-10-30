@@ -949,3 +949,15 @@ class RoleRow(Base):
     claim_value: Mapped[str] = mapped_column(String(128), unique=True)
     permissions: Mapped[str] = mapped_column(Text)
     version: Mapped[int] = mapped_column(Integer)
+
+
+class RunningVersionRow(Base):
+    """A version this installation ran, noted by the web process at start-up (ADR 0065)."""
+
+    __tablename__ = "running_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version: Mapped[str] = mapped_column(String(20))
+    commit: Mapped[str] = mapped_column(String(40))
+    since: Mapped[datetime] = mapped_column(UTCDateTime())
+    request_id: Mapped[int | None] = mapped_column(Integer)

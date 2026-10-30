@@ -380,3 +380,16 @@ async def test_an_unknown_diagnostics_target_changes_nothing(site: Site) -> None
     response = await site.client.post("/admin/audit/diagnostics", data={"target": "group:x"})
 
     assert response.headers["location"] == "/admin/audit?done=unchanged#diagnostics"
+
+
+async def test_the_subject_filter_selects_the_updates_and_nothing_else(logged: Site) -> None:
+    """ADR 0065: the updates page links here with the subject that lists only update events."""
+    await logged.login_as(SUPER)
+
+    page = (await logged.client.get("/admin/audit", params={"subject": "updates"})).text
+
+    assert 'name="subject"' in page
+    assert 'value="updates" selected' in page
+    for marker in ("global_marker", "org_marker", "smtp_unreachable", "other_marker"):
+        assert marker not in page  # none of the seeded events is about updates
+    assert 'href="/admin/audit/export.csv?subject=updates"' in page

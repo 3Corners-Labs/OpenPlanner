@@ -8,7 +8,14 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.update_service import UpdateService
-from app.domain.updates import Release, ReleaseCheck, UpdateStatus, UpdateStep, Version
+from app.domain.updates import (
+    Release,
+    ReleaseCheck,
+    RunningVersion,
+    UpdateStatus,
+    UpdateStep,
+    Version,
+)
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.domain import NOW
 
@@ -255,3 +262,41 @@ async def test_banner_elsewhere_names_the_current_step(site: Site) -> None:
 async def test_progress_fragment_refuses_an_organisation_admin(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     assert (await site.client.get(PROGRESS)).status_code == 403
+
+
+@pytest.fixture
+async def changed_outside(admin_db: str) -> None:
+    """Two running versions, the newest without a request: a change made on the server."""
+    engine = create_engine(admin_db)
+    try:
+        async with SqlUnitOfWork(engine).locked() as tx:
+            await tx.add_running_version(RunningVersion("1.2.0", "a" * 40, NOW))
+            await tx.add_running_version(
+                RunningVersion("1.3.0", "b" * 40, NOW + timedelta(hours=1))
+            )
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.usefixtures("released", "changed_outside")
+async def test_the_history_names_who_did_what_and_warns_about_a_change_from_outside(
+    site: Site,
+) -> None:
+    """ADR 0065: the history is the audit log of the updates, with a By column."""
+    await site.login_as(SUPER)
+    await site.client.post("/admin/updates/update", headers=SAME_ORIGIN)
+    history = await updates(site).overview(SUPER)
+    assert history.open is not None
+    await site.client.post(f"/admin/updates/requests/{history.open.id}/cancel", headers=SAME_ORIGIN)
+
+    page = (await site.client.get("/admin/updates")).text
+
+    assert "buiten het portaal om" in page  # the notice about the change from outside
+    assert "1.3.0" in page
+    assert ">Door<" in page
+    assert "Update aangevraagd" in page
+    assert "Aanvraag ingetrokken" in page
+    assert "<code>1.3.0</code> → <code>1.4.0</code>" in page
+    assert 'href="/admin/audit?subject=updates"' in page
+    # The updater's steps are not in the summary.
+    assert "update.pulling" not in page

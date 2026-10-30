@@ -38,6 +38,32 @@ OUTCOME_SHOWN = timedelta(hours=24)
 SNOOZE = timedelta(minutes=60)
 """How long "remind me later" hides the banner."""
 
+VERSION_ACTION = "system.version"
+"""Audit action of a version change the web process noticed at start-up (ADR 0065)."""
+
+HOST_ACTOR = "host"
+"""Audit actor of a version change nobody requested in the portal: installer or by hand."""
+
+HISTORY_ACTIONS = frozenset({"system.update", VERSION_ACTION})
+"""The audit actions the updates page shows as its history (ADR 0065 point 5)."""
+
+HISTORY_DETAILS = frozenset(
+    {
+        "update.request",
+        "update.auto_request",
+        "update.succeeded",
+        "update.failed",
+        "update.rolled_back",
+        "restore.request",
+        "restore.succeeded",
+        "restore.failed",
+        "restore.rolled_back",
+        "request.cancel",
+        "version.changed",
+    }
+)
+"""The milestones the history lists; the updater's steps stay in the audit log only."""
+
 _VERSION = re.compile(
     r"^v?(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})(?:-rc\.([1-9]\d{0,3}))?$"
 )
@@ -124,6 +150,48 @@ class Release:
         """Refuse a release page that is not on GitHub."""
         if not self.url.startswith(_RELEASE_PAGE) or len(self.url) > 300:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "url")
+
+
+@dataclass(frozen=True)
+class RunningVersion:
+    """A version this installation ran, as the web process saw it at start-up (ADR 0065).
+
+    Attributes:
+        version: ``APP_VERSION`` as text (``0.4.0-rc.7``, or ``main`` or empty for a build
+            that is no release).
+        commit: ``APP_COMMIT``; empty for a local build.
+        since: When this version was first seen.
+        request_id: The update request whose switch brought it, if the updater did; ``None``
+            for a change outside the portal (installer, by hand).
+    """
+
+    version: str
+    commit: str
+    since: datetime
+    request_id: int | None = None
+
+
+def version_changed(previous: "RunningVersion | None", current: RunningVersion) -> bool:
+    """Return whether ``current`` differs from ``previous`` in version or commit."""
+    return previous is None or (previous.version, previous.commit) != (
+        current.version,
+        current.commit,
+    )
+
+
+def detail_key(detail: str) -> str:
+    """Return the first key of an audit detail (``update.request`` of ``update.request,to:…``)."""
+    return detail.split(",", 1)[0]
+
+
+def detail_fields(detail: str) -> dict[str, str]:
+    """Return the ``key:value`` parts of an audit detail, in order."""
+    fields: dict[str, str] = {}
+    for part in detail.split(",")[1:]:
+        key, sep, value = part.partition(":")
+        if sep:
+            fields[key] = value
+    return fields
 
 
 @dataclass(frozen=True)

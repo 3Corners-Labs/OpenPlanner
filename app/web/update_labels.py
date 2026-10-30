@@ -54,3 +54,26 @@ OTHER_REASON = "admin.updates.reason.other"
 def reason_label(reason: str) -> str:
     """Return the catalogue key of an updater's reason code."""
     return REASON_LABELS.get(reason, OTHER_REASON)
+
+
+HISTORY_LABELS: dict[str, str] = {
+    "update.request": "admin.updates.history.update_request",
+    "update.auto_request": "admin.updates.history.update_auto_request",
+    "update.succeeded": "admin.updates.history.update_succeeded",
+    "update.failed": "admin.updates.history.update_failed",
+    "update.rolled_back": "admin.updates.history.update_rolled_back",
+    "restore.request": "admin.updates.history.restore_request",
+    "restore.succeeded": "admin.updates.history.restore_succeeded",
+    "restore.failed": "admin.updates.history.restore_failed",
+    "restore.rolled_back": "admin.updates.history.restore_rolled_back",
+    "request.cancel": "admin.updates.history.request_cancel",
+    "version.changed": "admin.updates.history.version_changed",
+}
+"""What a history line says, by the first key of the audit detail (ADR 0065)."""
+
+ACTOR_LABELS: dict[str, str] = {
+    "system": "admin.updates.actor.system",
+    "host-updater": "admin.updates.actor.updater",
+    "host": "admin.updates.actor.host",
+}
+"""Who did it, for the actors that are not a person."""

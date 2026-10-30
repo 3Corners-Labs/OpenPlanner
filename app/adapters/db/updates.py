@@ -8,11 +8,12 @@ parses (a hand-edited row) makes the release unknown rather than failing the pag
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import ReleaseCheckRow, UpdateRequestRow
+from app.adapters.db.models import ReleaseCheckRow, RunningVersionRow, UpdateRequestRow
 from app.domain.errors import DomainError
 from app.domain.updates import (
     Release,
     ReleaseCheck,
+    RunningVersion,
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
@@ -86,6 +87,26 @@ class UpdateQueries:
             )
         )
         await self._session.flush()
+
+    async def get_running_versions(self, limit: int = 2) -> list[RunningVersion]:
+        """Return the versions this installation ran, newest first."""
+        rows = await self._session.scalars(
+            select(RunningVersionRow).order_by(RunningVersionRow.id.desc()).limit(limit)
+        )
+        return [RunningVersion(row.version, row.commit, row.since, row.request_id) for row in rows]
+
+    async def add_running_version(self, running: RunningVersion) -> RunningVersion:
+        """Record a version seen at start-up."""
+        self._session.add(
+            RunningVersionRow(
+                version=running.version[:20],
+                commit=running.commit[:40],
+                since=running.since,
+                request_id=running.request_id,
+            )
+        )
+        await self._session.flush()
+        return running
 
     async def get_update_requests(self, limit: int = 20) -> list[UpdateRequest]:
         """Return the newest update requests, newest first."""

@@ -25,16 +25,26 @@ from app.admin.authz import AdminContext, RequirePermission, session_principal
 from app.admin.forms import done_message, raise_refusal, read_form, redirect_done, safe_next
 from app.admin.pages import Locale, SameOrigin, admin_moment, templates
 from app.admin.pages import page as _page
+from app.domain.audit import AuditEntry
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
 from app.domain.update_service import UpdateNotice, UpdateOverview, UpdateService
-from app.domain.updates import SNOOZE, UpdateRequest, UpdateStatus, progress
+from app.domain.updates import (
+    SNOOZE,
+    UpdateRequest,
+    UpdateStatus,
+    detail_fields,
+    detail_key,
+    progress,
+)
 from app.i18n import BoundGettext
 from app.web.errors import form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.templates import render
 from app.web.update_labels import (
     ACTION_LABELS,
+    ACTOR_LABELS,
+    HISTORY_LABELS,
     STATUS_LABELS,
     STEP_LABELS,
     STEP_STATE_LABELS,
@@ -246,6 +256,60 @@ def _history(
 
 
 @dataclass(frozen=True)
+class HistoryView:
+    """One line of the history: an audit event of the updates (ADR 0065 point 5).
+
+    Attributes:
+        at: When, in the admin time zone.
+        by: Who: the staff member's name, or "system", "the updater" or "the host".
+        what: What happened, from the detail key.
+        from_version: The version before; empty when the event predates ADR 0065.
+        to_version: The version after.
+        reason: The updater's reason, for a failure or rollback.
+        problem: Whether the line is a failure or rollback.
+    """
+
+    at: str
+    by: str
+    what: str
+    from_version: str
+    to_version: str
+    reason: str
+    problem: bool
+
+
+def _actor(entry: AuditEntry, _: BoundGettext) -> str:
+    """Name who acted: a staff member's display name, a known machine actor, or the subject."""
+    actor = entry.event.actor
+    if actor in ACTOR_LABELS:
+        return _(ACTOR_LABELS[actor])
+    return entry.actor_name or actor
+
+
+def _audit_history(
+    request: Request, locale: RequestLocale, entries: list[AuditEntry]
+) -> list[HistoryView]:
+    """Translate the audit entries of the updates for the history table."""
+    _ = locale.gettext
+    views = []
+    for entry in entries:
+        key = detail_key(entry.event.detail)
+        fields = detail_fields(entry.event.detail)
+        views.append(
+            HistoryView(
+                at=admin_moment(request, locale, entry.event.at),
+                by=_actor(entry, _),
+                what=_(HISTORY_LABELS.get(key, "admin.updates.history.other")),
+                from_version=fields.get("from", ""),
+                to_version=fields.get("to", ""),
+                reason=_(reason_label(entry.event.reason)) if entry.event.reason else "",
+                problem=key.endswith((".failed", ".rolled_back")),
+            )
+        )
+    return views
+
+
+@dataclass(frozen=True)
 class CommitView:
     """The commit this image was built from (ADR 0052).
 
@@ -276,7 +340,9 @@ async def _overview(
     error: DomainError | None = None,
 ) -> HTMLResponse:
     """Render the updates page, with the refusal of a request when there is one."""
-    found = await update_service(request).overview(context.principal)
+    service = update_service(request)
+    found = await service.overview(context.principal)
+    entries = await service.history(context.principal)
     check = found.check
     live = _progress(request, locale, found) if found.open else None
     response = _page(
@@ -289,7 +355,13 @@ async def _overview(
             "commit": _commit(request),
             "checked_at": admin_moment(request, locale, check.checked_at) if check else None,
             "check_error": check.error if check else "",
-            "history": _history(request, locale, found.history),
+            "history": _audit_history(request, locale, entries),
+            "outside_change": (
+                admin_moment(request, locale, found.outside_change.since)
+                if found.outside_change
+                else None
+            ),
+            "outside_version": found.outside_change.version if found.outside_change else "",
             "errors": form_errors(error, locale.gettext) if error else [],
             "done": done_message(request, locale.gettext),
             "progress": live,
