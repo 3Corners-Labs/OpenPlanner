@@ -59,6 +59,12 @@ SMTP and SMS settings per organisation are organisation data; their password and
 are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data.
 Neither leaves the system except as part of the messages above.
 
+```
+web ──DNS (TXT)──> the host's resolver          sender domain check (ADR 0073)
+   the domain of the sender address, _dmarc.<domain> and <selector>._domainkey.<domain>;
+   organisation data only, on the superuser's request; the answers are judged, not stored
+```
+
 The platform's fallback mail server, the update check's read token and the Webex Service App
 (client secret, refresh token) can also be set in the portal (ADR 0042 step 6). Their password and token are sealed the same way, under
 `setting:<key>` in `integration_credentials`, and are never shown, logged or audited by value;
@@ -199,6 +205,7 @@ citizen ──GET /b/{token}/join/go──> OpenPlanner ──303──> Webex w
 citizen ──POST /b/{token}/test──> OpenPlanner ──meeting (group name, times)──> Webex ──id, link──> OpenPlanner (ADR 0071)
 citizen ──GET /b/{token}/test/go──> OpenPlanner ──303──> the trial meeting in the Webex web app
 Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task events → booking_events, call_status
+web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex (ADR 0010, when an admin opens or polls the agenda and a status is older than MEETING_STATUS_REFRESH_SECONDS): meeting id and the group's host address out; state and participant list back, reduced in the adapter to state, count, host flag, first join and last leave → call_status. Participant names, addresses and IPs are processed in memory only, never stored or logged
 ```
 
 | Data item | Where | Source | Retention | Leaves the system |

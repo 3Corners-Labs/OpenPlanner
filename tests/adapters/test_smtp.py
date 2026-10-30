@@ -89,6 +89,24 @@ def test_plain_text_only_message() -> None:
     assert email.get_content_type() == "text/plain"
 
 
+def test_every_message_is_marked_auto_submitted_and_reply_to_only_when_given_adr_0073() -> None:
+    without = build_email(MESSAGE, "Team <noreply@example.nl>")
+    assert without["Auto-Submitted"] == "auto-generated"
+    assert without["Reply-To"] is None
+
+    with_reply = build_email(MESSAGE, "Team <noreply@example.nl>", "afspraken@example.nl")
+    assert with_reply["Reply-To"] == "afspraken@example.nl"
+    assert with_reply["Auto-Submitted"] == "auto-generated"
+
+
+async def test_the_configured_reply_address_reaches_the_message() -> None:
+    config = SmtpConfig("mailpit", 1025, "noreply@example.nl", reply_to="afspraken@example.nl")
+
+    await SmtpMailSender(config).send(MESSAGE)
+
+    assert FakeSMTP.instances[0].sent[0]["Reply-To"] == "afspraken@example.nl"
+
+
 class FakeSMTPSSL(FakeSMTP):
     def __init__(self, host: str, port: int, timeout: float, context: Any) -> None:
         super().__init__(host, port, timeout)

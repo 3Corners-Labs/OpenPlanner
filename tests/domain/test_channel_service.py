@@ -16,8 +16,10 @@ from app.domain.channel_settings import (
 )
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.mail_domain import Verdict
 from app.domain.scheduling import Organisation
 from tests.fakes.clock import FixedClock
+from tests.fakes.dns import FakeTxtResolver
 from tests.fakes.messaging import RecordingSender, RefusingSender
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import DEMO_ORG_ADMIN, DEMO_SUPERUSER, NOW
@@ -273,3 +275,80 @@ async def test_without_senders_there_is_nothing_to_test(service: ChannelSettings
         await service.send_test_email(SUPER, "demo", TEST_RECIPIENT, "Test", "Tekst")
 
     assert error.value.code is ErrorCode.CHANNEL_NOT_CONFIGURED
+
+
+RECORDS: dict[str, tuple[str, ...] | None] = {
+    "demo.nl": ("v=spf1 include:_spf.provider.example -all",),
+    "s1._domainkey.demo.nl": ("v=DKIM1; k=rsa; p=MIGfMA0G",),
+    "_dmarc.demo.nl": ("v=DMARC1; p=none",),
+    "platform.nl": ("v=spf1 -all",),
+}
+
+
+def _with_resolver(
+    uow: InMemoryUnitOfWork, resolver: FakeTxtResolver | None, fallback: str | None = None
+) -> ChannelSettingsService:
+    clock = FixedClock(NOW)
+    return ChannelSettingsService(
+        uow, clock, AdminService(uow, clock), None, resolver, lambda: fallback
+    )
+
+
+async def test_the_domain_check_uses_the_stored_sender_and_selector_and_audits_the_finding(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    resolver = FakeTxtResolver(RECORDS)
+    service = _with_resolver(uow, resolver, "Platform <noreply@platform.nl>")
+    await service.save(SUPER, "demo", replace(SMTP, dkim_selector="s1"), "pw")
+
+    report = await service.check_sender_domain(SUPER, "demo")
+
+    assert resolver.asked == ["demo.nl", "s1._domainkey.demo.nl", "_dmarc.demo.nl"]
+    assert report.domain == "demo.nl"
+    assert [c.verdict for c in report.checks] == [Verdict.OK, Verdict.OK, Verdict.WARNING]
+    event = uow.state.audit[-1]
+    assert (event.action, event.outcome, event.detail) == (
+        "integrations.manage",
+        Outcome.SUCCESS,
+        "smtp.domain_check.warning",
+    )
+    assert "spf1" not in repr(uow.state.audit)
+
+
+async def test_without_own_smtp_the_fallback_sender_domain_is_checked_without_dkim(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    resolver = FakeTxtResolver(RECORDS)
+    service = _with_resolver(uow, resolver, "Platform <noreply@platform.nl>")
+
+    report = await service.check_sender_domain(SUPER, "demo")
+
+    assert resolver.asked == ["platform.nl", "_dmarc.platform.nl"]
+    assert report.domain == "platform.nl"
+    assert [c.verdict for c in report.checks] == [
+        Verdict.OK,
+        Verdict.NOT_CHECKED,
+        Verdict.MISSING,
+    ]
+    assert uow.state.audit[-1].detail == "smtp.domain_check.missing"
+
+
+async def test_the_domain_check_needs_a_sender_and_a_resolver(uow: InMemoryUnitOfWork) -> None:
+    with pytest.raises(DomainError) as no_sender:
+        await _with_resolver(uow, FakeTxtResolver()).check_sender_domain(SUPER, "demo")
+    assert no_sender.value.code is ErrorCode.CHANNEL_NOT_CONFIGURED
+
+    with pytest.raises(DomainError) as no_resolver:
+        await _with_resolver(uow, None, "x@demo.nl").check_sender_domain(SUPER, "demo")
+    assert no_resolver.value.code is ErrorCode.CHANNEL_NOT_CONFIGURED
+
+
+async def test_the_domain_check_is_superuser_only(uow: InMemoryUnitOfWork) -> None:
+    resolver = FakeTxtResolver(RECORDS)
+    service = _with_resolver(uow, resolver, "x@demo.nl")
+
+    with pytest.raises(DomainError) as error:
+        await service.check_sender_domain(ORG_ADMIN, "demo")
+
+    assert error.value.code is ErrorCode.NOT_PERMITTED
+    assert resolver.asked == []

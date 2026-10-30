@@ -31,6 +31,7 @@ from app.domain.calls import (
     BookingOverview,
     CallStatus,
     MeetingRequest,
+    MeetingStatus,
     WorkItem,
 )
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
@@ -211,6 +212,17 @@ class VideoProvider(Protocol):
         """Delete a meeting; deleting one that no longer exists is not an error."""
         ...
 
+    async def meeting_status(self, meeting_id: str, host_email: str) -> MeetingStatus:
+        """Return the meeting's state, participant count and whether the host joined (ADR 0010).
+
+        The polling fallback for webhooks that did not arrive. Aggregates only: names and
+        addresses of participants never leave the adapter.
+
+        Raises:
+            IntegrationError: If the provider refuses or cannot be reached.
+        """
+        ...
+
 
 class IntegrationChecker(Protocol):
     """Checks a group's integration chain at the platforms (read-only; verify button)."""
@@ -273,6 +285,17 @@ class CertificateProbe(Protocol):
         """Connect to ``host:port``, verify the chain against the host's CA bundle, read the leaf.
 
         Never raises: a failed connection or handshake is a result with an error code.
+        """
+        ...
+
+
+class MailDomainResolver(Protocol):
+    """Looks up the TXT records of a DNS name, for the sender domain check (ADR 0073)."""
+
+    async def txt_records(self, name: str) -> tuple[str, ...] | None:
+        """Return the TXT records of ``name`` (``()`` when it has none).
+
+        Returns ``None`` when the lookup failed (timeout, no resolver); never raises.
         """
         ...
 
