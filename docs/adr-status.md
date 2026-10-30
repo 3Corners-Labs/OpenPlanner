@@ -26,7 +26,7 @@ package; when the two disagree, the code wins.
 | 0001 | Record architecture decisions | POLICY | `docs/adr/` (template #52); the PR template asks for ADR status (ADR 0059); `tests/test_adr_status.py` checks the list | No CI check on numbering or on "ADR in the same PR"; only review and the PR template |
 | 0002 | Runtime layout of the skeleton | PARTIAL | #1, #4; migrations only in `web`; `api/health.py`; `jobs/healthcheck.py`; SQLite pragmas in `adapters/db/engine.py` | Per-request logging with route templates (§5): the access log stays off; Referrer-Policy is `same-origin`, not `no-referrer` |
 | 0003 | Licence exception for certifi | BUILT | #1; `scripts/check-licenses.sh` (`IGNORED="certifi"`), CI `pip-licenses`, `docs/dependencies.md` | – |
-| 0004 | Internationalisation module | PARTIAL | #1, #19, #85, #168; `app/i18n/` (negotiation, `.po`, `missing_key`), `tests/i18n/`, import-linter contract, `group_texts`; organisation texts: ADR 0074, migration 0072 | The global (superuser) override layer and its editor, `.po` export and import, a revision counter (the 5 s re-read of ADR 0074 stands in), locales added in the portal |
+| 0004 | Internationalisation module | PARTIAL | #1, #19, #85, #168; `app/i18n/` (negotiation, `.po`, `missing_key`), `tests/i18n/`, import-linter contract, `group_texts`; organisation texts: ADR 0074, migration 0074 | The global (superuser) override layer and its editor, `.po` export and import, a revision counter (the 5 s re-read of ADR 0074 stands in), locales added in the portal |
 | 0005 | Modularity and documentation | POLICY | #1; ruff `D` (google), import-linter layers, jscpd at 1%, each a CI job | Reviewer check of module overlap is not machine-checked; adapters use hand-written expectations, no recorded fixtures |
 | 0006 | Test tooling, image publishing and signing | BUILT | #1, #4, #94, #131; `e2e/`, `make mutation`, `.github/actions/publish-image` (cosign, SBOM) | – (CI results on GitHub not checked here) |
 | 0007 | Dispatch through the WxCC Tasks API | BUILT | #10; `ContactCenterDispatcher` port, `adapters/wxcc.py`, `verify_wxcc` (HMAC, 300 s); points 1–2 superseded by ADR 0018 | Live behaviour against a WxCC tenant is not visible in the code |
@@ -96,7 +96,7 @@ package; when the two disagree, the code wins.
 | 0071 | Trial call on Webex | BUILT | #154; migration 0063 | – |
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
 | 0073 | Email deliverability: sender domain check, system mail headers | PARTIAL | step 1 #166; no migration | Step 2 (a periodic check in the worker) is decided after step 1 is in use (ADR decision 6) |
-| 0074 | Organisation text overrides | BUILT | #168; migration 0072; `domain/text_overrides.py`, `adapters/db/text_overrides.py`, `admin/organisation_text_routes.py` | Step 2: the global (superuser) layer, `.po` export and import, revision counter (follow-up, listed in the ADR) |
+| 0074 | Organisation text overrides | BUILT | #168; migration 0074; `domain/text_overrides.py`, `adapters/db/text_overrides.py`, `admin/organisation_text_routes.py` | Step 2: the global (superuser) layer, `.po` export and import, revision counter (follow-up, listed in the ADR) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 
