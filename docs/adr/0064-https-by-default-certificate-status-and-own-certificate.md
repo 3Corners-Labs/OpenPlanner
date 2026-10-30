@@ -88,7 +88,14 @@ manual override with an own certificate.
    `build: deploy/proxy` behind `image: ${OPENPLANNER_PROXY_IMAGE:-openplanner-proxy:local}`
    for development and `scripts/check-proxy.sh`, which still build the image locally in CI.
 
-Build steps: (1) decisions 1–4 (PR #139); (2) decision 5 (this PR, stacked on step 1).
+Build steps: (1) decisions 1–4 (PR #139); (2) decision 5 (PR #144, stacked on step 1); (3) the
+certificate source managed by the superuser in the portal (own ADR). The product owner decided
+on 2026-10-30 that docker01 runs the ACME flow by default, and that who manages the certificate
+depends on where TLS ends: with the bundled proxy (small installations) the superuser must be
+able to choose ACME or upload an own certificate from the portal; behind an enterprise reverse
+proxy (`--no-tls`) the certificate is theirs and OpenPlanner only shows what citizens see
+(decision 3 covers that already). Until step 3 the operator manages the source on the host, as
+decision 2 says.
 
 ## Settings
 
