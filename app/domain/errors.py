@@ -73,6 +73,16 @@ class ErrorCode(StrEnum):
     SETTING_NOT_LOCKED = "setting_not_locked"
     NOTHING_TO_RETRY = "nothing_to_retry"
     LOGIN_LOCKOUT = "login_lockout"
+    TLS_CERTIFICATE_UNREADABLE = "tls_certificate_unreadable"
+    TLS_KEY_MISMATCH = "tls_key_mismatch"
+    TLS_NAME_MISMATCH = "tls_name_mismatch"
+    TLS_CERTIFICATE_EXPIRED = "tls_certificate_expired"
+    TLS_CERTIFICATE_NOT_YET_VALID = "tls_certificate_not_yet_valid"
+    TLS_CERTIFICATE_MISSING = "tls_certificate_missing"
+    TLS_CERTIFICATE_IN_USE = "tls_certificate_in_use"
+    TLS_SOURCE_NOT_APPLICABLE = "tls_source_not_applicable"
+    TLS_KEY_MISSING = "tls_key_missing"
+    TLS_VOLUME_UNWRITABLE = "tls_volume_unwritable"
 
 
 class DomainError(Exception):

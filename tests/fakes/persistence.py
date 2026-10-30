@@ -36,6 +36,7 @@ from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobCounts, JobStatus, JobSummary, PlannedJob
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
+from app.domain.own_certificate import OwnCertificate
 from app.domain.retention import GroupRetentionCounts, PurgeCandidate, RetentionFacts
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
@@ -46,6 +47,7 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.staff import StaffFilter, StaffMember, visible
+from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
 from app.domain.updates import ReleaseCheck, UpdateRequest
 from app.domain.worker_check import WorkerHeartbeat
@@ -60,6 +62,7 @@ class State:
     slots: dict[int, Slot] = field(default_factory=dict)
     bookings: dict[int, Booking] = field(default_factory=dict)
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
+    active_jobs: list[ActiveJob] = field(default_factory=list)
     organisation_slugs: dict[int, str] = field(default_factory=dict)
     organisations: dict[int, Organisation] = field(default_factory=dict)
     booking_events: dict[int, list[BookingEvent]] = field(default_factory=dict)
@@ -91,6 +94,7 @@ class State:
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
     certificate_check: CertificateCheck | None = None
+    own_certificate: OwnCertificate | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     custom_roles: dict[int, CustomRole] = field(default_factory=dict)
@@ -669,6 +673,9 @@ class InMemoryTransaction:
         jobs = self.state.jobs.get(booking_id, [])
         self.state.jobs[booking_id] = [j for j in jobs if j.type not in types]
 
+    async def active_jobs(self, limit: int) -> ActiveJobs:
+        return ActiveJobs(list(self.state.active_jobs[:limit]), len(self.state.active_jobs))
+
     async def get_booking_jobs(self, booking_id: int) -> list[JobSummary]:
         # Planned jobs are pending; ``failed_jobs`` holds what a test says failed (ADR 0068).
         pending = [
@@ -876,6 +883,17 @@ class InMemoryTransaction:
 
     async def save_certificate_check(self, check: CertificateCheck) -> None:
         self.state.certificate_check = check
+
+    async def get_own_certificate(self) -> OwnCertificate | None:
+        return self.state.own_certificate
+
+    async def save_own_certificate(self, certificate: OwnCertificate) -> None:
+        self.state.own_certificate = certificate
+
+    async def delete_own_certificate(self) -> bool:
+        had = self.state.own_certificate is not None
+        self.state.own_certificate = None
+        return had
 
     async def get_maintenance_state(self) -> MaintenanceState:
         return self.state.maintenance
