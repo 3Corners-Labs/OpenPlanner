@@ -199,6 +199,7 @@ git fetch --depth 1 origin tag v0.3.0 && git checkout -f v0.3.0
 | `Docker Compose ... is too old` | run it again without `--no-packages`, or upgrade the Compose plugin |
 | `cannot find the latest release` | pass `--version`, or put a token in `UPDATE_CHECK_TOKEN` (`.env`) for a private repository |
 | `cannot pull ghcr.io/...` | `docker login ghcr.io -u <github user>` with a `read:packages` token, run it again (the updater gets a copy of this login) |
+| the portal reports *signature invalid* for a release that CI signed (`cosign verify` on the host says `no signatures found`) | the host's cosign is older than the one CI signs with (cosign 3 writes OCI bundles that cosign 2 cannot read; this hit docker01 at v0.3.0). Run the installer first, which upgrades cosign: `git fetch --tags && git checkout vX.Y.Z && ./scripts/install.sh`, then "Update now" again |
 | `is not signed by a release of ...` | the image is not a signed release of this repository: check `--repository` and `--version`; never work around it |
 | `Docker's release key has fingerprint ...` | the download was not Docker's key; check the network path (proxy, DNS) before trying again |
 | `checksum of cosign_... does not match` | the download is damaged or not the release; run it again later |
