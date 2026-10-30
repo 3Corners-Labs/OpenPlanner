@@ -813,7 +813,8 @@ OpenPlanner**. From then on:
   theirs;
 - the team's agents sign in to the admin portal (IdP role `OIDC_ROLE_AGENT`, default
   `openplanner-agent`, with the group in the group claim) and open the **Wachtrij** tab;
-- citizens can change or cancel until `queue_change_working_days` working days before the start.
+- citizens can cancel until the start and move until `citizen_change_lead_minutes` before it
+  (ADR 0069), as with the contact center.
 
 Switch back the same way once the contact center works again. Both changes are in the audit
 log (`group.edit`, detail `dispatch_kind`).

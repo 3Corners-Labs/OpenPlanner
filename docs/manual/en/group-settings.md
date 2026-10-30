@@ -81,14 +81,14 @@ A change applies to appointments not yet dispatched. An appointment already in t
 center as a task stays there. When the contact center fails (Webex Connect or Webex Contact
 Center outage), you can switch the group to the own queue for the time being.
 
-<!-- field: queue_change_working_days -->
-### Changes until (working days ahead, own queue)
+<!-- field: citizen_change_lead_minutes -->
+### Citizen can move until (minutes ahead)
 
-Only with the own queue. Until how many working days before the start the citizen can change or
-cancel the appointment, from 1 to 5, at the same time of day. Working days are Monday to Friday;
-public holidays count as working days here. Example with 1: an appointment on Monday at 10:00
-can be changed until Friday 10:00. A citizen cannot change an appointment booked later than
-that.
+Until how many minutes before the start the citizen can move the appointment, 60 by default.
+The number is never smaller than **Send to the queue** and at most 1440 (one day). Cancelling
+is always possible until the call begins; that is fixed and not a setting. It applies to the
+contact center and the own queue. A citizen can only cancel an appointment that was booked
+later than this number.
 
 <!-- field: queue_visible_from_minutes -->
 ### Visible in the queue (minutes ahead, own queue)
@@ -119,8 +119,8 @@ the address carefully; it is also shown on the group's overview page and in the 
 ### Send to the queue
 
 How many minutes before the start the appointment goes to Webex Contact Center as a task, from
-0 to 60. From that moment the citizen can no longer change or cancel the appointment through the
-link in the confirmation.
+0 to 60. The citizen can still cancel after that through the link in the confirmation; moving is
+possible until **Citizen can move until**.
 
 Choose enough time for an agent to pick up the task before the citizen waits in the video call,
 for example 5 minutes.

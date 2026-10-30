@@ -63,10 +63,10 @@ from app.domain.planning import (
 )
 from app.domain.scheduling import (
     MAX_BOOKINGS_PER_EMAIL,
+    MAX_CITIZEN_CHANGE_LEAD_MINUTES,
     MAX_DIRECT_CALLS,
     MAX_LABEL_LENGTH,
     MAX_PLANNER_LEAD_MINUTES,
-    MAX_QUEUE_CHANGE_WORKING_DAYS,
     MAX_QUEUE_VISIBLE_FROM_MINUTES,
     DispatchKind,
     GroupSummary,
@@ -115,9 +115,9 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
         "admin.field.dispatch_lead_minutes",
         "admin.field.dispatch_lead_minutes_hint",
     ),
-    "queue_change_working_days": (
-        "admin.field.queue_change_working_days",
-        "admin.field.queue_change_working_days_hint",
+    "citizen_change_lead_minutes": (
+        "admin.field.citizen_change_lead_minutes",
+        "admin.field.citizen_change_lead_minutes_hint",
     ),
     "planner_change_min_lead_minutes": (
         "admin.field.planner_change_min_lead_minutes",
@@ -558,9 +558,9 @@ def _settings_fields(
         ),
         number("dispatch_lead_minutes", current.dispatch_lead_minutes, {"min": "0", "max": "60"}),
         number(
-            "queue_change_working_days",
-            current.queue_change_working_days,
-            {"min": "1", "max": str(MAX_QUEUE_CHANGE_WORKING_DAYS)},
+            "citizen_change_lead_minutes",
+            current.citizen_change_lead_minutes,
+            {"min": "0", "max": str(MAX_CITIZEN_CHANGE_LEAD_MINUTES), "step": "5"},
         ),
         number(
             "planner_change_min_lead_minutes",

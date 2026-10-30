@@ -37,9 +37,9 @@ from app.domain.confirmation import ConfirmWindow
 def dispatch_moment(start: datetime, dispatch_lead: timedelta) -> datetime:
     """Return the moment a booking's WxCC task is dispatched.
 
-    For a contact-center group it is also the change deadline (``Group.change_deadline``):
-    from then on an agent may pick up the task and join the meeting, so cancelling or
-    rescheduling would leave a task for an appointment that no longer exists.
+    From then on an agent may pick up the task and join the meeting. A booking cancelled or
+    moved after it gets its task marked cancelled (ADR 0021); the citizen's own change lead
+    (``Group.change_deadline``, ADR 0069) is never shorter than the dispatch lead.
     """
     return start - dispatch_lead
 

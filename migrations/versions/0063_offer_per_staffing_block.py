@@ -5,13 +5,13 @@ Every staffing block (``schedule_rules``) and every exception with a window
 (direct calls only) or ``both``. The group switch ``direct_call_enabled`` goes: the blocks of
 a group that had it on become ``both``, so citizens see no change.
 
-Revises 0061 (own certificates, ADR 0070), the head of ``main`` at merge time.
+Revises 0062 (citizen change lead, ADR 0069), the head of ``main`` at merge time.
 
 The downgrade sets the switch again for every group with a block that offers direct calls,
 then drops the ``offer`` columns.
 
-Revision ID: 0062
-Revises: 0061
+Revision ID: 0063
+Revises: 0062
 Create Date: 2026-10-30 18:00:00.000000
 """
 
@@ -20,8 +20,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0062"
-down_revision: str | None = "0061"
+revision: str = "0063"
+down_revision: str | None = "0062"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

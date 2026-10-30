@@ -115,7 +115,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "horizon_days": "admin.form.error.horizon_days",
     "dispatch_lead_minutes": "admin.form.error.dispatch_lead_minutes",
     "dispatch_kind": "admin.form.error.choice",
-    "queue_change_working_days": "admin.form.error.queue_change_working_days",
+    "citizen_change_lead_minutes": "admin.form.error.citizen_change_lead_minutes",
     "planner_change_min_lead_minutes": "admin.form.error.planner_change_min_lead_minutes",
     "queue_visible_from_minutes": "admin.form.error.queue_visible_from_minutes",
     "queue_free_pick_allowed": "admin.form.error.choice",

@@ -110,12 +110,15 @@ def test_a_slot_within_the_planner_lead_is_no_candidate() -> None:
     assert ranked(GROUP, MON_0900, [_slot(TUE_0900)], REACH, now) == []
 
 
-def test_a_slot_past_the_own_queues_change_deadline_is_no_candidate() -> None:
-    group = make_group(dispatch_kind=DispatchKind.OPENPLANNER_QUEUE)
-    thursday_noon = THU_0900 + timedelta(hours=3)
+@pytest.mark.parametrize("kind", list(DispatchKind))
+def test_a_slot_within_the_citizens_change_lead_is_no_candidate(kind: DispatchKind) -> None:
+    """ADR 0069: the citizen's change lead applies to both kinds; a day ahead is far enough."""
+    group = make_group(dispatch_kind=kind, citizen_change_lead_minutes=180)
+    two_hours_before = FRI_0900 - timedelta(hours=2)
 
-    assert may_take(GROUP, FRI_0900, thursday_noon)
-    assert not may_take(group, FRI_0900, thursday_noon)
+    assert may_take(replace(group, citizen_change_lead_minutes=60), FRI_0900, two_hours_before)
+    assert not may_take(group, FRI_0900, two_hours_before)
+    assert may_take(group, FRI_0900, FRI_0900 - timedelta(days=1))
 
 
 def test_each_booking_gets_its_best_slot_until_the_room_runs_out() -> None:

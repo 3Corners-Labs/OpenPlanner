@@ -16,9 +16,9 @@ gets no meeting, reminders or task until confirmed; its deadline ``confirm_by`` 
 organisation's ``ConfirmPolicy``. A booking that is moved or rescheduled keeps the
 confirmation it had (the address was already verified), so it is placed confirmed.
 
-A booking is read-only from its change deadline (``Group.change_deadline``: the group's
-dispatch lead before the start, T−5 min by default, or with the own queue a number of working
-days before, ADR 0043): cancel and reschedule then raise
+A citizen can move a booking until its change deadline (``Group.change_deadline``: the group's
+``citizen_change_lead_minutes`` before the start, 60 by default) and cancel it until its start
+(``Group.cancel_deadline``, ADR 0069); after that, reschedule and cancel raise
 ``booking_locked``. A booking suspended by an emergency closure (ADR 0024) has no deadline:
 the citizen can move or cancel it until it is resolved. No slot inside a closure is offered
 or booked (``group_closed``), and no direct call starts while one is active. A direct call
@@ -99,11 +99,12 @@ class ContactInput:
 
 @dataclass(frozen=True)
 class BookingDetails:
-    """What the management page needs: the booking, its group and whether it may change.
+    """What the management page needs: the booking, its group and what it may still do.
 
-    ``closure`` is the closure that suspended the booking, for its notice. ``cancellable`` is
-    also true for a booking that awaits confirmation ("this was not me", ADR 0056), which
-    cannot be rescheduled.
+    ``changeable`` says whether the citizen may move it, ``cancellable`` whether they may
+    cancel it (ADR 0069). ``cancellable`` is also true for a booking that awaits confirmation
+    ("this was not me", ADR 0056), which cannot be rescheduled. ``closure`` is the closure that
+    suspended the booking, for its notice.
     """
 
     booking: Booking
@@ -317,10 +318,13 @@ class BookingService:
                 if booking.is_suspended and booking.closure_id is not None
                 else None
             )
+        now = self._clock.now()
         deadline = group.change_deadline(booking.start)
-        before = self._clock.now() < deadline
-        changeable = booking.on_hold or (booking.is_active and before)
-        cancellable = changeable or (booking.awaits_confirmation and before)
+        changeable = booking.on_hold or (booking.is_active and now < deadline)
+        cancellable = booking.on_hold or (
+            (booking.is_active or booking.awaits_confirmation)
+            and now < group.cancel_deadline(booking.start)
+        )
         return BookingDetails(booking, group, deadline, changeable, closure, cancellable)
 
     async def confirm(self, management_token: str) -> Booking:
@@ -352,14 +356,14 @@ class BookingService:
         """Cancel the booking; its pending jobs become a cancellation mail and the purge.
 
         Raises:
-            DomainError: ``booking_not_found``, ``booking_locked`` (from the change deadline)
+            DomainError: ``booking_not_found``, ``booking_locked`` (from the start on)
                 or ``booking_not_active``.
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
             now = self._clock.now()
             group = await self._group_by_id(tx, booking.group_id)
-            _ensure_changeable(booking, group, now)
+            _ensure_cancellable(booking, group, now)
             cancelled = booking.cancel(now)
             await tx.save_booking(cancelled)
             jobs = plan_for_cancellation(cancelled_at=now, team_invite=group.sends_team_invite)
@@ -621,7 +625,7 @@ async def _check_address_limit(
 
 
 def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
-    """Refuse changes from the change deadline on; the booking is read-only from then.
+    """Refuse a move from the change deadline on (ADR 0069).
 
     A booking on hold (suspended, or awaiting a new time) has no deadline: it does not go
     ahead at its time anyway.
@@ -629,6 +633,14 @@ def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
     if booking.on_hold:
         return
     if now >= group.change_deadline(booking.start):
+        raise DomainError(ErrorCode.BOOKING_LOCKED)
+
+
+def _ensure_cancellable(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse a cancellation from the start on (ADR 0069); on hold has no deadline."""
+    if booking.on_hold:
+        return
+    if now >= group.cancel_deadline(booking.start):
         raise DomainError(ErrorCode.BOOKING_LOCKED)
 
 

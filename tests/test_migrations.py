@@ -446,7 +446,7 @@ def test_the_direct_call_switch_becomes_an_offer_per_block_and_back(
     database.commit()
     database.close()
 
-    command.upgrade(alembic_config, "0062")
+    command.upgrade(alembic_config, "0063")
     database = sqlite3.connect(tmp_path / "migrate.db")
     rules = database.execute("SELECT group_id, offer FROM schedule_rules ORDER BY group_id")
     overrides = database.execute("SELECT group_id, offer FROM schedule_overrides ORDER BY group_id")

@@ -67,7 +67,7 @@ class GroupSettings:
     phone_mode: PhoneMode
     dispatch_lead_minutes: int
     dispatch_kind: DispatchKind
-    queue_change_working_days: int
+    citizen_change_lead_minutes: int
     planner_change_min_lead_minutes: int
     queue_visible_from_minutes: int
     queue_free_pick_allowed: bool
