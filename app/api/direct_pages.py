@@ -63,6 +63,15 @@ POLLING = frozenset({WaitState.SEARCHING, WaitState.ACCEPTED})
 """States that can still change into something the citizen must see at once."""
 OVER = frozenset({WaitState.UNAVAILABLE, WaitState.FAILED})
 """States in which the page offers to schedule an appointment instead."""
+WAIT_TEXT: dict[WaitState, str] = {
+    WaitState.SEARCHING: "wait.searching",
+    WaitState.ACCEPTED: "wait.accepted",
+    WaitState.IN_CALL: "wait.in_call",
+    WaitState.UNAVAILABLE: "wait.unavailable",
+    WaitState.FAILED: "wait.failed",
+    WaitState.INACTIVE: "manage.inactive",
+}
+"""The one sentence per state: shown in the notice and announced in the page's status region."""
 
 
 @dataclass(frozen=True)
@@ -81,13 +90,14 @@ class WaitView:
         shown = (self.state, self.joinable, self.queue)
         return hashlib.sha256(repr(shown).encode()).hexdigest()[:16]
 
-    def context(self, request: Request) -> dict[str, object]:
+    def context(self, request: Request, locale: RequestLocale) -> dict[str, object]:
         """Return the template context, with the poll URL while the state can still change."""
         polling = self.state in POLLING
         return {
             "group": self.group,
             "token": self.token,
             "state": self.state.value,
+            "status_text": locale.gettext(WAIT_TEXT[self.state]),
             "queue": self.queue,
             "joinable": self.joinable,
             "refresh": polling,
@@ -203,7 +213,8 @@ async def wait_page(request: Request, token: str, locale: Locale) -> Response:
     view = await _wait_view(request, token)
     if view is None:
         return RedirectResponse(f"/b/{token}", status_code=303)
-    return await citizen_page(request, locale, "wait.html", view.group, view.context(request))
+    context = view.context(request, locale)
+    return await citizen_page(request, locale, "wait.html", view.group, context)
 
 
 @router.get("/b/{token}/wait/status", response_class=HTMLResponse)
@@ -215,4 +226,4 @@ async def wait_status(request: Request, token: str, locale: Locale, seen: Seen =
         return RedirectResponse(f"/b/{token}", status_code=303)
     if view.key == seen:
         return Response(status_code=204, headers={"cache-control": "no-store"})
-    return render(templates, request, "_wait_status.html", locale, view.context(request))
+    return render(templates, request, "_wait_status.html", locale, view.context(request, locale))
