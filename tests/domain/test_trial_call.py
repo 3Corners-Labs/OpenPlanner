@@ -1,4 +1,4 @@
-"""The trial call rules (ADR 0070)."""
+"""The trial call rules (ADR 0071)."""
 
 from dataclasses import replace
 from datetime import timedelta

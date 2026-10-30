@@ -48,7 +48,7 @@ BOOKING_ROUTES = frozenset(
     {"/b/{token}/cancel", "/b/{token}/reschedule", "/b/{token}/test", "/b/{token}/test/go"}
 )
 """Citizen routes under a management link that close (both the form and the write). The trial
-call (ADR 0070) schedules a meeting at Webex, which is a write, so its page closes too."""
+call (ADR 0071) schedules a meeting at Webex, which is a write, so its page closes too."""
 
 WIDGET_ROUTES = frozenset(
     {

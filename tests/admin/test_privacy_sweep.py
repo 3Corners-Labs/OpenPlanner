@@ -336,7 +336,7 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     async with uow.locked() as tx:
         await tx.save_meeting(found.queued_id, MeetingRef("m-zq", MARKERS["guest_join_url"]))
         trial = TrialCall(MeetingRef("t-zq", MARKERS["trial_join_url"]), site.clock.now())
-        await tx.save_trial_call(found.queued_id, trial)  # ADR 0070: no admin page shows it
+        await tx.save_trial_call(found.queued_id, trial)  # ADR 0071: no admin page shows it
         waiting = await tx.get_booking(waiting_id)
         assert waiting is not None
         await tx.save_booking(waiting.request_rebook(ChangeReason.STAFFING, site.clock.now()))

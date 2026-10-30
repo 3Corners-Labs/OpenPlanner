@@ -1,4 +1,4 @@
-"""Opening and joining a trial call on Webex (ADR 0070); the rules are in ``trial_call``.
+"""Opening and joining a trial call on Webex (ADR 0071); the rules are in ``trial_call``.
 
     view   ─► state of the booking's trial call (read only)
     open   ─► AVAILABLE: schedule the meeting at Webex ─► locked tx: store, count, plan the

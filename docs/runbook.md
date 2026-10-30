@@ -480,7 +480,7 @@ Staff who join signed in with the organisation's account become cohost automatic
 on a phone that the citizen's browser join works with your site settings (mobile browsers may
 offer the Webex app).
 
-**Trial call (ADR 0070).** A citizen's trial call is a meeting of the same host on the same site
+**Trial call (ADR 0071).** A citizen's trial call is a meeting of the same host on the same site
 that participants may enter before the host (OpenPlanner sets `enabledJoinBeforeHost`,
 `enableConnectAudioBeforeHost` and `allowJoin` on it, not on the appointment's own meeting).
 The site must allow this. **Koppeling controleren** schedules and deletes a trial probe and

@@ -328,7 +328,7 @@ def plan_for_suspension(
 
     Reminders and the planned WxCC task go, and a work item that already exists is ended;
     the meeting stays, so a reinstated booking keeps its link. An open trial call is deleted
-    (ADR 0070): replacing the jobs would otherwise drop its pending clean-up. The purge waits
+    (ADR 0071): replacing the jobs would otherwise drop its pending clean-up. The purge waits
     for the end of the closure (``Closure.purge_at``); while the closure is open-ended there is
     none, and ``plan_purge`` adds it once the end is known.
     """

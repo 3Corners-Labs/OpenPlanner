@@ -194,7 +194,7 @@ class GroupRow(Base):
     citizen_change_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     # ADR 0044: a planner changes bookings up to this long before the start.
     planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
-    # ADR 0070: a trial call on Webex ahead of the appointment.
+    # ADR 0071: a trial call on Webex ahead of the appointment.
     trial_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
     trial_call_minutes: Mapped[int] = mapped_column(Integer, server_default=text("30"))
     trial_calls_per_booking: Mapped[int] = mapped_column(Integer, server_default=text("3"))
@@ -451,7 +451,7 @@ class BookingRow(Base):
     host_join_url: Mapped[str | None] = mapped_column(String(2048))
     video_room_id: Mapped[str | None] = mapped_column(String(255))
     wxcc_task_id: Mapped[str | None] = mapped_column(String(255))
-    # ADR 0070: the trial call on Webex; the link is PII and purged with the contact.
+    # ADR 0071: the trial call on Webex; the link is PII and purged with the contact.
     trial_room_id: Mapped[str | None] = mapped_column(String(255))
     trial_join_url: Mapped[str | None] = mapped_column(String(2048))
     trial_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime())

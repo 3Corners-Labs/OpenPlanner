@@ -8,7 +8,7 @@ skipped with a reason, ADR 0068) and logging. Failures are classified by the run
     create_video_room  ─► CallService.ensure_meeting
     dispatch_wxcc_task ─► CallService.ensure_task   (waits for the meeting)
     delete_video_room  ─► CallService.delete_meeting
-    delete_trial_call  ─► CallService.delete_trial_call   (ADR 0070)
+    delete_trial_call  ─► CallService.delete_trial_call   (ADR 0071)
     end_wxcc_task      ─► CallService.end_task      (cancelled bookings, ADR 0021)
 """
 
