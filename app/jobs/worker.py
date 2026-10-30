@@ -23,7 +23,12 @@ from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.maintenance import storage_limits
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
-from app.adapters.integrations import build_integrations, secret_box
+from app.adapters.integrations import (
+    Integrations,
+    build_integrations,
+    secret_box,
+    webex_fingerprint,
+)
 from app.adapters.live_settings import LiveSettings
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
@@ -87,23 +92,28 @@ async def run_worker(
         lambda: timedelta(minutes=live.settings.security_event_window_minutes),
         max_sources=lambda: live.settings.security_event_max_sources,
     )
-    integrations = build_integrations(settings, engine, http, clock, security)
-    runner = JobRunner(
-        SqlJobQueue(engine),
-        uow,
-        clock,
-        ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
-        MessageComposer(
-            Translator(load_catalogues()),
-            management_token_key(settings),
-            settings.public_base_url,
-        ),
-        video=integrations.video,
-        dispatcher=integrations.dispatcher,
-        integration=IntegrationService(uow, clock, AdminService(uow, clock)),
-        retention=lambda: live.settings.event_retention,
-        clock_style=lambda organisation: live.for_organisation(organisation).time_format,
-    )
+
+    def build_runner(current: Settings) -> tuple[Integrations, JobRunner]:
+        wired = build_integrations(current, engine, http, clock, security)
+        return wired, JobRunner(
+            SqlJobQueue(engine),
+            uow,
+            clock,
+            ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
+            MessageComposer(
+                Translator(load_catalogues()),
+                management_token_key(settings),
+                settings.public_base_url,
+            ),
+            video=wired.video,
+            dispatcher=wired.dispatcher,
+            integration=IntegrationService(uow, clock, AdminService(uow, clock)),
+            retention=lambda: live.settings.event_retention,
+            clock_style=lambda organisation: live.for_organisation(organisation).time_format,
+        )
+
+    integrations, runner = build_runner(settings)
+    wired_with = webex_fingerprint(settings)
     diagnostics = DiagnosticsService(
         uow,
         clock,
@@ -139,6 +149,9 @@ async def run_worker(
             if await is_reachable(engine):
                 if await live.refresh():  # the release repository or token may have changed
                     updates = update_service(live.settings, uow, clock, http)
+                    if webex_fingerprint(live.settings) != wired_with:  # ADR 0042 step 6b
+                        integrations, runner = build_runner(live.settings)
+                        wired_with = webex_fingerprint(live.settings)
                 # One trace per round for housekeeping; every job gets its own inside it.
                 with trace_scope():
                     try:
