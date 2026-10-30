@@ -5,6 +5,7 @@ request while one is open, a downgrade disguised as an update, a restore outside
 and an updater report that claims success for the wrong version.
 """
 
+from collections.abc import Sequence
 from datetime import timedelta
 
 import pytest
@@ -20,6 +21,7 @@ from app.domain.updates import (
     HOST_ACTOR,
     RESTORE_WINDOW,
     VERSION_ACTION,
+    ListedRelease,
     Release,
     ReleaseCheck,
     UpdateAction,
@@ -39,16 +41,18 @@ RELEASE = Release(V2, "https://github.com/acme/openplanner/releases/tag/v1.4.0")
 
 
 class FakeReleases:
-    def __init__(self, release: Release | None = RELEASE) -> None:
+    def __init__(self, release: Release | None = RELEASE, *, more: Sequence[Release] = ()) -> None:
         self.release = release
+        self.more = list(more)
         self.error: IntegrationError | None = None
         self.calls = 0
 
-    async def latest(self) -> Release | None:
+    async def listing(self) -> list[ListedRelease]:
         self.calls += 1
         if self.error is not None:
             raise self.error
-        return self.release
+        found = [r for r in (self.release, *self.more) if r is not None]
+        return [ListedRelease(r.version, r.url, None, f"notes of {r.version}") for r in found]
 
 
 @pytest.fixture
@@ -500,3 +504,58 @@ async def test_the_history_is_the_audit_log_of_updates_milestones_only(
     assert all(d in HISTORY_DETAILS for d in details)
     with pytest.raises(DomainError, match="not_permitted"):
         await service(uow, clock, current=V2).history(DEMO_ORG_ADMIN)
+
+
+# Choosing a version (ADR 0067 point 3).
+
+V3 = Version(1, 5, 0)
+OLDER = Release(Version(1, 2, 0), "https://github.com/acme/openplanner/releases/tag/v1.2.0")
+NEWEST = Release(V3, "https://github.com/acme/openplanner/releases/tag/v1.5.0")
+
+
+async def test_the_page_offers_every_newer_listed_version_with_notes(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await checked(uow, clock, FakeReleases(RELEASE, more=[OLDER, NEWEST, CANDIDATE]))
+
+    overview = await service(uow, clock).overview(DEMO_SUPERUSER)
+
+    assert [item.version for item in overview.offered] == [V3, V2]  # newest first, no candidate
+    assert overview.offered[0].notes == "notes of 1.5.0"
+    assert overview.available == NEWEST
+    on_rc = UpdateService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        current=V1,
+        releases=None,
+        checking=True,
+        channel=UpdateChannel.CANDIDATE,
+    )
+    assert [item.version for item in (await on_rc.overview(DEMO_SUPERUSER)).offered] == [
+        V3,
+        V2,
+        Version(1, 4, 0, 2),  # a release sorts above its own candidates
+    ]
+
+
+async def test_a_chosen_version_must_be_offered(uow: InMemoryUnitOfWork, clock: FixedClock) -> None:
+    await checked(uow, clock, FakeReleases(RELEASE, more=[OLDER, NEWEST, CANDIDATE]))
+    chosen = await service(uow, clock).request_update(DEMO_SUPERUSER, V2)
+    assert chosen.target == V2
+    await service(uow, clock).cancel(DEMO_SUPERUSER, chosen.id or 0)
+
+    for target in (OLDER.version, Version(1, 4, 0, 2), Version(9, 9, 9)):
+        with pytest.raises(DomainError, match="update_not_available"):
+            await service(uow, clock).request_update(DEMO_SUPERUSER, target)
+
+    newest = await service(uow, clock).request_update(DEMO_SUPERUSER)
+    assert newest.target == V3  # without a choice: the newest offered
+
+
+async def test_nothing_is_offered_while_a_request_is_open(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await checked(uow, clock, FakeReleases(RELEASE, more=[NEWEST]))
+    await service(uow, clock).request_update(DEMO_SUPERUSER)
+    assert (await service(uow, clock).overview(DEMO_SUPERUSER)).offered == []

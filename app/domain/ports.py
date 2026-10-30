@@ -48,7 +48,7 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.staff import StaffFilter, StaffMember
-from app.domain.updates import Release, ReleaseCheck, RunningVersion, UpdateRequest
+from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 
 
 class EventSink(Protocol):
@@ -212,10 +212,12 @@ class ContactCenterDispatcher(Protocol):
 
 
 class ReleaseSource(Protocol):
-    """Where the latest published release is looked up (GitHub releases, ADR 0029)."""
+    """Where the published releases are looked up (GitHub releases, ADR 0029, 0067)."""
 
-    async def latest(self) -> Release | None:
-        """Return the latest published release; ``None`` when there is none or it is no version.
+    async def listing(self) -> list[ListedRelease]:
+        """Return the newest published releases and candidates with their notes.
+
+        Drafts and anything that is no version are left out. Empty when there is none.
 
         Raises:
             IntegrationError: If the source refuses or cannot be reached.
@@ -873,6 +875,14 @@ class Transaction(Protocol):
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
         """Replace the outcome of the latest release check."""
+        ...
+
+    async def get_release_listing(self) -> list[ListedRelease]:
+        """Return the listing the last successful check stored (ADR 0067), newest first."""
+        ...
+
+    async def save_release_listing(self, listing: Sequence[ListedRelease]) -> None:
+        """Replace the stored listing."""
         ...
 
     async def get_running_versions(self, limit: int = 2) -> list[RunningVersion]:

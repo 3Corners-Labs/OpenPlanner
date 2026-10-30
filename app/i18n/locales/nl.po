@@ -3913,6 +3913,24 @@ msgstr "De boekingspagina's zijn tijdens de update enkele seconden niet bereikba
 msgid "admin.updates.release_notes"
 msgstr "Wat is er nieuw (release notes)"
 
+msgid "admin.updates.choose_lead"
+msgstr "Kies hieronder welke versie je installeert; de nieuwste staat bovenaan. Terug naar een oudere versie kan alleen via Vorige versie terugzetten."
+
+msgid "admin.updates.choose_heading"
+msgstr "Beschikbare versies"
+
+msgid "admin.updates.candidate"
+msgstr "releasekandidaat"
+
+msgid "admin.updates.published"
+msgstr "gepubliceerd {at}"
+
+msgid "admin.updates.no_notes"
+msgstr "Geen release notes."
+
+msgid "admin.updates.install_this"
+msgstr "Deze versie installeren ({version})"
+
 msgid "admin.updates.update_now"
 msgstr "Nu bijwerken naar {version}"
 
