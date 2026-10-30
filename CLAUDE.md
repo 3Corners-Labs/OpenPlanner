@@ -106,7 +106,7 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 - Every PR description: what, why, how tested, screenshots for UI, i18n checked (nl/en), migration reversible (yes/no).
 - Migrations: Alembic, always reversible, never edit a merged migration.
 - Releases tagged `vMAJOR.MINOR.PATCH`; image tagged with version and git SHA.
-- An ADR is not finished when it is written (ADR 0059, point 7): it carries a *Build status* table (step, PR, state) that the PR building a step updates, and its Status line says what is built (`proposed`, `accepted`, partly or not built), checked against the code. `docs/adr-status.md` lists every ADR. Asked for status, say what runs on the test host, not what is decided on paper.
+- An ADR is not finished when it is written (ADR 0059, point 7): it carries a *Build status* table (step, PR, state) that the PR building a step updates, and its Status line says what is built (`proposed`, `accepted`, partly or not built), checked against the code. `docs/adr-status.md` lists every ADR, and a test fails when one is missing there or when its Status line disagrees with the list. Asked for status, say what runs on the test host, not what is decided on paper.
 
 ## Documentation set (keep all present and current)
 - `README.md` — what, quick start (`docker compose up`), where to look next.

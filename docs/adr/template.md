@@ -40,6 +40,20 @@ A and B need a reason. A protection can never be switched off from the portal.
 **Fixed on purpose:** values that stay constants, and why (for example WCAG target sizes or
 crypto parameters).
 
+## Build status
+
+<!--
+Required (ADR 0059 point 7). One row per step; the PR that builds a step updates its row, and
+the Status line at the top says what is built (`proposed`, `accepted`, partly built, not
+built). States: `planned`, `in PR`, `merged`, `built`, `live on …`, `follow-up`. A new ADR also
+gets its row in `docs/adr-status.md`; a test fails when it is missing.
+-->
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 0 | ADR proposed | #NNN | in PR |
+| 1 | The first build step | | planned |
+
 ## Consequences
 
 What becomes easier or harder: docs, threat model, data flow, manual, migrations,

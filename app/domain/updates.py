@@ -1,9 +1,10 @@
 """Updates started from the admin portal (ADR 0029): versions, the release check and requests.
 
-The worker checks the latest release at most once per ``CHECK_INTERVAL``. A superuser turns
-an available release into a request; the host updater claims it, carries it out and reports
-the outcome. A successful update can be restored to the version it replaced for
-``RESTORE_WINDOW``.
+The worker checks the latest release once per check interval (the setting
+``update_check_minutes``, default ``CHECK_INTERVAL``), or at its next poll when a superuser
+asked for a check ("Check now"). A superuser turns an available release into a request; the
+host updater claims it, carries it out and reports the outcome. A successful update can be
+restored to the version it replaced for ``RESTORE_WINDOW``.
 
     requested ──claim──► running ──report──► succeeded | rolled_back | failed
         └──cancel──► cancelled
@@ -24,7 +25,7 @@ from functools import total_ordering
 from app.domain.errors import DomainError, ErrorCode
 
 CHECK_INTERVAL = timedelta(minutes=60)
-"""How often the worker asks for the latest release."""
+"""Default of ``update_check_minutes``: how often the worker asks for the latest release."""
 
 RESTORE_WINDOW = timedelta(hours=24)
 """How long after a successful update the previous version can be restored."""
@@ -260,11 +261,14 @@ class ReleaseCheck:
         checked_at: When the worker asked.
         latest: The latest release, kept from an earlier check when this one failed.
         error: The failure code of this check (``unauthorized``, ``server_error``, …), if any.
+        requested_at: When a superuser asked for a check ahead of the interval ("Check
+            now"); the worker's next check clears it.
     """
 
     checked_at: datetime
     latest: Release | None
     error: str = ""
+    requested_at: datetime | None = None
 
 
 class UpdateAction(StrEnum):
@@ -359,9 +363,17 @@ class UpdateRequest:
         return self.status in (UpdateStatus.REQUESTED, UpdateStatus.RUNNING)
 
 
-def check_due(last: ReleaseCheck | None, now: datetime) -> bool:
-    """Return whether the worker should ask for the latest release now."""
-    return last is None or now >= last.checked_at + CHECK_INTERVAL
+def check_due(
+    last: ReleaseCheck | None, now: datetime, interval: timedelta = CHECK_INTERVAL
+) -> bool:
+    """Return whether the worker should ask for the latest release now.
+
+    It should on the first run, once ``interval`` has passed since the last check, and at
+    once when a superuser asked for a check.
+    """
+    if last is None or last.requested_at is not None:
+        return True
+    return now >= last.checked_at + interval
 
 
 def available_update(

@@ -1,6 +1,6 @@
 # 0002. Runtime layout of the skeleton
 
-Status: accepted (2026-10-23)
+Status: accepted (2026-10-23) Partly built, checked on 2026-10-30; see `docs/adr-status.md` for what is built.
 
 ## Context
 

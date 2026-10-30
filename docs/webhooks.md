@@ -155,6 +155,15 @@ are kept 30 days and only for OpenPlanner's own meetings. The payload's meeting 
 (`<meetingId>_I_<…>`); it is matched on the series id. Participant names and emails are never
 stored: only counts, whether a host/cohost joined, and times (ADR 0010).
 
+**Polling fallback (ADR 0010).** A webhook can be lost, so a status older than
+`MEETING_STATUS_REFRESH_SECONDS` (default 30 s) is read from the Meetings API when an admin
+opens or polls the group's agenda: `GET /meetings/{id}?hostEmail=…` for the `state`, and once
+the meeting started `GET /meetingParticipants?meetingId=…&max=100&hostEmail=…` for the count
+and the host/cohost flag (`state` `joined`; `end` for the first join and last leave). Only for a
+confirmed booking with a meeting between 15 minutes before its start and 30 minutes after its
+end. The poll sets absolute values and adds timeline events only for transitions, marked
+`polled`; it needs the same participant scope as the webhooks.
+
 ## Inbound: WxCC subscription (`POST /webhooks/wxcc`)
 
 Registered with `POST /v2/subscriptions` (`name`, `eventTypes`, `resourceVersion: task:1.0.0` (required in v2; current versions in `GET /v2/event-types`), `destinationUrl`, `secret` of 32 to 256 characters).

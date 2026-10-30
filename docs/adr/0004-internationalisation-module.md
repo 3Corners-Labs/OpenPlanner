@@ -1,6 +1,6 @@
 # 0004. Internationalisation as a self-contained module
 
-Status: accepted (2026-10-23). Supersedes the `*_nl` / `*_en` columns in HANDOVER §3.
+Status: accepted (2026-10-23). Supersedes the `*_nl` / `*_en` columns in HANDOVER §3. Partly built, checked on 2026-10-30; see `docs/adr-status.md` for what is built.
 
 ## Context
 

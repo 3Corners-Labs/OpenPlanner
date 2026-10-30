@@ -80,7 +80,10 @@ class UpdateQueries:
         if row is None:
             return None
         return ReleaseCheck(
-            row.checked_at, _release(row.latest_version, row.release_url), row.error
+            row.checked_at,
+            _release(row.latest_version, row.release_url),
+            row.error,
+            row.requested_at,
         )
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
@@ -92,6 +95,7 @@ class UpdateQueries:
                 latest_version=str(check.latest.version) if check.latest else None,
                 release_url=check.latest.url if check.latest else None,
                 error=check.error,
+                requested_at=check.requested_at,
             )
         )
         await self._session.flush()
