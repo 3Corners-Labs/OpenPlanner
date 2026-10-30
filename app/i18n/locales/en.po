@@ -6456,3 +6456,48 @@ msgstr "Warn when the certificate is valid for fewer than (days)"
 
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Repeat the certificate report every (hours)"
+
+msgid "admin.overview.view.label"
+msgstr "View of {title}"
+
+msgid "admin.overview.view.list"
+msgstr "List"
+
+msgid "admin.overview.view.table"
+msgstr "Table"
+
+msgid "admin.overview.view.bar"
+msgstr "Bar"
+
+msgid "admin.overview.view.line"
+msgstr "Line"
+
+msgid "admin.overview.view.pie"
+msgstr "Pie"
+
+msgid "admin.overview.chart.bar"
+msgstr "Bar chart"
+
+msgid "admin.overview.chart.line"
+msgstr "Line chart"
+
+msgid "admin.overview.chart.pie"
+msgstr "Pie chart"
+
+msgid "admin.overview.chart.joiner"
+msgstr "; "
+
+msgid "admin.overview.chart.group"
+msgstr "Group"
+
+msgid "admin.overview.chart.table"
+msgstr "Data as a table"
+
+msgid "admin.overview.widget.bookings_today.series"
+msgstr "Bookings today"
+
+msgid "admin.overview.widget.bookings_today.chart_item"
+msgstr "{label}: {value} bookings today"
+
+msgid "admin.overview.widget.queue.chart_item"
+msgstr "{label}: {value} waiting"

@@ -1,5 +1,7 @@
 {#- Queue across own groups: per own queue in reach, who waits and who is signed in (counts only; plain values until the QUEUE_WAIT_* settings of OV-7). -#}
-{% if view.rows %}
+{% if view.chart %}
+{% include "admin/widgets/_chart.html" %}
+{% elif view.rows %}
 <table class="widget-table">
   <caption class="visually-hidden">{{ _(view.widget.title_key) }}</caption>
   <thead>
