@@ -38,6 +38,14 @@ the installation. Security events (`event.category = security`): `webhook.reject
 per kind per window, with `suppressed:<n>` for the ones held back. Shipping is described in
 `docs/runbook.md`.
 
+ADR 0068 adds `integration.request` (category `system`): one per call to Webex or WxCC, at the
+level of the booking (or group, for the probe meeting) of the trace that made it. `outcome`
+success or failure, `reason` the error code (`rejected_400`, `unreachable`, ...), `booking_id`,
+and `detail` `method:POST,path:/v1/meetings,status:400,ms:231,tracking:ROUTER_…,version:0.4.0`.
+No body, query string or header. Kept `INTEGRATION_REQUEST_RETENTION_DAYS` (default 30). Meeting
+and work item jobs with nothing to do are `skipped` with reason `already_done`, `no_video`,
+`own_queue` or `no_dispatch`.
+
 ADR 0053 adds the attempts on public entry points, all with outcome `denied` and a caller
 pseudonym `client:<16 hex>` in `detail` (also on `webhook.rejected`); the window then counts
 per kind and caller:
