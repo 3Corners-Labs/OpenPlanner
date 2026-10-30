@@ -134,7 +134,7 @@ class PlatformSettingsQueries:
         for row in rows:
             try:
                 opened = json.loads(self._box.open(row.name, row.nonce, row.ciphertext))
-            except Exception:  # noqa: S112 - another key or a broken row: leave it out
+            except Exception:  # noqa: S112  # nosec B112 - another key or a broken row: skip it
                 continue
             if isinstance(opened, dict) and isinstance(opened.get("value"), str):
                 found[row.name.removeprefix(_SECRET_PREFIX)] = opened["value"]
