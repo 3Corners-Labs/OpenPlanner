@@ -27,6 +27,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Closure scenarios / scenario's voor een noodsluiting | [Scenario's voor een noodsluiting](nl/closure-scenarios.md) | [Scenarios for an emergency closure](en/closure-scenarios.md) |
 | Group agenda / agenda van de groep | [Agenda van de groep](nl/group-agenda.md) | [Group agenda](en/group-agenda.md) |
 | Maintenance mode / onderhoudsmodus | [Onderhoudsmodus](nl/maintenance.md) | [Maintenance mode](en/maintenance.md) |
+| Channels / kanalen (SMTP, SMS, sender domain) | [Kanalen](nl/channels.md) | [Channels](en/channels.md) |
 | Advanced settings / geavanceerde instellingen | [Geavanceerde instellingen](nl/advanced-settings.md) | [Advanced settings](en/advanced-settings.md) |
 | Data fields and personal data / gegevensvelden en persoonsgegevens | [Gegevensvelden en persoonsgegevens](nl/data-fields.md) | [Data fields and personal data](en/data-fields.md) |
 | Organisation settings / organisatie-instellingen | [Organisatie-instellingen](nl/organisation-settings.md) | [Organisation settings](en/organisation-settings.md) |

@@ -1110,6 +1110,18 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=60,
     ),
     S(
+        "meeting_status_refresh_seconds",
+        K.INT,
+        30,
+        _C,
+        T.PLANNER,
+        "Seconds a meeting status on the agenda may be old before the video provider is asked "
+        "(webhooks come first), and between two refreshes of the agenda's status columns "
+        "(ADR 0010).",
+        minimum=10,
+        maximum=300,
+    ),
+    S(
         "planner_rebook_days",
         K.INT,
         14,

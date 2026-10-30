@@ -13,6 +13,7 @@ SETTING_LABELS: dict[str, str] = {
     "log_level": "settings.field.log_level.label",
     "worker_poll_seconds": "settings.field.worker_poll_seconds.label",
     "queue_refresh_seconds": "settings.field.queue_refresh_seconds.label",
+    "meeting_status_refresh_seconds": "settings.field.meeting_status_refresh_seconds.label",
     "maintenance_cache_seconds": "settings.field.maintenance_cache_seconds.label",
     "maintenance_retry_after_seconds": "settings.field.maintenance_retry_after_seconds.label",
     "maintenance_alert_hours": "settings.field.maintenance_alert_hours.label",
@@ -137,6 +138,8 @@ PROBLEM_LABELS: dict[str, str] = {
     "webhook_base_url": "admin.settings.problem.webhook_base_url",
     "webex_incomplete": "admin.settings.problem.webex_incomplete",
     "oidc_incomplete": "admin.settings.problem.oidc_incomplete",
+    "update_channel": "admin.settings.problem.update_channel",
+    "update_auto_apply": "admin.settings.problem.update_auto_apply",
 }
 """What production would refuse, by the code of ``Settings.production_problems``."""
 
