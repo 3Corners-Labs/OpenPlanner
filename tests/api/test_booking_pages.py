@@ -356,7 +356,7 @@ async def test_booking_cannot_be_moved_from_the_change_lead_but_can_be_cancelled
 
 async def test_booking_cannot_be_changed_once_the_call_has_begun(demo_settings: Settings) -> None:
     async with app_client(demo_settings, FixedClock(NOW)) as early:
-        token = token_of(await book(early))
+        token = await booked(early)
     started = FixedClock(NOW + timedelta(days=1))  # Fri 08:00 UTC, the start
 
     async with app_client(demo_settings, started) as late:
