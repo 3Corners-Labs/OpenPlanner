@@ -22,6 +22,14 @@ None. The mark is product identity, not tunable per installation.
 
 **Fixed on purpose:** the mark geometry, the two brand colours and the 16 px rule (§4). Organisations brand citizen pages through ADR 0041, not by replacing this mark.
 
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 0 | ADR proposed; backlog section 1 | #130 | in PR |
+| 1 | LG-1, LG-2, LG-3: brand files, `--op-brand-slot`, mark in the admin top bar, favicons, citizen and email footer | #135 | in PR |
+| 2 | LG-4: optional motion (`brand-motion.js`, CSS-only loader) | | planned |
+
 ## Consequences
 
 - `_shell.html` and `base.html` link the favicon; `layout.html` replaces the "OP" span with `mark.svg` and a visually hidden product name.

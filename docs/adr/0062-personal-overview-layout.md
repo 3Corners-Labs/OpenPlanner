@@ -24,6 +24,16 @@ With widgets on the overview (ADR 0061), admins want to choose what they see, in
 
 **Fixed on purpose:** the maximum of 4 columns and 20 rows, and the breakpoints. They follow the design system, not the installation.
 
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 0 | ADR proposed; backlog section 6; waits for ADR 0046 step 2 | #130 | in PR |
+| 1 | LY-1: `staff_members.overview_layout`, schema `openplanner.layout/1`, server-side validation | | planned |
+| 2 | LY-2: *Customise overview* form without script | | planned |
+| 3 | LY-3: the same controls live with the ADR 0061 script; pointer resize as an extra | | planned |
+| 4 | LY-4: `OVERVIEW_LOCKED_WIDGETS` and the lock in the form | | planned |
+
 ## Consequences
 
 - Migration: column `staff_members.overview_layout` (nullable JSON), reversible.
