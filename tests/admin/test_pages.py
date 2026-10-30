@@ -36,7 +36,8 @@ async def test_help_and_profile_sit_in_the_top_bar(site: Site) -> None:
     page = (await site.client.get("/admin/?lang=en")).text
     top_bar = page.split('<header class="admin-topbar">', 1)[1].split("</header>", 1)[0]
 
-    assert 'href="/admin/help"' in top_bar
+    # The overview has a manual topic (ADR 0061), so its help link opens that topic.
+    assert 'href="/admin/help/overview"' in top_bar
     assert '<details class="admin-profile">' in top_bar
     assert 'action="/admin/logout"' in top_bar
     assert "Group admin" in top_bar

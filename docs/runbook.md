@@ -727,9 +727,12 @@ prove that Webex or WxCC send events. For that, check `webhooks-list` (all `CURR
 
 Each group's **Instellingen** page has a card **Koppeling controleren**. Whoever may edit the
 group (`group.edit`: the organisation admin, the superuser) can press **Nu controleren**. It
-runs, read-only, what sections 6–8 check, but for that one group:
+runs what sections 6–8 check, but for that one group:
 
-- **Webex:** the host account exists and the Service App may schedule for it.
+- **Webex:** a probe meeting ("OpenPlanner controle", tomorrow, 30 minutes, no invitation
+  mail) is scheduled for the host exactly as a booking schedules one and deleted at once
+  (ADR 0065). That proves licence, scope, host, time zone and meeting options in one go; a
+  refusal shows Webex's own reason on the line. Nothing else is written at the platforms.
 - **Webex Contact Center:** region, channel, asset, asset schema, entry point, flow
   (`openplannerGroup` and a branch for the routing value), queue, Screen Pop. These are the
   same rules as `wxcc-config-check`.
@@ -739,6 +742,23 @@ runs, read-only, what sections 6–8 check, but for that one group:
 Each line says OK, Waarschuwing, Fout or Overgeslagen, and what to change. The latest result
 stays on the page with its time, and every run is audited as `integration.check`. Save
 changes first: the check uses the saved settings. It is limited to 6 runs per minute.
+
+**The worker runs the same check on its own** (ADR 0065 step 2). Every group with a Webex host
+is checked once per `INTEGRATION_CHECK_INTERVAL_HOURS` (platform setting, default 24, 1–168;
+the worker looks every ten minutes which groups are due) and right after an admin saves a new
+host address. The result replaces the group's latest check on its settings page, exactly as
+the button's does, and a broken chain is a system event `integration.check` at the group's
+level: outcome *mislukt*, the reason is the first failing line's code (for instance
+`webex.schedule_refused`) and Webex's own answer stands under it. The audit log (Logboek,
+kind *Systeem*) shows it to the group's and the organisation's admins and the superuser; it
+repeats once per interval while the chain stays broken, and a check that is fine again is
+recorded once as *gelukt*. Without a Service App, or for a group without a host, the worker
+checks nothing. The log line `integration.checked` says how many groups a sweep checked.
+
+When a meeting still fails later, the booking's timeline (Agenda → the booking) shows the
+code and, under it, Webex's own answer ("Antwoord van Webex: ..."); the audit log shows the
+same under the job's outcome, also in the chain view ("Hele keten"). The worker log keeps
+the `trackingId` for Cisco support at `integration.refused`.
 
 ### 10. Trying the flows without agents (simulator, not in production)
 
@@ -935,6 +955,47 @@ a candidate. The candidates of a released version may be deleted afterwards:
 ```sh
 git tag --list 'v0.4.0-rc.*' | xargs -n1 -I{} sh -c 'gh release delete {} --yes --cleanup-tag'
 ```
+
+### Test host on the rc channel (ADR 0059 step 3)
+
+docker01 (installer mode `lab`, `ENVIRONMENT=test`) follows channel `rc` with
+`UPDATE_AUTO_APPLY=true` since 2026-10-30, first candidate `v0.4.0-rc.5`. Every merge to
+`main` is running there within the hour (the worker's check interval), or within a minute after
+"Update now" on `/admin/updates`. Nothing is backed up beyond what the updater does; the lab
+data is disposable.
+
+Which candidate runs:
+
+- In the portal: `/admin/updates` → *Running now* `0.4.0-rc.5`, *Channel* `rc`, and the request
+  list shows the auto requests as actor `system` (`update.auto_request`).
+- On the host: `docker compose --env-file .env.update exec web python -m app.cli version`
+  (version and commit), and `grep UPDATE_ ~/openplanner/.env` for the channel and auto-apply.
+- Has a given merge landed? `git tag --contains <merge commit>` lists the candidate that
+  carries it; compare with *Running now*.
+
+The first hop onto the channel went through the installer, because a release image does not
+know the channel yet and cannot offer a candidate itself:
+
+```sh
+cd ~/openplanner && git fetch --tags && git checkout v0.4.0-rc.5 \
+  && ./scripts/install.sh --channel rc --version 0.4.0-rc.5
+```
+
+It writes `UPDATE_CHANNEL=rc` to `.env`, verifies and pins the candidate, starts it, and
+rewrites `/etc/openplanner/updater.env` so the updater also accepts images signed on `main`
+(needs sudo). Later candidates need nobody: the worker requests them itself.
+
+Back to releases only (`stable`): on the host, with the tag of the release to run (a release
+is older than the candidates built after it, so the updater will not go there by itself):
+
+```sh
+cd ~/openplanner && git fetch --tags && git checkout vX.Y.Z \
+  && ./scripts/install.sh --channel release --version X.Y.Z
+```
+
+That rewrites `UPDATE_CHANNEL=release`, narrows the updater's identity to release tags again
+and pins the release. Remove `UPDATE_AUTO_APPLY=true` from `.env` by hand if updates should
+wait for a superuser's click again, then `docker compose --env-file .env.update up -d`.
 
 ### Security fixes
 
@@ -1209,7 +1270,7 @@ pseudonym (and every management link). At most `SECURITY_EVENT_MAX_SOURCES` call
 
 ## Log lines and the event schema (ADR 0040)
 
-Every line on stdout is one JSON object in the field names of `openplanner.event/1`
+Every line on stdout is one JSON object in the field names of `openplanner.event/2`
 (`docs/audit-events.md`), so a log platform needs no mapping:
 
 | Field | Meaning |

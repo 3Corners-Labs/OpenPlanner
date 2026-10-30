@@ -26,6 +26,16 @@ SHARED_TEMPLATE_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
 """Stylesheets and images, served under ``/static``."""
 
+
+class FragmentResponse(HTMLResponse):
+    """An HTML fragment without the page shell: a widget of the overview (ADR 0061).
+
+    Routes that answer with a fragment declare this class, so the tests that sweep the
+    portal's *pages* (navigation homes, manual topics) leave them out: a fragment is part of
+    the page it belongs to, never a screen of its own.
+    """
+
+
 HTML_CSP = (
     "default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; "
     "base-uri 'none'; frame-ancestors 'none'"

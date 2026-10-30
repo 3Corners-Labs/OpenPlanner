@@ -33,11 +33,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, can_function
-from app.admin.check_routes import check_view
+from app.admin.check_routes import check_service, check_view
 from app.admin.forms import (
     Field,
     FormData,
@@ -88,6 +89,7 @@ from app.web.locale import RequestLocale
 from app.web.navigation import object_page
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
+log = structlog.get_logger()
 
 DISPATCH_LABELS: dict[DispatchKind, str] = {
     DispatchKind.CONTACT_CENTER: "admin.group.dispatch_contact_center",
@@ -684,10 +686,24 @@ async def save_settings(
             raise_refusal(error)
             form.refusal(error)
         else:
+            if "video_host_email" in changed and new.video_host_email:
+                await _check_host(request, slug)
             return redirect_done(
                 f"/admin/groups/{slug}/settings", "saved" if changed else "unchanged"
             )
     return await _settings_response(request, locale, context, form, 422)
+
+
+async def _check_host(request: Request, slug: str) -> None:
+    """Check the group right after its Webex host changed (ADR 0065 step 2).
+
+    The settings are saved by now; a check that fails for its own reasons is logged and never
+    blocks the save. The result is on the settings page the admin lands on.
+    """
+    try:
+        await check_service(request).check_as_system(slug)
+    except Exception as exc:  # the platforms or the database answered wrongly
+        log.warning("integration.check_failed", group=slug, error=type(exc).__name__)
 
 
 # --- staffing blocks ------------------------------------------------------------------------

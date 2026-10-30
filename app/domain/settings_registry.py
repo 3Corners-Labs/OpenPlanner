@@ -615,6 +615,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         choices=("acme", "own"),
     ),
     S(
+        "integration_check_interval_hours",
+        K.INT,
+        24,
+        _C,
+        T.OPERATIONS,
+        "The worker checks every group with a Webex host this often and reports a broken "
+        "chain as a system event (ADR 0065).",
+        minimum=1,
+        maximum=168,
+    ),
+    S(
         "staff_last_seen_interval_seconds",
         K.INT,
         300,

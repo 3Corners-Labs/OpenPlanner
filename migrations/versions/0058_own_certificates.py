@@ -3,10 +3,10 @@
 ``own_certificates`` holds one row: the PEM chain (public), the private key sealed with
 AES-256-GCM under ``SETTINGS_ENCRYPTION_KEY`` (ADR 0008), and the public data the page shows.
 No personal data. The downgrade drops the table; the pair must be uploaded again afterwards.
-Revises 0055 (certificate checks, ADR 0064); renumber when another migration lands first.
+Revises 0057, the merge of the certificate checks (ADR 0064) with main's event messages.
 
-Revision ID: 0057
-Revises: 0055
+Revision ID: 0058
+Revises: 0057
 Create Date: 2026-10-30 20:00:00.000000
 """
 
@@ -15,8 +15,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0057"
-down_revision: str | None = "0055"
+revision: str = "0058"
+down_revision: str | None = "0057"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

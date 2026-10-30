@@ -550,7 +550,7 @@ msgid "admin.dashboard.title"
 msgstr "Overzicht"
 
 msgid "admin.dashboard.intro"
-msgstr "Hier ziet u de groepen waarvoor u rechten heeft."
+msgstr "Wat nu aandacht vraagt, en de groepen waarvoor u rechten heeft."
 
 msgid "admin.dashboard.groups"
 msgstr "Uw groepen"
@@ -560,6 +560,51 @@ msgstr "Uw groepen"
 
 msgid "admin.dashboard.no_groups"
 msgstr "U heeft (nog) geen rechten op een groep. Vraag uw beheerder om toegang."
+
+msgid "admin.overview.refresh"
+msgstr "Vernieuwen"
+
+msgid "admin.overview.no_widgets"
+msgstr "Er zijn geen widgets voor uw rol beschikbaar."
+
+msgid "admin.overview.widget.more"
+msgstr "Nog {count} meer"
+
+msgid "admin.overview.widget.open"
+msgstr "Alles bekijken"
+
+msgid "admin.overview.widget.alerts.title"
+msgstr "Meldingen"
+
+msgid "admin.overview.widget.queue.title"
+msgstr "Wachtrij in mijn groepen"
+
+msgid "admin.overview.widget.bookings_today.title"
+msgstr "Afspraken vandaag per groep"
+
+msgid "admin.overview.widget.bookings_today.agenda_link"
+msgstr "Agenda van {name}"
+
+msgid "admin.overview.widget.bookings_today.empty"
+msgstr "Geen groepen in uw bereik."
+
+msgid "admin.overview.widget.changes.title"
+msgstr "Recente configuratiewijzigingen"
+
+msgid "admin.overview.widget.changes.empty"
+msgstr "Nog geen wijzigingen in uw bereik."
+
+msgid "admin.overview.widget.tasks.title"
+msgstr "Lopende taken"
+
+msgid "admin.overview.widget.status.title"
+msgstr "Systeemstatus"
+
+msgid "admin.overview.widget.rights.title"
+msgstr "Mijn rol en bereik"
+
+msgid "admin.overview.widget.rights.empty"
+msgstr "Geen rechten gevonden."
 
 msgid "admin.group.settings"
 msgstr "Instellingen"
@@ -1538,7 +1583,7 @@ msgid "call.event.meeting_failed"
 msgstr "Videomeeting aanmaken mislukt"
 
 msgid "call.hint.meeting.rejected_400"
-msgstr "Webex weigerde de meeting. Meestal is de Webex-host van deze groep (Instellingen) geen gebruiker met een Meetings-licentie in de Webex-organisatie van de Service App, of mag de Service App niet namens die host plannen. De reden van Webex staat in het worker-log bij integration.refused, met een trackingId. Een nieuwe of verplaatste afspraak probeert het opnieuw."
+msgstr "Webex weigerde de meeting; het antwoord van Webex staat hierboven. Vaak is de Webex-host van deze groep (Instellingen) geen gebruiker met een Meetings-licentie in de Webex-organisatie van de Service App, of mag de Service App niet namens die host plannen. Druk bij de groep op Koppeling controleren: die plant een proefmeeting zoals een afspraak dat doet. Een nieuwe of verplaatste afspraak probeert het opnieuw."
 
 msgid "call.hint.meeting.rejected_403"
 msgstr "Webex weigerde de toegang: de Service App mist de scope om meetings te plannen of is niet geautoriseerd door een beheerder van de Webex-organisatie. Pas dat aan in Control Hub en zet daarna een nieuw refresh-token in WEBEX_REFRESH_TOKEN."
@@ -1547,7 +1592,7 @@ msgid "call.hint.meeting.rejected_404"
 msgstr "Webex kent de Webex-host van deze groep niet. Controleer het e-mailadres onder Instellingen."
 
 msgid "call.hint.meeting.other"
-msgstr "De videomeeting kon niet worden aangemaakt. De code is de reden; meer staat in het worker-log bij integration.refused en job.failed."
+msgstr "De videomeeting kon niet worden aangemaakt. De code is de reden; het antwoord van Webex staat erbij als Webex er een gaf. Meer staat in het worker-log bij integration.refused en job.failed."
 
 msgid "call.hint.task.meeting_missing"
 msgstr "De taak wachtte op de videomeeting, maar die kwam er niet. Los eerst de fout bij de meeting op."
@@ -1556,7 +1601,7 @@ msgid "call.hint.task.other"
 msgstr "Webex Contact Center nam de taak niet aan. Controleer het entry point en kanaal van de groep onder Instellingen en de WxCC-inrichting onder Koppelingen; de code is de reden van WxCC."
 
 msgid "call.hint.integration.other"
-msgstr "Webex weigerde een aanroep. De reden van Webex staat in het worker-log bij integration.refused, met een trackingId."
+msgstr "Webex weigerde een aanroep. Het antwoord van Webex staat erbij als Webex er een gaf; het worker-log heeft bij integration.refused ook een trackingId."
 
 msgid "call.hint.unauthorized"
 msgstr "Webex accepteerde het token van de Service App niet. Bekijk de status onder Koppelingen en zet zo nodig een nieuw refresh-token in WEBEX_REFRESH_TOKEN."
@@ -1893,6 +1938,9 @@ msgstr "Verloop"
 
 msgid "admin.booking.no_events"
 msgstr "Nog niets gebeurd."
+
+msgid "admin.booking.provider_message"
+msgstr "Antwoord van Webex: {message}"
 
 msgid "admin.nav.integrations"
 msgstr "Koppelingen"
@@ -3523,6 +3571,9 @@ msgstr "Filter wissen"
 msgid "admin.audit.booking_link"
 msgstr "Afspraak {id}"
 
+msgid "admin.audit.provider_message"
+msgstr "Antwoord van Webex: {message}"
+
 msgid "admin.audit.detail.channel_email"
 msgstr "e-mail"
 
@@ -4253,16 +4304,22 @@ msgid "admin.check.webex.no_host"
 msgstr "Geen Webex-host ingevuld: deze groep krijgt geen videogesprekken."
 
 msgid "admin.check.webex.host_ok"
-msgstr "Host {host} is bekend en de Service App mag namens deze host plannen."
+msgstr "Een proefmeeting voor host {host} is gepland zoals een afspraak dat doet, en weer verwijderd."
 
 msgid "admin.check.webex.host_unknown"
-msgstr "Webex kent host {host} niet, of de host heeft geen licentie op deze site ({error})."
+msgstr "Webex kent host {host} niet ({error}): {reason}"
 
 msgid "admin.check.webex.host_refused"
-msgstr "De Service App mag niet plannen namens {host} ({error}): controleer de scopes en de autorisatie in Control Hub."
+msgstr "De Service App mag niet plannen namens {host} ({error}): {reason}. Controleer de scopes en de autorisatie in Control Hub."
 
 msgid "admin.check.webex.unreachable"
-msgstr "Webex was niet bereikbaar om host {host} te controleren ({error}). Probeer het later opnieuw."
+msgstr "Webex was niet bereikbaar om een proefmeeting voor host {host} te plannen ({error}). Probeer het later opnieuw."
+
+msgid "admin.check.webex.schedule_refused"
+msgstr "Webex weigerde een proefmeeting voor host {host} ({error}): {reason}"
+
+msgid "admin.check.webex.probe_left"
+msgstr "De proefmeeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
 
 msgid "admin.check.wxcc.not_configured"
 msgstr "Webex Contact Center is niet ingesteld; de routering is niet gecontroleerd."
@@ -5242,6 +5299,9 @@ msgstr "Probeer het later opnieuw."
 msgid "audit.event.maintenance_overdue"
 msgstr "Onderhoudsmodus staat lang aan"
 
+msgid "audit.event.integration_check"
+msgstr "Koppeling gecontroleerd"
+
 msgid "admin.audit.detail.hours"
 msgstr "{count} uur"
 
@@ -5807,6 +5867,9 @@ msgstr "Melding bij lang onderhoud na (uren)"
 
 msgid "settings.field.maintenance_alert_repeat_hours.label"
 msgstr "Melding lang onderhoud herhalen elke (uren)"
+
+msgid "settings.field.integration_check_interval_hours.label"
+msgstr "Koppeling van elke groep controleren elke (uren)"
 
 msgid "settings.field.security_event_max_sources.label"
 msgstr "Maximaal aantal bijgehouden bronnen voor beveiligingsgebeurtenissen"

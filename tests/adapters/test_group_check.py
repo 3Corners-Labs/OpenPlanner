@@ -1,4 +1,7 @@
-"""PlatformChecker: one group's chain at Webex and WxCC, as findings (verify button)."""
+"""PlatformChecker: one group's chain at Webex and WxCC, as findings (verify button).
+
+The Webex link schedules a probe meeting exactly as a booking does and deletes it (ADR 0065).
+"""
 
 import hashlib
 import hmac
@@ -89,6 +92,8 @@ class Platforms:
 
     def __init__(self) -> None:
         self.host_status = 200
+        self.delete_status = 204
+        self.reason = "Host host@example.nl is not a valid user."
         self.hooks = _hooks()
         self.subscriptions = _subscriptions()
         self.webhook_status: int | None = None
@@ -99,8 +104,13 @@ class Platforms:
         url = str(request.url)
         if request.url.path.endswith("/access_token"):
             return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
-        if url.startswith(f"{WEBEX}/meetings"):
-            return httpx.Response(self.host_status, json={"items": []})
+        if url == f"{WEBEX}/meetings" and request.method == "POST":
+            if self.host_status != 200:
+                refusal = {"message": "Refused.", "errors": [{"description": self.reason}]}
+                return httpx.Response(self.host_status, json=refusal)
+            return httpx.Response(200, json={"id": "probe-1", "webLink": "https://w.example/j"})
+        if url.startswith(f"{WEBEX}/meetings/probe-1") and request.method == "DELETE":
+            return httpx.Response(self.delete_status)
         if url.startswith(f"{WEBEX}/webhooks"):
             return httpx.Response(200, json={"items": self.hooks})
         if url.startswith(f"{WXCC}/v2/subscriptions"):
@@ -158,30 +168,65 @@ async def test_a_complete_chain_is_all_ok() -> None:
 
 
 @pytest.mark.usefixtures("wxcc_ok")
-async def test_nothing_is_created_or_deleted_and_no_token_leaves_for_our_endpoints() -> None:
+async def test_the_probe_meeting_is_scheduled_as_a_booking_would_and_deleted_again() -> None:
     platforms = Platforms()
     await _checker(platforms).check_group(GROUP, [GROUP])
 
-    assert {r.method for r in platforms.requests if not str(r.url).startswith(BASE)} <= {
-        "GET",
-        "POST",  # only the token refresh
-    }
-    assert all(
-        r.url.path.endswith("/access_token")
-        for r in platforms.requests
-        if r.method == "POST" and not str(r.url).startswith(BASE)
+    webex = [r for r in platforms.requests if str(r.url).startswith(f"{WEBEX}/meetings")]
+    assert [(r.method, r.url.path) for r in webex] == [
+        ("POST", "/v1/meetings"),
+        ("DELETE", "/v1/meetings/probe-1"),
+    ]
+    body = json.loads(webex[0].content)
+    assert body["title"] == "OpenPlanner controle"
+    assert body["hostEmail"] == HOST
+    assert body["sendEmail"] is False
+    # A day ahead, in the group's zone: the same body a booking sends (time zone bug of 0065).
+    assert (body["start"], body["end"]) == (
+        "2026-01-02T09:00:00+01:00",
+        "2026-01-02T09:30:00+01:00",
     )
+    assert body["unlockedMeetingJoinSecurity"] == "allowJoinWithLobby"
+    assert webex[1].url.params["sendEmail"] == "false"
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_besides_the_probe_nothing_is_written_and_no_token_leaves_for_our_endpoints() -> None:
+    platforms = Platforms()
+    await _checker(platforms).check_group(GROUP, [GROUP])
+
+    writes = [
+        r
+        for r in platforms.requests
+        if r.method not in ("GET",)
+        and not str(r.url).startswith(BASE)
+        and not r.url.path.endswith("/access_token")
+    ]
+    assert [r.url.path for r in writes] == ["/v1/meetings", "/v1/meetings/probe-1"]
     assert not any(
         "authorization" in r.headers for r in platforms.requests if str(r.url).startswith(BASE)
     )
 
 
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_probe_that_cannot_be_deleted_is_a_warning_naming_it() -> None:
+    platforms = Platforms()
+    platforms.delete_status = 500
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    assert findings[0].code == "webex.host_ok"
+    assert findings[1].code == "webex.probe_left"
+    assert findings[1].status is CheckStatus.WARN
+    assert ("meeting", "probe-1") in findings[1].params
+
+
 @pytest.mark.parametrize(
     ("status", "code"),
-    [(404, "webex.host_unknown"), (400, "webex.host_unknown"), (403, "webex.host_refused")],
+    [(404, "webex.host_unknown"), (400, "webex.schedule_refused"), (403, "webex.host_refused")],
 )
 @pytest.mark.usefixtures("wxcc_ok")
-async def test_a_host_webex_does_not_know_or_refuses_fails(status: int, code: str) -> None:
+async def test_a_refused_probe_fails_with_webexs_reason(status: int, code: str) -> None:
     platforms = Platforms()
     platforms.host_status = status
 
@@ -190,6 +235,8 @@ async def test_a_host_webex_does_not_know_or_refuses_fails(status: int, code: st
     assert findings[0].code == code
     assert findings[0].status is CheckStatus.FAIL
     assert ("error", f"rejected_{status}") in findings[0].params
+    assert ("reason", "Host *** is not a valid user.") in findings[0].params  # masked
+    assert not any(r.method == "DELETE" for r in platforms.requests)
 
 
 @pytest.mark.usefixtures("wxcc_ok")
