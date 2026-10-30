@@ -542,6 +542,13 @@ def test_an_own_certificate_replaces_acme_and_needs_both_files(host: Host) -> No
         "TLS_KEY_FILE": "/certs/privkey.pem",
     }
     assert host.settings(".env.update")["COMPOSE_PROFILES"] == "tls"
+    # ADR 0066: the portal's source setting is locked, so the page says the host manages it.
+    assert host.settings(".env")["TLS_CERTIFICATE_SOURCE"] == "own"
+
+    again = host.run("--mode", "production", "--own-certificate", "--non-interactive", **settings)
+
+    assert again.returncode == 0, again.stderr
+    assert host.file(".env").read_text().count("TLS_CERTIFICATE_SOURCE=") == 1
 
 
 def test_own_certificate_without_the_proxy_is_refused(host: Host) -> None:

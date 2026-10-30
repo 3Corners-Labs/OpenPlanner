@@ -538,9 +538,23 @@ proxy_settings() {
   [[ -n $TLS_DOMAIN ]] || die "$PROXY_ENV needs TLS_DOMAIN"
   [[ -n $(value "$PROXY_ENV" ACME_EMAIL) || -n $(value "$PROXY_ENV" TLS_CERT_FILE) ]] \
     || die "$PROXY_ENV needs ACME_EMAIL, or TLS_CERT_FILE and TLS_KEY_FILE (--own-certificate)"
+  ((!OWN_CERT)) || lock_certificate_source
   [[ $(value "$ENV_FILE" PUBLIC_BASE_URL) == "https://$TLS_DOMAIN"* ]] \
     || warn "PUBLIC_BASE_URL does not match TLS_DOMAIN=$TLS_DOMAIN"
   getent hosts "$TLS_DOMAIN" >/dev/null 2>&1 || warn "$TLS_DOMAIN does not resolve yet; the certificate will wait for DNS"
+}
+
+# ADR 0066: with the operator's files the proxy ignores the portal's choice, so the portal
+# setting is locked to `own` in .env; the page then says the host manages the certificate.
+lock_certificate_source() {
+  local backup
+  [[ $(value "$ENV_FILE" TLS_CERTIFICATE_SOURCE) != own ]] || return 0
+  # shellcheck disable=SC2016 # an awk program
+  backup=$(rewrite_env '
+    /^TLS_CERTIFICATE_SOURCE=/ { if (!done) { print "TLS_CERTIFICATE_SOURCE=own"; done = 1 }; next }
+    { print }
+    END { if (!done) print "TLS_CERTIFICATE_SOURCE=own" }')
+  log "TLS_CERTIFICATE_SOURCE=own written to $ENV_FILE: the portal shows the certificate as managed on the host (backup: $backup)"
 }
 
 # 4. The pinned release -------------------------------------------------------------------------

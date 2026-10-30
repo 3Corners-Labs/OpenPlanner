@@ -1,10 +1,11 @@
 #!/usr/bin/env sh
 # Start the compose stack with --profile tls against Pebble, Let's Encrypt's test ACME CA, and
-# check what ADR 0030 and ADR 0064 promise: a certificate is obtained without manual steps,
-# port 80 only redirects, public form bodies are capped, the proxy runs as non-root; then the
-# same proxy serves an own certificate from files, and `tls-check` from the web container
-# reads either certificate and judges it. Used by CI and by `make proxy-check`. Needs docker
-# with compose v2, curl and openssl.
+# check what ADR 0030, ADR 0064 and ADR 0066 promise: a certificate is obtained without manual
+# steps, port 80 only redirects, public form bodies are capped, the proxy runs as non-root; a
+# pair handed over through the portal-certs volume is served within the poll interval and ACME
+# applies again when it is withdrawn; then the same proxy serves an own certificate from files,
+# and `tls-check` from the web container reads either certificate and judges it. Used by CI
+# and by `make proxy-check`. Needs docker with compose v2, curl and openssl.
 set -eu
 
 project=openplanner-proxy-check
@@ -46,7 +47,7 @@ issuer() { # issuer: the issuer line of the served certificate
   curl -skv $resolve -o /dev/null https://booking.test:18443/healthz 2>&1 | grep 'issuer:' || true
 }
 
-edge_checks() { # redirect, body limit, non-root: the same in both passes
+edge_checks() { # redirect, body limit, non-root: the same in every pass
   redirect="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -H 'Host: booking.test' 'http://127.0.0.1:18080/g/x?a=1')"
   [ "$redirect" = "308 https://booking.test/g/x?a=1" ] || fail "port 80 does not redirect ($redirect)"
   # shellcheck disable=SC2086
@@ -75,10 +76,35 @@ edge_checks
 tls_check untrusted Pebble
 echo "pass 1 ok: certificate obtained over ACME, redirect, body limit, non-root, tls-check"
 
+self_signed() { # self_signed NAME ORGANISATION: a 30-day EC pair for booking.test in $certs
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 30 \
+    -subj "/O=$2/CN=booking.test" -addext "subjectAltName=DNS:booking.test" \
+    -keyout "$certs/$1.key" -out "$certs/$1.crt" >/dev/null 2>&1
+}
+
+wait_for_issuer() { # wait_for_issuer FRAGMENT: the watcher polls every 10 s (ADR 0066)
+  for _ in $(seq 1 20); do
+    if issuer | grep -q "$1"; then return 0; fi
+    sleep 2
+  done
+  fail "the proxy did not switch to '$1' ($(issuer))"
+}
+
+# Pass 1b: the pair the superuser uploads in the portal reaches the proxy through the
+# portal-certs volume (ADR 0066): written by web as fullchain.pem, privkey.pem and serial.
+self_signed portal "OpenPlanner portal check"
+compose cp "$certs/portal.crt" web:/srv/portal-certs/fullchain.pem
+compose cp "$certs/portal.key" web:/srv/portal-certs/privkey.pem
+compose exec -T web sh -c 'chmod 600 /srv/portal-certs/privkey.pem && echo portal-1 > /srv/portal-certs/serial'
+wait_for_issuer 'OpenPlanner portal check'
+edge_checks
+tls_check untrusted "OpenPlanner portal check"
+compose exec -T web sh -c 'rm /srv/portal-certs/serial /srv/portal-certs/privkey.pem /srv/portal-certs/fullchain.pem'
+wait_for_issuer 'Pebble'
+echo "pass 1b ok: portal certificate served from the volume and withdrawn again, tls-check"
+
 # Pass 2: an own certificate served from files (ADR 0064), mounted at /pebble like the CA.
-openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 30 \
-  -subj "/O=OpenPlanner own CA check/CN=booking.test" -addext "subjectAltName=DNS:booking.test" \
-  -keyout "$certs/own.key" -out "$certs/own.crt" >/dev/null 2>&1
+self_signed own "OpenPlanner own CA check"
 chmod 644 "$certs/own.key" "$certs/own.crt" # the proxy's uid must read them (test only)
 export PROXY_CERT_FILE=/pebble/own.crt PROXY_KEY_FILE=/pebble/own.key
 compose up -d --force-recreate --wait proxy

@@ -6204,3 +6204,108 @@ msgstr "Waarschuwen bij certificaat korter geldig dan (dagen)"
 
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Melding over het certificaat herhalen elke (uren)"
+
+msgid "admin.settings.tls.check_now"
+msgstr "Nu controleren"
+
+msgid "admin.settings.tls.check_now_hint"
+msgstr "Controleert het certificaat van het publieke adres meteen en slaat de uitslag op."
+
+msgid "admin.settings.tls.source.title"
+msgstr "Bron van het certificaat"
+
+msgid "admin.settings.tls.source.intro"
+msgstr "De meegeleverde HTTPS-proxy haalt het certificaat bij Let's Encrypt (automatisch verlengd) of gebruikt het certificaat dat hier is geüpload. Een wisseling is binnen ongeveer een halve minuut actief; kies daarna Nu controleren."
+
+msgid "admin.settings.tls.source.not_applicable"
+msgstr "Niet van toepassing: HTTPS eindigt bij een eigen reverse proxy of load balancer. Het certificaat wordt daar beheerd; hierboven staat wat bezoekers zien."
+
+msgid "admin.settings.tls.source.current"
+msgstr "Huidige bron"
+
+msgid "admin.settings.tls.source.acme"
+msgstr "Let's Encrypt (automatisch)"
+
+msgid "admin.settings.tls.source.own"
+msgstr "Eigen certificaat (geüpload)"
+
+msgid "admin.settings.tls.source.locked"
+msgstr "De serverbeheerder beheert het certificaat op de server; uploaden kan hier niet."
+
+msgid "admin.settings.tls.source.uploaded_title"
+msgstr "Geüpload certificaat"
+
+msgid "admin.settings.tls.source.fingerprint"
+msgstr "Vingerafdruk (SHA-256)"
+
+msgid "admin.settings.tls.source.subject"
+msgstr "Onderwerp"
+
+msgid "admin.settings.tls.source.names"
+msgstr "Namen"
+
+msgid "admin.settings.tls.source.uploaded_at"
+msgstr "Geüpload op"
+
+msgid "admin.settings.tls.source.none_uploaded"
+msgstr "Er is geen eigen certificaat geüpload."
+
+msgid "admin.settings.tls.source.choose"
+msgstr "Bron"
+
+msgid "admin.settings.tls.source.upload_title"
+msgstr "Eigen certificaat uploaden of vervangen"
+
+msgid "admin.settings.tls.source.upload_hint"
+msgstr "Twee PEM-bestanden van elk ten hoogste 64 KB: de certificaatketen (servercertificaat eerst, daarna de tussencertificaten) en de bijbehorende privésleutel zonder wachtwoord. De sleutel wordt versleuteld bewaard en nooit getoond. Het certificaat moet geldig zijn voor het publieke adres."
+
+msgid "admin.settings.tls.source.chain_file"
+msgstr "Certificaatketen (PEM)"
+
+msgid "admin.settings.tls.source.key_file"
+msgstr "Privésleutel (PEM)"
+
+msgid "admin.settings.tls.source.upload"
+msgstr "Certificaat opslaan"
+
+msgid "admin.settings.tls.source.remove"
+msgstr "Geüpload certificaat verwijderen"
+
+msgid "admin.settings.tls.source.in_use"
+msgstr "Dit certificaat is in gebruik; kies eerst Let's Encrypt als bron om het te verwijderen."
+
+msgid "admin.done.certificate_uploaded"
+msgstr "Het certificaat is opgeslagen."
+
+msgid "admin.done.certificate_removed"
+msgstr "Het geüploade certificaat is verwijderd."
+
+msgid "admin.done.certificate_checked"
+msgstr "Het certificaat is gecontroleerd. De uitslag staat hieronder."
+
+msgid "admin.form.error.tls_certificate_unreadable"
+msgstr "Dit bestand is geen leesbaar PEM-bestand (of de sleutel is met een wachtwoord beveiligd). Controleer de bestanden en probeer opnieuw."
+
+msgid "admin.form.error.tls_key_mismatch"
+msgstr "De privésleutel hoort niet bij het servercertificaat in de keten."
+
+msgid "admin.form.error.tls_name_mismatch"
+msgstr "Het certificaat is niet geldig voor het publieke adres van deze installatie."
+
+msgid "admin.form.error.tls_certificate_expired"
+msgstr "Het certificaat is verlopen."
+
+msgid "admin.form.error.tls_certificate_not_yet_valid"
+msgstr "Het certificaat is nog niet geldig."
+
+msgid "admin.form.error.tls_certificate_missing"
+msgstr "Upload eerst een eigen certificaat voordat u het als bron kiest."
+
+msgid "admin.form.error.tls_certificate_in_use"
+msgstr "Het certificaat is in gebruik; kies eerst Let's Encrypt als bron."
+
+msgid "admin.form.error.tls_source_not_applicable"
+msgstr "Deze installatie gebruikt een eigen reverse proxy; het certificaat wordt daar beheerd."
+
+msgid "settings.field.tls_certificate_source.label"
+msgstr "Bron van het certificaat van de meegeleverde proxy"

@@ -6204,3 +6204,108 @@ msgstr "Warn when the certificate is valid for fewer than (days)"
 
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Repeat the certificate report every (hours)"
+
+msgid "admin.settings.tls.check_now"
+msgstr "Check now"
+
+msgid "admin.settings.tls.check_now_hint"
+msgstr "Checks the certificate of the public address at once and stores the result."
+
+msgid "admin.settings.tls.source.title"
+msgstr "Certificate source"
+
+msgid "admin.settings.tls.source.intro"
+msgstr "The bundled HTTPS proxy gets its certificate from Let's Encrypt (renewed automatically) or serves the certificate uploaded here. A switch takes effect within about half a minute; then choose Check now."
+
+msgid "admin.settings.tls.source.not_applicable"
+msgstr "Not applicable: HTTPS ends at a reverse proxy or load balancer of your own. The certificate is managed there; above is what visitors see."
+
+msgid "admin.settings.tls.source.current"
+msgstr "Current source"
+
+msgid "admin.settings.tls.source.acme"
+msgstr "Let's Encrypt (automatic)"
+
+msgid "admin.settings.tls.source.own"
+msgstr "Own certificate (uploaded)"
+
+msgid "admin.settings.tls.source.locked"
+msgstr "The server operator manages the certificate on the server; it cannot be uploaded here."
+
+msgid "admin.settings.tls.source.uploaded_title"
+msgstr "Uploaded certificate"
+
+msgid "admin.settings.tls.source.fingerprint"
+msgstr "Fingerprint (SHA-256)"
+
+msgid "admin.settings.tls.source.subject"
+msgstr "Subject"
+
+msgid "admin.settings.tls.source.names"
+msgstr "Names"
+
+msgid "admin.settings.tls.source.uploaded_at"
+msgstr "Uploaded on"
+
+msgid "admin.settings.tls.source.none_uploaded"
+msgstr "No own certificate has been uploaded."
+
+msgid "admin.settings.tls.source.choose"
+msgstr "Source"
+
+msgid "admin.settings.tls.source.upload_title"
+msgstr "Upload or replace the own certificate"
+
+msgid "admin.settings.tls.source.upload_hint"
+msgstr "Two PEM files of at most 64 KB each: the certificate chain (server certificate first, then the intermediates) and the matching private key without a password. The key is stored encrypted and never shown. The certificate must be valid for the public address."
+
+msgid "admin.settings.tls.source.chain_file"
+msgstr "Certificate chain (PEM)"
+
+msgid "admin.settings.tls.source.key_file"
+msgstr "Private key (PEM)"
+
+msgid "admin.settings.tls.source.upload"
+msgstr "Save certificate"
+
+msgid "admin.settings.tls.source.remove"
+msgstr "Remove the uploaded certificate"
+
+msgid "admin.settings.tls.source.in_use"
+msgstr "This certificate is in use; choose Let's Encrypt as the source first to remove it."
+
+msgid "admin.done.certificate_uploaded"
+msgstr "The certificate has been saved."
+
+msgid "admin.done.certificate_removed"
+msgstr "The uploaded certificate has been removed."
+
+msgid "admin.done.certificate_checked"
+msgstr "The certificate has been checked. The result is below."
+
+msgid "admin.form.error.tls_certificate_unreadable"
+msgstr "This file is not a readable PEM file (or the key is protected by a password). Check the files and try again."
+
+msgid "admin.form.error.tls_key_mismatch"
+msgstr "The private key does not belong to the server certificate in the chain."
+
+msgid "admin.form.error.tls_name_mismatch"
+msgstr "The certificate is not valid for the public address of this installation."
+
+msgid "admin.form.error.tls_certificate_expired"
+msgstr "The certificate has expired."
+
+msgid "admin.form.error.tls_certificate_not_yet_valid"
+msgstr "The certificate is not valid yet."
+
+msgid "admin.form.error.tls_certificate_missing"
+msgstr "Upload an own certificate first before choosing it as the source."
+
+msgid "admin.form.error.tls_certificate_in_use"
+msgstr "The certificate is in use; choose Let's Encrypt as the source first."
+
+msgid "admin.form.error.tls_source_not_applicable"
+msgstr "This installation uses a reverse proxy of its own; the certificate is managed there."
+
+msgid "settings.field.tls_certificate_source.label"
+msgstr "Source of the bundled proxy's certificate"

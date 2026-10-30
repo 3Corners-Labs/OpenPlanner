@@ -36,7 +36,43 @@ finding other than *fine* is also in the audit log as a system event `tls.certif
 while it lasts (setting *Repeat the certificate report every*). *Not checked yet* means the
 server has not run a round yet.
 
+**Check now** (superuser) checks the certificate at once instead of waiting for the next
+round, for example after changing the source below.
+
 Support may ask for a screenshot of this screen instead of the server's configuration.
+
+### Certificate source
+
+On a small installation the bundled HTTPS proxy serves the certificate, and the superuser
+chooses where it comes from:
+
+- **Let's Encrypt (automatic)**, the default: the proxy obtains the certificate itself and
+  renews it; nothing to do.
+- **Own certificate (uploaded)**: the proxy serves the certificate uploaded here, for example a
+  PKIoverheid or other organisation-validated certificate. Renewal is then yours: upload the
+  new pair before the old one expires; the finding *expiring soon* above is the reminder.
+
+To use an own certificate, first upload two PEM files under **Upload or replace the own
+certificate**: the certificate chain (server certificate first, then the intermediates) and
+the matching private key without a password. The upload is checked before anything is stored:
+both files must be readable, the key must belong to the server certificate, the certificate
+must be valid for the public address of this installation, and it must be neither expired nor
+not yet valid. A refusal names the reason at the field. The private key is stored encrypted and
+never shown again; the screen shows the certificate's fingerprint, subject, names, expiry date
+and when it was uploaded. Then choose **Own certificate (uploaded)** as the source and save.
+The proxy switches within about half a minute; press **Check now** to see the result.
+
+Switching back to **Let's Encrypt (automatic)** takes effect the same way. The uploaded
+certificate stays stored for later; **Remove the uploaded certificate** deletes it and its key,
+and is possible only while Let's Encrypt is the source.
+
+Every upload and removal is recorded in the audit log with the certificate's fingerprint and
+expiry date, never the key. You need a recent login for any of these changes.
+
+When the server operator manages the certificate on the server itself, the setting is **locked
+by the server operator** and there is no upload form. When HTTPS ends at a reverse proxy or
+load balancer of your own, the screen says the source does not apply: the certificate is
+managed there, and the block above still shows what visitors see.
 
 ## Platform settings
 
