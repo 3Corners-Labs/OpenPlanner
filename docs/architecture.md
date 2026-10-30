@@ -93,6 +93,7 @@ flowchart TB
         web["web<br/>FastAPI + uvicorn<br/>pages, migrations on start"]
         worker["worker<br/>job loop, heartbeat"]
         volume[("data volume<br/>SQLite (WAL)")]
+        certs[("portal-certs volume<br/>own key, CSR, chain")]
         mailpit["mailpit<br/>dev profile only"]
     end
 
@@ -107,6 +108,7 @@ flowchart TB
     worker -- SMTP --> smtp
     worker -- hourly release check --> github
     worker -. "certificate probe, https :443" .-> proxy
+    web -- "own certificate (ADR 0070)" --> certs -. "watcher, caddy reload" .-> proxy
     updater -- "app.cli: claim, progress, report, backup" --> web
     updater -- "pull, verify, pin digest" --> github
     worker -. dev .-> mailpit
@@ -119,8 +121,12 @@ flowchart TB
   uid 10001 on a read-only filesystem, keeps certificates in the `proxy-data` volume and has a
   fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
   The worker probes the public address every few hours and shows the certificate's issuer,
-  expiry and one finding on *System status*; a failing one is a system event. Without the
-  profile (`--no-tls`), a load balancer of the host does TLS.
+  expiry and one finding on *System status*; a failing one is a system event. The superuser
+  chooses the source there (ADR 0070): Let's Encrypt, or an own certificate whose key `web`
+  makes in the `portal-certs` volume (a signing request for the CA; the chain comes back
+  through the portal, the key never enters the database) and whose pair the entrypoint's
+  watcher reloads Caddy with on change. Without the profile (`--no-tls`), a
+  load balancer of the host does TLS and the source is not the portal's.
 - **One image, two roles.** `web` runs `alembic upgrade head` and then uvicorn; `worker` runs
   `python -m app.jobs.worker` and starts only when `web` is healthy. Both run as uid 10001
   with a read-only root filesystem, no capabilities and `no-new-privileges`.
@@ -256,6 +262,7 @@ same commit and rollback behaviour as the SQL one.
 | Agenda per slot with agents and shortfalls, day and week view (ADR 0044) | `app/domain/agenda.py`, `app/domain/agenda_service.py`, `app/admin/agenda_routes.py`, `app/admin/shortfalls.py` |
 | A planner's changes: move, cancel with a fixed reason, accept a shortfall (ADR 0044) | `app/domain/planner_service.py`, `app/admin/planner_routes.py` |
 | Cancelling on the citizen's behalf, shared by closure and planner; the planner's limits; asking to rebook and its lapse (ADR 0044) | `app/domain/booking_changes.py`, `app/jobs/runner.py` (`lapse_rebook`) |
+| Rebooking assistant: which bookings of a short slot move and which slot each is proposed, same time on the nearest day first (ADR 0057) | `app/domain/rebooking.py` |
 | Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
@@ -740,6 +747,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0048 | Live progress of updates: the host updater reports each step, the updates page polls a fragment (proposed) |
 | 0050 | One host installer that installs, repairs and re-checks a host; one layout under `/home/<user>/openplanner` (proposed) |
 | 0056 | A citizen confirms a new booking by email link; it holds its place until `confirm_by`, then lapses |
+| 0057 | Rebooking assistant: propose a new time for the excess of a short slot, held until the citizen confirms (proposed) |
 
 ## 12. Status and roadmap
 
