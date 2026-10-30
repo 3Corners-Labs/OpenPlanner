@@ -53,7 +53,7 @@ Side navigation: *Overview*.
 | Entry | Path | Permission | Also the home of |
 |---|---|---|---|
 | Overview | `/admin/groups/{slug}` | `group.view` | – |
-| Settings | `/admin/groups/{slug}/settings` | `group.edit` | – |
+| Settings | `/admin/groups/{slug}/settings` | `group.edit` | `/admin/groups/{slug}/settings/form`, `/admin/groups/{slug}/settings/form/{key}` |
 | Staffing | `/admin/groups/{slug}/staffing` | `schedule.manage` | `/admin/groups/{slug}/staffing/{rule_id}`, `/admin/groups/{slug}/staffing/{rule_id}/split` |
 | Staffing exceptions | `/admin/groups/{slug}/exceptions` | `schedule.manage` | – |
 | Holidays | `/admin/groups/{slug}/holidays` | `schedule.manage` | – |

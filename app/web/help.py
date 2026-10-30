@@ -85,6 +85,11 @@ TOPICS = (
     ),
     HelpTopic("group-closure", ("/admin/groups/{slug}/closure",), Permission.CLOSURE_MANAGE),
     HelpTopic(
+        "group-booking-form",
+        ("/admin/groups/{slug}/settings/form", "/admin/groups/{slug}/settings/form/{key}"),
+        Permission.GROUP_EDIT,
+    ),
+    HelpTopic(
         "closure-scenarios",
         tuple(
             f"{base}/closure/scenarios{suffix}"
