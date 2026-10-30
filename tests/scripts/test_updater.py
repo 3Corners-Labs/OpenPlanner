@@ -276,6 +276,15 @@ def test_update_reports_each_step_before_taking_it(host: Host) -> None:
     assert host.index(cli("update-progress", "7", "starting")) < host.index(UP, pinned=NEW)
 
 
+def test_a_healthy_update_is_checked_at_least_once_before_the_deadline(host: Host) -> None:
+    config = host.root / "updater.env"
+    config.write_text(config.read_text().replace("HEALTH_TIMEOUT=1", "HEALTH_TIMEOUT=0"))
+
+    updated(host)
+
+    assert reports(host)[-1] == cli("update-report", "7", "succeeded")
+
+
 def test_unhealthy_update_reports_rolling_back(host: Host) -> None:
     host.given("unhealthy", f"{NEW}\n")
     host.given("claim", "7 update 1.4.0 1.3.0\n")

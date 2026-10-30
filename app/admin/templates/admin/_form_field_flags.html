@@ -1,0 +1,19 @@
+{#- The two checkboxes of a field definition: required, and the confirmation for "not PII" (ADR 0055). -#}
+<div class="form-section">
+  <div class="choice__option">
+    <input type="checkbox" id="required" name="required" value="yes"{% if required %} checked{% endif %} aria-describedby="required-hint">
+    <label for="required">{{ _("admin.form_fields.required") }}</label>
+  </div>
+  <p id="required-hint" class="hint">{{ _("admin.form_fields.required_hint") }}</p>
+  {% if not always_pii %}
+  <div class="field{% if confirm_error %} field--error{% endif %}">
+    {% if confirm_error %}<p class="error-message" id="confirm_not_pii-error">{{ confirm_error }}</p>{% endif %}
+    <div class="choice__option">
+      <input type="checkbox" id="confirm_not_pii" name="confirm_not_pii" value="yes"{% if confirm %} checked{% endif %}
+        aria-describedby="confirm_not_pii-hint{% if confirm_error %} confirm_not_pii-error{% endif %}"{% if confirm_error %} aria-invalid="true"{% endif %}>
+      <label for="confirm_not_pii">{{ _("admin.form_fields.confirm_not_pii") }}</label>
+    </div>
+    <p id="confirm_not_pii-hint" class="hint">{{ _("admin.form_fields.confirm_not_pii_hint") }}</p>
+  </div>
+  {% endif %}
+</div>
