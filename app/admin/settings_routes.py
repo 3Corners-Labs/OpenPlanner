@@ -19,13 +19,15 @@ The page reloads the portal values first, so it always shows what the processes 
     GET  /admin/settings              settings.platform.view
     POST /admin/settings/{key}        settings.platform.manage (recent login)
     POST /admin/settings/{key}/reset  settings.platform.manage (recent login)
+    POST /admin/settings/{key}/adopt  settings.platform.manage (recent login)
+    POST /admin/settings/login/test   settings.login.manage (recent login): dry run (§8)
 """
 
 from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, Response
+from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.live_settings import LiveSettings
 from app.adapters.settings_report import SettingState
@@ -33,9 +35,11 @@ from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin
 from app.admin.pages import page as _page
+from app.admin.session import save_login_trial
 from app.config import Settings
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
+from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
 from app.domain.settings_registry import BY_KEY, LOG_LEVEL_MAX_EXPIRY_HOURS, SettingClass, Topic
 from app.domain.settings_service import LOG_LEVEL, SettingsService, editable
 from app.web.locale import RequestLocale
@@ -112,6 +116,29 @@ class Problem:
 async def advanced_settings(request: Request, locale: Locale, context: View) -> HTMLResponse:
     """Show System status and every portal setting with its value and source."""
     return await _overview(request, locale, context)
+
+
+LoginChange = Annotated[
+    AdminContext, Depends(RequirePermission(Permission.SETTINGS_LOGIN_MANAGE, fresh=True))
+]
+
+
+@router.post("/settings/login/test", response_class=HTMLResponse)
+async def try_login_mapping(
+    request: Request, locale: Locale, _: SameOrigin, context: LoginChange
+) -> Response:
+    """Check a proposed login mapping, then dry-run it on a fresh login (ADR 0042 §8).
+
+    Nothing is saved here: the proposal waits in the signed session until the next login,
+    and is saved only if that login still resolves to this superuser.
+    """
+    form = await read_form(request, locale)
+    try:
+        values = validate_mapping({key: form.text(key) for key in LOGIN_KEYS})
+    except DomainError as error:
+        return await _overview(request, locale, context, (error.field or "", error), 422)
+    save_login_trial(request, context.principal.subject, values)
+    return RedirectResponse("/admin/login?next=/admin/settings&fresh=1", status_code=303)
 
 
 @router.post("/settings/{key}", response_class=HTMLResponse)
@@ -213,6 +240,7 @@ async def _overview(
             ),
             "done": done_message(request, locale.gettext),
             "max_hours": LOG_LEVEL_MAX_EXPIRY_HOURS,
+            "login_form": _login_form(context, current, live, errors, locale),
             "manage": manage,
             "unknown_error": next((m for k, m in errors.items() if k not in BY_KEY), None),
         },
@@ -296,3 +324,35 @@ def _stored(live: LiveSettings) -> frozenset[str]:
     """Return the keys the portal holds a value for (secrets included, values never)."""
     portal = live.portal
     return frozenset(portal.values) | frozenset(portal.secrets)
+
+
+@dataclass(frozen=True)
+class LoginField:
+    """One field of the login mapping form."""
+
+    key: str
+    label: str
+    value: str
+    error: str | None
+
+
+def _login_form(
+    context: AdminContext,
+    current: Settings,
+    live: LiveSettings,
+    errors: dict[str, str],
+    locale: RequestLocale,
+) -> list[LoginField] | None:
+    """Return the login mapping form, or ``None`` without the permission or with a lock.
+
+    Only the superuser holds ``settings.login.manage``; any key the environment locks makes
+    the whole mapping the operator's (it is saved as one).
+    """
+    can = can_function(context.principal)(Permission.SETTINGS_LOGIN_MANAGE)
+    if not can or set(LOGIN_KEYS) & live.locked():
+        return None
+    values = current.login_values
+    return [
+        LoginField(key, locale.gettext(SETTING_LABELS[key]), values[key], errors.get(key))
+        for key in LOGIN_KEYS
+    ]

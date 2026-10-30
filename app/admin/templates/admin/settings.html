@@ -53,6 +53,20 @@
   </table>
   </div>
 </section>
+{% if login_form %}
+<form class="card" method="post" action="/admin/settings/login/test" novalidate aria-labelledby="login-heading">
+  <h2 id="login-heading">{{ _("admin.settings.login.title") }}</h2>
+  <p>{{ _("admin.settings.login.intro") }}</p>
+  {% for field in login_form %}
+  <div class="field{% if field.error %} field--error{% endif %}">
+    <label for="login-{{ field.key }}">{{ field.label }}</label>
+    {% if field.error %}<p class="error-message" id="error-login-{{ field.key }}">{{ field.error }}</p>{% endif %}
+    <input id="login-{{ field.key }}" name="{{ field.key }}" type="text" value="{{ field.value }}" autocomplete="off"{% if field.error %} aria-invalid="true" aria-describedby="error-login-{{ field.key }}"{% endif %}>
+  </div>
+  {% endfor %}
+  <button type="submit" class="button">{{ _("admin.settings.login.test") }}</button>
+</form>
+{% endif %}
 {% for section in sections %}
 <section class="card" aria-labelledby="topic-{{ section.key }}">
   <h2 id="topic-{{ section.key }}">{{ section.heading }}</h2>
