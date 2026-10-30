@@ -221,12 +221,19 @@ meeting is deleted; the citizen can open a new trial call.
 How often one appointment may open a trial call, from 1 to 5. Default 3. Each trial call is a
 meeting in Webex; this number stops one appointment from creating them without end.
 
-<!-- field: direct_call_enabled -->
-### Start a call right away
+<!-- field: offer -->
+### Offer per block
 
-With **Yes**, citizens can start a video call right away during a block with agents, without an
-appointment. The booking page then shows a button. Outside the blocks, on holidays or during an
-emergency closure, the button disappears by itself.
+For every staffing block you choose what citizens can do in it: **Appointments** (the block's
+slots, the default), **Direct call** (start a video call right away, without an appointment;
+the block then offers no slots) or **Appointments and direct call**. A staffing exception for
+one day has the same choice.
+
+During a block with agents that offers direct calls, the booking page shows the button
+**Start a call now**. Outside such blocks, on holidays or during an emergency closure, the
+button disappears by itself. The group itself no longer has an on/off switch: the offer sits
+on the blocks, so a team can take direct calls in the morning and appointments in the
+afternoon.
 
 <!-- field: not_picked_up_minutes -->
 ### Not picked up after

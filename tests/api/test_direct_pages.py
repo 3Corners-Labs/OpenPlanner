@@ -13,9 +13,11 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.admin import AdminService
+from app.domain.booking import Claim
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
 from app.domain.ports import IntegrationError
+from app.domain.scheduling import DispatchKind, Offer
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
@@ -26,16 +28,20 @@ ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org",
 
 
 async def _configure(database_url: str, **changes: object) -> None:
+    """Change the demo group, and let every staffing block offer direct calls (ADR 0072)."""
     engine = create_engine(database_url)
     async with SqlUnitOfWork(engine).locked() as tx:
         group = await tx.get_group("demo")
         assert group is not None
         await tx.save_group(replace(group, **changes))
+        rules, _overrides = await tx.get_schedule_items(group.id)
+        for rule in rules:
+            block = replace(rule.window, offer=Offer.BOTH)
+            await tx.update_schedule_rule(group.id, rule.id or 0, replace(rule, window=block))
     await engine.dispose()
 
 
 WIRED = {
-    "direct_call_enabled": True,
     "video_host_email": "host@example.nl",
     "wxcc_business_address": "openplanner@example.biz",
     "wxcc_channel": "openplanner-video",
@@ -62,6 +68,33 @@ class Site:
         uow = SqlUnitOfWork(engine)
         service = IntegrationService(uow, self.clock, AdminService(uow, self.clock))
         await service.record_task_event(task_id, kind, self.clock.now())
+        await engine.dispose()
+
+    async def latest_booking_id(self) -> int:
+        """Return the id of the direct call started last."""
+        engine = create_engine(self.database_url)
+        async with SqlUnitOfWork(engine).read() as tx:
+            group = await tx.get_group("demo")
+            assert group is not None
+            calls = await tx.get_direct_calls(group.id, NOW - timedelta(days=1))
+        await engine.dispose()
+        return max(c.booking_id for c in calls)
+
+    async def record_booking_event(
+        self, booking_id: int, kind: EventKind, detail: str = ""
+    ) -> None:
+        """Put ``kind`` on the booking's timeline, as the worker or a webhook would."""
+        engine = create_engine(self.database_url)
+        uow = SqlUnitOfWork(engine)
+        service = IntegrationService(uow, self.clock, AdminService(uow, self.clock))
+        await service.record(booking_id, kind, detail=detail)
+        await engine.dispose()
+
+    async def claim(self, booking_id: int) -> None:
+        """Let an agent of the own queue pick the call up (ADR 0043)."""
+        engine = create_engine(self.database_url)
+        async with SqlUnitOfWork(engine).locked() as tx:
+            assert await tx.claim_booking(booking_id, Claim(self.clock.now(), "pseudonym"))
         await engine.dispose()
 
 
@@ -186,3 +219,80 @@ async def test_full_when_every_agent_is_taken(site: Site) -> None:
     await site.record("task-1", EventKind.TASK_ENDED)
 
     assert (await site.start()).status_code == 303
+
+
+def _poll_url(page: str) -> str | None:
+    """Return the status fragment's URL the page polls, or ``None`` when it stopped."""
+    found = re.search(r'data-poll="([^"]+)"', page)
+    return found.group(1).replace("&amp;", "&") if found else None
+
+
+async def test_the_page_polls_a_status_fragment_without_reloading(site: Site) -> None:
+    """ADR 0072: live through a fragment; 204 while nothing changed; never a page reload."""
+    wait = (await site.start()).headers["location"]
+
+    page = (await site.client.get(wait)).text
+    url = _poll_url(page)
+    assert url is not None
+    unchanged = await site.client.get(url)
+    await site.record("task-1", EventKind.TASK_CONNECTED)
+    changed = await site.client.get(url)
+
+    assert '<script src="/static/live-region.js" defer></script>' in page
+    assert "http-equiv" not in page
+    assert 'data-poll-seconds="10"' in page  # QUEUE_REFRESH_SECONDS, class C
+    assert unchanged.status_code == 204
+    assert changed.status_code == 200
+    assert "data-live-fragment" in changed.text
+    assert "heeft uw gesprek aangenomen" in changed.text
+    assert "<html" not in changed.text
+
+
+async def test_a_claim_in_the_own_queue_shows_as_accepted(site: Site) -> None:
+    """ADR 0072: the own queue has no WxCC task; the claim tells the citizen an agent is coming."""
+    await _configure(site.database_url, dispatch_kind=DispatchKind.OPENPLANNER_QUEUE)
+    wait = (await site.start()).headers["location"]
+    searching = (await site.client.get(wait)).text
+
+    await site.claim(await site.latest_booking_id())
+    accepted = (await site.client.get(wait)).text
+    await site.record_booking_event(await site.latest_booking_id(), EventKind.HOST_JOINED)
+    in_call = (await site.client.get(wait)).text
+
+    assert site.dispatcher.items == []  # no task for the own queue
+    assert "We zoeken een medewerker" in searching
+    assert "wachtruimte gaan" in searching  # the meeting is ready: wait in the lobby
+    assert "heeft uw gesprek aangenomen" in accepted
+    assert "/join/go" in accepted
+    assert "De medewerker is in het gesprek" in in_call
+    assert _poll_url(in_call) is None  # nothing left to wait for
+
+
+async def test_nobody_picking_up_in_the_own_queue_is_said_honestly(site: Site) -> None:
+    await _configure(site.database_url, dispatch_kind=DispatchKind.OPENPLANNER_QUEUE)
+    wait = (await site.start()).headers["location"]
+    site.clock.advance(timedelta(minutes=11))
+
+    page = (await site.client.get(wait)).text
+
+    assert "geen medewerker beschikbaar" in page
+    assert 'href="/g/demo"' in page
+
+
+async def test_a_failed_meeting_is_told_instead_of_waiting_for_nothing(site: Site) -> None:
+    """ADR 0072: Webex refused the meeting (ADR 0065 reason on the timeline): say so."""
+    site.video.error = IntegrationError("rejected_400", retryable=False)
+    wait = (await site.start()).headers["location"]
+    preparing = (await site.client.get(wait)).text
+
+    await site.record_booking_event(
+        await site.latest_booking_id(), EventKind.MEETING_FAILED, "rejected_400"
+    )
+    failed = (await site.client.get(wait)).text
+
+    assert "We zetten uw videogesprek klaar" in preparing
+    assert "/join/go" not in preparing
+    assert "technische storing" in failed
+    assert 'href="/g/demo"' in failed  # schedule instead
+    assert "/join/go" not in failed
+    assert _poll_url(failed) is None

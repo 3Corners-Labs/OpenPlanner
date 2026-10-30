@@ -70,6 +70,7 @@ OPEN_ROUTES = frozenset(
         "/g/{slug}/closure",
         "/g/{slug}/closure/image",
         "/b/{token}/wait",
+        "/b/{token}/wait/status",
         "/b/{token}/join",
         "/b/{token}/join/go",
         "/healthz",

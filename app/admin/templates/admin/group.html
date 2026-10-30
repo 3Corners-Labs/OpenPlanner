@@ -20,7 +20,7 @@
     <div><dt>{{ _("admin.group.phone") }}</dt><dd>{{ phone_label }}</dd></div>
     <div><dt>{{ _("admin.group.video") }}</dt><dd>{% if summary.group.video_enabled %}{{ _("admin.group.connected") }}{% else %}{{ _("admin.group.not_connected") }}{% endif %}</dd></div>
     <div><dt>{{ _("admin.group.wxcc") }}</dt><dd>{% if summary.group.dispatch_enabled %}{{ _("admin.group.connected") }} · {{ summary.group.routing_value }}{% else %}{{ _("admin.group.not_connected") }}{% endif %}</dd></div>
-    <div><dt>{{ _("admin.group.direct_call") }}</dt><dd>{% if summary.group.direct_call_enabled %}{{ _("admin.yes") }}{% else %}{{ _("admin.no") }}{% endif %}</dd></div>
+    <div><dt>{{ _("admin.group.direct_call") }}</dt><dd>{% if direct_blocks %}{{ _("admin.group.direct_blocks", count=direct_blocks) }}{% else %}{{ _("admin.no") }}{% endif %}</dd></div>
   </dl>
 </section>
 <section class="card" aria-labelledby="week-heading">

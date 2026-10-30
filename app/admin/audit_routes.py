@@ -41,6 +41,7 @@ from app.domain import staff
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT, LOGOUT_EVENT
 from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
 from app.domain.audit import (
+    SUBJECT_ACTIONS,
     SYSTEM_ACTOR,
     AuditEntry,
     AuditFilter,
@@ -48,6 +49,7 @@ from app.domain.audit import (
     Level,
     Outcome,
     Source,
+    Subject,
 )
 from app.domain.audit_export import ExportLimits, ExportRefused
 from app.domain.authorization import (
@@ -326,6 +328,23 @@ LEVEL_LABELS: dict[Level, str] = {
 }
 """Label per minimum level in the filter (ADR 0040)."""
 
+SUBJECT_LABELS: dict[Subject, str] = {
+    Subject.UPDATES: "admin.audit.subject.updates",
+    Subject.LOGIN: "admin.audit.subject.login",
+    Subject.SETTINGS: "admin.audit.subject.settings",
+    Subject.RIGHTS: "admin.audit.subject.rights",
+    Subject.BOOKINGS: "admin.audit.subject.bookings",
+    Subject.ORGANISATION: "admin.audit.subject.organisation",
+    Subject.INTEGRATIONS: "admin.audit.subject.integrations",
+}
+"""Filter label per subject (ADR 0067)."""
+
+
+def _subject_of(narrow: AuditFilter) -> Subject | None:
+    """Return the subject whose prefixes ``narrow`` selects, if it is exactly one."""
+    return next((s for s, prefixes in SUBJECT_ACTIONS.items() if prefixes == narrow.actions), None)
+
+
 CATEGORY_LABELS: dict[Category, str] = {
     Category.AUDIT: "admin.audit.category.audit",
     Category.SYSTEM: "admin.audit.category.system",
@@ -389,6 +408,8 @@ class FilterView:
     date_from: str
     date_to: str
     trace: str
+    subjects: tuple[Option, ...]
+    subject: str
     active: bool
     query: str
     """The current filter as a query string, for the export link."""
@@ -478,6 +499,7 @@ class AuditQuery:
     date_from: str | None = Query(default=None, alias="from")
     date_to: str | None = Query(default=None, alias="to")
     trace: str | None = None
+    subject: str | None = None
 
     def narrow(self, groups: set[str], zone: ZoneInfo) -> AuditFilter:
         """Turn the parameters into a filter; unknown or empty values are ignored.
@@ -499,6 +521,11 @@ class AuditQuery:
             since=_midnight(_date(self.date_from), zone),
             until=_midnight(until + timedelta(days=1), zone) if until else None,
             trace_id=self.trace if self.trace and TRACE_ID.fullmatch(self.trace) else None,
+            actions=(
+                SUBJECT_ACTIONS[Subject(self.subject)]
+                if self.subject in set(Subject)
+                else frozenset()
+            ),
         )
 
 
@@ -517,6 +544,7 @@ def _filter_view(
         "to": date_to.isoformat() if date_to else "",
         "trace": narrow.trace_id or "",
         "source": narrow.source.value if narrow.source else "",
+        "subject": subject.value if (subject := _subject_of(narrow)) else "",
     }
     return FilterView(
         levels=tuple(Option(level.value, _(LEVEL_LABELS[level])) for level in Level),
@@ -530,6 +558,8 @@ def _filter_view(
         date_from=values["from"],
         date_to=values["to"],
         trace=values["trace"],
+        subjects=tuple(Option(s.value, _(SUBJECT_LABELS[s])) for s in Subject),
+        subject=values["subject"],
         active=narrow != AuditFilter(),
         query=urlencode({key: value for key, value in values.items() if value}),
     )

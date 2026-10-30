@@ -419,3 +419,50 @@ def test_unconfirmed_bookings_are_cancelled_and_purged_on_downgrade(
     assert statuses == [(1, "cancelled"), (2, "confirmed")]
     assert purges == [(1,)]
     assert not {"confirm_by", "confirmed_at"} & columns
+
+
+def test_the_direct_call_switch_becomes_an_offer_per_block_and_back(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    """ADR 0072: the switch becomes blocks that offer both; the downgrade restores it."""
+    import sqlite3
+
+    command.upgrade(alembic_config, "0059")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    database.executescript(
+        """
+        INSERT INTO organisations (id, name, slug) VALUES (1, 'Gemeente', 'gemeente');
+        INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+            min_notice_minutes, horizon_days, phone_mode, direct_call_enabled)
+            VALUES (1, 1, 'Direct', 'direct', 'Europe/Amsterdam', 30, 60, 60, 'optional', 1),
+                   (2, 1, 'Gepland', 'gepland', 'Europe/Amsterdam', 30, 60, 60, 'optional', 0);
+        INSERT INTO schedule_rules (group_id, weekday, opens, closes, capacity)
+            VALUES (1, 0, '09:00:00', '12:00:00', 3), (2, 0, '09:00:00', '12:00:00', 3);
+        INSERT INTO schedule_overrides (group_id, day, opens, closes, capacity)
+            VALUES (1, '2026-11-02', '09:00:00', '10:00:00', 2);
+        INSERT INTO schedule_overrides (group_id, day) VALUES (2, '2026-11-03');
+        """
+    )
+    database.commit()
+    database.close()
+
+    command.upgrade(alembic_config, "0064")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    rules = database.execute("SELECT group_id, offer FROM schedule_rules ORDER BY group_id")
+    overrides = database.execute("SELECT group_id, offer FROM schedule_overrides ORDER BY group_id")
+    assert rules.fetchall() == [(1, "both"), (2, "scheduled")]
+    assert overrides.fetchall() == [(1, "both"), (2, "scheduled")]
+    with pytest.raises(sqlite3.IntegrityError):
+        database.execute(
+            "INSERT INTO schedule_rules (group_id, weekday, opens, closes, capacity, offer)"
+            " VALUES (2, 1, '09:00:00', '10:00:00', 1, 'maybe')"
+        )
+    database.execute("UPDATE schedule_rules SET offer = 'direct' WHERE group_id = 2")
+    database.commit()
+    database.close()
+
+    command.downgrade(alembic_config, "0059")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    switches = database.execute("SELECT id, direct_call_enabled FROM groups ORDER BY id")
+    assert switches.fetchall() == [(1, 1), (2, 1)]
+    database.close()
