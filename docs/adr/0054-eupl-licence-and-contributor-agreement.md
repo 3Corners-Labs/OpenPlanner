@@ -1,6 +1,6 @@
 # 0054. OpenPlanner is EUPL-1.2, contributions under a contributor licence agreement
 
-Status: proposed (2026-10-29), requested by the product owner.
+Status: accepted (2026-10-29), requested by the product owner. Built in the repository, checked on 2026-10-30; the lawyer's review of the CLA and making the repository public are not code (status was *proposed*; `docs/adr-status.md`).
 
 ## Context
 
