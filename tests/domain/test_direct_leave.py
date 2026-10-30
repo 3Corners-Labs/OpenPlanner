@@ -5,10 +5,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.domain.booking import BookingKind, BookingStatus, Claim
-from app.domain.calls import CallStatus, EventKind, TaskState
+from app.domain.admin import AdminService
+from app.domain.booking import BookingKind, BookingStatus, Claim, MeetingRef
+from app.domain.calls import CallState, CallStatus, EventKind, TaskState
 from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError
+from app.domain.integration import EventOutcome, IntegrationService
 from app.domain.job_plan import JobType
 from app.domain.scheduling import Offer, ScheduleRule
 from app.domain.services import BookingService
@@ -142,3 +144,37 @@ async def test_a_scheduled_booking_cannot_be_left_this_way() -> None:
         await service.leave_direct(receipt.management_token)
 
     assert uow.state.bookings[receipt.booking.id or 0].status is BookingStatus.CONFIRMED
+
+
+async def test_the_meeting_is_still_followed_after_the_citizen_left() -> None:
+    """The agent stays in the meeting: Webex events keep reaching the timeline (ADR 0010)."""
+    service, uow, token, booking_id = await _started()
+    async with uow.locked() as tx:
+        await tx.save_meeting(booking_id, MeetingRef("meeting-1", "https://site.webex.com/m/1"))
+    uow.state.call_status[booking_id] = CallStatus(booking_id, host_joined=True)
+    await service.leave_direct(token)
+    integration = IntegrationService(
+        uow, FixedClock(MONDAY_0915), AdminService(uow, FixedClock(MONDAY_0915))
+    )
+
+    outcome = await integration.record_meeting_event(
+        "meeting-1", EventKind.MEETING_ENDED, MONDAY_0915 + timedelta(minutes=5)
+    )
+
+    assert outcome is EventOutcome.RECORDED
+    assert _kinds(uow, booking_id) == [EventKind.CITIZEN_LEFT, EventKind.MEETING_ENDED]
+    assert uow.state.call_status[booking_id].call is CallState.ENDED
+
+
+async def test_an_agent_still_in_the_meeting_keeps_the_place_taken_until_it_ends() -> None:
+    service, uow, token, booking_id = await _started()
+    uow.state.call_status[booking_id] = CallStatus(booking_id, host_joined=True)
+    await service.leave_direct(token)
+
+    assert await service.direct_call_availability("aangifte") is DirectAvailability.FULL
+
+    uow.state.call_status[booking_id] = CallStatus(
+        booking_id, host_joined=True, call=CallState.ENDED
+    )
+
+    assert await service.direct_call_availability("aangifte") is DirectAvailability.AVAILABLE

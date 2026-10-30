@@ -12,7 +12,7 @@ holidays and an emergency closure. When you change the staffing, the agenda show
 
 Every slot of the day has its own block, with its time, the number of agents and the number of
 confirmed bookings. Below it are the bookings with the participant's first name and the state
-of the video meeting and the contact center task. The email address and phone number are only
+of the video meeting (with the Webex meeting ID under it) and the contact center task. The email address and phone number are only
 on a booking's detail page (**Details**).
 
 - **Closed**: an emergency closure covers this slot.
@@ -28,6 +28,10 @@ chosen day.
 A booking's detail page (**Details**) holds what you need when a video meeting or contact
 center task goes wrong:
 
+- **Meeting ID**: the Webex meeting's own ID, the one to quote to Webex support. It stays on
+  the page when a citizen stopped waiting for a direct call: OpenPlanner keeps following the
+  meeting while the agent is still in it, and the place of that call stays taken until Webex
+  reports the meeting's end.
 - **Timeline**: what happened to the meeting and the task. Each event shows the version of
   OpenPlanner that wrote it, so on a test environment that updates often you can tell an error
   of an older version. *Version unknown* means it was written before OpenPlanner kept it.

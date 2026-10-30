@@ -10,6 +10,7 @@
   </div>
   <dl class="facts">
     <div><dt>{{ _("admin.agenda.meeting") }}</dt><dd><span class="chip{% if call.tone %} chip--{{ call.tone }}{% endif %}">{{ call.label }}</span></dd></div>
+    {% if meeting_id %}<div><dt>{{ _("admin.agenda.meeting_id") }}</dt><dd><code>{{ meeting_id }}</code></dd></div>{% endif %}
     <div><dt>{{ _("admin.agenda.task") }}</dt><dd><span class="chip{% if task.tone %} chip--{{ task.tone }}{% endif %}">{{ task.label }}</span></dd></div>
     <div><dt>{{ _("admin.agenda.agent") }}</dt><dd>{% if status.host_joined %}{{ _("admin.yes") }}{% else %}{{ _("admin.no") }}{% endif %}</dd></div>
     <div><dt>{{ _("admin.agenda.participants") }}</dt><dd>{{ status.participants }}</dd></div>

@@ -8,7 +8,9 @@ not counted.
 
     WAITING   ─ task none or queued, no host yet, at most not_picked_up_minutes after the start
     CONNECTED ─ task connected, booking claimed (own queue, ADR 0043) or host joined, until the
-                meeting or task ends, at most JOIN_CLOSES_AFTER after the end
+                meeting or task ends, at most JOIN_CLOSES_AFTER after the end; a host in a
+                running meeting counts even if the citizen left or the task ended, so the
+                agent's place frees when Webex reports the meeting's end (ADR 0019 point 4)
     DONE      ─ anything else: ended, failed, cancelled, or stale (a lost webhook frees the place)
 
 ``wait_state`` is what the citizen's waiting page tells them (ADR 0072), for both dispatch
@@ -110,8 +112,13 @@ class QueueInfo:
 def phase(call: DirectCall, group: Group, now: datetime) -> QueuePhase:
     """Return where ``call`` is in ``group``'s queue at ``now``."""
     status = call.status
+    meeting_over = status.call in (CallState.ENDED, CallState.FAILED)
+    if status.host_joined and not meeting_over:
+        # The meeting itself decides (ADR 0019 point 4): while the agent is in it the place is
+        # taken, also after the citizen left or the task ended. Webex reports its end.
+        return QueuePhase.CONNECTED if now <= call.end + JOIN_CLOSES_AFTER else QueuePhase.DONE
     finished = status.task in (TaskState.ENDED, TaskState.FAILED, TaskState.CANCELLED)
-    if not call.active or finished or status.call in (CallState.ENDED, CallState.FAILED):
+    if not call.active or finished or meeting_over:
         return QueuePhase.DONE
     if status.task is TaskState.CONNECTED or status.host_joined or call.claimed:
         return QueuePhase.CONNECTED if now <= call.end + JOIN_CLOSES_AFTER else QueuePhase.DONE

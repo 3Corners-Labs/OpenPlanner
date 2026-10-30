@@ -36,7 +36,12 @@ the WxCC interworking end to end.
    the call (task connected, claim in the own queue, or the host in the meeting), leaving ends
    the call *for the citizen only*: their link stops working and the work item is marked
    cancelled and ended as in ADR 0021, but the Webex meeting is not deleted, so the agent is
-   not cut off mid-sentence; the meeting runs out by itself. Repeating the request, or leaving
+   not cut off mid-sentence; the meeting runs out by itself. OpenPlanner keeps following that
+   meeting (Webex events are matched by the meeting id, not by the booking's status), and the
+   meeting itself decides the cap: a host in a running meeting keeps the place taken until
+   Webex reports its end (ADR 0026 amended), also after the citizen left or the task ended.
+   The Webex meeting id shows on the agenda and the booking page, and in the `direct.left`
+   and `webhook.webex` log lines (not personal data; the join link is). Repeating the request, or leaving
    a call that already ended, changes nothing and shows the waiting page again.
 5. The same rate limits and honeypot as booking apply.
 

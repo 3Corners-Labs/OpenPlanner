@@ -7,6 +7,7 @@ from datetime import timedelta
 
 import httpx
 import pytest
+import structlog.testing
 
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
@@ -511,3 +512,15 @@ async def test_leaving_is_rate_limited_like_booking(demo_settings: Settings) -> 
         ]
 
     assert statuses == [404, 404, 429]
+
+
+async def test_leaving_logs_the_booking_and_meeting_ids_but_no_token(site: Site) -> None:
+    wait = (await site.start()).headers["location"]
+    token = wait.split("/")[2]
+
+    with structlog.testing.capture_logs() as events:
+        await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
+
+    logged = [e for e in events if e["event"] == "direct.left"]
+    assert [(e["meeting_id"], e["agent_present"]) for e in logged] == [("meeting-1", False)]
+    assert token not in repr(events)

@@ -7154,3 +7154,6 @@ msgstr "You are no longer waiting. No call is requested any more and the team kn
 
 msgid "wait.left.agent"
 msgstr "You have left the call. This link no longer works and the team has been told. You can start a new call or book an appointment later."
+
+msgid "admin.agenda.meeting_id"
+msgstr "Meeting ID"
