@@ -1,6 +1,6 @@
 # 0008. Integration secrets managed in the admin UI, encrypted at rest
 
-Status: accepted (2026-10-23). Refines the "secrets via env only" rule in CLAUDE.md.
+Status: accepted (2026-10-23). Refines the "secrets via env only" rule in CLAUDE.md. Partly built, checked on 2026-10-30; see `docs/adr-status.md` for what is built.
 
 ## Context
 

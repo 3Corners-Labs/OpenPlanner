@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+import structlog.testing
 from pydantic import SecretStr
 
 from app.adapters.db.engine import create_engine
@@ -235,3 +236,24 @@ async def test_a_replayed_participant_event_counts_once(
     assert status is not None
     assert status.participants == 1
     assert len(events) == 1
+
+
+async def test_a_webex_event_logs_the_meeting_id(
+    client: httpx.AsyncClient, booking_id: int
+) -> None:
+    """Support can follow a meeting through the logs by its id (not personal data)."""
+    body = json.dumps(
+        {
+            "resource": "meetings",
+            "event": "ended",
+            "data": {"id": "meeting-1_I_1", "meetingSeriesId": "meeting-1"},
+        }
+    ).encode()
+
+    with structlog.testing.capture_logs() as events:
+        await client.post(
+            "/webhooks/webex", content=body, headers={"x-spark-signature": sign(body, "sha1")}
+        )
+
+    logged = [e for e in events if e["event"] == "webhook.webex"]
+    assert [(e["meeting_id"], e["outcome"]) for e in logged] == [("meeting-1", "recorded")]

@@ -1,7 +1,7 @@
 # 0026. Cap on open direct calls and queue feedback from our own data
 
 Status: accepted (2026-10-26), requested by the product owner. Amends ADR 0019 (consequence
-"capacity of direct calls is managed by WxCC"). Amended by ADR 0072 (a claimed call counts as
+"capacity of direct calls is managed by WxCC"). Amended by ADR 0019 point 4 (a host in a running meeting counts as connected even after the citizen left or the task ended) and by ADR 0072 (a claimed call counts as
 connected; the waiting page polls a fragment instead of waiting for the refresh button).
 
 ## Context

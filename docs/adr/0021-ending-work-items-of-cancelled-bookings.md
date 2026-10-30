@@ -61,5 +61,6 @@ equivalent, as a secondary step (product owner, 2026-10-25).
   that by acting on `kind = cancelled` (for example a short queue timeout). To be confirmed
   with the Cisco beta team, after which this ADR is superseded or confirmed.
 - The work item asset's `kind` field now takes `scheduled`, `direct` or `cancelled`.
-- Direct calls have no citizen-side cancel yet; once the waiting page gets one (with the
-  citizen pages, WP3b), it reuses this job unchanged.
+- Direct calls: the waiting page lets the citizen stop waiting (ADR 0019 point 4); it reuses
+  this job unchanged. If an agent already took the call, the meeting is kept for the agent
+  while the work item still ends.

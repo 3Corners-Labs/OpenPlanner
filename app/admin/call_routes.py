@@ -85,6 +85,8 @@ class AgendaRow:
     not_picked_up: bool
     cancelled: bool
     waiting: bool = False
+    meeting_id: str = ""
+    """The Webex meeting's id, for support requests; not personal data (the join link is)."""
 
 
 def integration_service(request: Request) -> IntegrationService:
@@ -125,6 +127,7 @@ def agenda_row(
         not_picked_up=booking.is_active and not_picked_up(status, booking.start, now, limit),
         cancelled=not booking.is_active and not booking.awaits_rebook,
         waiting=booking.awaits_rebook,
+        meeting_id=booking.meeting.id if booking.meeting else "",
     )
 
 
@@ -285,6 +288,7 @@ async def booking_detail(
             "call": call,
             "task": task,
             "status": status,
+            "meeting_id": booking.meeting.id if booking.meeting else "",
             "events": events,
             "jobs": _job_views(request, locale, timeline.jobs, can_retry),
             "requests": _request_views(request, locale, timeline.requests),
