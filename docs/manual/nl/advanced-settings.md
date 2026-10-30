@@ -38,8 +38,10 @@ Een gewijzigde waarde geldt binnen ongeveer tien seconden, zonder herstart.
 ## Een instelling wijzigen
 
 De superuser wijzigt de instellingen voor bedrijfsvoering, bewaartermijnen, opslag,
-snelheidslimieten, sessies van het beheerportaal, medewerkers en de planner, de reservemailserver
-en de updatecontrole. Webex en de inlogkoppeling volgen in een latere versie.
+snelheidslimieten, sessies van het beheerportaal, medewerkers en de planner, de reservemailserver,
+de updatecontrole en de Webex Service App met het WxCC-adres. De webhookgeheimen (die de server
+zelf maakt) en de inlogkoppeling volgen in een latere versie. Na een gewijzigde Webex-waarde
+worden videogesprekken en werkitems binnen ongeveer tien seconden opnieuw gekoppeld.
 
 - Vul onder **Wijzigen** de nieuwe waarde in en kies **Opslaan**. Het portaal accepteert alleen
   waarden binnen zijn grenzen, bijvoorbeeld 1 tot 30 afspraken per uur per adres. Een waarde
