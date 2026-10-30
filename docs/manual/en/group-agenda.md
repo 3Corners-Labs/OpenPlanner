@@ -23,6 +23,30 @@ on a booking's detail page (**Details**).
 Use **Previous day**, **Today** and **Next day** to browse. **Week view** opens the week of the
 chosen day.
 
+### The meetings' state stays current
+
+The **Meeting**, **Agent** and **Participants** columns refresh themselves without reloading
+the page. A screen reader hears one short sentence ("Status updated: 1 calls in progress, 0
+not picked up"); focus only moves if it was inside the table. Today and in the future this
+happens every 30 seconds; a day in the past no longer changes and does not refresh. The
+superuser sets the 30 seconds in the platform settings (**Refresh of meeting status on the
+agenda**, 10 to 300 seconds).
+
+The state comes from Webex first: Webex sends an event when a meeting starts or ends or when
+someone joins or leaves. If such an event does not arrive, OpenPlanner asks Webex for the state
+once it is older than the refresh time, and only for bookings that can have a running meeting:
+confirmed, with a meeting, from 15 minutes before the start to 30 minutes after the end. A
+missed event is therefore corrected within about half a minute. In **Timeline** such an event
+carries the addition *polled*.
+
+When Webex does not answer, the agenda stays as it was. The booking's detail page shows an
+*Integration failed* event under **Timeline** with its code (for example `polled:rejected_403`)
+and, under *Webex's answer*, the reason Webex itself gave. It appears once per kind of
+failure, not on every refresh.
+
+If your browser runs without scripts, the agenda shows its state as loaded and the **Refresh**
+link reloads it.
+
 ## Looking into a booking
 
 A booking's detail page (**Details**) holds what you need when a video meeting or contact
