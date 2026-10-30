@@ -5838,3 +5838,21 @@ msgstr "Use the platform value"
 
 msgid "admin.settings.source.organisation"
 msgstr "Organisation"
+
+msgid "admin.settings.secret_hint"
+msgstr "Leave empty to keep the current value; it is never shown."
+
+msgid "admin.settings.adopt"
+msgstr "Manage this here from now on"
+
+msgid "admin.settings.adopted_note"
+msgstr "Taken over into the portal. Remove this variable from the server's environment and restart; until then it still applies:"
+
+msgid "admin.done.adopted"
+msgstr "The value is now held in the portal. Remove the variable from the server's environment and restart the containers."
+
+msgid "admin.form.error.setting_no_key"
+msgstr "Secrets can only be stored once the server has a SETTINGS_ENCRYPTION_KEY."
+
+msgid "admin.form.error.setting_not_locked"
+msgstr "This setting is not in the server's environment; there is nothing to take over."

@@ -139,3 +139,18 @@ def test_the_effective_settings_take_unlocked_portal_values_only() -> None:
     assert current.admin_reauth_minutes == 30  # locked by the environment
     assert current.public_base_url == settings.public_base_url  # class B: never the portal
     assert settings.admin_session_hours == 8  # the base is left alone
+
+
+def test_a_sealed_portal_secret_reaches_the_effective_settings_as_a_secret() -> None:
+    portal = PortalValues(3, secrets={"smtp_password": SECRET})
+
+    current = effective(Settings(environment="dev"), {}, portal)
+    state = next(
+        s
+        for s in describe(Settings(environment="dev"), {}, portal)
+        if s.spec.secret and s.spec.key == "smtp_password"
+    )
+
+    assert isinstance(current.smtp_password, SecretStr)
+    assert current.smtp_password.get_secret_value() == SECRET
+    assert (state.source, state.shown, state.value) == ("portal", "set", None)
