@@ -10,4 +10,4 @@
 {% include "_slot_picker.html" %}
 <p><a href="/b/{{ token }}">{{ _("cancel.back") }}</a></p>
 {% endblock %}
-{% block scripts %}<script src="/static/calendar.js" defer></script>{% endblock %}
+{% block scripts %}<script src="{{ static_url('calendar.js') }}" defer></script>{% endblock %}
