@@ -31,10 +31,10 @@ The state on `main` at 2026-10-30, counted with a case-insensitive search for `b
 (`EventKind.PARTICIPANT_LEFT`, the Webex resource `meetingParticipants`, "Deelnemer kwam
 binnen" in the call timeline). The rename removes a synonym; it does not add one.
 
-Some of the 'citizen' words are not text but contracts: a database column and its setting
-key, permission codes that custom roles and audit events carry, and i18n keys. A rename
-would need a migration or break stored data, so the decision draws a line between what
-changes and what stays.
+Some of the 'citizen' words are not text but contracts: a database column with its form field and
+audit-event field name, and i18n keys (some stored as organisation and group overrides). A
+rename of those needs a migration or breaks stored data, so the decision draws a line between
+what changes and what stays.
 
 Second need: a member of staff can hold several functions (administrator, superuser, planner,
 handler, group admin, and so on). ADR 0014 gives each built-in role a stable code and
@@ -54,45 +54,56 @@ messages.
    (point 3). "Burger", "citizen", "gebruiker" and "user" no longer name this person in text
    we write.
 2. **What the word does not replace.** The *booking* is still an "afspraak" / "appointment".
-   Staff stay "medewerker" / "agent" (see points 7 to 11) and the Webex host stays "host".
+   Staff stay "medewerker" / "agent" (see points 8 to 12) and the Webex host stays "host".
    Sentences that address the person directly keep "u" / "you"; "deelnemer" is for the third
    person and for headings. Words that merely contain the string are left alone:
    "burgerservicenummer" (the BSN rules), "burgerlijk", and a client's own organisation name.
    The Webex terms `meetingParticipants` and `participant` in Webex payloads are Webex's,
    not ours. In the Webex Contact Center integration "customer" stays where the provider says
    so.
-3. **What changes in code (part 2e) and what stays.** Changes, because they are internal:
+3. **What changes in code and what stays.** Changes, because they are internal (part 2d):
    Python identifiers, module names and comments (`app/api/citizen.py`, `citizen_page`,
    `CitizenState`, `CitizenAction`, `Family.CITIZEN`, `CITIZEN_ACTIONS`, test names and
-   helpers). Stays, because a rename needs a migration, breaks stored data or a published
-   contract, or is a stable key:
+   helpers), and the codes `citizen.*` of the participant actions (`citizen.book`,
+   `citizen.booking_view`, …), which become `participant.*`. Those codes are only labels in
+   `CITIZEN_ACTIONS` and `docs/authorization.md`: no permission, role row, audit event or
+   `authz.decision` log carries them (checked 2026-10-30), so the change needs no migration.
+   Changes in its own step with a migration (step 5, point 3a): the column below. Stays:
    - **Stable i18n keys** (`booking.citizen…`, `admin.queue.citizen.*`, `admin.matrix.citizen`,
-     `authz.citizen.*`, `admin.field.citizen_change_lead_minutes`): only the texts change,
-     never the keys (CLAUDE.md, ADR 0004).
-   - **The column `citizen_change_lead_minutes`** on `groups`, with the check constraint
-     `citizen_lead`, the same name as setting field, form field and audit-event field name.
-     Renaming it needs a migration, and audit events already written carry the old name. It
-     stays; the label next to it says "deelnemer".
-   - **Permission codes `citizen.*`** (`citizen.book`, `citizen.booking_view`, …). They appear
-     in `authz.decision` logs, audit history and `docs/authorization.md`. They stay as stable
-     codes; the displayed names change.
+     `authz.citizen.*`): only the texts change, never the keys (CLAUDE.md, ADR 0004). Keys on
+     the editable list of ADR 0074 are stored in `organisation_texts` and `group_texts`;
+     renaming them would need a data migration for no gain.
    - **`/api/v1` and the widget interface**: no field, path or attribute contains the word
      (checked 2026-10-30), so nothing breaks and nothing needs a version change. If one is
      ever found, it stays and gets a new name only through an ADR (CLAUDE.md).
    - **Merged migrations and the text of earlier ADRs** are never rewritten. This ADR is the
      key: read "citizen" and "burger" in an ADR before 0077 as "participant".
+
+   3a. **The column `citizen_change_lead_minutes`** on `groups` (with the check constraint
+   `citizen_lead`, the form field and the audit-event field name) becomes
+   `participant_change_lead_minutes` in step 5, in its own PR, after the text rename. The
+   product owner asked on 2026-10-30 until when this can still change: it is cheapest now.
+   Only the test host runs; each installation, audit event, log-platform query and export
+   made after go-live raises the cost. The migration is reversible (SQLite batch: rename the
+   column, recreate the constraint as `participant_lead`). Audit events already written keep
+   the old field name in their detail, so the audit view maps both names to the same label
+   for good, because history is not rewritten. If go-live passes before step 5 is done, the
+   name stays as it is (Q8).
+
 4. **`docs/HANDOVER.md` is not rewritten or translated.** Its three uses of "burger" stay as
-   written; it is the stakeholder document of its time. Whether it gets a one-line pointer to
-   this ADR is open question Q7.
+   written; it is the stakeholder document of its time. It gets one added line at the top, in
+   Dutch, pointing to this ADR (decided by the product owner on 2026-10-30; part 2c).
 5. **Threat model and data flow.** `docs/threat-model.md` and `docs/dataflow.md` are
    engineering documents, not stakeholder history: their prose, headings and diagram labels
    change from "citizen" to "participant". Abuse-case numbers, flow ids and the names of the
    tests they cite do not change, so existing references stay valid; where a cited test is
-   renamed in part 2e the reference is updated in the same PR.
+   renamed in part 2d the reference is updated in the same PR.
 6. **A guard against drift.** After part 2 a test (`tests/test_terminology.py`) fails when
    "burger" or "citizen" appears in the catalogue texts, templates, the widget or `docs/`
    (outside HANDOVER, `docs/adr/` before 0077, and a short allow-list of the stable names in
    point 3 and the words in point 2). That is how "no new uses" stays true after the rename.
+   The product owner had no preference (2026-10-30); the recommendation, to fail CI rather
+   than warn, is taken and can be loosened with one line.
 
 ### CLAUDE.md
 
@@ -115,59 +126,67 @@ A member of staff holds one or more roles; the principal carries a set of roles 
 `decide` takes the union (ADR 0014, 0039). The code of a role (`org_admin`, `agent`, a custom
 role's id) and the permissions it holds are rights. Its **name** is only a label.
 
-8. **Recommendation: an organisation may give the built-in organisation, group and agent roles
-   its own display name per locale; the label changes, the right never does.** The name lives
-   in the existing `organisation_texts` table of ADR 0074 under the stable keys
-   `authz.role.org_admin`, `authz.role.group_admin` and `authz.role.agent`. No new table and
-   no migration. The lookup chain is the one of ADR 0074 §4 (organisation text → catalogue of
-   the locale → Dutch catalogue). Example: an organisation calls `agent` "Behandelaar".
+8. **Display names per organisation, overridable per group.** An organisation may give
+   `org_admin`, `group_admin` and `agent` its own display name per locale, and a group may
+   give `agent` its own. The agent is the person who takes the video call; organisations call
+   that person "behandelaar", "agent" or "medewerker" and like to be recognised by it, and the
+   word can differ per team or subject. The names live in `organisation_texts` (ADR 0074) and
+   `group_texts` (ADR 0022) under the stable keys `authz.role.org_admin`,
+   `authz.role.group_admin` and `authz.role.agent`. No new table and no migration. The chain is
+   that of ADR 0074 §4 with the group first: group name → organisation name → catalogue of
+   the locale → Dutch catalogue. The standard names stay as they are today ("Medewerker",
+   "Agent"). The **planner** is not touched: it is a separate role, a custom role made by the
+   superuser (ADR 0044, ADR 0039), and a rename of `agent` never reaches it.
 9. **The rights are out of reach by construction.**
    - `app/domain/authorization.py` knows role codes, never names; it does not import `app.i18n`.
      `MATRIX`, `decide` and `scope_for` read no label. A test loads an override and asserts the
      decision for every role × permission is unchanged.
    - Overrides are display only. The audit log, `authz.decision` events, the role claim, the
      exports and `docs/authorization.md` always carry the code or the standard name, so
-     a reviewer or auditor can compare across organisations.
-   - Where a chosen name is shown next to rights (the rights matrix column, **My rights**), the
-     standard name stays visible as a second line, so an organisation cannot present a role as
-     something it is not without it being visible.
-   - The names of `superuser` (a platform role) and `auditor` (whose name states a privacy
-     guarantee, ADR 0039 B7) cannot be overridden. Custom roles already have names of their
-     own (ADR 0039 §3); they are not overridable per organisation.
+     a reviewer or auditor can compare across organisations. Wherever a chosen name is shown
+     next to rights (the matrix column, **My rights**) the standard name stays visible as a
+     second line, for every role alike, the superuser included.
+   - Not renamable now: `superuser`, `auditor` and custom roles (the product owner sees no need
+     yet). Leaving the flexibility out costs nothing structurally: the editable roles are a
+     list in code and a name is a key in the tables above, so another role is one more key,
+     without a migration. A custom role already has names of its own (ADR 0039 §3).
 10. **Rules for a name** (same machinery as `message_texts.check_text`): 2 to 40 characters,
-    one line, no control characters, no placeholders, and not equal (ignoring case) to the
-    name another role has in that organisation and locale, or to the standard name of another
-    role, so "Organisatiebeheerder" cannot be put on the agent. Blank means the standard name.
+    one line, no control characters, no placeholders, and not equal (ignoring case) to another
+    role's name in the same scope and locale, or to the standard name of another role, so
+    "Organisatiebeheerder" cannot be put on the agent. Blank means the name of the layer below.
     A name is plain text, escaped on output.
-11. **Where it shows and who edits.** Shown in the admin portal wherever the organisation is
-    known: the role names in the top bar, **My rights**, the rights matrix, the staff list and
-    the role editor. The organisation is the one in the scope filter (ADR 0047, PR #161) when
-    exactly one is selected, or the single organisation of the principal; otherwise the
-    standard names are shown (open question Q3). Edited by the same permission as the texts,
-    `texts.organisation.manage` (organisation admin for the own organisations, superuser for
-    all; not group admin or auditor), on the same screen as ADR 0074: a section **Function
-    names** on *Organisation settings → Texts*. No new section, entry or tab (ADR 0047). The
-    change needs a recent login, the Fetch Metadata check and writes an audit event with the
-    organisation, locale and role code, never the free text.
-12. **Built when.** Not in part 2. Part 2 only rewrites words. The role names are a feature
-    with a table of keys, an editor section and tests, and they build on #168, which is in
-    review. They get their own PR after #168 has merged and after the product owner has
-    answered Q1 to Q5. Until then a custom role (superuser, ADR 0039) is the way to have
-    a role called "Behandelaar", with its own permissions.
+11. **Where it shows, and who edits.** The name belongs to the role and follows the context of
+    the screen. A group page (agenda, queue, the group's staff) shows the group's chain; an
+    organisation page that organisation's; a screen without context (top bar, **My rights**)
+    uses the organisation when the person has exactly one in scope and the standard names
+    otherwise. Today roles and scopes are separate claims; when ADR 0049 (role and scope in
+    one claim) is built, **My rights** can show each role with the name of the organisation it
+    is held in. Edited with the permissions that already exist for texts, so no new
+    permission: the organisation's names with `texts.organisation.manage` (organisation admin
+    for the own organisations, superuser for all) in a section **Function names** on
+    *Organisation settings → Texts*; the group's `agent` name with `texts.manage` in the
+    group's *Texts*. No new section, entry or tab (ADR 0047). A change needs a recent login,
+    the Fetch Metadata check and writes an audit event with the scope, locale and role code,
+    never the free text.
+12. **Built when.** Not in part 2, which only rewrites words. The names are a feature with an
+    allow-list, an editor section and tests, and they build on #168, which is in review. They
+    get their own PR after #168 has merged. The word in texts addressed to participants
+    ("the first free medewerker") does not change with them (Q10). Until then a custom role
+    (superuser, ADR 0039) is the way to have a role called "Behandelaar".
+
 
 ### Alternatives not chosen
 
 - *Rename the built-in label for everyone* ("Medewerker" becomes "Behandelaar" in the
-  catalogue). Cheap, but it is one word for every organisation and it is the question Q1, not
-  an organisation setting. It can still happen as a part 2a text change if the product owner
-  wants it.
+  catalogue). One word for every organisation, while organisations differ. Rejected; the
+  standard stays "Medewerker".
 - *A new table `organisation_role_names`.* Same result, one more migration, cache and
   invalidation path than the one ADR 0074 builds. Rejected.
 - *Organisation admins make custom roles.* Contradicts ADR 0039 B1 and B2 (the superuser keeps
   the catalogue); it would let an organisation widen rights. Rejected.
-- *Naming a person's combination of roles* ("functieprofiel" as a bundle). The union of roles
-  is already what `decide` does; a named bundle is a new concept with its own lifecycle. Not
-  proposed; Q6.
+- *Naming a person's combination of roles* (a "functieprofiel"). The union of roles is already
+  what `decide` does; the product owner does not want it (Q6).
+
 
 ## Settings
 
@@ -176,38 +195,38 @@ role's id) and the permissions it holds are rights. Its **name** is only a label
 | – | – | – | – | – | None added. |
 
 Checked against ADR 0042: the rename has no tunable value. The role names (points 8 to 11)
-are data under the existing permission `texts.organisation.manage`, not a setting: whether an
+are data under the existing permissions `texts.organisation.manage` and `texts.manage`, not a setting: whether an
 organisation may name a role is not a threshold or a toggle, and the name changes no protection.
 **Fixed on purpose:** the name length of 2 to 40 characters follows from the matrix column
 and top bar layout (the same reason as the length limits of ADR 0074); the set of overridable
-roles (`org_admin`, `group_admin`, `agent`) is code, because it is a statement about which
+roles (`org_admin`, `group_admin`, `agent`; at group level `agent`) is code, because it is a statement about which
 labels may differ from the standard (point 9), not about policy.
 
-## Open questions
+## Decisions of the product owner and open questions
 
-The product owner has not decided these; none is guessed in the code.
+Answered by the product owner on 2026-10-30 (the points above already follow them):
 
-- **Q1.** Is the Dutch standard name of `agent` ("Medewerker") to be "Behandelaar" for everyone,
-  or only when an organisation chooses it (point 8)? The English standard "Agent" has the
-  same question. Related: "Beheerder" for the organisation and group admin roles.
-- **Q2.** Is the set in point 9 right: may `auditor` and `superuser` never be renamed, and
-  may custom roles not be renamed per organisation?
-- **Q3.** Which organisation counts when a person holds roles in several (point 11)? The
-  recommendation is the one selected in the scope filter, and standard names otherwise.
-- **Q4.** Is `texts.organisation.manage` the right permission, or should role names have a
-  permission of their own (`role_names.organisation.manage`)? Recommendation: reuse, to keep
-  the matrix small; a separate one is a one-line change later.
-- **Q5.** Should the matrix page always show the standard name beside the chosen one (point 9),
-  also for the superuser, who sees several organisations?
-- **Q6.** Is naming a *combination* of roles for one person wanted (a "functieprofiel")? Not
-  proposed here.
-- **Q7.** `docs/HANDOVER.md`: leave it completely untouched, or add one line at the top
-  pointing to this ADR? Recommendation: one line.
-- **Q8.** `citizen_change_lead_minutes` and the `citizen.*` permission codes (point 3): leave
-  as stable names for good, or rename them with a migration and an alias period in a later,
-  separate ADR? Recommendation: leave. It costs a word in two places a user never sees.
-- **Q9.** The guard test (point 6): fail CI on any new use, or warn only for the first release?
-  Recommendation: fail.
+| # | Question | Decided |
+|---|---|---|
+| Q1 | Is "Medewerker" renamed for everyone? | No. Per organisation, overridable per group or subject; "behandelaar", "agent" or "medewerker" are the examples. The agent takes the video call; the planner is a separate role (point 8). |
+| Q2 | May auditor, superuser and custom roles be renamed per organisation? | Not needed now. The impact of leaving it out is none structurally (point 9). |
+| Q3 | Which organisation counts for a person with roles in several? | The name belongs to the role and follows the screen's context (point 11). |
+| Q4 | Which permission edits role names? | No separate permission; the existing texts permissions (point 11). |
+| Q5 | Standard name beside the chosen one, also for the superuser? | The superuser is a role like any other: the same rule for all (point 9). |
+| Q6 | A "functieprofiel" (a named combination of roles)? | No. |
+| Q7 | A pointer line in HANDOVER? | Yes, one line (point 4). |
+| Q9 | Does the guard test fail CI? | No preference; the recommendation, fail, is taken (point 6). |
+
+Still open; none is guessed in the code:
+
+- **Q8.** Rename `citizen_change_lead_minutes` (step 5) now, before go-live? The `citizen.*` codes
+  are renamed in any case (point 3). Recommendation: yes. When is go-live?
+- **Q10.** Should the agent's function name also appear in texts addressed to participants and
+  in the mails ("een medewerker neemt contact op")? Dutch articles are the same for all three
+  words; English ("a handler", "an agent") is not. This ADR leaves participant texts as they
+  are and builds the portal first. Recommendation: later, as a `{agent}` placeholder.
+- **Q11.** Is `agent` the only role a group may rename (point 8), or also `group_admin`?
+- **Q12.** Is the reading of Q3 right: a name per scope, no choice among several organisations?
 
 ## Build status
 
@@ -216,10 +235,11 @@ The product owner has not decided these; none is guessed in the code.
 | 1 | This ADR and the `CLAUDE.md` wording (point 7) | | in review |
 | 2a | `nl.po` and `en.po` with the tests that assert their texts, `widget/`, `docs/widget.md` (keys unchanged) | | not started, waits for acceptance and for the open PRs on the catalogues |
 | 2b | Admin manual `docs/manual/{nl,en}/` | | not started |
-| 2c | `docs/*.md` except HANDOVER, and `CONTRIBUTING.md` | | not started |
-| 2d | Code identifiers and comments that are not schema or API; `e2e/`, `scripts/diagrams/` | | not started |
+| 2c | `docs/*.md` except HANDOVER (which gets its one line), and `CONTRIBUTING.md` | | not started |
+| 2d | Code identifiers, comments and the `citizen.*` codes; `e2e/`, `scripts/diagrams/` | | not started |
 | 3 | Guard test `tests/test_terminology.py` | | not started, after 2a to 2d |
-| 4 | Function names per organisation (points 8 to 11) | | not started, after #168 and Q1 to Q5 |
+| 4 | Function names per organisation and group (points 8 to 11) | | not started, after #168 |
+| 5 | Column `citizen_change_lead_minutes` → `participant_change_lead_minutes`, migration, audit alias (point 3a) | | not started, depends on Q8 |
 
 ## Consequences
 
