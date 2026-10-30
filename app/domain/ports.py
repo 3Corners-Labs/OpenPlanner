@@ -49,6 +49,7 @@ from app.domain.scheduling import (
 )
 from app.domain.staff import StaffFilter, StaffMember
 from app.domain.tasks import ActiveJobs
+from app.domain.tls import CertificateCheck, ProbeResult
 from app.domain.updates import Release, ReleaseCheck, UpdateRequest
 
 
@@ -220,6 +221,17 @@ class ReleaseSource(Protocol):
 
         Raises:
             IntegrationError: If the source refuses or cannot be reached.
+        """
+        ...
+
+
+class CertificateProbe(Protocol):
+    """Performs a TLS handshake with a server and reads the certificate it presents (ADR 0064)."""
+
+    async def probe(self, host: str, port: int) -> ProbeResult:
+        """Connect to ``host:port``, verify the chain against the host's CA bundle, read the leaf.
+
+        Never raises: a failed connection or handshake is a result with an error code.
         """
         ...
 
@@ -670,7 +682,7 @@ class Transaction(Protocol):
     async def upcoming_starts_for_email(
         self, group_id: int, email: str, after: datetime
     ) -> list[datetime]:
-        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0059).
+        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0066).
 
         Only bookings that hold a place and end after ``after`` count. The address is
         compared without regard to (ASCII) case; only start times leave the adapter.
@@ -931,6 +943,14 @@ class Transaction(Protocol):
 
     async def save_maintenance_state(self, state: MaintenanceState) -> None:
         """Replace the maintenance switch."""
+        ...
+
+    async def get_certificate_check(self) -> CertificateCheck | None:
+        """Return the latest check of the public address's certificate (ADR 0064), if any."""
+        ...
+
+    async def save_certificate_check(self, check: CertificateCheck) -> None:
+        """Replace the latest certificate check."""
         ...
 
     async def settings_version(self) -> int:
