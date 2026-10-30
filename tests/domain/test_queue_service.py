@@ -17,7 +17,16 @@ from app.domain.services import BookingService
 from app.domain.tokens import agent_pseudonym
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.domain import ADA, NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY, make_group, window
+from tests.support.domain import (
+    ADA,
+    NOW,
+    SLOT_0900,
+    SLOT_0930,
+    TEST_TOKEN_KEY,
+    book_confirmed,
+    make_group,
+    window,
+)
 
 KEY = b"p" * 32
 AGENT = Principal("a-1", "A", frozenset({Role.AGENT}), frozenset(), frozenset({"demo"}))
@@ -57,7 +66,7 @@ async def _book(
     uow: InMemoryUnitOfWork, clock: FixedClock, start: datetime = SLOT_0900, slug: str = "demo"
 ) -> int:
     bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
-    receipt = await bookings.book(group_slug=slug, start=start, contact=ADA, locale="nl")
+    receipt = await book_confirmed(bookings, group_slug=slug, start=start, contact=ADA, locale="nl")
     booking_id = receipt.booking.id or 0
     booking = uow.state.bookings[booking_id]
     uow.state.bookings[booking_id] = replace(booking, meeting=MeetingRef("m", "https://webex/j"))

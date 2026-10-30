@@ -187,9 +187,10 @@ Do not use `::part()` to hide information or reduce contrast; the widget is test
 Step 1, a time: the group's name and introduction, a closure notice if the group is closed
 or will close (no booking while closed), "first possible", the month grid and the free
 times of the chosen day. Step 2, details: name, email and, per group, phone, with the same
-validation as the standalone page. Step 3, done: the appointment and "you will receive a
-confirmation by email". The management link (view, move, cancel) arrives by email only; it is
-never shown to or readable by your page.
+validation as the standalone page. Step 3, done: the appointment and "confirm it with the link
+in the email we sent you" (ADR 0056: a new appointment awaits confirmation and lapses when it
+is not confirmed in time). The confirm link and the management link (view, move, cancel)
+arrive by email only; they are never shown to or readable by your page.
 
 Not in the widget: starting a call right away (O9) and the time filters. The widget links to
 the group's standalone page for those.

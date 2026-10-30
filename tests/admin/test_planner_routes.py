@@ -13,7 +13,7 @@ from app.domain.services import BookingService
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_agenda_routes import FRIDAY
 from tests.admin.test_call_routes import FRIDAY_0900
-from tests.support.domain import ADA, TEST_TOKEN_KEY
+from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed
 
 FRIDAY_0930 = datetime(2026, 1, 2, 8, 30, tzinfo=UTC)
 AGENDA = "/admin/groups/demo/agenda"
@@ -25,8 +25,12 @@ def _uow(site: Site) -> SqlUnitOfWork:
 
 
 async def _book(site: Site, start: datetime = FRIDAY_0900) -> int:
-    receipt = await BookingService(_uow(site), site.clock, TEST_TOKEN_KEY).book(
-        group_slug="demo", start=start, contact=ADA, locale="nl"
+    receipt = await book_confirmed(
+        BookingService(_uow(site), site.clock, TEST_TOKEN_KEY),
+        group_slug="demo",
+        start=start,
+        contact=ADA,
+        locale="nl",
     )
     return receipt.booking.id or 0
 

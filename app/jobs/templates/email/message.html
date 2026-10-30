@@ -42,6 +42,9 @@
     <p>{{ manage_text }}</p>
     <p><a href="{{ manage_url }}">{{ manage_link }}</a></p>
     {% endif %}
+    {% if book_url %}
+    <p>{{ book_text }} <a href="{{ book_url }}">{{ book_link }}</a></p>
+    {% endif %}
     <p>{{ signoff }}</p>
   </main>
 </body>

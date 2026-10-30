@@ -42,6 +42,24 @@ class ConfirmPolicy:
         if self.cutoff < timedelta(0) or self.reminders < 0:
             raise ValueError("cutoff and reminders must not be negative")
 
+    @classmethod
+    def from_settings(
+        cls, *, window_hours: int, cutoff_hours: int, reminders: int, min_minutes: int
+    ) -> "ConfirmPolicy":
+        """Return the policy for the ADR 0056 settings, given in their own units."""
+        return cls(
+            window=timedelta(hours=window_hours),
+            cutoff=timedelta(hours=cutoff_hours),
+            reminders=reminders,
+            min_lead=timedelta(minutes=min_minutes),
+        )
+
+
+DEFAULT_CONFIRM_POLICY = ConfirmPolicy.from_settings(
+    window_hours=24, cutoff_hours=2, reminders=1, min_minutes=15
+)
+"""The settings' defaults (ADR 0056), for services built without the live settings."""
+
 
 @dataclass(frozen=True)
 class ConfirmWindow:
