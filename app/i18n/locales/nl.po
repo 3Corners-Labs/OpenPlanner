@@ -5856,3 +5856,21 @@ msgstr "Platformwaarde gebruiken"
 
 msgid "admin.settings.source.organisation"
 msgstr "Organisatie"
+
+msgid "admin.settings.secret_hint"
+msgstr "Leeg laten houdt de huidige waarde; die wordt nooit getoond."
+
+msgid "admin.settings.adopt"
+msgstr "Beheer dit voortaan hier"
+
+msgid "admin.settings.adopted_note"
+msgstr "Overgenomen in het portaal. Haal deze variabele weg uit de omgeving van de server en herstart; tot dan blijft hij gelden:"
+
+msgid "admin.done.adopted"
+msgstr "De waarde is overgenomen in het portaal. Haal de variabele weg uit de omgeving van de server en herstart de containers."
+
+msgid "admin.form.error.setting_no_key"
+msgstr "Geheimen kunnen pas worden opgeslagen als de server een SETTINGS_ENCRYPTION_KEY heeft."
+
+msgid "admin.form.error.setting_not_locked"
+msgstr "Deze instelling staat niet in de omgeving van de server; er is niets over te nemen."

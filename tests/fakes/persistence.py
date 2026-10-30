@@ -94,6 +94,8 @@ class State:
     platform_settings: dict[str, object] = field(default_factory=dict)
     platform_expiries: dict[str, datetime] = field(default_factory=dict)
     organisation_settings: dict[int, dict[str, object]] = field(default_factory=dict)
+    platform_secrets: dict[str, str] = field(default_factory=dict)
+    secrets_available: bool = True
     purged_at: dict[int, datetime] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
     next_id: int = 1
@@ -866,6 +868,18 @@ class InMemoryTransaction:
     async def bump_settings_version(self) -> int:
         self.state.settings_version += 1
         return self.state.settings_version
+
+    async def platform_secrets(self) -> dict[str, str]:
+        return dict(self.state.platform_secrets)
+
+    async def secrets_available(self) -> bool:
+        return self.state.secrets_available
+
+    async def save_platform_secret(self, key: str, value: str, updated_at: datetime) -> None:
+        self.state.platform_secrets[key] = value
+
+    async def delete_platform_secret(self, key: str) -> bool:
+        return self.state.platform_secrets.pop(key, None) is not None
 
     async def organisation_settings(self) -> dict[int, dict[str, object]]:
         return {k: dict(v) for k, v in self.state.organisation_settings.items() if v}

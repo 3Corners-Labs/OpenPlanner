@@ -38,8 +38,8 @@ Een gewijzigde waarde geldt binnen ongeveer tien seconden, zonder herstart.
 ## Een instelling wijzigen
 
 De superuser wijzigt de instellingen voor bedrijfsvoering, bewaartermijnen, opslag,
-snelheidslimieten, sessies van het beheerportaal, medewerkers en de planner. De reservemailserver,
-Webex, updates en de inlogkoppeling volgen in een latere versie.
+snelheidslimieten, sessies van het beheerportaal, medewerkers en de planner, de reservemailserver
+en de updatecontrole. Webex en de inlogkoppeling volgen in een latere versie.
 
 - Vul onder **Wijzigen** de nieuwe waarde in en kies **Opslaan**. Het portaal accepteert alleen
   waarden binnen zijn grenzen, bijvoorbeeld 1 tot 30 afspraken per uur per adres. Een waarde
@@ -50,7 +50,13 @@ Webex, updates en de inlogkoppeling volgen in een latere versie.
 - **Standaardwaarde gebruiken** haalt de hier ingestelde waarde weg; dan geldt weer de
   standaardwaarde (of de waarde van de server).
 - Een instelling die **vastgezet is door de beheerder van de server** heeft geen formulier:
-  wijzig die in de omgeving van de server, of vraag het de beheerder.
+  wijzig die in de omgeving van de server, of vraag het de beheerder. **Beheer dit voortaan hier**
+  neemt de waarde van de server over in het portaal; vraag de beheerder daarna de variabele die
+  bij de regel staat weg te halen en te herstarten. Tot dan geldt de waarde van de server nog.
+- **Wachtwoorden en tokens** (het wachtwoord van de mailserver, het leestoken van de
+  updatecontrole) kunt u alleen schrijven: het scherm zegt alleen of er een is ingesteld. Laat het
+  veld leeg om de huidige te houden; **Standaardwaarde gebruiken** haalt hem weg. Ze worden
+  versleuteld opgeslagen en vragen de `SETTINGS_ENCRYPTION_KEY` van de server.
 - Het **logniveau** valt altijd vanzelf terug naar de standaard, na hooguit 24 uur. Vul in na
   hoeveel uur. Persoonsgegevens blijven op elk niveau gemaskeerd in het log.
 
