@@ -18,7 +18,7 @@ page, what a citizen reads after booking, the subject of the reminder.
 ## Decision
 
 1. **A table.** `organisation_texts(organisation_id, locale, key, text)`, primary key on the
-   first three, `ON DELETE CASCADE` (migration 0072, reversible). Plain text, no personal data.
+   first three, `ON DELETE CASCADE` (migration 0074, reversible). Plain text, no personal data.
 2. **An allow-list of editable keys** (`app/domain/text_overrides.py`): every message block of
    ADR 0009 (with its own placeholder allow-list and length) and twelve citizen-page texts (the
    group introduction, the direct-call card and page, the pages after booking and to confirm).
