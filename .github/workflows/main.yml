@@ -14,6 +14,9 @@ env:
   # renovate: datasource=python-version depName=python
   PYTHON_VERSION: "3.12"
   IMAGE: ghcr.io/${{ github.repository }}
+  # ADR 0064 step 2: the TLS proxy (deploy/proxy) is released next to the application, so no
+  # host builds Caddy itself. Same tags, same signature, own SBOM.
+  PROXY_IMAGE: ghcr.io/${{ github.repository }}-proxy
 
 jobs:
   zap-baseline:
@@ -61,7 +64,7 @@ jobs:
       group: release-candidate
       cancel-in-progress: false
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30   # two images; the proxy build fetches Go modules
     permissions:
       contents: write   # the rc tag and its pre-release
       packages: write   # push to ghcr.io
@@ -72,7 +75,9 @@ jobs:
           fetch-depth: 0   # the candidate number needs the tags and main's history
       # Registry paths must be lower case; the repository name is not.
       - id: image
-        run: echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
+          echo "proxy=${PROXY_IMAGE,,}" >> "$GITHUB_OUTPUT"
       - id: candidate
         name: next candidate number
         run: |
@@ -83,13 +88,28 @@ jobs:
         uses: ./.github/actions/publish-image
         with:
           image: ${{ steps.image.outputs.name }}
-          version: ${{ steps.candidate.outputs.version }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
+          # ADR 0029: the version an installation compares against; ADR 0052: the commit it
+          # was built from.
+          build-args: |
+            APP_VERSION=${{ steps.candidate.outputs.version }}
+            APP_COMMIT=${{ github.sha }}
           tags: |
             type=raw,value=${{ steps.candidate.outputs.version }}
             type=sha,format=long
             type=ref,event=branch
-      # The tag comes after the image: a failed build leaves no tag and no pre-release. A tag
+      - id: publish-proxy
+        uses: ./.github/actions/publish-image
+        with:
+          image: ${{ steps.image.outputs.proxy }}
+          registry-token: ${{ secrets.GITHUB_TOKEN }}
+          context: deploy/proxy
+          sbom-file: sbom-proxy.cdx.json
+          tags: |
+            type=raw,value=${{ steps.candidate.outputs.version }}
+            type=sha,format=long
+            type=ref,event=branch
+      # The tag comes after the images: a failed build leaves no tag and no pre-release. A tag
       # pushed with GITHUB_TOKEN starts no workflow, so this never triggers the release job.
       - name: tag and pre-release
         env:
@@ -100,11 +120,11 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "v$VERSION" -m "v$VERSION: release candidate of main @ $GITHUB_SHA ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
           git push origin "refs/tags/v$VERSION"
-          gh release create "v$VERSION" sbom.cdx.json --prerelease --verify-tag --generate-notes \
-            --title "v$VERSION (release candidate)"
+          gh release create "v$VERSION" sbom.cdx.json sbom-proxy.cdx.json --prerelease --verify-tag \
+            --generate-notes --title "v$VERSION (release candidate)"
 
   publish:
-    name: build, push and sign the release
+    name: build, push and sign the release (application and proxy images)
     if: github.ref_type == 'tag'
     needs: [zap-baseline, mutation]
     runs-on: ubuntu-24.04
@@ -132,20 +152,33 @@ jobs:
       - id: image
         run: |
           echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
+          echo "proxy=${PROXY_IMAGE,,}" >> "$GITHUB_OUTPUT"
           echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
       - id: publish
         uses: ./.github/actions/publish-image
         with:
           image: ${{ steps.image.outputs.name }}
-          version: ${{ steps.image.outputs.version }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
+          build-args: |
+            APP_VERSION=${{ steps.image.outputs.version }}
+            APP_COMMIT=${{ github.sha }}
           tags: |
             type=sha,format=long
             type=semver,pattern={{version}}
-      - name: attach SBOM to the release
+      - id: publish-proxy
+        uses: ./.github/actions/publish-image
+        with:
+          image: ${{ steps.image.outputs.proxy }}
+          registry-token: ${{ secrets.GITHUB_TOKEN }}
+          context: deploy/proxy
+          sbom-file: sbom-proxy.cdx.json
+          tags: |
+            type=sha,format=long
+            type=semver,pattern={{version}}
+      - name: attach the SBOMs to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" sbom.cdx.json --verify-tag --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" sbom.cdx.json sbom-proxy.cdx.json --verify-tag --generate-notes
 
   # ADR 0051: same gate as in ci.yml, for the jobs that run only on main.
   deprecations:

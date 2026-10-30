@@ -22,6 +22,13 @@ MAX_SECTIONS = 3
 MAX_TABS = 6
 """Top-level tabs per object page; more needs an ADR (ADR 0047 §7, a design rule)."""
 
+BOTTOM_BAR_ENTRIES = 4
+"""Entries of the user's menu shown directly in the phone bottom bar; the rest sit behind *More*.
+
+A design-system value like ``MAX_SECTIONS`` (backlog SH-1), not a setting: it follows from the
+width of a phone screen and the target size, and it never changes which screens a user sees.
+"""
+
 
 @dataclass(frozen=True)
 class Screen:
