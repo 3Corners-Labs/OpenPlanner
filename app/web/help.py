@@ -113,6 +113,8 @@ TOPICS = (
     ),
     HelpTopic("maintenance", ("/admin/maintenance",), Permission.SYSTEM_MAINTENANCE),
     HelpTopic("advanced-settings", ("/admin/settings",), Permission.SETTINGS_PLATFORM_VIEW),
+    # ADR 0063: the Data fields card on Advanced settings; no route of its own.
+    HelpTopic("data-fields", (), Permission.SETTINGS_PLATFORM_VIEW),
     HelpTopic(
         "organisation-settings",
         ("/admin/organisation-settings", "/admin/organisations/{org}/settings"),

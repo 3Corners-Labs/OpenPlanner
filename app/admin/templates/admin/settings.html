@@ -53,6 +53,35 @@
   </table>
   </div>
 </section>
+<section class="card" id="data-fields" aria-labelledby="data-fields-heading">
+  <div class="card__header">
+    <h2 id="data-fields-heading">{{ _("admin.settings.data_fields.title") }}</h2>
+    <p class="card__lead">{{ _("admin.settings.data_fields.intro") }}</p>
+  </div>
+  <p>{{ _("admin.settings.data_fields.rule") }}</p>
+  <div class="table-scroll" role="region" aria-labelledby="data-fields-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.settings.data_fields.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.settings.data_fields.field") }}</th>
+        <th scope="col">{{ _("admin.settings.data_fields.classification") }}</th>
+        <th scope="col">{{ _("admin.settings.data_fields.stored_on") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in data_fields %}
+      <tr>
+        <th scope="row">{{ row.label }}<br><code class="muted">{{ row.name }}</code></th>
+        <td><span class="chip chip--{{ row.tone }}">{{ row.classification }}</span></td>
+        <td>{{ row.entity }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p>{{ _("admin.settings.data_fields.fixed") }} <a href="/admin/help/data-fields">{{ _("admin.settings.data_fields.manual") }}</a></p>
+</section>
 {% if login_form %}
 <form class="card" method="post" action="/admin/settings/login/test" novalidate aria-labelledby="login-heading">
   <h2 id="login-heading">{{ _("admin.settings.login.title") }}</h2>

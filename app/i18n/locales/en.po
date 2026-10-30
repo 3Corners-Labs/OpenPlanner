@@ -6147,3 +6147,57 @@ msgstr "The new login mapping was not saved: with it you would no longer be supe
 
 msgid "admin.form.error.login_lockout"
 msgstr "With this mapping you would no longer be superuser; it was not saved."
+
+msgid "admin.settings.data_fields.title"
+msgstr "Data fields"
+
+msgid "admin.settings.data_fields.intro"
+msgstr "Which fields of an appointment are personal data of the citizen, and how sensitive they are."
+
+msgid "admin.settings.data_fields.rule"
+msgstr "Personal data is stored only on the appointment. It is shown only on the appointment page and in the queue, to roles that may view appointments or work the queue; the agenda shows the first name only. It never appears on the overview, in lists, in the audit log or its export, in a search result or in an alert, and no search or filter matches on it."
+
+msgid "admin.settings.data_fields.fixed"
+msgstr "This list is fixed in the software and cannot be changed here or anywhere else."
+
+msgid "admin.settings.data_fields.manual"
+msgstr "Read more: Data fields and personal data"
+
+msgid "admin.settings.data_fields.field"
+msgstr "Field"
+
+msgid "admin.settings.data_fields.classification"
+msgstr "Classification"
+
+msgid "admin.settings.data_fields.stored_on"
+msgstr "Stored on"
+
+msgid "admin.settings.data_fields.direct"
+msgstr "Direct: identifies the citizen on its own"
+
+msgid "admin.settings.data_fields.sensitive"
+msgstr "Sensitive: what the citizen told us, or a link into the conversation"
+
+msgid "admin.settings.data_fields.field.first_name"
+msgstr "First name"
+
+msgid "admin.settings.data_fields.field.last_name"
+msgstr "Last name"
+
+msgid "admin.settings.data_fields.field.email"
+msgstr "Email address"
+
+msgid "admin.settings.data_fields.field.phone"
+msgstr "Phone number"
+
+msgid "admin.settings.data_fields.field.note"
+msgstr "Note"
+
+msgid "admin.settings.data_fields.field.form_answers"
+msgstr "Answers to the team's own questions"
+
+msgid "admin.settings.data_fields.field.guest_join_url"
+msgstr "Join link of the citizen"
+
+msgid "admin.settings.data_fields.field.host_join_url"
+msgstr "Join link of the agent"

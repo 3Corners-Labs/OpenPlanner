@@ -620,6 +620,22 @@ setting) and `settings_version`; written by `POST /admin/settings/{key}` and
 | Tampering (CSRF) | A third-party site changes a setting in the superuser's browser | Fetch Metadata check (`SameOrigin`) and a recent login on both POST routes | `tests/admin/test_authorization_matrix.py` (POST rows), `tests/admin/test_settings_routes.py::test_the_superuser_changes_a_setting_and_it_applies_at_once` |
 | Repudiation / information disclosure | Who changed what is lost, or the audit log carries arbitrary text from a crafted request | `settings.platform.manage` events carry the key, old and new value (numbers, rates, codes; no personal data); a refusal carries the code and a registered key or `unknown`, never the submitted text | `tests/domain/test_settings_service.py::test_an_invalid_value_never_reaches_the_store_or_the_audit_detail`, `tests/test_cli_settings.py::test_set_refuses_a_value_outside_the_bounds_by_name_only` |
 
+## Flow: personal data in the admin portal (ADR 0063)
+
+Admin, every role: overview and list pages, the audit log and its export, search and filter
+parameters, alert texts. Personal data of citizens lives only on `Booking`
+(`app/domain/privacy.py`: the fixed list and its classification, no setting) and may be
+shown only on the booking detail page and the queue item, to roles with `bookings.view` or
+`queue.work`; the group's own agenda and queue show the first name only. Input from outside:
+the query parameters of every list and filter.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure | A list, overview, export or alert page shows a name, address, phone number, note, answer or join link (a widget added later, a column added to a table) | Every list is a view without personal data; the marker-value sweep renders every admin template with bookings full of marker values and fails on a marker outside the allowed pages; a template never reached fails too | `tests/admin/test_privacy_sweep.py::test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept` |
+| Information disclosure (abuse: PII through list search or export) | An admin without `bookings.view` types an email address or name into a filter and learns from the result that the person has an appointment, or the export carries personal data | No list filter or query parameter is a personal-data field (`AuditFilter`, `StaffFilter`, every route); a personal-data value in any parameter finds nothing; the audit export carries the event schema only (ADR 0040); a typed value is never echoed: the language switcher keeps only date-shaped values and a malformed parameter gets the error page, not FastAPI's JSON echo | `test_no_list_filter_or_query_parameter_names_a_pii_field`, `test_a_pii_value_in_any_query_parameter_finds_nothing_and_is_not_reflected`, `tests/web/test_templates.py::test_a_kept_parameter_with_text_in_it_is_dropped_not_echoed`, `tests/web/test_error_pages.py::test_a_malformed_query_parameter_on_a_page_is_not_echoed` |
+| Tampering | The field list or its classification is loosened from the portal or a stored row | A constant in `app/domain/privacy.py`, no setting, no form; the *Data fields* card is read-only for `settings.platform.view` | `tests/domain/test_privacy.py::test_the_list_cannot_be_changed_at_run_time`, `tests/admin/test_settings_routes.py::test_the_data_fields_card_is_read_only_and_links_to_the_manual` |
+| Information disclosure | The log mask, the purge job or the semgrep rule name a different list than the domain | One home: the mask and the purge test import the list, the rule's regex is asserted equal to it | `tests/test_logging.py::test_pii_fields_cover_the_booking_pii_columns`, `tests/adapters/db/test_uow.py::test_salt_is_stored_and_purge_clears_personal_data`, `tests/test_semgrep_rules.py` |
+
 ## Flow: organisation settings (ADR 0042 step 5)
 
 Admin (org admin for the own organisations, superuser for all): `GET /admin/organisation-settings`,
