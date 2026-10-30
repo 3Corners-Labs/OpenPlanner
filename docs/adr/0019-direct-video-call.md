@@ -51,7 +51,7 @@ None. Leaving uses the existing booking rate limit (`RATE_LIMIT_BOOKINGS`, ADR 0
 |---|---|---|---|
 | 1 | Points 1 to 3 and 5: switch, direct booking with meeting and work item, waiting page, limits | #10, #24, #155 | merged |
 | 2 | Point 4: "no agent" text and the link to schedule instead | #10 | merged |
-| 3 | Point 4: leave or cancel from the waiting page ends the work item (AG-2) | #NNN | in PR #NNN |
+| 3 | Point 4: leave or cancel from the waiting page ends the work item (AG-2) | #164 | in PR |
 
 ## Consequences
 
