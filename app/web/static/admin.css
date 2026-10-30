@@ -304,6 +304,11 @@ html {
 }
 
 /* Panel head: the name in bold, the role in muted text under it (design 2b-2). */
+.admin-profile__head {
+  display: flex;
+  flex-direction: column;
+}
+
 .admin-profile__who {
   font-weight: 700;
 }

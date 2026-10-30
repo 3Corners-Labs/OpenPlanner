@@ -196,7 +196,7 @@ async def test_navigation_follows_the_matrix(site: Site) -> None:
     assert 'href="/admin/integrations"' not in org_admin_page
     assert 'href="/admin/rights"' in group_admin_page
     assert 'aria-current="page"' in group_admin_page
-    assert "Ingelogd als Gina Group" in group_admin_page
+    assert '<p class="admin-profile__who">Gina Group</p>' in group_admin_page
 
 
 async def test_rights_page_shows_scope_per_permission(site: Site) -> None:
