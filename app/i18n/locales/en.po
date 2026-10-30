@@ -6210,3 +6210,132 @@ msgstr "The new login mapping was not saved: with it you would no longer be supe
 
 msgid "admin.form.error.login_lockout"
 msgstr "With this mapping you would no longer be superuser; it was not saved."
+
+msgid "admin.overview.widget.queue.group"
+msgstr "Group"
+
+msgid "admin.overview.widget.queue.waiting"
+msgstr "Waiting"
+
+msgid "admin.overview.widget.queue.longest_wait"
+msgstr "Longest wait"
+
+msgid "admin.overview.widget.queue.staff"
+msgstr "Signed in"
+
+msgid "admin.overview.widget.queue.minutes"
+msgstr "{minutes} min"
+
+msgid "admin.overview.widget.queue.queue_link"
+msgstr "Queue of {name}"
+
+msgid "admin.overview.widget.queue.empty"
+msgstr "No own queue within your reach."
+
+msgid "admin.overview.widget.tasks.empty"
+msgstr "No running or failed tasks."
+
+msgid "admin.overview.widget.tasks.state.running"
+msgstr "Running"
+
+msgid "admin.overview.widget.tasks.state.failed"
+msgstr "Failed"
+
+msgid "admin.overview.widget.tasks.since"
+msgstr "since {time}"
+
+msgid "admin.overview.widget.tasks.attempts"
+msgstr "attempt {count}"
+
+msgid "admin.overview.widget.status.version"
+msgstr "Version"
+
+msgid "admin.overview.widget.status.version.none"
+msgstr "Not a release"
+
+msgid "admin.overview.widget.status.update"
+msgstr "Update"
+
+msgid "admin.overview.widget.status.update.current"
+msgstr "Up to date"
+
+msgid "admin.overview.widget.status.update.available"
+msgstr "{version} available"
+
+msgid "admin.overview.widget.status.update.running"
+msgstr "In progress: {version}"
+
+msgid "admin.overview.widget.status.update.problem"
+msgstr "{version}: {status}"
+
+msgid "admin.overview.widget.status.maintenance"
+msgstr "Maintenance"
+
+msgid "admin.overview.widget.status.maintenance.off"
+msgstr "Off"
+
+msgid "admin.overview.widget.status.maintenance.on"
+msgstr "On since {time}"
+
+msgid "admin.overview.widget.status.maintenance.environment"
+msgstr "On (environment)"
+
+msgid "admin.overview.widget.status.worker"
+msgstr "Background worker"
+
+msgid "admin.overview.widget.status.worker.alive"
+msgstr "Alive, {time}"
+
+msgid "admin.overview.widget.status.worker.stale"
+msgstr "No heartbeat since {time}"
+
+msgid "admin.overview.widget.status.worker.unknown"
+msgstr "No heartbeat found"
+
+msgid "admin.overview.widget.status.diagnostics"
+msgstr "Diagnostic mode"
+
+msgid "admin.overview.widget.status.diagnostics.off"
+msgstr "Off"
+
+msgid "admin.overview.widget.status.diagnostics.on"
+msgstr "{count} active"
+
+msgid "admin.overview.widget.status.environment"
+msgstr "Environment"
+
+msgid "admin.overview.widget.status.environment.ok"
+msgstr "{environment}"
+
+msgid "admin.overview.widget.status.environment.problems"
+msgstr "{environment}, {count} not production-ready"
+
+msgid "audit.job.send_rebook_request"
+msgstr "Send request to rebook"
+
+msgid "audit.job.send_rebook_reminder"
+msgstr "Send reminder to rebook"
+
+msgid "audit.job.send_rebook_lapsed"
+msgstr "Send notice that rebooking lapsed"
+
+msgid "audit.job.lapse_rebook"
+msgstr "Let the rebooking lapse"
+
+msgid "audit.job.send_confirm_request"
+msgstr "Send request to confirm"
+
+msgid "audit.job.send_confirm_reminder"
+msgstr "Send reminder to confirm"
+
+msgid "audit.job.expire_unconfirmed"
+msgstr "Let the unconfirmed booking expire"
+
+msgid "audit.job.send_unconfirmed_lapsed"
+msgstr "Send notice that the booking lapsed"
+
+msgid "audit.job.send_team_invite"
+msgstr "Send calendar invite to the team"
+
+msgid "audit.job.send_team_cancel"
+msgstr "Send calendar cancellation to the team"

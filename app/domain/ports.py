@@ -48,6 +48,7 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.staff import StaffFilter, StaffMember
+from app.domain.tasks import ActiveJobs
 from app.domain.updates import Release, ReleaseCheck, UpdateRequest
 
 
@@ -715,6 +716,13 @@ class Transaction(Protocol):
 
     async def delete_pending_jobs(self, booking_id: int, types: Collection[JobType]) -> None:
         """Delete the booking's pending jobs of the given types."""
+        ...
+
+    async def active_jobs(self, limit: int) -> ActiveJobs:
+        """Return the first ``limit`` running or failed jobs and how many there are in all.
+
+        Running first, newest first; never a payload or a booking (ADR 0061 §2).
+        """
         ...
 
     async def get_shortfall_acceptances(

@@ -14,6 +14,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.queue_service import QueueService
 from app.domain.scheduling import DispatchKind, Organisation, ScheduleRule
 from app.domain.services import BookingService
+from app.domain.staff import Membership, StaffMember
 from app.domain.tokens import agent_pseudonym
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
@@ -215,3 +216,55 @@ async def test_not_claimed_in_time_is_flagged(
     view = await queue.view(AGENT, "demo")
 
     assert view.rows[0].overdue
+
+
+def _staff(
+    subject: str,
+    roles: frozenset[Role],
+    seen: datetime,
+    *memberships: Membership,
+    **changes: object,
+) -> StaffMember:
+    member = StaffMember(subject, subject, roles, frozenset(memberships), seen, seen, seen)
+    return replace(member, **changes)  # type: ignore[arg-type]
+
+
+async def test_the_summaries_cover_the_own_queues_in_reach_with_waiting_and_staff(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    waiting = await _book(uow, clock)
+    await _book(uow, clock, SLOT_0930)
+    await _book(uow, clock, SLOT_0900, "andere")
+    clock.advance(SLOT_0900 - timedelta(minutes=10) - clock.now())
+    uow.state.call_status[waiting] = CallStatus(
+        waiting, participants=1, updated_at=clock.now() - timedelta(minutes=4)
+    )
+    demo_team, now = Membership("demo", "demo"), clock.now()
+    uow.state.staff = {
+        "a-1": _staff("a-1", frozenset({Role.AGENT}), now, demo_team),
+        "a-9": _staff("a-9", frozenset({Role.AGENT}), now, demo_team, last_logout_at=now),
+        "u-1": _staff("u-1", frozenset({Role.AUDITOR}), now, Membership("demo")),
+        "a-3": _staff("a-3", frozenset({Role.AGENT}), now, Membership("demo", "andere")),
+        "a-0": _staff("a-0", frozenset({Role.AGENT}), now - timedelta(hours=9), demo_team),
+    }
+
+    summaries = await queue.summaries(GROUP_ADMIN, timedelta(hours=8))
+
+    assert [s.summary.group.slug for s in summaries] == ["demo"]
+    assert summaries[0].waiting == 1
+    assert summaries[0].longest_wait == timedelta(minutes=4)
+    assert summaries[0].staff_available == 1
+
+
+async def test_the_summaries_leave_out_contact_center_groups_and_groups_outside_reach(
+    queue: QueueService, uow: InMemoryUnitOfWork
+) -> None:
+    everything = await queue.summaries(
+        Principal("s", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset()),
+        timedelta(hours=8),
+    )
+
+    assert sorted(s.summary.group.slug for s in everything) == ["andere", "demo"]
+    assert await queue.summaries(AUDITOR, timedelta(hours=8)) == []
+    own = await queue.summaries(OTHER_TEAM, timedelta(hours=8))
+    assert [s.summary.group.slug for s in own] == ["andere"]
