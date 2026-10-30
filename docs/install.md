@@ -16,14 +16,14 @@ wherever the checkout is, and writes that path into the updater's configuration.
 | `~/openplanner/` | `git clone`, at a release tag | `docker-compose.yml`, `deploy/proxy/`, `scripts/` | |
 | `~/openplanner/.env` | installer, then you | the application's settings and integration secrets (`.env.example` lists every one) | 600 |
 | `~/openplanner/secrets/secrets.env` | installer (or `app.cli init`) | the bootstrap keys `SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`, `SESSION_SECRET` (ADR 0042 §9); back it up apart from the database | 600, directory 700 |
-| `~/openplanner/proxy.env` | installer (production) | `TLS_DOMAIN`, `ACME_EMAIL` for the HTTPS proxy, no secrets | 600 |
-| `~/openplanner/.env.update` | installer, host updater | `OPENPLANNER_IMAGE` (pinned digest), `COMPOSE_PROFILES`, `OPENPLANNER_MODE` | 644 |
+| `~/openplanner/proxy.env` | installer (with the HTTPS proxy) | `TLS_DOMAIN`, `ACME_EMAIL` (or the own certificate's files) for the HTTPS proxy, no secrets | 600 |
+| `~/openplanner/.env.update` | installer, host updater | `OPENPLANNER_IMAGE` and, with the HTTPS proxy, `OPENPLANNER_PROXY_IMAGE` (pinned digests), `COMPOSE_PROFILES`, `OPENPLANNER_TLS`, `OPENPLANNER_MODE` | 644 |
 | `~/openplanner/.env.bak.<time>` | installer, when it repaired `.env` | the `.env` as it was before | 600 |
 | `~/openplanner/docker-compose.override.yml` | you, optional | host-specific additions, such as a published port on a lab host | |
 | `/usr/local/sbin/openplanner-update` | installer | the host updater (`scripts/updater/openplanner-update.sh`) | 755 |
 | `/etc/systemd/system/openplanner-updater.{service,timer}` | installer | runs the updater every minute | 644 |
 | `/etc/systemd/system/openplanner-updater.service.d/override.conf` | installer | lets the updater write only `~/openplanner` under `/home` | 644 |
-| `/etc/openplanner/updater.env` | installer | `COMPOSE_DIR=/home/<user>/openplanner`, image, signing identity | 600 |
+| `/etc/openplanner/updater.env` | installer | `COMPOSE_DIR=/home/<user>/openplanner`, the two images, signing identity | 600 |
 | `/var/lib/openplanner-updater/` | updater, installer | `previous.env` (rollback), lock, a copy of the ghcr.io login, cosign's cache | 700 |
 | Docker volume `openplanner_data` | web, worker | the SQLite database and its update backups (personal data) | |
 | Docker volume `openplanner_proxy-data` | proxy | certificate, private key, ACME account | |
@@ -36,9 +36,12 @@ cd ~/openplanner
 docker compose --env-file .env.update ps
 ```
 
-The pin file also carries the profiles (`tls` in production, `dev` in a lab), so this one form
-starts exactly the services of the installation. Without `--env-file .env.update`, Compose
-would build a local image instead of running the signed release.
+The pin file also carries the profiles (`tls` with the HTTPS proxy, `dev` in a lab), so this
+one form starts exactly the services of the installation. Without `--env-file .env.update`,
+Compose would build local images instead of running the signed release: the application
+image and, since ADR 0064 step 2, the HTTPS proxy image (`ghcr.io/<owner>/<repo>-proxy`,
+released and signed with every version) are both pulled and verified; a host never builds
+Caddy.
 
 ## Modes
 
@@ -147,7 +150,7 @@ Webex Contact Center*.
 | Option | Effect |
 |---|---|
 | `--mode production\|test\|lab` | required on the first run; remembered afterwards |
-| `--version X.Y.Z` | pin this release (pulled, signature verified); without it a pinned release stays, and a first run takes the latest release. `X.Y.Z-rc.N` pins a candidate on a `test` or `lab` host |
+| `--version X.Y.Z` | pin this release (pulled, signature verified; with the HTTPS proxy its image too, at the same version); without it a pinned release stays, and a first run takes the latest release. `X.Y.Z-rc.N` pins a candidate on a `test` or `lab` host |
 | `--repository owner/name` | another repository's releases (default `3Corners-Labs/OpenPlanner`, or `UPDATE_REPOSITORY` from `.env`) |
 | `--non-interactive` | never ask; take answers from the environment (also when there is no terminal) |
 | `--no-tls` | production, test: no HTTPS proxy; asks the public address and your proxy's address (`FORWARDED_ALLOW_IPS`) |
@@ -171,8 +174,9 @@ Webex Contact Center*.
 | a host package missing or outdated, cosign older than the latest release | installs or upgrades it |
 | updater, units, drop-in or `updater.env` missing or changed | installs them again from the checkout |
 | an HTTPS proxy running where `--no-tls` was chosen (restarts for ever without `proxy.env`) | removes it |
+| the HTTPS proxy runs but its image is not pinned (installed before ADR 0064 step 2, when the host built it) | pulls and verifies the proxy image at the version of the pinned application image and pins it; the proxy restarts on the released image |
 | `PUBLIC_BASE_URL` or the OIDC URL on `http` in production, a missing OIDC client secret, `ENVIRONMENT` not matching the mode | stops with the list; nothing is pulled or started |
-| a release that does not pass `cosign verify` | stops; the running version stays |
+| a release that does not pass `cosign verify` (either image) | stops; the running version stays |
 
 ## Update channel (ADR 0059, 0065)
 
@@ -192,11 +196,11 @@ candidate directly.
 
 ## Upgrading
 
-- **The application image**: "Update now" in the admin portal (`/admin/updates`); the host
-  updater pulls, verifies, backs up and switches, with automatic rollback (runbook, *Updates
-  from the admin portal*).
-- **Compose file, proxy and scripts** change with the release too. After a portal update, bring
-  the checkout to the same tag and run the installer, which also reinstalls the updater:
+- **The application and proxy images**: "Update now" in the admin portal (`/admin/updates`);
+  the host updater pulls and verifies both, backs up and switches, with automatic rollback
+  (runbook, *Updates from the admin portal*). The proxy restarts with the new version.
+- **Compose file and scripts** change with the release too. After a portal update, bring the
+  checkout to the same tag and run the installer, which also reinstalls the updater:
 
   ```sh
   cd ~/openplanner

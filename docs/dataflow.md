@@ -22,6 +22,9 @@ It identifies nobody and is strictly functional, so no consent banner is needed.
 ```
 worker ──SMTP──> mail provider of the organisation (admin portal; else SMTP_HOST) ──> citizen
    reads booking at send time: first name, email, date, time, team, management link
+   request to confirm a new booking and its reminder (ADR 0056): email, date, time, team
+   and the confirm link only; no name, join link or calendar file (the address is not
+   verified yet); the lapse message links the group page instead of the booking
    closure mails also: the closure's notice and heading, its copy of the contact options
    (organisation data) and the link to the closure page (ADR 0037 §5); never the image
 ```
