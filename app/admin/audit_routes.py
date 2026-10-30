@@ -167,7 +167,7 @@ DETAIL_LABELS: dict[str, str] = {
     "phone_mode": "admin.field.phone_mode",
     "dispatch_lead_minutes": "admin.field.dispatch_lead_minutes",
     "dispatch_kind": "admin.field.dispatch_kind",
-    "queue_change_working_days": "admin.field.queue_change_working_days",
+    "citizen_change_lead_minutes": "admin.field.citizen_change_lead_minutes",
     "planner_change_min_lead_minutes": "admin.field.planner_change_min_lead_minutes",
     "queue_visible_from_minutes": "admin.field.queue_visible_from_minutes",
     "queue_free_pick_allowed": "admin.field.queue_free_pick_allowed",
