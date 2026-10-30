@@ -93,4 +93,4 @@
   {% endif %}
 </section>
 {% endblock %}
-{% block scripts %}{% if progress %}<script src="/static/update-progress.js" defer></script>{% endif %}{% endblock %}
+{% block scripts %}{% if progress %}<script src="{{ static_url('update-progress.js') }}" defer></script>{% endif %}{% endblock %}

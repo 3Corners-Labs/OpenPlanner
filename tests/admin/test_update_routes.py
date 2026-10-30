@@ -9,6 +9,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.update_service import UpdateService
 from app.domain.updates import Release, ReleaseCheck, UpdateStatus, UpdateStep, Version
+from app.web.static_assets import ASSETS
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.domain import NOW
 
@@ -204,7 +205,7 @@ async def test_page_shows_the_steps_and_loads_the_poller_while_a_request_is_open
     assert "script-src" not in before.headers["content-security-policy"]
     await site.client.post("/admin/updates/update", headers=SAME_ORIGIN)
     page = await site.client.get("/admin/updates")
-    assert '<script src="/static/update-progress.js" defer></script>' in page.text
+    assert f'<script src="{ASSETS.url("update-progress.js")}" defer></script>' in page.text
     assert "script-src 'self'" in page.headers["content-security-policy"]
     assert "data-update-progress" in page.text
     assert 'aria-current="step"' in page.text
