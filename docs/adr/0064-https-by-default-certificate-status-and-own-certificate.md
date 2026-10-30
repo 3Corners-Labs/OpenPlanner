@@ -78,7 +78,13 @@ manual override with an own certificate.
    installer and host updater verify it like the app image. Until then `docker compose` builds
    it from `deploy/proxy/` as before.
 
-Build steps: (1) this PR: decisions 1–4; (2) decision 5.
+Build steps: (1) this PR: decisions 1–4; (2) decision 5; (3) the certificate source managed by
+the superuser in the portal (own ADR). The product owner decided on 2026-10-30 that docker01
+runs the ACME flow by default, and that who manages the certificate depends on where TLS ends:
+with the bundled proxy (small installations) the superuser must be able to choose ACME or
+upload an own certificate from the portal; behind an enterprise reverse proxy (`--no-tls`)
+the certificate is theirs and OpenPlanner only shows what citizens see (decision 3 covers that
+already). Until step 3 the operator manages the source on the host, as decision 2 says.
 
 ## Settings
 
