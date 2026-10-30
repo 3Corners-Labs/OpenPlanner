@@ -27,12 +27,13 @@ from app.admin.pages import Locale, SameOrigin, admin_moment, templates
 from app.admin.pages import page as _page
 from app.domain.audit import AuditEntry
 from app.domain.authorization import Permission
-from app.domain.errors import DomainError
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.update_service import UpdateNotice, UpdateOverview, UpdateService
 from app.domain.updates import (
     SNOOZE,
     UpdateRequest,
     UpdateStatus,
+    Version,
     detail_fields,
     detail_key,
     progress,
@@ -356,6 +357,20 @@ async def _overview(
             "checked_at": admin_moment(request, locale, check.checked_at) if check else None,
             "check_error": check.error if check else "",
             "history": _audit_history(request, locale, entries),
+            "offered": [
+                {
+                    "version": str(item.version),
+                    "url": item.url,
+                    "candidate": item.version.is_candidate,
+                    "published": (
+                        admin_moment(request, locale, item.published_at)
+                        if item.published_at
+                        else ""
+                    ),
+                    "notes": item.notes.splitlines(),
+                }
+                for item in found.offered
+            ],
             "outside_change": (
                 admin_moment(request, locale, found.outside_change.since)
                 if found.outside_change
@@ -402,9 +417,14 @@ async def progress_fragment(
 async def request_update(
     request: Request, locale: Locale, _: SameOrigin, context: Change
 ) -> Response:
-    """Ask the host updater to install the latest release."""
+    """Ask the host updater to install the chosen version, or the newest one offered."""
+    form = await read_form(request, locale)
+    raw = form.text("target")
+    target = Version.parse(raw) if raw else None
     try:
-        await update_service(request).request_update(context.principal)
+        if raw and target is None:
+            raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
+        await update_service(request).request_update(context.principal, target)
     except DomainError as error:
         raise_refusal(error)
         return await _overview(request, locale, context, error)

@@ -17,7 +17,7 @@ package; when the two disagree, the code wins.
 | Built? | ADRs |
 |---|---|
 | BUILT | 43 |
-| PARTIAL | 21 |
+| PARTIAL | 22 |
 | NOT BUILT | 5 |
 | POLICY | 3 |
 
@@ -89,12 +89,13 @@ package; when the two disagree, the code wins.
 | 0064 | HTTPS by default, certificate status | BUILT | #139, #144; step 3 is ADR 0070 | – |
 | 0065 | Webex reason, probe meeting | BUILT | #138, #142; migration 0056 | – |
 | 0066 | Bookings per email address | PARTIAL | #128; migration 0054 | Point 8: a refusal is explained by email only (ADR 0056 step 2 is merged) |
-| 0067 | Version management in the portal | PARTIAL | step 1 #145; steps 2–3 (#146, #148) in the merge queue; migrations 0070, 0071 | Step 4: the live check on docker01 |
+| 0067 | Version management in the portal | PARTIAL | steps 1–2 #145, #146; step 3 #148 in the merge queue; migrations 0070, 0071 | Step 4: the live check on docker01 |
 | 0068 | Troubleshooting per booking | BUILT | #152; migration 0059 | – |
 | 0069 | Citizen cancels until the start | BUILT | #151; migration 0062 | – |
 | 0070 | Certificate source in the portal | BUILT | #149; migration 0061 | – |
 | 0071 | Trial call on Webex | BUILT | #154; migration 0063 | – |
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
+| 0073 | Email deliverability: sender domain check, system mail headers | PARTIAL | step 1 #166; no migration | Step 2 (a periodic check in the worker) is decided after step 1 is in use (ADR decision 6) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 

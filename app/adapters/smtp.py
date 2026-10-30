@@ -44,16 +44,24 @@ class SmtpConfig:
     password: str | None = field(default=None, repr=False)
     timeout: float = DEFAULT_TIMEOUT_SECONDS
     implicit_tls: bool = False
+    reply_to: str | None = None
 
 
-def build_email(message: OutboundMessage, sender: str) -> EmailMessage:
-    """Return the MIME message: plain text, optional HTML alternative, attachments."""
+def build_email(message: OutboundMessage, sender: str, reply_to: str | None = None) -> EmailMessage:
+    """Return the MIME message: plain text, optional HTML alternative, attachments.
+
+    Every message is marked ``Auto-Submitted: auto-generated`` (RFC 3834, ADR 0073) so
+    autoresponders and spam filters know nobody typed it; ``Reply-To`` is set when given.
+    """
     email = EmailMessage()
     email["From"] = sender
     email["To"] = message.recipient
+    if reply_to:
+        email["Reply-To"] = reply_to
     email["Subject"] = message.subject
     email["Date"] = formatdate(localtime=False)
     email["Message-ID"] = make_msgid(domain=sender.rsplit("@", 1)[-1].strip("> "))
+    email["Auto-Submitted"] = "auto-generated"
     email.set_content(message.text)
     if message.html is not None:
         email.add_alternative(message.html, subtype="html")
@@ -82,7 +90,8 @@ class SmtpMailSender:
         if message.channel is not ChannelKind.EMAIL:
             raise ValueError("SmtpMailSender only sends email")
         try:
-            await asyncio.to_thread(self._deliver, build_email(message, self._config.sender))
+            email = build_email(message, self._config.sender, self._config.reply_to)
+            await asyncio.to_thread(self._deliver, email)
         except (smtplib.SMTPException, OSError) as error:
             raise classify(error) from None  # the server's answer may name the recipient
 
