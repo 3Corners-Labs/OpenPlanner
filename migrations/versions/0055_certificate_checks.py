@@ -2,10 +2,11 @@
 
 ``certificate_checks`` holds one row: when the worker (or the CLI) last probed the host of
 ``PUBLIC_BASE_URL``, what it found and the public data of the certificate it saw. No personal
-data. The downgrade drops the table; the next worker round writes it again.
+data. The downgrade drops the table; the next worker round writes it again. Revises 0054
+(bookings per email address, ADR 0059), merged first.
 
-Revision ID: 0054
-Revises: 0053
+Revision ID: 0055
+Revises: 0054
 Create Date: 2026-10-30 16:00:00.000000
 """
 
@@ -14,8 +15,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0054"
-down_revision: str | None = "0053"
+revision: str = "0055"
+down_revision: str | None = "0054"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

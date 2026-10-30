@@ -126,7 +126,12 @@ def _curl(args: list[str]) -> int:
         latest = _lines("latest")
         if not latest:
             return 22
-        print(json.dumps({"tag_name": latest[0], "name": latest[0]}))
+        release = {"tag_name": latest[0], "name": latest[0]}
+        if any("/releases?" in arg for arg in args):  # the rc channel lists releases
+            release["prerelease"] = "-rc." in latest[0]
+            print(json.dumps([release]))
+        else:
+            print(json.dumps(release))
     return 0
 
 

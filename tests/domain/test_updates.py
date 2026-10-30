@@ -16,6 +16,7 @@ from app.domain.updates import (
     Release,
     ReleaseCheck,
     UpdateAction,
+    UpdateChannel,
     UpdateRequest,
     UpdateStatus,
     UpdateStep,
@@ -58,6 +59,9 @@ def request(**overrides: object) -> UpdateRequest:
         ("1.4.0", Version(1, 4, 0)),
         ("v1.4.0", Version(1, 4, 0)),
         ("v10.0.12", Version(10, 0, 12)),
+        # Release candidates (ADR 0059).
+        ("1.4.0-rc.1", Version(1, 4, 0, 1)),
+        ("v0.4.0-rc.12", Version(0, 4, 0, 12)),
     ],
 )
 def test_parse_accepts_release_versions(raw: str, expected: Version) -> None:
@@ -65,7 +69,21 @@ def test_parse_accepts_release_versions(raw: str, expected: Version) -> None:
 
 
 @pytest.mark.parametrize(
-    "raw", ["", "main", "1.4", "1.4.0-rc.1", "v1.4.0 ", "01.4.0", "1.4.0.1", "1" * 30 + ".0.0"]
+    "raw",
+    [
+        "",
+        "main",
+        "1.4",
+        "v1.4.0 ",
+        "01.4.0",
+        "1.4.0.1",
+        "1" * 30 + ".0.0",
+        # Only CI's -rc.N form is a candidate; other pre-release spellings are not versions.
+        "1.4.0-rc.0",
+        "1.4.0-rc1",
+        "1.4.0-beta.1",
+        "1.4.0-rc.1+build",
+    ],
 )
 def test_parse_refuses_anything_else(raw: str) -> None:
     assert Version.parse(raw) is None
@@ -74,6 +92,34 @@ def test_parse_refuses_anything_else(raw: str) -> None:
 def test_versions_order_numerically_and_print_without_prefix() -> None:
     assert Version(1, 10, 0) > Version(1, 9, 9)
     assert str(Version(1, 4, 0)) == "1.4.0"
+
+
+def test_candidates_order_as_semver_says_and_print_their_number() -> None:
+    # A candidate comes before its release and after the release before it.
+    assert Version(0, 4, 0, 3) < Version(0, 4, 0)
+    assert Version(0, 4, 0, 3) > Version(0, 3, 0)
+    assert Version(0, 4, 0, 2) < Version(0, 4, 0, 10)
+    assert Version(0, 4, 0, 1) >= Version(0, 4, 0, 1)
+    assert Version(0, 4, 0, 1) != Version(0, 4, 0)
+    assert Version(0, 4, 0, 3).is_candidate
+    assert not Version(0, 4, 0).is_candidate
+    assert str(Version(0, 4, 0, 3)) == "0.4.0-rc.3"
+    assert sorted([Version(0, 4, 0), Version(0, 4, 0, 2), Version(0, 3, 0)]) == [
+        Version(0, 3, 0),
+        Version(0, 4, 0, 2),
+        Version(0, 4, 0),
+    ]
+
+
+def test_a_candidate_is_offered_on_the_rc_channel_only() -> None:
+    candidate = Release(Version(1, 4, 0, 2), "https://github.com/acme/openplanner/releases/tag/x")
+    check = ReleaseCheck(NOW, candidate)
+    assert available_update(V1, check) is None
+    assert available_update(V1, check, UpdateChannel.CANDIDATE) == candidate
+    # Running a candidate, the release of the same number is an update on both channels.
+    release = ReleaseCheck(NOW, Release(Version(1, 4, 0), candidate.url))
+    assert available_update(Version(1, 4, 0, 2), release) == release.latest
+    assert available_update(Version(1, 4, 0, 2), release, UpdateChannel.CANDIDATE) == release.latest
 
 
 def test_release_needs_a_github_https_page() -> None:

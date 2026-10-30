@@ -17,6 +17,12 @@ msgstr "Afspraak maken"
 msgid "site.skip_to_content"
 msgstr "Naar de inhoud"
 
+msgid "site.product_footer_via"
+msgstr "Afspraken via"
+
+msgid "site.product_name"
+msgstr "OpenPlanner"
+
 msgid "home.title"
 msgstr "Een videogesprek plannen"
 
@@ -348,6 +354,9 @@ msgstr "Vul een geldig telefoonnummer in, bijvoorbeeld 06 12345678."
 
 msgid "error.slot_full"
 msgstr "Dit moment is net vol geraakt. Kies een ander moment."
+
+msgid "error.booking_limit_reached"
+msgstr "We kunnen deze afspraak niet maken. Heeft u al een afspraak bij dit team? Gebruik dan de link in de bevestigingsmail om die te verzetten of te annuleren. Boekt u voor iemand anders? Gebruik dan zo mogelijk het e-mailadres van die persoon."
 
 msgid "error.slot_unavailable"
 msgstr "Dit moment is niet meer beschikbaar. Kies een ander moment."
@@ -964,6 +973,12 @@ msgstr "Hoe afspraken bij medewerkers komen"
 msgid "admin.field.dispatch_kind_hint"
 msgstr "Contactcenter: een taak in de wachtrij van het team, kort voor de start. Eigen wachtrij: medewerkers loggen in op OpenPlanner en pakken een afspraak op. Geldt voor afspraken die nog niet zijn doorgezet."
 
+msgid "admin.field.max_bookings_per_email"
+msgstr "Afspraken per e-mailadres"
+
+msgid "admin.field.max_bookings_per_email_hint"
+msgstr "Hoeveel toekomstige afspraken één e-mailadres tegelijk bij dit team mag hebben. Hoger dan 1 zodat mensen ook voor een ander kunnen boeken. Hetzelfde adres twee keer op hetzelfde moment kan nooit. 1 tot 10."
+
 msgid "admin.field.calendar_invite_address"
 msgstr "Agenda-uitnodiging naar (eigen wachtrij)"
 
@@ -1071,8 +1086,14 @@ msgstr "Vul een aantal minuten in van het doorzetten naar de wachtrij tot 1440."
 msgid "admin.form.error.planner_too_late"
 msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Bel de deelnemer."
 
+msgid "admin.form.error.booking_limit_reached"
+msgstr "Dit e-mailadres heeft al een afspraak in dat tijdslot, of al het maximum aantal afspraken bij dit team (zie Afspraken per e-mailadres in de instellingen). Kies een ander tijdslot."
+
 msgid "admin.form.error.move_causes_shortfall"
 msgstr "In dit tijdslot zijn dan meer afspraken dan medewerkers. Bevestig dat u het tekort accepteert, of kies een ander tijdslot."
+
+msgid "admin.form.error.max_bookings_per_email"
+msgstr "Vul een aantal in van 1 tot 10."
 
 msgid "admin.form.error.calendar_invite_address"
 msgstr "Vul een geldig e-mailadres in, of laat het veld leeg."
@@ -3793,6 +3814,18 @@ msgstr "Geen releaseversie (ontwikkelversie); updates worden niet aangeboden."
 msgid "admin.updates.commit"
 msgstr "Commit"
 
+msgid "admin.updates.channel"
+msgstr "Kanaal"
+
+msgid "admin.updates.channel.release"
+msgstr "Releases"
+
+msgid "admin.updates.channel.rc"
+msgstr "Releasekandidaten (elke merge naar main) en releases"
+
+msgid "admin.updates.auto_apply"
+msgstr "werkt zichzelf bij"
+
 msgid "admin.updates.latest"
 msgstr "Nieuwste versie"
 
@@ -5750,6 +5783,9 @@ msgstr "Tijdnotatie"
 
 msgid "settings.field.admin_timezone.label"
 msgstr "Tijdzone beheerportaal"
+
+msgid "settings.field.product_footer.label"
+msgstr "Toon \"Afspraken via OpenPlanner\" onderaan"
 
 msgid "settings.field.staff_dormant_after_days.label"
 msgstr "Medewerker inactief na (dagen)"

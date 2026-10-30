@@ -55,6 +55,8 @@ def test_group_defaults() -> None:
         ("not_picked_up_minutes", 121),
         ("direct_call_max_concurrent", 0),
         ("direct_call_max_concurrent", 1001),
+        ("max_bookings_per_email", 0),
+        ("max_bookings_per_email", 11),
     ],
 )
 def test_group_rejects_invalid_configuration(field: str, value: object) -> None:

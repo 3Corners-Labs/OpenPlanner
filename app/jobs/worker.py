@@ -113,6 +113,7 @@ async def run_worker(
             integration=IntegrationService(uow, clock, AdminService(uow, clock)),
             retention=lambda: live.settings.event_retention,
             clock_style=lambda organisation: live.for_organisation(organisation).time_format,
+            product_footer=lambda organisation: live.for_organisation(organisation).product_footer,
         )
 
     integrations, runner = build_runner(settings)

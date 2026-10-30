@@ -419,3 +419,16 @@ def test_the_example_config_keeps_the_signature_identity_strict(tmp_path: Path) 
     workflow = "acme/openplanner/.github/workflows/main.yml"
     assert re.fullmatch(sourced, f"https://github.com/{workflow}@refs/tags/v1.4.0")
     assert not re.fullmatch(sourced, f"https://githubXcom/{workflow}@refs/tags/v1.4.0")
+
+
+def test_a_release_candidate_is_a_valid_target(host: Host) -> None:
+    """ADR 0059: the rc channel updates to ``X.Y.Z-rc.N`` like to any release."""
+    candidate = digest(IMAGE, "1.5.0-rc.3")
+    host.given("claim", "9 update 1.5.0-rc.3 1.4.0\n")
+
+    result = host.run()
+
+    assert result.returncode == 0, result.stderr
+    assert any(c.startswith(f"docker pull -q {IMAGE}:1.5.0-rc.3") for c in host.commands())
+    assert host.index(UP, pinned=candidate) > host.index(cli("backup-db", "request-9"))
+    assert reports(host)[-1] == cli("update-report", "9", "succeeded")
