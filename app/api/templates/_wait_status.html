@@ -16,7 +16,10 @@
 {% if refresh %}
 <p><a class="button button--secondary" href="/b/{{ token }}/wait">{{ _("join.refresh") }}</a></p>
 {% endif %}
-{% if over %}
+{% if schedule %}
 <p><a class="button" href="/g/{{ group.slug }}">{{ _("direct.schedule_instead") }}</a></p>
+{% endif %}
+{% if leavable %}
+<p><a href="/b/{{ token }}/wait/leave">{{ _("wait.leave.link") }}</a></p>
 {% endif %}
 </div>

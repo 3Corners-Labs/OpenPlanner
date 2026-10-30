@@ -1,9 +1,9 @@
 # 0073. Email deliverability: the sender domain checked in the portal, system mail marked as such
 
-Status: accepted (2026-10-30), requested by the product owner ("how to prevent email hitting
+Status: accepted (2026-10-30), partly built (step 1 merged in #166, step 2 follows), requested by the product owner ("how to prevent email hitting
 spam folders"). Extends ADR 0022 (message channels per organisation) and ADR 0009 (message
-layouts); grants a licence exception in the manner of ADR 0003. Partly built, checked on 2026-10-30
-(step 1 is built, step 2 is not); see `docs/adr-status.md` and the *Build status* table below.
+layouts); grants a licence exception in the manner of ADR 0003. The *Build status* table
+below says what is built.
 
 ## Context
 
@@ -107,7 +107,7 @@ checked (SPF, DKIM, DMARC are the three every receiver evaluates).
 | Step | What | PR | State |
 |---|---|---|---|
 | 1 | Headers, the two fields, the sender domain check on *Channels*, manual topic `channels`, `dnspython` | #166 | merged |
-| 2 | Periodic check in the worker with a system event (decision 6) | – | planned; decided after step 1 is in use |
+| 2 | Periodic check in the worker with a system event (decision 6) | – | follow-up; decided after step 1 is in use |
 
 (State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
 
