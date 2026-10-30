@@ -51,6 +51,7 @@ EDITABLE_TOPICS = frozenset(
         Topic.PLANNER,
         Topic.MAIL,
         Topic.UPDATES,
+        Topic.CONFIRMATION,
     }
 )
 """The topics of class C settings the portal changes: step 4, and mail and updates with their

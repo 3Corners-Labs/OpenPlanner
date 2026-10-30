@@ -169,6 +169,73 @@ def test_stale_jobs() -> None:
     assert is_stale(START, replace(booking, contact=None))
 
 
+def test_pending_booking_plan_asks_reminds_and_lapses() -> None:
+    from app.domain.confirmation import ConfirmWindow
+    from app.domain.job_plan import plan_for_pending
+
+    confirm_by = NOW + timedelta(hours=24)
+    reminder = NOW + timedelta(hours=12)
+
+    jobs = plan_for_pending(now=NOW, window=ConfirmWindow(confirm_by, (reminder,)))
+
+    assert jobs == [
+        PlannedJob(JobType.SEND_CONFIRM_REQUEST, NOW, None, ChannelKind.EMAIL),
+        PlannedJob(JobType.SEND_CONFIRM_REMINDER, reminder, None, ChannelKind.EMAIL),
+        PlannedJob(JobType.EXPIRE_UNCONFIRMED, confirm_by, None),
+        PlannedJob(JobType.PURGE_PII, confirm_by + timedelta(hours=24), None),
+    ]
+
+
+def test_pending_booking_plan_has_no_meeting_task_or_reminder() -> None:
+    from app.domain.confirmation import ConfirmWindow
+    from app.domain.job_plan import plan_for_pending
+
+    types = {
+        job.type
+        for job in plan_for_pending(now=NOW, window=ConfirmWindow(NOW + timedelta(hours=1), ()))
+    }
+
+    assert types.isdisjoint(
+        {JobType.CREATE_VIDEO_ROOM, JobType.DISPATCH_WXCC_TASK, JobType.SEND_REMINDER}
+    )
+
+
+def test_unconfirmed_lapse_sends_one_email() -> None:
+    from app.domain.job_plan import plan_for_unconfirmed_lapse
+
+    assert plan_for_unconfirmed_lapse(now=NOW) == [
+        PlannedJob(JobType.SEND_UNCONFIRMED_LAPSED, NOW, None, ChannelKind.EMAIL)
+    ]
+
+
+def test_confirm_notices_only_while_the_booking_awaits_confirmation() -> None:
+    from dataclasses import replace
+
+    from app.domain.booking import Booking, BookingStatus
+    from app.domain.job_plan import is_stale
+
+    pending = Booking(
+        id=1,
+        group_id=1,
+        slot_id=1,
+        start=START,
+        end=END,
+        status=BookingStatus.PENDING_CONFIRMATION,
+        contact=WITH_PHONE,
+        locale="nl",
+        token_hash="h",
+        created_at=NOW,
+    )
+
+    for job_type in (JobType.SEND_CONFIRM_REQUEST, JobType.SEND_CONFIRM_REMINDER):
+        assert not is_stale(None, pending, job_type)
+        assert is_stale(None, pending.confirm(NOW), job_type)
+        assert is_stale(None, pending.expire(NOW), job_type)
+        assert is_stale(None, replace(pending, contact=None), job_type)
+    assert not is_stale(None, pending.expire(NOW), JobType.SEND_UNCONFIRMED_LAPSED)
+    assert not is_stale(None, pending, JobType.EXPIRE_UNCONFIRMED)
+
+
 def test_team_invite_is_planned_now_and_cancelled_with_the_booking() -> None:
     from app.domain.job_plan import plan_for_suspension
 

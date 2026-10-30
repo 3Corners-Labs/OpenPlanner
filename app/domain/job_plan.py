@@ -5,6 +5,10 @@ is a per-group setting (``Group.dispatch_lead_minutes``). Time-based jobs carry 
 on run, a job re-reads the booking and does nothing if it is no longer confirmed or its start
 changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
 
+    pending ──► send_confirm_request (now) ──► send_confirm_reminder × n ──► expire_unconfirmed
+               (confirm_by) ──► purge_pii (confirm_by + 24 h)            (ADR 0056)
+    confirmed (citizen clicked) ──► as booked below
+    lapsed ──► send_unconfirmed_lapsed (now); the purge planned while pending stays
     booked ──► create_video_room (now) ─► send_confirmation | send_change (now)
            ──► send_reminder × rules (start − offset, if still ahead and reachable)
            ──► dispatch_wxcc_task (start − dispatch lead) ──► purge_pii (end + 24 h)
@@ -16,7 +20,8 @@ changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
     reinstated ──► as booked, with send_reinstatement instead of the confirmation
 
 Closure notices are not pinned (the booking is no longer confirmed); they only run while the
-booking is still suspended (``is_stale``).
+booking is still suspended (``is_stale``). Requests to confirm only run while the booking still
+awaits confirmation.
 """
 
 from collections.abc import Iterable
@@ -26,6 +31,7 @@ from enum import StrEnum
 
 from app.domain.booking import Booking, Contact
 from app.domain.channels import ChannelKind, ReminderRule, reachable
+from app.domain.confirmation import ConfirmWindow
 
 
 def dispatch_moment(start: datetime, dispatch_lead: timedelta) -> datetime:
@@ -61,6 +67,10 @@ class JobType(StrEnum):
     SEND_REBOOK_REMINDER = "send_rebook_reminder"
     SEND_REBOOK_LAPSED = "send_rebook_lapsed"
     LAPSE_REBOOK = "lapse_rebook"
+    SEND_CONFIRM_REQUEST = "send_confirm_request"
+    SEND_CONFIRM_REMINDER = "send_confirm_reminder"
+    EXPIRE_UNCONFIRMED = "expire_unconfirmed"
+    SEND_UNCONFIRMED_LAPSED = "send_unconfirmed_lapsed"
     SEND_TEAM_INVITE = "send_team_invite"
     SEND_TEAM_CANCEL = "send_team_cancel"
 
@@ -74,6 +84,9 @@ CLOSURE_NOTICES = frozenset({JobType.SEND_SUSPENSION, JobType.SEND_CLOSURE_UPDAT
 
 REBOOK_NOTICES = frozenset({JobType.SEND_REBOOK_REQUEST, JobType.SEND_REBOOK_REMINDER})
 """A planner's request to choose a new time (ADR 0044); sent only while it is unanswered."""
+
+CONFIRM_NOTICES = frozenset({JobType.SEND_CONFIRM_REQUEST, JobType.SEND_CONFIRM_REMINDER})
+"""Requests to confirm a booking by email link (ADR 0056); sent only while it is pending."""
 
 
 @dataclass(frozen=True)
@@ -144,13 +157,16 @@ def is_stale(
 
     Pinned jobs only act on a confirmed booking whose start is unchanged and whose personal
     data still exists (CLAUDE.md). Closure notices only act on a booking that is still
-    suspended; requests to rebook only while the booking still awaits a new time. Other
-    unpinned jobs (cancellation mail, purge) always run.
+    suspended; requests to rebook only while the booking still awaits a new time; requests to
+    confirm only while it still awaits confirmation. Other unpinned jobs (cancellation mail,
+    lapse, purge) always run.
     """
     if job_type in CLOSURE_NOTICES:
         return not booking.is_suspended or booking.contact is None
     if job_type in REBOOK_NOTICES:
         return not booking.awaits_rebook or booking.contact is None
+    if job_type in CONFIRM_NOTICES:
+        return not booking.awaits_confirmation or booking.contact is None
     if pinned_start is None:
         return False
     return not booking.is_active or booking.start != pinned_start or booking.contact is None
@@ -233,6 +249,34 @@ def plan_for_lapse(*, now: datetime, sms: bool) -> list[PlannedJob]:
     """
     channels = [ChannelKind.EMAIL, ChannelKind.SMS] if sms else [ChannelKind.EMAIL]
     return [PlannedJob(JobType.SEND_REBOOK_LAPSED, now, None, c) for c in channels]
+
+
+def plan_for_pending(*, now: datetime, window: ConfirmWindow) -> list[PlannedJob]:
+    """Return the jobs of a booking that awaits the citizen's confirmation (ADR 0056).
+
+    The request to confirm goes now, the reminders at ``window.reminders``, all by email (the
+    point is to verify that address). At ``window.confirm_by`` ``EXPIRE_UNCONFIRMED`` cancels
+    a booking that is still pending, and its personal data is purged ``PURGE_AFTER`` later.
+    No meeting, reminder of the appointment or WxCC task yet: confirming replaces all of
+    these jobs with ``plan_for_booking``.
+    """
+    return [
+        PlannedJob(JobType.SEND_CONFIRM_REQUEST, now, None, ChannelKind.EMAIL),
+        *(
+            PlannedJob(JobType.SEND_CONFIRM_REMINDER, at, None, ChannelKind.EMAIL)
+            for at in window.reminders
+        ),
+        PlannedJob(JobType.EXPIRE_UNCONFIRMED, window.confirm_by, None),
+        PlannedJob(JobType.PURGE_PII, window.confirm_by + PURGE_AFTER, None),
+    ]
+
+
+def plan_for_unconfirmed_lapse(*, now: datetime) -> list[PlannedJob]:
+    """Return the message job when an unconfirmed booking lapses (ADR 0056).
+
+    The purge planned with the request to confirm stays.
+    """
+    return [PlannedJob(JobType.SEND_UNCONFIRMED_LAPSED, now, None, ChannelKind.EMAIL)]
 
 
 def plan_for_suspension(

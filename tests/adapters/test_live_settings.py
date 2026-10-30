@@ -171,6 +171,9 @@ async def test_the_organisation_states_show_the_source() -> None:
         "shortfall_horizon_days",
         "planner_rebook_days",
         "planner_rebook_reminder_days",
+        "booking_confirm_window_hours",
+        "booking_confirm_cutoff_hours",
+        "booking_confirm_reminders",
     }
     assert (states["time_format"].source, states["time_format"].shown) == ("organisation", "12h")
     assert states["admin_timezone"].source == "default"
