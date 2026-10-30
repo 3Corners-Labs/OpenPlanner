@@ -15,7 +15,7 @@ package; when the two disagree, the code wins.
 |---|---|
 | BUILT | 31 |
 | PARTIAL | 14 |
-| NOT BUILT | 5 |
+| NOT BUILT | 6 |
 
 | ADR | Title | Built? | Evidence | What is missing |
 |---|---|---|---|---|
@@ -69,6 +69,7 @@ package; when the two disagree, the code wins.
 | 0071 | Trial call on Webex | BUILT | #154; migration 0063 | – |
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
 | 0073 | Email deliverability: sender domain check, system mail headers | BUILT | step 1 #166; no migration | Step 2 (a periodic check in the worker) is decided after step 1 is in use (ADR decision 6) |
+| 0077 | Terminology: participant, and organisation names for staff functions | NOT BUILT | ADR only (proposed 2026-10-30); `CLAUDE.md` wording changed with it | Everything: the rename (steps 2a to 2d), the guard test, function names per organisation |
 
 ## Corrected on 2026-10-30
 

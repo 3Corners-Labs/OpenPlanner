@@ -3,7 +3,7 @@
 This file is read by Claude Code at the start of every session. It states how we work, not what we build; the what is in `docs/HANDOVER.md` and `docs/adr/`.
 
 ## Project in one line
-Lightweight group-booking service for a contact center: embeddable widget, admin UI with IdP roles, Webex video links, Webex Contact Center task dispatch via Webex Connect, strict PII retention.
+Lightweight group-booking platform: organisations offer sessions to groups of participants, who book on a standalone page or an embeddable widget and join by video. Admin UI with IdP roles, Webex video links, Webex Contact Center task dispatch via Webex Connect, strict PII retention. The first client is a contact center.
 
 ## Language
 - Code, identifiers, comments, commit messages, ADRs, README: **English**.
