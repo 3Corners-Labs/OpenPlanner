@@ -116,7 +116,7 @@ PRODUCTION_REFUSED: Mapping[str, frozenset[object]] = {
     "update_channel": frozenset({"rc"}),
     "update_auto_apply": frozenset({True}),
 }
-"""Portal values that are never usable with ``ENVIRONMENT=prod`` (ADR 0065 point 1).
+"""Portal values that are never usable with ``ENVIRONMENT=prod`` (ADR 0067 point 1).
 
 Production follows releases on a superuser's click. A stored value in this table is ignored
 and flagged, like any value outside the bounds; the environment may still lock the setting.
@@ -170,7 +170,7 @@ def resolve(
         now: The current time; a value that lapsed before it no longer applies. ``None``
             applies every stored value.
         production: Whether ``ENVIRONMENT=prod``: the values of ``PRODUCTION_REFUSED`` are
-            then ignored (ADR 0065).
+            then ignored (ADR 0067).
     """
     if spec.secret:
         return _resolve_secret(spec, env_value, env_source, portal)

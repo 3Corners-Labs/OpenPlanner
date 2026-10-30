@@ -156,7 +156,7 @@ class SettingsService:
             over the platform values; defaults to ``combination`` on those values alone.
         environment_value: Returns the environment's value of a key, for ``adopt``.
         production: Whether ``ENVIRONMENT=prod``: the values of ``PRODUCTION_REFUSED`` are
-            then refused as invalid (ADR 0065).
+            then refused as invalid (ADR 0067).
     """
 
     def __init__(

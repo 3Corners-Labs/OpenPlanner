@@ -6,7 +6,7 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ### Features
 
-- Version management in the portal (ADR 0065, step 1): the update channel and auto-apply
+- Version management in the portal (ADR 0067, step 1): the update channel and auto-apply
   are class C settings the superuser changes in the portal (topic Updates), read live by web
   and worker; `rc` and auto-apply are not usable in production. The installer's `--channel`
   flag is gone; which images the updater trusts follows the installer mode (test and lab
