@@ -173,7 +173,7 @@ The product owner accepted this ADR with these choices, so it can be built befor
 - **The `BookingDispatcher` port (point 2)** arrives with the calendar invite (point 9), its
   first hooks that do something beyond today's WxCC calls (ADR 0005: extract at the second
   use).
-- **Change deadline per kind** (superseded by ADR 0068: both kinds cancel until the start and
+- **Change deadline per kind** (superseded by ADR 0069: both kinds cancel until the start and
   move until `citizen_change_lead_minutes`). Contact center: unchanged, the dispatch moment. Own queue:
   `queue_change_working_days` working days before the start, at the same local time (product
   owner: "1 werkdag van te voren"). Working days are Monday to Friday; public holidays are not

@@ -15,7 +15,7 @@ Server-rendered and usable without JavaScript. Every response goes through
                                    scanners open links in advance (ADR 0056 §8)
     POST /b/{token}/confirm        confirm ─► 303 /b/{token}?status=confirmed (or lapsed)
     GET  /b/{token}                booking (no move from the change lead, no cancel from the
-                                   start, ADR 0068; a booking on hold by an emergency
+                                   start, ADR 0069; a booking on hold by an emergency
                                    closure shows its notice, ADR 0024)
     GET  /b/{token}/cancel         confirm ─► POST ─► 303 /b/{token}?status=cancelled
     GET  /b/{token}/reschedule     slot picker ─► ?start= confirm ─► POST

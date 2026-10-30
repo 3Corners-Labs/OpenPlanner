@@ -18,7 +18,7 @@ confirmation it had (the address was already verified), so it is placed confirme
 
 A citizen can move a booking until its change deadline (``Group.change_deadline``: the group's
 ``citizen_change_lead_minutes`` before the start, 60 by default) and cancel it until its start
-(``Group.cancel_deadline``, ADR 0068); after that, reschedule and cancel raise
+(``Group.cancel_deadline``, ADR 0069); after that, reschedule and cancel raise
 ``booking_locked``. A booking suspended by an emergency closure (ADR 0024) has no deadline:
 the citizen can move or cancel it until it is resolved. No slot inside a closure is offered
 or booked (``group_closed``), and no direct call starts while one is active. A direct call
@@ -102,7 +102,7 @@ class BookingDetails:
     """What the management page needs: the booking, its group and what it may still do.
 
     ``changeable`` says whether the citizen may move it, ``cancellable`` whether they may
-    cancel it (ADR 0068). ``cancellable`` is also true for a booking that awaits confirmation
+    cancel it (ADR 0069). ``cancellable`` is also true for a booking that awaits confirmation
     ("this was not me", ADR 0056), which cannot be rescheduled. ``closure`` is the closure that
     suspended the booking, for its notice.
     """
@@ -624,7 +624,7 @@ async def _check_address_limit(
 
 
 def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
-    """Refuse a move from the change deadline on (ADR 0068).
+    """Refuse a move from the change deadline on (ADR 0069).
 
     A booking on hold (suspended, or awaiting a new time) has no deadline: it does not go
     ahead at its time anyway.
@@ -636,7 +636,7 @@ def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
 
 
 def _ensure_cancellable(booking: Booking, group: Group, now: datetime) -> None:
-    """Refuse a cancellation from the start on (ADR 0068); on hold has no deadline."""
+    """Refuse a cancellation from the start on (ADR 0069); on hold has no deadline."""
     if booking.on_hold:
         return
     if now >= group.cancel_deadline(booking.start):

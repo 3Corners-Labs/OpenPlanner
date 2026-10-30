@@ -57,7 +57,7 @@ MAX_DIRECT_CALLS = MAX_CAPACITY
 DEFAULT_DISPATCH_LEAD_MINUTES = 5
 MAX_DISPATCH_LEAD_MINUTES = 60
 DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES = 60
-"""ADR 0068: a citizen can move a booking until this long before the start."""
+"""ADR 0069: a citizen can move a booking until this long before the start."""
 MAX_CITIZEN_CHANGE_LEAD_MINUTES = 1440
 DEFAULT_QUEUE_VISIBLE_FROM_MINUTES = 15
 MAX_QUEUE_VISIBLE_FROM_MINUTES = 120
@@ -180,7 +180,7 @@ class Group:
             ``DispatchKind.CONTACT_CENTER``.
         dispatch_kind: Contact center or OpenPlanner's own queue (ADR 0043).
         citizen_change_lead_minutes: How long before the start the citizen may still move
-            the booking (ADR 0068, class D per group); cancelling is possible until the start.
+            the booking (ADR 0069, class D per group); cancelling is possible until the start.
             Never below ``dispatch_lead_minutes``. A booking made later than that cannot be
             moved by the citizen, only cancelled.
         planner_change_min_lead_minutes: How long before the start a planner may still move
@@ -323,14 +323,14 @@ class Group:
     def change_deadline(self, start: datetime) -> datetime:
         """Return the moment the citizen can no longer move a booking starting at ``start``.
 
-        ``citizen_change_lead_minutes`` before the start, for both dispatch kinds (ADR 0068).
+        ``citizen_change_lead_minutes`` before the start, for both dispatch kinds (ADR 0069).
         A booking already dispatched to the contact center is moved with its task ended
         (ADR 0021), so the lead is never shorter than the dispatch lead.
         """
         return start - timedelta(minutes=self.citizen_change_lead_minutes)
 
     def cancel_deadline(self, start: datetime) -> datetime:
-        """Return the moment the citizen can no longer cancel: the start itself (ADR 0068).
+        """Return the moment the citizen can no longer cancel: the start itself (ADR 0069).
 
         A late cancellation beats a no-show; after dispatch the task is marked cancelled
         (ADR 0021) and the team's invite withdrawn (ADR 0043).

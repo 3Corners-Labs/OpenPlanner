@@ -190,7 +190,7 @@ class GroupRow(Base):
     direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
     dispatch_kind: Mapped[str] = mapped_column(String(32), server_default=text("'contact_center'"))
-    # ADR 0068: the citizen moves a booking up to this long before the start.
+    # ADR 0069: the citizen moves a booking up to this long before the start.
     citizen_change_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     # ADR 0044: a planner changes bookings up to this long before the start.
     planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))

@@ -40,7 +40,7 @@ def test_citizen_cancels_until_the_start_for_both_kinds(kind: DispatchKind) -> N
 
 
 def test_a_monday_booking_is_not_locked_since_friday() -> None:
-    """The case behind ADR 0068: own queue, Monday 09:30, two days before."""
+    """The case behind ADR 0069: own queue, Monday 09:30, two days before."""
     start = datetime(2026, 11, 2, 8, 30, tzinfo=UTC)  # Monday 09:30 Amsterdam
     group = make_group(dispatch_kind=QUEUE)
     sunday_noon = datetime(2026, 11, 1, 11, 0, tzinfo=UTC)
