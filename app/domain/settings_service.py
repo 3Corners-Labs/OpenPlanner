@@ -52,11 +52,15 @@ EDITABLE_TOPICS = frozenset(
         Topic.PLANNER,
         Topic.MAIL,
         Topic.UPDATES,
+        Topic.WEBEX,
         Topic.CONFIRMATION,
     }
 )
-"""The topics of class C settings the portal changes: step 4, and mail and updates with their
-secrets from step 6 (sealed, ADR 0008). Webex/WxCC and the login mapping follow."""
+"""The topics of class C settings the portal changes: step 4, and mail, updates and the Webex
+Service App with their secrets from step 6 (sealed, ADR 0008). The login mapping follows."""
+
+GENERATED_SECRETS = frozenset({"webex_webhook_secret", "wxcc_webhook_secret"})
+"""Secrets the server generates and rotates with a button, never typed in (ADR 0042 inventory)."""
 
 LOG_LEVEL = "log_level"
 
@@ -71,6 +75,8 @@ def editable(spec: SettingSpec) -> bool:
     """Return whether the portal and the CLI may change ``spec``'s platform value."""
     if spec.class_ is SettingClass.ORGANISATION:
         return not spec.secret
+    if spec.key in GENERATED_SECRETS:
+        return False
     return spec.class_ is SettingClass.PLATFORM and spec.topic in EDITABLE_TOPICS
 
 

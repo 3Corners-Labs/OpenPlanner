@@ -5,6 +5,7 @@ video meetings and work items; bookings keep working. Without a settings key the
 ``SecretBox``, so channel secrets (ADR 0022) can be neither stored nor read.
 """
 
+import hashlib
 from dataclasses import dataclass
 
 import httpx
@@ -38,6 +39,22 @@ class Integrations:
     video: VideoProvider | None = None
     dispatcher: ContactCenterDispatcher | None = None
     checker: IntegrationChecker | None = None
+
+
+def webex_fingerprint(settings: Settings) -> str:
+    """Return a digest of the settings ``build_integrations`` uses, to notice a change.
+
+    Web and worker rebuild their Webex and WxCC adapters when it changes (ADR 0042 step 6b);
+    a digest, so no second copy of the secrets is kept.
+    """
+    parts = (
+        settings.webex_client_id or "",
+        settings.webex_client_secret.get_secret_value() if settings.webex_client_secret else "",
+        settings.webex_refresh_token.get_secret_value() if settings.webex_refresh_token else "",
+        settings.wxcc_api_base_url or "",
+        settings.webex_api_base_url,
+    )
+    return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
 
 
 def secret_box(settings: Settings) -> SecretBox | None:
