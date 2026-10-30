@@ -304,16 +304,18 @@ worker ──TLS handshake, no request──> proxy (public name, port 443): rea
 ```
 
 ```
-superuser ──https, multipart──> web: PEM chain + private key (ADR 0066)
-web ──> own_certificates: chain (public), key sealed AES-256-GCM (SETTINGS_ENCRYPTION_KEY),
-        fingerprint, subject, issuer, names, validity; audit_events: fingerprint + expiry only
-web ──portal-certs volume──> proxy: fullchain.pem, privkey.pem (mode 600), serial
+web ──> portal-certs volume (uid 10001, mode 600): private key + CSR made here (ADR 0066)
+superuser ──https, admin session──> web: the CSR (public) out; the certificate chain in
+   (a migration: chain + private key in, the key written to the volume only)
+web ──> own_certificates: chain (public), public key, fingerprint, subject, issuer, names,
+        validity; audit_events: fingerprint + expiry only
+web ──portal-certs volume──> proxy: privkey.pem, fullchain.pem, serial
 ```
 
-The uploaded private key is an integration secret (ADR 0008): it is in the database only
-sealed, in the shared volume as the proxy's working copy, and nowhere else (not in logs, audit
-events, error messages or the page). It concerns the organisation's server identity, not a
-citizen. The CA learns the domain name and the operator's e-mail address; no citizen data
+**The database holds certificates but no private keys** (DPIA input): the key of an own
+certificate is made on the host or imported straight into the `portal-certs` volume, which the
+database backup leaves out on purpose; it is never in a log, an audit event, an error message or
+a page. It concerns the organisation's server identity, not a citizen. The CA learns the domain name and the operator's e-mail address; no citizen data
 leaves through this flow. The proxy keeps no access log, so booking paths with management tokens are not
 written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
 name only).

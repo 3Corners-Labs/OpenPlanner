@@ -4,10 +4,10 @@
 #   operator files    TLS_CERT_FILE and TLS_KEY_FILE under /certs (proxy.env): Caddy serves the
 #                     files and manages nothing; renewal is the operator's, and the portal's
 #                     choice is ignored.
-#   portal pair       the pair the superuser uploaded in the portal, handed over by web in
-#                     /portal-certs (fullchain.pem, privkey.pem and serial, written last). A
-#                     watcher reloads Caddy whenever serial changes: with the pair, or without
-#                     it so ACME applies again.
+#   portal pair       the own certificate managed in the portal: its key made or imported on
+#                     this host by web in /portal-certs (privkey.pem), the chain web places next
+#                     to it (fullchain.pem) and serial, written last. A watcher reloads Caddy
+#                     whenever serial changes: with the pair, or without it so ACME applies.
 #   ACME (default)    TLS_DOMAIN and ACME_EMAIL; Caddy obtains and renews the certificate.
 # The Caddyfile cannot branch, so the `tls` line of the https site comes from TLS_DIRECTIVE,
 # which this script sets for `caddy run` and again for every `caddy reload`. Without a domain

@@ -49,12 +49,12 @@ services:
     networks: [default, edge]
     volumes:
       - data:/srv/data
-      # The own certificate uploaded in the portal, handed to the proxy (ADR 0066); web writes,
-      # the proxy reads. Empty with ACME.
+      # The own certificate managed in the portal (ADR 0066): its private key lives here and
+      # nowhere else (never in the database); web writes, the proxy reads. Empty with ACME.
       - portal-certs:/srv/portal-certs
     environment:
       # ADR 0066: whether the bundled proxy runs (the installer's OPENPLANNER_TLS pin), so the
-      # portal knows the certificate source is its to manage; and where to hand the pair over.
+      # portal knows the certificate source is its to manage; and the volume with the own key.
       TLS_PROXY_BUNDLED: ${OPENPLANNER_TLS:-false}
       TLS_PORTAL_CERTIFICATE_DIR: /srv/portal-certs
     ports:
@@ -95,7 +95,7 @@ services:
       - proxy-data:/data
       # An own certificate and key (ADR 0064); empty with ACME.
       - ./certs:/certs:ro
-      # The pair uploaded in the portal (ADR 0066); the entrypoint's watcher reloads on change.
+      # The own certificate from the portal (ADR 0066); the entrypoint's watcher reloads on change.
       - portal-certs:/portal-certs:ro
     networks:
       edge:

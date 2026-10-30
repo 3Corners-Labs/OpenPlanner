@@ -80,6 +80,8 @@ class ErrorCode(StrEnum):
     TLS_CERTIFICATE_MISSING = "tls_certificate_missing"
     TLS_CERTIFICATE_IN_USE = "tls_certificate_in_use"
     TLS_SOURCE_NOT_APPLICABLE = "tls_source_not_applicable"
+    TLS_KEY_MISSING = "tls_key_missing"
+    TLS_VOLUME_UNWRITABLE = "tls_volume_unwritable"
 
 
 class DomainError(Exception):

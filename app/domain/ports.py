@@ -38,7 +38,7 @@ from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.maintenance import MaintenanceState
-from app.domain.own_certificate import OwnCertificate, PemPair
+from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
 from app.domain.retention import RetentionFacts
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
@@ -237,29 +237,64 @@ class CertificateProbe(Protocol):
 
 
 class PemReader(Protocol):
-    """Parses an uploaded certificate chain and private key (ADR 0066)."""
+    """Parses an uploaded certificate chain or private key (ADR 0066)."""
 
-    def read(self, chain: bytes, key: bytes) -> PemPair:
-        """Return the leaf certificate's public data, the fingerprint and whether the key fits.
-
-        The returned pair carries the normalised PEM texts; the caller stores them and never
-        logs them.
+    def read_chain(self, chain: bytes) -> ParsedChain:
+        """Return the leaf's public data, fingerprint, public key and the normalised chain.
 
         Raises:
-            DomainError: ``tls_certificate_unreadable`` when either file does not parse.
+            DomainError: ``tls_certificate_unreadable`` (field ``chain``).
+        """
+        ...
+
+    def read_key(self, key: bytes) -> ParsedKey:
+        """Return the normalised key and its public key; the caller hands it to the volume.
+
+        Raises:
+            DomainError: ``tls_certificate_unreadable`` (field ``key``).
         """
         ...
 
 
-class CertificateDelivery(Protocol):
-    """Hands the stored own certificate to the proxy, or takes it away again (ADR 0066)."""
+class CertificateVolume(Protocol):
+    """The directory shared with the proxy: the key lives here and nowhere else (ADR 0066).
 
-    async def publish(self, fingerprint: str) -> None:
-        """Write the stored pair with ``fingerprint`` where the proxy reads it."""
+    ``privkey.pem`` is the key the proxy serves with, ``pending.key``/``pending.csr`` a key
+    waiting for its certificate, ``fullchain.pem`` and ``serial`` the served pair. Reading
+    and publishing never raise; making or importing a key raises when the volume cannot be
+    written, because the superuser must hear that.
+    """
+
+    def keys(self) -> HostKeys:
+        """Return the public keys on this host and the pending request."""
         ...
 
-    async def withdraw(self) -> None:
-        """Remove the pair, so the proxy falls back to ACME; nothing to remove is fine."""
+    def generate_pending(self, host: str) -> str:
+        """Make a new key and a signing request for ``host``; return the request (PEM).
+
+        Raises:
+            DomainError: ``tls_volume_unwritable``.
+        """
+        ...
+
+    def promote_pending(self) -> None:
+        """Make the pending key the served one (its chain was uploaded)."""
+        ...
+
+    def import_key(self, key_pem: str) -> None:
+        """Write an imported key as the served one, dropping any pending request.
+
+        Raises:
+            DomainError: ``tls_volume_unwritable``.
+        """
+        ...
+
+    def publish(self, chain_pem: str, fingerprint: str) -> None:
+        """Write the chain and, last, the serial, so the proxy serves the pair."""
+        ...
+
+    def withdraw(self) -> None:
+        """Remove the serial and the chain, so the proxy falls back to ACME; the key stays."""
         ...
 
 
@@ -974,19 +1009,15 @@ class Transaction(Protocol):
         ...
 
     async def get_own_certificate(self) -> OwnCertificate | None:
-        """Return the uploaded own certificate (ADR 0066), never its key; ``None`` without one."""
+        """Return the uploaded own certificate (ADR 0066); ``None`` without one."""
         ...
 
-    async def save_own_certificate(self, certificate: OwnCertificate, key_pem: str) -> None:
-        """Store or replace the own certificate; the key is sealed (ADR 0008).
-
-        Raises:
-            DomainError: ``setting_no_key`` without ``SETTINGS_ENCRYPTION_KEY``.
-        """
+    async def save_own_certificate(self, certificate: OwnCertificate) -> None:
+        """Store or replace the own certificate's chain and public data (never a key)."""
         ...
 
     async def delete_own_certificate(self) -> bool:
-        """Remove the own certificate and its key; return whether there was one."""
+        """Remove the own certificate; return whether there was one."""
         ...
 
     async def settings_version(self) -> int:

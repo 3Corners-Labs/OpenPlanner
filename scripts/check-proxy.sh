@@ -90,8 +90,8 @@ wait_for_issuer() { # wait_for_issuer FRAGMENT: the watcher polls every 10 s (AD
   fail "the proxy did not switch to '$1' ($(issuer))"
 }
 
-# Pass 1b: the pair the superuser uploads in the portal reaches the proxy through the
-# portal-certs volume (ADR 0066): written by web as fullchain.pem, privkey.pem and serial.
+# Pass 1b: the own certificate managed in the portal reaches the proxy through the
+# portal-certs volume (ADR 0066): web keeps the key there and adds fullchain.pem and serial.
 self_signed portal "OpenPlanner portal check"
 compose cp "$certs/portal.crt" web:/srv/portal-certs/fullchain.pem
 compose cp "$certs/portal.key" web:/srv/portal-certs/privkey.pem

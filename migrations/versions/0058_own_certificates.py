@@ -1,8 +1,8 @@
 """The own certificate uploaded in the portal (ADR 0066).
 
-``own_certificates`` holds one row: the PEM chain (public), the private key sealed with
-AES-256-GCM under ``SETTINGS_ENCRYPTION_KEY`` (ADR 0008), and the public data the page shows.
-No personal data. The downgrade drops the table; the pair must be uploaded again afterwards.
+``own_certificates`` holds one row: the PEM chain (public), the leaf's public key and the
+public data the page shows. Never a private key (it lives on the volume the proxy reads) and no
+personal data. The downgrade drops the table; the chain must be uploaded again afterwards.
 Revises 0057, the merge of the certificate checks (ADR 0064) with main's event messages.
 
 Revision ID: 0058
@@ -27,8 +27,7 @@ def upgrade() -> None:
         "own_certificates",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("chain_pem", sa.Text(), nullable=False),
-        sa.Column("key_nonce", sa.LargeBinary(), nullable=False),
-        sa.Column("key_ciphertext", sa.LargeBinary(), nullable=False),
+        sa.Column("public_key", sa.LargeBinary(), nullable=False),
         sa.Column("fingerprint", sa.String(length=64), nullable=False),
         sa.Column("subject", sa.String(length=255), nullable=False),
         sa.Column("issuer", sa.String(length=255), nullable=False),

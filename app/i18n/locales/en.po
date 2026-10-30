@@ -6278,7 +6278,7 @@ msgid "admin.settings.tls.source.title"
 msgstr "Certificate source"
 
 msgid "admin.settings.tls.source.intro"
-msgstr "The bundled HTTPS proxy gets its certificate from Let's Encrypt (renewed automatically) or serves the certificate uploaded here. A switch takes effect within about half a minute; then choose Check now."
+msgstr "The bundled HTTPS proxy gets its certificate from Let's Encrypt (renewed automatically) or serves the own certificate placed here. The private key stays on this server, in the proxy's volume, and never enters the database or a backup of it. A switch takes effect within about half a minute; then choose Check now."
 
 msgid "admin.settings.tls.source.not_applicable"
 msgstr "Not applicable: HTTPS ends at a reverse proxy or load balancer of your own. The certificate is managed there; above is what visitors see."
@@ -6317,16 +6317,16 @@ msgid "admin.settings.tls.source.choose"
 msgstr "Source"
 
 msgid "admin.settings.tls.source.upload_title"
-msgstr "Upload or replace the own certificate"
+msgstr "Place or replace the certificate chain"
 
 msgid "admin.settings.tls.source.upload_hint"
-msgstr "Two PEM files of at most 64 KB each: the certificate chain (server certificate first, then the intermediates) and the matching private key without a password. The key is stored encrypted and never shown. The certificate must be valid for the public address."
+msgstr "PEM files of at most 64 KB each. The chain (server certificate first, then the intermediates) must belong to a key on this server: the request above, or the key already in use. The certificate must be valid for the public address."
 
 msgid "admin.settings.tls.source.chain_file"
 msgstr "Certificate chain (PEM)"
 
 msgid "admin.settings.tls.source.key_file"
-msgstr "Private key (PEM)"
+msgstr "Private key (PEM, only when migrating)"
 
 msgid "admin.settings.tls.source.upload"
 msgstr "Save certificate"
@@ -6347,10 +6347,10 @@ msgid "admin.done.certificate_checked"
 msgstr "The certificate has been checked. The result is below."
 
 msgid "admin.form.error.tls_certificate_unreadable"
-msgstr "This file is not a readable PEM file (or the key is protected by a password). Check the files and try again."
+msgstr "This file is not a readable PEM file (or the key is protected by a password). Check the file and try again."
 
 msgid "admin.form.error.tls_key_mismatch"
-msgstr "The private key does not belong to the server certificate in the chain."
+msgstr "The chain does not belong to a key on this server: make a request first, or migrate the existing certificate with its private key. A key given here must belong to the server certificate."
 
 msgid "admin.form.error.tls_name_mismatch"
 msgstr "The certificate is not valid for the public address of this installation."
@@ -6372,3 +6372,42 @@ msgstr "This installation uses a reverse proxy of its own; the certificate is ma
 
 msgid "settings.field.tls_certificate_source.label"
 msgstr "Source of the bundled proxy's certificate"
+
+msgid "admin.settings.tls.source.key_on_host"
+msgstr "Private key on this server"
+
+msgid "admin.settings.tls.source.key_present"
+msgstr "Present"
+
+msgid "admin.settings.tls.source.key_missing"
+msgstr "Missing on this server"
+
+msgid "admin.settings.tls.source.key_missing_hint"
+msgstr "The database was restored on another server; the key does not travel with it. Make a new request and place the new certificate, or migrate the existing certificate with its key. Until then the proxy uses Let's Encrypt."
+
+msgid "admin.settings.tls.source.csr_title"
+msgstr "Request for an own certificate"
+
+msgid "admin.settings.tls.source.csr_hint"
+msgstr "Make a new key on this server with a certificate signing request (CSR) for the public address. Hand the request to your certificate authority (for example PKIoverheid) and place the chain you receive below. The key never leaves this server. A request does not disturb a certificate in use; a new request replaces an earlier one."
+
+msgid "admin.settings.tls.source.csr_pending"
+msgstr "Request waiting for its certificate"
+
+msgid "admin.settings.tls.source.csr_download"
+msgstr "Download the request (openplanner.csr)"
+
+msgid "admin.settings.tls.source.csr_generate"
+msgstr "Make a new key and request"
+
+msgid "admin.settings.tls.source.key_hint"
+msgstr "Only to migrate an existing certificate with its key: the key goes straight to the proxy's volume without a password, is never shown and is not kept in the database."
+
+msgid "admin.done.csr_generated"
+msgstr "The key and the request have been made. Hand the request to the certificate authority, then place the chain."
+
+msgid "admin.form.error.tls_key_missing"
+msgstr "The private key of the placed certificate is not on this server. Make a new request or migrate the certificate with its key."
+
+msgid "admin.form.error.tls_volume_unwritable"
+msgstr "The server cannot write the key to the proxy's volume. Tell the server operator."

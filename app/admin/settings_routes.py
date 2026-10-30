@@ -18,16 +18,20 @@ the audit log.
 The page reloads the portal values first, so it always shows what the processes now apply.
 
 The certificate block (ADR 0066) also carries the source of the bundled proxy's certificate
-and the uploaded own certificate: the source is the setting ``tls_certificate_source``,
-changed through the generic route but checked by ``CertificateSourceService`` (``own`` needs an
-upload); the pair is uploaded as two files, replaced or removed there, and *Check now* runs the
-worker's probe at once. Without the bundled proxy the block says the source does not apply.
+and the own certificate: the source is the setting ``tls_certificate_source``, changed through
+the generic route but checked by ``CertificateSourceService`` (``own`` needs a chain whose key
+is on this host); a key is made here with its signing request (downloaded as text), the chain
+the CA issued is uploaded (with its key only to import an existing certificate), replaced or
+removed there, and *Check now* runs the worker's probe at once. The private key never passes
+through a response. Without the bundled proxy the block says the source does not apply.
 
     GET  /admin/settings                          settings.platform.view
     POST /admin/settings/{key}                    settings.platform.manage (recent login)
     POST /admin/settings/{key}/reset              settings.platform.manage (recent login)
     POST /admin/settings/{key}/adopt              settings.platform.manage (recent login)
     POST /admin/settings/login/test               settings.login.manage (recent login): dry run (§8)
+    POST /admin/settings/tls/csr                  settings.platform.manage (recent login): new key
+    GET  /admin/settings/tls/csr.pem              settings.platform.manage: the pending request
     POST /admin/settings/tls/certificate          settings.platform.manage (recent login): upload
     POST /admin/settings/tls/certificate/remove   settings.platform.manage (recent login)
     POST /admin/settings/tls/check                settings.platform.manage (recent login)
@@ -37,7 +41,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, RedirectResponse, Response
+from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
 from app.adapters.live_settings import LiveSettings
 from app.adapters.settings_report import SettingState
@@ -51,13 +55,20 @@ from app.config import Settings
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
-from app.domain.own_certificate import MAX_PEM_BYTES, SOURCE_KEY, SOURCES, OwnCertificate
+from app.domain.own_certificate import (
+    MAX_PEM_BYTES,
+    SOURCE_KEY,
+    SOURCES,
+    OwnCertificate,
+    SourceStatus,
+)
 from app.domain.settings_registry import BY_KEY, LOG_LEVEL_MAX_EXPIRY_HOURS, SettingClass, Topic
 from app.domain.settings_service import LOG_LEVEL, SettingsService, editable
 from app.domain.tls import Finding
 from app.domain.tls_check import CertificateStatus
 from app.domain.tls_source import CertificateSourceService
 from app.web.locale import RequestLocale
+from app.web.protection import RejectedRequest
 from app.web.settings_labels import (
     CLASS_LABELS,
     PROBLEM_LABELS,
@@ -71,6 +82,7 @@ router = APIRouter(prefix="/admin", include_in_schema=False)
 
 URL = "/admin/settings"
 View = Annotated[AdminContext, Depends(RequirePermission(Permission.SETTINGS_PLATFORM_VIEW))]
+Manage = Annotated[AdminContext, Depends(RequirePermission(Permission.SETTINGS_PLATFORM_MANAGE))]
 Change = Annotated[
     AdminContext, Depends(RequirePermission(Permission.SETTINGS_PLATFORM_MANAGE, fresh=True))
 ]
@@ -129,6 +141,8 @@ TLS_URL = f"{URL}#tls-heading"
 CERTIFICATE_FIELDS = ("chain", "key")
 REMOVE_KEY = "tls_certificate"
 """The error key of the remove form (the upload's errors sit at ``chain`` or ``key``)."""
+CSR_KEY = "tls_csr"
+"""The error key of the request form."""
 
 
 @dataclass(frozen=True)
@@ -145,7 +159,21 @@ class UploadedView:
 
 @dataclass(frozen=True)
 class SourceView:
-    """The certificate source block: the setting, the upload and what the admin may do."""
+    """The certificate source block: the setting, the key on this host, the chain, the forms.
+
+    Attributes:
+        applicable: Whether the bundled proxy runs; otherwise only a note is shown.
+        source: The effective source (``acme`` or ``own``).
+        choices: The sources to choose from.
+        locked: Whether the environment locks the source (the host manages it).
+        variable: The locking variable's name.
+        editable: Whether the forms are shown (manage permission, not locked).
+        uploaded: The stored chain, if any.
+        key_missing: A chain is stored but its key is not on this host (restored elsewhere).
+        pending_csr: A signing request waiting for its certificate, if any.
+        removable: Whether the chain may be removed (not in use).
+        errors: Refusals by field: the source, the chain, the key or the removal.
+    """
 
     applicable: bool
     source: str
@@ -154,6 +182,8 @@ class SourceView:
     variable: str
     editable: bool
     uploaded: UploadedView | None
+    key_missing: bool
+    pending_csr: str | None
     removable: bool
     errors: dict[str, str]
 
@@ -241,15 +271,41 @@ async def reset_setting(
     return redirect_done(URL, "saved", anchor=_anchor(key))
 
 
+@router.post("/settings/tls/csr", response_class=HTMLResponse)
+async def request_certificate(
+    request: Request, locale: Locale, _: SameOrigin, context: Change
+) -> Response:
+    """Make a new key on this host and its signing request (ADR 0066)."""
+    try:
+        await (await _source(request)).generate_csr(context.principal)
+    except DomainError as error:
+        raise_refusal(error)
+        return await _overview(request, locale, context, (CSR_KEY, error), 422)
+    return redirect_done(URL, "csr_generated", anchor="tls-heading")
+
+
+@router.get("/settings/tls/csr.pem", response_class=PlainTextResponse)
+async def download_request(request: Request, context: Manage) -> Response:
+    """Return the pending signing request as a file to hand to the CA (public data)."""
+    status = await (await _source(request)).status()
+    if status.pending_csr is None:
+        raise RejectedRequest(404)
+    return PlainTextResponse(
+        status.pending_csr,
+        media_type="application/pkcs10",
+        headers={"content-disposition": 'attachment; filename="openplanner.csr"'},
+    )
+
+
 @router.post("/settings/tls/certificate", response_class=HTMLResponse)
 async def upload_certificate(
     request: Request, locale: Locale, _: SameOrigin, context: Change
 ) -> Response:
-    """Store an uploaded chain and key as the own certificate (ADR 0066)."""
+    """Store an uploaded chain; with a key, import an existing certificate (ADR 0066)."""
     uploads = await read_uploads(request, CERTIFICATE_FIELDS, MAX_PEM_BYTES)
     try:
         await (await _source(request)).upload(
-            context.principal, uploads.files["chain"], uploads.files["key"]
+            context.principal, uploads.files["chain"], uploads.files["key"] or None
         )
     except DomainError as error:
         raise_refusal(error)
@@ -410,7 +466,9 @@ async def _source_view(
     """Describe the certificate source block (ADR 0066) from the setting's state."""
     service = await _source(request)
     state = next(s for s in states if s.spec.key == SOURCE_KEY)
-    uploaded = await service.uploaded() if service.applicable() else None
+    status = await service.status() if service.applicable() else SourceStatus(None, False, None)
+    uploaded = status.uploaded
+    keys = (SOURCE_KEY, REMOVE_KEY, CSR_KEY, *CERTIFICATE_FIELDS)
     return SourceView(
         service.applicable(),
         str(state.value),
@@ -419,8 +477,10 @@ async def _source_view(
         state.spec.env,
         manage and not state.locked,
         None if uploaded is None else _uploaded_view(request, locale, uploaded),
+        status.key_missing,
+        status.pending_csr,
         uploaded is not None and state.value != SOURCES[1],
-        {k: v for k, v in errors.items() if k in (SOURCE_KEY, REMOVE_KEY, *CERTIFICATE_FIELDS)},
+        {k: v for k, v in errors.items() if k in keys},
     )
 
 

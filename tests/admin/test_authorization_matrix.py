@@ -134,9 +134,16 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/{key}/reset": {
         "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
     },
-    # ADR 0066: the certificate source and the uploaded pair, superuser only. Without the
-    # bundled proxy (the test settings) an upload is refused (422), a removal is a conflict
-    # (409); *Check now* always probes and returns to the page.
+    # ADR 0066: the certificate source, the key on this host and the chain, superuser only.
+    # Without the bundled proxy (the test settings) a request or an upload is refused (422), a
+    # removal is a conflict (409), there is no request to download (404); *Check now* always
+    # probes and returns to the page.
+    "POST /admin/settings/tls/csr": {
+        "/admin/settings/tls/csr": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    "GET /admin/settings/tls/csr.pem": {
+        "/admin/settings/tls/csr.pem": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
     "POST /admin/settings/tls/certificate": {
         "/admin/settings/tls/certificate": statuses(422, 403, 403, 403, 403, 403, 403),
     },

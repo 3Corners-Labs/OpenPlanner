@@ -31,7 +31,6 @@ from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
-from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import Answers, FormDefinition, raise_to_pii
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import PlannedJob
@@ -93,7 +92,6 @@ class State:
     release_check: ReleaseCheck | None = None
     certificate_check: CertificateCheck | None = None
     own_certificate: OwnCertificate | None = None
-    own_certificate_key: str | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     custom_roles: dict[int, CustomRole] = field(default_factory=dict)
@@ -849,16 +847,12 @@ class InMemoryTransaction:
     async def get_own_certificate(self) -> OwnCertificate | None:
         return self.state.own_certificate
 
-    async def save_own_certificate(self, certificate: OwnCertificate, key_pem: str) -> None:
-        if not self.state.secrets_available:
-            raise DomainError(ErrorCode.SETTING_NO_KEY)
+    async def save_own_certificate(self, certificate: OwnCertificate) -> None:
         self.state.own_certificate = certificate
-        self.state.own_certificate_key = key_pem
 
     async def delete_own_certificate(self) -> bool:
         had = self.state.own_certificate is not None
         self.state.own_certificate = None
-        self.state.own_certificate_key = None
         return had
 
     async def get_maintenance_state(self) -> MaintenanceState:

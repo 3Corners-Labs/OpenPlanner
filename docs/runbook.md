@@ -242,45 +242,52 @@ Back to ACME: remove `TLS_CERT_FILE` and `TLS_KEY_FILE` from `proxy.env`, make s
 
 On a small installation (the bundled proxy, the installer's default) the superuser manages the
 certificate source without the host: *Platform → Advanced settings → System status →
-Certificate source*.
+Certificate source*. The private key never leaves the host: it lives in the `portal-certs`
+volume (uid 10001, mode 600), never in the database, so a database backup never carries it.
 
-1. **Upload** the PEM chain (server certificate first, then the intermediates) and the matching
-   private key (unencrypted) under *Upload or replace the own certificate*. The upload is
-   refused with the reason when a file is not PEM, the key does not fit, the certificate does
-   not cover the public address, or it is expired. The key is stored encrypted with
-   `SETTINGS_ENCRYPTION_KEY` and never shown; the page shows the fingerprint, subject, names
-   and expiry date.
-2. **Switch the source** to *Own certificate (uploaded)* and save. `web` writes the pair into
-   the `portal-certs` volume (`fullchain.pem`, `privkey.pem`, `serial`); the proxy's watcher
-   sees the new `serial` within `TLS_PORTAL_POLL_SECONDS` (10) and reloads Caddy with the pair.
-   The proxy's log says `portal certificate <fingerprint> applied`.
-3. **Check now** probes the public address at once: *System status* shows the uploaded
-   certificate's issuer and the finding (*in orde* for a publicly trusted CA, *niet vertrouwd*
-   for a private one).
-4. **Replace** before expiry by uploading the new pair: with the source on *own* it reaches the
-   proxy at once. **Renewal is the organisation's**: the worker's *expiring* finding and the
-   system event `tls.certificate` are the safety net, so put a calendar entry at the expiry date
-   minus a month.
-5. **Back to Let's Encrypt**: switch the source to *Let's Encrypt (automatic)*. The pair is
-   withdrawn from the volume (`serial` first), the watcher reloads Caddy without it and ACME
-   applies again; the certificate Caddy kept in `proxy-data` is still there, renewed as before.
-   The uploaded pair stays stored until *Remove the uploaded certificate*, which is allowed only
-   while Let's Encrypt is the source.
+1. **Make a key and a request**: *Make a new key and request*. `web` makes an ECDSA P-256 key
+   and a certificate signing request for the public address in the volume (`pending.key`,
+   `pending.csr`). The page shows the request as text and offers it as `openplanner.csr`.
+   Hand it to the CA (PKIoverheid or any other); a request does not disturb a certificate in
+   use, and a new request replaces an earlier one.
+2. **Place the chain** the CA issued under *Place or replace the certificate chain* (PEM,
+   server certificate first, then the intermediates). The upload is refused with the reason
+   when the file is not PEM, the chain does not belong to a key on this host, does not cover the
+   public address, or is expired. The pending key becomes the served key (`privkey.pem`); the
+   page shows fingerprint, subject, names, expiry and *Private key on this server: present*.
+3. **Switch the source** to *Own certificate* and save. `web` writes `fullchain.pem` and
+   `serial` next to the key; the proxy's watcher sees the new `serial` within
+   `TLS_PORTAL_POLL_SECONDS` (10) and reloads Caddy with the pair. The proxy's log says
+   `portal certificate <fingerprint> applied`.
+4. **Check now** probes the public address at once: *System status* shows the new issuer and
+   the finding (*in orde* for a publicly trusted CA, *niet vertrouwd* for a private one).
+5. **Renew** before expiry: with the same key, place the new chain (one upload, served at once
+   while the source is *own*); with a new key, make a new request first. **Renewal is the
+   organisation's**: the worker's *expiring* finding and the system event `tls.certificate`
+   are the safety net, so put a calendar entry at the expiry date minus a month.
+6. **Back to Let's Encrypt**: switch the source to *Let's Encrypt*. `serial` and the chain are
+   withdrawn from the volume, the watcher reloads Caddy without them and ACME applies again;
+   the key stays for the next chain. *Remove the uploaded certificate* deletes the chain from
+   the database (never the key) and is allowed only while Let's Encrypt is the source.
+
+**Migrating an existing certificate**: place the chain and, in the second field, its private
+key (unencrypted PEM) together. The key goes straight to the volume, write-only; it is not
+kept anywhere else and never shown. Use this once; afterwards renew with requests.
+
+**After a database restore on another host** the chain is there but the key is not: the page
+says *Private key on this server: missing*, *own* cannot be chosen, and the proxy serves Let's
+Encrypt until you make a new request and place its chain (or import the pair again). The
+`portal-certs` volume is left out of the database backup on purpose (*Backup and restore*).
 
 Precedence in the proxy: files named in `proxy.env` (`TLS_CERT_FILE`/`TLS_KEY_FILE`, above) win
 over the portal, then the portal's pair, then ACME. The installer's `--own-certificate` also
 writes `TLS_CERTIFICATE_SOURCE=own` into `.env`, which locks the portal setting: the page then
-says the host manages the certificate and offers no upload. An operator who wants the choice out
+says the host manages the certificate and offers no forms. An operator who wants the choice out
 of the portal altogether sets `TLS_CERTIFICATE_SOURCE=acme` in `.env` (ADR 0042 lock). Behind a
 load balancer of your own (`--no-tls`) the block says the source does not apply.
 
-Every upload and removal is in the audit log with the fingerprint and the expiry date only.
-Losing `SETTINGS_ENCRYPTION_KEY` (see *Rotating secrets*) makes the stored key unreadable: the
-proxy keeps serving the working copy in `portal-certs` until the source changes; upload the
-pair again afterwards. Include `portal-certs` in the backup next to `proxy-data`, or just
-upload again after a restore.
-
-On the host, the volume and the proxy's view of it:
+Every request, upload, import and removal is in the audit log with the fingerprint and the
+expiry date only. On the host, the volume and the proxy's view of it:
 
 ```bash
 docker compose --env-file .env.update exec web ls -l /srv/portal-certs
@@ -307,9 +314,10 @@ On a host with a public DNS name and ports 80 and 443 open (docker01 in the lab)
    expiry date then, and *expiring* appears only if it did not happen.
 5. Optionally the own-certificate path: a self-signed pair in `certs/`, `--own-certificate`,
    System status says *niet vertrouwd* with your own issuer; back to ACME as above.
-6. The portal path (ADR 0066): upload a self-signed pair for the host on *Advanced settings*,
-   switch the source to *own*, press *Check now* and see your own issuer with *niet vertrouwd*;
-   switch back to Let's Encrypt and see *ok* again, without touching the host.
+6. The portal path (ADR 0066): on *Advanced settings* make a request, sign it with any test CA
+   (or import a self-signed pair for the host with its key), place the chain, switch the source
+   to *own*, press *Check now* and see your own issuer with *niet vertrouwd*; switch back to
+   Let's Encrypt and see *ok* again, without touching the host.
 
 ## Time zones and clock format
 
@@ -1069,6 +1077,14 @@ deploy the old image. Every migration is reversible (enforced in CI).
 
 *TBD (O7).* Planned: Litestream or a daily `sqlite3 .backup`, encrypted, retention = PII term
 + 7 days (HANDOVER §7).
+
+The `portal-certs` volume (ADR 0066: the private key of an own certificate, its signing
+request and the served pair) is **not** part of the database backup, on purpose: the database
+holds certificates but no private keys. After a restore on another host, make a new request in
+the portal and place its chain, or import the pair again (*Own certificate from the portal*);
+until then the proxy serves Let's Encrypt. The same holds for `proxy-data` (the ACME key and
+account): keep it with the host, or let Caddy obtain a certificate again.
+
 
 ## Rotating secrets
 

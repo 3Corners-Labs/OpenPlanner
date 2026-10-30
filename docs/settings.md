@@ -43,7 +43,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `TLS_CERT_FILE` | path | — | Own certificate chain (PEM) for the proxy; with TLS_KEY_FILE it replaces ACME (proxy.env, ADR 0064). |
 | `TLS_KEY_FILE` | path | — | Private key of the own certificate (proxy.env, ADR 0064). |
 | `TLS_PROXY_BUNDLED` | bool | `false` | The bundled HTTPS proxy runs, so the portal manages the certificate source (docker-compose.yml sets it from OPENPLANNER_TLS; ADR 0066). |
-| `TLS_PORTAL_CERTIFICATE_DIR` | path | `data/portal-certs` | Where web writes the own certificate for the proxy (the portal-certs volume; ADR 0066). |
+| `TLS_PORTAL_CERTIFICATE_DIR` | path | `portal-certs` | The volume shared with the proxy that holds the own certificate's private key, its request and the served pair; never under data/ (ADR 0066). |
 | `TLS_PORTAL_POLL_SECONDS` | int | `10` | How often the proxy looks for a changed certificate from the portal (proxy.env, ADR 0066). |
 | `WORKER_HEARTBEAT_PATH` | path | `data/worker.heartbeat` | Heartbeat file the worker healthcheck reads. |
 | `WORKER_HEARTBEAT_MAX_AGE_SECONDS` | float | `120.0` | Age after which the worker healthcheck fails. |
