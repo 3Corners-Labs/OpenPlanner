@@ -425,7 +425,7 @@ async def test_booking_cannot_be_cancelled_from_the_start(
 async def test_booking_can_be_cancelled_after_the_change_lead_and_dispatch(
     uow: InMemoryUnitOfWork, minutes_before: int
 ) -> None:
-    """ADR 0068: no cancel-lock before the start; the task is ended by the job (ADR 0021)."""
+    """ADR 0069: no cancel-lock before the start; the task is ended by the job (ADR 0021)."""
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     late = BookingService(
         uow, FixedClock(SLOT_0900 - timedelta(minutes=minutes_before)), TEST_TOKEN_KEY
