@@ -67,6 +67,17 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/overview/w/changes": {
         "/admin/overview/w/changes": statuses(200, 200, 200, 200, 200, 403, 403)
     },
+    # queue.work: not the auditor (no personal data); tasks: dashboard.view, every admin;
+    # status: settings.platform.view, the superuser and the auditor only.
+    "GET /admin/overview/w/queue": {
+        "/admin/overview/w/queue": statuses(200, 200, 200, 200, 403, 200, 403)
+    },
+    "GET /admin/overview/w/tasks": {
+        "/admin/overview/w/tasks": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "GET /admin/overview/w/status": {
+        "/admin/overview/w/status": statuses(200, 403, 403, 403, 200, 403, 403)
+    },
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 200, 200, 403)},
     # ADR 0039: the role editor is the superuser's (roles.manage is locked).
     "GET /admin/roles": {"/admin/roles": statuses(200, 403, 403, 403, 403, 403, 403)},
