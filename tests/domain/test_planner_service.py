@@ -24,6 +24,7 @@ from tests.support.domain import (
     SLOT_0900,
     SLOT_0930,
     window,
+    with_team_invite,
 )
 
 SMS = frozenset({ChannelKind.SMS})
@@ -141,6 +142,17 @@ async def test_a_cancellation_carries_the_reason_to_the_citizen(
     }
     (event,) = [e for e in uow.state.audit if e.action == "bookings.manage"]
     assert event.detail == "planner.cancel,reason:technical"
+
+
+async def test_a_cancellation_in_the_own_queue_withdraws_the_team_invite(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    uow.state.groups[1] = with_team_invite(uow.state.groups[1])
+    booking_id = await _book(bookings)
+
+    await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.STAFFING)
+
+    assert (JobType.SEND_TEAM_CANCEL, ChannelKind.EMAIL) in _messages(uow, booking_id)
 
 
 # --- limits -------------------------------------------------------------------------------
@@ -261,6 +273,17 @@ async def test_asking_to_rebook_frees_the_place_and_tells_the_citizen(
     assert [b.id for b in await planner.waiting(GROUP_ADMIN, "demo")] == [booking_id]
     (event,) = [e for e in uow.state.audit if e.action == "bookings.manage"]
     assert (event.detail, event.booking_id) == ("planner.rebook,reason:staffing", booking_id)
+
+
+async def test_asking_to_rebook_in_the_own_queue_withdraws_the_team_invite(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    uow.state.groups[1] = with_team_invite(uow.state.groups[1])
+    booking_id = await _book(bookings)
+
+    await planner.request_rebook(GROUP_ADMIN, "demo", booking_id, ChangeReason.STAFFING)
+
+    assert (JobType.SEND_TEAM_CANCEL, ChannelKind.EMAIL) in _messages(uow, booking_id)
 
 
 async def test_a_booking_awaiting_a_new_time_can_still_be_moved_or_cancelled(

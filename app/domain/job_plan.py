@@ -71,6 +71,12 @@ class JobType(StrEnum):
     SEND_CONFIRM_REMINDER = "send_confirm_reminder"
     EXPIRE_UNCONFIRMED = "expire_unconfirmed"
     SEND_UNCONFIRMED_LAPSED = "send_unconfirmed_lapsed"
+    SEND_TEAM_INVITE = "send_team_invite"
+    SEND_TEAM_CANCEL = "send_team_cancel"
+
+
+TEAM_INVITES = frozenset({JobType.SEND_TEAM_INVITE, JobType.SEND_TEAM_CANCEL})
+"""The calendar invite to an own-queue team's address and its cancellation (ADR 0043)."""
 
 
 CLOSURE_NOTICES = frozenset({JobType.SEND_SUSPENSION, JobType.SEND_CLOSURE_UPDATE})
@@ -104,6 +110,7 @@ def plan_for_booking(
     dispatch_lead: timedelta,
     message: JobType = JobType.SEND_CONFIRMATION,
     sms: bool = False,
+    team_invite: bool = False,
 ) -> list[PlannedJob]:
     """Return the jobs of a newly confirmed booking, in execution order.
 
@@ -112,7 +119,7 @@ def plan_for_booking(
     an SMS as well when the citizen is reachable there (a planner's move, ADR 0044). Reminders
     are skipped
     when disabled, duplicated, not strictly in the future, or when the booking is not reachable
-    on the channel.
+    on the channel. ``team_invite`` adds the invite to the team's address (ADR 0043).
     """
     jobs = [
         PlannedJob(JobType.CREATE_VIDEO_ROOM, now, start),
@@ -120,6 +127,8 @@ def plan_for_booking(
     ]
     if sms and reachable(ChannelKind.SMS, contact, consents):
         jobs.append(PlannedJob(message, now, start, ChannelKind.SMS))
+    if team_invite:
+        jobs.append(PlannedJob(JobType.SEND_TEAM_INVITE, now, start, ChannelKind.EMAIL))
     seen: set[tuple[ChannelKind, int]] = set()
     reminders: list[PlannedJob] = []
     for rule in rules:
@@ -164,7 +173,7 @@ def is_stale(
 
 
 def plan_for_cancellation(
-    *, cancelled_at: datetime, notify: bool = True, sms: bool = False
+    *, cancelled_at: datetime, notify: bool = True, sms: bool = False, team_invite: bool = False
 ) -> list[PlannedJob]:
     """Return the jobs that replace all pending jobs of a cancelled booking.
 
@@ -173,15 +182,15 @@ def plan_for_cancellation(
     cancellation (a planner's change, ADR 0044; the caller checks the citizen is reachable).
     The work item is ended and the meeting removed first (ADR 0021); those jobs do nothing
     when the booking never got them.
+    ``team_invite`` withdraws the team's calendar invite, also on a reschedule (ADR 0043).
     """
     end = PlannedJob(JobType.END_WXCC_TASK, cancelled_at, None)
     delete = PlannedJob(JobType.DELETE_VIDEO_ROOM, cancelled_at, None)
     message = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.EMAIL)
     text = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.SMS)
     purge = PlannedJob(JobType.PURGE_PII, cancelled_at + PURGE_AFTER, None)
-    if not notify:
-        return [end, delete, purge]
-    return [end, delete, message, text, purge] if sms else [end, delete, message, purge]
+    notices = ([message, text] if sms else [message]) if notify else []
+    return [end, delete, *notices, *_team_cancel(cancelled_at, team_invite), purge]
 
 
 def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:
@@ -199,7 +208,12 @@ def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:
 
 
 def plan_for_rebook(
-    *, now: datetime, rebook_by: datetime, reminder_at: datetime | None, sms: bool
+    *,
+    now: datetime,
+    rebook_by: datetime,
+    reminder_at: datetime | None,
+    sms: bool,
+    team_invite: bool = False,
 ) -> list[PlannedJob]:
     """Return the jobs that replace all pending jobs of a booking awaiting a new time.
 
@@ -209,13 +223,15 @@ def plan_for_rebook(
     ``rebook_by`` an unanswered request lapses (``LAPSE_REBOOK`` cancels the booking and
     sends the lapse message) and the personal data is purged ``PURGE_AFTER`` later. ``sms``
     adds the SMS forms (the caller checks the citizen is reachable). Choosing a new time or
-    cancelling replaces all of these jobs.
+    cancelling replaces all of these jobs. ``team_invite`` withdraws the team's calendar
+    invite (ADR 0043).
     """
     channels = [ChannelKind.EMAIL, ChannelKind.SMS] if sms else [ChannelKind.EMAIL]
     jobs = [
         PlannedJob(JobType.END_WXCC_TASK, now, None),
         PlannedJob(JobType.DELETE_VIDEO_ROOM, now, None),
         *(PlannedJob(JobType.SEND_REBOOK_REQUEST, now, None, c) for c in channels),
+        *_team_cancel(now, team_invite),
     ]
     if reminder_at is not None and reminder_at > now:
         jobs.extend(
@@ -263,7 +279,9 @@ def plan_for_unconfirmed_lapse(*, now: datetime) -> list[PlannedJob]:
     return [PlannedJob(JobType.SEND_UNCONFIRMED_LAPSED, now, None, ChannelKind.EMAIL)]
 
 
-def plan_for_suspension(*, now: datetime, purge_at: datetime | None) -> list[PlannedJob]:
+def plan_for_suspension(
+    *, now: datetime, purge_at: datetime | None, team_invite: bool = False
+) -> list[PlannedJob]:
     """Return the jobs that replace all pending jobs of a booking put on hold (ADR 0024).
 
     Reminders and the planned WxCC task go, and a work item that already exists is ended;
@@ -275,7 +293,14 @@ def plan_for_suspension(*, now: datetime, purge_at: datetime | None) -> list[Pla
         PlannedJob(JobType.END_WXCC_TASK, now, None),
         PlannedJob(JobType.SEND_SUSPENSION, now, None, ChannelKind.EMAIL),
     ]
-    return jobs + plan_purge(purge_at)
+    return jobs + _team_cancel(now, team_invite) + plan_purge(purge_at)
+
+
+def _team_cancel(now: datetime, team_invite: bool) -> list[PlannedJob]:
+    """Return the withdrawal of the team's calendar invite, if the group sends one."""
+    return (
+        [PlannedJob(JobType.SEND_TEAM_CANCEL, now, None, ChannelKind.EMAIL)] if team_invite else []
+    )
 
 
 def plan_purge(purge_at: datetime | None) -> list[PlannedJob]:

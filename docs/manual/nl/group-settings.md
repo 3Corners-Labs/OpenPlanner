@@ -98,6 +98,19 @@ afspraak op, zodat elke deelnemer de eerste vrije medewerker krijgt. **Ja**: ze 
 andere afspraak uit de lijst oppakken. Dat is een werkafspraak binnen het team, geen
 beveiliging.
 
+<!-- field: calendar_invite_address -->
+### Agenda-uitnodiging naar (eigen wachtrij)
+
+Alleen bij de eigen wachtrij, en optioneel. Een gedeelde mailbox of verzendlijst van het team,
+zoals `team-aangifte@organisatie.nl`. Per afspraak krijgt dat adres een agenda-uitnodiging met
+de tijd, de voornaam van de deelnemer, het afspraaknummer en een link naar de wachtrij. Wordt
+de afspraak verzet, geannuleerd of opgeschort, dan wordt de uitnodiging ingetrokken.
+
+De link naar het gesprek staat er bewust niet in: die krijgt een medewerker pas als hij de
+afspraak oppakt. De uitnodiging staat in de mailbox van het team en valt buiten de
+bewaartermijn van OpenPlanner. Controleer het adres daarom goed; het staat ook op de
+overzichtspagina van de groep en in het auditlog.
+
 <!-- field: dispatch_lead_minutes -->
 ### Doorzetten naar de wachtrij
 

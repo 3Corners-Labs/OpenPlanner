@@ -39,6 +39,7 @@ MAX_CAPACITY = 1000
 MAX_LABEL_LENGTH = 50
 """Longest label of a window ("Lunch", "Teamoverleg"; ADR 0027)."""
 
+MAX_EMAIL_LENGTH = 254
 _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,189}\.[^@\s]{2,63}$")
 
 INTEGRATION_TEXT_LIMITS = {
@@ -187,6 +188,8 @@ class Group:
         queue_visible_from_minutes: Own queue: how long before its start a booking appears.
         queue_free_pick_allowed: Own queue: whether agents may claim any row, not only the
             next one (a working agreement against cherry picking, not a protection).
+        calendar_invite_address: Own queue: the team's shared mailbox or list that gets an
+            iCalendar invite per booking (ADR 0043 point 9); ``None`` sends none.
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -215,6 +218,7 @@ class Group:
     embedding_enabled: bool = False
     queue_visible_from_minutes: int = DEFAULT_QUEUE_VISIBLE_FROM_MINUTES
     queue_free_pick_allowed: bool = False
+    calendar_invite_address: str | None = None
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""
@@ -242,6 +246,9 @@ class Group:
             raise _invalid("queue_visible_from_minutes")
         if self.video_host_email is not None and not _EMAIL.fullmatch(self.video_host_email):
             raise _invalid("video_host_email")
+        invite = self.calendar_invite_address
+        if invite is not None and (len(invite) > MAX_EMAIL_LENGTH or not _EMAIL.fullmatch(invite)):
+            raise _invalid("calendar_invite_address")
         for name, limit in INTEGRATION_TEXT_LIMITS.items():
             value = getattr(self, name)
             if value is not None and (
@@ -296,6 +303,11 @@ class Group:
     def has_own_queue(self) -> bool:
         """Whether agents pick up this group's bookings in OpenPlanner (ADR 0043)."""
         return self.dispatch_kind is DispatchKind.OPENPLANNER_QUEUE
+
+    @property
+    def sends_team_invite(self) -> bool:
+        """Whether each booking is also sent as a calendar invite to the team (ADR 0043)."""
+        return self.has_own_queue and self.calendar_invite_address is not None
 
     def change_deadline(self, start: datetime) -> datetime:
         """Return the moment a booking starting at ``start`` becomes read-only.
