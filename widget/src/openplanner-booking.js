@@ -25,6 +25,7 @@ const LOCALES = ['nl', 'en'];
 const STEP_KEYS = ['steps.time', 'steps.details', 'steps.done'];
 const ERROR_TEXTS = {
   slot_full: 'error.slot_full',
+  booking_limit_reached: 'error.booking_limit_reached',
   slot_unavailable: 'error.slot_unavailable',
   outside_booking_window: 'error.outside_booking_window',
   group_closed: 'error.group_closed',

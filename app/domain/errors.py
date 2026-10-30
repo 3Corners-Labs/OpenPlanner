@@ -17,6 +17,7 @@ class ErrorCode(StrEnum):
     GROUP_NOT_FOUND = "group_not_found"
     SLOT_UNAVAILABLE = "slot_unavailable"
     SLOT_FULL = "slot_full"
+    BOOKING_LIMIT_REACHED = "booking_limit_reached"
     OUTSIDE_BOOKING_WINDOW = "outside_booking_window"
     BOOKING_NOT_FOUND = "booking_not_found"
     BOOKING_NOT_ACTIVE = "booking_not_active"
