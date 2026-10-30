@@ -80,6 +80,14 @@ off; no reason to tune it); the entry options of the trial meeting (they are wha
 trial); that the trial uses the group's own Webex host and site (the point of this ADR); that
 the page offers at most one open meeting at a time.
 
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | Trial call on Webex: `trial_call*`, trial pages, `delete_trial_call` job, probe in the group check (migration 0063) | #154 | merged |
+
+(State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
+
 ## Consequences
 
 - A Webex site that forbids entry before the host cannot offer the trial call. The group check

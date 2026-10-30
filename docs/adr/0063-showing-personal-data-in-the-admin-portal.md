@@ -1,6 +1,6 @@
 # 0063. Showing personal data in the admin portal
 
-Status: proposed (2026-10-30), requested by the product owner. Builds on the privacy rules in CLAUDE.md and ADR 0039 (auditor never sees personal data). Does not change the list of PII fields.
+Status: accepted (2026-10-30), requested by the product owner. Builds on the privacy rules in CLAUDE.md and ADR 0039 (auditor never sees personal data). Does not change the list of PII fields. Built, checked against the code on 2026-10-30 (status was *proposed*; `docs/adr-status.md`).
 
 ## Context
 
@@ -25,11 +25,11 @@ None.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; backlog section 4 | #130 | in PR |
-| 1 | PI-1: `app/domain/privacy.py` with the fixed field list and classification | #143 | in PR |
-| 2 | PI-2: marker-value test over every list, overview, export and alert template | #143 | in PR |
-| 3 | PI-3: list search and filters never match PII fields; abuse case in the threat model | #143 | in PR |
-| 4 | PI-4: read-only card *Platform → Advanced settings → Data fields*; manual topic | #143 | in PR |
+| 0 | ADR proposed; backlog section 4 | #130 | merged |
+| 1 | PI-1: `app/domain/privacy.py` with the fixed field list and classification | #143 | merged |
+| 2 | PI-2: marker-value test over every list, overview, export and alert template | #143 | merged |
+| 3 | PI-3: list search and filters never match PII fields; abuse case in the threat model | #143 | merged |
+| 4 | PI-4: read-only card *Platform → Advanced settings → Data fields*; manual topic | #143 | merged |
 
 ## Consequences
 

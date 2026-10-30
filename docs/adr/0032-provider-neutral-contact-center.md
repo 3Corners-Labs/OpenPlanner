@@ -3,7 +3,7 @@
 Status: proposed (2026-10-25). Renumbered from 0021 on 2026-10-27: two ADRs were given number
 0021 in parallel; ADR 0021 is "Ending the work item of a cancelled booking". The content is
 unchanged. Extends ADR 0007 and ADR 0018; once accepted, it replaces
-their per-group mapping (ADR 0018 point 1) with the model below.
+their per-group mapping (ADR 0018 point 1) with the model below. Not built yet; see `docs/adr-status.md` for what is built.
 
 ## Context
 
