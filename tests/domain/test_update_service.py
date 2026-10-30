@@ -500,3 +500,16 @@ async def test_the_history_is_the_audit_log_of_updates_milestones_only(
     assert all(d in HISTORY_DETAILS for d in details)
     with pytest.raises(DomainError, match="not_permitted"):
         await service(uow, clock, current=V2).history(DEMO_ORG_ADMIN)
+
+
+async def test_summary_tells_any_reader_what_the_banner_tells_the_superuser(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await checked(uow, clock, releases)
+
+    summary = await service(uow, clock).summary()
+
+    assert summary == await service(uow, clock).notice(DEMO_SUPERUSER)
+    assert summary.available == RELEASE
+    assert summary.open is None
+    assert (await service(uow, clock, current=V2).summary()).available is None

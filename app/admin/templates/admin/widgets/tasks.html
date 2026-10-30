@@ -1,0 +1,10 @@
+{#- Running tasks: the jobs a worker is busy with or gave up on, by type, state and moment; never a payload or a booking. -#}
+{% if view.rows %}
+<ul class="widget-list" role="list">
+  {% for row in view.rows %}
+  <li class="widget-list__item"><span class="widget-list__label">{{ row.label }}</span><span class="widget-list__meta">{{ row.since }} · {{ row.attempts }}</span><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %} widget-list__state">{{ row.state }}</span></li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="widget__empty">{{ _("admin.overview.widget.tasks.empty") }}</p>
+{% endif %}

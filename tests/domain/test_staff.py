@@ -144,3 +144,19 @@ def test_losing_every_membership_is_still_shown_where_it_was() -> None:
     assert [(e.organisation, e.group, e.detail) for e in events] == [
         ("demo", "team", "group.remove:team")
     ]
+
+
+def test_signed_in_until_the_session_lifetime_passes_or_a_logout() -> None:
+    lifetime = timedelta(hours=8)
+    seen = member()
+    logged_out = replace(member(), last_logout_at=NOW)
+    back = replace(
+        logged_out,
+        last_login_at=NOW + timedelta(minutes=5),
+        last_seen_at=NOW + timedelta(minutes=5),
+    )
+
+    assert seen.is_signed_in(NOW + timedelta(hours=8), lifetime)
+    assert not seen.is_signed_in(NOW + timedelta(hours=8, seconds=1), lifetime)
+    assert not logged_out.is_signed_in(NOW, lifetime)
+    assert back.is_signed_in(NOW + timedelta(minutes=6), lifetime)

@@ -49,6 +49,7 @@ from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.retention import RetentionOverview, candidates_before, summarise
 from app.domain.scheduling import GroupSummary
 from app.domain.staff import Membership, StaffFilter, StaffMember, change_events
+from app.domain.tasks import ActiveJobs
 
 ANONYMOUS = "anonymous"
 """Actor recorded for events without a logged-in admin (e.g. a failed login)."""
@@ -238,6 +239,15 @@ class AdminService:
         """Return the groups ``principal`` may use ``permission`` on (database-side scope)."""
         async with self._uow.read() as tx:
             return await tx.list_groups(scope_for(principal, permission))
+
+    async def active_jobs(self, limit: int) -> ActiveJobs:
+        """Return the running and failed background jobs for the overview (ADR 0061 §2).
+
+        Platform-wide: the widget's route carries ``dashboard.view``, a global permission,
+        and a job is shown by type, state and moment only, never by its booking.
+        """
+        async with self._uow.read() as tx:
+            return await tx.active_jobs(limit)
 
     async def audit_log(
         self, principal: Principal, narrow: AuditFilter | None = None, limit: int = 100
