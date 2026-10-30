@@ -131,11 +131,15 @@ flowchart TB
 - **Configuration** comes from the environment only. `ENVIRONMENT` defaults to `prod`, which
   requires `MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`.
 - **Images** are built in CI, pushed to GHCR, signed keyless with cosign and carry an SBOM
-  attestation (ADR 0006). Hosting and backups: open point O7.
+  attestation (ADR 0006): the application image `ghcr.io/<owner>/<repo>` and, since ADR 0064
+  step 2, the HTTPS proxy image `ghcr.io/<owner>/<repo>-proxy` from `deploy/proxy/`, both for
+  every release and release candidate. A host pulls, verifies and pins both by digest
+  (`.env.update`) and never builds Caddy; `docker compose` builds the proxy locally only in
+  development and in `scripts/check-proxy.sh`. Hosting and backups: open point O7.
 - **Updates** (ADR 0029): the worker checks the latest release hourly; a superuser requests an
   update or a restore in the portal; the host updater (outside the containers, with the Docker
-  socket) verifies the signature, backs up, switches the pinned digest and rolls back on its
-  own when the new version does not become healthy.
+  socket) verifies the signatures of both images, backs up, switches the pinned digests and
+  rolls back on its own when the new version (web, worker or proxy) does not become healthy.
 - **Releases** (ADR 0052): only a tag `vX.Y.Z` on `main` is a version; a merge to `main` only
   builds a test image. Every image carries its commit (`APP_COMMIT`), shown on `/admin/updates`.
 
