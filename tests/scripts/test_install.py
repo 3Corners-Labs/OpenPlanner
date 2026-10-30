@@ -19,7 +19,9 @@ from tests.fakes.updater_host import digest
 REPO = Path(__file__).parents[2]
 BASH = shutil.which("bash") or "/bin/bash"
 IMAGE = "ghcr.io/3corners-labs/openplanner"
+PROXY_IMAGE = f"{IMAGE}-proxy"
 RELEASE = digest(IMAGE, "1.4.0")
+PROXY_RELEASE = digest(PROXY_IMAGE, "1.4.0")
 TOOLS = (
     *("docker", "cosign", "curl", "flock", "sleep", "systemctl", "systemd-analyze"),
     *("apt-get", "apt", "dpkg", "gpg", "sha256sum", "id", "usermod"),
@@ -193,10 +195,17 @@ def test_production_install_from_scratch(host: Host) -> None:
         "OPENPLANNER_TLS": "1",
         "COMPOSE_PROFILES": "tls",
         "OPENPLANNER_IMAGE": RELEASE,
+        "OPENPLANNER_PROXY_IMAGE": PROXY_RELEASE,
     }
     commands = host.commands()
-    verified = commands.index(next(c for c in commands if c.startswith(f"cosign verify {RELEASE}")))
-    assert verified < commands.index(next(c for c in commands if c.endswith(" up -d")))
+    started = commands.index(next(c for c in commands if c.endswith(" up -d")))
+    # ADR 0064 step 2: both images are verified before anything starts; no `docker build`.
+    for image in (RELEASE, PROXY_RELEASE):
+        verified = commands.index(
+            next(c for c in commands if c.startswith(f"cosign verify {image}"))
+        )
+        assert verified < started
+    assert not host.ran("docker build")
     assert host.ran("sudo systemctl enable --now openplanner-updater.timer")
 
 
@@ -209,7 +218,7 @@ def test_the_updater_points_at_the_checkout_and_may_write_only_there(host: Host)
         [
             BASH,
             "-c",
-            '. "$1" && printf "%s\\n" "$COMPOSE_DIR" "$CERT_IDENTITY_REGEXP"',
+            '. "$1" && printf "%s\\n" "$COMPOSE_DIR" "$CERT_IDENTITY_REGEXP" "$UPDATE_PROXY_IMAGE"',
             "-",
             config,
         ],
@@ -222,6 +231,7 @@ def test_the_updater_points_at_the_checkout_and_may_write_only_there(host: Host)
     workflow = "3Corners-Labs/OpenPlanner/.github/workflows/main.yml"
     assert re.fullmatch(sourced[1], f"https://github.com/{workflow}@refs/tags/v1.4.0")
     assert not re.fullmatch(sourced[1], f"https://githubXcom/{workflow}@refs/tags/v1.4.0")
+    assert sourced[2] == PROXY_IMAGE
     drop_in = host.staged / "etc/systemd/system/openplanner-updater.service.d/override.conf"
     assert f"ReadWritePaths={host.checkout}\n" in drop_in.read_text()
     assert "ProtectHome=read-only\n" in drop_in.read_text()
@@ -493,6 +503,9 @@ def test_no_tls_leaves_https_to_a_proxy_of_your_own(host: Host) -> None:
     assert env["FORWARDED_ALLOW_IPS"] == "10.0.0.5"
     assert not host.file("proxy.env").exists()
     assert "COMPOSE_PROFILES" not in host.settings(".env.update")
+    # Without the proxy its image is neither pulled nor pinned (ADR 0064 step 2).
+    assert "OPENPLANNER_PROXY_IMAGE" not in host.settings(".env.update")
+    assert not host.ran(PROXY_IMAGE)
     assert host.ran("--profile tls rm --stop --force proxy")
     # A rerun remembers the choice through the pin file.
     again = host.run("--non-interactive")
@@ -549,6 +562,50 @@ def test_own_certificate_without_the_proxy_is_refused(host: Host) -> None:
 
     assert result.returncode == 1
     assert "--own-certificate needs the HTTPS proxy" in result.stderr
+
+
+# The released proxy image (ADR 0064 step 2): pulled, verified and pinned like the application.
+
+
+def test_an_unsigned_proxy_image_changes_nothing(host: Host) -> None:
+    host.given("fail", "cosign-proxy\n")
+
+    result = host.run("--mode", "production", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 1
+    assert f"{PROXY_RELEASE} is not signed by a release" in result.stderr
+    assert not host.file(".env.update").exists()
+    assert not host.ran(" up -d")
+
+
+def test_a_rerun_pins_the_proxy_image_of_an_installation_from_before_it_was_released(
+    host: Host,
+) -> None:
+    assert host.run("--mode", "production", "--non-interactive", **PRODUCTION).returncode == 0
+    pin = host.file(".env.update")
+    pin.write_text(pin.read_text().replace(f"OPENPLANNER_PROXY_IMAGE={PROXY_RELEASE}\n", ""))
+    host.given("latest", "v1.5.0\n")
+    (host.fakes / "calls.jsonl").unlink()
+
+    result = host.run()
+
+    assert result.returncode == 0, result.stderr
+    # The version comes from the pinned application image, never from the latest release.
+    assert host.settings(".env.update")["OPENPLANNER_IMAGE"] == RELEASE
+    assert host.settings(".env.update")["OPENPLANNER_PROXY_IMAGE"] == PROXY_RELEASE
+    assert not host.ran(f"pull -q {IMAGE}:")
+    assert host.ran(f"pull -q {PROXY_IMAGE}:1.4.0")
+    assert host.ran(f"cosign verify {PROXY_RELEASE}")
+
+
+def test_a_new_version_pins_both_images_at_that_version(host: Host) -> None:
+    assert host.run("--mode", "production", "--non-interactive", **PRODUCTION).returncode == 0
+
+    result = host.run("--version", "1.5.0", "--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(".env.update")["OPENPLANNER_IMAGE"] == digest(IMAGE, "1.5.0")
+    assert host.settings(".env.update")["OPENPLANNER_PROXY_IMAGE"] == digest(PROXY_IMAGE, "1.5.0")
 
 
 # Trust by installer mode (ADR 0067): the channel itself is chosen in the portal.

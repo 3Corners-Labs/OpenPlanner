@@ -4,14 +4,13 @@
 an admin can tell an event of an older version from the check that ran on a newer one. Events
 written before this migration keep an empty version, which the page shows as unknown.
 
-Revises 0057 (merge of certificate checks and event messages); the open branch 0058 (running
-versions, PR #146) also revises 0057, so whichever merges second adds a merge revision.
+Revises 0058 (booking confirmation, ADR 0056 step 2).
 
 The downgrade drops the column; the request events (ADR 0068) are ordinary audit events and
 need no schema change.
 
 Revision ID: 0059
-Revises: 0057
+Revises: 0058
 Create Date: 2026-10-30 18:00:00.000000
 """
 
@@ -21,7 +20,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0059"
-down_revision: str | None = "0057"
+down_revision: str | None = "0058"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
