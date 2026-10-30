@@ -3,19 +3,24 @@
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
+from app.domain.authorization import Role
 from app.domain.booking import Booking, BookingKind, BookingStatus, Contact, MeetingRef
 from app.domain.calls import CallState, CallStatus
 from app.domain.own_queue import (
     CitizenState,
     Claim,
     QueueEntry,
+    QueueSummary,
     VideoState,
     citizen_state,
     next_up,
     not_claimed_in_time,
+    summarise,
     video_state,
     visible,
+    works_queue,
 )
+from app.domain.staff import Membership, StaffMember
 from tests.support.domain import make_group
 
 NOW = datetime(2026, 11, 4, 9, 0, tzinfo=UTC)
@@ -122,3 +127,49 @@ def test_where_the_citizen_is() -> None:
     assert citizen_state(CallStatus(1, participants=1)) is CitizenState.IN_LOBBY
     assert citizen_state(CallStatus(1, participants=2, host_joined=True)) is CitizenState.IN_CALL
     assert citizen_state(CallStatus(1, call=CallState.ENDED)) is CitizenState.ENDED
+
+
+def _joined(item: QueueEntry, minutes_ago: int) -> QueueEntry:
+    """Return ``item`` with the citizen's presence last changed ``minutes_ago``."""
+    at = NOW - timedelta(minutes=minutes_ago)
+    return replace(item, status=replace(item.status, updated_at=at))
+
+
+def test_summarise_counts_waiting_citizens_and_the_longest_wait() -> None:
+    since_start = entry(1, -8, lobby=True)  # joined at an unknown moment: waits since its start
+    early = _joined(entry(2, 5, lobby=True), 3)  # joined before the start: waits since joining
+    claimed = entry(3, -20, lobby=True, claimed=True)
+    upcoming = entry(4, 10)
+
+    summary = summarise([since_start, early, claimed, upcoming], NOW)
+
+    assert summary == QueueSummary(waiting=2, longest_wait=timedelta(minutes=8))
+
+
+def test_summarise_an_empty_or_idle_queue() -> None:
+    assert summarise([], NOW) == QueueSummary(0, timedelta(0))
+    assert summarise([entry(1, -5), entry(2, 0, claimed=True)], NOW) == QueueSummary(
+        0, timedelta(0)
+    )
+
+
+def test_a_wait_never_goes_below_zero() -> None:
+    ahead = entry(1, 5, lobby=True)  # in the lobby, start still ahead, no join moment known
+
+    assert summarise([ahead], NOW).longest_wait == timedelta(0)
+
+
+def _member(roles: frozenset[Role], *memberships: Membership) -> StaffMember:
+    return StaffMember("sub", "Name", roles, frozenset(memberships), NOW, NOW, NOW)
+
+
+def test_works_queue_follows_the_matrix_for_the_members_memberships() -> None:
+    agent = _member(frozenset({Role.AGENT}), Membership("demo", "team"))
+    elsewhere = _member(frozenset({Role.AGENT}), Membership("demo", "other"))
+    org_admin = _member(frozenset({Role.ORG_ADMIN}), Membership("demo"))
+    auditor = _member(frozenset({Role.AUDITOR}), Membership("demo"))
+
+    assert works_queue(agent, "team", "demo")
+    assert not works_queue(elsewhere, "team", "demo")
+    assert works_queue(org_admin, "team", "demo")
+    assert not works_queue(auditor, "team", "demo")

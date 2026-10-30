@@ -21,8 +21,20 @@ tijden.
   uw bereik, met wie, wanneer en waar. Een regel opent de hele keten in het auditlog;
   **Alles bekijken** opent het auditlog zelf.
 
-De widgets *Meldingen*, *Wachtrij in mijn groepen*, *Lopende taken* en *Systeemstatus* volgen
-in een volgende versie.
+- **Wachtrij in mijn groepen**: per groep met een eigen wachtrij in uw bereik hoeveel burgers
+  er wachten, hoe lang de langste wacht al duurt en hoeveel medewerkers die de wachtrij mogen
+  bedienen nu zijn aangemeld. De groepsnaam opent de wachtrij. Alleen aantallen en minuten,
+  nooit namen. Kleuren bij een te lange wachttijd volgen met de wachttijdgrenzen.
+- **Lopende taken**: de achtergrondtaken die nu bezig zijn en de taken die na de laatste
+  poging zijn mislukt, met soort, status en tijdstip. Nooit de inhoud van een taak of de
+  afspraak waar ze bij hoort. Staat hier iets als *Mislukt*, dan loopt er iets vast: meld het
+  aan de beheerder van de installatie.
+- **Systeemstatus**: de draaiende versie en of er een update is, of onderhoud aan staat, of
+  het achtergrondproces recent een hartslag gaf, of de diagnosemodus aan staat en in welke
+  omgeving de installatie draait. De regels openen de pagina's die er meer over weten, voor
+  zover uw rol die mag openen.
+
+De widget *Meldingen* volgt in een volgende versie.
 
 ## Standaardindeling per rol
 

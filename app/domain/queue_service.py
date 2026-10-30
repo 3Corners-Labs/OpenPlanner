@@ -6,6 +6,7 @@ transaction (``BEGIN IMMEDIATE``) with a conditional update, so of two agents cl
 exactly one wins; the other gets ``already_claimed`` (a chosen row) or the next row.
 
     view        ─► visible rows, first names only, which one is next
+    summaries   ─► per own queue in reach: waiting, longest wait, staff signed in (ADR 0061)
     claim_next  ─► locked: next unclaimed ─► claim_booking ─► audit queue.claimed
     claim       ─► only with queue_free_pick_allowed
     claimed     ─► the meeting link, for the claiming agent only
@@ -22,7 +23,7 @@ from datetime import datetime, timedelta
 
 from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, Outcome
-from app.domain.authorization import Permission, Principal, Target, decide, scope_for
+from app.domain.authorization import Permission, Principal, Scope, Target, decide, scope_for
 from app.domain.booking import Booking, Claim
 from app.domain.calls import CallStatus, new_status
 from app.domain.errors import DomainError, ErrorCode
@@ -40,11 +41,14 @@ from app.domain.own_queue import (
     citizen_state,
     next_up,
     not_claimed_in_time,
+    summarise,
     video_state,
     visible,
+    works_queue,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, GroupSummary
+from app.domain.staff import StaffFilter, StaffMember
 from app.domain.tokens import agent_pseudonym
 
 CLAIMED = "queue.claimed"
@@ -90,6 +94,23 @@ class QueueView:
     next_booking_id: int | None
     free_pick: bool
     can_release_any: bool
+
+
+@dataclass(frozen=True)
+class GroupQueueSummary:
+    """One own queue as the overview shows it: counts and a duration, no booking fields.
+
+    Attributes:
+        summary: The group with its organisation.
+        waiting: Citizens in the lobby nobody picked up yet.
+        longest_wait: How long the first of them has waited.
+        staff_available: Staff who may work this queue and are signed in now.
+    """
+
+    summary: GroupSummary
+    waiting: int
+    longest_wait: timedelta
+    staff_available: int
 
 
 @dataclass(frozen=True)
@@ -149,6 +170,38 @@ class QueueService:
             group.queue_free_pick_allowed,
             _supervises(principal, summary),
         )
+
+    async def summaries(
+        self, principal: Principal, session_lifetime: timedelta
+    ) -> list[GroupQueueSummary]:
+        """Return every own queue in ``principal``'s ``queue.work`` reach, busiest first.
+
+        Counts only (ADR 0061 §8). Staff available are the directory's members (ADR 0046)
+        whose last login grants ``queue.work`` on the group and whose session can still be
+        open (``session_lifetime``, the absolute lifetime). Superusers are not in an
+        organisation's directory and do not count.
+        """
+        scope = scope_for(principal, Permission.QUEUE_WORK)
+        now = self._clock.now()
+        async with self._uow.read() as tx:
+            groups = [g for g in await tx.list_groups(scope) if g.group.has_own_queue]
+            staff = {
+                organisation: await tx.list_staff(
+                    Scope(organisations=frozenset({organisation})),
+                    StaffFilter(organisation=organisation),
+                )
+                for organisation in {g.organisation_slug for g in groups}
+            }
+            rows = []
+            for summary in groups:
+                queue = summarise(await self._entries(tx, principal, summary.group, now), now)
+                available = _signed_in_for(
+                    staff[summary.organisation_slug], summary, now, session_lifetime
+                )
+                rows.append(
+                    GroupQueueSummary(summary, queue.waiting, queue.longest_wait, available)
+                )
+        return sorted(rows, key=lambda r: (-r.waiting, -r.longest_wait, r.summary.group.name))
 
     async def claim_next(self, principal: Principal, slug: str) -> ClaimedBooking:
         """Claim the booking "pick up next" points at.
@@ -285,6 +338,18 @@ class QueueService:
                 booking_id=booking_id,
             )
         )
+
+
+def _signed_in_for(
+    members: list[StaffMember], summary: GroupSummary, now: datetime, lifetime: timedelta
+) -> int:
+    """Count the members signed in now who may work the group's queue."""
+    return sum(
+        1
+        for m in members
+        if m.is_signed_in(now, lifetime)
+        and works_queue(m, summary.group.slug, summary.organisation_slug)
+    )
 
 
 def _supervises(principal: Principal, summary: GroupSummary) -> bool:
