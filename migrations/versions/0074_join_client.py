@@ -1,8 +1,9 @@
 """Which Webex page the citizen's join link opens, per group (ADR 0075).
 
-``groups`` gains ``join_client`` (``browser`` or ``choice``, default ``browser``): with
-``browser`` the link carries Webex's own parameter for the web app, with ``choice`` it is the
-stored link unchanged. Existing groups get ``browser``, the ADR's default.
+``bookings`` gets an index on ``trial_room_id`` (ADR 0076: Webex events of the trial meeting
+are matched on it). ``groups`` gains ``join_client`` (``browser`` or ``choice``, default
+``browser``): with ``browser`` the link carries Webex's own parameter for the web app, with
+``choice`` it is the stored link unchanged. Existing groups get ``browser``, the ADR's default.
 
 Revises 0071 (release listing), the head of ``main`` when this was written. PR #168 claims 0072
 and PR #170 claims 0073: when they merge first, set ``down_revision`` to the head of ``main``
@@ -36,10 +37,16 @@ def upgrade() -> None:
             )
         )
         batch.create_check_constraint("join_client", "join_client IN ('browser', 'choice')")
+    # Webex events of the trial meeting are looked up by its id (ADR 0076), like the
+    # appointment's own meeting, which has had an index since 0008.
+    with op.batch_alter_table("bookings") as batch:
+        batch.create_index("ix_bookings_trial_room_id", ["trial_room_id"], unique=False)
 
 
 def downgrade() -> None:
-    """Drop the setting again; every group then gets Webex's own page."""
+    """Drop the index and the setting again; every group then gets Webex's own page."""
+    with op.batch_alter_table("bookings") as batch:
+        batch.drop_index("ix_bookings_trial_room_id")
     with op.batch_alter_table("groups") as batch:
         batch.drop_constraint("join_client", type_="check")
         batch.drop_column("join_client")

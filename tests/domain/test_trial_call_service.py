@@ -1,11 +1,12 @@
 """Opening, joining and deleting a trial call (ADR 0071)."""
 
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.booking import BookingStatus
+from app.domain.booking import BookingStatus, MeetingRef
 from app.domain.calls import EventKind
 from app.domain.errors import DomainError
 from app.domain.integration import IntegrationService
@@ -223,3 +224,17 @@ async def test_following_the_trial_link_says_which_page_the_citizen_was_sent_to(
         if e.kind is EventKind.TRIAL_JOINED
     ]
     assert [e.detail for e in joined] == [client.value]
+
+
+@pytest.mark.parametrize(
+    "link", ["http://evil.example/m", "javascript:alert(1)", "", "//evil.example/m"]
+)
+async def test_a_trial_link_that_is_not_https_is_never_followed(setup: Setup, link: str) -> None:
+    await setup.service.open(setup.token)
+    booking = setup.uow.state.bookings[setup.booking_id]
+    assert booking.trial is not None
+    trial = replace(booking.trial, meeting=MeetingRef(booking.trial.meeting.id, link))
+    setup.uow.state.bookings[setup.booking_id] = replace(booking, trial=trial)
+
+    assert await setup.service.join_link(setup.token) is None
+    assert EventKind.TRIAL_JOINED not in setup.events()  # nothing was followed
