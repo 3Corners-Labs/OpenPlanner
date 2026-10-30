@@ -1,0 +1,73 @@
+name: publish image
+description: >-
+  Build the OpenPlanner image, push it to ghcr.io, sign it keyless and attest its SBOM
+  (ADR 0006). Shared by the release and the release-candidate jobs of main.yml (ADR 0059), so
+  both produce the same image with APP_VERSION and APP_COMMIT (ADR 0052). Leaves sbom.cdx.json
+  in the workspace for the release page.
+
+inputs:
+  image:
+    description: Registry name in lower case (ghcr.io/owner/repo).
+    required: true
+  version:
+    description: APP_VERSION baked into the image (X.Y.Z, or X.Y.Z-rc.N for a candidate).
+    required: true
+  tags:
+    description: Tag rules for docker/metadata-action, one per line.
+    required: true
+  registry-token:
+    description: Token with packages:write for ghcr.io (GITHUB_TOKEN).
+    required: true
+
+outputs:
+  digest:
+    description: The pushed image's digest (sha256:…).
+    value: ${{ steps.build.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+    - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.registry-token }}
+    - id: meta
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+      with:
+        images: ${{ inputs.image }}
+        tags: ${{ inputs.tags }}
+    - id: build
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        # ADR 0029: the version an installation compares against; ADR 0052: the commit it was
+        # built from.
+        build-args: |
+          APP_VERSION=${{ inputs.version }}
+          APP_COMMIT=${{ github.sha }}
+        provenance: mode=max
+    - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+    # Expressions go through the environment, never into the script text (actionlint's
+    # script-injection rule), although both values come from this repository.
+    - name: sign image (keyless)
+      shell: bash
+      env:
+        IMAGE_REF: ${{ inputs.image }}@${{ steps.build.outputs.digest }}
+      run: cosign sign --yes "$IMAGE_REF"
+    - name: SBOM (CycloneDX)
+      uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      with:
+        image: ${{ inputs.image }}@${{ steps.build.outputs.digest }}
+        format: cyclonedx-json
+        output-file: sbom.cdx.json
+        upload-artifact: false
+    - name: attest SBOM
+      shell: bash
+      env:
+        IMAGE_REF: ${{ inputs.image }}@${{ steps.build.outputs.digest }}
+      run: cosign attest --yes --type cyclonedx --predicate sbom.cdx.json "$IMAGE_REF"
