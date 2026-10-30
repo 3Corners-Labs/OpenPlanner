@@ -282,6 +282,14 @@ async def leave(request: Request, token: str, locale: Locale, _: SameOrigin) -> 
         return RedirectResponse(f"/b/{token}", status_code=303)
     bind_booking(details.booking.id or 0)
     left = await _bookings(request).leave_direct(token)
+    if left.changed:
+        meeting = left.booking.meeting
+        log.info(
+            "direct.left",
+            booking_id=left.booking.id,
+            meeting_id=meeting.id if meeting else None,
+            agent_present=left.agent_present,
+        )
     outcome = "left_agent" if left.agent_present else "left"
     target = f"/b/{token}/wait?status={outcome}" if left.changed else f"/b/{token}/wait"
     return RedirectResponse(target, status_code=303)

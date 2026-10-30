@@ -7166,3 +7166,6 @@ msgstr "U wacht niet meer. Er is geen gesprek meer aangevraagd en het team weet 
 
 msgid "wait.left.agent"
 msgstr "U hebt het gesprek verlaten. Deze link werkt niet meer en het team is op de hoogte. U kunt later opnieuw een gesprek starten of een afspraak maken."
+
+msgid "admin.agenda.meeting_id"
+msgstr "Meeting-ID"
