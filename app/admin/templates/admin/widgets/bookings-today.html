@@ -1,0 +1,10 @@
+{#- Bookings today per group: a count per group, nothing about the bookings themselves. -#}
+{% if view.rows %}
+<ul class="widget-list" role="list">
+  {% for row in view.rows %}
+  <li class="widget-list__item"><a class="widget-list__label" href="{{ row.href }}">{{ row.name }}</a><span class="widget-list__meta">{{ row.organisation }}</span><span class="widget__count">{{ row.count }}</span></li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="widget__empty">{{ _("admin.overview.widget.bookings_today.empty") }}</p>
+{% endif %}
