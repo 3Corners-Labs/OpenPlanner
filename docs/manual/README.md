@@ -31,6 +31,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Advanced settings / geavanceerde instellingen | [Geavanceerde instellingen](nl/advanced-settings.md) | [Advanced settings](en/advanced-settings.md) |
 | Data fields and personal data / gegevensvelden en persoonsgegevens | [Gegevensvelden en persoonsgegevens](nl/data-fields.md) | [Data fields and personal data](en/data-fields.md) |
 | Organisation settings / organisatie-instellingen | [Organisatie-instellingen](nl/organisation-settings.md) | [Organisation settings](en/organisation-settings.md) |
+| Texts for citizens / teksten voor burgers | [Teksten voor burgers](nl/organisation-texts.md) | [Texts for citizens](en/organisation-texts.md) |
 
 ## Writing a topic
 

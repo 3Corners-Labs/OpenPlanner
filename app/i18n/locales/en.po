@@ -7216,6 +7216,77 @@ msgstr "The private key of the placed certificate is not on this server. Make a 
 msgid "admin.form.error.tls_volume_unwritable"
 msgstr "The server cannot write the key to the proxy's volume. Tell the server operator."
 
+# ADR 0074: the organisation's own texts for citizens.
+
+msgid "admin.org_texts.title"
+msgstr "Texts for citizens"
+
+msgid "admin.org_texts.lead"
+msgstr "Change the texts that citizens of {name} see on the group pages and in emails and text messages. Layout, links and the calendar attachment stay fixed; you only change the text."
+
+msgid "admin.org_texts.languages_heading"
+msgstr "Language of the texts"
+
+msgid "admin.org_texts.order"
+msgstr "Order: a group's own text comes first, then the organisation's text, then the default text."
+
+msgid "admin.org_texts.custom"
+msgstr "This organisation's own text."
+
+msgid "admin.org_texts.save_hint"
+msgstr "Empty a field to restore the default text. Texts are plain text: markup or code is shown as text."
+
+msgid "admin.org_texts.section_pages"
+msgstr "Pages for citizens"
+
+msgid "admin.org_texts.link_title"
+msgstr "Texts for citizens"
+
+msgid "admin.org_texts.link_lead"
+msgstr "Change the texts on the group pages and in emails and text messages for the whole organisation."
+
+msgid "admin.org_texts.link_button"
+msgstr "Change texts"
+
+msgid "admin.org_texts.page.group_intro"
+msgstr "Introduction on the group's page"
+
+msgid "admin.org_texts.page.direct_card_title"
+msgstr "Card for a direct call: title"
+
+msgid "admin.org_texts.page.direct_card_text"
+msgstr "Card for a direct call: text"
+
+msgid "admin.org_texts.page.direct_intro"
+msgstr "Direct call: introduction"
+
+msgid "admin.org_texts.page.direct_unavailable"
+msgstr "Direct call: not available"
+
+msgid "admin.org_texts.page.booked_title"
+msgstr "After booking: title"
+
+msgid "admin.org_texts.page.booked_text"
+msgstr "After booking: explanation"
+
+msgid "admin.org_texts.page.booked_lapse"
+msgstr "After booking: when the appointment lapses"
+
+msgid "admin.org_texts.page.booked_no_mail"
+msgstr "After booking: no email received"
+
+msgid "admin.org_texts.page.confirm_text"
+msgstr "Confirm appointment: explanation"
+
+msgid "admin.org_texts.page.confirm_not_me"
+msgstr "Confirm appointment: not made by you"
+
+msgid "admin.org_texts.page.manage_pending_text"
+msgstr "Manage appointment: not yet confirmed"
+
+msgid "authz.permission.texts_organisation_manage"
+msgstr "Change the organisation's texts"
+
 msgid "wait.inactive"
 msgstr "This call has ended."
 

@@ -9,3 +9,6 @@ class DictOverrides:
 
     def get(self, locale: str, key: str, organisation_id: int | None) -> str | None:
         return self.texts.get((organisation_id, locale, key))
+
+    async def refresh(self) -> None:
+        return None
