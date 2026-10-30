@@ -9,8 +9,8 @@ rules:
     languages: [python]
     severity: ERROR
     message: >-
-      PII field passed to a logger. Log identifiers (booking_id), never name, email,
-      phone, note or join URLs.
+      PII field passed to a logger. Log identifiers (booking_id), never a name, email,
+      phone, note, form answers or join URLs (app/domain/privacy.py).
     patterns:
       - pattern-either:
           - pattern: $LOG.$METHOD(..., $KEY=$VALUE, ...)
@@ -21,4 +21,4 @@ rules:
           regex: ^(debug|info|warning|warn|error|exception|critical|fatal|msg|log|bind|new)$
       - metavariable-regex:
           metavariable: $KEY
-          regex: ^(name|email|phone|note|guest_join_url|host_join_url)$
+          regex: ^(name|first_name|last_name|email|phone|note|form_answers|answers|guest_join_url|host_join_url)$
