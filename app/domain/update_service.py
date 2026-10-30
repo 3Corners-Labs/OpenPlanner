@@ -5,6 +5,8 @@ Three callers, three paths:
     worker         check_if_due ─► ReleaseSource.latest (at most hourly) ─► release_checks
     superuser      notice (banner) · overview · request_update · request_restore · cancel
                    (system.update, every change audited)
+    overview page  summary: the notice without a principal, for the *System status* widget
+                   (its route carries settings.platform.view, ADR 0061 §2)
     host updater   claim ─► running ─► report_step(step)* ─► report(succeeded | rolled_back
                    | failed, reason) (through ``python -m app.cli``; audited as ``host-updater``)
 
@@ -178,17 +180,25 @@ class UpdateService:
         """
         if not decide(principal, _PERMISSION, Target.everything()).allowed:
             return None
+        notice = await self.summary()
+        return notice if (notice.available or notice.outcome or notice.open) else None
+
+    async def summary(self) -> UpdateNotice:
+        """Return what is known about updates: a newer release, the open request, the outcome.
+
+        No permission is checked here: the caller's route carries one (the *System status*
+        widget needs ``settings.platform.view``), and nothing here names a secret.
+        """
         now = self._clock.now()
         async with self._uow.read() as tx:
             check = await tx.get_release_check()
             history = await tx.get_update_requests()
         current = open_request(history)
-        notice = UpdateNotice(
+        return UpdateNotice(
             None if current else self._available(check),
             recent_outcome(history, now),
             current,
         )
-        return notice if (notice.available or notice.outcome or notice.open) else None
 
     async def overview(self, principal: Principal) -> UpdateOverview:
         """Return everything the updates page shows.

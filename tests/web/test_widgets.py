@@ -5,8 +5,10 @@ from fastapi.routing import APIRoute
 from app.admin.authz import RequirePermission, can_function
 from app.config import Settings
 from app.domain.authorization import Permission, Principal, Role
+from app.domain.job_plan import JobType
 from app.i18n import CATALOGUE_DIR, load_catalogues
 from app.main import create_app
+from app.web.job_labels import JOB_TYPE_LABELS
 from app.web.widgets import (
     DEFAULT_LAYOUTS,
     WIDGETS,
@@ -78,7 +80,14 @@ def test_the_adr_table_is_followed() -> None:
 
 
 def test_only_the_widgets_of_this_step_are_available() -> None:
-    assert {w.key for w in WIDGETS if w.available} == {"bookings-today", "changes", "rights"}
+    assert {w.key for w in WIDGETS if w.available} == {
+        "queue",
+        "bookings-today",
+        "changes",
+        "tasks",
+        "status",
+        "rights",
+    }
 
 
 def test_every_role_has_a_default_layout_of_known_widgets() -> None:
@@ -151,7 +160,16 @@ def test_visible_widgets_follow_the_matrix() -> None:
     def shown(principal: Principal) -> list[str]:
         return [w.key for w in visible(principal, can_function(principal))]
 
-    assert shown(SUPER) == ["bookings-today", "changes", "rights"]
-    assert shown(AUDITOR) == ["changes", "rights"]
-    assert shown(AGENT) == ["rights"]
-    assert shown(GROUP_ADMIN) == ["bookings-today", "changes", "rights"]
+    assert shown(SUPER) == ["queue", "bookings-today", "changes", "tasks", "status", "rights"]
+    assert shown(AUDITOR) == ["changes", "status", "rights"]
+    assert shown(AGENT) == ["queue", "rights"]
+    assert shown(GROUP_ADMIN) == ["bookings-today", "queue", "changes", "rights"]
+
+
+def test_every_job_type_has_a_label_in_dutch_and_english() -> None:
+    catalogues = load_catalogues(CATALOGUE_DIR)
+
+    assert set(JOB_TYPE_LABELS) == set(JobType)
+    for job_type, key in JOB_TYPE_LABELS.items():
+        for locale in REQUIRED_LOCALES:
+            assert catalogues[locale].get(key, "").strip(), (job_type, locale)

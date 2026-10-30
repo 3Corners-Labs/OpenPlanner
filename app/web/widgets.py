@@ -10,7 +10,7 @@ layout.
 Like the navigation register (ADR 0047), the register decides *what* exists and *where* it
 sits, never *who* may see it: visibility comes only from the matrix, through each widget's
 permission. A widget that is declared but not ``available`` yet has no route and is not
-rendered; OV-3 adds them one by one.
+rendered; *Alerts* waits for the alert model of OV-6.
 """
 
 from collections.abc import Callable, Iterator
@@ -97,6 +97,7 @@ WIDGETS: tuple[Widget, ...] = (
         (View.TABLE, View.BAR, View.LINE),
         default_rows=8,
         live=True,
+        available=True,
     ),
     Widget(
         "bookings-today",
@@ -126,6 +127,7 @@ WIDGETS: tuple[Widget, ...] = (
         (View.LIST,),
         default_rows=5,
         live=True,
+        available=True,
     ),
     Widget(
         "status",
@@ -133,8 +135,9 @@ WIDGETS: tuple[Widget, ...] = (
         Permission.SETTINGS_PLATFORM_VIEW,
         WidgetScope.PLATFORM,
         (View.LIST,),
-        default_rows=5,
+        default_rows=6,
         live=True,
+        available=True,
     ),
     Widget(
         "rights",

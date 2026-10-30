@@ -857,6 +857,49 @@ fieldset.card {
   font-variant-numeric: tabular-nums;
 }
 
+.widget-list__state {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.widget-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.widget-table th,
+.widget-table td {
+  padding: 0.5rem 0.5rem 0.5rem 0;
+  border-top: 1px solid var(--adm-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.widget-table thead th {
+  border-top: 0;
+  padding-top: 0;
+  color: var(--adm-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  vertical-align: bottom;
+}
+
+.widget-table tbody th {
+  font-weight: 600;
+}
+
+.widget-table td.widget-table__number {
+  white-space: nowrap;
+}
+
+.widget-table .widget-table__number {
+  padding-right: 0;
+  padding-left: 0.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ADR 0062 §6: the column count is at most 2 on a tablet and 1 on a phone. Fixed on purpose:
    a layout rule of the design, not a setting. */
 @media (max-width: 52rem) {

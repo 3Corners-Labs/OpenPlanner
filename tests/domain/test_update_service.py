@@ -423,3 +423,16 @@ async def test_auto_apply_leaves_an_open_request_alone_and_asks_nothing_when_cur
     )
     assert await current.check_if_due()
     assert (await current.overview(DEMO_SUPERUSER)).open is None
+
+
+async def test_summary_tells_any_reader_what_the_banner_tells_the_superuser(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await checked(uow, clock, releases)
+
+    summary = await service(uow, clock).summary()
+
+    assert summary == await service(uow, clock).notice(DEMO_SUPERUSER)
+    assert summary.available == RELEASE
+    assert summary.open is None
+    assert (await service(uow, clock, current=V2).summary()).available is None
