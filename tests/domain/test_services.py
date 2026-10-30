@@ -497,7 +497,7 @@ async def test_own_queue_team_gets_an_invite_and_its_withdrawal(uow: InMemoryUni
 
 # --- bookings per email address (ADR 0059) ------------------------------------------------
 
-BEA = ContactInput(name="Bea de Vries", email="bea@example.org")
+BEA = ContactInput(first_name="Bea", last_name="de Vries", email="bea@example.org")
 """A second citizen, for tests that need two people in one slot."""
 
 
@@ -511,7 +511,7 @@ def _limit_service(uow: InMemoryUnitOfWork, limit: int) -> BookingService:
 async def test_the_same_address_in_the_same_slot_is_refused(uow: InMemoryUnitOfWork) -> None:
     service = _limit_service(uow, 10)
     await book(service)
-    shouting = ContactInput(name="Ada L.", email="ADA@Example.org")
+    shouting = ContactInput(first_name="Ada", last_name="L.", email="ADA@Example.org")
 
     with pytest.raises(DomainError) as excinfo:
         await service.book(group_slug="aangifte", start=SLOT_0900, contact=shouting, locale="nl")

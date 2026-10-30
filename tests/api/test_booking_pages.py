@@ -193,7 +193,7 @@ async def test_the_same_address_twice_in_a_slot_is_refused_without_saying_why(
 ) -> None:
     await book(site)
 
-    response = await book(site, name="Ada Byron")
+    response = await book(site, last_name="Byron")
 
     assert response.status_code == 409
     assert "Heeft u al een afspraak bij dit team?" in response.text
