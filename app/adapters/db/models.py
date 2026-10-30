@@ -66,6 +66,7 @@ __all__ = [
     "CallStatusRow",
     "ChannelSettingsRow",
     "GroupTextRow",
+    "OrganisationTextRow",
     "AuditEventRow",
     "Base",
     "BookingRow",
@@ -406,6 +407,19 @@ class GroupTextRow(Base):
 
     group_id: Mapped[int] = mapped_column(
         ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    locale: Mapped[str] = mapped_column(String(8), primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    text: Mapped[str] = mapped_column(String(2000))
+
+
+class OrganisationTextRow(Base):
+    """An organisation's own text of one catalogue key in one locale (ADR 0004, 0074)."""
+
+    __tablename__ = "organisation_texts"
+
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), primary_key=True
     )
     locale: Mapped[str] = mapped_column(String(8), primary_key=True)
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
