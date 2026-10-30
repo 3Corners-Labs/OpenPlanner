@@ -4,7 +4,7 @@
 <p class="eyebrow">{{ group.name }}</p>
 <h1 id="wait-heading" tabindex="-1">{{ _("wait.title") }}</h1>
 <div data-live data-heading="wait-heading">
-  <p class="visually-hidden" aria-live="polite" data-live-announce></p>
+  <p class="visually-hidden" role="status" data-live-announce>{{ status_text }}</p>
   {% include "_wait_status.html" %}
 </div>
 {% endblock %}
