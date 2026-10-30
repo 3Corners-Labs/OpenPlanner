@@ -2138,6 +2138,9 @@ msgstr "Task could not be ended"
 msgid "call.event.task_marked_cancelled"
 msgstr "Task marked as cancelled"
 
+msgid "call.event.citizen_left"
+msgstr "The citizen stopped waiting"
+
 msgid "admin.booking.end_not_possible"
 msgstr "The booking was cancelled and the task was marked as cancelled through the v2 API (Kind: cancelled; see the timeline), but WxCC did not let OpenPlanner end the task. End the task in Agent Desktop if it is still open."
 
@@ -3974,6 +3977,9 @@ msgstr "An update request is already open. Wait until it is done or withdraw it.
 msgid "admin.done.update_requested"
 msgstr "The update has been requested. The updater on the server carries it out within a minute."
 
+msgid "admin.done.check_requested"
+msgstr "The check has been requested. The worker looks for a new version within half a minute."
+
 msgid "admin.done.restore_requested"
 msgstr "The restore has been requested. The updater on the server carries it out within a minute."
 
@@ -4024,6 +4030,15 @@ msgstr "Last checked"
 
 msgid "admin.updates.never"
 msgstr "Not yet"
+
+msgid "admin.updates.check_requested"
+msgstr "Check requested"
+
+msgid "admin.updates.check_interval"
+msgstr "The server checks for a new version every {minutes} minutes. The interval is in Advanced settings, topic Updates."
+
+msgid "admin.updates.check_now"
+msgstr "Check now"
 
 msgid "admin.updates.check_failed"
 msgstr "Check failed ({code})"
@@ -6100,6 +6115,9 @@ msgstr "Update channel"
 msgid "settings.field.update_auto_apply.label"
 msgstr "Update automatically"
 
+msgid "settings.field.update_check_minutes.label"
+msgstr "Minutes between two version checks"
+
 msgid "settings.field.time_format.label"
 msgstr "Time format"
 
@@ -7200,6 +7218,36 @@ msgstr "The private key of the placed certificate is not on this server. Make a 
 
 msgid "admin.form.error.tls_volume_unwritable"
 msgstr "The server cannot write the key to the proxy's volume. Tell the server operator."
+
+msgid "wait.inactive"
+msgstr "This call has ended."
+
+msgid "wait.leave.link"
+msgstr "Stop waiting"
+
+msgid "wait.leave.title"
+msgstr "Stop waiting?"
+
+msgid "wait.leave.question.waiting"
+msgstr "Are you sure you want to stop? You lose your place in line and we tell the team you are no longer waiting. You can start a new call or book an appointment afterwards."
+
+msgid "wait.leave.question.agent"
+msgstr "An agent has already accepted your call. If you stop, this link no longer works. The agent stays in the call and is told. You can start a new call or book an appointment afterwards."
+
+msgid "wait.leave.confirm"
+msgstr "Yes, stop waiting"
+
+msgid "wait.leave.back"
+msgstr "No, keep waiting"
+
+msgid "wait.left.waiting"
+msgstr "You are no longer waiting. No call is requested any more and the team knows you stopped waiting. You can start a new call or book an appointment later."
+
+msgid "wait.left.agent"
+msgstr "You have left the call. This link no longer works and the team has been told. You can start a new call or book an appointment later."
+
+msgid "admin.agenda.meeting_id"
+msgstr "Meeting ID"
 
 msgid "admin.channels.reply_to_address"
 msgstr "Reply address"
