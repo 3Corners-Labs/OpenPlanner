@@ -48,7 +48,7 @@ from app.domain.services import BookingDetails, BookingService
 from app.i18n.dates import format_clock, format_day, local_day
 from app.web.closure_labels import closure_view
 from app.web.errors import FormError, form_errors, status_for
-from app.web.locale import RequestLocale, resolve_locale
+from app.web.locale import RequestLocale, request_locale
 from app.web.organisation_settings import follow, follow_group_from_path
 from app.web.protection import (
     RejectedRequest,
@@ -82,7 +82,7 @@ STATUS_LABELS: dict[BookingStatus, str] = {
     BookingStatus.PENDING_CONFIRMATION: "manage.status.pending_confirmation",
 }
 
-Locale = Annotated[RequestLocale, Depends(resolve_locale)]
+Locale = Annotated[RequestLocale, Depends(request_locale)]
 SameOrigin = Annotated[None, Depends(require_same_origin)]
 
 

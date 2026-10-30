@@ -19,13 +19,13 @@ from app.api.citizen import citizen_page
 from app.api.labels import slot_label
 from app.domain.trial_call_service import TrialCallService, TrialView
 from app.i18n.dates import format_clock
-from app.web.locale import RequestLocale, resolve_locale
+from app.web.locale import RequestLocale, request_locale
 from app.web.organisation_settings import follow
 from app.web.protection import limiter, read_limit, require_same_origin
 
 router = APIRouter(include_in_schema=False)
 
-Locale = Annotated[RequestLocale, Depends(resolve_locale)]
+Locale = Annotated[RequestLocale, Depends(request_locale)]
 SameOrigin = Annotated[None, Depends(require_same_origin)]
 
 

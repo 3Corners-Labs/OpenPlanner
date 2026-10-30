@@ -804,6 +804,20 @@ class Transaction(Protocol):
         """Store the group's text of a block in a locale; ``None`` removes it."""
         ...
 
+    async def get_organisation_texts(self, organisation_id: int) -> dict[tuple[str, str], str]:
+        """Return the organisation's own texts by ``(locale, key)`` (ADR 0004)."""
+        ...
+
+    async def save_organisation_text(
+        self, organisation_id: int, locale: str, key: str, text: str | None
+    ) -> None:
+        """Store the organisation's text of a key in a locale; ``None`` removes it."""
+        ...
+
+    async def get_all_organisation_texts(self) -> dict[tuple[int, str, str], str]:
+        """Return every organisation's texts by ``(organisation id, locale, key)``."""
+        ...
+
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[SlotUsage]:

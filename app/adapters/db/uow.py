@@ -61,6 +61,7 @@ from app.adapters.db.models import (
     OrganisationLogoRow,
     OrganisationOriginRow,
     OrganisationRow,
+    OrganisationTextRow,
     ReminderRuleRow,
     ScheduleOverrideRow,
     ScheduleRuleRow,
@@ -1425,6 +1426,38 @@ class SqlTransaction(
             GroupTextRow(group_id=group_id, locale=locale, key=key, text=text)
         )
         await self._session.flush()
+
+    async def get_organisation_texts(self, organisation_id: int) -> dict[tuple[str, str], str]:
+        """Return the organisation's own texts by ``(locale, key)``."""
+        rows = await self._session.scalars(
+            select(OrganisationTextRow).where(
+                OrganisationTextRow.organisation_id == organisation_id
+            )
+        )
+        return {(row.locale, row.key): row.text for row in rows}
+
+    async def save_organisation_text(
+        self, organisation_id: int, locale: str, key: str, text: str | None
+    ) -> None:
+        """Store or, with ``None``, delete the organisation's text of a key in a locale."""
+        if text is None:
+            await self._session.execute(
+                delete(OrganisationTextRow).where(
+                    OrganisationTextRow.organisation_id == organisation_id,
+                    OrganisationTextRow.locale == locale,
+                    OrganisationTextRow.key == key,
+                )
+            )
+            return
+        await self._session.merge(
+            OrganisationTextRow(organisation_id=organisation_id, locale=locale, key=key, text=text)
+        )
+        await self._session.flush()
+
+    async def get_all_organisation_texts(self) -> dict[tuple[int, str, str], str]:
+        """Return every organisation's texts by ``(organisation id, locale, key)``."""
+        rows = await self._session.scalars(select(OrganisationTextRow))
+        return {(row.organisation_id, row.locale, row.key): row.text for row in rows}
 
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime

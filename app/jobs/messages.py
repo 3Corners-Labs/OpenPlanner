@@ -229,6 +229,10 @@ class MessageComposer:
         self._base_url = public_base_url.rstrip("/")
         self._environment = create_environment([TEMPLATE_DIR])
 
+    async def refresh(self) -> None:
+        """Bring the organisations' own texts up to date before a message is composed."""
+        await self._translator.refresh()
+
     def manage_url(self, booking: Booking) -> str:
         """Return the citizen's management link for ``booking``."""
         return f"{self._base_url}/b/{derive_token(self._token_key, booking.token_salt)}"

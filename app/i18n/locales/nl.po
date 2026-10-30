@@ -583,8 +583,35 @@ msgstr "Platform"
 msgid "admin.nav.object.group"
 msgstr "Groep"
 
-msgid "admin.profile.roles"
-msgstr "Uw rollen"
+msgid "admin.profile.source"
+msgstr "Uw rol komt uit uw organisatie-account en is hier niet te wijzigen."
+
+msgid "admin.profile.my_rights"
+msgstr "Mijn rechten bekijken"
+
+msgid "admin.alerts.label"
+msgstr "Meldingen"
+
+msgid "admin.alerts.banner"
+msgstr "Balk tonen bij storingen"
+
+msgid "admin.alerts.popups.label"
+msgstr "Pop-ups"
+
+msgid "admin.alerts.popups.all"
+msgstr "Alle meldingen"
+
+msgid "admin.alerts.popups.warnings"
+msgstr "Waarschuwingen en storingen"
+
+msgid "admin.alerts.popups.outages"
+msgstr "Alleen storingen"
+
+msgid "admin.alerts.popups.off"
+msgstr "Geen"
+
+msgid "admin.alerts.save"
+msgstr "Opslaan"
 
 msgid "admin.theme.label"
 msgstr "Weergave"
@@ -7230,6 +7257,77 @@ msgstr "De privésleutel van het geplaatste certificaat staat niet op deze serve
 
 msgid "admin.form.error.tls_volume_unwritable"
 msgstr "De server kan de sleutel niet wegschrijven naar het volume van de proxy. Waarschuw de serverbeheerder."
+
+# ADR 0074: the organisation's own texts for citizens.
+
+msgid "admin.org_texts.title"
+msgstr "Teksten voor burgers"
+
+msgid "admin.org_texts.lead"
+msgstr "Hier past u de teksten aan die burgers van {name} zien op de pagina's van de groepen en in mails en sms'jes. Opmaak, links en de agenda-bijlage blijven vast; u past alleen de tekst aan."
+
+msgid "admin.org_texts.languages_heading"
+msgstr "Taal van de teksten"
+
+msgid "admin.org_texts.order"
+msgstr "Volgorde: de eigen tekst van een groep gaat voor, dan de tekst van de organisatie, dan de standaardtekst."
+
+msgid "admin.org_texts.custom"
+msgstr "Eigen tekst van deze organisatie."
+
+msgid "admin.org_texts.save_hint"
+msgstr "Maak een veld leeg om de standaardtekst terug te zetten. Teksten zijn gewone tekst: opmaak of code wordt als tekst getoond."
+
+msgid "admin.org_texts.section_pages"
+msgstr "Pagina's voor burgers"
+
+msgid "admin.org_texts.link_title"
+msgstr "Teksten voor burgers"
+
+msgid "admin.org_texts.link_lead"
+msgstr "Pas de teksten op de pagina's van de groepen en in de mails en sms'jes aan voor de hele organisatie."
+
+msgid "admin.org_texts.link_button"
+msgstr "Teksten aanpassen"
+
+msgid "admin.org_texts.page.group_intro"
+msgstr "Inleiding op de pagina van de groep"
+
+msgid "admin.org_texts.page.direct_card_title"
+msgstr "Kaart voor een direct gesprek: titel"
+
+msgid "admin.org_texts.page.direct_card_text"
+msgstr "Kaart voor een direct gesprek: tekst"
+
+msgid "admin.org_texts.page.direct_intro"
+msgstr "Direct gesprek: inleiding"
+
+msgid "admin.org_texts.page.direct_unavailable"
+msgstr "Direct gesprek: niet beschikbaar"
+
+msgid "admin.org_texts.page.booked_title"
+msgstr "Na het boeken: titel"
+
+msgid "admin.org_texts.page.booked_text"
+msgstr "Na het boeken: uitleg"
+
+msgid "admin.org_texts.page.booked_lapse"
+msgstr "Na het boeken: wanneer de afspraak vervalt"
+
+msgid "admin.org_texts.page.booked_no_mail"
+msgstr "Na het boeken: geen e-mail ontvangen"
+
+msgid "admin.org_texts.page.confirm_text"
+msgstr "Afspraak bevestigen: uitleg"
+
+msgid "admin.org_texts.page.confirm_not_me"
+msgstr "Afspraak bevestigen: niet door u gemaakt"
+
+msgid "admin.org_texts.page.manage_pending_text"
+msgstr "Afspraak beheren: nog niet bevestigd"
+
+msgid "authz.permission.texts_organisation_manage"
+msgstr "Teksten van de organisatie wijzigen"
 
 msgid "wait.inactive"
 msgstr "Dit gesprek is beëindigd."
