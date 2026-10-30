@@ -343,6 +343,10 @@ class Settings(BaseSettings):
     # Neither is allowed in production, from the environment or from the portal.
     update_channel: Literal["release", "rc"] = "release"
     update_auto_apply: bool = False
+    # Class C: minutes between two release checks by the worker; "Check now" on the updates
+    # page asks for one ahead of time. GitHub allows 60 anonymous calls per hour per address,
+    # so the portal floor is 5 minutes.
+    update_check_minutes: int = Field(default=60, ge=1, le=1440)
 
     # Maintenance mode (ADR 0038). MAINTENANCE_MODE (class B, deployment: needed while the
     # database is unavailable or being restored) switches it on from the environment; the

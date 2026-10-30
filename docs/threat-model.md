@@ -562,9 +562,10 @@ address; in the admin portal the client form.
 
 ## Flow: updates from the admin portal (ADR 0029)
 
-Worker: `GET https://api.github.com/repos/{UPDATE_REPOSITORY}/releases?per_page=30` (hourly;
-the channel is applied in the domain, ADR 0059 and 0067).
-Admin (superuser): `GET /admin/updates`, `POST /admin/updates/update`, `/restore`,
+Worker: `GET https://api.github.com/repos/{UPDATE_REPOSITORY}/releases?per_page=30` (every
+`update_check_minutes`, or at the next poll after "Check now"; the channel is applied in the
+domain, ADR 0059 and 0067).
+Admin (superuser): `GET /admin/updates`, `POST /admin/updates/check`, `/update`, `/restore`,
 `/requests/{id}/cancel`, `/snooze`, and `GET /admin/updates/progress?seen=` polled by the
 page's script (ADR 0048). Host updater: `python -m app.cli update-claim`, `update-progress`,
 `update-report`, `backup-db`, `restore-db` inside the web container. Inputs from outside: the
@@ -598,6 +599,7 @@ database backups.
 | Tampering | The updater (or a shell in the container) reports nonsense steps to mislead the superuser, or a step that goes back | Steps must be in the action's plan (also a database check) and only move forward; the CLI only accepts known step names | `tests/domain/test_updates.py::test_steps_only_move_forward_and_belong_to_the_action`, `tests/test_cli_updates.py::test_progress_records_the_step` |
 | Elevation (XSS) | The live progress script becomes a way to run injected markup on an admin page | The script runs only on the updates page while a request is open, loads from our origin (`script-src 'self'`, no inline), fetches only the same-origin fragment and inserts autoescaped server HTML; `seen` is only compared, never echoed unescaped | `tests/admin/test_update_routes.py::test_page_shows_the_steps_and_loads_the_poller_while_a_request_is_open`, `test_progress_fragment_answers_only_when_something_changed` |
 | Elevation | An organisation admin reads the update progress | The fragment needs `system.update` like the page | `test_progress_fragment_refuses_an_organisation_admin`, `tests/admin/test_authorization_matrix.py::test_matrix` |
+| Denial of service | "Check now" or a tiny interval turns the installation into a GitHub rate-limit offender, or lets the web process call out | The web process never calls GitHub: "Check now" only marks the stored check (`requested_at`), the worker runs at most one lookup per poll and clears the mark; the portal floor of `update_check_minutes` is 5 (GitHub allows 60 anonymous calls an hour); the mark needs `system.update` and the same origin (ADR 0067 point 7) | `tests/domain/test_update_service.py::test_a_requested_check_runs_at_the_next_poll_and_is_audited`, `test_org_admin_cannot_request_a_check`, `tests/domain/test_settings_registry.py` (bounds), `tests/admin/test_update_routes.py::test_check_now_is_refused_when_nobody_checks` |
 | Repudiation | Who started an update and what the updater did | Requests and cancellations audited (`system.update`, `update.request`, `restore.request`, `request.cancel`); every updater step audited as `host-updater` with its reason | `test_cancel_a_waiting_request`, `test_updater_claims_the_waiting_request_once` |
 
 

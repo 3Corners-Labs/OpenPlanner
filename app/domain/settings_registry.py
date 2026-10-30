@@ -1040,6 +1040,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "The worker requests a newer version itself as soon as the check finds one "
         "(ADR 0059, 0065); not usable in production.",
     ),
+    S(
+        "update_check_minutes",
+        K.INT,
+        60,
+        _C,
+        T.UPDATES,
+        'Minutes between two release checks by the worker (ADR 0067); "Check now" on the '
+        "updates page asks for one ahead of time.",
+        minimum=5,
+        maximum=1440,
+    ),
     # D. Organisation: the value per organisation; the superuser's or the environment's value
     # is the default for organisations without one.
     S(

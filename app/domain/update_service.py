@@ -2,9 +2,10 @@
 
 Three callers, three paths:
 
-    worker         check_if_due ─► ReleaseSource.latest (at most hourly) ─► release_checks
-    superuser      notice (banner) · overview · request_update · request_restore · cancel
-                   (system.update, every change audited)
+    worker         check_if_due ─► ReleaseSource.latest (once per interval, or when asked)
+                   ─► release_checks
+    superuser      notice (banner) · overview · request_check · request_update ·
+                   request_restore · cancel (system.update, every change audited)
     overview page  summary: the notice without a principal, for the *System status* widget
                    (its route carries settings.platform.view, ADR 0061 §2)
     host updater   claim ─► running ─► report_step(step)* ─► report(succeeded | rolled_back
@@ -15,7 +16,8 @@ happened. The host updater does the work and checks the image signature.
 """
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import timedelta
 
 from app.domain.admin import AdminService, record_change, require
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Outcome, Source
@@ -23,6 +25,7 @@ from app.domain.authorization import Permission, Principal, Scope, Target, decid
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, IntegrationError, ReleaseSource, Transaction, UnitOfWork
 from app.domain.updates import (
+    CHECK_INTERVAL,
     HISTORY_ACTIONS,
     HISTORY_DETAILS,
     HOST_ACTOR,
@@ -89,8 +92,10 @@ class UpdateOverview:
         enabled: Whether the installation checks for releases (``UPDATE_REPOSITORY``).
         channel: What it follows: releases only, or release candidates too (ADR 0059).
         auto_apply: Whether the worker requests a newer version itself.
+        interval: How often the worker checks (``update_check_minutes``).
         current: The running version; ``None`` for a build that is not a release.
         check: The latest release check.
+        check_requested: Whether a superuser asked for a check the worker has not run yet.
         newest: The newest version on the channel, from the stored listing; ``None`` when
             nothing is listed (the page then shows the check's latest, if any).
         available: A newer release that can be requested now.
@@ -117,6 +122,8 @@ class UpdateOverview:
     history: list[UpdateRequest]
     outside_change: RunningVersion | None = None
     offered: list[ListedRelease] = field(default_factory=list)
+    interval: timedelta = CHECK_INTERVAL
+    check_requested: bool = False
 
 
 class UpdateService:
@@ -136,6 +143,8 @@ class UpdateService:
             (ADR 0067).
         auto_apply: Whether a check that finds a newer version requests the update itself;
             a value or a callable, as ``channel``.
+        interval: How often the worker checks for releases (``update_check_minutes``); a
+            value or a callable, as ``channel``.
     """
 
     def __init__(
@@ -149,6 +158,7 @@ class UpdateService:
         checking: bool | None = None,
         channel: UpdateChannel | Callable[[], UpdateChannel] = UpdateChannel.RELEASE,
         auto_apply: bool | Callable[[], bool] = False,
+        interval: timedelta | Callable[[], timedelta] = CHECK_INTERVAL,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -159,6 +169,7 @@ class UpdateService:
         self._checking = releases is not None if checking is None else checking
         self._channel = channel if callable(channel) else _constant(channel)
         self._auto_apply = auto_apply if callable(auto_apply) else _constant(auto_apply)
+        self._interval = interval if callable(interval) else _constant(interval)
 
     @property
     def current(self) -> Version | None:
@@ -168,19 +179,19 @@ class UpdateService:
     # --- worker ------------------------------------------------------------------------
 
     async def check_if_due(self) -> bool:
-        """Look up the latest release when the last check is an hour old; return if it did.
+        """Look up the latest release when the interval has passed or a superuser asked.
 
-        A failed lookup is stored as an error code next to the release found before, so the
-        page can say the check fails without forgetting what is known. With ``auto_apply``, a
-        newer version becomes an update request at once (actor ``system``, audited), unless a
-        request is already open (ADR 0059 point 6).
+        Returns whether it did. A failed lookup is stored as an error code next to the
+        release found before, so the page can say the check fails without forgetting what is
+        known. With ``auto_apply``, a newer version becomes an update request at once (actor
+        ``system``, audited), unless a request is already open (ADR 0059 point 6).
         """
         if self._releases is None:
             return False
         now = self._clock.now()
         async with self._uow.read() as tx:
             last = await tx.get_release_check()
-        if not check_due(last, now):
+        if not check_due(last, now, self._interval()):
             return False
         listing: list[ListedRelease] | None
         try:
@@ -216,6 +227,27 @@ class UpdateService:
         return available_update(self._current, check, self._channel())
 
     # --- superuser ---------------------------------------------------------------------
+
+    async def request_check(self, principal: Principal) -> None:
+        """Ask the worker to check for releases at its next poll instead of at the interval.
+
+        The web process never asks GitHub itself (ADR 0029): the request is a mark on the
+        stored check, which the worker's next check clears. Before the first check there is
+        nothing to mark; the worker checks on its next poll anyway.
+
+        Raises:
+            DomainError: ``not_permitted``; ``update_not_available`` when the installation
+                does not check for releases (no ``UPDATE_REPOSITORY``).
+        """
+        require(await self._admin.authorize(principal, _PERMISSION))
+        if not self._checking:
+            raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
+        now = self._clock.now()
+        async with self._uow.locked() as tx:
+            last = await tx.get_release_check()
+            if last is not None and last.requested_at is None:
+                await tx.save_release_check(replace(last, requested_at=now))
+            await record_change(tx, now, principal, _PERMISSION, None, None, "check.request")
 
     async def notice(self, principal: Principal) -> UpdateNotice | None:
         """Return the banner for ``principal``, or ``None`` when there is nothing to show.
@@ -266,8 +298,10 @@ class UpdateService:
             enabled=self._checking,
             channel=self._channel(),
             auto_apply=self._auto_apply(),
+            interval=self._interval(),
             current=self._current,
             check=check,
+            check_requested=check is not None and check.requested_at is not None,
             newest=on_this_channel[0].release if on_this_channel else None,
             available=None if current else self._available(check, listing),
             open=current,

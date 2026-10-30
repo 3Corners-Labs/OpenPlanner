@@ -3938,6 +3938,9 @@ msgstr "Er loopt al een updateverzoek. Wacht tot het klaar is of trek het in."
 msgid "admin.done.update_requested"
 msgstr "De update is aangevraagd. De updater op de server voert hem binnen een minuut uit."
 
+msgid "admin.done.check_requested"
+msgstr "De controle is aangevraagd. De worker kijkt binnen een halve minuut of er een nieuwe versie is."
+
 msgid "admin.done.restore_requested"
 msgstr "Terugzetten is aangevraagd. De updater op de server voert het binnen een minuut uit."
 
@@ -3988,6 +3991,15 @@ msgstr "Laatst gecontroleerd"
 
 msgid "admin.updates.never"
 msgstr "Nog niet"
+
+msgid "admin.updates.check_requested"
+msgstr "Controle aangevraagd"
+
+msgid "admin.updates.check_interval"
+msgstr "De server controleert elke {minutes} minuten of er een nieuwe versie is. Dit interval staat bij Geavanceerde instellingen, onderwerp Updates."
+
+msgid "admin.updates.check_now"
+msgstr "Nu controleren"
 
 msgid "admin.updates.check_failed"
 msgstr "Controle mislukt ({code})"
@@ -6045,6 +6057,9 @@ msgstr "Updatekanaal"
 
 msgid "settings.field.update_auto_apply.label"
 msgstr "Automatisch bijwerken"
+
+msgid "settings.field.update_check_minutes.label"
+msgstr "Minuten tussen twee versiecontroles"
 
 msgid "settings.field.time_format.label"
 msgstr "Tijdnotatie"
