@@ -90,11 +90,13 @@ def _without_comment(line: str) -> str:
 def files(root: Path) -> list[Path]:
     """Return the files whose versions only the custom manager can see.
 
-    Workflows, the Makefile and every shell script, the host installer and updater among them.
+    Workflows and composite actions, the Makefile and every shell script, the host installer
+    and updater among them.
     """
     return sorted(
         [
             *(root / ".github" / "workflows").glob("*.y*ml"),
+            *(root / ".github" / "actions").rglob("action.y*ml"),
             root / "Makefile",
             *(root / "scripts").rglob("*.sh"),
             *(root / ".githooks").glob("*"),
