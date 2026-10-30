@@ -267,7 +267,7 @@ class CertificateProbe(Protocol):
 
 
 class PemReader(Protocol):
-    """Parses an uploaded certificate chain or private key (ADR 0068)."""
+    """Parses an uploaded certificate chain or private key (ADR 0070)."""
 
     def read_chain(self, chain: bytes) -> ParsedChain:
         """Return the leaf's public data, fingerprint, public key and the normalised chain.
@@ -287,7 +287,7 @@ class PemReader(Protocol):
 
 
 class CertificateVolume(Protocol):
-    """The directory shared with the proxy: the key lives here and nowhere else (ADR 0068).
+    """The directory shared with the proxy: the key lives here and nowhere else (ADR 0070).
 
     ``privkey.pem`` is the key the proxy serves with, ``pending.key``/``pending.csr`` a key
     waiting for its certificate, ``fullchain.pem`` and ``serial`` the served pair. Reading
@@ -1060,7 +1060,7 @@ class Transaction(Protocol):
         ...
 
     async def get_own_certificate(self) -> OwnCertificate | None:
-        """Return the uploaded own certificate (ADR 0068); ``None`` without one."""
+        """Return the uploaded own certificate (ADR 0070); ``None`` without one."""
         ...
 
     async def save_own_certificate(self, certificate: OwnCertificate) -> None:

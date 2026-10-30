@@ -1,4 +1,4 @@
-"""The proxy's entrypoint: which certificate source it starts with, and the watcher (ADR 0068).
+"""The proxy's entrypoint: which certificate source it starts with, and the watcher (ADR 0070).
 
 Runs ``deploy/proxy/entrypoint.sh`` with a fake ``caddy`` on the PATH that logs every ``run``
 and ``reload`` with the ``TLS_DIRECTIVE`` it was given, so the shell logic is tested without

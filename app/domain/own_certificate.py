@@ -1,4 +1,4 @@
-"""The own certificate of the bundled proxy: what is uploaded and the rules it must meet (ADR 0068).
+"""The own certificate of the bundled proxy: what is uploaded and the rules it must meet (ADR 0070).
 
 Pure data, shared by the ports (``PemReader``, ``CertificateVolume``, the stored record), the
 service (``app.domain.tls_source``) and the page. The private key never enters the domain as
@@ -23,7 +23,7 @@ OWN = "own"
 SOURCES = (ACME, OWN)
 
 MAX_PEM_BYTES = 64 * 1024
-"""Largest chain or key file accepted; fixed (ADR 0068, *Fixed on purpose*)."""
+"""Largest chain or key file accepted; fixed (ADR 0070, *Fixed on purpose*)."""
 
 UPLOAD_EVENT = "tls.certificate.upload"
 REMOVE_EVENT = "tls.certificate.remove"
@@ -101,7 +101,7 @@ class OwnCertificate:
 
 @dataclass(frozen=True)
 class SourceStatus:
-    """The certificate source as the page shows it (ADR 0068 decision 4).
+    """The certificate source as the page shows it (ADR 0070 decision 4).
 
     Attributes:
         uploaded: The stored chain, if any.

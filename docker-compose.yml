@@ -50,11 +50,11 @@ services:
     networks: [default, edge]
     volumes:
       - data:/srv/data
-      # The own certificate managed in the portal (ADR 0068): its private key lives here and
+      # The own certificate managed in the portal (ADR 0070): its private key lives here and
       # nowhere else (never in the database); web writes, the proxy reads. Empty with ACME.
       - portal-certs:/srv/portal-certs
     environment:
-      # ADR 0068: whether the bundled proxy runs (the installer's OPENPLANNER_TLS pin), so the
+      # ADR 0070: whether the bundled proxy runs (the installer's OPENPLANNER_TLS pin), so the
       # portal knows the certificate source is its to manage; and the volume with the own key.
       TLS_PROXY_BUNDLED: ${OPENPLANNER_TLS:-false}
       TLS_PORTAL_CERTIFICATE_DIR: /srv/portal-certs
@@ -79,7 +79,7 @@ services:
   # only redirects and answers ACME challenges. Needs TLS_DOMAIN and ACME_EMAIL in proxy.env and
   # the domain's DNS pointing at this host. An own certificate instead: TLS_CERT_FILE and
   # TLS_KEY_FILE in proxy.env, the files in ./certs (read-only below), or the pair the superuser
-  # uploads in the portal (ADR 0068, the portal-certs volume).
+  # uploads in the portal (ADR 0070, the portal-certs volume).
   proxy:
     # Released and signed next to the application image (ADR 0064 step 2); a host never builds
     # Caddy. Development and scripts/check-proxy.sh build it from deploy/proxy.
@@ -98,7 +98,7 @@ services:
       - proxy-data:/data
       # An own certificate and key (ADR 0064); empty with ACME.
       - ./certs:/certs:ro
-      # The own certificate from the portal (ADR 0068); the entrypoint's watcher reloads on change.
+      # The own certificate from the portal (ADR 0070); the entrypoint's watcher reloads on change.
       - portal-certs:/portal-certs:ro
     networks:
       edge:

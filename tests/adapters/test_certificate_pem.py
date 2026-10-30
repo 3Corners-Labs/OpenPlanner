@@ -1,4 +1,4 @@
-"""Parsing an uploaded chain or key, and making a key with its request (ADR 0068)."""
+"""Parsing an uploaded chain or key, and making a key with its request (ADR 0070)."""
 
 from datetime import timedelta
 

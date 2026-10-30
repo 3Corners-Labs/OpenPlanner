@@ -1,4 +1,4 @@
-"""Self-signed certificate pairs for the own-certificate tests (ADR 0068); test material only."""
+"""Self-signed certificate pairs for the own-certificate tests (ADR 0070); test material only."""
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta

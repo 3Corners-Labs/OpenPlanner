@@ -1,4 +1,4 @@
-"""Storage of the own certificate: the chain and public key, never a private key (ADR 0068)."""
+"""Storage of the own certificate: the chain and public key, never a private key (ADR 0070)."""
 
 from datetime import timedelta
 

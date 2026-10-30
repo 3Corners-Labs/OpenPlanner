@@ -1,4 +1,4 @@
-"""The directory shared with the proxy: keys, request and the served pair (ADR 0068)."""
+"""The directory shared with the proxy: keys, request and the served pair (ADR 0070)."""
 
 import stat
 from pathlib import Path

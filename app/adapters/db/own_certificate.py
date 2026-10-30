@@ -1,4 +1,4 @@
-"""SQL queries of the own certificate uploaded in the portal (ADR 0068).
+"""SQL queries of the own certificate uploaded in the portal (ADR 0070).
 
 A mixin of ``SqlTransaction``. One row at most: the chain (public), the leaf's public key and
 the public data the page shows. No private key is ever stored here: it lives on the volume

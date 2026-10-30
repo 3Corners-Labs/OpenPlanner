@@ -247,7 +247,7 @@ For a PKIoverheid or other organisation-validated certificate, or any CA without
 Back to ACME: remove `TLS_CERT_FILE` and `TLS_KEY_FILE` from `proxy.env`, make sure
 `ACME_EMAIL` is there, and restart the proxy; it obtains a certificate again.
 
-### Own certificate from the portal (ADR 0068)
+### Own certificate from the portal (ADR 0070)
 
 On a small installation (the bundled proxy, the installer's default) the superuser manages the
 certificate source without the host: *Platform → Advanced settings → System status →
@@ -323,7 +323,7 @@ On a host with a public DNS name and ports 80 and 443 open (docker01 in the lab)
    expiry date then, and *expiring* appears only if it did not happen.
 5. Optionally the own-certificate path: a self-signed pair in `certs/`, `--own-certificate`,
    System status says *niet vertrouwd* with your own issuer; back to ACME as above.
-6. The portal path (ADR 0068): on *Advanced settings* make a request, sign it with any test CA
+6. The portal path (ADR 0070): on *Advanced settings* make a request, sign it with any test CA
    (or import a self-signed pair for the host with its key), place the chain, switch the source
    to *own*, press *Check now* and see your own issuer with *niet vertrouwd*; switch back to
    Let's Encrypt and see *ok* again, without touching the host.
@@ -1097,7 +1097,7 @@ deploy the old images. Every migration is reversible (enforced in CI).
 *TBD (O7).* Planned: Litestream or a daily `sqlite3 .backup`, encrypted, retention = PII term
 + 7 days (HANDOVER §7).
 
-The `portal-certs` volume (ADR 0068: the private key of an own certificate, its signing
+The `portal-certs` volume (ADR 0070: the private key of an own certificate, its signing
 request and the served pair) is **not** part of the database backup, on purpose: the database
 holds certificates but no private keys. After a restore on another host, make a new request in
 the portal and place its chain, or import the pair again (*Own certificate from the portal*);

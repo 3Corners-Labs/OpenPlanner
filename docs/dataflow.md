@@ -306,7 +306,7 @@ bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error
 The switch holds a subject identifier or a host actor, times and a reason code: no personal
 data. A refused change is audited with its permission and target only, never the form content.
 
-## HTTPS certificate (ADR 0030, ADR 0064, ADR 0068)
+## HTTPS certificate (ADR 0030, ADR 0064, ADR 0070)
 
 ```
 proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
@@ -317,7 +317,7 @@ worker ──TLS handshake, no request──> proxy (public name, port 443): rea
 ```
 
 ```
-web ──> portal-certs volume (uid 10001, mode 600): private key + CSR made here (ADR 0068)
+web ──> portal-certs volume (uid 10001, mode 600): private key + CSR made here (ADR 0070)
 superuser ──https, admin session──> web: the CSR (public) out; the certificate chain in
    (a migration: chain + private key in, the key written to the volume only)
 web ──> own_certificates: chain (public), public key, fingerprint, subject, issuer, names,

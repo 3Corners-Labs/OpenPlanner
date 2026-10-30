@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Start the compose stack with --profile tls against Pebble, Let's Encrypt's test ACME CA, and
-# check what ADR 0030, ADR 0064 and ADR 0068 promise: a certificate is obtained without manual
+# check what ADR 0030, ADR 0064 and ADR 0070 promise: a certificate is obtained without manual
 # steps, port 80 only redirects, public form bodies are capped, the proxy runs as non-root; a
 # pair handed over through the portal-certs volume is served within the poll interval and ACME
 # applies again when it is withdrawn; then the same proxy serves an own certificate from files,
@@ -82,7 +82,7 @@ self_signed() { # self_signed NAME ORGANISATION: a 30-day EC pair for booking.te
     -keyout "$certs/$1.key" -out "$certs/$1.crt" >/dev/null 2>&1
 }
 
-wait_for_issuer() { # wait_for_issuer FRAGMENT: the watcher polls every 10 s (ADR 0068)
+wait_for_issuer() { # wait_for_issuer FRAGMENT: the watcher polls every 10 s (ADR 0070)
   for _ in $(seq 1 20); do
     if issuer | grep -q "$1"; then return 0; fi
     sleep 2
@@ -91,7 +91,7 @@ wait_for_issuer() { # wait_for_issuer FRAGMENT: the watcher polls every 10 s (AD
 }
 
 # Pass 1b: the own certificate managed in the portal reaches the proxy through the
-# portal-certs volume (ADR 0068): web keeps the key there and adds fullchain.pem and serial.
+# portal-certs volume (ADR 0070): web keeps the key there and adds fullchain.pem and serial.
 self_signed portal "OpenPlanner portal check"
 # Through web's own adapter, as the portal does it: the volume belongs to uid 10001 and the key is
 # written mode 600 by that user (`docker cp` would leave root-owned files the app cannot manage).

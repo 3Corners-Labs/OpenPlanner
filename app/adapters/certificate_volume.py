@@ -1,4 +1,4 @@
-"""``CertificateVolume`` on a directory the proxy reads: the ``portal-certs`` volume (ADR 0068).
+"""``CertificateVolume`` on a directory the proxy reads: the ``portal-certs`` volume (ADR 0070).
 
 Files, all written through a temporary name and a rename so the proxy's watcher never sees a
 half file:

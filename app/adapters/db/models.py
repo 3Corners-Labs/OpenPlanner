@@ -980,7 +980,7 @@ class RoleRow(Base):
 
 
 class OwnCertificateRow(Base):
-    """The own certificate uploaded in the portal (ADR 0068); at most one row.
+    """The own certificate uploaded in the portal (ADR 0070); at most one row.
 
     The chain is public and stored as text with the leaf's public key; the private key is never
     in the database (it lives on the volume the proxy reads), so a backup never carries it.
