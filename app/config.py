@@ -20,6 +20,7 @@ from pydantic_settings import (
 )
 
 from app.domain.event_schema import Envelope
+from app.domain.login_mapping import LOGIN_KEYS
 from app.domain.settings_registry import REGISTRY, SettingClass
 from app.domain.system_log import EventRetention
 from app.i18n.dates import ClockStyle
@@ -443,6 +444,11 @@ class Settings(BaseSettings):
             "OIDC needs an https discovery URL and a client secret",
         )
         return found
+
+    @property
+    def login_values(self) -> dict[str, str]:
+        """The login mapping settings by key (ADR 0042 §8), for ``claim_mapping``."""
+        return {key: str(getattr(self, key)) for key in LOGIN_KEYS}
 
     @property
     def event_retention(self) -> EventRetention:

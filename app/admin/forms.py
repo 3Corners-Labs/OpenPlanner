@@ -67,6 +67,9 @@ DONE_MESSAGES: dict[str, str] = {
     "scenario_deleted": "admin.done.scenario_deleted",
     "checked": "admin.done.checked",
     "maintenance_on": "admin.done.maintenance_on",
+    "adopted": "admin.done.adopted",
+    "login_mapping_saved": "admin.done.login_mapping_saved",
+    "login_mapping_refused": "admin.done.login_mapping_refused",
     "maintenance_off": "admin.done.maintenance_off",
     "simulated": "admin.done.simulated",
     "simulated_prepared": "admin.done.simulated_prepared",
@@ -220,6 +223,9 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SETTING_INVALID: "admin.form.error.setting_invalid",
     ErrorCode.SETTING_COMBINATION: "admin.form.error.setting_combination",
     ErrorCode.SETTING_EXPIRY: "admin.form.error.setting_expiry",
+    ErrorCode.SETTING_NO_KEY: "admin.form.error.setting_no_key",
+    ErrorCode.SETTING_NOT_LOCKED: "admin.form.error.setting_not_locked",
+    ErrorCode.LOGIN_LOCKOUT: "admin.form.error.login_lockout",
 }
 
 

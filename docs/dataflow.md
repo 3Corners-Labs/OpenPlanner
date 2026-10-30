@@ -56,6 +56,11 @@ SMTP and SMS settings per organisation are organisation data; their password and
 are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data.
 Neither leaves the system except as part of the messages above.
 
+The platform's fallback mail server, the update check's read token and the Webex Service App
+(client secret, refresh token) can also be set in the portal (ADR 0042 step 6). Their password and token are sealed the same way, under
+`setting:<key>` in `integration_credentials`, and are never shown, logged or audited by value;
+they leave the system only to the mail server and to GitHub respectively.
+
 ## Stored personal data (WP2 schema)
 
 | Data item | Table.column | Source | Retention | Leaves the system |

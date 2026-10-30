@@ -22,8 +22,10 @@ import asyncio
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import datetime
+from enum import Enum
 
 import structlog
+from pydantic import SecretStr
 
 from app.adapters.settings_report import (
     SettingState,
@@ -168,6 +170,15 @@ class LiveSettings:
                 )
             )
         return found
+
+    def environment_value(self, key: str) -> object:
+        """Return what the environment gives ``key`` (a secret opened), for taking it over."""
+        value = getattr(self._base, key, None)
+        if isinstance(value, SecretStr):
+            return value.get_secret_value()
+        if isinstance(value, Enum):
+            return value.value
+        return value
 
     def locked(self) -> frozenset[str]:
         """Return the keys the environment locks; the portal and the CLI never change them."""
