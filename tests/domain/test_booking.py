@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -137,3 +138,59 @@ def test_booking_repr_hides_personal_data() -> None:
 
     assert "Ada" not in text
     assert "example.org" not in text
+
+
+def test_pending_booking_holds_its_place_but_is_not_active() -> None:
+    pending = make_booking(BookingStatus.PENDING_CONFIRMATION)
+
+    assert pending.holds_place is True
+    assert pending.is_active is False
+    assert pending.awaits_confirmation is True
+
+
+def test_confirm_records_the_moment_the_address_was_verified() -> None:
+    confirmed = make_booking(BookingStatus.PENDING_CONFIRMATION).confirm(NOW)
+
+    assert confirmed.status is BookingStatus.CONFIRMED
+    assert confirmed.confirmed_at == NOW
+    assert confirmed.awaits_confirmation is False
+
+
+@pytest.mark.parametrize("status", [BookingStatus.CONFIRMED, BookingStatus.CANCELLED])
+def test_only_pending_bookings_can_be_confirmed(status: BookingStatus) -> None:
+    with pytest.raises(DomainError) as excinfo:
+        make_booking(status).confirm(NOW)
+
+    assert excinfo.value.code is ErrorCode.BOOKING_NOT_PENDING
+
+
+def test_expire_cancels_an_unconfirmed_booking_at_its_deadline() -> None:
+    deadline = NOW - timedelta(minutes=3)  # the worker ran a little late
+    pending = replace(make_booking(BookingStatus.PENDING_CONFIRMATION), confirm_by=deadline)
+
+    lapsed = pending.expire(NOW)
+
+    assert lapsed.status is BookingStatus.CANCELLED
+    assert lapsed.cancelled_at == deadline
+    assert lapsed.holds_place is False
+    assert lapsed.lapsed_unconfirmed is True
+
+
+def test_a_cancelled_confirmed_booking_did_not_lapse_unconfirmed() -> None:
+    confirmed = make_booking(BookingStatus.PENDING_CONFIRMATION).confirm(NOW)
+
+    assert confirmed.cancel(NOW).lapsed_unconfirmed is False
+
+
+def test_a_confirmed_booking_cannot_expire() -> None:
+    with pytest.raises(DomainError) as excinfo:
+        make_booking().expire(NOW)
+
+    assert excinfo.value.code is ErrorCode.BOOKING_NOT_PENDING
+
+
+def test_a_pending_booking_can_be_cancelled_by_the_citizen() -> None:
+    cancelled = make_booking(BookingStatus.PENDING_CONFIRMATION).cancel(NOW)
+
+    assert cancelled.status is BookingStatus.CANCELLED
+    assert cancelled.lapsed_unconfirmed is False
