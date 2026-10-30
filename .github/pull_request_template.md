@@ -28,3 +28,4 @@
 - [ ] Manual updated for every admin screen this PR adds or changes (`docs/manual/`, ADR 0033)
 - [ ] Migration reversible: yes / no / n.a.
 - [ ] Docs updated (threat model, dataflow, runbook, ADR) where a flow changed
+- [ ] For every ADR this PR builds a step of: its *Build status* row, its Status line and its row in `docs/adr-status.md` say what is built now, not what is decided (ADR 0059)

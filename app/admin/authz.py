@@ -164,11 +164,12 @@ def can_function(principal: Principal) -> Callable[..., bool]:
     return can
 
 
-def _return_path(request: Request) -> str:
-    """Return the page to come back to after a fresh login.
+def return_path(request: Request) -> str:
+    """Return the page to come back to after a fresh login or a profile-menu choice.
 
     A GET returns to itself. A POST returns to the page that sent the form (the referer
-    path); the login only accepts admin paths, so a forged referer cannot leave the portal.
+    path); every receiver passes it through ``safe_next``, so a forged referer cannot leave
+    the portal.
     """
     if request.method == "GET":
         return request.url.path
@@ -280,4 +281,4 @@ class RequirePermission:
         limit = timedelta(minutes=request.app.state.settings.admin_reauth_minutes)
         age = login_age(request, clock.now())
         if age is None or age > limit:
-            raise ReauthRequired(_return_path(request))
+            raise ReauthRequired(return_path(request))

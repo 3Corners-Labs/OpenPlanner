@@ -101,18 +101,26 @@ def create_templates(page_dirs: Sequence[Path]) -> Jinja2Templates:
     return Jinja2Templates(env=create_environment([*page_dirs, SHARED_TEMPLATE_DIR]))
 
 
-def switch_href(request: Request, param: str, value: str) -> str:
-    """Return a query-only link (``?lang=en``) that sets ``param`` on the current page.
+def kept_query(request: Request) -> list[tuple[str, str]]:
+    """Return the query parameters of ``request`` that a link may carry over.
 
-    Keeps only ``KEPT_QUERY_PARAMS``, so arbitrary input is never reflected, and never contains
-    the request path, so a crafted path cannot turn it into a link to another host.
+    Only ``KEPT_QUERY_PARAMS`` with a date-like value, so arbitrary input (a filter text, a
+    personal-data value, ADR 0063 §3) is never reflected into a link or a form.
     """
-    kept = [
+    return [
         (key, value)
         for key, value in request.query_params.multi_items()
         if key in KEPT_QUERY_PARAMS and _KEPT_VALUE.fullmatch(value)
     ]
-    return f"?{urlencode([*kept, (param, value)])}"
+
+
+def switch_href(request: Request, param: str, value: str) -> str:
+    """Return a query-only link (``?lang=en``) that sets ``param`` on the current page.
+
+    Keeps only ``kept_query``, and never contains the request path, so a crafted path cannot
+    turn it into a link to another host.
+    """
+    return f"?{urlencode([*kept_query(request), (param, value)])}"
 
 
 def language_options(request: Request, locale: RequestLocale) -> list[LanguageOption]:

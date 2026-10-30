@@ -572,3 +572,78 @@ async def test_summary_tells_any_reader_what_the_banner_tells_the_superuser(
     assert summary.available == RELEASE
     assert summary.open is None
     assert (await service(uow, clock, current=V2).summary()).available is None
+
+
+async def test_the_check_interval_is_a_setting_read_live(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    minutes = [5]
+    updates = UpdateService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        current=V1,
+        releases=releases,
+        interval=lambda: timedelta(minutes=minutes[0]),
+    )
+    assert await updates.check_if_due()
+    clock.advance(timedelta(minutes=5))
+    assert await updates.check_if_due()
+    minutes[0] = 30  # the superuser raised it in the portal
+    clock.advance(timedelta(minutes=5))
+    assert not await updates.check_if_due()
+    clock.advance(timedelta(minutes=25))
+    assert await updates.check_if_due()
+    assert (await updates.overview(DEMO_SUPERUSER)).interval == timedelta(minutes=30)
+
+
+async def test_a_requested_check_runs_at_the_next_poll_and_is_audited(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    updates = service(uow, clock, releases)
+    await checked(uow, clock, releases)
+    clock.advance(timedelta(minutes=1))
+    assert not await updates.check_if_due()
+
+    await updates.request_check(DEMO_SUPERUSER)
+    assert (await updates.overview(DEMO_SUPERUSER)).check_requested
+    event = uow.state.audit[-1]
+    assert (event.actor, event.action, event.outcome, event.detail) == (
+        DEMO_SUPERUSER.subject,
+        "system.update",
+        Outcome.SUCCESS,
+        "check.request",
+    )
+    assert await updates.check_if_due()
+    assert releases.calls == 2
+    assert uow.state.release_check == ReleaseCheck(clock.now(), RELEASE)
+    assert not (await updates.overview(DEMO_SUPERUSER)).check_requested
+
+
+async def test_a_check_requested_before_the_first_one_only_leaves_the_audit_event(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    updates = service(uow, clock, releases)
+    await updates.request_check(DEMO_SUPERUSER)
+    assert uow.state.release_check is None  # the worker checks anyway: nothing to mark
+    assert uow.state.audit[-1].detail == "check.request"
+    assert await updates.check_if_due()
+
+
+async def test_org_admin_cannot_request_a_check(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await checked(uow, clock, releases)
+    with pytest.raises(DomainError) as caught:
+        await service(uow, clock, releases).request_check(DEMO_ORG_ADMIN)
+    assert caught.value.code is ErrorCode.NOT_PERMITTED
+    assert uow.state.release_check == ReleaseCheck(NOW, RELEASE)
+    assert uow.state.audit[-1].outcome is Outcome.DENIED
+
+
+async def test_a_check_cannot_be_requested_when_nobody_checks(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    with pytest.raises(DomainError) as caught:
+        await service(uow, clock).request_check(DEMO_SUPERUSER)
+    assert caught.value.code is ErrorCode.UPDATE_NOT_AVAILABLE

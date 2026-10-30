@@ -170,6 +170,8 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/staff/999": statuses(404, 404, 404, 404, 404, 403, 403)
     },
     # ADR 0033: the manual is public, every admin may read every topic.
+    # Step 2b: the profile menu's theme and alert choices, stored in the own session (303 back).
+    "GET /admin/preferences": {"/admin/preferences": statuses(303, 303, 303, 303, 303, 303, 403)},
     "GET /admin/help": {"/admin/help": statuses(200, 200, 200, 200, 200, 200, 403)},
     "GET /admin/help/{topic}": {
         "/admin/help/group-settings": statuses(200, 200, 200, 200, 200, 200, 403),
@@ -316,6 +318,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/updates": {"/admin/updates": statuses(200, 403, 403, 403, 403, 403, 403)},
     "GET /admin/updates/progress": {
         "/admin/updates/progress": statuses(200, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/updates/check": {
+        "/admin/updates/check": statuses(409, 403, 403, 403, 403, 403, 403)
     },
     "POST /admin/updates/update": {
         "/admin/updates/update": statuses(409, 403, 403, 403, 403, 403, 403)
@@ -901,6 +906,7 @@ WRITABLE_IN_MAINTENANCE = frozenset(
         "POST /admin/organisations/{org}/channels/email/domain",
         "POST /admin/organisations/{org}/channels/sms",
         "POST /admin/organisations/{org}/channels/{channel}/remove",
+        "POST /admin/updates/check",
         "POST /admin/updates/update",
         "POST /admin/updates/restore",
         "POST /admin/updates/requests/{request_id}/cancel",
