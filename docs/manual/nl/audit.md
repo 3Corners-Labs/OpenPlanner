@@ -22,8 +22,9 @@ Het log bevat nooit gegevens van burgers: geen namen, e-mailadressen of telefoon
 - **Minimaal niveau**: bijvoorbeeld *Waarschuwing* toont waarschuwingen, fouten en kritieke
   meldingen. Geweigerd en opnieuw proberen zijn waarschuwingen, mislukt is een fout.
 - **Soort**: *Beheeracties* (inloggen, wijzigingen, weigeringen), *Systeem* (berichten,
-  videogesprekken, verwijderen van gegevens, opslag), *Beveiliging* (geweigerde webhooks,
-  mislukte vernieuwing van het Webex-token) en *Diagnose*.
+  videogesprekken, verwijderen van gegevens, opslag, de automatische controle van de
+  koppeling), *Beveiliging* (geweigerde webhooks, mislukte vernieuwing van het Webex-token) en
+  *Diagnose*.
 - **Van** en **Tot en met**: hele dagen in de tijdzone van het portaal.
 - **Keten-id**: alle regels van één verzoek of één taak. U komt er ook met **Hele keten**
   bij een regel.

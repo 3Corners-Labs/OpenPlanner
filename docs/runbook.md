@@ -66,7 +66,9 @@ Kubernetes mounts secrets with mode 0644 unless the volume sets `defaultMode: 04
 
 ## Verifying the image signature
 
-Only deploy images signed by the `main` workflow of this repository:
+Only deploy images signed by the `main` workflow of this repository. Every version has two:
+the application `ghcr.io/<owner>/<repo>` and the HTTPS proxy `ghcr.io/<owner>/<repo>-proxy`
+(ADR 0064 step 2), signed by the same workflow run:
 
 ```sh
 cosign verify ghcr.io/<owner>/<repo>@sha256:<digest> \
@@ -74,7 +76,8 @@ cosign verify ghcr.io/<owner>/<repo>@sha256:<digest> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-Deploy by digest, not by tag.
+Deploy by digest, not by tag. The installer and the host updater do exactly this for both
+images (`OPENPLANNER_IMAGE` and `OPENPLANNER_PROXY_IMAGE` in `.env.update`).
 
 ## Health
 
@@ -102,7 +105,8 @@ production there is no bar. An acceptance environment where real citizens book m
 
 The image refuses to start in production (`ENVIRONMENT` defaults to `prod`) without
 `MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`. With the bundled TLS proxy (next
-section) nothing else is needed. Behind a reverse proxy of your own also set:
+section; the installer's default) nothing else is needed. Behind a reverse proxy of your own
+(`scripts/install.sh --no-tls`) also set:
 
 - `FORWARDED_ALLOW_IPS=<proxy address>` (read by uvicorn), so rate limits see the visitor's IP
   instead of one shared proxy address. Without it, a single bot can exhaust the booking limit
@@ -146,10 +150,28 @@ the environment outside the portal bounds still applies, but is marked
 row edited by hand) is not applied and is marked `! stored portal value ignored`. A change
 applies within 10 seconds in `web` and in the next loop of the worker, without a restart.
 
-## HTTPS certificate (ADR 0030)
+## HTTPS certificate (ADR 0030, ADR 0064)
 
 The `proxy` service (Caddy, profile `tls`) gets a certificate from Let's Encrypt over ACME and
-renews it on its own; nobody has to install or renew a certificate by hand.
+renews it on its own; nobody has to install or renew a certificate by hand. The installer runs
+it in `production` and `test` mode by default and in a `lab` with `--tls-domain`; `--no-tls`
+leaves HTTPS to a load balancer of your own.
+
+**Where to look.** *Platform → Advanced settings → System status* shows the certificate of the
+public address: issuer, valid until, days left, when it was last checked, and one finding
+(*in orde*, *verloopt binnenkort*, *niet vertrouwd*, …). The worker probes it every
+`TLS_CHECK_INTERVAL_HOURS` (6) and writes a system event `tls.certificate` when the finding
+changes or keeps failing (every `TLS_ALERT_REPEAT_HOURS`); below `TLS_EXPIRY_WARNING_DAYS`
+(20) left the finding is *expiring*, which means Caddy's renewal (at 30 days) is failing. On
+the host:
+
+```bash
+docker compose --env-file .env.update exec web python -m app.cli tls-check
+```
+
+prints the same and exits 1 on any finding (`--host`/`--port` probe another server without
+storing). *Unreachable* from the worker while browsers are fine means the host cannot reach its
+own public address (hairpin NAT or a firewall rule); open it, or accept the finding.
 
 First start:
 
@@ -157,7 +179,8 @@ First start:
    record, it must allow `letsencrypt.org`.
 2. Open ports 80 and 443 from the internet. Port 80 is needed for the ACME challenge and
    redirects everything else to https.
-3. `scripts/install.sh --mode production --acme-staging` does steps 3 and 4 (`docs/install.md`).
+3. `scripts/install.sh --mode production --acme-staging` does steps 3 and 4 (`docs/install.md`;
+   `--mode test` or `--mode lab --tls-domain <host>` for an acceptance or lab host).
    By hand: `cp proxy.env.example proxy.env` and fill in `TLS_DOMAIN=<host name>` and
    `ACME_EMAIL=<operations mailbox>`. The proxy reads only this file, not `.env`, so it never
    holds the app's secrets and works with `--env-file .env.update` (updater, ADR 0029) too.
@@ -167,7 +190,8 @@ First start:
    `ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory`, then
    `docker compose --env-file .env.update up -d` and look for `certificate obtained
    successfully` in `docker compose --env-file .env.update logs proxy`. Browsers will not trust
-   the staging certificate; that is expected.
+   the staging certificate, and System status says *niet vertrouwd* with the staging issuer;
+   that is expected.
 5. Remove `ACME_CA` (default: Let's Encrypt production), delete the staging certificate with
    `docker compose --env-file .env.update stop proxy && docker compose --env-file .env.update rm -f proxy && docker volume rm openplanner_proxy-data`,
    and start again with `docker compose --env-file .env.update up -d`.
@@ -176,25 +200,133 @@ Day to day:
 
 - **Renewal** happens inside the running proxy when a third of the lifetime is left (about 30
   days before expiry for 90-day certificates), with retries. A restart is not needed.
-- **Check the expiry date** (monthly, or in monitoring; Let's Encrypt sends no expiry mail):
+- **The expiry date is watched** by the worker (above): the finding *expiring* on System
+  status, the system event `tls.certificate` and `python -m app.cli tls-check` all say so, and
+  Let's Encrypt sends no expiry mail. Less than 20 days left means renewal is failing: read
+  `docker compose logs proxy` (`tls.obtain` / `tls.renew`). Usual causes: port 80 or 443
+  closed, DNS changed, a `CAA` record. By hand:
   `echo | openssl s_client -connect <host>:443 -servername <host> 2>/dev/null | openssl x509 -noout -enddate`.
-  Less than 20 days left means renewal is failing: read `docker compose logs proxy` (`tls.obtain`
-  / `tls.renew`). Usual causes: port 80 or 443 closed, DNS changed, a `CAA` record.
 - **Keep the `proxy-data` volume** and include it in the backup. It holds the certificate, its
   private key and the ACME account; without it every start requests a new certificate, and
   more than 5 per week for the same name are refused.
 - **Another ACME CA** (for example ZeroSSL, or a government CA that speaks ACME): set `ACME_CA`
   in `proxy.env` to its directory URL and restart the proxy.
-- **Updates from the admin portal** (ADR 0029) restart only `web` and `worker`; the proxy keeps
-  running and answers 502 for the seconds `web` is down. `.env.update` carries
-  `COMPOSE_PROFILES=tls`, so `docker compose --env-file .env.update up -d` keeps the proxy in
-  the stack. An organisation-validated (PKIoverheid)
-  certificate without ACME is not supported by this profile (ADR 0030).
+- **Updates from the admin portal** (ADR 0029) also update the proxy (ADR 0064 step 2): the
+  updater pulls and verifies `ghcr.io/<owner>/<repo>-proxy` at the new version, pins it as
+  `OPENPLANNER_PROXY_IMAGE` next to the application image and recreates `web`, `worker` and
+  `proxy` together, so the public address answers nothing for the seconds the proxy restarts
+  (inside the maintenance window). The certificate stays in the `proxy-data` volume, so no
+  new certificate is requested. A proxy that does not become healthy rolls the whole update
+  back, and a rollback or a restore returns the previous proxy image as well. `.env.update`
+  carries `COMPOSE_PROFILES=tls` and `OPENPLANNER_TLS=1`, so `docker compose --env-file
+  .env.update up -d` keeps the proxy in the stack. No host builds the proxy: `deploy/proxy/`
+  is built only in CI (and by `make proxy-check`).
 - **Webhooks**: with a public domain, `WEBHOOK_BASE_URL` can stay empty; Webex and WxCC use
   `PUBLIC_BASE_URL`.
 - `web` stays reachable on `127.0.0.1:8000` of the host itself, without the proxy's limits;
   keep shell access to the host restricted.
-- `make proxy-check` (also in CI) runs the whole flow against Pebble, Let's Encrypt's test CA.
+- `make proxy-check` (also in CI) runs the whole flow against Pebble, Let's Encrypt's test CA,
+  then the own-certificate mode below, and `tls-check` against both.
+
+### Own certificate instead of ACME (ADR 0064)
+
+For a PKIoverheid or other organisation-validated certificate, or any CA without ACME:
+
+1. Put the certificate chain (server certificate first, then the intermediates, PEM) and the
+   private key in `~/openplanner/certs/` as `fullchain.pem` and `privkey.pem`. The proxy runs
+   as uid 10001 and must read them: `sudo chown 10001:10001 certs/*.pem && chmod 600 certs/*.pem`
+   (the directory itself stays 755).
+2. `scripts/install.sh --own-certificate` writes `proxy.env` with `TLS_CERT_FILE=/certs/fullchain.pem`
+   and `TLS_KEY_FILE=/certs/privkey.pem` (by hand: those two lines, `ACME_EMAIL` may go) and
+   restarts the stack. The proxy's log says `own certificate from /certs/fullchain.pem`.
+3. System status shows the new issuer and expiry date. **Renewal is now yours**: put a calendar
+   entry at the expiry date minus a month, replace the two files and run
+   `docker compose --env-file .env.update restart proxy`. The worker's finding *expiring* is the
+   safety net, not the plan.
+
+Back to ACME: remove `TLS_CERT_FILE` and `TLS_KEY_FILE` from `proxy.env`, make sure
+`ACME_EMAIL` is there, and restart the proxy; it obtains a certificate again.
+
+### Own certificate from the portal (ADR 0070)
+
+On a small installation (the bundled proxy, the installer's default) the superuser manages the
+certificate source without the host: *Platform → Advanced settings → System status →
+Certificate source*. The private key never leaves the host: it lives in the `portal-certs`
+volume (uid 10001, mode 600), never in the database, so a database backup never carries it.
+
+1. **Make a key and a request**: *Make a new key and request*. `web` makes an ECDSA P-256 key
+   and a certificate signing request for the public address in the volume (`pending.key`,
+   `pending.csr`). The page shows the request as text and offers it as `openplanner.csr`.
+   Hand it to the CA (PKIoverheid or any other); a request does not disturb a certificate in
+   use, and a new request replaces an earlier one.
+2. **Place the chain** the CA issued under *Place or replace the certificate chain* (PEM,
+   server certificate first, then the intermediates). The upload is refused with the reason
+   when the file is not PEM, the chain does not belong to a key on this host, does not cover the
+   public address, or is expired. The pending key becomes the served key (`privkey.pem`); the
+   page shows fingerprint, subject, names, expiry and *Private key on this server: present*.
+3. **Switch the source** to *Own certificate* and save. `web` writes `fullchain.pem` and
+   `serial` next to the key; the proxy's watcher sees the new `serial` within
+   `TLS_PORTAL_POLL_SECONDS` (10) and reloads Caddy with the pair. The proxy's log says
+   `portal certificate <fingerprint> applied`.
+4. **Check now** probes the public address at once: *System status* shows the new issuer and
+   the finding (*in orde* for a publicly trusted CA, *niet vertrouwd* for a private one).
+5. **Renew** before expiry: with the same key, place the new chain (one upload, served at once
+   while the source is *own*); with a new key, make a new request first. **Renewal is the
+   organisation's**: the worker's *expiring* finding and the system event `tls.certificate`
+   are the safety net, so put a calendar entry at the expiry date minus a month.
+6. **Back to Let's Encrypt**: switch the source to *Let's Encrypt*. `serial` and the chain are
+   withdrawn from the volume, the watcher reloads Caddy without them and ACME applies again;
+   the key stays for the next chain. *Remove the uploaded certificate* deletes the chain from
+   the database (never the key) and is allowed only while Let's Encrypt is the source.
+
+**Migrating an existing certificate**: place the chain and, in the second field, its private
+key (unencrypted PEM) together. The key goes straight to the volume, write-only; it is not
+kept anywhere else and never shown. Use this once; afterwards renew with requests.
+
+**After a database restore on another host** the chain is there but the key is not: the page
+says *Private key on this server: missing*, *own* cannot be chosen, and the proxy serves Let's
+Encrypt until you make a new request and place its chain (or import the pair again). The
+`portal-certs` volume is left out of the database backup on purpose (*Backup and restore*).
+
+Precedence in the proxy: files named in `proxy.env` (`TLS_CERT_FILE`/`TLS_KEY_FILE`, above) win
+over the portal, then the portal's pair, then ACME. The installer's `--own-certificate` also
+writes `TLS_CERTIFICATE_SOURCE=own` into `.env`, which locks the portal setting: the page then
+says the host manages the certificate and offers no forms. An operator who wants the choice out
+of the portal altogether sets `TLS_CERTIFICATE_SOURCE=acme` in `.env` (ADR 0042 lock). Behind a
+load balancer of your own (`--no-tls`) the block says the source does not apply.
+
+Every request, upload, import and removal is in the audit log with the fingerprint and the
+expiry date only. On the host, the volume and the proxy's view of it:
+
+```bash
+docker compose --env-file .env.update exec web ls -l /srv/portal-certs
+```
+
+```bash
+docker compose --env-file .env.update logs proxy | grep 'portal certificate'
+```
+
+### Test the certificate flow end to end (ADR 0064)
+
+On a host with a public DNS name and ports 80 and 443 open (docker01 in the lab):
+
+1. `scripts/install.sh --mode lab --tls-domain <host> --acme-staging` (or `--mode test`). The
+   proxy obtains a staging certificate; the log says `certificate obtained successfully`.
+2. Open *Platform → Advanced settings*: the certificate block shows the staging issuer and the
+   finding *niet vertrouwd*; the audit log (superuser) has a system event `tls.certificate`
+   with reason `untrusted`. The browser warns, as expected.
+3. Remove `ACME_CA` from `proxy.env`, delete the staging certificate
+   (`docker compose --env-file .env.update stop proxy && docker compose --env-file .env.update rm -f proxy && docker volume rm openplanner_proxy-data`)
+   and start again. Within the check interval (or at once with `tls-check`) System status says
+   *Let's Encrypt* and *in orde*, and the system event records the return to `ok`.
+4. The renewal itself is Caddy's: it runs when 30 days are left. The status page shows the new
+   expiry date then, and *expiring* appears only if it did not happen.
+5. Optionally the own-certificate path: a self-signed pair in `certs/`, `--own-certificate`,
+   System status says *niet vertrouwd* with your own issuer; back to ACME as above.
+6. The portal path (ADR 0070): on *Advanced settings* make a request, sign it with any test CA
+   (or import a self-signed pair for the host with its key), place the chain, switch the source
+   to *own*, press *Check now* and see your own issuer with *niet vertrouwd*; switch back to
+   Let's Encrypt and see *ok* again, without touching the host.
 
 ## Time zones and clock format
 
@@ -628,6 +760,18 @@ Each line says OK, Waarschuwing, Fout or Overgeslagen, and what to change. The l
 stays on the page with its time, and every run is audited as `integration.check`. Save
 changes first: the check uses the saved settings. It is limited to 6 runs per minute.
 
+**The worker runs the same check on its own** (ADR 0065 step 2). Every group with a Webex host
+is checked once per `INTEGRATION_CHECK_INTERVAL_HOURS` (platform setting, default 24, 1–168;
+the worker looks every ten minutes which groups are due) and right after an admin saves a new
+host address. The result replaces the group's latest check on its settings page, exactly as
+the button's does, and a broken chain is a system event `integration.check` at the group's
+level: outcome *mislukt*, the reason is the first failing line's code (for instance
+`webex.schedule_refused`) and Webex's own answer stands under it. The audit log (Logboek,
+kind *Systeem*) shows it to the group's and the organisation's admins and the superuser; it
+repeats once per interval while the chain stays broken, and a check that is fine again is
+recorded once as *gelukt*. Without a Service App, or for a group without a host, the worker
+checks nothing. The log line `integration.checked` says how many groups a sweep checked.
+
 When a meeting still fails later, the booking's timeline (Agenda → the booking) shows the
 code and, under it, Webex's own answer ("Antwoord van Webex: ..."); the audit log shows the
 same under the job's outcome, also in the chain view ("Hele keten"). The worker log keeps
@@ -732,8 +876,8 @@ tag); everything after the tag is automatic and visible in the Actions tab.
 | Event | What runs | Result | Offered to installations? |
 |---|---|---|---|
 | PR | `ci.yml` | checks only | no |
-| Merge to `main` | `main.yml`: ZAP, then build, sign, tag `vX.Y.Z-rc.N`, pre-release (ADR 0059); mutation runs alongside | image `:X.Y.Z-rc.N`, `:main` and `:sha-<commit>`, with `APP_VERSION=X.Y.Z-rc.N` and `APP_COMMIT`; pre-release page with SBOM | only on the `rc` channel (below) |
-| Tag `vX.Y.Z` pushed | `main.yml`: tag check, ZAP, mutation, build, sign, SBOM, GitHub release | image `:X.Y.Z` with `APP_VERSION` and `APP_COMMIT`; release page with SBOM | yes, within an hour |
+| Merge to `main` | `main.yml`: ZAP, then build, sign, tag `vX.Y.Z-rc.N`, pre-release (ADR 0059); mutation runs alongside | application and proxy images `:X.Y.Z-rc.N`, `:main` and `:sha-<commit>` (the application with `APP_VERSION=X.Y.Z-rc.N` and `APP_COMMIT`); pre-release page with both SBOMs | only on the `rc` channel (below) |
+| Tag `vX.Y.Z` pushed | `main.yml`: tag check, ZAP, mutation, build, sign, SBOM, GitHub release | application image `:X.Y.Z` with `APP_VERSION` and `APP_COMMIT`, proxy image `:X.Y.Z` (ADR 0064 step 2); release page with `sbom.cdx.json` and `sbom-proxy.cdx.json` | yes, within an hour |
 
 ### Step 1: decide the number
 
@@ -775,8 +919,10 @@ the image is signed, and a hand-made release would make that step fail.
 
 1. GitHub → *Actions* → workflow *main* for `v0.3.0`. First "release tag matches main and
    pyproject.toml" (fails if the tag is not on `main` or `pyproject.toml` says another
-   version), then ZAP and mutation, then *build, push and sign image*.
-2. When it is green, GitHub → *Releases* shows `v0.3.0` with `sbom.cdx.json`.
+   version), then ZAP and mutation, then *build, push and sign the release* (the application
+   image, then the proxy image).
+2. When it is green, GitHub → *Releases* shows `v0.3.0` with `sbom.cdx.json` and
+   `sbom-proxy.cdx.json`.
 3. Within an hour the superuser sees the update banner in the portal and starts the update on
    `/admin/updates` (section *Updates from the admin portal* below).
 
@@ -897,15 +1043,17 @@ operator's ghcr.io login to `/var/lib/openplanner-updater/.docker/` so root can 
 image; after a new `docker login`, run the installer again. Check it with
 `systemctl list-timers openplanner-updater.timer` and `sudo journalctl -u openplanner-updater`.
 
-The updater replaces only `OPENPLANNER_IMAGE` in `.env.update` and keeps the profiles and mode
-the installer wrote there.
+The updater replaces only the image pins in `.env.update` (`OPENPLANNER_IMAGE` and, where the
+HTTPS proxy runs, `OPENPLANNER_PROXY_IMAGE`; ADR 0064 step 2) and keeps the profiles, the TLS
+choice and the mode the installer wrote there. The proxy image comes from `UPDATE_PROXY_IMAGE`
+in `updater.env` (default: the application image's name plus `-proxy`).
 
 ### What the updater does
 
 | Request | Steps | When something fails |
 |---|---|---|
-| Update | pull `<image>:<version>`, take its digest, `cosign verify` it (release tag of this repository), note the current digest and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digest, `up -d`, wait up to `HEALTH_TIMEOUT` for `/readyz` and a healthy worker | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digest, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
-| Restore previous version (≤ 24 h after an update) | switch maintenance on, back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digest, start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
+| Update | pull `<image>:<version>` and, where the proxy runs, `<image>-proxy:<version>`, take their digests, `cosign verify` both (release tag of this repository), note the current digests and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digests, `up -d` (`web`, `worker` and `proxy`), wait up to `HEALTH_TIMEOUT` for `/readyz`, a healthy worker and a healthy proxy | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digests, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
+| Restore previous version (≤ 24 h after an update) | switch maintenance on, back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digests (application and proxy), start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
 
 Before each step the updater reports it (`python -m app.cli update-progress ID STEP`: pulling,
 verifying, backing_up, migrating, starting, rolling_back; ADR 0048), and at the end the outcome
@@ -926,9 +1074,12 @@ the image from `previous.env`:
 ```sh
 docker compose --env-file .env.update stop web worker
 docker compose --env-file .env.update run --rm --no-deps web python -m app.cli restore-db request-<id>
-echo "OPENPLANNER_IMAGE=<PREVIOUS_IMAGE>" > .env.update
+sed -i 's|^OPENPLANNER_IMAGE=.*|OPENPLANNER_IMAGE=<PREVIOUS_IMAGE>|; s|^OPENPLANNER_PROXY_IMAGE=.*|OPENPLANNER_PROXY_IMAGE=<PREVIOUS_PROXY_IMAGE>|' .env.update
 docker compose --env-file .env.update up -d
 ```
+
+(`previous.env` has both; an empty `PREVIOUS_PROXY_IMAGE` means the previous version ran a
+locally built proxy: remove the `OPENPLANNER_PROXY_IMAGE` line then.)
 
 Backups hold personal data: they stay in the data volume (mode 600) and every updater run
 deletes those older than 24 hours (`backup-db --prune`). Never copy them off the host.
@@ -936,14 +1087,23 @@ deletes those older than 24 hours (`backup-db --prune`). Never copy them off the
 ## Rollback
 
 Prefer "Restore previous version" in the portal (above) within 24 hours of an update. By hand:
-deploy the previous image tag. If the release contained a migration, first run
+`./scripts/install.sh --version <previous>` pins both images (application and proxy) at that
+version, verified. If the release contained a migration, first run
 `docker compose run --rm web alembic downgrade <previous-revision>` with the *new* image, then
-deploy the old image. Every migration is reversible (enforced in CI).
+deploy the old images. Every migration is reversible (enforced in CI).
 
 ## Backup and restore
 
 *TBD (O7).* Planned: Litestream or a daily `sqlite3 .backup`, encrypted, retention = PII term
 + 7 days (HANDOVER §7).
+
+The `portal-certs` volume (ADR 0070: the private key of an own certificate, its signing
+request and the served pair) is **not** part of the database backup, on purpose: the database
+holds certificates but no private keys. After a restore on another host, make a new request in
+the portal and place its chain, or import the pair again (*Own certificate from the portal*);
+until then the proxy serves Let's Encrypt. The same holds for `proxy-data` (the ACME key and
+account): keep it with the host, or let Caddy obtain a certificate again.
+
 
 ## Rotating secrets
 
@@ -1142,6 +1302,26 @@ To check whether an IP address from a firewall or proxy log is the caller in an 
 is no way from a pseudonym back to an address. Rotating `MANAGEMENT_TOKEN_KEY` changes every
 pseudonym (and every management link). At most `SECURITY_EVENT_MAX_SOURCES` callers (default
 1000) are tracked per window and process; beyond that, events count under `client:many`.
+
+### A booking without a video meeting (ADR 0068)
+
+Open the booking from the group's agenda (**Details**). Three blocks tell the story:
+
+1. **Verloop** (timeline): each event names the version that wrote it. On docker01 or another
+   host on the `rc` channel, an error of an older version may already be fixed: compare with
+   `python -m app.cli version`.
+2. **Achtergrondtaken** (jobs): `create_video_room` *Mislukt* with its code. **Opnieuw
+   proberen** (needs `bookings.manage`) plans it again; the worker runs it within a minute.
+   *Gepland* long past its time means the worker is not taking it: see step 4.
+3. **Verzoeken aan Webex en Webex Contact Center**: every call with status, duration and
+   Webex's `trackingId`. Give the tracking id to Cisco TAC; it identifies the request in
+   Webex's logs. Request events are kept `INTEGRATION_REQUEST_RETENTION_DAYS` (30) and survive
+   container restarts and updates, unlike `docker compose logs`.
+4. **Koppeling controleren** on the group's settings now also checks the worker: never seen
+   or stale (the worker container is down or cannot reach the database), a version that
+   differs from web (an update is half way), `worker.no_video_jobs` (the worker started
+   without the Webex settings: restart it), failed and overdue jobs of the group (overdue after
+   `JOB_OVERDUE_MINUTES`, default 10).
 
 ## Log lines and the event schema (ADR 0040)
 

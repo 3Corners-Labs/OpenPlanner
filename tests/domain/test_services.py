@@ -28,6 +28,7 @@ from tests.support.domain import (
     TEST_TOKEN_KEY,
     TUESDAY_0900,
     book,
+    book_confirmed,
     make_group,
     window,
 )
@@ -347,8 +348,13 @@ async def test_consents_are_stored_and_kept_on_reschedule(
 ) -> None:
     uow.state.reminder_rules[1] = [ReminderRule(ChannelKind.WHATSAPP, minutes_before=60)]
     consents = frozenset({ChannelKind.WHATSAPP})
-    old = await service.book(
-        group_slug="aangifte", start=SLOT_0900, contact=ADA, locale="nl", consents=consents
+    old = await book_confirmed(
+        service,
+        group_slug="aangifte",
+        start=SLOT_0900,
+        contact=ADA,
+        locale="nl",
+        consents=consents,
     )
 
     new = await service.reschedule(old.management_token, SLOT_0930)
@@ -495,7 +501,7 @@ async def test_own_queue_team_gets_an_invite_and_its_withdrawal(uow: InMemoryUni
     assert JobType.SEND_TEAM_CANCEL in [j.type for j in uow.state.jobs[booking_id]]
 
 
-# --- bookings per email address (ADR 0059) ------------------------------------------------
+# --- bookings per email address (ADR 0066) ------------------------------------------------
 
 BEA = ContactInput(first_name="Bea", last_name="de Vries", email="bea@example.org")
 """A second citizen, for tests that need two people in one slot."""

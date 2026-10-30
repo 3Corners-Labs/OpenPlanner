@@ -36,8 +36,9 @@ from app.domain.embedding import AllowedOrigins
 from app.domain.form_fields import FormDefinition
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.images import ImageFile, ImageText
-from app.domain.job_plan import JobType, PlannedJob
+from app.domain.job_plan import JobCounts, JobSummary, JobType, PlannedJob
 from app.domain.maintenance import MaintenanceState
+from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
 from app.domain.retention import RetentionFacts
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
@@ -48,7 +49,10 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.staff import StaffFilter, StaffMember
+from app.domain.tasks import ActiveJobs
+from app.domain.tls import CertificateCheck, ProbeResult
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
+from app.domain.worker_check import WorkerHeartbeat
 
 
 class EventSink(Protocol):
@@ -155,6 +159,35 @@ class IntegrationError(Exception):
         self.reason = reason[:REASON_LIMIT]
 
 
+@dataclass(frozen=True)
+class RequestRecord:
+    """One HTTP request an adapter made to a platform (ADR 0068): codes and numbers only.
+
+    Attributes:
+        method: ``POST``, ``DELETE``, ...
+        path: The URL path without its query string (a query may carry an address).
+        status: The HTTP status, or ``0`` when the platform could not be reached.
+        error: The ``IntegrationError`` code the request ended in; empty on success.
+        tracking_id: The platform's id of the request (Webex ``trackingId``), for its support.
+        duration_ms: How long the request took.
+    """
+
+    method: str
+    path: str
+    status: int
+    error: str = ""
+    tracking_id: str = ""
+    duration_ms: int = 0
+
+
+class RequestLog(Protocol):
+    """Where an adapter reports every request it made (ADR 0068); never raises to the caller."""
+
+    async def record(self, record: RequestRecord) -> None:
+        """Keep ``record`` for the booking page and the audit log's chain view."""
+        ...
+
+
 class VideoProvider(Protocol):
     """Schedules and removes video meetings (Webex Meetings API, ADR 0017)."""
 
@@ -222,6 +255,79 @@ class ReleaseSource(Protocol):
         Raises:
             IntegrationError: If the source refuses or cannot be reached.
         """
+        ...
+
+
+class CertificateProbe(Protocol):
+    """Performs a TLS handshake with a server and reads the certificate it presents (ADR 0064)."""
+
+    async def probe(self, host: str, port: int) -> ProbeResult:
+        """Connect to ``host:port``, verify the chain against the host's CA bundle, read the leaf.
+
+        Never raises: a failed connection or handshake is a result with an error code.
+        """
+        ...
+
+
+class PemReader(Protocol):
+    """Parses an uploaded certificate chain or private key (ADR 0070)."""
+
+    def read_chain(self, chain: bytes) -> ParsedChain:
+        """Return the leaf's public data, fingerprint, public key and the normalised chain.
+
+        Raises:
+            DomainError: ``tls_certificate_unreadable`` (field ``chain``).
+        """
+        ...
+
+    def read_key(self, key: bytes) -> ParsedKey:
+        """Return the normalised key and its public key; the caller hands it to the volume.
+
+        Raises:
+            DomainError: ``tls_certificate_unreadable`` (field ``key``).
+        """
+        ...
+
+
+class CertificateVolume(Protocol):
+    """The directory shared with the proxy: the key lives here and nowhere else (ADR 0070).
+
+    ``privkey.pem`` is the key the proxy serves with, ``pending.key``/``pending.csr`` a key
+    waiting for its certificate, ``fullchain.pem`` and ``serial`` the served pair. Reading
+    and publishing never raise; making or importing a key raises when the volume cannot be
+    written, because the superuser must hear that.
+    """
+
+    def keys(self) -> HostKeys:
+        """Return the public keys on this host and the pending request."""
+        ...
+
+    def generate_pending(self, host: str) -> str:
+        """Make a new key and a signing request for ``host``; return the request (PEM).
+
+        Raises:
+            DomainError: ``tls_volume_unwritable``.
+        """
+        ...
+
+    def promote_pending(self) -> None:
+        """Make the pending key the served one (its chain was uploaded)."""
+        ...
+
+    def import_key(self, key_pem: str) -> None:
+        """Write an imported key as the served one, dropping any pending request.
+
+        Raises:
+            DomainError: ``tls_volume_unwritable``.
+        """
+        ...
+
+    def publish(self, chain_pem: str, fingerprint: str) -> None:
+        """Write the chain and, last, the serial, so the proxy serves the pair."""
+        ...
+
+    def withdraw(self) -> None:
+        """Remove the serial and the chain, so the proxy falls back to ACME; the key stays."""
         ...
 
 
@@ -310,8 +416,13 @@ class Transaction(Protocol):
         """
         ...
 
-    async def delete_audit_events(self, category: Category, before: datetime) -> int:
-        """Delete the events of ``category`` older than ``before``; return how many (ADR 0040)."""
+    async def delete_audit_events(
+        self, category: Category, before: datetime, action: str | None = None
+    ) -> int:
+        """Delete the events of ``category`` older than ``before``; return how many (ADR 0040).
+
+        With ``action`` only the events with that action go (the request events, ADR 0068).
+        """
         ...
 
     async def active_diagnostic_modes(self, now: datetime) -> list[DiagnosticMode]:
@@ -671,7 +782,7 @@ class Transaction(Protocol):
     async def upcoming_starts_for_email(
         self, group_id: int, email: str, after: datetime
     ) -> list[datetime]:
-        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0059).
+        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0066).
 
         Only bookings that hold a place and end after ``after`` count. The address is
         compared without regard to (ASCII) case; only start times leave the adapter.
@@ -717,6 +828,29 @@ class Transaction(Protocol):
 
     async def delete_pending_jobs(self, booking_id: int, types: Collection[JobType]) -> None:
         """Delete the booking's pending jobs of the given types."""
+        ...
+
+    async def active_jobs(self, limit: int) -> ActiveJobs:
+        """Return the first ``limit`` running or failed jobs and how many there are in all.
+
+        Running first, newest first; never a payload or a booking (ADR 0061 §2).
+        """
+        ...
+
+    async def get_booking_jobs(self, booking_id: int) -> list[JobSummary]:
+        """Return the booking's jobs, oldest first, for its page (ADR 0068)."""
+        ...
+
+    async def count_group_jobs(self, group_id: int, overdue_before: datetime) -> JobCounts:
+        """Count the group's failed jobs and its pending jobs planned before ``overdue_before``."""
+        ...
+
+    async def save_worker_heartbeat(self, heartbeat: WorkerHeartbeat) -> None:
+        """Store the worker's heartbeat row, replacing the previous one (ADR 0068)."""
+        ...
+
+    async def get_worker_heartbeat(self) -> WorkerHeartbeat | None:
+        """Return the worker's latest heartbeat row, if it ever wrote one."""
         ...
 
     async def get_shortfall_acceptances(
@@ -941,6 +1075,26 @@ class Transaction(Protocol):
 
     async def save_maintenance_state(self, state: MaintenanceState) -> None:
         """Replace the maintenance switch."""
+        ...
+
+    async def get_certificate_check(self) -> CertificateCheck | None:
+        """Return the latest check of the public address's certificate (ADR 0064), if any."""
+        ...
+
+    async def save_certificate_check(self, check: CertificateCheck) -> None:
+        """Replace the latest certificate check."""
+        ...
+
+    async def get_own_certificate(self) -> OwnCertificate | None:
+        """Return the uploaded own certificate (ADR 0070); ``None`` without one."""
+        ...
+
+    async def save_own_certificate(self, certificate: OwnCertificate) -> None:
+        """Store or replace the own certificate's chain and public data (never a key)."""
+        ...
+
+    async def delete_own_certificate(self) -> bool:
+        """Remove the own certificate; return whether there was one."""
         ...
 
     async def settings_version(self) -> int:

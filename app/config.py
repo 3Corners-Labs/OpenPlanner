@@ -176,6 +176,12 @@ class Settings(BaseSettings):
     # ADR 0031: system events (job outcomes) in the audit log are deleted after this many
     # days; admin actions are kept.
     system_event_retention_days: int = Field(default=90, ge=1, le=3650)
+    # ADR 0068 (class C): request events (every call to Webex and WxCC for a booking) are
+    # many and only useful while a failure is fresh, so they go earlier than the rest.
+    integration_request_retention_days: int = Field(default=30, ge=1, le=365)
+    # ADR 0068 (class C): a pending job this many minutes past its planned time counts as
+    # overdue in a group's "Koppeling controleren".
+    job_overdue_minutes: int = Field(default=10, ge=1, le=1440)
     # ADR 0040: grades of the data volume. Below these free-space percentages (or above
     # DATABASE_MAX_MB, default no limit) the worker records a system event, logs a warning or
     # error every hour and /readyz answers "degraded".
@@ -349,6 +355,18 @@ class Settings(BaseSettings):
     # worker (ADR 0038 §6), and again every MAINTENANCE_ALERT_REPEAT_HOURS while it lasts.
     maintenance_alert_hours: int = Field(default=4, ge=1, le=72)
     maintenance_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # Class C: the certificate of the public address (ADR 0064): how often the worker probes
+    # it, below how many days left it warns, and how often a lasting finding is repeated.
+    tls_check_interval_hours: int = Field(default=6, ge=1, le=168)
+    tls_expiry_warning_days: int = Field(default=20, ge=1, le=60)
+    tls_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # ADR 0070: the certificate source of the bundled proxy, managed in the portal.
+    tls_certificate_source: Literal["acme", "own"] = "acme"
+    tls_proxy_bundled: bool = False
+    tls_portal_certificate_dir: Path = Path("portal-certs")
+    # Class C: the worker checks every group with a Webex host whose latest integration check
+    # is older than this many hours, and records a system event on failure (ADR 0065 step 2).
+    integration_check_interval_hours: int = Field(default=24, ge=1, le=168)
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":
@@ -483,6 +501,7 @@ class Settings(BaseSettings):
             system=timedelta(days=self.system_event_retention_days),
             security=timedelta(days=self.security_event_retention_days),
             diagnostic=timedelta(days=self.diagnostic_event_retention_days),
+            requests=timedelta(days=self.integration_request_retention_days),
         )
 
     @property

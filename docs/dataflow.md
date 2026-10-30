@@ -22,6 +22,9 @@ It identifies nobody and is strictly functional, so no consent banner is needed.
 ```
 worker ──SMTP──> mail provider of the organisation (admin portal; else SMTP_HOST) ──> citizen
    reads booking at send time: first name, email, date, time, team, management link
+   request to confirm a new booking and its reminder (ADR 0056): email, date, time, team
+   and the confirm link only; no name, join link or calendar file (the address is not
+   verified yet); the lapse message links the group page instead of the booking
    closure mails also: the closure's notice and heading, its copy of the contact options
    (organisation data) and the link to the closure page (ADR 0037 §5); never the image
 ```
@@ -63,6 +66,11 @@ they leave the system only to the mail server and to GitHub respectively.
 
 ## Stored personal data (WP2 schema)
 
+The fields below are the fixed list of `app/domain/privacy.py` (ADR 0063): personal data is
+shown in the admin portal only on the booking detail page and the queue item (first name only
+on the group's agenda and queue), never on overview, list, export or alert pages, and no list
+filter matches on it. The list and the rule are constants, not settings.
+
 | Data item | Table.column | Source | Retention | Leaves the system |
 |---|---|---|---|---|
 | First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
@@ -75,7 +83,14 @@ they leave the system only to the mail server and to GitHub respectively.
 
 Jobs, slots, schedules and audit events carry no personal data of citizens. A failed meeting
 job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
-the group name and the host's address (masked), never a citizen's data. The definitions of
+the group name and the host's address (masked), never a citizen's data; the system event of the
+automatic group check (ADR 0065 step 2) carries the same masked reason of the probe meeting,
+which belongs to no booking. A request event (`integration.request`, ADR 0068) records each
+call to Webex and WxCC made for a booking as method, path without its query string, status,
+duration, the platform's tracking id and the version: never a body, a query or a header, so
+neither the host's address (a query parameter of `DELETE /meetings`) nor a citizen's first name
+(the work item body) reaches it. Request events are kept `INTEGRATION_REQUEST_RETENTION_DAYS`
+(default 30). The definitions of
 custom fields (`group_form_fields`: keys, labels, options) are the organisation's questions,
 not answers, and hold no personal data; the admin screen refuses questions about a BSN, an
 identity document or special categories of personal data (ADR 0055).
@@ -292,16 +307,30 @@ bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error
 The switch holds a subject identifier or a host actor, times and a reason code: no personal
 data. A refused change is audited with its permission and target only, never the form content.
 
-## HTTPS certificate (ADR 0030)
+## HTTPS certificate (ADR 0030, ADR 0064, ADR 0070)
 
 ```
 proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
 Let's Encrypt ──HTTP-01 / TLS-ALPN-01──> proxy (ports 80/443): challenge token only
 visitor ──https──> proxy ──http, edge network──> web (X-Forwarded-For set by the proxy)
+worker ──TLS handshake, no request──> proxy (public name, port 443): reads the public certificate
+       ──> certificate_checks (issuer, names, validity, finding; no personal data; ADR 0064)
 ```
 
-The CA learns the domain name and the operator's e-mail address; no citizen data leaves through
-this flow. The proxy keeps no access log, so booking paths with management tokens are not
+```
+web ──> portal-certs volume (uid 10001, mode 600): private key + CSR made here (ADR 0070)
+superuser ──https, admin session──> web: the CSR (public) out; the certificate chain in
+   (a migration: chain + private key in, the key written to the volume only)
+web ──> own_certificates: chain (public), public key, fingerprint, subject, issuer, names,
+        validity; audit_events: fingerprint + expiry only
+web ──portal-certs volume──> proxy: privkey.pem, fullchain.pem, serial
+```
+
+**The database holds certificates but no private keys** (DPIA input): the key of an own
+certificate is made on the host or imported straight into the `portal-certs` volume, which the
+database backup leaves out on purpose; it is never in a log, an audit event, an error message or
+a page. It concerns the organisation's server identity, not a citizen. The CA learns the domain name and the operator's e-mail address; no citizen data
+leaves through this flow. The proxy keeps no access log, so booking paths with management tokens are not
 written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
 name only).
 

@@ -14,7 +14,7 @@ from app.domain.services import BookingService
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_agenda_routes import FRIDAY
 from tests.admin.test_call_routes import FRIDAY_0900
-from tests.support.domain import ADA, TEST_TOKEN_KEY, citizen
+from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed, citizen
 
 FRIDAY_0930 = datetime(2026, 1, 2, 8, 30, tzinfo=UTC)
 AGENDA = "/admin/groups/demo/agenda"
@@ -26,12 +26,16 @@ def _uow(site: Site) -> SqlUnitOfWork:
 
 
 _CITIZENS = itertools.count(1)
-"""Each booking of ``_book`` is another citizen, so the address limit (ADR 0059) stays out."""
+"""Each booking of ``_book`` is another citizen, so the address limit (ADR 0066) stays out."""
 
 
 async def _book(site: Site, start: datetime = FRIDAY_0900) -> int:
-    receipt = await BookingService(_uow(site), site.clock, TEST_TOKEN_KEY).book(
-        group_slug="demo", start=start, contact=citizen(next(_CITIZENS)), locale="nl"
+    receipt = await book_confirmed(
+        BookingService(_uow(site), site.clock, TEST_TOKEN_KEY),
+        group_slug="demo",
+        start=start,
+        contact=citizen(next(_CITIZENS)),
+        locale="nl",
     )
     return receipt.booking.id or 0
 
@@ -100,7 +104,7 @@ async def test_a_move_into_a_short_slot_needs_the_planners_confirmation(site: Si
 async def test_a_move_onto_the_same_address_tells_the_planner_why(site: Site) -> None:
     bookings = BookingService(_uow(site), site.clock, TEST_TOKEN_KEY)
     receipts = [
-        await bookings.book(group_slug="demo", start=start, contact=ADA, locale="nl")
+        await book_confirmed(bookings, group_slug="demo", start=start, contact=ADA, locale="nl")
         for start in (FRIDAY_0900, FRIDAY_0930)
     ]
     await site.login_as(GROUP_ADMIN)

@@ -559,3 +559,16 @@ async def test_nothing_is_offered_while_a_request_is_open(
     await checked(uow, clock, FakeReleases(RELEASE, more=[NEWEST]))
     await service(uow, clock).request_update(DEMO_SUPERUSER)
     assert (await service(uow, clock).overview(DEMO_SUPERUSER)).offered == []
+
+
+async def test_summary_tells_any_reader_what_the_banner_tells_the_superuser(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await checked(uow, clock, releases)
+
+    summary = await service(uow, clock).summary()
+
+    assert summary == await service(uow, clock).notice(DEMO_SUPERUSER)
+    assert summary.available == RELEASE
+    assert summary.open is None
+    assert (await service(uow, clock, current=V2).summary()).available is None

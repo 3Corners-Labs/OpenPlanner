@@ -77,7 +77,7 @@ a stack trace, not a reason); the probe meeting is 30 minutes, a day ahead, and 
 | Step | What | PR | Status |
 |---|---|---|---|
 | 1 | Times in the group's time zone; reason on timeline, chain, export and shipped record; probe meeting in the group check | this PR | built |
-| 2 | Automatic check per group with a system event on failure, `integration_check_interval_hours` | next PR | open |
+| 2 | Automatic check per group with a system event on failure, `integration_check_interval_hours` | #142 | built |
 
 ## Consequences
 
@@ -89,7 +89,13 @@ a stack trace, not a reason); the probe meeting is 30 minutes, a day ahead, and 
   capped, shown as text (escaped by the template), never interpreted, and only for requests
   without citizen data; `docs/dataflow.md` says so.
 - The host's calendar briefly shows and loses a probe meeting on every check; `sendEmail` is
-  false, so nobody is mailed.
+  false, so nobody is mailed. With step 2 that is once per `integration_check_interval_hours`
+  per group (the worker looks every ten minutes which groups are due) and once after a host
+  address is saved.
+- Step 2: `SystemLog.record` takes a `group_slug`, so an event about a group itself lands at
+  that group's level; the audit page labels `integration.check` ("Koppeling gecontroleerd");
+  `docs/runbook.md` §9, the group settings and audit manual topics and the threat model
+  describe the automatic check.
 - Tests: the meeting body in the group's zone; the reason from `errors[]` preferred over the
   generic `message`; the reason on the timeline and the system event; the probe meeting is
   created and deleted and a refusal becomes a finding with the reason; schema fields in order.

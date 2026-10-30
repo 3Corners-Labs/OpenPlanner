@@ -1,11 +1,14 @@
 /**
- * Typed access to pages.json, the single list of public pages under test.
+ * Typed access to pages.json, the single list of pages under test: public pages, and admin
+ * pages that need a login (tests/admin-shell.spec.ts).
  *
  * A path may name a seeded example in braces, e.g. "{suspended_booking}": its value comes from
  * fixtures.json, written by `python -m app.cli seed-closures > e2e/fixtures.json` (a management
  * link exists only after seeding, so it cannot be in pages.json).
  */
 import { existsSync, readFileSync } from 'node:fs';
+
+import type { TestUser } from './keycloak';
 
 export interface PageUnderTest {
   /** Human-readable name, used in test titles. */
@@ -14,6 +17,11 @@ export interface PageUnderTest {
   path: string;
   /** Locales the page must pass in; each is requested with ?lang=<locale>. */
   locales: string[];
+}
+
+export interface AdminPageUnderTest extends PageUnderTest {
+  /** The Keycloak test user who opens the page (keycloak.ts). */
+  user: TestUser;
 }
 
 const file = new URL('./pages.json', import.meta.url);
@@ -36,6 +44,16 @@ export function fixture(name: string): string {
 /** Every (page, locale) combination as a URL path with the lang query parameter. */
 export function pageVariants(): { title: string; path: string }[] {
   const { pages } = JSON.parse(readFileSync(file, 'utf8')) as { pages: PageUnderTest[] };
+  return variants(pages);
+}
+
+/** Every (admin page, locale) combination with the user who logs in for it. */
+export function adminPageVariants(): { title: string; path: string; user: TestUser }[] {
+  const { admin } = JSON.parse(readFileSync(file, 'utf8')) as { admin: AdminPageUnderTest[] };
+  return admin.flatMap((page) => variants([page]).map((v) => ({ ...v, user: page.user })));
+}
+
+function variants(pages: PageUnderTest[]): { title: string; path: string }[] {
   return pages.flatMap((page) => {
     const path = page.path.replace(/^\{(\w+)\}$/, (_, name: string) => fixture(name));
     return page.locales.map((locale) => {

@@ -9,6 +9,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.channels import ChannelKind
 from app.domain.job_plan import JobType
 from app.domain.services import BookingService
+from app.domain.tasks import JobState
 from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book
@@ -84,3 +85,30 @@ async def test_stale_claims_are_recovered(engine: AsyncEngine) -> None:
 
     assert recovered.id == job.id
     assert recovered.attempts == 2
+
+
+async def test_active_jobs_lists_running_then_failed_jobs_with_their_count(
+    engine: AsyncEngine,
+) -> None:
+    queue = await booked(engine)
+    [video, confirmation] = await queue.claim_due(
+        NOW, {JobType.CREATE_VIDEO_ROOM, JobType.SEND_CONFIRMATION}, {ChannelKind.EMAIL}
+    )
+    await queue.fail(video.id, "rejected_400")
+
+    async with SqlUnitOfWork(engine).read() as tx:
+        active = await tx.active_jobs(limit=5)
+        first_only = await tx.active_jobs(limit=1)
+
+    assert [(j.type, j.state) for j in active.jobs] == [
+        (JobType.SEND_CONFIRMATION, JobState.RUNNING),
+        (JobType.CREATE_VIDEO_ROOM, JobState.FAILED),
+    ]
+    assert active.total == 2
+    assert active.jobs[0].since == NOW
+    assert active.jobs[0].attempts == 1
+    assert [j.type for j in first_only.jobs] == [JobType.SEND_CONFIRMATION]
+    assert first_only.total == 2
+    assert not any(
+        hasattr(j, "booking_id") for j in active.jobs
+    )  # no payload, no link to a citizen

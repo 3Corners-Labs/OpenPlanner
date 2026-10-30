@@ -8,7 +8,12 @@ Server-rendered and usable without JavaScript. Every response goes through
     GET  /g/{slug}/closure         closure page of an active or upcoming closure, else ─► 303
     GET  /g/{slug}/closure/image   that closure's image (ADR 0037 §3), else 404
     GET  /g/{slug}/book?start=     contact form for one slot
-    POST /g/{slug}/book            book ─► 303 /b/{token}?status=booked
+    POST /g/{slug}/book            book ─► 303 /g/{slug}/booked?start= (ADR 0056: the token
+                                   goes to the citizen by email only, never to the browser)
+    GET  /g/{slug}/booked?start=   "check your email to confirm"
+    GET  /b/{token}/confirm        the appointment and one button; a GET never confirms, mail
+                                   scanners open links in advance (ADR 0056 §8)
+    POST /b/{token}/confirm        confirm ─► 303 /b/{token}?status=confirmed (or lapsed)
     GET  /b/{token}                booking (read-only from the change deadline; a booking on
                                    hold by an emergency closure shows its notice, ADR 0024)
     GET  /b/{token}/cancel         confirm ─► POST ─► 303 /b/{token}?status=cancelled
@@ -16,7 +21,7 @@ Server-rendered and usable without JavaScript. Every response goes through
                                    ─► 303 /b/{new token}?status=rescheduled
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -60,9 +65,10 @@ router = APIRouter(
 )
 
 STATUS_NOTICES: dict[str, str] = {
-    "booked": "manage.notice.booked",
     "rescheduled": "manage.notice.rescheduled",
     "cancelled": "manage.notice.cancelled",
+    "confirmed": "manage.notice.confirmed",
+    "lapsed": "manage.notice.lapsed",
 }
 
 STATUS_LABELS: dict[BookingStatus, str] = {
@@ -72,6 +78,7 @@ STATUS_LABELS: dict[BookingStatus, str] = {
     BookingStatus.NO_SHOW: "manage.status.no_show",
     BookingStatus.SUSPENDED: "manage.status.suspended",
     BookingStatus.AWAITING_REBOOK: "manage.status.awaiting_rebook",
+    BookingStatus.PENDING_CONFIRMATION: "manage.status.pending_confirmation",
 }
 
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
@@ -241,7 +248,38 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
         contact = await load_contact_form(service, group, _clock(request).now())
         context = _book_context(contact, start, slot, locale, contact.errors(error, locale), values)
         return await citizen_page(request, locale, "book.html", group, context, status_for(error))
-    return RedirectResponse(_manage_url(receipt.management_token, "booked"), status_code=303)
+    booked = f"/g/{group.slug}/booked?start={slot_value(receipt.booking.start)}"
+    return RedirectResponse(booked, status_code=303)
+
+
+@router.get("/g/{slug}/booked", response_class=HTMLResponse)
+@limiter.limit(read_limit)
+async def booked_page(
+    request: Request, slug: str, locale: Locale, start: str | None = None
+) -> Response:
+    """Ask the citizen to confirm by the link in their email (ADR 0056).
+
+    The page knows no booking: ``start`` only repeats the chosen time, and is left out when
+    it does not parse.
+    """
+    group = await _service(request).get_group(slug)
+    parsed = parse_start(start)
+    length = timedelta(minutes=group.slot_minutes)
+    context: dict[str, object] = {
+        "group": group,
+        "slot_label": slot_label(parsed, parsed + length, group, locale) if parsed else None,
+    }
+    return await citizen_page(request, locale, "booked.html", group, context)
+
+
+def _moment(moment: datetime | None, group: Group, locale: RequestLocale) -> str | None:
+    """Return ``moment`` as local date and time for the page, or ``None``."""
+    if moment is None:
+        return None
+    return (
+        f"{format_day(local_day(moment, group.tz), locale.code)}, "
+        f"{format_clock(moment, group.tz, locale.code)}"
+    )
 
 
 def _manage_context(
@@ -252,25 +290,22 @@ def _manage_context(
     deadline = details.change_deadline
     closure = details.closure
     return {
+        # ADR 0056: not confirmed yet; it lapses at ``confirm_by``.
+        "pending": booking.awaits_confirmation,
+        "confirm_by": _moment(booking.confirm_by, group, locale),
+        "lapsed": booking.lapsed_unconfirmed,
+        "cancellable": details.cancellable,
         "suspended": booking.is_suspended,
         # ADR 0044: a planner asked for a new time; the request lapses at ``rebook_by``.
         "awaiting_rebook": booking.awaits_rebook,
-        "rebook_by": (
-            f"{format_day(local_day(booking.rebook_by, group.tz), locale.code)}, "
-            f"{format_clock(booking.rebook_by, group.tz, locale.code)}"
-            if booking.rebook_by
-            else None
-        ),
+        "rebook_by": _moment(booking.rebook_by, group, locale),
         "closure": closure_view(closure, group, locale, now) if closure else None,
         "group": group,
         "slot_label": slot_label(booking.start, booking.end, group, locale),
         "status_label": locale.gettext(STATUS_LABELS[booking.status]),
         "active": booking.is_active,
         "changeable": details.changeable,
-        "deadline": (
-            f"{format_day(local_day(deadline, group.tz), locale.code)}, "
-            f"{format_clock(deadline, group.tz, locale.code)}"
-        ),
+        "deadline": _moment(deadline, group, locale),
         "notice": locale.gettext(STATUS_NOTICES[status]) if status in STATUS_NOTICES else None,
     }
 
@@ -293,10 +328,31 @@ async def cancel_page(request: Request, token: str, locale: Locale) -> Response:
     """Ask for confirmation before cancelling."""
     details = await _service(request).find(token)
     follow(request, details.group.organisation_id)
-    if not details.changeable:
+    if not details.cancellable:
         return RedirectResponse(f"/b/{token}", status_code=303)
     context = {**_manage_context(details, locale, None, _clock(request).now()), "token": token}
     return await citizen_page(request, locale, "cancel.html", details.group, context)
+
+
+@router.get("/b/{token}/confirm", response_class=HTMLResponse)
+@limiter.limit(read_limit)
+async def confirm_page(request: Request, token: str, locale: Locale) -> Response:
+    """Show the appointment with one button to confirm it; a GET never confirms (ADR 0056)."""
+    details = await _service(request).find(token)
+    follow(request, details.group.organisation_id)
+    if not details.booking.awaits_confirmation:
+        return RedirectResponse(f"/b/{token}", status_code=303)
+    context = {**_manage_context(details, locale, None, _clock(request).now()), "token": token}
+    return await citizen_page(request, locale, "confirm.html", details.group, context)
+
+
+@router.post("/b/{token}/confirm", response_class=HTMLResponse)
+@limiter.limit(booking_limit)
+async def confirm(request: Request, token: str, locale: Locale, _: SameOrigin) -> Response:
+    """Confirm the booking; one that came too late lapses and says so."""
+    booking = await _service(request).confirm(token)
+    status = "lapsed" if booking.lapsed_unconfirmed else "confirmed"
+    return RedirectResponse(_manage_url(token, status), status_code=303)
 
 
 @router.post("/b/{token}/cancel", response_class=HTMLResponse)

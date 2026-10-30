@@ -4,8 +4,8 @@
 newer than the running one from it, with the generated notes (PR titles and numbers) as plain
 text. No personal data.
 
-Revision ID: 0059
-Revises: 0058
+Revision ID: 0071
+Revises: 0070
 Create Date: 2026-10-30 17:00:00.000000
 """
 
@@ -14,8 +14,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0059"
-down_revision: str | None = "0058"
+revision: str = "0071"
+down_revision: str | None = "0070"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

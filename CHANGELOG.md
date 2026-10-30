@@ -9,13 +9,13 @@ All notable changes are listed here, generated from Conventional Commits on rele
 - Version picker (ADR 0067, step 3): the updates page lists every version newer than the
   running one on the channel, with the release notes as plain text (PR titles and numbers),
   and installs the chosen one; going back stays the 24-hour restore. The worker stores the
-  listing of each check (`release_listing`, migration 0059); the release adapter lists releases
+  listing of each check (`release_listing`, migration 0071); the release adapter lists releases
   and candidates alike and the channel is applied by the domain.
 - Update history from the audit log (ADR 0067, step 2): the updates page lists requests,
   outcomes, cancellations and version changes from the global audit log with who did it
   (name, `system`, updater or host), and links to the audit page filtered on the subject
   *Updates*; the audit page gains a *subject* filter. The web process records the running
-  version at start-up (`running_versions`, migration 0058) and audits a change nobody
+  version at start-up (`running_versions`, migration 0070) and audits a change nobody
   requested in the portal as `system.version` by actor `host`; the page says so.
 - Version management in the portal (ADR 0067, step 1): the update channel and auto-apply
   are class C settings the superuser changes in the portal (topic Updates), read live by web

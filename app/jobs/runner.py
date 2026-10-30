@@ -25,7 +25,7 @@ While that group or its organisation is in diagnostic mode, each job also writes
 its own retention period.
 """
 
-from collections.abc import Callable, Collection
+from collections.abc import Awaitable, Callable, Collection
 from datetime import datetime, timedelta
 from typing import Protocol
 
@@ -34,11 +34,12 @@ import structlog
 from app.adapters.db.jobs import ClaimedJob
 from app.domain import booking_changes
 from app.domain.audit import Outcome
+from app.domain.booking import Booking
 from app.domain.call_service import CallService
 from app.domain.channels import ChannelKind
 from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.event_context import current, trace_scope
+from app.domain.event_context import bind_booking, current, trace_scope
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import TEAM_INVITES, JobType, is_stale
 from app.domain.ports import (
@@ -46,6 +47,7 @@ from app.domain.ports import (
     ContactCenterDispatcher,
     IntegrationError,
     SenderDirectory,
+    Transaction,
     UnitOfWork,
     VideoProvider,
 )
@@ -99,6 +101,13 @@ NO_RECIPIENT = "no_recipient"
 NO_TEAM_INVITE = "no_team_invite"
 """Skip reason: the group no longer has an own queue with an invite address (ADR 0043)."""
 
+LAPSES: dict[JobType, Callable[[Transaction, Booking, datetime], Awaitable[bool]]] = {
+    JobType.LAPSE_REBOOK: booking_changes.lapse,
+    JobType.EXPIRE_UNCONFIRMED: booking_changes.lapse_unconfirmed,
+}
+"""Jobs that cancel a booking left unanswered: a request to rebook (ADR 0044) or to confirm
+(ADR 0056). Each re-reads the booking and does nothing when it was answered in time."""
+
 MESSAGE_CHANNELS = frozenset({ChannelKind.EMAIL, ChannelKind.SMS})
 """Channels whose message jobs are claimed when a sender directory is available."""
 
@@ -149,7 +158,7 @@ class JobRunner:
         self._clock = clock
         self._senders = senders
         self._composer = composer
-        self._types: set[JobType] = {JobType.PURGE_PII, JobType.LAPSE_REBOOK}
+        self._types: set[JobType] = {JobType.PURGE_PII, *LAPSES}
         if senders is not None:
             self._types |= set(MESSAGE_KINDS) | TEAM_INVITES
         self._calls = (
@@ -207,8 +216,14 @@ class JobRunner:
             outcome = Outcome.SUCCESS if skipped is None else Outcome.SKIPPED
             await self._record(job, outcome, skipped or "")
 
+    @property
+    def types(self) -> frozenset[JobType]:
+        """The job types this worker claims with its adapters (the heartbeat row, ADR 0068)."""
+        return frozenset(self._types)
+
     async def _bind(self, job: ClaimedJob) -> None:
-        """Tag the job's trace with its booking's organisation and group; a failure is logged."""
+        """Tag the job's trace with its booking's level and id; a failure is logged."""
+        bind_booking(job.booking_id)
         try:
             await self._system_log.bind_level(job.booking_id)
         except Exception as exc:  # tagging helps troubleshooting; it never stops a job
@@ -223,10 +238,11 @@ class JobRunner:
                 await tx.purge_personal_data(job.booking_id, now)
             log.info("job.purged", job_id=job.id, booking_id=job.booking_id)
             return None
-        if job.type is JobType.LAPSE_REBOOK:  # ADR 0044: no new time chosen in time
+        if job.type in LAPSES:  # ADR 0044 / 0056: no new time chosen, or not confirmed
+            lapse = LAPSES[job.type]
             async with self._uow.locked() as tx:
                 booking = await tx.get_booking(job.booking_id)
-                lapsed = booking is not None and await booking_changes.lapse(tx, booking, now)
+                lapsed = booking is not None and await lapse(tx, booking, now)
             if not lapsed:
                 log.info("job.skipped", job_id=job.id, reason=STALE)
                 return STALE

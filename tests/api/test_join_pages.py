@@ -11,7 +11,8 @@ from app.config import Settings
 from app.domain.booking import MeetingRef
 from app.domain.calls import EventKind
 from app.domain.tokens import hash_token
-from tests.api.test_booking_pages import FRIDAY_0900, book, token_of
+from tests.api.test_booking_pages import FRIDAY_0900
+from tests.api.test_booking_pages import booked as book_and_confirm
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
@@ -43,8 +44,7 @@ async def _events(database_url: str, booking_id: int) -> list[EventKind]:
 @pytest.fixture
 async def booked(demo_settings: Settings) -> tuple[str, int, Settings]:
     async with app_client(demo_settings, FixedClock(NOW)) as client:
-        response = await book(client)
-        token = token_of(response)
+        token = await book_and_confirm(client)
     engine = create_engine(demo_settings.database_url)
     async with SqlUnitOfWork(engine).read() as tx:
         booking = await tx.get_booking_by_token_hash(hash_token(token))
