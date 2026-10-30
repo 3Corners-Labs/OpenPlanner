@@ -20,6 +20,7 @@ from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import DispatchKind, Offer
+from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
@@ -241,7 +242,7 @@ async def test_the_page_polls_a_status_fragment_without_reloading(site: Site) ->
     await site.record("task-1", EventKind.TASK_CONNECTED)
     changed = await site.client.get(url)
 
-    assert '<script src="/static/live-region.js" defer></script>' in page
+    assert f'<script src="{ASSETS.url("live-region.js")}" defer></script>' in page
     assert "http-equiv" not in page
     assert 'data-poll-seconds="10"' in page  # QUEUE_REFRESH_SECONDS, class C
     assert unchanged.status_code == 204

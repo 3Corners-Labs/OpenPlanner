@@ -10,6 +10,7 @@ from app.domain.admin import AdminService
 from app.domain.calls import CallState, EventKind, MeetingStatus
 from app.domain.integration import IntegrationService
 from app.domain.ports import IntegrationError
+from app.web.static_assets import ASSETS
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, Site
 from tests.fakes.integrations import FakeVideo
 from tests.support.queue import FRIDAY_0900
@@ -79,7 +80,7 @@ async def test_the_agenda_refreshes_through_a_fragment_and_works_without_the_scr
 
     # The page: the script is allowed on this page only, the status is there without it,
     # and a link refreshes it.
-    assert '<script src="/static/live-region.js" defer></script>' in page.text
+    assert f'<script src="{ASSETS.url("live-region.js")}" defer></script>' in page.text
     assert 'data-poll-seconds="30"' in page.text  # MEETING_STATUS_REFRESH_SECONDS, class C
     assert "http-equiv" not in page.text
     assert "script-src 'self'" in page.headers["content-security-policy"]
