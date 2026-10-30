@@ -28,7 +28,7 @@ from app.domain.closure import Closure
 from app.domain.job_plan import JobType
 from app.domain.message_texts import GroupTexts
 from app.domain.ports import Attachment, OutboundMessage
-from app.domain.scheduling import Group
+from app.domain.scheduling import Group, JoinClient
 from app.domain.tokens import derive_token
 from app.i18n import BoundGettext, Translator, format_message
 from app.i18n.dates import format_clock, format_day, local_day
@@ -330,7 +330,9 @@ class MessageComposer:
             "book_text": _("message.book_again"),
             "book_link": _("message.book_again_link"),
             "join_url": join_url,
-            "join_text": _("message.join"),
+            "join_text": _(
+                "message.join_choice" if group.join_client is JoinClient.CHOICE else "message.join"
+            ),
             "join_link": _("message.join_link"),
             "trial_url": f"{manage_url}/test" if join_url and group.trial_call_enabled else None,
             "trial_text": _("message.trial"),
