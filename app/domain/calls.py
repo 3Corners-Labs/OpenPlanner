@@ -48,6 +48,8 @@ class EventKind(StrEnum):
     END_NOT_POSSIBLE = "end_not_possible"
     """WxCC refused to end the task (detail: the code, e.g. ``rejected_403``)."""
     TASK_MARKED_CANCELLED = "task_marked_cancelled"
+    CITIZEN_LEFT = "citizen_left"
+    """The citizen stopped waiting for a direct call (detail: ``waiting`` or ``agent``)."""
     MEETING_STARTED = "meeting_started"
     HOST_JOINED = "host_joined"
     GUEST_JOINED = "guest_joined"
@@ -176,6 +178,57 @@ def apply_event(status: CallStatus, kind: EventKind, at: datetime) -> CallStatus
     elif kind is EventKind.TASK_MARKED_CANCELLED:
         changes["task"] = TaskState.CANCELLED
     return replace(status, **changes)  # type: ignore[arg-type]
+
+
+@dataclass(frozen=True)
+class MeetingStatus:
+    """What the video provider reports about a meeting right now (ADR 0010 point 1).
+
+    Aggregates only: the provider's participant list is reduced to a count and to whether the
+    host (an agent) is in it before it leaves the adapter; names and addresses never get here.
+    ``state`` is ``SCHEDULED``, ``IN_PROGRESS`` or ``ENDED``.
+    """
+
+    state: CallState
+    participants: int = 0
+    host_joined: bool = False
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+
+
+def apply_polled(status: CallStatus, polled: MeetingStatus, at: datetime) -> CallStatus:
+    """Return ``status`` after the provider reported ``polled`` at ``at`` (polling fallback).
+
+    What the provider says now wins over counts built from webhooks, which drift when an event
+    is lost. A meeting that has ended stays ended, and a host who joined once stays joined.
+    """
+    ended = polled.state is CallState.ENDED
+    return replace(
+        status,
+        call=CallState.ENDED if status.call is CallState.ENDED else polled.state,
+        participants=0 if ended else polled.participants,
+        host_joined=status.host_joined or polled.host_joined,
+        host_joined_at=status.host_joined_at or (at if polled.host_joined else None),
+        started_at=status.started_at or polled.started_at,
+        ended_at=status.ended_at or polled.ended_at or (at if ended else None),
+        updated_at=at,
+    )
+
+
+def polled_events(before: CallStatus, after: CallStatus) -> list[EventKind]:
+    """Return the timeline events a poll adds: only what changed since ``before``.
+
+    A webhook would have recorded these; the poll records each transition once, so a quiet
+    provider does not fill the timeline every 30 seconds.
+    """
+    events = []
+    if before.call is not CallState.IN_PROGRESS and after.call is CallState.IN_PROGRESS:
+        events.append(EventKind.MEETING_STARTED)
+    if after.host_joined and not before.host_joined:
+        events.append(EventKind.HOST_JOINED)
+    if after.call is CallState.ENDED and before.call is not CallState.ENDED:
+        events.append(EventKind.MEETING_ENDED)
+    return events
 
 
 def not_picked_up(status: CallStatus, start: datetime, now: datetime, limit: timedelta) -> bool:

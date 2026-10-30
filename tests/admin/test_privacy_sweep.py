@@ -121,6 +121,7 @@ FIRST_NAME_PAGES = frozenset(
     {
         "/admin/groups/demo/queue/live",
         "/admin/groups/demo/agenda",
+        "/admin/groups/demo/agenda/live",
         "/admin/groups/demo/agenda/week",
         "/admin/groups/demo/agenda/waiting",
         "/admin/groups/demo/agenda/slot-rebook?start=2026-01-09T08:00:00Z",
@@ -149,6 +150,7 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/messages/{text_locale}": "/admin/groups/demo/messages/nl",
     "/admin/groups/{slug}/holidays": "/admin/groups/demo/holidays",
     "/admin/groups/{slug}/agenda": "/admin/groups/demo/agenda",
+    "/admin/groups/{slug}/agenda/live": "/admin/groups/demo/agenda/live",
     "/admin/groups/{slug}/agenda/week": "/admin/groups/demo/agenda/week",
     "/admin/groups/{slug}/agenda/waiting": "/admin/groups/demo/agenda/waiting",
     "/admin/groups/{slug}/agenda/slot-rebook": (

@@ -97,6 +97,7 @@ DONE_MESSAGES: dict[str, str] = {
     "client_disabled": "admin.done.client_disabled",
     "tokens_revoked": "admin.done.tokens_revoked",
     "update_requested": "admin.done.update_requested",
+    "check_requested": "admin.done.check_requested",
     "restore_requested": "admin.done.restore_requested",
     "request_cancelled": "admin.done.request_cancelled",
     "texts_saved": "admin.done.texts_saved",

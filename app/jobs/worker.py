@@ -201,7 +201,9 @@ async def run_worker(
         while not stop.is_set():
             if await is_reachable(engine):
                 if await live.refresh():  # the release repository or token may have changed
-                    updates = update_service(live.settings, uow, clock, http)
+                    updates = update_service(
+                        live.settings, uow, clock, http, live=lambda: live.settings
+                    )
                     if webex_fingerprint(live.settings) != wired_with:  # ADR 0042 step 6b
                         wired, runner, watch = build_runner(live.settings)
                         wired_with = webex_fingerprint(live.settings)
