@@ -1,16 +1,14 @@
 name: publish image
 description: >-
-  Build the OpenPlanner image, push it to ghcr.io, sign it keyless and attest its SBOM
+  Build one of OpenPlanner's images, push it to ghcr.io, sign it keyless and attest its SBOM
   (ADR 0006). Shared by the release and the release-candidate jobs of main.yml (ADR 0059), so
-  both produce the same image with APP_VERSION and APP_COMMIT (ADR 0052). Leaves sbom.cdx.json
-  in the workspace for the release page.
+  both produce the same images: the application (APP_VERSION and APP_COMMIT, ADR 0052) and the
+  TLS proxy from deploy/proxy (ADR 0064 step 2). Leaves the SBOM in the workspace for the
+  release page.
 
 inputs:
   image:
     description: Registry name in lower case (ghcr.io/owner/repo).
-    required: true
-  version:
-    description: APP_VERSION baked into the image (X.Y.Z, or X.Y.Z-rc.N for a candidate).
     required: true
   tags:
     description: Tag rules for docker/metadata-action, one per line.
@@ -18,6 +16,21 @@ inputs:
   registry-token:
     description: Token with packages:write for ghcr.io (GITHUB_TOKEN).
     required: true
+  context:
+    description: Build context with the Dockerfile (the repository root, or deploy/proxy).
+    required: false
+    default: "."
+  build-args:
+    description: >-
+      Build arguments, one per line. The application image takes APP_VERSION and APP_COMMIT
+      (ADR 0052); the proxy image takes none (its Dockerfile has no arguments, and an argument
+      nobody consumes is a build warning).
+    required: false
+    default: ""
+  sbom-file:
+    description: Where the CycloneDX SBOM is written, relative to the workspace.
+    required: false
+    default: sbom.cdx.json
 
 outputs:
   digest:
@@ -41,15 +54,11 @@ runs:
     - id: build
       uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
       with:
-        context: .
+        context: ${{ inputs.context }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        # ADR 0029: the version an installation compares against; ADR 0052: the commit it was
-        # built from.
-        build-args: |
-          APP_VERSION=${{ inputs.version }}
-          APP_COMMIT=${{ github.sha }}
+        build-args: ${{ inputs.build-args }}
         provenance: mode=max
     - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
     # Expressions go through the environment, never into the script text (actionlint's
@@ -64,10 +73,11 @@ runs:
       with:
         image: ${{ inputs.image }}@${{ steps.build.outputs.digest }}
         format: cyclonedx-json
-        output-file: sbom.cdx.json
+        output-file: ${{ inputs.sbom-file }}
         upload-artifact: false
     - name: attest SBOM
       shell: bash
       env:
         IMAGE_REF: ${{ inputs.image }}@${{ steps.build.outputs.digest }}
-      run: cosign attest --yes --type cyclonedx --predicate sbom.cdx.json "$IMAGE_REF"
+        SBOM_FILE: ${{ inputs.sbom-file }}
+      run: cosign attest --yes --type cyclonedx --predicate "$SBOM_FILE" "$IMAGE_REF"

@@ -23,7 +23,9 @@
 #                      --tls-domain; ADR 0064): TLS_DOMAIN and ACME_EMAIL, or with
 #                      --own-certificate the files in certs/; same rules
 #   4. .env.update     pull <image>:<version> -> digest -> cosign verify -> pin digest, profiles
-#                      and mode; without --version an existing pin stays
+#                      and mode; with the HTTPS proxy the same for <image>-proxy:<version>
+#                      (ADR 0064 step 2: no host builds Caddy); without --version existing
+#                      pins stay
 #   5. start           docker compose --env-file .env.update up -d, wait for health
 #   6. host updater    /usr/local/sbin, systemd units, /etc/openplanner/updater.env pointing at
 #                      this directory, a drop-in that opens only this directory under /home
@@ -546,6 +548,8 @@ proxy_settings() {
 # 4. The pinned release -------------------------------------------------------------------------
 
 image_name() { printf 'ghcr.io/%s' "$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"; }
+# The TLS proxy, released and signed next to the application image (ADR 0064 step 2).
+proxy_image_name() { printf '%s-proxy' "$(image_name)"; }
 # What the host's cosign accepts (ADR 0006): images signed by main.yml for a release tag. On
 # the rc channel also those signed on main, where release candidates are built (ADR 0059).
 identity_regexp() {
@@ -568,33 +572,64 @@ latest_version() {
   printf '%s' "$tag"
 }
 
+# pull_verified VAR IMAGE VERSION: pull the image, take its registry digest, verify the
+# signature (ADR 0006) and leave the digest reference in VAR. The same for both images.
+pull_verified() {
+  local image=$2 version=$3 ref # not `digest`: the caller's variable of that name is the target
+  log "pulling $image:$version"
+  docker pull -q "$image:$version" >/dev/null 2>&1 \
+    || die "cannot pull $image:$version; for a private package run: docker login ghcr.io -u <github user> (token with read:packages)"
+  ref=$(docker image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$image:$version" \
+    | grep -m1 "^$image@sha256:") || die "no registry digest for $image:$version"
+  cosign verify "$ref" --certificate-identity-regexp "$(identity_regexp)" \
+    --certificate-oidc-issuer "$OIDC_ISSUER" >/dev/null 2>&1 \
+    || die "$ref is not signed by a release of $REPOSITORY; nothing was changed"
+  log "signature verified: $ref"
+  printf -v "$1" '%s' "$ref"
+}
+
+# The version baked into a pulled application image (APP_VERSION, ADR 0052), for an
+# installation whose proxy image is not pinned yet (from before ADR 0064 step 2).
+pinned_version() {
+  docker image inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$1" 2>/dev/null \
+    | sed -n 's/^APP_VERSION=//p' | head -n 1
+}
+
 pin_release() {
-  local image digest profiles='' current
+  local image digest profiles='' current proxy_digest='' proxy_current version
   image=$(image_name)
   [[ $MODE != lab ]] || profiles=dev
   if ((TLS)); then profiles=${profiles:+$profiles,}tls; fi
   current=$(value "$PIN_FILE" OPENPLANNER_IMAGE)
+  proxy_current=$(value "$PIN_FILE" OPENPLANNER_PROXY_IMAGE)
   if [[ -z $VERSION && -n $current ]]; then
     log "keeping the pinned release $current"
     digest=$current
   else
     VERSION=${VERSION:-$(latest_version)}
-    log "pulling $image:$VERSION"
-    docker pull -q "$image:$VERSION" >/dev/null 2>&1 \
-      || die "cannot pull $image:$VERSION; for a private package run: docker login ghcr.io -u <github user> (token with read:packages)"
-    digest=$(docker image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$image:$VERSION" \
-      | grep -m1 "^$image@sha256:") || die "no registry digest for $image:$VERSION"
-    cosign verify "$digest" --certificate-identity-regexp "$(identity_regexp)" \
-      --certificate-oidc-issuer "$OIDC_ISSUER" >/dev/null 2>&1 \
-      || die "$digest is not signed by a release of $REPOSITORY; nothing was changed"
-    log "signature verified: $digest"
+    pull_verified digest "$image" "$VERSION"
+  fi
+  # The proxy image at the same version (ADR 0064 step 2); a host never builds it.
+  if ((TLS)); then
+    if [[ -n $VERSION ]]; then
+      pull_verified proxy_digest "$(proxy_image_name)" "$VERSION"
+    elif [[ -n $proxy_current ]]; then
+      log "keeping the pinned proxy image $proxy_current"
+      proxy_digest=$proxy_current
+    else
+      version=$(pinned_version "$digest")
+      [[ $version =~ $VERSION_RE ]] \
+        || die "cannot tell the version of $digest, so the proxy image cannot be pinned; run again with --version"
+      pull_verified proxy_digest "$(proxy_image_name)" "$version"
+    fi
   fi
   {
-    printf '# Written by scripts/install.sh; the host updater replaces OPENPLANNER_IMAGE.\n'
+    printf '# Written by scripts/install.sh; the host updater replaces the image pins.\n'
     printf 'OPENPLANNER_MODE=%s\n' "$MODE"
     printf 'OPENPLANNER_TLS=%s\n' "$TLS"
     [[ -z $profiles ]] || printf 'COMPOSE_PROFILES=%s\n' "$profiles"
     printf 'OPENPLANNER_IMAGE=%s\n' "$digest"
+    [[ -z $proxy_digest ]] || printf 'OPENPLANNER_PROXY_IMAGE=%s\n' "$proxy_digest"
   } >"$PIN_FILE.tmp"
   chmod 644 "$PIN_FILE.tmp"
   mv "$PIN_FILE.tmp" "$PIN_FILE"
@@ -649,6 +684,7 @@ install_updater() {
 # Written by scripts/install.sh; run it again instead of editing (docs/install.md).
 COMPOSE_DIR=$DIR
 UPDATE_IMAGE=$(image_name)
+UPDATE_PROXY_IMAGE=$(proxy_image_name)
 CERT_IDENTITY_REGEXP='$(identity_regexp)'
 HEALTH_TIMEOUT=$HEALTH_TIMEOUT
 READY_URL=$READY_URL
