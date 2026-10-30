@@ -55,7 +55,7 @@ msgid "message.team"
 msgstr "Team"
 
 msgid "message.manage"
-msgstr "You can view, change or cancel the appointment until {deadline}. After that the appointment is fixed."
+msgstr "You can view and move the appointment until {deadline}. You can cancel until the call begins."
 
 msgid "message.manage_link"
 msgstr "View or change appointment"
@@ -365,7 +365,7 @@ msgid "error.outside_booking_window"
 msgstr "This time can no longer be booked. Choose another time."
 
 msgid "error.booking_locked"
-msgstr "This appointment is fixed and can no longer be changed."
+msgstr "This appointment can no longer be changed because the call has begun or is about to."
 
 msgid "error.queue_empty"
 msgstr "There is no appointment left to pick up."
@@ -428,10 +428,13 @@ msgid "manage.status.no_show"
 msgstr "Did not take place"
 
 msgid "manage.deadline"
-msgstr "You can change or cancel this appointment until {deadline}."
+msgstr "You can move this appointment until {deadline}. You can cancel until the call begins."
 
 msgid "manage.locked"
-msgstr "This appointment is fixed. The call starts soon; it can no longer be changed or cancelled."
+msgstr "Moving is no longer possible because the call starts soon. You can still cancel the appointment if you cannot make it."
+
+msgid "manage.started"
+msgstr "The call has begun. This appointment can no longer be changed."
 
 msgid "manage.inactive"
 msgstr "This appointment is no longer active."
@@ -1042,11 +1045,11 @@ msgstr "Agents may choose an appointment (own queue)"
 msgid "admin.field.queue_free_pick_allowed_hint"
 msgstr "No: agents always pick up the next one. Yes: they can also pick up another appointment from the list."
 
-msgid "admin.field.queue_change_working_days"
-msgstr "Changes until (working days ahead, own queue)"
+msgid "admin.field.citizen_change_lead_minutes"
+msgstr "Citizen can move until (minutes ahead)"
 
-msgid "admin.field.queue_change_working_days_hint"
-msgstr "With the own queue the participant can change or cancel the appointment until this many working days (Monday to Friday) before the start, at the same time of day. 1 to 5."
+msgid "admin.field.citizen_change_lead_minutes_hint"
+msgstr "Until how many minutes before the start the citizen can still move the appointment. Cancelling is always possible until the start. Not shorter than Send to the queue, at most 1440. Default 60."
 
 msgid "admin.field.planner_change_min_lead_minutes"
 msgstr "Changes by a planner (minutes before)"
@@ -1122,8 +1125,8 @@ msgstr "Enter a number of days from 1 to 366."
 msgid "admin.form.error.dispatch_lead_minutes"
 msgstr "Enter a number of minutes from 0 to 60."
 
-msgid "admin.form.error.queue_change_working_days"
-msgstr "Enter a number of working days from 1 to 5."
+msgid "admin.form.error.citizen_change_lead_minutes"
+msgstr "Enter a number of minutes from 0 to 1440, not shorter than Send to the queue."
 
 msgid "admin.form.error.planner_change_min_lead_minutes"
 msgstr "Enter a number of minutes from the send-to-queue time up to 1440."

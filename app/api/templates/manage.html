@@ -42,8 +42,13 @@
   <li><a class="button button--secondary" href="/b/{{ token }}/reschedule">{{ _("manage.reschedule") }}</a></li>
   <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
 </ul>
-{% elif active %}
+{% elif cancellable %}
 <div class="notice"><p>{{ _("manage.locked") }}</p></div>
+<ul class="actions">
+  <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+</ul>
+{% elif active %}
+<div class="notice"><p>{{ _("manage.started") }}</p></div>
 {% else %}
 <div class="notice"><p>{{ _("manage.inactive") }}</p></div>
 {% endif %}

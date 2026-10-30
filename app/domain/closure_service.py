@@ -540,7 +540,7 @@ class ClosureService:
     async def _reinstate(self, tx: Transaction, group: Group, booking: Booking) -> None:
         """Confirm ``booking`` again and plan its jobs as a fresh booking."""
         now = self._clock.now()
-        if now >= group.change_deadline(booking.start):
+        if now >= booking.start - group.dispatch_lead:  # too late to plan jobs and a task
             raise DomainError(ErrorCode.BOOKING_LOCKED)
         if covering(await tx.get_closures(group.id, now), booking.start) is not None:
             raise DomainError(ErrorCode.GROUP_CLOSED)

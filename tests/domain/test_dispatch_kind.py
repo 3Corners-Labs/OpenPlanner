@@ -16,7 +16,7 @@ def test_existing_groups_keep_the_contact_center() -> None:
     group = make_group()
 
     assert group.dispatch_kind is DispatchKind.CONTACT_CENTER
-    assert group.queue_change_working_days == 1
+    assert group.citizen_change_lead_minutes == 60
 
 
 def test_only_contact_center_groups_send_work_items() -> None:
@@ -24,47 +24,48 @@ def test_only_contact_center_groups_send_work_items() -> None:
     assert not make_group(dispatch_kind=QUEUE, **WXCC).dispatch_enabled
 
 
-def test_contact_center_deadline_is_the_dispatch_moment() -> None:
-    start = datetime(2026, 11, 4, 9, 0, tzinfo=UTC)
-    group = make_group(dispatch_lead_minutes=15)
+@pytest.mark.parametrize("kind", list(DispatchKind))
+def test_citizen_moves_until_the_change_lead_for_both_kinds(kind: DispatchKind) -> None:
+    start = datetime(2026, 11, 2, 9, 30, tzinfo=UTC)
+    group = make_group(dispatch_kind=kind, citizen_change_lead_minutes=90)
 
-    assert group.change_deadline(start) == start - timedelta(minutes=15)
-
-
-@pytest.mark.parametrize(
-    ("start", "days", "deadline"),
-    [
-        # Wednesday 10:00 Amsterdam (09:00 UTC) → Tuesday, same local time
-        (datetime(2026, 11, 4, 9, 0, tzinfo=UTC), 1, datetime(2026, 11, 3, 9, 0, tzinfo=UTC)),
-        # Monday → the Friday before, skipping the weekend
-        (datetime(2026, 11, 2, 9, 0, tzinfo=UTC), 1, datetime(2026, 10, 30, 9, 0, tzinfo=UTC)),
-        # Sunday → Friday
-        (datetime(2026, 11, 1, 9, 0, tzinfo=UTC), 1, datetime(2026, 10, 30, 9, 0, tzinfo=UTC)),
-        # Tuesday, two working days → the Friday before
-        (datetime(2026, 11, 3, 9, 0, tzinfo=UTC), 2, datetime(2026, 10, 30, 9, 0, tzinfo=UTC)),
-        # Monday after the DST change (25 Oct) → Friday before it: same local 10:00
-        (datetime(2026, 10, 26, 9, 0, tzinfo=UTC), 1, datetime(2026, 10, 23, 8, 0, tzinfo=UTC)),
-    ],
-)
-def test_own_queue_deadline_is_working_days_before_at_the_same_local_time(
-    start: datetime, days: int, deadline: datetime
-) -> None:
-    group = make_group(dispatch_kind=QUEUE, queue_change_working_days=days)
-
-    assert group.change_deadline(start) == deadline
+    assert group.change_deadline(start) == start - timedelta(minutes=90)
 
 
-@pytest.mark.parametrize("days", [0, 6])
-def test_working_days_are_bounded(days: int) -> None:
+@pytest.mark.parametrize("kind", list(DispatchKind))
+def test_citizen_cancels_until_the_start_for_both_kinds(kind: DispatchKind) -> None:
+    start = datetime(2026, 11, 2, 9, 30, tzinfo=UTC)
+
+    assert make_group(dispatch_kind=kind).cancel_deadline(start) == start
+
+
+def test_a_monday_booking_is_not_locked_since_friday() -> None:
+    """The case behind ADR 0068: own queue, Monday 09:30, two days before."""
+    start = datetime(2026, 11, 2, 8, 30, tzinfo=UTC)  # Monday 09:30 Amsterdam
+    group = make_group(dispatch_kind=QUEUE)
+    sunday_noon = datetime(2026, 11, 1, 11, 0, tzinfo=UTC)
+
+    assert sunday_noon < group.change_deadline(start) < start
+
+
+@pytest.mark.parametrize("minutes", [-1, 1441])
+def test_change_lead_is_bounded(minutes: int) -> None:
     with pytest.raises(DomainError) as excinfo:
-        make_group(queue_change_working_days=days)
+        make_group(citizen_change_lead_minutes=minutes)
 
-    assert excinfo.value.field == "queue_change_working_days"
+    assert excinfo.value.field == "citizen_change_lead_minutes"
 
 
-@pytest.mark.parametrize("days", [1, 5])
-def test_working_days_accept_the_bounds(days: int) -> None:
-    make_group(queue_change_working_days=days)
+@pytest.mark.parametrize("minutes", [0, 1440])
+def test_change_lead_accepts_the_bounds(minutes: int) -> None:
+    make_group(citizen_change_lead_minutes=minutes, dispatch_lead_minutes=0)
+
+
+def test_change_lead_is_never_shorter_than_the_dispatch_lead() -> None:
+    with pytest.raises(DomainError) as excinfo:
+        make_group(dispatch_lead_minutes=15, min_notice_minutes=60, citizen_change_lead_minutes=10)
+
+    assert excinfo.value.field == "citizen_change_lead_minutes"
 
 
 def test_only_an_own_queue_group_with_an_address_sends_the_team_invite() -> None:

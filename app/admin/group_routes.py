@@ -63,10 +63,10 @@ from app.domain.planning import (
 )
 from app.domain.scheduling import (
     MAX_BOOKINGS_PER_EMAIL,
+    MAX_CITIZEN_CHANGE_LEAD_MINUTES,
     MAX_DIRECT_CALLS,
     MAX_LABEL_LENGTH,
     MAX_PLANNER_LEAD_MINUTES,
-    MAX_QUEUE_CHANGE_WORKING_DAYS,
     MAX_QUEUE_VISIBLE_FROM_MINUTES,
     DispatchKind,
     GroupSummary,

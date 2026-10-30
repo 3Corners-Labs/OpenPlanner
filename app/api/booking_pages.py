@@ -9,8 +9,9 @@ Server-rendered and usable without JavaScript. Every response goes through
     GET  /g/{slug}/closure/image   that closure's image (ADR 0037 §3), else 404
     GET  /g/{slug}/book?start=     contact form for one slot
     POST /g/{slug}/book            book ─► 303 /b/{token}?status=booked
-    GET  /b/{token}                booking (read-only from the change deadline; a booking on
-                                   hold by an emergency closure shows its notice, ADR 0024)
+    GET  /b/{token}                booking (no move from the change lead, no cancel from the
+                                   start, ADR 0068; a booking on hold by an emergency
+                                   closure shows its notice, ADR 0024)
     GET  /b/{token}/cancel         confirm ─► POST ─► 303 /b/{token}?status=cancelled
     GET  /b/{token}/reschedule     slot picker ─► ?start= confirm ─► POST
                                    ─► 303 /b/{new token}?status=rescheduled
@@ -267,6 +268,7 @@ def _manage_context(
         "status_label": locale.gettext(STATUS_LABELS[booking.status]),
         "active": booking.is_active,
         "changeable": details.changeable,
+        "cancellable": details.cancellable,
         "deadline": (
             f"{format_day(local_day(deadline, group.tz), locale.code)}, "
             f"{format_clock(deadline, group.tz, locale.code)}"
@@ -293,7 +295,7 @@ async def cancel_page(request: Request, token: str, locale: Locale) -> Response:
     """Ask for confirmation before cancelling."""
     details = await _service(request).find(token)
     follow(request, details.group.organisation_id)
-    if not details.changeable:
+    if not details.cancellable:
         return RedirectResponse(f"/b/{token}", status_code=303)
     context = {**_manage_context(details, locale, None, _clock(request).now()), "token": token}
     return await citizen_page(request, locale, "cancel.html", details.group, context)

@@ -1,6 +1,5 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
-from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -13,7 +12,6 @@ from app.domain.scheduling import (
     PhoneMode,
     ScheduleOverride,
     ScheduleRule,
-    working_days_before,
 )
 from app.domain.services import BookingService, ContactInput
 from app.domain.tokens import derive_token, hash_token
@@ -375,25 +373,21 @@ async def test_purged_booking_cannot_be_rescheduled(
 @pytest.mark.parametrize(
     "now",
     [
-        SLOT_0900 - timedelta(minutes=5),  # the WxCC task is dispatched now
+        SLOT_0900 - timedelta(minutes=60),  # the change lead
         SLOT_0900,  # the meeting starts
         SLOT_0900 + timedelta(hours=2),  # long after
     ],
 )
-async def test_booking_is_read_only_from_the_dispatch_moment(
+async def test_booking_cannot_be_moved_from_the_change_lead(
     uow: InMemoryUnitOfWork, now: datetime
 ) -> None:
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     late = BookingService(uow, FixedClock(now), TEST_TOKEN_KEY)
 
-    for change in (
-        late.cancel(receipt.management_token),
-        late.reschedule(receipt.management_token, SLOT_0930),
-    ):
-        with pytest.raises(DomainError) as excinfo:
-            await change
-        assert excinfo.value.code is ErrorCode.BOOKING_LOCKED
+    with pytest.raises(DomainError) as excinfo:
+        await late.reschedule(receipt.management_token, SLOT_0930)
 
+    assert excinfo.value.code is ErrorCode.BOOKING_LOCKED
     details = await late.find(receipt.management_token)
     assert details.booking.status is BookingStatus.CONFIRMED
     assert details.changeable is False
@@ -401,48 +395,94 @@ async def test_booking_is_read_only_from_the_dispatch_moment(
     assert JobType.DISPATCH_WXCC_TASK in [j.type for j in jobs]
 
 
-async def test_booking_can_change_until_just_before_the_deadline(uow: InMemoryUnitOfWork) -> None:
+@pytest.mark.parametrize(
+    "now",
+    [
+        SLOT_0900,  # the meeting starts
+        SLOT_0900 + timedelta(hours=2),  # long after
+    ],
+)
+async def test_booking_cannot_be_cancelled_from_the_start(
+    uow: InMemoryUnitOfWork, now: datetime
+) -> None:
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
-    just_before = BookingService(
-        uow, FixedClock(SLOT_0900 - timedelta(minutes=5, seconds=1)), TEST_TOKEN_KEY
+    late = BookingService(uow, FixedClock(now), TEST_TOKEN_KEY)
+
+    with pytest.raises(DomainError) as excinfo:
+        await late.cancel(receipt.management_token)
+
+    assert excinfo.value.code is ErrorCode.BOOKING_LOCKED
+    assert (await late.find(receipt.management_token)).cancellable is False
+
+
+@pytest.mark.parametrize("minutes_before", [59, 30, 6, 1])
+async def test_booking_can_be_cancelled_after_the_change_lead_and_dispatch(
+    uow: InMemoryUnitOfWork, minutes_before: int
+) -> None:
+    """ADR 0068: no cancel-lock before the start; the task is ended by the job (ADR 0021)."""
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    late = BookingService(
+        uow, FixedClock(SLOT_0900 - timedelta(minutes=minutes_before)), TEST_TOKEN_KEY
     )
 
-    cancelled = await just_before.cancel(receipt.management_token)
+    details = await late.find(receipt.management_token)
+    cancelled = await late.cancel(receipt.management_token)
 
+    assert details.changeable is False
+    assert details.cancellable is True
     assert cancelled.status is BookingStatus.CANCELLED
+    jobs = [j.type for j in uow.state.jobs[receipt.booking.id or 0]]
+    assert JobType.END_WXCC_TASK in jobs
+    assert JobType.DISPATCH_WXCC_TASK not in jobs
 
 
-def test_change_deadline_is_the_dispatch_moment() -> None:
+async def test_booking_can_be_moved_until_just_before_the_change_lead(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    just_before = BookingService(
+        uow, FixedClock(SLOT_0900 - timedelta(minutes=60, seconds=1)), TEST_TOKEN_KEY
+    )
+
+    moved = await just_before.reschedule(receipt.management_token, SLOT_0930)
+
+    assert moved.booking.start == SLOT_0930
+
+
+def test_dispatch_moment_is_the_start_minus_the_lead() -> None:
     from app.domain.job_plan import dispatch_moment
 
     assert dispatch_moment(SLOT_0900, timedelta(minutes=15)) == SLOT_0900 - timedelta(minutes=15)
 
 
-async def test_own_queue_booking_is_read_only_a_working_day_ahead(
-    uow: InMemoryUnitOfWork,
+@pytest.mark.parametrize("kind", list(DispatchKind))
+async def test_both_kinds_can_still_cancel_a_day_ahead_and_after_the_lead(
+    uow: InMemoryUnitOfWork, kind: DispatchKind
 ) -> None:
-    uow.state.groups[1] = make_group(
-        id=1, slug="aangifte", dispatch_kind=DispatchKind.OPENPLANNER_QUEUE
-    )
+    """The product owner's case: a Monday booking is not locked from Friday on."""
+    uow.state.groups[1] = make_group(id=1, slug="aangifte", dispatch_kind=kind)
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
-    deadline = working_days_before(SLOT_0900, 1, ZoneInfo("Europe/Amsterdam"))
-    before = BookingService(uow, FixedClock(deadline - timedelta(seconds=1)), TEST_TOKEN_KEY)
-    at = BookingService(uow, FixedClock(deadline), TEST_TOKEN_KEY)
+    sunday = BookingService(uow, FixedClock(SLOT_0900 - timedelta(days=1)), TEST_TOKEN_KEY)
 
-    assert (await before.find(receipt.management_token)).changeable
-    with pytest.raises(DomainError, match="booking_locked"):
-        await at.cancel(receipt.management_token)
+    details = await sunday.find(receipt.management_token)
+
+    assert details.changeable
+    assert details.cancellable
 
 
-async def test_read_only_moment_follows_the_groups_dispatch_lead(uow: InMemoryUnitOfWork) -> None:
+async def test_dispatch_job_follows_the_groups_dispatch_lead(uow: InMemoryUnitOfWork) -> None:
     uow.state.groups[1] = make_group(
-        id=1, slug="aangifte", dispatch_lead_minutes=15, min_notice_minutes=60
+        id=1,
+        slug="aangifte",
+        dispatch_lead_minutes=15,
+        min_notice_minutes=60,
+        citizen_change_lead_minutes=15,
     )
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     at_lead = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=15)), TEST_TOKEN_KEY)
 
     with pytest.raises(DomainError, match="booking_locked"):
-        await at_lead.cancel(receipt.management_token)
+        await at_lead.reschedule(receipt.management_token, SLOT_0930)
     dispatch = [
         j for j in uow.state.jobs[receipt.booking.id or 0] if j.type is JobType.DISPATCH_WXCC_TASK
     ]
@@ -456,7 +496,8 @@ async def test_find_returns_group_and_changeability(service: BookingService) -> 
 
     assert details.group.slug == "aangifte"
     assert details.changeable is True
-    assert details.change_deadline == SLOT_0900 - timedelta(minutes=5)
+    assert details.change_deadline == SLOT_0900 - timedelta(minutes=60)
+    assert details.cancellable is True
 
 
 async def test_find_of_a_cancelled_booking_is_not_changeable(service: BookingService) -> None:
