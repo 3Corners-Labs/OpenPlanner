@@ -2,6 +2,7 @@
 
 Status: accepted (2026-10-29), requested by the product owner. Builds on ADR 0006 (signed
 images), ADR 0012 (actions on explicit instruction) and ADR 0029 (updates from the portal).
+Amended by ADR 0059 (point 1: CI tags a release candidate `vX.Y.Z-rc.N` on every merge).
 
 ## Context
 

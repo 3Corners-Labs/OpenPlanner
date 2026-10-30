@@ -20,7 +20,7 @@ untouched.
 
 import struct
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, time, timedelta
 
 from sqlalchemy import select
@@ -309,7 +309,9 @@ async def _pending_booking(
             start=start,
             end=end,
             status=BookingStatus.PENDING_CONFIRMATION,
-            contact=EXAMPLE_PARTICIPANT,
+            # Its own address each run, so repeated seeds stay under the address limit
+            # (ADR 0059) when the e2e flow moves the confirmed one.
+            contact=replace(EXAMPLE_PARTICIPANT, email=f"wacht-{salt[:8].lower()}@example.org"),
             locale="nl",
             token_hash=hash_token(token),
             created_at=now,

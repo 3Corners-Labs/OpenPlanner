@@ -4,6 +4,14 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ## Unreleased
 
+### Features
+
+- Release candidates (ADR 0059, step 1): every merge to `main` becomes `vX.Y.Z-rc.N`, a
+  signed image and a GitHub pre-release with SBOM, published after the ZAP baseline without
+  waiting for the mutation test; `make release-plan` ignores candidates, and
+  `python -m scripts.release_plan --candidate` prints the next one. A hand-pushed `rc` tag
+  fails the tag check.
+
 ## 0.3.0 (2026-10-29)
 
 ### Features
