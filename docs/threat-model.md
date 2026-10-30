@@ -44,6 +44,7 @@ Public, unauthenticated: `GET /` (more pages from WP3), `GET /static/*`. Inputs 
 | Denial of service | Very long `Accept-Language` header | Parsed up to 4096 characters and 32 entries | `test_parse_ignores_absurdly_long_headers` |
 | Information disclosure | Cached page served in the wrong language or to another visitor | `Vary: Accept-Language, Cookie`, `Cache-Control: no-store` | `test_html_pages_get_a_csp_allowing_own_stylesheets` |
 | Tampering | Injected script or inline style on HTML pages | CSP without `script-src`; only `style-src 'self'`; no inline styles | same |
+| Tampering (stored XSS) | A served brand SVG (`/static/brand/*.svg`, ADR 0060) carries script, event handlers or a reference to another host | The files are hand-written and reviewed in PRs; a test refuses `<script`, `on*=`, `href` and any URL other than the SVG namespace; pages load them as `<img>` under `img-src 'self'`, where script never runs | `tests/web/test_brand.py::test_svgs_carry_no_script_handler_or_external_reference` |
 
 ## Dynamic scan (OWASP ZAP baseline, on merge to `main`)
 
@@ -154,6 +155,7 @@ Admin: `GET /admin/organisations`, `GET /admin/organisations/new`, `POST /admin/
 | Tampering | Message sent for a moved or cancelled booking | Pinned jobs are skipped when the booking changed or was purged | `test_stale_jobs_send_nothing`, `tests/domain/test_job_plan.py::test_stale_jobs` |
 | Injection | Group name or text with HTML in emails | Jinja2 autoescape for the HTML part; plain-text part separate | `tests/jobs/test_messages.py::test_html_is_escaped_and_semantic` |
 | Information disclosure | Personal data in calendar files | `.ics` contains team, times and the management link only | `test_calendar_attachment` |
+| Information disclosure (tracking) | The product mark in the HTML part (ADR 0060 §6) works as a tracking pixel | One fixed URL (`/static/brand/mark-48.png`) for every recipient, no per-booking or per-recipient parameter; the plain-text part carries no image; an organisation can switch the footer off (`PRODUCT_FOOTER`, class D) | `tests/jobs/test_messages.py::test_the_html_part_ends_with_the_product_footer_and_the_text_part_does_not`, `test_the_product_footer_follows_the_organisations_setting` |
 
 ## Flow: message channels, SMS reminders and message texts (ADR 0022, 0028)
 

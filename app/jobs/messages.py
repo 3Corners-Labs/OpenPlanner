@@ -203,6 +203,7 @@ class MessageComposer:
         channel: ChannelKind = ChannelKind.EMAIL,
         texts: GroupTexts | None = None,
         closure: Closure | None = None,
+        product_footer: bool = True,
     ) -> OutboundMessage:
         """Return the message for ``job_type`` on ``channel``.
 
@@ -214,6 +215,9 @@ class MessageComposer:
             channel: Email or SMS (SMS exists for reminders).
             texts: The group's own texts; catalogue texts where it has none.
             closure: For closure messages: the closure whose notice they carry.
+            product_footer: Whether the HTML part ends with "Appointments via OpenPlanner" and
+                the product mark (ADR 0060 §6, the organisation's class D setting). The
+                plain-text part never carries it.
 
         Raises:
             KeyError: If ``job_type`` is not a message job.
@@ -275,6 +279,13 @@ class MessageComposer:
             "join_text": _("message.join"),
             "join_link": _("message.join_link"),
             "signoff": _("message.signoff", group_name=group.name),
+            "product_footer": {
+                "via": _("site.product_footer_via"),
+                "name": _("site.product_name"),
+                "mark_url": f"{self._base_url}/static/brand/mark-48.png",
+            }
+            if product_footer
+            else None,
         }
         attachments: tuple[Attachment, ...] = ()
         if not on_hold and kind.calendar:  # on hold: leave the citizen's calendar alone
@@ -336,6 +347,8 @@ class MessageComposer:
             "manage_text": _("message.team_invite.queue"),
             "manage_link": _("message.team_invite.queue_link"),
             "signoff": _("message.team_invite.signoff"),
+            # The team's own mailbox needs no "Appointments via OpenPlanner" (ADR 0060 §6).
+            "product_footer": None,
         }
         calendar = build_ics(
             uid=f"booking-{booking.id}-team@{urlsplit(self._base_url).hostname or 'openplanner'}",

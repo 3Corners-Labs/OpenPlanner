@@ -17,6 +17,12 @@ msgstr "Book an appointment"
 msgid "site.skip_to_content"
 msgstr "Skip to content"
 
+msgid "site.product_footer_via"
+msgstr "Appointments via"
+
+msgid "site.product_name"
+msgstr "OpenPlanner"
+
 msgid "home.title"
 msgstr "Schedule a video call"
 
@@ -5754,6 +5760,9 @@ msgstr "Time format"
 
 msgid "settings.field.admin_timezone.label"
 msgstr "Admin portal time zone"
+
+msgid "settings.field.product_footer.label"
+msgstr "Show \"Appointments via OpenPlanner\" at the bottom"
 
 msgid "settings.field.staff_dormant_after_days.label"
 msgstr "Staff member dormant after (days)"

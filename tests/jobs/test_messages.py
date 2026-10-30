@@ -266,7 +266,9 @@ def test_closure_mails_match_their_snapshots(
         job_type, replace(FIXED, locale=locale), group, NOW, closure=CONTACT_CLOSURE
     )
 
-    assert "<img" not in (message.html or "")  # the closure image is never mailed
+    # The closure image is never mailed; the only image is the product mark of the footer.
+    assert (message.html or "").count("<img") == 1
+    assert "/static/brand/mark-48.png" in (message.html or "")
     name = f"{job_type.value}.{locale}"
     for suffix, rendered in (("txt", message.text), ("html", message.html or "")):
         path = SNAPSHOTS / f"{name}.{suffix}"
@@ -446,3 +448,34 @@ def test_team_cancel_withdraws_the_same_event_without_the_name(
     assert "METHOD:CANCEL" in cancel.attachments[0].data.decode()
     assert "Ada" not in cancel.text
     assert "OP-000042" in cancel.text
+
+
+def test_the_html_part_ends_with_the_product_footer_and_the_text_part_does_not(
+    composer: MessageComposer,
+) -> None:
+    message = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW)
+
+    html = message.html or ""
+    footer = html.split("<footer>", 1)[1].split("</footer>", 1)[0]
+    assert "Afspraken via" in footer
+    assert "<strong>OpenPlanner</strong>" in footer
+    mark = "https://afspraak.example.nl/static/brand/mark-48.png"
+    assert f'<img src="{mark}" alt="" width="24" height="24">' in footer
+    assert html.index("Met vriendelijke groet") < html.index("<footer>")  # after the signoff
+    assert "OpenPlanner" not in message.text  # the plain-text part is unchanged (ADR 0060 §6)
+    assert "mark-48" not in message.text
+
+
+def test_the_product_footer_follows_the_organisations_setting(composer: MessageComposer) -> None:
+    message = composer.compose(
+        JobType.SEND_CONFIRMATION, replace(BOOKING, locale="en"), GROUP, NOW, product_footer=False
+    )
+
+    assert "<footer>" not in (message.html or "")
+    assert "OpenPlanner" not in (message.html or "") + message.text
+
+
+def test_the_product_footer_speaks_the_citizens_language(composer: MessageComposer) -> None:
+    message = composer.compose(JobType.SEND_CONFIRMATION, replace(BOOKING, locale="en"), GROUP, NOW)
+
+    assert "Appointments via" in (message.html or "")

@@ -17,6 +17,12 @@ msgstr "Afspraak maken"
 msgid "site.skip_to_content"
 msgstr "Naar de inhoud"
 
+msgid "site.product_footer_via"
+msgstr "Afspraken via"
+
+msgid "site.product_name"
+msgstr "OpenPlanner"
+
 msgid "home.title"
 msgstr "Een videogesprek plannen"
 
@@ -5754,6 +5760,9 @@ msgstr "Tijdnotatie"
 
 msgid "settings.field.admin_timezone.label"
 msgstr "Tijdzone beheerportaal"
+
+msgid "settings.field.product_footer.label"
+msgstr "Toon \"Afspraken via OpenPlanner\" onderaan"
 
 msgid "settings.field.staff_dormant_after_days.label"
 msgstr "Medewerker inactief na (dagen)"

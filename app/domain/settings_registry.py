@@ -913,6 +913,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "IANA time zone of the admin portal.",
     ),
     S(
+        "product_footer",
+        K.BOOL,
+        True,
+        _D,
+        T.DISPLAY,
+        '"Appointments via OpenPlanner" with the product mark at the foot of the booking pages '
+        "and in the HTML part of emails (ADR 0060 §6).",
+    ),
+    S(
         "staff_dormant_after_days",
         K.INT,
         90,
