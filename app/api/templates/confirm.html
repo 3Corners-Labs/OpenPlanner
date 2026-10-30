@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ _("confirm.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+<p class="eyebrow">{{ group.name }}</p>
+<h1>{{ _("confirm.title") }}</h1>
+<dl class="details">
+  <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
+  <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
+</dl>
+<p>{{ _("confirm.text", deadline=confirm_by) }}</p>
+<form method="post" action="/b/{{ token }}/confirm">
+  <button type="submit" class="button button--large">{{ _("confirm.submit") }}</button>
+</form>
+{% if cancellable %}
+<p><a href="/b/{{ token }}/cancel">{{ _("confirm.not_me") }}</a></p>
+{% endif %}
+{% endblock %}

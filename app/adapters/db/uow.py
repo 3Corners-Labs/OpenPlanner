@@ -31,8 +31,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
+from app.adapters.db.certificate import CertificateQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
+from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, answers_json
 from app.adapters.db.images import ImageQueries, page_image
 from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
@@ -197,6 +199,7 @@ def _group(row: GroupRow) -> Group:
         embedding_enabled=row.embedding_enabled,
         queue_visible_from_minutes=row.queue_visible_from_minutes,
         queue_free_pick_allowed=row.queue_free_pick_allowed,
+        max_bookings_per_email=row.max_bookings_per_email,
         calendar_invite_address=row.calendar_invite_address,
     )
 
@@ -267,6 +270,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "embedding_enabled": group.embedding_enabled,
         "queue_visible_from_minutes": group.queue_visible_from_minutes,
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
+        "max_bookings_per_email": group.max_bookings_per_email,
         "calendar_invite_address": group.calendar_invite_address,
     }
 
@@ -274,8 +278,14 @@ def _group_columns(group: Group) -> dict[str, Any]:
 def _booking(row: BookingRow, slot: SlotRow) -> Booking:
     """Map a booking row and its slot; a purged booking has no contact."""
     contact = (
-        Contact(name=row.name, email=row.email, phone=row.phone)
-        if row.name is not None and row.email is not None
+        Contact(
+            first_name=row.first_name,
+            last_name=row.last_name or "",
+            email=row.email,
+            phone=row.phone,
+            answers=answers_from_json(row.form_answers),
+        )
+        if row.first_name is not None and row.email is not None
         else None
     )
     return Booking(
@@ -299,6 +309,8 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
         rebook_by=row.rebook_by,
+        confirm_by=row.confirm_by,
+        confirmed_at=row.confirmed_at,
         claim=Claim(row.claimed_at, row.claimed_by)
         if row.claimed_at is not None and row.claimed_by is not None
         else None,
@@ -367,6 +379,8 @@ class SqlTransaction(
     ImageQueries,
     ScenarioQueries,
     PlatformSettingsQueries,
+    FormFieldQueries,
+    CertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
@@ -376,7 +390,7 @@ class SqlTransaction(
     the maintenance switch from ``MaintenanceQueries`` (ADR 0038), custom roles from
     ``RoleQueries`` (ADR 0039), closure images and scenarios from ``ImageQueries`` and
     ``ScenarioQueries`` (ADR 0037), portal settings from ``PlatformSettingsQueries``
-    (ADR 0042).
+    (ADR 0042), the certificate check from ``CertificateQueries`` (ADR 0064).
 
     Args:
         session: The open session.
@@ -433,6 +447,7 @@ class SqlTransaction(
                 category=event.event_category.value,
                 trace_id=event.trace_id[:32],
                 service=event.service[:16],
+                message=event.message[:300],
             )
         )
         await self._session.flush()
@@ -503,6 +518,7 @@ class SqlTransaction(
                     trace_id=row.trace_id,
                     service=row.service,
                     event_id=row.event_id,
+                    message=row.message,
                 ),
                 name,
             )
@@ -1104,6 +1120,7 @@ class SqlTransaction(
                 at=event.at,
                 kind=event.kind.value,
                 detail=event.detail[:128],
+                message=event.message[:300],
             )
         )
         await self._session.flush()
@@ -1115,7 +1132,9 @@ class SqlTransaction(
             .where(BookingEventRow.booking_id == booking_id)
             .order_by(BookingEventRow.at, BookingEventRow.id)
         )
-        return [BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail) for r in rows]
+        return [
+            BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail, r.message) for r in rows
+        ]
 
     async def list_bookings(
         self, scope: Scope, group_id: int, lower: datetime, upper: datetime
@@ -1365,6 +1384,28 @@ class SqlTransaction(
         )
         return int(count or 0)
 
+    async def upcoming_starts_for_email(
+        self, group_id: int, email: str, after: datetime
+    ) -> list[datetime]:
+        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0066).
+
+        ``lower()`` on both sides: SQLite folds ASCII only, the same for the stored and the
+        submitted address. The address stays in this query; only start times come back.
+        """
+        starts = await self._session.scalars(
+            select(SlotRow.start)
+            .select_from(BookingRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(
+                BookingRow.group_id == group_id,
+                BookingRow.status.in_(_HOLDS_PLACE),
+                SlotRow.end > after,
+                SlotRow.kind == BookingKind.SCHEDULED.value,
+                func.lower(BookingRow.email) == func.lower(email),
+            )
+        )
+        return list(starts)
+
     async def add_booking(self, booking: Booking) -> Booking:
         """Insert a booking and return it with its ID."""
         contact = booking.contact
@@ -1372,9 +1413,11 @@ class SqlTransaction(
             slot_id=booking.slot_id,
             group_id=booking.group_id,
             status=booking.status.value,
-            name=contact.name if contact else None,
+            first_name=contact.first_name if contact else None,
+            last_name=contact.last_name if contact else None,
             email=contact.email if contact else None,
             phone=contact.phone if contact else None,
+            form_answers=answers_json(contact.answers) if contact else None,
             locale=booking.locale,
             consents=",".join(sorted(booking.consents)),
             management_token_hash=booking.token_hash,
@@ -1382,6 +1425,8 @@ class SqlTransaction(
             created_at=booking.created_at,
             cancelled_at=booking.cancelled_at,
             rescheduled_from_id=booking.rescheduled_from_id,
+            confirm_by=booking.confirm_by,
+            confirmed_at=booking.confirmed_at,
         )
         self._session.add(row)
         await self._session.flush()
@@ -1403,9 +1448,11 @@ class SqlTransaction(
             update(BookingRow)
             .where(BookingRow.id == booking_id)
             .values(
-                name=None,
+                first_name=None,
+                last_name=None,
                 email=None,
                 phone=None,
+                form_answers=None,
                 guest_join_url=None,
                 host_join_url=None,
                 claimed_by=None,
@@ -1424,7 +1471,7 @@ class SqlTransaction(
         return _booking(*found) if found else None
 
     async def save_booking(self, booking: Booking) -> None:
-        """Persist the mutable fields of a booking (status, cancellation, closure, reason)."""
+        """Persist the mutable fields of a booking (status, times, closure, reason)."""
         await self._session.execute(
             update(BookingRow)
             .where(BookingRow.id == booking.id)
@@ -1434,6 +1481,7 @@ class SqlTransaction(
                 closure_id=booking.closure_id,
                 change_reason=booking.change_reason.value if booking.change_reason else None,
                 rebook_by=booking.rebook_by,
+                confirmed_at=booking.confirmed_at,
             )
         )
 

@@ -1,0 +1,80 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.form_fields.title") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<section class="card" id="fields" aria-labelledby="form-fields-heading">
+  <div class="card__header">
+    <h2 id="form-fields-heading">{{ _("admin.form_fields.title") }}</h2>
+    <p class="card__lead">{{ _("admin.form_fields.lead") }}</p>
+  </div>
+  <p>{{ _("admin.form_fields.system") }}</p>
+  {% if rows %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.form_fields.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.form_fields.label") }}</th>
+        <th scope="col">{{ _("admin.form_fields.type") }}</th>
+        <th scope="col">{{ _("admin.form_fields.required") }}</th>
+        <th scope="col">{{ _("admin.form_fields.classification") }}</th>
+        <th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <th scope="row"><a href="/admin/groups/{{ summary.group.slug }}/settings/form/{{ row.key }}">{{ row.label }}</a> <code>{{ row.key }}</code></th>
+        <td>{{ row.type }}</td>
+        <td>{% if row.required %}{{ _("admin.yes") }}{% else %}{{ _("admin.no") }}{% endif %}</td>
+        <td>{% if row.pii %}<span class="chip chip--warning">{{ _("admin.form_fields.classification.pii") }}</span>{% else %}<span class="chip">{{ _("admin.form_fields.classification.not_pii") }}</span>{% endif %}</td>
+        <td>
+          {% if not row.first %}
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/form/{{ row.key }}/move">
+            <input type="hidden" name="direction" value="up">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.form_fields.up_label", label=row.label) }}">{{ _("admin.form_fields.up") }}</button>
+          </form>
+          {% endif %}
+          {% if not row.last %}
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/form/{{ row.key }}/move">
+            <input type="hidden" name="direction" value="down">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.form_fields.down_label", label=row.label) }}">{{ _("admin.form_fields.down") }}</button>
+          </form>
+          {% endif %}
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/form/{{ row.key }}/retire">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.form_fields.retire_label", label=row.label) }}">{{ _("admin.form_fields.retire") }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.form_fields.none") }}</p>
+  {% endif %}
+  {% if retired %}
+  <p class="hint">{{ _("admin.form_fields.retired", names=retired | join(", ")) }}</p>
+  {% endif %}
+  <p><a href="/admin/groups/{{ summary.group.slug }}/settings">{{ _("admin.form_fields.back") }}</a></p>
+</section>
+{% if can_add %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/form" novalidate aria-labelledby="add-field-heading">
+  <div class="card__header">
+    <h2 id="add-field-heading">{{ _("admin.form_fields.add") }}</h2>
+    <p class="card__lead">{{ _("admin.form_fields.add_lead", count=limit) }}</p>
+  </div>
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  {% include "admin/_form_field_flags.html" %}
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.form_fields.add_button") }}</button>
+  </div>
+</form>
+{% else %}
+<section class="card"><p>{{ _("admin.form_fields.limit_reached", count=limit) }}</p></section>
+{% endif %}
+{% endblock %}

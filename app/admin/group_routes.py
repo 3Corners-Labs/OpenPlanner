@@ -33,11 +33,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, can_function
-from app.admin.check_routes import check_view
+from app.admin.check_routes import check_service, check_view
 from app.admin.forms import (
     Field,
     FormData,
@@ -61,6 +62,7 @@ from app.domain.planning import (
     settings_of,
 )
 from app.domain.scheduling import (
+    MAX_BOOKINGS_PER_EMAIL,
     MAX_DIRECT_CALLS,
     MAX_LABEL_LENGTH,
     MAX_PLANNER_LEAD_MINUTES,
@@ -87,6 +89,7 @@ from app.web.locale import RequestLocale
 from app.web.navigation import object_page
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
+log = structlog.get_logger()
 
 DISPATCH_LABELS: dict[DispatchKind, str] = {
     DispatchKind.CONTACT_CENTER: "admin.group.dispatch_contact_center",
@@ -103,6 +106,10 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
     "slot_minutes": ("admin.field.slot_minutes", "admin.field.slot_minutes_hint"),
     "min_notice_minutes": ("admin.field.min_notice_minutes", "admin.field.min_notice_minutes_hint"),
     "horizon_days": ("admin.field.horizon_days", "admin.field.horizon_days_hint"),
+    "max_bookings_per_email": (
+        "admin.field.max_bookings_per_email",
+        "admin.field.max_bookings_per_email_hint",
+    ),
     "dispatch_lead_minutes": (
         "admin.field.dispatch_lead_minutes",
         "admin.field.dispatch_lead_minutes_hint",
@@ -508,6 +515,11 @@ def _settings_fields(
         number("slot_minutes", current.slot_minutes, {"min": "5", "max": "480", "step": "5"}),
         number("min_notice_minutes", current.min_notice_minutes, {"min": "0", "step": "5"}),
         number("horizon_days", current.horizon_days, {"min": "1", "max": "366"}),
+        number(
+            "max_bookings_per_email",
+            current.max_bookings_per_email,
+            {"min": "1", "max": str(MAX_BOOKINGS_PER_EMAIL)},
+        ),
         Field(
             "dispatch_kind",
             _("admin.field.dispatch_kind"),
@@ -674,10 +686,24 @@ async def save_settings(
             raise_refusal(error)
             form.refusal(error)
         else:
+            if "video_host_email" in changed and new.video_host_email:
+                await _check_host(request, slug)
             return redirect_done(
                 f"/admin/groups/{slug}/settings", "saved" if changed else "unchanged"
             )
     return await _settings_response(request, locale, context, form, 422)
+
+
+async def _check_host(request: Request, slug: str) -> None:
+    """Check the group right after its Webex host changed (ADR 0065 step 2).
+
+    The settings are saved by now; a check that fails for its own reasons is logged and never
+    blocks the save. The result is on the settings page the admin lands on.
+    """
+    try:
+        await check_service(request).check_as_system(slug)
+    except Exception as exc:  # the platforms or the database answered wrongly
+        log.warning("integration.check_failed", group=slug, error=type(exc).__name__)
 
 
 # --- staffing blocks ------------------------------------------------------------------------

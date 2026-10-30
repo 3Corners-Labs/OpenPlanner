@@ -2,12 +2,31 @@
 
 import re
 
-from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
+from app.web.navigation import BOTTOM_BAR_ENTRIES
+from tests.admin.conftest import AGENT, GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
 
 
 def _current_links(page: str) -> list[str]:
-    """Return the hrefs of the links marked as the current page."""
-    return re.findall(r'<a href="([^"]+)" aria-current="page"', page)
+    """Return the hrefs of the links marked as the current page, once each.
+
+    The side navigation and the phone bottom bar both mark the current entry (SH-1).
+    """
+    return list(dict.fromkeys(re.findall(r'<a href="([^"]+)" aria-current="page"', page)))
+
+
+def _hrefs(markup: str) -> list[str]:
+    """Return the hrefs of every link in ``markup``, in order."""
+    return re.findall(r'<a href="([^"]+)"', markup)
+
+
+def _side_nav(page: str) -> str:
+    """Return the side navigation (desktop and tablet) of ``page``."""
+    return page.split('class="admin-nav">', 1)[1].split("</nav>", 1)[0]
+
+
+def _bottom_bar(page: str) -> str:
+    """Return the bottom bar (phone) of ``page``."""
+    return page.split('class="admin-bottombar">', 1)[1].split("</nav>", 1)[0]
 
 
 async def test_side_navigation_is_grouped_in_sections(site: Site) -> None:
@@ -30,13 +49,59 @@ async def test_a_section_without_visible_entries_is_left_out(site: Site) -> None
     assert 'id="nav-platform"' not in page
 
 
+async def test_the_bottom_bar_shows_the_first_four_entries_and_the_rest_behind_more(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+
+    page = (await site.client.get("/admin/audit?lang=en")).text
+    entries = _hrefs(_side_nav(page))
+    bar, more = _bottom_bar(page).split('<details class="admin-bottombar__more">', 1)
+
+    assert len(entries) > BOTTOM_BAR_ENTRIES
+    assert _hrefs(bar) == entries[:BOTTOM_BAR_ENTRIES]
+    assert _hrefs(more) == entries[BOTTOM_BAR_ENTRIES:]
+    assert "<summary>" in more
+    assert ">More</span></summary>" in more
+    assert '<span class="admin-nav__heading" id="more-manage">Manage</span>' in more
+    assert '<ul aria-labelledby="more-manage">' in more
+    assert 'id="nav-manage"' not in more
+    assert '<a href="/admin/audit" aria-current="page">' in bar
+
+
+async def test_a_short_menu_fits_the_bottom_bar_without_more(site: Site) -> None:
+    await site.login_as(AGENT)
+
+    page = (await site.client.get("/admin/")).text
+    entries = _hrefs(_side_nav(page))
+
+    assert 0 < len(entries) <= BOTTOM_BAR_ENTRIES
+    assert _hrefs(_bottom_bar(page)) == entries
+    assert "admin-bottombar__more" not in page
+    assert "Meer" not in _bottom_bar(page)
+
+
+async def test_every_navigation_link_keeps_a_visible_text_label(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    page = (await site.client.get("/admin/")).text
+    links = re.findall(
+        r"<a href=\"/admin[^\"]*\"[^>]*>(.*?)</a>", _side_nav(page) + _bottom_bar(page)
+    )
+
+    assert links
+    assert all(re.search(r"<span>[^<]+</span>$", link) for link in links)
+    assert all("<svg" in link for link in links)
+
+
 async def test_help_and_profile_sit_in_the_top_bar(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
     page = (await site.client.get("/admin/?lang=en")).text
     top_bar = page.split('<header class="admin-topbar">', 1)[1].split("</header>", 1)[0]
 
-    assert 'href="/admin/help"' in top_bar
+    # The overview has a manual topic (ADR 0061), so its help link opens that topic.
+    assert 'href="/admin/help/overview"' in top_bar
     assert '<details class="admin-profile">' in top_bar
     assert 'action="/admin/logout"' in top_bar
     assert "Group admin" in top_bar

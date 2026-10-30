@@ -10,6 +10,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 
 | Screen / scherm | Nederlands | English |
 |---|---|---|
+| Overview / overzicht | [Overzicht](nl/overview.md) | [Overview](en/overview.md) |
 | Group settings / groepsinstellingen | [Groepsinstellingen](nl/group-settings.md) | [Group settings](en/group-settings.md) |
 | Branding / huisstijl | [Huisstijl](nl/branding.md) | [Branding](en/branding.md) |
 | Rights matrix / rechtenmatrix | [Rechtenmatrix](nl/rights-matrix.md) | [Rights matrix](en/rights-matrix.md) |
@@ -21,11 +22,13 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Alternative contact options / contactalternatieven | [Contactalternatieven](nl/organisation-contacts.md) | [Alternative contact options](en/organisation-contacts.md) |
 | Embedding on websites / insluiten op websites | [Insluiten op websites](nl/embedding.md) | [Embedding on websites](en/embedding.md) |
 | A team's contact options / contactalternatieven van een team | [Contactalternatieven van een team](nl/group-contacts.md) | [A team's contact options](en/group-contacts.md) |
+| A team's booking form / boekingsformulier van een team | [Boekingsformulier van een team](nl/group-booking-form.md) | [A team's booking form](en/group-booking-form.md) |
 | Emergency closure of a team / noodsluiting van een team | [Noodsluiting van een team](nl/group-closure.md) | [Emergency closure of a team](en/group-closure.md) |
 | Closure scenarios / scenario's voor een noodsluiting | [Scenario's voor een noodsluiting](nl/closure-scenarios.md) | [Scenarios for an emergency closure](en/closure-scenarios.md) |
 | Group agenda / agenda van de groep | [Agenda van de groep](nl/group-agenda.md) | [Group agenda](en/group-agenda.md) |
 | Maintenance mode / onderhoudsmodus | [Onderhoudsmodus](nl/maintenance.md) | [Maintenance mode](en/maintenance.md) |
 | Advanced settings / geavanceerde instellingen | [Geavanceerde instellingen](nl/advanced-settings.md) | [Advanced settings](en/advanced-settings.md) |
+| Data fields and personal data / gegevensvelden en persoonsgegevens | [Gegevensvelden en persoonsgegevens](nl/data-fields.md) | [Data fields and personal data](en/data-fields.md) |
 | Organisation settings / organisatie-instellingen | [Organisatie-instellingen](nl/organisation-settings.md) | [Organisation settings](en/organisation-settings.md) |
 
 ## Writing a topic

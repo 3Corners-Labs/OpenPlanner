@@ -4,7 +4,7 @@ Every log line, from structlog or the stdlib (uvicorn, SQLAlchemy, ...), passes 
 ``mask_pii`` before rendering. Masking is a safety net: code must still never pass PII
 to a logger (enforced by the semgrep rules in ``.semgrep/``).
 
-Lines use the envelope of ``openplanner.event/1`` (ADR 0040, part 2), so a log platform reads
+Lines use the envelope of ``openplanner.event/2`` (ADR 0040, part 2), so a log platform reads
 them without mapping: ``@timestamp`` (RFC 3339 UTC, milliseconds), ``log.level``, ``message``,
 ``service.name``, ``service.version``, ``installation``, and, inside a request or job,
 ``trace.id``, ``organisation`` and ``group`` from ``app.domain.event_context``.
@@ -21,9 +21,12 @@ from structlog.typing import EventDict, Processor, WrappedLogger
 
 from app.domain.event_context import current
 from app.domain.event_schema import Envelope, rfc3339
+from app.domain.privacy import ALIASES
+from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 
-# The PII columns of Booking (CLAUDE.md, privacy rules).
-PII_FIELDS = frozenset({"name", "email", "phone", "note", "guest_join_url", "host_join_url"})
+PII_FIELDS = PII_COLUMNS | ALIASES
+"""Every personal-data field of ``Booking`` (``app.domain.privacy``, the one home of the
+list, ADR 0063) plus the other names the same data travels by (``name``, ``answers``)."""
 MASK = "***"
 
 

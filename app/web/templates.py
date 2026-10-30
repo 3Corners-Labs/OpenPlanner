@@ -4,6 +4,7 @@ Every HTML response goes through ``render``, so locale headers, the language swi
 the HTML Content-Security-Policy and caching rules are applied in one place.
 """
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,11 +21,25 @@ KEPT_QUERY_PARAMS = ("start", "month", "day", "days", "from", "until")
 """Query parameters the language switcher carries over; anything else is dropped so that
 arbitrary input is never reflected into links."""
 
+_KEPT_VALUE = re.compile(r"[0-9][0-9A-Z:+.-]{0,39}")
+"""The shape of a kept value: a date, time or number. Anything else (text typed into the
+address bar, a personal-data value, ADR 0063 §3) is dropped instead of echoed into a link."""
+
 SHARED_TEMPLATE_DIR = Path(__file__).parent / "templates"
 """Layout and partials shared by all entry points."""
 
 STATIC_DIR = Path(__file__).parent / "static"
 """Stylesheets and images, served under ``/static``."""
+
+
+class FragmentResponse(HTMLResponse):
+    """An HTML fragment without the page shell: a widget of the overview (ADR 0061).
+
+    Routes that answer with a fragment declare this class, so the tests that sweep the
+    portal's *pages* (navigation homes, manual topics) leave them out: a fragment is part of
+    the page it belongs to, never a screen of its own.
+    """
+
 
 HTML_CSP = (
     "default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; "
@@ -95,7 +110,7 @@ def switch_href(request: Request, param: str, value: str) -> str:
     kept = [
         (key, value)
         for key, value in request.query_params.multi_items()
-        if key in KEPT_QUERY_PARAMS
+        if key in KEPT_QUERY_PARAMS and _KEPT_VALUE.fullmatch(value)
     ]
     return f"?{urlencode([*kept, (param, value)])}"
 
@@ -128,6 +143,18 @@ ENVIRONMENT_LABELS = {
 """Bar label per non-production ``ENVIRONMENT``; production shows no bar."""
 
 
+def product_footer_of(request: Request) -> bool:
+    """Whether the page shows "Appointments via OpenPlanner" (ADR 0060 §6, class D).
+
+    The organisation the request follows decides (``app.web.organisation_settings``); a
+    request that follows none shows the platform's value.
+    """
+    current = getattr(request.state, "organisation_settings", None) or getattr(
+        request.app.state, "settings", None
+    )
+    return bool(getattr(current, "product_footer", True))
+
+
 def environment_of(request: Request) -> EnvironmentNotice | None:
     """Return the environment bar for this installation, or ``None`` in production."""
     settings = getattr(request.app.state, "settings", None)
@@ -148,8 +175,9 @@ def render(
 ) -> HTMLResponse:
     """Render template ``name`` in the request's locale.
 
-    The template receives ``_`` (bound gettext), ``locale`` and ``languages`` in addition
-    to ``context``. ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``).
+    The template receives ``_`` (bound gettext), ``locale``, ``languages``, ``environment``
+    and ``product_footer`` in addition to ``context``. ``scripts=True`` allows the page's own
+    scripts (``SCRIPT_CSP``).
     """
     response = templates.TemplateResponse(
         request,
@@ -160,6 +188,7 @@ def render(
             "locale": locale.code,
             "languages": language_options(request, locale),
             "environment": environment_of(request),
+            "product_footer": product_footer_of(request),
         },
     )
     response.headers["content-security-policy"] = SCRIPT_CSP if scripts else HTML_CSP

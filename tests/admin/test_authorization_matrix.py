@@ -56,6 +56,17 @@ def statuses(*codes: int) -> dict[str, int]:
 EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 200, 403)},
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 200, 403)},
+    # ADR 0061: overview widgets, each with the permission of the widget register. The
+    # auditor and the agent hold no bookings.view; the agent holds no audit.view.
+    "GET /admin/overview/w/rights": {
+        "/admin/overview/w/rights": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "GET /admin/overview/w/bookings-today": {
+        "/admin/overview/w/bookings-today": statuses(200, 200, 200, 200, 403, 403, 403)
+    },
+    "GET /admin/overview/w/changes": {
+        "/admin/overview/w/changes": statuses(200, 200, 200, 200, 200, 403, 403)
+    },
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 200, 200, 403)},
     # ADR 0039: the role editor is the superuser's (roles.manage is locked).
     "GET /admin/roles": {"/admin/roles": statuses(200, 403, 403, 403, 403, 403, 403)},
@@ -337,6 +348,30 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/groups/{slug}/settings": {
         "/admin/groups/demo/settings": statuses(422, 422, 403, 403, 403, 403, 403),
         "/admin/groups/andere-team/settings": statuses(422, 403, 403, 422, 403, 403, 403),
+    },
+    # ADR 0055: the booking form is part of the group's settings (group.edit). An empty add is
+    # refused (422); an unknown field sends back to the list (303).
+    "GET /admin/groups/{slug}/settings/form": {
+        "/admin/groups/demo/settings/form": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/settings/form": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/settings/form": {
+        "/admin/groups/demo/settings/form": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/settings/form": statuses(422, 403, 403, 422, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/settings/form/{key}": {
+        "/admin/groups/demo/settings/form/nope": statuses(303, 303, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/settings/form/{key}": {
+        "/admin/groups/demo/settings/form/nope": statuses(303, 303, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/settings/form/{key}/move": {
+        "/admin/groups/demo/settings/form/nope/move": statuses(303, 303, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/settings/form/{key}/retire": {
+        "/admin/groups/andere-team/settings/form/nope/retire": statuses(
+            303, 403, 403, 303, 403, 403, 403
+        ),
     },
     # "Koppeling controleren": whoever edits the group's settings (incl. routing) may check them.
     "POST /admin/groups/{slug}/check": {

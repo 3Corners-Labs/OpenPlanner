@@ -1,0 +1,13 @@
+{#- My role and reach: role chips and the first permissions with their scope. -#}
+{% if view.extra.roles %}
+<ul class="group-card__meta" role="list">{% for role in view.extra.roles %}<li class="chip chip--accent">{{ role }}</li>{% endfor %}</ul>
+{% endif %}
+{% if view.rows %}
+<ul class="widget-list" role="list">
+  {% for label, scope in view.rows %}
+  <li class="widget-list__item"><span class="widget-list__label">{{ label }}</span><span class="widget-list__meta">{{ scope }}</span></li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="widget__empty">{{ _("admin.overview.widget.rights.empty") }}</p>
+{% endif %}

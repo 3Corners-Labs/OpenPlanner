@@ -1,7 +1,8 @@
 # 0029. Updates started from the admin portal, carried out by a host updater
 
 Status: accepted (2026-10-26), requested by the product owner. Builds on ADR 0006 (signed
-images) and ADR 0014 (authorisation matrix).
+images) and ADR 0014 (authorisation matrix). Amended by ADR 0059 (§1: an installation on the
+`rc` channel is also offered release candidates; `UPDATE_AUTO_APPLY`).
 
 ## Context
 

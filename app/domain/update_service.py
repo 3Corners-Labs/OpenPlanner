@@ -12,6 +12,7 @@ The service never touches containers or images: it only records what is asked an
 happened. The host updater does the work and checks the image signature.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change, require
@@ -23,6 +24,7 @@ from app.domain.updates import (
     Release,
     ReleaseCheck,
     UpdateAction,
+    UpdateChannel,
     UpdateRequest,
     UpdateStatus,
     UpdateStep,
@@ -41,7 +43,15 @@ from app.domain.updates import (
 UPDATER_ACTOR = "host-updater"
 """Audit actor of the steps the host updater reports."""
 
+SYSTEM_ACTOR = "system"
+"""Audit actor of an update the worker requested itself (``UPDATE_AUTO_APPLY``, ADR 0059)."""
+
 _PERMISSION = Permission.SYSTEM_UPDATE
+
+
+def _constant[T](value: T) -> Callable[[], T]:
+    """Return a callable that always returns ``value``."""
+    return lambda: value
 
 
 @dataclass(frozen=True)
@@ -65,6 +75,8 @@ class UpdateOverview:
 
     Attributes:
         enabled: Whether the installation checks for releases (``UPDATE_REPOSITORY``).
+        channel: What it follows: releases only, or release candidates too (ADR 0059).
+        auto_apply: Whether the worker requests a newer version itself.
         current: The running version; ``None`` for a build that is not a release.
         check: The latest release check.
         available: A newer release that can be requested now.
@@ -75,6 +87,8 @@ class UpdateOverview:
     """
 
     enabled: bool
+    channel: UpdateChannel
+    auto_apply: bool
     current: Version | None
     check: ReleaseCheck | None
     available: Release | None
@@ -96,6 +110,11 @@ class UpdateService:
             and in the web process, which leaves the lookup to the worker.
         checking: Whether the installation checks for releases (``UPDATE_REPOSITORY``), also
             when this process does not look them up itself; defaults to ``releases`` being set.
+        channel: ``release`` offers releases only; ``rc`` release candidates too (ADR 0059);
+            a value, or a callable read on every use so a portal change applies live
+            (ADR 0067).
+        auto_apply: Whether a check that finds a newer version requests the update itself;
+            a value or a callable, as ``channel``.
     """
 
     def __init__(
@@ -107,6 +126,8 @@ class UpdateService:
         current: Version | None,
         releases: ReleaseSource | None,
         checking: bool | None = None,
+        channel: UpdateChannel | Callable[[], UpdateChannel] = UpdateChannel.RELEASE,
+        auto_apply: bool | Callable[[], bool] = False,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -115,6 +136,8 @@ class UpdateService:
         self._current = current
         self._releases = releases
         self._checking = releases is not None if checking is None else checking
+        self._channel = channel if callable(channel) else _constant(channel)
+        self._auto_apply = auto_apply if callable(auto_apply) else _constant(auto_apply)
 
     @property
     def current(self) -> Version | None:
@@ -127,7 +150,9 @@ class UpdateService:
         """Look up the latest release when the last check is an hour old; return if it did.
 
         A failed lookup is stored as an error code next to the release found before, so the
-        page can say the check fails without forgetting what is known.
+        page can say the check fails without forgetting what is known. With ``auto_apply``, a
+        newer version becomes an update request at once (actor ``system``, audited), unless a
+        request is already open (ADR 0059 point 6).
         """
         if self._releases is None:
             return False
@@ -142,7 +167,15 @@ class UpdateService:
             check = ReleaseCheck(now, last.latest if last else None, error.code)
         async with self._uow.locked() as tx:
             await tx.save_release_check(check)
+            release = self._available(check)
+            if self._auto_apply() and release is not None and self._current is not None:
+                if open_request(await tx.get_update_requests()) is None:
+                    await self._add(tx, None, UpdateAction.UPDATE, release.version)
         return True
+
+    def _available(self, check: ReleaseCheck | None) -> Release | None:
+        """Return the newer version the channel offers, if any."""
+        return available_update(self._current, check, self._channel())
 
     # --- superuser ---------------------------------------------------------------------
 
@@ -160,7 +193,7 @@ class UpdateService:
             history = await tx.get_update_requests()
         current = open_request(history)
         notice = UpdateNotice(
-            None if current else available_update(self._current, check),
+            None if current else self._available(check),
             recent_outcome(history, now),
             current,
         )
@@ -180,9 +213,11 @@ class UpdateService:
         current = open_request(history)
         return UpdateOverview(
             enabled=self._checking,
+            channel=self._channel(),
+            auto_apply=self._auto_apply(),
             current=self._current,
             check=check,
-            available=None if current else available_update(self._current, check),
+            available=None if current else self._available(check),
             open=current,
             unclaimed=current is not None and unclaimed(current, now),
             restore=None if current else restore_candidate(history, self._current, now),
@@ -199,7 +234,7 @@ class UpdateService:
         require(await self._admin.authorize(principal, _PERMISSION))
         async with self._uow.locked() as tx:
             await _refuse_when_open(tx)
-            release = available_update(self._current, await tx.get_release_check())
+            release = self._available(await tx.get_release_check())
             if release is None or self._current is None:
                 raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
             return await self._add(tx, principal, UpdateAction.UPDATE, release.version)
@@ -237,9 +272,13 @@ class UpdateService:
         return ended
 
     async def _add(
-        self, tx: Transaction, principal: Principal, action: UpdateAction, target: Version
+        self, tx: Transaction, principal: Principal | None, action: UpdateAction, target: Version
     ) -> UpdateRequest:
-        """Store a new request from the running version to ``target`` and audit it."""
+        """Store a new request from the running version to ``target`` and audit it.
+
+        Without a principal the worker itself asks (``UPDATE_AUTO_APPLY``): the request and
+        its audit event carry the actor ``system``.
+        """
         if self._current is None:  # pragma: no cover - callers checked it
             raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
         now = self._clock.now()
@@ -249,12 +288,23 @@ class UpdateService:
                 action=action,
                 target=target,
                 from_version=self._current,
-                requested_by=principal.subject,
+                requested_by=principal.subject if principal else SYSTEM_ACTOR,
                 requested_at=now,
                 status=UpdateStatus.REQUESTED,
             )
         )
-        await record_change(tx, now, principal, _PERMISSION, None, None, f"{action}.request")
+        if principal is None:
+            event = AuditEvent(
+                now,
+                SYSTEM_ACTOR,
+                _PERMISSION.value,
+                Outcome.SUCCESS,
+                "",
+                detail="update.auto_request",
+            )
+            await tx.add_audit_event(event)
+        else:
+            await record_change(tx, now, principal, _PERMISSION, None, None, f"{action}.request")
         return created
 
     # --- host updater ------------------------------------------------------------------

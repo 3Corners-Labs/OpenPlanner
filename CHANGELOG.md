@@ -4,6 +4,24 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ## Unreleased
 
+### Features
+
+- Version management in the portal (ADR 0067, step 1): the update channel and auto-apply
+  are class C settings the superuser changes in the portal (topic Updates), read live by web
+  and worker; `rc` and auto-apply are not usable in production. The installer's `--channel`
+  flag is gone; which images the updater trusts follows the installer mode (test and lab
+  also trust `main`), and `--version X.Y.Z-rc.N` pins a candidate outside production.
+- Release candidates (ADR 0059, step 1): every merge to `main` becomes `vX.Y.Z-rc.N`, a
+  signed image and a GitHub pre-release with SBOM, published after the ZAP baseline without
+  waiting for the mutation test; `make release-plan` ignores candidates, and
+  `python -m scripts.release_plan --candidate` prints the next one. A hand-pushed `rc` tag
+  fails the tag check.
+- Update channel per installation (ADR 0059, step 2): `UPDATE_CHANNEL=rc` offers release
+  candidates `X.Y.Z-rc.N` next to releases (test and lab hosts; refused in production), and
+  `UPDATE_AUTO_APPLY=true` lets the worker request a newer version itself (actor `system`,
+  audited). `scripts/install.sh --channel rc` writes the channel and lets the updater trust
+  images signed on `main`; the updates page shows the channel.
+
 ## 0.3.0 (2026-10-29)
 
 ### Features

@@ -31,6 +31,7 @@ from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
+from app.domain.form_fields import Answers, FormDefinition, raise_to_pii
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import PlannedJob
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
@@ -45,6 +46,7 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.staff import StaffFilter, StaffMember, visible
+from app.domain.tls import CertificateCheck
 from app.domain.updates import ReleaseCheck, UpdateRequest
 
 
@@ -87,6 +89,7 @@ class State:
     channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
+    certificate_check: CertificateCheck | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     custom_roles: dict[int, CustomRole] = field(default_factory=dict)
@@ -97,6 +100,7 @@ class State:
     platform_secrets: dict[str, str] = field(default_factory=dict)
     secrets_available: bool = True
     purged_at: dict[int, datetime] = field(default_factory=dict)
+    forms: dict[int, FormDefinition] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
     next_id: int = 1
 
@@ -202,6 +206,26 @@ class InMemoryTransaction:
 
     async def get_group_by_id(self, group_id: int) -> Group | None:
         return self.state.groups.get(group_id)
+
+    async def get_form(self, group_id: int) -> FormDefinition:
+        return self.state.forms.get(group_id, FormDefinition(1))
+
+    async def save_form(self, group_id: int, form: FormDefinition) -> None:
+        self.state.forms[group_id] = form
+
+    async def raise_answers_to_pii(self, group_id: int, key: str) -> int:
+        changed = 0
+        for booking_id, booking in self.state.bookings.items():
+            contact = booking.contact
+            if booking.group_id != group_id or contact is None or contact.answers is None:
+                continue
+            stored = raise_to_pii(contact.answers.to_storage(), key)
+            answers = Answers.from_storage(stored)
+            self.state.bookings[booking_id] = replace(
+                booking, contact=replace(contact, answers=answers)
+            )
+            changed += 1
+        return changed
 
     async def get_schedule(
         self, group_id: int, first_day: date, last_day: date
@@ -560,6 +584,20 @@ class InMemoryTransaction:
             1 for b in self.state.bookings.values() if b.slot_id == slot_id and b.holds_place
         )
 
+    async def upcoming_starts_for_email(
+        self, group_id: int, email: str, after: datetime
+    ) -> list[datetime]:
+        return [
+            b.start
+            for b in self.state.bookings.values()
+            if b.group_id == group_id
+            and b.kind is BookingKind.SCHEDULED
+            and b.holds_place
+            and b.end > after
+            and b.contact is not None
+            and b.contact.email.lower() == email.lower()
+        ]
+
     async def add_booking(self, booking: Booking) -> Booking:
         stored = replace(booking, id=self._new_id())
         self.state.bookings[stored.id or 0] = stored
@@ -797,6 +835,12 @@ class InMemoryTransaction:
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
         self.state.release_check = check
+
+    async def get_certificate_check(self) -> CertificateCheck | None:
+        return self.state.certificate_check
+
+    async def save_certificate_check(self, check: CertificateCheck) -> None:
+        self.state.certificate_check = check
 
     async def get_maintenance_state(self) -> MaintenanceState:
         return self.state.maintenance

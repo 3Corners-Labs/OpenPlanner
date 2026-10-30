@@ -18,7 +18,7 @@ from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
 from app.domain.services import BookingService
 from tests.admin.conftest import GROUP_ADMIN, OUTSIDER, SUPER, Site
-from tests.support.domain import ADA, TEST_TOKEN_KEY
+from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed
 
 FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # demo group: open weekdays
 
@@ -26,8 +26,12 @@ FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # demo group: open weekday
 async def _book(site: Site, slug: str) -> int:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     uow = SqlUnitOfWork(app.state.engine)
-    receipt = await BookingService(uow, site.clock, TEST_TOKEN_KEY).book(
-        group_slug=slug, start=FRIDAY_0900, contact=ADA, locale="nl"
+    receipt = await book_confirmed(
+        BookingService(uow, site.clock, TEST_TOKEN_KEY),
+        group_slug=slug,
+        start=FRIDAY_0900,
+        contact=ADA,
+        locale="nl",
     )
     booking_id = receipt.booking.id or 0
     integration = IntegrationService(uow, site.clock, AdminService(uow, site.clock))
@@ -69,7 +73,12 @@ async def test_a_failed_meeting_explains_what_to_check(site: Site) -> None:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     uow = SqlUnitOfWork(app.state.engine)
     integration = IntegrationService(uow, site.clock, AdminService(uow, site.clock))
-    await integration.record(booking_id, EventKind.MEETING_FAILED, detail="rejected_400")
+    await integration.record(
+        booking_id,
+        EventKind.MEETING_FAILED,
+        detail="rejected_400",
+        message="timezone 'Europe/Amsterdam' and timezone offset in '+00:00' do not match",
+    )
     await site.login_as(GROUP_ADMIN)
 
     text = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
@@ -77,6 +86,8 @@ async def test_a_failed_meeting_explains_what_to_check(site: Site) -> None:
     assert "Videomeeting aanmaken mislukt" in text
     assert "<code>rejected_400</code>" in text
     assert "Webex-host" in text  # the hint names the field to check
+    # ADR 0065: Webex's own words, escaped, under the event.
+    assert "Antwoord van Webex: timezone &#39;Europe/Amsterdam&#39;" in text
 
 
 async def test_an_unknown_code_still_gets_a_hint(site: Site) -> None:

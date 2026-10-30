@@ -13,6 +13,8 @@ FINDING_LABELS: dict[str, str] = {
     "webex.host_ok": "admin.check.webex.host_ok",
     "webex.host_unknown": "admin.check.webex.host_unknown",
     "webex.host_refused": "admin.check.webex.host_refused",
+    "webex.schedule_refused": "admin.check.webex.schedule_refused",
+    "webex.probe_left": "admin.check.webex.probe_left",
     "webex.unreachable": "admin.check.webex.unreachable",
     "wxcc.not_configured": "admin.check.wxcc.not_configured",
     "wxcc.no_mapping": "admin.check.wxcc.no_mapping",

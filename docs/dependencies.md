@@ -28,6 +28,7 @@ Checked on 2026-10-23 against PyPI release history and GitHub activity (tzdata: 
 | itsdangerous | Signed session cookie (Starlette `SessionMiddleware`) | BSD-3 | maintained (Pallets), feature-complete | Starlette's own choice |
 | tzdata | IANA time-zone database for `zoneinfo` (summer/winter time rules) | Apache-2.0 | active (CPython core devs, follows every IANA release) | PEP 615's official fallback; pinned in `uv.lock` and the only source in the image (`PYTHONTZPATH=""`), so DST rules change only through a reviewed Renovate PR |
 | markdown-it-py (+ mdurl) | Renders the manual in the portal, raw HTML off (ADR 0033) | MIT | active (executablebooks; release 2026) | De facto CommonMark parser for Python; already in the lock through development tools |
+| phonenumbers | Parses and validates phone numbers, stores them as E.164 (ADR 0055) | Apache-2.0 | very active (follows every libphonenumber release, several a month) | Python port of Google's libphonenumber, the de-facto standard; pure Python, ships type stubs. Checked 2026-10-29 |
 | certifi | CA bundle (via httpx) | MPL-2.0 | active | Exception: ADR 0003 |
 
 Rejected: **authlib** (its httpx integration is deprecated and cannot be imported under
@@ -80,7 +81,7 @@ The widget itself has no runtime dependencies: vanilla JavaScript, no framework.
 
 | Image | Purpose | License | Maintenance | Note |
 |---|---|---|---|---|
-| caddy, caddy builder (official images) | TLS proxy with automatic ACME certificates and renewal (`--profile tls`) | Apache-2.0 | very active (release every few months, Go stdlib TLS) | ADR 0030; checked 2026-10-26. Own image in `deploy/proxy/` (Caddy rebuilt with current Go, see the Dockerfile), scanned in CI |
+| caddy, caddy builder (official images) | TLS proxy with automatic ACME certificates and renewal (`--profile tls`) | Apache-2.0 | very active (release every few months, Go stdlib TLS) | ADR 0030; checked 2026-10-26. Own image in `deploy/proxy/` (Caddy rebuilt with current Go, see the Dockerfile), built, scanned, signed and attested in CI as `ghcr.io/<owner>/<repo>-proxy` (ADR 0064 step 2); hosts pull it, never build it |
 
 ## Host packages (installed by `scripts/install.sh`)
 

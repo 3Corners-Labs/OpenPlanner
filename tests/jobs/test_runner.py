@@ -29,6 +29,7 @@ from tests.support.domain import (
     SLOT_0900,
     TEST_TOKEN_KEY,
     book,
+    book_pending,
     make_group,
     window,
     with_team_invite,
@@ -112,7 +113,11 @@ async def test_without_sender_only_purges_and_lapses_are_claimed(
 
     await JobRunner(queue, uow, FixedClock(NOW), None, composer).run_due()
 
-    assert queue.requested_types == {JobType.PURGE_PII, JobType.LAPSE_REBOOK}
+    assert queue.requested_types == {
+        JobType.PURGE_PII,
+        JobType.LAPSE_REBOOK,
+        JobType.EXPIRE_UNCONFIRMED,
+    }
 
 
 async def test_purge(uow: InMemoryUnitOfWork, composer: MessageComposer) -> None:
@@ -185,7 +190,7 @@ async def test_sms_reminder_goes_through_the_organisations_sms_sender(
 
     assert sender.asked == [(1, ChannelKind.SMS)]
     assert sender.sent[0].channel is ChannelKind.SMS
-    assert sender.sent[0].recipient == "0612345678"
+    assert sender.sent[0].recipient == "+31612345678"
     assert queue.done == [1]
 
 
@@ -477,3 +482,81 @@ async def test_team_invite_goes_to_the_teams_address_only_while_the_group_sends_
     assert JobType.SEND_TEAM_INVITE in queue.requested_types
     assert [m.recipient for m in sender.sent] == ["team@example.org"]
     assert later.done == [2]
+
+
+async def test_the_product_footer_is_asked_per_organisation(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    asked: list[int] = []
+
+    def footer(organisation_id: int) -> bool:
+        asked.append(organisation_id)
+        return False
+
+    queue, sender = FakeQueue([job(bid, JobType.SEND_CONFIRMATION)]), RecordingSender()
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer, product_footer=footer).run_due()
+
+    assert asked == [uow.state.groups[uow.state.bookings[bid].group_id].organisation_id]
+    assert "<footer>" not in (sender.sent[0].html or "")
+
+
+async def test_without_the_setting_the_product_footer_stays(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    queue, sender = FakeQueue([job(bid, JobType.SEND_CONFIRMATION)]), RecordingSender()
+
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert "<footer>" in (sender.sent[0].html or "")
+
+
+async def _pending_id(uow: InMemoryUnitOfWork) -> int:
+    receipt = await book_pending(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    return receipt.booking.id or 0
+
+
+async def test_an_unconfirmed_booking_lapses_at_its_deadline(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await _pending_id(uow)
+    confirm_by = uow.state.bookings[bid].confirm_by
+    assert confirm_by is not None
+    queue = FakeQueue([job(bid, JobType.EXPIRE_UNCONFIRMED, pinned=None)])
+
+    await JobRunner(queue, uow, FixedClock(confirm_by), None, composer).run_due()
+
+    lapsed = uow.state.bookings[bid]
+    assert lapsed.status is BookingStatus.CANCELLED
+    assert lapsed.lapsed_unconfirmed
+    assert uow.state.jobs[bid][-1].type is JobType.SEND_UNCONFIRMED_LAPSED
+    assert queue.done == [1]
+
+
+async def test_a_confirmed_booking_does_not_lapse(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)  # confirmed by its link
+    queue = FakeQueue([job(bid, JobType.EXPIRE_UNCONFIRMED, pinned=None)])
+
+    await JobRunner(queue, uow, FixedClock(NOW), None, composer).run_due()
+
+    assert uow.state.bookings[bid].status is BookingStatus.CONFIRMED
+    assert queue.done == [1]
+
+
+async def test_the_request_to_confirm_goes_only_while_it_is_pending(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    receipt = await book_pending(service)
+    bid = receipt.booking.id or 0
+    request = job(bid, JobType.SEND_CONFIRM_REQUEST, pinned=None)
+    sender = RecordingSender()
+
+    await JobRunner(FakeQueue([request]), uow, FixedClock(NOW), sender, composer).run_due()
+    await service.confirm(receipt.management_token)
+    await JobRunner(FakeQueue([request]), uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert [m.subject for m in sender.sent] == ["Bevestig uw afspraak met Aangifte"]

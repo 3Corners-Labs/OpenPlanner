@@ -54,6 +54,7 @@ class HelpTopic:
 
 
 TOPICS = (
+    HelpTopic("overview", ("/admin/",), Permission.DASHBOARD_VIEW),
     HelpTopic("group-settings", ("/admin/groups/{slug}/settings",), Permission.GROUP_EDIT),
     HelpTopic("branding", ("/admin/organisations/{org}/branding",), Permission.BRANDING_MANAGE),
     HelpTopic("rights-matrix", ("/admin/matrix",), Permission.MATRIX_VIEW),
@@ -85,6 +86,11 @@ TOPICS = (
     ),
     HelpTopic("group-closure", ("/admin/groups/{slug}/closure",), Permission.CLOSURE_MANAGE),
     HelpTopic(
+        "group-booking-form",
+        ("/admin/groups/{slug}/settings/form", "/admin/groups/{slug}/settings/form/{key}"),
+        Permission.GROUP_EDIT,
+    ),
+    HelpTopic(
         "closure-scenarios",
         tuple(
             f"{base}/closure/scenarios{suffix}"
@@ -108,6 +114,8 @@ TOPICS = (
     ),
     HelpTopic("maintenance", ("/admin/maintenance",), Permission.SYSTEM_MAINTENANCE),
     HelpTopic("advanced-settings", ("/admin/settings",), Permission.SETTINGS_PLATFORM_VIEW),
+    # ADR 0063: the Data fields card on Advanced settings; no route of its own.
+    HelpTopic("data-fields", (), Permission.SETTINGS_PLATFORM_VIEW),
     HelpTopic(
         "organisation-settings",
         ("/admin/organisation-settings", "/admin/organisations/{org}/settings"),
