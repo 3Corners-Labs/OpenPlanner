@@ -229,6 +229,34 @@ main > .notice {
   max-width: var(--booking-text-width);
 }
 
+/* --- Footer: "Appointments via OpenPlanner" (ADR 0060 §6), secondary to the header ------- */
+.site-footer {
+  max-width: var(--booking-max-width);
+  margin: 0 auto;
+  padding: var(--booking-space-m) var(--booking-space-m) var(--booking-space-l);
+  color: var(--booking-color-text-muted);
+  font-size: 0.9375rem;
+}
+
+.product-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--booking-space-xs);
+  margin: 0;
+}
+
+.product-footer__mark {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.product-footer__name {
+  color: var(--booking-color-text);
+  font-weight: 700;
+}
+
 /* --- Page heading, steps ---------------------------------------------------------------- */
 .eyebrow {
   margin: 0;
