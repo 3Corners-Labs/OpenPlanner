@@ -4013,6 +4013,24 @@ msgstr "The booking pages are unavailable for a few seconds during the update. C
 msgid "admin.updates.release_notes"
 msgstr "What is new (release notes)"
 
+msgid "admin.updates.choose_lead"
+msgstr "Choose below which version to install; the newest is first. Going back to an older version is only possible with Restore the previous version."
+
+msgid "admin.updates.choose_heading"
+msgstr "Available versions"
+
+msgid "admin.updates.candidate"
+msgstr "release candidate"
+
+msgid "admin.updates.published"
+msgstr "published {at}"
+
+msgid "admin.updates.no_notes"
+msgstr "No release notes."
+
+msgid "admin.updates.install_this"
+msgstr "Install this version ({version})"
+
 msgid "admin.updates.update_now"
 msgstr "Update to {version} now"
 
