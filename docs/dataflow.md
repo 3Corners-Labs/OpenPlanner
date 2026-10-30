@@ -76,7 +76,9 @@ they leave the system only to the mail server and to GitHub respectively.
 | Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the participant, host URL to WxCC |
 | Management token | `bookings.management_token_hash` (SHA-256 only) | generated | kept (not personal data once the booking is purged) | token itself only in the confirmation mail |
 
-Jobs, slots, schedules and audit events carry no personal data of participants. The definitions of
+Jobs, slots, schedules and audit events carry no personal data of participants. A failed meeting
+job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
+the group name and the host's address (masked), never a participant's data. The definitions of
 custom fields (`group_form_fields`: keys, labels, options) are the organisation's questions,
 not answers, and hold no personal data; the admin screen refuses questions about a SSN, an
 identity document or special categories of personal data (ADR 0055).
