@@ -558,6 +558,20 @@ class InMemoryTransaction:
             1 for b in self.state.bookings.values() if b.slot_id == slot_id and b.holds_place
         )
 
+    async def upcoming_starts_for_email(
+        self, group_id: int, email: str, after: datetime
+    ) -> list[datetime]:
+        return [
+            b.start
+            for b in self.state.bookings.values()
+            if b.group_id == group_id
+            and b.kind is BookingKind.SCHEDULED
+            and b.holds_place
+            and b.end > after
+            and b.contact is not None
+            and b.contact.email.lower() == email.lower()
+        ]
+
     async def add_booking(self, booking: Booking) -> Booking:
         stored = replace(booking, id=self._new_id())
         self.state.bookings[stored.id or 0] = stored

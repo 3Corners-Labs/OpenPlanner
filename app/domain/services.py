@@ -5,6 +5,7 @@ booking and its jobs commit together or not at all (CLAUDE.md architecture rules
 
     book ─► locked tx ─► _place: window ─► offered? ─► slot (create, snapshot capacity)
                                 ─► capacity (minus overlapping old-grid bookings)
+                                ─► address limit (same slot, max per group; ADR 0059)
                                 ─► booking + token ─► replace_jobs
     reschedule ─► locked tx ─► cancel old (jobs: purge only) ─► _place new in the SAME group
 
@@ -179,7 +180,7 @@ class BookingService:
 
         Raises:
             DomainError: ``group_not_found``, ``invalid_contact``, ``outside_booking_window``,
-                ``slot_unavailable`` or ``slot_full``.
+                ``slot_unavailable``, ``slot_full`` or ``booking_limit_reached``.
             ValueError: If ``start`` is naive.
         """
         async with self._uow.locked() as tx:
@@ -414,6 +415,7 @@ class BookingService:
         overlap = overlapping_active(offered.start, length, {u.start: u.active for u in usage})
         if await tx.count_active_bookings(_id(slot)) + overlap >= slot.capacity_snapshot:
             raise DomainError(ErrorCode.SLOT_FULL)
+        await _check_address_limit(tx, group, contact, slot.start, now)
         salt = new_token_salt()
         token = derive_token(self._token_key, salt)
         booking = await tx.add_booking(
@@ -446,6 +448,23 @@ class BookingService:
         )
         await tx.replace_jobs(_id(booking), jobs)
         return BookingReceipt(booking, token)
+
+
+async def _check_address_limit(
+    tx: Transaction, group: Group, contact: Contact, start: datetime, now: datetime
+) -> None:
+    """Refuse a second place for one address in a slot, or more than the group allows.
+
+    Runs after the capacity check, so a full slot is reported as full to everyone. The
+    refusal does not say which rule applied; the page must not reveal that an address
+    already has a booking (ADR 0059).
+
+    Raises:
+        DomainError: ``booking_limit_reached``.
+    """
+    starts = await tx.upcoming_starts_for_email(group.id, contact.email, now)
+    if start in starts or len(starts) >= group.max_bookings_per_email:
+        raise DomainError(ErrorCode.BOOKING_LIMIT_REACHED)
 
 
 def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:

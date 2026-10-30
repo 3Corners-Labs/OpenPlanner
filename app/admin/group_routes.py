@@ -61,6 +61,7 @@ from app.domain.planning import (
     settings_of,
 )
 from app.domain.scheduling import (
+    MAX_BOOKINGS_PER_EMAIL,
     MAX_DIRECT_CALLS,
     MAX_LABEL_LENGTH,
     MAX_PLANNER_LEAD_MINUTES,
@@ -103,6 +104,10 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
     "slot_minutes": ("admin.field.slot_minutes", "admin.field.slot_minutes_hint"),
     "min_notice_minutes": ("admin.field.min_notice_minutes", "admin.field.min_notice_minutes_hint"),
     "horizon_days": ("admin.field.horizon_days", "admin.field.horizon_days_hint"),
+    "max_bookings_per_email": (
+        "admin.field.max_bookings_per_email",
+        "admin.field.max_bookings_per_email_hint",
+    ),
     "dispatch_lead_minutes": (
         "admin.field.dispatch_lead_minutes",
         "admin.field.dispatch_lead_minutes_hint",
@@ -508,6 +513,11 @@ def _settings_fields(
         number("slot_minutes", current.slot_minutes, {"min": "5", "max": "480", "step": "5"}),
         number("min_notice_minutes", current.min_notice_minutes, {"min": "0", "step": "5"}),
         number("horizon_days", current.horizon_days, {"min": "1", "max": "366"}),
+        number(
+            "max_bookings_per_email",
+            current.max_bookings_per_email,
+            {"min": "1", "max": str(MAX_BOOKINGS_PER_EMAIL)},
+        ),
         Field(
             "dispatch_kind",
             _("admin.field.dispatch_kind"),
