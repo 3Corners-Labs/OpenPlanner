@@ -1,11 +1,12 @@
 """One event schema for the table, the log line, the CSV export and the log platform (ADR 0040).
 
-``openplanner.event/1`` follows Elastic Common Schema and the OpenTelemetry log data model, so
+``openplanner.event/2`` follows Elastic Common Schema and the OpenTelemetry log data model, so
 a log platform needs no mapping: dotted field names (``event.action``, ``trace.id``), an
 ``@timestamp`` in RFC 3339 UTC with milliseconds, and ``log.level``. Our own ``outcome`` keeps
 the five outcomes of the audit log; ``event.outcome`` is ECS's coarser success / failure /
 unknown. A record holds ids, slugs and codes only; never personal data of citizens and never
-an admin's display name (``actor`` is the identity provider's subject).
+an admin's display name (``actor`` is the identity provider's subject). Version 2 adds
+``message``: the provider's own reason for a failed job (ADR 0065), masked and capped.
 
     AuditEvent + Envelope (version, installation) ─► to_record() ─► dict in FIELDS order
 
@@ -18,7 +19,7 @@ from datetime import UTC, datetime
 
 from app.domain.audit import AuditEvent, Outcome
 
-SCHEMA = "openplanner.event/1"
+SCHEMA = "openplanner.event/2"
 """Name and version of the schema, sent with every record."""
 
 FIELDS = (
@@ -40,6 +41,7 @@ FIELDS = (
     "service.version",
     "installation",
     "detail",
+    "message",
 )
 """Every field of a record, in the order the CSV export writes them."""
 
@@ -83,7 +85,7 @@ def rfc3339(at: datetime) -> str:
 
 
 def to_record(event: AuditEvent, envelope: Envelope) -> dict[str, Value]:
-    """Return ``event`` as an ``openplanner.event/1`` record, fields in ``FIELDS`` order."""
+    """Return ``event`` as an ``openplanner.event/2`` record, fields in ``FIELDS`` order."""
     return {
         "schema": SCHEMA,
         "event_id": event.event_id,
@@ -103,4 +105,5 @@ def to_record(event: AuditEvent, envelope: Envelope) -> dict[str, Value]:
         "service.version": envelope.service_version,
         "installation": envelope.installation,
         "detail": event.detail,
+        "message": event.message,
     }

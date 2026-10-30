@@ -101,6 +101,9 @@ class AuditEvent:
         group: Slug of the group concerned, if any.
         detail: What changed, as machine keys (changed field names, ``rule.add``); never
             values, so no personal data.
+        message: The provider's own words on a failure (ADR 0065): Webex's reason with
+            addresses masked, at most 300 characters, only for requests without citizen data.
+            Empty for every other event.
         source: Admin action or system event.
         booking_id: The booking a system event is about, if any (an id, not personal data).
         category: Kind of event; ``None`` follows the source (admin: audit, system: system).
@@ -122,6 +125,7 @@ class AuditEvent:
     booking_id: int | None = None
     category: Category | None = None
     level: Level | None = None
+    message: str = ""
     trace_id: str = field(default_factory=current_trace_id, compare=False)
     service: str = field(default_factory=current_service, compare=False)
     event_id: str = field(default_factory=new_id, compare=False)
