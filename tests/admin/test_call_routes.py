@@ -1,7 +1,9 @@
 """Agenda and booking timeline in the admin portal (ADR 0010)."""
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
+from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.registrations import (
@@ -15,9 +17,13 @@ from app.adapters.registrations import (
 from app.adapters.webhook_selftest import Delivery, Outcome, deliveries_to_report
 from app.domain.admin import AdminService
 from app.domain.calls import EventKind
+from app.domain.event_context import bind_booking, bind_level, trace_scope
 from app.domain.integration import IntegrationService
+from app.domain.job_plan import JobType
+from app.domain.ports import RequestRecord
+from app.domain.request_log import RequestEvents
 from app.domain.services import BookingService
-from tests.admin.conftest import GROUP_ADMIN, OUTSIDER, SUPER, Site
+from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.support.domain import ADA, TEST_TOKEN_KEY
 
 FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # demo group: open weekdays
@@ -225,3 +231,69 @@ async def test_timeline_explains_a_work_item_that_could_not_be_ended(site: Site)
     assert "<code>rejected_403</code>" in text
     assert "Taak als geannuleerd gemarkeerd" in text
     assert "Beëindig de taak in Agent Desktop" in text
+
+
+async def _failed_meeting(site: Site) -> int:
+    """A booking of ``demo`` (with a Webex host) whose meeting job failed on an older version."""
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    uow = SqlUnitOfWork(app.state.engine)
+    async with uow.locked() as tx:
+        demo = await tx.get_group("demo")
+        assert demo is not None
+        await tx.save_group(replace(demo, video_host_email="host@example.nl"))
+    booking_id = await _book(site, "demo")
+    queue = SqlJobQueue(app.state.engine)
+    [meeting] = await queue.claim_due(site.clock.now(), {JobType.CREATE_VIDEO_ROOM}, set())
+    await queue.fail(meeting.id, "rejected_400")
+    old = IntegrationService(uow, site.clock, AdminService(uow, site.clock))  # no version
+    await old.record(booking_id, EventKind.MEETING_FAILED, detail="rejected_400")
+    with trace_scope():
+        bind_level("demo", "demo")
+        bind_booking(booking_id)
+        await RequestEvents(uow, site.clock, "0.4.0-rc.7").record(
+            RequestRecord("POST", "/v1/meetings", 400, "rejected_400", "ROUTER_42", 120)
+        )
+    return booking_id
+
+
+async def test_the_booking_page_shows_jobs_requests_and_an_honest_hint(site: Site) -> None:
+    # ADR 0068: the page of 2026-10-30 said "Webex's answer is above" with nothing above.
+    booking_id = await _failed_meeting(site)
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
+
+    assert "bewaart het antwoord van Webex niet" in text
+    assert "het antwoord van Webex staat hierboven" not in text
+    assert "versie onbekend" in text
+    assert "Achtergrondtaken" in text
+    assert "Mislukt" in text
+    assert 'name="job" value="create_video_room"' in text  # the retry button
+    assert "<code>POST /v1/meetings</code>" in text
+    assert "<code>ROUTER_42</code>" in text
+    assert "0.4.0-rc.7" in text
+
+
+async def test_without_bookings_manage_there_is_no_retry_button(site: Site) -> None:
+    booking_id = await _failed_meeting(site)
+    await site.login_as(AUDITOR)
+
+    response = await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")
+
+    assert 'name="job"' not in response.text
+
+
+async def test_retry_plans_the_meeting_again_and_says_so(site: Site) -> None:
+    booking_id = await _failed_meeting(site)
+    await site.login_as(GROUP_ADMIN)
+    url = f"/admin/groups/demo/bookings/{booking_id}/retry"
+
+    response = await site.client.post(url, data={"job": "create_video_room"}, headers=SAME_ORIGIN)
+
+    assert response.status_code == 303
+    assert "done=retried" in response.headers["location"]
+    page = (await site.client.get(response.headers["location"])).text
+    assert "De taak is opnieuw gepland" in page
+    assert 'name="job" value="create_video_room"' not in page  # pending now: no second button
+    again = await site.client.post(url, data={"job": "send_confirmation"}, headers=SAME_ORIGIN)
+    assert "done=retry_not_possible" in again.headers["location"]

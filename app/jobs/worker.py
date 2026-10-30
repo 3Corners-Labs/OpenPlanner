@@ -14,7 +14,7 @@ once.
 import asyncio
 import signal
 from contextlib import suppress
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import httpx
 import structlog
@@ -42,10 +42,12 @@ from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService, IntegrationWatch
 from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.platform_settings import PlatformSettingsStore
-from app.domain.ports import Clock
+from app.domain.ports import Clock, UnitOfWork
+from app.domain.request_log import RequestEvents
 from app.domain.security_log import SecurityLog
 from app.domain.system_log import SystemLog
 from app.domain.update_service import UpdateService
+from app.domain.worker_check import WorkerHeartbeat, heartbeat_due
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.jobs.housekeeping import Housekeeping
@@ -67,8 +69,9 @@ async def run_worker(
     """Run the poll loop until ``stop`` is set.
 
     After every iteration in which the database answered, the current time is written to
-    ``settings.worker_heartbeat_path``; ``app.jobs.healthcheck`` reads it. A failing job run
-    is logged and does not stop the loop.
+    ``settings.worker_heartbeat_path``; ``app.jobs.healthcheck`` reads it. Once a minute the
+    worker also writes a heartbeat row in the database with its version and job types, which
+    the group check reads (ADR 0068). A failing job run is logged and does not stop the loop.
 
     Args:
         settings: Database, mail and worker settings.
@@ -101,12 +104,25 @@ async def run_worker(
 
     system_log = SystemLog(uow, clock)
 
+    version = settings.app_version
+    # ADR 0068: every request to Webex and WxCC becomes a system event of the booking.
+    request_log = RequestEvents(uow, clock, version)
+
     def build_runner(current: Settings) -> tuple[Integrations, JobRunner, IntegrationWatch]:
-        wired = integrations or build_integrations(current, engine, http, clock, security)
+        wired = integrations or build_integrations(
+            current, engine, http, clock, security, request_log
+        )
         # ADR 0065 step 2: the automatic group check, with the checker of this wiring.
         watch = IntegrationWatch(
             IntegrationCheckService(
-                uow, clock, AdminService(uow, clock), wired.checker, system_log
+                uow,
+                clock,
+                AdminService(uow, clock),
+                wired.checker,
+                system_log,
+                version=version,
+                heartbeat_max_age=timedelta(seconds=settings.worker_heartbeat_max_age_seconds),
+                overdue_after=lambda: timedelta(minutes=live.settings.job_overdue_minutes),
             ),
             clock,
             lambda: timedelta(hours=live.settings.integration_check_interval_hours),
@@ -125,7 +141,7 @@ async def run_worker(
                 ),
                 video=wired.video,
                 dispatcher=wired.dispatcher,
-                integration=IntegrationService(uow, clock, AdminService(uow, clock)),
+                integration=IntegrationService(uow, clock, AdminService(uow, clock), version),
                 retention=lambda: live.settings.event_retention,
                 clock_style=lambda organisation: live.for_organisation(organisation).time_format,
                 product_footer=lambda organisation: (
@@ -137,6 +153,7 @@ async def run_worker(
 
     wired, runner, watch = build_runner(settings)
     wired_with = webex_fingerprint(settings)
+    heartbeat_at: datetime | None = None
     diagnostics = DiagnosticsService(
         uow,
         clock,
@@ -181,6 +198,8 @@ async def run_worker(
                         await runner.run_due()
                     except Exception as exc:  # e.g. schema not migrated yet; keep the loop alive
                         log.warning("worker.run_failed", error=type(exc).__name__)
+                    # Before the group check, which reads it (ADR 0068).
+                    heartbeat_at = await _heartbeat(uow, clock, runner, version, heartbeat_at)
                     await housekeeping.run()
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)
@@ -218,6 +237,24 @@ async def _watch_maintenance(watch: MaintenanceWatch) -> None:
         return
     if hours is not None:
         log.warning("maintenance.overdue", hours=hours)
+
+
+async def _heartbeat(
+    uow: UnitOfWork, clock: Clock, runner: JobRunner, version: str, last: datetime | None
+) -> datetime | None:
+    """Write the heartbeat row once a minute (ADR 0068); a failure is logged, never fatal."""
+    now = clock.now()
+    if not heartbeat_due(last, now):
+        return last
+    try:
+        async with uow.locked() as tx:
+            await tx.save_worker_heartbeat(
+                WorkerHeartbeat(now, version, tuple(sorted(t.value for t in runner.types)))
+            )
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("worker.heartbeat_failed", error=type(exc).__name__)
+        return last
+    return now
 
 
 async def _check_integrations(watch: IntegrationWatch) -> None:

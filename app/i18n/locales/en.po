@@ -6210,3 +6210,165 @@ msgstr "The new login mapping was not saved: with it you would no longer be supe
 
 msgid "admin.form.error.login_lockout"
 msgstr "With this mapping you would no longer be superuser; it was not saved."
+
+msgid "call.hint.meeting.rejected_400.unexplained"
+msgstr "Webex refused the meeting, but this event does not store Webex's answer: it was written by a version that did not keep it yet. Look under Requests to Webex below, or plan the meeting again under Background jobs; a new refusal then shows Webex's answer on this page."
+
+msgid "audit.job.send_rebook_request"
+msgstr "Send request for a new time"
+
+msgid "audit.job.send_rebook_reminder"
+msgstr "Send reminder to choose a new time"
+
+msgid "audit.job.send_rebook_lapsed"
+msgstr "Send notice of a lapsed request"
+
+msgid "audit.job.lapse_rebook"
+msgstr "Let the request for a new time lapse"
+
+msgid "audit.job.send_confirm_request"
+msgstr "Send request to confirm"
+
+msgid "audit.job.send_confirm_reminder"
+msgstr "Send reminder to confirm"
+
+msgid "audit.job.expire_unconfirmed"
+msgstr "Expire unconfirmed booking"
+
+msgid "audit.job.send_unconfirmed_lapsed"
+msgstr "Send notice of an expired booking"
+
+msgid "audit.job.send_team_invite"
+msgstr "Send calendar invite to the team"
+
+msgid "audit.job.send_team_cancel"
+msgstr "Send calendar cancellation to the team"
+
+msgid "admin.booking.version"
+msgstr "version {version}"
+
+msgid "admin.booking.version_unknown"
+msgstr "version unknown"
+
+msgid "admin.booking.jobs"
+msgstr "Background jobs"
+
+msgid "admin.booking.jobs_lead"
+msgstr "What the worker does or did for this booking: video meeting, contact center task, messages and removing personal data. A failed video meeting or contact center task can be tried again."
+
+msgid "admin.booking.job.type"
+msgstr "Job"
+
+msgid "admin.booking.job.when"
+msgstr "Planned"
+
+msgid "admin.booking.job.status"
+msgstr "State"
+
+msgid "admin.booking.job.attempts"
+msgstr "Attempts"
+
+msgid "admin.booking.job.pending"
+msgstr "Planned"
+
+msgid "admin.booking.job.running"
+msgstr "Running"
+
+msgid "admin.booking.job.done"
+msgstr "Done"
+
+msgid "admin.booking.job.failed"
+msgstr "Failed"
+
+msgid "admin.booking.retry"
+msgstr "Try again"
+
+msgid "admin.booking.no_jobs"
+msgstr "There are no jobs for this booking."
+
+msgid "admin.booking.requests"
+msgstr "Requests to Webex and Webex Contact Center"
+
+msgid "admin.booking.requests_lead"
+msgstr "Every call OpenPlanner made for this booking, with the platform's answer. The tracking id is what Cisco support needs. It holds no personal data."
+
+msgid "admin.booking.request.when"
+msgstr "Time"
+
+msgid "admin.booking.request.call"
+msgstr "Call"
+
+msgid "admin.booking.request.status"
+msgstr "Answer"
+
+msgid "admin.booking.request.tracking"
+msgstr "Tracking id"
+
+msgid "admin.booking.request.version"
+msgstr "Version"
+
+msgid "admin.booking.request.ms"
+msgstr "{ms} ms"
+
+msgid "admin.booking.no_requests"
+msgstr "No requests recorded for this booking yet."
+
+msgid "admin.check.area.worker"
+msgstr "Background jobs (worker)"
+
+msgid "admin.check.worker.never_seen"
+msgstr "The worker has never reported: no worker is running, or it cannot reach the database. Bookings then get no video meeting."
+
+msgid "admin.check.worker.stale"
+msgstr "The worker last reported {minutes} minutes ago (version {version}): it is stuck or stopped."
+
+msgid "admin.check.worker.alive"
+msgstr "The worker is running (version {version})."
+
+msgid "admin.check.worker.version_differs"
+msgstr "The worker runs version {worker}, the admin portal version {web}: an update is half way."
+
+msgid "admin.check.worker.no_video_jobs"
+msgstr "The worker creates no video meetings: it was started without the Webex settings. Restart the worker once the Service App is set up."
+
+msgid "admin.check.worker.jobs_ok"
+msgstr "No failed or overdue jobs in this group."
+
+msgid "admin.check.worker.failed_jobs"
+msgstr "{count} jobs of this group failed. Open the booking in the agenda to see why and try again."
+
+msgid "admin.check.worker.overdue_jobs"
+msgstr "{count} jobs of this group have waited longer than {minutes} minutes for the worker."
+
+msgid "audit.event.integration_request"
+msgstr "Request to Webex or Webex Contact Center"
+
+msgid "admin.audit.reason.already_done"
+msgstr "Already done: the meeting or task exists."
+
+msgid "admin.audit.reason.no_video"
+msgstr "Not needed: this group has no Webex host."
+
+msgid "admin.audit.reason.own_queue"
+msgstr "Not needed: this group uses OpenPlanner's own queue, so no contact center task is made."
+
+msgid "admin.audit.reason.no_dispatch"
+msgstr "Not possible: this group has no work item channel or business address."
+
+msgid "admin.audit.detail.retry_create_video_room"
+msgstr "video meeting planned again"
+
+msgid "admin.audit.detail.retry_dispatch_wxcc_task"
+msgstr "contact center task planned again"
+
+msgid "admin.done.retried"
+msgstr "The job is planned again. The worker runs it within a minute; reload the page for the outcome."
+
+msgid "admin.done.retry_not_possible"
+msgstr "Trying again is no longer possible: the booking is not active, or the meeting or task exists already."
+
+msgid "settings.field.integration_request_retention_days.label"
+msgstr "Keep requests to Webex and WxCC (days)"
+
+msgid "settings.field.job_overdue_minutes.label"
+msgstr "Job overdue after (minutes)"
