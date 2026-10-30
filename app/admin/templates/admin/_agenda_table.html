@@ -1,0 +1,61 @@
+{#- The day's slots and bookings (ADR 0010, 0044): rendered inside group_agenda.html and on its
+    own for static/live-region.js, which swaps it in every ``poll_seconds`` while ``poll`` is
+    set (ADR 0072). The hidden sentence is what the script reads out after a swap. -#}
+{% from "admin/_icons.html" import icon %}
+<div data-live-fragment{% if poll %} data-poll="{{ poll }}" data-poll-seconds="{{ poll_seconds }}"{% endif %}>
+  <span data-live-status hidden>{{ announcement }}</span>
+  {% if slots %}
+  <div class="table-scroll" role="region" aria-labelledby="agenda-heading" tabindex="0">
+  <table class="data-table agenda-table">
+    <caption class="visually-hidden">{{ _("admin.agenda.caption", day=day_label) }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.agenda.time") }}</th>
+        <th scope="col">{{ _("admin.agenda.citizen") }}</th>
+        <th scope="col">{{ _("admin.agenda.meeting") }}</th>
+        <th scope="col">{{ _("admin.agenda.task") }}</th>
+        <th scope="col">{{ _("admin.agenda.agent") }}</th>
+        <th scope="col">{{ _("admin.agenda.participants") }}</th>
+        <th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th>
+      </tr>
+    </thead>
+    {% for slot in slots %}
+    <tbody id="{{ slot.anchor }}">
+      <tr class="agenda-slot{% if slot.shortfall %} agenda-slot--short{% endif %}">
+        <th scope="rowgroup" colspan="7">
+          <span class="nowrap">{{ slot.time }}</span>
+          {% if slot.closed %}<span class="chip">{{ icon("lock") }}{{ _("admin.agenda.closed") }}</span>
+          {% elif slot.staffing %}<span class="muted">{{ slot.staffing }}</span>
+          {% else %}<span class="muted">{{ _("admin.agenda.off_schedule") }}</span>{% endif %}
+          {% if slot.shortfall and slot.accepted %}<span class="chip">{{ icon("check") }}{{ _("admin.agenda.accepted") }}</span>
+          {% elif slot.shortfall %}<span class="chip chip--danger">{{ icon("alert") }}{{ slot.shortfall }}</span>{% endif %}
+          {% if slot.can_accept %}
+          <a class="button button--secondary button--small" href="/admin/groups/{{ summary.group.slug }}/agenda/slot-rebook?start={{ slot.start | urlencode }}">{{ _("admin.agenda.slot_rebook") }}<span class="visually-hidden"> {{ slot.time }}</span></a>
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/agenda/accept">
+            <input type="hidden" name="start" value="{{ slot.start }}">
+            <button type="submit" class="button button--secondary button--small">{{ _("admin.agenda.accept") }}<span class="visually-hidden"> {{ slot.time }}</span></button>
+          </form>
+          {% endif %}
+        </th>
+      </tr>
+      {% for row in slot.rows %}
+      {% include "admin/_agenda_row.html" %}
+      {% else %}
+      <tr><td colspan="7" class="muted">{{ _("admin.agenda.no_bookings") }}</td></tr>
+      {% endfor %}
+    </tbody>
+    {% endfor %}
+    {% if direct %}
+    <tbody>
+      <tr class="agenda-slot"><th scope="rowgroup" colspan="7">{{ _("admin.agenda.direct") }}</th></tr>
+      {% for row in direct %}
+      {% include "admin/_agenda_row.html" %}
+      {% endfor %}
+    </tbody>
+    {% endif %}
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.agenda.empty") }}</p>
+  {% endif %}
+</div>

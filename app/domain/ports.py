@@ -31,6 +31,7 @@ from app.domain.calls import (
     BookingOverview,
     CallStatus,
     MeetingRequest,
+    MeetingStatus,
     WorkItem,
 )
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
@@ -209,6 +210,17 @@ class VideoProvider(Protocol):
 
     async def delete_meeting(self, meeting_id: str, host_email: str) -> None:
         """Delete a meeting; deleting one that no longer exists is not an error."""
+        ...
+
+    async def meeting_status(self, meeting_id: str, host_email: str) -> MeetingStatus:
+        """Return the meeting's state, participant count and whether the host joined (ADR 0010).
+
+        The polling fallback for webhooks that did not arrive. Aggregates only: names and
+        addresses of participants never leave the adapter.
+
+        Raises:
+            IntegrationError: If the provider refuses or cannot be reached.
+        """
         ...
 
 
