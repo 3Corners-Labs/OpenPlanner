@@ -232,7 +232,7 @@ async def test_worker_checks_every_group_with_a_host_once_per_interval(
     finally:
         await engine.dispose()
     assert check is not None
-    assert check.findings == (REFUSED,)
+    assert [f for f in check.findings if f.area is not CheckArea.WORKER] == [REFUSED]
     checks = [e.event for e in events if e.event.action == "integration.check"]
     assert [(e.actor, e.outcome, e.reason, e.message, e.organisation, e.group) for e in checks] == [
         ("system", Outcome.FAILURE, "webex.schedule_refused", "no licence", "demo", "demo")

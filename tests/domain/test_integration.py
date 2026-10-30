@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 
 from app.domain.admin import AdminService
+from app.domain.audit import AuditEvent, Outcome, Source
 from app.domain.authorization import Principal, Role
 from app.domain.booking import Booking, BookingStatus, Contact, MeetingRef
 from app.domain.calls import (
@@ -18,6 +19,8 @@ from app.domain.calls import (
 )
 from app.domain.errors import DomainError
 from app.domain.integration import WEBHOOK_MEMORY, EventOutcome, IntegrationService
+from app.domain.job_plan import JobStatus, JobType, PlannedJob
+from app.domain.request_log import REQUEST_EVENT
 from app.domain.scheduling import PhoneMode
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
@@ -330,3 +333,36 @@ async def test_day_overview_covers_the_25_hour_day_when_clocks_go_back(
 
     assert [row.booking.id for row in on_the_day] == [123]
     assert next_day == []
+
+
+async def test_the_timeline_carries_versions_jobs_and_the_bookings_requests(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    # ADR 0068: what ran, what failed, what Webex answered, and which version wrote it.
+    clock = FixedClock(NOW)
+    service = IntegrationService(uow, clock, AdminService(uow, clock), "0.4.0-rc.7")
+    uow.state.jobs[123] = [PlannedJob(JobType.SEND_REMINDER, NOW, SLOT_0900)]
+    mine = AuditEvent(
+        NOW,
+        "system",
+        REQUEST_EVENT,
+        Outcome.FAILURE,
+        "rejected_400",
+        "demo",
+        "demo",
+        "method:POST",
+        Source.SYSTEM,
+        123,
+    )
+    other = replace(mine, booking_id=124)
+    job_event = replace(mine, action="job.create_video_room")
+    uow.state.audit += [mine, other, job_event]
+
+    await service.record(123, EventKind.MEETING_FAILED, detail="rejected_400")
+    timeline = await service.timeline(GROUP_ADMIN, 123)
+
+    assert timeline.events[-1].version == "0.4.0-rc.7"
+    assert [(j.type, j.status) for j in timeline.jobs] == [
+        (JobType.SEND_REMINDER, JobStatus.PENDING)
+    ]
+    assert timeline.requests == [mine]

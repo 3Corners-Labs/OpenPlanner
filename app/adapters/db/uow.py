@@ -130,7 +130,7 @@ from app.domain.embedding import AllowedOrigins
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.images import PageImage
-from app.domain.job_plan import JobType, PlannedJob
+from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
 from app.domain.ports import EventSink
 from app.domain.scheduling import (
     DispatchKind,
@@ -143,6 +143,7 @@ from app.domain.scheduling import (
     TimeWindow,
 )
 from app.domain.theme import Theme
+from app.domain.worker_check import WorkerHeartbeat
 
 _PENDING = "pending"
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
@@ -151,6 +152,10 @@ _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
 def _check_name(group_id: int) -> str:
     """Return the integration report name of a group's latest check."""
     return f"group-check:{group_id}"
+
+
+HEARTBEAT_NAME = "worker-heartbeat"
+"""Integration report name of the worker's heartbeat row (ADR 0068)."""
 
 
 def _organisation(row: OrganisationRow) -> Organisation:
@@ -486,6 +491,8 @@ class SqlTransaction(
             query = query.where(AuditEventRow.at < narrow.until)
         if narrow.trace_id is not None:
             query = query.where(AuditEventRow.trace_id == narrow.trace_id)
+        if narrow.action is not None:
+            query = query.where(AuditEventRow.action == narrow.action)
         return await self._entries(query, limit)
 
     async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
@@ -527,13 +534,16 @@ class SqlTransaction(
             for row, name in rows
         ]
 
-    async def delete_audit_events(self, category: Category, before: datetime) -> int:
+    async def delete_audit_events(
+        self, category: Category, before: datetime, action: str | None = None
+    ) -> int:
         """Delete the events of ``category`` older than ``before``; return how many."""
-        result = await self._session.execute(
-            delete(AuditEventRow).where(
-                AuditEventRow.category == category.value, AuditEventRow.at < before
-            )
+        query = delete(AuditEventRow).where(
+            AuditEventRow.category == category.value, AuditEventRow.at < before
         )
+        if action is not None:
+            query = query.where(AuditEventRow.action == action)
+        result = await self._session.execute(query)
         return int(getattr(result, "rowcount", 0) or 0)
 
     async def active_diagnostic_modes(self, now: datetime) -> list[DiagnosticMode]:
@@ -638,6 +648,28 @@ class SqlTransaction(
             IntegrationReportRow(
                 name=_check_name(check.group_id), body=json.dumps(body), checked_at=check.checked_at
             )
+        )
+
+    async def save_worker_heartbeat(self, heartbeat: WorkerHeartbeat) -> None:
+        """Store the worker's heartbeat as an integration report (``worker-heartbeat``)."""
+        body = {"version": heartbeat.version, "job_types": list(heartbeat.job_types)}
+        await self._session.merge(
+            IntegrationReportRow(
+                name=HEARTBEAT_NAME, body=json.dumps(body), checked_at=heartbeat.seen_at
+            )
+        )
+
+    async def get_worker_heartbeat(self) -> WorkerHeartbeat | None:
+        """Return the worker's latest heartbeat, if it ever wrote one."""
+        row = await self._session.get(IntegrationReportRow, HEARTBEAT_NAME)
+        if row is None:
+            return None
+        body = json.loads(row.body)
+        types = body.get("job_types", [])
+        return WorkerHeartbeat(
+            row.checked_at,
+            str(body.get("version", "")),
+            tuple(str(t) for t in types) if isinstance(types, list) else (),
         )
 
     async def get_group_check(self, group_id: int) -> GroupCheck | None:
@@ -1123,6 +1155,7 @@ class SqlTransaction(
                 kind=event.kind.value,
                 detail=event.detail[:128],
                 message=event.message[:300],
+                version=event.version[:40],
             )
         )
         await self._session.flush()
@@ -1135,7 +1168,8 @@ class SqlTransaction(
             .order_by(BookingEventRow.at, BookingEventRow.id)
         )
         return [
-            BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail, r.message) for r in rows
+            BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail, r.message, r.version)
+            for r in rows
         ]
 
     async def list_bookings(
@@ -1520,6 +1554,41 @@ class SqlTransaction(
                 JobRow.type.in_(sorted(t.value for t in types)),
             )
         )
+
+    async def get_booking_jobs(self, booking_id: int) -> list[JobSummary]:
+        """Return the booking's jobs, oldest first (ADR 0068)."""
+        rows = await self._session.scalars(
+            select(JobRow).where(JobRow.booking_id == booking_id).order_by(JobRow.run_at, JobRow.id)
+        )
+        return [
+            JobSummary(
+                JobType(r.type),
+                JobStatus(r.status),
+                r.run_at,
+                int(r.attempts or 0),
+                r.last_error or "",
+                ChannelKind(r.channel) if r.channel else None,
+            )
+            for r in rows
+        ]
+
+    async def count_group_jobs(self, group_id: int, overdue_before: datetime) -> JobCounts:
+        """Count the group's failed jobs and its pending jobs planned before ``overdue_before``."""
+        failed = await self._session.scalar(
+            select(func.count(JobRow.id))
+            .join(BookingRow, BookingRow.id == JobRow.booking_id)
+            .where(BookingRow.group_id == group_id, JobRow.status == JobStatus.FAILED.value)
+        )
+        overdue = await self._session.scalar(
+            select(func.count(JobRow.id))
+            .join(BookingRow, BookingRow.id == JobRow.booking_id)
+            .where(
+                BookingRow.group_id == group_id,
+                JobRow.status == _PENDING,
+                JobRow.run_at < overdue_before,
+            )
+        )
+        return JobCounts(int(failed or 0), int(overdue or 0))
 
     async def get_shortfall_acceptances(
         self, group_id: int, lower: datetime, upper: datetime
