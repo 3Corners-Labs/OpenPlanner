@@ -628,6 +628,18 @@ Each line says OK, Waarschuwing, Fout or Overgeslagen, and what to change. The l
 stays on the page with its time, and every run is audited as `integration.check`. Save
 changes first: the check uses the saved settings. It is limited to 6 runs per minute.
 
+**The worker runs the same check on its own** (ADR 0065 step 2). Every group with a Webex host
+is checked once per `INTEGRATION_CHECK_INTERVAL_HOURS` (platform setting, default 24, 1–168;
+the worker looks every ten minutes which groups are due) and right after an admin saves a new
+host address. The result replaces the group's latest check on its settings page, exactly as
+the button's does, and a broken chain is a system event `integration.check` at the group's
+level: outcome *mislukt*, the reason is the first failing line's code (for instance
+`webex.schedule_refused`) and Webex's own answer stands under it. The audit log (Logboek,
+kind *Systeem*) shows it to the group's and the organisation's admins and the superuser; it
+repeats once per interval while the chain stays broken, and a check that is fine again is
+recorded once as *gelukt*. Without a Service App, or for a group without a host, the worker
+checks nothing. The log line `integration.checked` says how many groups a sweep checked.
+
 When a meeting still fails later, the booking's timeline (Agenda → the booking) shows the
 code and, under it, Webex's own answer ("Antwoord van Webex: ..."); the audit log shows the
 same under the job's outcome, also in the chain view ("Hele keten"). The worker log keeps

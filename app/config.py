@@ -348,6 +348,9 @@ class Settings(BaseSettings):
     # worker (ADR 0038 §6), and again every MAINTENANCE_ALERT_REPEAT_HOURS while it lasts.
     maintenance_alert_hours: int = Field(default=4, ge=1, le=72)
     maintenance_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # Class C: the worker checks every group with a Webex host whose latest integration check
+    # is older than this many hours, and records a system event on failure (ADR 0065 step 2).
+    integration_check_interval_hours: int = Field(default=24, ge=1, le=168)
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":
