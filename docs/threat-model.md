@@ -711,6 +711,26 @@ message job. No personal data.
 | Information disclosure | One organisation's time format or settings leak into another organisation's pages or mails | A clock scope per request (`ClockScopeMiddleware`) and per message job; outside a scope the platform style applies | `tests/i18n/test_dates.py::test_an_organisation_clock_applies_inside_its_scope_only`, `test_use_clock_outside_a_scope_changes_nothing` |
 | Repudiation | Who changed an organisation's setting | `settings.organisation.manage` audited with the organisation, key, old and new value; refusals with the code | `tests/domain/test_settings_service.py::test_an_org_admin_sets_a_value_for_their_own_organisation` |
 
+## Flow: organisation texts (ADR 0074)
+
+Admin (org admin for the own organisations, superuser for all):
+`GET /admin/organisations/{org}/texts`, `GET` and `POST /admin/organisations/{org}/texts/{locale}`
+(`texts.organisation.manage`, recent login for changes). Storage: `organisation_texts`. The texts
+are read into a per-process cache and shown to every citizen of the organisation's groups, on
+pages and in emails and text messages. Inputs from outside: the locale and the text of each
+allow-listed key. No personal data is stored or logged.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Tampering (XSS) | Markup or a script in a text, rendered to citizens on a page or in the HTML mail | Plain text only; Jinja2 autoescape on pages and in the HTML part; the plain-text part is text; the text is never a template (ADR 0009) | `tests/admin/test_organisation_text_routes.py::test_the_organisation_text_is_escaped_on_the_citizen_page`, `tests/jobs/test_messages.py::test_an_organisation_text_is_escaped_in_the_html_part` |
+| Tampering | A key off the allow-list (`home.title`, an admin string, a button) replaced to deface or mislead | Only keys of `EDITABLE_TEXTS`; the service refuses others with `invalid_configuration`; the form ignores them | `tests/domain/test_text_overrides.py::test_refused_texts`, `tests/admin/test_organisation_text_routes.py::test_a_key_off_the_allow_list_is_ignored` |
+| Information disclosure | A text pulls in other data (`{x.__class__}`, `{email}`, `{bsn}`) through the placeholder syntax | Placeholders only from the key's allow-list, exactly those its page or message provides; the formatter has no attribute access; malformed braces are refused | `tests/domain/test_text_overrides.py::test_refused_texts`, `tests/i18n/test_editable_texts.py::test_a_page_text_allows_exactly_the_placeholders_its_page_provides` |
+| Tampering | Header injection through a subject; a megabyte text; control characters | Single-line subjects and titles, a length per key, no control characters | `tests/domain/test_text_overrides.py::test_refused_texts` |
+| Elevation | A group admin, the auditor or another organisation's admin changes an organisation's texts | One `RequirePermission(texts.organisation.manage, organisation_param="org")`; `OrganisationTextService` authorises again; the cache is keyed by organisation id | `tests/admin/test_organisation_text_routes.py::test_others_cannot_open_or_change_the_texts`, `tests/domain/test_organisation_text_service.py::test_others_are_refused_and_the_refusal_is_audited`, `tests/jobs/test_messages.py::test_another_organisations_text_does_not_apply` |
+| Tampering (CSRF) | A cross-site form changes a text | Fetch Metadata check on the POST; recent login | `tests/admin/test_organisation_text_routes.py::test_a_change_needs_a_cross_site_safe_request` |
+| Repudiation | Who changed the wording citizens see | Audit event with organisation, locale and key names, never the texts | `tests/domain/test_organisation_text_service.py::test_organisation_admin_saves_texts_and_it_is_audited_with_keys_only` |
+| Denial of service | Many large texts exhaust memory in the per-process cache | At most the allow-list's keys per locale and organisation, each bounded in length | `tests/domain/test_text_overrides.py::test_keys_are_unique_and_page_texts_are_on_pages` |
+
 ## Flow: secrets of class C and taking values over (ADR 0042 step 6, §12)
 
 Admin (superuser, recent login): `POST /admin/settings/{key}` for the fallback mail server's
