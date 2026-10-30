@@ -821,6 +821,47 @@ a candidate. The candidates of a released version may be deleted afterwards:
 git tag --list 'v0.4.0-rc.*' | xargs -n1 -I{} sh -c 'gh release delete {} --yes --cleanup-tag'
 ```
 
+### Test host on the rc channel (ADR 0059 step 3)
+
+docker01 (installer mode `lab`, `ENVIRONMENT=test`) follows channel `rc` with
+`UPDATE_AUTO_APPLY=true` since 2026-10-30, first candidate `v0.4.0-rc.5`. Every merge to
+`main` is running there within the hour (the worker's check interval), or within a minute after
+"Update now" on `/admin/updates`. Nothing is backed up beyond what the updater does; the lab
+data is disposable.
+
+Which candidate runs:
+
+- In the portal: `/admin/updates` → *Running now* `0.4.0-rc.5`, *Channel* `rc`, and the request
+  list shows the auto requests as actor `system` (`update.auto_request`).
+- On the host: `docker compose --env-file .env.update exec web python -m app.cli version`
+  (version and commit), and `grep UPDATE_ ~/openplanner/.env` for the channel and auto-apply.
+- Has a given merge landed? `git tag --contains <merge commit>` lists the candidate that
+  carries it; compare with *Running now*.
+
+The first hop onto the channel went through the installer, because a release image does not
+know the channel yet and cannot offer a candidate itself:
+
+```sh
+cd ~/openplanner && git fetch --tags && git checkout v0.4.0-rc.5 \
+  && ./scripts/install.sh --channel rc --version 0.4.0-rc.5
+```
+
+It writes `UPDATE_CHANNEL=rc` to `.env`, verifies and pins the candidate, starts it, and
+rewrites `/etc/openplanner/updater.env` so the updater also accepts images signed on `main`
+(needs sudo). Later candidates need nobody: the worker requests them itself.
+
+Back to releases only (`stable`): on the host, with the tag of the release to run (a release
+is older than the candidates built after it, so the updater will not go there by itself):
+
+```sh
+cd ~/openplanner && git fetch --tags && git checkout vX.Y.Z \
+  && ./scripts/install.sh --channel release --version X.Y.Z
+```
+
+That rewrites `UPDATE_CHANNEL=release`, narrows the updater's identity to release tags again
+and pins the release. Remove `UPDATE_AUTO_APPLY=true` from `.env` by hand if updates should
+wait for a superuser's click again, then `docker compose --env-file .env.update up -d`.
+
 ### Security fixes
 
 Release on the day the fix is merged (ADR 0052 §6): run the same steps; `make release-plan`
