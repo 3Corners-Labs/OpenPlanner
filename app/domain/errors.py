@@ -71,6 +71,7 @@ class ErrorCode(StrEnum):
     INVALID_ANSWER = "invalid_answer"
     SETTING_NO_KEY = "setting_no_key"
     SETTING_NOT_LOCKED = "setting_not_locked"
+    NOTHING_TO_RETRY = "nothing_to_retry"
     LOGIN_LOCKOUT = "login_lockout"
 
 
