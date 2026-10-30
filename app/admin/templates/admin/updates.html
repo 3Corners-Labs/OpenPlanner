@@ -22,8 +22,16 @@
     <div><dt>{{ _("admin.updates.commit") }}</dt><dd>{% if commit and commit.url %}<a href="{{ commit.url }}"><code>{{ commit.short }}</code></a>{% elif commit %}<code>{{ commit.short }}</code>{% else %}{{ _("admin.updates.unknown") }}{% endif %}</dd></div>
     <div><dt>{{ _("admin.updates.channel") }}</dt><dd>{% if overview.channel.value == "rc" %}{{ _("admin.updates.channel.rc") }}{% else %}{{ _("admin.updates.channel.release") }}{% endif %}{% if overview.auto_apply %} <span class="chip">{{ _("admin.updates.auto_apply") }}</span>{% endif %}</dd></div>
     <div><dt>{{ _("admin.updates.latest") }}</dt><dd>{% set newest = overview.newest or (overview.check.latest if overview.check else None) %}{% if newest %}<a href="{{ newest.url }}">{{ newest.version }}</a>{% else %}{{ _("admin.updates.unknown") }}{% endif %}</dd></div>
-    <div><dt>{{ _("admin.updates.checked_at") }}</dt><dd>{{ checked_at or _("admin.updates.never") }}{% if check_error %} <span class="chip chip--warning">{{ _("admin.updates.check_failed", code=check_error) }}</span>{% endif %}</dd></div>
+    <div><dt>{{ _("admin.updates.checked_at") }}</dt><dd>{{ checked_at or _("admin.updates.never") }}{% if check_error %} <span class="chip chip--warning">{{ _("admin.updates.check_failed", code=check_error) }}</span>{% endif %}{% if overview.check_requested %} <span class="chip">{{ _("admin.updates.check_requested") }}</span>{% endif %}</dd></div>
   </dl>
+  {% if overview.enabled %}
+  <form method="post" action="/admin/updates/check">
+    <p class="hint">{{ _("admin.updates.check_interval", minutes=check_minutes) }}</p>
+    <div class="form-actions">
+      <button type="submit" class="button button--secondary"{% if overview.check_requested %} disabled{% endif %}>{{ _("admin.updates.check_now") }}</button>
+    </div>
+  </form>
+  {% endif %}
 </section>
 {% if progress %}
 <section class="card" aria-labelledby="open-heading">

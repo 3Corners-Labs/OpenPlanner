@@ -317,6 +317,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/updates/progress": {
         "/admin/updates/progress": statuses(200, 403, 403, 403, 403, 403, 403),
     },
+    "POST /admin/updates/check": {
+        "/admin/updates/check": statuses(409, 403, 403, 403, 403, 403, 403)
+    },
     "POST /admin/updates/update": {
         "/admin/updates/update": statuses(409, 403, 403, 403, 403, 403, 403)
     },
@@ -889,6 +892,7 @@ WRITABLE_IN_MAINTENANCE = frozenset(
         "POST /admin/organisations/{org}/channels/email/test",
         "POST /admin/organisations/{org}/channels/sms",
         "POST /admin/organisations/{org}/channels/{channel}/remove",
+        "POST /admin/updates/check",
         "POST /admin/updates/update",
         "POST /admin/updates/restore",
         "POST /admin/updates/requests/{request_id}/cancel",

@@ -121,6 +121,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_CHECK_TOKEN` | secret | — | — | `settings.platform.manage` | Read token for a private repository; write-only. |
 | `UPDATE_CHANNEL` | enum | `release` | release, rc | `settings.platform.manage` | What the installation follows (ADR 0059, 0065): releases only, or release candidates (`rc`) too; `rc` is not usable in production. |
 | `UPDATE_AUTO_APPLY` | bool | `false` | — | `settings.platform.manage` | The worker requests a newer version itself as soon as the check finds one (ADR 0059, 0065); not usable in production. |
+| `UPDATE_CHECK_MINUTES` | int | `60` | 5–1440 | `settings.platform.manage` | Minutes between two release checks by the worker (ADR 0067); "Check now" on the updates page asks for one ahead of time. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the citizen's waiting page (ADR 0072). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |

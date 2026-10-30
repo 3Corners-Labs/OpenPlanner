@@ -70,6 +70,7 @@ SETTING_LABELS: dict[str, str] = {
     "update_repository": "settings.field.update_repository.label",
     "update_channel": "settings.field.update_channel.label",
     "update_auto_apply": "settings.field.update_auto_apply.label",
+    "update_check_minutes": "settings.field.update_check_minutes.label",
     "update_check_token": "settings.field.update_check_token.label",  # nosec B105 - an i18n key
     "time_format": "settings.field.time_format.label",
     "admin_timezone": "settings.field.admin_timezone.label",
