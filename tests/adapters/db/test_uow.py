@@ -13,6 +13,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
+from app.domain.privacy import PII_FIELDS
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import close_day, seed_group
 from tests.fakes.clock import FixedClock
@@ -233,23 +234,15 @@ async def test_salt_is_stored_and_purge_clears_personal_data(
         assert await tx.get_booking(9999) is None
     assert purged is not None
     assert purged.contact is None
+    # ADR 0063: every personal-data column of the one list is cleared, whatever is added later.
+    columns = [
+        getattr(BookingRow, name) for name in sorted(PII_FIELDS) if hasattr(BookingRow, name)
+    ]
+    assert len(columns) == 7
     async with engine.connect() as conn:
-        row = (
-            await conn.execute(
-                select(
-                    BookingRow.first_name,
-                    BookingRow.last_name,
-                    BookingRow.email,
-                    BookingRow.phone,
-                    BookingRow.form_answers,
-                    BookingRow.guest_join_url,
-                    BookingRow.host_join_url,
-                    BookingRow.pii_purged_at,
-                )
-            )
-        ).one()
-    assert row[:7] == (None,) * 7
-    assert row[7] == NOW
+        row = (await conn.execute(select(*columns, BookingRow.pii_purged_at))).one()
+    assert row[:-1] == (None,) * len(columns)
+    assert row[-1] == NOW
 
 
 async def test_upcoming_starts_for_email_counts_place_holding_bookings_only(

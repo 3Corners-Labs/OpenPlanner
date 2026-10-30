@@ -20,5 +20,11 @@ def examples(booking, email):
     # ruleid: no-pii-in-log-call
     log.error(f"failed for {booking.name}")
 
+    # ruleid: no-pii-in-log-call
+    log.info("booking.created", first_name=booking.first_name)
+
+    # ruleid: no-pii-in-log-call
+    log.info("booking.created", form_answers=booking.form_answers)
+
     # ok: no-pii-in-log-call
     log.info("booking.created", booking_id=booking.id)
