@@ -110,6 +110,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "planner_change_min_lead_minutes": "admin.form.error.planner_change_min_lead_minutes",
     "queue_visible_from_minutes": "admin.form.error.queue_visible_from_minutes",
     "queue_free_pick_allowed": "admin.form.error.choice",
+    "calendar_invite_address": "admin.form.error.calendar_invite_address",
     "phone_mode": "admin.form.error.phone_mode",
     "video_host_email": "admin.form.error.video_host_email",
     "wxcc_business_address": "admin.form.error.integration_text",

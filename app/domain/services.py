@@ -307,10 +307,12 @@ class BookingService:
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
             now = self._clock.now()
-            _ensure_changeable(booking, await self._group_by_id(tx, booking.group_id), now)
+            group = await self._group_by_id(tx, booking.group_id)
+            _ensure_changeable(booking, group, now)
             cancelled = booking.cancel(now)
             await tx.save_booking(cancelled)
-            await tx.replace_jobs(_id(booking), plan_for_cancellation(cancelled_at=now))
+            jobs = plan_for_cancellation(cancelled_at=now, team_invite=group.sends_team_invite)
+            await tx.replace_jobs(_id(booking), jobs)
             return cancelled
 
     async def reschedule(self, management_token: str, new_start: datetime) -> BookingReceipt:
@@ -354,7 +356,10 @@ class BookingService:
             raise DomainError(ErrorCode.SAME_SLOT)
         now = self._clock.now()
         await tx.save_booking(old.cancel(now))
-        await tx.replace_jobs(_id(old), plan_for_cancellation(cancelled_at=now, notify=False))
+        jobs = plan_for_cancellation(
+            cancelled_at=now, notify=False, team_invite=group.sends_team_invite
+        )
+        await tx.replace_jobs(_id(old), jobs)
         return await self._place(
             tx, group, new_start, old.contact, old.locale, old.consents, _id(old), sms=sms
         )
@@ -490,6 +495,7 @@ class BookingService:
             dispatch_lead=group.dispatch_lead,
             message=JobType.SEND_CHANGE if rescheduled_from else JobType.SEND_CONFIRMATION,
             sms=sms,
+            team_invite=group.sends_team_invite,
         )
         await tx.replace_jobs(_id(booking), jobs)
         return BookingReceipt(booking, token)

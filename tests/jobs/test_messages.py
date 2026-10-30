@@ -10,7 +10,7 @@ from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.job_plan import JobType
-from app.domain.scheduling import PhoneMode
+from app.domain.scheduling import DispatchKind, PhoneMode
 from app.domain.tokens import derive_token, new_token_salt
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
@@ -407,3 +407,47 @@ def test_the_sms_request_to_rebook_carries_reason_deadline_and_link(
 
     assert "niet genoeg medewerkers beschikbaar. Kies voor maandag 19 januari 2026" in message.text
     assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}" in message.text
+
+
+TEAM = make_group(
+    slug="aangifte",
+    name="Aangifte",
+    dispatch_kind=DispatchKind.OPENPLANNER_QUEUE,
+    calendar_invite_address="team-aangifte@example.org",
+)
+
+
+def test_team_invite_goes_to_the_team_with_first_name_reference_and_queue_link(
+    composer: MessageComposer,
+) -> None:
+    message = composer.compose_team_invite(JobType.SEND_TEAM_INVITE, BOOKING, TEAM, NOW, "nl")
+    ics = message.attachments[0].data.decode()
+
+    assert message.recipient == "team-aangifte@example.org"
+    assert "Ada" in message.text
+    assert "OP-000042" in message.text
+    assert "https://afspraak.example.nl/admin/groups/aangifte/queue" in message.text
+    assert "Lovelace" not in message.text + ics
+    assert "ada@example.org" not in message.text + str(message.html) + ics
+    assert "/b/" not in message.text + ics  # no management or join link
+    assert "METHOD:REQUEST" in ics
+    assert message.attachments[0].content_type == "text/calendar"
+
+
+def test_team_cancel_withdraws_the_same_event_without_the_name(
+    composer: MessageComposer,
+) -> None:
+    invite = composer.compose_team_invite(JobType.SEND_TEAM_INVITE, BOOKING, TEAM, NOW, "en")
+    cancel = composer.compose_team_invite(
+        JobType.SEND_TEAM_CANCEL, BOOKING, TEAM, NOW + timedelta(minutes=1), "en"
+    )
+    uid = next(
+        line
+        for line in invite.attachments[0].data.decode().split("\r\n")
+        if line.startswith("UID:")
+    )
+
+    assert uid in cancel.attachments[0].data.decode()
+    assert "METHOD:CANCEL" in cancel.attachments[0].data.decode()
+    assert "Ada" not in cancel.text
+    assert "OP-000042" in cancel.text

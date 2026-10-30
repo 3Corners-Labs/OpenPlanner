@@ -198,6 +198,7 @@ def _group(row: GroupRow) -> Group:
         embedding_enabled=row.embedding_enabled,
         queue_visible_from_minutes=row.queue_visible_from_minutes,
         queue_free_pick_allowed=row.queue_free_pick_allowed,
+        calendar_invite_address=row.calendar_invite_address,
     )
 
 
@@ -267,6 +268,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "embedding_enabled": group.embedding_enabled,
         "queue_visible_from_minutes": group.queue_visible_from_minutes,
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
+        "calendar_invite_address": group.calendar_invite_address,
     }
 
 
