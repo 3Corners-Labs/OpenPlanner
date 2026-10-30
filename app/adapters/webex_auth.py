@@ -14,6 +14,7 @@ five minutes before it expires, or at once after the API answered 401.
 import asyncio
 import hashlib
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Protocol
@@ -22,7 +23,7 @@ import httpx
 import structlog
 
 from app.domain.audit import Outcome
-from app.domain.ports import REASON_LIMIT, Clock, IntegrationError
+from app.domain.ports import REASON_LIMIT, Clock, IntegrationError, RequestLog, RequestRecord
 from app.domain.security_log import TOKEN_REFRESH_FAILED, SecurityLog
 
 log = structlog.get_logger()
@@ -192,17 +193,23 @@ class AuthorizedClient:
     """Calls Webex and WxCC APIs with the Service App's token; maps failures to codes.
 
     A 401 refreshes the token once and repeats the call. Response bodies are never logged or
-    put in errors: they can contain personal data.
+    put in errors: they can contain personal data. Every request is reported to the
+    ``RequestLog`` (ADR 0068) as method, path, status, tracking id and duration: never a body,
+    a query string or a header. A failing report is logged and never fails the request.
 
     Args:
         http: Shared HTTP client.
         tokens: Source of access tokens.
+        request_log: Where every request is reported; ``None`` reports nothing.
     """
 
-    def __init__(self, http: httpx.AsyncClient, tokens: WebexTokens) -> None:
+    def __init__(
+        self, http: httpx.AsyncClient, tokens: WebexTokens, request_log: RequestLog | None = None
+    ) -> None:
         """Store the collaborators."""
         self._http = http
         self._tokens = tokens
+        self._request_log = request_log
 
     async def request(
         self,
@@ -223,8 +230,10 @@ class AuthorizedClient:
             IntegrationError: ``unauthorized``, ``rejected`` (4xx; not retryable),
                 ``rate_limited``, ``server_error`` or ``unreachable`` (retryable).
         """
+        path = httpx.URL(url).path
         for attempt in (0, 1):
             token = await self._tokens.access_token(refresh=attempt == 1)
+            started = time.monotonic()
             try:
                 response = await self._http.request(
                     method,
@@ -235,13 +244,40 @@ class AuthorizedClient:
                 )
             except httpx.HTTPError as exc:
                 log.warning("integration.unreachable", error=type(exc).__name__)
+                await self._report(RequestRecord(method, path, 0, "unreachable", "", _ms(started)))
                 raise IntegrationError("unreachable", retryable=True) from exc
             if response.status_code == 401 and attempt == 0:
+                await self._report(_record(method, path, response, "unauthorized", started))
                 continue
             if response.status_code in ok:
+                await self._report(_record(method, path, response, "", started))
                 return response
-            raise http_failure(response, explain=explain)
+            failure = http_failure(response, explain=explain)
+            await self._report(_record(method, path, response, failure.code, started))
+            raise failure
         raise IntegrationError("unauthorized", retryable=False)  # pragma: no cover - loop ends
+
+    async def _report(self, record: RequestRecord) -> None:
+        """Hand the record to the request log; a failure there never fails the request."""
+        if self._request_log is None:
+            return
+        try:
+            await self._request_log.record(record)
+        except Exception as exc:  # the request itself is what the caller must see
+            log.warning("request_log.failed", error=type(exc).__name__)
+
+
+def _ms(started: float) -> int:
+    """Return the milliseconds since ``started`` (a ``time.monotonic`` value)."""
+    return int((time.monotonic() - started) * 1000)
+
+
+def _record(
+    method: str, path: str, response: httpx.Response, error: str, started: float
+) -> RequestRecord:
+    """Describe a finished request: the tracking id from the header or, failing that, the body."""
+    tracking_id = response.headers.get("trackingid", "") or _refusal(response)[1]
+    return RequestRecord(method, path, response.status_code, error, tracking_id, _ms(started))
 
 
 def http_failure(response: httpx.Response, *, explain: bool = False) -> IntegrationError:

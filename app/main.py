@@ -49,10 +49,12 @@ from app.domain.admin import AdminService
 from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
+from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
+from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
@@ -69,6 +71,7 @@ from app.domain.planning import PlanningService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, IdentityProvider
 from app.domain.queue_service import QueueService
+from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
 from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
@@ -118,6 +121,16 @@ def oidc_provider(
     return OidcIdentityProvider(config, http)
 
 
+def _confirm_policy(settings: Settings) -> ConfirmPolicy:
+    """Return the rules for confirming a booking from one organisation's settings (ADR 0056)."""
+    return ConfirmPolicy.from_settings(
+        window_hours=settings.booking_confirm_window_hours,
+        cutoff_hours=settings.booking_confirm_cutoff_hours,
+        reminders=settings.booking_confirm_reminders,
+        min_minutes=settings.booking_confirm_min_minutes,
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     clock: Clock | None = None,
@@ -164,6 +177,8 @@ def create_app(
         uow = SqlUnitOfWork(
             app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
         )
+        # ADR 0068: every request to Webex and WxCC becomes a system event of the booking.
+        request_log = RequestEvents(uow, clock, settings.app_version)
 
         def apply(current: Settings) -> None:
             app.state.settings = current
@@ -186,7 +201,7 @@ def create_app(
 
         def wire_integrations(current: Settings) -> None:
             wired = integrations or build_integrations(
-                current, app.state.engine, http, clock, app.state.security_log
+                current, app.state.engine, http, clock, app.state.security_log, request_log
             )
             app.state.integrations = wired
             app.state.call_service = CallService(
@@ -200,7 +215,14 @@ def create_app(
                 uow, wired.video, app.state.integration_service, clock
             )
             app.state.integration_check_service = IntegrationCheckService(
-                uow, clock, app.state.admin_service, wired.checker, SystemLog(uow, clock)
+                uow,
+                clock,
+                app.state.admin_service,
+                wired.checker,
+                SystemLog(uow, clock),
+                version=settings.app_version,
+                heartbeat_max_age=timedelta(seconds=settings.worker_heartbeat_max_age_seconds),
+                overdue_after=lambda: timedelta(minutes=live().job_overdue_minutes),
             )
             # Explicit adapters (tests) are never rebuilt.
             app.state.webex_fingerprint = None if integrations else webex_fingerprint(current)
@@ -232,6 +254,7 @@ def create_app(
             clock,
             token_key,
             phone_region=lambda org: per_organisation(org).phone_default_region,
+            confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
         )
         app.state.admin_service = AdminService(uow, clock)
         app.state.form_service = FormService(
@@ -260,7 +283,10 @@ def create_app(
         app.state.queue_service = QueueService(
             uow, clock, app.state.admin_service, agent_pseudonym_key(settings)
         )
-        app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
+        app.state.integration_service = IntegrationService(
+            uow, clock, app.state.admin_service, settings.app_version
+        )
+        app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
         app.state.scenario_service = ScenarioService(uow, clock, app.state.admin_service)

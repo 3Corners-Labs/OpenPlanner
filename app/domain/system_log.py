@@ -13,7 +13,7 @@ same way. An event without a known booking or group is global and only the super
 System events carry codes only (job type, error code, attempt, channel): no personal data, no
 message text, no addresses. Every category of event is pruned after its own retention period
 (ADR 0040, part 4): diagnostic 7 days, system 90 days, security 1 year, admin actions 2 years
-by default, each a setting.
+by default, each a setting; request events (ADR 0068) 30 days, before the other system events.
 """
 
 from dataclasses import dataclass
@@ -22,6 +22,7 @@ from datetime import timedelta
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
 from app.domain.event_context import bind_level
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.request_log import REQUEST_EVENT
 
 
 @dataclass(frozen=True)
@@ -33,12 +34,15 @@ class EventRetention:
         system: System events (``SYSTEM_EVENT_RETENTION_DAYS``).
         security: Security events (``SECURITY_EVENT_RETENTION_DAYS``).
         diagnostic: Debug events (``DIAGNOSTIC_EVENT_RETENTION_DAYS``).
+        requests: Request events, ``integration.request`` (ADR 0068,
+            ``INTEGRATION_REQUEST_RETENTION_DAYS``); system events, pruned on their own.
     """
 
     audit: timedelta = timedelta(days=730)
     system: timedelta = timedelta(days=90)
     security: timedelta = timedelta(days=365)
     diagnostic: timedelta = timedelta(days=7)
+    requests: timedelta = timedelta(days=30)
 
     def of(self, category: Category) -> timedelta:
         """Return the retention period of ``category``."""
@@ -114,7 +118,9 @@ class SystemLog:
         """Delete every event older than its category's retention; return how many."""
         now = self._clock.now()
         async with self._uow.locked() as tx:
-            removed = 0
+            removed = await tx.delete_audit_events(
+                Category.SYSTEM, now - retention.requests, REQUEST_EVENT
+            )
             for category in Category:
                 removed += await tx.delete_audit_events(category, now - retention.of(category))
             return removed

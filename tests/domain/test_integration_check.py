@@ -18,7 +18,9 @@ from app.domain.integration_check import (
     check_due,
     report_for,
 )
+from app.domain.job_plan import JobType
 from app.domain.system_log import SystemLog
+from app.domain.worker_check import WorkerHeartbeat
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeChecker
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -38,6 +40,13 @@ UNEXPLAINED = Finding(
     CheckArea.WEBEX, "webex.unreachable", CheckStatus.FAIL, (("error", "timeout"), ("reason", "-"))
 )
 HOST = "host@example.nl"
+
+
+def _platform(check: GroupCheck) -> tuple[Finding, ...]:
+    """The findings of the platforms; the worker's own (ADR 0068) are tested apart."""
+    return tuple(f for f in check.findings if f.area is not CheckArea.WORKER)
+
+
 INTERVAL = timedelta(hours=24)
 
 
@@ -45,6 +54,8 @@ INTERVAL = timedelta(hours=24)
 def uow() -> InMemoryUnitOfWork:
     state = two_organisations()
     state.groups[3] = make_group(id=3, organisation_id=1, slug="demo-2", name="Demo 2")
+    # A live worker with the Webex adapters (ADR 0068), so the platform findings decide.
+    state.worker_heartbeat = WorkerHeartbeat(NOW, "", (JobType.CREATE_VIDEO_ROOM.value,))
     return InMemoryUnitOfWork(state)
 
 
@@ -87,7 +98,7 @@ async def test_run_stores_the_result_and_audits_it(uow: InMemoryUnitOfWork) -> N
 
     check = await service.run(ORG_ADMIN, "demo")
 
-    assert check.findings == (OK, WARN, FAIL)
+    assert _platform(check) == (OK, WARN, FAIL)
     assert check.checked_at == NOW
     # Peers are the groups of the same organisation only: no other organisation's slugs.
     assert checker.calls == [("demo", ["demo", "demo-2"])]
@@ -109,8 +120,24 @@ async def test_a_clean_check_is_audited_as_success(uow: InMemoryUnitOfWork) -> N
 async def test_without_platforms_the_check_says_so(uow: InMemoryUnitOfWork) -> None:
     check = await _service(uow, None).run(ORG_ADMIN, "demo")
 
-    assert [f.code for f in check.findings] == ["platform.not_configured"]
-    assert check.overall is CheckStatus.SKIPPED
+    assert [f.code for f in _platform(check)] == ["platform.not_configured"]
+    assert [f.code for f in check.findings if f.area is CheckArea.WORKER] == [
+        "worker.alive",
+        "worker.jobs_ok",
+    ]
+
+
+async def test_every_check_proves_the_worker_and_the_queue(uow: InMemoryUnitOfWork) -> None:
+    # ADR 0068: the probe ran in web; the bookings run in the worker.
+    uow.state.worker_heartbeat = None
+
+    check = await _service(uow, FakeChecker([OK])).run(ORG_ADMIN, "demo")
+
+    assert check.findings[-2:] == (
+        Finding(CheckArea.WORKER, "worker.never_seen", CheckStatus.FAIL),
+        Finding(CheckArea.WORKER, "worker.jobs_ok", CheckStatus.OK),
+    )
+    assert check.overall is CheckStatus.FAIL
 
 
 @pytest.mark.parametrize("principal", [GROUP_ADMIN, OUTSIDER])
@@ -137,7 +164,7 @@ async def test_a_new_check_replaces_the_old_one(uow: InMemoryUnitOfWork) -> None
 
     last = await service.last(ORG_ADMIN, "demo")
     assert last is not None
-    assert last.findings == (OK,)
+    assert _platform(last) == (OK,)
 
 
 # --- ADR 0065 step 2: the automatic check -----------------------------------------------------
@@ -190,7 +217,7 @@ async def test_the_system_check_stores_the_result_and_records_an_event_at_the_gr
     check = await service.check_as_system("demo")
 
     assert check is not None
-    assert check.findings == (OK, REFUSED)
+    assert _platform(check) == (OK, REFUSED)
     assert checker.calls == [("demo", ["demo", "demo-2"])]
     assert await service.last(ORG_ADMIN, "demo") == check  # the page shows it as the latest
     assert _system_events(uow) == [

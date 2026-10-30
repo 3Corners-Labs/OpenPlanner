@@ -10,6 +10,11 @@ closure's copy of the contact options as a fixed block and link to the closure p
 closure's image is never mailed. A planner's cancellation (ADR 0044) adds the fixed reason
 the planner chose, as a text block (``message.reason.<code>``); a planner's move or
 cancellation also has an SMS form.
+
+The request to confirm a new booking and its reminder (ADR 0056 §7) go to an address that is
+not verified yet: they greet without a name, carry no calendar file or join link, and link to
+the confirm page instead of the booking. The lapse message links to the group page to book
+again.
 """
 
 from dataclasses import dataclass
@@ -50,6 +55,9 @@ class MessageKind:
         rebook: A planner's request to choose a new time (ADR 0044): no join link, and the
             deadline in the texts is when the request lapses (``Booking.rebook_by``).
         calendar: Whether the email carries the calendar attachment.
+        confirm: A request to confirm a new booking (ADR 0056): no name, link to the confirm
+            page, and the deadline in the texts is ``Booking.confirm_by``.
+        book_again: Whether the message links to the group page to make a new appointment.
     """
 
     subject_key: str
@@ -61,6 +69,8 @@ class MessageKind:
     closure_notice: bool = False
     rebook: bool = False
     calendar: bool = True
+    confirm: bool = False
+    book_again: bool = False
 
 
 MESSAGE_KINDS: dict[JobType, MessageKind] = {
@@ -129,6 +139,34 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
         rebook=True,
         calendar=False,
     ),
+    # ADR 0056: confirm a new booking by email link; it lapses at ``confirm_by``.
+    JobType.SEND_CONFIRM_REQUEST: MessageKind(
+        "message.confirm_request.subject",
+        "message.confirm_request.intro",
+        True,
+        False,
+        manage_key="message.manage_confirm",
+        calendar=False,
+        confirm=True,
+    ),
+    JobType.SEND_CONFIRM_REMINDER: MessageKind(
+        "message.confirm_reminder.subject",
+        "message.confirm_reminder.intro",
+        True,
+        False,
+        manage_key="message.manage_confirm",
+        calendar=False,
+        confirm=True,
+    ),
+    JobType.SEND_UNCONFIRMED_LAPSED: MessageKind(
+        "message.unconfirmed_lapsed.subject",
+        "message.unconfirmed_lapsed.intro",
+        False,
+        False,
+        calendar=False,
+        confirm=True,
+        book_again=True,
+    ),
 }
 
 
@@ -162,9 +200,11 @@ REASON_KEYS: dict[ChangeReason, str] = {
 
 
 def _deadline(kind: MessageKind, booking: Booking, group: Group) -> datetime:
-    """Return the deadline the message names: the lapse of a request, else the change one."""
+    """Return the deadline the message names: a lapse of a request, else the change one."""
     if kind.rebook and booking.rebook_by is not None:
         return booking.rebook_by
+    if kind.confirm and booking.confirm_by is not None:
+        return booking.confirm_by
     return group.change_deadline(booking.start)
 
 
@@ -246,16 +286,27 @@ class MessageComposer:
         if kind.rebook:
             params["deadline"] = deadline_text
         manage_url = self.manage_url(booking) if kind.includes_manage_link else None
+        if manage_url and kind.confirm:  # ADR 0056 §8: the page confirms only on its POST
+            manage_url = f"{manage_url}/confirm"
         on_hold = kind.closure_notice
         join_url = (
             f"{manage_url}/join"
-            if manage_url and group.video_enabled and not on_hold and not kind.rebook
+            if manage_url
+            and group.video_enabled
+            and not on_hold
+            and not kind.rebook
+            and not kind.confirm
             else None
+        )
+        greeting = (
+            _("message.greeting_anonymous")  # ADR 0056 §7: the address is not verified yet
+            if kind.confirm
+            else _("message.greeting", first_name=booking.contact.first_name)
         )
         context = {
             "locale": locale,
             "subject": _(kind.subject_key, **params),
-            "greeting": _("message.greeting", first_name=booking.contact.first_name),
+            "greeting": greeting,
             "intro": _(kind.intro_key, **params),
             "when_label": _("message.when"),
             "when": f"{date}, {start_time}–{end_time}",
@@ -274,7 +325,10 @@ class MessageComposer:
             "reason_label": _("message.reason"),
             "reason": _reason(booking, _),
             "manage_text": _(kind.manage_key, deadline=deadline_text),
-            "manage_link": _("message.manage_link"),
+            "manage_link": _("message.confirm_link" if kind.confirm else "message.manage_link"),
+            "book_url": f"{self._base_url}/g/{group.slug}" if kind.book_again else None,
+            "book_text": _("message.book_again"),
+            "book_link": _("message.book_again_link"),
             "join_url": join_url,
             "join_text": _("message.join"),
             "join_link": _("message.join_link"),
@@ -347,6 +401,7 @@ class MessageComposer:
             "reason": None,
             "join_url": None,
             "trial_url": None,
+            "book_url": None,
             "manage_url": None if cancel else queue_url,
             "manage_text": _("message.team_invite.queue"),
             "manage_link": _("message.team_invite.queue_link"),

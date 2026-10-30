@@ -163,6 +163,7 @@ class AuditFilter:
         since: Only events at or after this time (UTC).
         until: Only events before this time (UTC).
         trace_id: Only the events of this request or job: the whole chain (ADR 0040).
+        action: Only events with this action, e.g. the request events of a booking (ADR 0068).
     """
 
     source: Source | None = None
@@ -175,6 +176,7 @@ class AuditFilter:
     since: datetime | None = None
     until: datetime | None = None
     trace_id: str | None = None
+    action: str | None = None
 
     def matches(self, event: AuditEvent) -> bool:
         """Return whether ``event`` passes the filter (the SQL adapter applies the same rules)."""
@@ -189,6 +191,7 @@ class AuditFilter:
             and (self.since is None or event.at >= self.since)
             and (self.until is None or event.at < self.until)
             and (self.trace_id is None or event.trace_id == self.trace_id)
+            and (self.action is None or event.action == self.action)
         )
 
 
