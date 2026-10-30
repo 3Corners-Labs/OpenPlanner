@@ -32,7 +32,7 @@ from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.audit import AuditFilter
 from app.domain.authorization import MATRIX, Role
-from app.domain.booking import ChangeReason, MeetingRef
+from app.domain.booking import ChangeReason, MeetingRef, TrialCall
 from app.domain.form_fields import FieldDefinition, FieldType, FormDefinition
 from app.domain.planning import PlanningService
 from app.domain.privacy import ALIASES, PII_FIELDS
@@ -66,6 +66,7 @@ MARKERS = {
     "form_answers": "Zqanswer7x",
     "guest_join_url": "https://video.example/zqjoin7x",
     "host_join_url": "https://video.example/zqjoin7x",
+    "trial_join_url": "https://video.example/zqtrial7x",
 }
 """Marker per personal-data field (one join link: the adapter stores it under both)."""
 
@@ -336,6 +337,8 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     await planning.add_override(SUPER, "demo", one_agent)
     async with uow.locked() as tx:
         await tx.save_meeting(found.queued_id, MeetingRef("m-zq", MARKERS["guest_join_url"]))
+        trial = TrialCall(MeetingRef("t-zq", MARKERS["trial_join_url"]), site.clock.now())
+        await tx.save_trial_call(found.queued_id, trial)  # ADR 0071: no admin page shows it
         waiting = await tx.get_booking(waiting_id)
         assert waiting is not None
         await tx.save_booking(waiting.request_rebook(ChangeReason.STAFFING, site.clock.now()))

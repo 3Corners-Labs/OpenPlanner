@@ -117,6 +117,7 @@ def test_cancellation_plan() -> None:
     assert plan_for_cancellation(cancelled_at=NOW) == [
         PlannedJob(JobType.END_WXCC_TASK, NOW, None),
         PlannedJob(JobType.DELETE_VIDEO_ROOM, NOW, None),
+        PlannedJob(JobType.DELETE_TRIAL_CALL, NOW, None),
         PlannedJob(JobType.SEND_CANCELLATION, NOW, None, ChannelKind.EMAIL),
         PlannedJob(JobType.PURGE_PII, NOW + timedelta(hours=24), None),
     ]
@@ -126,6 +127,7 @@ def test_reschedule_cancellation_plan_sends_nothing() -> None:
     assert plan_for_cancellation(cancelled_at=NOW, notify=False) == [
         PlannedJob(JobType.END_WXCC_TASK, NOW, None),
         PlannedJob(JobType.DELETE_VIDEO_ROOM, NOW, None),
+        PlannedJob(JobType.DELETE_TRIAL_CALL, NOW, None),
         PlannedJob(JobType.PURGE_PII, NOW + timedelta(hours=24), None),
     ]
 
@@ -267,3 +269,21 @@ def test_team_invite_is_planned_now_and_cancelled_with_the_booking() -> None:
         assert [j.run_at for j in jobs if j.type is JobType.SEND_TEAM_CANCEL] == [NOW]
     plain = plan_for_cancellation(cancelled_at=NOW)
     assert not any(j.type is JobType.SEND_TEAM_CANCEL for j in plain)
+
+
+def test_every_plan_that_replaces_all_jobs_cleans_up_an_open_trial_call() -> None:
+    """ADR 0071: replacing a booking's jobs would otherwise drop the pending delete of its trial
+    meeting at Webex."""
+    from app.domain.job_plan import plan_for_rebook, plan_for_suspension
+
+    plans = {
+        "cancellation": plan_for_cancellation(cancelled_at=NOW),
+        "reschedule": plan_for_cancellation(cancelled_at=NOW, notify=False),
+        "suspension": plan_for_suspension(now=NOW, purge_at=None),
+        "rebook": plan_for_rebook(
+            now=NOW, rebook_by=NOW + timedelta(days=7), reminder_at=None, sms=False
+        ),
+    }
+
+    for name, plan in plans.items():
+        assert JobType.DELETE_TRIAL_CALL in [job.type for job in plan], name

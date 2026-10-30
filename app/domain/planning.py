@@ -69,6 +69,9 @@ class GroupSettings:
     dispatch_kind: DispatchKind
     citizen_change_lead_minutes: int
     planner_change_min_lead_minutes: int
+    trial_call_enabled: bool
+    trial_call_minutes: int
+    trial_calls_per_booking: int
     queue_visible_from_minutes: int
     queue_free_pick_allowed: bool
     max_bookings_per_email: int

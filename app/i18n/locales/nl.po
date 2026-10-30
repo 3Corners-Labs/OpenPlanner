@@ -436,6 +436,69 @@ msgstr "Verplaatsen kan niet meer, want het gesprek begint binnenkort. U kunt de
 msgid "manage.started"
 msgstr "Het gesprek is begonnen. Deze afspraak kan niet meer worden gewijzigd."
 
+msgid "trial.title"
+msgstr "Proefgesprek"
+
+msgid "trial.from_manage"
+msgstr "Uw verbinding vooraf uitproberen"
+
+msgid "trial.from_join"
+msgstr "Liever eerst uw verbinding uitproberen? Open een proefgesprek."
+
+msgid "trial.intro"
+msgstr "Met een proefgesprek ziet u vooraf of het videogesprek bij u werkt. Het is een echte Webex-vergadering, op dezelfde plek en met dezelfde Webex als uw afspraak. U kunt controleren:"
+
+msgid "trial.check.camera"
+msgstr "of uw camera werkt en uw beeld goed te zien is;"
+
+msgid "trial.check.microphone"
+msgstr "of uw microfoon u oppikt;"
+
+msgid "trial.check.speakers"
+msgstr "of u via uw luidsprekers of koptelefoon kunt horen;"
+
+msgid "trial.check.browser"
+msgstr "of uw browser het gesprek goed kan afspelen."
+
+msgid "trial.alone"
+msgstr "U zit er alleen in. Er komt niemand van het team binnen en niemand wacht op u. Webex vraagt u zelf om toestemming voor camera en microfoon, net als bij uw afspraak."
+
+msgid "trial.open_hint"
+msgstr "Het proefgesprek blijft {minutes} minuten open."
+
+msgid "trial.open"
+msgstr "Proefgesprek openen"
+
+msgid "trial.calls_left"
+msgstr "Proefgesprekken die u nog kunt openen: {count}."
+
+msgid "trial.active"
+msgstr "Uw proefgesprek staat open tot {time}."
+
+msgid "trial.join"
+msgstr "Naar het proefgesprek"
+
+msgid "trial.failed"
+msgstr "Het proefgesprek openen lukt nu niet. Probeer het over een paar minuten opnieuw. Uw afspraak zelf blijft gewoon staan."
+
+msgid "trial.limit"
+msgstr "U heeft het aantal proefgesprekken voor deze afspraak gebruikt. Lukt het niet? Neem dan contact met ons op."
+
+msgid "trial.too_late"
+msgstr "Uw afspraak begint of is al begonnen. Gebruik de link voor het gesprek zelf."
+
+msgid "trial.off"
+msgstr "Voor deze afspraak is geen proefgesprek beschikbaar."
+
+msgid "trial.back"
+msgstr "Terug naar uw afspraak"
+
+msgid "message.trial"
+msgstr "Wilt u vooraf uitproberen of beeld en geluid bij u werken? Open dan een proefgesprek in Webex, op elk moment voor uw afspraak."
+
+msgid "message.trial_link"
+msgstr "Proefgesprek openen"
+
 msgid "manage.inactive"
 msgstr "Deze afspraak is niet meer actief."
 
@@ -1051,6 +1114,42 @@ msgstr "Verplaatsen door de burger tot (minuten vooraf)"
 
 msgid "admin.field.citizen_change_lead_minutes_hint"
 msgstr "Tot hoeveel minuten voor de start de burger de afspraak nog kan verplaatsen. Annuleren kan altijd tot de start. Niet korter dan Doorzetten naar de wachtrij, hoogstens 1440. Standaard 60."
+
+msgid "admin.field.trial_call_enabled"
+msgstr "Proefgesprek voor de burger"
+
+msgid "admin.field.trial_call_enabled_hint"
+msgstr "Ja: de burger kan vooraf in een echte Webex-meeting uitproberen of camera, microfoon en luidsprekers werken. De meeting is van de Webex-host van deze groep; er komt niemand van het team in. Alleen met een Webex-host."
+
+msgid "admin.field.trial_call_minutes"
+msgstr "Proefgesprek blijft open (minuten)"
+
+msgid "admin.field.trial_call_minutes_hint"
+msgstr "Hoe lang één proefgesprek openstaat, van 10 tot 60 minuten. Standaard 30."
+
+msgid "admin.field.trial_calls_per_booking"
+msgstr "Proefgesprekken per afspraak"
+
+msgid "admin.field.trial_calls_per_booking_hint"
+msgstr "Hoe vaak één afspraak een proefgesprek mag openen, van 1 tot 5. Elk proefgesprek is een Webex-meeting. Standaard 3."
+
+msgid "admin.form.error.trial_call_minutes"
+msgstr "Vul een aantal minuten in van 10 tot 60."
+
+msgid "admin.form.error.trial_calls_per_booking"
+msgstr "Vul een aantal in van 1 tot 5."
+
+msgid "call.event.trial_created"
+msgstr "Proefgesprek geopend door de burger"
+
+msgid "call.event.trial_joined"
+msgstr "Burger ging het proefgesprek in"
+
+msgid "call.event.trial_failed"
+msgstr "Proefgesprek openen mislukt"
+
+msgid "call.event.trial_deleted"
+msgstr "Proefgesprek opgeruimd"
 
 msgid "admin.field.planner_change_min_lead_minutes"
 msgstr "Wijzigen door een planner (minuten vooraf)"
@@ -3638,6 +3737,9 @@ msgstr "Videogesprek aanmaken"
 msgid "audit.job.delete_video_room"
 msgstr "Videogesprek verwijderen"
 
+msgid "audit.job.delete_trial_call"
+msgstr "Proefgesprek verwijderen"
+
 msgid "audit.job.send_confirmation"
 msgstr "Bevestiging versturen"
 
@@ -4324,6 +4426,15 @@ msgstr "Webex weigerde een proefmeeting voor host {host} ({error}): {reason}"
 
 msgid "admin.check.webex.probe_left"
 msgstr "De proefmeeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
+
+msgid "admin.check.webex.trial_ok"
+msgstr "Een proefgesprek-meeting voor host {host} (deelnemers mogen vóór de host binnen) is gepland en weer verwijderd."
+
+msgid "admin.check.webex.trial_refused"
+msgstr "Webex weigerde een proefgesprek-meeting voor host {host} ({error}): {reason}. Burgers kunnen dan geen proefgesprek openen; controleer op de Webex-site of deelnemers vóór de host mogen binnenkomen."
+
+msgid "admin.check.webex.trial_left"
+msgstr "De proefgesprek-meeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
 
 msgid "admin.check.wxcc.not_configured"
 msgstr "Webex Contact Center is niet ingesteld; de routering is niet gecontroleerd."
@@ -6651,6 +6762,9 @@ msgstr "Deelnamekoppeling van de burger"
 
 msgid "admin.settings.data_fields.field.host_join_url"
 msgstr "Deelnamekoppeling van de medewerker"
+
+msgid "admin.settings.data_fields.field.trial_join_url"
+msgstr "Deelnamekoppeling van het proefgesprek"
 
 msgid "admin.settings.tls.title"
 msgstr "Certificaat van het publieke adres"

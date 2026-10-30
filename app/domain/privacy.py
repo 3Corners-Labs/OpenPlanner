@@ -9,7 +9,8 @@ Personal data (PII) lives only on ``Booking``:
 
 - *direct* fields identify the citizen on their own: first and last name, email, phone;
 - *sensitive* fields hold what the citizen told us or give access to the conversation: a
-  note, the answers to the group's custom form fields (ADR 0055) and the two join links.
+  note, the answers to the group's custom form fields (ADR 0055) and the join links (the
+  call's own and the trial call's, ADR 0071).
 
 Where it may appear: the booking detail page and the queue item, for a role holding a
 ``PII_PERMISSIONS`` permission (ADR 0039, 0063 §4), and the group's own agenda and queue show
@@ -54,6 +55,7 @@ DATA_FIELDS: tuple[DataField, ...] = (
     DataField("form_answers", Classification.SENSITIVE),
     DataField("guest_join_url", Classification.SENSITIVE),
     DataField("host_join_url", Classification.SENSITIVE),
+    DataField("trial_join_url", Classification.SENSITIVE),
 )
 """Every personal-data field, in the order the *Data fields* card shows them. The one list
 of CLAUDE.md's privacy rules; a field that is not here is not personal data."""

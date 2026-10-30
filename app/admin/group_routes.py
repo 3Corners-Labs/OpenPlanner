@@ -68,6 +68,9 @@ from app.domain.scheduling import (
     MAX_LABEL_LENGTH,
     MAX_PLANNER_LEAD_MINUTES,
     MAX_QUEUE_VISIBLE_FROM_MINUTES,
+    MAX_TRIAL_CALL_MINUTES,
+    MAX_TRIAL_CALLS_PER_BOOKING,
+    MIN_TRIAL_CALL_MINUTES,
     DispatchKind,
     GroupSummary,
     PhoneMode,
@@ -117,6 +120,14 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
     "citizen_change_lead_minutes": (
         "admin.field.citizen_change_lead_minutes",
         "admin.field.citizen_change_lead_minutes_hint",
+    ),
+    "trial_call_minutes": (
+        "admin.field.trial_call_minutes",
+        "admin.field.trial_call_minutes_hint",
+    ),
+    "trial_calls_per_booking": (
+        "admin.field.trial_calls_per_booking",
+        "admin.field.trial_calls_per_booking_hint",
     ),
     "planner_change_min_lead_minutes": (
         "admin.field.planner_change_min_lead_minutes",
@@ -589,6 +600,25 @@ def _settings_fields(
             error=form.error_for("direct_call_enabled"),
             options=yes_no,
         ),
+        Field(
+            "trial_call_enabled",
+            _("admin.field.trial_call_enabled"),
+            "select",
+            value("trial_call_enabled", "yes" if current.trial_call_enabled else "no"),
+            hint=_("admin.field.trial_call_enabled_hint"),
+            error=form.error_for("trial_call_enabled"),
+            options=yes_no,
+        ),
+        number(
+            "trial_call_minutes",
+            current.trial_call_minutes,
+            {"min": str(MIN_TRIAL_CALL_MINUTES), "max": str(MAX_TRIAL_CALL_MINUTES)},
+        ),
+        number(
+            "trial_calls_per_booking",
+            current.trial_calls_per_booking,
+            {"min": "1", "max": str(MAX_TRIAL_CALLS_PER_BOOKING)},
+        ),
         number("not_picked_up_minutes", current.not_picked_up_minutes, {"min": "1", "max": "120"}),
         number(
             "direct_call_max_concurrent",
@@ -662,8 +692,9 @@ async def save_settings(
     direct = form.choice("direct_call_enabled", {"yes", "no"})
     dispatch = form.choice("dispatch_kind", {kind.value for kind in DispatchKind})
     embedding = form.choice("embedding_enabled", {"yes", "no"})
+    trial = form.choice("trial_call_enabled", {"yes", "no"})
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
-    if not form.errors and None not in (phone, direct, dispatch, embedding, free_pick):
+    if not form.errors and None not in (phone, direct, dispatch, embedding, free_pick, trial):
         new = GroupSettings(
             name=form.text("name"),
             timezone=form.text("timezone"),
@@ -678,6 +709,7 @@ async def save_settings(
             direct_call_enabled=direct == "yes",
             direct_call_max_concurrent=cap,
             embedding_enabled=embedding == "yes",
+            trial_call_enabled=trial == "yes",
             **{name: value for name, value in numbers.items() if value is not None},
         )
         try:

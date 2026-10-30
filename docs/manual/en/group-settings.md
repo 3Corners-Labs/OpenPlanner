@@ -198,6 +198,29 @@ The value the flow in Webex Contact Center uses to choose the queue. If you leav
 portal sends the group's web address. Only fill in something else if the flow expects another
 value.
 
+<!-- field: trial_call_enabled -->
+### Trial call for the citizen
+
+With **Yes** the citizen can try, before the appointment and in a real Webex meeting, whether
+camera, microphone, speakers and browser work. It is not a separate test on our page: it is the
+same Webex site and the same Webex environment as the call itself, so a problem shows up now.
+The citizen is alone in it; nobody from the team joins and no task is created. The link is in
+the confirmation, the reminder, on the appointment page and on the page for the call. It only
+works with a **Webex host**. The trial call uses the host's Webex site, which must allow
+participants to enter before the host. **Check the integration** shows whether it does.
+
+<!-- field: trial_call_minutes -->
+### Trial call stays open (minutes)
+
+How long one trial call stays open, from 10 to 60 minutes. Default 30. After that the Webex
+meeting is deleted; the citizen can open a new trial call.
+
+<!-- field: trial_calls_per_booking -->
+### Trial calls per appointment
+
+How often one appointment may open a trial call, from 1 to 5. Default 3. Each trial call is a
+meeting in Webex; this number stops one appointment from creating them without end.
+
 <!-- field: direct_call_enabled -->
 ### Start a call right away
 

@@ -14,7 +14,8 @@ organisatie, een berichttekst of een logregel.
   telefoonnummer.
 - **Gevoelige** velden bevatten wat de burger ons heeft verteld, of geven toegang tot het
   gesprek: een notitie, de antwoorden op de eigen vragen van het team op het
-  boekingsformulier, en de twee koppelingen om aan het videogesprek deel te nemen.
+  boekingsformulier, en de koppelingen om aan het videogesprek en aan het proefgesprek deel te nemen (twee voor het
+  gesprek zelf en één voor het proefgesprek ervoor).
 
 De antwoorden op de eigen vragen van een team gelden als persoonsgegevens, tenzij de vraag bij
 het toevoegen is gemarkeerd als *geen persoonsgegevens* (zie
