@@ -99,6 +99,7 @@ def smtp_config(settings: SmtpSettings, password: str | None) -> SmtpConfig:
         implicit_tls=settings.security is SmtpSecurity.TLS,
         username=settings.username,
         password=password,
+        reply_to=settings.reply_to_address,
     )
 
 

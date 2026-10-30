@@ -5,6 +5,7 @@ request while one is open, a downgrade disguised as an update, a restore outside
 and an updater report that claims success for the wrong version.
 """
 
+from collections.abc import Sequence
 from datetime import timedelta
 
 import pytest
@@ -20,6 +21,7 @@ from app.domain.updates import (
     HOST_ACTOR,
     RESTORE_WINDOW,
     VERSION_ACTION,
+    ListedRelease,
     Release,
     ReleaseCheck,
     UpdateAction,
@@ -39,16 +41,18 @@ RELEASE = Release(V2, "https://github.com/acme/openplanner/releases/tag/v1.4.0")
 
 
 class FakeReleases:
-    def __init__(self, release: Release | None = RELEASE) -> None:
+    def __init__(self, release: Release | None = RELEASE, *, more: Sequence[Release] = ()) -> None:
         self.release = release
+        self.more = list(more)
         self.error: IntegrationError | None = None
         self.calls = 0
 
-    async def latest(self) -> Release | None:
+    async def listing(self) -> list[ListedRelease]:
         self.calls += 1
         if self.error is not None:
             raise self.error
-        return self.release
+        found = [r for r in (self.release, *self.more) if r is not None]
+        return [ListedRelease(r.version, r.url, None, f"notes of {r.version}") for r in found]
 
 
 @pytest.fixture
@@ -502,6 +506,61 @@ async def test_the_history_is_the_audit_log_of_updates_milestones_only(
         await service(uow, clock, current=V2).history(DEMO_ORG_ADMIN)
 
 
+# Choosing a version (ADR 0067 point 3).
+
+V3 = Version(1, 5, 0)
+OLDER = Release(Version(1, 2, 0), "https://github.com/acme/openplanner/releases/tag/v1.2.0")
+NEWEST = Release(V3, "https://github.com/acme/openplanner/releases/tag/v1.5.0")
+
+
+async def test_the_page_offers_every_newer_listed_version_with_notes(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await checked(uow, clock, FakeReleases(RELEASE, more=[OLDER, NEWEST, CANDIDATE]))
+
+    overview = await service(uow, clock).overview(DEMO_SUPERUSER)
+
+    assert [item.version for item in overview.offered] == [V3, V2]  # newest first, no candidate
+    assert overview.offered[0].notes == "notes of 1.5.0"
+    assert overview.available == NEWEST
+    on_rc = UpdateService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        current=V1,
+        releases=None,
+        checking=True,
+        channel=UpdateChannel.CANDIDATE,
+    )
+    assert [item.version for item in (await on_rc.overview(DEMO_SUPERUSER)).offered] == [
+        V3,
+        V2,
+        Version(1, 4, 0, 2),  # a release sorts above its own candidates
+    ]
+
+
+async def test_a_chosen_version_must_be_offered(uow: InMemoryUnitOfWork, clock: FixedClock) -> None:
+    await checked(uow, clock, FakeReleases(RELEASE, more=[OLDER, NEWEST, CANDIDATE]))
+    chosen = await service(uow, clock).request_update(DEMO_SUPERUSER, V2)
+    assert chosen.target == V2
+    await service(uow, clock).cancel(DEMO_SUPERUSER, chosen.id or 0)
+
+    for target in (OLDER.version, Version(1, 4, 0, 2), Version(9, 9, 9)):
+        with pytest.raises(DomainError, match="update_not_available"):
+            await service(uow, clock).request_update(DEMO_SUPERUSER, target)
+
+    newest = await service(uow, clock).request_update(DEMO_SUPERUSER)
+    assert newest.target == V3  # without a choice: the newest offered
+
+
+async def test_nothing_is_offered_while_a_request_is_open(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await checked(uow, clock, FakeReleases(RELEASE, more=[NEWEST]))
+    await service(uow, clock).request_update(DEMO_SUPERUSER)
+    assert (await service(uow, clock).overview(DEMO_SUPERUSER)).offered == []
+
+
 async def test_summary_tells_any_reader_what_the_banner_tells_the_superuser(
     uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
 ) -> None:
@@ -513,3 +572,78 @@ async def test_summary_tells_any_reader_what_the_banner_tells_the_superuser(
     assert summary.available == RELEASE
     assert summary.open is None
     assert (await service(uow, clock, current=V2).summary()).available is None
+
+
+async def test_the_check_interval_is_a_setting_read_live(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    minutes = [5]
+    updates = UpdateService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        current=V1,
+        releases=releases,
+        interval=lambda: timedelta(minutes=minutes[0]),
+    )
+    assert await updates.check_if_due()
+    clock.advance(timedelta(minutes=5))
+    assert await updates.check_if_due()
+    minutes[0] = 30  # the superuser raised it in the portal
+    clock.advance(timedelta(minutes=5))
+    assert not await updates.check_if_due()
+    clock.advance(timedelta(minutes=25))
+    assert await updates.check_if_due()
+    assert (await updates.overview(DEMO_SUPERUSER)).interval == timedelta(minutes=30)
+
+
+async def test_a_requested_check_runs_at_the_next_poll_and_is_audited(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    updates = service(uow, clock, releases)
+    await checked(uow, clock, releases)
+    clock.advance(timedelta(minutes=1))
+    assert not await updates.check_if_due()
+
+    await updates.request_check(DEMO_SUPERUSER)
+    assert (await updates.overview(DEMO_SUPERUSER)).check_requested
+    event = uow.state.audit[-1]
+    assert (event.actor, event.action, event.outcome, event.detail) == (
+        DEMO_SUPERUSER.subject,
+        "system.update",
+        Outcome.SUCCESS,
+        "check.request",
+    )
+    assert await updates.check_if_due()
+    assert releases.calls == 2
+    assert uow.state.release_check == ReleaseCheck(clock.now(), RELEASE)
+    assert not (await updates.overview(DEMO_SUPERUSER)).check_requested
+
+
+async def test_a_check_requested_before_the_first_one_only_leaves_the_audit_event(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    updates = service(uow, clock, releases)
+    await updates.request_check(DEMO_SUPERUSER)
+    assert uow.state.release_check is None  # the worker checks anyway: nothing to mark
+    assert uow.state.audit[-1].detail == "check.request"
+    assert await updates.check_if_due()
+
+
+async def test_org_admin_cannot_request_a_check(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await checked(uow, clock, releases)
+    with pytest.raises(DomainError) as caught:
+        await service(uow, clock, releases).request_check(DEMO_ORG_ADMIN)
+    assert caught.value.code is ErrorCode.NOT_PERMITTED
+    assert uow.state.release_check == ReleaseCheck(NOW, RELEASE)
+    assert uow.state.audit[-1].outcome is Outcome.DENIED
+
+
+async def test_a_check_cannot_be_requested_when_nobody_checks(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    with pytest.raises(DomainError) as caught:
+        await service(uow, clock).request_check(DEMO_SUPERUSER)
+    assert caught.value.code is ErrorCode.UPDATE_NOT_AVAILABLE
