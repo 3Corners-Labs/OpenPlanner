@@ -582,6 +582,9 @@ msgstr "Queue across my groups"
 msgid "admin.overview.widget.bookings_today.title"
 msgstr "Bookings today per group"
 
+msgid "admin.overview.widget.bookings_today.agenda_link"
+msgstr "Agenda of {name}"
+
 msgid "admin.overview.widget.bookings_today.empty"
 msgstr "No groups within your reach."
 
