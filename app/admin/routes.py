@@ -19,7 +19,7 @@ their branding in ``branding_routes``.
 import hmac
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 from urllib.parse import quote
 
@@ -174,7 +174,11 @@ async def callback(
     provider = _identity_provider(request)
     service = admin_service(request)
     pending = pop_login_start(request)
-    trial = pop_login_trial(request)
+    trial = pop_login_trial(
+        request,
+        _clock(request).now(),
+        timedelta(minutes=request.app.state.settings.admin_reauth_minutes),
+    )
     if (
         provider is None
         or pending is None
