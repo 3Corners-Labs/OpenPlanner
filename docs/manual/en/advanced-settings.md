@@ -16,6 +16,26 @@ When the installation does not run as production (for example a test environment
 screen also lists what production would refuse: a missing key or an address without https.
 Production never starts with any of these.
 
+### Certificate of the public address
+
+Below the environment is the certificate visitors reach the installation with: the address,
+who issued it, until when it is valid (with the days left), when it was last checked and one
+finding:
+
+- **Fine**: the certificate is trusted and valid for a good while. Renewal happens on its own.
+- **Expiring soon**: fewer days are left than the setting *Warn when the certificate is valid
+  for fewer than*. Automatic renewal seems to be failing; tell the server operator.
+- **Not trusted**: the certificate comes from a test, private or unknown certificate
+  authority. Normal during a trial installation with Let's Encrypt's staging environment; in
+  production browsers warn visitors.
+- **Expired**, **wrong name**, **not yet valid**, **unreachable**, **no https**: the text next
+  to the finding says what is going on.
+
+The server checks the certificate every few hours (setting *Check the certificate every*). A
+finding other than *fine* is also in the audit log as a system event `tls.certificate`, repeated
+while it lasts (setting *Repeat the certificate report every*). *Not checked yet* means the
+server has not run a round yet.
+
 Support may ask for a screenshot of this screen instead of the server's configuration.
 
 ## Platform settings

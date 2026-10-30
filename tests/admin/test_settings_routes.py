@@ -340,3 +340,46 @@ async def test_a_webex_service_app_set_in_the_portal_wires_the_integrations(site
     assert app.state.call_service is not None
     assert "client-secret" not in page
     assert "refresh-token" not in page
+
+
+async def test_system_status_shows_the_latest_certificate_check(site: Site) -> None:
+    # ADR 0064: what the worker found, in words, with issuer and days left.
+    from app.adapters.db.uow import SqlUnitOfWork
+    from app.domain.tls import Certificate, CertificateCheck, Finding, Trust
+
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    certificate = Certificate(
+        "afspraak.example.nl",
+        "Let's Encrypt (R11)",
+        site.clock.now() - timedelta(days=30),
+        site.clock.now() + timedelta(days=59, hours=12),
+        ("afspraak.example.nl",),
+    )
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        await tx.save_certificate_check(
+            CertificateCheck(
+                site.clock.now(), "afspraak.example.nl", Finding.OK, certificate, Trust.TRUSTED
+            )
+        )
+    await site.login_as(AUDITOR)
+
+    text = (await site.client.get("/admin/settings")).text
+
+    assert "Certificaat van het publieke adres" in text
+    assert "<code>afspraak.example.nl</code>" in text
+    assert "Let&#39;s Encrypt (R11)" in text or "Let's Encrypt (R11)" in text
+    assert "nog 59 dagen" in text
+    assert "chip--success" in text
+    assert "In orde: het certificaat wordt vertrouwd" in text
+
+
+async def test_system_status_without_a_check_says_so(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    text = (await site.client.get("/admin/settings")).text
+
+    assert "Nog niet gecontroleerd" in text
+    assert (
+        "chip--success"
+        not in text.split("Certificaat van het publieke adres")[1].split("</section>")[0]
+    )
