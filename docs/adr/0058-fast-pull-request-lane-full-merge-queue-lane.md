@@ -102,11 +102,11 @@ time.
 
 ## Consequences
 
-- Expected times, scaling the local measurements by the CI factor of 2–3 seen today: a pull
-  request answers in about 5–6 minutes (`python` without the matrix). The queue run takes about
-  7–8 minutes, set by `e2e`, with the matrix job at 5–7 minutes beside it. From push to `main`
-  that is roughly 13–15 minutes instead of 35–45. These are estimates; the PR that carries
-  out this ADR reports the real times.
+- Measured on this ADR's own pull request (#122, run 41036008137, both lanes): `python`
+  (fast lane, pytest with coverage, 4,149 tests) 6 minutes, `authorisation matrix` 6 minutes,
+  `container` 4.5 minutes, `e2e` 8.5 minutes, all in parallel. A pull request without
+  `ci:full` therefore answers in about 6 minutes instead of 12–22. A queue run takes about
+  8.5 minutes, set by `e2e`. From push to `main` that is roughly 15 minutes instead of 35–45.
 - A pull request can be green and still fail in the merge queue on the matrix, e2e or the
   container. The queue then removes it, and `main` stays green. The author learns
   this later than today. Pull requests that touch authorisation, navigation, templates or the
