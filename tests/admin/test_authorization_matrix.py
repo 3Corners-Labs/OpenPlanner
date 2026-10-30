@@ -107,6 +107,10 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             303, 303, 403, 403, 403, 403, 403
         ),
     },
+    # ADR 0042 §12: taking a value over from the environment; nothing is locked here (409).
+    "POST /admin/settings/{key}/adopt": {
+        "/admin/settings/admin_session_hours/adopt": statuses(409, 403, 403, 403, 403, 403, 403),
+    },
     "POST /admin/settings/{key}/reset": {
         "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
     },

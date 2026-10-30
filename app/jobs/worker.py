@@ -88,12 +88,11 @@ async def run_worker(
         max_sources=lambda: live.settings.security_event_max_sources,
     )
     integrations = build_integrations(settings, engine, http, clock, security)
-    fallback = fallback_mail(settings)
     runner = JobRunner(
         SqlJobQueue(engine),
         uow,
         clock,
-        ConfiguredSenders(uow, http, fallback),
+        ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
         MessageComposer(
             Translator(load_catalogues()),
             management_token_key(settings),
@@ -130,7 +129,7 @@ async def run_worker(
     log.info(
         "worker.started",
         poll_seconds=settings.worker_poll_seconds,
-        fallback_mail=fallback is not None,
+        fallback_mail=fallback_mail(settings) is not None,
         video_enabled=integrations.video is not None,
         dispatch_enabled=integrations.dispatcher is not None,
         release_check=settings.update_repository is not None,
@@ -138,7 +137,8 @@ async def run_worker(
     try:
         while not stop.is_set():
             if await is_reachable(engine):
-                await live.refresh()
+                if await live.refresh():  # the release repository or token may have changed
+                    updates = update_service(live.settings, uow, clock, http)
                 # One trace per round for housekeeping; every job gets its own inside it.
                 with trace_scope():
                     try:
