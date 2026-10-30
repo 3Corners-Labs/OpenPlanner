@@ -306,7 +306,6 @@ def _manage_context(
         "status_label": locale.gettext(STATUS_LABELS[booking.status]),
         "active": booking.is_active,
         "changeable": details.changeable,
-        "cancellable": details.cancellable,
         "deadline": _moment(deadline, group, locale),
         "notice": locale.gettext(STATUS_NOTICES[status]) if status in STATUS_NOTICES else None,
     }
