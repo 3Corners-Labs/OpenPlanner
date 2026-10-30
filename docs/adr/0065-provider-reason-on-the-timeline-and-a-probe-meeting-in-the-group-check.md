@@ -76,7 +76,7 @@ a stack trace, not a reason); the probe meeting is 30 minutes, a day ahead, and 
 
 | Step | What | PR | Status |
 |---|---|---|---|
-| 1 | Times in the group's time zone; reason on timeline, chain, export and shipped record; probe meeting in the group check | this PR | built |
+| 1 | Times in the group's time zone; reason on timeline, chain, export and shipped record; probe meeting in the group check | #138 | built |
 | 2 | Automatic check per group with a system event on failure, `integration_check_interval_hours` | #142 | built |
 
 ## Consequences

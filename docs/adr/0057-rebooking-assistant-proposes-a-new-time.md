@@ -1,8 +1,8 @@
 # 0057. Rebooking assistant: propose a new time and hold it until the citizen confirms
 
-Status: proposed (2026-10-30), requested by the product owner, with the choices recorded under *Choices
+Status: accepted (2026-10-30), requested by the product owner, with the choices recorded under *Choices
 made on acceptance*. Extends ADR 0044 (planner agenda, shortfalls, actions on bookings) and
-reuses the pending-confirmation mechanism of ADR 0056.
+reuses the pending-confirmation mechanism of ADR 0056. Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
 
 ## Context
 
@@ -138,6 +138,15 @@ The product owner chose on 2026-10-30, out of the options put to them:
    the proposal table (reversible). Depends on ADR 0056 step 1.
 3. Planner review page in the agenda, bulk send, overview in *Awaiting a new time*.
 4. Automatic mode per group with delay, staffing-version pin and the booking ceiling.
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | Ranking and assignment of new times (`domain/rebooking.py`) | #129 | merged |
+| 2–4 | Held proposal with migration and message, confirm, choose, cancel and expiry, review page, automatic mode, the `reschedule_*` settings |  | planned |
+
+(State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
 
 ## Consequences
 

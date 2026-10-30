@@ -5,22 +5,25 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from app.domain.booking import Booking, BookingKind, BookingStatus, Claim
 from app.domain.calls import CallState, CallStatus, TaskState
 from app.domain.direct_queue import (
     MIN_SAMPLES,
     SAMPLE_SIZE,
     DirectCall,
     QueuePhase,
+    WaitState,
     has_room,
     load_since,
     phase,
     queue_info,
     typical_wait,
+    wait_state,
 )
 from tests.support.domain import make_group
 
 NOW = datetime(2026, 1, 5, 8, 30, tzinfo=UTC)
-GROUP = make_group(direct_call_enabled=True, direct_call_max_concurrent=2)
+GROUP = make_group(direct_call_max_concurrent=2)
 
 
 def call(
@@ -29,6 +32,7 @@ def call(
     minutes_ago: int = 1,
     task: TaskState = TaskState.QUEUED,
     active: bool = True,
+    claimed: bool = False,
     **status: object,
 ) -> DirectCall:
     """Return a direct call that started ``minutes_ago`` with the given status."""
@@ -39,6 +43,7 @@ def call(
         end=start + timedelta(minutes=30),
         active=active,
         status=CallStatus(booking_id, task=task, **status),  # type: ignore[arg-type]
+        claimed=claimed,
     )
 
 
@@ -62,6 +67,7 @@ def picked_up(booking_id: int, wait_minutes: int) -> DirectCall:
         (call(1, minutes_ago=11), QueuePhase.DONE),  # not picked up after 10 min: stale
         (call(1, task=TaskState.CONNECTED, minutes_ago=50), QueuePhase.CONNECTED),
         (call(1, host_joined=True), QueuePhase.CONNECTED),  # agent in the meeting
+        (call(1, task=TaskState.NONE, claimed=True, minutes_ago=11), QueuePhase.CONNECTED),
         (call(1, task=TaskState.CONNECTED, minutes_ago=61), QueuePhase.DONE),  # lost end
         (call(1, task=TaskState.ENDED), QueuePhase.DONE),
         (call(1, task=TaskState.FAILED), QueuePhase.DONE),
@@ -139,3 +145,47 @@ def test_seconds_round_up_to_a_whole_minute() -> None:
     ]
 
     assert typical_wait(quick) == 1
+
+
+# --- the citizen's waiting page (ADR 0072) ---------------------------------------------------
+
+
+def _direct_booking(*, claimed: bool = False, active: bool = True) -> Booking:
+    """Return a direct booking that started at ``NOW``, claimed in the own queue or not."""
+    return Booking(
+        id=7,
+        group_id=1,
+        slot_id=7,
+        start=NOW,
+        end=NOW + timedelta(minutes=30),
+        status=BookingStatus.CONFIRMED if active else BookingStatus.CANCELLED,
+        contact=None,
+        locale="nl",
+        token_hash="h",
+        created_at=NOW,
+        kind=BookingKind.DIRECT,
+        claim=Claim(NOW, "pseudonym") if claimed else None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("booking", "status", "minutes", "expected"),
+    [
+        (_direct_booking(), CallStatus(7), 1, WaitState.SEARCHING),
+        (_direct_booking(), CallStatus(7, task=TaskState.QUEUED), 1, WaitState.SEARCHING),
+        (_direct_booking(), CallStatus(7, task=TaskState.CONNECTED), 1, WaitState.ACCEPTED),
+        (_direct_booking(claimed=True), CallStatus(7), 1, WaitState.ACCEPTED),  # own queue
+        (_direct_booking(claimed=True), CallStatus(7), 30, WaitState.ACCEPTED),  # agent on the way
+        (_direct_booking(), CallStatus(7, host_joined=True), 1, WaitState.IN_CALL),
+        (_direct_booking(), CallStatus(7, task=TaskState.FAILED), 1, WaitState.UNAVAILABLE),
+        (_direct_booking(), CallStatus(7, task=TaskState.QUEUED), 11, WaitState.UNAVAILABLE),
+        (_direct_booking(), CallStatus(7), 11, WaitState.UNAVAILABLE),  # own queue, nobody came
+        (_direct_booking(), CallStatus(7, call=CallState.FAILED), 1, WaitState.FAILED),
+        (_direct_booking(claimed=True), CallStatus(7, call=CallState.FAILED), 1, WaitState.FAILED),
+        (_direct_booking(active=False), CallStatus(7), 1, WaitState.INACTIVE),
+    ],
+)
+def test_what_the_waiting_page_says(
+    booking: Booking, status: CallStatus, minutes: int, expected: WaitState
+) -> None:
+    assert wait_state(booking, status, GROUP, NOW + timedelta(minutes=minutes)) is expected

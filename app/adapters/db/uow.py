@@ -137,6 +137,7 @@ from app.domain.scheduling import (
     DispatchKind,
     Group,
     GroupSummary,
+    Offer,
     Organisation,
     PhoneMode,
     ScheduleOverride,
@@ -197,7 +198,6 @@ def _group(row: GroupRow) -> Group:
         wxcc_business_address=row.wxcc_business_address,
         wxcc_channel=row.wxcc_channel,
         wxcc_routing_value=row.wxcc_routing_value,
-        direct_call_enabled=row.direct_call_enabled,
         not_picked_up_minutes=row.not_picked_up_minutes,
         direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
@@ -220,7 +220,9 @@ def _override(row: ScheduleOverrideRow) -> ScheduleOverride:
     if row.opens is None or row.closes is None or row.capacity is None:
         return ScheduleOverride(day=row.day, window=None, id=row.id)
     return ScheduleOverride(
-        day=row.day, window=TimeWindow(row.opens, row.closes, row.capacity, row.label), id=row.id
+        day=row.day,
+        window=TimeWindow(row.opens, row.closes, row.capacity, row.label, Offer(row.offer)),
+        id=row.id,
     )
 
 
@@ -238,7 +240,7 @@ def _rule(row: ScheduleRuleRow) -> ScheduleRule:
     """Map a weekly rule row."""
     return ScheduleRule(
         weekday=row.weekday,
-        window=TimeWindow(row.opens, row.closes, row.capacity, row.label),
+        window=TimeWindow(row.opens, row.closes, row.capacity, row.label, Offer(row.offer)),
         valid_from=row.valid_from,
         valid_to=row.valid_to,
         id=row.id,
@@ -253,6 +255,7 @@ def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
         "closes": rule.window.closes,
         "capacity": rule.window.capacity,
         "label": rule.window.label,
+        "offer": rule.window.offer.value,
         "valid_from": rule.valid_from,
         "valid_to": rule.valid_to,
     }
@@ -271,7 +274,6 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "wxcc_business_address": group.wxcc_business_address,
         "wxcc_channel": group.wxcc_channel,
         "wxcc_routing_value": group.wxcc_routing_value,
-        "direct_call_enabled": group.direct_call_enabled,
         "not_picked_up_minutes": group.not_picked_up_minutes,
         "direct_call_max_concurrent": group.direct_call_max_concurrent,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
@@ -503,6 +505,15 @@ class SqlTransaction(
             query = query.where(AuditEventRow.at < narrow.until)
         if narrow.trace_id is not None:
             query = query.where(AuditEventRow.trace_id == narrow.trace_id)
+        if narrow.actions:
+            query = query.where(
+                or_(
+                    *(
+                        AuditEventRow.action.startswith(prefix, autoescape=True)
+                        for prefix in sorted(narrow.actions)
+                    )
+                )
+            )
         if narrow.action is not None:
             query = query.where(AuditEventRow.action == narrow.action)
         return await self._entries(query, limit)
@@ -941,6 +952,7 @@ class SqlTransaction(
             closes=window.closes if window else None,
             capacity=window.capacity if window else None,
             label=window.label if window else None,
+            offer=window.offer.value if window else Offer.SCHEDULED.value,
         )
         self._session.add(row)
         await self._session.flush()
@@ -1234,7 +1246,14 @@ class SqlTransaction(
     async def get_direct_calls(self, group_id: int, since: datetime) -> list[DirectCall]:
         """Return the group's direct calls started at or after ``since``, with their status."""
         rows = await self._session.execute(
-            select(BookingRow.id, BookingRow.status, SlotRow.start, SlotRow.end, CallStatusRow)
+            select(
+                BookingRow.id,
+                BookingRow.status,
+                SlotRow.start,
+                SlotRow.end,
+                CallStatusRow,
+                BookingRow.claimed_at,
+            )
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
             .outerjoin(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
             .where(
@@ -1251,8 +1270,9 @@ class SqlTransaction(
                 end,
                 status == BookingStatus.CONFIRMED.value,
                 _call_status(call) if call else new_status(booking_id),
+                claimed=claimed_at is not None,
             )
-            for booking_id, status, start, end, call in rows
+            for booking_id, status, start, end, call, claimed_at in rows
         ]
 
     async def get_call_status(self, booking_id: int) -> CallStatus | None:

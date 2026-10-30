@@ -115,8 +115,11 @@ RELEASE = Release(Version(1, 4, 0), "https://github.com/acme/openplanner/release
 
 DETAIL = "/admin/groups/demo/bookings/{id}"
 QUEUE_ITEM = "/admin/groups/demo/queue/{queued}"
+QUEUE_ITEM_LIVE = QUEUE_ITEM + "/live"
+"""The claimed booking's status fragment (ADR 0072): the join link travels with it."""
 FIRST_NAME_PAGES = frozenset(
     {
+        "/admin/groups/demo/queue/live",
         "/admin/groups/demo/agenda",
         "/admin/groups/demo/agenda/week",
         "/admin/groups/demo/agenda/waiting",
@@ -163,6 +166,8 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/bookings/{booking_id}": DETAIL,
     "/admin/groups/{slug}/queue": "/admin/groups/demo/queue",
     "/admin/groups/{slug}/queue/{booking_id}": QUEUE_ITEM,
+    "/admin/groups/{slug}/queue/live": "/admin/groups/demo/queue/live",
+    "/admin/groups/{slug}/queue/{booking_id}/live": QUEUE_ITEM_LIVE,
     "/admin/groups/{slug}/closure": "/admin/groups/demo/closure",
     "/admin/groups/{slug}/closure/contacts": "/admin/groups/demo/closure/contacts",
     "/admin/groups/{slug}/closure/scenarios": "/admin/groups/demo/closure/scenarios",
@@ -398,7 +403,7 @@ def _allowed(path: str, found: Fixture) -> set[str]:
     """The markers ADR 0063 §4 allows on ``path``."""
     if path == found.fill(DETAIL):
         return set(MARKERS.values())
-    if path == found.fill(QUEUE_ITEM):
+    if path in {found.fill(QUEUE_ITEM), found.fill(QUEUE_ITEM_LIVE)}:
         return {MARKERS["first_name"], MARKERS["guest_join_url"]}
     if path in {found.fill(p) for p in FIRST_NAME_PAGES}:
         return {MARKERS["first_name"]}
@@ -433,11 +438,18 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         if found_leaks := _leaks(response.text, _allowed(path, found)):
             leaks[path] = found_leaks
     assert leaks == {}, "personal data on a list, overview, export or alert page (ADR 0063 §2)"
-    # An image route has none to show; the certificate request download (ADR 0070) has no
+    # An image route has none to show; the certificate request download (ADR 0072) has no
     # request waiting. Both answer 404 on purpose and carry no personal data.
     no_content = ("/image", "/tls/csr.pem")
     not_reached = {p: s for p, s in statuses.items() if s >= 400 and not p.endswith(no_content)}
     assert not_reached == {}, "a swept page did not render; fix its path or the fixture"
+
+    # ADR 0072: the claimed booking's fragment once the claim is gone carries no booking data.
+    async with _uow(site).locked() as tx:
+        await tx.release_claim(found.queued_id)
+    lost = await site.client.get(found.fill(QUEUE_ITEM_LIVE))
+    assert lost.status_code == 200
+    assert not _leaks(lost.text, set()), "claim lost fragment"
 
     # The chart views of the overview widgets (ADR 0061 §5) are other templates on the same
     # routes, reached only by asking for them: counts and group names, never a marker.
