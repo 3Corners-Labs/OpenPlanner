@@ -64,7 +64,7 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     form = (await site.client.get(f"{GROUP}/settings")).text
 
     assert '<option value="Europe/Amsterdam" selected>' in form
-    # time zone, dispatch kind, free pick, phone mode, trial call, Webex page (ADR 0073),
+    # time zone, dispatch kind, free pick, phone mode, trial call, Webex page (ADR 0075),
     # embedding (the direct call is offered per staffing block since ADR 0072)
     assert form.count(" selected>") == 7
 
