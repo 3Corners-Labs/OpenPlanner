@@ -126,14 +126,13 @@
   <div class="table-scroll">
   <table class="data-table">
     <caption class="visually-hidden">{{ _("admin.integrations.groups") }}</caption>
-    <thead><tr><th scope="col">{{ _("admin.field.name") }}</th><th scope="col">{{ _("admin.group.video") }}</th><th scope="col">{{ _("admin.group.wxcc") }}</th><th scope="col">{{ _("admin.group.direct_call") }}</th></tr></thead>
+    <thead><tr><th scope="col">{{ _("admin.field.name") }}</th><th scope="col">{{ _("admin.group.video") }}</th><th scope="col">{{ _("admin.group.wxcc") }}</th></tr></thead>
     <tbody>
       {% for summary in groups %}
       <tr>
         <th scope="row"><a href="/admin/groups/{{ summary.group.slug }}/settings">{{ summary.group.name }}</a></th>
         <td>{% if summary.group.video_enabled %}{{ _("admin.yes") }}{% else %}{{ _("admin.no") }}{% endif %}</td>
         <td>{% if summary.group.dispatch_enabled %}{{ _("admin.yes") }} · {{ summary.group.routing_value }}{% else %}{{ _("admin.no") }}{% endif %}</td>
-        <td>{% if summary.group.direct_call_enabled %}{{ _("admin.yes") }}{% else %}{{ _("admin.no") }}{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
