@@ -62,7 +62,7 @@ package; when the two disagree, the code wins.
 | 0064 | HTTPS by default, certificate status | BUILT | #139, #144; step 3 is ADR 0070 | – |
 | 0065 | Webex reason, probe meeting | BUILT | #138, #142; migration 0056 | – |
 | 0066 | Bookings per email address | PARTIAL | #128; migration 0054 | Point 8: a refusal is explained by email only (ADR 0056 step 2 is merged) |
-| 0067 | Version management in the portal | PARTIAL | steps 1–2 #145, #146; step 3 #148 in the merge queue; step 5 (check interval, "Check now") #169 in PR; migrations 0070, 0071, 0073 | Step 4: the live check on docker01 |
+| 0067 | Version management in the portal | PARTIAL | steps 1–2 #145, #146; step 3 #148 in the merge queue; step 5 (check interval, "Check now") #170 in PR; migrations 0070, 0071, 0073 | Step 4: the live check on docker01 |
 | 0068 | Troubleshooting per booking | BUILT | #152; migration 0059 | – |
 | 0069 | Citizen cancels until the start | BUILT | #151; migration 0062 | – |
 | 0070 | Certificate source in the portal | BUILT | #149; migration 0061 | – |
