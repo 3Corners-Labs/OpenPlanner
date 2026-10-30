@@ -1,4 +1,4 @@
-"""The audit filter's subjects (ADR 0065): action prefixes, applied by the fake and by SQL."""
+"""The audit filter's subjects (ADR 0067): action prefixes, applied by the fake and by SQL."""
 
 from app.domain.audit import SUBJECT_ACTIONS, AuditEvent, AuditFilter, Outcome, Subject
 from tests.support.domain import NOW

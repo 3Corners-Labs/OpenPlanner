@@ -282,7 +282,7 @@ async def changed_outside(admin_db: str) -> None:
 async def test_the_history_names_who_did_what_and_warns_about_a_change_from_outside(
     site: Site,
 ) -> None:
-    """ADR 0065: the history is the audit log of the updates, with a By column."""
+    """ADR 0067: the history is the audit log of the updates, with a By column."""
     await site.login_as(SUPER)
     await site.client.post("/admin/updates/update", headers=SAME_ORIGIN)
     history = await updates(site).overview(SUPER)

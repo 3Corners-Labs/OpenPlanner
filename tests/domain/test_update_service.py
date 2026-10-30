@@ -432,7 +432,7 @@ async def test_auto_apply_leaves_an_open_request_alone_and_asks_nothing_when_cur
     assert (await current.overview(DEMO_SUPERUSER)).open is None
 
 
-# Running versions and the history from the audit log (ADR 0065).
+# Running versions and the history from the audit log (ADR 0067).
 
 
 async def test_the_first_running_version_is_recorded_without_an_event(

@@ -868,7 +868,7 @@ class Transaction(Protocol):
         ...
 
     async def get_running_versions(self, limit: int = 2) -> list[RunningVersion]:
-        """Return the versions this installation ran, newest first (ADR 0065)."""
+        """Return the versions this installation ran, newest first (ADR 0067)."""
         ...
 
     async def add_running_version(self, running: RunningVersion) -> RunningVersion:

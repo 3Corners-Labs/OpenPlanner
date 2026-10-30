@@ -449,7 +449,7 @@ def test_the_installer_generates_the_keys_app_cli_init_generates() -> None:
     assert sorted(keys.split()) == sorted(KEYS)
 
 
-# Trust by installer mode (ADR 0065): the channel itself is chosen in the portal.
+# Trust by installer mode (ADR 0067): the channel itself is chosen in the portal.
 
 
 def _identity(host: Host) -> str:

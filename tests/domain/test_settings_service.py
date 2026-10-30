@@ -570,7 +570,7 @@ async def test_the_wxcc_host_must_use_https(uow: InMemoryUnitOfWork, clock: Fixe
 async def test_production_refuses_the_rc_channel_and_auto_apply(
     uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    """ADR 0065: the portal cannot move a production installation onto candidates."""
+    """ADR 0067: the portal cannot move a production installation onto candidates."""
     production = SettingsService(
         uow,
         clock,

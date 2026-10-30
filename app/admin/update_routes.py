@@ -257,13 +257,13 @@ def _history(
 
 @dataclass(frozen=True)
 class HistoryView:
-    """One line of the history: an audit event of the updates (ADR 0065 point 5).
+    """One line of the history: an audit event of the updates (ADR 0067 point 5).
 
     Attributes:
         at: When, in the admin time zone.
         by: Who: the staff member's name, or "system", "the updater" or "the host".
         what: What happened, from the detail key.
-        from_version: The version before; empty when the event predates ADR 0065.
+        from_version: The version before; empty when the event predates ADR 0067.
         to_version: The version after.
         reason: The updater's reason, for a failure or rollback.
         problem: Whether the line is a failure or rollback.

@@ -39,13 +39,13 @@ SNOOZE = timedelta(minutes=60)
 """How long "remind me later" hides the banner."""
 
 VERSION_ACTION = "system.version"
-"""Audit action of a version change the web process noticed at start-up (ADR 0065)."""
+"""Audit action of a version change the web process noticed at start-up (ADR 0067)."""
 
 HOST_ACTOR = "host"
 """Audit actor of a version change nobody requested in the portal: installer or by hand."""
 
 HISTORY_ACTIONS = frozenset({"system.update", VERSION_ACTION})
-"""The audit actions the updates page shows as its history (ADR 0065 point 5)."""
+"""The audit actions the updates page shows as its history (ADR 0067 point 5)."""
 
 HISTORY_DETAILS = frozenset(
     {
@@ -154,7 +154,7 @@ class Release:
 
 @dataclass(frozen=True)
 class RunningVersion:
-    """A version this installation ran, as the web process saw it at start-up (ADR 0065).
+    """A version this installation ran, as the web process saw it at start-up (ADR 0067).
 
     Attributes:
         version: ``APP_VERSION`` as text (``0.4.0-rc.7``, or ``main`` or empty for a build

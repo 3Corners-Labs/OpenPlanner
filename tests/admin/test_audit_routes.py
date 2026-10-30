@@ -383,7 +383,7 @@ async def test_an_unknown_diagnostics_target_changes_nothing(site: Site) -> None
 
 
 async def test_the_subject_filter_selects_the_updates_and_nothing_else(logged: Site) -> None:
-    """ADR 0065: the updates page links here with the subject that lists only update events."""
+    """ADR 0067: the updates page links here with the subject that lists only update events."""
     await logged.login_as(SUPER)
 
     page = (await logged.client.get("/admin/audit", params={"subject": "updates"})).text
