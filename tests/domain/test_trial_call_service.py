@@ -206,3 +206,20 @@ async def test_a_group_that_keeps_webexs_choice_gets_the_meeting_link_unchanged(
     await setup.service.open(setup.token)
 
     assert await setup.service.join_link(setup.token) == "https://site.webex.com/m/1"
+
+
+@pytest.mark.parametrize("client", list(JoinClient))
+async def test_following_the_trial_link_says_which_page_the_citizen_was_sent_to(
+    client: JoinClient,
+) -> None:
+    setup = await Setup(join_client=client).booked()
+    await setup.service.open(setup.token)
+
+    await setup.service.join_link(setup.token)
+
+    joined = [
+        e
+        for e in setup.uow.state.booking_events[setup.booking_id]
+        if e.kind is EventKind.TRIAL_JOINED
+    ]
+    assert [e.detail for e in joined] == [client.value]

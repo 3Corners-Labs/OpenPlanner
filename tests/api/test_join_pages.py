@@ -44,6 +44,14 @@ async def _set_client(database_url: str, client: JoinClient) -> None:
     await engine.dispose()
 
 
+async def _details(database_url: str, booking_id: int, kind: EventKind) -> list[str]:
+    engine = create_engine(database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        events = await tx.get_booking_events(booking_id)
+    await engine.dispose()
+    return [e.detail for e in events if e.kind is kind]
+
+
 async def _events(database_url: str, booking_id: int) -> list[EventKind]:
     engine = create_engine(database_url)
     async with SqlUnitOfWork(engine).read() as tx:
@@ -166,3 +174,20 @@ async def test_never_redirects_to_a_non_https_link(booked: tuple[str, int, Setti
 async def test_unknown_token_is_a_404(demo_settings: Settings) -> None:
     async with app_client(demo_settings, FixedClock(NOW)) as client:
         assert (await client.get("/b/not-a-token/join")).status_code == 404
+
+
+@pytest.mark.parametrize("client", list(JoinClient))
+async def test_the_click_says_which_page_the_citizen_was_sent_to(
+    booked: tuple[str, int, Settings], client: JoinClient
+) -> None:
+    """Without it "I saw the app question" cannot be told from a link that lost its parameter."""
+    token, booking_id, settings = booked
+    await _wire(settings.database_url, booking_id)
+    await _set_client(settings.database_url, client)
+
+    async with app_client(settings, FixedClock(START - timedelta(minutes=5))) as http:
+        await http.get(f"/b/{token}/join/go")
+
+    assert await _details(settings.database_url, booking_id, EventKind.JOIN_CLICKED) == [
+        client.value
+    ]

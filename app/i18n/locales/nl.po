@@ -1163,6 +1163,12 @@ msgstr "Proefgesprek geopend door de burger"
 msgid "call.event.trial_joined"
 msgstr "Burger ging het proefgesprek in"
 
+msgid "call.event.trial_entered"
+msgstr "Deelnemer kwam het proefgesprek binnen"
+
+msgid "call.event.trial_left"
+msgstr "Deelnemer verliet het proefgesprek"
+
 msgid "call.event.trial_failed"
 msgstr "Proefgesprek openen mislukt"
 

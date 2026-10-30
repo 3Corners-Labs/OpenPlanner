@@ -1163,6 +1163,12 @@ msgstr "Citizen opened a trial call"
 msgid "call.event.trial_joined"
 msgstr "Citizen entered the trial call"
 
+msgid "call.event.trial_entered"
+msgstr "Someone entered the trial call"
+
+msgid "call.event.trial_left"
+msgstr "Someone left the trial call"
+
 msgid "call.event.trial_failed"
 msgstr "Opening the trial call failed"
 

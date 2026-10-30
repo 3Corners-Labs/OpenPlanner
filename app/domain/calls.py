@@ -41,10 +41,19 @@ class EventKind(StrEnum):
     MEETING_DELETED = "meeting_deleted"
     JOIN_PAGE_OPENED = "join_page_opened"
     JOIN_CLICKED = "join_clicked"
+    """The citizen pressed the button on the join page (detail: the page they were sent to,
+    ``browser`` or ``choice``, ADR 0073)."""
     TRIAL_CREATED = "trial_created"
     """The citizen opened a trial call on Webex (ADR 0071)."""
     TRIAL_JOINED = "trial_joined"
-    """The citizen followed the link into the trial call."""
+    """The citizen followed the link into the trial call (detail: the page they were sent to,
+    ``browser`` or ``choice``, ADR 0073)."""
+    TRIAL_ENTERED = "trial_entered"
+    """Webex reports that someone joined the trial meeting (detail ``host`` when a host did,
+    which nobody from the team should). A click that is never followed by this means the
+    guest did not get in, for example because they wait in the lobby."""
+    TRIAL_LEFT = "trial_left"
+    """Webex reports that someone left the trial meeting."""
     TRIAL_FAILED = "trial_failed"
     """The trial meeting could not be created (detail: the code, e.g. ``rejected_400``)."""
     TRIAL_DELETED = "trial_deleted"
@@ -82,6 +91,16 @@ def join_link(link: str | None, client: JoinClient) -> str | None:
     query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k not in names]
     query.extend(BROWSER_LINK_PARAMS)
     return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+TRIAL_MEETING_EVENTS: dict[EventKind, EventKind] = {
+    EventKind.GUEST_JOINED: EventKind.TRIAL_ENTERED,
+    EventKind.HOST_JOINED: EventKind.TRIAL_ENTERED,
+    EventKind.PARTICIPANT_LEFT: EventKind.TRIAL_LEFT,
+}
+"""How an event of a trial meeting (ADR 0071) is recorded: as its own kinds, so the
+appointment's call status (participants, host joined) never counts the trial. The meeting's
+start and end are left out: our own jobs open and delete it."""
 
 
 class JoinState(StrEnum):

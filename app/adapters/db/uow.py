@@ -1141,6 +1141,10 @@ class SqlTransaction(
         """Return the booking whose meeting has ``meeting_id``."""
         return await self._booking_where(BookingRow.video_room_id == meeting_id)
 
+    async def get_booking_by_trial_meeting(self, meeting_id: str) -> Booking | None:
+        """Return the booking whose open trial call (ADR 0071) is the meeting ``meeting_id``."""
+        return await self._booking_where(BookingRow.trial_room_id == meeting_id)
+
     async def claim_booking(self, booking_id: int, claim: Claim) -> bool:
         """Record ``claim`` if the booking is confirmed and unclaimed (one conditional UPDATE)."""
         result = await self._session.execute(

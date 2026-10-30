@@ -72,5 +72,7 @@ async def join_go(request: Request, token: str) -> Response:
     link = join_link(booking.meeting.link if booking.meeting else None, details.group.join_client)
     if join_state(booking, clock.now()) is not JoinState.OPEN or not link or booking.id is None:
         return RedirectResponse(f"/b/{token}/join", status_code=303)
-    await integration.record(booking.id, EventKind.JOIN_CLICKED)
+    await integration.record(
+        booking.id, EventKind.JOIN_CLICKED, detail=details.group.join_client.value
+    )
     return RedirectResponse(link, status_code=303)
