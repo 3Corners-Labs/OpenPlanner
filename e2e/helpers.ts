@@ -15,7 +15,7 @@ export async function expectNoAxeViolations(page: Page): Promise<void> {
 
 /**
  * An email address of its own for this test, browser and attempt. All browsers book against
- * one server, and an address may hold only a few bookings per group (ADR 0059), so a shared
+ * one server, and an address may hold only a few bookings per group (ADR 0066), so a shared
  * address would make the later browsers' runs fail.
  */
 export function citizenEmail(testInfo: TestInfo): string {
