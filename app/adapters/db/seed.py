@@ -53,8 +53,9 @@ DEMO_CALENDAR_SLUG = "nationaal"
 DEMO_WIDGET_HOST = "http://localhost:8001"
 CLOSED_GROUP_SLUG = "demo-gesloten"
 PLANNED_GROUP_SLUG = "demo-gepland"
-PENDING_TIMES = (time(11), time(11, 30))
-"""Local times of the two example bookings awaiting confirmation, one per slot."""
+PENDING_TIMES = (time(11), time(11, 30), time(13), time(13, 30))
+"""Local times of the example bookings awaiting confirmation: one for the page checks and one
+per browser of the e2e keyboard flow, each in its own slot."""
 FIRST_WEEKEND_DAY = 5
 """``date.weekday()`` of Saturday: the demo team works on weekdays only."""
 EXAMPLE_NOTICES = {
@@ -100,14 +101,19 @@ class ClosureExamples:
         suspended_booking: The management page of a booking on hold (a new link each run).
         pending_confirm: The confirm page of a demo booking that awaits confirmation
             (ADR 0056), for the page checks; never confirmed by them.
-        pending_flow: Another such confirm page, which the keyboard flow confirms.
+        pending_flow_chromium: Another such confirm page, which the keyboard flow confirms in
+            Chromium; the flow runs in each browser, and each confirms its own booking.
+        pending_flow_firefox: The same for Firefox.
+        pending_flow_webkit: The same for WebKit.
     """
 
     closed_group: str
     planned_closure: str
     suspended_booking: str
     pending_confirm: str
-    pending_flow: str
+    pending_flow_chromium: str
+    pending_flow_firefox: str
+    pending_flow_webkit: str
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -206,7 +212,9 @@ async def seed_closure_examples(
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
         suspended_booking=f"/b/{token}",
         pending_confirm=f"/b/{pending[0]}/confirm",
-        pending_flow=f"/b/{pending[1]}/confirm",
+        pending_flow_chromium=f"/b/{pending[1]}/confirm",
+        pending_flow_firefox=f"/b/{pending[2]}/confirm",
+        pending_flow_webkit=f"/b/{pending[3]}/confirm",
     )
 
 
