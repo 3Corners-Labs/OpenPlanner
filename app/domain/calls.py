@@ -103,12 +103,17 @@ class TaskState(StrEnum):
 
 @dataclass(frozen=True)
 class BookingEvent:
-    """One entry of a booking's timeline; ``detail`` is a reason code, never personal data."""
+    """One entry of a booking's timeline; ``detail`` is a reason code, never personal data.
+
+    ``message`` is the provider's own reason for a failure (ADR 0065): masked, capped, and
+    only from requests without citizen data; empty for every other event.
+    """
 
     booking_id: int
     at: datetime
     kind: EventKind
     detail: str = ""
+    message: str = ""
 
 
 @dataclass(frozen=True)

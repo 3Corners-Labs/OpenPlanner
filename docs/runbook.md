@@ -612,9 +612,12 @@ prove that Webex or WxCC send events. For that, check `webhooks-list` (all `CURR
 
 Each group's **Instellingen** page has a card **Koppeling controleren**. Whoever may edit the
 group (`group.edit`: the organisation admin, the superuser) can press **Nu controleren**. It
-runs, read-only, what sections 6–8 check, but for that one group:
+runs what sections 6–8 check, but for that one group:
 
-- **Webex:** the host account exists and the Service App may schedule for it.
+- **Webex:** a probe meeting ("OpenPlanner controle", tomorrow, 30 minutes, no invitation
+  mail) is scheduled for the host exactly as a booking schedules one and deleted at once
+  (ADR 0065). That proves licence, scope, host, time zone and meeting options in one go; a
+  refusal shows Webex's own reason on the line. Nothing else is written at the platforms.
 - **Webex Contact Center:** region, channel, asset, asset schema, entry point, flow
   (`openplannerGroup` and a branch for the routing value), queue, Screen Pop. These are the
   same rules as `wxcc-config-check`.
@@ -624,6 +627,11 @@ runs, read-only, what sections 6–8 check, but for that one group:
 Each line says OK, Waarschuwing, Fout or Overgeslagen, and what to change. The latest result
 stays on the page with its time, and every run is audited as `integration.check`. Save
 changes first: the check uses the saved settings. It is limited to 6 runs per minute.
+
+When a meeting still fails later, the booking's timeline (Agenda → the booking) shows the
+code and, under it, Webex's own answer ("Antwoord van Webex: ..."); the audit log shows the
+same under the job's outcome, also in the chain view ("Hele keten"). The worker log keeps
+the `trackingId` for Cisco support at `integration.refused`.
 
 ### 10. Trying the flows without agents (simulator, not in production)
 
@@ -1135,7 +1143,7 @@ pseudonym (and every management link). At most `SECURITY_EVENT_MAX_SOURCES` call
 
 ## Log lines and the event schema (ADR 0040)
 
-Every line on stdout is one JSON object in the field names of `openplanner.event/1`
+Every line on stdout is one JSON object in the field names of `openplanner.event/2`
 (`docs/audit-events.md`), so a log platform needs no mapping:
 
 | Field | Meaning |
