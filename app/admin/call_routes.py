@@ -112,12 +112,16 @@ def agenda_row(
 
 @dataclass(frozen=True)
 class EventView:
-    """One timeline entry; ``hint`` says what to check after a failure."""
+    """One timeline entry; ``hint`` says what to check after a failure.
+
+    ``message`` is the provider's own reason (ADR 0065), already translated into a sentence.
+    """
 
     time: str
     label: str
     detail: str
     hint: str
+    message: str = ""
 
 
 @router.get("/groups/{slug}/bookings/{booking_id}", response_class=HTMLResponse)
@@ -144,6 +148,7 @@ async def booking_detail(
             _(EVENT_LABELS[e.kind]),
             e.detail,
             _(hint) if (hint := failure_hint(e.kind, e.detail)) else "",
+            _("admin.booking.provider_message", message=e.message) if e.message else "",
         )
         for e in timeline.events
     ]

@@ -24,7 +24,7 @@ from app.domain.calls import (
     new_status,
 )
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.ports import REASON_LIMIT, Clock, Transaction, UnitOfWork
 
 WEBHOOK_MEMORY = timedelta(days=30)
 """How long a Webex event key is remembered; older keys are forgotten on the next event."""
@@ -67,11 +67,20 @@ class IntegrationService:
         self._admin = admin
 
     async def record(
-        self, booking_id: int, kind: EventKind, at: datetime | None = None, detail: str = ""
+        self,
+        booking_id: int,
+        kind: EventKind,
+        at: datetime | None = None,
+        detail: str = "",
+        *,
+        message: str = "",
     ) -> None:
-        """Add an event to the booking's timeline and update its call status."""
+        """Add an event to the booking's timeline and update its call status.
+
+        ``message`` is the provider's own reason for a failure (ADR 0065), if it gave one.
+        """
         async with self._uow.locked() as tx:
-            await self._record(tx, booking_id, kind, at or self._clock.now(), detail)
+            await self._record(tx, booking_id, kind, at or self._clock.now(), detail, message)
 
     async def record_meeting_event(
         self,
@@ -156,9 +165,17 @@ class IntegrationService:
         return Timeline(booking, events, status)
 
     async def _record(
-        self, tx: Transaction, booking_id: int, kind: EventKind, at: datetime, detail: str
+        self,
+        tx: Transaction,
+        booking_id: int,
+        kind: EventKind,
+        at: datetime,
+        detail: str,
+        message: str = "",
     ) -> None:
         """Write the event and the updated status in the caller's transaction."""
-        await tx.add_booking_event(BookingEvent(booking_id, at, kind, detail[:128]))
+        await tx.add_booking_event(
+            BookingEvent(booking_id, at, kind, detail[:128], message[:REASON_LIMIT])
+        )
         status = await tx.get_call_status(booking_id) or new_status(booking_id)
         await tx.save_call_status(apply_event(status, kind, at))
