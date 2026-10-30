@@ -16,8 +16,8 @@ package; when the two disagree, the code wins.
 
 | Built? | ADRs |
 |---|---|
-| BUILT | 44 |
-| PARTIAL | 21 |
+| BUILT | 45 |
+| PARTIAL | 20 |
 | NOT BUILT | 5 |
 | POLICY | 3 |
 
@@ -32,7 +32,7 @@ package; when the two disagree, the code wins.
 | 0007 | Dispatch through the WxCC Tasks API | BUILT | #10; `ContactCenterDispatcher` port, `adapters/wxcc.py`, `verify_wxcc` (HMAC, 300 s); points 1–2 superseded by ADR 0018 | Live behaviour against a WxCC tenant is not visible in the code |
 | 0008 | Integration secrets in the admin UI, encrypted | PARTIAL | #10, #19, #106; `adapters/crypto.py` (AES-256-GCM), write-only inputs, audit, `integrations.manage` locked to the superuser | Key id per value and re-encryption on rotation: a new `SETTINGS_ENCRYPTION_KEY` makes secrets unreadable (runbook) |
 | 0009 | Notification channels, reminder rules, templates | PARTIAL | #2, #19; `domain/channels.py`, `job_plan.py`, `message_texts.py`, `admin/message_routes.py` | Organisation override layer of the text blocks (no store, no editor); group texts and reminder rules work |
-| 0010 | Live meeting status for group admins | BUILT | #10, #81, #167; `adapters/webhooks.py`, `MeetingStatusService`, `VideoProvider.meeting_status`, the agenda's polled fragment | – (Webex webhooks carry no timestamp, so there is no 300 s window; replays are caught by `event_key`) |
+| 0010 | Live meeting status for group admins | BUILT | #10, #81, #167 (AG-3); `adapters/webhooks.py`, `domain/calls.py`, `admin/_agenda_row.html`, `MeetingStatusService` | Webex webhooks carry no timestamp, replays are caught by `event_key` |
 | 0011 | Derived management tokens | BUILT | #10; `domain/tokens.py`, migration 0003, `tests/domain/test_tokens.py` | – |
 | 0012 | Merge only on the product owner's instruction | POLICY | CLAUDE.md, Git section; merge commits record the instruction; merge queue in `ci.yml` | No check that the instruction is recorded; the ADR says five review questions, the PR template has seven |
 | 0013 | Admin login with OIDC | BUILT | #7; `adapters/oidc.py` (PKCE, nonce, PyJWT), `admin/session.py`, Keycloak in `docker-compose.yml` | – (the session holds roles and scope as well, more than the ADR says) |
@@ -41,7 +41,7 @@ package; when the two disagree, the code wins.
 | 0016 | Admin forms without JavaScript | BUILT | #7, #8; `HTML_CSP`, `admin.css`; amended by ADR 0048, 0061, 0072 | – (HTMX is not used; own scripts on three pages) |
 | 0017 | Video calls through the Webex Meetings API | BUILT | #10, #12, #138, #154; `adapters/webex_meetings.py`, `webex_auth.py`, `api/join_pages.py` | `templateId` per group ("later" in the ADR); blur and backgrounds are a runbook checklist |
 | 0018 | Dispatch to WxCC as work items | BUILT | #10, #12, #125; `adapters/wxcc.py` (`task_body`), `verify_wxcc`, migration 0007; point 5 superseded by ADR 0021 | – |
-| 0019 | Direct video call per group | PARTIAL | #10, #24, #155; `api/direct_pages.py`, `direct_queue.py`, migration 0064 (switch moved by ADR 0072) | Point 4: the citizen cannot leave or cancel to end the task; only a "schedule instead" link exists |
+| 0019 | Direct video call per group | BUILT | #10, #24, #155, #164 (AG-2, leave from the waiting page); `api/direct_pages.py`, `domain/direct_leave.py`, `direct_queue.py`, migration 0064 (switch moved by ADR 0072) | – |
 | 0020 | Citizen calendar, branding through tokens | BUILT | #11, #49; `calendar.js`, `slot_picker.py`, `SCRIPT_CSP`, `/o/{slug}/theme.css`, `domain/branding.py` | – |
 | 0021 | Ending the work item of a cancelled booking | BUILT | #12; `CallService.end_task`, `WxccDispatcher`, job `END_WXCC_TASK`, `diagnostics.py` | – |
 | 0022 | Channels per organisation, SMS, editable texts | BUILT | #19, #29; migration 0013; `admin/channel_routes.py`, `message_routes.py`, `adapters/senders.py` | Organisation-wide text editor (deferred by the ADR itself) |
@@ -89,7 +89,7 @@ package; when the two disagree, the code wins.
 | 0064 | HTTPS by default, certificate status | BUILT | #139, #144; step 3 is ADR 0070 | – |
 | 0065 | Webex reason, probe meeting | BUILT | #138, #142; migration 0056 | – |
 | 0066 | Bookings per email address | PARTIAL | #128; migration 0054 | Point 8: a refusal is explained by email only (ADR 0056 step 2 is merged) |
-| 0067 | Version management in the portal | PARTIAL | steps 1–2 #145, #146; step 3 #148 in the merge queue; migrations 0070, 0071 | Step 4: the live check on docker01 |
+| 0067 | Version management in the portal | PARTIAL | steps 1–2 #145, #146; step 3 #148 in the merge queue; step 5 (check interval, "Check now") #170 in PR; migrations 0070, 0071, 0073 | Step 4: the live check on docker01 |
 | 0068 | Troubleshooting per booking | BUILT | #152; migration 0059 | – |
 | 0069 | Citizen cancels until the start | BUILT | #151; migration 0062 | – |
 | 0070 | Certificate source in the portal | BUILT | #149; migration 0061 | – |
@@ -101,7 +101,7 @@ package; when the two disagree, the code wins.
 
 - ADR 0001 to 0023 were not in this list. Each was checked against the code by reading the ADR
   and finding what runs, not by trusting its own words. Seven turned out partly built (0002,
-  0004, 0008, 0009, 0010, 0019, 0023) and now say so in their Status line; three are policy
+  0004, 0008, 0009, 0010, 0019, 0023; 0019 was completed by AG-2 afterwards) and now say so in their Status line; three are policy
   (0001, 0005, 0012). Two things worth knowing: CLAUDE.md says organisation text overrides are
   editable in the admin UI, but the override store of ADR 0004 and ADR 0009 does not exist
   (group texts do); ADR 0010's polling fallback and 30-second refresh were never built.

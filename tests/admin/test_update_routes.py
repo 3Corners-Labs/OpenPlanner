@@ -139,6 +139,35 @@ async def test_request_update_and_cancel_it(site: Site) -> None:
 
 
 @pytest.mark.usefixtures("released")
+@pytest.mark.parametrize(
+    "settings",
+    [{"update_repository": "acme/openplanner", "update_check_minutes": 15}],
+    indirect=True,
+)
+async def test_check_now_asks_the_worker_and_the_page_says_so(site: Site) -> None:
+    await site.login_as(SUPER)
+    page = (await site.client.get("/admin/updates")).text
+    assert "elke 15 minuten" in page
+    assert "Nu controleren" in page
+    asked = await site.client.post("/admin/updates/check", headers=SAME_ORIGIN)
+    assert asked.status_code == 303
+    assert asked.headers["location"] == "/admin/updates?done=check_requested"
+    page = (await site.client.get("/admin/updates?done=check_requested")).text
+    assert "Controle aangevraagd" in page
+    assert (await updates(site).overview(SUPER)).check_requested
+
+
+async def test_check_now_is_refused_when_nobody_checks(site: Site) -> None:
+    await site.login_as(SUPER)
+    refused = await site.client.post("/admin/updates/check", headers=SAME_ORIGIN)
+    assert refused.status_code == 409
+    forged = await site.client.post(
+        "/admin/updates/check", headers={"sec-fetch-site": "cross-site"}
+    )
+    assert forged.status_code == 403
+
+
+@pytest.mark.usefixtures("released")
 async def test_a_second_request_is_refused_on_the_page(site: Site) -> None:
     await site.login_as(SUPER)
     await site.client.post("/admin/updates/update", headers=SAME_ORIGIN)
