@@ -94,7 +94,7 @@ def build_integrations(
     store = CredentialStore(engine, SecretBox(settings_encryption_key(settings)))
     tokens = WebexTokens(config, http, store, clock, security)
     client = AuthorizedClient(http, tokens)
-    video = WebexMeetings(client, settings.webex_api_base_url)
+    video = WebexMeetings(client, settings.webex_api_base_url, clock)
     dispatcher = (
         WxccTasks(client, settings.wxcc_api_base_url, clock)
         if settings.dispatch_configured and settings.wxcc_api_base_url

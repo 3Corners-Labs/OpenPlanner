@@ -198,12 +198,19 @@ De waarde die de flow in Webex Contact Center gebruikt om de wachtrij te kiezen.
 veld leeg, dan stuurt het portaal het webadres van de groep mee. Vul alleen iets anders in als
 de flow een andere waarde verwacht.
 
-<!-- field: direct_call_enabled -->
-### Direct gesprek starten
+<!-- field: offer -->
+### Aanbod per tijdblok
 
-Met **Ja** kunnen burgers tijdens een tijdblok met medewerkers meteen een videogesprek starten,
-zonder afspraak. De afsprakenpagina toont dan een knop. Buiten de tijdblokken, op feestdagen
-of tijdens een noodsluiting verdwijnt die knop vanzelf.
+Bij elk tijdblok van de bezetting kiest u wat burgers in dat blok kunnen: **Afspraken** (de
+tijdslots van het blok, de standaard), **Direct gesprek** (meteen een videogesprek starten,
+zonder afspraak; het blok levert dan geen tijdslots) of **Afspraken en direct gesprek**. Een
+afwijkende bezetting voor één dag heeft dezelfde keuze.
+
+Tijdens een blok met medewerkers dat directe gesprekken aanbiedt, toont de afsprakenpagina de
+knop **Nu een gesprek starten**. Buiten zulke blokken, op feestdagen of tijdens een noodsluiting
+verdwijnt die knop vanzelf. De groep zelf heeft geen aan/uit-schakelaar meer: het aanbod staat
+bij de tijdblokken, zodat een team bijvoorbeeld 's ochtends directe gesprekken aanneemt en
+'s middags afspraken.
 
 <!-- field: not_picked_up_minutes -->
 ### Niet opgepakt na

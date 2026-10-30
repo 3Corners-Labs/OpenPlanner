@@ -788,6 +788,14 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/queue": statuses(404, 404, 404, 403, 403, 404, 403),
         "/admin/groups/andere-team/queue": statuses(404, 403, 403, 404, 403, 403, 403),
     },
+    # ADR 0070: the fragments the live queue polls carry the same permission as the page.
+    "GET /admin/groups/{slug}/queue/live": {
+        "/admin/groups/demo/queue/live": statuses(404, 404, 404, 403, 403, 404, 403),
+        "/admin/groups/andere-team/queue/live": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/queue/{booking_id}/live": {
+        "/admin/groups/demo/queue/999999/live": statuses(404, 404, 404, 403, 403, 404, 403),
+    },
     "POST /admin/groups/{slug}/queue/next": {
         "/admin/groups/demo/queue/next": statuses(404, 404, 404, 403, 403, 404, 403),
         "/admin/groups/andere-team/queue/next": statuses(404, 403, 403, 404, 403, 403, 403),

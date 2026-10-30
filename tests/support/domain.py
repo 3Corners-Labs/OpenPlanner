@@ -8,7 +8,7 @@ from dataclasses import replace
 from datetime import UTC, date, datetime, time
 
 from app.domain.authorization import Principal, Role
-from app.domain.scheduling import DispatchKind, Group, TimeWindow
+from app.domain.scheduling import DispatchKind, Group, Offer, TimeWindow
 from app.domain.services import BookingReceipt, BookingService, ContactInput
 
 NOW = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
@@ -28,9 +28,11 @@ TEST_TOKEN_KEY = b"k" * 32
 """Server key for deriving management tokens in tests (never used outside tests)."""
 
 
-def window(opens: str = "09:00", closes: str = "10:00", capacity: int = 2) -> TimeWindow:
-    """Return a local opening window."""
-    return TimeWindow(time.fromisoformat(opens), time.fromisoformat(closes), capacity)
+def window(
+    opens: str = "09:00", closes: str = "10:00", capacity: int = 2, offer: Offer = Offer.SCHEDULED
+) -> TimeWindow:
+    """Return a local staffing block; ``offer`` says whether it takes direct calls (ADR 0070)."""
+    return TimeWindow(time.fromisoformat(opens), time.fromisoformat(closes), capacity, offer=offer)
 
 
 def make_group(**overrides: object) -> Group:

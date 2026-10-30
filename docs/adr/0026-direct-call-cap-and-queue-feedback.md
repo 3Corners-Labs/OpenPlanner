@@ -1,7 +1,8 @@
 # 0026. Cap on open direct calls and queue feedback from our own data
 
 Status: accepted (2026-10-26), requested by the product owner. Amends ADR 0019 (consequence
-"capacity of direct calls is managed by WxCC").
+"capacity of direct calls is managed by WxCC"). Amended by ADR 0070 (a claimed call counts as
+connected; the waiting page polls a fragment instead of waiting for the refresh button).
 
 ## Context
 

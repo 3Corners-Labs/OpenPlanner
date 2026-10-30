@@ -1360,9 +1360,6 @@ msgstr "De flow kiest hiermee de wachtrij. Leeg: het webadres van de groep."
 msgid "admin.field.direct_call_enabled"
 msgstr "Direct gesprek starten"
 
-msgid "admin.field.direct_call_enabled_hint"
-msgstr "Deelnemers kunnen meteen een gesprek starten tijdens een tijdblok met medewerkers."
-
 msgid "admin.field.embedding_enabled"
 msgstr "Insluiten op websites"
 
@@ -1499,7 +1496,7 @@ msgid "wait.title"
 msgstr "Uw videogesprek"
 
 msgid "wait.searching"
-msgstr "We zoeken een medewerker voor u. U kunt alvast naar de wachtruimte gaan."
+msgstr "We zoeken een medewerker voor u."
 
 msgid "wait.accepted"
 msgstr "Een medewerker heeft uw gesprek aangenomen en komt zo naar de wachtruimte."
@@ -1677,9 +1674,6 @@ msgstr "Deelnemen aan het gesprek"
 
 msgid "admin.queue.new_window"
 msgstr "(opent in een nieuw venster)"
-
-msgid "admin.queue.no_meeting"
-msgstr "Voor deze afspraak is nog geen videogesprek klaar. Probeer het over een minuut opnieuw of geef de afspraak vrij."
 
 msgid "admin.queue.state.mine"
 msgstr "Door u opgepakt"
@@ -6330,3 +6324,60 @@ msgstr "Waarschuwen bij certificaat korter geldig dan (dagen)"
 
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Melding over het certificaat herhalen elke (uren)"
+
+msgid "admin.field.offer"
+msgstr "Aanbod"
+
+msgid "admin.field.offer_hint"
+msgstr "Wat deelnemers in dit tijdblok kunnen: een afspraak boeken, direct een gesprek starten, of allebei."
+
+msgid "admin.offer.scheduled"
+msgstr "Afspraken"
+
+msgid "admin.offer.direct"
+msgstr "Direct gesprek"
+
+msgid "admin.offer.both"
+msgstr "Afspraken en direct gesprek"
+
+msgid "admin.group.direct_blocks"
+msgstr "In {count} tijdblok(ken)"
+
+msgid "admin.queue.video_pending"
+msgstr "Videolink wordt klaargezet"
+
+msgid "admin.queue.video_failed"
+msgstr "Videolink mislukt"
+
+msgid "admin.queue.video_pending_explained"
+msgstr "Het videogesprek wordt nog klaargezet. De knop verschijnt vanzelf zodra het klaarstaat."
+
+msgid "admin.queue.video_failed_explained"
+msgstr "Het videogesprek kon niet worden klaargezet. De deelnemer ziet dit ook en krijgt het advies een afspraak te maken. Geef de afspraak vrij."
+
+msgid "admin.queue.timeline"
+msgstr "Bekijk de tijdlijn van deze afspraak"
+
+msgid "admin.queue.citizen.not_yet"
+msgstr "Deelnemer nog niet in het gesprek"
+
+msgid "admin.queue.citizen.in_lobby"
+msgstr "Deelnemer wacht in de wachtruimte"
+
+msgid "admin.queue.citizen.in_call"
+msgstr "Gesprek bezig"
+
+msgid "admin.queue.citizen.ended"
+msgstr "Gesprek afgelopen"
+
+msgid "wait.preparing"
+msgstr "We zetten uw videogesprek klaar. De knop verschijnt vanzelf zodra het klaarstaat."
+
+msgid "wait.lobby_hint"
+msgstr "U kunt alvast naar de wachtruimte gaan."
+
+msgid "wait.failed"
+msgstr "Het videogesprek kon helaas niet worden klaargezet door een technische storing. Het team is op de hoogte. Maak een afspraak, dan bellen we op een moment dat u schikt."
+
+msgid "settings.field.queue_refresh_seconds.label"
+msgstr "Wachtrij en wachtpagina verversen (seconden)"

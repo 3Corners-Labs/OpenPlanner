@@ -2,23 +2,10 @@
 {% block title %}{{ _("wait.title") }} – {{ group.name }}{% endblock %}
 {% block content %}
 <p class="eyebrow">{{ group.name }}</p>
-<h1>{{ _("wait.title") }}</h1>
-<div role="status" class="notice{% if state == 'unavailable' %} notice--warning{% endif %}">
-  {% if state == "searching" %}<p>{{ _("wait.searching") }}</p>
-  {% include "_queue_info.html" %}
-  {% elif state == "accepted" %}<p>{{ _("wait.accepted") }}</p>
-  {% elif state == "in_call" %}<p>{{ _("wait.in_call") }}</p>
-  {% elif state == "unavailable" %}<p>{{ _("wait.unavailable") }}</p>
-  {% else %}<p>{{ _("manage.inactive") }}</p>{% endif %}
+<h1 id="wait-heading" tabindex="-1">{{ _("wait.title") }}</h1>
+<div data-live data-heading="wait-heading">
+  <p class="visually-hidden" aria-live="polite" data-live-announce></p>
+  {% include "_wait_status.html" %}
 </div>
-{% if joinable %}
-<p><a class="button button--large" href="/b/{{ token }}/join/go">{{ _("join.button") }}</a></p>
-<p>{{ _("join.tips.lobby") }}</p>
-{% endif %}
-{% if refresh %}
-<p><a class="button button--secondary" href="/b/{{ token }}/wait">{{ _("join.refresh") }}</a></p>
-{% endif %}
-{% if state == "unavailable" %}
-<p><a class="button" href="/g/{{ group.slug }}">{{ _("direct.schedule_instead") }}</a></p>
-{% endif %}
 {% endblock %}
+{% block scripts %}<script src="/static/live-region.js" defer></script>{% endblock %}

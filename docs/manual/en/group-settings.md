@@ -191,12 +191,19 @@ The value the flow in Webex Contact Center uses to choose the queue. If you leav
 portal sends the group's web address. Only fill in something else if the flow expects another
 value.
 
-<!-- field: direct_call_enabled -->
-### Start a call right away
+<!-- field: offer -->
+### Offer per block
 
-With **Yes**, citizens can start a video call right away during a block with agents, without an
-appointment. The booking page then shows a button. Outside the blocks, on holidays or during an
-emergency closure, the button disappears by itself.
+For every staffing block you choose what citizens can do in it: **Appointments** (the block's
+slots, the default), **Direct call** (start a video call right away, without an appointment;
+the block then offers no slots) or **Appointments and direct call**. A staffing exception for
+one day has the same choice.
+
+During a block with agents that offers direct calls, the booking page shows the button
+**Start a call now**. Outside such blocks, on holidays or during an emergency closure, the
+button disappears by itself. The group itself no longer has an on/off switch: the offer sits
+on the blocks, so a team can take direct calls in the morning and appointments in the
+afternoon.
 
 <!-- field: not_picked_up_minutes -->
 ### Not picked up after

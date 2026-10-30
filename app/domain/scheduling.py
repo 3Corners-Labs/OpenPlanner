@@ -127,6 +127,26 @@ class DispatchKind(StrEnum):
     """OpenPlanner's own queue: agents sign in and pick up a booking."""
 
 
+class Offer(StrEnum):
+    """What a staffing block offers citizens (ADR 0070): slots, direct calls, or both."""
+
+    SCHEDULED = "scheduled"
+    """Appointments in the slot grid; the default."""
+    DIRECT = "direct"
+    """Direct calls (ADR 0019) only; the block offers no slots."""
+    BOTH = "both"
+
+    @property
+    def scheduled(self) -> bool:
+        """Whether the block takes part in the slot grid."""
+        return self is not Offer.DIRECT
+
+    @property
+    def direct(self) -> bool:
+        """Whether a citizen can start a direct call during the block."""
+        return self is not Offer.SCHEDULED
+
+
 class PhoneMode(StrEnum):
     """Whether the booking form asks for a phone number (per group, HANDOVER B15)."""
 
@@ -170,7 +190,6 @@ class Group:
         wxcc_business_address: Business address of the WxCC work item asset (ADR 0018).
         wxcc_channel: Name of the WxCC work item channel.
         wxcc_routing_value: Passed to the WxCC flow to choose the queue; the slug when empty.
-        direct_call_enabled: Whether citizens can start a call right away (ADR 0019).
         not_picked_up_minutes: After this long without an agent a call counts as not
             picked up (signal for O2).
         direct_call_max_concurrent: How many direct calls may be open (waiting or with an
@@ -216,7 +235,6 @@ class Group:
     wxcc_business_address: str | None = None
     wxcc_channel: str | None = None
     wxcc_routing_value: str | None = None
-    direct_call_enabled: bool = False
     not_picked_up_minutes: int = DEFAULT_NOT_PICKED_UP_MINUTES
     direct_call_max_concurrent: int | None = None
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
@@ -362,12 +380,14 @@ class TimeWindow:
         capacity: Number of agents, 0 to ``MAX_CAPACITY``; 0 offers no slots (lunch).
         label: Optional admin note such as "Lunch"; admin content only, never shown to
             citizens or logged, and no part of equality or ordering.
+        offer: Slots, direct calls or both (ADR 0070); ``scheduled`` by default.
     """
 
     opens: time
     closes: time
     capacity: int
     label: str | None = field(default=None, compare=False)
+    offer: Offer = Offer.SCHEDULED
 
     def __post_init__(self) -> None:
         """Require ``opens < closes``, ``0 <= capacity <= MAX_CAPACITY`` and a valid label."""
@@ -387,6 +407,16 @@ class TimeWindow:
     def staffed(self) -> bool:
         """Whether at least one agent works in this block."""
         return self.capacity > 0
+
+    @property
+    def offers_slots(self) -> bool:
+        """Whether the block takes part in the slot grid: staffed and not direct-only."""
+        return self.staffed and self.offer.scheduled
+
+    @property
+    def offers_direct(self) -> bool:
+        """Whether a citizen can start a direct call during the block (ADR 0070)."""
+        return self.staffed and self.offer.direct
 
     def overlaps(self, other: "TimeWindow") -> bool:
         """Return whether the two windows share any time (touching ends do not count)."""
@@ -485,15 +515,15 @@ def validate_schedule(rules: Sequence[ScheduleRule], overrides: Sequence[Schedul
                 raise _invalid("schedule_overrides")
 
 
-def is_open(
+def open_for_direct(
     group: Group,
     rules: Iterable[ScheduleRule],
     overrides: Iterable[ScheduleOverride],
     now: datetime,
 ) -> bool:
-    """Return whether ``now`` falls inside a staffed window of the group (local time)."""
+    """Return whether ``now`` falls inside a staffed block that offers direct calls (ADR 0070)."""
     local = now.astimezone(group.tz)
     return any(
-        window.staffed and window.opens <= local.time() < window.closes
+        window.offers_direct and window.opens <= local.time() < window.closes
         for window in windows_on(local.date(), rules, overrides)
     )

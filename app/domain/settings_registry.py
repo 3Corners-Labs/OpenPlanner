@@ -1037,6 +1037,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1000,
     ),
     S(
+        "queue_refresh_seconds",
+        K.INT,
+        10,
+        _C,
+        T.PLANNER,
+        "Seconds between two refreshes of the own queue, a claimed booking and the citizen's "
+        "waiting page (ADR 0070).",
+        minimum=5,
+        maximum=60,
+    ),
+    S(
         "planner_rebook_days",
         K.INT,
         14,
