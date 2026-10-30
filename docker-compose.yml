@@ -63,10 +63,11 @@ services:
       start_period: 15s
       retries: 3
 
-  # Production with a public domain (`docker compose --profile tls up -d`, ADR 0030): HTTPS on
-  # 443 with a certificate from Let's Encrypt, renewed automatically; port 80 only redirects and
-  # answers ACME challenges. Needs TLS_DOMAIN and ACME_EMAIL in proxy.env and the domain's DNS
-  # pointing at this host.
+  # Every installation with a public domain (`docker compose --profile tls up -d`, ADR 0030,
+  # ADR 0064): HTTPS on 443 with a certificate from Let's Encrypt, renewed automatically; port 80
+  # only redirects and answers ACME challenges. Needs TLS_DOMAIN and ACME_EMAIL in proxy.env and
+  # the domain's DNS pointing at this host. An own certificate instead: TLS_CERT_FILE and
+  # TLS_KEY_FILE in proxy.env, the files in ./certs (read-only below).
   proxy:
     build: deploy/proxy
     image: openplanner-proxy:local
@@ -81,6 +82,8 @@ services:
       # Certificates, keys and the ACME account: keep them, or every restart asks the CA again
       # and soon hits its rate limits.
       - proxy-data:/data
+      # An own certificate and key (ADR 0064); empty with ACME.
+      - ./certs:/certs:ro
     networks:
       edge:
         ipv4_address: 172.31.240.2

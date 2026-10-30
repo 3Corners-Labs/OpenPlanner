@@ -22,8 +22,8 @@ The log never contains citizens' data: no names, email addresses or phone number
 - **Minimum level**: for example *Warning* shows warnings, errors and critical entries.
   Denied and retry are warnings, failed is an error.
 - **Kind**: *Admin actions* (logins, changes, denials), *System* (messages, video calls,
-  removal of personal data, storage), *Security* (rejected webhooks, failed Webex token
-  renewal) and *Diagnostics*.
+  removal of personal data, storage, the automatic integration check), *Security* (rejected
+  webhooks, failed Webex token renewal) and *Diagnostics*.
 - **From** and **Up to and including**: whole days in the portal's time zone.
 - **Trace id**: every row of one request or one job. **Whole chain** on a row takes you
   there too.
