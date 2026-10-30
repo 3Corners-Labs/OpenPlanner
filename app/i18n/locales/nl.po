@@ -464,6 +464,9 @@ msgid "trial.alone"
 msgstr "U zit er alleen in. Er komt niemand van het team binnen en niemand wacht op u. Webex vraagt u zelf om toestemming voor camera en microfoon, net als bij uw afspraak."
 
 msgid "trial.browser"
+msgstr "Het proefgesprek opent in uw browser; op een computer hoeft u niets te installeren. Op een telefoon of tablet vraagt Webex om de Webex-app."
+
+msgid "trial.browser_choice"
 msgstr "Op een computer hoeft u niets te installeren: vraagt Webex om de app te openen, kies dan 'Deelnemen via deze browser'. Op een telefoon of tablet vraagt Webex om de Webex-app."
 
 msgid "trial.open_hint"
@@ -1124,6 +1127,18 @@ msgstr "Proefgesprek voor de burger"
 msgid "admin.field.trial_call_enabled_hint"
 msgstr "Ja: de burger kan vooraf in een echte Webex-meeting uitproberen of camera, microfoon en luidsprekers werken. De meeting is van de Webex-host van deze groep; er komt niemand van het team in. Alleen met een Webex-host."
 
+msgid "admin.field.join_client"
+msgstr "Webex-pagina voor de burger"
+
+msgid "admin.field.join_client_hint"
+msgstr "Welke pagina van Webex de burger bij de afspraak en het proefgesprek te zien krijgt."
+
+msgid "admin.group.join_client_browser"
+msgstr "Direct in de browser"
+
+msgid "admin.group.join_client_choice"
+msgstr "Webex laat de burger kiezen"
+
 msgid "admin.field.trial_call_minutes"
 msgstr "Proefgesprek blijft open (minuten)"
 
@@ -1512,6 +1527,9 @@ msgid "admin.group.not_connected"
 msgstr "Niet gekoppeld"
 
 msgid "message.join"
+msgstr "Het gesprek opent in uw browser; op een computer hoeft u niets te installeren. Op een telefoon of tablet vraagt Webex om de Webex-app. De link werkt vanaf 15 minuten voor de start."
+
+msgid "message.join_choice"
 msgstr "Op een computer hoeft u niets te installeren: vraagt Webex om de app te openen, kies dan 'Deelnemen via deze browser'. Op een telefoon of tablet vraagt Webex om de Webex-app. De link werkt vanaf 15 minuten voor de start."
 
 msgid "message.join_link"
@@ -1531,6 +1549,9 @@ msgstr "Goed om te weten"
 
 msgid "join.tips.browser"
 msgstr "Het gesprek opent in uw browser; op een computer hoeft u niets te installeren. Op een telefoon of tablet vraagt Webex om de Webex-app."
+
+msgid "join.tips.choice"
+msgstr "Vraagt Webex of u de app wilt openen? Kies dan 'Deelnemen via deze browser'; op een computer hoeft u niets te installeren. Op een telefoon of tablet vraagt Webex om de Webex-app."
 
 msgid "join.tips.devices"
 msgstr "Geef uw browser toestemming voor camera en microfoon als daarom wordt gevraagd."

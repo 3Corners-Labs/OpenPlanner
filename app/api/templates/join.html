@@ -11,7 +11,7 @@
 <p><a class="button button--large" href="/b/{{ token }}/join/go">{{ _("join.button") }}</a></p>
 <h2>{{ _("join.tips.title") }}</h2>
 <ul>
-  <li>{{ _("join.tips.browser") }}</li>
+  <li>{{ _("join.tips.choice" if group.join_client.value == "choice" else "join.tips.browser") }}</li>
   <li>{{ _("join.tips.devices") }}</li>
   <li>{{ _("join.tips.lobby") }}</li>
 </ul>

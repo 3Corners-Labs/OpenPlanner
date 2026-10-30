@@ -14,7 +14,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.api.citizen import citizen_page
 from app.api.labels import slot_label
-from app.domain.calls import JOIN_OPENS_BEFORE, EventKind, JoinState, join_state
+from app.domain.calls import JOIN_OPENS_BEFORE, EventKind, JoinState, join_link, join_state
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock
 from app.domain.services import BookingService
@@ -67,10 +67,10 @@ async def join_go(request: Request, token: str) -> Response:
     details = await bookings.find(token)
     follow(request, details.group.organisation_id)
     booking = details.booking
-    link = booking.meeting.link if booking.meeting else None
+    # The link comes from Webex: ``join_link`` refuses anything but https and sets the group's
+    # client (ADR 0073), so nothing else can ever become a redirect.
+    link = join_link(booking.meeting.link if booking.meeting else None, details.group.join_client)
     if join_state(booking, clock.now()) is not JoinState.OPEN or not link or booking.id is None:
-        return RedirectResponse(f"/b/{token}/join", status_code=303)
-    if not link.startswith("https://"):  # the link comes from Webex; never redirect elsewhere
         return RedirectResponse(f"/b/{token}/join", status_code=303)
     await integration.record(booking.id, EventKind.JOIN_CLICKED)
     return RedirectResponse(link, status_code=303)

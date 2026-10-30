@@ -1,8 +1,9 @@
 # 0073. A join link that opens the Webex web app directly, per group
 
-Status: proposed (2026-10-30), requested by the product owner after the question whether a
+Status: accepted (2026-10-30), requested by the product owner after the question whether a
 guest can be given the browser option only. Extends ADR 0017 (video through the Webex Meetings
-API) and ADR 0071 (trial call); settings per ADR 0042. Not built: see *Build status*.
+API) and ADR 0071 (trial call); settings per ADR 0042. Step 1 built on a branch, steps 2 and 3
+not: see *Build status*.
 
 ## Context
 
@@ -53,12 +54,15 @@ that happens.
 
 ## Decision
 
-1. **The join link is built in one place.** `app.domain.calls.join_link(meeting, client)`
+1. **The join link is built in one place.** `app.domain.calls.join_link(link, client)`
    returns the link the citizen is sent to: the meeting's `webLink` as stored for
-   `JoinClient.CHOICE`, and the same link with `launchApp=true` appended for
-   `JoinClient.BROWSER`. The parameter name is a constant next to `MEETING_OPTIONS` in the
-   Webex adapter (`BROWSER_LINK_PARAMS`), since it is Webex's mechanism, not a tunable. The
-   stored `webLink` does not change; the parameter is added when the link is handed out.
+   `JoinClient.CHOICE`, and the same link with `launchApp=true` set for `JoinClient.BROWSER`
+   (other query parameters kept, a value that says the opposite replaced, applying it twice
+   changes nothing). It returns `None` for anything but an `https` link, so a poisoned stored
+   value never becomes a redirect. The parameter is the constant `BROWSER_LINK_PARAMS` next to
+   it, since it is Webex's mechanism, not a tunable; it lives in the domain module because the
+   builder does and the domain imports nothing from an adapter. The stored `webLink` does not
+   change; the parameter is added when the link is handed out.
 2. **Per group, `join_client`, default `browser`.** The appointment's link
    (`/b/{token}/join/go`) and the trial call's link (`/b/{token}/test/go`) use the same
    builder, so the trial call tests the path the appointment takes (ADR 0071 point 1). A group
@@ -102,14 +106,15 @@ probe meeting's title, lead and length stay as in the group check today.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1 | `join_client` on `groups` (migration, reversible), `JoinClient`, `join_link()`, both redirects, group form and manual topic, texts in nl and en | | pending |
+| 1 | `join_client` on `groups` (migration 0072, reversible), `JoinClient`, `join_link()`, both redirects, group form and manual topic, texts per client in nl and en | | built on the branch, PR pending |
 | 2 | Group check: `webex.browser_link_*` and `webex.trial_lobby`, tolerant trial cleanup, i18n of the findings | | pending |
 | 3 | Confirm on docker01 with the Webex app installed on the tester's computer that `browser` opens the web app and `choice` the Webex page; record in this table | | pending |
 
 ## Consequences
 
-- Migration (reversible): `groups.join_client` text, default `browser`; the downgrade drops
-  the column.
+- Migration 0072 (reversible): `groups.join_client` text, default `browser`; the downgrade drops
+  the column. It revises 0070; PR #148 claims 0071, so whichever merges second changes its
+  `down_revision`.
 - `docs/settings.md` unchanged (a group setting, not a `Settings` field); `docs/admin-map.md`
   unchanged (same screen); `docs/manual/{nl,en}/group-settings.md` gets the setting;
   `docs/authorization.md` unchanged.

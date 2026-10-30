@@ -197,6 +197,8 @@ class GroupRow(Base):
     trial_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
     trial_call_minutes: Mapped[int] = mapped_column(Integer, server_default=text("30"))
     trial_calls_per_booking: Mapped[int] = mapped_column(Integer, server_default=text("3"))
+    # ADR 0073: which Webex page the citizen's join link opens.
+    join_client: Mapped[str] = mapped_column(String(16), server_default=text("'browser'"))
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     queue_visible_from_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))
     queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
@@ -216,6 +218,7 @@ class GroupRow(Base):
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
         CheckConstraint("trial_call_minutes BETWEEN 10 AND 60", name="trial_call_minutes"),
         CheckConstraint("trial_calls_per_booking BETWEEN 1 AND 5", name="trial_calls_per_booking"),
+        CheckConstraint("join_client IN ('browser', 'choice')", name="join_client"),
         CheckConstraint("queue_visible_from_minutes BETWEEN 0 AND 120", name="queue_visible_from"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
         CheckConstraint("max_bookings_per_email BETWEEN 1 AND 10", name="max_bookings_per_email"),

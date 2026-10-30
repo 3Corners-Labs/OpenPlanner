@@ -464,6 +464,9 @@ msgid "trial.alone"
 msgstr "You will be alone in it. Nobody from the team joins and nobody is waiting for you. Webex asks for permission to use your camera and microphone, just as for your appointment."
 
 msgid "trial.browser"
+msgstr "The trial call opens in your browser; on a computer there is nothing to install. On a phone or tablet Webex asks for the Webex app."
+
+msgid "trial.browser_choice"
 msgstr "On a computer there is nothing to install: if Webex asks to open the app, choose 'Join from this browser'. On a phone or tablet Webex asks for the Webex app."
 
 msgid "trial.open_hint"
@@ -1124,6 +1127,18 @@ msgstr "Trial call for the citizen"
 msgid "admin.field.trial_call_enabled_hint"
 msgstr "Yes: the citizen can try beforehand, in a real Webex meeting, whether camera, microphone and speakers work. The meeting belongs to this group's Webex host; nobody from the team joins. Only with a Webex host."
 
+msgid "admin.field.join_client"
+msgstr "Webex page for the citizen"
+
+msgid "admin.field.join_client_hint"
+msgstr "Which Webex page the citizen sees for the appointment and the trial call."
+
+msgid "admin.group.join_client_browser"
+msgstr "Straight into the browser"
+
+msgid "admin.group.join_client_choice"
+msgstr "Webex lets the citizen choose"
+
 msgid "admin.field.trial_call_minutes"
 msgstr "Trial call stays open (minutes)"
 
@@ -1512,6 +1527,9 @@ msgid "admin.group.not_connected"
 msgstr "Not connected"
 
 msgid "message.join"
+msgstr "The call opens in your browser; on a computer there is nothing to install. On a phone or tablet Webex asks for the Webex app. The link works from 15 minutes before the start."
+
+msgid "message.join_choice"
 msgstr "On a computer there is nothing to install: if Webex asks to open the app, choose 'Join from this browser'. On a phone or tablet Webex asks for the Webex app. The link works from 15 minutes before the start."
 
 msgid "message.join_link"
@@ -1531,6 +1549,9 @@ msgstr "Good to know"
 
 msgid "join.tips.browser"
 msgstr "The call opens in your browser; on a computer there is nothing to install. On a phone or tablet Webex asks for the Webex app."
+
+msgid "join.tips.choice"
+msgstr "If Webex asks whether to open the app, choose 'Join from this browser'; on a computer there is nothing to install. On a phone or tablet Webex asks for the Webex app."
 
 msgid "join.tips.devices"
 msgstr "Allow your browser to use the camera and microphone when it asks."
