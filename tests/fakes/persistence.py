@@ -50,7 +50,7 @@ from app.domain.scheduling import (
 from app.domain.staff import StaffFilter, StaffMember, visible
 from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
-from app.domain.updates import ReleaseCheck, UpdateRequest
+from app.domain.updates import ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -94,6 +94,7 @@ class State:
     channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
+    running_versions: list[RunningVersion] = field(default_factory=list)
     certificate_check: CertificateCheck | None = None
     own_certificate: OwnCertificate | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
@@ -888,6 +889,13 @@ class InMemoryTransaction:
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
         self.state.release_check = check
+
+    async def get_running_versions(self, limit: int = 2) -> list[RunningVersion]:
+        return list(reversed(self.state.running_versions))[:limit]
+
+    async def add_running_version(self, running: RunningVersion) -> RunningVersion:
+        self.state.running_versions.append(running)
+        return running
 
     async def get_certificate_check(self) -> CertificateCheck | None:
         return self.state.certificate_check
