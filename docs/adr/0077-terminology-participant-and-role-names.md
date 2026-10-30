@@ -246,15 +246,17 @@ Still open; none is guessed in the code:
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1a | Column `citizen_change_lead_minutes` → `participant_change_lead_minutes`, migration, audit alias (point 3a) | | decided, first in line |
-| 1b | This ADR and the `CLAUDE.md` wording (point 7) | | in review |
-| 2a | `nl.po` and `en.po` with the tests that assert their texts, `widget/`, `docs/widget.md` (keys unchanged) | | not started, waits for acceptance and for the open PRs on the catalogues |
-| 2b | Admin manual `docs/manual/{nl,en}/` | | not started |
-| 2c | `docs/*.md` except HANDOVER (which gets its one line), and `CONTRIBUTING.md` | | not started |
-| 2d | Code identifiers, comments and the `citizen.*` codes; `e2e/`, `scripts/diagrams/` | | not started |
-| 3 | Guard test `tests/test_terminology.py` | | not started, after 2a to 2d |
-| 4a | The agent term and role names per organisation and group in the portal (points 8, 10 to 13) | | not started, after #168 |
-| 4b | `{agent}` and `{agents}` in catalogue texts and mails, grammar test (point 9) | | not started, after 2a and 4a |
+| 1a | Column `citizen_change_lead_minutes` → `participant_change_lead_minutes`, migration, audit alias (point 3a) | | planned, first in line; branch `feat/participant-change-lead` is checked, no PR yet |
+| 1b | This ADR and the `CLAUDE.md` wording (point 7) | | planned, this change is in review |
+| 2a | `nl.po` and `en.po` with the tests that assert their texts, `widget/`, `docs/widget.md` (keys unchanged) | | planned |
+| 2b | Admin manual `docs/manual/{nl,en}/` | | planned |
+| 2c | `docs/*.md` except HANDOVER (which gets its one line), and `CONTRIBUTING.md` | | planned |
+| 2d | Code identifiers, comments and the `citizen.*` codes; `e2e/`, `scripts/diagrams/` | | planned |
+| 3 | Guard test `tests/test_terminology.py` | | planned |
+| 4a | The agent term and role names per organisation and group in the portal (points 8, 10 to 13) | | planned |
+| 4b | `{agent}` and `{agents}` in catalogue texts and mails, grammar test (point 9) | | planned |
+
+Steps 2a and 4a wait for the open PRs on the catalogue and for #168; 4b after 2a and 4a; 3 after 2a to 2d.
 
 ## Consequences
 
