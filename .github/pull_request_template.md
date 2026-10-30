@@ -22,6 +22,7 @@
 ## Checklist
 - [ ] I agree to the OpenPlanner Contributor Licence Agreement (`docs/cla.md`)
 - [ ] `make check` green
+- [ ] Label `ci:full` set if this touches authorisation, navigation, templates or the widget (ADR 0058)
 - [ ] Screenshots for UI changes
 - [ ] i18n checked (nl/en)
 - [ ] Manual updated for every admin screen this PR adds or changes (`docs/manual/`, ADR 0033)
