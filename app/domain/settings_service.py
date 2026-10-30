@@ -49,6 +49,7 @@ EDITABLE_TOPICS = frozenset(
         Topic.ADMIN_SESSION,
         Topic.STAFF,
         Topic.PLANNER,
+        Topic.CONFIRMATION,
     }
 )
 """The topics of class C settings the portal changes from build step 4 on."""

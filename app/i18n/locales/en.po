@@ -373,6 +373,9 @@ msgstr "You did not pick up this appointment."
 msgid "error.booking_not_active"
 msgstr "This appointment is no longer active."
 
+msgid "error.booking_not_pending"
+msgstr "This appointment is already confirmed or no longer active."
+
 msgid "error.same_slot"
 msgstr "This is the time of your current appointment. Choose another time."
 
@@ -5601,6 +5604,9 @@ msgstr "Staff"
 msgid "settings.topic.planner"
 msgstr "Planner"
 
+msgid "settings.topic.confirmation"
+msgstr "Confirming appointments"
+
 msgid "settings.field.log_level.label"
 msgstr "Log level"
 
@@ -5774,6 +5780,18 @@ msgstr "Request to rebook lapses after (days)"
 
 msgid "settings.field.planner_rebook_reminder_days.label"
 msgstr "Rebook reminder (days before the lapse)"
+
+msgid "settings.field.booking_confirm_min_minutes.label"
+msgstr "Minimum time to confirm (minutes)"
+
+msgid "settings.field.booking_confirm_reminders.label"
+msgstr "Number of reminders to confirm"
+
+msgid "settings.field.booking_confirm_cutoff_hours.label"
+msgstr "Confirm at the latest (hours before the appointment)"
+
+msgid "settings.field.booking_confirm_window_hours.label"
+msgstr "Confirm within (hours after booking)"
 
 msgid "admin.settings.change"
 msgstr "Change"

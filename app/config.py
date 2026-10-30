@@ -218,6 +218,15 @@ class Settings(BaseSettings):
     # country of phone numbers typed without a country code (class D organisation).
     booking_form_max_custom_fields: int = Field(default=5, ge=0, le=15)
     phone_default_region: str = Field(default="NL", pattern=r"^[A-Z]{2}$")
+    # ADR 0056: a citizen confirms a booking by email link within the earlier of this many
+    # hours after booking and this many hours before the start, with this many reminders.
+    # Class D organisation (ADR 0042, settings registry).
+    booking_confirm_window_hours: int = Field(default=24, ge=1, le=72)
+    booking_confirm_cutoff_hours: int = Field(default=2, ge=0, le=24)
+    booking_confirm_reminders: int = Field(default=1, ge=0, le=3)
+    # ADR 0056: less time to confirm than this switches to the short-notice rule, and no
+    # reminder goes closer to the deadline. Class C platform (ADR 0042, settings registry).
+    booking_confirm_min_minutes: int = Field(default=15, ge=5, le=120)
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"

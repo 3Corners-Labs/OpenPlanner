@@ -3,6 +3,10 @@
 ``Contact`` holds the only personal data in the system (CLAUDE.md privacy rules). Its fields
 are excluded from ``repr`` so they cannot end up in logs or tracebacks by accident.
 
+    pending_confirmation ──confirm()──► confirmed      (citizen clicks, ADR 0056)
+             ├──expire()──► cancelled                  (not confirmed in time)
+             └──cancel()──► cancelled
+
     confirmed ──cancel()──► cancelled
         │  ▲
         │  └──reinstate()── suspended ──cancel()──► cancelled
@@ -144,6 +148,8 @@ class BookingStatus(StrEnum):
     SUSPENDED = "suspended"
     AWAITING_REBOOK = "awaiting_rebook"
     """A planner asked the citizen to choose a new time (ADR 0044); the place is freed."""
+    PENDING_CONFIRMATION = "pending_confirmation"
+    """The citizen has not confirmed by email link yet (ADR 0056); the place is held."""
 
 
 @dataclass(frozen=True)
@@ -189,7 +195,9 @@ class Claim:
 class Booking:
     """One citizen's appointment in a slot.
 
-    ``contact`` is ``None`` after the personal data has been purged.
+    ``contact`` is ``None`` after the personal data has been purged. ``confirm_by`` is set on a
+    booking that had to be confirmed by email link (ADR 0056), ``confirmed_at`` once it was:
+    the moment the citizen's email address was verified.
     """
 
     id: int | None
@@ -213,6 +221,8 @@ class Booking:
     change_reason: ChangeReason | None = None
     rebook_by: datetime | None = None
     claim: Claim | None = None
+    confirm_by: datetime | None = None
+    confirmed_at: datetime | None = None
 
     @property
     def reference(self) -> str:
@@ -235,6 +245,25 @@ class Booking:
         return self.status is BookingStatus.AWAITING_REBOOK
 
     @property
+    def awaits_confirmation(self) -> bool:
+        """Whether the citizen still has to confirm the booking by email link (ADR 0056)."""
+        return self.status is BookingStatus.PENDING_CONFIRMATION
+
+    @property
+    def lapsed_unconfirmed(self) -> bool:
+        """Whether the booking was cancelled because it was not confirmed in time (ADR 0056).
+
+        Told apart from other cancellations without a reason field: it had a deadline to
+        confirm, was never confirmed, and was cancelled exactly at that deadline.
+        """
+        return (
+            self.status is BookingStatus.CANCELLED
+            and self.confirmed_at is None
+            and self.confirm_by is not None
+            and self.cancelled_at == self.confirm_by
+        )
+
+    @property
     def on_hold(self) -> bool:
         """Whether the booking does not go ahead at its time until the citizen or staff act.
 
@@ -246,7 +275,9 @@ class Booking:
 
     @property
     def holds_place(self) -> bool:
-        """Whether the booking takes a place in its slot: confirmed, or on hold.
+        """Whether the booking takes a place in its slot: confirmed, pending or suspended.
+
+        A booking awaiting confirmation holds its place until it lapses (ADR 0056).
 
         A suspended booking keeps its place, so it can be reinstated when the closure ends
         early without competing with new bookings.
@@ -270,6 +301,29 @@ class Booking:
             cancelled_at=now,
             change_reason=reason or self.change_reason,
         )
+
+    def confirm(self, now: datetime) -> "Booking":
+        """Return the booking confirmed by the citizen (or a planner on their behalf) at ``now``.
+
+        Raises:
+            DomainError: ``booking_not_pending`` if it does not await confirmation.
+        """
+        if not self.awaits_confirmation:
+            raise DomainError(ErrorCode.BOOKING_NOT_PENDING)
+        return replace(self, status=BookingStatus.CONFIRMED, confirmed_at=now)
+
+    def expire(self, now: datetime) -> "Booking":
+        """Return the booking cancelled because it was not confirmed by ``confirm_by``.
+
+        ``cancelled_at`` is the deadline itself, so ``lapsed_unconfirmed`` can recognise it
+        even when the worker ran late.
+
+        Raises:
+            DomainError: ``booking_not_pending`` if it does not await confirmation.
+        """
+        if not self.awaits_confirmation:
+            raise DomainError(ErrorCode.BOOKING_NOT_PENDING)
+        return replace(self, status=BookingStatus.CANCELLED, cancelled_at=self.confirm_by or now)
 
     def request_rebook(self, reason: ChangeReason, by: datetime) -> "Booking":
         """Return the booking awaiting a new time from the citizen until ``by`` (ADR 0044).
@@ -307,5 +361,7 @@ class Booking:
         return replace(self, status=BookingStatus.CONFIRMED)
 
 
-HOLDS_PLACE = frozenset({BookingStatus.CONFIRMED, BookingStatus.SUSPENDED})
+HOLDS_PLACE = frozenset(
+    {BookingStatus.CONFIRMED, BookingStatus.SUSPENDED, BookingStatus.PENDING_CONFIRMATION}
+)
 """Statuses that take a place in their slot (counted against its capacity)."""

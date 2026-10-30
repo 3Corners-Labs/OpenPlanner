@@ -15,6 +15,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.OUTSIDE_BOOKING_WINDOW: "error.outside_booking_window",
     ErrorCode.BOOKING_LOCKED: "error.booking_locked",
     ErrorCode.BOOKING_NOT_ACTIVE: "error.booking_not_active",
+    ErrorCode.BOOKING_NOT_PENDING: "error.booking_not_pending",
     ErrorCode.SAME_SLOT: "error.same_slot",
     ErrorCode.DATABASE_BUSY: "error.database_busy",
     ErrorCode.INVALID_CONTACT: "error.invalid_request",
