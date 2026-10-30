@@ -218,6 +218,11 @@ class Settings(BaseSettings):
     # settings registry).
     planner_rebook_days: int = Field(default=14, ge=1, le=30)
     planner_rebook_reminder_days: int = Field(default=3, ge=1, le=29)
+    # ADR 0057: a planner's proposal of a new time is held this many hours (never past the
+    # new time's change deadline), with one reminder this many hours before; 0 sends none.
+    # Class D organisation (ADR 0042, settings registry).
+    reschedule_proposal_confirm_hours: int = Field(default=48, ge=4, le=168)
+    reschedule_proposal_reminder_hours: int = Field(default=12, ge=0, le=72)
     # ADR 0055: custom fields per group's booking form at most (class C platform), and the
     # country of phone numbers typed without a country code (class D organisation).
     booking_form_max_custom_fields: int = Field(default=5, ge=0, le=15)
@@ -366,6 +371,10 @@ class Settings(BaseSettings):
             return "STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT"
         if self.planner_rebook_reminder_days >= self.planner_rebook_days:
             return "PLANNER_REBOOK_REMINDER_DAYS must be below PLANNER_REBOOK_DAYS"
+        if self.reschedule_proposal_reminder_hours >= self.reschedule_proposal_confirm_hours:
+            return (
+                "RESCHEDULE_PROPOSAL_REMINDER_HOURS must be below RESCHEDULE_PROPOSAL_CONFIRM_HOURS"
+            )
         if (
             self.smtp_host
             and self.smtp_username

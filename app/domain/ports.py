@@ -684,6 +684,14 @@ class Transaction(Protocol):
         """Return the booking whose management token hashes to ``token_hash``."""
         ...
 
+    async def get_open_proposal(self, replaced_id: int) -> Booking | None:
+        """Return the unanswered proposal that would replace booking ``replaced_id`` (ADR 0057).
+
+        A proposal is a booking in status ``proposed`` whose ``rescheduled_from_id`` is
+        ``replaced_id``; there is at most one.
+        """
+        ...
+
     async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:
         """Return the retention counts per group in ``scope`` and the possibly overdue bookings.
 

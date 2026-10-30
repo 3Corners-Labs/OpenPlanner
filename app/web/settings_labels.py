@@ -66,6 +66,10 @@ SETTING_LABELS: dict[str, str] = {
     "planner_changes_alert_per_hour": "settings.field.planner_changes_alert_per_hour.label",
     "planner_rebook_days": "settings.field.planner_rebook_days.label",
     "planner_rebook_reminder_days": "settings.field.planner_rebook_reminder_days.label",
+    "reschedule_proposal_confirm_hours": "settings.field.reschedule_proposal_confirm_hours.label",
+    "reschedule_proposal_reminder_hours": (
+        "settings.field.reschedule_proposal_reminder_hours.label"
+    ),
     "booking_form_max_custom_fields": "settings.field.booking_form_max_custom_fields.label",
     "phone_default_region": "settings.field.phone_default_region.label",
     "booking_confirm_window_hours": "settings.field.booking_confirm_window_hours.label",
