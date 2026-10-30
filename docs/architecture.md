@@ -379,6 +379,7 @@ erDiagram
         string management_token_hash
         string guest_join_url "PII"
         string host_join_url "PII"
+        string trial_join_url "PII"
         datetime pii_purged_at
     }
     JOB {

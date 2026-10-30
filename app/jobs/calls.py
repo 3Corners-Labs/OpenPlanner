@@ -8,6 +8,7 @@ skipped with a reason, ADR 0068) and logging. Failures are classified by the run
     create_video_room  ─► CallService.ensure_meeting
     dispatch_wxcc_task ─► CallService.ensure_task   (waits for the meeting)
     delete_video_room  ─► CallService.delete_meeting
+    delete_trial_call  ─► CallService.delete_trial_call   (ADR 0071)
     end_wxcc_task      ─► CallService.end_task      (cancelled bookings, ADR 0021)
 """
 
@@ -46,6 +47,7 @@ CALL_JOBS = frozenset(
     {
         JobType.CREATE_VIDEO_ROOM,
         JobType.DELETE_VIDEO_ROOM,
+        JobType.DELETE_TRIAL_CALL,
         JobType.DISPATCH_WXCC_TASK,
         JobType.END_WXCC_TASK,
     }
@@ -70,7 +72,11 @@ class CallJobs:
         """The job types this worker can run with the configured adapters."""
         types: set[JobType] = set()
         if self._calls.video_available:
-            types |= {JobType.CREATE_VIDEO_ROOM, JobType.DELETE_VIDEO_ROOM}
+            types |= {
+                JobType.CREATE_VIDEO_ROOM,
+                JobType.DELETE_VIDEO_ROOM,
+                JobType.DELETE_TRIAL_CALL,
+            }
         if self._calls.dispatch_available:
             types.add(JobType.DISPATCH_WXCC_TASK)
         if self._calls.end_available:
@@ -87,6 +93,8 @@ class CallJobs:
             return NO_BOOKING
         if job.type is JobType.DELETE_VIDEO_ROOM:
             await self._calls.delete_meeting(booking, group)
+        elif job.type is JobType.DELETE_TRIAL_CALL:
+            await self._calls.delete_trial_call(booking, group)
         elif job.type is JobType.END_WXCC_TASK:
             await self._calls.end_task(booking)
         elif is_stale(job.pinned_start, booking):

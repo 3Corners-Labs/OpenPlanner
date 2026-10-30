@@ -105,7 +105,7 @@ async def test_free_pick_shows_a_button_per_row(site: Site) -> None:
 
 
 async def test_the_list_refreshes_through_a_fragment(site: Site) -> None:
-    """ADR 0071: the page polls a fragment; 204 while nothing changed; never a page reload."""
+    """ADR 0072: the page polls a fragment; 204 while nothing changed; never a page reload."""
     await _own_queue(site)
     await site.login_as(AGENT)
 
@@ -128,7 +128,7 @@ async def test_the_list_refreshes_through_a_fragment(site: Site) -> None:
 
 
 async def test_a_failed_video_link_is_said_on_the_row_and_after_the_claim(site: Site) -> None:
-    """ADR 0071: Webex refused the meeting; the agent reads it instead of "no meeting"."""
+    """ADR 0072: Webex refused the meeting; the agent reads it instead of "no meeting"."""
     booking_id = await _own_queue(site, meeting=False)
     await _record(site, booking_id, EventKind.MEETING_FAILED, "rejected_400")
     await site.login_as(AGENT)
@@ -175,7 +175,7 @@ async def test_a_pending_video_link_is_said_while_the_worker_is_on_it(site: Site
 
 
 async def test_a_released_claim_is_told_on_the_open_page(site: Site) -> None:
-    """ADR 0071: a group admin released the claim; the agent's page says so and stops polling."""
+    """ADR 0072: a group admin released the claim; the agent's page says so and stops polling."""
     booking_id = await _own_queue(site)
     await site.login_as(AGENT)
     picked = await site.client.post(f"{QUEUE}/next", headers=SAME_ORIGIN)

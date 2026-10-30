@@ -145,7 +145,7 @@ async def test_direct_calls_are_listed_with_their_status_and_cap(engine: AsyncEn
         assert group is not None
         await tx.save_group(replace(group, direct_call_max_concurrent=3))
         rules, _overrides = await tx.get_schedule_items(group.id)
-        for rule in rules:  # ADR 0071: direct calls are offered per block
+        for rule in rules:  # ADR 0072: direct calls are offered per block
             await tx.update_schedule_rule(
                 group.id, rule.id or 0, replace(rule, window=replace(rule.window, offer=Offer.BOTH))
             )

@@ -13,6 +13,7 @@ Public, unauthenticated: `GET /healthz`, `GET /readyz`.
 | Information disclosure | Interactive docs expose internals and load third-party scripts | Swagger UI / ReDoc disabled | `test_interactive_docs_are_disabled` |
 | Information disclosure | Readiness tells an outsider how full the disk is | Body is only `{"status":"degraded"}`; percentages and sizes go to the worker log and the superuser's audit log | `tests/api/test_health.py::test_readiness_reports_a_volume_short_of_space_as_degraded` |
 | Denial of service | Logs or tables grow until the data volume is full and SQLite stops writing (e.g. a flood of failing jobs or rejected webhooks) | Container logs rotate (5 × 20 MB); system events pruned and pages reclaimed hourly; worker grades free space, logs and records a system event on change, `/readyz` degraded (ADR 0040) | `tests/jobs/test_housekeeping.py`, `tests/domain/test_storage.py` |
+| Abuse | The trial call page is used to create Webex meetings without end, or to enter someone else's | The page needs a valid management token (unguessable, ADR 0011); at most `trial_calls_per_booking` meetings per booking (default 3, max 5); only for a confirmed booking before its start; one open meeting is reused; the meeting is deleted after it closes and at once on cancel or move; the link is PII, purged with the contact, followed only through a `https://` check | `test_the_number_of_trial_calls_is_limited_per_booking`, `test_an_open_trial_call_is_reused_until_it_closes`, `test_a_closed_trial_call_can_be_opened_again_until_the_limit`, `test_cancelling_plans_the_removal_of_the_trial_meeting`, `test_an_unknown_token_is_not_found` |
 | Denial of service | `/readyz` flooded to exhaust database connections | Cheap `SELECT 1` on a pooled connection; rate limiting at the reverse proxy *(TBD, O7)* | — |
 | Tampering | Clickjacking / MIME sniffing on any response | Security headers middleware | `test_security_headers_on_every_response` |
 
@@ -25,7 +26,7 @@ Public: ports 80 and 443 of the `proxy` service (`--profile tls`, the installer'
 | Information disclosure | Traffic, session cookies or management tokens read on the network | HTTPS only: port 80 answers ACME challenges and otherwise redirects (308); HSTS from the app | `scripts/check-proxy.sh` (CI step "proxy check") |
 | Denial of service | Certificate expires unnoticed: bookings, admin login and webhooks stop together | Caddy renews at a third of the lifetime with retries; certificates kept in `proxy-data`; the worker probes the public address every 6 h, shows the finding on System status and raises `tls.certificate` below 20 days left (ADR 0064) | `tests/domain/test_tls.py`, `tests/domain/test_tls_check.py`, `scripts/check-proxy.sh` (`tls-check`) |
 | Information disclosure | An own certificate's private key readable by others on the host | `certs/` is git-ignored; the runbook sets the key to uid 10001 mode 600; the proxy mounts it read-only | `tests/scripts/test_install.py` (own certificate) |
-| Information disclosure | The private key of an own certificate (ADR 0071) read from a database backup, a log, an audit event or the page | The key never enters the database: it is made on the host (CSR flow) or imported straight into the `portal-certs` volume; the database holds the chain and the public key only; `repr` of an imported key excludes it; audit events carry the fingerprint and expiry only; the page shows public data and the CSR (public) only; the volume is left out of the database backup | `tests/adapters/db/test_own_certificate_queries.py` (no key column), `tests/domain/test_tls_source.py` (`keys_never_appear_in_a_repr`, audited without content), `tests/admin/test_tls_source_routes.py` (key not in page, row or audit) |
+| Information disclosure | The private key of an own certificate (ADR 0072) read from a database backup, a log, an audit event or the page | The key never enters the database: it is made on the host (CSR flow) or imported straight into the `portal-certs` volume; the database holds the chain and the public key only; `repr` of an imported key excludes it; audit events carry the fingerprint and expiry only; the page shows public data and the CSR (public) only; the volume is left out of the database backup | `tests/adapters/db/test_own_certificate_queries.py` (no key column), `tests/domain/test_tls_source.py` (`keys_never_appear_in_a_repr`, audited without content), `tests/admin/test_tls_source_routes.py` (key not in page, row or audit) |
 | Information disclosure | The key at rest on the host volume readable by another container or user | A named volume mounted only in `web` (rw) and the proxy (ro), both uid 10001; `privkey.pem` and `pending.key` written mode 600 through a temporary name and a rename; same exposure as the ACME key in `proxy-data` | `tests/adapters/test_certificate_volume.py` |
 | Information disclosure | An imported key read on the network | Upload only over the admin session (HTTPS, same-origin, recent login); the body is read once by the multipart reader and handed to the volume, never echoed or logged | `tests/admin/test_tls_source_routes.py` (migrating, cross-site refused) |
 | Tampering / denial of service | A chain that takes the site down: for another key, for another name, expired, or garbage | Validated before storage (parses, public key equals the pending or served key, covers the host of `PUBLIC_BASE_URL`, validity dates); `own` is refused without a usable chain or with the key missing on this host; a failed Caddy reload keeps the previous certificate; removal is refused while in use | `tests/domain/test_tls_source.py`, `tests/adapters/test_certificate_pem.py`, `tests/scripts/test_proxy_entrypoint.py` |
@@ -438,7 +439,7 @@ flow, "embedded booking".
 ## Flow: video meetings, work items and direct calls (WP5/WP6)
 
 Public: `GET /b/{token}/join`, `GET /b/{token}/join/go`, `GET/POST /g/{slug}/direct`,
-`GET /b/{token}/wait`, `GET /b/{token}/wait/status` (the fragment the page polls, ADR 0071).
+`GET /b/{token}/wait`, `GET /b/{token}/wait/status` (the fragment the page polls, ADR 0072).
 Machine: `POST /webhooks/webex`, `POST /webhooks/wxcc`. Outbound:
 Webex Meetings API, WxCC Create Task v2. Inputs from outside: tokens in paths, the contact
 form, webhook bodies and headers, API responses.
@@ -482,7 +483,7 @@ form, webhook bodies and headers, API responses.
 Admin: `GET /admin/groups/{slug}/queue`, `GET …/queue/live`, `POST …/queue/next`,
 `POST …/queue/{booking_id}/claim`, `GET …/queue/{booking_id}`, `GET …/queue/{booking_id}/live`,
 `POST …/queue/{booking_id}/release`, all `queue.work` on the group (the two `live` paths are the
-fragments the page polls, ADR 0071).
+fragments the page polls, ADR 0072).
 Inputs from outside: the slug and booking id in the path. Agents are portal users (role
 `agent`, ADR 0013 login); they see first names and, after a claim, the meeting link.
 
