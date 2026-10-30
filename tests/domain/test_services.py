@@ -26,6 +26,7 @@ from tests.support.domain import (
     TEST_TOKEN_KEY,
     TUESDAY_0900,
     book,
+    book_confirmed,
     make_group,
     window,
 )
@@ -345,8 +346,13 @@ async def test_consents_are_stored_and_kept_on_reschedule(
 ) -> None:
     uow.state.reminder_rules[1] = [ReminderRule(ChannelKind.WHATSAPP, minutes_before=60)]
     consents = frozenset({ChannelKind.WHATSAPP})
-    old = await service.book(
-        group_slug="aangifte", start=SLOT_0900, contact=ADA, locale="nl", consents=consents
+    old = await book_confirmed(
+        service,
+        group_slug="aangifte",
+        start=SLOT_0900,
+        contact=ADA,
+        locale="nl",
+        consents=consents,
     )
 
     new = await service.reschedule(old.management_token, SLOT_0930)
