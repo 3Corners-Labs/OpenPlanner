@@ -1,6 +1,6 @@
 # 0010. Live meeting status for group admins
 
-Status: accepted (2026-10-23). Implemented in work packages 5 (video adapter) and 7 (admin UI).
+Status: accepted (2026-10-23). Implemented in work packages 5 (video adapter) and 7 (admin UI). Partly built, checked on 2026-10-30; see `docs/adr-status.md` for what is built.
 
 ## Context
 
