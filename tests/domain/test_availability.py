@@ -11,7 +11,7 @@ from app.domain.availability import (
     slots_on,
 )
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.scheduling import ScheduleOverride, ScheduleRule, TimeWindow
+from app.domain.scheduling import Offer, ScheduleOverride, ScheduleRule, TimeWindow
 from tests.support.domain import make_group, window
 
 MONDAY = date(2026, 1, 5)  # CET, UTC+1
@@ -207,6 +207,20 @@ STRADDLING = [window("09:00", "10:15", 3), window("10:15", "12:00", 2)]
 
 def test_a_block_without_agents_offers_no_slots() -> None:
     assert slots_on(GROUP, MONDAY, [window("12:00", "13:00", 0)]) == []
+
+
+def test_a_direct_only_block_offers_no_slots_and_ends_the_run() -> None:
+    """ADR 0072: a block for direct calls only splits the grid like a block without agents."""
+    blocks = [
+        window("09:00", "10:00", 2, Offer.BOTH),
+        window("10:00", "10:15", 2, Offer.DIRECT),
+        window("10:15", "11:15", 2),
+    ]
+
+    starts = [s.start.astimezone(GROUP.tz).time() for s in slots_on(GROUP, MONDAY, blocks)]
+
+    assert starts == [time(9), time(9, 30), time(10, 15), time(10, 45)]
+    assert slots_on(GROUP, MONDAY, [window("09:00", "10:00", 2, Offer.DIRECT)]) == []
 
 
 def test_the_slot_grid_continues_across_touching_blocks() -> None:

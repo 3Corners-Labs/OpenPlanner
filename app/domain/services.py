@@ -71,7 +71,7 @@ from app.domain.job_plan import (
     plan_for_pending,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.scheduling import Group, is_open
+from app.domain.scheduling import Group, open_for_direct
 from app.domain.tokens import (
     MIN_KEY_BYTES,
     derive_token,
@@ -242,7 +242,7 @@ class BookingService:
             )
 
     async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
-        """Return whether a direct call can be started now: switched on, open, and room.
+        """Return whether a direct call can be started now: a block offers it, and room.
 
         Raises:
             DomainError: ``group_not_found``.
@@ -250,7 +250,7 @@ class BookingService:
         async with self._uow.read() as tx:
             group = await self._group(tx, group_slug)
             now = self._clock.now()
-            if not group.direct_call_enabled or not await self._direct_open(tx, group, now):
+            if not await self._direct_open(tx, group, now):
                 return DirectAvailability.UNAVAILABLE
             if not await self._direct_room(tx, group, now):
                 return DirectAvailability.FULL
@@ -270,13 +270,13 @@ class BookingService:
 
         Raises:
             DomainError: ``group_not_found``, ``invalid_contact``, ``direct_call_unavailable``
-                (switched off, or the group is not open now) or ``direct_call_full`` (the
-                group's cap of open direct calls is reached).
+                (no staffed block offers direct calls now, ADR 0072) or ``direct_call_full``
+                (the group's cap of open direct calls is reached).
         """
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
             now = self._clock.now()
-            if not group.direct_call_enabled or not await self._direct_open(tx, group, now):
+            if not await self._direct_open(tx, group, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_UNAVAILABLE)
             if not await self._direct_room(tx, group, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_FULL)
@@ -434,13 +434,14 @@ class BookingService:
     async def _direct_open(self, tx: Transaction, group: Group, now: datetime) -> bool:
         """Return whether the group is open for a direct call at ``now``.
 
-        Holidays count as closed days (ADR 0025), and so does an active emergency closure.
+        That takes a staffed block that offers direct calls (ADR 0072). Holidays count as
+        closed days (ADR 0025), and so does an active emergency closure.
         """
         today = group.today(now)
         rules, overrides = await effective_schedule(tx, group, today, today)
         if any(c.is_active(now) for c in await tx.get_closures(group.id, now)):
             return False
-        return is_open(group, rules, overrides, now)
+        return open_for_direct(group, rules, overrides, now)
 
     async def _direct_room(self, tx: Transaction, group: Group, now: datetime) -> bool:
         """Return whether another direct call fits under the group's cap at ``now``."""

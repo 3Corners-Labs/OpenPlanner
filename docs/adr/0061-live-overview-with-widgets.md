@@ -1,6 +1,6 @@
 # 0061. Live overview with widgets
 
-Status: proposed (2026-10-30), requested by the product owner. Amends ADR 0016 (admin pages without JavaScript) for the overview page only, following the pattern of ADR 0048. Builds on ADR 0047 §5 (overview as status and to-dos), ADR 0014 (matrix) and ADR 0043 (own queue).
+Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0016 (admin pages without JavaScript) for the overview page only, following the pattern of ADR 0048. Builds on ADR 0047 §5 (overview as status and to-dos), ADR 0014 (matrix) and ADR 0043 (own queue). Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
 
 ## Context
 
@@ -44,10 +44,10 @@ The overview (`/admin/`, `dashboard.view`) lists groups as cards. Admins asked f
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; backlog section 5 | #130 | merged 2026-10-30 |
-| 1 | OV-1, OV-2: widget register, fragment routes, overview without script, role defaults | #141 | merged 2026-10-30 |
-| 2a | OV-3: the queue, running tasks and system status widgets (alerts wait for OV-6) | #150 | merged 2026-10-30 |
-| 2b | OV-4: server-rendered SVG charts (bar, line, pie) with text summary and table | #153 | merged 2026-10-30 |
+| 0 | ADR proposed; backlog section 5 | #130 | merged |
+| 1 | OV-1, OV-2: widget register, fragment routes, overview without script, role defaults | #141 | merged |
+| 2a | OV-3: the queue, running tasks and system status widgets (alerts wait for OV-6) | #150 | merged |
+| 2b | OV-4: server-rendered SVG charts (bar, line, pie) with text summary and table | #153 | merged |
 | 3 | OV-5: `overview-live.js`, live endpoint, CSP on this page only, "poll flood" abuse case | | planned |
 | 4 | OV-6, OV-7: alerts, banner, pop-ups, level filter; `QUEUE_WAIT_*` settings | | planned |
 | 5 | SH-3: organisation › group filter in the top bar | | planned |
