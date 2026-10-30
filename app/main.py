@@ -309,6 +309,10 @@ def create_app(
             lambda: live().planner_changes_alert_per_hour,
             rebook_days=lambda org: per_organisation(org).planner_rebook_days,
             reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
+            proposal_hours=lambda org: per_organisation(org).reschedule_proposal_confirm_hours,
+            proposal_reminder_hours=lambda org: (
+                per_organisation(org).reschedule_proposal_reminder_hours
+            ),
         )
         app.state.role_service = RoleService(
             uow,

@@ -15,7 +15,7 @@ from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.event_context import TRACE_ID, current, current_trace_id
 from app.domain.job_plan import JobType
 from app.domain.scheduling import ScheduleRule
-from app.domain.services import BookingService
+from app.domain.services import BookingService, ProposalTerms
 from app.domain.system_log import EventRetention, SystemLog
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
@@ -27,6 +27,7 @@ from tests.support.closures import NOTICES
 from tests.support.domain import (
     NOW,
     SLOT_0900,
+    SLOT_0930,
     TEST_TOKEN_KEY,
     book,
     book_pending,
@@ -512,6 +513,15 @@ async def test_without_the_setting_the_product_footer_stays(
     assert "<footer>" in (sender.sent[0].html or "")
 
 
+TERMS = ProposalTerms(
+    reason=ChangeReason.STAFFING,
+    confirm_within=timedelta(hours=48),
+    remind_before=timedelta(hours=12),
+    rebook_days=14,
+    rebook_reminder_days=3,
+)
+
+
 async def _pending_id(uow: InMemoryUnitOfWork) -> int:
     receipt = await book_pending(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     return receipt.booking.id or 0
@@ -560,3 +570,23 @@ async def test_the_request_to_confirm_goes_only_while_it_is_pending(
     await JobRunner(FakeQueue([request]), uow, FixedClock(NOW), sender, composer).run_due()
 
     assert [m.subject for m in sender.sent] == ["Bevestig uw afspraak met Aangifte"]
+
+
+async def test_a_proposal_goes_with_the_old_time_and_stops_once_answered(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    uow.state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=2))]
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    old = await book(service)
+    async with uow.locked() as tx:
+        receipt = await service.propose(tx, old.booking, uow.state.groups[1], SLOT_0930, TERMS)
+    bid = receipt.booking.id or 0
+    proposal = job(bid, JobType.SEND_PROPOSAL, pinned=None)
+    sender = RecordingSender()
+
+    await JobRunner(FakeQueue([proposal]), uow, FixedClock(NOW), sender, composer).run_due()
+    await service.confirm(receipt.management_token)
+    await JobRunner(FakeQueue([proposal]), uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert len(sender.sent) == 1
+    assert "maandag 5 januari 2026 om 09:00 kan niet doorgaan" in sender.sent[0].text

@@ -250,6 +250,15 @@ class JobRunner:
                 else None
             )
             texts = await tx.get_group_texts(group.id) if group else {}
+            kind = MESSAGE_KINDS.get(job.type)
+            previous = (  # ADR 0057: the booking a proposal would replace
+                await tx.get_booking(booking.rescheduled_from_id)
+                if booking
+                and booking.rescheduled_from_id is not None
+                and kind is not None
+                and (kind.proposal or kind.released)
+                else None
+            )
             organisation = (
                 await tx.get_organisation_by_id(group.organisation_id)
                 if group and job.type in TEAM_INVITES
@@ -292,6 +301,7 @@ class JobRunner:
                     closure=closure,
                     product_footer=self._product_footer is None
                     or self._product_footer(group.organisation_id),
+                    previous=previous,
                 )
         await sender.send(message)
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)

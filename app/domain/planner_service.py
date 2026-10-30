@@ -13,6 +13,8 @@ agreed to it (ADR 0022).
             one reminder follows, an unanswered request lapses (``booking_changes``)
     rebook a slot  the same for the last-made bookings of a short slot, as many as the
             shortfall, after the planner confirmed exactly that list
+    propose a new time in another free slot (ADR 0057): it is held for the citizen to
+            confirm, the booking frees its place and awaits a new time meanwhile
     accept  "leave as is" for one slot's shortfall, until its counts change
     waiting the group's bookings awaiting a new time, for the agenda's list
 
@@ -36,7 +38,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group
-from app.domain.services import BookingService
+from app.domain.services import BookingService, ProposalTerms
 from app.domain.tunable import value_for, value_of
 
 ALERT_ACTION = "planner.changes_alert"
@@ -59,6 +61,10 @@ class PlannerService:
             booking's start.
         reminder_days: ``planner_rebook_reminder_days`` (class D): the one reminder goes this
             long before the request lapses.
+        proposal_hours: ``reschedule_proposal_confirm_hours`` (class D): a proposed new
+            time is held this long (ADR 0057).
+        proposal_reminder_hours: ``reschedule_proposal_reminder_hours`` (class D): its one
+            reminder goes this long before the deadline; 0 sends none.
     """
 
     def __init__(
@@ -71,6 +77,8 @@ class PlannerService:
         *,
         rebook_days: int | Callable[[int], int] = 14,
         reminder_days: int | Callable[[int], int] = 3,
+        proposal_hours: int | Callable[[int], int] = 48,
+        proposal_reminder_hours: int | Callable[[int], int] = 12,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -80,6 +88,8 @@ class PlannerService:
         self._alert_per_hour = alert_per_hour
         self._rebook_days = rebook_days
         self._reminder_days = reminder_days
+        self._proposal_hours = proposal_hours
+        self._proposal_reminder_hours = proposal_reminder_hours
 
     def rebook_days(self, organisation_id: int) -> int:
         """Days after the start after which an unanswered request to rebook lapses."""
@@ -167,6 +177,44 @@ class PlannerService:
             detail = f"planner.rebook,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
         return waiting
+
+    async def propose(
+        self,
+        principal: Principal,
+        slug: str,
+        booking_id: int,
+        new_start: datetime,
+        reason: ChangeReason,
+    ) -> Booking:
+        """Propose a new time to the citizen and hold it for them; return the proposal.
+
+        The booking frees its place and awaits a new time (ADR 0044); the proposal holds a
+        place at ``new_start`` until the citizen answers or ``reschedule_proposal_confirm_hours``
+        pass (ADR 0057). The citizen always gets the proposal with its reason.
+
+        Raises:
+            DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active``,
+                ``planner_too_late``, ``same_slot`` or any error of booking the new start.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            booking = await self._changeable(tx, group, booking_id)
+            terms = ProposalTerms(
+                reason=reason,
+                confirm_within=timedelta(
+                    hours=value_for(self._proposal_hours, group.organisation_id)
+                ),
+                remind_before=timedelta(
+                    hours=value_for(self._proposal_reminder_hours, group.organisation_id)
+                ),
+                rebook_days=self.rebook_days(group.organisation_id),
+                rebook_reminder_days=self.reminder_days(group.organisation_id),
+            )
+            receipt = await self._bookings.propose(tx, booking, group, new_start, terms)
+            detail = f"planner.propose,reason:{reason.value}"
+            await self._audit(tx, principal, authorization, detail, booking_id)
+        return receipt.booking
 
     async def slot_candidates(
         self, principal: Principal, slug: str, start: datetime

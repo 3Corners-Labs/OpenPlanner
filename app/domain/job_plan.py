@@ -9,6 +9,10 @@ changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
                (confirm_by) ──► purge_pii (confirm_by + 24 h)            (ADR 0056)
     confirmed (citizen clicked) ──► as booked below
     lapsed ──► send_unconfirmed_lapsed (now); the purge planned while pending stays
+    proposed ──► send_proposal (now) ──► send_proposal_reminder ──► expire_unconfirmed
+                (confirm_by) ──► purge_pii (confirm_by + 24 h)           (ADR 0057)
+    released ──► send_proposal_released (now); the booking it would replace still awaits
+                a new time until its own lapse
     booked ──► create_video_room (now) ─► send_confirmation | send_change (now)
            ──► send_reminder × rules (start − offset, if still ahead and reachable)
            ──► dispatch_wxcc_task (start − dispatch lead) ──► purge_pii (end + 24 h)
@@ -71,6 +75,9 @@ class JobType(StrEnum):
     SEND_CONFIRM_REMINDER = "send_confirm_reminder"
     EXPIRE_UNCONFIRMED = "expire_unconfirmed"
     SEND_UNCONFIRMED_LAPSED = "send_unconfirmed_lapsed"
+    SEND_PROPOSAL = "send_proposal"
+    SEND_PROPOSAL_REMINDER = "send_proposal_reminder"
+    SEND_PROPOSAL_RELEASED = "send_proposal_released"
     SEND_TEAM_INVITE = "send_team_invite"
     SEND_TEAM_CANCEL = "send_team_cancel"
 
@@ -87,6 +94,9 @@ REBOOK_NOTICES = frozenset({JobType.SEND_REBOOK_REQUEST, JobType.SEND_REBOOK_REM
 
 CONFIRM_NOTICES = frozenset({JobType.SEND_CONFIRM_REQUEST, JobType.SEND_CONFIRM_REMINDER})
 """Requests to confirm a booking by email link (ADR 0056); sent only while it is pending."""
+
+PROPOSAL_NOTICES = frozenset({JobType.SEND_PROPOSAL, JobType.SEND_PROPOSAL_REMINDER})
+"""A planner's proposal of a new time (ADR 0057); sent only while it is unanswered."""
 
 
 @dataclass(frozen=True)
@@ -167,6 +177,8 @@ def is_stale(
         return not booking.awaits_rebook or booking.contact is None
     if job_type in CONFIRM_NOTICES:
         return not booking.awaits_confirmation or booking.contact is None
+    if job_type in PROPOSAL_NOTICES:
+        return not booking.is_proposal or booking.contact is None
     if pinned_start is None:
         return False
     return not booking.is_active or booking.start != pinned_start or booking.contact is None
@@ -214,6 +226,7 @@ def plan_for_rebook(
     reminder_at: datetime | None,
     sms: bool,
     team_invite: bool = False,
+    notify: bool = True,
 ) -> list[PlannedJob]:
     """Return the jobs that replace all pending jobs of a booking awaiting a new time.
 
@@ -224,13 +237,14 @@ def plan_for_rebook(
     sends the lapse message) and the personal data is purged ``PURGE_AFTER`` later. ``sms``
     adds the SMS forms (the caller checks the citizen is reachable). Choosing a new time or
     cancelling replaces all of these jobs. ``team_invite`` withdraws the team's calendar
-    invite (ADR 0043).
+    invite (ADR 0043). ``notify=False`` leaves out the request itself: a planner proposed a
+    new time instead, and that proposal is the message (ADR 0057).
     """
     channels = [ChannelKind.EMAIL, ChannelKind.SMS] if sms else [ChannelKind.EMAIL]
     jobs = [
         PlannedJob(JobType.END_WXCC_TASK, now, None),
         PlannedJob(JobType.DELETE_VIDEO_ROOM, now, None),
-        *(PlannedJob(JobType.SEND_REBOOK_REQUEST, now, None, c) for c in channels),
+        *(PlannedJob(JobType.SEND_REBOOK_REQUEST, now, None, c) for c in channels if notify),
         *_team_cancel(now, team_invite),
     ]
     if reminder_at is not None and reminder_at > now:
@@ -277,6 +291,37 @@ def plan_for_unconfirmed_lapse(*, now: datetime) -> list[PlannedJob]:
     The purge planned with the request to confirm stays.
     """
     return [PlannedJob(JobType.SEND_UNCONFIRMED_LAPSED, now, None, ChannelKind.EMAIL)]
+
+
+def plan_for_proposal(
+    *, now: datetime, confirm_by: datetime, reminder_at: datetime | None, sms: bool
+) -> list[PlannedJob]:
+    """Return the jobs of a new time a planner proposed (ADR 0057).
+
+    The proposal goes now, one reminder at ``reminder_at`` if that lies ahead and before
+    ``confirm_by``; ``sms`` adds the SMS forms (the caller checks the citizen is reachable).
+    At ``confirm_by`` ``EXPIRE_UNCONFIRMED`` releases a proposal that is still unanswered,
+    and its personal data is purged ``PURGE_AFTER`` later. Confirming replaces these jobs
+    with ``plan_for_booking``.
+    """
+    channels = [ChannelKind.EMAIL, ChannelKind.SMS] if sms else [ChannelKind.EMAIL]
+    jobs = [PlannedJob(JobType.SEND_PROPOSAL, now, None, c) for c in channels]
+    if reminder_at is not None and now < reminder_at < confirm_by:
+        jobs.extend(
+            PlannedJob(JobType.SEND_PROPOSAL_REMINDER, reminder_at, None, c) for c in channels
+        )
+    jobs.append(PlannedJob(JobType.EXPIRE_UNCONFIRMED, confirm_by, None))
+    jobs.append(PlannedJob(JobType.PURGE_PII, confirm_by + PURGE_AFTER, None))
+    return jobs
+
+
+def plan_for_proposal_release(*, now: datetime, sms: bool) -> list[PlannedJob]:
+    """Return the message jobs when a planner's proposal is released unanswered (ADR 0057).
+
+    The purge planned with the proposal stays.
+    """
+    channels = [ChannelKind.EMAIL, ChannelKind.SMS] if sms else [ChannelKind.EMAIL]
+    return [PlannedJob(JobType.SEND_PROPOSAL_RELEASED, now, None, c) for c in channels]
 
 
 def plan_for_suspension(

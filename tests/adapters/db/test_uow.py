@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC
+from datetime import UTC, timedelta
 
 import pytest
 from sqlalchemy import func, select, text
@@ -10,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.engine import BEGIN_MODE_OPTION, create_engine
 from app.adapters.db.models import BookingRow, JobRow, SlotRow
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.booking import BookingStatus
+from app.domain.booking import BookingStatus, ChangeReason
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
-from app.domain.services import BookingService
+from app.domain.services import BookingService, ProposalTerms
 from tests.adapters.db.conftest import close_day, seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import (
@@ -290,3 +290,32 @@ async def test_upcoming_starts_for_email_counts_place_holding_bookings_only(
     assert ada == [kept.booking.start]
     assert gone == []
     assert ended == []
+
+
+async def test_a_proposal_is_stored_and_found_by_the_booking_it_replaces(
+    engine: AsyncEngine, service: BookingService
+) -> None:
+    await seed_group(engine, capacity=2)
+    old = await book(service)
+    terms = ProposalTerms(
+        reason=ChangeReason.STAFFING,
+        confirm_within=timedelta(hours=48),
+        remind_before=timedelta(hours=12),
+        rebook_days=14,
+        rebook_reminder_days=3,
+    )
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        group = await tx.get_group_by_id(old.booking.group_id)
+        assert group is not None
+        receipt = await service.propose(tx, old.booking, group, SLOT_0930, terms)
+
+    async with uow.read() as tx:
+        found = await tx.get_open_proposal(old.booking.id or 0)
+        none = await tx.get_open_proposal(receipt.booking.id or 0)
+    assert found == receipt.booking
+    assert (found.status, found.change_reason) == (BookingStatus.PROPOSED, ChangeReason.STAFFING)
+    assert none is None
+    await service.confirm(receipt.management_token)
+    async with uow.read() as tx:
+        assert await tx.get_open_proposal(old.booking.id or 0) is None

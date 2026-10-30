@@ -6231,3 +6231,71 @@ msgstr "You can always make a new appointment."
 
 msgid "message.book_again_link"
 msgstr "Make a new appointment"
+
+# ADR 0057 step 2: a planner's proposal of a new time (messages, pages, settings).
+
+msgid "settings.field.reschedule_proposal_confirm_hours.label"
+msgstr "Time to confirm a proposed time (hours)"
+
+msgid "settings.field.reschedule_proposal_reminder_hours.label"
+msgstr "Reminder for a proposed time (hours before the deadline)"
+
+msgid "message.proposal.subject"
+msgstr "Your appointment has moved: please confirm the new time"
+
+msgid "message.proposal.intro"
+msgstr "Your video call with {group_name} on {old_date} at {old_time} cannot go ahead. We have reserved a new time for you: {date} at {time}. Please confirm this time by {deadline}; after that we free the place again. If the time does not suit you, choose another time yourself."
+
+msgid "message.proposal.sms"
+msgstr "Dear {first_name}, your video call with {group_name} has moved to {date} at {time}. {reason} Confirm by {deadline} or choose another time: {manage_url}"
+
+msgid "message.proposal_reminder.subject"
+msgstr "Reminder: please confirm the new time of your appointment"
+
+msgid "message.proposal_reminder.intro"
+msgstr "You have not yet confirmed the new time of your video call with {group_name}: {date} at {time}. Please confirm by {deadline}, or choose another time yourself."
+
+msgid "message.proposal_reminder.sms"
+msgstr "Dear {first_name}, please confirm by {deadline} the new time of your video call with {group_name} ({date} at {time}) or choose another time: {manage_url}"
+
+msgid "message.proposal_released.subject"
+msgstr "The proposed time has been released"
+
+msgid "message.proposal_released.intro"
+msgstr "You did not confirm the proposed time of your video call with {group_name} ({date} at {time}). That place is free again. You can still choose a new time yourself until {deadline}; after that the appointment lapses."
+
+msgid "message.proposal_released.sms"
+msgstr "Dear {first_name}, the proposed time ({date} at {time}) has been released. Choose a new time by {deadline}: {manage_url}"
+
+msgid "message.manage_proposal"
+msgstr "Please confirm the new time by {deadline}:"
+
+msgid "message.proposal_other"
+msgstr "Does this time not suit you? Choose another time yourself."
+
+msgid "message.proposal_other_link"
+msgstr "Choose another time"
+
+msgid "manage.status.proposed"
+msgstr "New time proposed"
+
+msgid "manage.proposal.title"
+msgstr "New time proposed"
+
+msgid "manage.proposal.text"
+msgstr "We have reserved this new time for you. Please confirm it by {deadline}, or choose another time yourself."
+
+msgid "manage.proposal.confirm"
+msgstr "Confirm new time"
+
+msgid "manage.proposal.other"
+msgstr "Choose another time"
+
+msgid "manage.proposal.choose"
+msgstr "Choose a new time yourself"
+
+msgid "manage.notice.released"
+msgstr "You did not confirm the proposed time in time. That place is free again."
+
+msgid "confirm.proposal_text"
+msgstr "We have reserved this new time for you. Please confirm it by {deadline}; after that we free the place again."

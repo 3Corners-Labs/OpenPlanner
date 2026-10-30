@@ -1420,6 +1420,7 @@ class SqlTransaction(
             rescheduled_from_id=booking.rescheduled_from_id,
             confirm_by=booking.confirm_by,
             confirmed_at=booking.confirmed_at,
+            change_reason=booking.change_reason.value if booking.change_reason else None,
         )
         self._session.add(row)
         await self._session.flush()
@@ -1452,6 +1453,20 @@ class SqlTransaction(
                 pii_purged_at=now,
             )
         )
+
+    async def get_open_proposal(self, replaced_id: int) -> Booking | None:
+        """Return the unanswered proposal that would replace booking ``replaced_id``."""
+        result = await self._session.execute(
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(
+                BookingRow.rescheduled_from_id == replaced_id,
+                BookingRow.status == BookingStatus.PROPOSED.value,
+            )
+            .limit(1)
+        )
+        found = result.one_or_none()
+        return _booking(*found) if found else None
 
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         """Return the booking whose management token hashes to ``token_hash``."""

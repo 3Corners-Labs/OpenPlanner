@@ -569,6 +569,10 @@ stateDiagram-v2
     [*] --> pending_confirmation: book (ADR 0056)
     pending_confirmation --> confirmed: confirm by email link
     pending_confirmation --> cancelled: lapse at confirm_by, or "this was not me"
+    confirmed --> awaiting_rebook: planner proposes a new time (ADR 0057)
+    awaiting_rebook --> proposed: the proposal holds the new time (a new booking)
+    proposed --> confirmed: confirmed by the citizen (the old booking is cancelled)
+    proposed --> cancelled: released at confirm_by, another time chosen, or cancelled
     confirmed --> cancelled: cancel (before the dispatch lead)
     confirmed --> cancelled: reschedule (old booking; a new one is confirmed)
     confirmed --> completed: after the call (WP6)

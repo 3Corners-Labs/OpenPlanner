@@ -13,7 +13,11 @@ locked transaction, and the planner's limits:
                          rebook_by, purge 24 h later (ADR 0044)
     lapse                still awaiting at rebook_by ─► cancelled, lapse message
     lapse unconfirmed    still pending at confirm_by ─► cancelled at confirm_by, lapse
-                         message (ADR 0056; the citizen's own lapse, kept beside the other)
+                         message (ADR 0056; the citizen's own lapse, kept beside the other);
+                         a proposal still unanswered ─► released, "you can still choose"
+                         message; the booking it would replace keeps awaiting a new time
+    close replaced       a proposal was answered (confirmed, another time, cancelled) ─► the
+                         booking it would replace is cancelled without a message (ADR 0057)
 """
 
 from datetime import datetime, timedelta
@@ -24,6 +28,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import (
     plan_for_cancellation,
     plan_for_lapse,
+    plan_for_proposal_release,
     plan_for_rebook,
     plan_for_unconfirmed_lapse,
 )
@@ -90,6 +95,7 @@ async def cancel(
     Raises:
         DomainError: ``booking_not_active`` if it holds no place.
     """
+    await withdraw_proposal(tx, booking, now, team_invite=team_invite)
     cancelled = booking.cancel(now, reason)
     await tx.save_booking(cancelled)
     jobs = plan_for_cancellation(
@@ -108,6 +114,7 @@ async def request_rebook(
     rebook_days: int,
     reminder_days: int,
     team_invite: bool = False,
+    notify: bool = True,
 ) -> Booking:
     """Ask the citizen to choose a new time for ``booking``; return it (ADR 0044).
 
@@ -120,6 +127,8 @@ async def request_rebook(
         reminder_days: ``planner_rebook_reminder_days``: the one reminder goes this long
             before the request lapses.
         team_invite: Withdraw the calendar invite of the group's team (ADR 0043).
+        notify: Send the request; ``False`` when a planner's proposal is the message
+            instead (ADR 0057).
 
     Raises:
         DomainError: ``booking_not_active`` if it is not confirmed.
@@ -133,6 +142,7 @@ async def request_rebook(
         reminder_at=rebook_by - timedelta(days=reminder_days),
         sms=sms_reachable(booking),
         team_invite=team_invite,
+        notify=notify,
     )
     await tx.replace_jobs(_id(booking), jobs)
     return waiting
@@ -145,6 +155,7 @@ async def lapse(tx: Transaction, booking: Booking, now: datetime) -> bool:
     """
     if not booking.awaits_rebook:
         return False
+    await withdraw_proposal(tx, booking, now)
     await tx.save_booking(booking.cancel(now))
     await tx.add_jobs(_id(booking), plan_for_lapse(now=now, sms=sms_reachable(booking)))
     return True
@@ -155,13 +166,57 @@ async def lapse_unconfirmed(tx: Transaction, booking: Booking, now: datetime) ->
 
     Run by ``expire_unconfirmed`` at ``confirm_by``, and by a confirmation that comes too
     late. The place is freed and the citizen gets the short lapse message; the purge planned
-    with the request to confirm stays.
+    with the request to confirm stays. A planner's proposal (ADR 0057) is released the same
+    way, with its own message: the booking it would replace still awaits a new time.
     """
-    if not booking.awaits_confirmation:
+    if not booking.awaits_answer:
         return False
     await tx.save_booking(booking.expire(now))
-    await tx.add_jobs(_id(booking), plan_for_unconfirmed_lapse(now=now))
+    jobs = (
+        plan_for_proposal_release(now=now, sms=sms_reachable(booking))
+        if booking.is_proposal
+        else plan_for_unconfirmed_lapse(now=now)
+    )
+    await tx.add_jobs(_id(booking), jobs)
     return True
+
+
+async def withdraw_proposal(
+    tx: Transaction, replaced: Booking, now: datetime, *, team_invite: bool = False
+) -> None:
+    """Release, without a message, an open proposal for ``replaced`` (ADR 0057).
+
+    Runs when the booking that awaits a new time is moved, cancelled or lapses another way
+    (a planner, the closure, the citizen's own link): the proposal no longer applies, and
+    its place is freed. The citizen hears about the outcome from that change.
+    """
+    if replaced.id is None or not replaced.awaits_rebook:
+        return
+    proposal = await tx.get_open_proposal(replaced.id)
+    if proposal is None:
+        return
+    await tx.save_booking(proposal.cancel(now))
+    jobs = plan_for_cancellation(cancelled_at=now, notify=False, team_invite=team_invite)
+    await tx.replace_jobs(_id(proposal), jobs)
+
+
+async def close_replaced(
+    tx: Transaction, proposal: Booking, now: datetime, *, team_invite: bool = False
+) -> None:
+    """Cancel, without a message, the booking a planner's proposal would replace (ADR 0057).
+
+    Runs when the citizen answers the proposal: confirming it, choosing another time or
+    cancelling. The replaced booking only awaited a new time; the citizen hears about the
+    outcome from the answer itself. Does nothing when it is no longer waiting.
+    """
+    if proposal.rescheduled_from_id is None:
+        return
+    replaced = await tx.get_booking(proposal.rescheduled_from_id)
+    if replaced is None or not replaced.awaits_rebook:
+        return
+    await tx.save_booking(replaced.cancel(now))
+    jobs = plan_for_cancellation(cancelled_at=now, notify=False, team_invite=team_invite)
+    await tx.replace_jobs(_id(replaced), jobs)
 
 
 def _id(booking: Booking) -> int:

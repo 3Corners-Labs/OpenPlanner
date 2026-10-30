@@ -35,6 +35,16 @@
   <li><a class="button" href="/b/{{ token }}/confirm">{{ _("manage.pending.confirm") }}</a></li>
   {% if cancellable %}<li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>{% endif %}
 </ul>
+{% elif proposal %}
+<div class="notice notice--warning">
+  <h2>{{ _("manage.proposal.title") }}</h2>
+  <p>{{ _("manage.proposal.text", deadline=confirm_by) }}</p>
+</div>
+<ul class="actions">
+  <li><a class="button" href="/b/{{ token }}/confirm">{{ _("manage.proposal.confirm") }}</a></li>
+  <li><a href="/b/{{ token }}/reschedule">{{ _("manage.proposal.other") }}</a></li>
+  <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+</ul>
 {% elif awaiting_rebook %}
 <div class="notice notice--warning">
   <h2>{{ _("manage.suspended.title") }}</h2>
@@ -56,5 +66,6 @@
 {% else %}
 <div class="notice"><p>{{ _("manage.inactive") }}</p></div>
 {% if lapsed %}<p><a href="/g/{{ group.slug }}">{{ _("manage.book_again") }}</a></p>{% endif %}
+{% if replaced_token %}<p><a class="button" href="/b/{{ replaced_token }}/reschedule">{{ _("manage.proposal.choose") }}</a></p>{% endif %}
 {% endif %}
 {% endblock %}

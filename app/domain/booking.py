@@ -150,6 +150,13 @@ class BookingStatus(StrEnum):
     """A planner asked the citizen to choose a new time (ADR 0044); the place is freed."""
     PENDING_CONFIRMATION = "pending_confirmation"
     """The citizen has not confirmed by email link yet (ADR 0056); the place is held."""
+    PROPOSED = "proposed"
+    """A new time a planner proposed (ADR 0057); the place is held until ``confirm_by``.
+
+    ``rescheduled_from_id`` is the booking it would replace, which awaits a new time, and
+    ``change_reason`` the planner's reason. The citizen confirms it, chooses another time or
+    cancels; unanswered, it is released at ``confirm_by``.
+    """
 
 
 @dataclass(frozen=True)
@@ -250,15 +257,41 @@ class Booking:
         return self.status is BookingStatus.PENDING_CONFIRMATION
 
     @property
+    def is_proposal(self) -> bool:
+        """Whether this is a new time a planner proposed, still unanswered (ADR 0057)."""
+        return self.status is BookingStatus.PROPOSED
+
+    @property
+    def awaits_answer(self) -> bool:
+        """Whether the citizen still has to confirm: a new booking or a proposed time."""
+        return self.awaits_confirmation or self.is_proposal
+
+    @property
     def lapsed_unconfirmed(self) -> bool:
         """Whether the booking was cancelled because it was not confirmed in time (ADR 0056).
 
         Told apart from other cancellations without a reason field: it had a deadline to
-        confirm, was never confirmed, and was cancelled exactly at that deadline.
+        confirm, was never confirmed, and was cancelled exactly at that deadline. A released
+        proposal (``released_proposal``) carries the planner's reason and is not counted here.
         """
         return (
             self.status is BookingStatus.CANCELLED
             and self.confirmed_at is None
+            and self.change_reason is None
+            and self.confirm_by is not None
+            and self.cancelled_at == self.confirm_by
+        )
+
+    @property
+    def released_proposal(self) -> bool:
+        """Whether this was a planner's proposal the citizen did not confirm in time (ADR 0057).
+
+        A proposal is the only booking with both a deadline to confirm and a planner's
+        reason; it is released exactly at that deadline.
+        """
+        return (
+            self.status is BookingStatus.CANCELLED
+            and self.change_reason is not None
             and self.confirm_by is not None
             and self.cancelled_at == self.confirm_by
         )
@@ -277,7 +310,8 @@ class Booking:
     def holds_place(self) -> bool:
         """Whether the booking takes a place in its slot: confirmed, pending or suspended.
 
-        A booking awaiting confirmation holds its place until it lapses (ADR 0056).
+        A booking awaiting confirmation holds its place until it lapses (ADR 0056), and so
+        does a planner's proposal until it is released (ADR 0057).
 
         A suspended booking keeps its place, so it can be reinstated when the closure ends
         early without competing with new bookings.
@@ -305,10 +339,12 @@ class Booking:
     def confirm(self, now: datetime) -> "Booking":
         """Return the booking confirmed by the citizen (or a planner on their behalf) at ``now``.
 
+        A planner's proposal (ADR 0057) is confirmed the same way.
+
         Raises:
             DomainError: ``booking_not_pending`` if it does not await confirmation.
         """
-        if not self.awaits_confirmation:
+        if not self.awaits_answer:
             raise DomainError(ErrorCode.BOOKING_NOT_PENDING)
         return replace(self, status=BookingStatus.CONFIRMED, confirmed_at=now)
 
@@ -316,12 +352,12 @@ class Booking:
         """Return the booking cancelled because it was not confirmed by ``confirm_by``.
 
         ``cancelled_at`` is the deadline itself, so ``lapsed_unconfirmed`` can recognise it
-        even when the worker ran late.
+        even when the worker ran late. A planner's proposal is released the same way.
 
         Raises:
             DomainError: ``booking_not_pending`` if it does not await confirmation.
         """
-        if not self.awaits_confirmation:
+        if not self.awaits_answer:
             raise DomainError(ErrorCode.BOOKING_NOT_PENDING)
         return replace(self, status=BookingStatus.CANCELLED, cancelled_at=self.confirm_by or now)
 
@@ -362,6 +398,11 @@ class Booking:
 
 
 HOLDS_PLACE = frozenset(
-    {BookingStatus.CONFIRMED, BookingStatus.SUSPENDED, BookingStatus.PENDING_CONFIRMATION}
+    {
+        BookingStatus.CONFIRMED,
+        BookingStatus.SUSPENDED,
+        BookingStatus.PENDING_CONFIRMATION,
+        BookingStatus.PROPOSED,
+    }
 )
 """Statuses that take a place in their slot (counted against its capacity)."""

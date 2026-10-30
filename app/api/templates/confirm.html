@@ -7,11 +7,20 @@
   <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
   <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
 </dl>
+{% if proposal %}
+<p>{{ _("confirm.proposal_text", deadline=confirm_by) }}</p>
+{% else %}
 <p>{{ _("confirm.text", deadline=confirm_by) }}</p>
+{% endif %}
 <form method="post" action="/b/{{ token }}/confirm">
   <button type="submit" class="button button--large">{{ _("confirm.submit") }}</button>
 </form>
-{% if cancellable %}
+{% if proposal %}
+<ul class="actions">
+  <li><a href="/b/{{ token }}/reschedule">{{ _("manage.proposal.other") }}</a></li>
+  <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+</ul>
+{% elif cancellable %}
 <p><a href="/b/{{ token }}/cancel">{{ _("confirm.not_me") }}</a></p>
 {% endif %}
 {% endblock %}

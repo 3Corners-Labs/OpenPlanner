@@ -43,13 +43,25 @@ from app.domain.booking import (
     Booking,
     BookingKind,
     BookingStatus,
+    ChangeReason,
     Contact,
     Slot,
 )
-from app.domain.booking_changes import lapse_unconfirmed
+from app.domain.booking_changes import (
+    close_replaced,
+    lapse_unconfirmed,
+    request_rebook,
+    sms_reachable,
+    withdraw_proposal,
+)
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure, covering
-from app.domain.confirmation import DEFAULT_CONFIRM_POLICY, ConfirmPolicy, confirm_window
+from app.domain.confirmation import (
+    DEFAULT_CONFIRM_POLICY,
+    ConfirmPolicy,
+    ConfirmWindow,
+    confirm_window,
+)
 from app.domain.direct_queue import (
     ESTIMATE_WINDOW,
     DirectAvailability,
@@ -69,6 +81,7 @@ from app.domain.job_plan import (
     plan_for_cancellation,
     plan_for_direct,
     plan_for_pending,
+    plan_for_proposal,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, is_open
@@ -112,6 +125,9 @@ class BookingDetails:
     changeable: bool
     closure: Closure | None = None
     cancellable: bool = False
+    replaced_token: str | None = field(default=None, repr=False)
+    """For a released proposal (ADR 0057): the link of the booking it would have replaced,
+    which still awaits a new time, so the citizen can choose one there."""
 
 
 @dataclass(frozen=True)
@@ -120,6 +136,28 @@ class BookingReceipt:
 
     booking: Booking
     management_token: str = field(repr=False)
+
+
+@dataclass(frozen=True)
+class ProposalTerms:
+    """How a planner's proposal of a new time works (ADR 0057).
+
+    Attributes:
+        reason: The planner's fixed reason, shown in the messages.
+        confirm_within: ``reschedule_proposal_confirm_hours``: the proposal is held this
+            long, never beyond the new time's change deadline.
+        remind_before: ``reschedule_proposal_reminder_hours`` before ``confirm_by`` the one
+            reminder goes; zero sends none.
+        rebook_days: ``planner_rebook_days``: the replaced booking awaits a new time this
+            long after its start (ADR 0044), also once the proposal is released.
+        rebook_reminder_days: ``planner_rebook_reminder_days``, for that wait.
+    """
+
+    reason: ChangeReason
+    confirm_within: timedelta
+    remind_before: timedelta
+    rebook_days: int
+    rebook_reminder_days: int
 
 
 class BookingService:
@@ -317,26 +355,96 @@ class BookingService:
                 if booking.is_suspended and booking.closure_id is not None
                 else None
             )
+            replaced = (
+                await tx.get_booking(booking.rescheduled_from_id)
+                if booking.released_proposal and booking.rescheduled_from_id is not None
+                else None
+            )
+        now = self._clock.now()
         deadline = group.change_deadline(booking.start)
-        before = self._clock.now() < deadline
-        changeable = booking.on_hold or (booking.is_active and before)
+        before = now < deadline
+        answerable = booking.is_proposal and booking.confirm_by is not None
+        changeable = (
+            booking.on_hold
+            or (booking.is_active and before)
+            or (answerable and now < (booking.confirm_by or now))
+        )
         cancellable = changeable or (booking.awaits_confirmation and before)
-        return BookingDetails(booking, group, deadline, changeable, closure, cancellable)
+        replaced_token = (
+            derive_token(self._token_key, replaced.token_salt)
+            if replaced is not None and replaced.awaits_rebook
+            else None
+        )
+        return BookingDetails(
+            booking, group, deadline, changeable, closure, cancellable, replaced_token
+        )
+
+    async def propose(
+        self,
+        tx: Transaction,
+        old: Booking,
+        group: Group,
+        new_start: datetime,
+        terms: ProposalTerms,
+    ) -> BookingReceipt:
+        """Propose ``new_start`` for ``old`` inside the caller's locked transaction (ADR 0057).
+
+        ``old`` frees its place and awaits a new time (ADR 0044) without the usual request;
+        a booking in status ``proposed`` holds a place at ``new_start`` until the citizen
+        confirms it, chooses another time or cancels, or until ``confirm_by``. The caller
+        (``PlannerService``) checks who may do it and the planner's limits.
+
+        Raises:
+            DomainError: ``booking_not_active``, ``same_slot``, ``planner_too_late`` (no time
+                left to confirm before the new time's change deadline) or any error of
+                ``book`` for the new start.
+        """
+        if not old.is_active or old.contact is None:
+            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        if new_start == old.start:
+            raise DomainError(ErrorCode.SAME_SLOT)
+        now = self._clock.now()
+        confirm_by = min(now + terms.confirm_within, group.change_deadline(new_start))
+        if confirm_by <= now:
+            raise DomainError(ErrorCode.PLANNER_TOO_LATE)
+        await request_rebook(
+            tx,
+            old,
+            now,
+            reason=terms.reason,
+            rebook_days=terms.rebook_days,
+            reminder_days=terms.rebook_reminder_days,
+            team_invite=group.sends_team_invite,
+            notify=False,
+        )
+        return await self._place(
+            tx,
+            group,
+            new_start,
+            old.contact,
+            old.locale,
+            old.consents,
+            _id(old),
+            confirmed_at=old.confirmed_at,
+            proposal=(terms, confirm_by),
+        )
 
     async def confirm(self, management_token: str) -> Booking:
         """Confirm a booking by its email link (ADR 0056) and return it as it now is.
 
         A pending booking before its ``confirm_by`` is confirmed: the meeting, reminders,
         task and purge are planned as for any booking, with the full confirmation mail. After
-        ``confirm_by`` it lapses here, as the worker would. Any other booking is returned
-        unchanged, so a second click shows the booking (idempotent).
+        ``confirm_by`` it lapses here, as the worker would. A planner's proposal (ADR 0057) is
+        confirmed the same way, with the change mail, and the booking it replaces goes. Any
+        other booking is returned unchanged, so a second click shows the booking
+        (idempotent).
 
         Raises:
             DomainError: ``booking_not_found`` or ``group_not_found``.
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
-            if not booking.awaits_confirmation:
+            if not booking.awaits_answer:
                 return booking
             now = self._clock.now()
             if booking.confirm_by is not None and now >= booking.confirm_by:
@@ -346,6 +454,8 @@ class BookingService:
             confirmed = booking.confirm(now)
             await tx.save_booking(confirmed)
             await tx.replace_jobs(_id(booking), await self._booked_jobs(tx, group, confirmed))
+            if booking.is_proposal:
+                await close_replaced(tx, booking, now, team_invite=group.sends_team_invite)
             return confirmed
 
     async def cancel(self, management_token: str) -> Booking:
@@ -360,10 +470,13 @@ class BookingService:
             now = self._clock.now()
             group = await self._group_by_id(tx, booking.group_id)
             _ensure_changeable(booking, group, now)
+            await withdraw_proposal(tx, booking, now, team_invite=group.sends_team_invite)
             cancelled = booking.cancel(now)
             await tx.save_booking(cancelled)
             jobs = plan_for_cancellation(cancelled_at=now, team_invite=group.sends_team_invite)
             await tx.replace_jobs(_id(booking), jobs)
+            if booking.is_proposal:  # ADR 0057: the booking it would replace goes as well
+                await close_replaced(tx, booking, now, team_invite=group.sends_team_invite)
             return cancelled
 
     async def reschedule(self, management_token: str, new_start: datetime) -> BookingReceipt:
@@ -409,11 +522,14 @@ class BookingService:
         if new_start == old.start:
             raise DomainError(ErrorCode.SAME_SLOT)
         now = self._clock.now()
+        await withdraw_proposal(tx, old, now, team_invite=group.sends_team_invite)
         await tx.save_booking(old.cancel(now))
         jobs = plan_for_cancellation(
             cancelled_at=now, notify=False, team_invite=group.sends_team_invite
         )
         await tx.replace_jobs(_id(old), jobs)
+        if old.is_proposal:  # the citizen chose another time than the planner proposed
+            await close_replaced(tx, old, now, team_invite=group.sends_team_invite)
         return await self._place(
             tx,
             group,
@@ -506,12 +622,14 @@ class BookingService:
         sms: bool = False,
         pending: bool = False,
         confirmed_at: datetime | None = None,
+        proposal: tuple[ProposalTerms, datetime] | None = None,
     ) -> BookingReceipt:
         """Reserve a place at ``start`` and store the booking with its jobs.
 
         ``pending`` places it awaiting confirmation with its own ``confirm_by`` (a citizen's
         new booking, or a moved one that was still pending, ADR 0056); otherwise it is placed
-        confirmed and keeps ``confirmed_at`` of the booking it replaces.
+        confirmed and keeps ``confirmed_at`` of the booking it replaces. ``proposal`` places
+        a planner's proposal (ADR 0057) with its terms and ``confirm_by``.
         """
         if start.tzinfo is None:
             raise ValueError("start must be timezone-aware")
@@ -556,7 +674,7 @@ class BookingService:
                 slot_id=_id(slot),
                 start=slot.start,
                 end=slot.end,
-                status=BookingStatus.PENDING_CONFIRMATION if window else BookingStatus.CONFIRMED,
+                status=_placed_status(window, proposal),
                 contact=contact,
                 locale=locale,
                 token_hash=hash_token(token),
@@ -564,15 +682,23 @@ class BookingService:
                 token_salt=salt,
                 consents=consents,
                 rescheduled_from_id=rescheduled_from,
-                confirm_by=window.confirm_by if window else None,
+                change_reason=proposal[0].reason if proposal else None,
+                confirm_by=proposal[1] if proposal else window.confirm_by if window else None,
                 confirmed_at=confirmed_at,
             )
         )
-        jobs = (
-            plan_for_pending(now=now, window=window)
-            if window
-            else await self._booked_jobs(tx, group, booking, sms=sms)
-        )
+        if proposal:
+            terms, confirm_by = proposal
+            jobs = plan_for_proposal(
+                now=now,
+                confirm_by=confirm_by,
+                reminder_at=confirm_by - terms.remind_before if terms.remind_before else None,
+                sms=sms_reachable(booking),
+            )
+        elif window:
+            jobs = plan_for_pending(now=now, window=window)
+        else:
+            jobs = await self._booked_jobs(tx, group, booking, sms=sms)
         await tx.replace_jobs(_id(booking), jobs)
         return BookingReceipt(booking, token)
 
@@ -617,6 +743,15 @@ async def _check_address_limit(
     starts = await tx.upcoming_starts_for_email(group.id, contact.email, now)
     if start in starts or len(starts) >= group.max_bookings_per_email:
         raise DomainError(ErrorCode.BOOKING_LIMIT_REACHED)
+
+
+def _placed_status(
+    window: ConfirmWindow | None, proposal: tuple[ProposalTerms, datetime] | None
+) -> BookingStatus:
+    """Return the status of a placed booking: proposed, awaiting confirmation or confirmed."""
+    if proposal:
+        return BookingStatus.PROPOSED
+    return BookingStatus.PENDING_CONFIRMATION if window else BookingStatus.CONFIRMED
 
 
 def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:

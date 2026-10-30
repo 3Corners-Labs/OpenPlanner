@@ -6,7 +6,7 @@ Calendar: "now" is Thursday 1 January 2026 08:00 UTC; the demo group is open on 
 
 import re
 from collections.abc import AsyncIterator
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import httpx
 import pytest
@@ -15,7 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import BookingRow, GroupRow, ScheduleRuleRow
+from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
+from app.domain.booking import ChangeReason
+from app.domain.services import BookingService, ProposalTerms
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.citizen import confirm_by_link, confirm_newest, emailed_token
@@ -568,3 +571,55 @@ async def test_the_check_your_email_page(
     assert page.status_code == 200
     assert text in page.text
     assert (slot in page.text) if slot else ("<dl" not in page.text)
+
+
+async def _propose(site: httpx.AsyncClient, old_token: str, start: str) -> str:
+    """Let a planner propose ``start`` for the booking behind ``old_token`` (ADR 0057)."""
+    app = site._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    service: BookingService = app.state.booking_service
+    old = (await service.find(old_token)).booking
+    terms = ProposalTerms(ChangeReason.STAFFING, timedelta(hours=48), timedelta(hours=12), 14, 3)
+    uow = SqlUnitOfWork(app.state.engine)
+    async with uow.locked() as tx:
+        group = await tx.get_group_by_id(old.group_id)
+        assert group is not None
+        await service.propose(tx, old, group, datetime.fromisoformat(start), terms)
+    return await emailed_token(site)
+
+
+async def test_a_proposed_time_can_be_confirmed_changed_or_cancelled(
+    site: httpx.AsyncClient,
+) -> None:
+    old = await booked(site)
+    proposal = await _propose(site, old, FRIDAY_0930)
+
+    page = await site.get(f"/b/{proposal}")
+    confirm = await site.get(f"/b/{proposal}/confirm")
+    confirmed = await confirm_by_link(site, proposal)
+
+    assert "Nieuwe tijd voorgesteld" in page.text
+    assert "vrijdag 2 januari 2026, 09:30–10:00" in page.text
+    for action in ("confirm", "reschedule", "cancel"):
+        assert f'href="/b/{proposal}/{action}"' in page.text
+    assert "Wij hebben deze nieuwe tijd voor u gereserveerd" in confirm.text
+    assert f'href="/b/{proposal}/reschedule"' in confirm.text
+    assert confirmed.headers["location"] == f"/b/{proposal}?status=confirmed"
+    assert "Bevestigd" in (await site.get(f"/b/{proposal}")).text
+    assert "Geannuleerd" in (await site.get(f"/b/{old}")).text
+
+
+async def test_a_released_proposal_points_to_choosing_a_new_time(
+    demo_settings: Settings,
+) -> None:
+    async with app_client(demo_settings, FixedClock(NOW)) as early:
+        old = await booked(early, FRIDAY_0930)
+        proposal = await _propose(early, old, FRIDAY_0900)
+    late_clock = FixedClock(NOW + timedelta(hours=23, minutes=56))  # past the change deadline
+
+    async with app_client(demo_settings, late_clock) as late:
+        response = await confirm_by_link(late, proposal)
+        page = await late.get(response.headers["location"])
+
+    assert response.headers["location"] == f"/b/{proposal}?status=released"
+    assert "niet op tijd bevestigd. Die plek is weer vrij" in page.text
+    assert f'href="/b/{old}/reschedule"' in page.text

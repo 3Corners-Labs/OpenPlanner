@@ -637,6 +637,16 @@ class InMemoryTransaction:
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         return next((b for b in self.state.bookings.values() if b.token_hash == token_hash), None)
 
+    async def get_open_proposal(self, replaced_id: int) -> Booking | None:
+        return next(
+            (
+                b
+                for b in self.state.bookings.values()
+                if b.is_proposal and b.rescheduled_from_id == replaced_id
+            ),
+            None,
+        )
+
     async def save_booking(self, booking: Booking) -> None:
         self.state.bookings[booking.id or 0] = booking
 

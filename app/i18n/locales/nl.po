@@ -6231,3 +6231,71 @@ msgstr "U kunt altijd een nieuwe afspraak maken."
 
 msgid "message.book_again_link"
 msgstr "Nieuwe afspraak maken"
+
+# ADR 0057 step 2: a planner's proposal of a new time (messages, pages, settings).
+
+msgid "settings.field.reschedule_proposal_confirm_hours.label"
+msgstr "Bedenktijd voor een voorgestelde tijd (uren)"
+
+msgid "settings.field.reschedule_proposal_reminder_hours.label"
+msgstr "Herinnering bij een voorgestelde tijd (uren voor de deadline)"
+
+msgid "message.proposal.subject"
+msgstr "Uw afspraak is verplaatst: bevestig de nieuwe tijd"
+
+msgid "message.proposal.intro"
+msgstr "Uw videogesprek met {group_name} op {old_date} om {old_time} kan niet doorgaan. Wij hebben een nieuwe tijd voor u gereserveerd: {date} om {time}. Bevestig deze tijd uiterlijk {deadline}; daarna geven we de plek weer vrij. Past de tijd niet, kies dan zelf een ander moment."
+
+msgid "message.proposal.sms"
+msgstr "Beste {first_name}, uw videogesprek met {group_name} is verplaatst naar {date} om {time}. {reason} Bevestig voor {deadline} of kies een ander moment: {manage_url}"
+
+msgid "message.proposal_reminder.subject"
+msgstr "Herinnering: bevestig de nieuwe tijd van uw afspraak"
+
+msgid "message.proposal_reminder.intro"
+msgstr "U heeft de nieuwe tijd voor uw videogesprek met {group_name} nog niet bevestigd: {date} om {time}. Bevestig uiterlijk {deadline}, of kies zelf een ander moment."
+
+msgid "message.proposal_reminder.sms"
+msgstr "Beste {first_name}, bevestig voor {deadline} de nieuwe tijd van uw videogesprek met {group_name} ({date} om {time}) of kies een ander moment: {manage_url}"
+
+msgid "message.proposal_released.subject"
+msgstr "De voorgestelde tijd is vrijgegeven"
+
+msgid "message.proposal_released.intro"
+msgstr "U heeft de voorgestelde tijd voor uw videogesprek met {group_name} ({date} om {time}) niet bevestigd. Die plek is weer vrij. U kunt nog tot {deadline} zelf een nieuwe tijd kiezen; daarna vervalt de afspraak."
+
+msgid "message.proposal_released.sms"
+msgstr "Beste {first_name}, de voorgestelde tijd ({date} om {time}) is vrijgegeven. Kies voor {deadline} zelf een nieuwe tijd: {manage_url}"
+
+msgid "message.manage_proposal"
+msgstr "Bevestig de nieuwe tijd uiterlijk {deadline}:"
+
+msgid "message.proposal_other"
+msgstr "Past deze tijd niet? Kies zelf een ander moment."
+
+msgid "message.proposal_other_link"
+msgstr "Ander moment kiezen"
+
+msgid "manage.status.proposed"
+msgstr "Nieuwe tijd voorgesteld"
+
+msgid "manage.proposal.title"
+msgstr "Nieuwe tijd voorgesteld"
+
+msgid "manage.proposal.text"
+msgstr "Wij hebben deze nieuwe tijd voor u gereserveerd. Bevestig hem uiterlijk {deadline}, of kies zelf een ander moment."
+
+msgid "manage.proposal.confirm"
+msgstr "Nieuwe tijd bevestigen"
+
+msgid "manage.proposal.other"
+msgstr "Ander moment kiezen"
+
+msgid "manage.proposal.choose"
+msgstr "Zelf een nieuwe tijd kiezen"
+
+msgid "manage.notice.released"
+msgstr "U heeft de voorgestelde tijd niet op tijd bevestigd. Die plek is weer vrij."
+
+msgid "confirm.proposal_text"
+msgstr "Wij hebben deze nieuwe tijd voor u gereserveerd. Bevestig hem uiterlijk {deadline}; daarna geven we de plek weer vrij."

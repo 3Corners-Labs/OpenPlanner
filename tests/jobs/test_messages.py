@@ -531,3 +531,64 @@ def test_a_lapsed_booking_links_the_group_page_to_book_again(composer: MessageCo
     assert f"https://afspraak.example.nl/g/{GROUP.slug}" in message.text
     assert "vervallen" in message.subject
     assert message.attachments == ()
+
+
+OLD = replace(BOOKING, id=41, token_salt=new_token_salt(), rebook_by=SLOT_0900 + timedelta(days=14))
+PROPOSAL = replace(
+    BOOKING,
+    status=BookingStatus.PROPOSED,
+    start=SLOT_0900 + timedelta(days=1),
+    end=SLOT_0930 + timedelta(days=1),
+    rescheduled_from_id=41,
+    change_reason=ChangeReason.STAFFING,
+    confirm_by=NOW + timedelta(hours=48),
+)
+
+
+def test_a_proposal_names_both_times_the_reason_and_both_choices(
+    composer: MessageComposer,
+) -> None:
+    message = composer.compose(JobType.SEND_PROPOSAL, PROPOSAL, GROUP, NOW, previous=OLD)
+    link = f"https://afspraak.example.nl/b/{derive_token(TEST_TOKEN_KEY, SALT)}"
+
+    assert message.subject == "Uw afspraak is verplaatst: bevestig de nieuwe tijd"
+    assert "Beste Ada," in message.text
+    assert "op maandag 5 januari 2026 om 09:00 kan niet doorgaan" in message.text
+    assert "dinsdag 6 januari 2026 om 09:00" in message.text
+    assert "uiterlijk zaterdag 3 januari 2026, 09:00" in message.text
+    assert f"{link}/confirm" in message.text
+    assert f"{link}/reschedule" in message.text
+    assert "/join" not in message.text
+    assert "Er zijn op dat moment niet genoeg medewerkers beschikbaar." in message.text
+    # The old time leaves the citizen's calendar; the confirmation brings the new one.
+    ics = message.attachments[0].data.decode()
+    assert "METHOD:CANCEL" in ics
+    assert "booking-41@" in ics
+
+
+def test_a_released_proposal_links_the_old_booking_to_choose_a_time(
+    composer: MessageComposer,
+) -> None:
+    released = PROPOSAL.expire(NOW)
+    old_link = f"https://afspraak.example.nl/b/{derive_token(TEST_TOKEN_KEY, OLD.token_salt)}"
+
+    message = composer.compose(JobType.SEND_PROPOSAL_RELEASED, released, GROUP, NOW, previous=OLD)
+    sms = composer.compose(
+        JobType.SEND_PROPOSAL_RELEASED,
+        replace(released, contact=replace(released.contact, phone="+31612345678")),  # type: ignore[type-var]
+        GROUP,
+        NOW,
+        channel=ChannelKind.SMS,
+        previous=OLD,
+    )
+
+    assert message.subject == "De voorgestelde tijd is vrijgegeven"
+    assert old_link in message.text
+    assert "uiterlijk maandag 19 januari 2026, 09:00" in message.text
+    assert message.attachments == ()
+    assert old_link in sms.text
+
+
+def test_a_proposal_message_needs_the_booking_it_replaces(composer: MessageComposer) -> None:
+    with pytest.raises(ValueError, match="replaces"):
+        composer.compose(JobType.SEND_PROPOSAL, PROPOSAL, GROUP, NOW)

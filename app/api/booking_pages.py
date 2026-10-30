@@ -69,6 +69,7 @@ STATUS_NOTICES: dict[str, str] = {
     "cancelled": "manage.notice.cancelled",
     "confirmed": "manage.notice.confirmed",
     "lapsed": "manage.notice.lapsed",
+    "released": "manage.notice.released",
 }
 
 STATUS_LABELS: dict[BookingStatus, str] = {
@@ -79,6 +80,7 @@ STATUS_LABELS: dict[BookingStatus, str] = {
     BookingStatus.SUSPENDED: "manage.status.suspended",
     BookingStatus.AWAITING_REBOOK: "manage.status.awaiting_rebook",
     BookingStatus.PENDING_CONFIRMATION: "manage.status.pending_confirmation",
+    BookingStatus.PROPOSED: "manage.status.proposed",
 }
 
 Locale = Annotated[RequestLocale, Depends(resolve_locale)]
@@ -295,6 +297,9 @@ def _manage_context(
         "confirm_by": _moment(booking.confirm_by, group, locale),
         "lapsed": booking.lapsed_unconfirmed,
         "cancellable": details.cancellable,
+        # ADR 0057: a planner's proposal, and once released the replaced booking's link.
+        "proposal": booking.is_proposal,
+        "replaced_token": details.replaced_token,
         "suspended": booking.is_suspended,
         # ADR 0044: a planner asked for a new time; the request lapses at ``rebook_by``.
         "awaiting_rebook": booking.awaits_rebook,
@@ -337,10 +342,13 @@ async def cancel_page(request: Request, token: str, locale: Locale) -> Response:
 @router.get("/b/{token}/confirm", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def confirm_page(request: Request, token: str, locale: Locale) -> Response:
-    """Show the appointment with one button to confirm it; a GET never confirms (ADR 0056)."""
+    """Show the appointment with one button to confirm it; a GET never confirms (ADR 0056).
+
+    The same page confirms a planner's proposal of a new time (ADR 0057).
+    """
     details = await _service(request).find(token)
     follow(request, details.group.organisation_id)
-    if not details.booking.awaits_confirmation:
+    if not details.booking.awaits_answer:
         return RedirectResponse(f"/b/{token}", status_code=303)
     context = {**_manage_context(details, locale, None, _clock(request).now()), "token": token}
     return await citizen_page(request, locale, "confirm.html", details.group, context)
@@ -351,7 +359,10 @@ async def confirm_page(request: Request, token: str, locale: Locale) -> Response
 async def confirm(request: Request, token: str, locale: Locale, _: SameOrigin) -> Response:
     """Confirm the booking; one that came too late lapses and says so."""
     booking = await _service(request).confirm(token)
-    status = "lapsed" if booking.lapsed_unconfirmed else "confirmed"
+    if booking.released_proposal:
+        status = "released"
+    else:
+        status = "lapsed" if booking.lapsed_unconfirmed else "confirmed"
     return RedirectResponse(_manage_url(token, status), status_code=303)
 
 
