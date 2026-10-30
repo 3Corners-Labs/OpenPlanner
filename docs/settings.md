@@ -71,6 +71,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `TLS_CHECK_INTERVAL_HOURS` | int | `6` | 1–168 | `settings.platform.manage` | How often the worker probes the certificate of the public address (ADR 0064). |
 | `TLS_EXPIRY_WARNING_DAYS` | int | `20` | 1–60 | `settings.platform.manage` | Fewer days left than this makes the certificate finding 'expiring' (ADR 0064). |
 | `TLS_ALERT_REPEAT_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | A lasting certificate finding is reported again at this interval (ADR 0064). |
+| `INTEGRATION_CHECK_INTERVAL_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The worker checks every group with a Webex host this often and reports a broken chain as a system event (ADR 0065). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
 | `SYSTEM_EVENT_RETENTION_DAYS` | int | `90` | 30–3650 | `settings.platform.manage` | Days after which system events leave the audit log (ADR 0031). |
 | `AUDIT_RETENTION_DAYS` | int | `730` | 365–3650 | `settings.platform.manage` | Days after which admin actions leave the audit log (ADR 0040). |

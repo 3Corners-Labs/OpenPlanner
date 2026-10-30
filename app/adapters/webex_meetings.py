@@ -3,10 +3,13 @@
 Meetings are scheduled by the Service App on behalf of the group's licensed host. Every
 signed-in user of the organisation becomes cohost on joining (the agent); guests wait in the
 lobby. Webex sends no invitations: OpenPlanner mails the citizen itself. The request carries
-the group's name and times only (``app.domain.calls.meeting_request``).
+the group's name and times only (``app.domain.calls.meeting_request``). Start and end are
+sent in the group's time zone: Webex refuses a ``timezone`` whose offset differs from the one
+in the times (ADR 0065), so UTC times next to ``Europe/Amsterdam`` would never schedule.
 """
 
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from app.adapters.webex_auth import AuthorizedClient
 from app.domain.booking import MeetingRef
@@ -39,16 +42,8 @@ class WebexMeetings:
 
     async def create_meeting(self, request: MeetingRequest) -> MeetingRef:
         """Schedule the meeting on behalf of the group's host and return its id and link."""
-        body = {
-            "title": request.title,
-            "start": request.start.isoformat(),
-            "end": request.end.isoformat(),
-            "timezone": request.timezone,
-            "hostEmail": request.host_email,
-            **MEETING_OPTIONS,
-        }
         response = await self._client.request(
-            "POST", f"{self._base}/meetings", json=body, explain=True
+            "POST", f"{self._base}/meetings", json=meeting_body(request), explain=True
         )
         data = response.json()
         if not isinstance(data.get("id"), str) or not isinstance(data.get("webLink"), str):
@@ -63,3 +58,19 @@ class WebexMeetings:
             params={"hostEmail": host_email, "sendEmail": "false"},
             ok=(200, 204, 404),
         )
+
+
+def meeting_body(request: MeetingRequest) -> dict[str, Any]:
+    """Return the ``POST /meetings`` body: the request in its own time zone plus the defaults.
+
+    Shared with the group check, whose probe meeting must be exactly what a booking sends.
+    """
+    zone = ZoneInfo(request.timezone)
+    return {
+        "title": request.title,
+        "start": request.start.astimezone(zone).isoformat(),
+        "end": request.end.astimezone(zone).isoformat(),
+        "timezone": request.timezone,
+        "hostEmail": request.host_email,
+        **MEETING_OPTIONS,
+    }

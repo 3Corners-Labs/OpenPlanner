@@ -86,7 +86,7 @@ class CallJobs:
             await self._calls.ensure_task(booking, group)
         return None
 
-    async def record_failure(self, job: ClaimedJob, code: str) -> None:
-        """Put a job's final failure on the booking's timeline."""
+    async def record_failure(self, job: ClaimedJob, code: str, message: str = "") -> None:
+        """Put a job's final failure on the booking's timeline, with the provider's reason."""
         kind = FAILURE_EVENTS.get(job.type, EventKind.INTEGRATION_ERROR)
-        await self._calls.record_failure(job.booking_id, code, kind)
+        await self._calls.record_failure(job.booking_id, code, kind, message)
