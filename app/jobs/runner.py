@@ -39,7 +39,7 @@ from app.domain.call_service import CallService
 from app.domain.channels import ChannelKind
 from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.event_context import current, trace_scope
+from app.domain.event_context import bind_booking, current, trace_scope
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import TEAM_INVITES, JobType, is_stale
 from app.domain.ports import (
@@ -216,8 +216,14 @@ class JobRunner:
             outcome = Outcome.SUCCESS if skipped is None else Outcome.SKIPPED
             await self._record(job, outcome, skipped or "")
 
+    @property
+    def types(self) -> frozenset[JobType]:
+        """The job types this worker claims with its adapters (the heartbeat row, ADR 0068)."""
+        return frozenset(self._types)
+
     async def _bind(self, job: ClaimedJob) -> None:
-        """Tag the job's trace with its booking's organisation and group; a failure is logged."""
+        """Tag the job's trace with its booking's level and id; a failure is logged."""
+        bind_booking(job.booking_id)
         try:
             await self._system_log.bind_level(job.booking_id)
         except Exception as exc:  # tagging helps troubleshooting; it never stops a job
