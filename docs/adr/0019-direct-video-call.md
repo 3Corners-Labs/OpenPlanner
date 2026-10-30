@@ -1,7 +1,8 @@
 # 0019. Direct video call ("now") per group
 
 Status: accepted (2026-10-23). Settles open point O9. Amended by ADR 0026 (cap on open direct
-calls per group, queue feedback).
+calls per group, queue feedback) and by ADR 0070 (the switch moves from the group to the
+staffing block; the waiting page refreshes itself through a polled fragment).
 
 ## Context
 

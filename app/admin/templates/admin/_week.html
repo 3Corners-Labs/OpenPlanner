@@ -10,6 +10,7 @@
       <li class="window{% if not window.staffed %} window--unstaffed{% endif %}">
         <span class="window__time">{{ window.time }}</span>
         <span class="window__capacity">{{ window.capacity }}</span>
+        {% if window.offer %}<span class="window__offer">{{ window.offer }}</span>{% endif %}
         {% if window.label %}<span class="window__label">{{ window.label }}</span>{% endif %}
         {% if window.validity %}<span class="window__validity">{{ window.validity }}</span>{% endif %}
         {% if removable | default(false) %}

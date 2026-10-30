@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import MeetingRef
 from app.domain.calls import BookingEvent, CallState, EventKind, TaskState, apply_event, new_status
+from app.domain.scheduling import Offer
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
@@ -142,7 +143,12 @@ async def test_direct_calls_are_listed_with_their_status_and_cap(engine: AsyncEn
     async with uow.locked() as tx:
         group = await tx.get_group("aangifte")
         assert group is not None
-        await tx.save_group(replace(group, direct_call_enabled=True, direct_call_max_concurrent=3))
+        await tx.save_group(replace(group, direct_call_max_concurrent=3))
+        rules, _overrides = await tx.get_schedule_items(group.id)
+        for rule in rules:  # ADR 0070: direct calls are offered per block
+            await tx.update_schedule_rule(
+                group.id, rule.id or 0, replace(rule, window=replace(rule.window, offer=Offer.BOTH))
+            )
     clock = FixedClock(NOW)
     service = BookingService(uow, clock, TEST_TOKEN_KEY)
     await book(service, SLOT_0900)  # scheduled: not a direct call

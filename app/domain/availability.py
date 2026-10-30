@@ -6,7 +6,8 @@ ambiguous local times (fall back) use their first occurrence.
 
 Touching windows with agents form one *run* (ADR 0027): the slot grid starts at the run's
 start and continues across window borders, and a slot gets the lowest agent count among the
-windows it covers. A window with 0 agents or a gap ends the run.
+windows it covers. A window with 0 agents, a window that offers direct calls only (ADR 0070)
+or a gap ends the run.
 
     09:00 ──── 3 ──── 10:15 ──── 2 ──── 12:00     one run
     |09:00|09:30|10:00|10:30|11:00|11:30|         10:00 straddles the border: capacity 2
@@ -54,12 +55,13 @@ class AvailableSlot:
 
 
 def staffed_runs(windows: Sequence[TimeWindow]) -> list[list[TimeWindow]]:
-    """Group the staffed windows into runs of touching windows, in time order.
+    """Group the windows that offer slots into runs of touching windows, in time order.
 
-    A window with 0 agents takes no part and so splits a run, just like a gap.
+    A window with 0 agents or one that takes direct calls only takes no part and so splits a
+    run, just like a gap.
     """
     runs: list[list[TimeWindow]] = []
-    for window in sorted(w for w in windows if w.staffed):
+    for window in sorted(w for w in windows if w.offers_slots):
         if runs and runs[-1][-1].closes == window.opens:
             runs[-1].append(window)
         else:
