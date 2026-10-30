@@ -6,11 +6,14 @@ counts its changes. On ``bookings`` the single ``name`` becomes ``first_name`` a
 ``form_answers`` holds the answers as JSON. All three are personal data and purged with the
 other contact columns.
 
+Revises 0044 (team invite address, ADR 0043 step 3), which was merged first; it revises the
+merge revision 0052.
+
 The downgrade joins the two name parts again and drops the answers and the fields: answers
 to custom fields cannot be kept in the older schema.
 
 Revision ID: 0053
-Revises: 0052
+Revises: 0044
 Create Date: 2026-10-29 23:30:00.000000
 """
 
@@ -20,7 +23,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0053"
-down_revision: str | None = "0052"
+down_revision: str | None = "0044"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
