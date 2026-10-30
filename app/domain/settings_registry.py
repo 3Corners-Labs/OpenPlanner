@@ -899,6 +899,25 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Read token for a private repository; write-only.",
         optional=True,
     ),
+    S(
+        "update_channel",
+        K.ENUM,
+        "release",
+        _B,
+        T.UPDATES,
+        "What the installation follows (ADR 0059): releases only, or release candidates "
+        "(`rc`) too; `rc` is refused in production.",
+        choices=("release", "rc"),
+    ),
+    S(
+        "update_auto_apply",
+        K.BOOL,
+        False,
+        _B,
+        T.UPDATES,
+        "The worker requests a newer version itself as soon as the check finds one "
+        "(ADR 0059); refused in production.",
+    ),
     # D. Organisation: the value per organisation; the superuser's or the environment's value
     # is the default for organisations without one.
     S(

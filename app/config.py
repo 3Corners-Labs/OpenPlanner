@@ -325,6 +325,11 @@ class Settings(BaseSettings):
     app_commit: str = Field(default="", pattern=r"^([0-9a-f]{7,40})?$")
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
+    # ADR 0059: UPDATE_CHANNEL (class B, deployment: what this host is for, like the installer
+    # mode) says whether release candidates are offered too; UPDATE_AUTO_APPLY (B) lets the
+    # worker request an update itself. Neither is allowed in production.
+    update_channel: Literal["release", "rc"] = "release"
+    update_auto_apply: bool = False
 
     # Maintenance mode (ADR 0038). MAINTENANCE_MODE (class B, deployment: needed while the
     # database is unavailable or being restored) switches it on from the environment; the
@@ -391,6 +396,18 @@ class Settings(BaseSettings):
             "simulator_enabled",
             "SIMULATOR_ENABLED",
             "SIMULATOR_ENABLED is not allowed in production",
+        )
+        check(
+            self.update_channel != "release",
+            "update_channel",
+            "UPDATE_CHANNEL",
+            "UPDATE_CHANNEL must be release in production (ADR 0059)",
+        )
+        check(
+            self.update_auto_apply,
+            "update_auto_apply",
+            "UPDATE_AUTO_APPLY",
+            "UPDATE_AUTO_APPLY is not allowed in production (ADR 0059)",
         )
         check(
             self.management_token_key is None,

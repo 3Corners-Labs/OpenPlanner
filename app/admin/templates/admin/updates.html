@@ -20,6 +20,7 @@
   <dl class="facts">
     <div><dt>{{ _("admin.updates.running") }}</dt><dd>{% if overview.current %}<code>{{ overview.current }}</code>{% else %}{{ _("admin.updates.no_release_build") }}{% endif %}</dd></div>
     <div><dt>{{ _("admin.updates.commit") }}</dt><dd>{% if commit and commit.url %}<a href="{{ commit.url }}"><code>{{ commit.short }}</code></a>{% elif commit %}<code>{{ commit.short }}</code>{% else %}{{ _("admin.updates.unknown") }}{% endif %}</dd></div>
+    <div><dt>{{ _("admin.updates.channel") }}</dt><dd>{% if overview.channel.value == "rc" %}{{ _("admin.updates.channel.rc") }}{% else %}{{ _("admin.updates.channel.release") }}{% endif %}{% if overview.auto_apply %} <span class="chip">{{ _("admin.updates.auto_apply") }}</span>{% endif %}</dd></div>
     <div><dt>{{ _("admin.updates.latest") }}</dt><dd>{% if overview.check and overview.check.latest %}<a href="{{ overview.check.latest.url }}">{{ overview.check.latest.version }}</a>{% else %}{{ _("admin.updates.unknown") }}{% endif %}</dd></div>
     <div><dt>{{ _("admin.updates.checked_at") }}</dt><dd>{{ checked_at or _("admin.updates.never") }}{% if check_error %} <span class="chip chip--warning">{{ _("admin.updates.check_failed", code=check_error) }}</span>{% endif %}</dd></div>
   </dl>
