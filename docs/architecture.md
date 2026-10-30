@@ -773,6 +773,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0070 | The certificate source of the bundled proxy, managed by the superuser in the portal |
 | 0071 | A trial call on Webex ahead of the appointment |
 | 0072 | Direct calls per staffing block, live status for citizen and agent, visible failures |
+| 0074 | Organisation text overrides: allow-listed citizen-page and message texts per organisation and locale |
 
 What is built of each decision is not kept here: it is in `docs/adr-status.md` (checked against the code) and in the *Build status* of the ADR itself.
 
@@ -800,7 +801,7 @@ What is built of each decision is not kept here: it is in `docs/adr-status.md` (
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
 | ADR 0033 | Manual and context-sensitive help: 20 topics in Dutch and English; 28 admin routes still without a topic | in progress |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
-| WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
+| WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides (ADR 0074); global overrides and `.po` import/export | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 | ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | done (AU-3, the client's security review, is open) |

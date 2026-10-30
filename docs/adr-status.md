@@ -13,7 +13,7 @@ package; when the two disagree, the code wins.
 
 | Built? | ADRs |
 |---|---|
-| BUILT | 30 |
+| BUILT | 31 |
 | PARTIAL | 14 |
 | NOT BUILT | 5 |
 
@@ -68,6 +68,7 @@ package; when the two disagree, the code wins.
 | 0070 | Certificate source in the portal | BUILT | #149; migration 0061 | – |
 | 0071 | Trial call on Webex | BUILT | #154; migration 0063 | – |
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
+| 0074 | Organisation text overrides | BUILT | #164; migration 0072; `domain/text_overrides.py`, `adapters/db/text_overrides.py`, `admin/organisation_text_routes.py` | Step 2: the global (superuser) layer, `.po` export and import, revision counter (follow-up, listed in the ADR) |
 
 ## Corrected on 2026-10-30
 
