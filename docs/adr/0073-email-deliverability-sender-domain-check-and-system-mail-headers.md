@@ -106,7 +106,7 @@ checked (SPF, DKIM, DMARC are the three every receiver evaluates).
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1 | Headers, the two fields, the sender domain check on *Channels*, manual topic `channels`, `dnspython` | this PR | in review |
+| 1 | Headers, the two fields, the sender domain check on *Channels*, manual topic `channels`, `dnspython` | #166 | in review |
 | 2 | Periodic check in the worker with a system event (decision 6) | – | not started; decided after step 1 is in use |
 
 (State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
