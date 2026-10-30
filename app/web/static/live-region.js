@@ -1,5 +1,5 @@
 /*
- * Live regions (ADR 0071): the citizen's waiting page, the own queue and a claimed booking
+ * Live regions (ADR 0072): the citizen's waiting page, the own queue and a claimed booking
  * keep themselves current without reloading. Without this script each page shows the state
  * it loaded with and offers a Refresh link; with it, per region marked [data-live]:
  *

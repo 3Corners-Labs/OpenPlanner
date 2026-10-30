@@ -436,6 +436,69 @@ msgstr "Moving is no longer possible because the call starts soon. You can still
 msgid "manage.started"
 msgstr "The call has begun. This appointment can no longer be changed."
 
+msgid "trial.title"
+msgstr "Trial call"
+
+msgid "trial.from_manage"
+msgstr "Try your connection beforehand"
+
+msgid "trial.from_join"
+msgstr "Want to try your connection first? Open a trial call."
+
+msgid "trial.intro"
+msgstr "A trial call shows you beforehand whether the video call works for you. It is a real Webex meeting, on the same Webex site and with the same Webex as your appointment. You can check:"
+
+msgid "trial.check.camera"
+msgstr "that your camera works and your picture looks right;"
+
+msgid "trial.check.microphone"
+msgstr "that your microphone picks you up;"
+
+msgid "trial.check.speakers"
+msgstr "that you can hear through your speakers or headphones;"
+
+msgid "trial.check.browser"
+msgstr "that your browser plays the call well."
+
+msgid "trial.alone"
+msgstr "You will be alone in it. Nobody from the team joins and nobody is waiting for you. Webex asks for permission to use your camera and microphone, just as for your appointment."
+
+msgid "trial.open_hint"
+msgstr "The trial call stays open for {minutes} minutes."
+
+msgid "trial.open"
+msgstr "Open trial call"
+
+msgid "trial.calls_left"
+msgstr "Trial calls you can still open: {count}."
+
+msgid "trial.active"
+msgstr "Your trial call is open until {time}."
+
+msgid "trial.join"
+msgstr "Go to the trial call"
+
+msgid "trial.failed"
+msgstr "Opening the trial call does not work right now. Please try again in a few minutes. Your appointment itself is unaffected."
+
+msgid "trial.limit"
+msgstr "You have used the number of trial calls for this appointment. If it does not work, please contact us."
+
+msgid "trial.too_late"
+msgstr "Your appointment is starting or has started. Use the link for the call itself."
+
+msgid "trial.off"
+msgstr "No trial call is available for this appointment."
+
+msgid "trial.back"
+msgstr "Back to your appointment"
+
+msgid "message.trial"
+msgstr "Want to try beforehand whether picture and sound work for you? Open a trial call in Webex, at any time before your appointment."
+
+msgid "message.trial_link"
+msgstr "Open trial call"
+
 msgid "manage.inactive"
 msgstr "This appointment is no longer active."
 
@@ -1051,6 +1114,42 @@ msgstr "Citizen can move until (minutes ahead)"
 
 msgid "admin.field.citizen_change_lead_minutes_hint"
 msgstr "Until how many minutes before the start the citizen can still move the appointment. Cancelling is always possible until the start. Not shorter than Send to the queue, at most 1440. Default 60."
+
+msgid "admin.field.trial_call_enabled"
+msgstr "Trial call for the citizen"
+
+msgid "admin.field.trial_call_enabled_hint"
+msgstr "Yes: the citizen can try beforehand, in a real Webex meeting, whether camera, microphone and speakers work. The meeting belongs to this group's Webex host; nobody from the team joins. Only with a Webex host."
+
+msgid "admin.field.trial_call_minutes"
+msgstr "Trial call stays open (minutes)"
+
+msgid "admin.field.trial_call_minutes_hint"
+msgstr "How long one trial call stays open, from 10 to 60 minutes. Default 30."
+
+msgid "admin.field.trial_calls_per_booking"
+msgstr "Trial calls per appointment"
+
+msgid "admin.field.trial_calls_per_booking_hint"
+msgstr "How often one appointment may open a trial call, from 1 to 5. Each trial call is a Webex meeting. Default 3."
+
+msgid "admin.form.error.trial_call_minutes"
+msgstr "Enter a number of minutes from 10 to 60."
+
+msgid "admin.form.error.trial_calls_per_booking"
+msgstr "Enter a number from 1 to 5."
+
+msgid "call.event.trial_created"
+msgstr "Citizen opened a trial call"
+
+msgid "call.event.trial_joined"
+msgstr "Citizen entered the trial call"
+
+msgid "call.event.trial_failed"
+msgstr "Opening the trial call failed"
+
+msgid "call.event.trial_deleted"
+msgstr "Trial call removed"
 
 msgid "admin.field.planner_change_min_lead_minutes"
 msgstr "Changes by a planner (minutes before)"
@@ -3632,6 +3731,9 @@ msgstr "Create video meeting"
 msgid "audit.job.delete_video_room"
 msgstr "Delete video meeting"
 
+msgid "audit.job.delete_trial_call"
+msgstr "Delete trial call"
+
 msgid "audit.job.send_confirmation"
 msgstr "Send confirmation"
 
@@ -4318,6 +4420,15 @@ msgstr "Webex refused a probe meeting for host {host} ({error}): {reason}"
 
 msgid "admin.check.webex.probe_left"
 msgstr "The probe meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
+
+msgid "admin.check.webex.trial_ok"
+msgstr "A trial-call meeting for host {host} (participants may enter before the host) was scheduled and deleted again."
+
+msgid "admin.check.webex.trial_refused"
+msgstr "Webex refused a trial-call meeting for host {host} ({error}): {reason}. Citizens cannot then open a trial call; check on the Webex site whether participants may join before the host."
+
+msgid "admin.check.webex.trial_left"
+msgstr "The trial-call meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
 
 msgid "admin.check.wxcc.not_configured"
 msgstr "Webex Contact Center is not configured; the routing was not checked."
@@ -6633,6 +6744,9 @@ msgstr "Join link of the citizen"
 
 msgid "admin.settings.data_fields.field.host_join_url"
 msgstr "Join link of the agent"
+
+msgid "admin.settings.data_fields.field.trial_join_url"
+msgstr "Join link of the trial call"
 
 msgid "admin.settings.tls.title"
 msgstr "Certificate of the public address"

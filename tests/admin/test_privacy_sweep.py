@@ -32,7 +32,7 @@ from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.audit import AuditFilter
 from app.domain.authorization import MATRIX, Role
-from app.domain.booking import ChangeReason, MeetingRef
+from app.domain.booking import ChangeReason, MeetingRef, TrialCall
 from app.domain.form_fields import FieldDefinition, FieldType, FormDefinition
 from app.domain.planning import PlanningService
 from app.domain.privacy import ALIASES, PII_FIELDS
@@ -66,6 +66,7 @@ MARKERS = {
     "form_answers": "Zqanswer7x",
     "guest_join_url": "https://video.example/zqjoin7x",
     "host_join_url": "https://video.example/zqjoin7x",
+    "trial_join_url": "https://video.example/zqtrial7x",
 }
 """Marker per personal-data field (one join link: the adapter stores it under both)."""
 
@@ -115,7 +116,7 @@ RELEASE = Release(Version(1, 4, 0), "https://github.com/acme/openplanner/release
 DETAIL = "/admin/groups/demo/bookings/{id}"
 QUEUE_ITEM = "/admin/groups/demo/queue/{queued}"
 QUEUE_ITEM_LIVE = QUEUE_ITEM + "/live"
-"""The claimed booking's status fragment (ADR 0071): the join link travels with it."""
+"""The claimed booking's status fragment (ADR 0072): the join link travels with it."""
 FIRST_NAME_PAGES = frozenset(
     {
         "/admin/groups/demo/queue/live",
@@ -341,6 +342,8 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     await planning.add_override(SUPER, "demo", one_agent)
     async with uow.locked() as tx:
         await tx.save_meeting(found.queued_id, MeetingRef("m-zq", MARKERS["guest_join_url"]))
+        trial = TrialCall(MeetingRef("t-zq", MARKERS["trial_join_url"]), site.clock.now())
+        await tx.save_trial_call(found.queued_id, trial)  # ADR 0071: no admin page shows it
         waiting = await tx.get_booking(waiting_id)
         assert waiting is not None
         await tx.save_booking(waiting.request_rebook(ChangeReason.STAFFING, site.clock.now()))
@@ -435,13 +438,13 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         if found_leaks := _leaks(response.text, _allowed(path, found)):
             leaks[path] = found_leaks
     assert leaks == {}, "personal data on a list, overview, export or alert page (ADR 0063 §2)"
-    # An image route has none to show; the certificate request download (ADR 0071) has no
+    # An image route has none to show; the certificate request download (ADR 0072) has no
     # request waiting. Both answer 404 on purpose and carry no personal data.
     no_content = ("/image", "/tls/csr.pem")
     not_reached = {p: s for p, s in statuses.items() if s >= 400 and not p.endswith(no_content)}
     assert not_reached == {}, "a swept page did not render; fix its path or the fixture"
 
-    # ADR 0071: the claimed booking's fragment once the claim is gone carries no booking data.
+    # ADR 0072: the claimed booking's fragment once the claim is gone carries no booking data.
     async with _uow(site).locked() as tx:
         await tx.release_claim(found.queued_id)
     lost = await site.client.get(found.fill(QUEUE_ITEM_LIVE))

@@ -44,8 +44,11 @@ from app.web.templates import render
 GROUP_ROUTES = frozenset({"/g/{slug}", "/g/{slug}/book", "/g/{slug}/direct"})
 """Citizen routes of a group that show the maintenance page instead of a form or a write."""
 
-BOOKING_ROUTES = frozenset({"/b/{token}/cancel", "/b/{token}/reschedule"})
-"""Citizen routes under a management link that close (both the form and the write)."""
+BOOKING_ROUTES = frozenset(
+    {"/b/{token}/cancel", "/b/{token}/reschedule", "/b/{token}/test", "/b/{token}/test/go"}
+)
+"""Citizen routes under a management link that close (both the form and the write). The trial
+call (ADR 0071) schedules a meeting at Webex, which is a write, so its page closes too."""
 
 WIDGET_ROUTES = frozenset(
     {

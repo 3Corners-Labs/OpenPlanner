@@ -42,9 +42,9 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `ACME_CA` | url | — | ACME directory (proxy.env). |
 | `TLS_CERT_FILE` | path | — | Own certificate chain (PEM) for the proxy; with TLS_KEY_FILE it replaces ACME (proxy.env, ADR 0064). |
 | `TLS_KEY_FILE` | path | — | Private key of the own certificate (proxy.env, ADR 0064). |
-| `TLS_PROXY_BUNDLED` | bool | `false` | The bundled HTTPS proxy runs, so the portal manages the certificate source (docker-compose.yml sets it from OPENPLANNER_TLS; ADR 0071). |
-| `TLS_PORTAL_CERTIFICATE_DIR` | path | `portal-certs` | The volume shared with the proxy that holds the own certificate's private key, its request and the served pair; never under data/ (ADR 0071). |
-| `TLS_PORTAL_POLL_SECONDS` | int | `10` | How often the proxy looks for a changed certificate from the portal (proxy.env, ADR 0071). |
+| `TLS_PROXY_BUNDLED` | bool | `false` | The bundled HTTPS proxy runs, so the portal manages the certificate source (docker-compose.yml sets it from OPENPLANNER_TLS; ADR 0072). |
+| `TLS_PORTAL_CERTIFICATE_DIR` | path | `portal-certs` | The volume shared with the proxy that holds the own certificate's private key, its request and the served pair; never under data/ (ADR 0072). |
+| `TLS_PORTAL_POLL_SECONDS` | int | `10` | How often the proxy looks for a changed certificate from the portal (proxy.env, ADR 0072). |
 | `WORKER_HEARTBEAT_PATH` | path | `data/worker.heartbeat` | Heartbeat file the worker healthcheck reads. |
 | `WORKER_HEARTBEAT_MAX_AGE_SECONDS` | float | `120.0` | Age after which the worker healthcheck fails. |
 | `APP_VERSION` | string | `""` | Baked into release images (ADR 0029). |
@@ -72,7 +72,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `TLS_CHECK_INTERVAL_HOURS` | int | `6` | 1–168 | `settings.platform.manage` | How often the worker probes the certificate of the public address (ADR 0064). |
 | `TLS_EXPIRY_WARNING_DAYS` | int | `20` | 1–60 | `settings.platform.manage` | Fewer days left than this makes the certificate finding 'expiring' (ADR 0064). |
 | `TLS_ALERT_REPEAT_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | A lasting certificate finding is reported again at this interval (ADR 0064). |
-| `TLS_CERTIFICATE_SOURCE` | enum | `acme` | acme, own | `settings.platform.manage` | Where the bundled proxy's certificate comes from: Let's Encrypt (acme) or the pair uploaded in the portal (own); 'own' needs an upload (ADR 0071). |
+| `TLS_CERTIFICATE_SOURCE` | enum | `acme` | acme, own | `settings.platform.manage` | Where the bundled proxy's certificate comes from: Let's Encrypt (acme) or the pair uploaded in the portal (own); 'own' needs an upload (ADR 0072). |
 | `INTEGRATION_CHECK_INTERVAL_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The worker checks every group with a Webex host this often and reports a broken chain as a system event (ADR 0065). |
 | `JOB_OVERDUE_MINUTES` | int | `10` | 1–1440 | `settings.platform.manage` | A pending job this many minutes past its planned time counts as overdue in a group's integration check (ADR 0068). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
@@ -122,7 +122,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_CHANNEL` | enum | `release` | release, rc | `settings.platform.manage` | What the installation follows (ADR 0059, 0065): releases only, or release candidates (`rc`) too; `rc` is not usable in production. |
 | `UPDATE_AUTO_APPLY` | bool | `false` | — | `settings.platform.manage` | The worker requests a newer version itself as soon as the check finds one (ADR 0059, 0065); not usable in production. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
-| `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the citizen's waiting page (ADR 0071). |
+| `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the citizen's waiting page (ADR 0072). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |
 

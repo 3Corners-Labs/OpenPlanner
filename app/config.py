@@ -219,7 +219,7 @@ class Settings(BaseSettings):
     # ADR 0044: changes by one planner per hour above which a system event warns (never
     # blocks). Class C platform (ADR 0042, settings registry).
     planner_changes_alert_per_hour: int = Field(default=50, ge=5, le=1000)
-    # ADR 0071 (announced in ADR 0043): how often the own queue, a claimed booking and the
+    # ADR 0072 (announced in ADR 0043): how often the own queue, a claimed booking and the
     # citizen's waiting page ask the server for a change. Class C platform.
     queue_refresh_seconds: int = Field(default=10, ge=5, le=60)
     # ADR 0044: a planner's request to choose a new time lapses this many days after the
@@ -363,7 +363,7 @@ class Settings(BaseSettings):
     tls_check_interval_hours: int = Field(default=6, ge=1, le=168)
     tls_expiry_warning_days: int = Field(default=20, ge=1, le=60)
     tls_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
-    # ADR 0071: the certificate source of the bundled proxy, managed in the portal.
+    # ADR 0072: the certificate source of the bundled proxy, managed in the portal.
     tls_certificate_source: Literal["acme", "own"] = "acme"
     tls_proxy_bundled: bool = False
     tls_portal_certificate_dir: Path = Path("portal-certs")

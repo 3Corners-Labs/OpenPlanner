@@ -68,6 +68,9 @@ from app.domain.scheduling import (
     MAX_LABEL_LENGTH,
     MAX_PLANNER_LEAD_MINUTES,
     MAX_QUEUE_VISIBLE_FROM_MINUTES,
+    MAX_TRIAL_CALL_MINUTES,
+    MAX_TRIAL_CALLS_PER_BOOKING,
+    MIN_TRIAL_CALL_MINUTES,
     DispatchKind,
     GroupSummary,
     Offer,
@@ -118,6 +121,14 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
     "citizen_change_lead_minutes": (
         "admin.field.citizen_change_lead_minutes",
         "admin.field.citizen_change_lead_minutes_hint",
+    ),
+    "trial_call_minutes": (
+        "admin.field.trial_call_minutes",
+        "admin.field.trial_call_minutes_hint",
+    ),
+    "trial_calls_per_booking": (
+        "admin.field.trial_calls_per_booking",
+        "admin.field.trial_calls_per_booking_hint",
     ),
     "planner_change_min_lead_minutes": (
         "admin.field.planner_change_min_lead_minutes",
@@ -171,7 +182,7 @@ def group_page(
 ) -> HTMLResponse:
     """Render a group page with header, the tabs the matrix allows, and any confirmation.
 
-    ``scripts=True`` allows the page's own script (the queue's live region, ADR 0071).
+    ``scripts=True`` allows the page's own script (the queue's live region, ADR 0072).
     """
     summary = context.group
     can = can_function(context.principal)
@@ -337,7 +348,7 @@ class WindowView:
     label: str | None
     staffed: bool
     offer: str | None = None
-    """The block's offer in words when it is not the default (ADR 0071)."""
+    """The block's offer in words when it is not the default (ADR 0072)."""
 
 
 @dataclass(frozen=True)
@@ -379,7 +390,7 @@ OFFER_LABELS: dict[Offer, str] = {
     Offer.DIRECT: "admin.offer.direct",
     Offer.BOTH: "admin.offer.both",
 }
-"""Catalogue key per offer of a block (ADR 0071), for the select and the week view."""
+"""Catalogue key per offer of a block (ADR 0072), for the select and the week view."""
 
 
 def _offer_text(window: TimeWindow, _: BoundGettext) -> str | None:
@@ -487,7 +498,7 @@ async def group(
             "exceptions": _exceptions(schedule, locale),
             "preview": _preview(preview, summary, locale),
             "shortfalls": await group_shortfalls(request, locale, context),
-            # ADR 0071: direct calls are offered per block, not per group.
+            # ADR 0072: direct calls are offered per block, not per group.
             "direct_blocks": sum(1 for r in schedule.rules if r.window.offers_direct),
         },
     )
@@ -607,6 +618,25 @@ def _settings_fields(
         text(
             "wxcc_routing_value", current.wxcc_routing_value, "admin.field.wxcc_routing_value_hint"
         ),
+        Field(
+            "trial_call_enabled",
+            _("admin.field.trial_call_enabled"),
+            "select",
+            value("trial_call_enabled", "yes" if current.trial_call_enabled else "no"),
+            hint=_("admin.field.trial_call_enabled_hint"),
+            error=form.error_for("trial_call_enabled"),
+            options=yes_no,
+        ),
+        number(
+            "trial_call_minutes",
+            current.trial_call_minutes,
+            {"min": str(MIN_TRIAL_CALL_MINUTES), "max": str(MAX_TRIAL_CALL_MINUTES)},
+        ),
+        number(
+            "trial_calls_per_booking",
+            current.trial_calls_per_booking,
+            {"min": "1", "max": str(MAX_TRIAL_CALLS_PER_BOOKING)},
+        ),
         number("not_picked_up_minutes", current.not_picked_up_minutes, {"min": "1", "max": "120"}),
         number(
             "direct_call_max_concurrent",
@@ -679,8 +709,9 @@ async def save_settings(
     phone = form.choice("phone_mode", {mode.value for mode in PhoneMode})
     dispatch = form.choice("dispatch_kind", {kind.value for kind in DispatchKind})
     embedding = form.choice("embedding_enabled", {"yes", "no"})
+    trial = form.choice("trial_call_enabled", {"yes", "no"})
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
-    if not form.errors and None not in (phone, dispatch, embedding, free_pick):
+    if not form.errors and None not in (phone, dispatch, embedding, free_pick, trial):
         new = GroupSettings(
             name=form.text("name"),
             timezone=form.text("timezone"),
@@ -694,6 +725,7 @@ async def save_settings(
             wxcc_routing_value=form.optional_text("wxcc_routing_value"),
             direct_call_max_concurrent=cap,
             embedding_enabled=embedding == "yes",
+            trial_call_enabled=trial == "yes",
             **{name: value for name, value in numbers.items() if value is not None},
         )
         try:
@@ -770,7 +802,7 @@ def _read_offer(form: FormData) -> str | None:
 
 
 def _offer_field(form: FormData, locale: RequestLocale) -> Field:
-    """Return the offer select of a block: slots, direct calls or both (ADR 0071)."""
+    """Return the offer select of a block: slots, direct calls or both (ADR 0072)."""
     _ = locale.gettext
     return Field(
         "offer",

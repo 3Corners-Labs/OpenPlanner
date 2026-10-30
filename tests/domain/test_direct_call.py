@@ -1,4 +1,4 @@
-"""Direct calls (ADR 0019): only in a block that offers them (ADR 0071), in its own slot."""
+"""Direct calls (ADR 0019): only in a block that offers them (ADR 0072), in its own slot."""
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -20,7 +20,7 @@ MONDAY_0915 = datetime(2026, 1, 5, 8, 15, tzinfo=UTC)  # 09:15 Amsterdam
 GROUP = make_group(id=1, slug="aangifte")
 RULES = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 1, Offer.BOTH))]
 SLOTS_ONLY = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 1))]
-"""The same block offering appointments only: no direct call (ADR 0071)."""
+"""The same block offering appointments only: no direct call (ADR 0072)."""
 
 
 def test_open_follows_windows_and_exceptions() -> None:
@@ -46,7 +46,7 @@ def test_closed_during_a_block_without_agents() -> None:
 
 
 def test_only_a_block_that_offers_direct_calls_opens_them() -> None:
-    """ADR 0071: the offer is per block; a direct-only block opens them as well."""
+    """ADR 0072: the offer is per block; a direct-only block opens them as well."""
     direct_only = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 1, Offer.DIRECT))]
     exception = [ScheduleOverride(MONDAY_0915.date(), window("09:00", "10:00", 1, Offer.BOTH))]
 

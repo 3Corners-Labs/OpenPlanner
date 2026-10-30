@@ -105,6 +105,8 @@ class ClosureExamples:
             Chromium; the flow runs in each browser, and each confirms its own booking.
         pending_flow_firefox: The same for Firefox.
         pending_flow_webkit: The same for WebKit.
+        trial_page: The trial call page of that booking. It shows the page's "not available
+            for this appointment" state; its other states are covered by the API tests.
     """
 
     closed_group: str
@@ -114,6 +116,7 @@ class ClosureExamples:
     pending_flow_chromium: str
     pending_flow_firefox: str
     pending_flow_webkit: str
+    trial_page: str
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -215,6 +218,7 @@ async def seed_closure_examples(
         pending_flow_chromium=f"/b/{pending[1]}/confirm",
         pending_flow_firefox=f"/b/{pending[2]}/confirm",
         pending_flow_webkit=f"/b/{pending[3]}/confirm",
+        trial_page=f"/b/{token}/test",
     )
 
 

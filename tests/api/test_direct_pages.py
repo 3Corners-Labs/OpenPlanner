@@ -28,7 +28,7 @@ ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org",
 
 
 async def _configure(database_url: str, **changes: object) -> None:
-    """Change the demo group, and let every staffing block offer direct calls (ADR 0071)."""
+    """Change the demo group, and let every staffing block offer direct calls (ADR 0072)."""
     engine = create_engine(database_url)
     async with SqlUnitOfWork(engine).locked() as tx:
         group = await tx.get_group("demo")
@@ -228,7 +228,7 @@ def _poll_url(page: str) -> str | None:
 
 
 async def test_the_page_polls_a_status_fragment_without_reloading(site: Site) -> None:
-    """ADR 0071: live through a fragment; 204 while nothing changed; never a page reload."""
+    """ADR 0072: live through a fragment; 204 while nothing changed; never a page reload."""
     wait = (await site.start()).headers["location"]
 
     page = (await site.client.get(wait)).text
@@ -249,7 +249,7 @@ async def test_the_page_polls_a_status_fragment_without_reloading(site: Site) ->
 
 
 async def test_a_claim_in_the_own_queue_shows_as_accepted(site: Site) -> None:
-    """ADR 0071: the own queue has no WxCC task; the claim tells the citizen an agent is coming."""
+    """ADR 0072: the own queue has no WxCC task; the claim tells the citizen an agent is coming."""
     await _configure(site.database_url, dispatch_kind=DispatchKind.OPENPLANNER_QUEUE)
     wait = (await site.start()).headers["location"]
     searching = (await site.client.get(wait)).text
@@ -280,7 +280,7 @@ async def test_nobody_picking_up_in_the_own_queue_is_said_honestly(site: Site) -
 
 
 async def test_a_failed_meeting_is_told_instead_of_waiting_for_nothing(site: Site) -> None:
-    """ADR 0071: Webex refused the meeting (ADR 0065 reason on the timeline): say so."""
+    """ADR 0072: Webex refused the meeting (ADR 0065 reason on the timeline): say so."""
     site.video.error = IntegrationError("rejected_400", retryable=False)
     wait = (await site.start()).headers["location"]
     preparing = (await site.client.get(wait)).text

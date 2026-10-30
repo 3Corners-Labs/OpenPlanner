@@ -39,7 +39,7 @@ def _meetings(
 
 
 async def test_a_direct_call_is_sent_in_whole_seconds_from_now() -> None:
-    """Webex refuses microseconds and a start over a minute ago (ADR 0071)."""
+    """Webex refuses microseconds and a start over a minute ago (ADR 0072)."""
     seen: list[dict[str, object]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -123,3 +123,22 @@ async def test_a_refused_meeting_logs_and_carries_webexs_reason() -> None:
     refused = next(entry for entry in logs if entry["event"] == "integration.refused")
     assert (refused["reason"], refused["tracking_id"]) == ("Invalid hostEmail.", "ROUTER_789")
     assert error.value.reason == "Invalid hostEmail."  # ADR 0065: shown on the timeline
+
+
+async def test_a_trial_meeting_differs_only_in_who_may_enter_first() -> None:
+    from dataclasses import replace
+
+    from app.adapters.webex_meetings import meeting_body
+
+    booking = meeting_body(REQUEST, NOW)
+    trial = meeting_body(replace(REQUEST, join_before_host=True), NOW)
+
+    assert trial["enabledJoinBeforeHost"] is True
+    assert trial["enableConnectAudioBeforeHost"] is True
+    assert trial["unlockedMeetingJoinSecurity"] == "allowJoin"
+    same = {k: v for k, v in trial.items() if k in booking and trial[k] == booking[k]}
+    assert same["hostEmail"] == "host@example.nl"
+    assert same["meetingOptions"] == booking["meetingOptions"]
+    assert same["sendEmail"] is False
+    assert same["allowAnyUserToBeCoHost"] is True
+    assert "enableConnectAudioBeforeHost" not in booking

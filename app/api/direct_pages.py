@@ -4,7 +4,7 @@ Starting a call creates a booking of kind direct, then the meeting and the work 
 away so the citizen does not wait for the worker; if Webex or WxCC is slow or down, the
 worker's jobs take over (they are idempotent). The waiting page says honestly when no agent
 is available and when the meeting could not be set up (``direct_queue.wait_state``, ADR
-0071). It never reloads by itself (no time limits, WCAG 2.2.1): ``static/live-region.js``
+0072). It never reloads by itself (no time limits, WCAG 2.2.1): ``static/live-region.js``
 polls a status fragment and swaps it in, and without the script a button refreshes the page;
 the citizen can wait in the Webex lobby meanwhile. When the group's cap of open direct calls
 is reached the form says all agents are busy; the form and the waiting page show the place

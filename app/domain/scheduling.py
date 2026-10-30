@@ -59,6 +59,13 @@ MAX_DISPATCH_LEAD_MINUTES = 60
 DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES = 60
 """ADR 0069: a citizen can move a booking until this long before the start."""
 MAX_CITIZEN_CHANGE_LEAD_MINUTES = 1440
+DEFAULT_TRIAL_CALL_MINUTES = 30
+"""ADR 0071: how long a trial call stays open, from the moment the citizen starts it."""
+MIN_TRIAL_CALL_MINUTES = 10
+MAX_TRIAL_CALL_MINUTES = 60
+DEFAULT_TRIAL_CALLS_PER_BOOKING = 3
+"""ADR 0071: how often one booking may open a trial call; each one is a Webex meeting."""
+MAX_TRIAL_CALLS_PER_BOOKING = 5
 DEFAULT_QUEUE_VISIBLE_FROM_MINUTES = 15
 MAX_QUEUE_VISIBLE_FROM_MINUTES = 120
 MAX_PLANNER_LEAD_MINUTES = 1440
@@ -126,7 +133,7 @@ class DispatchKind(StrEnum):
 
 
 class Offer(StrEnum):
-    """What a staffing block offers citizens (ADR 0071): slots, direct calls, or both."""
+    """What a staffing block offers citizens (ADR 0072): slots, direct calls, or both."""
 
     SCHEDULED = "scheduled"
     """Appointments in the slot grid; the default."""
@@ -205,6 +212,11 @@ class Group:
         planner_change_min_lead_minutes: How long before the start a planner may still move
             or cancel a booking (ADR 0044, class D per group). Never below
             ``dispatch_lead_minutes``: a dispatched booking needs a phone call, not a mail.
+        trial_call_enabled: Whether the citizen can open a trial call on Webex ahead of the
+            appointment (ADR 0071); needs video. On by default.
+        trial_call_minutes: How long one trial call stays open, 10 to 60 minutes.
+        trial_calls_per_booking: How many trial calls one booking may open, 1 to 5, so the page
+            cannot be used to create Webex meetings without end.
         embedding_enabled: Whether the group may appear in the widget on the websites its
             organisation allows (ADR 0035); off until the group switches it on.
         queue_visible_from_minutes: Own queue: how long before its start a booking appears.
@@ -240,6 +252,9 @@ class Group:
     dispatch_kind: DispatchKind = DispatchKind.CONTACT_CENTER
     citizen_change_lead_minutes: int = DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES
     planner_change_min_lead_minutes: int = 60
+    trial_call_enabled: bool = True
+    trial_call_minutes: int = DEFAULT_TRIAL_CALL_MINUTES
+    trial_calls_per_booking: int = DEFAULT_TRIAL_CALLS_PER_BOOKING
     embedding_enabled: bool = False
     queue_visible_from_minutes: int = DEFAULT_QUEUE_VISIBLE_FROM_MINUTES
     queue_free_pick_allowed: bool = False
@@ -269,6 +284,10 @@ class Group:
         planner_lead = self.planner_change_min_lead_minutes
         if not self.dispatch_lead_minutes <= planner_lead <= MAX_PLANNER_LEAD_MINUTES:
             raise _invalid("planner_change_min_lead_minutes")
+        if not MIN_TRIAL_CALL_MINUTES <= self.trial_call_minutes <= MAX_TRIAL_CALL_MINUTES:
+            raise _invalid("trial_call_minutes")
+        if not 1 <= self.trial_calls_per_booking <= MAX_TRIAL_CALLS_PER_BOOKING:
+            raise _invalid("trial_calls_per_booking")
         if not 0 <= self.queue_visible_from_minutes <= MAX_QUEUE_VISIBLE_FROM_MINUTES:
             raise _invalid("queue_visible_from_minutes")
         if not 1 <= self.max_bookings_per_email <= MAX_BOOKINGS_PER_EMAIL:
@@ -373,7 +392,7 @@ class TimeWindow:
         capacity: Number of agents, 0 to ``MAX_CAPACITY``; 0 offers no slots (lunch).
         label: Optional admin note such as "Lunch"; admin content only, never shown to
             citizens or logged, and no part of equality or ordering.
-        offer: Slots, direct calls or both (ADR 0071); ``scheduled`` by default.
+        offer: Slots, direct calls or both (ADR 0072); ``scheduled`` by default.
     """
 
     opens: time
@@ -408,7 +427,7 @@ class TimeWindow:
 
     @property
     def offers_direct(self) -> bool:
-        """Whether a citizen can start a direct call during the block (ADR 0071)."""
+        """Whether a citizen can start a direct call during the block (ADR 0072)."""
         return self.staffed and self.offer.direct
 
     def overlaps(self, other: "TimeWindow") -> bool:
@@ -514,7 +533,7 @@ def open_for_direct(
     overrides: Iterable[ScheduleOverride],
     now: datetime,
 ) -> bool:
-    """Return whether ``now`` falls inside a staffed block that offers direct calls (ADR 0071)."""
+    """Return whether ``now`` falls inside a staffed block that offers direct calls (ADR 0072)."""
     local = now.astimezone(group.tz)
     return any(
         window.offers_direct and window.opens <= local.time() < window.closes

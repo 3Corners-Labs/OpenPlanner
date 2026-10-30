@@ -1783,7 +1783,7 @@ fieldset.card {
   font-style: italic;
 }
 
-/* ADR 0071: what a block offers when it is not the default (slots only). */
+/* ADR 0072: what a block offers when it is not the default (slots only). */
 .window__offer {
   font-size: 0.8rem;
   color: var(--adm-text-muted);

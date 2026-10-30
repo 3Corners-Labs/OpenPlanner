@@ -145,7 +145,7 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/{key}/reset": {
         "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
     },
-    # ADR 0071: the certificate source, the key on this host and the chain, superuser only.
+    # ADR 0072: the certificate source, the key on this host and the chain, superuser only.
     # Without the bundled proxy (the test settings) a request or an upload is refused (422), a
     # removal is a conflict (409), there is no request to download (404); *Check now* always
     # probes and returns to the page.
@@ -826,7 +826,7 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/queue": statuses(404, 404, 404, 403, 403, 404, 403),
         "/admin/groups/andere-team/queue": statuses(404, 403, 403, 404, 403, 403, 403),
     },
-    # ADR 0071: the fragments the live queue polls carry the same permission as the page.
+    # ADR 0072: the fragments the live queue polls carry the same permission as the page.
     "GET /admin/groups/{slug}/queue/live": {
         "/admin/groups/demo/queue/live": statuses(404, 404, 404, 403, 403, 404, 403),
         "/admin/groups/andere-team/queue/live": statuses(404, 403, 403, 404, 403, 403, 403),

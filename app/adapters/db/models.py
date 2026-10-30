@@ -193,6 +193,10 @@ class GroupRow(Base):
     citizen_change_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     # ADR 0044: a planner changes bookings up to this long before the start.
     planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
+    # ADR 0071: a trial call on Webex ahead of the appointment.
+    trial_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
+    trial_call_minutes: Mapped[int] = mapped_column(Integer, server_default=text("30"))
+    trial_calls_per_booking: Mapped[int] = mapped_column(Integer, server_default=text("3"))
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     queue_visible_from_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))
     queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
@@ -210,6 +214,8 @@ class GroupRow(Base):
         ),
         CheckConstraint("citizen_change_lead_minutes BETWEEN 0 AND 1440", name="citizen_lead"),
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
+        CheckConstraint("trial_call_minutes BETWEEN 10 AND 60", name="trial_call_minutes"),
+        CheckConstraint("trial_calls_per_booking BETWEEN 1 AND 5", name="trial_calls_per_booking"),
         CheckConstraint("queue_visible_from_minutes BETWEEN 0 AND 120", name="queue_visible_from"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
         CheckConstraint("max_bookings_per_email BETWEEN 1 AND 10", name="max_bookings_per_email"),
@@ -258,13 +264,13 @@ class GroupContactsRow(Base):
 
 
 OFFERS = "('scheduled', 'direct', 'both')"
-"""What a staffing block offers (ADR 0071), as the database checks it."""
+"""What a staffing block offers (ADR 0072), as the database checks it."""
 
 
 class ScheduleRuleRow(Base):
     """A weekly staffing block of a group; capacity 0 is a block without agents (ADR 0027).
 
-    ``offer`` says whether the block offers slots, direct calls or both (ADR 0071).
+    ``offer`` says whether the block offers slots, direct calls or both (ADR 0072).
     """
 
     __tablename__ = "schedule_rules"
@@ -455,6 +461,11 @@ class BookingRow(Base):
     host_join_url: Mapped[str | None] = mapped_column(String(2048))
     video_room_id: Mapped[str | None] = mapped_column(String(255))
     wxcc_task_id: Mapped[str | None] = mapped_column(String(255))
+    # ADR 0071: the trial call on Webex; the link is PII and purged with the contact.
+    trial_room_id: Mapped[str | None] = mapped_column(String(255))
+    trial_join_url: Mapped[str | None] = mapped_column(String(2048))
+    trial_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    trial_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
     cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     pii_purged_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
@@ -991,7 +1002,7 @@ class RoleRow(Base):
 
 
 class OwnCertificateRow(Base):
-    """The own certificate uploaded in the portal (ADR 0071); at most one row.
+    """The own certificate uploaded in the portal (ADR 0072); at most one row.
 
     The chain is public and stored as text with the leaf's public key; the private key is never
     in the database (it lives on the volume the proxy reads), so a backup never carries it.

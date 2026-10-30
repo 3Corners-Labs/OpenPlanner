@@ -7,7 +7,7 @@ the group's name and times only (``app.domain.calls.meeting_request``). Start an
 sent in the group's time zone: Webex refuses a ``timezone`` whose offset differs from the one
 in the times (ADR 0065), so UTC times next to ``Europe/Amsterdam`` would never schedule.
 
-Two more rules of the Meetings API, found with a direct call (ADR 0071): a time with
+Two more rules of the Meetings API, found with a direct call (ADR 0072): a time with
 microseconds is refused ("format is wrong"), and so is a start more than about a minute in the
 past ("before current time"), while a start a few seconds ago is accepted. The body therefore
 carries whole seconds, and a start that has passed (a direct call, or its retry by the worker)
@@ -32,6 +32,16 @@ MEETING_OPTIONS: dict[str, Any] = {
     "attendeePrivileges": {"enabledChatHost": True, "enabledChatOtherParticipants": True},
 }
 """Defaults for every meeting (ADR 0017: cohost for staff, lobby for guests, chat on)."""
+
+TRIAL_OPTIONS: dict[str, Any] = {
+    "enabledJoinBeforeHost": True,
+    "enableConnectAudioBeforeHost": True,
+    "unlockedMeetingJoinSecurity": "allowJoin",
+}
+"""What a trial call (ADR 0071) changes: the citizen enters alone, without waiting in the lobby.
+
+Everything else, the site, the host, the chat and file settings, is the booking's own, so the
+citizen tries the call they will have."""
 
 
 class WebexMeetings:
@@ -80,11 +90,12 @@ def meeting_body(request: MeetingRequest, now: datetime) -> dict[str, Any]:
     zone = ZoneInfo(request.timezone)
     start = max(request.start, now).replace(microsecond=0)
     end = request.end.replace(microsecond=0)
+    options = {**MEETING_OPTIONS, **TRIAL_OPTIONS} if request.join_before_host else MEETING_OPTIONS
     return {
         "title": request.title,
         "start": start.astimezone(zone).isoformat(),
         "end": end.astimezone(zone).isoformat(),
         "timezone": request.timezone,
         "hostEmail": request.host_email,
-        **MEETING_OPTIONS,
+        **options,
     }

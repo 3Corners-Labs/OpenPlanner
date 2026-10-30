@@ -64,9 +64,9 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     form = (await site.client.get(f"{GROUP}/settings")).text
 
     assert '<option value="Europe/Amsterdam" selected>' in form
-    # time zone, dispatch kind, free pick, phone mode, embedding (the direct call is offered
-    # per staffing block since ADR 0071)
-    assert form.count(" selected>") == 5
+    # time zone, dispatch kind, free pick, phone mode, trial call, embedding (the direct
+    # call is offered per staffing block since ADR 0072)
+    assert form.count(" selected>") == 6
 
 
 async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
@@ -196,6 +196,9 @@ SETTINGS_FORM = {
     "dispatch_lead_minutes": "5",
     "dispatch_kind": "contact_center",
     "citizen_change_lead_minutes": "60",
+    "trial_call_enabled": "yes",
+    "trial_call_minutes": "30",
+    "trial_calls_per_booking": "3",
     "planner_change_min_lead_minutes": "60",
     "queue_visible_from_minutes": "15",
     "max_bookings_per_email": "3",
@@ -244,6 +247,9 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "dispatch_lead_minutes": "5",
         "dispatch_kind": "openplanner_queue",
         "citizen_change_lead_minutes": "120",
+        "trial_call_enabled": "yes",
+        "trial_call_minutes": "30",
+        "trial_calls_per_booking": "3",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
@@ -293,6 +299,9 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, 
         "dispatch_lead_minutes": "5",
         "dispatch_kind": kind,
         "citizen_change_lead_minutes": minutes,
+        "trial_call_enabled": "yes",
+        "trial_call_minutes": "30",
+        "trial_calls_per_booking": "3",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
@@ -323,6 +332,9 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "dispatch_lead_minutes": "5",
             "dispatch_kind": "contact_center",
             "citizen_change_lead_minutes": "60",
+            "trial_call_enabled": "yes",
+            "trial_call_minutes": "30",
+            "trial_calls_per_booking": "3",
             "planner_change_min_lead_minutes": "60",
             "queue_visible_from_minutes": "15",
             "max_bookings_per_email": "3",
@@ -629,6 +641,9 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "dispatch_lead_minutes": "5",
             "dispatch_kind": "contact_center",
             "citizen_change_lead_minutes": "60",
+            "trial_call_enabled": "yes",
+            "trial_call_minutes": "30",
+            "trial_calls_per_booking": "3",
             "planner_change_min_lead_minutes": "60",
             "queue_visible_from_minutes": "15",
             "max_bookings_per_email": "3",
@@ -666,6 +681,9 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "dispatch_lead_minutes": "5",
         "dispatch_kind": "contact_center",
         "citizen_change_lead_minutes": "60",
+        "trial_call_enabled": "yes",
+        "trial_call_minutes": "30",
+        "trial_calls_per_booking": "3",
         "planner_change_min_lead_minutes": "60",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
@@ -778,3 +796,35 @@ async def test_a_split_outside_the_block_is_explained(site: Site) -> None:
     assert garbage.status_code == 422  # type: ignore[attr-defined]
     assert '<a href="#split_at">' in garbage.text  # type: ignore[attr-defined]
     assert "10:00–12:00" in (await site.client.get(f"{GROUP}/staffing")).text
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("trial_call_minutes", "9"), ("trial_call_minutes", "61"), ("trial_calls_per_booking", "0")],
+)
+async def test_trial_call_fields_are_checked(site: Site, field: str, value: str) -> None:
+    await site.login_as(SUPER)
+    form = {**SETTINGS_FORM, field: value}
+
+    response = await _post(site, f"{GROUP}/settings", form)
+
+    assert response.status_code == 422
+    assert f'<a href="#{field}">' in response.text
+
+
+async def test_the_trial_call_switch_and_limits_are_saved(site: Site) -> None:
+    await site.login_as(SUPER)
+    form = {
+        **SETTINGS_FORM,
+        "trial_call_enabled": "no",
+        "trial_call_minutes": "45",
+        "trial_calls_per_booking": "5",
+    }
+
+    saved = await _post(site, f"{GROUP}/settings", form)
+    after = (await site.client.get(f"{GROUP}/settings")).text
+
+    assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
+    assert 'name="trial_call_minutes" type="number" value="45"' in after
+    assert 'name="trial_calls_per_booking" type="number" value="5"' in after
+    assert '<option value="no" selected' in after

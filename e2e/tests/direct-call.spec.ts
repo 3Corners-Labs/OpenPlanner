@@ -1,6 +1,6 @@
 /**
  * Direct video call (ADR 0019) end to end, without Webex: the org admin creates a group that is
- * open around the clock with blocks that offer direct calls (ADR 0071); a citizen starts a call
+ * open around the clock with blocks that offer direct calls (ADR 0072); a citizen starts a call
  * and lands on the waiting page; the org admin sees it in the agenda. axe (WCAG 2.2 AA) on every
  * page.
  *

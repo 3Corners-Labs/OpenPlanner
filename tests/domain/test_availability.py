@@ -210,7 +210,7 @@ def test_a_block_without_agents_offers_no_slots() -> None:
 
 
 def test_a_direct_only_block_offers_no_slots_and_ends_the_run() -> None:
-    """ADR 0071: a block for direct calls only splits the grid like a block without agents."""
+    """ADR 0072: a block for direct calls only splits the grid like a block without agents."""
     blocks = [
         window("09:00", "10:00", 2, Offer.BOTH),
         window("10:00", "10:15", 2, Offer.DIRECT),

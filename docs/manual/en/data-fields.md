@@ -13,8 +13,9 @@ organisation, a message text or a log line.
 - **Direct** fields identify the citizen on their own: first name, last name, email address
   and phone number.
 - **Sensitive** fields hold what the citizen told us, or give access to the conversation: a
-  note, the answers to the team's own questions on the booking form, and the two links to
-  join the video call.
+  note, the answers to the team's own questions on the booking form, and the links to join the
+  video call and the trial call (a link for the call itself, one for the host, and one for the
+  trial call before it).
 
 The answers to a team's own questions count as personal data unless the question was marked
 *not personal data* when it was added (see [the booking form](group-booking-form.md)).

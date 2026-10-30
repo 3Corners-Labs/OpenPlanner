@@ -32,7 +32,7 @@ TEST_TOKEN_KEY = b"k" * 32
 def window(
     opens: str = "09:00", closes: str = "10:00", capacity: int = 2, offer: Offer = Offer.SCHEDULED
 ) -> TimeWindow:
-    """Return a local staffing block; ``offer`` says whether it takes direct calls (ADR 0071)."""
+    """Return a local staffing block; ``offer`` says whether it takes direct calls (ADR 0072)."""
     return TimeWindow(time.fromisoformat(opens), time.fromisoformat(closes), capacity, offer=offer)
 
 
