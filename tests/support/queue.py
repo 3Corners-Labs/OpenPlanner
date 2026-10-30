@@ -19,8 +19,12 @@ def site_uow(site: Site) -> SqlUnitOfWork:
     return SqlUnitOfWork(app.state.engine)
 
 
-async def own_queue(site: Site, **changes: object) -> int:
-    """Switch the demo group to the own queue, book Friday 09:00 and move to its start."""
+async def own_queue(site: Site, *, meeting: bool = True, **changes: object) -> int:
+    """Switch the demo group to the own queue, book Friday 09:00 and move to its start.
+
+    ``meeting=False`` leaves the booking without a meeting (a pending or failed video link,
+    ADR 0072).
+    """
     uow = site_uow(site)
     async with uow.locked() as tx:
         summary = await tx.get_group_summary("demo")
@@ -35,7 +39,8 @@ async def own_queue(site: Site, **changes: object) -> int:
         locale="nl",
     )
     booking_id = receipt.booking.id or 0
-    async with uow.locked() as tx:
-        await tx.save_meeting(booking_id, MeetingRef("m-1", "https://webex.example/j/1"))
+    if meeting:
+        async with uow.locked() as tx:
+            await tx.save_meeting(booking_id, MeetingRef("m-1", "https://webex.example/j/1"))
     site.clock.advance(FRIDAY_0900 - site.clock.now() - timedelta(minutes=5))
     return booking_id

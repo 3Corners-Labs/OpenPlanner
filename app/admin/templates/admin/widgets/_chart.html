@@ -1,0 +1,44 @@
+{#- One chart of a widget (ADR 0061 §5): expects ``view.chart`` (ChartView). The SVG is role="img" with the whole text summary as its label; colours come from classes, never from style attributes, and the values are printed, so colour is never the only signal. The same data sits in a table behind a <details>. -#}
+{% set cv = view.chart %}
+{% set c = cv.chart %}
+<figure class="chart chart--{{ c.kind.value }}">
+  <svg class="chart__svg" viewBox="0 0 {{ c.width }} {{ c.height }}" role="img" aria-label="{{ cv.summary }}" focusable="false">
+    {% if c.axis %}<line class="chart__axis" x1="{{ c.axis[0] }}" y1="{{ c.axis[1] }}" x2="{{ c.axis[2] }}" y2="{{ c.axis[3] }}"/>{% endif %}
+    {% if c.kind.value == "bar" %}
+    {% for m in c.marks %}
+    <rect class="chart__bar chart-series-{{ m.series }}" x="{{ m.x }}" y="{{ m.y }}" width="{{ m.width }}" height="{{ m.height }}" rx="2"/>
+    <text class="chart__value" x="{{ m.value_x }}" y="{{ m.value_y }}" text-anchor="{{ m.value_anchor }}">{{ m.value_text }}</text>
+    <text class="chart__label" x="{{ m.label_x }}" y="{{ m.label_y }}" text-anchor="{{ m.label_anchor }}">{{ m.label }}</text>
+    {% endfor %}
+    {% elif c.kind.value == "line" %}
+    <polyline class="chart__line" points="{{ c.points }}"/>
+    {% for m in c.marks %}
+    <circle class="chart__marker" cx="{{ m.x }}" cy="{{ m.y }}" r="4"/>
+    <text class="chart__value" x="{{ m.value_x }}" y="{{ m.value_y }}" text-anchor="middle">{{ m.value_text }}</text>
+    <text class="chart__label" x="{{ m.label_x }}" y="{{ m.label_y }}" text-anchor="middle">{{ m.label }}</text>
+    {% endfor %}
+    {% else %}
+    {% for m in c.marks if m.path %}<path class="chart__slice chart-series-{{ m.series }}" d="{{ m.path }}"/>{% endfor %}
+    <text class="chart__total" x="{{ c.width // 2 }}" y="{{ c.height // 2 + 6 }}" text-anchor="middle">{{ c.total_text }}</text>
+    {% endif %}
+  </svg>
+  {% if c.kind.value == "pie" %}
+  <ul class="chart-legend" role="list" aria-hidden="true">
+    {% for m in c.marks %}
+    <li class="chart-legend__item"><span class="chart-swatch chart-series-{{ m.series }}"></span><span>{{ m.full_label }}: {{ m.value_text }} ({{ m.share }}%)</span></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <details class="chart-data">
+    <summary>{{ _("admin.overview.chart.table") }}</summary>
+    <table class="widget-table">
+      <caption class="visually-hidden">{{ cv.kind_label }}: {{ _(view.widget.title_key) }}</caption>
+      <thead><tr><th scope="col">{{ cv.group_header }}</th><th scope="col" class="widget-table__number">{{ cv.value_header }}</th></tr></thead>
+      <tbody>
+        {% for label, value in cv.rows %}
+        <tr><th scope="row">{{ label }}</th><td class="widget-table__number">{{ value }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</figure>

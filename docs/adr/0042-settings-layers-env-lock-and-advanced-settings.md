@@ -3,7 +3,7 @@
 Status: accepted (2026-10-28), requested and accepted by the product owner. Refines ADR 0008 (which
 secrets stay in the environment) and the CLAUDE.md stack rule "Settings: `pydantic-settings`
 from env only". Builds on ADR 0014/0039 (permissions), ADR 0015 (fresh login), ADR 0031
-(audit), ADR 0033 (manual) and ADR 0032 (contact-center connection per organisation).
+(audit), ADR 0033 (manual) and ADR 0032 (contact-center connection per organisation). Partly built; see `docs/adr-status.md` for what is built.
 
 ## Context
 

@@ -15,6 +15,7 @@
   <li>{{ _("join.tips.devices") }}</li>
   <li>{{ _("join.tips.lobby") }}</li>
 </ul>
+
 {% elif state == "too_early" %}
 <div class="notice" role="status"><p>{{ _("join.too_early", time=opens_at) }}</p></div>
 {% elif state == "no_meeting" %}
@@ -24,6 +25,7 @@
 {% else %}
 <div class="notice"><p>{{ _("manage.inactive") }}</p></div>
 {% endif %}
+{% if trial_offered and state in ("open", "too_early", "no_meeting") %}<p><a href="/b/{{ token }}/test">{{ _("trial.from_join") }}</a></p>{% endif %}
 {% if refresh %}<p><a class="button button--secondary" href="/b/{{ token }}/join">{{ _("join.refresh") }}</a></p>{% endif %}
 <p><a href="/b/{{ token }}">{{ _("join.back") }}</a></p>
 {% endblock %}

@@ -3,7 +3,7 @@
 Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0059 (points 4 and
 6: the channel and auto-apply move from class B to class C; the updater's identity follows the
 installer mode) and ADR 0029 (a chosen version instead of "the latest"; the history comes from
-the audit log). Extends ADR 0031 and 0040 (audit filter by subject) and ADR 0048.
+the audit log). Extends ADR 0031 and 0040 (audit filter by subject) and ADR 0048. Partly built; see `docs/adr-status.md` for what is built.
 
 ## Context
 
@@ -92,7 +92,7 @@ trust decision of the host team, never a portal setting.
 | Step | What | PR | State |
 |---|---|---|---|
 | 1 | `update_channel` and `update_auto_apply` class C, read live by web and worker; production rule in `usable`; installer identity by mode, `--channel` removed; settings docs | #145 | merged 2026-10-30 |
-| 2 | `running_versions` and `system.version` at start-up; history from the audit log with *By*; audit filter *subject*; "changed outside the portal" notice | #146 | in PR |
+| 2 | `running_versions` and `system.version` at start-up; history from the audit log with *By*; audit filter *subject*; "changed outside the portal" notice | #146 | merged 2026-10-30 |
 | 3 | `release_listing` with notes; version picker and "Install this version"; `request_update(target)` | #148 | in PR |
 | 4 | docker01: channel switched in the portal, a chosen candidate installed, history shows who | | planned |
 

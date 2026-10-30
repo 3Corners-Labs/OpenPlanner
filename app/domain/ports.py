@@ -16,7 +16,15 @@ from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import CustomRole, Principal, Scope
-from app.domain.booking import Booking, BookingStatus, Claim, MeetingRef, Slot, SlotUsage
+from app.domain.booking import (
+    Booking,
+    BookingStatus,
+    Claim,
+    MeetingRef,
+    Slot,
+    SlotUsage,
+    TrialCall,
+)
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import (
     BookingEvent,
@@ -659,6 +667,14 @@ class Transaction(Protocol):
 
     async def save_meeting(self, booking_id: int, meeting: MeetingRef) -> None:
         """Store the booking's meeting id and join link."""
+        ...
+
+    async def save_trial_call(self, booking_id: int, trial: TrialCall) -> None:
+        """Store a new trial call (ADR 0071) and add one to the booking's count."""
+        ...
+
+    async def clear_trial_call(self, booking_id: int) -> None:
+        """Forget the trial call's meeting and link; the count stays."""
         ...
 
     async def save_task_id(self, booking_id: int, task_id: str) -> None:
