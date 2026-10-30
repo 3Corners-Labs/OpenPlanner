@@ -1,7 +1,7 @@
 """Audit events on the log stream, for the log platform (ADR 0034).
 
 After a transaction commits, every audit, system and security event it wrote is written once
-to stdout as one JSON line: an ``openplanner.event/1`` record (ADR 0040) plus
+to stdout as one JSON line: an ``openplanner.event/2`` record (ADR 0040) plus
 ``log_type: "audit"``, which the platform routes to its own index. Diagnostic events stay in
 the portal. The line does not pass the ``LOG_LEVEL`` filter, so a quiet log level never drops
 the audit trail; it does pass the PII mask, as a safety net on top of a schema that holds ids

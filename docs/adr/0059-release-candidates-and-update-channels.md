@@ -98,7 +98,11 @@ channel: the candidate is live within the hour, or within a minute after "Update
 |---|---|---|---|
 | 1 | `main.yml`: candidate version, image, tag, pre-release; publish without waiting for mutation; `release_plan --candidate`; runbook | #131 | merged 2026-10-30 |
 | 2 | `Version` with `rc`, channel `rc` in the release adapter, `UPDATE_CHANNEL` and `UPDATE_AUTO_APPLY`, auto request in the worker, updater and installer `--channel`, `/admin/updates` shows the channel | #132 | merged 2026-10-30 |
+<<<<<<< HEAD
 | 3 | docker01 on `rc` with auto-apply; first candidate seen live | | done 2026-10-30: docker01 runs 0.4.0-rc.5, channel and auto-apply shown; the switch needed the installer because 0.3.0 predates this ADR (hence ADR 0067) |
+=======
+| 3 | docker01 on `rc` with auto-apply; first candidate seen live | #140 | live on the test host 2026-10-30: `v0.4.0-rc.5` (runbook, *Test host on the rc channel*) |
+>>>>>>> origin/main
 
 ## Consequences
 

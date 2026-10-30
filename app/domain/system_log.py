@@ -69,6 +69,7 @@ class SystemLog:
         booking_id: int | None = None,
         reason: str = "",
         detail: str = "",
+        message: str = "",
     ) -> None:
         """Write one system event at the level of ``booking_id``'s group (global without one).
 
@@ -78,6 +79,7 @@ class SystemLog:
             booking_id: The booking the event is about, if any.
             reason: Machine-readable reason or error code.
             detail: Further machine keys, e.g. ``attempt:2,channel:sms``.
+            message: The provider's own reason for a failure (ADR 0065), if it gave one.
         """
         async with self._uow.locked() as tx:
             organisation, group = await _level(tx, booking_id)
@@ -93,6 +95,7 @@ class SystemLog:
                     detail,
                     Source.SYSTEM,
                     booking_id,
+                    message=message,
                 )
             )
 

@@ -137,9 +137,14 @@ class CallService:
         await self._video.delete_meeting(booking.meeting.id, group.video_host_email)
         await self._integration.record(_id(booking), EventKind.MEETING_DELETED)
 
-    async def record_failure(self, booking_id: int, code: str, kind: EventKind) -> None:
-        """Put a final failure of kind ``kind`` with reason ``code`` on the booking's timeline."""
-        await self._integration.record(booking_id, kind, detail=code)
+    async def record_failure(
+        self, booking_id: int, code: str, kind: EventKind, message: str = ""
+    ) -> None:
+        """Put a final failure of kind ``kind`` with reason ``code`` on the booking's timeline.
+
+        ``message`` is the provider's own reason (ADR 0065), shown under the event.
+        """
+        await self._integration.record(booking_id, kind, detail=code, message=message)
 
 
 def _with(booking: Booking, **changes: object) -> Booking:
