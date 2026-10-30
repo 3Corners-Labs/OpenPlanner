@@ -196,8 +196,11 @@ class GroupRow(Base):
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     queue_visible_from_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))
     queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    # ADR 0066: future bookings one email address may hold in this group.
+    max_bookings_per_email: Mapped[int] = mapped_column(Integer, server_default=text("3"))
     calendar_invite_address: Mapped[str | None] = mapped_column(String(254))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
+    form_version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
 
     __table_args__ = (
         CheckConstraint("phone_mode IN ('hidden', 'optional', 'required')", name="phone_mode"),
@@ -209,6 +212,37 @@ class GroupRow(Base):
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
         CheckConstraint("queue_visible_from_minutes BETWEEN 0 AND 120", name="queue_visible_from"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
+        CheckConstraint("max_bookings_per_email BETWEEN 1 AND 10", name="max_bookings_per_email"),
+    )
+
+
+class GroupFormFieldRow(Base):
+    """A custom field of a group's booking form (ADR 0055); no personal data.
+
+    Retired fields stay, so their labels explain earlier answers and their keys are not used
+    again. Texts are JSON objects of locale to text; options a JSON list of keys.
+    """
+
+    __tablename__ = "group_form_fields"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    key: Mapped[str] = mapped_column(String(40))
+    position: Mapped[int] = mapped_column(Integer)
+    type: Mapped[str] = mapped_column(String(16))
+    required: Mapped[bool] = mapped_column(Boolean)
+    classification: Mapped[str] = mapped_column(String(8))
+    options: Mapped[str] = mapped_column(Text, server_default=text("'[]'"))
+    minimum: Mapped[int | None] = mapped_column(Integer)
+    maximum: Mapped[int | None] = mapped_column(Integer)
+    labels: Mapped[str] = mapped_column(Text)
+    hints: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+    option_labels: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+    retired: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "key"),
+        CheckConstraint("classification IN ('pii', 'not_pii')", name="classification"),
     )
 
 
@@ -397,8 +431,9 @@ class BookingRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     slot_id: Mapped[int] = mapped_column(ForeignKey("slots.id", ondelete="RESTRICT"))
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="RESTRICT"), index=True)
-    status: Mapped[str] = mapped_column(String(16))
-    name: Mapped[str | None] = mapped_column(String(100))
+    status: Mapped[str] = mapped_column(String(24))
+    first_name: Mapped[str | None] = mapped_column(String(100))
+    last_name: Mapped[str | None] = mapped_column(String(100))
     email: Mapped[str | None] = mapped_column(String(254))
     phone: Mapped[str | None] = mapped_column(String(16))
     locale: Mapped[str] = mapped_column(String(16))
@@ -422,6 +457,11 @@ class BookingRow(Base):
     rebook_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
     claimed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     claimed_by: Mapped[str | None] = mapped_column(String(64))
+    # ADR 0056: the deadline to confirm by email link, and when the citizen did.
+    confirm_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0055: answers to the group's custom fields as JSON; PII, purged as a whole.
+    form_answers: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),
@@ -429,7 +469,7 @@ class BookingRow(Base):
         Index("ix_bookings_wxcc_task_id", "wxcc_task_id"),
         CheckConstraint(
             "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended', "
-            "'awaiting_rebook')",
+            "'awaiting_rebook', 'pending_confirmation')",
             name="status",
         ),
         CheckConstraint(
@@ -564,6 +604,8 @@ class AuditEventRow(Base):
     organisation: Mapped[str | None] = mapped_column(String(64))
     group: Mapped[str | None] = mapped_column(String(64))
     detail: Mapped[str] = mapped_column(String(255), server_default=text("''"))
+    # The provider's reason for a failed job (ADR 0065): masked, capped, no citizen data.
+    message: Mapped[str] = mapped_column(String(300), server_default=text("''"))
     source: Mapped[str] = mapped_column(String(16), server_default=text("'admin'"))
     booking_id: Mapped[int | None] = mapped_column(Integer)
     # ADR 0040, part 2: the fields of the one event schema that are not derived on export.
@@ -657,6 +699,7 @@ class BookingEventRow(Base):
     at: Mapped[datetime] = mapped_column(UTCDateTime())
     kind: Mapped[str] = mapped_column(String(32))
     detail: Mapped[str] = mapped_column(String(128), server_default=text("''"))
+    message: Mapped[str] = mapped_column(String(300), server_default=text("''"))
 
     __table_args__ = (Index("ix_booking_events_booking_id", "booking_id"),)
 
@@ -857,6 +900,26 @@ class MaintenanceStateRow(Base):
     switched_by: Mapped[str] = mapped_column(String(255), server_default=text("''"))
     expected_end: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reason: Mapped[str | None] = mapped_column(String(16))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class CertificateCheckRow(Base):
+    """The latest check of the public address's certificate (ADR 0064); at most one row."""
+
+    __tablename__ = "certificate_checks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    checked_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    host: Mapped[str] = mapped_column(String(255))
+    finding: Mapped[str] = mapped_column(String(16))
+    trust: Mapped[str | None] = mapped_column(String(16))
+    error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+    subject: Mapped[str | None] = mapped_column(String(255))
+    issuer: Mapped[str | None] = mapped_column(String(255))
+    not_before: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    not_after: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    names: Mapped[str] = mapped_column(Text, server_default=text("'[]'"))
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 

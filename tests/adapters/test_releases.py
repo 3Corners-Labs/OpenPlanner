@@ -8,7 +8,7 @@ import pytest
 from app.adapters.releases import GitHubReleases, running_version, update_service
 from app.config import Settings
 from app.domain.ports import IntegrationError
-from app.domain.updates import Release, Version
+from app.domain.updates import Release, UpdateChannel, Version
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.domain import DEMO_SUPERUSER
@@ -124,3 +124,90 @@ async def test_web_process_never_looks_up_but_knows_the_worker_does() -> None:
         web = update_service(repository, uow, clock, http, lookup=False)
         assert not await web.check_if_due()
     assert (await web.overview(DEMO_SUPERUSER)).enabled
+
+
+# The rc channel (ADR 0059) lists releases and pre-releases and takes the highest version.
+
+LISTED = [  # recorded shape of GET /repos/{owner}/{repo}/releases (trimmed), newest first
+    {
+        "html_url": "https://github.com/acme/openplanner/releases/tag/v1.5.0-rc.2",
+        "tag_name": "v1.5.0-rc.2",
+        "draft": False,
+        "prerelease": True,
+    },
+    {
+        "html_url": "https://github.com/acme/openplanner/releases/tag/v1.5.0-rc.10",
+        "tag_name": "v1.5.0-rc.10",
+        "draft": True,  # a draft is never offered, however high its number
+        "prerelease": True,
+    },
+    {
+        "html_url": "https://github.com/acme/openplanner/releases/tag/v1.5.0-rc.1",
+        "tag_name": "v1.5.0-rc.1",
+        "draft": False,
+        "prerelease": True,
+    },
+    LATEST,
+    {"html_url": "https://github.com/acme/openplanner/releases/tag/nightly", "tag_name": "nightly"},
+]
+
+
+async def test_rc_channel_takes_the_highest_release_or_candidate_from_the_list() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=LISTED)
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    release = await GitHubReleases(http, "acme/openplanner", None, UpdateChannel.CANDIDATE).latest()
+
+    assert release == Release(Version(1, 5, 0, 2), LISTED[0]["html_url"])
+    assert str(seen[0].url) == "https://api.github.com/repos/acme/openplanner/releases?per_page=30"
+
+
+async def test_rc_channel_moves_to_the_release_once_it_is_newer_than_every_candidate() -> None:
+    final = {
+        **LATEST,
+        "html_url": "https://github.com/acme/openplanner/releases/tag/v1.5.0",
+        "tag_name": "v1.5.0",
+    }
+    http = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=[final, *LISTED]))
+    )
+    release = await GitHubReleases(http, "acme/openplanner", None, UpdateChannel.CANDIDATE).latest()
+    assert release == Release(Version(1, 5, 0), final["html_url"])
+
+
+async def test_rc_channel_with_nothing_usable_or_no_list_is_none() -> None:
+    empty = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200, json=[])))
+    assert (
+        await GitHubReleases(empty, "acme/openplanner", None, UpdateChannel.CANDIDATE).latest()
+        is None
+    )
+    odd = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json={"x": 1}))
+    )
+    assert (
+        await GitHubReleases(odd, "acme/openplanner", None, UpdateChannel.CANDIDATE).latest()
+        is None
+    )
+
+
+async def test_release_channel_still_asks_for_the_latest_release_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("UPDATE_REPOSITORY", "acme/openplanner")
+    monkeypatch.setenv("UPDATE_CHANNEL", "rc")
+    monkeypatch.setenv("UPDATE_AUTO_APPLY", "true")
+    monkeypatch.setenv("APP_VERSION", "1.5.0-rc.1")
+    settings = Settings(environment="test")  # type: ignore[call-arg]
+    assert running_version(settings) == Version(1, 5, 0, 1)
+    http = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200, json=[])))
+    service = update_service(settings, InMemoryUnitOfWork(), FixedClock(), http)
+    overview = await service.overview(DEMO_SUPERUSER)
+    assert (overview.channel, overview.auto_apply, overview.current) == (
+        UpdateChannel.CANDIDATE,
+        True,
+        Version(1, 5, 0, 1),
+    )

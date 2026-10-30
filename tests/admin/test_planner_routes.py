@@ -1,5 +1,6 @@
 """A planner's changes from the agenda in the admin portal (ADR 0044 step 2)."""
 
+import itertools
 from datetime import UTC, datetime, time, timedelta
 
 import httpx
@@ -13,7 +14,7 @@ from app.domain.services import BookingService
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_agenda_routes import FRIDAY
 from tests.admin.test_call_routes import FRIDAY_0900
-from tests.support.domain import ADA, TEST_TOKEN_KEY
+from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed, citizen
 
 FRIDAY_0930 = datetime(2026, 1, 2, 8, 30, tzinfo=UTC)
 AGENDA = "/admin/groups/demo/agenda"
@@ -24,9 +25,17 @@ def _uow(site: Site) -> SqlUnitOfWork:
     return SqlUnitOfWork(app.state.engine)
 
 
+_CITIZENS = itertools.count(1)
+"""Each booking of ``_book`` is another citizen, so the address limit (ADR 0066) stays out."""
+
+
 async def _book(site: Site, start: datetime = FRIDAY_0900) -> int:
-    receipt = await BookingService(_uow(site), site.clock, TEST_TOKEN_KEY).book(
-        group_slug="demo", start=start, contact=ADA, locale="nl"
+    receipt = await book_confirmed(
+        BookingService(_uow(site), site.clock, TEST_TOKEN_KEY),
+        group_slug="demo",
+        start=start,
+        contact=citizen(next(_CITIZENS)),
+        locale="nl",
     )
     return receipt.booking.id or 0
 
@@ -90,6 +99,22 @@ async def test_a_move_into_a_short_slot_needs_the_planners_confirmation(site: Si
     assert refused.status_code == 409
     assert "meer afspraken dan medewerkers" in refused.text
     assert accepted.status_code == 303
+
+
+async def test_a_move_onto_the_same_address_tells_the_planner_why(site: Site) -> None:
+    bookings = BookingService(_uow(site), site.clock, TEST_TOKEN_KEY)
+    receipts = [
+        await book_confirmed(bookings, group_slug="demo", start=start, contact=ADA, locale="nl")
+        for start in (FRIDAY_0900, FRIDAY_0930)
+    ]
+    await site.login_as(GROUP_ADMIN)
+    path = f"{AGENDA}/bookings/{receipts[0].booking.id}/move"
+
+    refused = await _post(site, path, {"start": FRIDAY_0930.isoformat()})
+
+    assert refused.status_code == 409
+    assert "Afspraken per e-mailadres" in refused.text
+    assert "Heeft u al een afspraak" not in refused.text
 
 
 async def test_a_planner_cancels_with_a_fixed_reason(site: Site) -> None:

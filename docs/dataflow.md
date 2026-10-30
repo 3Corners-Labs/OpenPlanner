@@ -22,6 +22,9 @@ It identifies nobody and is strictly functional, so no consent banner is needed.
 ```
 worker ──SMTP──> mail provider of the organisation (admin portal; else SMTP_HOST) ──> citizen
    reads booking at send time: first name, email, date, time, team, management link
+   request to confirm a new booking and its reminder (ADR 0056): email, date, time, team
+   and the confirm link only; no name, join link or calendar file (the address is not
+   verified yet); the lapse message links the group page instead of the booking
    closure mails also: the closure's notice and heading, its copy of the contact options
    (organisation data) and the link to the closure page (ADR 0037 §5); never the image
 ```
@@ -63,16 +66,29 @@ they leave the system only to the mail server and to GitHub respectively.
 
 ## Stored personal data (WP2 schema)
 
+The fields below are the fixed list of `app/domain/privacy.py` (ADR 0063): personal data is
+shown in the admin portal only on the booking detail page and the queue item (first name only
+on the group's agenda and queue), never on overview, list, export or alert pages, and no list
+filter matches on it. The list and the rule are constants, not settings.
+
 | Data item | Table.column | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| Name | `bookings.name` | booking form | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
+| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
 | Email | `bookings.email` | booking form | as above | mail provider (WP4) |
-| Phone (optional per group) | `bookings.phone` | booking form | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
+| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
+| Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
 | Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the citizen, host URL to WxCC |
 | Management token | `bookings.management_token_hash` (SHA-256 only) | generated | kept (not personal data once the booking is purged) | token itself only in the confirmation mail |
 
-Jobs, slots, schedules and audit events carry no personal data of citizens.
+Jobs, slots, schedules and audit events carry no personal data of citizens. A failed meeting
+job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
+the group name and the host's address (masked), never a citizen's data; the system event of the
+automatic group check (ADR 0065 step 2) carries the same masked reason of the probe meeting,
+which belongs to no booking. The definitions of
+custom fields (`group_form_fields`: keys, labels, options) are the organisation's questions,
+not answers, and hold no personal data; the admin screen refuses questions about a BSN, an
+identity document or special categories of personal data (ADR 0055).
 
 **Exception: emergency closure (ADR 0024).** A booking suspended by an emergency closure keeps
 the data above until it is moved, reinstated or cancelled (then the rules above apply again),
@@ -89,7 +105,8 @@ and an optional heading per locale (`closure_notices.heading`). Organisation dat
 the admin page asks for general numbers and addresses only. No purge job; kept until changed.
 
 **Embedded booking (ADR 0035).** With `<gov-booking>` on a host website, the citizen's
-browser calls `/api/v1/widget/{org}/{group}/` directly: name, email and (optional) phone go
+browser calls `/api/v1/widget/{org}/{group}/` directly: first and last name, email, (optional) phone
+and the answers to the group's custom fields go
 from the browser to OpenPlanner over TLS, never through the host's servers. The host site
 does see that a citizen opened its page with the widget, and which group the tag names; it
 cannot read what is typed into the shadow root's form through our API, and the answer to a
@@ -180,7 +197,7 @@ Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task e
 | Data item | Where | Source | Retention | Leaves the system |
 |---|---|---|---|---|
 | Meeting join link | `bookings.guest_join_url`, `host_join_url` | Webex | purged with the contact (PII field) | in the citizen's link (via OpenPlanner) and to WxCC (`meetingLink`) |
-| First name | derived from `bookings.name` at dispatch | booking form | as the contact | to WxCC (`firstName`, `origin.name`) |
+| First name | `bookings.first_name` | booking form | as the contact | to WxCC (`firstName`, `origin.name`) |
 | Meeting and task ids, timeline, call status | `bookings.video_room_id`, `wxcc_task_id`, `booking_events`, `call_status` | Webex, WxCC | kept for statistics (no personal data) | no |
 | Participant names/emails in webhook payloads | processed in memory only; webhooks filtered on the groups' host accounts, so other meetings of the organisation are not delivered | Webex | not stored, not logged | no |
 | Webex event keys (SHA-256 of resource, event, event id, join/leave time) | `webhook_events` | OpenPlanner | 30 days, removed on a later event | no |
@@ -253,7 +270,8 @@ audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
 ## Updates from the admin portal (ADR 0029)
 
 ```
-worker ──GET releases/latest (no data sent; optional read-only token)──> api.github.com
+worker ──GET releases/latest, or the releases list on the rc channel (ADR 0059; no data
+        sent; optional read-only token)──> api.github.com
         <── tag and release page ── stored in release_checks
 superuser ──POST update / restore / cancel──> web ──SQL──> update_requests (versions, subject id)
 superuser's browser ──GET /admin/updates/progress (every 5 s while open; ADR 0048)──> web
@@ -289,6 +307,8 @@ data. A refused change is audited with its permission and target only, never the
 proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
 Let's Encrypt ──HTTP-01 / TLS-ALPN-01──> proxy (ports 80/443): challenge token only
 visitor ──https──> proxy ──http, edge network──> web (X-Forwarded-For set by the proxy)
+worker ──TLS handshake, no request──> proxy (public name, port 443): reads the public certificate
+       ──> certificate_checks (issuer, names, validity, finding; no personal data; ADR 0064)
 ```
 
 The CA learns the domain name and the operator's e-mail address; no citizen data leaves through

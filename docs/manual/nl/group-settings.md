@@ -59,6 +59,16 @@ geboekt zijn voordat hij naar het contactcenter gaat.
 Hoeveel dagen vooruit burgers kunnen kiezen, van 1 tot 366. Houd dit in lijn met hoe ver het
 rooster van het team vaststaat: een tijdslot dat te boeken is, moet ook bemand zijn.
 
+<!-- field: max_bookings_per_email -->
+### Afspraken per e-mailadres
+
+Hoeveel toekomstige afspraken één e-mailadres tegelijk bij dit team mag hebben, van 1 tot 10.
+Standaard 3. Mensen boeken vaak voor een ander, bijvoorbeeld een ouder voor een kind of een
+mantelzorger voor een naaste; zet het getal daarom niet te laag. Een afspraak die is geannuleerd
+of voorbij is, telt niet mee. Hetzelfde e-mailadres twee keer op hetzelfde moment kan nooit:
+dat is bijna altijd een dubbele klik. De burger krijgt bij een weigering een algemene melding,
+zonder dat de pagina zegt dat er al een afspraak is.
+
 <!-- field: dispatch_kind -->
 ### Hoe afspraken bij medewerkers komen
 
@@ -158,6 +168,15 @@ cohost, zodat ze het gesprek kunnen leiden zonder dat de host aanwezig is.
 
 Gebruik een functioneel account (bijvoorbeeld `videogesprekken@gemeente.nl`), geen
 persoonlijk account: het moet blijven werken als een medewerker vertrekt.
+
+Zodra u een nieuw adres opslaat, controleert OpenPlanner de koppeling meteen, net als de knop
+**Koppeling controleren** onderaan de pagina: er wordt een proefmeeting ingepland en weer
+verwijderd. De uitslag staat na het opslaan onder **Koppeling controleren**. Daarna
+controleert het platform elke groep met een host vanzelf, standaard eens per dag. Gaat er
+iets mis (geen licentie, verkeerd account, ontbrekende rechten), dan staat dat als
+systeemmelding *Koppeling gecontroleerd* in het logboek van de groep, met het antwoord van
+Webex eronder; die melding herhaalt zich tot het is opgelost en meldt één keer dat het weer
+goed is. Zo hoort u het voordat een burger een afspraak zonder videogesprek krijgt.
 
 <!-- field: wxcc_business_address -->
 ### WxCC business address

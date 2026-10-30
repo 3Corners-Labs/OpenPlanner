@@ -26,7 +26,11 @@ BOOKING = Booking(
     end=SLOT_0930,
     status=BookingStatus.CONFIRMED,
     contact=Contact.create(
-        name="Ada Lovelace", email="ada@example.org", phone=None, phone_mode=PhoneMode.OPTIONAL
+        first_name="Ada",
+        last_name="Lovelace",
+        email="ada@example.org",
+        phone=None,
+        phone_mode=PhoneMode.OPTIONAL,
     ),
     locale="nl",
     token_hash="h",
@@ -122,7 +126,8 @@ def test_join_link_only_for_groups_with_video(composer: MessageComposer) -> None
 SMS_BOOKING = replace(
     BOOKING,
     contact=Contact.create(
-        name="Ada Lovelace",
+        first_name="Ada",
+        last_name="Lovelace",
         email="ada@example.org",
         phone="06 1234 5678",
         phone_mode=PhoneMode.OPTIONAL,
@@ -136,7 +141,7 @@ def test_sms_reminder_is_one_short_text_with_the_manage_link(composer: MessageCo
     )
 
     assert message.channel is ChannelKind.SMS
-    assert message.recipient == "0612345678"
+    assert message.recipient == "+31612345678"
     assert message.html is None
     assert message.attachments == ()
     assert message.text.startswith("Beste Ada, herinnering: videogesprek met Aangifte")
@@ -266,7 +271,9 @@ def test_closure_mails_match_their_snapshots(
         job_type, replace(FIXED, locale=locale), group, NOW, closure=CONTACT_CLOSURE
     )
 
-    assert "<img" not in (message.html or "")  # the closure image is never mailed
+    # The closure image is never mailed; the only image is the product mark of the footer.
+    assert (message.html or "").count("<img") == 1
+    assert "/static/brand/mark-48.png" in (message.html or "")
     name = f"{job_type.value}.{locale}"
     for suffix, rendered in (("txt", message.text), ("html", message.html or "")):
         path = SNAPSHOTS / f"{name}.{suffix}"
@@ -446,3 +453,81 @@ def test_team_cancel_withdraws_the_same_event_without_the_name(
     assert "METHOD:CANCEL" in cancel.attachments[0].data.decode()
     assert "Ada" not in cancel.text
     assert "OP-000042" in cancel.text
+
+
+def test_the_html_part_ends_with_the_product_footer_and_the_text_part_does_not(
+    composer: MessageComposer,
+) -> None:
+    message = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW)
+
+    html = message.html or ""
+    footer = html.split("<footer>", 1)[1].split("</footer>", 1)[0]
+    assert "Afspraken via" in footer
+    assert "<strong>OpenPlanner</strong>" in footer
+    mark = "https://afspraak.example.nl/static/brand/mark-48.png"
+    assert f'<img src="{mark}" alt="" width="24" height="24">' in footer
+    assert html.index("Met vriendelijke groet") < html.index("<footer>")  # after the signoff
+    assert "OpenPlanner" not in message.text  # the plain-text part is unchanged (ADR 0060 §6)
+    assert "mark-48" not in message.text
+
+
+def test_the_product_footer_follows_the_organisations_setting(composer: MessageComposer) -> None:
+    message = composer.compose(
+        JobType.SEND_CONFIRMATION, replace(BOOKING, locale="en"), GROUP, NOW, product_footer=False
+    )
+
+    assert "<footer>" not in (message.html or "")
+    assert "OpenPlanner" not in (message.html or "") + message.text
+
+
+def test_the_product_footer_speaks_the_citizens_language(composer: MessageComposer) -> None:
+    message = composer.compose(JobType.SEND_CONFIRMATION, replace(BOOKING, locale="en"), GROUP, NOW)
+
+    assert "Appointments via" in (message.html or "")
+
+
+PENDING = replace(
+    BOOKING,
+    status=BookingStatus.PENDING_CONFIRMATION,
+    confirm_by=NOW + timedelta(hours=24),
+    group_id=1,
+)
+
+
+@pytest.mark.parametrize("job_type", [JobType.SEND_CONFIRM_REQUEST, JobType.SEND_CONFIRM_REMINDER])
+def test_a_request_to_confirm_links_the_confirm_page_and_names_nobody(
+    composer: MessageComposer, job_type: JobType
+) -> None:
+    message = composer.compose(
+        job_type, PENDING, replace(GROUP, video_host_email="host@example.nl"), NOW
+    )
+    confirm = f"https://afspraak.example.nl/b/{derive_token(TEST_TOKEN_KEY, SALT)}/confirm"
+
+    # ADR 0056 §7: the address is not verified yet, so no name, join link or calendar file.
+    assert "Ada" not in message.text
+    assert "Goedendag," in message.text
+    assert confirm in message.text
+    assert f'href="{confirm}"' in (message.html or "")
+    assert "/join" not in message.text
+    assert message.attachments == ()
+    assert "uiterlijk vrijdag 2 januari 2026, 09:00" in message.text
+
+
+def test_the_request_to_confirm_in_english(composer: MessageComposer) -> None:
+    message = composer.compose(
+        JobType.SEND_CONFIRM_REQUEST, replace(PENDING, locale="en"), GROUP, NOW
+    )
+
+    assert message.subject == "Confirm your appointment with Aangifte <Inkomstenbelasting>"
+    assert "Hello," in message.text
+
+
+def test_a_lapsed_booking_links_the_group_page_to_book_again(composer: MessageComposer) -> None:
+    lapsed = PENDING.expire(NOW + timedelta(hours=24))
+
+    message = composer.compose(JobType.SEND_UNCONFIRMED_LAPSED, lapsed, GROUP, NOW)
+
+    assert "/b/" not in message.text
+    assert f"https://afspraak.example.nl/g/{GROUP.slug}" in message.text
+    assert "vervallen" in message.subject
+    assert message.attachments == ()

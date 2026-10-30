@@ -16,14 +16,14 @@ wherever the checkout is, and writes that path into the updater's configuration.
 | `~/openplanner/` | `git clone`, at a release tag | `docker-compose.yml`, `deploy/proxy/`, `scripts/` | |
 | `~/openplanner/.env` | installer, then you | the application's settings and integration secrets (`.env.example` lists every one) | 600 |
 | `~/openplanner/secrets/secrets.env` | installer (or `app.cli init`) | the bootstrap keys `SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`, `SESSION_SECRET` (ADR 0042 §9); back it up apart from the database | 600, directory 700 |
-| `~/openplanner/proxy.env` | installer (production) | `TLS_DOMAIN`, `ACME_EMAIL` for the HTTPS proxy, no secrets | 600 |
-| `~/openplanner/.env.update` | installer, host updater | `OPENPLANNER_IMAGE` (pinned digest), `COMPOSE_PROFILES`, `OPENPLANNER_MODE` | 644 |
+| `~/openplanner/proxy.env` | installer (with the HTTPS proxy) | `TLS_DOMAIN`, `ACME_EMAIL` (or the own certificate's files) for the HTTPS proxy, no secrets | 600 |
+| `~/openplanner/.env.update` | installer, host updater | `OPENPLANNER_IMAGE` and, with the HTTPS proxy, `OPENPLANNER_PROXY_IMAGE` (pinned digests), `COMPOSE_PROFILES`, `OPENPLANNER_TLS`, `OPENPLANNER_MODE` | 644 |
 | `~/openplanner/.env.bak.<time>` | installer, when it repaired `.env` | the `.env` as it was before | 600 |
 | `~/openplanner/docker-compose.override.yml` | you, optional | host-specific additions, such as a published port on a lab host | |
 | `/usr/local/sbin/openplanner-update` | installer | the host updater (`scripts/updater/openplanner-update.sh`) | 755 |
 | `/etc/systemd/system/openplanner-updater.{service,timer}` | installer | runs the updater every minute | 644 |
 | `/etc/systemd/system/openplanner-updater.service.d/override.conf` | installer | lets the updater write only `~/openplanner` under `/home` | 644 |
-| `/etc/openplanner/updater.env` | installer | `COMPOSE_DIR=/home/<user>/openplanner`, image, signing identity | 600 |
+| `/etc/openplanner/updater.env` | installer | `COMPOSE_DIR=/home/<user>/openplanner`, the two images, signing identity | 600 |
 | `/var/lib/openplanner-updater/` | updater, installer | `previous.env` (rollback), lock, a copy of the ghcr.io login, cosign's cache | 700 |
 | Docker volume `openplanner_data` | web, worker | the SQLite database and its update backups (personal data) | |
 | Docker volume `openplanner_proxy-data` | proxy | certificate, private key, ACME account | |
@@ -35,19 +35,25 @@ cd ~/openplanner
 docker compose --env-file .env.update ps
 ```
 
-The pin file also carries the profiles (`tls` in production, `dev` in a lab), so this one form
-starts exactly the services of the installation. Without `--env-file .env.update`, Compose
-would build a local image instead of running the signed release.
+The pin file also carries the profiles (`tls` with the HTTPS proxy, `dev` in a lab), so this
+one form starts exactly the services of the installation. Without `--env-file .env.update`,
+Compose would build local images instead of running the signed release: the application
+image and, since ADR 0064 step 2, the HTTPS proxy image (`ghcr.io/<owner>/<repo>-proxy`,
+released and signed with every version) are both pulled and verified; a host never builds
+Caddy.
 
 ## Modes
 
 | `--mode` | `ENVIRONMENT` | Services | For |
 |---|---|---|---|
 | `production` | `prod` | web, worker, HTTPS proxy (Let's Encrypt) | real citizens; public DNS name, ports 80 and 443 |
-| `test` | `test` | web, worker | acceptance behind your own address or proxy |
-| `lab` | `test` | web, worker, Keycloak, Mailpit | internal demo and integration tests (as on docker01) |
+| `test` | `test` | web, worker, HTTPS proxy (Let's Encrypt) | acceptance on its own public DNS name; `--no-tls` behind your own proxy |
+| `lab` | `test` | web, worker, Keycloak, Mailpit; HTTPS proxy with `--tls-domain` | internal demo and integration tests (as on docker01) |
 
-The script remembers the mode in `.env.update`, so later runs need no `--mode`.
+HTTPS is the standard shape (ADR 0064): `production` and `test` run the proxy unless `--no-tls`
+says a load balancer of your own does TLS; a `lab` runs it when `--tls-domain <host>` names a
+public DNS name. The script remembers the mode and that choice in `.env.update`, so later runs
+need neither.
 
 ## Prerequisites
 
@@ -118,9 +124,10 @@ system.
    healthy. `docker compose --env-file .env.update ps` shows them, and
    `systemctl list-timers openplanner-updater.timer` shows the updater.
 
-For production, a trial run against Let's Encrypt's staging CA first keeps you clear of its rate
-limits: add `--acme-staging` on the first run, then follow *HTTPS certificate* in
-`docs/runbook.md` to switch to the real CA.
+With the HTTPS proxy, a trial run against Let's Encrypt's staging CA first keeps you clear of its
+rate limits: add `--acme-staging` on the first run, then follow *HTTPS certificate* in
+`docs/runbook.md` to switch to the real CA; *System status* in the portal shows which
+certificate is served and whether browsers trust it.
 
 Without prompts, for automation, set the answers as environment variables named after the
 setting and add `--non-interactive`:
@@ -140,10 +147,13 @@ Webex Contact Center*.
 | Option | Effect |
 |---|---|
 | `--mode production\|test\|lab` | required on the first run; remembered afterwards |
-| `--version X.Y.Z` | pin this release (pulled, signature verified); without it a pinned release stays, and a first run takes the latest |
+| `--version X.Y.Z` | pin this release (pulled, signature verified; with the HTTPS proxy its image too, at the same version); without it a pinned release stays, and a first run takes the latest release. `X.Y.Z-rc.N` pins a candidate on a `test` or `lab` host |
 | `--repository owner/name` | another repository's releases (default `3Corners-Labs/OpenPlanner`, or `UPDATE_REPOSITORY` from `.env`) |
 | `--non-interactive` | never ask; take answers from the environment (also when there is no terminal) |
-| `--acme-staging` | production: the first `proxy.env` points at Let's Encrypt's staging CA |
+| `--no-tls` | production, test: no HTTPS proxy; asks the public address and your proxy's address (`FORWARDED_ALLOW_IPS`) |
+| `--tls-domain HOST` | lab: run the HTTPS proxy for this host name (also sets it for the other modes) |
+| `--own-certificate` | `proxy.env` names `certs/fullchain.pem` and `certs/privkey.pem` instead of ACME (runbook, *Own certificate*) |
+| `--acme-staging` | with the HTTPS proxy: the first `proxy.env` points at Let's Encrypt's staging CA |
 | `--upgrade-docker` | also upgrade Docker Engine (restarts every container on the host) |
 | `--no-packages` | leave the host's packages alone; only check them |
 | `--no-updater` | do not install the host updater (portal update requests then wait) |
@@ -160,17 +170,34 @@ Webex Contact Center*.
 | `.env` readable by others | sets mode 600 |
 | a host package missing or outdated, cosign older than the latest release | installs or upgrades it |
 | updater, units, drop-in or `updater.env` missing or changed | installs them again from the checkout |
-| an HTTPS proxy running outside production (restarts for ever without `proxy.env`) | removes it |
+| an HTTPS proxy running where `--no-tls` was chosen (restarts for ever without `proxy.env`) | removes it |
+| the HTTPS proxy runs but its image is not pinned (installed before ADR 0064 step 2, when the host built it) | pulls and verifies the proxy image at the version of the pinned application image and pins it; the proxy restarts on the released image |
 | `PUBLIC_BASE_URL` or the OIDC URL on `http` in production, a missing OIDC client secret, `ENVIRONMENT` not matching the mode | stops with the list; nothing is pulled or started |
-| a release that does not pass `cosign verify` | stops; the running version stays |
+| a release that does not pass `cosign verify` (either image) | stops; the running version stays |
+
+## Update channel (ADR 0059, 0065)
+
+Every merge to `main` becomes a signed release candidate `vX.Y.Z-rc.N` (runbook, *Release
+candidates*). Which channel an installation follows is the **superuser's** choice, on
+`/admin/updates` or the settings page (`update_channel`, class C): `release` (the default)
+offers releases only; `rc` offers the newest of releases and candidates. `update_auto_apply`
+lets the worker request a newer version itself. Both are not usable with `ENVIRONMENT=prod`:
+production follows releases on a superuser's click, whatever is stored. An operator who wants
+either fixed sets `UPDATE_CHANNEL` or `UPDATE_AUTO_APPLY` in `.env`, which locks the portal
+value (ADR 0042).
+
+The host decides only whom to trust, once, through the installer **mode**: `production`
+trusts images signed by `main.yml` for a release tag only; `test` and `lab` also those signed
+on `main`, where candidates are built. Outside production, `--version X.Y.Z-rc.N` pins a
+candidate directly.
 
 ## Upgrading
 
-- **The application image**: "Update now" in the admin portal (`/admin/updates`); the host
-  updater pulls, verifies, backs up and switches, with automatic rollback (runbook, *Updates
-  from the admin portal*).
-- **Compose file, proxy and scripts** change with the release too. After a portal update, bring
-  the checkout to the same tag and run the installer, which also reinstalls the updater:
+- **The application and proxy images**: "Update now" in the admin portal (`/admin/updates`);
+  the host updater pulls and verifies both, backs up and switches, with automatic rollback
+  (runbook, *Updates from the admin portal*). The proxy restarts with the new version.
+- **Compose file and scripts** change with the release too. After a portal update, bring the
+  checkout to the same tag and run the installer, which also reinstalls the updater:
 
   ```sh
   cd ~/openplanner
@@ -199,6 +226,7 @@ git fetch --depth 1 origin tag v0.3.0 && git checkout -f v0.3.0
 | `Docker Compose ... is too old` | run it again without `--no-packages`, or upgrade the Compose plugin |
 | `cannot find the latest release` | pass `--version`, or put a token in `UPDATE_CHECK_TOKEN` (`.env`) for a private repository |
 | `cannot pull ghcr.io/...` | `docker login ghcr.io -u <github user>` with a `read:packages` token, run it again (the updater gets a copy of this login) |
+| the portal reports *signature invalid* for a release that CI signed (`cosign verify` on the host says `no signatures found`) | the host's cosign is older than the one CI signs with (cosign 3 writes OCI bundles that cosign 2 cannot read; this hit docker01 at v0.3.0). Run the installer first, which upgrades cosign: `git fetch --tags && git checkout vX.Y.Z && ./scripts/install.sh`, then "Update now" again |
 | `is not signed by a release of ...` | the image is not a signed release of this repository: check `--repository` and `--version`; never work around it |
 | `Docker's release key has fingerprint ...` | the download was not Docker's key; check the network path (proxy, DNS) before trying again |
 | `checksum of cosign_... does not match` | the download is damaged or not the release; run it again later |

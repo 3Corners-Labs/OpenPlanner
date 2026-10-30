@@ -1,13 +1,27 @@
-{#- Logged-in portal: top bar (help, language, profile) and side navigation in sections, both from the navigation register (ADR 0047) through the matrix. -#}
+{#- Logged-in portal: top bar (help, language, profile) and the navigation from the register (ADR 0047) through the matrix: side navigation in sections (an icon rail on tablet), and on phone a bottom bar with the first entries and the rest behind *More* (SH-1). Which one shows is CSS only. -#}
 {% extends "admin/_shell.html" %}
 {% from "admin/_icons.html" import icon %}
+{% macro nav_entry(item) -%}
+<a href="{{ item.href }}"{% if item.current %} aria-current="page"{% endif %}>{{ icon(item.icon) }}<span>{{ item.label }}</span></a>
+{%- endmacro %}
+{% macro nav_sections(items, prefix) -%}
+{% for section in items %}
+<div class="admin-nav__section">
+  <span class="admin-nav__heading" id="{{ prefix }}-{{ section.key }}">{{ section.label }}</span>
+  <ul aria-labelledby="{{ prefix }}-{{ section.key }}">
+    {% for item in section.entries %}<li>{{ nav_entry(item) }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endfor %}
+{%- endmacro %}
 {% block page %}
 {% include "admin/_environment.html" %}
 {% include "admin/_maintenance.html" %}
 <div class="admin-shell{% if not nav %} admin-shell--no-nav{% endif %}">
   <header class="admin-topbar">
     {#- Without a menu (no role) the overview would only loop back to the refusal. -#}
-    {% if nav %}<a class="admin-brand" href="/admin/">{% else %}<span class="admin-brand">{% endif %}<span class="admin-brand__mark" aria-hidden="true">OP</span><span>{{ _("admin.title") }}</span>{% if nav %}</a>{% else %}</span>{% endif %}
+    {% if nav %}<a class="admin-brand" href="/admin/">{% else %}<span class="admin-brand">{% endif %}<img class="admin-brand__mark" src="/static/brand/mark.svg" alt="" width="26" height="26"><span>{{ _("admin.title") }}</span>{% if nav %}</a>{% else %}</span>{% endif %}
     <div class="admin-topbar__end">
       {% if help_topic %}
       <a class="admin-topbar__link page-help" href="/admin/help/{{ help_topic.slug }}">{{ icon("help") }}<span>{{ _("help.page_link") }}</span></a>
@@ -45,16 +59,23 @@
   </header>
   {% if nav %}
   <nav aria-label="{{ _("admin.nav.label") }}" class="admin-nav">
-    {% for section in nav %}
-    <div class="admin-nav__section">
-      <span class="admin-nav__heading" id="nav-{{ section.key }}">{{ section.label }}</span>
-      <ul aria-labelledby="nav-{{ section.key }}">
-        {% for item in section.entries %}
-        <li><a href="{{ item.href }}"{% if item.current %} aria-current="page"{% endif %}>{{ icon(item.icon) }}<span>{{ item.label }}</span></a></li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endfor %}
+    {{ nav_sections(nav, "nav") }}
+  </nav>
+  <nav aria-label="{{ _("admin.nav.label") }}" class="admin-bottombar">
+    <ul>
+      {% for item in bottom_bar %}<li>{{ nav_entry(item) }}</li>
+      {% endfor %}
+      {% if bottom_more %}
+      <li>
+        <details class="admin-bottombar__more">
+          <summary>{{ icon("more") }}<span>{{ _("admin.nav.more") }}</span></summary>
+          <div class="admin-bottombar__panel">
+            {{ nav_sections(bottom_more, "more") }}
+          </div>
+        </details>
+      </li>
+      {% endif %}
+    </ul>
   </nav>
   {% endif %}
   <main id="content" tabindex="-1" class="admin-main">

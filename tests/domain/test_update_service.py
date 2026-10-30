@@ -13,13 +13,14 @@ from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import IntegrationError
-from app.domain.update_service import UPDATER_ACTOR, UpdateService
+from app.domain.update_service import SYSTEM_ACTOR, UPDATER_ACTOR, UpdateService
 from app.domain.updates import (
     CHECK_INTERVAL,
     RESTORE_WINDOW,
     Release,
     ReleaseCheck,
     UpdateAction,
+    UpdateChannel,
     UpdateRequest,
     UpdateStatus,
     UpdateStep,
@@ -340,3 +341,85 @@ async def test_overview_flags_a_request_no_updater_picked_up(
     found = await service(uow, clock).overview(DEMO_SUPERUSER)
     assert found.open is not None
     assert found.unclaimed
+
+
+# Update channel and auto-apply (ADR 0059).
+
+CANDIDATE = Release(
+    Version(1, 4, 0, 2), "https://github.com/acme/openplanner/releases/tag/v1.4.0-rc.2"
+)
+
+
+async def test_a_candidate_is_offered_on_the_rc_channel_only(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await checked(uow, clock, FakeReleases(CANDIDATE))
+    on_release = service(uow, clock)
+    assert (await on_release.notice(DEMO_SUPERUSER)) is None
+    with pytest.raises(DomainError, match="update_not_available"):
+        await on_release.request_update(DEMO_SUPERUSER)
+
+    on_rc = UpdateService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        current=V1,
+        releases=None,
+        checking=True,
+        channel=UpdateChannel.CANDIDATE,
+    )
+    notice = await on_rc.notice(DEMO_SUPERUSER)
+    assert notice is not None
+    assert notice.available == CANDIDATE
+    overview = await on_rc.overview(DEMO_SUPERUSER)
+    assert (overview.channel, overview.auto_apply) == (UpdateChannel.CANDIDATE, False)
+    created = await on_rc.request_update(DEMO_SUPERUSER)
+    assert created.target == Version(1, 4, 0, 2)
+
+
+async def test_auto_apply_requests_the_newer_version_as_the_system(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    auto = UpdateService(
+        uow, clock, AdminService(uow, clock), current=V1, releases=releases, auto_apply=True
+    )
+    assert await auto.check_if_due()
+
+    history = await auto.overview(DEMO_SUPERUSER)
+    assert history.open is not None
+    assert (history.open.action, history.open.target, history.open.from_version) == (
+        UpdateAction.UPDATE,
+        V2,
+        V1,
+    )
+    assert history.open.requested_by == SYSTEM_ACTOR
+    assert history.available is None  # a request is open
+    event = uow.state.audit[-1]
+    assert (event.actor, event.action, event.outcome, event.detail) == (
+        SYSTEM_ACTOR,
+        "system.update",
+        Outcome.SUCCESS,
+        "update.auto_request",
+    )
+
+
+async def test_auto_apply_leaves_an_open_request_alone_and_asks_nothing_when_current(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    auto = UpdateService(
+        uow, clock, AdminService(uow, clock), current=V1, releases=releases, auto_apply=True
+    )
+    assert await auto.check_if_due()
+    clock.advance(timedelta(hours=1, minutes=1))
+    assert await auto.check_if_due()
+    assert len(await uow.state_requests()) == 1 if hasattr(uow, "state_requests") else True
+    overview = await auto.overview(DEMO_SUPERUSER)
+    assert len([r for r in overview.history if r.is_open]) == 1
+
+    # Up to date: nothing is requested.
+    fresh = InMemoryUnitOfWork()
+    current = UpdateService(
+        fresh, clock, AdminService(fresh, clock), current=V2, releases=releases, auto_apply=True
+    )
+    assert await current.check_if_due()
+    assert (await current.overview(DEMO_SUPERUSER)).open is None

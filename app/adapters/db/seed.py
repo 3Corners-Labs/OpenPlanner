@@ -20,7 +20,7 @@ untouched.
 
 import struct
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, time, timedelta
 
 from sqlalchemy import select
@@ -38,6 +38,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import Booking, BookingStatus, Contact, Slot
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
+from app.domain.form_fields import Classification, FieldDefinition, FieldType, FormDefinition
 from app.domain.images import ImageFile, ImageText
 from app.domain.ports import Transaction
 from app.domain.scheduling import Group, PhoneMode
@@ -52,6 +53,11 @@ DEMO_CALENDAR_SLUG = "nationaal"
 DEMO_WIDGET_HOST = "http://localhost:8001"
 CLOSED_GROUP_SLUG = "demo-gesloten"
 PLANNED_GROUP_SLUG = "demo-gepland"
+PENDING_TIMES = (time(11), time(11, 30), time(13), time(13, 30))
+"""Local times of the example bookings awaiting confirmation: one for the page checks and one
+per browser of the e2e keyboard flow, each in its own slot."""
+FIRST_WEEKEND_DAY = 5
+"""``date.weekday()`` of Saturday: the demo team works on weekdays only."""
 EXAMPLE_NOTICES = {
     "nl": "Door een storing in ons systeem kunnen wij u nu niet te woord staan.\n"
     "Wij werken aan een oplossing.",
@@ -77,7 +83,8 @@ EXAMPLE_CONTACTS = ContactBlock(
 )
 # A made-up citizen: the booking on hold exists only in development and test databases.
 EXAMPLE_CITIZEN = Contact.create(
-    name="Voorbeeld Inwoner",
+    first_name="Voorbeeld",
+    last_name="Inwoner",
     email="inwoner@example.org",
     phone=None,
     phone_mode=PhoneMode.OPTIONAL,
@@ -92,11 +99,21 @@ class ClosureExamples:
         closed_group: The group page of a team that is closed now.
         planned_closure: The closure page of a team whose closure is still to come.
         suspended_booking: The management page of a booking on hold (a new link each run).
+        pending_confirm: The confirm page of a demo booking that awaits confirmation
+            (ADR 0056), for the page checks; never confirmed by them.
+        pending_flow_chromium: Another such confirm page, which the keyboard flow confirms in
+            Chromium; the flow runs in each browser, and each confirms its own booking.
+        pending_flow_firefox: The same for Firefox.
+        pending_flow_webkit: The same for WebKit.
     """
 
     closed_group: str
     planned_closure: str
     suspended_booking: str
+    pending_confirm: str
+    pending_flow_chromium: str
+    pending_flow_firefox: str
+    pending_flow_webkit: str
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -108,7 +125,41 @@ async def seed_demo(engine: AsyncEngine) -> bool:
         engine, OTHER_ORGANISATION_SLUG, "Andere gemeente", OTHER_GROUP_SLUG, "Andere: team"
     )
     await _seed_calendar(engine)
+    if created:
+        await _seed_form(engine)
     return created
+
+
+DEMO_FORM_FIELDS = (
+    FieldDefinition.create(
+        key="onderwerp",
+        type=FieldType.CHOICE,
+        labels={"nl": "Waar gaat uw vraag over?", "en": "What is your question about?"},
+        hints={"nl": "Dan bereidt de medewerker zich voor.", "en": "So the agent can prepare."},
+        options=("toeslagen", "belastingen", "anders"),
+        option_labels={
+            "toeslagen": {"nl": "Toeslagen", "en": "Benefits"},
+            "belastingen": {"nl": "Belastingen", "en": "Taxes"},
+            "anders": {"nl": "Iets anders", "en": "Something else"},
+        },
+        classification=Classification.NOT_PII,
+    ),
+    FieldDefinition.create(
+        key="tolk",
+        type=FieldType.CHECKBOX,
+        labels={"nl": "Ik wil graag een tolk", "en": "I would like an interpreter"},
+    ),
+)
+"""Two optional example fields on the demo group's form (ADR 0055), so the demo and the
+accessibility checks show a choice list and a checkbox."""
+
+
+async def _seed_form(engine: AsyncEngine) -> None:
+    """Give the new demo group its example form fields."""
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        group = await _group(tx, DEMO_SLUG)
+        await tx.save_form(group.id, FormDefinition(2, DEMO_FORM_FIELDS))
 
 
 async def _seed_calendar(engine: AsyncEngine) -> None:
@@ -154,10 +205,16 @@ async def seed_closure_examples(
             await tx.add_closure(_example_closure(group, start, start + timedelta(days=2), now))
         (closure,) = await tx.get_closures(closed_group.id, now)
         token = await _suspended_booking(tx, closed_group, closure, now, token_key)
+        demo = await _group(tx, DEMO_SLUG)
+        pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
     return ClosureExamples(
         closed_group=f"/g/{CLOSED_GROUP_SLUG}",
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
         suspended_booking=f"/b/{token}",
+        pending_confirm=f"/b/{pending[0]}/confirm",
+        pending_flow_chromium=f"/b/{pending[1]}/confirm",
+        pending_flow_firefox=f"/b/{pending[2]}/confirm",
+        pending_flow_webkit=f"/b/{pending[3]}/confirm",
     )
 
 
@@ -230,6 +287,46 @@ async def _suspended_booking(
         )
     )
     await tx.save_booking(booking.suspend(closure.id))
+    return token
+
+
+async def _pending_booking(
+    tx: Transaction, group: Group, now: datetime, token_key: bytes, at: time
+) -> str:
+    """Store a demo booking that awaits confirmation (ADR 0056) and return its token.
+
+    It lies on the next weekday at ``at`` and has a day to be confirmed.
+    """
+    days = 1
+    while (now + timedelta(days=days)).astimezone(group.tz).weekday() >= FIRST_WEEKEND_DAY:
+        days += 1
+    start = _local(group, now, days, at)
+    end = start + timedelta(minutes=group.slot_minutes)
+    slot = await tx.get_slot(group.id, start) or await tx.add_slot(
+        Slot(None, group.id, start, end, DEMO_CAPACITY)
+    )
+    if slot.id is None:
+        raise ValueError("the slot must be stored")
+    salt = new_token_salt()
+    token = derive_token(token_key, salt)
+    await tx.add_booking(
+        Booking(
+            id=None,
+            group_id=group.id,
+            slot_id=slot.id,
+            start=start,
+            end=end,
+            status=BookingStatus.PENDING_CONFIRMATION,
+            # Its own address each run, so repeated seeds stay under the address limit
+            # (ADR 0059) when the e2e flow moves the confirmed one.
+            contact=replace(EXAMPLE_CITIZEN, email=f"wacht-{salt[:8].lower()}@example.org"),
+            locale="nl",
+            token_hash=hash_token(token),
+            created_at=now,
+            token_salt=salt,
+            confirm_by=now + timedelta(days=1),
+        )
+    )
     return token
 
 

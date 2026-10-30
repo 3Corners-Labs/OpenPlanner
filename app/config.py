@@ -21,7 +21,7 @@ from pydantic_settings import (
 
 from app.domain.event_schema import Envelope
 from app.domain.login_mapping import LOGIN_KEYS
-from app.domain.settings_registry import REGISTRY, SettingClass
+from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
 from app.domain.system_log import EventRetention
 from app.i18n.dates import ClockStyle
 
@@ -165,6 +165,9 @@ class Settings(BaseSettings):
     # How clock times are written everywhere (admin agenda, booking pages, messages):
     # ``24h`` (default), ``12h`` or ``locale`` (per language). Dates always follow the locale.
     time_format: ClockStyle = ClockStyle.H24
+    # ADR 0060 §6 (class D): "Appointments via OpenPlanner" with the product mark at the foot of
+    # the booking pages and in the HTML part of the citizen's emails.
+    product_footer: bool = True
 
     # Worker loop: poll interval and the heartbeat file its container healthcheck reads.
     worker_poll_seconds: float = 30.0
@@ -215,6 +218,10 @@ class Settings(BaseSettings):
     # settings registry).
     planner_rebook_days: int = Field(default=14, ge=1, le=30)
     planner_rebook_reminder_days: int = Field(default=3, ge=1, le=29)
+    # ADR 0055: custom fields per group's booking form at most (class C platform), and the
+    # country of phone numbers typed without a country code (class D organisation).
+    booking_form_max_custom_fields: int = Field(default=5, ge=0, le=15)
+    phone_default_region: str = Field(default="NL", pattern=r"^[A-Z]{2}$")
     # ADR 0056: a citizen confirms a booking by email link within the earlier of this many
     # hours after booking and this many hours before the start, with this many reminders.
     # Class D organisation (ADR 0042, settings registry).
@@ -321,6 +328,12 @@ class Settings(BaseSettings):
     app_commit: str = Field(default="", pattern=r"^([0-9a-f]{7,40})?$")
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
+    # ADR 0059, 0065: UPDATE_CHANNEL (class C) says whether release candidates are offered too;
+    # UPDATE_AUTO_APPLY (C) lets the worker request an update itself. The superuser sets both
+    # in the portal; here they are the code defaults and, when set, the environment lock.
+    # Neither is allowed in production, from the environment or from the portal.
+    update_channel: Literal["release", "rc"] = "release"
+    update_auto_apply: bool = False
 
     # Maintenance mode (ADR 0038). MAINTENANCE_MODE (class B, deployment: needed while the
     # database is unavailable or being restored) switches it on from the environment; the
@@ -336,6 +349,14 @@ class Settings(BaseSettings):
     # worker (ADR 0038 §6), and again every MAINTENANCE_ALERT_REPEAT_HOURS while it lasts.
     maintenance_alert_hours: int = Field(default=4, ge=1, le=72)
     maintenance_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # Class C: the certificate of the public address (ADR 0064): how often the worker probes
+    # it, below how many days left it warns, and how often a lasting finding is repeated.
+    tls_check_interval_hours: int = Field(default=6, ge=1, le=168)
+    tls_expiry_warning_days: int = Field(default=20, ge=1, le=60)
+    tls_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # Class C: the worker checks every group with a Webex host whose latest integration check
+    # is older than this many hours, and records a system event on failure (ADR 0065 step 2).
+    integration_check_interval_hours: int = Field(default=24, ge=1, le=168)
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":
@@ -387,6 +408,18 @@ class Settings(BaseSettings):
             "simulator_enabled",
             "SIMULATOR_ENABLED",
             "SIMULATOR_ENABLED is not allowed in production",
+        )
+        check(
+            self.update_channel != "release",
+            "update_channel",
+            "UPDATE_CHANNEL",
+            "UPDATE_CHANNEL must be release in production (ADR 0059)",
+        )
+        check(
+            self.update_auto_apply,
+            "update_auto_apply",
+            "UPDATE_AUTO_APPLY",
+            "UPDATE_AUTO_APPLY is not allowed in production (ADR 0059)",
         )
         check(
             self.management_token_key is None,
@@ -493,6 +526,14 @@ class Settings(BaseSettings):
             not _REPOSITORY.fullmatch(value) or {".", ".."} & set(value.split("/"))
         ):
             raise ValueError("UPDATE_REPOSITORY must be owner/name")
+        return value
+
+    @field_validator("phone_default_region")
+    @classmethod
+    def _known_phone_region(cls, value: str) -> str:
+        """Accept only a region the phone number library knows (ADR 0055)."""
+        if value not in PHONE_REGIONS:
+            raise ValueError("PHONE_DEFAULT_REGION must be a known ISO 3166-1 region")
         return value
 
     @field_validator("log_level", mode="before")

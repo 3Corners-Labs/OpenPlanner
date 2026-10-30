@@ -6,6 +6,7 @@ open on Monday 5 January 09:00-10:00 Amsterdam time (08:00-09:00 UTC) in 30-minu
 
 from dataclasses import replace
 from datetime import UTC, date, datetime, time
+from typing import Any
 
 from app.domain.authorization import Principal, Role
 from app.domain.scheduling import DispatchKind, Group, TimeWindow
@@ -16,7 +17,9 @@ MONDAY = date(2026, 1, 5)
 SLOT_0900 = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)  # 09:00 Amsterdam (CET)
 SLOT_0930 = datetime(2026, 1, 5, 8, 30, tzinfo=UTC)
 TUESDAY_0900 = datetime(2026, 1, 6, 8, 0, tzinfo=UTC)
-ADA = ContactInput(name="Ada Lovelace", email="ada@example.org", phone="06 1234 5678")
+ADA = ContactInput(
+    first_name="Ada", last_name="Lovelace", email="ada@example.org", phone="06 1234 5678"
+)
 DEMO_SUPERUSER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 DEMO_ORG_ADMIN = Principal(
     "o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset()
@@ -54,8 +57,33 @@ def with_team_invite(group: Group) -> Group:
     )
 
 
-async def book(
-    service: BookingService, start: datetime = SLOT_0900, slug: str = "aangifte"
+async def book_confirmed(service: BookingService, **arguments: Any) -> BookingReceipt:
+    """Book with ``service.book(**arguments)`` and confirm it, as the citizen would by link."""
+    receipt = await service.book(**arguments)
+    confirmed = await service.confirm(receipt.management_token)
+    return BookingReceipt(confirmed, receipt.management_token)
+
+
+async def book_pending(
+    service: BookingService,
+    start: datetime = SLOT_0900,
+    slug: str = "aangifte",
+    contact: ContactInput = ADA,
 ) -> BookingReceipt:
-    """Book ``start`` for Ada in group ``slug``."""
-    return await service.book(group_slug=slug, start=start, contact=ADA, locale="nl")
+    """Book ``start`` for ``contact`` (Ada) in group ``slug``; it awaits confirmation."""
+    return await service.book(group_slug=slug, start=start, contact=contact, locale="nl")
+
+
+def citizen(number: int) -> ContactInput:
+    """Return Ada's details under address ``number``: another citizen for the address limit."""
+    return replace(ADA, email=f"citizen{number}@example.org")
+
+
+async def book(
+    service: BookingService,
+    start: datetime = SLOT_0900,
+    slug: str = "aangifte",
+    contact: ContactInput = ADA,
+) -> BookingReceipt:
+    """Book ``start`` for ``contact`` (Ada) in ``slug`` and confirm it, as by email link."""
+    return await book_confirmed(service, group_slug=slug, start=start, contact=contact, locale="nl")

@@ -4,8 +4,8 @@
 # for sudo only to install the host updater (ADR 0029).
 #
 #   ./scripts/install.sh --mode production|test|lab [--version X.Y.Z] [--repository owner/name]
-#                        [--non-interactive] [--acme-staging] [--no-updater]
-#                        [--upgrade-docker] [--no-packages]
+#                        [--non-interactive] [--no-tls | --tls-domain HOST] [--own-certificate]
+#                        [--acme-staging] [--no-updater] [--upgrade-docker] [--no-packages]
 #
 #   0. host packages   Ubuntu/Debian: curl, flock, Compose plugin and cosign at their newest
 #                      version on every run; Docker Engine from Docker's own repository when
@@ -18,9 +18,13 @@
 #                      backup first), then checked; the rest is reported
 #      secrets/        secrets.env: the bootstrap keys, apart from .env (ADR 0042 §9); moved
 #                      there from .env once, generated when missing, never overwritten
-#   3. proxy.env       production only: TLS_DOMAIN and ACME_EMAIL, same rules
+#   3. proxy.env       with the HTTPS proxy (production and test by default, a lab with
+#                      --tls-domain; ADR 0064): TLS_DOMAIN and ACME_EMAIL, or with
+#                      --own-certificate the files in certs/; same rules
 #   4. .env.update     pull <image>:<version> -> digest -> cosign verify -> pin digest, profiles
-#                      and mode; without --version an existing pin stays
+#                      and mode; with the HTTPS proxy the same for <image>-proxy:<version>
+#                      (ADR 0064 step 2: no host builds Caddy); without --version existing
+#                      pins stay
 #   5. start           docker compose --env-file .env.update up -d, wait for health
 #   6. host updater    /usr/local/sbin, systemd units, /etc/openplanner/updater.env pointing at
 #                      this directory, a drop-in that opens only this directory under /home
@@ -46,7 +50,8 @@ READY_URL=http://127.0.0.1:8000/readyz
 HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-300}
 # not a pin: the oldest Compose that reads env_file with path/required; packages stay newest
 COMPOSE_MIN=2.24.0
-VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$'
+VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(-rc\.[0-9]{1,4})?$'
+RELEASE_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$'
 REPOSITORY_RE='^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
 
 OS_RELEASE=$ROOT/etc/os-release
@@ -55,6 +60,10 @@ DOCKER_KEY_FINGERPRINT=9DC858229FC7DD38854AE2D88D81803C0EBFCD88
 DOCKER_KEYRING=$ROOT/etc/apt/keyrings/docker.asc
 
 MODE='' VERSION='' REPOSITORY='' INTERACTIVE=1 ACME_STAGING=0 UPDATER=1 PACKAGES=1 UPGRADE_DOCKER=0
+# TLS: '' decides by the pin file, then the mode; 1 runs the HTTPS proxy, 0 leaves TLS to your own.
+TLS='' OWN_CERT=0
+CERTS_DIR=$DIR/certs
+OWN_CERT_FILE=/certs/fullchain.pem OWN_KEY_FILE=/certs/privkey.pem
 
 log() { printf '==> %s\n' "$*"; }
 warn() { printf 'warning: %s\n' "$*" >&2; }
@@ -64,7 +73,7 @@ die() {
   (($# == 0)) || printf '%s\n' "$@" >&2
   exit 1
 }
-usage() { sed -n '2,7p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 compose() { docker compose --project-directory "$DIR" --env-file "$PIN_FILE" "$@"; }
 # A value from an env file, read as data (never sourced); the last occurrence wins, as in Compose.
 value() {
@@ -79,8 +88,12 @@ parse_args() {
       --mode) MODE=${2:?--mode needs a value} && shift ;;
       --version) VERSION=${2:?--version needs a value} && shift ;;
       --repository) REPOSITORY=${2:?--repository needs a value} && shift ;;
+      --channel) die "--channel is gone (ADR 0067): the superuser chooses the channel on /admin/updates" ;;
       --non-interactive) INTERACTIVE=0 ;;
       --acme-staging) ACME_STAGING=1 ;;
+      --no-tls) TLS=0 ;;
+      --tls-domain) TLS=1 TLS_DOMAIN=${2:?--tls-domain needs a host name} && shift ;;
+      --own-certificate) OWN_CERT=1 ;;
       --no-updater) UPDATER=0 ;;
       --no-packages) PACKAGES=0 ;;
       --upgrade-docker) UPGRADE_DOCKER=1 ;;
@@ -97,7 +110,16 @@ parse_args() {
     '') usage >&2 && die "--mode is required on the first run" ;;
     *) die "--mode must be production, test or lab, not '$MODE'" ;;
   esac
-  [[ -z $VERSION || $VERSION =~ $VERSION_RE ]] || die "--version must look like 1.2.3"
+  # ADR 0067: a release candidate may be pinned on a test or lab host; production runs releases.
+  [[ -z $VERSION || $VERSION =~ $VERSION_RE ]] || die "--version must look like 1.2.3 (or 1.2.3-rc.4 outside production)"
+  [[ -z $VERSION || $MODE != production || $VERSION =~ $RELEASE_RE ]] \
+    || die "--version $VERSION is a release candidate; production runs releases only"
+  # ADR 0064: HTTPS is the standard shape. A rerun remembers the choice through the pin file.
+  TLS=${TLS:-$(value "$PIN_FILE" OPENPLANNER_TLS)}
+  if [[ -z $TLS ]]; then
+    if [[ $MODE == lab ]]; then TLS=0; else TLS=1; fi
+  fi
+  ((TLS)) || ((!OWN_CERT)) || die "--own-certificate needs the HTTPS proxy; drop --no-tls"
   REPOSITORY=${REPOSITORY:-$(value "$ENV_FILE" UPDATE_REPOSITORY)}
   REPOSITORY=${REPOSITORY:-3Corners-Labs/OpenPlanner}
   [[ $REPOSITORY =~ $REPOSITORY_RE ]] || die "--repository must be owner/name"
@@ -268,23 +290,35 @@ write_private() {
   mv "$tmp" "$target"
 }
 
+# public_address HINT DEFAULT: with the HTTPS proxy the address follows the host name.
+public_address() {
+  if ((TLS)); then
+    PUBLIC_BASE_URL=https://$TLS_DOMAIN
+  else
+    ask PUBLIC_BASE_URL "Public address of this installation${1:+ ($1)}" "$2"
+  fi
+}
+
 new_env() {
   local environment=test smtp_default='' oidc_default=''
   log "writing $ENV_FILE"
   case $MODE in
     production)
       environment=prod
-      PUBLIC_BASE_URL=https://$TLS_DOMAIN
+      public_address "https (behind your proxy)" ''
       ;;
-    test) ask PUBLIC_BASE_URL "Public address of this installation" "http://$(hostname -f 2>/dev/null || hostname):8000" ;;
+    test) public_address "" "http://$(hostname -f 2>/dev/null || hostname):8000" ;;
     lab)
-      ask PUBLIC_BASE_URL "Public address of this installation" "http://127.0.0.1:8000"
+      public_address "" "http://127.0.0.1:8000"
       smtp_default=mailpit
       oidc_default=http://keycloak:8080/realms/openplanner/.well-known/openid-configuration
       OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-dev-only-openplanner-admin-secret}
       SMTP_PORT=${SMTP_PORT:-1025} SMTP_STARTTLS=${SMTP_STARTTLS:-false}
       ;;
   esac
+  # Behind a proxy of your own, rate limits must see the visitor's address (ADR 0030 §6).
+  ((TLS)) || [[ $MODE == lab ]] \
+    || ask FORWARDED_ALLOW_IPS "Address of your reverse proxy, for X-Forwarded-For (empty: none)" '' optional
   ask OIDC_DISCOVERY_URL "OIDC discovery URL of the identity provider (empty: no admin portal)" "$oidc_default" optional
   if [[ -n $OIDC_DISCOVERY_URL ]]; then
     ask OIDC_CLIENT_ID "OIDC client ID" openplanner-admin
@@ -304,6 +338,7 @@ new_env() {
     printf '# Holds secrets: mode 600, never copied off this host. Keys: secrets/secrets.env.\n'
     put ENVIRONMENT "$environment"
     put PUBLIC_BASE_URL "$PUBLIC_BASE_URL"
+    put FORWARDED_ALLOW_IPS "${FORWARDED_ALLOW_IPS:-}"
     put OIDC_DISCOVERY_URL "$OIDC_DISCOVERY_URL"
     put OIDC_CLIENT_ID "${OIDC_CLIENT_ID:-}"
     put OIDC_CLIENT_SECRET "${OIDC_CLIENT_SECRET:-}"
@@ -409,6 +444,8 @@ check_env() {
         || problems+=("$key is missing")
     done
     [[ $(value "$ENV_FILE" SIMULATOR_ENABLED) != true ]] || problems+=("SIMULATOR_ENABLED=true is refused in production")
+    [[ $(value "$ENV_FILE" UPDATE_CHANNEL) != rc ]] || problems+=("UPDATE_CHANNEL=rc is refused in production (ADR 0067)")
+    [[ $(value "$ENV_FILE" UPDATE_AUTO_APPLY) != true ]] || problems+=("UPDATE_AUTO_APPLY=true is refused in production (ADR 0067)")
     case $(value "$ENV_FILE" OIDC_DISCOVERY_URL) in
       '') ;;
       https://*)
@@ -427,9 +464,9 @@ check_env() {
 }
 
 settings() {
-  if [[ $MODE == production ]]; then
+  if ((TLS)); then
     if [[ -f $PROXY_ENV ]]; then
-      TLS_DOMAIN=$(value "$PROXY_ENV" TLS_DOMAIN)
+      TLS_DOMAIN=${TLS_DOMAIN:-$(value "$PROXY_ENV" TLS_DOMAIN)}
     else
       ask TLS_DOMAIN "Host name for HTTPS (DNS must point at this host)" ''
     fi
@@ -444,19 +481,40 @@ settings() {
   fi
   bootstrap_keys "$fresh"
   check_env
-  [[ $MODE == production ]] || return 0
-  if [[ ! -f $PROXY_ENV ]]; then
-    ask ACME_EMAIL "Operations mailbox for the certificate authority" ''
+  ((TLS)) || return 0
+  proxy_settings
+}
+
+# ADR 0064: the proxy's own file. ACME by default; --own-certificate names the files in certs/.
+proxy_settings() {
+  install -d -m 755 "$CERTS_DIR"
+  if ((OWN_CERT)); then
+    for file in fullchain.pem privkey.pem; do
+      [[ -f $CERTS_DIR/$file ]] || die "--own-certificate: put the certificate chain and key in $CERTS_DIR as fullchain.pem and privkey.pem (readable by uid 10001)"
+    done
+  fi
+  local write=0
+  [[ -f $PROXY_ENV ]] || write=1
+  ((!OWN_CERT)) || [[ -n $(value "$PROXY_ENV" TLS_CERT_FILE) ]] || write=1 # switching to own files
+  if ((write)); then
+    ((OWN_CERT)) || ask ACME_EMAIL "Operations mailbox for the certificate authority" ''
     log "writing $PROXY_ENV"
     {
-      printf '# Written by scripts/install.sh. Only the HTTPS proxy reads this file (ADR 0030).\n'
+      printf '# Written by scripts/install.sh. Only the HTTPS proxy reads this file (ADR 0030, ADR 0064).\n'
       put TLS_DOMAIN "$TLS_DOMAIN"
-      put ACME_EMAIL "$ACME_EMAIL"
-      ((!ACME_STAGING)) || put ACME_CA https://acme-staging-v02.api.letsencrypt.org/directory
+      if ((OWN_CERT)); then
+        printf '# Own certificate: renewal is yours; restart the proxy after replacing the files.\n'
+        put TLS_CERT_FILE "$OWN_CERT_FILE"
+        put TLS_KEY_FILE "$OWN_KEY_FILE"
+      else
+        put ACME_EMAIL "$ACME_EMAIL"
+        ((!ACME_STAGING)) || put ACME_CA https://acme-staging-v02.api.letsencrypt.org/directory
+      fi
     } | write_private "$PROXY_ENV"
   fi
-  [[ -n $TLS_DOMAIN && -n $(value "$PROXY_ENV" ACME_EMAIL) ]] \
-    || die "$PROXY_ENV needs TLS_DOMAIN and ACME_EMAIL"
+  [[ -n $TLS_DOMAIN ]] || die "$PROXY_ENV needs TLS_DOMAIN"
+  [[ -n $(value "$PROXY_ENV" ACME_EMAIL) || -n $(value "$PROXY_ENV" TLS_CERT_FILE) ]] \
+    || die "$PROXY_ENV needs ACME_EMAIL, or TLS_CERT_FILE and TLS_KEY_FILE (--own-certificate)"
   [[ $(value "$ENV_FILE" PUBLIC_BASE_URL) == "https://$TLS_DOMAIN"* ]] \
     || warn "PUBLIC_BASE_URL does not match TLS_DOMAIN=$TLS_DOMAIN"
   getent hosts "$TLS_DOMAIN" >/dev/null 2>&1 || warn "$TLS_DOMAIN does not resolve yet; the certificate will wait for DNS"
@@ -465,48 +523,87 @@ settings() {
 # 4. The pinned release -------------------------------------------------------------------------
 
 image_name() { printf 'ghcr.io/%s' "$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"; }
-identity_regexp() { printf '^https://github\\.com/%s/\\.github/workflows/main\\.yml@refs/tags/v[0-9]+\\.[0-9]+\\.[0-9]+$' "${REPOSITORY//./\\.}"; }
+# The TLS proxy, released and signed next to the application image (ADR 0064 step 2).
+proxy_image_name() { printf '%s-proxy' "$(image_name)"; }
+# What the host's cosign accepts (ADR 0006): images signed by main.yml for a release tag. Test
+# and lab hosts also trust those signed on main, where release candidates are built; the
+# installer mode is the host team's trust decision, the channel is the superuser's (ADR 0067).
+identity_regexp() {
+  local ref='tags/v[0-9]+\.[0-9]+\.[0-9]+' # through %s: single backslashes here
+  [[ $MODE == production ]] || ref="(heads/main|$ref)"
+  printf '^https://github\\.com/%s/\\.github/workflows/main\\.yml@refs/%s$' "${REPOSITORY//./\\.}" "$ref"
+}
 
 latest_version() {
-  local token tag
+  local token tag url="https://api.github.com/repos/$REPOSITORY/releases/latest"
   token=$(value "$ENV_FILE" UPDATE_CHECK_TOKEN)
   # The token goes in through a file descriptor, never on the command line (visible in ps).
   tag=$(curl -fsS -H "Accept: application/vnd.github+json" -H @<(printf 'Authorization: Bearer %s\n' "$token") \
-    "https://api.github.com/repos/$REPOSITORY/releases/latest" 2>/dev/null \
+    "$url" 2>/dev/null \
     | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' | head -n 1) || true
   [[ $tag =~ $VERSION_RE ]] \
     || die "cannot find the latest release of $REPOSITORY: pass --version, or set UPDATE_CHECK_TOKEN for a private repository"
   printf '%s' "$tag"
 }
 
+# pull_verified VAR IMAGE VERSION: pull the image, take its registry digest, verify the
+# signature (ADR 0006) and leave the digest reference in VAR. The same for both images.
+pull_verified() {
+  local image=$2 version=$3 ref # not `digest`: the caller's variable of that name is the target
+  log "pulling $image:$version"
+  docker pull -q "$image:$version" >/dev/null 2>&1 \
+    || die "cannot pull $image:$version; for a private package run: docker login ghcr.io -u <github user> (token with read:packages)"
+  ref=$(docker image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$image:$version" \
+    | grep -m1 "^$image@sha256:") || die "no registry digest for $image:$version"
+  cosign verify "$ref" --certificate-identity-regexp "$(identity_regexp)" \
+    --certificate-oidc-issuer "$OIDC_ISSUER" >/dev/null 2>&1 \
+    || die "$ref is not signed by a release of $REPOSITORY; nothing was changed"
+  log "signature verified: $ref"
+  printf -v "$1" '%s' "$ref"
+}
+
+# The version baked into a pulled application image (APP_VERSION, ADR 0052), for an
+# installation whose proxy image is not pinned yet (from before ADR 0064 step 2).
+pinned_version() {
+  docker image inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$1" 2>/dev/null \
+    | sed -n 's/^APP_VERSION=//p' | head -n 1
+}
+
 pin_release() {
-  local image digest profiles='' current
+  local image digest profiles='' current proxy_digest='' proxy_current version
   image=$(image_name)
-  case $MODE in
-    production) profiles=tls ;;
-    lab) profiles=dev ;;
-  esac
+  [[ $MODE != lab ]] || profiles=dev
+  if ((TLS)); then profiles=${profiles:+$profiles,}tls; fi
   current=$(value "$PIN_FILE" OPENPLANNER_IMAGE)
+  proxy_current=$(value "$PIN_FILE" OPENPLANNER_PROXY_IMAGE)
   if [[ -z $VERSION && -n $current ]]; then
     log "keeping the pinned release $current"
     digest=$current
   else
     VERSION=${VERSION:-$(latest_version)}
-    log "pulling $image:$VERSION"
-    docker pull -q "$image:$VERSION" >/dev/null 2>&1 \
-      || die "cannot pull $image:$VERSION; for a private package run: docker login ghcr.io -u <github user> (token with read:packages)"
-    digest=$(docker image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$image:$VERSION" \
-      | grep -m1 "^$image@sha256:") || die "no registry digest for $image:$VERSION"
-    cosign verify "$digest" --certificate-identity-regexp "$(identity_regexp)" \
-      --certificate-oidc-issuer "$OIDC_ISSUER" >/dev/null 2>&1 \
-      || die "$digest is not signed by a release of $REPOSITORY; nothing was changed"
-    log "signature verified: $digest"
+    pull_verified digest "$image" "$VERSION"
+  fi
+  # The proxy image at the same version (ADR 0064 step 2); a host never builds it.
+  if ((TLS)); then
+    if [[ -n $VERSION ]]; then
+      pull_verified proxy_digest "$(proxy_image_name)" "$VERSION"
+    elif [[ -n $proxy_current ]]; then
+      log "keeping the pinned proxy image $proxy_current"
+      proxy_digest=$proxy_current
+    else
+      version=$(pinned_version "$digest")
+      [[ $version =~ $VERSION_RE ]] \
+        || die "cannot tell the version of $digest, so the proxy image cannot be pinned; run again with --version"
+      pull_verified proxy_digest "$(proxy_image_name)" "$version"
+    fi
   fi
   {
-    printf '# Written by scripts/install.sh; the host updater replaces OPENPLANNER_IMAGE.\n'
+    printf '# Written by scripts/install.sh; the host updater replaces the image pins.\n'
     printf 'OPENPLANNER_MODE=%s\n' "$MODE"
+    printf 'OPENPLANNER_TLS=%s\n' "$TLS"
     [[ -z $profiles ]] || printf 'COMPOSE_PROFILES=%s\n' "$profiles"
     printf 'OPENPLANNER_IMAGE=%s\n' "$digest"
+    [[ -z $proxy_digest ]] || printf 'OPENPLANNER_PROXY_IMAGE=%s\n' "$proxy_digest"
   } >"$PIN_FILE.tmp"
   chmod 644 "$PIN_FILE.tmp"
   mv "$PIN_FILE.tmp" "$PIN_FILE"
@@ -529,8 +626,8 @@ healthy() {
 
 start() {
   log "starting (docker compose --env-file .env.update up -d)"
-  # Only production runs the HTTPS proxy; one started by hand elsewhere restarts for ever.
-  [[ $MODE == production ]] || compose --profile tls rm --stop --force proxy >/dev/null 2>&1 || true
+  # Without the tls profile a proxy started by hand earlier would restart for ever.
+  ((TLS)) || compose --profile tls rm --stop --force proxy >/dev/null 2>&1 || true
   compose up -d
   healthy || die "not healthy within ${HEALTH_TIMEOUT}s; see: docker compose --env-file .env.update logs web worker"
   log "web and worker are healthy"
@@ -561,6 +658,7 @@ install_updater() {
 # Written by scripts/install.sh; run it again instead of editing (docs/install.md).
 COMPOSE_DIR=$DIR
 UPDATE_IMAGE=$(image_name)
+UPDATE_PROXY_IMAGE=$(proxy_image_name)
 CERT_IDENTITY_REGEXP='$(identity_regexp)'
 HEALTH_TIMEOUT=$HEALTH_TIMEOUT
 READY_URL=$READY_URL

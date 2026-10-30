@@ -3,8 +3,11 @@
 One page for ``settings.platform.view`` (superuser and auditor):
 
 - *System status*: every class A and B variable with whether it is set and where from, never
-  its value; for a development or test installation, what production would refuse, in the
-  words of the start-up check;
+  its value; the latest check of the public address's certificate (ADR 0064); for a
+  development or test installation, what production would refuse, in the words of the
+  start-up check;
+- *Data fields* (ADR 0063 §6): the fixed list of personal-data fields of a booking with
+  its classification, read-only, with a link to the manual topic ``data-fields``;
 - every class C and D setting by topic, with its effective value, its source and a lock note
   naming the variable when the environment locks it. Secrets show only whether they are set.
 
@@ -33,21 +36,25 @@ from app.adapters.live_settings import LiveSettings
 from app.adapters.settings_report import SettingState
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
-from app.admin.pages import Locale, SameOrigin
+from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.session import save_login_trial
 from app.config import Settings
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
+from app.domain.privacy import DATA_FIELDS, ENTITY, Classification
 from app.domain.settings_registry import BY_KEY, LOG_LEVEL_MAX_EXPIRY_HOURS, SettingClass, Topic
 from app.domain.settings_service import LOG_LEVEL, SettingsService, editable
+from app.domain.tls import Finding
+from app.domain.tls_check import CertificateStatus
 from app.web.locale import RequestLocale
 from app.web.settings_labels import (
     CLASS_LABELS,
     PROBLEM_LABELS,
     SETTING_LABELS,
     SOURCE_LABELS,
+    TLS_FINDING_LABELS,
     TOPIC_LABELS,
 )
 
@@ -96,6 +103,21 @@ class SettingRow:
 
 
 @dataclass(frozen=True)
+class CertificateView:
+    """The latest certificate check as System status shows it (ADR 0064)."""
+
+    host: str
+    finding: str
+    chip: str
+    checked_at: str
+    issuer: str = ""
+    valid_until: str = ""
+
+
+_DANGER = (Finding.EXPIRED, Finding.NOT_YET_VALID)
+
+
+@dataclass(frozen=True)
 class TopicSection:
     """The settings of one topic."""
 
@@ -110,6 +132,57 @@ class Problem:
 
     variable: str
     text: str
+
+
+@dataclass(frozen=True)
+class DataFieldRow:
+    """One personal-data field on the read-only *Data fields* card (ADR 0063 §6).
+
+    Attributes:
+        name: The field as it is called on the booking and in the database.
+        label: Its name for the reader.
+        classification: *direct* or *sensitive*, as a chip label.
+        tone: The chip's tone (``danger`` for direct, ``warning`` for sensitive).
+        entity: What it is stored on; always the booking.
+    """
+
+    name: str
+    label: str
+    classification: str
+    tone: str
+    entity: str
+
+
+_FIELD_LABELS = {
+    "first_name": "admin.settings.data_fields.field.first_name",
+    "last_name": "admin.settings.data_fields.field.last_name",
+    "email": "admin.settings.data_fields.field.email",
+    "phone": "admin.settings.data_fields.field.phone",
+    "note": "admin.settings.data_fields.field.note",
+    "form_answers": "admin.settings.data_fields.field.form_answers",
+    "guest_join_url": "admin.settings.data_fields.field.guest_join_url",
+    "host_join_url": "admin.settings.data_fields.field.host_join_url",
+}
+"""Label per personal-data field; a test fails when the list and this map drift apart."""
+_CLASS_LABELS = {
+    Classification.DIRECT: ("admin.settings.data_fields.direct", "danger"),
+    Classification.SENSITIVE: ("admin.settings.data_fields.sensitive", "warning"),
+}
+
+
+def data_field_rows(locale: RequestLocale) -> list[DataFieldRow]:
+    """Return the fixed personal-data list of ``app.domain.privacy`` for the card, translated."""
+    _ = locale.gettext
+    return [
+        DataFieldRow(
+            f.name,
+            _(_FIELD_LABELS[f.name]),
+            _(_CLASS_LABELS[f.classification][0]),
+            _CLASS_LABELS[f.classification][1],
+            ENTITY,
+        )
+        for f in DATA_FIELDS
+    ]
 
 
 @router.get("/settings", response_class=HTMLResponse)
@@ -232,9 +305,11 @@ async def _overview(
         context.principal,
         {
             "environment": current.environment,
+            "certificate": await _certificate(request, locale),
             "refused": live.refused,
             "status": status_rows,
             "problems": problems,
+            "data_fields": data_field_rows(locale),
             "sections": _sections(
                 states, locale, manage=manage, errors=errors, stored=_stored(live)
             ),
@@ -247,6 +322,32 @@ async def _overview(
     )
     response.status_code = status
     return response
+
+
+async def _certificate(request: Request, locale: RequestLocale) -> CertificateView | None:
+    """Return the latest certificate check for the page, if the worker or the CLI ran one."""
+    status: CertificateStatus = request.app.state.certificate_status
+    check = await status.latest()
+    if check is None:
+        return None
+    _ = locale.gettext
+    valid_until = issuer = ""
+    if check.certificate is not None:
+        days = check.certificate.days_left(request.app.state.clock.now())
+        valid_until = (
+            f"{admin_moment(request, locale, check.certificate.not_after)} "
+            f"({_('admin.settings.tls.days_left', days=days)})"
+        )
+        issuer = check.certificate.issuer
+    chip = "success" if check.ok else "danger" if check.finding in _DANGER else "warning"
+    return CertificateView(
+        check.host,
+        _(TLS_FINDING_LABELS[check.finding]),
+        chip,
+        admin_moment(request, locale, check.checked_at),
+        issuer,
+        valid_until,
+    )
 
 
 def _sections(

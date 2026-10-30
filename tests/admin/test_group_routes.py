@@ -186,29 +186,34 @@ async def test_outsider_cannot_create_a_group_in_another_organisation(site: Site
     assert (await site.client.get("/admin/groups/kaping")).status_code == 404
 
 
+SETTINGS_FORM = {
+    "name": "Demo-team",
+    "timezone": "Europe/Amsterdam",
+    "slot_minutes": "30",
+    "min_notice_minutes": "60",
+    "horizon_days": "30",
+    "dispatch_lead_minutes": "5",
+    "dispatch_kind": "contact_center",
+    "queue_change_working_days": "1",
+    "planner_change_min_lead_minutes": "60",
+    "queue_visible_from_minutes": "15",
+    "max_bookings_per_email": "3",
+    "queue_free_pick_allowed": "no",
+    "phone_mode": "required",
+    "video_host_email": "host-demo@example.nl",
+    "wxcc_business_address": "openplanner@example.biz",
+    "wxcc_channel": "openplanner-video",
+    "wxcc_routing_value": "team-42",
+    "direct_call_enabled": "yes",
+    "not_picked_up_minutes": "10",
+    "embedding_enabled": "yes",
+}
+"""A complete, valid settings form for the demo group."""
+
+
 async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
-    form = {
-        "name": "Demo-team",
-        "timezone": "Europe/Amsterdam",
-        "slot_minutes": "30",
-        "min_notice_minutes": "60",
-        "horizon_days": "30",
-        "dispatch_lead_minutes": "5",
-        "dispatch_kind": "contact_center",
-        "queue_change_working_days": "1",
-        "planner_change_min_lead_minutes": "60",
-        "queue_visible_from_minutes": "15",
-        "queue_free_pick_allowed": "no",
-        "phone_mode": "required",
-        "video_host_email": "host-demo@example.nl",
-        "wxcc_business_address": "openplanner@example.biz",
-        "wxcc_channel": "openplanner-video",
-        "wxcc_routing_value": "team-42",
-        "direct_call_enabled": "yes",
-        "not_picked_up_minutes": "10",
-        "embedding_enabled": "yes",
-    }
+    form = dict(SETTINGS_FORM)
 
     saved = await _post(site, f"{GROUP}/settings", form)
     again = await _post(site, f"{GROUP}/settings", form)
@@ -240,6 +245,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "dispatch_kind": "openplanner_queue",
         "queue_change_working_days": "2",
         "queue_visible_from_minutes": "15",
+        "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
         "calendar_invite_address": "team-demo@example.nl",
         "phone_mode": "optional",
@@ -284,6 +290,7 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, days: str, err
         "dispatch_kind": kind,
         "queue_change_working_days": days,
         "queue_visible_from_minutes": "15",
+        "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
         "phone_mode": "optional",
         "direct_call_enabled": "no",
@@ -315,6 +322,7 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "queue_change_working_days": "1",
             "planner_change_min_lead_minutes": "60",
             "queue_visible_from_minutes": "15",
+            "max_bookings_per_email": "3",
             "queue_free_pick_allowed": "no",
             "phone_mode": "optional",
             "direct_call_enabled": "no",
@@ -621,6 +629,7 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "queue_change_working_days": "1",
             "planner_change_min_lead_minutes": "60",
             "queue_visible_from_minutes": "15",
+            "max_bookings_per_email": "3",
             "queue_free_pick_allowed": "no",
             "phone_mode": "optional",
             "direct_call_enabled": "no",
@@ -658,6 +667,7 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "queue_change_working_days": "1",
         "planner_change_min_lead_minutes": "60",
         "queue_visible_from_minutes": "15",
+        "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
         "phone_mode": "optional",
         "direct_call_enabled": "yes",

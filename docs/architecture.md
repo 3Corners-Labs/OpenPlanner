@@ -106,17 +106,21 @@ flowchart TB
     worker <--> volume
     worker -- SMTP --> smtp
     worker -- hourly release check --> github
+    worker -. "certificate probe, https :443" .-> proxy
     updater -- "app.cli: claim, progress, report, backup" --> web
     updater -- "pull, verify, pin digest" --> github
     worker -. dev .-> mailpit
 
 ```
 
-- **TLS at the edge (ADR 0030).** With `--profile tls` the `proxy` service (Caddy) gets a
-  certificate for `TLS_DOMAIN` from Let's Encrypt and renews it on its own; port 80 only
-  redirects. It runs as uid 10001 on a read-only filesystem, keeps certificates in the
-  `proxy-data` volume and has a fixed address on the `edge` network, the only address `web`
-  accepts `X-Forwarded-For` from. Without the profile, a load balancer of the host does this.
+- **TLS at the edge (ADR 0030, ADR 0064).** With `--profile tls` (the installer's default) the
+  `proxy` service (Caddy) gets a certificate for `TLS_DOMAIN` from Let's Encrypt and renews it
+  on its own, or serves an own certificate from `./certs`; port 80 only redirects. It runs as
+  uid 10001 on a read-only filesystem, keeps certificates in the `proxy-data` volume and has a
+  fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
+  The worker probes the public address every few hours and shows the certificate's issuer,
+  expiry and one finding on *System status*; a failing one is a system event. Without the
+  profile (`--no-tls`), a load balancer of the host does TLS.
 - **One image, two roles.** `web` runs `alembic upgrade head` and then uvicorn; `worker` runs
   `python -m app.jobs.worker` and starts only when `web` is healthy. Both run as uid 10001
   with a read-only root filesystem, no capabilities and `no-new-privileges`.
@@ -127,11 +131,15 @@ flowchart TB
 - **Configuration** comes from the environment only. `ENVIRONMENT` defaults to `prod`, which
   requires `MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`.
 - **Images** are built in CI, pushed to GHCR, signed keyless with cosign and carry an SBOM
-  attestation (ADR 0006). Hosting and backups: open point O7.
+  attestation (ADR 0006): the application image `ghcr.io/<owner>/<repo>` and, since ADR 0064
+  step 2, the HTTPS proxy image `ghcr.io/<owner>/<repo>-proxy` from `deploy/proxy/`, both for
+  every release and release candidate. A host pulls, verifies and pins both by digest
+  (`.env.update`) and never builds Caddy; `docker compose` builds the proxy locally only in
+  development and in `scripts/check-proxy.sh`. Hosting and backups: open point O7.
 - **Updates** (ADR 0029): the worker checks the latest release hourly; a superuser requests an
   update or a restore in the portal; the host updater (outside the containers, with the Docker
-  socket) verifies the signature, backs up, switches the pinned digest and rolls back on its
-  own when the new version does not become healthy.
+  socket) verifies the signatures of both images, backs up, switches the pinned digests and
+  rolls back on its own when the new version (web, worker or proxy) does not become healthy.
 - **Releases** (ADR 0052): only a tag `vX.Y.Z` on `main` is a version; a merge to `main` only
   builds a test image. Every image carries its commit (`APP_COMMIT`), shown on `/admin/updates`.
 
@@ -313,6 +321,7 @@ erDiagram
         int queue_change_working_days
         int queue_visible_from_minutes
         bool queue_free_pick_allowed
+        int max_bookings_per_email
         string phone_mode
         string wxcc_queue_id
         string holiday_source "inherit | own"
@@ -424,10 +433,13 @@ sequenceDiagram
     C->>W: POST /g/demo/book (same-origin, rate-limited, honeypot)
     W->>S: book(start, contact, locale)
     S->>DB: BEGIN IMMEDIATE
-    Note over S,DB: offered? capacity left? create slot,<br/>booking (salt + token hash), plan jobs
+    Note over S,DB: offered? capacity left? create slot,<br/>booking pending (salt + token hash), plan jobs
     S->>DB: COMMIT
     S-->>W: receipt (token, only in memory)
-    W-->>C: 303 /b/{token}?status=booked
+    W-->>C: 303 /g/demo/booked (no token, ADR 0056)
+    K->>M: request to confirm + confirm link
+    C->>W: GET /b/{token}/confirm, then POST (same-origin)
+    W->>S: confirm(token): before confirm_by? confirmed, plan jobs
     loop every poll interval
         K->>DB: claim due jobs (write lock)
         K->>DB: read booking (skip if stale)
@@ -481,7 +493,11 @@ schedule, writes and audits in one locked transaction.
 
 ```mermaid
 flowchart LR
-    book(["booked"]) --> confirm["create video room<br/>send confirmation<br/>now"]
+    pending(["booked, awaiting<br/>confirmation (ADR 0056)"]) --> ask["request to confirm now,<br/>reminders over the window"]
+    ask --> answered{"confirmed before<br/>confirm_by?"}
+    answered -->|yes| book
+    answered -->|no| lapse["cancelled at confirm_by,<br/>lapse mail, purge + 24h"]
+    book(["confirmed"]) --> confirm["create video room<br/>send confirmation<br/>now"]
     confirm --> remind["reminders<br/>per group rule<br/>e.g. T-24h"]
     remind --> kind{"dispatch kind<br/>(ADR 0043)"}
     kind -->|contact center| dispatch["T-dispatch lead<br/>WxCC task created,<br/>booking read-only"]
@@ -559,7 +575,9 @@ longer than `MAINTENANCE_ALERT_HOURS` as the system event `maintenance.overdue`.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> confirmed: book
+    [*] --> pending_confirmation: book (ADR 0056)
+    pending_confirmation --> confirmed: confirm by email link
+    pending_confirmation --> cancelled: lapse at confirm_by, or "this was not me"
     confirmed --> cancelled: cancel (before the dispatch lead)
     confirmed --> cancelled: reschedule (old booking; a new one is confirmed)
     confirmed --> completed: after the call (WP6)
@@ -630,7 +648,7 @@ flowchart LR
 | Management tokens: 256 bits, HMAC-derived, only the salt and hash stored | `app/domain/tokens.py` | ADR 0011 |
 | No PII in logs (masking processor and semgrep rule), errors, URLs or jobs | `app/logging.py`, `.semgrep/` | CLAUDE.md |
 | Audit events shipped after commit as `log_type: audit` lines; security events deduplicated | `app/adapters/event_sink.py`, `app/domain/security_log.py` | ADR 0034 |
-| One event schema (`openplanner.event/1`) for audit table and log lines; a trace id per request and job, set by the server only | `app/domain/event_schema.py`, `app/domain/event_context.py`, `app/api/trace.py` | ADR 0040 |
+| One event schema (`openplanner.event/2`) for audit table and log lines; a trace id per request and job, set by the server only | `app/domain/event_schema.py`, `app/domain/event_context.py`, `app/api/trace.py` | ADR 0040 |
 | Authorisation matrix: one `RequirePermission` per admin route, scoped SQL, audit of denials and logins | `app/domain/authorization.py`, `app/admin/authz.py` | ADR 0014 |
 | OIDC with PKCE, nonce, asymmetric algorithms only; RP-initiated logout | `app/adapters/oidc.py` | ADR 0013 |
 | Encrypted, write-only integration secrets | WP7 | ADR 0008 |
@@ -722,6 +740,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0044 | Planner: group agenda with shortfalls; move, ask to rebook, cancel or accept per booking (`bookings.manage`) |
 | 0048 | Live progress of updates: the host updater reports each step, the updates page polls a fragment (proposed) |
 | 0050 | One host installer that installs, repairs and re-checks a host; one layout under `/home/<user>/openplanner` (proposed) |
+| 0056 | A citizen confirms a new booking by email link; it holds its place until `confirm_by`, then lapses |
 | 0057 | Rebooking assistant: propose a new time for the excess of a short slot, held until the citizen confirms (proposed) |
 
 ## 12. Status and roadmap

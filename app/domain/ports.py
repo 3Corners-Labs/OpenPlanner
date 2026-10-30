@@ -33,6 +33,7 @@ from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
+from app.domain.form_fields import FormDefinition
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobType, PlannedJob
@@ -47,6 +48,7 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.staff import StaffFilter, StaffMember
+from app.domain.tls import CertificateCheck, ProbeResult
 from app.domain.updates import Release, ReleaseCheck, UpdateRequest
 
 
@@ -132,18 +134,26 @@ class IdentityError(Exception):
         self.code = code
 
 
+REASON_LIMIT = 300
+"""Longest provider reason kept on an error or an event (the column size, ADR 0065)."""
+
+
 class IntegrationError(Exception):
     """A call to Webex or WxCC failed; ``code`` says why, ``retryable`` whether to try again.
 
     The code is a short machine key (``unauthorized``, ``rate_limited``, ``server_error``,
     ``rejected``); it never contains response bodies, which could hold personal data.
+    ``reason`` is the provider's own explanation (ADR 0065): set only by adapters for requests
+    that carry no citizen data, with addresses masked and cut at ``REASON_LIMIT``; it is kept
+    with the failure on the timeline and the system event, so admins read it on the page.
     """
 
-    def __init__(self, code: str, *, retryable: bool) -> None:
-        """Store the code and whether a retry can help."""
+    def __init__(self, code: str, *, retryable: bool, reason: str = "") -> None:
+        """Store the code, whether a retry can help, and the provider's reason, if any."""
         super().__init__(code)
         self.code = code
         self.retryable = retryable
+        self.reason = reason[:REASON_LIMIT]
 
 
 class VideoProvider(Protocol):
@@ -210,6 +220,17 @@ class ReleaseSource(Protocol):
 
         Raises:
             IntegrationError: If the source refuses or cannot be reached.
+        """
+        ...
+
+
+class CertificateProbe(Protocol):
+    """Performs a TLS handshake with a server and reads the certificate it presents (ADR 0064)."""
+
+    async def probe(self, host: str, port: int) -> ProbeResult:
+        """Connect to ``host:port``, verify the chain against the host's CA bundle, read the leaf.
+
+        Never raises: a failed connection or handshake is a result with an error code.
         """
         ...
 
@@ -351,6 +372,24 @@ class Transaction(Protocol):
 
     async def get_group_by_id(self, group_id: int) -> Group | None:
         """Return the group with ``group_id``."""
+        ...
+
+    async def get_form(self, group_id: int) -> FormDefinition:
+        """Return the custom fields of the group's booking form, active and retired (ADR 0055).
+
+        A group without custom fields has an empty form at version 1.
+        """
+        ...
+
+    async def save_form(self, group_id: int, form: FormDefinition) -> None:
+        """Store the group's form as a whole: its version, active and retired fields in order."""
+        ...
+
+    async def raise_answers_to_pii(self, group_id: int, key: str) -> int:
+        """Make field ``key`` count as PII in every stored answer of the group; return how many.
+
+        Called when a field is raised to ``pii`` or retired (ADR 0055 point 4).
+        """
         ...
 
     async def get_schedule(
@@ -639,6 +678,16 @@ class Transaction(Protocol):
         """Return the number of confirmed bookings in the slot."""
         ...
 
+    async def upcoming_starts_for_email(
+        self, group_id: int, email: str, after: datetime
+    ) -> list[datetime]:
+        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0066).
+
+        Only bookings that hold a place and end after ``after`` count. The address is
+        compared without regard to (ASCII) case; only start times leave the adapter.
+        """
+        ...
+
     async def add_booking(self, booking: Booking) -> Booking:
         """Store a new booking and return it with its ID."""
         ...
@@ -886,6 +935,14 @@ class Transaction(Protocol):
 
     async def save_maintenance_state(self, state: MaintenanceState) -> None:
         """Replace the maintenance switch."""
+        ...
+
+    async def get_certificate_check(self) -> CertificateCheck | None:
+        """Return the latest check of the public address's certificate (ADR 0064), if any."""
+        ...
+
+    async def save_certificate_check(self, check: CertificateCheck) -> None:
+        """Replace the latest certificate check."""
         ...
 
     async def settings_version(self) -> int:

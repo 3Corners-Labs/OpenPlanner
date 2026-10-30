@@ -40,6 +40,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `TLS_DOMAIN` | string | — | Certificate domain (proxy.env, ADR 0030). |
 | `ACME_EMAIL` | string | — | Mailbox for CA notices (proxy.env). |
 | `ACME_CA` | url | — | ACME directory (proxy.env). |
+| `TLS_CERT_FILE` | path | — | Own certificate chain (PEM) for the proxy; with TLS_KEY_FILE it replaces ACME (proxy.env, ADR 0064). |
+| `TLS_KEY_FILE` | path | — | Private key of the own certificate (proxy.env, ADR 0064). |
 | `WORKER_HEARTBEAT_PATH` | path | `data/worker.heartbeat` | Heartbeat file the worker healthcheck reads. |
 | `WORKER_HEARTBEAT_MAX_AGE_SECONDS` | float | `120.0` | Age after which the worker healthcheck fails. |
 | `APP_VERSION` | string | `""` | Baked into release images (ADR 0029). |
@@ -64,6 +66,10 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `MAINTENANCE_RETRY_AFTER_SECONDS` | int | `300` | 30–3600 | `settings.platform.manage` | Retry-After of the 503 that citizens and the machine API get during maintenance (ADR 0038). |
 | `MAINTENANCE_ALERT_HOURS` | int | `4` | 1–72 | `settings.platform.manage` | Maintenance on longer than this is reported as a system event (ADR 0038). |
 | `MAINTENANCE_ALERT_REPEAT_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The overdue maintenance event repeats at this interval while it lasts (ADR 0038). |
+| `TLS_CHECK_INTERVAL_HOURS` | int | `6` | 1–168 | `settings.platform.manage` | How often the worker probes the certificate of the public address (ADR 0064). |
+| `TLS_EXPIRY_WARNING_DAYS` | int | `20` | 1–60 | `settings.platform.manage` | Fewer days left than this makes the certificate finding 'expiring' (ADR 0064). |
+| `TLS_ALERT_REPEAT_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | A lasting certificate finding is reported again at this interval (ADR 0064). |
+| `INTEGRATION_CHECK_INTERVAL_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The worker checks every group with a Webex host this often and reports a broken chain as a system event (ADR 0065). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
 | `SYSTEM_EVENT_RETENTION_DAYS` | int | `90` | 30–3650 | `settings.platform.manage` | Days after which system events leave the audit log (ADR 0031). |
 | `AUDIT_RETENTION_DAYS` | int | `730` | 365–3650 | `settings.platform.manage` | Days after which admin actions leave the audit log (ADR 0040). |
@@ -107,7 +113,10 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WXCC_WEBHOOK_SECRET` | secret | — | — | `settings.platform.manage` | WxCC webhook secret; to be generated and rotated by the server. |
 | `UPDATE_REPOSITORY` | string | — | — | `settings.platform.manage` | owner/name of the release repository (ADR 0029). |
 | `UPDATE_CHECK_TOKEN` | secret | — | — | `settings.platform.manage` | Read token for a private repository; write-only. |
+| `UPDATE_CHANNEL` | enum | `release` | release, rc | `settings.platform.manage` | What the installation follows (ADR 0059, 0065): releases only, or release candidates (`rc`) too; `rc` is not usable in production. |
+| `UPDATE_AUTO_APPLY` | bool | `false` | — | `settings.platform.manage` | The worker requests a newer version itself as soon as the check finds one (ADR 0059, 0065); not usable in production. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
+| `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |
 
 ## D. Organisation (portal, organisation settings; lockable by env)
@@ -116,10 +125,12 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 |---|---|---|---|---|---|
 | `TIME_FORMAT` | enum | `24h` | 24h, 12h, locale | `settings.organisation.manage` | How clock times are written. |
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
+| `PRODUCT_FOOTER` | bool | `true` | — | `settings.organisation.manage` | "Appointments via OpenPlanner" with the product mark at the foot of the booking pages and in the HTML part of emails (ADR 0060 §6). |
 | `STAFF_DORMANT_AFTER_DAYS` | int | `90` | 14–365 | `settings.organisation.manage` | Days without a login after which a person is marked dormant in the staff list (ADR 0046). |
 | `SHORTFALL_HORIZON_DAYS` | int | `14` | 1–60 | `settings.organisation.manage` | Days ahead the shortfall notice on group pages and the dashboard looks (ADR 0044). |
 | `PLANNER_REBOOK_DAYS` | int | `14` | 1–30 | `settings.organisation.manage` | Days after the original start after which an unanswered request to rebook lapses. |
 | `PLANNER_REBOOK_REMINDER_DAYS` | int | `3` | 1–29 | `settings.organisation.manage` | Days before the lapse at which the one reminder to rebook goes (below the lapse). |
+| `PHONE_DEFAULT_REGION` | enum | `NL` | AC, AD, AE, AF, AG, AI, AL, AM, AO, AR, AS, AT, AU, AW, AX, AZ, BA, BB, BD, BE, BF, BG, BH, BI, BJ, BL, BM, BN, BO, BQ, BR, BS, BT, BW, BY, BZ, CA, CC, CD, CF, CG, CH, CI, CK, CL, CM, CN, CO, CR, CU, CV, CW, CX, CY, CZ, DE, DJ, DK, DM, DO, DZ, EC, EE, EG, EH, ER, ES, ET, FI, FJ, FK, FM, FO, FR, GA, GB, GD, GE, GF, GG, GH, GI, GL, GM, GN, GP, GQ, GR, GT, GU, GW, GY, HK, HN, HR, HT, HU, ID, IE, IL, IM, IN, IO, IQ, IR, IS, IT, JE, JM, JO, JP, KE, KG, KH, KI, KM, KN, KP, KR, KW, KY, KZ, LA, LB, LC, LI, LK, LR, LS, LT, LU, LV, LY, MA, MC, MD, ME, MF, MG, MH, MK, ML, MM, MN, MO, MP, MQ, MR, MS, MT, MU, MV, MW, MX, MY, MZ, NA, NC, NE, NF, NG, NI, NL, NO, NP, NR, NU, NZ, OM, PA, PE, PF, PG, PH, PK, PL, PM, PR, PS, PT, PW, PY, QA, RE, RO, RS, RU, RW, SA, SB, SC, SD, SE, SG, SH, SI, SJ, SK, SL, SM, SN, SO, SR, SS, ST, SV, SX, SY, SZ, TA, TC, TD, TG, TH, TJ, TK, TL, TM, TN, TO, TR, TT, TV, TW, TZ, UA, UG, US, UY, UZ, VA, VC, VE, VG, VI, VN, VU, WF, WS, XK, YE, YT, ZA, ZM, ZW | `settings.organisation.manage` | Country of phone numbers typed without a country code (ADR 0055). |
 | `BOOKING_CONFIRM_WINDOW_HOURS` | int | `24` | 1–72 | `settings.organisation.manage` | Hours after booking within which the citizen confirms by email link (ADR 0056). |
 | `BOOKING_CONFIRM_CUTOFF_HOURS` | int | `2` | 0–24 | `settings.organisation.manage` | Hours before the start by which the citizen confirms at the latest (ADR 0056). |
 | `BOOKING_CONFIRM_REMINDERS` | int | `1` | 0–3 | `settings.organisation.manage` | Reminders to confirm, spread evenly over the time to confirm (ADR 0056). |

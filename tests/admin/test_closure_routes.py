@@ -10,6 +10,7 @@ import httpx
 
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
 from tests.admin.test_admin_flow import audit_events
+from tests.support.citizen import confirm_newest
 
 CLOSURE = "/admin/groups/demo/closure"
 FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam
@@ -26,13 +27,17 @@ async def _book(site: Site, start: str = FRIDAY_0900) -> str:
     """Book as a citizen and return the management path ``/b/{token}``."""
     response = await site.client.post(
         "/g/demo/book",
-        data={"start": start, "name": "Ada Lovelace", "email": "ada@example.org", "phone": ""},
+        data={
+            "start": start,
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "email": "ada@example.org",
+            "phone": "",
+        },
         headers=CITIZEN,
     )
     assert response.status_code == 303
-    match = re.match(r"(/b/[A-Za-z0-9_-]+)\?", response.headers["location"])
-    assert match
-    return match.group(1)
+    return f"/b/{await confirm_newest(site.client)}"
 
 
 async def _post(site: Site, path: str, data: dict[str, str] | None = None) -> httpx.Response:
@@ -79,7 +84,12 @@ async def test_closed_team_cannot_be_booked(site: Site) -> None:
 
     response = await site.client.post(
         "/g/demo/book",
-        data={"start": "2026-01-02T09:00:00Z", "name": "Bo", "email": "bo@example.org"},
+        data={
+            "start": "2026-01-02T09:00:00Z",
+            "first_name": "Bo",
+            "last_name": "Berg",
+            "email": "bo@example.org",
+        },
         headers=CITIZEN,
     )
 

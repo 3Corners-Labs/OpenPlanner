@@ -6,7 +6,7 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { expectNoAxeViolations, tabTo } from '../helpers';
+import { citizenEmail, expectNoAxeViolations, tabTo } from '../helpers';
 
 const HOST = process.env.WIDGET_HOST_URL ?? 'http://localhost:8001/';
 
@@ -42,8 +42,10 @@ test('book through the widget with the keyboard only', async ({ page }, info) =>
   await expectNoAxeViolations(page);
 
   // An invalid email: the error summary is focused and linked to the field.
-  await tabTo(page, widget.getByLabel('Naam'));
-  await page.keyboard.type('Ada Lovelace');
+  await tabTo(page, widget.getByLabel('Voornaam'));
+  await page.keyboard.type('Ada');
+  await tabTo(page, widget.getByLabel('Achternaam'));
+  await page.keyboard.type('Lovelace');
   await tabTo(page, widget.getByLabel('E-mailadres'));
   await page.keyboard.type('not-an-email');
   await tabTo(page, widget.getByRole('button', { name: 'Afspraak maken' }));
@@ -57,12 +59,13 @@ test('book through the widget with the keyboard only', async ({ page }, info) =>
   await page.keyboard.press('Enter');
   await expect(widget.getByLabel('E-mailadres')).toBeFocused();
   await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.type('ada@example.org');
+  await page.keyboard.type(citizenEmail(info));
   await tabTo(page, widget.getByRole('button', { name: 'Afspraak maken' }));
   await page.keyboard.press('Enter');
 
-  await expect(widget.getByRole('heading', { level: 2, name: 'Uw afspraak is gemaakt' })).toBeFocused();
-  await expect(widget.getByRole('status')).toContainText('bevestiging per e-mail');
+  // ADR 0056: the appointment awaits confirmation by the link in the email.
+  await expect(widget.getByRole('heading', { level: 2, name: 'Bevestig uw afspraak' })).toBeFocused();
+  await expect(widget.getByRole('status')).toContainText('Bevestig hem met de link in de e-mail');
   await expectNoAxeViolations(page);
   // No CSP violations or script errors on the strict host page; the refused email above is
   // an expected 422, which browsers log as a failed resource.

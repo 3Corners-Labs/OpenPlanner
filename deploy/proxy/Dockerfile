@@ -33,9 +33,11 @@ RUN setcap -r /usr/bin/caddy \
  && apk del --no-cache curl libcurl brotli-libs \
  && chown -R 10001:10001 /data /config
 COPY Caddyfile /etc/caddy/Caddyfile
+COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 USER 10001:10001
 EXPOSE 8080 8443
-# Without a domain Caddy would serve plain HTTP on 8443, so an empty value stops the container.
-CMD ["sh", "-c", "test -n \"$TLS_DOMAIN\" && test -n \"$ACME_EMAIL\" || { echo 'TLS_DOMAIN and ACME_EMAIL are required' >&2; exit 1; }; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]
+# The entrypoint checks the settings (a domain, and a mailbox or an own certificate; ADR 0064)
+# and refuses to start otherwise: without them Caddy would serve plain HTTP on 8443.
+CMD ["/usr/local/bin/entrypoint.sh"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]

@@ -17,6 +17,12 @@ msgstr "Afspraak maken"
 msgid "site.skip_to_content"
 msgstr "Naar de inhoud"
 
+msgid "site.product_footer_via"
+msgstr "Afspraken via"
+
+msgid "site.product_name"
+msgstr "OpenPlanner"
+
 msgid "home.title"
 msgstr "Een videogesprek plannen"
 
@@ -305,8 +311,6 @@ msgstr "Gekozen moment"
 msgid "book.change_slot"
 msgstr "Ander moment kiezen"
 
-msgid "form.name"
-msgstr "Naam"
 
 msgid "form.email"
 msgstr "E-mailadres"
@@ -341,8 +345,6 @@ msgstr "Er is een probleem"
 msgid "error.title"
 msgstr "Er ging iets mis"
 
-msgid "error.field.name"
-msgstr "Vul uw naam in, maximaal 100 tekens."
 
 msgid "error.field.email"
 msgstr "Vul een geldig e-mailadres in, bijvoorbeeld naam@voorbeeld.nl."
@@ -352,6 +354,9 @@ msgstr "Vul een geldig telefoonnummer in, bijvoorbeeld 06 12345678."
 
 msgid "error.slot_full"
 msgstr "Dit moment is net vol geraakt. Kies een ander moment."
+
+msgid "error.booking_limit_reached"
+msgstr "We kunnen deze afspraak niet maken. Heeft u al een afspraak bij dit team? Gebruik dan de link in de bevestigingsmail om die te verzetten of te annuleren. Boekt u voor iemand anders? Gebruik dan zo mogelijk het e-mailadres van die persoon."
 
 msgid "error.slot_unavailable"
 msgstr "Dit moment is niet meer beschikbaar. Kies een ander moment."
@@ -437,8 +442,6 @@ msgstr "Afspraak verplaatsen"
 msgid "manage.cancel"
 msgstr "Afspraak annuleren"
 
-msgid "manage.notice.booked"
-msgstr "Uw afspraak is gemaakt. U ontvangt een bevestiging per e-mail."
 
 msgid "manage.notice.rescheduled"
 msgstr "Uw afspraak is verplaatst. U ontvangt een bevestiging per e-mail."
@@ -493,6 +496,9 @@ msgstr "Beheer"
 msgid "admin.nav.label"
 msgstr "Beheermenu"
 
+msgid "admin.nav.more"
+msgstr "Meer"
+
 msgid "admin.nav.section.monitor"
 msgstr "Bewaken"
 
@@ -545,7 +551,7 @@ msgid "admin.dashboard.title"
 msgstr "Overzicht"
 
 msgid "admin.dashboard.intro"
-msgstr "Hier ziet u de groepen waarvoor u rechten heeft."
+msgstr "Wat nu aandacht vraagt, en de groepen waarvoor u rechten heeft."
 
 msgid "admin.dashboard.groups"
 msgstr "Uw groepen"
@@ -555,6 +561,51 @@ msgstr "Uw groepen"
 
 msgid "admin.dashboard.no_groups"
 msgstr "U heeft (nog) geen rechten op een groep. Vraag uw beheerder om toegang."
+
+msgid "admin.overview.refresh"
+msgstr "Vernieuwen"
+
+msgid "admin.overview.no_widgets"
+msgstr "Er zijn geen widgets voor uw rol beschikbaar."
+
+msgid "admin.overview.widget.more"
+msgstr "Nog {count} meer"
+
+msgid "admin.overview.widget.open"
+msgstr "Alles bekijken"
+
+msgid "admin.overview.widget.alerts.title"
+msgstr "Meldingen"
+
+msgid "admin.overview.widget.queue.title"
+msgstr "Wachtrij in mijn groepen"
+
+msgid "admin.overview.widget.bookings_today.title"
+msgstr "Afspraken vandaag per groep"
+
+msgid "admin.overview.widget.bookings_today.agenda_link"
+msgstr "Agenda van {name}"
+
+msgid "admin.overview.widget.bookings_today.empty"
+msgstr "Geen groepen in uw bereik."
+
+msgid "admin.overview.widget.changes.title"
+msgstr "Recente configuratiewijzigingen"
+
+msgid "admin.overview.widget.changes.empty"
+msgstr "Nog geen wijzigingen in uw bereik."
+
+msgid "admin.overview.widget.tasks.title"
+msgstr "Lopende taken"
+
+msgid "admin.overview.widget.status.title"
+msgstr "Systeemstatus"
+
+msgid "admin.overview.widget.rights.title"
+msgstr "Mijn rol en bereik"
+
+msgid "admin.overview.widget.rights.empty"
+msgstr "Geen rechten gevonden."
 
 msgid "admin.group.settings"
 msgstr "Instellingen"
@@ -968,6 +1019,12 @@ msgstr "Hoe afspraken bij medewerkers komen"
 msgid "admin.field.dispatch_kind_hint"
 msgstr "Contactcenter: een taak in de wachtrij van het team, kort voor de start. Eigen wachtrij: medewerkers loggen in op OpenPlanner en pakken een afspraak op. Geldt voor afspraken die nog niet zijn doorgezet."
 
+msgid "admin.field.max_bookings_per_email"
+msgstr "Afspraken per e-mailadres"
+
+msgid "admin.field.max_bookings_per_email_hint"
+msgstr "Hoeveel toekomstige afspraken één e-mailadres tegelijk bij dit team mag hebben. Hoger dan 1 zodat mensen ook voor een ander kunnen boeken. Hetzelfde adres twee keer op hetzelfde moment kan nooit. 1 tot 10."
+
 msgid "admin.field.calendar_invite_address"
 msgstr "Agenda-uitnodiging naar (eigen wachtrij)"
 
@@ -1075,8 +1132,14 @@ msgstr "Vul een aantal minuten in van het doorzetten naar de wachtrij tot 1440."
 msgid "admin.form.error.planner_too_late"
 msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Bel de deelnemer."
 
+msgid "admin.form.error.booking_limit_reached"
+msgstr "Dit e-mailadres heeft al een afspraak in dat tijdslot, of al het maximum aantal afspraken bij dit team (zie Afspraken per e-mailadres in de instellingen). Kies een ander tijdslot."
+
 msgid "admin.form.error.move_causes_shortfall"
 msgstr "In dit tijdslot zijn dan meer afspraken dan medewerkers. Bevestig dat u het tekort accepteert, of kies een ander tijdslot."
+
+msgid "admin.form.error.max_bookings_per_email"
+msgstr "Vul een aantal in van 1 tot 10."
 
 msgid "admin.form.error.calendar_invite_address"
 msgstr "Vul een geldig e-mailadres in, of laat het veld leeg."
@@ -1521,7 +1584,7 @@ msgid "call.event.meeting_failed"
 msgstr "Videomeeting aanmaken mislukt"
 
 msgid "call.hint.meeting.rejected_400"
-msgstr "Webex weigerde de meeting. Meestal is de Webex-host van deze groep (Instellingen) geen gebruiker met een Meetings-licentie in de Webex-organisatie van de Service App, of mag de Service App niet namens die host plannen. De reden van Webex staat in het worker-log bij integration.refused, met een trackingId. Een nieuwe of verplaatste afspraak probeert het opnieuw."
+msgstr "Webex weigerde de meeting; het antwoord van Webex staat hierboven. Vaak is de Webex-host van deze groep (Instellingen) geen gebruiker met een Meetings-licentie in de Webex-organisatie van de Service App, of mag de Service App niet namens die host plannen. Druk bij de groep op Koppeling controleren: die plant een proefmeeting zoals een afspraak dat doet. Een nieuwe of verplaatste afspraak probeert het opnieuw."
 
 msgid "call.hint.meeting.rejected_403"
 msgstr "Webex weigerde de toegang: de Service App mist de scope om meetings te plannen of is niet geautoriseerd door een beheerder van de Webex-organisatie. Pas dat aan in Control Hub en zet daarna een nieuw refresh-token in WEBEX_REFRESH_TOKEN."
@@ -1530,7 +1593,7 @@ msgid "call.hint.meeting.rejected_404"
 msgstr "Webex kent de Webex-host van deze groep niet. Controleer het e-mailadres onder Instellingen."
 
 msgid "call.hint.meeting.other"
-msgstr "De videomeeting kon niet worden aangemaakt. De code is de reden; meer staat in het worker-log bij integration.refused en job.failed."
+msgstr "De videomeeting kon niet worden aangemaakt. De code is de reden; het antwoord van Webex staat erbij als Webex er een gaf. Meer staat in het worker-log bij integration.refused en job.failed."
 
 msgid "call.hint.task.meeting_missing"
 msgstr "De taak wachtte op de videomeeting, maar die kwam er niet. Los eerst de fout bij de meeting op."
@@ -1539,7 +1602,7 @@ msgid "call.hint.task.other"
 msgstr "Webex Contact Center nam de taak niet aan. Controleer het entry point en kanaal van de groep onder Instellingen en de WxCC-inrichting onder Koppelingen; de code is de reden van WxCC."
 
 msgid "call.hint.integration.other"
-msgstr "Webex weigerde een aanroep. De reden van Webex staat in het worker-log bij integration.refused, met een trackingId."
+msgstr "Webex weigerde een aanroep. Het antwoord van Webex staat erbij als Webex er een gaf; het worker-log heeft bij integration.refused ook een trackingId."
 
 msgid "call.hint.unauthorized"
 msgstr "Webex accepteerde het token van de Service App niet. Bekijk de status onder Koppelingen en zet zo nodig een nieuw refresh-token in WEBEX_REFRESH_TOKEN."
@@ -1876,6 +1939,9 @@ msgstr "Verloop"
 
 msgid "admin.booking.no_events"
 msgstr "Nog niets gebeurd."
+
+msgid "admin.booking.provider_message"
+msgstr "Antwoord van Webex: {message}"
 
 msgid "admin.nav.integrations"
 msgstr "Koppelingen"
@@ -3506,6 +3572,9 @@ msgstr "Filter wissen"
 msgid "admin.audit.booking_link"
 msgstr "Afspraak {id}"
 
+msgid "admin.audit.provider_message"
+msgstr "Antwoord van Webex: {message}"
+
 msgid "admin.audit.detail.channel_email"
 msgstr "e-mail"
 
@@ -3796,6 +3865,18 @@ msgstr "Geen releaseversie (ontwikkelversie); updates worden niet aangeboden."
 
 msgid "admin.updates.commit"
 msgstr "Commit"
+
+msgid "admin.updates.channel"
+msgstr "Kanaal"
+
+msgid "admin.updates.channel.release"
+msgstr "Releases"
+
+msgid "admin.updates.channel.rc"
+msgstr "Releasekandidaten (elke merge naar main) en releases"
+
+msgid "admin.updates.auto_apply"
+msgstr "werkt zichzelf bij"
 
 msgid "admin.updates.latest"
 msgstr "Nieuwste versie"
@@ -4224,16 +4305,22 @@ msgid "admin.check.webex.no_host"
 msgstr "Geen Webex-host ingevuld: deze groep krijgt geen videogesprekken."
 
 msgid "admin.check.webex.host_ok"
-msgstr "Host {host} is bekend en de Service App mag namens deze host plannen."
+msgstr "Een proefmeeting voor host {host} is gepland zoals een afspraak dat doet, en weer verwijderd."
 
 msgid "admin.check.webex.host_unknown"
-msgstr "Webex kent host {host} niet, of de host heeft geen licentie op deze site ({error})."
+msgstr "Webex kent host {host} niet ({error}): {reason}"
 
 msgid "admin.check.webex.host_refused"
-msgstr "De Service App mag niet plannen namens {host} ({error}): controleer de scopes en de autorisatie in Control Hub."
+msgstr "De Service App mag niet plannen namens {host} ({error}): {reason}. Controleer de scopes en de autorisatie in Control Hub."
 
 msgid "admin.check.webex.unreachable"
-msgstr "Webex was niet bereikbaar om host {host} te controleren ({error}). Probeer het later opnieuw."
+msgstr "Webex was niet bereikbaar om een proefmeeting voor host {host} te plannen ({error}). Probeer het later opnieuw."
+
+msgid "admin.check.webex.schedule_refused"
+msgstr "Webex weigerde een proefmeeting voor host {host} ({error}): {reason}"
+
+msgid "admin.check.webex.probe_left"
+msgstr "De proefmeeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
 
 msgid "admin.check.wxcc.not_configured"
 msgstr "Webex Contact Center is niet ingesteld; de routering is niet gecontroleerd."
@@ -5213,6 +5300,9 @@ msgstr "Probeer het later opnieuw."
 msgid "audit.event.maintenance_overdue"
 msgstr "Onderhoudsmodus staat lang aan"
 
+msgid "audit.event.integration_check"
+msgstr "Koppeling gecontroleerd"
+
 msgid "admin.audit.detail.hours"
 msgstr "{count} uur"
 
@@ -5417,7 +5507,7 @@ msgid "widget.more"
 msgstr "Meer mogelijkheden, zoals direct een gesprek starten, vindt u op de pagina van {name}."
 
 msgid "widget.done_title"
-msgstr "Uw afspraak is gemaakt"
+msgstr "Bevestig uw afspraak"
 
 msgid "widget.error_summary"
 msgstr "Er is iets niet goed ingevuld"
@@ -5749,11 +5839,20 @@ msgstr "Repository met releases"
 msgid "settings.field.update_check_token.label"
 msgstr "Leestoken repository"
 
+msgid "settings.field.update_channel.label"
+msgstr "Updatekanaal"
+
+msgid "settings.field.update_auto_apply.label"
+msgstr "Automatisch bijwerken"
+
 msgid "settings.field.time_format.label"
 msgstr "Tijdnotatie"
 
 msgid "settings.field.admin_timezone.label"
 msgstr "Tijdzone beheerportaal"
+
+msgid "settings.field.product_footer.label"
+msgstr "Toon \"Afspraken via OpenPlanner\" onderaan"
 
 msgid "settings.field.staff_dormant_after_days.label"
 msgstr "Medewerker inactief na (dagen)"
@@ -5775,6 +5874,9 @@ msgstr "Melding bij lang onderhoud na (uren)"
 
 msgid "settings.field.maintenance_alert_repeat_hours.label"
 msgstr "Melding lang onderhoud herhalen elke (uren)"
+
+msgid "settings.field.integration_check_interval_hours.label"
+msgstr "Koppeling van elke groep controleren elke (uren)"
 
 msgid "settings.field.security_event_max_sources.label"
 msgstr "Maximaal aantal bijgehouden bronnen voor beveiligingsgebeurtenissen"
@@ -5857,6 +5959,229 @@ msgstr "Platformwaarde gebruiken"
 msgid "admin.settings.source.organisation"
 msgstr "Organisatie"
 
+msgid "admin.form.error.invalid_form_field"
+msgstr "Dit veld is niet goed ingesteld. Controleer de sleutel, de opties en de grenzen."
+
+msgid "admin.form.error.form_field_forbidden"
+msgstr "Dit veld vraagt om gegevens die we niet mogen vragen, zoals een BSN, een identiteitsbewijs of gegevens over gezondheid, geloof of afkomst."
+
+msgid "error.invalid_answer"
+msgstr "Controleer uw antwoord op deze vraag."
+
+msgid "form.first_name"
+msgstr "Voornaam"
+
+msgid "form.last_name"
+msgstr "Achternaam"
+
+
+msgid "error.field.first_name"
+msgstr "Vul uw voornaam in, maximaal 100 tekens."
+
+msgid "error.field.last_name"
+msgstr "Vul uw achternaam in, maximaal 100 tekens."
+
+msgid "error.invalid_answer_field"
+msgstr "Controleer uw antwoord bij ‘{label}’."
+
+msgid "settings.topic.booking_form"
+msgstr "Boekingsformulier"
+
+msgid "settings.field.booking_form_max_custom_fields.label"
+msgstr "Eigen velden per boekingsformulier (maximaal)"
+
+msgid "settings.field.phone_default_region.label"
+msgstr "Land van telefoonnummers zonder landcode"
+
+msgid "admin.done.field_retired"
+msgstr "Het veld is uitgezet. Eerdere antwoorden blijven tot ze worden gewist en tellen als persoonsgegevens."
+
+msgid "admin.form_fields.title"
+msgstr "Boekingsformulier"
+
+msgid "admin.form_fields.lead"
+msgstr "Extra vragen die inwoners beantwoorden als ze een afspraak maken. Vraag alleen wat het team echt nodig heeft."
+
+msgid "admin.form_fields.settings_lead"
+msgstr "Extra vragen op het formulier, met controles en een markering voor persoonsgegevens."
+
+msgid "admin.form_fields.open"
+msgstr "Boekingsformulier beheren"
+
+msgid "admin.form_fields.back"
+msgstr "Terug naar de instellingen"
+
+msgid "admin.form_fields.system"
+msgstr "Voornaam, achternaam en e-mailadres vraagt het formulier altijd; het telefoonnummer stelt u in bij de instellingen."
+
+msgid "admin.form_fields.none"
+msgstr "Dit team heeft nog geen eigen velden."
+
+msgid "admin.form_fields.retired"
+msgstr "Uitgezet (alleen nog bij eerdere afspraken): {names}"
+
+msgid "admin.form_fields.label"
+msgstr "Vraag"
+
+msgid "admin.form_fields.key"
+msgstr "Sleutel"
+
+msgid "admin.form_fields.key_hint"
+msgstr "Kleine letters, cijfers en _, beginnend met een letter, bijvoorbeeld klantnummer. Ligt vast na opslaan."
+
+msgid "admin.form_fields.type"
+msgstr "Soort"
+
+msgid "admin.form_fields.type_hint"
+msgstr "Bepaalt de controle op het antwoord. Ligt vast na opslaan."
+
+msgid "admin.form_fields.type.short_text"
+msgstr "Korte tekst (tot 100 tekens)"
+
+msgid "admin.form_fields.type.long_text"
+msgstr "Vrij tekstveld (tot 1000 tekens, altijd persoonsgegeven)"
+
+msgid "admin.form_fields.type.email"
+msgstr "E-mailadres"
+
+msgid "admin.form_fields.type.phone"
+msgstr "Telefoonnummer"
+
+msgid "admin.form_fields.type.number"
+msgstr "Geheel getal"
+
+msgid "admin.form_fields.type.date"
+msgstr "Datum"
+
+msgid "admin.form_fields.type.postcode_nl"
+msgstr "Postcode (Nederland)"
+
+msgid "admin.form_fields.type.choice"
+msgstr "Keuzelijst"
+
+msgid "admin.form_fields.type.checkbox"
+msgstr "Vinkje"
+
+msgid "admin.form_fields.label_nl"
+msgstr "Vraag in het Nederlands"
+
+msgid "admin.form_fields.label_en"
+msgstr "Vraag in het Engels"
+
+msgid "admin.form_fields.hint_nl"
+msgstr "Toelichting in het Nederlands"
+
+msgid "admin.form_fields.hint_en"
+msgstr "Toelichting in het Engels"
+
+msgid "admin.form_fields.classification"
+msgstr "Persoonsgegeven"
+
+msgid "admin.form_fields.classification_hint"
+msgstr "Een persoonsgegeven komt nooit in logs, exports, berichten of de wachtrij van medewerkers."
+
+msgid "admin.form_fields.classification.pii"
+msgstr "Persoonsgegeven"
+
+msgid "admin.form_fields.classification.not_pii"
+msgstr "Geen persoonsgegeven"
+
+msgid "admin.form_fields.options"
+msgstr "Keuzes"
+
+msgid "admin.form_fields.options_hint"
+msgstr "Alleen bij een keuzelijst. Eén keuze per regel: sleutel; Nederlands; Engels. Bijvoorbeeld: huur; Huurtoeslag; Rent benefit"
+
+msgid "admin.form_fields.minimum"
+msgstr "Ondergrens"
+
+msgid "admin.form_fields.maximum"
+msgstr "Bovengrens"
+
+msgid "admin.form_fields.minimum_hint"
+msgstr "Alleen bij een getal (de waarde) of een datum (dagen vanaf vandaag, negatief is in het verleden)."
+
+msgid "admin.form_fields.maximum_hint"
+msgstr "Idem; leeg is geen grens."
+
+msgid "admin.form_fields.required"
+msgstr "Verplicht"
+
+msgid "admin.form_fields.required_hint"
+msgstr "Bij een vinkje betekent verplicht: het moet aangevinkt zijn, bijvoorbeeld voor toestemming."
+
+msgid "admin.form_fields.confirm_not_pii"
+msgstr "Ik bevestig dat de antwoorden op deze vraag nooit iets over een persoon zeggen."
+
+msgid "admin.form_fields.confirm_not_pii_hint"
+msgstr "Alleen nodig als u ‘Geen persoonsgegeven’ kiest. Twijfelt u, laat het dan een persoonsgegeven."
+
+msgid "admin.form_fields.add"
+msgstr "Veld toevoegen"
+
+msgid "admin.form_fields.add_lead"
+msgstr "Een formulier heeft hoogstens {count} eigen velden."
+
+msgid "admin.form_fields.add_button"
+msgstr "Veld toevoegen"
+
+msgid "admin.form_fields.limit_reached"
+msgstr "Het formulier heeft al {count} eigen velden, het maximum. Zet eerst een veld uit."
+
+msgid "admin.form_fields.edit_lead"
+msgstr "Sleutel {field_key}, soort {type}. Sleutel en soort liggen vast."
+
+msgid "admin.form_fields.up"
+msgstr "Omhoog"
+
+msgid "admin.form_fields.down"
+msgstr "Omlaag"
+
+msgid "admin.form_fields.retire"
+msgstr "Uitzetten"
+
+msgid "admin.form_fields.up_label"
+msgstr "{label} omhoog"
+
+msgid "admin.form_fields.down_label"
+msgstr "{label} omlaag"
+
+msgid "admin.form_fields.retire_label"
+msgstr "{label} uitzetten"
+
+msgid "admin.form_fields.error.key"
+msgstr "Kies een sleutel van 2 tot 40 tekens: kleine letters, cijfers en _, beginnend met een letter, nog niet eerder gebruikt in dit team en niet first_name, last_name, email of phone."
+
+msgid "admin.form_fields.error.type"
+msgstr "Kies een soort uit de lijst."
+
+msgid "admin.form_fields.error.label"
+msgstr "Vul de vraag in het Nederlands en het Engels in, maximaal 200 tekens."
+
+msgid "admin.form_fields.error.hint"
+msgstr "Een toelichting heeft maximaal 300 tekens."
+
+msgid "admin.form_fields.error.classification"
+msgstr "Een e-mailadres, telefoonnummer of vrij tekstveld is altijd een persoonsgegeven."
+
+msgid "admin.form_fields.error.confirm_not_pii"
+msgstr "Bevestig dat de antwoorden niets over een persoon zeggen, of laat het veld een persoonsgegeven."
+
+msgid "admin.form_fields.error.options"
+msgstr "Geef 1 tot 30 keuzes, elk op een eigen regel als sleutel; Nederlands; Engels, met unieke sleutels."
+
+msgid "admin.form_fields.error.bounds"
+msgstr "Grenzen zijn hele getallen, alleen bij een getal of datum, en de ondergrens ligt niet boven de bovengrens."
+
+msgid "admin.form_fields.error.limit"
+msgstr "Het formulier heeft het maximum aantal eigen velden al."
+
+msgid "admin.booking.answers"
+msgstr "Antwoorden op het formulier"
+
+msgid "admin.booking.answers_lead"
+msgstr "Persoonsgegevens; ze worden gewist met de rest van de afspraak."
+
 msgid "admin.settings.secret_hint"
 msgstr "Leeg laten houdt de huidige waarde; die wordt nooit getoond."
 
@@ -5892,3 +6217,200 @@ msgstr "De nieuwe inlogkoppeling is niet bewaard: met die koppeling zou u na het
 
 msgid "admin.form.error.login_lockout"
 msgstr "Met deze koppeling zou u geen superuser meer zijn; ze is niet bewaard."
+
+# ADR 0056 step 2: confirming a booking by email link (pages and messages).
+
+msgid "booked.title"
+msgstr "Bevestig uw afspraak"
+
+msgid "booked.text"
+msgstr "We hebben u een e-mail gestuurd. Klik op de knop in die e-mail om uw afspraak te bevestigen. Pas dan is de afspraak definitief."
+
+msgid "booked.lapse"
+msgstr "Bevestigt u niet op tijd, dan vervalt de afspraak en komt de plek vrij voor iemand anders."
+
+msgid "booked.no_mail"
+msgstr "Geen e-mail ontvangen? Kijk ook bij uw ongewenste e-mail."
+
+msgid "booked.slot"
+msgstr "Gekozen moment"
+
+msgid "confirm.title"
+msgstr "Afspraak bevestigen"
+
+msgid "confirm.text"
+msgstr "Bevestig uw afspraak uiterlijk {deadline}. Daarna ontvangt u een e-mail met alle gegevens."
+
+msgid "confirm.submit"
+msgstr "Afspraak bevestigen"
+
+msgid "confirm.not_me"
+msgstr "Heeft u deze afspraak niet gemaakt? Annuleer hem dan."
+
+msgid "manage.status.pending_confirmation"
+msgstr "Niet bevestigd"
+
+msgid "manage.pending.title"
+msgstr "Nog niet bevestigd"
+
+msgid "manage.pending.text"
+msgstr "Bevestig uw afspraak uiterlijk {deadline}, anders vervalt hij."
+
+msgid "manage.pending.confirm"
+msgstr "Afspraak bevestigen"
+
+msgid "manage.notice.pending"
+msgstr "Uw afspraak is bijna klaar. Bevestig hem met de link in de e-mail die we u hebben gestuurd."
+
+msgid "manage.notice.confirmed"
+msgstr "Uw afspraak is bevestigd. U ontvangt een e-mail met alle gegevens."
+
+msgid "manage.notice.lapsed"
+msgstr "U heeft de afspraak niet op tijd bevestigd. De afspraak is vervallen."
+
+msgid "manage.book_again"
+msgstr "Nieuwe afspraak maken"
+
+msgid "message.greeting_anonymous"
+msgstr "Goedendag,"
+
+msgid "message.confirm_request.subject"
+msgstr "Bevestig uw afspraak met {group_name}"
+
+msgid "message.confirm_request.intro"
+msgstr "U heeft een videogesprek met {group_name} aangevraagd op {date} om {time}. Bevestig de afspraak; pas dan is hij definitief. Heeft u dit niet aangevraagd? Dan hoeft u niets te doen: de afspraak vervalt vanzelf."
+
+msgid "message.confirm_reminder.subject"
+msgstr "Herinnering: bevestig uw afspraak met {group_name}"
+
+msgid "message.confirm_reminder.intro"
+msgstr "U heeft uw videogesprek met {group_name} op {date} om {time} nog niet bevestigd. Bevestigt u niet op tijd, dan vervalt de afspraak."
+
+msgid "message.manage_confirm"
+msgstr "Bevestig uw afspraak uiterlijk {deadline}:"
+
+msgid "message.confirm_link"
+msgstr "Afspraak bevestigen"
+
+msgid "message.unconfirmed_lapsed.subject"
+msgstr "Uw afspraak met {group_name} is vervallen"
+
+msgid "message.unconfirmed_lapsed.intro"
+msgstr "U heeft uw videogesprek met {group_name} op {date} om {time} niet op tijd bevestigd. De afspraak is vervallen en de plek is vrijgegeven."
+
+msgid "message.book_again"
+msgstr "U kunt altijd een nieuwe afspraak maken."
+
+msgid "message.book_again_link"
+msgstr "Nieuwe afspraak maken"
+
+msgid "admin.settings.data_fields.title"
+msgstr "Gegevensvelden"
+
+msgid "admin.settings.data_fields.intro"
+msgstr "Welke velden van een afspraak persoonsgegevens van de burger zijn, en hoe gevoelig ze zijn."
+
+msgid "admin.settings.data_fields.rule"
+msgstr "Persoonsgegevens staan alleen bij de afspraak. Ze worden alleen getoond op de afspraakpagina en in de wachtrij, aan rollen die afspraken mogen bekijken of de wachtrij bedienen; de agenda toont alleen de voornaam. Ze staan nooit op het overzicht, in lijsten, in het auditlog of de export daarvan, in een zoekresultaat of in een melding, en zoeken of filteren werkt er nooit op."
+
+msgid "admin.settings.data_fields.fixed"
+msgstr "Deze lijst ligt vast in de software en kan hier noch elders worden gewijzigd."
+
+msgid "admin.settings.data_fields.manual"
+msgstr "Lees verder: Gegevensvelden en persoonsgegevens"
+
+msgid "admin.settings.data_fields.field"
+msgstr "Veld"
+
+msgid "admin.settings.data_fields.classification"
+msgstr "Classificatie"
+
+msgid "admin.settings.data_fields.stored_on"
+msgstr "Opgeslagen bij"
+
+msgid "admin.settings.data_fields.direct"
+msgstr "Direct: identificeert de burger op zichzelf"
+
+msgid "admin.settings.data_fields.sensitive"
+msgstr "Gevoelig: wat de burger ons vertelde, of een koppeling naar het gesprek"
+
+msgid "admin.settings.data_fields.field.first_name"
+msgstr "Voornaam"
+
+msgid "admin.settings.data_fields.field.last_name"
+msgstr "Achternaam"
+
+msgid "admin.settings.data_fields.field.email"
+msgstr "E-mailadres"
+
+msgid "admin.settings.data_fields.field.phone"
+msgstr "Telefoonnummer"
+
+msgid "admin.settings.data_fields.field.note"
+msgstr "Notitie"
+
+msgid "admin.settings.data_fields.field.form_answers"
+msgstr "Antwoorden op de eigen vragen van het team"
+
+msgid "admin.settings.data_fields.field.guest_join_url"
+msgstr "Deelnamekoppeling van de burger"
+
+msgid "admin.settings.data_fields.field.host_join_url"
+msgstr "Deelnamekoppeling van de medewerker"
+
+msgid "admin.settings.tls.title"
+msgstr "Certificaat van het publieke adres"
+
+msgid "admin.settings.tls.host"
+msgstr "Adres"
+
+msgid "admin.settings.tls.finding"
+msgstr "Bevinding"
+
+msgid "admin.settings.tls.issuer"
+msgstr "Uitgegeven door"
+
+msgid "admin.settings.tls.valid_until"
+msgstr "Geldig tot"
+
+msgid "admin.settings.tls.checked_at"
+msgstr "Laatst gecontroleerd"
+
+msgid "admin.settings.tls.days_left"
+msgstr "nog {days} dagen"
+
+msgid "admin.settings.tls.none"
+msgstr "Nog niet gecontroleerd. De worker controleert het certificaat elke paar uur; op de server kan dat direct met python -m app.cli tls-check."
+
+msgid "admin.settings.tls.finding.ok"
+msgstr "In orde: het certificaat wordt vertrouwd en is nog ruim geldig."
+
+msgid "admin.settings.tls.finding.expiring"
+msgstr "Verloopt binnenkort: de automatische verlenging lijkt te mislukken. Controleer het log van de proxy (runbook, HTTPS-certificaat)."
+
+msgid "admin.settings.tls.finding.expired"
+msgstr "Verlopen: bezoekers krijgen een waarschuwing in de browser. Herstel de verlenging of plaats een nieuw certificaat."
+
+msgid "admin.settings.tls.finding.not_yet_valid"
+msgstr "Nog niet geldig: de klok van de server of de ingangsdatum van het certificaat klopt niet."
+
+msgid "admin.settings.tls.finding.untrusted"
+msgstr "Niet vertrouwd: het certificaat komt van een test-, eigen of onbekende certificaatautoriteit (bijvoorbeeld de staging-omgeving van Let's Encrypt). Browsers waarschuwen bezoekers."
+
+msgid "admin.settings.tls.finding.name_mismatch"
+msgstr "Verkeerde naam: het certificaat is niet uitgegeven voor dit adres."
+
+msgid "admin.settings.tls.finding.unreachable"
+msgstr "Niet bereikbaar: de server kon zijn eigen publieke adres op poort 443 niet bereiken. Controleer DNS, de firewall en of de proxy draait."
+
+msgid "admin.settings.tls.finding.not_https"
+msgstr "Geen https: het publieke adres gebruikt http, dus er is geen certificaat te controleren. In productie is dit niet toegestaan."
+
+msgid "settings.field.tls_check_interval_hours.label"
+msgstr "Certificaat controleren elke (uren)"
+
+msgid "settings.field.tls_expiry_warning_days.label"
+msgstr "Waarschuwen bij certificaat korter geldig dan (dagen)"
+
+msgid "settings.field.tls_alert_repeat_hours.label"
+msgstr "Melding over het certificaat herhalen elke (uren)"

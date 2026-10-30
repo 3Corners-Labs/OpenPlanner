@@ -25,7 +25,7 @@ While that group or its organisation is in diagnostic mode, each job also writes
 its own retention period.
 """
 
-from collections.abc import Callable, Collection
+from collections.abc import Awaitable, Callable, Collection
 from datetime import datetime, timedelta
 from typing import Protocol
 
@@ -34,6 +34,7 @@ import structlog
 from app.adapters.db.jobs import ClaimedJob
 from app.domain import booking_changes
 from app.domain.audit import Outcome
+from app.domain.booking import Booking
 from app.domain.call_service import CallService
 from app.domain.channels import ChannelKind
 from app.domain.diagnostics import DiagnosticLog
@@ -46,6 +47,7 @@ from app.domain.ports import (
     ContactCenterDispatcher,
     IntegrationError,
     SenderDirectory,
+    Transaction,
     UnitOfWork,
     VideoProvider,
 )
@@ -99,6 +101,13 @@ NO_RECIPIENT = "no_recipient"
 NO_TEAM_INVITE = "no_team_invite"
 """Skip reason: the group no longer has an own queue with an invite address (ADR 0043)."""
 
+LAPSES: dict[JobType, Callable[[Transaction, Booking, datetime], Awaitable[bool]]] = {
+    JobType.LAPSE_REBOOK: booking_changes.lapse,
+    JobType.EXPIRE_UNCONFIRMED: booking_changes.lapse_unconfirmed,
+}
+"""Jobs that cancel a booking left unanswered: a request to rebook (ADR 0044) or to confirm
+(ADR 0056). Each re-reads the booking and does nothing when it was answered in time."""
+
 MESSAGE_CHANNELS = frozenset({ChannelKind.EMAIL, ChannelKind.SMS})
 """Channels whose message jobs are claimed when a sender directory is available."""
 
@@ -118,6 +127,8 @@ class JobRunner:
         retention: How long each category of event is kept (ADR 0040, part 4).
         clock_style: The time format of an organisation by id (ADR 0042 step 5); messages
             write times in their group's organisation's format.
+        product_footer: Whether an organisation (by id) keeps "Appointments via OpenPlanner"
+            in its emails (ADR 0060 §6); ``None`` keeps it.
     """
 
     def __init__(
@@ -133,19 +144,21 @@ class JobRunner:
         integration: IntegrationService | None = None,
         retention: EventRetention | Callable[[], EventRetention] | None = None,
         clock_style: Callable[[int], str] | None = None,
+        product_footer: Callable[[int], bool] | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
         self._system_log = SystemLog(uow, clock)
         self._retention = retention or EventRetention()
         self._clock_style = clock_style
+        self._product_footer = product_footer
         self._diagnostics = DiagnosticLog(uow, clock)
         self._pruned_at: datetime | None = None
         self._uow = uow
         self._clock = clock
         self._senders = senders
         self._composer = composer
-        self._types: set[JobType] = {JobType.PURGE_PII, JobType.LAPSE_REBOOK}
+        self._types: set[JobType] = {JobType.PURGE_PII, *LAPSES}
         if senders is not None:
             self._types |= set(MESSAGE_KINDS) | TEAM_INVITES
         self._calls = (
@@ -191,7 +204,9 @@ class JobRunner:
         try:
             skipped = await self._run(job, now)
         except IntegrationError as exc:
-            await self._handle_failure(job, now, exc.code, retryable=exc.retryable)
+            await self._handle_failure(
+                job, now, exc.code, retryable=exc.retryable, message=exc.reason
+            )
         except DomainError as exc:  # e.g. integration_not_ready: retrying will not help
             await self._handle_failure(job, now, exc.code.value, retryable=False)
         except Exception as exc:  # any failure is retried; the type is logged, not the text
@@ -217,10 +232,11 @@ class JobRunner:
                 await tx.purge_personal_data(job.booking_id, now)
             log.info("job.purged", job_id=job.id, booking_id=job.booking_id)
             return None
-        if job.type is JobType.LAPSE_REBOOK:  # ADR 0044: no new time chosen in time
+        if job.type in LAPSES:  # ADR 0044 / 0056: no new time chosen, or not confirmed
+            lapse = LAPSES[job.type]
             async with self._uow.locked() as tx:
                 booking = await tx.get_booking(job.booking_id)
-                lapsed = booking is not None and await booking_changes.lapse(tx, booking, now)
+                lapsed = booking is not None and await lapse(tx, booking, now)
             if not lapsed:
                 log.info("job.skipped", job_id=job.id, reason=STALE)
                 return STALE
@@ -269,28 +285,47 @@ class JobRunner:
                 message = self._composer.compose_team_invite(job.type, booking, group, now, locale)
             else:
                 message = self._composer.compose(
-                    job.type, booking, group, now, channel=channel, texts=texts, closure=closure
+                    job.type,
+                    booking,
+                    group,
+                    now,
+                    channel=channel,
+                    texts=texts,
+                    closure=closure,
+                    product_footer=self._product_footer is None
+                    or self._product_footer(group.organisation_id),
                 )
         await sender.send(message)
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)
         return None
 
     async def _handle_failure(
-        self, job: ClaimedJob, now: datetime, error: str, *, retryable: bool = True
+        self,
+        job: ClaimedJob,
+        now: datetime,
+        error: str,
+        *,
+        retryable: bool = True,
+        message: str = "",
     ) -> None:
-        """Retry with backoff, or fail after the last attempt (refusals fail at once)."""
+        """Retry with backoff, or fail after the last attempt (refusals fail at once).
+
+        ``message`` is the provider's own reason (ADR 0065); it goes with the event.
+        """
         if retryable and job.attempts <= len(BACKOFF):
             await self._queue.retry(job.id, now + BACKOFF[job.attempts - 1], error)
             log.warning("job.retry", job_id=job.id, attempt=job.attempts, error=error)
-            await self._record(job, Outcome.RETRY, error)
+            await self._record(job, Outcome.RETRY, error, message)
             return
         await self._queue.fail(job.id, error)
         log.error("job.failed", job_id=job.id, type=job.type.value, error=error)
-        await self._record(job, Outcome.FAILURE, error)
+        await self._record(job, Outcome.FAILURE, error, message)
         if job.type in CALL_JOBS and self._calls is not None:
-            await self._calls.record_failure(job, error)
+            await self._calls.record_failure(job, error, message)
 
-    async def _record(self, job: ClaimedJob, outcome: Outcome, reason: str) -> None:
+    async def _record(
+        self, job: ClaimedJob, outcome: Outcome, reason: str, message: str = ""
+    ) -> None:
         """Write the job's outcome as a system event; a failure here is only logged."""
         detail = f"attempt:{job.attempts}"
         if job.channel is not None:
@@ -302,6 +337,7 @@ class JobRunner:
                 booking_id=job.booking_id,
                 reason=reason,
                 detail=detail,
+                message=message,
             )
         except Exception as exc:  # the job's own outcome is already settled
             log.warning("system_log.failed", job_id=job.id, error=type(exc).__name__)

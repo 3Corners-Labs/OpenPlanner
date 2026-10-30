@@ -17,6 +17,12 @@ msgstr "Book an appointment"
 msgid "site.skip_to_content"
 msgstr "Skip to content"
 
+msgid "site.product_footer_via"
+msgstr "Appointments via"
+
+msgid "site.product_name"
+msgstr "OpenPlanner"
+
 msgid "home.title"
 msgstr "Schedule a video call"
 
@@ -305,8 +311,6 @@ msgstr "Selected time"
 msgid "book.change_slot"
 msgstr "Choose another time"
 
-msgid "form.name"
-msgstr "Name"
 
 msgid "form.email"
 msgstr "Email address"
@@ -341,8 +345,6 @@ msgstr "There is a problem"
 msgid "error.title"
 msgstr "Something went wrong"
 
-msgid "error.field.name"
-msgstr "Enter your name, at most 100 characters."
 
 msgid "error.field.email"
 msgstr "Enter a valid email address, for example name@example.com."
@@ -352,6 +354,9 @@ msgstr "Enter a valid phone number, for example +31 6 12345678."
 
 msgid "error.slot_full"
 msgstr "This time has just filled up. Choose another time."
+
+msgid "error.booking_limit_reached"
+msgstr "We cannot make this appointment. Do you already have an appointment with this team? Then use the link in the confirmation email to move or cancel it. Booking for someone else? Then use that person’s email address where possible."
 
 msgid "error.slot_unavailable"
 msgstr "This time is no longer available. Choose another time."
@@ -437,8 +442,6 @@ msgstr "Move appointment"
 msgid "manage.cancel"
 msgstr "Cancel appointment"
 
-msgid "manage.notice.booked"
-msgstr "Your appointment has been booked. You will receive a confirmation by email."
 
 msgid "manage.notice.rescheduled"
 msgstr "Your appointment has been moved. You will receive a confirmation by email."
@@ -493,6 +496,9 @@ msgstr "Administration"
 msgid "admin.nav.label"
 msgstr "Administration menu"
 
+msgid "admin.nav.more"
+msgstr "More"
+
 msgid "admin.nav.section.monitor"
 msgstr "Monitor"
 
@@ -545,7 +551,7 @@ msgid "admin.dashboard.title"
 msgstr "Overview"
 
 msgid "admin.dashboard.intro"
-msgstr "These are the groups you have rights for."
+msgstr "What needs attention now, and the groups you have rights for."
 
 msgid "admin.dashboard.groups"
 msgstr "Your groups"
@@ -555,6 +561,51 @@ msgstr "Your groups"
 
 msgid "admin.dashboard.no_groups"
 msgstr "You have no rights for any group yet. Ask your administrator for access."
+
+msgid "admin.overview.refresh"
+msgstr "Refresh"
+
+msgid "admin.overview.no_widgets"
+msgstr "No widgets are available for your role."
+
+msgid "admin.overview.widget.more"
+msgstr "{count} more"
+
+msgid "admin.overview.widget.open"
+msgstr "Open the full list"
+
+msgid "admin.overview.widget.alerts.title"
+msgstr "Alerts"
+
+msgid "admin.overview.widget.queue.title"
+msgstr "Queue across my groups"
+
+msgid "admin.overview.widget.bookings_today.title"
+msgstr "Bookings today per group"
+
+msgid "admin.overview.widget.bookings_today.agenda_link"
+msgstr "Agenda of {name}"
+
+msgid "admin.overview.widget.bookings_today.empty"
+msgstr "No groups within your reach."
+
+msgid "admin.overview.widget.changes.title"
+msgstr "Recent configuration changes"
+
+msgid "admin.overview.widget.changes.empty"
+msgstr "No changes within your reach yet."
+
+msgid "admin.overview.widget.tasks.title"
+msgstr "Running tasks"
+
+msgid "admin.overview.widget.status.title"
+msgstr "System status"
+
+msgid "admin.overview.widget.rights.title"
+msgstr "My role and reach"
+
+msgid "admin.overview.widget.rights.empty"
+msgstr "No rights found."
 
 msgid "admin.group.settings"
 msgstr "Settings"
@@ -968,6 +1019,12 @@ msgstr "How appointments reach staff"
 msgid "admin.field.dispatch_kind_hint"
 msgstr "Contact center: a task in the team's queue, shortly before the start. Own queue: staff sign in to OpenPlanner and pick up an appointment. Applies to appointments not yet dispatched."
 
+msgid "admin.field.max_bookings_per_email"
+msgstr "Appointments per email address"
+
+msgid "admin.field.max_bookings_per_email_hint"
+msgstr "How many future appointments one email address may have with this team at the same time. Above 1 so people can also book for someone else. The same address twice at the same time is never possible. 1 to 10."
+
 msgid "admin.field.calendar_invite_address"
 msgstr "Calendar invite to (own queue)"
 
@@ -1075,8 +1132,14 @@ msgstr "Enter a number of minutes from the send-to-queue time up to 1440."
 msgid "admin.form.error.planner_too_late"
 msgstr "This booking starts soon or has already gone to the contact center. Call the participant."
 
+msgid "admin.form.error.booking_limit_reached"
+msgstr "This email address already has an appointment in that slot, or already the maximum number of appointments with this team (see Appointments per email address in the settings). Choose another slot."
+
 msgid "admin.form.error.move_causes_shortfall"
 msgstr "This slot would then have more bookings than agents. Confirm that you accept the shortfall, or choose another slot."
+
+msgid "admin.form.error.max_bookings_per_email"
+msgstr "Enter a number from 1 to 10."
 
 msgid "admin.form.error.calendar_invite_address"
 msgstr "Enter a valid email address, or leave the field empty."
@@ -1521,7 +1584,7 @@ msgid "call.event.meeting_failed"
 msgstr "Creating the video meeting failed"
 
 msgid "call.hint.meeting.rejected_400"
-msgstr "Webex refused the meeting. Usually this group's Webex host (Settings) is not a user with a Meetings licence in the Service App's Webex organisation, or the Service App may not schedule on that host's behalf. Webex's reason is in the worker log at integration.refused, with a trackingId. A new or rescheduled booking tries again."
+msgstr "Webex refused the meeting; Webex's answer is shown above. Often this group's Webex host (Settings) is not a user with a Meetings licence in the Service App's Webex organisation, or the Service App may not schedule on that host's behalf. Press Check integration on the group: it schedules a probe meeting exactly as a booking does. A new or rescheduled booking tries again."
 
 msgid "call.hint.meeting.rejected_403"
 msgstr "Webex denied access: the Service App lacks the scope to schedule meetings or has not been authorised by an administrator of the Webex organisation. Fix that in Control Hub, then put a new refresh token in WEBEX_REFRESH_TOKEN."
@@ -1530,7 +1593,7 @@ msgid "call.hint.meeting.rejected_404"
 msgstr "Webex does not know this group's Webex host. Check the email address under Settings."
 
 msgid "call.hint.meeting.other"
-msgstr "The video meeting could not be created. The code is the reason; the worker log has more at integration.refused and job.failed."
+msgstr "The video meeting could not be created. The code is the reason; Webex's answer is shown when Webex gave one. The worker log has more at integration.refused and job.failed."
 
 msgid "call.hint.task.meeting_missing"
 msgstr "The task waited for the video meeting, but it never came. Fix the meeting failure first."
@@ -1539,7 +1602,7 @@ msgid "call.hint.task.other"
 msgstr "Webex Contact Center did not accept the task. Check the group's entry point and channel under Settings and the WxCC setup under Integrations; the code is WxCC's reason."
 
 msgid "call.hint.integration.other"
-msgstr "Webex refused a request. Webex's reason is in the worker log at integration.refused, with a trackingId."
+msgstr "Webex refused a request. Webex's answer is shown when Webex gave one; the worker log also has a trackingId at integration.refused."
 
 msgid "call.hint.unauthorized"
 msgstr "Webex did not accept the Service App's token. Check the status under Integrations and, if needed, put a new refresh token in WEBEX_REFRESH_TOKEN."
@@ -1876,6 +1939,9 @@ msgstr "Timeline"
 
 msgid "admin.booking.no_events"
 msgstr "Nothing has happened yet."
+
+msgid "admin.booking.provider_message"
+msgstr "Webex's answer: {message}"
 
 msgid "admin.nav.integrations"
 msgstr "Integrations"
@@ -3506,6 +3572,9 @@ msgstr "Clear filter"
 msgid "admin.audit.booking_link"
 msgstr "Appointment {id}"
 
+msgid "admin.audit.provider_message"
+msgstr "Webex's answer: {message}"
+
 msgid "admin.audit.detail.channel_email"
 msgstr "email"
 
@@ -3796,6 +3865,18 @@ msgstr "Not a release (development build); no updates are offered."
 
 msgid "admin.updates.commit"
 msgstr "Commit"
+
+msgid "admin.updates.channel"
+msgstr "Channel"
+
+msgid "admin.updates.channel.release"
+msgstr "Releases"
+
+msgid "admin.updates.channel.rc"
+msgstr "Release candidates (every merge to main) and releases"
+
+msgid "admin.updates.auto_apply"
+msgstr "updates itself"
 
 msgid "admin.updates.latest"
 msgstr "Latest version"
@@ -4224,16 +4305,22 @@ msgid "admin.check.webex.no_host"
 msgstr "No Webex host entered: this group gets no video calls."
 
 msgid "admin.check.webex.host_ok"
-msgstr "Host {host} is known and the Service App may schedule on its behalf."
+msgstr "A probe meeting for host {host} was scheduled exactly as a booking does, and deleted again."
 
 msgid "admin.check.webex.host_unknown"
-msgstr "Webex does not know host {host}, or the host has no licence on this site ({error})."
+msgstr "Webex does not know host {host} ({error}): {reason}"
 
 msgid "admin.check.webex.host_refused"
-msgstr "The Service App may not schedule on behalf of {host} ({error}): check the scopes and the authorisation in Control Hub."
+msgstr "The Service App may not schedule on behalf of {host} ({error}): {reason}. Check the scopes and the authorisation in Control Hub."
 
 msgid "admin.check.webex.unreachable"
-msgstr "Webex could not be reached to check host {host} ({error}). Try again later."
+msgstr "Webex could not be reached to schedule a probe meeting for host {host} ({error}). Try again later."
+
+msgid "admin.check.webex.schedule_refused"
+msgstr "Webex refused a probe meeting for host {host} ({error}): {reason}"
+
+msgid "admin.check.webex.probe_left"
+msgstr "The probe meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
 
 msgid "admin.check.wxcc.not_configured"
 msgstr "Webex Contact Center is not configured; the routing was not checked."
@@ -5213,6 +5300,9 @@ msgstr "Please try again later."
 msgid "audit.event.maintenance_overdue"
 msgstr "Maintenance mode on for long"
 
+msgid "audit.event.integration_check"
+msgstr "Integration checked"
+
 msgid "admin.audit.detail.hours"
 msgstr "{count} hours"
 
@@ -5417,7 +5507,7 @@ msgid "widget.more"
 msgstr "More options, such as starting a call right away, are on the page of {name}."
 
 msgid "widget.done_title"
-msgstr "Your appointment is booked"
+msgstr "Confirm your appointment"
 
 msgid "widget.error_summary"
 msgstr "Something was not filled in correctly"
@@ -5749,11 +5839,20 @@ msgstr "Release repository"
 msgid "settings.field.update_check_token.label"
 msgstr "Repository read token"
 
+msgid "settings.field.update_channel.label"
+msgstr "Update channel"
+
+msgid "settings.field.update_auto_apply.label"
+msgstr "Update automatically"
+
 msgid "settings.field.time_format.label"
 msgstr "Time format"
 
 msgid "settings.field.admin_timezone.label"
 msgstr "Admin portal time zone"
+
+msgid "settings.field.product_footer.label"
+msgstr "Show \"Appointments via OpenPlanner\" at the bottom"
 
 msgid "settings.field.staff_dormant_after_days.label"
 msgstr "Staff member dormant after (days)"
@@ -5775,6 +5874,9 @@ msgstr "Report long maintenance after (hours)"
 
 msgid "settings.field.maintenance_alert_repeat_hours.label"
 msgstr "Repeat the long-maintenance report every (hours)"
+
+msgid "settings.field.integration_check_interval_hours.label"
+msgstr "Check every group's integration every (hours)"
 
 msgid "settings.field.security_event_max_sources.label"
 msgstr "Most sources tracked for security events"
@@ -5857,6 +5959,229 @@ msgstr "Use the platform value"
 msgid "admin.settings.source.organisation"
 msgstr "Organisation"
 
+msgid "admin.form.error.invalid_form_field"
+msgstr "This field is not set up correctly. Check the key, the options and the limits."
+
+msgid "admin.form.error.form_field_forbidden"
+msgstr "This field asks for data we may not ask for, such as a citizen service number, an identity document, or data about health, religion or origin."
+
+msgid "error.invalid_answer"
+msgstr "Please check your answer to this question."
+
+msgid "form.first_name"
+msgstr "First name"
+
+msgid "form.last_name"
+msgstr "Last name"
+
+
+msgid "error.field.first_name"
+msgstr "Enter your first name, at most 100 characters."
+
+msgid "error.field.last_name"
+msgstr "Enter your last name, at most 100 characters."
+
+msgid "error.invalid_answer_field"
+msgstr "Please check your answer to ‘{label}’."
+
+msgid "settings.topic.booking_form"
+msgstr "Booking form"
+
+msgid "settings.field.booking_form_max_custom_fields.label"
+msgstr "Custom fields per booking form (at most)"
+
+msgid "settings.field.phone_default_region.label"
+msgstr "Country of phone numbers without a country code"
+
+msgid "admin.done.field_retired"
+msgstr "The field is retired. Earlier answers stay until they are erased and count as personal data."
+
+msgid "admin.form_fields.title"
+msgstr "Booking form"
+
+msgid "admin.form_fields.lead"
+msgstr "Extra questions citizens answer when they book. Ask only what the team really needs."
+
+msgid "admin.form_fields.settings_lead"
+msgstr "Extra questions on the form, with checks and a personal data tag."
+
+msgid "admin.form_fields.open"
+msgstr "Manage the booking form"
+
+msgid "admin.form_fields.back"
+msgstr "Back to the settings"
+
+msgid "admin.form_fields.system"
+msgstr "The form always asks first name, last name and email address; the phone number is set in the settings."
+
+msgid "admin.form_fields.none"
+msgstr "This team has no custom fields yet."
+
+msgid "admin.form_fields.retired"
+msgstr "Retired (only on earlier bookings): {names}"
+
+msgid "admin.form_fields.label"
+msgstr "Question"
+
+msgid "admin.form_fields.key"
+msgstr "Key"
+
+msgid "admin.form_fields.key_hint"
+msgstr "Lower-case letters, digits and _, starting with a letter, for example customer_number. Fixed once saved."
+
+msgid "admin.form_fields.type"
+msgstr "Type"
+
+msgid "admin.form_fields.type_hint"
+msgstr "Decides how the answer is checked. Fixed once saved."
+
+msgid "admin.form_fields.type.short_text"
+msgstr "Short text (up to 100 characters)"
+
+msgid "admin.form_fields.type.long_text"
+msgstr "Free text (up to 1000 characters, always personal data)"
+
+msgid "admin.form_fields.type.email"
+msgstr "Email address"
+
+msgid "admin.form_fields.type.phone"
+msgstr "Phone number"
+
+msgid "admin.form_fields.type.number"
+msgstr "Whole number"
+
+msgid "admin.form_fields.type.date"
+msgstr "Date"
+
+msgid "admin.form_fields.type.postcode_nl"
+msgstr "Postcode (Netherlands)"
+
+msgid "admin.form_fields.type.choice"
+msgstr "Choice list"
+
+msgid "admin.form_fields.type.checkbox"
+msgstr "Checkbox"
+
+msgid "admin.form_fields.label_nl"
+msgstr "Question in Dutch"
+
+msgid "admin.form_fields.label_en"
+msgstr "Question in English"
+
+msgid "admin.form_fields.hint_nl"
+msgstr "Help text in Dutch"
+
+msgid "admin.form_fields.hint_en"
+msgstr "Help text in English"
+
+msgid "admin.form_fields.classification"
+msgstr "Personal data"
+
+msgid "admin.form_fields.classification_hint"
+msgstr "Personal data never appears in logs, exports, messages or the agents' queue."
+
+msgid "admin.form_fields.classification.pii"
+msgstr "Personal data"
+
+msgid "admin.form_fields.classification.not_pii"
+msgstr "Not personal data"
+
+msgid "admin.form_fields.options"
+msgstr "Choices"
+
+msgid "admin.form_fields.options_hint"
+msgstr "Choice lists only. One choice per line: key; Dutch; English. For example: rent; Huurtoeslag; Rent benefit"
+
+msgid "admin.form_fields.minimum"
+msgstr "Lower limit"
+
+msgid "admin.form_fields.maximum"
+msgstr "Upper limit"
+
+msgid "admin.form_fields.minimum_hint"
+msgstr "Numbers (the value) or dates (days from today, negative is in the past) only."
+
+msgid "admin.form_fields.maximum_hint"
+msgstr "The same; empty means no limit."
+
+msgid "admin.form_fields.required"
+msgstr "Required"
+
+msgid "admin.form_fields.required_hint"
+msgstr "For a checkbox, required means it must be ticked, for example for consent."
+
+msgid "admin.form_fields.confirm_not_pii"
+msgstr "I confirm that the answers to this question never say anything about a person."
+
+msgid "admin.form_fields.confirm_not_pii_hint"
+msgstr "Only needed when you choose ‘Not personal data’. When in doubt, keep it personal data."
+
+msgid "admin.form_fields.add"
+msgstr "Add a field"
+
+msgid "admin.form_fields.add_lead"
+msgstr "A form has at most {count} custom fields."
+
+msgid "admin.form_fields.add_button"
+msgstr "Add field"
+
+msgid "admin.form_fields.limit_reached"
+msgstr "The form already has {count} custom fields, the maximum. Retire a field first."
+
+msgid "admin.form_fields.edit_lead"
+msgstr "Key {field_key}, type {type}. Key and type are fixed."
+
+msgid "admin.form_fields.up"
+msgstr "Up"
+
+msgid "admin.form_fields.down"
+msgstr "Down"
+
+msgid "admin.form_fields.retire"
+msgstr "Retire"
+
+msgid "admin.form_fields.up_label"
+msgstr "Move {label} up"
+
+msgid "admin.form_fields.down_label"
+msgstr "Move {label} down"
+
+msgid "admin.form_fields.retire_label"
+msgstr "Retire {label}"
+
+msgid "admin.form_fields.error.key"
+msgstr "Choose a key of 2 to 40 characters: lower-case letters, digits and _, starting with a letter, not used before in this team and not first_name, last_name, email or phone."
+
+msgid "admin.form_fields.error.type"
+msgstr "Choose a type from the list."
+
+msgid "admin.form_fields.error.label"
+msgstr "Enter the question in Dutch and English, at most 200 characters."
+
+msgid "admin.form_fields.error.hint"
+msgstr "A help text has at most 300 characters."
+
+msgid "admin.form_fields.error.classification"
+msgstr "An email address, phone number or free text is always personal data."
+
+msgid "admin.form_fields.error.confirm_not_pii"
+msgstr "Confirm that the answers say nothing about a person, or keep the field personal data."
+
+msgid "admin.form_fields.error.options"
+msgstr "Give 1 to 30 choices, each on its own line as key; Dutch; English, with unique keys."
+
+msgid "admin.form_fields.error.bounds"
+msgstr "Limits are whole numbers, only for numbers or dates, and the lower limit is not above the upper limit."
+
+msgid "admin.form_fields.error.limit"
+msgstr "The form already has the maximum number of custom fields."
+
+msgid "admin.booking.answers"
+msgstr "Answers on the form"
+
+msgid "admin.booking.answers_lead"
+msgstr "Personal data; erased with the rest of the booking."
+
 msgid "admin.settings.secret_hint"
 msgstr "Leave empty to keep the current value; it is never shown."
 
@@ -5892,3 +6217,200 @@ msgstr "The new login mapping was not saved: with it you would no longer be supe
 
 msgid "admin.form.error.login_lockout"
 msgstr "With this mapping you would no longer be superuser; it was not saved."
+
+# ADR 0056 step 2: confirming a booking by email link (pages and messages).
+
+msgid "booked.title"
+msgstr "Confirm your appointment"
+
+msgid "booked.text"
+msgstr "We have sent you an email. Select the button in that email to confirm your appointment. Only then is the appointment final."
+
+msgid "booked.lapse"
+msgstr "If you do not confirm in time, the appointment lapses and the place becomes free for someone else."
+
+msgid "booked.no_mail"
+msgstr "No email? Please also check your junk mail."
+
+msgid "booked.slot"
+msgstr "Chosen time"
+
+msgid "confirm.title"
+msgstr "Confirm appointment"
+
+msgid "confirm.text"
+msgstr "Please confirm your appointment by {deadline}. You will then receive an email with all the details."
+
+msgid "confirm.submit"
+msgstr "Confirm appointment"
+
+msgid "confirm.not_me"
+msgstr "Did you not make this appointment? Then cancel it."
+
+msgid "manage.status.pending_confirmation"
+msgstr "Not confirmed"
+
+msgid "manage.pending.title"
+msgstr "Not confirmed yet"
+
+msgid "manage.pending.text"
+msgstr "Please confirm your appointment by {deadline}, or it lapses."
+
+msgid "manage.pending.confirm"
+msgstr "Confirm appointment"
+
+msgid "manage.notice.pending"
+msgstr "Your appointment is almost done. Confirm it with the link in the email we sent you."
+
+msgid "manage.notice.confirmed"
+msgstr "Your appointment is confirmed. You will receive an email with all the details."
+
+msgid "manage.notice.lapsed"
+msgstr "You did not confirm the appointment in time. The appointment has lapsed."
+
+msgid "manage.book_again"
+msgstr "Make a new appointment"
+
+msgid "message.greeting_anonymous"
+msgstr "Hello,"
+
+msgid "message.confirm_request.subject"
+msgstr "Confirm your appointment with {group_name}"
+
+msgid "message.confirm_request.intro"
+msgstr "You requested a video call with {group_name} on {date} at {time}. Please confirm the appointment; only then is it final. Did you not request this? Then you need not do anything: the appointment lapses by itself."
+
+msgid "message.confirm_reminder.subject"
+msgstr "Reminder: confirm your appointment with {group_name}"
+
+msgid "message.confirm_reminder.intro"
+msgstr "You have not yet confirmed your video call with {group_name} on {date} at {time}. If you do not confirm in time, the appointment lapses."
+
+msgid "message.manage_confirm"
+msgstr "Please confirm your appointment by {deadline}:"
+
+msgid "message.confirm_link"
+msgstr "Confirm appointment"
+
+msgid "message.unconfirmed_lapsed.subject"
+msgstr "Your appointment with {group_name} has lapsed"
+
+msgid "message.unconfirmed_lapsed.intro"
+msgstr "You did not confirm your video call with {group_name} on {date} at {time} in time. The appointment has lapsed and the place has been freed."
+
+msgid "message.book_again"
+msgstr "You can always make a new appointment."
+
+msgid "message.book_again_link"
+msgstr "Make a new appointment"
+
+msgid "admin.settings.data_fields.title"
+msgstr "Data fields"
+
+msgid "admin.settings.data_fields.intro"
+msgstr "Which fields of an appointment are personal data of the citizen, and how sensitive they are."
+
+msgid "admin.settings.data_fields.rule"
+msgstr "Personal data is stored only on the appointment. It is shown only on the appointment page and in the queue, to roles that may view appointments or work the queue; the agenda shows the first name only. It never appears on the overview, in lists, in the audit log or its export, in a search result or in an alert, and no search or filter matches on it."
+
+msgid "admin.settings.data_fields.fixed"
+msgstr "This list is fixed in the software and cannot be changed here or anywhere else."
+
+msgid "admin.settings.data_fields.manual"
+msgstr "Read more: Data fields and personal data"
+
+msgid "admin.settings.data_fields.field"
+msgstr "Field"
+
+msgid "admin.settings.data_fields.classification"
+msgstr "Classification"
+
+msgid "admin.settings.data_fields.stored_on"
+msgstr "Stored on"
+
+msgid "admin.settings.data_fields.direct"
+msgstr "Direct: identifies the citizen on its own"
+
+msgid "admin.settings.data_fields.sensitive"
+msgstr "Sensitive: what the citizen told us, or a link into the conversation"
+
+msgid "admin.settings.data_fields.field.first_name"
+msgstr "First name"
+
+msgid "admin.settings.data_fields.field.last_name"
+msgstr "Last name"
+
+msgid "admin.settings.data_fields.field.email"
+msgstr "Email address"
+
+msgid "admin.settings.data_fields.field.phone"
+msgstr "Phone number"
+
+msgid "admin.settings.data_fields.field.note"
+msgstr "Note"
+
+msgid "admin.settings.data_fields.field.form_answers"
+msgstr "Answers to the team's own questions"
+
+msgid "admin.settings.data_fields.field.guest_join_url"
+msgstr "Join link of the citizen"
+
+msgid "admin.settings.data_fields.field.host_join_url"
+msgstr "Join link of the agent"
+
+msgid "admin.settings.tls.title"
+msgstr "Certificate of the public address"
+
+msgid "admin.settings.tls.host"
+msgstr "Address"
+
+msgid "admin.settings.tls.finding"
+msgstr "Finding"
+
+msgid "admin.settings.tls.issuer"
+msgstr "Issued by"
+
+msgid "admin.settings.tls.valid_until"
+msgstr "Valid until"
+
+msgid "admin.settings.tls.checked_at"
+msgstr "Last checked"
+
+msgid "admin.settings.tls.days_left"
+msgstr "{days} days left"
+
+msgid "admin.settings.tls.none"
+msgstr "Not checked yet. The worker checks the certificate every few hours; on the server, python -m app.cli tls-check does it at once."
+
+msgid "admin.settings.tls.finding.ok"
+msgstr "Fine: the certificate is trusted and valid for a good while."
+
+msgid "admin.settings.tls.finding.expiring"
+msgstr "Expiring soon: automatic renewal seems to be failing. Check the proxy's log (runbook, HTTPS certificate)."
+
+msgid "admin.settings.tls.finding.expired"
+msgstr "Expired: visitors get a browser warning. Repair the renewal or install a new certificate."
+
+msgid "admin.settings.tls.finding.not_yet_valid"
+msgstr "Not yet valid: the server's clock or the certificate's start date is wrong."
+
+msgid "admin.settings.tls.finding.untrusted"
+msgstr "Not trusted: the certificate comes from a test, private or unknown certificate authority (for example Let's Encrypt's staging environment). Browsers warn visitors."
+
+msgid "admin.settings.tls.finding.name_mismatch"
+msgstr "Wrong name: the certificate was not issued for this address."
+
+msgid "admin.settings.tls.finding.unreachable"
+msgstr "Unreachable: the server could not reach its own public address on port 443. Check DNS, the firewall and whether the proxy is running."
+
+msgid "admin.settings.tls.finding.not_https"
+msgstr "No https: the public address uses http, so there is no certificate to check. Production does not allow this."
+
+msgid "settings.field.tls_check_interval_hours.label"
+msgstr "Check the certificate every (hours)"
+
+msgid "settings.field.tls_expiry_warning_days.label"
+msgstr "Warn when the certificate is valid for fewer than (days)"
+
+msgid "settings.field.tls_alert_repeat_hours.label"
+msgstr "Repeat the certificate report every (hours)"

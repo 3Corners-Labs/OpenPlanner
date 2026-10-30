@@ -15,6 +15,8 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 
+import phonenumbers
+
 from app.domain.authorization import Permission
 
 
@@ -75,6 +77,7 @@ class Topic(StrEnum):
     DISPLAY = "display"
     STAFF = "staff"
     PLANNER = "planner"
+    BOOKING_FORM = "booking_form"
     CONFIRMATION = "confirmation"
 
 
@@ -98,6 +101,9 @@ ORGANISATION_SETTINGS_TOPIC = "organisation-settings"
 
 CLOCK_STYLES = ("24h", "12h", "locale")
 """Values of ``TIME_FORMAT``; a test checks them against ``app.i18n.dates.ClockStyle``."""
+
+PHONE_REGIONS = tuple(sorted(phonenumbers.SUPPORTED_REGIONS))
+"""Values of ``PHONE_DEFAULT_REGION``: the regions ``phonenumbers`` knows (ADR 0055)."""
 
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 """Values of ``LOG_LEVEL``."""
@@ -369,6 +375,25 @@ REGISTRY: tuple[SettingSpec, ...] = (
     ),
     S("acme_ca", K.URL, None, _B, T.HOST, "ACME directory (proxy.env).", in_config=False),
     S(
+        "tls_cert_file",
+        K.PATH,
+        None,
+        _B,
+        T.HOST,
+        "Own certificate chain (PEM) for the proxy; with TLS_KEY_FILE it replaces ACME "
+        "(proxy.env, ADR 0064).",
+        in_config=False,
+    ),
+    S(
+        "tls_key_file",
+        K.PATH,
+        None,
+        _B,
+        T.HOST,
+        "Private key of the own certificate (proxy.env, ADR 0064).",
+        in_config=False,
+    ),
+    S(
         "worker_heartbeat_path",
         K.PATH,
         "data/worker.heartbeat",
@@ -517,6 +542,47 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _C,
         T.OPERATIONS,
         "The overdue maintenance event repeats at this interval while it lasts (ADR 0038).",
+        minimum=1,
+        maximum=168,
+    ),
+    S(
+        "tls_check_interval_hours",
+        K.INT,
+        6,
+        _C,
+        T.OPERATIONS,
+        "How often the worker probes the certificate of the public address (ADR 0064).",
+        minimum=1,
+        maximum=168,
+    ),
+    S(
+        "tls_expiry_warning_days",
+        K.INT,
+        20,
+        _C,
+        T.OPERATIONS,
+        "Fewer days left than this makes the certificate finding 'expiring' (ADR 0064).",
+        minimum=1,
+        maximum=60,
+    ),
+    S(
+        "tls_alert_repeat_hours",
+        K.INT,
+        24,
+        _C,
+        T.OPERATIONS,
+        "A lasting certificate finding is reported again at this interval (ADR 0064).",
+        minimum=1,
+        maximum=168,
+    ),
+    S(
+        "integration_check_interval_hours",
+        K.INT,
+        24,
+        _C,
+        T.OPERATIONS,
+        "The worker checks every group with a Webex host this often and reports a broken "
+        "chain as a system event (ADR 0065).",
         minimum=1,
         maximum=168,
     ),
@@ -893,6 +959,25 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Read token for a private repository; write-only.",
         optional=True,
     ),
+    S(
+        "update_channel",
+        K.ENUM,
+        "release",
+        _C,
+        T.UPDATES,
+        "What the installation follows (ADR 0059, 0065): releases only, or release "
+        "candidates (`rc`) too; `rc` is not usable in production.",
+        choices=("release", "rc"),
+    ),
+    S(
+        "update_auto_apply",
+        K.BOOL,
+        False,
+        _C,
+        T.UPDATES,
+        "The worker requests a newer version itself as soon as the check finds one "
+        "(ADR 0059, 0065); not usable in production.",
+    ),
     # D. Organisation: the value per organisation; the superuser's or the environment's value
     # is the default for organisations without one.
     S(
@@ -911,6 +996,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _D,
         T.DISPLAY,
         "IANA time zone of the admin portal.",
+    ),
+    S(
+        "product_footer",
+        K.BOOL,
+        True,
+        _D,
+        T.DISPLAY,
+        '"Appointments via OpenPlanner" with the product mark at the foot of the booking pages '
+        "and in the HTML part of emails (ADR 0060 §6).",
     ),
     S(
         "staff_dormant_after_days",
@@ -961,6 +1055,25 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Days before the lapse at which the one reminder to rebook goes (below the lapse).",
         minimum=1,
         maximum=29,
+    ),
+    S(
+        "booking_form_max_custom_fields",
+        K.INT,
+        5,
+        _C,
+        T.BOOKING_FORM,
+        "Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055).",
+        minimum=0,
+        maximum=15,
+    ),
+    S(
+        "phone_default_region",
+        K.ENUM,
+        "NL",
+        _D,
+        T.BOOKING_FORM,
+        "Country of phone numbers typed without a country code (ADR 0055).",
+        choices=PHONE_REGIONS,
     ),
     S(
         "booking_confirm_window_hours",

@@ -29,6 +29,13 @@
     <a href="/admin/groups/{{ summary.group.slug }}">{{ _("admin.cancel") }}</a>
   </div>
 </form>
+<section class="card" id="booking-form" aria-labelledby="booking-form-heading">
+  <div class="card__header">
+    <h2 id="booking-form-heading">{{ _("admin.form_fields.title") }}</h2>
+    <p class="card__lead">{{ _("admin.form_fields.settings_lead") }}</p>
+  </div>
+  <p><a href="/admin/groups/{{ summary.group.slug }}/settings/form">{{ _("admin.form_fields.open") }}</a></p>
+</section>
 <section class="card" id="check" aria-labelledby="check-heading">
   <div class="card__header">
     <h2 id="check-heading">{{ _("admin.check.title") }}</h2>

@@ -9,11 +9,12 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``claim``: what ``app.cli update-claim`` prints.
 - ``revision``: what ``alembic current`` prints as the revision.
 - ``fail``: one operation per line that exits 1 (``pull``, ``cosign``, ``backup-db``,
-  ``restore-db``, ``downgrade``, ``docker-info``, ``update-progress``, ``maintenance``).
+  ``restore-db``, ``downgrade``, ``docker-info``, ``update-progress``, ``maintenance``;
+  ``pull-proxy`` and ``cosign-proxy`` fail only for the proxy image, ADR 0064).
 - ``compose-version``: what ``docker compose version --short`` prints (default 2.40.3).
 - ``latest``: the tag of the latest GitHub release (default none: the API call fails).
-- ``unhealthy``: one image reference per line; the worker reports ``unhealthy`` while it is
-  pinned.
+- ``unhealthy``: one image reference per line; the worker (or, for a proxy image, the proxy)
+  reports ``unhealthy`` while it is pinned.
 - ``cosign-version``: the installed cosign (default v3.1.4, the latest the fake GitHub offers).
 - ``installed``: Debian packages ``dpkg -s`` finds; ``upgradable``: ``apt list --upgradable``.
 - ``docker-key``: the fingerprint of Docker's release key (default the real one).
@@ -30,7 +31,11 @@ import time
 from pathlib import Path
 
 WORKER = "worker-container-id"
+PROXY = "proxy-container-id"
 COSIGN = "3.1.4"
+# The releases the fake registry knows, so an image's digest can be mapped back to the version
+# baked into it (``APP_VERSION``, read by the installer; ADR 0064 step 2).
+RELEASES = ("1.3.0", "1.4.0", "1.5.0", "1.5.0-rc.3")
 COSIGN_DEB = b"cosign package"
 DOCKER_KEY = "9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
 
@@ -49,14 +54,33 @@ def _lines(name: str) -> list[str]:
     return path.read_text().splitlines() if path.exists() else []
 
 
-def _pinned() -> str:
+def _pin(key: str) -> str:
     pin_file = Path(os.environ["FAKE_PIN_FILE"])
     if not pin_file.exists():
         return ""
     for line in pin_file.read_text().splitlines():
-        if line.startswith("OPENPLANNER_IMAGE="):
-            return line.removeprefix("OPENPLANNER_IMAGE=")
+        if line.startswith(f"{key}="):
+            return line.removeprefix(f"{key}=")
     return ""
+
+
+def _pinned() -> str:
+    return _pin("OPENPLANNER_IMAGE")
+
+
+def _pinned_proxy() -> str:
+    return _pin("OPENPLANNER_PROXY_IMAGE")
+
+
+def _is_proxy(reference: str) -> bool:
+    return "-proxy:" in reference or "-proxy@" in reference
+
+
+def _version_of(reference: str) -> str:
+    """Return the release whose digest ``reference`` is, as the image's ``APP_VERSION``."""
+    image = reference.partition("@")[0]
+    known = (*RELEASES, *(line.removeprefix("v") for line in _lines("latest")))
+    return next((version for version in known if digest(image, version) == reference), "")
 
 
 def _failing(operation: str) -> int:
@@ -72,6 +96,8 @@ def _compose(args: list[str]) -> int:
         command = command[5:]
     if command == ["ps", "-q", "worker"]:
         print(WORKER)
+    elif command == ["ps", "-q", "proxy"]:
+        print(PROXY)
     elif command[:2] == ["alembic", "current"]:
         print(f"{(_host() / 'revision').read_text().strip()} (head)")
     elif command[:2] == ["alembic", "downgrade"]:
@@ -94,12 +120,15 @@ def _docker(args: list[str]) -> int:
     elif args[0] == "info":
         return _failing("docker-info")
     if args[0] == "pull":
-        return _failing("pull")
-    if args[:2] == ["image", "inspect"]:
+        return _failing("pull") or (_is_proxy(args[-1]) and _failing("pull-proxy"))
+    if args[:2] == ["image", "inspect"] and any(".Config.Env" in arg for arg in args):
+        print(f"APP_VERSION={_version_of(args[-1])}")
+    elif args[:2] == ["image", "inspect"]:
         image, _, version = args[-1].rpartition(":")
         print(digest(image, version))
     elif args[0] == "inspect":
-        print("unhealthy" if _pinned() in _lines("unhealthy") else "healthy")
+        pinned = _pinned_proxy() if args[-1] == PROXY else _pinned()
+        print("unhealthy" if pinned in _lines("unhealthy") else "healthy")
     return 0
 
 
@@ -126,7 +155,12 @@ def _curl(args: list[str]) -> int:
         latest = _lines("latest")
         if not latest:
             return 22
-        print(json.dumps({"tag_name": latest[0], "name": latest[0]}))
+        release = {"tag_name": latest[0], "name": latest[0]}
+        if any("/releases?" in arg for arg in args):  # the rc channel lists releases
+            release["prerelease"] = "-rc." in latest[0]
+            print(json.dumps([release]))
+        else:
+            print(json.dumps(release))
     return 0
 
 
@@ -147,13 +181,14 @@ def main() -> int:
     """Record the call, then act as the tool named in ``sys.argv[1]``."""
     tool, args = sys.argv[1], sys.argv[2:]
     with (_host() / "calls.jsonl").open("a") as calls:
-        calls.write(json.dumps({"tool": tool, "args": args, "pinned": _pinned()}) + "\n")
+        call = {"tool": tool, "args": args, "pinned": _pinned(), "proxy": _pinned_proxy()}
+        calls.write(json.dumps(call) + "\n")
     if tool == "docker":
         return _docker(args)
     if tool == "cosign" and args == ["version"]:
         print(f"GitVersion:    {next(iter(_lines('cosign-version')), 'v' + COSIGN)}")
     elif tool == "cosign":
-        return _failing("cosign")
+        return _failing("cosign") or (any(map(_is_proxy, args)) and _failing("cosign-proxy"))
     if tool == "curl":
         return _curl(args)
     if tool in ("dpkg", "apt", "gpg"):

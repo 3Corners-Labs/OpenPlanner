@@ -52,10 +52,12 @@ from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
+from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
 from app.domain.event_context import set_service
+from app.domain.form_service import FormService
 from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
@@ -73,6 +75,8 @@ from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
+from app.domain.system_log import SystemLog
+from app.domain.tls_check import CertificateStatus
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import (
@@ -111,6 +115,16 @@ def oidc_provider(
         mapping=lambda: claim_mapping(current().login_values),
     )
     return OidcIdentityProvider(config, http)
+
+
+def _confirm_policy(settings: Settings) -> ConfirmPolicy:
+    """Return the rules for confirming a booking from one organisation's settings (ADR 0056)."""
+    return ConfirmPolicy.from_settings(
+        window_hours=settings.booking_confirm_window_hours,
+        cutoff_hours=settings.booking_confirm_cutoff_hours,
+        reminders=settings.booking_confirm_reminders,
+        min_minutes=settings.booking_confirm_min_minutes,
+    )
 
 
 def create_app(
@@ -192,7 +206,7 @@ def create_app(
                 agent_start_label,
             )
             app.state.integration_check_service = IntegrationCheckService(
-                uow, clock, app.state.admin_service, wired.checker
+                uow, clock, app.state.admin_service, wired.checker, SystemLog(uow, clock)
             )
             # Explicit adapters (tests) are never rebuilt.
             app.state.webex_fingerprint = None if integrations else webex_fingerprint(current)
@@ -219,8 +233,17 @@ def create_app(
             lambda: timedelta(minutes=live().security_event_window_minutes),
             max_sources=lambda: live().security_event_max_sources,
         )
-        app.state.booking_service = BookingService(uow, clock, token_key)
+        app.state.booking_service = BookingService(
+            uow,
+            clock,
+            token_key,
+            phone_region=lambda org: per_organisation(org).phone_default_region,
+            confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
+        )
         app.state.admin_service = AdminService(uow, clock)
+        app.state.form_service = FormService(
+            uow, clock, app.state.admin_service, lambda: live().booking_form_max_custom_fields
+        )
         # ADR 0042 step 4: class C settings changed in the portal, checked against the lock.
         app.state.settings_service = SettingsService(
             uow,
@@ -229,8 +252,10 @@ def create_app(
             locked=app.state.live_settings.locked,
             combination=app.state.live_settings.combination_problem,
             environment_value=app.state.live_settings.environment_value,
+            production=settings.environment == "prod",
         )
         # ADR 0038: read on every admin change (and citizen write), cached for a few seconds.
+        app.state.certificate_status = CertificateStatus(uow)
         app.state.maintenance_service = MaintenanceService(
             uow,
             clock,

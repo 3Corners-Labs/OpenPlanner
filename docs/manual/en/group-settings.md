@@ -57,6 +57,16 @@ goes to the contact centre.
 How many days ahead citizens can choose, from 1 to 366. Keep this in line with how far ahead
 the team's roster is fixed: a slot that can be booked must also be staffed.
 
+<!-- field: max_bookings_per_email -->
+### Appointments per email address
+
+How many future appointments one email address may have with this team at the same time, from
+1 to 10. Default 3. People often book for someone else, such as a parent for a child or a carer
+for a relative, so do not set the number too low. A cancelled or past appointment does not
+count. The same email address twice at the same time is never possible: that is almost always
+a double click. A refused citizen gets a general message; the page does not say that an
+appointment already exists.
+
 <!-- field: dispatch_kind -->
 ### How appointments reach staff
 
@@ -152,6 +162,15 @@ run the call without the host being present.
 
 Use a functional account (for example `videocalls@municipality.nl`), not a personal one: it
 must keep working when someone leaves.
+
+As soon as you save a new address, OpenPlanner checks the integration right away, just like the
+**Check integration** button at the bottom of the page: a probe meeting is scheduled and removed
+again. The result is shown under **Check integration** after saving. From then on the platform
+checks every group with a host by itself, once a day by default. When something is wrong (no
+licence, wrong account, missing rights), the group's audit log shows a system entry
+*Integration checked* with Webex's answer under it; it repeats until it is fixed and reports
+once that all is well again. So you hear about it before a citizen gets an appointment without
+a video call.
 
 <!-- field: wxcc_business_address -->
 ### WxCC business address

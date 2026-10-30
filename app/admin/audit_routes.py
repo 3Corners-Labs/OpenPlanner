@@ -65,6 +65,7 @@ from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
 from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
+from app.domain.integration_check import CHECK_EVENT
 from app.domain.maintenance import OVERDUE_EVENT, MaintenanceReason
 from app.domain.planner_service import ALERT_ACTION
 from app.domain.ports import Clock
@@ -136,6 +137,8 @@ EVENT_LABELS: dict[str, str] = {
     staff.CHANGED_EVENT: "audit.event.staff_changed",
     # ADR 0038: maintenance on longer than the alert threshold (global).
     OVERDUE_EVENT: "audit.event.maintenance_overdue",
+    # ADR 0065: "Koppeling controleren", by hand or by the worker (at the group).
+    CHECK_EVENT: "audit.event.integration_check",
     # Security events (ADR 0034): global, deduplicated per window.
     WEBHOOK_REJECTED: "audit.event.webhook_rejected",
     TOKEN_REFRESH_FAILED: "audit.event.token_refresh",
@@ -168,6 +171,7 @@ DETAIL_LABELS: dict[str, str] = {
     "planner_change_min_lead_minutes": "admin.field.planner_change_min_lead_minutes",
     "queue_visible_from_minutes": "admin.field.queue_visible_from_minutes",
     "queue_free_pick_allowed": "admin.field.queue_free_pick_allowed",
+    "max_bookings_per_email": "admin.field.max_bookings_per_email",
     "calendar_invite_address": "admin.field.calendar_invite_address",
     "video_host_email": "admin.field.video_host_email",
     "wxcc_business_address": "admin.field.wxcc_business_address",
@@ -340,6 +344,7 @@ class AuditView:
     booking_id: int | None
     booking_url: str | None
     trace_url: str | None
+    message: str = ""
 
 
 @dataclass(frozen=True)
@@ -536,6 +541,7 @@ def audit_views(
             e.booking_id,
             _booking_url(principal, entry),
             f"/admin/audit?trace={e.trace_id}" if e.trace_id else None,
+            e.message,
         )
         for entry in entries
         for e in (entry.event,)
