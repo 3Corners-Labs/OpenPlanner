@@ -5874,3 +5874,21 @@ msgstr "Secrets can only be stored once the server has a SETTINGS_ENCRYPTION_KEY
 
 msgid "admin.form.error.setting_not_locked"
 msgstr "This setting is not in the server's environment; there is nothing to take over."
+
+msgid "admin.settings.login.title"
+msgstr "Change the login mapping"
+
+msgid "admin.settings.login.intro"
+msgstr "Which claims of the identity provider carry the roles, organisations and groups, and which value is which role. After testing you log in again; the new mapping is only saved if you are still superuser afterwards."
+
+msgid "admin.settings.login.test"
+msgstr "Test with a new login"
+
+msgid "admin.done.login_mapping_saved"
+msgstr "The new login mapping was tested with your new login and saved."
+
+msgid "admin.done.login_mapping_refused"
+msgstr "The new login mapping was not saved: with it you would no longer be superuser after logging in. Nothing has changed."
+
+msgid "admin.form.error.login_lockout"
+msgstr "With this mapping you would no longer be superuser; it was not saved."

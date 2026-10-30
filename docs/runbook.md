@@ -264,7 +264,16 @@ There is no login bypass, fallback IdP or local account. Diagnose and act from t
    came in but matched none of `OIDC_ROLE_*`, and `claims_present`, the *names* of the
    claims in the ID token. Values are never logged. Typical cause: the claim or a role value
    was renamed at PingFederate. Fix it there, or set the matching `OIDC_*` variable and
-   restart `web`.
+   restart `web`. A mapping changed in the portal (ADR 0042 §8) is undone from the host
+   without a restart:
+
+   ```sh
+   docker compose exec web python -m app.cli settings reset OIDC_ROLE_CLAIM
+   docker compose exec web python -m app.cli settings set OIDC_ROLE_SUPERUSER openplanner-superuser
+   ```
+
+   Both are audited as `system:cli`; the portal itself only saves a mapping after a dry run
+   on the superuser's own fresh login.
 3. **Teams must close while the IdP is down** (ADR 0024, same rules, mails and audit as the
    portal; the audit log shows the actor `system:cli`):
 

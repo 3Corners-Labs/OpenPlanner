@@ -16,7 +16,7 @@ import hashlib
 import hmac
 import secrets
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
@@ -28,6 +28,7 @@ import structlog
 from app.domain.authorization import Principal, Role
 from app.domain.ports import IdentityError, LoginStart
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
+from app.domain.tunable import value_of
 
 log = structlog.get_logger()
 
@@ -62,7 +63,7 @@ class OidcConfig:
     client_id: str
     client_secret: str = field(repr=False)
     scopes: str
-    mapping: ClaimMapping
+    mapping: ClaimMapping | Callable[[], ClaimMapping]
     leeway_seconds: int = 60
 
 
@@ -75,7 +76,25 @@ def _values(claim: object) -> frozenset[str]:
     return frozenset()
 
 
-def principal_from_claims(claims: Mapping[str, Any], mapping: ClaimMapping) -> Principal:
+def claim_mapping(values: Mapping[str, str]) -> ClaimMapping:
+    """Return the mapping the login settings describe (``oidc_*`` keys, ADR 0042 §8)."""
+    return ClaimMapping(
+        role_claim=values["oidc_role_claim"],
+        organisation_claim=values["oidc_organisation_claim"],
+        group_claim=values["oidc_group_claim"],
+        role_values={
+            values["oidc_role_superuser"]: Role.SUPERUSER,
+            values["oidc_role_org_admin"]: Role.ORG_ADMIN,
+            values["oidc_role_group_admin"]: Role.GROUP_ADMIN,
+            values["oidc_role_auditor"]: Role.AUDITOR,
+            values["oidc_role_agent"]: Role.AGENT,
+        },
+    )
+
+
+def principal_from_claims(
+    claims: Mapping[str, Any], mapping: ClaimMapping, *, log_lockout: bool = True
+) -> Principal:
     """Map verified ID-token claims to a ``Principal``.
 
     Values of built-in roles become roles. The other role values are kept as
@@ -97,7 +116,8 @@ def principal_from_claims(claims: Mapping[str, Any], mapping: ClaimMapping) -> P
         groups=_values(claims.get(mapping.group_claim)),
         role_claims=frozenset(others[:MAX_ROLE_CLAIMS]),
     )
-    _log_lockout(claims, mapping, principal, len(seen))
+    if log_lockout:  # a dry run's verdict is audited, not logged as a lockout
+        _log_lockout(claims, mapping, principal, len(seen))
     return principal
 
 
@@ -165,29 +185,63 @@ class OidcIdentityProvider:
         self._metadata_at = 0.0
         self._keys: jwt.PyJWKSet | None = None
 
-    async def start_login(self, redirect_uri: str) -> LoginStart:
-        """Prepare an authorisation request with fresh ``state``, ``nonce`` and PKCE."""
+    async def start_login(self, redirect_uri: str, *, fresh: bool = False) -> LoginStart:
+        """Prepare an authorisation request with fresh ``state``, ``nonce`` and PKCE.
+
+        ``fresh`` adds ``prompt=login`` and ``max_age=0`` (OIDC Core §3.1.2.1), so the admin
+        authenticates again rather than through single sign-on.
+        """
         metadata = await self._discover()
         state, nonce = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         verifier = secrets.token_urlsafe(64)
-        query = urlencode(
-            {
-                "response_type": "code",
-                "client_id": self._config.client_id,
-                "redirect_uri": redirect_uri,
-                "scope": self._config.scopes,
-                "state": state,
-                "nonce": nonce,
-                "code_challenge": _code_challenge(verifier),
-                "code_challenge_method": "S256",
-            }
-        )
+        params = {
+            "response_type": "code",
+            "client_id": self._config.client_id,
+            "redirect_uri": redirect_uri,
+            "scope": self._config.scopes,
+            "state": state,
+            "nonce": nonce,
+            "code_challenge": _code_challenge(verifier),
+            "code_challenge_method": "S256",
+        }
+        if fresh:
+            params |= {"prompt": "login", "max_age": "0"}
+        query = urlencode(params)
         return LoginStart(f"{metadata['authorization_endpoint']}?{query}", state, nonce, verifier)
 
     async def finish_login(
         self, *, code: str, redirect_uri: str, code_verifier: str, nonce: str
     ) -> Principal:
         """Exchange the code, verify the ID token and return the admin it describes.
+
+        Raises:
+            IdentityError: ``token_exchange_failed``, ``invalid_token`` or ``nonce_mismatch``.
+        """
+        claims = await self._claims(code, redirect_uri, code_verifier, nonce)
+        return principal_from_claims(claims, value_of(self._config.mapping))
+
+    async def finish_trial_login(
+        self,
+        *,
+        code: str,
+        redirect_uri: str,
+        code_verifier: str,
+        nonce: str,
+        trial: Mapping[str, str],
+    ) -> tuple[Principal, Principal]:
+        """Return the admin under the current mapping and under the ``trial`` one (§8).
+
+        Raises:
+            IdentityError: As ``finish_login``.
+        """
+        claims = await self._claims(code, redirect_uri, code_verifier, nonce)
+        current = principal_from_claims(claims, value_of(self._config.mapping))
+        return current, principal_from_claims(claims, claim_mapping(trial), log_lockout=False)
+
+    async def _claims(
+        self, code: str, redirect_uri: str, code_verifier: str, nonce: str
+    ) -> dict[str, Any]:
+        """Exchange the code and return the verified ID-token claims.
 
         Raises:
             IdentityError: ``token_exchange_failed``, ``invalid_token`` or ``nonce_mismatch``.
@@ -212,7 +266,7 @@ class OidcIdentityProvider:
         claims = await self._verify(id_token, metadata)
         if not hmac.compare_digest(str(claims.get("nonce", "")), nonce):
             raise IdentityError("nonce_mismatch")
-        return principal_from_claims(claims, self._config.mapping)
+        return claims
 
     async def logout_url(self, post_logout_redirect_uri: str) -> str | None:
         """Return the RP-initiated logout URL (OIDC ``end_session_endpoint``), if offered."""

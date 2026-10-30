@@ -4,7 +4,7 @@ Run with ``uvicorn app.main:create_app --factory``.
 """
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
 
@@ -19,7 +19,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import Integrations, build_integrations, secret_box
 from app.adapters.live_settings import LiveSettings, keep_current
-from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider
+from app.adapters.oidc import OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.admin.routes import register_admin
@@ -42,7 +42,6 @@ from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_fil
 from app.domain.admin import AdminService
 from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
-from app.domain.authorization import Role
 from app.domain.branding_service import BrandingService
 from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
@@ -85,29 +84,26 @@ from app.web.protection import configure_rate_limits, limiter, set_rate_limits
 from app.web.templates import STATIC_DIR
 
 
-def oidc_provider(settings: Settings, http: httpx.AsyncClient) -> IdentityProvider | None:
-    """Return the admin identity provider from the settings, or ``None`` if not configured."""
+def oidc_provider(
+    settings: Settings,
+    http: httpx.AsyncClient,
+    current: Callable[[], Settings] | None = None,
+) -> IdentityProvider | None:
+    """Return the admin identity provider from the settings, or ``None`` if not configured.
+
+    The claim mapping is read from ``current()`` at every login, so a mapping changed in the
+    portal (ADR 0042 §8) applies at once; the client registration stays class A.
+    """
+    current = current or (lambda: settings)
     if settings.oidc_discovery_url is None:
         return None
-    mapping = ClaimMapping(
-        role_claim=settings.oidc_role_claim,
-        organisation_claim=settings.oidc_organisation_claim,
-        group_claim=settings.oidc_group_claim,
-        role_values={
-            settings.oidc_role_superuser: Role.SUPERUSER,
-            settings.oidc_role_org_admin: Role.ORG_ADMIN,
-            settings.oidc_role_group_admin: Role.GROUP_ADMIN,
-            settings.oidc_role_auditor: Role.AUDITOR,
-            settings.oidc_role_agent: Role.AGENT,
-        },
-    )
     secret = settings.oidc_client_secret.get_secret_value() if settings.oidc_client_secret else ""
     config = OidcConfig(
         discovery_url=settings.oidc_discovery_url,
         client_id=settings.oidc_client_id,
         client_secret=secret,
         scopes=settings.oidc_scopes,
-        mapping=mapping,
+        mapping=lambda: claim_mapping(current().login_values),
     )
     return OidcIdentityProvider(config, http)
 
@@ -331,7 +327,9 @@ def create_app(
     app.state.limiter = limiter
     # ADR 0053: security events name callers by pseudonym, never by address.
     app.state.client_pseudonyms = ClientPseudonyms(client_pseudonym_key(settings))
-    app.state.identity_provider = identity_provider or oidc_provider(settings, http)
+    app.state.identity_provider = identity_provider or oidc_provider(
+        settings, http, lambda: app.state.settings
+    )
     # Admin-edited overrides are wired in here once the database adapter exists (WP7).
     app.state.translator = Translator(load_catalogues())
     # Admin session (ADR 0013): only sent to /admin, signed, HttpOnly, SameSite=Lax.
