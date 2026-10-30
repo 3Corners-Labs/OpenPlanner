@@ -44,7 +44,7 @@ What the code already supports:
    before the start. A cancellation after it relies on ADR 0021; a booking cancelled in the
    last minutes may leave a task that the end request closes asynchronously. The agent sees
    "cancelled" on the task.
-7. **Migration 0060** adds `citizen_change_lead_minutes` (default 60; the dispatch lead for
+7. **Migration 0062** adds `citizen_change_lead_minutes` (default 60; the dispatch lead for
    groups whose dispatch lead is longer than 60) and drops `queue_change_working_days`. The
    downgrade restores the working days at 1.
 
