@@ -68,6 +68,7 @@ async def cancel(
     *,
     reason: ChangeReason | None = None,
     sms: bool = False,
+    team_invite: bool = False,
 ) -> Booking:
     """Cancel ``booking`` with the cancellation message and the usual purge; return it.
 
@@ -77,13 +78,16 @@ async def cancel(
         now: Current time.
         reason: The planner's fixed reason, shown in the message.
         sms: Also send the cancellation as an SMS when the citizen is reachable there.
+        team_invite: Withdraw the calendar invite of the group's team (ADR 0043).
 
     Raises:
         DomainError: ``booking_not_active`` if it holds no place.
     """
     cancelled = booking.cancel(now, reason)
     await tx.save_booking(cancelled)
-    jobs = plan_for_cancellation(cancelled_at=now, sms=sms and sms_reachable(booking))
+    jobs = plan_for_cancellation(
+        cancelled_at=now, sms=sms and sms_reachable(booking), team_invite=team_invite
+    )
     await tx.replace_jobs(_id(booking), jobs)
     return cancelled
 
@@ -96,6 +100,7 @@ async def request_rebook(
     reason: ChangeReason,
     rebook_days: int,
     reminder_days: int,
+    team_invite: bool = False,
 ) -> Booking:
     """Ask the citizen to choose a new time for ``booking``; return it (ADR 0044).
 
@@ -107,6 +112,7 @@ async def request_rebook(
         rebook_days: ``planner_rebook_days``: the request lapses this long after the start.
         reminder_days: ``planner_rebook_reminder_days``: the one reminder goes this long
             before the request lapses.
+        team_invite: Withdraw the calendar invite of the group's team (ADR 0043).
 
     Raises:
         DomainError: ``booking_not_active`` if it is not confirmed.
@@ -119,6 +125,7 @@ async def request_rebook(
         rebook_by=rebook_by,
         reminder_at=rebook_by - timedelta(days=reminder_days),
         sms=sms_reachable(booking),
+        team_invite=team_invite,
     )
     await tx.replace_jobs(_id(booking), jobs)
     return waiting

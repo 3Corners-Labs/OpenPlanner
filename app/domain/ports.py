@@ -6,7 +6,7 @@ live meeting status per ADR 0010), ``ContactCenterDispatcher`` (WP6, ADR 0007),
 ``IdentityProvider`` (WP7).
 """
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -217,14 +217,37 @@ class ReleaseSource(Protocol):
 class IdentityProvider(Protocol):
     """The admin portal's identity provider (OIDC; PingFederate in production, ADR 0013)."""
 
-    async def start_login(self, redirect_uri: str) -> LoginStart:
-        """Prepare an authorisation request with fresh ``state``, ``nonce`` and PKCE."""
+    async def start_login(self, redirect_uri: str, *, fresh: bool = False) -> LoginStart:
+        """Prepare an authorisation request with fresh ``state``, ``nonce`` and PKCE.
+
+        ``fresh`` asks the provider to authenticate again instead of single sign-on (the dry
+        run of a new login mapping, ADR 0042 §8).
+        """
         ...
 
     async def finish_login(
         self, *, code: str, redirect_uri: str, code_verifier: str, nonce: str
     ) -> Principal:
         """Exchange the code, verify the ID token and return the admin it describes.
+
+        Raises:
+            IdentityError: If the exchange or any token check fails.
+        """
+        ...
+
+    async def finish_trial_login(
+        self,
+        *,
+        code: str,
+        redirect_uri: str,
+        code_verifier: str,
+        nonce: str,
+        trial: Mapping[str, str],
+    ) -> tuple[Principal, Principal]:
+        """Like ``finish_login``, and also map the same claims with the ``trial`` mapping.
+
+        Returns the admin under the current mapping and under the proposed one; the claims
+        themselves are never returned or stored.
 
         Raises:
             IdentityError: If the exchange or any token check fails.
@@ -889,6 +912,22 @@ class Transaction(Protocol):
 
     async def bump_settings_version(self) -> int:
         """Raise ``settings_version`` by one and return the new value (ADR 0042 §6)."""
+        ...
+
+    async def platform_secrets(self) -> dict[str, str]:
+        """Return the class C secrets set in the portal, opened (empty without a settings key)."""
+        ...
+
+    async def secrets_available(self) -> bool:
+        """Return whether secrets can be sealed here (``SETTINGS_ENCRYPTION_KEY`` is set)."""
+        ...
+
+    async def save_platform_secret(self, key: str, value: str, updated_at: datetime) -> None:
+        """Seal and store the portal value of the secret ``key`` (ADR 0008)."""
+        ...
+
+    async def delete_platform_secret(self, key: str) -> bool:
+        """Remove the sealed portal value of ``key``; return whether there was one."""
         ...
 
     async def organisation_settings(self) -> dict[int, dict[str, object]]:

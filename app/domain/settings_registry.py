@@ -75,6 +75,7 @@ class Topic(StrEnum):
     DISPLAY = "display"
     STAFF = "staff"
     PLANNER = "planner"
+    CONFIRMATION = "confirmation"
 
 
 PLATFORM_VIEW = Permission.SETTINGS_PLATFORM_VIEW
@@ -960,6 +961,46 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Days before the lapse at which the one reminder to rebook goes (below the lapse).",
         minimum=1,
         maximum=29,
+    ),
+    S(
+        "booking_confirm_window_hours",
+        K.INT,
+        24,
+        _D,
+        T.CONFIRMATION,
+        "Hours after booking within which the citizen confirms by email link (ADR 0056).",
+        minimum=1,
+        maximum=72,
+    ),
+    S(
+        "booking_confirm_cutoff_hours",
+        K.INT,
+        2,
+        _D,
+        T.CONFIRMATION,
+        "Hours before the start by which the citizen confirms at the latest (ADR 0056).",
+        minimum=0,
+        maximum=24,
+    ),
+    S(
+        "booking_confirm_reminders",
+        K.INT,
+        1,
+        _D,
+        T.CONFIRMATION,
+        "Reminders to confirm, spread evenly over the time to confirm (ADR 0056).",
+        minimum=0,
+        maximum=3,
+    ),
+    S(
+        "booking_confirm_min_minutes",
+        K.INT,
+        15,
+        _C,
+        T.CONFIRMATION,
+        "Less time to confirm than this: confirm until the change deadline, no reminder.",
+        minimum=5,
+        maximum=120,
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

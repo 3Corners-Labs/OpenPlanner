@@ -1,4 +1,4 @@
-.PHONY: setup check pins fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation release-plan e2e proxy-check diagrams up down
+.PHONY: setup fast check matrix pins fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation release-plan e2e proxy-check diagrams up down
 
 UV := uv run
 
@@ -13,7 +13,10 @@ setup:
 	git config core.hooksPath .githooks
 	@echo "setup done; run 'make check' before a PR"
 
-check: lint shellcheck type imports test security audit lock pins duplication ## Everything a PR must pass locally
+# ADR 0058: `fast` is the pull request's fast lane, for trying an idea; `check` is everything the
+# merge queue runs that can run without Docker, so run it before asking for review.
+fast: lint shellcheck type imports test security ## The fast lane: about two minutes
+check: fast matrix audit lock pins duplication ## Everything a PR must pass locally
 
 fmt:
 	$(UV) ruff format .
@@ -36,9 +39,15 @@ type:
 imports:
 	$(UV) lint-imports
 
+# Every test except the authorisation matrix sweeps, with the coverage gates; the gates hold
+# without the sweeps (ADR 0058).
 test:
-	$(UV) pytest -n auto --cov --cov-report=term --cov-fail-under=75
+	$(UV) pytest -n auto -m "not matrix" --cov --cov-report=term --cov-fail-under=75
 	$(UV) coverage report --include='app/domain/*,app/i18n/*' --fail-under=90
+
+# The role × admin route sweeps (ADR 0014), without coverage: the full lane only (ADR 0058).
+matrix:
+	$(UV) pytest -n auto -m matrix
 
 security:
 	$(UV) bandit -q -c pyproject.toml -r app/

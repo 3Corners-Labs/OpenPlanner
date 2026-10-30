@@ -56,6 +56,11 @@ SMTP and SMS settings per organisation are organisation data; their password and
 are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data.
 Neither leaves the system except as part of the messages above.
 
+The platform's fallback mail server, the update check's read token and the Webex Service App
+(client secret, refresh token) can also be set in the portal (ADR 0042 step 6). Their password and token are sealed the same way, under
+`setting:<key>` in `integration_credentials`, and are never shown, logged or audited by value;
+they leave the system only to the mail server and to GitHub respectively.
+
 ## Stored personal data (WP2 schema)
 
 | Data item | Table.column | Source | Retention | Leaves the system |
@@ -198,6 +203,7 @@ web ──> audit_events: queue.claimed / queue.released (actor subject, group, 
 |---|---|---|---|---|
 | First name, meeting link | read from `bookings` | booking form, Webex | as the contact | shown to agents of the group only (link only after a claim) |
 | Who claimed | `bookings.claimed_by` (pseudonym, not the subject) | the agent's login | removed by `purge_pii` with the contact; `claimed_at` stays for statistics | no |
+| Team invite: first name, booking reference, group, start/end, queue link | built in memory by the worker | `bookings`, the group | not stored by OpenPlanner; **in the team's mailbox outside our purge** (DPIA) | by email to `groups.calendar_invite_address` (own queue only), withdrawn with `METHOD:CANCEL` on cancel, move or suspension; never the meeting link, email or phone |
 
 ## Branding and the calendar script (WP3b)
 
