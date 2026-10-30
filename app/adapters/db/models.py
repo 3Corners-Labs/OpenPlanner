@@ -952,7 +952,7 @@ class RoleRow(Base):
 
 
 class RunningVersionRow(Base):
-    """A version this installation ran, noted by the web process at start-up (ADR 0065)."""
+    """A version this installation ran, noted by the web process at start-up (ADR 0067)."""
 
     __tablename__ = "running_versions"
 

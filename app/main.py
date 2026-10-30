@@ -317,7 +317,7 @@ def create_app(
         )
         # ADR 0029: the web process only reads checks and stores requests; no release lookup.
         app.state.update_service = update_service(live(), uow, clock, http, lookup=False)
-        # ADR 0065: a version change nobody requested in the portal still leaves a trace.
+        # ADR 0067: a version change nobody requested in the portal still leaves a trace.
         try:
             await app.state.update_service.note_running(settings.app_version, settings.app_commit)
         except Exception as exc:  # an old schema without the table must not stop the start

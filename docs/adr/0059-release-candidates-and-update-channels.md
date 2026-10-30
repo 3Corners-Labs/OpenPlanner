@@ -3,7 +3,7 @@
 Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0052 (point 1: no
 pre-release tags) and ADR 0029 (§1: an image of `main` is never offered to an installation).
 Extends ADR 0050 (installer modes) and ADR 0058 (what runs where in CI). Amended the same day
-by ADR 0065 (points 4 and 6: channel and auto-apply are class C portal settings; the updater's
+by ADR 0067 (points 4 and 6: channel and auto-apply are class C portal settings; the updater's
 identity follows the installer mode, not the channel).
 
 ## Context
@@ -98,7 +98,7 @@ channel: the candidate is live within the hour, or within a minute after "Update
 |---|---|---|---|
 | 1 | `main.yml`: candidate version, image, tag, pre-release; publish without waiting for mutation; `release_plan --candidate`; runbook | #131 | merged 2026-10-30 |
 | 2 | `Version` with `rc`, channel `rc` in the release adapter, `UPDATE_CHANNEL` and `UPDATE_AUTO_APPLY`, auto request in the worker, updater and installer `--channel`, `/admin/updates` shows the channel | #132 | merged 2026-10-30 |
-| 3 | docker01 on `rc` with auto-apply; first candidate seen live | | done 2026-10-30: docker01 runs 0.4.0-rc.5, channel and auto-apply shown; the switch needed the installer because 0.3.0 predates this ADR (hence ADR 0065) |
+| 3 | docker01 on `rc` with auto-apply; first candidate seen live | | done 2026-10-30: docker01 runs 0.4.0-rc.5, channel and auto-apply shown; the switch needed the installer because 0.3.0 predates this ADR (hence ADR 0067) |
 
 ## Consequences
 

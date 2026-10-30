@@ -69,7 +69,7 @@ HISTORY_LABELS: dict[str, str] = {
     "request.cancel": "admin.updates.history.request_cancel",
     "version.changed": "admin.updates.history.version_changed",
 }
-"""What a history line says, by the first key of the audit detail (ADR 0065)."""
+"""What a history line says, by the first key of the audit detail (ADR 0067)."""
 
 ACTOR_LABELS: dict[str, str] = {
     "system": "admin.updates.actor.system",

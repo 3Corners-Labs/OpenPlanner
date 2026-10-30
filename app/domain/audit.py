@@ -146,7 +146,7 @@ class AuditEvent:
 
 
 class Subject(StrEnum):
-    """A subject of the audit log: a fixed set of action prefixes, for the filter (ADR 0065)."""
+    """A subject of the audit log: a fixed set of action prefixes, for the filter (ADR 0067)."""
 
     UPDATES = "updates"
     LOGIN = "login"
@@ -199,7 +199,7 @@ class AuditFilter:
         until: Only events before this time (UTC).
         trace_id: Only the events of this request or job: the whole chain (ADR 0040).
         actions: Only events whose action starts with one of these prefixes (a subject,
-            ADR 0065); empty for all.
+            ADR 0067); empty for all.
     """
 
     source: Source | None = None

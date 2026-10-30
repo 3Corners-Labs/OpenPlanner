@@ -92,7 +92,7 @@ class UpdateOverview:
         restore: The update whose previous version can be restored now.
         history: The newest requests, newest first.
         outside_change: The running version when it came from outside the portal (installer,
-            by hand) and is the latest change (ADR 0065 point 6); else ``None``.
+            by hand) and is the latest change (ADR 0067 point 6); else ``None``.
     """
 
     enabled: bool
@@ -122,7 +122,7 @@ class UpdateService:
             when this process does not look them up itself; defaults to ``releases`` being set.
         channel: ``release`` offers releases only; ``rc`` release candidates too (ADR 0059);
             a value, or a callable read on every use so a portal change applies live
-            (ADR 0065).
+            (ADR 0067).
         auto_apply: Whether a check that finds a newer version requests the update itself;
             a value or a callable, as ``channel``.
     """
@@ -241,7 +241,7 @@ class UpdateService:
         """Return the update history from the audit log: the milestones, newest first.
 
         Requests, outcomes, cancellations and version changes (``HISTORY_DETAILS``); the
-        updater's steps stay in the audit log itself (ADR 0065 point 5).
+        updater's steps stay in the audit log itself (ADR 0067 point 5).
 
         Raises:
             DomainError: ``not_permitted``.
@@ -255,7 +255,7 @@ class UpdateService:
     # --- web process, at start-up ----------------------------------------------------------
 
     async def note_running(self, version: str, commit: str) -> RunningVersion | None:
-        """Record the running version when it differs from the last one seen (ADR 0065).
+        """Record the running version when it differs from the last one seen (ADR 0067).
 
         Returns the new record, or ``None`` when nothing changed. A change the updater made
         (a running request for this version) is noted with its request; any other change
@@ -457,7 +457,7 @@ async def _audit_updater(
     """Record a step of the host updater (global: only the superuser sees it).
 
     The detail names the versions too (``from``, ``to``), so the history can be read from
-    the audit log alone (ADR 0065).
+    the audit log alone (ADR 0067).
     """
     event = AuditEvent(
         request.finished_at or request.step_at or request.started_at or request.requested_at,

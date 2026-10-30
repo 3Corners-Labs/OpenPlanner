@@ -169,7 +169,7 @@ async def test_audit_scope_is_exact_per_level(engine: AsyncEngine) -> None:
         (AuditFilter(group="demo"), [3, 2, 1]),
         (AuditFilter(booking_id=42), [3, 1]),
         (AuditFilter(group="andere-team"), []),  # outside the scope stays outside
-        # Subjects (ADR 0065): action prefixes; a `_` in a prefix is a character, not a wildcard.
+        # Subjects (ADR 0067): action prefixes; a `_` in a prefix is a character, not a wildcard.
         (AuditFilter(actions=frozenset({"group."})), [2]),
         (AuditFilter(actions=frozenset({"job.send_", "group.view"})), [3, 2, 1]),
         (AuditFilter(actions=frozenset({"job_send"})), []),

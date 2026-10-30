@@ -320,7 +320,7 @@ SUBJECT_LABELS: dict[Subject, str] = {
     Subject.ORGANISATION: "admin.audit.subject.organisation",
     Subject.INTEGRATIONS: "admin.audit.subject.integrations",
 }
-"""Filter label per subject (ADR 0065)."""
+"""Filter label per subject (ADR 0067)."""
 
 
 def _subject_of(narrow: AuditFilter) -> Subject | None:

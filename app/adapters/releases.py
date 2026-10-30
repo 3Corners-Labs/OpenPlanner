@@ -38,7 +38,7 @@ class GitHubReleases:
         repository: ``owner/name`` on GitHub (validated by the settings).
         token: Optional read-only token for a private repository; never logged.
         channel: ``release`` asks ``/releases/latest``; ``rc`` lists releases and pre-releases.
-            A value, or a callable read on every lookup (the portal setting, ADR 0065).
+            A value, or a callable read on every lookup (the portal setting, ADR 0067).
     """
 
     def __init__(
@@ -141,7 +141,7 @@ def update_service(
         lookup: Whether this process looks up releases itself; the web process passes
             ``False`` and only reads the worker's checks (ADR 0029).
         live: Returns the current effective settings, for the channel and auto-apply, which
-            the superuser changes in the portal (ADR 0065); the worker passes its live
+            the superuser changes in the portal (ADR 0067); the worker passes its live
             settings, the web process rebuilds the service on every change instead.
     """
     token = settings.update_check_token

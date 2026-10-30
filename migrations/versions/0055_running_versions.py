@@ -1,4 +1,4 @@
-"""Running versions (ADR 0065): the versions this installation ran, noted at start-up.
+"""Running versions (ADR 0067): the versions this installation ran, noted at start-up.
 
 ``running_versions`` gets one row each time the web process starts on another version or
 commit than the last row; a change the updater did carries its request id, one from the
