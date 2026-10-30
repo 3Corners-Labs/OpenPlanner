@@ -18,6 +18,28 @@ Draait de installatie niet als productie (bijvoorbeeld een testomgeving), dan st
 wat productie zou weigeren: een ontbrekende sleutel of een adres zonder https. Productie start
 nooit met een van deze punten.
 
+### Certificaat van het publieke adres
+
+Onder de omgeving staat het certificaat waarmee bezoekers de installatie bereiken: het adres,
+wie het heeft uitgegeven, tot wanneer het geldig is (met het aantal dagen dat nog rest), wanneer
+het voor het laatst is gecontroleerd en één bevinding:
+
+- **In orde**: het certificaat wordt vertrouwd en is nog ruim geldig. De verlenging gaat
+  vanzelf.
+- **Verloopt binnenkort**: er zijn minder dagen over dan de instelling *Waarschuwen bij
+  certificaat korter geldig dan*. De automatische verlenging lijkt te mislukken; waarschuw de
+  beheerder van de server.
+- **Niet vertrouwd**: het certificaat komt van een test-, eigen of onbekende
+  certificaatautoriteit. Normaal tijdens een proefinstallatie met de testomgeving van Let's
+  Encrypt; in productie waarschuwen browsers bezoekers.
+- **Verlopen**, **verkeerde naam**, **nog niet geldig**, **niet bereikbaar**, **geen https**:
+  de tekst bij de bevinding zegt wat er aan de hand is.
+
+De server controleert het certificaat elke paar uur (instelling *Certificaat controleren
+elke*). Een bevinding die niet *in orde* is, staat ook in het auditlog als systeemgebeurtenis
+`tls.certificate`, en wordt herhaald zolang hij duurt (instelling *Melding over het certificaat
+herhalen elke*). Staat er *Nog niet gecontroleerd*, dan heeft de server nog geen ronde gedraaid.
+
 De ondersteuning kan u om een schermafdruk van dit scherm vragen in plaats van de configuratie
 van de server.
 

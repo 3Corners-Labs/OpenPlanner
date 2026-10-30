@@ -340,6 +340,11 @@ class Settings(BaseSettings):
     # worker (ADR 0038 §6), and again every MAINTENANCE_ALERT_REPEAT_HOURS while it lasts.
     maintenance_alert_hours: int = Field(default=4, ge=1, le=72)
     maintenance_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # Class C: the certificate of the public address (ADR 0064): how often the worker probes
+    # it, below how many days left it warns, and how often a lasting finding is repeated.
+    tls_check_interval_hours: int = Field(default=6, ge=1, le=168)
+    tls_expiry_warning_days: int = Field(default=20, ge=1, le=60)
+    tls_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":
