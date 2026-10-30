@@ -253,3 +253,26 @@ async def test_the_store_reads_the_sealed_secrets() -> None:
     await store.refresh()
 
     assert store.current.secrets == {"update_check_token": "ghp_x"}
+
+
+def test_production_never_applies_candidates_or_auto_apply_from_the_portal() -> None:
+    """ADR 0065: production follows releases on a superuser's click, whatever is stored."""
+    channel, auto = BY_KEY["update_channel"], BY_KEY["update_auto_apply"]
+    portal = PortalValues(5, {"update_channel": "rc", "update_auto_apply": True})
+
+    in_test = resolve(channel, "release", None, portal)
+    in_prod = resolve(channel, "release", None, portal, production=True)
+    auto_in_prod = resolve(auto, False, None, portal, production=True)
+
+    assert (in_test.value, in_test.source) == ("rc", Source.PORTAL)
+    assert (in_prod.value, in_prod.source, in_prod.portal_ignored) == (
+        "release",
+        Source.DEFAULT,
+        True,
+    )
+    assert (auto_in_prod.value, auto_in_prod.portal_ignored) == (False, True)
+    # The release channel and auto-apply off are fine in production.
+    fine = PortalValues(6, {"update_channel": "release", "update_auto_apply": False})
+    assert resolve(channel, "release", None, fine, production=True).source is Source.PORTAL
+    assert not usable(channel, "rc", production=True)
+    assert usable(channel, "rc")

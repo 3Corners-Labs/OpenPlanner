@@ -903,20 +903,20 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "update_channel",
         K.ENUM,
         "release",
-        _B,
+        _C,
         T.UPDATES,
-        "What the installation follows (ADR 0059): releases only, or release candidates "
-        "(`rc`) too; `rc` is refused in production.",
+        "What the installation follows (ADR 0059, 0065): releases only, or release "
+        "candidates (`rc`) too; `rc` is not usable in production.",
         choices=("release", "rc"),
     ),
     S(
         "update_auto_apply",
         K.BOOL,
         False,
-        _B,
+        _C,
         T.UPDATES,
         "The worker requests a newer version itself as soon as the check finds one "
-        "(ADR 0059); refused in production.",
+        "(ADR 0059, 0065); not usable in production.",
     ),
     # D. Organisation: the value per organisation; the superuser's or the environment's value
     # is the default for organisations without one.
