@@ -45,6 +45,7 @@ async def test_a_request_to_rebook_frees_the_place_and_plans_its_messages(
     assert uow.state.jobs[booking_id] == [
         PlannedJob(JobType.END_WXCC_TASK, NOW, None),
         PlannedJob(JobType.DELETE_VIDEO_ROOM, NOW, None),
+        PlannedJob(JobType.DELETE_TRIAL_CALL, NOW, None),
         PlannedJob(JobType.SEND_REBOOK_REQUEST, NOW, None, ChannelKind.EMAIL),
         PlannedJob(JobType.SEND_REBOOK_REQUEST, NOW, None, ChannelKind.SMS),
         PlannedJob(

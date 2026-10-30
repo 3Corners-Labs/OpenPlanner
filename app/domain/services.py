@@ -16,9 +16,9 @@ gets no meeting, reminders or task until confirmed; its deadline ``confirm_by`` 
 organisation's ``ConfirmPolicy``. A booking that is moved or rescheduled keeps the
 confirmation it had (the address was already verified), so it is placed confirmed.
 
-A booking is read-only from its change deadline (``Group.change_deadline``: the group's
-dispatch lead before the start, T−5 min by default, or with the own queue a number of working
-days before, ADR 0043): cancel and reschedule then raise
+A citizen can move a booking until its change deadline (``Group.change_deadline``: the group's
+``citizen_change_lead_minutes`` before the start, 60 by default) and cancel it until its start
+(``Group.cancel_deadline``, ADR 0069); after that, reschedule and cancel raise
 ``booking_locked``. A booking suspended by an emergency closure (ADR 0024) has no deadline:
 the citizen can move or cancel it until it is resolved. No slot inside a closure is offered
 or booked (``group_closed``), and no direct call starts while one is active. A direct call
@@ -71,7 +71,7 @@ from app.domain.job_plan import (
     plan_for_pending,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.scheduling import Group, is_open
+from app.domain.scheduling import Group, open_for_direct
 from app.domain.tokens import (
     MIN_KEY_BYTES,
     derive_token,
@@ -99,11 +99,12 @@ class ContactInput:
 
 @dataclass(frozen=True)
 class BookingDetails:
-    """What the management page needs: the booking, its group and whether it may change.
+    """What the management page needs: the booking, its group and what it may still do.
 
-    ``closure`` is the closure that suspended the booking, for its notice. ``cancellable`` is
-    also true for a booking that awaits confirmation ("this was not me", ADR 0056), which
-    cannot be rescheduled.
+    ``changeable`` says whether the citizen may move it, ``cancellable`` whether they may
+    cancel it (ADR 0069). ``cancellable`` is also true for a booking that awaits confirmation
+    ("this was not me", ADR 0056), which cannot be rescheduled. ``closure`` is the closure that
+    suspended the booking, for its notice.
     """
 
     booking: Booking
@@ -241,7 +242,7 @@ class BookingService:
             )
 
     async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
-        """Return whether a direct call can be started now: switched on, open, and room.
+        """Return whether a direct call can be started now: a block offers it, and room.
 
         Raises:
             DomainError: ``group_not_found``.
@@ -249,7 +250,7 @@ class BookingService:
         async with self._uow.read() as tx:
             group = await self._group(tx, group_slug)
             now = self._clock.now()
-            if not group.direct_call_enabled or not await self._direct_open(tx, group, now):
+            if not await self._direct_open(tx, group, now):
                 return DirectAvailability.UNAVAILABLE
             if not await self._direct_room(tx, group, now):
                 return DirectAvailability.FULL
@@ -269,13 +270,13 @@ class BookingService:
 
         Raises:
             DomainError: ``group_not_found``, ``invalid_contact``, ``direct_call_unavailable``
-                (switched off, or the group is not open now) or ``direct_call_full`` (the
-                group's cap of open direct calls is reached).
+                (no staffed block offers direct calls now, ADR 0072) or ``direct_call_full``
+                (the group's cap of open direct calls is reached).
         """
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
             now = self._clock.now()
-            if not group.direct_call_enabled or not await self._direct_open(tx, group, now):
+            if not await self._direct_open(tx, group, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_UNAVAILABLE)
             if not await self._direct_room(tx, group, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_FULL)
@@ -317,10 +318,13 @@ class BookingService:
                 if booking.is_suspended and booking.closure_id is not None
                 else None
             )
+        now = self._clock.now()
         deadline = group.change_deadline(booking.start)
-        before = self._clock.now() < deadline
-        changeable = booking.on_hold or (booking.is_active and before)
-        cancellable = changeable or (booking.awaits_confirmation and before)
+        changeable = booking.on_hold or (booking.is_active and now < deadline)
+        cancellable = booking.on_hold or (
+            (booking.is_active or booking.awaits_confirmation)
+            and now < group.cancel_deadline(booking.start)
+        )
         return BookingDetails(booking, group, deadline, changeable, closure, cancellable)
 
     async def confirm(self, management_token: str) -> Booking:
@@ -352,14 +356,14 @@ class BookingService:
         """Cancel the booking; its pending jobs become a cancellation mail and the purge.
 
         Raises:
-            DomainError: ``booking_not_found``, ``booking_locked`` (from the change deadline)
+            DomainError: ``booking_not_found``, ``booking_locked`` (from the start on)
                 or ``booking_not_active``.
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
             now = self._clock.now()
             group = await self._group_by_id(tx, booking.group_id)
-            _ensure_changeable(booking, group, now)
+            _ensure_cancellable(booking, group, now)
             cancelled = booking.cancel(now)
             await tx.save_booking(cancelled)
             jobs = plan_for_cancellation(cancelled_at=now, team_invite=group.sends_team_invite)
@@ -430,13 +434,14 @@ class BookingService:
     async def _direct_open(self, tx: Transaction, group: Group, now: datetime) -> bool:
         """Return whether the group is open for a direct call at ``now``.
 
-        Holidays count as closed days (ADR 0025), and so does an active emergency closure.
+        That takes a staffed block that offers direct calls (ADR 0072). Holidays count as
+        closed days (ADR 0025), and so does an active emergency closure.
         """
         today = group.today(now)
         rules, overrides = await effective_schedule(tx, group, today, today)
         if any(c.is_active(now) for c in await tx.get_closures(group.id, now)):
             return False
-        return is_open(group, rules, overrides, now)
+        return open_for_direct(group, rules, overrides, now)
 
     async def _direct_room(self, tx: Transaction, group: Group, now: datetime) -> bool:
         """Return whether another direct call fits under the group's cap at ``now``."""
@@ -620,7 +625,7 @@ async def _check_address_limit(
 
 
 def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
-    """Refuse changes from the change deadline on; the booking is read-only from then.
+    """Refuse a move from the change deadline on (ADR 0069).
 
     A booking on hold (suspended, or awaiting a new time) has no deadline: it does not go
     ahead at its time anyway.
@@ -628,6 +633,14 @@ def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
     if booking.on_hold:
         return
     if now >= group.change_deadline(booking.start):
+        raise DomainError(ErrorCode.BOOKING_LOCKED)
+
+
+def _ensure_cancellable(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse a cancellation from the start on (ADR 0069); on hold has no deadline."""
+    if booking.on_hold:
+        return
+    if now >= group.cancel_deadline(booking.start):
         raise DomainError(ErrorCode.BOOKING_LOCKED)
 
 

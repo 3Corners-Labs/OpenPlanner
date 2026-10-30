@@ -96,7 +96,7 @@ message has its own channel test and the citizen must not be mailed twice).
 
 | Step | What | PR | Status |
 |---|---|---|---|
-| 1 | Request events with retention; version and honest hint on the timeline; skipped jobs; jobs list and retry on the booking page; worker and queue in the group check | this PR | built |
+| 1 | Request events with retention; version and honest hint on the timeline; skipped jobs; jobs list and retry on the booking page; worker and queue in the group check | #152 | built |
 
 ## Consequences
 

@@ -35,6 +35,20 @@ The overview never shows citizens' personal data: only counts, group names and t
 
 The widget *Alerts* follows in a later version.
 
+## Choosing a view
+
+*Bookings today per group* and *Queue across my groups* can be shown in more than one way.
+Under the title are the views the widget knows: list, bar or pie for the bookings, table, bar
+or line for the queue. Choosing a view reloads the page with that choice in the address (for
+example `/admin/?bookings-today=bar`); the other widgets stay as they were. What you do not
+choose is the first view. A fixed personal choice comes later (ADR 0062).
+
+Every chart is a picture with a text that names all values, for those who cannot see the
+picture. The values are also printed in the chart itself, and colour is never the only sign: a
+pie has a legend with the value and the share. Below each chart, **Data as a table** opens the
+same figures as a plain table. Above four groups the bars lie down; up to four they stand
+upright. The line for the queue connects the groups, so it is not a development over time.
+
 ## Default layout per role
 
 Each role starts with its own order: an agent sees the queue first, the Compliance and privacy

@@ -84,14 +84,14 @@ Een wijziging geldt voor afspraken die nog niet zijn doorgezet. Een afspraak die
 het contactcenter staat, blijft daar. Lukt het contactcenter niet (storing van Webex Connect of
 Webex Contact Center), dan kunt u de groep tijdelijk op de eigen wachtrij zetten.
 
-<!-- field: queue_change_working_days -->
-### Wijzigen tot (werkdagen vooraf, eigen wachtrij)
+<!-- field: citizen_change_lead_minutes -->
+### Verplaatsen door de burger tot (minuten vooraf)
 
-Alleen bij de eigen wachtrij. Tot hoeveel werkdagen voor de start de burger de afspraak kan
-wijzigen of annuleren, van 1 tot 5, op dezelfde tijd van de dag. Werkdagen zijn maandag tot en
-met vrijdag; feestdagen tellen hier als werkdag. Voorbeeld met 1: een afspraak op maandag om
-10:00 kan tot vrijdag 10:00 worden gewijzigd. Een afspraak die later wordt geboekt, kan de
-burger niet meer zelf wijzigen.
+Tot hoeveel minuten voor de start de burger de afspraak kan verplaatsen, standaard 60. Het
+getal is nooit kleiner dan **Doorzetten naar de wachtrij** en hoogstens 1440 (een dag).
+Annuleren kan altijd tot het gesprek begint; dat is vast en niet instelbaar. Het geldt voor
+contactcenter en eigen wachtrij. Een afspraak die later wordt geboekt dan dit getal, kan de
+burger alleen nog annuleren.
 
 <!-- field: queue_visible_from_minutes -->
 ### Zichtbaar in de wachtrij (minuten vooraf, eigen wachtrij)
@@ -125,8 +125,8 @@ overzichtspagina van de groep en in het auditlog.
 ### Doorzetten naar de wachtrij
 
 Hoeveel minuten voor de start de afspraak als taak naar Webex Contact Center gaat, van 0 tot 60.
-Vanaf dat moment kan de burger de afspraak niet meer wijzigen of annuleren via de link in de
-bevestiging.
+De burger kan de afspraak daarna nog annuleren via de link in de bevestiging; verplaatsen kan
+tot **Verplaatsen door de burger tot**.
 
 Kies dit ruim genoeg dat een medewerker de taak kan oppakken voordat de burger in het
 videogesprek wacht, bijvoorbeeld 5 minuten.
@@ -206,12 +206,43 @@ De waarde die de flow in Webex Contact Center gebruikt om de wachtrij te kiezen.
 veld leeg, dan stuurt het portaal het webadres van de groep mee. Vul alleen iets anders in als
 de flow een andere waarde verwacht.
 
-<!-- field: direct_call_enabled -->
-### Direct gesprek starten
+<!-- field: trial_call_enabled -->
+### Proefgesprek voor de burger
 
-Met **Ja** kunnen burgers tijdens een tijdblok met medewerkers meteen een videogesprek starten,
-zonder afspraak. De afsprakenpagina toont dan een knop. Buiten de tijdblokken, op feestdagen
-of tijdens een noodsluiting verdwijnt die knop vanzelf.
+Met **Ja** kan de burger vóór de afspraak in een echte Webex-meeting uitproberen of camera,
+microfoon, luidsprekers en browser werken. Dat is geen aparte test op onze pagina: het is
+dezelfde Webex-site en dezelfde Webex-omgeving als het gesprek zelf, zodat een probleem nu al
+zichtbaar wordt. De burger zit er alleen in; er komt niemand van het team in en er wordt geen
+taak aangemaakt. De link staat in de bevestiging, de herinnering, op de afspraakpagina en op de
+pagina voor het gesprek. Het werkt alleen met een **Webex-host**. Het proefgesprek gebruikt de
+Webex-site van de host: die moet toestaan dat deelnemers vóór de host binnenkomen. Of dat zo is,
+ziet u bij **Koppeling controleren**.
+
+<!-- field: trial_call_minutes -->
+### Proefgesprek blijft open (minuten)
+
+Hoe lang één proefgesprek openstaat, van 10 tot 60 minuten. Standaard 30. Daarna wordt de
+Webex-meeting verwijderd; de burger kan een nieuw proefgesprek openen.
+
+<!-- field: trial_calls_per_booking -->
+### Proefgesprekken per afspraak
+
+Hoe vaak één afspraak een proefgesprek mag openen, van 1 tot 5. Standaard 3. Elk proefgesprek is
+een meeting in Webex; met dit getal kan één afspraak er niet onbeperkt aanmaken.
+
+<!-- field: offer -->
+### Aanbod per tijdblok
+
+Bij elk tijdblok van de bezetting kiest u wat burgers in dat blok kunnen: **Afspraken** (de
+tijdslots van het blok, de standaard), **Direct gesprek** (meteen een videogesprek starten,
+zonder afspraak; het blok levert dan geen tijdslots) of **Afspraken en direct gesprek**. Een
+afwijkende bezetting voor één dag heeft dezelfde keuze.
+
+Tijdens een blok met medewerkers dat directe gesprekken aanbiedt, toont de afsprakenpagina de
+knop **Nu een gesprek starten**. Buiten zulke blokken, op feestdagen of tijdens een noodsluiting
+verdwijnt die knop vanzelf. De groep zelf heeft geen aan/uit-schakelaar meer: het aanbod staat
+bij de tijdblokken, zodat een team bijvoorbeeld 's ochtends directe gesprekken aanneemt en
+'s middags afspraken.
 
 <!-- field: not_picked_up_minutes -->
 ### Niet opgepakt na

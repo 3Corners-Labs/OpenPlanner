@@ -63,13 +63,17 @@ from app.domain.planning import (
 )
 from app.domain.scheduling import (
     MAX_BOOKINGS_PER_EMAIL,
+    MAX_CITIZEN_CHANGE_LEAD_MINUTES,
     MAX_DIRECT_CALLS,
     MAX_LABEL_LENGTH,
     MAX_PLANNER_LEAD_MINUTES,
-    MAX_QUEUE_CHANGE_WORKING_DAYS,
     MAX_QUEUE_VISIBLE_FROM_MINUTES,
+    MAX_TRIAL_CALL_MINUTES,
+    MAX_TRIAL_CALLS_PER_BOOKING,
+    MIN_TRIAL_CALL_MINUTES,
     DispatchKind,
     GroupSummary,
+    Offer,
     PhoneMode,
     ScheduleOverride,
     ScheduleRule,
@@ -114,9 +118,17 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
         "admin.field.dispatch_lead_minutes",
         "admin.field.dispatch_lead_minutes_hint",
     ),
-    "queue_change_working_days": (
-        "admin.field.queue_change_working_days",
-        "admin.field.queue_change_working_days_hint",
+    "citizen_change_lead_minutes": (
+        "admin.field.citizen_change_lead_minutes",
+        "admin.field.citizen_change_lead_minutes_hint",
+    ),
+    "trial_call_minutes": (
+        "admin.field.trial_call_minutes",
+        "admin.field.trial_call_minutes_hint",
+    ),
+    "trial_calls_per_booking": (
+        "admin.field.trial_calls_per_booking",
+        "admin.field.trial_calls_per_booking_hint",
     ),
     "planner_change_min_lead_minutes": (
         "admin.field.planner_change_min_lead_minutes",
@@ -165,8 +177,13 @@ def group_page(
     template: str,
     extra: dict[str, object],
     status: int = 200,
+    *,
+    scripts: bool = False,
 ) -> HTMLResponse:
-    """Render a group page with header, the tabs the matrix allows, and any confirmation."""
+    """Render a group page with header, the tabs the matrix allows, and any confirmation.
+
+    ``scripts=True`` allows the page's own script (the queue's live region, ADR 0072).
+    """
     summary = context.group
     can = can_function(context.principal)
     home = current_home(request)
@@ -187,6 +204,7 @@ def group_page(
         template,
         context.principal,
         {"summary": summary, "tabs": tabs, "done": done_message(request, locale.gettext), **extra},
+        scripts=scripts,
     )
     response.status_code = status
     return response
@@ -329,6 +347,8 @@ class WindowView:
     validity: str | None
     label: str | None
     staffed: bool
+    offer: str | None = None
+    """The block's offer in words when it is not the default (ADR 0072)."""
 
 
 @dataclass(frozen=True)
@@ -340,6 +360,7 @@ class ExceptionView:
     closed: bool
     time: str | None
     capacity: str | None
+    offer: str | None = None
 
 
 @dataclass(frozen=True)
@@ -362,6 +383,19 @@ def _agents_text(count: int, _: BoundGettext) -> str:
     if count == 1:
         return _("admin.hours.capacity_one")
     return _("admin.hours.capacity", count=count)
+
+
+OFFER_LABELS: dict[Offer, str] = {
+    Offer.SCHEDULED: "admin.offer.scheduled",
+    Offer.DIRECT: "admin.offer.direct",
+    Offer.BOTH: "admin.offer.both",
+}
+"""Catalogue key per offer of a block (ADR 0072), for the select and the week view."""
+
+
+def _offer_text(window: TimeWindow, _: BoundGettext) -> str | None:
+    """Return the block's offer in words, or ``None`` for the default (slots only)."""
+    return None if window.offer is Offer.SCHEDULED else _(OFFER_LABELS[window.offer])
 
 
 def _week(schedule: Schedule, locale: RequestLocale) -> list[DayView]:
@@ -389,6 +423,7 @@ def _week(schedule: Schedule, locale: RequestLocale) -> list[DayView]:
                     validity,
                     rule.window.label,
                     rule.window.staffed,
+                    _offer_text(rule.window, _),
                 )
             )
         days.append(DayView(weekday, name, windows))
@@ -405,6 +440,7 @@ def _exceptions(schedule: Schedule, locale: RequestLocale) -> list[ExceptionView
             o.window is None,
             _clock_text(o.window, locale.code) if o.window else None,
             _agents_text(o.window.capacity, _) if o.window else None,
+            _offer_text(o.window, _) if o.window else None,
         )
         for o in schedule.overrides
     ]
@@ -462,6 +498,8 @@ async def group(
             "exceptions": _exceptions(schedule, locale),
             "preview": _preview(preview, summary, locale),
             "shortfalls": await group_shortfalls(request, locale, context),
+            # ADR 0072: direct calls are offered per block, not per group.
+            "direct_blocks": sum(1 for r in schedule.rules if r.window.offers_direct),
         },
     )
 
@@ -531,9 +569,9 @@ def _settings_fields(
         ),
         number("dispatch_lead_minutes", current.dispatch_lead_minutes, {"min": "0", "max": "60"}),
         number(
-            "queue_change_working_days",
-            current.queue_change_working_days,
-            {"min": "1", "max": str(MAX_QUEUE_CHANGE_WORKING_DAYS)},
+            "citizen_change_lead_minutes",
+            current.citizen_change_lead_minutes,
+            {"min": "0", "max": str(MAX_CITIZEN_CHANGE_LEAD_MINUTES), "step": "5"},
         ),
         number(
             "planner_change_min_lead_minutes",
@@ -581,13 +619,23 @@ def _settings_fields(
             "wxcc_routing_value", current.wxcc_routing_value, "admin.field.wxcc_routing_value_hint"
         ),
         Field(
-            "direct_call_enabled",
-            _("admin.field.direct_call_enabled"),
+            "trial_call_enabled",
+            _("admin.field.trial_call_enabled"),
             "select",
-            value("direct_call_enabled", "yes" if current.direct_call_enabled else "no"),
-            hint=_("admin.field.direct_call_enabled_hint"),
-            error=form.error_for("direct_call_enabled"),
+            value("trial_call_enabled", "yes" if current.trial_call_enabled else "no"),
+            hint=_("admin.field.trial_call_enabled_hint"),
+            error=form.error_for("trial_call_enabled"),
             options=yes_no,
+        ),
+        number(
+            "trial_call_minutes",
+            current.trial_call_minutes,
+            {"min": str(MIN_TRIAL_CALL_MINUTES), "max": str(MAX_TRIAL_CALL_MINUTES)},
+        ),
+        number(
+            "trial_calls_per_booking",
+            current.trial_calls_per_booking,
+            {"min": "1", "max": str(MAX_TRIAL_CALLS_PER_BOOKING)},
         ),
         number("not_picked_up_minutes", current.not_picked_up_minutes, {"min": "1", "max": "120"}),
         number(
@@ -659,11 +707,11 @@ async def save_settings(
     numbers = {name: form.integer(name) for name in NUMBER_LABELS if name not in OPTIONAL_NUMBERS}
     cap = form.optional_integer("direct_call_max_concurrent")
     phone = form.choice("phone_mode", {mode.value for mode in PhoneMode})
-    direct = form.choice("direct_call_enabled", {"yes", "no"})
     dispatch = form.choice("dispatch_kind", {kind.value for kind in DispatchKind})
     embedding = form.choice("embedding_enabled", {"yes", "no"})
+    trial = form.choice("trial_call_enabled", {"yes", "no"})
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
-    if not form.errors and None not in (phone, direct, dispatch, embedding, free_pick):
+    if not form.errors and None not in (phone, dispatch, embedding, free_pick, trial):
         new = GroupSettings(
             name=form.text("name"),
             timezone=form.text("timezone"),
@@ -675,9 +723,9 @@ async def save_settings(
             wxcc_business_address=form.optional_text("wxcc_business_address"),
             wxcc_channel=form.optional_text("wxcc_channel"),
             wxcc_routing_value=form.optional_text("wxcc_routing_value"),
-            direct_call_enabled=direct == "yes",
             direct_call_max_concurrent=cap,
             embedding_enabled=embedding == "yes",
+            trial_call_enabled=trial == "yes",
             **{name: value for name, value in numbers.items() if value is not None},
         )
         try:
@@ -743,6 +791,30 @@ def _capacity_field(
     )
 
 
+OFFER_VALUES = frozenset(offer.value for offer in Offer)
+
+
+def _read_offer(form: FormData) -> str | None:
+    """Return the submitted offer; a form without the field means the default (slots)."""
+    if not form.text("offer"):
+        return Offer.SCHEDULED.value
+    return form.choice("offer", OFFER_VALUES)
+
+
+def _offer_field(form: FormData, locale: RequestLocale) -> Field:
+    """Return the offer select of a block: slots, direct calls or both (ADR 0072)."""
+    _ = locale.gettext
+    return Field(
+        "offer",
+        _("admin.field.offer"),
+        "select",
+        form.text("offer") or Offer.SCHEDULED.value,
+        hint=_("admin.field.offer_hint"),
+        error=form.error_for("offer"),
+        options=tuple(Option(offer.value, _(OFFER_LABELS[offer])) for offer in Offer),
+    )
+
+
 def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
     """Return the inputs of the add-block and change-block forms."""
     _ = locale.gettext
@@ -771,6 +843,7 @@ def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
             error=form.error_for("closes"),
         ),
         _capacity_field(form, locale, "1"),
+        _offer_field(form, locale),
         _label_field(form, locale),
         Field(
             "valid_from",
@@ -797,11 +870,12 @@ def _read_rule(form: FormData) -> ScheduleRule | None:
     weekday = form.choice("weekday", WEEKDAYS)
     opens, closes = form.clock("opens"), form.clock("closes")
     capacity = form.integer("capacity")
+    offer = _read_offer(form)
     valid_from, valid_to = form.optional_day("valid_from"), form.optional_day("valid_to")
-    if form.errors or not (weekday and opens and closes and capacity is not None):
+    if form.errors or not (weekday and opens and closes and offer and capacity is not None):
         return None
     try:
-        window = TimeWindow(opens, closes, capacity, form.optional_text("label"))
+        window = TimeWindow(opens, closes, capacity, form.optional_text("label"), Offer(offer))
         return ScheduleRule(int(weekday), window, valid_from, valid_to)
     except DomainError as error:
         form.refusal(error)
@@ -815,6 +889,7 @@ def _rule_values(rule: ScheduleRule) -> dict[str, str]:
         "opens": rule.window.opens.strftime("%H:%M"),
         "closes": rule.window.closes.strftime("%H:%M"),
         "capacity": str(rule.window.capacity),
+        "offer": rule.window.offer.value,
         "label": rule.window.label or "",
         "valid_from": rule.valid_from.isoformat() if rule.valid_from else "",
         "valid_to": rule.valid_to.isoformat() if rule.valid_to else "",
@@ -1081,6 +1156,7 @@ def _exception_fields(form: FormData, locale: RequestLocale) -> list[Field]:
             required=False,
         ),
         _capacity_field(form, locale, "", required=False),
+        _offer_field(form, locale),
         _label_field(form, locale),
     ]
 
@@ -1130,9 +1206,11 @@ async def add_exception(
             form.clock("closes"),
             form.integer("capacity"),
         )
-        if opens and closes and capacity is not None:
+        offer = _read_offer(form)
+        if opens and closes and offer and capacity is not None:
             try:
-                window = TimeWindow(opens, closes, capacity, form.optional_text("label"))
+                label = form.optional_text("label")
+                window = TimeWindow(opens, closes, capacity, label, Offer(offer))
             except DomainError as error:
                 form.refusal(error)
     if not form.errors and day is not None:

@@ -480,6 +480,16 @@ Staff who join signed in with the organisation's account become cohost automatic
 on a phone that the citizen's browser join works with your site settings (mobile browsers may
 offer the Webex app).
 
+**Trial call (ADR 0071).** A citizen's trial call is a meeting of the same host on the same site
+that participants may enter before the host (OpenPlanner sets `enabledJoinBeforeHost`,
+`enableConnectAudioBeforeHost` and `allowJoin` on it, not on the appointment's own meeting).
+The site must allow this. **Koppeling controleren** schedules and deletes a trial probe and
+shows `webex.trial_refused` with Webex's reason when it does not; citizens then cannot open a
+trial call, and the group's switch can be set to *Nee* until the site allows it. After a Webex or
+site change, run the check and then open a trial call yourself from a test booking: it must
+open without the lobby, ask for camera and microphone, and be gone from the host's Webex
+calendar a few minutes after it closes.
+
 ### 3. WxCC work items (Control Hub)
 
 Work Items is in beta; the organisation must be enabled by Cisco.
@@ -813,7 +823,8 @@ OpenPlanner**. From then on:
   theirs;
 - the team's agents sign in to the admin portal (IdP role `OIDC_ROLE_AGENT`, default
   `openplanner-agent`, with the group in the group claim) and open the **Wachtrij** tab;
-- citizens can change or cancel until `queue_change_working_days` working days before the start.
+- citizens can cancel until the start and move until `citizen_change_lead_minutes` before it
+  (ADR 0069), as with the contact center.
 
 Switch back the same way once the contact center works again. Both changes are in the audit
 log (`group.edit`, detail `dispatch_kind`).

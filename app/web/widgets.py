@@ -47,6 +47,16 @@ class View(StrEnum):
     PIE = "pie"
 
 
+VIEW_LABELS: dict[View, str] = {
+    View.LIST: "admin.overview.view.list",
+    View.TABLE: "admin.overview.view.table",
+    View.BAR: "admin.overview.view.bar",
+    View.LINE: "admin.overview.view.line",
+    View.PIE: "admin.overview.view.pie",
+}
+"""Catalogue key of each view's name, for the links that switch a widget's view."""
+
+
 @dataclass(frozen=True)
 class Widget:
     """One widget of the overview.
@@ -175,6 +185,20 @@ def widget(key: str) -> Widget | None:
 def fragment_path(item: Widget) -> str:
     """Return the fragment route of ``item`` (``/admin/overview/w/{key}``)."""
     return item.path
+
+
+def resolve_view(item: Widget, requested: str | None) -> View:
+    """Return the view ``item`` draws: ``requested`` when it supports it, else its first.
+
+    The first view in the register is the widget's default (ADR 0061 §2). ``requested`` comes
+    from outside (a query parameter, later a personal layout, ADR 0062), so anything that is
+    not exactly the name of a supported view, including garbage, is the default.
+    """
+    try:
+        wanted = View(requested or "")
+    except ValueError:
+        return item.views[0]
+    return wanted if wanted in item.views else item.views[0]
 
 
 def default_layout(principal: Principal) -> tuple[Widget, ...]:

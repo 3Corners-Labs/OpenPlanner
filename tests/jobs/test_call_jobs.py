@@ -349,3 +349,28 @@ async def test_a_group_that_wants_no_meeting_or_task_skips_the_job(
     await setup.runner(FakeQueue([job(bid, job_type)])).run_due()
 
     assert _skips(setup) == [(f"job.{job_type.value}", reason)]
+
+
+async def test_the_trial_meeting_is_deleted_and_forgotten(setup: Setup) -> None:
+    from app.domain.booking import MeetingRef, TrialCall
+
+    bid = await setup.booking()
+    async with setup.uow.locked() as tx:
+        await tx.save_trial_call(bid, TrialCall(MeetingRef("trial-1", "https://x/1"), NOW))
+
+    await setup.runner(FakeQueue([job(bid, JobType.DELETE_TRIAL_CALL, pinned=None)])).run_due()
+
+    assert setup.video.deleted == [("trial-1", "host@example.nl")]
+    stored = setup.uow.state.bookings[bid]
+    assert stored.trial is None
+    assert stored.trial_count == 1  # the count stays: deleting must not give a fresh allowance
+    assert setup.events(bid)[-1] is EventKind.TRIAL_DELETED
+
+
+async def test_deleting_a_trial_meeting_that_is_not_there_does_nothing(setup: Setup) -> None:
+    bid = await setup.booking()
+
+    await setup.runner(FakeQueue([job(bid, JobType.DELETE_TRIAL_CALL, pinned=None)])).run_due()
+
+    assert setup.video.deleted == []
+    assert setup.events(bid) == []

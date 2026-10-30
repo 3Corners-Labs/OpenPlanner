@@ -64,7 +64,8 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     form = (await site.client.get(f"{GROUP}/settings")).text
 
     assert '<option value="Europe/Amsterdam" selected>' in form
-    # time zone, dispatch kind, free pick, phone mode, direct call, embedding
+    # time zone, dispatch kind, free pick, phone mode, trial call, embedding (the direct
+    # call is offered per staffing block since ADR 0072)
     assert form.count(" selected>") == 6
 
 
@@ -194,7 +195,10 @@ SETTINGS_FORM = {
     "horizon_days": "30",
     "dispatch_lead_minutes": "5",
     "dispatch_kind": "contact_center",
-    "queue_change_working_days": "1",
+    "citizen_change_lead_minutes": "60",
+    "trial_call_enabled": "yes",
+    "trial_call_minutes": "30",
+    "trial_calls_per_booking": "3",
     "planner_change_min_lead_minutes": "60",
     "queue_visible_from_minutes": "15",
     "max_bookings_per_email": "3",
@@ -204,7 +208,6 @@ SETTINGS_FORM = {
     "wxcc_business_address": "openplanner@example.biz",
     "wxcc_channel": "openplanner-video",
     "wxcc_routing_value": "team-42",
-    "direct_call_enabled": "yes",
     "not_picked_up_minutes": "10",
     "embedding_enabled": "yes",
 }
@@ -243,13 +246,15 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "horizon_days": "60",
         "dispatch_lead_minutes": "5",
         "dispatch_kind": "openplanner_queue",
-        "queue_change_working_days": "2",
+        "citizen_change_lead_minutes": "120",
+        "trial_call_enabled": "yes",
+        "trial_call_minutes": "30",
+        "trial_calls_per_booking": "3",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
         "calendar_invite_address": "team-demo@example.nl",
         "phone_mode": "optional",
-        "direct_call_enabled": "no",
         "embedding_enabled": "no",
         "planner_change_min_lead_minutes": "60",
         "not_picked_up_minutes": "10",
@@ -262,7 +267,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
     assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
     after = (await site.client.get(f"{GROUP}/settings")).text
     assert '<option value="openplanner_queue" selected' in after
-    assert 'name="queue_change_working_days" type="number" value="2"' in after
+    assert 'name="citizen_change_lead_minutes" type="number" value="120"' in after
     overview = (await site.client.get(GROUP)).text
     assert "team-demo@example.nl" in overview
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
@@ -272,13 +277,18 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
 
 
 @pytest.mark.parametrize(
-    ("kind", "days", "error"),
+    ("kind", "minutes", "error"),
     [
-        ("genesys", "1", '<a href="#dispatch_kind">'),
-        ("openplanner_queue", "9", '<a href="#queue_change_working_days">Vul een aantal werkdagen'),
+        ("genesys", "60", '<a href="#dispatch_kind">'),
+        (
+            "openplanner_queue",
+            "2000",
+            '<a href="#citizen_change_lead_minutes">Vul een aantal minuten',
+        ),
+        ("contact_center", "3", '<a href="#citizen_change_lead_minutes">Vul een aantal minuten'),
     ],
 )
-async def test_dispatch_fields_are_checked(site: Site, kind: str, days: str, error: str) -> None:
+async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, error: str) -> None:
     await site.login_as(SUPER)
     form = {
         "name": "Demo",
@@ -288,12 +298,14 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, days: str, err
         "horizon_days": "60",
         "dispatch_lead_minutes": "5",
         "dispatch_kind": kind,
-        "queue_change_working_days": days,
+        "citizen_change_lead_minutes": minutes,
+        "trial_call_enabled": "yes",
+        "trial_call_minutes": "30",
+        "trial_calls_per_booking": "3",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
         "phone_mode": "optional",
-        "direct_call_enabled": "no",
         "embedding_enabled": "no",
         "planner_change_min_lead_minutes": "60",
         "not_picked_up_minutes": "10",
@@ -319,13 +331,15 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "horizon_days": "60",
             "dispatch_lead_minutes": "5",
             "dispatch_kind": "contact_center",
-            "queue_change_working_days": "1",
+            "citizen_change_lead_minutes": "60",
+            "trial_call_enabled": "yes",
+            "trial_call_minutes": "30",
+            "trial_calls_per_booking": "3",
             "planner_change_min_lead_minutes": "60",
             "queue_visible_from_minutes": "15",
             "max_bookings_per_email": "3",
             "queue_free_pick_allowed": "no",
             "phone_mode": "optional",
-            "direct_call_enabled": "no",
             "not_picked_up_minutes": "10",
             "embedding_enabled": "no",
         },
@@ -626,13 +640,15 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "horizon_days": "45",
             "dispatch_lead_minutes": "5",
             "dispatch_kind": "contact_center",
-            "queue_change_working_days": "1",
+            "citizen_change_lead_minutes": "60",
+            "trial_call_enabled": "yes",
+            "trial_call_minutes": "30",
+            "trial_calls_per_booking": "3",
             "planner_change_min_lead_minutes": "60",
             "queue_visible_from_minutes": "15",
             "max_bookings_per_email": "3",
             "queue_free_pick_allowed": "no",
             "phone_mode": "optional",
-            "direct_call_enabled": "no",
             "not_picked_up_minutes": "10",
             "embedding_enabled": "no",
         },
@@ -664,13 +680,15 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "horizon_days": "60",
         "dispatch_lead_minutes": "5",
         "dispatch_kind": "contact_center",
-        "queue_change_working_days": "1",
+        "citizen_change_lead_minutes": "60",
+        "trial_call_enabled": "yes",
+        "trial_call_minutes": "30",
+        "trial_calls_per_booking": "3",
         "planner_change_min_lead_minutes": "60",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
         "phone_mode": "optional",
-        "direct_call_enabled": "yes",
         "not_picked_up_minutes": "10",
         "embedding_enabled": "no",
     }
@@ -778,3 +796,35 @@ async def test_a_split_outside_the_block_is_explained(site: Site) -> None:
     assert garbage.status_code == 422  # type: ignore[attr-defined]
     assert '<a href="#split_at">' in garbage.text  # type: ignore[attr-defined]
     assert "10:00–12:00" in (await site.client.get(f"{GROUP}/staffing")).text
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("trial_call_minutes", "9"), ("trial_call_minutes", "61"), ("trial_calls_per_booking", "0")],
+)
+async def test_trial_call_fields_are_checked(site: Site, field: str, value: str) -> None:
+    await site.login_as(SUPER)
+    form = {**SETTINGS_FORM, field: value}
+
+    response = await _post(site, f"{GROUP}/settings", form)
+
+    assert response.status_code == 422
+    assert f'<a href="#{field}">' in response.text
+
+
+async def test_the_trial_call_switch_and_limits_are_saved(site: Site) -> None:
+    await site.login_as(SUPER)
+    form = {
+        **SETTINGS_FORM,
+        "trial_call_enabled": "no",
+        "trial_call_minutes": "45",
+        "trial_calls_per_booking": "5",
+    }
+
+    saved = await _post(site, f"{GROUP}/settings", form)
+    after = (await site.client.get(f"{GROUP}/settings")).text
+
+    assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
+    assert 'name="trial_call_minutes" type="number" value="45"' in after
+    assert 'name="trial_calls_per_booking" type="number" value="5"' in after
+    assert '<option value="no" selected' in after

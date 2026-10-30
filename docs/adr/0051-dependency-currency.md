@@ -1,7 +1,7 @@
 # 0051. Dependency currency: every module tracked, deprecations fail the build
 
-Status: proposed (2026-10-29), requested by the product owner. Amends ADR 0006 (supply chain:
-how updates arrive) and the "Weekly: Renovate" line of CLAUDE.md.
+Status: accepted (2026-10-29), requested by the product owner. Amends ADR 0006 (supply chain:
+how updates arrive) and the "Weekly: Renovate" line of CLAUDE.md. Built in the repository, checked on 2026-10-30; the Renovate app and the branch protection are settings outside the code (status was *proposed*; `docs/adr-status.md`).
 
 ## Context
 

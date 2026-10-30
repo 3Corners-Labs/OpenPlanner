@@ -1,4 +1,3 @@
-from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -11,7 +10,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import DayState, HolidayService, effective_schedule
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.planning import PlanningService
-from app.domain.scheduling import ScheduleOverride, ScheduleRule
+from app.domain.scheduling import Offer, ScheduleOverride, ScheduleRule
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -91,8 +90,7 @@ async def test_holidays_close_citizen_availability(uow: InMemoryUnitOfWork) -> N
 
 async def test_no_direct_call_on_a_holiday(uow: InMemoryUnitOfWork) -> None:
     # Now is Thursday 1 January 2026, 09:00 in Amsterdam: inside the opening hours.
-    uow.state.groups[1] = replace(uow.state.groups[1], direct_call_enabled=True)
-    uow.state.rules[1].append(ScheduleRule(3, window("09:00", "10:00")))
+    uow.state.rules[1].append(ScheduleRule(3, window("09:00", "10:00", offer=Offer.BOTH)))
     service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
     open_before = await service.direct_call_availability("demo") is DirectAvailability.AVAILABLE
 

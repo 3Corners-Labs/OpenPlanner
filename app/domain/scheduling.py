@@ -56,13 +56,18 @@ MAX_DIRECT_CALLS = MAX_CAPACITY
 
 DEFAULT_DISPATCH_LEAD_MINUTES = 5
 MAX_DISPATCH_LEAD_MINUTES = 60
-DEFAULT_QUEUE_CHANGE_WORKING_DAYS = 1
-"""Own queue: a citizen can change or cancel until this many working days before the start."""
-MAX_QUEUE_CHANGE_WORKING_DAYS = 5
+DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES = 60
+"""ADR 0069: a citizen can move a booking until this long before the start."""
+MAX_CITIZEN_CHANGE_LEAD_MINUTES = 1440
+DEFAULT_TRIAL_CALL_MINUTES = 30
+"""ADR 0071: how long a trial call stays open, from the moment the citizen starts it."""
+MIN_TRIAL_CALL_MINUTES = 10
+MAX_TRIAL_CALL_MINUTES = 60
+DEFAULT_TRIAL_CALLS_PER_BOOKING = 3
+"""ADR 0071: how often one booking may open a trial call; each one is a Webex meeting."""
+MAX_TRIAL_CALLS_PER_BOOKING = 5
 DEFAULT_QUEUE_VISIBLE_FROM_MINUTES = 15
 MAX_QUEUE_VISIBLE_FROM_MINUTES = 120
-WORKING_DAYS = frozenset(range(5))
-"""Monday to Friday; holidays do not count as non-working days here (ADR 0043)."""
 MAX_PLANNER_LEAD_MINUTES = 1440
 """ADR 0044: upper bound of ``planner_change_min_lead_minutes`` (one day)."""
 DEFAULT_MAX_BOOKINGS_PER_EMAIL = 3
@@ -127,6 +132,26 @@ class DispatchKind(StrEnum):
     """OpenPlanner's own queue: agents sign in and pick up a booking."""
 
 
+class Offer(StrEnum):
+    """What a staffing block offers citizens (ADR 0072): slots, direct calls, or both."""
+
+    SCHEDULED = "scheduled"
+    """Appointments in the slot grid; the default."""
+    DIRECT = "direct"
+    """Direct calls (ADR 0019) only; the block offers no slots."""
+    BOTH = "both"
+
+    @property
+    def scheduled(self) -> bool:
+        """Whether the block takes part in the slot grid."""
+        return self is not Offer.DIRECT
+
+    @property
+    def direct(self) -> bool:
+        """Whether a citizen can start a direct call during the block."""
+        return self is not Offer.SCHEDULED
+
+
 class PhoneMode(StrEnum):
     """Whether the booking form asks for a phone number (per group, HANDOVER B15)."""
 
@@ -170,23 +195,28 @@ class Group:
         wxcc_business_address: Business address of the WxCC work item asset (ADR 0018).
         wxcc_channel: Name of the WxCC work item channel.
         wxcc_routing_value: Passed to the WxCC flow to choose the queue; the slug when empty.
-        direct_call_enabled: Whether citizens can start a call right away (ADR 0019).
         not_picked_up_minutes: After this long without an agent a call counts as not
             picked up (signal for O2).
         direct_call_max_concurrent: How many direct calls may be open (waiting or with an
             agent) at once, typically the number of agents for direct calls; ``None`` leaves
             it to WxCC (ADR 0026).
-        dispatch_lead_minutes: How long before the start the WxCC task is created; from
-            that moment the booking is read-only (``job_plan.change_deadline``). At most
-            ``min_notice_minutes``, so no booking is read-only when it is made. Used only
-            with ``DispatchKind.CONTACT_CENTER``.
+        dispatch_lead_minutes: How long before the start the WxCC task is created
+            (``job_plan.dispatch_moment``). At most ``min_notice_minutes``, so a booking is
+            never dispatched the moment it is made. Used only with
+            ``DispatchKind.CONTACT_CENTER``.
         dispatch_kind: Contact center or OpenPlanner's own queue (ADR 0043).
-        queue_change_working_days: With the own queue, how many working days (Monday to
-            Friday) before the start the booking becomes read-only, at the same local time.
-            A booking made later than that is read-only from the start.
+        citizen_change_lead_minutes: How long before the start the citizen may still move
+            the booking (ADR 0069, class D per group); cancelling is possible until the start.
+            Never below ``dispatch_lead_minutes``. A booking made later than that cannot be
+            moved by the citizen, only cancelled.
         planner_change_min_lead_minutes: How long before the start a planner may still move
             or cancel a booking (ADR 0044, class D per group). Never below
             ``dispatch_lead_minutes``: a dispatched booking needs a phone call, not a mail.
+        trial_call_enabled: Whether the citizen can open a trial call on Webex ahead of the
+            appointment (ADR 0071); needs video. On by default.
+        trial_call_minutes: How long one trial call stays open, 10 to 60 minutes.
+        trial_calls_per_booking: How many trial calls one booking may open, 1 to 5, so the page
+            cannot be used to create Webex meetings without end.
         embedding_enabled: Whether the group may appear in the widget on the websites its
             organisation allows (ADR 0035); off until the group switches it on.
         queue_visible_from_minutes: Own queue: how long before its start a booking appears.
@@ -216,13 +246,15 @@ class Group:
     wxcc_business_address: str | None = None
     wxcc_channel: str | None = None
     wxcc_routing_value: str | None = None
-    direct_call_enabled: bool = False
     not_picked_up_minutes: int = DEFAULT_NOT_PICKED_UP_MINUTES
     direct_call_max_concurrent: int | None = None
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
     dispatch_kind: DispatchKind = DispatchKind.CONTACT_CENTER
-    queue_change_working_days: int = DEFAULT_QUEUE_CHANGE_WORKING_DAYS
+    citizen_change_lead_minutes: int = DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES
     planner_change_min_lead_minutes: int = 60
+    trial_call_enabled: bool = True
+    trial_call_minutes: int = DEFAULT_TRIAL_CALL_MINUTES
+    trial_calls_per_booking: int = DEFAULT_TRIAL_CALLS_PER_BOOKING
     embedding_enabled: bool = False
     queue_visible_from_minutes: int = DEFAULT_QUEUE_VISIBLE_FROM_MINUTES
     queue_free_pick_allowed: bool = False
@@ -246,11 +278,16 @@ class Group:
             raise _invalid("dispatch_lead_minutes")
         if self.min_notice_minutes < self.dispatch_lead_minutes:
             raise _invalid("min_notice_minutes")
-        if not 1 <= self.queue_change_working_days <= MAX_QUEUE_CHANGE_WORKING_DAYS:
-            raise _invalid("queue_change_working_days")
+        change_lead = self.citizen_change_lead_minutes
+        if not self.dispatch_lead_minutes <= change_lead <= MAX_CITIZEN_CHANGE_LEAD_MINUTES:
+            raise _invalid("citizen_change_lead_minutes")
         planner_lead = self.planner_change_min_lead_minutes
         if not self.dispatch_lead_minutes <= planner_lead <= MAX_PLANNER_LEAD_MINUTES:
             raise _invalid("planner_change_min_lead_minutes")
+        if not MIN_TRIAL_CALL_MINUTES <= self.trial_call_minutes <= MAX_TRIAL_CALL_MINUTES:
+            raise _invalid("trial_call_minutes")
+        if not 1 <= self.trial_calls_per_booking <= MAX_TRIAL_CALLS_PER_BOOKING:
+            raise _invalid("trial_calls_per_booking")
         if not 0 <= self.queue_visible_from_minutes <= MAX_QUEUE_VISIBLE_FROM_MINUTES:
             raise _invalid("queue_visible_from_minutes")
         if not 1 <= self.max_bookings_per_email <= MAX_BOOKINGS_PER_EMAIL:
@@ -321,28 +358,21 @@ class Group:
         return self.has_own_queue and self.calendar_invite_address is not None
 
     def change_deadline(self, start: datetime) -> datetime:
-        """Return the moment a booking starting at ``start`` becomes read-only.
+        """Return the moment the citizen can no longer move a booking starting at ``start``.
 
-        Contact center: when its task is dispatched, since an agent may pick it up from then
-        on. Own queue: ``queue_change_working_days`` working days earlier (ADR 0043).
+        ``citizen_change_lead_minutes`` before the start, for both dispatch kinds (ADR 0069).
+        A booking already dispatched to the contact center is moved with its task ended
+        (ADR 0021), so the lead is never shorter than the dispatch lead.
         """
-        if self.has_own_queue:
-            return working_days_before(start, self.queue_change_working_days, self.tz)
-        return start - self.dispatch_lead
+        return start - timedelta(minutes=self.citizen_change_lead_minutes)
 
+    def cancel_deadline(self, start: datetime) -> datetime:
+        """Return the moment the citizen can no longer cancel: the start itself (ADR 0069).
 
-def working_days_before(moment: datetime, days: int, tz: ZoneInfo) -> datetime:
-    """Return ``moment`` moved back ``days`` working days, at the same local time in ``tz``.
-
-    Weekend days are skipped; from a weekend day the first step lands on Friday.
-    """
-    local = moment.astimezone(tz)
-    day = local.date()
-    while days:
-        day -= timedelta(days=1)
-        if day.weekday() in WORKING_DAYS:
-            days -= 1
-    return datetime.combine(day, local.time(), tz).astimezone(moment.tzinfo)
+        A late cancellation beats a no-show; after dispatch the task is marked cancelled
+        (ADR 0021) and the team's invite withdrawn (ADR 0043).
+        """
+        return start
 
 
 @dataclass(frozen=True)
@@ -362,12 +392,14 @@ class TimeWindow:
         capacity: Number of agents, 0 to ``MAX_CAPACITY``; 0 offers no slots (lunch).
         label: Optional admin note such as "Lunch"; admin content only, never shown to
             citizens or logged, and no part of equality or ordering.
+        offer: Slots, direct calls or both (ADR 0072); ``scheduled`` by default.
     """
 
     opens: time
     closes: time
     capacity: int
     label: str | None = field(default=None, compare=False)
+    offer: Offer = Offer.SCHEDULED
 
     def __post_init__(self) -> None:
         """Require ``opens < closes``, ``0 <= capacity <= MAX_CAPACITY`` and a valid label."""
@@ -387,6 +419,16 @@ class TimeWindow:
     def staffed(self) -> bool:
         """Whether at least one agent works in this block."""
         return self.capacity > 0
+
+    @property
+    def offers_slots(self) -> bool:
+        """Whether the block takes part in the slot grid: staffed and not direct-only."""
+        return self.staffed and self.offer.scheduled
+
+    @property
+    def offers_direct(self) -> bool:
+        """Whether a citizen can start a direct call during the block (ADR 0072)."""
+        return self.staffed and self.offer.direct
 
     def overlaps(self, other: "TimeWindow") -> bool:
         """Return whether the two windows share any time (touching ends do not count)."""
@@ -485,15 +527,15 @@ def validate_schedule(rules: Sequence[ScheduleRule], overrides: Sequence[Schedul
                 raise _invalid("schedule_overrides")
 
 
-def is_open(
+def open_for_direct(
     group: Group,
     rules: Iterable[ScheduleRule],
     overrides: Iterable[ScheduleOverride],
     now: datetime,
 ) -> bool:
-    """Return whether ``now`` falls inside a staffed window of the group (local time)."""
+    """Return whether ``now`` falls inside a staffed block that offers direct calls (ADR 0072)."""
     local = now.astimezone(group.tz)
     return any(
-        window.staffed and window.opens <= local.time() < window.closes
+        window.offers_direct and window.opens <= local.time() < window.closes
         for window in windows_on(local.date(), rules, overrides)
     )

@@ -324,7 +324,7 @@ erDiagram
         int horizon_days
         int dispatch_lead_minutes
         string dispatch_kind "contact_center | openplanner_queue"
-        int queue_change_working_days
+        int citizen_change_lead_minutes
         int queue_visible_from_minutes
         bool queue_free_pick_allowed
         int max_bookings_per_email
@@ -379,6 +379,7 @@ erDiagram
         string management_token_hash
         string guest_join_url "PII"
         string host_join_url "PII"
+        string trial_join_url "PII"
         datetime pii_purged_at
     }
     JOB {
@@ -407,14 +408,13 @@ Rules that matter for the rest of the system:
   organisation chooses the ones its groups follow, a group inherits or picks its own (or
   none) and may keep single holidays open. On a date the group's own override wins, then a
   holiday closes the day, then the weekly rules apply (`app/domain/holidays.py`).
-- **The dispatch lead** (`dispatch_lead_minutes`, default 5) sets two moments: when the WxCC
-  task is created, and when the booking becomes read-only. The minimum notice can never be
-  shorter than it.
+- **The dispatch lead** (`dispatch_lead_minutes`, default 5) sets when the WxCC task is
+  created. The minimum notice can never be shorter than it. The citizen can cancel until the
+  start and move until `citizen_change_lead_minutes` (default 60, ADR 0069).
 - **Dispatch kind per group** (ADR 0043): `contact_center` (the WxCC task above) or
   `openplanner_queue`, where agents sign in and claim bookings in the group's own queue
-  (`app/domain/own_queue.py`, `queue_service.py`). An own-queue group sends no task and its
-  bookings become read-only `queue_change_working_days` working days before the start
-  (`Group.change_deadline`).
+  (`app/domain/own_queue.py`, `queue_service.py`). An own-queue group sends no task; both
+  kinds share the citizen's change rule (`Group.change_deadline`, `Group.cancel_deadline`).
 - **All times are stored in UTC.** They are converted to the group's time zone only when
   rendering and parsing.
 
@@ -734,20 +734,47 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0031 | Audit log exact per role level, with system events of the worker for troubleshooting |
 | 0032 | Provider-neutral contact-center integration (proposed; renumbered from 0021) |
 | 0033 | Context-sensitive help: one Markdown manual, shown on GitHub and in the portal, (i) per field |
-| 0034 | Audit events also on the log stream for an external log platform such as Splunk (proposed) |
-| 0035 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes (proposed) |
-| 0036 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond (proposed) |
+| 0034 | Audit events also on the log stream for an external log platform such as Splunk |
+| 0035 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes |
+| 0036 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond |
 | 0037 | Closure page: prepared scenarios, structured alternative contact options, an image with alt text |
 | 0038 | Maintenance mode for the whole installation: data frozen, integrations open for the superuser |
 | 0039 | Adjustable roles within fixed bounds (superuser only), and a read-only auditor role |
 | 0040 | Standard event schema, log levels, role tags, CSV export and storage limits (log rotation, SQLite space reclaim, disk watch) |
 | 0041 | Extended branding: allow-listed tokens with contrast checks, own WOFF2 fonts, header styles, theme file; no free CSS |
-| 0043 | Dispatch option per group: contact center or OpenPlanner's own queue (claim by agents, optional calendar invite to a group address) (proposed) |
+| 0043 | Dispatch option per group: contact center or OpenPlanner's own queue (claim by agents, optional calendar invite to a group address) |
 | 0044 | Planner: group agenda with shortfalls; move, ask to rebook, cancel or accept per booking (`bookings.manage`) |
-| 0048 | Live progress of updates: the host updater reports each step, the updates page polls a fragment (proposed) |
-| 0050 | One host installer that installs, repairs and re-checks a host; one layout under `/home/<user>/openplanner` (proposed) |
+| 0048 | Live progress of updates: the host updater reports each step, the updates page polls a fragment |
+| 0050 | One host installer that installs, repairs and re-checks a host; one layout under `/home/<user>/openplanner` |
 | 0056 | A citizen confirms a new booking by email link; it holds its place until `confirm_by`, then lapses |
-| 0057 | Rebooking assistant: propose a new time for the excess of a short slot, held until the citizen confirms (proposed) |
+| 0057 | Rebooking assistant: propose a new time for the excess of a short slot, held until the citizen confirms |
+| 0042 | Settings layers: code default, admin portal, environment lock |
+| 0045 | Dedicated Webex site and an enforced meeting policy |
+| 0046 | Staff directory: just-in-time records from OIDC, optional SCIM 2.0 provisioning |
+| 0047 | Admin information architecture: scope, object, tab, and one navigation register |
+| 0049 | Role and scope paired in one claim value |
+| 0051 | Dependency currency: every module tracked, deprecations fail the build |
+| 0052 | Releases, version numbers and knowing what runs |
+| 0053 | Security events for attacks on public entry points |
+| 0054 | OpenPlanner is EUPL-1.2, contributions under a contributor licence agreement |
+| 0055 | Configurable booking form fields with validation and a PII tag |
+| 0058 | A fast lane on the pull request, the full lane in the merge queue |
+| 0059 | Release candidates on every merge, and an update channel per installation |
+| 0060 | Product logo: the open-slot mark |
+| 0061 | Live overview with widgets |
+| 0062 | Personal overview layout |
+| 0063 | Showing personal data in the admin portal |
+| 0064 | HTTPS by default: the certificate watched, shown, replaceable and tested end to end |
+| 0065 | Webex's reason on the timeline and in the chain; the group check schedules a probe meeting |
+| 0066 | Bookings per email address |
+| 0067 | Version management in the portal: channel, chosen version, history |
+| 0068 | Troubleshooting per booking: requests, versions, retries and the worker in the group check |
+| 0069 | The citizen cancels until the start and moves until a lead per group |
+| 0070 | The certificate source of the bundled proxy, managed by the superuser in the portal |
+| 0071 | A trial call on Webex ahead of the appointment |
+| 0072 | Direct calls per staffing block, live status for citizen and agent, visible failures |
+
+What is built of each decision is not kept here: it is in `docs/adr-status.md` (checked against the code) and in the *Build status* of the ADR itself.
 
 ## 12. Status and roadmap
 
@@ -758,7 +785,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | WP2 | Domain, persistence, write lock | done |
 | WP3 (slice 1) | Citizen pages, mail, worker, demo | done |
 | WP3b | Citizen pages: month calendar grid, modern layout, branding (O5) | done |
-| WP3c | Embeddable widget (Web Component, same tokens; ADR 0035, backlog EM-1 to EM-5) | planned |
+| WP3c | Embeddable widget (Web Component, same tokens; ADR 0035, backlog EM-1 to EM-5) | done |
 | WP4 | SMS reminders, message editors | done (ADR 0022) |
 | WP5 | Webex Meetings, join page, live status (O1: Meetings API) | done |
 | WP6 | WxCC work items, task events, direct call (O9) | done (O2 follow-up open) |
@@ -771,18 +798,20 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | ADR 0048 | Live update progress: steps reported by the host updater, shown live on the updates page | done |
 | ADR 0052 | Releases and version numbers: rules, release PR plus tag, tag check in CI, commit in every image | done |
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
-| ADR 0033 | Manual and context-sensitive help: group settings documented, other screens follow | in progress |
+| ADR 0033 | Manual and context-sensitive help: 20 topics in Dutch and English; 28 admin routes still without a topic | in progress |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
-| ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | proposed |
-| ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed |
+| ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | done (AU-3, the client's security review, is open) |
+| ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed; nothing built |
 | ADR 0037 | Closure page with scenarios, contact options and image (backlog CB-1, CL-1 to CL-5) | done (CB-1, CL-1 to CL-5) |
-| ADR 0038 | Maintenance mode (backlog MM-1 to MM-5) | planned |
-| ADR 0039 | Rights: (1) auditor role, reach, matrix page text; (2) retention overview; (3) custom roles within bounds | in progress |
-| ADR 0040 | Logging and storage: step 1 rotation, reclaim and disk watch; steps 2–4 schema and levels, filters and CSV export, diagnostic mode and retention | step 1 done |
+| ADR 0038 | Maintenance mode (backlog MM-1 to MM-5) | done |
+| ADR 0039 | Rights: (1) auditor role, reach, matrix page text; (2) retention overview; (3) custom roles within bounds | done |
+| ADR 0040 | Logging and storage: step 1 rotation, reclaim and disk watch; steps 2–4 schema and levels, filters and CSV export, diagnostic mode and retention | done (parts 1–4) |
 | O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
 | O11 step 2 | Change requests by phone number, confirmed by the citizen by email/SMS (ADR 0023) | planned |
+
+Every other decision since ADR 0035 (settings layers, own queue, planner, staff directory, installer, releases and release candidates, TLS, the overview, troubleshooting and more) has its state in `docs/adr-status.md`; this table keeps the work packages only.
 
 The open decisions (O1–O10) are listed in `docs/HANDOVER.md` §11.

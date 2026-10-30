@@ -26,6 +26,7 @@ EXPECTED = {
     "form_answers": "sensitive",
     "guest_join_url": "sensitive",
     "host_join_url": "sensitive",
+    "trial_join_url": "sensitive",
 }
 
 
@@ -43,6 +44,7 @@ def test_the_list_keeps_the_card_order_direct_fields_first() -> None:
         "form_answers",
         "guest_join_url",
         "host_join_url",
+        "trial_join_url",
     )
 
 

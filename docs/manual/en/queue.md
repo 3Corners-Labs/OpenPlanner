@@ -19,7 +19,13 @@ appointment reference and the status:
 Direct calls are in the same list, with **Direct call** below the time. You never see the
 participant's email address or phone number.
 
-The list does not refresh by itself. Choose **Refresh** to see the latest state.
+The status also says how the video link is doing: **Video link being prepared** while the
+call is still being created, and **Video link failed** when that did not work. Nothing there
+means the link is ready.
+
+The list refreshes itself every few seconds (the administrator sets the interval). You do not
+need to reload; **Refresh** does it by hand as well. A new or waiting participant is read out
+by the screen reader.
 
 ## Picking up an appointment
 
@@ -29,6 +35,14 @@ the appointment that starts first. That way every participant gets the first fre
 You then see the button **Join the call**. Only you see that link, so two colleagues never start
 the same call at once. If a colleague was just ahead of you, you see "Already picked up by a
 colleague" and can pick up the next one.
+
+The page of the picked-up appointment shows where the participant is (not in the call yet,
+waiting in the lobby, call in progress) and refreshes itself. The participant, in turn, sees
+at once that an agent has accepted the call.
+
+If the video link failed, this page says so, with a link to the appointment's timeline for
+whoever may see it. The participant sees the same message and the advice to book an
+appointment. Release the appointment.
 
 If **Agents may choose an appointment** is on for the group, every free appointment also has a
 **Pick up** button.

@@ -3,7 +3,7 @@
 Status: accepted (2026-10-29) by the product owner, with the choices recorded under *Choices
 made on acceptance*. Requested by the product owner. Builds on ADR 0011 (management tokens),
 ADR 0022 (channels and consent), ADR 0042 (settings classes), ADR 0044 (planner, lapse of an
-unanswered request) and ADR 0055 (booking form fields).
+unanswered request) and ADR 0055 (booking form fields). Partly built; see `docs/adr-status.md` for what is built.
 
 ## Context
 
@@ -133,6 +133,17 @@ by POST only (point 8).
 3. **Planner:** status in agenda, detail and filter; confirm on behalf; audit event.
 4. **Correct details:** management page form for name, phone and form answers (after
    ADR 0055 step 2).
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | Domain: confirmation policy, `pending_confirmation`, job plan, settings | #115 | merged |
+| 2 | Persistence, jobs, mails, confirm page and POST; bookings start `pending_confirmation` (migration 0058) | #134 | merged |
+| 3 | Planner: status filter, confirm on behalf of the citizen |  | planned |
+| 4 | The citizen corrects details |  | planned |
+
+(State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
 
 ## Consequences
 

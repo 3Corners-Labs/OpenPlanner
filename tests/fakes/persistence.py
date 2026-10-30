@@ -20,6 +20,7 @@ from app.domain.booking import (
     MeetingRef,
     Slot,
     SlotUsage,
+    TrialCall,
 )
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
@@ -461,6 +462,15 @@ class InMemoryTransaction:
     async def save_meeting(self, booking_id: int, meeting: MeetingRef) -> None:
         self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], meeting=meeting)
 
+    async def save_trial_call(self, booking_id: int, trial: TrialCall) -> None:
+        booking = self.state.bookings[booking_id]
+        self.state.bookings[booking_id] = replace(
+            booking, trial=trial, trial_count=booking.trial_count + 1
+        )
+
+    async def clear_trial_call(self, booking_id: int) -> None:
+        self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], trial=None)
+
     async def save_task_id(self, booking_id: int, task_id: str) -> None:
         booking = self.state.bookings[booking_id]
         self.state.bookings[booking_id] = replace(booking, wxcc_task_id=task_id)
@@ -526,6 +536,7 @@ class InMemoryTransaction:
                 b.end,
                 b.is_active,
                 self.state.call_status.get(b.id or 0) or new_status(b.id or 0),
+                claimed=b.claim is not None,
             )
             for b in self.state.bookings.values()
             if b.group_id == group_id and b.kind is BookingKind.DIRECT and b.start >= since
@@ -631,7 +642,7 @@ class InMemoryTransaction:
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         self.state.bookings[booking_id] = replace(
-            self.state.bookings[booking_id], contact=None, claim=None
+            self.state.bookings[booking_id], contact=None, claim=None, trial=None
         )
         self.state.purged_at[booking_id] = now
 

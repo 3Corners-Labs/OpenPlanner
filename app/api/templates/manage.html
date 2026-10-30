@@ -15,6 +15,9 @@
 {% if active and group.video_enabled %}
 <p><a class="button button--large" href="/b/{{ token }}/join">{{ _("join.from_manage") }}</a></p>
 {% endif %}
+{% if active and trial_offered %}
+<p><a href="/b/{{ token }}/test">{{ _("trial.from_manage") }}</a></p>
+{% endif %}
 {% if suspended %}
 <div class="notice notice--warning">
   <h2>{{ _("manage.suspended.title") }}</h2>
@@ -51,8 +54,13 @@
   <li><a class="button button--secondary" href="/b/{{ token }}/reschedule">{{ _("manage.reschedule") }}</a></li>
   <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
 </ul>
-{% elif active %}
+{% elif cancellable %}
 <div class="notice"><p>{{ _("manage.locked") }}</p></div>
+<ul class="actions">
+  <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+</ul>
+{% elif active %}
+<div class="notice"><p>{{ _("manage.started") }}</p></div>
 {% else %}
 <div class="notice"><p>{{ _("manage.inactive") }}</p></div>
 {% if lapsed %}<p><a href="/g/{{ group.slug }}">{{ _("manage.book_again") }}</a></p>{% endif %}

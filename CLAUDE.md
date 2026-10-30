@@ -84,7 +84,7 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 - External penetration test before go-live and yearly; `SECURITY.md` and `/.well-known/security.txt` describe responsible disclosure.
 
 ## Privacy rules
-- PII fields: `first_name, last_name, email, phone, note, form_answers, guest_join_url, host_join_url`. Only on `Booking`. Nowhere else. Answers to a group's custom form fields (ADR 0055) are read only through `Answers.visible(purpose)`; never read a field's PII tag yourself.
+- PII fields: `first_name, last_name, email, phone, note, form_answers, guest_join_url, host_join_url, trial_join_url`. Only on `Booking`. Nowhere else. Answers to a group's custom form fields (ADR 0055) are read only through `Answers.visible(purpose)`; never read a field's PII tag yourself.
 - `purge_pii` job runs at `slot.end + 24h` or `cancelled_at + 24h`; sets fields to NULL and `pii_purged_at`. A nightly sweep re-checks for stragglers and alerts if any booking older than 48 h still has PII.
 - Outbound payloads to any contact-center provider (Webex Contact Center today, ADR 0032) contain only first name and the host join URL.
 - Data flow diagram in `docs/dataflow.md` is the input for the DPIA; keep it current.
@@ -106,6 +106,7 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 - Every PR description: what, why, how tested, screenshots for UI, i18n checked (nl/en), migration reversible (yes/no).
 - Migrations: Alembic, always reversible, never edit a merged migration.
 - Releases tagged `vMAJOR.MINOR.PATCH`; image tagged with version and git SHA.
+- An ADR is not finished when it is written (ADR 0059, point 7): it carries a *Build status* table (step, PR, state) that the PR building a step updates, and its Status line says what is built (`proposed`, `accepted`, partly or not built), checked against the code. `docs/adr-status.md` lists every ADR. Asked for status, say what runs on the test host, not what is decided on paper.
 
 ## Documentation set (keep all present and current)
 - `README.md` — what, quick start (`docker compose up`), where to look next.
