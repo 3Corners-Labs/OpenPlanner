@@ -57,6 +57,33 @@ msgstr "View or change appointment"
 msgid "message.signoff"
 msgstr "Kind regards, {group_name}"
 
+msgid "message.team_invite.subject"
+msgstr "Video appointment {date} {time}, {group_name} ({reference})"
+
+msgid "message.team_invite.greeting"
+msgstr "Dear colleagues,"
+
+msgid "message.team_invite.intro"
+msgstr "A video appointment was booked with {group_name}: {first_name}, reference {reference}. An agent picks it up in OpenPlanner's queue."
+
+msgid "message.team_invite.queue"
+msgstr "You get the link to the call when you pick up the appointment."
+
+msgid "message.team_invite.queue_link"
+msgstr "Go to the queue"
+
+msgid "message.team_invite.summary"
+msgstr "Video appointment {group_name} ({reference})"
+
+msgid "message.team_invite.signoff"
+msgstr "This message was sent automatically by OpenPlanner."
+
+msgid "message.team_cancel.subject"
+msgstr "Cancelled: video appointment {date} {time}, {group_name} ({reference})"
+
+msgid "message.team_cancel.intro"
+msgstr "The video appointment {reference} with {group_name} does not take place at this time. It was removed from your calendar."
+
 msgid "message.calendar_summary"
 msgstr "Video call with {group_name}"
 
@@ -353,6 +380,9 @@ msgstr "You did not pick up this appointment."
 msgid "error.booking_not_active"
 msgstr "This appointment is no longer active."
 
+msgid "error.booking_not_pending"
+msgstr "This appointment is already confirmed or no longer active."
+
 msgid "error.same_slot"
 msgstr "This is the time of your current appointment. Choose another time."
 
@@ -552,6 +582,9 @@ msgstr "Task to the queue and appointment fixed"
 
 msgid "admin.group.dispatch_value"
 msgstr "{minutes} minutes before the start"
+
+msgid "admin.group.no_invite"
+msgstr "No invite"
 
 msgid "admin.group.phone"
 msgstr "Phone number"
@@ -944,6 +977,12 @@ msgstr "Appointments per email address"
 msgid "admin.field.max_bookings_per_email_hint"
 msgstr "How many future appointments one email address may have with this team at the same time. Above 1 so people can also book for someone else. The same address twice at the same time is never possible. 1 to 10."
 
+msgid "admin.field.calendar_invite_address"
+msgstr "Calendar invite to (own queue)"
+
+msgid "admin.field.calendar_invite_address_hint"
+msgstr "Optional. A shared mailbox or mailing list of the team. Each appointment sends it a calendar invite with first name and reference, without a link to the call. Check the address carefully: the invite is outside OpenPlanner's retention."
+
 msgid "admin.field.queue_visible_from_minutes"
 msgstr "Visible in the queue (minutes ahead, own queue)"
 
@@ -1053,6 +1092,9 @@ msgstr "This slot would then have more bookings than agents. Confirm that you ac
 
 msgid "admin.form.error.max_bookings_per_email"
 msgstr "Enter a number from 1 to 10."
+
+msgid "admin.form.error.calendar_invite_address"
+msgstr "Enter a valid email address, or leave the field empty."
 
 msgid "admin.form.error.queue_visible_from_minutes"
 msgstr "Enter a number of minutes from 0 to 120."
@@ -5581,6 +5623,9 @@ msgstr "Staff"
 msgid "settings.topic.planner"
 msgstr "Planner"
 
+msgid "settings.topic.confirmation"
+msgstr "Confirming appointments"
+
 msgid "settings.field.log_level.label"
 msgstr "Log level"
 
@@ -5755,6 +5800,18 @@ msgstr "Request to rebook lapses after (days)"
 msgid "settings.field.planner_rebook_reminder_days.label"
 msgstr "Rebook reminder (days before the lapse)"
 
+msgid "settings.field.booking_confirm_min_minutes.label"
+msgstr "Minimum time to confirm (minutes)"
+
+msgid "settings.field.booking_confirm_reminders.label"
+msgstr "Number of reminders to confirm"
+
+msgid "settings.field.booking_confirm_cutoff_hours.label"
+msgstr "Confirm at the latest (hours before the appointment)"
+
+msgid "settings.field.booking_confirm_window_hours.label"
+msgstr "Confirm within (hours after booking)"
+
 msgid "admin.settings.change"
 msgstr "Change"
 
@@ -5814,3 +5871,39 @@ msgstr "Use the platform value"
 
 msgid "admin.settings.source.organisation"
 msgstr "Organisation"
+
+msgid "admin.settings.secret_hint"
+msgstr "Leave empty to keep the current value; it is never shown."
+
+msgid "admin.settings.adopt"
+msgstr "Manage this here from now on"
+
+msgid "admin.settings.adopted_note"
+msgstr "Taken over into the portal. Remove this variable from the server's environment and restart; until then it still applies:"
+
+msgid "admin.done.adopted"
+msgstr "The value is now held in the portal. Remove the variable from the server's environment and restart the containers."
+
+msgid "admin.form.error.setting_no_key"
+msgstr "Secrets can only be stored once the server has a SETTINGS_ENCRYPTION_KEY."
+
+msgid "admin.form.error.setting_not_locked"
+msgstr "This setting is not in the server's environment; there is nothing to take over."
+
+msgid "admin.settings.login.title"
+msgstr "Change the login mapping"
+
+msgid "admin.settings.login.intro"
+msgstr "Which claims of the identity provider carry the roles, organisations and groups, and which value is which role. After testing you log in again; the new mapping is only saved if you are still superuser afterwards."
+
+msgid "admin.settings.login.test"
+msgstr "Test with a new login"
+
+msgid "admin.done.login_mapping_saved"
+msgstr "The new login mapping was tested with your new login and saved."
+
+msgid "admin.done.login_mapping_refused"
+msgstr "The new login mapping was not saved: with it you would no longer be superuser after logging in. Nothing has changed."
+
+msgid "admin.form.error.login_lockout"
+msgstr "With this mapping you would no longer be superuser; it was not saved."

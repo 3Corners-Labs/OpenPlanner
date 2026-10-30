@@ -86,7 +86,7 @@ def effective(
     """
     names = {name.lower() for name in environ}
     update = {
-        spec.key: resolved.value
+        spec.key: SecretStr(str(resolved.value)) if spec.secret else resolved.value
         for spec in REGISTRY
         if spec.in_config
         and (resolved := _resolve(spec, settings, environ, names, portal, now)).source

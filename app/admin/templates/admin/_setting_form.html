@@ -7,6 +7,9 @@
   <select id="value-{{ row.key }}" name="value"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
     {% for choice in row.choices %}<option value="{{ choice }}"{% if choice == row.input %} selected{% endif %}>{{ choice }}</option>{% endfor %}
   </select>
+  {% elif row.secret %}
+  <input id="value-{{ row.key }}" name="value" type="password" autocomplete="new-password" value="" size="16" aria-describedby="hint-{{ row.key }}{% if row.error %} error-{{ row.key }}{% endif %}"{% if row.error %} aria-invalid="true"{% endif %}>
+  <span class="muted" id="hint-{{ row.key }}">{{ _("admin.settings.secret_hint") }}</span>
   {% else %}
   <input id="value-{{ row.key }}" name="value" type="text" value="{{ row.input }}" size="16"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
   {% endif %}

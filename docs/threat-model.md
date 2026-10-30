@@ -461,6 +461,8 @@ Inputs from outside: the slug and booking id in the path. Agents are portal user
 | Repudiation | Who picked up or released a booking | `queue.claimed` and `queue.released` audit events with actor, group and booking id; `claimed_by` is an HMAC pseudonym of the subject under an HKDF-derived key, removed by the purge | `tests/domain/test_queue_service.py::test_pick_up_next_claims_the_citizen_waiting_in_the_lobby`, `tests/adapters/db/test_queue_queries.py::test_the_purge_removes_the_agent_pseudonym`, `tests/test_keys.py::test_agent_pseudonym_key_is_derived_and_differs_from_the_token_key` |
 | Denial of service | An agent hoards claims or leaves without releasing | Group admins (`bookings.view`) release any claim; unclaimed bookings past `not_picked_up_minutes` are flagged | `tests/domain/test_queue_service.py::test_release_by_the_agent_or_a_group_admin_only`, `test_not_claimed_in_time_is_flagged` |
 | Tampering (CSRF) | A third-party site makes an agent claim or release | Fetch Metadata check (`SameOrigin`) on every POST, as on all admin forms | `tests/admin/test_authorization_matrix.py` (POSTs need `sec-fetch-site: same-origin`) |
+| Information disclosure | The team invite carries more than needed, or the meeting link | Fixed layout with i18n text blocks; first name (invite only), reference, time, queue link; the cancel carries no name | `tests/jobs/test_messages.py::test_team_invite_goes_to_the_team_with_first_name_reference_and_queue_link`, `test_team_cancel_withdraws_the_same_event_without_the_name` |
+| Information disclosure | An admin typo sends first names to an address outside the organisation | Email syntax checked; changing it needs `group.edit` with a fresh login and is audited; the address is shown on the group overview; invites stop at once when it is cleared or the group leaves the own queue | `tests/domain/test_dispatch_kind.py::test_the_invite_address_must_be_an_email_address`, `tests/jobs/test_runner.py::test_team_invite_goes_to_the_teams_address_only_while_the_group_sends_one`, `tests/admin/test_group_routes.py::test_group_switches_to_the_own_queue` |
 
 ## Flow: verify button and simulator (admin)
 
@@ -611,3 +613,35 @@ message job. No personal data.
 | Tampering | A crafted time zone (`../../etc/passwd`) or format reaches the formatting code | Only class D keys; values pass the registry kind and bounds, a time zone must be an IANA zone known to the installation; a stored value that fails is ignored | `tests/domain/test_platform_settings.py::test_a_time_zone_must_be_a_real_iana_zone`, `tests/admin/test_organisation_settings_routes.py::test_an_invalid_time_zone_is_refused_at_its_row` |
 | Information disclosure | One organisation's time format or settings leak into another organisation's pages or mails | A clock scope per request (`ClockScopeMiddleware`) and per message job; outside a scope the platform style applies | `tests/i18n/test_dates.py::test_an_organisation_clock_applies_inside_its_scope_only`, `test_use_clock_outside_a_scope_changes_nothing` |
 | Repudiation | Who changed an organisation's setting | `settings.organisation.manage` audited with the organisation, key, old and new value; refusals with the code | `tests/domain/test_settings_service.py::test_an_org_admin_sets_a_value_for_their_own_organisation` |
+
+## Flow: secrets of class C and taking values over (ADR 0042 step 6, §12)
+
+Admin (superuser, recent login): `POST /admin/settings/{key}` for the fallback mail server's
+password and the update check's token; `POST /admin/settings/{key}/adopt` takes a value the
+environment locks into the portal. Storage: sealed in `integration_credentials` under
+`setting:<key>` (AES-256-GCM, ADR 0008). The host CLI never sets a secret (§10).
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure | A secret set in the portal reaches a page, the CLI, the audit log or a log line | Write-only password field (never pre-filled); `SettingState.value` is `None` for a secret; audit detail `set:<key>:secret`; `PortalValues.secrets` has no `repr` | `tests/admin/test_settings_routes.py::test_a_secret_is_written_but_never_shown`, `tests/domain/test_settings_service.py::test_a_secret_is_sealed_and_audited_without_its_value`, `tests/domain/test_platform_settings.py::test_secrets_never_show_in_the_repr_of_the_portal_values` |
+| Information disclosure | A secret is stored in plain text, or read from the JSON table | Sealed under the settings key; a secret found among the JSON values is ignored; without a key nothing is stored (`setting_no_key`) | `tests/adapters/db/test_platform_settings_queries.py::test_a_secret_is_sealed_never_stored_in_plain_text`, `tests/domain/test_platform_settings.py::test_a_secret_comes_only_from_the_sealed_store`, `tests/domain/test_settings_service.py::test_without_a_settings_key_a_secret_is_refused` |
+| Tampering | The fallback mail server is replaced to intercept mail | Superuser only, recent login, audited with old and new host; the SMTP login still needs TLS (cross-field rule) | `tests/domain/test_settings_service.py::test_a_change_is_stored_bumps_the_version_and_is_audited`, `test_values_that_break_a_rule_together_are_refused` |
+| Elevation | Taking over turns into overruling the operator's lock | Taking over only copies the environment's own value; the setting stays locked until the variable is removed and the containers restart; audited `adopt:<key>` | `tests/domain/test_settings_service.py::test_a_locked_value_is_taken_over_from_the_environment`, `test_only_a_locked_setting_can_be_taken_over`, `tests/admin/test_settings_routes.py::test_a_locked_value_is_taken_over_and_names_the_variable_to_remove` |
+| Information disclosure | The host CLI sets or prints a secret | `settings set` refuses secrets; `list` and `show` print only set / not set | `tests/domain/test_settings_service.py::test_the_cli_never_sets_a_secret`, `tests/adapters/test_settings_report.py::test_secrets_show_only_whether_they_are_set` |
+| Tampering / spoofing | A compromised superuser swaps the Webex Service App or the WxCC host to receive meeting links or work items | Superuser only, recent login; the WxCC host must be https; the client secret and refresh token are sealed and audited without value, the client id and host with old and new value; the webhook secrets stay out of the portal (generated by the server, ADR 0042 inventory) | `tests/domain/test_settings_service.py::test_the_wxcc_host_must_use_https`, `test_webhook_secrets_are_never_typed_in`, `tests/admin/test_settings_routes.py::test_a_webex_service_app_set_in_the_portal_wires_the_integrations` |
+
+## Flow: login mapping with a dry run (ADR 0042 step 7, §8)
+
+Admin (superuser, `settings.login.manage`, recent login): `POST /admin/settings/login/test`
+checks a proposed mapping and keeps it in the signed session; the next login (`prompt=login`,
+`max_age=0`) maps the same ID-token claims with the current and the proposed mapping; the
+proposal is saved only if it resolves the same person to superuser. Host: `settings set|reset
+OIDC_*` (§10). No claim values are stored or logged.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Denial of service | A wrong mapping locks every admin out of the portal | Saved only after the dry run on the superuser's own fresh login resolves to superuser; refused otherwise (`login_lockout`, audited); the host can set or reset the mapping without a login | `tests/domain/test_settings_service.py::test_a_mapping_that_would_lock_the_superuser_out_is_refused`, `test_the_host_can_set_and_reset_the_mapping_to_recover`, `tests/admin/test_settings_routes.py::test_a_mapping_that_would_lock_out_is_not_saved` |
+| Spoofing | Another person completes the dry-run login, or a proposal is replayed | The proposal holds its proposer's subject and is consumed by the next login; a login by anyone else counts as a failed dry run | `tests/domain/test_settings_service.py::test_a_dry_run_of_another_person_does_not_count` |
+| Elevation | A role other than the superuser changes the mapping, or a mapped value grants two roles | `settings.login.manage` is locked to the superuser and never delegable (ADR 0039); one role value per role; claim names and values are plain tokens | `tests/admin/test_settings_routes.py::test_only_the_superuser_sees_and_posts_the_login_mapping`, `tests/domain/test_login_mapping.py::test_an_invalid_mapping_is_refused_by_key` |
+| Tampering | The portal overrules a mapping the operator locked | Any locked key hides the form and refuses the whole change (`setting_locked`) | `tests/domain/test_settings_service.py::test_a_locked_key_of_the_mapping_refuses_the_whole_change` |
+| Tampering (CSRF) | A third-party site starts a dry run in the superuser's browser | Fetch Metadata check and a recent login; the dry run still needs the superuser to authenticate again | `tests/admin/test_authorization_matrix.py` (`POST /admin/settings/login/test`) |

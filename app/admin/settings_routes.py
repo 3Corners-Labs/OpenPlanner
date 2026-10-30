@@ -19,13 +19,15 @@ The page reloads the portal values first, so it always shows what the processes 
     GET  /admin/settings              settings.platform.view
     POST /admin/settings/{key}        settings.platform.manage (recent login)
     POST /admin/settings/{key}/reset  settings.platform.manage (recent login)
+    POST /admin/settings/{key}/adopt  settings.platform.manage (recent login)
+    POST /admin/settings/login/test   settings.login.manage (recent login): dry run (§8)
 """
 
 from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, Response
+from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.live_settings import LiveSettings
 from app.adapters.settings_report import SettingState
@@ -33,9 +35,11 @@ from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin
 from app.admin.pages import page as _page
+from app.admin.session import save_login_trial
 from app.config import Settings
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
+from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
 from app.domain.settings_registry import BY_KEY, LOG_LEVEL_MAX_EXPIRY_HOURS, SettingClass, Topic
 from app.domain.settings_service import LOG_LEVEL, SettingsService, editable
 from app.web.locale import RequestLocale
@@ -86,6 +90,9 @@ class SettingRow:
     from_portal: bool = False
     expires: bool = False
     error: str | None = None
+    secret: bool = False
+    adoptable: bool = False
+    adopted: bool = False
 
 
 @dataclass(frozen=True)
@@ -111,12 +118,38 @@ async def advanced_settings(request: Request, locale: Locale, context: View) -> 
     return await _overview(request, locale, context)
 
 
+LoginChange = Annotated[
+    AdminContext, Depends(RequirePermission(Permission.SETTINGS_LOGIN_MANAGE, fresh=True))
+]
+
+
+@router.post("/settings/login/test", response_class=HTMLResponse)
+async def try_login_mapping(
+    request: Request, locale: Locale, _: SameOrigin, context: LoginChange
+) -> Response:
+    """Check a proposed login mapping, then dry-run it on a fresh login (ADR 0042 §8).
+
+    Nothing is saved here: the proposal waits in the signed session until the next login,
+    and is saved only if that login still resolves to this superuser.
+    """
+    form = await read_form(request, locale)
+    try:
+        values = validate_mapping({key: form.text(key) for key in LOGIN_KEYS})
+    except DomainError as error:
+        return await _overview(request, locale, context, (error.field or "", error), 422)
+    save_login_trial(request, context.principal.subject, values, request.app.state.clock.now())
+    return RedirectResponse("/admin/login?next=/admin/settings&fresh=1", status_code=303)
+
+
 @router.post("/settings/{key}", response_class=HTMLResponse)
 async def change_setting(
     request: Request, key: str, locale: Locale, _: SameOrigin, context: Change
 ) -> Response:
     """Change one setting within its portal bounds; the processes apply it within 10 s."""
     form = await read_form(request, locale)
+    spec = BY_KEY.get(key)
+    if spec is not None and spec.secret and not form.text("value").strip():
+        return redirect_done(URL, "unchanged", anchor=_anchor(key))  # write-only: empty keeps it
     raw_hours = form.text("hours")
     hours = int(raw_hours) if raw_hours.isdigit() and len(raw_hours) <= 3 else None
     try:
@@ -138,6 +171,19 @@ async def reset_setting(
         raise_refusal(error)
         return await _overview(request, locale, context, (key, error), 409)
     return redirect_done(URL, "saved", anchor=_anchor(key))
+
+
+@router.post("/settings/{key}/adopt", response_class=HTMLResponse)
+async def adopt_setting(
+    request: Request, key: str, locale: Locale, _: SameOrigin, context: Change
+) -> Response:
+    """Take a value the environment locks over into the portal (ADR 0042 §12)."""
+    try:
+        await _service(request).adopt(context.principal, key)
+    except DomainError as error:
+        raise_refusal(error)
+        return await _overview(request, locale, context, (key, error), 409)
+    return redirect_done(URL, "adopted", anchor=_anchor(key))
 
 
 def _service(request: Request) -> SettingsService:
@@ -189,9 +235,12 @@ async def _overview(
             "refused": live.refused,
             "status": status_rows,
             "problems": problems,
-            "sections": _sections(states, locale, manage=manage, errors=errors),
+            "sections": _sections(
+                states, locale, manage=manage, errors=errors, stored=_stored(live)
+            ),
             "done": done_message(request, locale.gettext),
             "max_hours": LOG_LEVEL_MAX_EXPIRY_HOURS,
+            "login_form": _login_form(context, current, live, errors, locale),
             "manage": manage,
             "unknown_error": next((m for k, m in errors.items() if k not in BY_KEY), None),
         },
@@ -206,8 +255,13 @@ def _sections(
     *,
     manage: bool = False,
     errors: dict[str, str] | None = None,
+    stored: frozenset[str] = frozenset(),
 ) -> list[TopicSection]:
-    """Group the class C and D settings by topic, in the registry's topic order."""
+    """Group the class C and D settings by topic, in the registry's topic order.
+
+    ``stored`` names the keys the portal holds a value for, so a locked one that was taken
+    over says which variable to remove.
+    """
     _ = locale.gettext
     errors = errors or {}
     by_topic: dict[Topic, list[SettingRow]] = {}
@@ -230,6 +284,12 @@ def _sections(
                 from_portal=state.source.value == "portal",
                 expires=state.spec.key == LOG_LEVEL,
                 error=errors.get(state.spec.key),
+                secret=state.spec.secret,
+                adoptable=manage
+                and editable(state.spec)
+                and state.locked
+                and state.spec.key not in stored,
+                adopted=state.locked and state.spec.key in stored,
             )
         )
     return [
@@ -258,3 +318,41 @@ def _input(state: SettingState) -> str:
     if isinstance(state.value, bool):
         return "true" if state.value else "false"
     return str(state.value)
+
+
+def _stored(live: LiveSettings) -> frozenset[str]:
+    """Return the keys the portal holds a value for (secrets included, values never)."""
+    portal = live.portal
+    return frozenset(portal.values) | frozenset(portal.secrets)
+
+
+@dataclass(frozen=True)
+class LoginField:
+    """One field of the login mapping form."""
+
+    key: str
+    label: str
+    value: str
+    error: str | None
+
+
+def _login_form(
+    context: AdminContext,
+    current: Settings,
+    live: LiveSettings,
+    errors: dict[str, str],
+    locale: RequestLocale,
+) -> list[LoginField] | None:
+    """Return the login mapping form, or ``None`` without the permission or with a lock.
+
+    Only the superuser holds ``settings.login.manage``; any key the environment locks makes
+    the whole mapping the operator's (it is saved as one).
+    """
+    can = can_function(context.principal)(Permission.SETTINGS_LOGIN_MANAGE)
+    if not can or set(LOGIN_KEYS) & live.locked():
+        return None
+    values = current.login_values
+    return [
+        LoginField(key, locale.gettext(SETTING_LABELS[key]), values[key], errors.get(key))
+        for key in LOGIN_KEYS
+    ]

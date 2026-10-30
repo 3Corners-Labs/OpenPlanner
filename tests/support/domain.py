@@ -8,7 +8,7 @@ from dataclasses import replace
 from datetime import UTC, date, datetime, time
 
 from app.domain.authorization import Principal, Role
-from app.domain.scheduling import Group, TimeWindow
+from app.domain.scheduling import DispatchKind, Group, TimeWindow
 from app.domain.services import BookingReceipt, BookingService, ContactInput
 
 NOW = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
@@ -43,6 +43,15 @@ def make_group(**overrides: object) -> Group:
     }
     fields.update(overrides)
     return Group(**fields)  # type: ignore[arg-type]
+
+
+def with_team_invite(group: Group) -> Group:
+    """Return ``group`` on the own queue, sending its team a calendar invite (ADR 0043)."""
+    return replace(
+        group,
+        dispatch_kind=DispatchKind.OPENPLANNER_QUEUE,
+        calendar_invite_address="team@example.org",
+    )
 
 
 def citizen(number: int) -> ContactInput:

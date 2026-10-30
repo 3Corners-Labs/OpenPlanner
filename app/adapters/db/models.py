@@ -198,6 +198,7 @@ class GroupRow(Base):
     queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     # ADR 0059: future bookings one email address may hold in this group.
     max_bookings_per_email: Mapped[int] = mapped_column(Integer, server_default=text("3"))
+    calendar_invite_address: Mapped[str | None] = mapped_column(String(254))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
 
     __table_args__ = (

@@ -2,6 +2,10 @@
 
 Every role × every admin route × own and other organisation/group, against an expectation
 table written by hand from HANDOVER §6. It must not be derived from the implementation.
+
+The sweeps over role × route carry the ``matrix`` marker: they run in the merge queue and on a
+pull request labelled ``ci:full``, not on every push (ADR 0058). The structural tests at the
+end of this file run everywhere, so a route without a permission is still caught at once.
 """
 
 import pytest
@@ -106,6 +110,15 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/organisations/demo/settings/time_format/reset": statuses(
             303, 303, 403, 403, 403, 403, 403
         ),
+    },
+    # ADR 0042 §12: taking a value over from the environment; nothing is locked here (409).
+    "POST /admin/settings/{key}/adopt": {
+        "/admin/settings/admin_session_hours/adopt": statuses(409, 403, 403, 403, 403, 403, 403),
+    },
+    # ADR 0042 §8: the login mapping, superuser only (settings.login.manage); an empty form is
+    # refused before any login.
+    "POST /admin/settings/login/test": {
+        "/admin/settings/login/test": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/settings/{key}/reset": {
         "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
@@ -772,6 +785,7 @@ CASES = [
 ]
 
 
+@pytest.mark.matrix
 @pytest.mark.parametrize(("role", "method", "path", "status"), CASES)
 async def test_matrix(site: Site, role: str, method: str, path: str, status: int) -> None:
     assert await answer(site, role, method, path) == status, (role, method, path)
@@ -815,14 +829,31 @@ def in_maintenance(key: str, role: str, status: int) -> int:
     return 503
 
 
+def maintenance_relevant(key: str, role: str, status: int) -> bool:
+    """Whether a case says something maintenance changes (ADR 0038: every endpoint once).
+
+    The superuser runs every endpoint, which covers each one once and every writable change.
+    Of the other roles, a POST the matrix allows must now get 503, and "no role" on every POST
+    proves the matrix refuses (403) before maintenance does. A GET or a refused POST of
+    another role answers exactly as in ``test_matrix``, which runs those cases already.
+    """
+    if role == "superuser":
+        return True
+    if not key.startswith("POST "):
+        return False
+    return status != 403 or role == "no role"
+
+
 MAINTENANCE_CASES = [
     (role, key.split(" ", 1)[0], path, in_maintenance(key, role, status))
     for key, routes in EXPECTED.items()
     for path, by_role in routes.items()
     for role, status in by_role.items()
+    if maintenance_relevant(key, role, status)
 ]
 
 
+@pytest.mark.matrix
 @pytest.mark.parametrize(("role", "method", "path", "status"), MAINTENANCE_CASES)
 async def test_matrix_during_maintenance(
     site: Site, role: str, method: str, path: str, status: int
@@ -836,6 +867,22 @@ def test_writable_routes_exist() -> None:
     assert WRITABLE_IN_MAINTENANCE <= set(EXPECTED)
 
 
+def test_the_maintenance_sweep_covers_every_endpoint_and_every_allowed_change() -> None:
+    swept = {(role, path) for role, _, path, _ in MAINTENANCE_CASES}
+    every_path = {path for routes in EXPECTED.values() for path in routes}
+    allowed_posts = {
+        (role, path)
+        for key, routes in EXPECTED.items()
+        if key.startswith("POST ")
+        for path, by_role in routes.items()
+        for role, status in by_role.items()
+        if status != 403
+    }
+
+    assert {path for role, path in swept if role == "superuser"} == every_path
+    assert allowed_posts <= swept
+
+
 async def maintenance_on(site: Site) -> None:
     """Switch maintenance on as the host would (``python -m app.cli maintenance on``)."""
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
@@ -846,6 +893,7 @@ async def maintenance_on(site: Site) -> None:
 GET_PATHS = [p for key, routes in EXPECTED.items() if key.startswith("GET ") for p in routes]
 
 
+@pytest.mark.matrix
 @pytest.mark.parametrize("path", GET_PATHS)
 async def test_anonymous_visitors_are_sent_to_the_login(site: Site, path: str) -> None:
     response = await site.client.get(path)

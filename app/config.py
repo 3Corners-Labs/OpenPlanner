@@ -20,6 +20,7 @@ from pydantic_settings import (
 )
 
 from app.domain.event_schema import Envelope
+from app.domain.login_mapping import LOGIN_KEYS
 from app.domain.settings_registry import REGISTRY, SettingClass
 from app.domain.system_log import EventRetention
 from app.i18n.dates import ClockStyle
@@ -214,6 +215,15 @@ class Settings(BaseSettings):
     # settings registry).
     planner_rebook_days: int = Field(default=14, ge=1, le=30)
     planner_rebook_reminder_days: int = Field(default=3, ge=1, le=29)
+    # ADR 0056: a citizen confirms a booking by email link within the earlier of this many
+    # hours after booking and this many hours before the start, with this many reminders.
+    # Class D organisation (ADR 0042, settings registry).
+    booking_confirm_window_hours: int = Field(default=24, ge=1, le=72)
+    booking_confirm_cutoff_hours: int = Field(default=2, ge=0, le=24)
+    booking_confirm_reminders: int = Field(default=1, ge=0, le=3)
+    # ADR 0056: less time to confirm than this switches to the short-notice rule, and no
+    # reminder goes closer to the deadline. Class C platform (ADR 0042, settings registry).
+    booking_confirm_min_minutes: int = Field(default=15, ge=5, le=120)
 
     # Links in messages (manage link, calendar UID) are built from this base URL.
     public_base_url: str = "http://127.0.0.1:8000"
@@ -434,6 +444,11 @@ class Settings(BaseSettings):
             "OIDC needs an https discovery URL and a client secret",
         )
         return found
+
+    @property
+    def login_values(self) -> dict[str, str]:
+        """The login mapping settings by key (ADR 0042 §8), for ``claim_mapping``."""
+        return {key: str(getattr(self, key)) for key in LOGIN_KEYS}
 
     @property
     def event_retention(self) -> EventRetention:

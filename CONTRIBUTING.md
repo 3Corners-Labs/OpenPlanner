@@ -25,9 +25,19 @@ uv run python -m app.jobs.worker                         # worker
 
 ## Checks
 
-`make check` runs what every PR must pass locally: ruff (format + lint), mypy `--strict`,
-import-linter, pytest with coverage (≥ 90% on `app/domain/`, ≥ 75% overall), bandit,
-pip-audit and `uv lock --check`.
+CI has two lanes (ADR 0058). The **fast lane** runs on every push to a pull request and answers
+in a few minutes. The **full lane** adds the authorisation matrix sweep, the container checks
+and Playwright; it runs in the merge queue, on `main`, and on a pull request with the label
+`ci:full`. Nothing reaches `main` without both. Add `ci:full` when a change touches
+authorisation, navigation, templates or the widget, so those failures show up before the queue.
+
+`make fast` is the fast lane on your machine, in about two minutes: ruff (format + lint),
+shellcheck, mypy `--strict`, import-linter, pytest with coverage (≥ 90% on `app/domain/` and
+`app/i18n/`, ≥ 75% overall) and bandit. Use it while trying an idea.
+
+`make check` runs what every PR must pass locally: `make fast`, the authorisation matrix sweep
+(`make matrix`, `pytest -m matrix`), pip-audit, `uv lock --check`, `make pins` and jscpd. Run
+it before asking for review.
 
 The tests run on every core (`pytest -n auto`, pytest-xdist). A single test or file still runs
 on its own: `uv run pytest tests/domain/test_booking.py`. A test must not depend on another
@@ -112,7 +122,9 @@ Run the `security-review` skill (`.claude/skills/security-review/`) before openi
 
 `main` merges through a merge queue (squash): the queue builds `main` with the queued pull
 requests on top and merges only when that build is green, so two pull requests that pass on
-their own (two Alembic heads, two ADRs with one number) cannot both land.
+their own (two Alembic heads, two ADRs with one number) cannot both land. The queue also runs
+the full lane, so a pull request that was green on the fast lane can still be sent back from
+there.
 
 ## Releases
 
