@@ -329,6 +329,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/updates/progress": {
         "/admin/updates/progress": statuses(200, 403, 403, 403, 403, 403, 403),
     },
+    "POST /admin/updates/check": {
+        "/admin/updates/check": statuses(409, 403, 403, 403, 403, 403, 403)
+    },
     "POST /admin/updates/update": {
         "/admin/updates/update": statuses(409, 403, 403, 403, 403, 403, 403)
     },
@@ -512,6 +515,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/groups/{slug}/agenda": {
         "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403, 403, 403),
         "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    # ADR 0010, 0072: the fragment the agenda polls carries the page's permission and scope.
+    "GET /admin/groups/{slug}/agenda/live": {
+        "/admin/groups/demo/agenda/live": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/live": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     # ADR 0044: a planner's changes; an unknown booking is a 404, an empty form a 400.
     "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
@@ -908,6 +916,7 @@ WRITABLE_IN_MAINTENANCE = frozenset(
         "POST /admin/organisations/{org}/channels/email/domain",
         "POST /admin/organisations/{org}/channels/sms",
         "POST /admin/organisations/{org}/channels/{channel}/remove",
+        "POST /admin/updates/check",
         "POST /admin/updates/update",
         "POST /admin/updates/restore",
         "POST /admin/updates/requests/{request_id}/cancel",

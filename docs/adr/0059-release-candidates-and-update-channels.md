@@ -89,8 +89,9 @@ or unattended updates: that is a decision about the host, taken by the operator 
 chose its mode. `APP_VERSION` (B, baked into the image) now also holds `X.Y.Z-rc.N`.
 
 **Fixed on purpose:** the `rc` numbering and the pre-release flag (process rules, as in ADR
-0052); the hourly check interval (`CHECK_INTERVAL`, ADR 0029) also applies to the `rc`
-channel: the candidate is live within the hour, or within a minute after "Update now".
+0052). The check interval also applies to the `rc` channel: the candidate is live within
+one interval (`update_check_minutes`, a class C setting since ADR 0067 point 7; fixed at an
+hour before), at once after "Check now", or within a minute after "Update now".
 
 ## Build status
 

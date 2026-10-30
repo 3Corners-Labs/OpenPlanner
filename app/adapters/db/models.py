@@ -890,6 +890,7 @@ class ReleaseCheckRow(Base):
     latest_version: Mapped[str | None] = mapped_column(String(20))
     release_url: Mapped[str | None] = mapped_column(String(300))
     error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+    requested_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 

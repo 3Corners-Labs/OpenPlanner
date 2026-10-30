@@ -106,7 +106,7 @@ flowchart TB
     web <--> volume
     worker <--> volume
     worker -- SMTP --> smtp
-    worker -- hourly release check --> github
+    worker -- release check (interval setting) --> github
     worker -. "certificate probe, https :443" .-> proxy
     web -- "own certificate (ADR 0070)" --> certs -. "watcher, caddy reload" .-> proxy
     updater -- "app.cli: claim, progress, report, backup" --> web
@@ -142,7 +142,8 @@ flowchart TB
   every release and release candidate. A host pulls, verifies and pins both by digest
   (`.env.update`) and never builds Caddy; `docker compose` builds the proxy locally only in
   development and in `scripts/check-proxy.sh`. Hosting and backups: open point O7.
-- **Updates** (ADR 0029): the worker checks the latest release hourly; a superuser requests an
+- **Updates** (ADR 0029): the worker checks the latest release every `update_check_minutes`
+  (default 60) or at once after "Check now" (ADR 0067 point 7); a superuser requests an
   update or a restore in the portal; the host updater (outside the containers, with the Docker
   socket) verifies the signatures of both images, backs up, switches the pinned digests and
   rolls back on its own when the new version (web, worker or proxy) does not become healthy.

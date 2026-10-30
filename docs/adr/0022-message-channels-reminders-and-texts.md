@@ -2,6 +2,7 @@
 
 Status: accepted (2026-10-25); superseded in part by ADR 0028 (SMS provider as data, Webex
 Connect as one adapter). Implements ADR 0008 for SMTP and SMS, and the editors of ADR 0009.
+Built; the organisation-wide text editor it deferred came with ADR 0074 (checked on 2026-10-31).
 
 ## Context
 
@@ -49,6 +50,13 @@ already existed, but there was no SMS adapter, no screen for reminder rules and 
    allow-list (`{date}`, `{time}`, `{group_name}` for email; plus `{first_name}` and
    `{manage_url}` for SMS). Lookup: group text → organisation override → catalogue. The
    layout, links and the calendar attachment stay fixed; admins never edit HTML or Jinja.
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | Channel settings, SMS through Webex Connect, reminder rules, group texts | #19, #29 | built |
+| 2 | Organisation-wide text editor (the last Consequences point) | #168 | in PR |
 
 ## Consequences
 

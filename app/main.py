@@ -70,6 +70,7 @@ from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
 from app.domain.maintenance_service import MaintenanceService
+from app.domain.meeting_status_service import MeetingStatusService
 from app.domain.messaging_service import MessagingService
 from app.domain.organisation_text_service import OrganisationTextService
 from app.domain.organisations import OrganisationService
@@ -334,6 +335,14 @@ def create_app(
         )
         app.state.integration_service = IntegrationService(
             uow, clock, app.state.admin_service, settings.app_version
+        )
+        app.state.meeting_status_service = MeetingStatusService(
+            uow,
+            clock,
+            app.state.integration_service,
+            lambda: app.state.integrations.video,
+            lambda: timedelta(seconds=live().meeting_status_refresh_seconds),
+            settings.app_version,
         )
         app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)

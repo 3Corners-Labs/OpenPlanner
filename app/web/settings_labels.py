@@ -13,6 +13,7 @@ SETTING_LABELS: dict[str, str] = {
     "log_level": "settings.field.log_level.label",
     "worker_poll_seconds": "settings.field.worker_poll_seconds.label",
     "queue_refresh_seconds": "settings.field.queue_refresh_seconds.label",
+    "meeting_status_refresh_seconds": "settings.field.meeting_status_refresh_seconds.label",
     "maintenance_cache_seconds": "settings.field.maintenance_cache_seconds.label",
     "maintenance_retry_after_seconds": "settings.field.maintenance_retry_after_seconds.label",
     "maintenance_alert_hours": "settings.field.maintenance_alert_hours.label",
@@ -70,6 +71,7 @@ SETTING_LABELS: dict[str, str] = {
     "update_repository": "settings.field.update_repository.label",
     "update_channel": "settings.field.update_channel.label",
     "update_auto_apply": "settings.field.update_auto_apply.label",
+    "update_check_minutes": "settings.field.update_check_minutes.label",
     "update_check_token": "settings.field.update_check_token.label",  # nosec B105 - an i18n key
     "time_format": "settings.field.time_format.label",
     "admin_timezone": "settings.field.admin_timezone.label",
