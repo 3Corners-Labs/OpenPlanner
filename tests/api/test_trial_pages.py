@@ -1,6 +1,5 @@
 """The citizen's trial call on Webex (ADR 0070): page, opening, the way in, and its limits."""
 
-import re
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import timedelta
@@ -16,6 +15,7 @@ from app.domain.ports import IntegrationError
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
+from tests.support.citizen import confirm_newest, emailed_token
 from tests.support.domain import NOW
 
 FRIDAY_0900 = "2026-01-02T08:00:00Z"
@@ -38,13 +38,12 @@ class Site:
         self.client, self.clock, self.video = client, clock, video
         self.token = ""
 
-    async def booked(self) -> "Site":
-        response = await self.client.post(
+    async def booked(self, *, confirm: bool = True) -> "Site":
+        """Book, then confirm by the emailed link (ADR 0056), as a citizen does."""
+        await self.client.post(
             "/g/demo/book", data={"start": FRIDAY_0900, **ADA}, headers=SAME_ORIGIN
         )
-        match = re.fullmatch(r"/b/([A-Za-z0-9_-]+)\?status=\w+", response.headers["location"])
-        assert match
-        self.token = match.group(1)
+        self.token = await (confirm_newest if confirm else emailed_token)(self.client)
         return self
 
     async def open(self) -> httpx.Response:
@@ -178,3 +177,21 @@ async def test_an_unknown_token_is_a_404(site: Site) -> None:
     for path in ("/b/unknown/test", "/b/unknown/test/go"):
         assert (await site.client.get(path)).status_code == 404
     assert (await site.client.post("/b/unknown/test", headers=SAME_ORIGIN)).status_code == 404
+
+
+async def test_a_booking_that_awaits_confirmation_has_no_trial_call(site: Site) -> None:
+    """ADR 0056: the address is not verified yet, so no Webex meeting is made for it."""
+    await site.client.post(
+        "/g/demo/book",
+        data={"start": "2026-01-02T08:30:00Z", **{**ADA, "email": "b@example.org"}},
+        headers=SAME_ORIGIN,
+    )
+    pending = await emailed_token(site.client)
+
+    page = await site.client.get(f"/b/{pending}/test")
+    opened = await site.client.post(f"/b/{pending}/test", headers=SAME_ORIGIN)
+
+    assert page.status_code == 200
+    assert "Proefgesprek openen" not in page.text
+    assert opened.status_code == 303
+    assert site.video.created == []
