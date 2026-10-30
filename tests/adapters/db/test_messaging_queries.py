@@ -138,3 +138,26 @@ async def test_group_texts_store_replace_and_delete(engine: AsyncEngine) -> None
         }
         await tx.save_group_text(group, "nl", "message.reminder.sms", None)
         assert await tx.get_group_texts(group) == {("en", "message.reminder.sms"): "Second"}
+
+
+async def test_organisation_texts_store_replace_delete_and_list_all(engine: AsyncEngine) -> None:
+    await seed_demo(engine)
+    uow = SqlUnitOfWork(engine)
+    org, group = await _demo_ids(uow)
+    async with uow.locked() as tx:
+        await tx.save_organisation_text(org, "nl", "booked.text", "Eerste")
+        await tx.save_organisation_text(org, "nl", "booked.text", "Tweede")
+        await tx.save_organisation_text(org, "en", "booked.text", "Second")
+        await tx.save_group_text(group, "nl", "message.reminder.sms", "Groep")
+    async with uow.locked() as tx:
+        assert await tx.get_organisation_texts(org) == {
+            ("nl", "booked.text"): "Tweede",
+            ("en", "booked.text"): "Second",
+        }
+        assert await tx.get_organisation_texts(org + 1) == {}
+        assert await tx.get_all_organisation_texts() == {
+            (org, "nl", "booked.text"): "Tweede",
+            (org, "en", "booked.text"): "Second",
+        }
+        await tx.save_organisation_text(org, "nl", "booked.text", None)
+        assert await tx.get_organisation_texts(org) == {("en", "booked.text"): "Second"}

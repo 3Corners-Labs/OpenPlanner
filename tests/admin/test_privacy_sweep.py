@@ -187,6 +187,8 @@ PATHS: dict[str, str] = {
     ),
     "/admin/organisations/{org}": "/admin/organisations/demo",
     "/admin/organisations/{org}/settings": "/admin/organisations/demo/settings",
+    "/admin/organisations/{org}/texts/{text_locale}": "/admin/organisations/demo/texts/nl",
+    "/admin/organisations/{org}/texts": "/admin/organisations/demo/texts",
     "/admin/organisations/{org}/branding": "/admin/organisations/demo/branding",
     "/admin/organisations/{org}/branding/theme.css": "/admin/organisations/demo/branding/theme.css",
     "/admin/organisations/{org}/channels": "/admin/organisations/demo/channels",

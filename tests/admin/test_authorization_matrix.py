@@ -133,6 +133,18 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             303, 303, 403, 403, 403, 403, 403
         ),
     },
+    # ADR 0074: the organisation's own texts; org admins (own organisation) and the superuser.
+    "GET /admin/organisations/{org}/texts": {
+        "/admin/organisations/demo/texts": statuses(303, 303, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/texts": statuses(303, 403, 403, 303, 403, 403, 403),
+    },
+    "GET /admin/organisations/{org}/texts/{text_locale}": {
+        "/admin/organisations/demo/texts/nl": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/texts/nl": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/texts/{text_locale}": {
+        "/admin/organisations/demo/texts/nl": statuses(303, 303, 403, 403, 403, 403, 403),
+    },
     # ADR 0042 §12: taking a value over from the environment; nothing is locked here (409).
     "POST /admin/settings/{key}/adopt": {
         "/admin/settings/admin_session_hours/adopt": statuses(409, 403, 403, 403, 403, 403, 403),
