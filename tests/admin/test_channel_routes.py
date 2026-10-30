@@ -8,8 +8,15 @@ import httpx
 import pytest
 
 from app.adapters import smtp as smtp_module
-from app.admin.channel_routes import SMS_PROVIDER_LABELS
+from app.admin.channel_routes import (
+    REASON_LABELS,
+    RECORD_LABELS,
+    SMS_PROVIDER_LABELS,
+    VERDICT_LABELS,
+    VERDICT_TONES,
+)
 from app.domain.channel_settings import SmsProvider
+from app.domain.mail_domain import REASONS, Record, Verdict
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
 from tests.admin.test_admin_flow import audit_events
 
@@ -218,3 +225,78 @@ async def test_a_test_email_needs_a_valid_address(site: Site, fake_smtp: type[Fa
     assert response.status_code == 422
     assert 'href="#test_recipient"' in response.text
     assert fake_smtp.calls == []
+
+
+DOMAIN_RECORDS: dict[str, tuple[str, ...] | None] = {
+    "demo.nl": ("v=spf1 include:_spf.provider.example -all", "google-site-verification=x"),
+    "s1._domainkey.demo.nl": ("v=DKIM1; k=rsa; p=MIGfMA0G",),
+    "_dmarc.demo.nl": ("v=DMARC1; p=none; rua=mailto:dmarc@demo.nl",),
+}
+
+
+async def test_the_sender_domain_check_shows_one_verdict_per_record_adr_0073(site: Site) -> None:
+    await site.login_as(SUPER)
+    await _post(site, "email", {**SMTP, "dkim_selector": "s1", "reply_to_address": "info@demo.nl"})
+    site.dns.records = DOMAIN_RECORDS
+
+    response = await _post(site, "email/domain", {})
+
+    assert response.status_code == 200
+    page = response.text
+    assert site.dns.asked == ["demo.nl", "s1._domainkey.demo.nl", "_dmarc.demo.nl"]
+    assert "Resultaat voor demo.nl" in page
+    assert page.count("In orde") == 2  # SPF and DKIM
+    assert "Aandachtspunt" in page  # DMARC p=none, also the overall chip
+    assert "p=none" in page  # explained in words
+    assert "v=spf1" not in page  # never the record itself
+    assert 'value="info@demo.nl"' in page
+    assert 'value="s1"' in page
+    assert ("sub-super", "integrations.manage", "success", "") in [
+        (a, b, str(c), d) for a, b, c, d in await audit_events(site)
+    ]
+    assert "smtp.domain_check.warning" in (await site.client.get("/admin/audit")).text
+
+
+async def test_the_sender_domain_check_needs_a_sender(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    response = await _post(site, "email/domain", {})
+
+    assert response.status_code == 422
+    assert 'href="#domain_check"' in response.text
+    assert "niets te controleren" in response.text
+    assert site.dns.asked == []
+
+
+async def test_a_failed_lookup_is_reported_as_unknown_not_missing(site: Site) -> None:
+    await site.login_as(SUPER)
+    await _post(site, "email", SMTP)
+    site.dns.records = {"demo.nl": None, "_dmarc.demo.nl": ("v=DMARC1; p=reject",)}
+
+    page = (await _post(site, "email/domain", {})).text
+
+    assert "Niet vast te stellen" in page
+    assert "Niet gecontroleerd" in page  # DKIM without a selector
+    assert "Ontbreekt" not in page
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("reply_to_address", "geen-adres"), ("dkim_selector", "s 1")],
+)
+async def test_an_invalid_reply_address_or_selector_is_refused(
+    site: Site, field: str, value: str
+) -> None:
+    await site.login_as(SUPER)
+
+    response = await _post(site, "email", {**SMTP, field: value})
+
+    assert response.status_code == 422
+    assert f'href="#{field}"' in response.text
+
+
+def test_every_verdict_record_and_reason_has_a_label() -> None:
+    assert set(VERDICT_TONES) == set(Verdict)
+    assert set(VERDICT_LABELS) == set(Verdict)
+    assert set(RECORD_LABELS) == set(Record)
+    assert set(REASON_LABELS) == REASONS

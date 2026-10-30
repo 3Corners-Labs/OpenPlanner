@@ -10,9 +10,14 @@ The test email goes through exactly the server the worker would use (the organis
 else the installation's fallback); a failure is explained per code, never with the server's
 own answer. It is rate-limited like a booking, since it sends mail to a typed-in address.
 
+The sender domain check (ADR 0073) looks up SPF, DKIM and DMARC of the sender in effect and
+shows one verdict per record, explained in the admin's words; the records themselves are not
+shown. It is rate-limited like the test email, since it makes the server send DNS queries.
+
     GET  /admin/organisations/{org}/channels                   integrations.manage  forms
     POST /admin/organisations/{org}/channels/email             integrations.manage  SMTP
     POST /admin/organisations/{org}/channels/email/test        integrations.manage  test email
+    POST /admin/organisations/{org}/channels/email/domain      integrations.manage  domain check
     POST /admin/organisations/{org}/channels/sms               integrations.manage  SMS
     POST /admin/organisations/{org}/channels/{channel}/remove  integrations.manage  remove
 """
@@ -41,6 +46,7 @@ from app.domain.channel_settings import (
 )
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.mail_domain import DomainReport, Record, Verdict
 from app.i18n import BoundGettext
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
@@ -71,6 +77,49 @@ TEST_FAILURES: dict[str, str] = {
 """Explanation per failure code of a test email; ``rejected_<status>`` and others are generic."""
 
 TEST_FIELD = "test_recipient"
+DOMAIN_FIELD = "domain_check"
+"""The id of the check button; a refusal of the check is linked to it."""
+
+VERDICT_TONES: dict[Verdict, str] = {
+    Verdict.OK: "success",
+    Verdict.NOT_CHECKED: "",
+    Verdict.WARNING: "warning",
+    Verdict.UNKNOWN: "warning",
+    Verdict.MISSING: "danger",
+    Verdict.INVALID: "danger",
+}
+"""Chip tone per verdict of the sender domain check (ADR 0073); a test checks every verdict."""
+
+VERDICT_LABELS: dict[Verdict, str] = {
+    Verdict.OK: "admin.channels.domain_verdict.ok",
+    Verdict.NOT_CHECKED: "admin.channels.domain_verdict.not_checked",
+    Verdict.WARNING: "admin.channels.domain_verdict.warning",
+    Verdict.UNKNOWN: "admin.channels.domain_verdict.unknown",
+    Verdict.MISSING: "admin.channels.domain_verdict.missing",
+    Verdict.INVALID: "admin.channels.domain_verdict.invalid",
+}
+"""Label per verdict; a test checks every verdict."""
+
+RECORD_LABELS: dict[Record, str] = {
+    Record.SPF: "admin.channels.domain_record.spf",
+    Record.DKIM: "admin.channels.domain_record.dkim",
+    Record.DMARC: "admin.channels.domain_record.dmarc",
+}
+"""Label per record; a test checks every record."""
+
+REASON_LABELS: dict[str, str] = {
+    "ok": "admin.channels.domain_reason.ok",
+    "missing": "admin.channels.domain_reason.missing",
+    "multiple": "admin.channels.domain_reason.multiple",
+    "invalid": "admin.channels.domain_reason.invalid",
+    "unknown": "admin.channels.domain_reason.unknown",
+    "spf_pass_all": "admin.channels.domain_reason.spf_pass_all",  # nosec B105 (a key, not a secret)
+    "spf_neutral_all": "admin.channels.domain_reason.spf_neutral_all",
+    "dkim_no_selector": "admin.channels.domain_reason.dkim_no_selector",
+    "dkim_revoked": "admin.channels.domain_reason.dkim_revoked",
+    "dmarc_policy_none": "admin.channels.domain_reason.dmarc_policy_none",
+}
+"""Explanation per reason code of ``app.domain.mail_domain``; a test checks every reason."""
 
 CHANNEL_PATHS = {"email": ChannelKind.EMAIL, "sms": ChannelKind.SMS}
 """The channels in URLs; anything else is a 404."""
@@ -181,6 +230,25 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
             error=form.error_for("sender_name"),
             required=False,
         ),
+        Field(
+            "reply_to_address",
+            _("admin.channels.reply_to_address"),
+            "email",
+            _value(form, "reply_to_address", config.reply_to_address if config else None),
+            hint=_("admin.channels.reply_to_address_hint"),
+            error=form.error_for("reply_to_address"),
+            required=False,
+            attributes={"autocomplete": "off", "spellcheck": "false"},
+        ),
+        Field(
+            "dkim_selector",
+            _("admin.channels.dkim_selector"),
+            value=_value(form, "dkim_selector", config.dkim_selector if config else None),
+            hint=_("admin.channels.dkim_selector_hint"),
+            error=form.error_for("dkim_selector"),
+            required=False,
+            attributes={"autocapitalize": "none", "spellcheck": "false"},
+        ),
     ]
 
 
@@ -282,14 +350,17 @@ async def _form_page(
     submitted: dict[ChannelKind, FormData],
     status: int = 200,
     test: FormData | None = None,
+    domain: FormData | None = None,
+    report: DomainReport | None = None,
 ) -> HTMLResponse:
-    """Render both channel forms and the test email form with the stored settings."""
+    """Render both channel forms, the test email form and the domain check (with its report)."""
     overview: ChannelOverview = await channel_service(request).overview(context.principal, org)
     _ = locale.gettext
     tz = ZoneInfo(settings_for(request).admin_timezone)
     email = submitted.get(ChannelKind.EMAIL) or FormData({}, _)
     sms = submitted.get(ChannelKind.SMS) or FormData({}, _)
     test = test or FormData({}, _)
+    domain = domain or FormData({}, _)
     stored_email = overview.channels[ChannelKind.EMAIL]
     stored_sms = overview.channels[ChannelKind.SMS]
     response = _page(
@@ -307,12 +378,33 @@ async def _form_page(
             "sms_stored": stored_sms is not None,
             "fallback_mail": bool(request.app.state.settings.smtp_host),
             "test_fields": _test_fields(test, _),
-            "errors": email.errors + sms.errors + test.errors,
+            "domain_error": domain.error_for(DOMAIN_FIELD),
+            "domain_report": _domain_view(report, _) if report else None,
+            "errors": email.errors + sms.errors + test.errors + domain.errors,
             "done": forms.done_message(request, _),
         },
     )
     response.status_code = status
     return response
+
+
+def _domain_view(report: DomainReport, _: BoundGettext) -> dict[str, object]:
+    """Return the domain report as the template shows it: labels and tones, no record texts."""
+    rows = [
+        {
+            "record": _(RECORD_LABELS[check.record]),
+            "verdict": _(VERDICT_LABELS[check.verdict]),
+            "tone": VERDICT_TONES[check.verdict],
+            "explanation": _(REASON_LABELS[check.reason], record=_(RECORD_LABELS[check.record])),
+        }
+        for check in report.checks
+    ]
+    return {
+        "domain": report.domain,
+        "finding": _(VERDICT_LABELS[report.finding]),
+        "tone": VERDICT_TONES[report.finding],
+        "rows": rows,
+    }
 
 
 @router.get("/organisations/{org}/channels", response_class=HTMLResponse)
@@ -361,11 +453,35 @@ async def save_email(
                 username=form.optional_text("smtp_username"),
                 sender_address=form.text("sender_address"),
                 sender_name=form.optional_text("sender_name"),
+                reply_to_address=form.optional_text("reply_to_address"),
+                dkim_selector=form.optional_text("dkim_selector"),
             )
         except DomainError as error:
             form.refusal(error)
     secret = form.values.get("smtp_credential") or None
     return await _save(request, locale, context, org, ChannelKind.EMAIL, form, config, secret)
+
+
+@router.post("/organisations/{org}/channels/email/domain", response_class=HTMLResponse)
+@limiter.limit(booking_limit)
+async def check_sender_domain(
+    request: Request, locale: Locale, org: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Look up SPF, DKIM and DMARC of the sender domain in effect and show the verdicts."""
+    gettext = locale.gettext
+    form = FormData({}, gettext)
+    try:
+        report = await channel_service(request).check_sender_domain(context.principal, org)
+    except DomainError as error:
+        forms.raise_refusal(error)
+        if error.code is ErrorCode.CHANNEL_NOT_CONFIGURED:
+            form.errors.append(
+                FormError(DOMAIN_FIELD, gettext("admin.channels.domain_failed.no_server"))
+            )
+        else:
+            form.refusal(error)
+        return await _form_page(request, locale, context, org, {}, 422, domain=form)
+    return await _form_page(request, locale, context, org, {}, report=report)
 
 
 @router.post("/organisations/{org}/channels/email/test", response_class=HTMLResponse)
