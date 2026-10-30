@@ -288,6 +288,7 @@ same commit and rollback behaviour as the SQL one.
 | Channel settings per organisation (SMTP, SMS; ADR 0022) | `app/domain/channel_settings.py`, `app/domain/channel_service.py`, `app/admin/channel_routes.py` |
 | Reminder rules and group texts (ADR 0022) | `app/domain/messaging_service.py`, `app/domain/message_texts.py`, `app/admin/message_routes.py` |
 | Senders per organisation, SMS adapters per provider (ADR 0028) | `app/adapters/senders.py`, `app/adapters/sms.py`, `app/adapters/webex_connect_sms.py`, `app/adapters/smtp.py` |
+| Sender domain check: SPF, DKIM, DMARC verdicts (ADR 0073) | `app/domain/mail_domain.py`, `app/adapters/mail_dns.py` |
 | Job execution | `app/jobs/runner.py`, `app/jobs/worker.py` |
 | Settings: registry, portal values with env lock, live reload, Advanced settings (ADR 0042) | `app/domain/settings_registry.py`, `app/domain/platform_settings.py`, `app/adapters/settings_report.py`, `app/adapters/live_settings.py`, `app/adapters/db/platform_settings.py`, `app/admin/settings_routes.py` |
 

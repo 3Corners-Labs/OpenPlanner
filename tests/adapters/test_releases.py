@@ -1,19 +1,20 @@
 """GitHub releases adapter (ADR 0029) against recorded responses."""
 
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 import httpx
 import pytest
 
-from app.adapters.releases import GitHubReleases, running_version, update_service
+from app.adapters.releases import GitHubReleases, plain_notes, running_version, update_service
 from app.config import Settings
 from app.domain.ports import IntegrationError
-from app.domain.updates import Release, UpdateChannel, Version
+from app.domain.updates import NOTES_CHARS, ListedRelease, Version
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.domain import DEMO_SUPERUSER
 
-LATEST = {  # recorded shape of GET /repos/{owner}/{repo}/releases/latest (trimmed)
+LATEST = {  # recorded shape of one item of GET /repos/{owner}/{repo}/releases (trimmed)
     "url": "https://api.github.com/repos/acme/openplanner/releases/1",
     "html_url": "https://github.com/acme/openplanner/releases/tag/v1.4.0",
     "tag_name": "v1.4.0",
@@ -21,8 +22,19 @@ LATEST = {  # recorded shape of GET /repos/{owner}/{repo}/releases/latest (trimm
     "draft": False,
     "prerelease": False,
     "published_at": "2026-10-26T12:00:00Z",
-    "body": "Release notes",
+    "body": (
+        "## What's Changed\n"
+        "* feat(queue): own queue by @cyberbeuk in https://github.com/acme/openplanner/pull/88\n"
+        "* fix(video): time zone by @someone in https://github.com/acme/openplanner/pull/90\n"
+        "\n\n**Full Changelog**: https://github.com/acme/openplanner/compare/v1.3.0...v1.4.0"
+    ),
 }
+RELEASE = ListedRelease(
+    Version(1, 4, 0),
+    LATEST["html_url"],
+    datetime(2026, 10, 26, 12, tzinfo=UTC),
+    "feat(queue): own queue (#88)\nfix(video): time zone (#90)",
+)
 
 
 def _releases(
@@ -32,16 +44,16 @@ def _releases(
     return GitHubReleases(http, "acme/openplanner", token)
 
 
-async def test_latest_release_is_read_from_the_tag_and_page() -> None:
+async def test_the_listing_is_read_from_tag_page_time_and_notes() -> None:
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return httpx.Response(200, json=LATEST)
+        return httpx.Response(200, json=[LATEST])
 
-    release = await _releases(handler).latest()
-    assert release == Release(Version(1, 4, 0), LATEST["html_url"])
-    assert str(seen[0].url) == "https://api.github.com/repos/acme/openplanner/releases/latest"
+    listing = await _releases(handler).listing()
+    assert listing == [RELEASE]
+    assert str(seen[0].url) == "https://api.github.com/repos/acme/openplanner/releases?per_page=30"
     assert seen[0].headers["accept"] == "application/vnd.github+json"
     assert "authorization" not in seen[0].headers
 
@@ -51,31 +63,59 @@ async def test_token_is_sent_for_a_private_repository() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return httpx.Response(200, json=LATEST)
+        return httpx.Response(200, json=[LATEST])
 
-    await _releases(handler, token="github_pat_x").latest()
+    await _releases(handler, token="github_pat_x").listing()
     assert seen[0].headers["authorization"] == "Bearer github_pat_x"
 
 
-async def test_no_release_yet_is_none() -> None:
-    assert await _releases(lambda _: httpx.Response(404, json={})).latest() is None
+async def test_no_release_yet_is_an_empty_listing() -> None:
+    assert await _releases(lambda _: httpx.Response(404, json={})).listing() == []
+    assert await _releases(lambda _: httpx.Response(200, json=[])).listing() == []
+    assert await _releases(lambda _: httpx.Response(200, json={"x": 1})).listing() == []
 
 
 @pytest.mark.parametrize(
-    "body",
+    "item",
     [
         {**LATEST, "tag_name": "nightly"},
         {**LATEST, "html_url": "https://evil.example/notes"},
         {**LATEST, "html_url": "https://github.com/other/repo/releases/tag/v1.4.0"},
         {**LATEST, "tag_name": 5},
+        {**LATEST, "draft": True},
         {"message": "unexpected"},
-        [],
+        "text",
     ],
 )
-async def test_a_release_that_is_no_version_or_has_a_foreign_page_is_none(
-    body: object,
+async def test_a_release_that_is_no_version_a_draft_or_a_foreign_page_is_skipped(
+    item: object,
 ) -> None:
-    assert await _releases(lambda _: httpx.Response(200, json=body)).latest() is None
+    listing = await _releases(lambda _: httpx.Response(200, json=[item, LATEST])).listing()
+    assert listing == [RELEASE]
+
+
+async def test_candidates_are_listed_with_releases_and_odd_dates_are_none() -> None:
+    candidate = {
+        **LATEST,
+        "html_url": "https://github.com/acme/openplanner/releases/tag/v1.5.0-rc.2",
+        "tag_name": "v1.5.0-rc.2",
+        "prerelease": True,
+        "published_at": "yesterday",
+        "body": None,
+    }
+    listing = await _releases(lambda _: httpx.Response(200, json=[candidate, LATEST])).listing()
+    assert listing[0] == ListedRelease(Version(1, 5, 0, 2), candidate["html_url"], None, "")
+    assert listing[1] == RELEASE
+
+
+def test_notes_become_plain_pr_titles_and_numbers() -> None:
+    assert plain_notes(LATEST["body"]) == RELEASE.notes
+    assert (
+        plain_notes("- [docs](https://x.example) by @me in https://github.com/a/b/pull/7")
+        == "docs (#7)"
+    )
+    assert plain_notes("") == ""
+    assert len(plain_notes("x" * 5000)) == NOTES_CHARS
 
 
 @pytest.mark.parametrize(
@@ -83,7 +123,7 @@ async def test_a_release_that_is_no_version_or_has_a_foreign_page_is_none(
 )
 async def test_refusals_become_integration_errors(status: int, code: str) -> None:
     with pytest.raises(IntegrationError) as caught:
-        await _releases(lambda _: httpx.Response(status)).latest()
+        await _releases(lambda _: httpx.Response(status)).listing()
     assert caught.value.code == code
 
 
@@ -92,7 +132,7 @@ async def test_unreachable() -> None:
         raise httpx.ConnectError("down", request=request)
 
     with pytest.raises(IntegrationError) as caught:
-        await _releases(handler).latest()
+        await _releases(handler).listing()
     assert caught.value.code == "unreachable"
 
 
@@ -126,88 +166,31 @@ async def test_web_process_never_looks_up_but_knows_the_worker_does() -> None:
     assert (await web.overview(DEMO_SUPERUSER)).enabled
 
 
-# The rc channel (ADR 0059) lists releases and pre-releases and takes the highest version.
-
-LISTED = [  # recorded shape of GET /repos/{owner}/{repo}/releases (trimmed), newest first
-    {
-        "html_url": "https://github.com/acme/openplanner/releases/tag/v1.5.0-rc.2",
-        "tag_name": "v1.5.0-rc.2",
-        "draft": False,
-        "prerelease": True,
-    },
-    {
-        "html_url": "https://github.com/acme/openplanner/releases/tag/v1.5.0-rc.10",
-        "tag_name": "v1.5.0-rc.10",
-        "draft": True,  # a draft is never offered, however high its number
-        "prerelease": True,
-    },
-    {
-        "html_url": "https://github.com/acme/openplanner/releases/tag/v1.5.0-rc.1",
-        "tag_name": "v1.5.0-rc.1",
-        "draft": False,
-        "prerelease": True,
-    },
-    LATEST,
-    {"html_url": "https://github.com/acme/openplanner/releases/tag/nightly", "tag_name": "nightly"},
-]
-
-
-async def test_rc_channel_takes_the_highest_release_or_candidate_from_the_list() -> None:
-    seen: list[httpx.Request] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen.append(request)
-        return httpx.Response(200, json=LISTED)
-
-    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    release = await GitHubReleases(http, "acme/openplanner", None, UpdateChannel.CANDIDATE).latest()
-
-    assert release == Release(Version(1, 5, 0, 2), LISTED[0]["html_url"])
-    assert str(seen[0].url) == "https://api.github.com/repos/acme/openplanner/releases?per_page=30"
-
-
-async def test_rc_channel_moves_to_the_release_once_it_is_newer_than_every_candidate() -> None:
-    final = {
-        **LATEST,
-        "html_url": "https://github.com/acme/openplanner/releases/tag/v1.5.0",
-        "tag_name": "v1.5.0",
-    }
-    http = httpx.AsyncClient(
-        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=[final, *LISTED]))
-    )
-    release = await GitHubReleases(http, "acme/openplanner", None, UpdateChannel.CANDIDATE).latest()
-    assert release == Release(Version(1, 5, 0), final["html_url"])
-
-
-async def test_rc_channel_with_nothing_usable_or_no_list_is_none() -> None:
-    empty = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200, json=[])))
-    assert (
-        await GitHubReleases(empty, "acme/openplanner", None, UpdateChannel.CANDIDATE).latest()
-        is None
-    )
-    odd = httpx.AsyncClient(
-        transport=httpx.MockTransport(lambda _: httpx.Response(200, json={"x": 1}))
-    )
-    assert (
-        await GitHubReleases(odd, "acme/openplanner", None, UpdateChannel.CANDIDATE).latest()
-        is None
-    )
-
-
-async def test_release_channel_still_asks_for_the_latest_release_only(
+async def test_the_channel_decides_what_the_check_calls_the_latest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("UPDATE_REPOSITORY", "acme/openplanner")
-    monkeypatch.setenv("UPDATE_CHANNEL", "rc")
-    monkeypatch.setenv("UPDATE_AUTO_APPLY", "true")
-    monkeypatch.setenv("APP_VERSION", "1.5.0-rc.1")
-    settings = Settings(environment="test")  # type: ignore[call-arg]
-    assert running_version(settings) == Version(1, 5, 0, 1)
-    http = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200, json=[])))
-    service = update_service(settings, InMemoryUnitOfWork(), FixedClock(), http)
-    overview = await service.overview(DEMO_SUPERUSER)
-    assert (overview.channel, overview.auto_apply, overview.current) == (
-        UpdateChannel.CANDIDATE,
-        True,
-        Version(1, 5, 0, 1),
+    """ADR 0059, 0067: the adapter lists everything; the channel is applied by the domain."""
+    candidate = {
+        **LATEST,
+        "html_url": "https://github.com/acme/openplanner/releases/tag/v1.5.0-rc.2",
+        "tag_name": "v1.5.0-rc.2",
+        "prerelease": True,
+    }
+    http = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=[candidate, LATEST]))
     )
+    monkeypatch.setenv("UPDATE_REPOSITORY", "acme/openplanner")
+    monkeypatch.setenv("APP_VERSION", "1.3.0")
+    for channel, latest in (("release", Version(1, 4, 0)), ("rc", Version(1, 5, 0, 2))):
+        monkeypatch.setenv("UPDATE_CHANNEL", channel)
+        uow = InMemoryUnitOfWork()
+        service = update_service(Settings(environment="test"), uow, FixedClock(), http)
+        assert await service.check_if_due()
+        overview = await service.overview(DEMO_SUPERUSER)
+        assert overview.check is not None
+        assert overview.check.latest is not None
+        assert overview.check.latest.version == Version(1, 5, 0, 2)  # the newest of all
+        assert overview.newest is not None
+        assert overview.newest.version == latest  # the newest on this channel
+        assert [item.version for item in overview.offered][0] == latest
+        assert len(uow.state.release_listing) == 2
