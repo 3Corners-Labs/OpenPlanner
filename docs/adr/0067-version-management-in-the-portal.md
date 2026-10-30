@@ -73,6 +73,15 @@ application requests, verifies the signature, backs up and rolls back.
 6. **A version change outside the portal is visible, not silent.** When point 4 records a
    change with actor `host`, the updates page says so above the history ("version changed
    outside the portal on <date>"), until the next change.
+7. **The check interval is the superuser's, and a check can be asked for.** (Added
+   2026-10-30, after docker01 ran one candidate behind GitHub for up to an hour.) The worker
+   checks every `update_check_minutes` (class C, default 60, read live) instead of the fixed
+   hourly `CHECK_INTERVAL`. "Check now" on `/admin/updates` marks the stored check as
+   requested (`release_checks.requested_at`, audited as `check.request` under
+   `system.update`); the worker checks at its next poll and clears the mark. The web process
+   still never asks GitHub itself (ADR 0029), so a click costs at most one lookup per worker
+   poll, and the portal floor of 5 minutes keeps an installation within GitHub's anonymous
+   rate limit.
 
 ## Settings
 
@@ -80,11 +89,12 @@ application requests, verifies the signature, backs up and rolls back.
 |---|---|---|---|---|---|
 | `update_channel` | C platform (was B, ADR 0059) | `release` | `release`, `rc`; `rc` not usable with `ENVIRONMENT=prod` | `settings.platform.manage` | Live; env locks. |
 | `update_auto_apply` | C platform (was B) | `false` | bool; `true` not usable with `ENVIRONMENT=prod` | `settings.platform.manage` | Live; env locks. |
+| `update_check_minutes` | C platform | `60` | 5–1440 in the portal (1–1440 from the environment) | `settings.platform.manage` | Live; env locks. Point 7. |
 
 **Fixed on purpose:** `LISTED = 30` versions per check and `NOTES_CHARS = 4000` of notes per
-version (protocol and storage details, not behaviour an administrator tunes); the hourly
-`CHECK_INTERVAL` and the 24-hour `RESTORE_WINDOW` (ADR 0029); the audit subjects (a fixed
-mapping of action prefixes). The installer mode decides the signing identity (ADR 0006): a
+version (protocol and storage details, not behaviour an administrator tunes); the 24-hour
+`RESTORE_WINDOW` (ADR 0029); the audit subjects (a fixed mapping of action prefixes). The
+check interval was fixed here until point 7 made it a setting. The installer mode decides the signing identity (ADR 0006): a
 trust decision of the host team, never a portal setting.
 
 ## Build status
@@ -95,6 +105,7 @@ trust decision of the host team, never a portal setting.
 | 2 | `running_versions` and `system.version` at start-up; history from the audit log with *By*; audit filter *subject*; "changed outside the portal" notice | #146 | merged 2026-10-30 |
 | 3 | `release_listing` with notes; version picker and "Install this version"; `request_update(target)` | #148 | in PR |
 | 4 | docker01: channel switched in the portal, a chosen candidate installed, history shows who | | planned |
+| 5 | `update_check_minutes` (class C) and "Check now" (point 7); migration 0073 | #170 | in PR |
 
 ## Consequences
 
@@ -103,7 +114,8 @@ trust decision of the host team, never a portal setting.
 - Two settings change class from B to C, two days after they were introduced; `docs/settings.md`
   follows from the registry. An installation that set `UPDATE_CHANNEL` in `.env` keeps
   working: the environment locks the portal value.
-- Migrations: `release_listing` and `running_versions` (reversible, no personal data).
+- Migrations: `release_listing`, `running_versions` and `release_checks.requested_at`
+  (reversible, no personal data).
 - The threat model gains: "a production installation moved onto candidates from the portal"
   (not usable in production, env lock), "a chosen version that is not in the listing or older
   than the running one" (refused by the domain), "a version change outside the portal that
