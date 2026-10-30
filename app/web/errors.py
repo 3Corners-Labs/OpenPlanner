@@ -72,6 +72,16 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.SETTING_NOT_LOCKED: "admin.form.error.setting_not_locked",
     ErrorCode.NOTHING_TO_RETRY: "admin.done.retry_not_possible",
     ErrorCode.LOGIN_LOCKOUT: "admin.form.error.login_lockout",
+    ErrorCode.TLS_CERTIFICATE_UNREADABLE: "admin.form.error.tls_certificate_unreadable",
+    ErrorCode.TLS_KEY_MISMATCH: "admin.form.error.tls_key_mismatch",
+    ErrorCode.TLS_NAME_MISMATCH: "admin.form.error.tls_name_mismatch",
+    ErrorCode.TLS_CERTIFICATE_EXPIRED: "admin.form.error.tls_certificate_expired",
+    ErrorCode.TLS_CERTIFICATE_NOT_YET_VALID: "admin.form.error.tls_certificate_not_yet_valid",
+    ErrorCode.TLS_CERTIFICATE_MISSING: "admin.form.error.tls_certificate_missing",
+    ErrorCode.TLS_CERTIFICATE_IN_USE: "admin.form.error.tls_certificate_in_use",
+    ErrorCode.TLS_SOURCE_NOT_APPLICABLE: "admin.form.error.tls_source_not_applicable",
+    ErrorCode.TLS_KEY_MISSING: "admin.form.error.tls_key_missing",
+    ErrorCode.TLS_VOLUME_UNWRITABLE: "admin.form.error.tls_volume_unwritable",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {

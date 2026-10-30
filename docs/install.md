@@ -27,6 +27,7 @@ wherever the checkout is, and writes that path into the updater's configuration.
 | `/var/lib/openplanner-updater/` | updater, installer | `previous.env` (rollback), lock, a copy of the ghcr.io login, cosign's cache | 700 |
 | Docker volume `openplanner_data` | web, worker | the SQLite database and its update backups (personal data) | |
 | Docker volume `openplanner_proxy-data` | proxy | certificate, private key, ACME account | |
+| Docker volume `openplanner_portal-certs` | web (writes), proxy (reads) | the private key of an own certificate made or imported in the portal, its signing request and the served pair (ADR 0070); never in the database backup; empty with Let's Encrypt | |
 
 Every Compose command on the host runs from `~/openplanner` with the pin file:
 
@@ -127,7 +128,9 @@ system.
 With the HTTPS proxy, a trial run against Let's Encrypt's staging CA first keeps you clear of its
 rate limits: add `--acme-staging` on the first run, then follow *HTTPS certificate* in
 `docs/runbook.md` to switch to the real CA; *System status* in the portal shows which
-certificate is served and whether browsers trust it.
+certificate is served and whether browsers trust it. From there the superuser can also request
+an own certificate (the key stays on the host), place its chain, switch to it and back
+(ADR 0070), without the host.
 
 Without prompts, for automation, set the answers as environment variables named after the
 setting and add `--non-interactive`:
@@ -152,7 +155,7 @@ Webex Contact Center*.
 | `--non-interactive` | never ask; take answers from the environment (also when there is no terminal) |
 | `--no-tls` | production, test: no HTTPS proxy; asks the public address and your proxy's address (`FORWARDED_ALLOW_IPS`) |
 | `--tls-domain HOST` | lab: run the HTTPS proxy for this host name (also sets it for the other modes) |
-| `--own-certificate` | `proxy.env` names `certs/fullchain.pem` and `certs/privkey.pem` instead of ACME (runbook, *Own certificate*) |
+| `--own-certificate` | `proxy.env` names `certs/fullchain.pem` and `certs/privkey.pem` instead of ACME (runbook, *Own certificate*); locks the portal's certificate source (`TLS_CERTIFICATE_SOURCE=own` in `.env`, ADR 0070) |
 | `--acme-staging` | with the HTTPS proxy: the first `proxy.env` points at Let's Encrypt's staging CA |
 | `--upgrade-docker` | also upgrade Docker Engine (restarts every container on the host) |
 | `--no-packages` | leave the host's packages alone; only check them |
