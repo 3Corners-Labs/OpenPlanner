@@ -1536,7 +1536,7 @@ msgid "call.event.meeting_failed"
 msgstr "Creating the video meeting failed"
 
 msgid "call.hint.meeting.rejected_400"
-msgstr "Webex refused the meeting. Usually this group's Webex host (Settings) is not a user with a Meetings licence in the Service App's Webex organisation, or the Service App may not schedule on that host's behalf. Webex's reason is in the worker log at integration.refused, with a trackingId. A new or rescheduled booking tries again."
+msgstr "Webex refused the meeting; Webex's answer is shown above. Often this group's Webex host (Settings) is not a user with a Meetings licence in the Service App's Webex organisation, or the Service App may not schedule on that host's behalf. Press Check integration on the group: it schedules a probe meeting exactly as a booking does. A new or rescheduled booking tries again."
 
 msgid "call.hint.meeting.rejected_403"
 msgstr "Webex denied access: the Service App lacks the scope to schedule meetings or has not been authorised by an administrator of the Webex organisation. Fix that in Control Hub, then put a new refresh token in WEBEX_REFRESH_TOKEN."
@@ -1545,7 +1545,7 @@ msgid "call.hint.meeting.rejected_404"
 msgstr "Webex does not know this group's Webex host. Check the email address under Settings."
 
 msgid "call.hint.meeting.other"
-msgstr "The video meeting could not be created. The code is the reason; the worker log has more at integration.refused and job.failed."
+msgstr "The video meeting could not be created. The code is the reason; Webex's answer is shown when Webex gave one. The worker log has more at integration.refused and job.failed."
 
 msgid "call.hint.task.meeting_missing"
 msgstr "The task waited for the video meeting, but it never came. Fix the meeting failure first."
@@ -1554,7 +1554,7 @@ msgid "call.hint.task.other"
 msgstr "Webex Contact Center did not accept the task. Check the group's entry point and channel under Settings and the WxCC setup under Integrations; the code is WxCC's reason."
 
 msgid "call.hint.integration.other"
-msgstr "Webex refused a request. Webex's reason is in the worker log at integration.refused, with a trackingId."
+msgstr "Webex refused a request. Webex's answer is shown when Webex gave one; the worker log also has a trackingId at integration.refused."
 
 msgid "call.hint.unauthorized"
 msgstr "Webex did not accept the Service App's token. Check the status under Integrations and, if needed, put a new refresh token in WEBEX_REFRESH_TOKEN."
@@ -1891,6 +1891,9 @@ msgstr "Timeline"
 
 msgid "admin.booking.no_events"
 msgstr "Nothing has happened yet."
+
+msgid "admin.booking.provider_message"
+msgstr "Webex's answer: {message}"
 
 msgid "admin.nav.integrations"
 msgstr "Integrations"
@@ -3521,6 +3524,9 @@ msgstr "Clear filter"
 msgid "admin.audit.booking_link"
 msgstr "Appointment {id}"
 
+msgid "admin.audit.provider_message"
+msgstr "Webex's answer: {message}"
+
 msgid "admin.audit.detail.channel_email"
 msgstr "email"
 
@@ -4251,16 +4257,22 @@ msgid "admin.check.webex.no_host"
 msgstr "No Webex host entered: this group gets no video calls."
 
 msgid "admin.check.webex.host_ok"
-msgstr "Host {host} is known and the Service App may schedule on its behalf."
+msgstr "A probe meeting for host {host} was scheduled exactly as a booking does, and deleted again."
 
 msgid "admin.check.webex.host_unknown"
-msgstr "Webex does not know host {host}, or the host has no licence on this site ({error})."
+msgstr "Webex does not know host {host} ({error}): {reason}"
 
 msgid "admin.check.webex.host_refused"
-msgstr "The Service App may not schedule on behalf of {host} ({error}): check the scopes and the authorisation in Control Hub."
+msgstr "The Service App may not schedule on behalf of {host} ({error}): {reason}. Check the scopes and the authorisation in Control Hub."
 
 msgid "admin.check.webex.unreachable"
-msgstr "Webex could not be reached to check host {host} ({error}). Try again later."
+msgstr "Webex could not be reached to schedule a probe meeting for host {host} ({error}). Try again later."
+
+msgid "admin.check.webex.schedule_refused"
+msgstr "Webex refused a probe meeting for host {host} ({error}): {reason}"
+
+msgid "admin.check.webex.probe_left"
+msgstr "The probe meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
 
 msgid "admin.check.wxcc.not_configured"
 msgstr "Webex Contact Center is not configured; the routing was not checked."

@@ -84,7 +84,7 @@ async def test_checking_shows_translated_findings_per_area(
     assert "De koppeling is gecontroleerd." in page
     assert 'Uitslag: <span class="chip chip--danger">Fout</span>' in page
     assert "Webex (videogesprek)" in page
-    assert "Host host@example.nl is bekend" in page
+    assert "Een proefmeeting voor host host@example.nl is gepland" in page
     assert "velden die ontbreken: meetingLink" in page
     assert "Geen Screen Pop" in page
     # Delivery outcomes are translated with the integrations page's labels.

@@ -388,7 +388,7 @@ def test_unconfirmed_bookings_are_cancelled_and_purged_on_downgrade(
 ) -> None:
     import sqlite3
 
-    command.upgrade(alembic_config, "0055")
+    command.upgrade(alembic_config, "0057")
     database = sqlite3.connect(tmp_path / "migrate.db")
     database.executescript(
         """
@@ -409,7 +409,7 @@ def test_unconfirmed_bookings_are_cancelled_and_purged_on_downgrade(
     database.commit()
     database.close()
 
-    command.downgrade(alembic_config, "0054")
+    command.downgrade(alembic_config, "0056")
 
     database = sqlite3.connect(tmp_path / "migrate.db")
     statuses = database.execute("SELECT id, status FROM bookings ORDER BY id").fetchall()
