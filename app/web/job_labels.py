@@ -9,6 +9,7 @@ from app.domain.job_plan import JobType
 JOB_TYPE_LABELS: dict[JobType, str] = {
     JobType.CREATE_VIDEO_ROOM: "audit.job.create_video_room",
     JobType.DELETE_VIDEO_ROOM: "audit.job.delete_video_room",
+    JobType.DELETE_TRIAL_CALL: "audit.job.delete_trial_call",
     JobType.SEND_CONFIRMATION: "audit.job.send_confirmation",
     JobType.SEND_CHANGE: "audit.job.send_change",
     JobType.SEND_REMINDER: "audit.job.send_reminder",
