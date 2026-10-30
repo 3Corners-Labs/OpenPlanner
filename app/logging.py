@@ -21,23 +21,12 @@ from structlog.typing import EventDict, Processor, WrappedLogger
 
 from app.domain.event_context import current
 from app.domain.event_schema import Envelope, rfc3339
+from app.domain.privacy import ALIASES
+from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 
-# The PII columns of Booking (CLAUDE.md, privacy rules), the answers to custom form fields
-# (ADR 0055) under every name they travel by.
-PII_FIELDS = frozenset(
-    {
-        "name",
-        "first_name",
-        "last_name",
-        "email",
-        "phone",
-        "note",
-        "guest_join_url",
-        "host_join_url",
-        "form_answers",
-        "answers",
-    }
-)
+PII_FIELDS = PII_COLUMNS | ALIASES
+"""Every personal-data field of ``Booking`` (``app.domain.privacy``, the one home of the
+list, ADR 0063) plus the other names the same data travels by (``name``, ``answers``)."""
 MASK = "***"
 
 
