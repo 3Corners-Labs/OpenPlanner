@@ -538,6 +538,14 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/andere-team/bookings/999999": statuses(404, 403, 403, 404, 403, 403, 403),
     },
     # Simulator (not in production): whoever edits the group; an empty form is refused (400).
+    # ADR 0068: plan a failed meeting or work item job again (bookings.manage, fresh login).
+    # An empty form names no job: 400 once the matrix allows it.
+    "POST /admin/groups/{slug}/bookings/{booking_id}/retry": {
+        "/admin/groups/demo/bookings/999999/retry": statuses(400, 400, 400, 403, 403, 403, 403),
+        "/admin/groups/andere-team/bookings/999999/retry": statuses(
+            400, 403, 403, 400, 403, 403, 403
+        ),
+    },
     "POST /admin/groups/{slug}/bookings/{booking_id}/simulate": {
         "/admin/groups/demo/bookings/999999/simulate": statuses(400, 400, 403, 403, 403, 403, 403),
         "/admin/groups/andere-team/bookings/999999/simulate": statuses(

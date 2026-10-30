@@ -6,8 +6,13 @@ latest result are behind the matrix (ADR 0014). The platforms are read through t
 replaces the previous one and every run by hand is audited with its overall status, so admins
 can see who checked and what came out.
 
-    run(principal, slug)   authorise ─► checker.check_group(group, peers) ─► store ─► audit
+    run(principal, slug)   authorise ─► checker.check_group(group, peers) ─► worker findings
+                                     ─► store ─► audit
     last(principal, slug)  authorise ─► latest stored result (or None)
+
+ADR 0068: every check also proves the worker, which runs the bookings' jobs while the probe
+meeting ran here: its heartbeat, version and job types, and the group's failed and overdue
+jobs (``app.domain.worker_check``).
 
 ADR 0065 step 2: the platform also checks on its own, so a wrong host, licence or scope is
 reported before a citizen's booking fails. The worker checks every group with a Webex host
@@ -27,10 +32,12 @@ from app.domain.audit import Outcome
 from app.domain.authorization import Permission, Principal, Scope
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.event_context import bind_level, trace_scope
 from app.domain.ports import Clock, IntegrationChecker, Transaction, UnitOfWork
 from app.domain.scheduling import Group
 from app.domain.system_log import SystemLog
 from app.domain.tunable import value_of
+from app.domain.worker_check import worker_findings
 
 CHECK_EVENT = "integration.check"
 """Audit action of a check; the reason is the overall status (by hand) or the failing code."""
@@ -43,6 +50,11 @@ tunable; the interval itself is the setting (lower bound one hour)."""
 
 NO_REASON = "-"
 """What the checker puts in a finding's ``reason`` when the provider gave none."""
+
+HEARTBEAT_MAX_AGE = timedelta(seconds=120)
+"""Default age after which the worker's heartbeat counts as stale (the healthcheck's)."""
+OVERDUE_AFTER = timedelta(minutes=10)
+"""Default threshold for an overdue pending job (``job_overdue_minutes``)."""
 
 
 @dataclass(frozen=True)
@@ -94,6 +106,9 @@ class IntegrationCheckService:
         admin: Authorises and audits the runs by hand.
         checker: Reads the platforms; ``None`` when no Service App is configured.
         system_log: Where the events about automatic runs go.
+        version: ``APP_VERSION`` of this process, compared with the worker's (ADR 0068).
+        heartbeat_max_age: How old the worker's heartbeat may be before it counts as stale.
+        overdue_after: How long past its planned time a pending job counts as overdue.
     """
 
     def __init__(
@@ -103,6 +118,10 @@ class IntegrationCheckService:
         admin: AdminService,
         checker: IntegrationChecker | None,
         system_log: SystemLog,
+        *,
+        version: str = "",
+        heartbeat_max_age: timedelta | Callable[[], timedelta] = HEARTBEAT_MAX_AGE,
+        overdue_after: timedelta | Callable[[], timedelta] = OVERDUE_AFTER,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -110,6 +129,9 @@ class IntegrationCheckService:
         self._admin = admin
         self._checker = checker
         self._system_log = system_log
+        self._version = version
+        self._heartbeat_max_age = heartbeat_max_age
+        self._overdue_after = overdue_after
 
     async def run(self, principal: Principal, slug: str) -> GroupCheck:
         """Check the group now and keep the result.
@@ -151,6 +173,7 @@ class IntegrationCheckService:
             summary = await tx.get_group_summary(slug)
         if summary is None or not summary.group.video_host_email:
             return None
+        bind_level(summary.organisation_slug, slug)
         check, previous = await self._check(summary.group, summary.organisation_slug)
         report = report_for(previous, check)
         if report is not None:
@@ -180,7 +203,14 @@ class IntegrationCheckService:
                     continue
                 if check_due(await tx.get_group_check(group.id), now, interval):
                     due.append(group.slug)
-        return [slug for slug in due if await self.check_as_system(slug) is not None]
+        checked = []
+        for slug in due:
+            # One trace per group, so its probe requests land at its level (ADR 0068).
+            with trace_scope():
+                bind_level(None, slug)
+                if await self.check_as_system(slug) is not None:
+                    checked.append(slug)
+        return checked
 
     async def _check(self, group: Group, organisation: str) -> tuple[GroupCheck, GroupCheck | None]:
         """Run the checker for ``group`` and store the result; return it with the previous one."""
@@ -193,10 +223,28 @@ class IntegrationCheckService:
         findings = (
             await self._checker.check_group(group, peers) if self._checker else [NOT_CONFIGURED]
         )
+        findings += await self._worker(group)
         check = GroupCheck(group.id, self._clock.now(), tuple(findings))
         async with self._uow.locked() as tx:
             await tx.save_group_check(check)
         return check, previous
+
+    async def _worker(self, group: Group) -> list[Finding]:
+        """Return the worker and queue findings of ``group`` (ADR 0068)."""
+        now = self._clock.now()
+        overdue_after = value_of(self._overdue_after)
+        async with self._uow.read() as tx:
+            heartbeat = await tx.get_worker_heartbeat()
+            counts = await tx.count_group_jobs(group.id, now - overdue_after)
+        return worker_findings(
+            heartbeat,
+            counts,
+            now=now,
+            max_age=value_of(self._heartbeat_max_age),
+            web_version=self._version,
+            has_host=group.video_enabled,
+            overdue_after=overdue_after,
+        )
 
     async def _authorize(self, principal: Principal, slug: str) -> str:
         """Require ``group.edit`` on the group; return its organisation slug."""

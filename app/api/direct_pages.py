@@ -33,6 +33,7 @@ from app.domain.call_service import CallService
 from app.domain.calls import CallStatus, JoinState, TaskState, join_state, not_picked_up
 from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError
+from app.domain.event_context import bind_booking
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, IntegrationError
 from app.domain.scheduling import Group
@@ -119,6 +120,7 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
             values=values,
         )
     calls: CallService = request.app.state.call_service
+    bind_booking(receipt.booking.id)  # ADR 0068: the request events belong to this booking
     try:
         booking = await calls.ensure_meeting(receipt.booking, group)
         await calls.ensure_task(booking, group)
