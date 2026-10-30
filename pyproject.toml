@@ -87,6 +87,10 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = "--strict-markers --strict-config"
+markers = [
+    # ADR 0058: the role × route sweeps, run in the merge queue and with the label ci:full.
+    "matrix: authorisation matrix sweep (role × admin route); full lane only",
+]
 filterwarnings = [
     "error",
     # aiosqlite hands every error inside its connection thread to the awaiting code; the
