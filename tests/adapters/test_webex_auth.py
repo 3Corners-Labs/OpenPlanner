@@ -14,7 +14,7 @@ from app.adapters.webex_auth import (
     http_failure,
 )
 from app.domain.audit import Category
-from app.domain.ports import IntegrationError
+from app.domain.ports import IntegrationError, RequestRecord
 from app.domain.security_log import SecurityLog
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
@@ -244,3 +244,86 @@ async def test_a_new_bootstrap_token_replaces_the_stored_tokens(webex: FakeWebex
     assert token == "access-2"
     assert webex.refreshes[1]["refresh_token"] == ["new-bootstrap-refresh"]
     assert "new-bootstrap-refresh" not in json.dumps(store.values[CREDENTIAL_NAME])
+
+
+class Recorded:
+    """``RequestLog`` that keeps what it was given (ADR 0068)."""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.records: list[RequestRecord] = []
+        self.error = error
+
+    async def record(self, record: RequestRecord) -> None:
+        if self.error is not None:
+            raise self.error
+        self.records.append(record)
+
+
+def _reporting(handler: object, log: Recorded) -> AuthorizedClient:
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))  # type: ignore[arg-type]
+    return AuthorizedClient(
+        http, WebexTokens(CONFIG, http, MemoryTokenStore(), FixedClock(NOW)), log
+    )
+
+
+def _api(status: int, body: dict[str, object] | None = None, tracking: str = "") -> object:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/access_token":
+            return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
+        headers = {"trackingid": tracking} if tracking else {}
+        return httpx.Response(status, json=body or {}, headers=headers)
+
+    return handler
+
+
+async def test_every_request_is_reported_without_query_or_body() -> None:
+    log = Recorded()
+    client = _reporting(_api(204, tracking="ROUTER_1"), log)
+
+    await client.request(
+        "DELETE",
+        "https://webexapis.com/v1/meetings/m1",
+        params={"hostEmail": "host@example.nl"},
+    )
+
+    [record] = log.records
+    assert (record.method, record.path, record.status, record.error, record.tracking_id) == (
+        "DELETE",
+        "/v1/meetings/m1",
+        204,
+        "",
+        "ROUTER_1",
+    )
+    assert "host" not in repr(record)
+
+
+async def test_a_refusal_is_reported_with_its_code_and_the_tracking_id_of_the_body() -> None:
+    log = Recorded()
+    client = _reporting(_api(400, {"message": "bad", "trackingId": "ROUTER_2"}), log)
+
+    with pytest.raises(IntegrationError):
+        await client.request("POST", "https://webexapis.com/v1/meetings", json={"title": "x"})
+
+    [record] = log.records
+    assert (record.status, record.error, record.tracking_id) == (400, "rejected_400", "ROUTER_2")
+
+
+async def test_an_unreachable_platform_is_reported_with_status_zero() -> None:
+    def down(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/access_token":
+            return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
+        raise httpx.ConnectError("down")
+
+    log = Recorded()
+    with pytest.raises(IntegrationError):
+        await _reporting(down, log).request("POST", "https://webexapis.com/v1/meetings")
+
+    assert [(r.status, r.error) for r in log.records] == [(0, "unreachable")]
+
+
+async def test_a_failing_request_log_never_fails_the_request() -> None:
+    client = _reporting(_api(200), Recorded(RuntimeError("database locked")))
+
+    response = await client.request("GET", "https://webexapis.com/v1/meetings")
+
+    assert response.status_code == 200

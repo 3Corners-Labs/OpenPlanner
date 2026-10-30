@@ -59,6 +59,15 @@ FINDING_LABELS: dict[str, str] = {
     "webhooks.no_secret": "admin.check.webhooks.no_secret",  # nosec B105 - a catalogue key
     "webhooks.delivery_ok": "admin.check.webhooks.delivery_ok",
     "webhooks.delivery_failed": "admin.check.webhooks.delivery_failed",
+    # ADR 0068: the worker and the group's queue.
+    "worker.never_seen": "admin.check.worker.never_seen",
+    "worker.stale": "admin.check.worker.stale",
+    "worker.alive": "admin.check.worker.alive",
+    "worker.version_differs": "admin.check.worker.version_differs",
+    "worker.no_video_jobs": "admin.check.worker.no_video_jobs",
+    "worker.jobs_ok": "admin.check.worker.jobs_ok",
+    "worker.failed_jobs": "admin.check.worker.failed_jobs",
+    "worker.overdue_jobs": "admin.check.worker.overdue_jobs",
 }
 
 UNKNOWN_FINDING = "admin.check.unknown"
@@ -68,6 +77,7 @@ AREA_LABELS: dict[CheckArea, str] = {
     CheckArea.WEBEX: "admin.check.area.webex",
     CheckArea.WXCC: "admin.check.area.wxcc",
     CheckArea.WEBHOOKS: "admin.check.area.webhooks",
+    CheckArea.WORKER: "admin.check.area.worker",
 }
 
 STATUS_LABELS: dict[CheckStatus, tuple[str, str]] = {

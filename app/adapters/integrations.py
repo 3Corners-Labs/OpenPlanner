@@ -23,6 +23,7 @@ from app.domain.ports import (
     Clock,
     ContactCenterDispatcher,
     IntegrationChecker,
+    RequestLog,
     VideoProvider,
 )
 from app.domain.security_log import SecurityLog
@@ -76,8 +77,13 @@ def build_integrations(
     http: httpx.AsyncClient,
     clock: Clock,
     security: SecurityLog | None = None,
+    request_log: RequestLog | None = None,
 ) -> Integrations:
-    """Return the adapters the settings allow; ``security`` records failing token refreshes."""
+    """Return the adapters the settings allow.
+
+    ``security`` records failing token refreshes; ``request_log`` receives every request the
+    adapters make (ADR 0068).
+    """
     client_id, secret, refresh = (
         settings.webex_client_id,
         settings.webex_client_secret,
@@ -93,7 +99,7 @@ def build_integrations(
     )
     store = CredentialStore(engine, SecretBox(settings_encryption_key(settings)))
     tokens = WebexTokens(config, http, store, clock, security)
-    client = AuthorizedClient(http, tokens)
+    client = AuthorizedClient(http, tokens, request_log)
     video = WebexMeetings(client, settings.webex_api_base_url, clock)
     dispatcher = (
         WxccTasks(client, settings.wxcc_api_base_url, clock)
@@ -112,5 +118,6 @@ def build_integrations(
             wxcc_secret=wxcc_secret.get_secret_value() if wxcc_secret else None,
         ),
         clock,
+        request_log,
     )
     return Integrations(tokens, video, dispatcher, checker)

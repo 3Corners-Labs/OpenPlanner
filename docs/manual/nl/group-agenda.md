@@ -24,6 +24,27 @@ ziet u alleen op de detailpagina van een afspraak (**Details**).
 Met **Vorige dag**, **Vandaag** en **Volgende dag** bladert u. **Weekoverzicht** opent de
 week van de gekozen dag.
 
+## Een afspraak uitzoeken
+
+Op de detailpagina van een afspraak (**Details**) staat alles wat nodig is als een
+videogesprek of contactcentertaak niet goed gaat:
+
+- **Verloop**: wat er met de meeting en de taak gebeurde. Achter elke gebeurtenis staat de
+  versie van OpenPlanner die haar schreef. Op een testomgeving die vaak bijwerkt, ziet u zo of
+  een fout van een oudere versie komt. *Versie onbekend* betekent: geschreven voordat
+  OpenPlanner de versie bewaarde.
+- **Achtergrondtaken**: elke taak van de afspraak (videomeeting, contactcentertaak, berichten,
+  persoonsgegevens verwijderen) met het geplande tijdstip, de stand, het aantal pogingen en de
+  foutcode. Is de videomeeting of de contactcentertaak mislukt, dan staat er **Opnieuw
+  proberen**. Die knop ziet u als u afspraken van de groep mag wijzigen. De worker voert de
+  taak binnen een minuut uit; vernieuw de pagina voor de uitkomst. Een taak die niets hoefde te
+  doen (de meeting bestond al, of de groep gebruikt de eigen wachtrij) staat in het logboek als
+  *Overgeslagen* met de reden, niet als geslaagd.
+- **Verzoeken aan Webex en Webex Contact Center**: elke oproep die OpenPlanner voor de afspraak
+  deed, met het antwoord (statuscode), de duur, de *tracking-id* en de versie. De tracking-id
+  geeft u door aan Cisco-support als Webex de fout moet uitzoeken. Er staan geen
+  persoonsgegevens in. Deze verzoeken worden standaard 30 dagen bewaard.
+
 ## Weekoverzicht
 
 Een tabel met de tijden in de rijen en de dagen van maandag tot en met zondag in de kolommen.
