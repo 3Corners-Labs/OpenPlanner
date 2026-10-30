@@ -344,7 +344,7 @@ def test_the_name_is_split_on_upgrade_and_joined_on_downgrade(
     import sqlite3
     from contextlib import closing
 
-    command.upgrade(alembic_config, "0052")
+    command.upgrade(alembic_config, "0044")
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         database.executescript(
             """
@@ -374,7 +374,7 @@ def test_the_name_is_split_on_upgrade_and_joined_on_downgrade(
         database.commit()
     assert split == [("Ada", "Augusta Lovelace"), ("Cher", ""), (None, None)]
 
-    command.downgrade(alembic_config, "0052")
+    command.downgrade(alembic_config, "0044")
 
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         joined = database.execute("SELECT name FROM bookings ORDER BY id").fetchall()
