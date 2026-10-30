@@ -5818,6 +5818,12 @@ msgstr "Webex needs WEBEX_CLIENT_SECRET, WEBEX_REFRESH_TOKEN and SETTINGS_ENCRYP
 msgid "admin.settings.problem.oidc_incomplete"
 msgstr "login (OIDC) needs an https discovery URL and a client secret in production."
 
+msgid "admin.settings.problem.update_channel"
+msgstr "the rc update channel is not allowed in production: production follows releases."
+
+msgid "admin.settings.problem.update_auto_apply"
+msgstr "automatic updates are not allowed in production: a superuser starts the update."
+
 msgid "authz.permission.settings_platform_view"
 msgstr "View system status and advanced settings"
 
