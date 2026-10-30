@@ -90,7 +90,8 @@ that happens.
    when the site stored something else it reports the warning `webex.trial_lobby` naming the
    values it kept, instead of `webex.trial_ok` ("the site does not allow entry before the
    host: the citizen waits in the lobby and nobody comes"). A key the answer leaves out is not
-   a refusal. It is a warning, not a failure, because the appointment's own meeting works; and
+   a refusal. It is a warning, not a failure, because the appointment's own meeting works (the product
+   owner confirmed this on 2026-10-31: it stays a warning); and
    as for every warning (ADR 0065) the automatic check stores it with the group's latest
    check but raises no system event, so the administrator sees it on the check page. The trial
    probe's cleanup already reports a refused deletion (such as `403 Meeting is in progress`)
