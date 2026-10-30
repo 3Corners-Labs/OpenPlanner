@@ -33,6 +33,13 @@ class EventKind(StrEnum):
     MEETING_DELETED = "meeting_deleted"
     JOIN_PAGE_OPENED = "join_page_opened"
     JOIN_CLICKED = "join_clicked"
+    TRIAL_CREATED = "trial_created"
+    """The citizen opened a trial call on Webex (ADR 0069)."""
+    TRIAL_JOINED = "trial_joined"
+    """The citizen followed the link into the trial call."""
+    TRIAL_FAILED = "trial_failed"
+    """The trial meeting could not be created (detail: the code, e.g. ``rejected_400``)."""
+    TRIAL_DELETED = "trial_deleted"
     TASK_CREATED = "task_created"
     TASK_FAILED = "task_failed"
     TASK_CONNECTED = "task_connected"
@@ -194,6 +201,8 @@ class MeetingRequest:
     end: datetime
     timezone: str
     host_email: str
+    join_before_host: bool = False
+    """A trial call (ADR 0069): the citizen can enter alone, without the lobby."""
 
 
 @dataclass(frozen=True)

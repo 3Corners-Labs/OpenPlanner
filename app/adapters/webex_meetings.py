@@ -26,6 +26,16 @@ MEETING_OPTIONS: dict[str, Any] = {
 }
 """Defaults for every meeting (ADR 0017: cohost for staff, lobby for guests, chat on)."""
 
+TRIAL_OPTIONS: dict[str, Any] = {
+    "enabledJoinBeforeHost": True,
+    "enableConnectAudioBeforeHost": True,
+    "unlockedMeetingJoinSecurity": "allowJoin",
+}
+"""What a trial call (ADR 0069) changes: the citizen enters alone, without waiting in the lobby.
+
+Everything else, the site, the host, the chat and file settings, is the booking's own, so the
+citizen tries the call they will have."""
+
 
 class WebexMeetings:
     """Creates and deletes meetings.
@@ -66,11 +76,12 @@ def meeting_body(request: MeetingRequest) -> dict[str, Any]:
     Shared with the group check, whose probe meeting must be exactly what a booking sends.
     """
     zone = ZoneInfo(request.timezone)
+    options = {**MEETING_OPTIONS, **TRIAL_OPTIONS} if request.join_before_host else MEETING_OPTIONS
     return {
         "title": request.title,
         "start": request.start.astimezone(zone).isoformat(),
         "end": request.end.astimezone(zone).isoformat(),
         "timezone": request.timezone,
         "hostEmail": request.host_email,
-        **MEETING_OPTIONS,
+        **options,
     }

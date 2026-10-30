@@ -408,6 +408,16 @@ Staff who join signed in with the organisation's account become cohost automatic
 on a phone that the citizen's browser join works with your site settings (mobile browsers may
 offer the Webex app).
 
+**Trial call (ADR 0069).** A citizen's trial call is a meeting of the same host on the same site
+that participants may enter before the host (OpenPlanner sets `enabledJoinBeforeHost`,
+`enableConnectAudioBeforeHost` and `allowJoin` on it, not on the appointment's own meeting).
+The site must allow this. **Koppeling controleren** schedules and deletes a trial probe and
+shows `webex.trial_refused` with Webex's reason when it does not; citizens then cannot open a
+trial call, and the group's switch can be set to *Nee* until the site allows it. After a Webex or
+site change, run the check and then open a trial call yourself from a test booking: it must
+open without the lobby, ask for camera and microphone, and be gone from the host's Webex
+calendar a few minutes after it closes.
+
 ### 3. WxCC work items (Control Hub)
 
 Work Items is in beta; the organisation must be enabled by Cisco.

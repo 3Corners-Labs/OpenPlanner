@@ -100,6 +100,7 @@ from app.domain.booking import (
     MeetingRef,
     Slot,
     SlotUsage,
+    TrialCall,
 )
 from app.domain.branding import Branding, FontFile, FontRef, FontRole, HeaderStyle, Logo, LogoRef
 from app.domain.calls import (
@@ -196,6 +197,9 @@ def _group(row: GroupRow) -> Group:
         dispatch_kind=DispatchKind(row.dispatch_kind),
         citizen_change_lead_minutes=row.citizen_change_lead_minutes,
         planner_change_min_lead_minutes=row.planner_change_min_lead_minutes,
+        trial_call_enabled=row.trial_call_enabled,
+        trial_call_minutes=row.trial_call_minutes,
+        trial_calls_per_booking=row.trial_calls_per_booking,
         embedding_enabled=row.embedding_enabled,
         queue_visible_from_minutes=row.queue_visible_from_minutes,
         queue_free_pick_allowed=row.queue_free_pick_allowed,
@@ -267,6 +271,9 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "dispatch_kind": group.dispatch_kind.value,
         "citizen_change_lead_minutes": group.citizen_change_lead_minutes,
         "planner_change_min_lead_minutes": group.planner_change_min_lead_minutes,
+        "trial_call_enabled": group.trial_call_enabled,
+        "trial_call_minutes": group.trial_call_minutes,
+        "trial_calls_per_booking": group.trial_calls_per_booking,
         "embedding_enabled": group.embedding_enabled,
         "queue_visible_from_minutes": group.queue_visible_from_minutes,
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
@@ -304,6 +311,10 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         cancelled_at=row.cancelled_at,
         rescheduled_from_id=row.rescheduled_from_id,
         meeting=MeetingRef(row.video_room_id, row.guest_join_url) if row.video_room_id else None,
+        trial=TrialCall(MeetingRef(row.trial_room_id, row.trial_join_url), row.trial_expires_at)
+        if row.trial_room_id and row.trial_expires_at
+        else None,
+        trial_count=row.trial_count,
         wxcc_task_id=row.wxcc_task_id,
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
@@ -1047,6 +1058,27 @@ class SqlTransaction(
             )
         )
 
+    async def save_trial_call(self, booking_id: int, trial: TrialCall) -> None:
+        """Store a new trial call and count it; a previous one is replaced."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(
+                trial_room_id=trial.meeting.id,
+                trial_join_url=trial.meeting.link,
+                trial_expires_at=trial.expires_at,
+                trial_count=BookingRow.trial_count + 1,
+            )
+        )
+
+    async def clear_trial_call(self, booking_id: int) -> None:
+        """Forget the trial call's meeting and link after the meeting is deleted."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(trial_room_id=None, trial_join_url=None, trial_expires_at=None)
+        )
+
     async def save_task_id(self, booking_id: int, task_id: str) -> None:
         """Store the booking's WxCC task id."""
         await self._session.execute(
@@ -1451,6 +1483,7 @@ class SqlTransaction(
                 form_answers=None,
                 guest_join_url=None,
                 host_join_url=None,
+                trial_join_url=None,
                 claimed_by=None,
                 pii_purged_at=now,
             )

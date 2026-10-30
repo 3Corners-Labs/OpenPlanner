@@ -94,11 +94,14 @@ class ClosureExamples:
         closed_group: The group page of a team that is closed now.
         planned_closure: The closure page of a team whose closure is still to come.
         suspended_booking: The management page of a booking on hold (a new link each run).
+        trial_page: The trial call page of that booking. It shows the page's "not available
+            for this appointment" state; its other states are covered by the API tests.
     """
 
     closed_group: str
     planned_closure: str
     suspended_booking: str
+    trial_page: str
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -194,6 +197,7 @@ async def seed_closure_examples(
         closed_group=f"/g/{CLOSED_GROUP_SLUG}",
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
         suspended_booking=f"/b/{token}",
+        trial_page=f"/b/{token}/test",
     )
 
 

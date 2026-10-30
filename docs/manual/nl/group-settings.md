@@ -198,6 +198,30 @@ De waarde die de flow in Webex Contact Center gebruikt om de wachtrij te kiezen.
 veld leeg, dan stuurt het portaal het webadres van de groep mee. Vul alleen iets anders in als
 de flow een andere waarde verwacht.
 
+<!-- field: trial_call_enabled -->
+### Proefgesprek voor de burger
+
+Met **Ja** kan de burger vóór de afspraak in een echte Webex-meeting uitproberen of camera,
+microfoon, luidsprekers en browser werken. Dat is geen aparte test op onze pagina: het is
+dezelfde Webex-site en dezelfde Webex-omgeving als het gesprek zelf, zodat een probleem nu al
+zichtbaar wordt. De burger zit er alleen in; er komt niemand van het team in en er wordt geen
+taak aangemaakt. De link staat in de bevestiging, de herinnering, op de afspraakpagina en op de
+pagina voor het gesprek. Het werkt alleen met een **Webex-host**. Het proefgesprek gebruikt de
+Webex-site van de host: die moet toestaan dat deelnemers vóór de host binnenkomen. Of dat zo is,
+ziet u bij **Koppeling controleren**.
+
+<!-- field: trial_call_minutes -->
+### Proefgesprek blijft open (minuten)
+
+Hoe lang één proefgesprek openstaat, van 10 tot 60 minuten. Standaard 30. Daarna wordt de
+Webex-meeting verwijderd; de burger kan een nieuw proefgesprek openen.
+
+<!-- field: trial_calls_per_booking -->
+### Proefgesprekken per afspraak
+
+Hoe vaak één afspraak een proefgesprek mag openen, van 1 tot 5. Standaard 3. Elk proefgesprek is
+een meeting in Webex; met dit getal kan één afspraak er niet onbeperkt aanmaken.
+
 <!-- field: direct_call_enabled -->
 ### Direct gesprek starten
 

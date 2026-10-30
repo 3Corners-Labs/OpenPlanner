@@ -63,3 +63,4 @@ async def test_a_second_run_adds_only_a_new_booking_link(engine: AsyncEngine) ->
         closures = await tx.get_closures(closed.id, NOW)
     assert len(closures) == 1
     assert second.suspended_booking != first.suspended_booking
+    assert first.trial_page == f"{first.suspended_booking}/test"

@@ -137,6 +137,19 @@ class CallService:
         await self._video.delete_meeting(booking.meeting.id, group.video_host_email)
         await self._integration.record(_id(booking), EventKind.MEETING_DELETED)
 
+    async def delete_trial_call(self, booking: Booking, group: Group) -> None:
+        """Delete the booking's trial meeting, if it has one, and forget it (ADR 0069).
+
+        Runs after the trial call closed, and at once when the booking is cancelled or moved.
+        """
+        if self._video is None or booking.trial is None or group.video_host_email is None:
+            return
+        booking_id = _id(booking)
+        await self._video.delete_meeting(booking.trial.meeting.id, group.video_host_email)
+        async with self._uow.locked() as tx:
+            await tx.clear_trial_call(booking_id)
+        await self._integration.record(booking_id, EventKind.TRIAL_DELETED)
+
     async def record_failure(
         self, booking_id: int, code: str, kind: EventKind, message: str = ""
     ) -> None:

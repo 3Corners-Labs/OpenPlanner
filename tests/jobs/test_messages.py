@@ -485,3 +485,32 @@ def test_the_product_footer_speaks_the_citizens_language(composer: MessageCompos
     message = composer.compose(JobType.SEND_CONFIRMATION, replace(BOOKING, locale="en"), GROUP, NOW)
 
     assert "Appointments via" in (message.html or "")
+
+
+def test_the_confirmation_offers_a_trial_call_next_to_the_join_link(
+    composer: MessageComposer,
+) -> None:
+    video = replace(GROUP, video_host_email="host@example.org")
+
+    message = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, video, NOW)
+
+    token = derive_token(TEST_TOKEN_KEY, SALT)
+    url = f"https://afspraak.example.nl/b/{token}/test"
+    assert "Proefgesprek openen" in message.text
+    assert url in message.text
+    assert f'href="{url}"' in (message.html or "")
+
+
+def test_no_trial_link_without_video_or_when_the_group_switched_it_off(
+    composer: MessageComposer,
+) -> None:
+    no_video = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW)
+    off = composer.compose(
+        JobType.SEND_CONFIRMATION,
+        BOOKING,
+        replace(GROUP, video_host_email="host@example.org", trial_call_enabled=False),
+        NOW,
+    )
+
+    assert "/test" not in no_video.text
+    assert "/test" not in off.text

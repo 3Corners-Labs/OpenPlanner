@@ -278,6 +278,9 @@ class MessageComposer:
             "join_url": join_url,
             "join_text": _("message.join"),
             "join_link": _("message.join_link"),
+            "trial_url": f"{manage_url}/test" if join_url and group.trial_call_enabled else None,
+            "trial_text": _("message.trial"),
+            "trial_link": _("message.trial_link"),
             "signoff": _("message.signoff", group_name=group.name),
             "product_footer": {
                 "via": _("site.product_footer_via"),
@@ -343,6 +346,7 @@ class MessageComposer:
             "closure_url": None,
             "reason": None,
             "join_url": None,
+            "trial_url": None,
             "manage_url": None if cancel else queue_url,
             "manage_text": _("message.team_invite.queue"),
             "manage_link": _("message.team_invite.queue_link"),

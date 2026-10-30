@@ -125,6 +125,18 @@ class MeetingRef:
     link: str | None = field(default=None, repr=False)
 
 
+@dataclass(frozen=True)
+class TrialCall:
+    """A trial call on Webex ahead of the appointment (ADR 0069): meeting and when it closes.
+
+    The meeting's link is personal data like the appointment's own (it gives access to a
+    meeting room), so it is excluded from ``repr`` and purged with the contact.
+    """
+
+    meeting: MeetingRef
+    expires_at: datetime
+
+
 class ChangeReason(StrEnum):
     """Why a planner cancelled a booking or asked to rebook it (ADR 0044).
 
@@ -215,6 +227,8 @@ class Booking:
     cancelled_at: datetime | None = None
     rescheduled_from_id: int | None = None
     meeting: MeetingRef | None = None
+    trial: TrialCall | None = None
+    trial_count: int = 0
     wxcc_task_id: str | None = None
     kind: BookingKind = BookingKind.SCHEDULED
     closure_id: int | None = None

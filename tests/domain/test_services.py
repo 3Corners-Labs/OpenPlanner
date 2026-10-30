@@ -208,6 +208,7 @@ async def test_find_and_cancel(service: BookingService, uow: InMemoryUnitOfWork)
     assert [j.type for j in uow.state.jobs[cancelled.id or 0]] == [
         JobType.END_WXCC_TASK,
         JobType.DELETE_VIDEO_ROOM,
+        JobType.DELETE_TRIAL_CALL,
         JobType.SEND_CANCELLATION,
         JobType.PURGE_PII,
     ]
@@ -249,6 +250,7 @@ async def test_reschedule_moves_the_booking(
     assert [j.type for j in uow.state.jobs[old.booking.id or 0]] == [
         JobType.END_WXCC_TASK,
         JobType.DELETE_VIDEO_ROOM,
+        JobType.DELETE_TRIAL_CALL,
         JobType.PURGE_PII,
     ]
     assert JobType.SEND_CHANGE in [j.type for j in uow.state.jobs[new.booking.id or 0]]

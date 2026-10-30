@@ -125,7 +125,13 @@ async def test_add_and_delete_pending_jobs_by_type(engine: AsyncEngine) -> None:
         )
         types = [row[0] for row in rows]
 
-    assert types == ["end_wxcc_task", "send_suspension", "send_closure_update", "purge_pii"]
+    assert types == [
+        "end_wxcc_task",
+        "delete_trial_call",
+        "send_suspension",
+        "send_closure_update",
+        "purge_pii",
+    ]
 
 
 async def test_headings_and_the_contact_copy_round_trip_and_follow_an_update(
