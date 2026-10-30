@@ -55,7 +55,7 @@ test('a citizen starts a call right away and the admin sees it', async ({ page, 
   await expect(page.getByRole('status')).toContainText('De groep is aangemaakt');
   await tabs.getByRole('link', { name: 'Bezetting', exact: true }).click();
   await addAllDayHours(page);
-  await expect(page.getByText('Afspraken en direct gesprek')).toHaveCount(WEEKDAYS.length);
+  await expect(page.locator('.window__offer', { hasText: 'Afspraken en direct gesprek' })).toHaveCount(WEEKDAYS.length);
   await expectNoAxeViolations(page);
 
   // Citizen (no admin session): group page offers the direct call.
