@@ -2,7 +2,7 @@
 
 Status: accepted (2026-10-28), requested by the product owner; U1–U4 settled as recommended. Amends ADR 0013 (claims are
 also stored, not only held in the session) and HANDOVER B8 ("no user table for admins").
-Builds on ADR 0014, 0031 and 0039.
+Builds on ADR 0014, 0031 and 0039. Partly built; see `docs/adr-status.md` for what is built.
 
 ## Context
 

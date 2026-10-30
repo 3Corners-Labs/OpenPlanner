@@ -2,7 +2,7 @@
 
 Status: proposed (2026-10-28), requested by the product owner. Extends ADR 0017 (video through
 the Webex Meetings API) and ADR 0019 (direct video call). Settings per ADR 0042. Touches open
-point O8 (accessibility of the video call).
+point O8 (accessibility of the video call). Not built yet; see `docs/adr-status.md` for what is built.
 
 ## Context
 

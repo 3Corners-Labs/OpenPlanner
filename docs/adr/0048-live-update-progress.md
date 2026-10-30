@@ -1,7 +1,7 @@
 # 0048. Live progress of updates: steps reported by the host updater
 
-Status: proposed (2026-10-28), requested by the product owner. Extends ADR 0029 (updates from
-the admin portal); amends ADR 0016 (admin pages without JavaScript) for one page.
+Status: accepted (2026-10-28), requested by the product owner. Extends ADR 0029 (updates from
+the admin portal); amends ADR 0016 (admin pages without JavaScript) for one page. Built, checked against the code on 2026-10-30 (status was *proposed*; `docs/adr-status.md`).
 
 ## Context
 
