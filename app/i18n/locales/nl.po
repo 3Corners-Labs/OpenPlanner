@@ -5778,6 +5778,12 @@ msgstr "Repository met releases"
 msgid "settings.field.update_check_token.label"
 msgstr "Leestoken repository"
 
+msgid "settings.field.update_channel.label"
+msgstr "Updatekanaal"
+
+msgid "settings.field.update_auto_apply.label"
+msgstr "Automatisch bijwerken"
+
 msgid "settings.field.time_format.label"
 msgstr "Tijdnotatie"
 

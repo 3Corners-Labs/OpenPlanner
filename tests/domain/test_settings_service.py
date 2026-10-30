@@ -565,3 +565,29 @@ async def test_the_wxcc_host_must_use_https(uow: InMemoryUnitOfWork, clock: Fixe
         await _service(uow, clock).change(SUPER, "wxcc_api_base_url", "http://api.wxcc.example")
 
     assert caught.value.code is ErrorCode.SETTING_INVALID
+
+
+async def test_production_refuses_the_rc_channel_and_auto_apply(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0065: the portal cannot move a production installation onto candidates."""
+    production = SettingsService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        locked=lambda: set(),
+        combination=lambda _: None,
+        production=True,
+    )
+    with pytest.raises(DomainError, match="setting_invalid"):
+        await production.change(SUPER, "update_channel", "rc")
+    with pytest.raises(DomainError, match="setting_invalid"):
+        await production.change(SUPER, "update_auto_apply", "true")
+    await production.change(SUPER, "update_channel", "release")
+
+    # Outside production both are ordinary class C changes.
+    await _service(uow, clock).change(SUPER, "update_channel", "rc")
+    await _service(uow, clock).change(SUPER, "update_auto_apply", "true")
+    async with uow.read() as tx:
+        stored = await tx.platform_settings()
+    assert (stored["update_channel"], stored["update_auto_apply"]) == ("rc", True)
