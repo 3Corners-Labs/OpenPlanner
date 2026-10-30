@@ -534,6 +534,7 @@ class InMemoryTransaction:
                 b.end,
                 b.is_active,
                 self.state.call_status.get(b.id or 0) or new_status(b.id or 0),
+                claimed=b.claim is not None,
             )
             for b in self.state.bookings.values()
             if b.group_id == group_id and b.kind is BookingKind.DIRECT and b.start >= since

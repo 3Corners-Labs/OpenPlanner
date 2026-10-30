@@ -4,15 +4,19 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from app.domain.authorization import Role
-from app.domain.booking import Booking, BookingKind, BookingStatus, Contact
-from app.domain.calls import CallStatus
+from app.domain.booking import Booking, BookingKind, BookingStatus, Contact, MeetingRef
+from app.domain.calls import CallState, CallStatus
 from app.domain.own_queue import (
+    CitizenState,
     Claim,
     QueueEntry,
     QueueSummary,
+    VideoState,
+    citizen_state,
     next_up,
     not_claimed_in_time,
     summarise,
+    video_state,
     visible,
     works_queue,
 )
@@ -105,6 +109,24 @@ def test_direct_calls_are_marked() -> None:
 
     assert direct.is_direct
     assert not entry(2, 0).is_direct
+
+
+def test_the_video_link_is_ready_pending_or_failed() -> None:
+    """ADR 0072: a failed meeting is said so, even when a stale link is still stored."""
+    booking = entry(1, 0).booking
+    with_link = replace(booking, meeting=MeetingRef("m-1", "https://webex.example/j/1"))
+
+    assert video_state(booking, CallStatus(1)) is VideoState.PENDING
+    assert video_state(with_link, CallStatus(1)) is VideoState.READY
+    assert video_state(with_link, CallStatus(1, call=CallState.FAILED)) is VideoState.FAILED
+    assert entry(1, 0).video is VideoState.PENDING
+
+
+def test_where_the_citizen_is() -> None:
+    assert citizen_state(CallStatus(1)) is CitizenState.NOT_YET
+    assert citizen_state(CallStatus(1, participants=1)) is CitizenState.IN_LOBBY
+    assert citizen_state(CallStatus(1, participants=2, host_joined=True)) is CitizenState.IN_CALL
+    assert citizen_state(CallStatus(1, call=CallState.ENDED)) is CitizenState.ENDED
 
 
 def _joined(item: QueueEntry, minutes_ago: int) -> QueueEntry:

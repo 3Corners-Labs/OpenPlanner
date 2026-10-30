@@ -14,6 +14,8 @@ exactly one wins; the other gets ``already_claimed`` (a chosen row) or the next 
 
 The meeting link is shown only after a claim, so two agents cannot both start the same
 meeting unannounced. The agent is recorded as a pseudonym (``tokens.agent_pseudonym``).
+Every row and the claimed booking carry the video link's state and the citizen's state
+(ADR 0072), so the page can say what is going on instead of showing "no meeting".
 """
 
 from dataclasses import dataclass, field
@@ -23,6 +25,7 @@ from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Permission, Principal, Scope, Target, decide, scope_for
 from app.domain.booking import Booking, Claim
+from app.domain.calls import CallStatus, new_status
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import (
     FALLBACK_LOCALE,
@@ -32,10 +35,14 @@ from app.domain.form_fields import (
     labelled_answers,
 )
 from app.domain.own_queue import (
+    CitizenState,
     QueueEntry,
+    VideoState,
+    citizen_state,
     next_up,
     not_claimed_in_time,
     summarise,
+    video_state,
     visible,
     works_queue,
 )
@@ -63,6 +70,7 @@ class QueueRow:
         mine: The viewing agent picked it up.
         direct: A direct call (ADR 0019) rather than a scheduled appointment.
         overdue: Not claimed ``not_picked_up_minutes`` after its start.
+        video: Whether the meeting is ready, pending or failed (ADR 0072).
     """
 
     booking_id: int
@@ -74,6 +82,7 @@ class QueueRow:
     mine: bool
     direct: bool
     overdue: bool
+    video: VideoState = VideoState.PENDING
 
 
 @dataclass(frozen=True)
@@ -115,6 +124,10 @@ class ClaimedBooking:
     join_url: str | None = field(repr=False)
     answers: tuple[LabelledAnswer, ...] = field(default=(), repr=False)
     """Answers to the group's custom fields an agent may see: never PII (ADR 0055)."""
+    video: VideoState = VideoState.PENDING
+    """Whether the meeting is ready, pending or failed (ADR 0072)."""
+    citizen: CitizenState = CitizenState.NOT_YET
+    """Where the citizen is: not yet joined, in the lobby, in the call, or gone."""
 
 
 class QueueService:
@@ -234,9 +247,10 @@ class QueueService:
         async with self._uow.read() as tx:
             booking = await _booking_of(tx, group, booking_id)
             form = await tx.get_form(group.id)
+            status = await tx.get_call_status(booking_id)
         if not self._holds(principal, booking):
             raise DomainError(ErrorCode.NOT_CLAIMED)
-        return _claimed(booking, form, locale)
+        return _claimed(booking, form, locale, status)
 
     async def release(self, principal: Principal, slug: str, booking_id: int) -> None:
         """Put a claimed booking back at the top of the queue.
@@ -361,14 +375,19 @@ def _row(entry: QueueEntry, me: str, overdue: bool) -> QueueRow:
         mine=claim is not None and claim.claimed_by == me,
         direct=entry.is_direct,
         overdue=overdue,
+        video=entry.video,
     )
 
 
 def _claimed(
-    booking: Booking, form: FormDefinition | None = None, locale: str = FALLBACK_LOCALE
+    booking: Booking,
+    form: FormDefinition | None = None,
+    locale: str = FALLBACK_LOCALE,
+    status: CallStatus | None = None,
 ) -> ClaimedBooking:
-    """Return what the claiming agent sees of ``booking``: first name and non-PII answers."""
+    """Return what the claiming agent sees of ``booking``: first name, answers, states."""
     contact = booking.contact
+    status = status or new_status(_id(booking))
     return ClaimedBooking(
         booking_id=_id(booking),
         reference=booking.reference,
@@ -381,6 +400,8 @@ def _claimed(
             Purpose.AGENT_VIEW,
             locale,
         ),
+        video=video_state(booking, status),
+        citizen=citizen_state(status),
     )
 
 

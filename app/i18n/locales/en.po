@@ -1460,9 +1460,6 @@ msgstr "The flow chooses the queue with it. Empty: the group's web address."
 msgid "admin.field.direct_call_enabled"
 msgstr "Start a call right away"
 
-msgid "admin.field.direct_call_enabled_hint"
-msgstr "Participants can start a call right away during a block with agents."
-
 msgid "admin.field.embedding_enabled"
 msgstr "Embed on websites"
 
@@ -1599,7 +1596,7 @@ msgid "wait.title"
 msgstr "Your video call"
 
 msgid "wait.searching"
-msgstr "We are looking for an agent. You can go to the lobby already."
+msgstr "We are looking for an agent for you."
 
 msgid "wait.accepted"
 msgstr "An agent has accepted your call and will come to the lobby shortly."
@@ -1777,9 +1774,6 @@ msgstr "Join the call"
 
 msgid "admin.queue.new_window"
 msgstr "(opens in a new window)"
-
-msgid "admin.queue.no_meeting"
-msgstr "The video call for this appointment is not ready yet. Try again in a minute or release the appointment."
 
 msgid "admin.queue.state.mine"
 msgstr "Picked up by you"
@@ -6811,6 +6805,62 @@ msgstr "Warn when the certificate is valid for fewer than (days)"
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Repeat the certificate report every (hours)"
 
+msgid "admin.field.offer"
+msgstr "Offer"
+
+msgid "admin.field.offer_hint"
+msgstr "What citizens can do in this block: book an appointment, start a call right away, or both."
+
+msgid "admin.offer.scheduled"
+msgstr "Appointments"
+
+msgid "admin.offer.direct"
+msgstr "Direct call"
+
+msgid "admin.offer.both"
+msgstr "Appointments and direct call"
+
+msgid "admin.group.direct_blocks"
+msgstr "In {count} block(s)"
+
+msgid "admin.queue.video_pending"
+msgstr "Video link being prepared"
+
+msgid "admin.queue.video_failed"
+msgstr "Video link failed"
+
+msgid "admin.queue.video_pending_explained"
+msgstr "The video call is still being prepared. The button appears by itself once it is ready."
+
+msgid "admin.queue.video_failed_explained"
+msgstr "The video call could not be set up. The citizen sees this too and is advised to book an appointment. Release the booking."
+
+msgid "admin.queue.timeline"
+msgstr "Open this booking's timeline"
+
+msgid "admin.queue.citizen.not_yet"
+msgstr "Citizen not in the call yet"
+
+msgid "admin.queue.citizen.in_lobby"
+msgstr "Citizen waiting in the lobby"
+
+msgid "admin.queue.citizen.in_call"
+msgstr "Call in progress"
+
+msgid "admin.queue.citizen.ended"
+msgstr "Call ended"
+
+msgid "wait.preparing"
+msgstr "We are setting up your video call. The button appears by itself once it is ready."
+
+msgid "wait.lobby_hint"
+msgstr "You can go to the waiting room already."
+
+msgid "wait.failed"
+msgstr "Unfortunately the video call could not be set up because of a technical problem. The team has been informed. Book an appointment and we will call you at a time that suits you."
+
+msgid "settings.field.queue_refresh_seconds.label"
+msgstr "Refresh of the queue and waiting page (seconds)"
 msgid "admin.overview.view.label"
 msgstr "View of {title}"
 

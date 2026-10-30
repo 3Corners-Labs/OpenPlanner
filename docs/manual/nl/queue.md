@@ -20,7 +20,13 @@ het afspraaknummer en de status:
 Direct gesprekken staan in dezelfde lijst, met **Direct gesprek** onder de tijd. U ziet nooit
 het e-mailadres of telefoonnummer van de deelnemer.
 
-De lijst ververst niet vanzelf. Kies **Vernieuwen** om de nieuwste stand te zien.
+Bij de status staat ook hoe het met de videolink staat: **Videolink wordt klaargezet** zolang
+het gesprek nog wordt aangemaakt, en **Videolink mislukt** als dat niet is gelukt. Staat er
+niets, dan is de link klaar.
+
+De lijst ververst zichzelf om de paar seconden (de beheerder stelt het interval in). U hoeft
+niet te herladen; met **Vernieuwen** kan het ook met de hand. Een nieuwe of wachtende
+deelnemer wordt voorgelezen door de schermlezer.
 
 ## Een afspraak oppakken
 
@@ -30,6 +36,14 @@ de afspraak die het eerst begint. Zo krijgt elke deelnemer de eerste vrije medew
 Daarna ziet u de knop **Deelnemen aan het gesprek**. Die link ziet alleen u: zo beginnen twee
 collega's nooit tegelijk aan hetzelfde gesprek. Was een collega u net voor, dan ziet u "Al
 opgepakt door een collega" en kunt u de volgende oppakken.
+
+De pagina van de opgepakte afspraak laat zien waar de deelnemer is (nog niet in het gesprek,
+wacht in de wachtruimte, gesprek bezig) en ververst zichzelf. De deelnemer ziet op zijn beurt
+meteen dat een medewerker het gesprek heeft aangenomen.
+
+Is de videolink mislukt, dan staat dat op deze pagina, met een link naar de tijdlijn van de
+afspraak voor wie die mag zien. De deelnemer ziet dezelfde boodschap en het advies een
+afspraak te maken. Geef de afspraak vrij.
 
 Staat **Medewerkers mogen zelf een afspraak kiezen** aan bij de groep, dan staat bij elke vrije
 afspraak ook een knop **Oppakken**.

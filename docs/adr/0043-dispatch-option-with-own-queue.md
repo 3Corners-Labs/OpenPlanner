@@ -1,7 +1,8 @@
 # 0043. Dispatch option per group: contact center or OpenPlanner's own queue
 
 Status: accepted (2026-10-28), decided by the product owner with the amendments under
-*Acceptance* below; built without ADR 0032. Extends ADR 0032 (provider-neutral
+*Acceptance* below; built without ADR 0032. Extended by ADR 0072 (`queue_refresh_seconds`, the
+live queue, the video link's state, and the claim on the citizen's waiting page). Extends ADR 0032 (provider-neutral
 contact center) and ADR 0039 (adjustable roles). Builds on ADR 0010 and 0017 (meeting status
 from Webex webhooks), ADR 0019 and 0026 (direct calls), and ADR 0042 (settings).
 

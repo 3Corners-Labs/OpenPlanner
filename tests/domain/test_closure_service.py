@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -10,6 +11,7 @@ from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
+from app.domain.scheduling import Offer
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -225,8 +227,9 @@ async def test_citizen_can_cancel_a_suspended_booking(
 async def test_no_direct_call_while_closed(
     closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    group = uow.state.groups[1]
-    uow.state.groups[1] = group.__class__(**{**group.__dict__, "direct_call_enabled": True})
+    uow.state.rules[1] = [
+        replace(r, window=replace(r.window, offer=Offer.BOTH)) for r in uow.state.rules[1]
+    ]
     clock.advance(SLOT_0900 - NOW)  # Monday 09:00, the group is open
     assert await bookings.direct_call_availability("demo") is DirectAvailability.AVAILABLE
 

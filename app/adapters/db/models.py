@@ -185,7 +185,6 @@ class GroupRow(Base):
     wxcc_business_address: Mapped[str | None] = mapped_column(String(255))
     wxcc_channel: Mapped[str | None] = mapped_column(String(255))
     wxcc_routing_value: Mapped[str | None] = mapped_column(String(512))
-    direct_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
@@ -264,8 +263,15 @@ class GroupContactsRow(Base):
     body: Mapped[str] = mapped_column(Text)
 
 
+OFFERS = "('scheduled', 'direct', 'both')"
+"""What a staffing block offers (ADR 0072), as the database checks it."""
+
+
 class ScheduleRuleRow(Base):
-    """A weekly staffing block of a group; capacity 0 is a block without agents (ADR 0027)."""
+    """A weekly staffing block of a group; capacity 0 is a block without agents (ADR 0027).
+
+    ``offer`` says whether the block offers slots, direct calls or both (ADR 0072).
+    """
 
     __tablename__ = "schedule_rules"
 
@@ -276,6 +282,7 @@ class ScheduleRuleRow(Base):
     closes: Mapped[time] = mapped_column(Time)
     capacity: Mapped[int] = mapped_column(Integer)
     label: Mapped[str | None] = mapped_column(String(50))
+    offer: Mapped[str] = mapped_column(String(9), server_default=text("'scheduled'"))
     valid_from: Mapped[date | None] = mapped_column(Date)
     valid_to: Mapped[date | None] = mapped_column(Date)
 
@@ -283,6 +290,7 @@ class ScheduleRuleRow(Base):
         CheckConstraint("weekday BETWEEN 0 AND 6", name="weekday"),
         CheckConstraint("opens < closes", name="window"),
         CheckConstraint("capacity >= 0", name="capacity"),
+        CheckConstraint(f"offer IN {OFFERS}", name="offer"),
     )
 
 
@@ -298,6 +306,7 @@ class ScheduleOverrideRow(Base):
     closes: Mapped[time | None] = mapped_column(Time)
     capacity: Mapped[int | None] = mapped_column(Integer)
     label: Mapped[str | None] = mapped_column(String(50))
+    offer: Mapped[str] = mapped_column(String(9), server_default=text("'scheduled'"))
 
     __table_args__ = (
         Index("ix_schedule_overrides_group_day", "group_id", "day"),
@@ -306,6 +315,7 @@ class ScheduleOverrideRow(Base):
             "OR (opens < closes AND capacity >= 0)",
             name="window_or_closed",
         ),
+        CheckConstraint(f"offer IN {OFFERS}", name="offer"),
     )
 
 
@@ -992,7 +1002,7 @@ class RoleRow(Base):
 
 
 class OwnCertificateRow(Base):
-    """The own certificate uploaded in the portal (ADR 0070); at most one row.
+    """The own certificate uploaded in the portal (ADR 0072); at most one row.
 
     The chain is public and stored as text with the leaf's public key; the private key is never
     in the database (it lives on the volume the proxy reads), so a backup never carries it.
