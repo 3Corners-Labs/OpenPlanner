@@ -69,6 +69,7 @@ from app.adapters.db.models import (
     StaffRow,
     WebhookEventRow,
 )
+from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
@@ -141,6 +142,7 @@ from app.domain.scheduling import (
     ScheduleRule,
     TimeWindow,
 )
+from app.domain.tasks import ActiveJob, ActiveJobs, JobState
 from app.domain.theme import Theme
 from app.domain.worker_check import WorkerHeartbeat
 
@@ -386,6 +388,7 @@ class SqlTransaction(
     PlatformSettingsQueries,
     FormFieldQueries,
     CertificateQueries,
+    OwnCertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
@@ -1551,6 +1554,30 @@ class SqlTransaction(
                 JobRow.status == _PENDING,
                 JobRow.type.in_(sorted(t.value for t in types)),
             )
+        )
+
+    async def active_jobs(self, limit: int) -> ActiveJobs:
+        """Return the first ``limit`` running or failed jobs and their count, no payload.
+
+        Running jobs first (newest claim first), then failed ones (latest due first).
+        """
+        states = [JobState.RUNNING.value, JobState.FAILED.value]
+        since = func.coalesce(JobRow.claimed_at, JobRow.run_at)
+        rows = await self._session.execute(
+            select(JobRow.type, JobRow.status, JobRow.claimed_at, JobRow.run_at, JobRow.attempts)
+            .where(JobRow.status.in_(states))
+            .order_by(case((JobRow.status == JobState.RUNNING.value, 0), else_=1), since.desc())
+            .limit(limit)
+        )
+        total = await self._session.scalar(
+            select(func.count()).select_from(JobRow).where(JobRow.status.in_(states))
+        )
+        return ActiveJobs(
+            [
+                ActiveJob(JobType(job_type), JobState(status), claimed_at or run_at, attempts)
+                for job_type, status, claimed_at, run_at, attempts in rows
+            ],
+            int(total or 0),
         )
 
     async def get_booking_jobs(self, booking_id: int) -> list[JobSummary]:
