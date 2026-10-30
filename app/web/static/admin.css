@@ -810,17 +810,17 @@ fieldset.card {
   height: 100%;
 }
 
-.group-card h2 {
+.group-card :is(h2, h3) {
   margin: 0;
   font-size: 1.1rem;
 }
 
-.group-card h2 a {
+.group-card :is(h2, h3) a {
   color: var(--adm-text);
   text-decoration: none;
 }
 
-.group-card h2 a:hover {
+.group-card :is(h2, h3) a:hover {
   color: var(--adm-accent);
   text-decoration: underline;
 }
@@ -902,6 +902,108 @@ fieldset.card {
   background: var(--adm-surface);
   color: var(--adm-text-muted);
   text-align: center;
+}
+
+/* --- Overview widgets (ADR 0061) ---------------------------------------------------------- */
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.widget {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius);
+  background: var(--adm-surface);
+  box-shadow: var(--adm-shadow);
+}
+
+.widget__header {
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid var(--adm-border);
+}
+
+.widget__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.widget__body {
+  flex: 1;
+  padding: 1rem 1.25rem;
+}
+
+.widget__body > .group-card__meta {
+  margin-bottom: 0.75rem;
+}
+
+.widget__footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--adm-border);
+  font-size: 0.95rem;
+}
+
+.widget__empty {
+  margin: 0;
+  color: var(--adm-text-muted);
+}
+
+.widget-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.widget-list__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 0.75rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--adm-border);
+}
+
+.widget-list__item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.widget-list__label {
+  grid-column: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.widget-list__meta {
+  grid-column: 1;
+  font-size: 0.9rem;
+  color: var(--adm-text-muted);
+}
+
+.widget__count {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ADR 0062 §6: the column count is at most 2 on a tablet and 1 on a phone. Fixed on purpose:
+   a layout rule of the design, not a setting. */
+@media (max-width: 52rem) {
+  .widget-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 40rem) {
+  .widget-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* --- Definition lists ---------------------------------------------------------------------- */

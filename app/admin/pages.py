@@ -20,7 +20,8 @@ from app.admin.authz import can_function, session_principal
 from app.admin.forms import Field, moment_label
 from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
 from app.admin.session import THEMES, choose_theme, session_theme
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Principal, Role, Scope
+from app.i18n import BoundGettext
 from app.web.authz_labels import ROLE_LABELS
 from app.web.help import HelpTopic, shipped_manual, topic_for_path
 from app.web.locale import RequestLocale, resolve_locale
@@ -128,6 +129,22 @@ def with_manual(request: Request, locale: RequestLocale, fields: Sequence[Field]
 def admin_moment(request: Request, locale: RequestLocale, at: datetime) -> str:
     """Return a compact local date and time in the admin time zone (``ADMIN_TIMEZONE``)."""
     return moment_label(at, ZoneInfo(settings_for(request).admin_timezone), locale.code)
+
+
+def scope_text(scope: Scope | None, _: BoundGettext) -> str:
+    """Describe a scope in words, for the rights page and the "My role and reach" widget."""
+    if scope is None:
+        return _("admin.rights.scope_portal")
+    if scope.everything:
+        return _("admin.rights.scope_everything")
+    parts = []
+    if scope.organisations:
+        parts.append(
+            _("admin.rights.scope_organisations", names=", ".join(sorted(scope.organisations)))
+        )
+    if scope.groups:
+        parts.append(_("admin.rights.scope_groups", names=", ".join(sorted(scope.groups))))
+    return "; ".join(parts)
 
 
 def role_labels(principal: Principal, locale: RequestLocale) -> list[str]:
