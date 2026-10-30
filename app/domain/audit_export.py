@@ -2,7 +2,7 @@
 
 The file is meant for Dutch Excel as much as for scripts: UTF-8 with a byte order mark, ``;``
 as separator, RFC 4180 quoting and CRLF line ends. The columns are the fields of
-``openplanner.event/1`` in schema order, so the export, the log platform and the table speak
+``openplanner.event/2`` in schema order, so the export, the log platform and the table speak
 one language. A cell that a spreadsheet would read as a formula (starting with ``=``, ``+``,
 ``-``, ``@``, tab or carriage return) gets a leading ``'`` (CSV injection, OWASP).
 

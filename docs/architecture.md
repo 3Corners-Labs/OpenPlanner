@@ -630,7 +630,7 @@ flowchart LR
 | Management tokens: 256 bits, HMAC-derived, only the salt and hash stored | `app/domain/tokens.py` | ADR 0011 |
 | No PII in logs (masking processor and semgrep rule), errors, URLs or jobs | `app/logging.py`, `.semgrep/` | CLAUDE.md |
 | Audit events shipped after commit as `log_type: audit` lines; security events deduplicated | `app/adapters/event_sink.py`, `app/domain/security_log.py` | ADR 0034 |
-| One event schema (`openplanner.event/1`) for audit table and log lines; a trace id per request and job, set by the server only | `app/domain/event_schema.py`, `app/domain/event_context.py`, `app/api/trace.py` | ADR 0040 |
+| One event schema (`openplanner.event/2`) for audit table and log lines; a trace id per request and job, set by the server only | `app/domain/event_schema.py`, `app/domain/event_context.py`, `app/api/trace.py` | ADR 0040 |
 | Authorisation matrix: one `RequirePermission` per admin route, scoped SQL, audit of denials and logins | `app/domain/authorization.py`, `app/admin/authz.py` | ADR 0014 |
 | OIDC with PKCE, nonce, asymmetric algorithms only; RP-initiated logout | `app/adapters/oidc.py` | ADR 0013 |
 | Encrypted, write-only integration secrets | WP7 | ADR 0008 |

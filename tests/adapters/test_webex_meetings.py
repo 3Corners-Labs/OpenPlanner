@@ -56,7 +56,12 @@ async def test_meeting_is_created_with_the_agreed_defaults() -> None:
         "enabledVideo": True,
         "enabledFileTransfer": False,
     }
-    assert body["start"] == "2026-01-05T08:00:00+00:00"
+    # In the group's time zone: Webex refuses a zone that does not match the offset (ADR 0065).
+    assert (body["start"], body["end"]) == (
+        "2026-01-05T09:00:00+01:00",
+        "2026-01-05T09:30:00+01:00",
+    )
+    assert body["timezone"] == "Europe/Amsterdam"
 
 
 async def test_deleting_a_meeting_that_is_gone_is_fine() -> None:
@@ -80,12 +85,13 @@ async def test_unexpected_answer_is_not_retried() -> None:
         await meetings.create_meeting(REQUEST)
 
 
-async def test_a_refused_meeting_logs_webexs_reason() -> None:
+async def test_a_refused_meeting_logs_and_carries_webexs_reason() -> None:
     body = {"message": "Invalid hostEmail.", "trackingId": "ROUTER_789"}
     meetings = _meetings(lambda request: httpx.Response(400, json=body))
 
-    with capture_logs() as logs, pytest.raises(IntegrationError, match="rejected_400"):
+    with capture_logs() as logs, pytest.raises(IntegrationError, match="rejected_400") as error:
         await meetings.create_meeting(REQUEST)
 
     refused = next(entry for entry in logs if entry["event"] == "integration.refused")
     assert (refused["reason"], refused["tracking_id"]) == ("Invalid hostEmail.", "ROUTER_789")
+    assert error.value.reason == "Invalid hostEmail."  # ADR 0065: shown on the timeline
