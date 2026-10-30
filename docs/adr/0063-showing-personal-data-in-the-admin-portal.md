@@ -26,10 +26,10 @@ None.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed; backlog section 4 | #130 | in PR |
-| 1 | PI-1: `app/domain/privacy.py` with the fixed field list and classification | | planned |
-| 2 | PI-2: marker-value test over every list, overview, export and alert template | | planned |
-| 3 | PI-3: list search and filters never match PII fields; abuse case in the threat model | | planned |
-| 4 | PI-4: read-only card *Platform → Advanced settings → Data fields*; manual topic | | planned |
+| 1 | PI-1: `app/domain/privacy.py` with the fixed field list and classification | #PRNUM | in PR |
+| 2 | PI-2: marker-value test over every list, overview, export and alert template | #PRNUM | in PR |
+| 3 | PI-3: list search and filters never match PII fields; abuse case in the threat model | #PRNUM | in PR |
+| 4 | PI-4: read-only card *Platform → Advanced settings → Data fields*; manual topic | #PRNUM | in PR |
 
 ## Consequences
 
@@ -37,4 +37,8 @@ None.
 - The design's editable "PII marking per field" is replaced by this read-only card.
 - Threat model: abuse case "PII through list search or export" with a test.
 - `docs/dataflow.md`: no change in flows; the rule is referenced in the DPIA input.
+- Build note (PR 4): the booking detail page shows the reference, the call status, the
+  answers to the group's form and the timeline; the group's own agenda, queue and planner
+  pages show the first name (ADR 0043, 0044). The sweep allows exactly that and nothing
+  else; the `note` field is reserved (a free-text answer lives in `form_answers`).
 - Manual: topic *Data fields and personal data*.
