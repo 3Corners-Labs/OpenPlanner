@@ -25,12 +25,18 @@ def _service(
     *,
     locked: frozenset[str] = frozenset(),
     combination: str | None = None,
+    environment: dict[str, object] | None = None,
 ) -> SettingsService:
     def check(_: Mapping[str, object]) -> str | None:
         return combination
 
     return SettingsService(
-        uow, clock, AdminService(uow, clock), locked=lambda: locked, combination=check
+        uow,
+        clock,
+        AdminService(uow, clock),
+        locked=lambda: locked,
+        combination=check,
+        environment_value=(environment or {}).get,
     )
 
 
@@ -60,7 +66,7 @@ def test_operations_retention_storage_rates_and_sessions_are_editable() -> None:
 
 
 def test_login_mapping_secrets_mail_and_environment_settings_are_not() -> None:
-    for key in ("oidc_role_claim", "smtp_password", "smtp_host", "public_base_url"):
+    for key in ("oidc_role_claim", "webex_webhook_secret", "public_base_url"):
         assert not editable(BY_KEY[key]), key
 
 
@@ -368,3 +374,194 @@ async def test_an_org_admin_lists_and_opens_only_their_own_organisations(
     with pytest.raises(DomainError) as caught:
         await service.organisation(ORG, "andere")
     assert caught.value.code is ErrorCode.NOT_PERMITTED
+
+
+# Secrets and taking a value over from the environment (ADR 0042 step 6, §12).
+
+
+async def test_a_secret_is_sealed_and_audited_without_its_value(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await _service(uow, clock).change(SUPER, "smtp_password", "s3cret")
+
+    assert uow.state.platform_secrets == {"smtp_password": "s3cret"}
+    assert uow.state.platform_settings == {}
+    assert uow.state.settings_version == 1
+    assert uow.state.audit[-1].detail == "set:smtp_password:secret"
+    assert all("s3cret" not in e.detail for e in uow.state.audit)
+
+
+async def test_an_empty_secret_is_refused_reset_clears_it(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    service = _service(uow, clock)
+    with pytest.raises(DomainError) as caught:
+        await service.change(SUPER, "update_check_token", "  ")
+    assert caught.value.code is ErrorCode.SETTING_INVALID
+
+    await service.change(SUPER, "update_check_token", "ghp_x")
+    assert await service.reset(SUPER, "update_check_token")
+
+    assert uow.state.platform_secrets == {}
+    assert uow.state.audit[-1].detail == "reset:update_check_token:secret"
+
+
+async def test_without_a_settings_key_a_secret_is_refused(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    uow.state.secrets_available = False
+
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change(SUPER, "smtp_password", "s3cret")
+
+    assert caught.value.code is ErrorCode.SETTING_NO_KEY
+
+
+async def test_the_mail_server_and_the_update_repository_are_editable() -> None:
+    for key in ("smtp_host", "smtp_password", "mail_from", "update_repository"):
+        assert editable(BY_KEY[key]), key
+
+
+async def test_a_locked_value_is_taken_over_from_the_environment(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    service = _service(
+        uow,
+        clock,
+        locked=frozenset({"smtp_host", "smtp_password"}),
+        environment={"smtp_host": "mail.example.nl", "smtp_password": "from-env"},
+    )
+
+    await service.adopt(SUPER, "smtp_host")
+    await service.adopt(SUPER, "smtp_password")
+
+    assert uow.state.platform_settings == {"smtp_host": "mail.example.nl"}
+    assert uow.state.platform_secrets == {"smtp_password": "from-env"}
+    details = [e.detail for e in uow.state.audit[-2:]]
+    assert details == ["adopt:smtp_host:mail.example.nl", "adopt:smtp_password:secret"]
+
+
+async def test_only_a_locked_setting_can_be_taken_over(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).adopt(SUPER, "smtp_host")
+
+    assert caught.value.code is ErrorCode.SETTING_NOT_LOCKED
+
+
+async def test_the_cli_never_sets_a_secret(uow: InMemoryUnitOfWork, clock: FixedClock) -> None:
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change_host("smtp_password", "s3cret")
+
+    assert caught.value.code is ErrorCode.SETTING_NOT_EDITABLE
+    assert uow.state.platform_secrets == {}
+
+
+# The login mapping after a dry run (ADR 0042 step 7, §8).
+
+MAPPING = {
+    "oidc_role_claim": "realm_roles",
+    "oidc_organisation_claim": "organisations",
+    "oidc_group_claim": "groups",
+    "oidc_role_superuser": "op-super",
+    "oidc_role_org_admin": "op-org",
+    "oidc_role_group_admin": "op-group",
+    "oidc_role_auditor": "op-audit",
+    "oidc_role_agent": "op-agent",
+}
+
+
+async def test_a_mapping_that_keeps_the_superuser_is_saved_and_audited(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await _service(uow, clock).change_login_mapping(SUPER, MAPPING, trial=SUPER)
+
+    assert uow.state.platform_settings["oidc_role_claim"] == "realm_roles"
+    assert uow.state.settings_version == 1
+    actions = {e.action for e in uow.state.audit if e.outcome is Outcome.SUCCESS}
+    assert actions == {"settings.login.manage"}
+    assert "set:oidc_role_superuser:openplanner-superuser->op-super" in {
+        e.detail for e in uow.state.audit
+    }
+
+
+async def test_a_mapping_that_would_lock_the_superuser_out_is_refused(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    no_roles = Principal("sub-super", "S", frozenset(), frozenset(), frozenset())
+
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change_login_mapping(SUPER, MAPPING, trial=no_roles)
+
+    assert caught.value.code is ErrorCode.LOGIN_LOCKOUT
+    assert uow.state.platform_settings == {}
+    assert uow.state.audit[-1].reason == "login_lockout"
+
+
+async def test_a_dry_run_of_another_person_does_not_count(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    other = Principal("sub-other", "O", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change_login_mapping(SUPER, MAPPING, trial=other)
+
+    assert caught.value.code is ErrorCode.LOGIN_LOCKOUT
+
+
+async def test_only_the_superuser_changes_the_login_mapping(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change_login_mapping(AUDITOR, MAPPING, trial=AUDITOR)
+
+    assert caught.value.code is ErrorCode.NOT_PERMITTED
+
+
+async def test_a_locked_key_of_the_mapping_refuses_the_whole_change(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    service = _service(uow, clock, locked=frozenset({"oidc_group_claim"}))
+
+    with pytest.raises(DomainError) as caught:
+        await service.change_login_mapping(SUPER, MAPPING, trial=SUPER)
+
+    assert caught.value.code is ErrorCode.SETTING_LOCKED
+    assert uow.state.platform_settings == {}
+
+
+async def test_the_host_can_set_and_reset_the_mapping_to_recover(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    service = _service(uow, clock)
+
+    await service.change_host("oidc_role_claim", "realm_roles")
+    assert uow.state.platform_settings == {"oidc_role_claim": "realm_roles"}
+    assert await service.reset_host("oidc_role_claim")
+
+
+# Webex and WxCC (ADR 0042 step 6b-1).
+
+
+def test_the_webex_service_app_and_the_wxcc_host_are_editable() -> None:
+    for key in (
+        "webex_client_id",
+        "webex_client_secret",
+        "webex_refresh_token",
+        "wxcc_api_base_url",
+    ):
+        assert editable(BY_KEY[key]), key
+
+
+def test_webhook_secrets_are_never_typed_in() -> None:
+    # ADR 0042 inventory: generated by the server and rotated with a button (step 6b-2).
+    for key in ("webex_webhook_secret", "wxcc_webhook_secret"):
+        assert not editable(BY_KEY[key]), key
+
+
+async def test_the_wxcc_host_must_use_https(uow: InMemoryUnitOfWork, clock: FixedClock) -> None:
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change(SUPER, "wxcc_api_base_url", "http://api.wxcc.example")
+
+    assert caught.value.code is ErrorCode.SETTING_INVALID

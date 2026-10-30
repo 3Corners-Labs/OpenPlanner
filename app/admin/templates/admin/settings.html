@@ -53,6 +53,20 @@
   </table>
   </div>
 </section>
+{% if login_form %}
+<form class="card" method="post" action="/admin/settings/login/test" novalidate aria-labelledby="login-heading">
+  <h2 id="login-heading">{{ _("admin.settings.login.title") }}</h2>
+  <p>{{ _("admin.settings.login.intro") }}</p>
+  {% for field in login_form %}
+  <div class="field{% if field.error %} field--error{% endif %}">
+    <label for="login-{{ field.key }}">{{ field.label }}</label>
+    {% if field.error %}<p class="error-message" id="error-login-{{ field.key }}">{{ field.error }}</p>{% endif %}
+    <input id="login-{{ field.key }}" name="{{ field.key }}" type="text" value="{{ field.value }}" autocomplete="off"{% if field.error %} aria-invalid="true" aria-describedby="error-login-{{ field.key }}"{% endif %}>
+  </div>
+  {% endfor %}
+  <button type="submit" class="button">{{ _("admin.settings.login.test") }}</button>
+</form>
+{% endif %}
 {% for section in sections %}
 <section class="card" aria-labelledby="topic-{{ section.key }}">
   <h2 id="topic-{{ section.key }}">{{ section.heading }}</h2>
@@ -82,6 +96,12 @@
         {% if manage %}
         <td>
           {% if row.editable %}{{ setting_form(row, "/admin/settings/" ~ row.key, _("admin.settings.reset"), max_hours) }}{% elif row.error %}<p class="error-message" id="error-{{ row.key }}">{{ row.error }}</p>{% endif %}
+          {% if row.adoptable %}
+          <form method="post" action="/admin/settings/{{ row.key }}/adopt" class="setting-form">
+            <button type="submit" class="button button--secondary button--small">{{ _("admin.settings.adopt") }}</button>
+          </form>
+          {% endif %}
+          {% if row.adopted %}<p>{{ _("admin.settings.adopted_note") }} <code>{{ row.variable }}</code></p>{% endif %}
         </td>
         {% endif %}
       </tr>
