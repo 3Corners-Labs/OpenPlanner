@@ -138,6 +138,8 @@ PROBLEM_LABELS: dict[str, str] = {
     "webhook_base_url": "admin.settings.problem.webhook_base_url",
     "webex_incomplete": "admin.settings.problem.webex_incomplete",
     "oidc_incomplete": "admin.settings.problem.oidc_incomplete",
+    "update_channel": "admin.settings.problem.update_channel",
+    "update_auto_apply": "admin.settings.problem.update_auto_apply",
 }
 """What production would refuse, by the code of ``Settings.production_problems``."""
 

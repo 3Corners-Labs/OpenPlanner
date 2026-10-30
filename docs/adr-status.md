@@ -13,7 +13,7 @@ package; when the two disagree, the code wins.
 
 | Built? | ADRs |
 |---|---|
-| BUILT | 30 |
+| BUILT | 31 |
 | PARTIAL | 14 |
 | NOT BUILT | 5 |
 
@@ -68,6 +68,7 @@ package; when the two disagree, the code wins.
 | 0070 | Certificate source in the portal | BUILT | #149; migration 0061 | – |
 | 0071 | Trial call on Webex | BUILT | #154; migration 0063 | – |
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
+| 0073 | Email deliverability: sender domain check, system mail headers | BUILT | step 1 #166; no migration | Step 2 (a periodic check in the worker) is decided after step 1 is in use (ADR decision 6) |
 
 ## Corrected on 2026-10-30
 

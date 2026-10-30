@@ -14,6 +14,7 @@ from app.config import Settings
 from app.domain.authorization import Principal, Role
 from app.main import create_app
 from tests.fakes.clock import FixedClock
+from tests.fakes.dns import FakeTxtResolver
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.integrations import FakeVideo
 from tests.support.database import migrated_database
@@ -41,12 +42,19 @@ SAME_ORIGIN = {"sec-fetch-site": "same-origin"}
 
 
 class Site:
-    """The app, its fake identity provider and clock."""
+    """The app, its fake identity provider, clock and DNS resolver (ADR 0073)."""
 
-    def __init__(self, client: httpx.AsyncClient, idp: FakeIdentityProvider, clock: FixedClock):
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        idp: FakeIdentityProvider,
+        clock: FixedClock,
+        dns: FakeTxtResolver | None = None,
+    ):
         self.client = client
         self.idp = idp
         self.clock = clock
+        self.dns = dns or FakeTxtResolver()
 
     async def login_as(self, principal: Principal) -> httpx.Response:
         self.idp.next_principal = principal
@@ -68,12 +76,13 @@ async def _running_site(
     engine = create_engine(admin_db)
     await seed_demo(engine)
     await engine.dispose()
-    idp, clock = FakeIdentityProvider(), FixedClock(NOW)
+    idp, clock, dns = FakeIdentityProvider(), FixedClock(NOW), FakeTxtResolver()
     app = create_app(
         settings.model_copy(update={"database_url": admin_db}),
         clock,
         idp,
         integrations=integrations,
+        mail_domain_resolver=dns,
     )
     async with (
         app.router.lifespan_context(app),
@@ -81,7 +90,7 @@ async def _running_site(
             transport=httpx.ASGITransport(app=app), base_url="http://testserver"
         ) as client,
     ):
-        yield Site(client, idp, clock)
+        yield Site(client, idp, clock, dns)
 
 
 @pytest.fixture
