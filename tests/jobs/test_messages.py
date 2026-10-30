@@ -56,7 +56,8 @@ def test_confirmation_in_dutch(composer: MessageComposer) -> None:
     assert "maandag 5 januari 2026, 09:00–09:30" in message.text
     assert url in message.text
     assert f'href="{url}"' in message.html  # type: ignore[operator]
-    assert "tot maandag 5 januari 2026, 08:55" in message.text
+    assert "verplaatsen tot maandag 5 januari 2026, 08:00" in message.text
+    assert "Annuleren kan tot het gesprek begint" in message.text
     assert "Lovelace" not in message.text  # first name only
 
 
