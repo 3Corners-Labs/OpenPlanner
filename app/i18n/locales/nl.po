@@ -1490,9 +1490,6 @@ msgstr "De flow kiest hiermee de wachtrij. Leeg: het webadres van de groep."
 msgid "admin.field.direct_call_enabled"
 msgstr "Direct gesprek starten"
 
-msgid "admin.field.direct_call_enabled_hint"
-msgstr "Deelnemers kunnen meteen een gesprek starten tijdens een tijdblok met medewerkers."
-
 msgid "admin.field.embedding_enabled"
 msgstr "Insluiten op websites"
 
@@ -1629,7 +1626,7 @@ msgid "wait.title"
 msgstr "Uw videogesprek"
 
 msgid "wait.searching"
-msgstr "We zoeken een medewerker voor u. U kunt alvast naar de wachtruimte gaan."
+msgstr "We zoeken een medewerker voor u."
 
 msgid "wait.accepted"
 msgstr "Een medewerker heeft uw gesprek aangenomen en komt zo naar de wachtruimte."
@@ -1807,9 +1804,6 @@ msgstr "Deelnemen aan het gesprek"
 
 msgid "admin.queue.new_window"
 msgstr "(opent in een nieuw venster)"
-
-msgid "admin.queue.no_meeting"
-msgstr "Voor deze afspraak is nog geen videogesprek klaar. Probeer het over een minuut opnieuw of geef de afspraak vrij."
 
 msgid "admin.queue.state.mine"
 msgstr "Door u opgepakt"
@@ -4061,23 +4055,98 @@ msgstr "Gaat terug naar versie {version}. Gegevens die sinds de update zijn inge
 msgid "admin.updates.restore_now"
 msgstr "Terugzetten naar {version}"
 
+msgid "admin.updates.when"
+msgstr "Wanneer"
+
+msgid "admin.updates.what"
+msgstr "Wat"
+
+msgid "admin.updates.by"
+msgstr "Door"
+
+msgid "admin.updates.history_lead"
+msgstr "Elke aanvraag, uitkomst en versiewissel staat in het globale auditlog; dit is de samenvatting."
+
+msgid "admin.updates.history_audit_link"
+msgstr "Alle update-gebeurtenissen in het auditlog"
+
+msgid "admin.updates.outside_change"
+msgstr "Op {at} is de versie buiten het portaal om gewijzigd naar {version} (installer of handmatig op de server)."
+
+msgid "admin.updates.history.update_request"
+msgstr "Update aangevraagd"
+
+msgid "admin.updates.history.update_auto_request"
+msgstr "Update automatisch aangevraagd"
+
+msgid "admin.updates.history.update_succeeded"
+msgstr "Update geslaagd"
+
+msgid "admin.updates.history.update_failed"
+msgstr "Update mislukt"
+
+msgid "admin.updates.history.update_rolled_back"
+msgstr "Update teruggedraaid"
+
+msgid "admin.updates.history.restore_request"
+msgstr "Terugzetten aangevraagd"
+
+msgid "admin.updates.history.restore_succeeded"
+msgstr "Vorige versie teruggezet"
+
+msgid "admin.updates.history.restore_failed"
+msgstr "Terugzetten mislukt"
+
+msgid "admin.updates.history.restore_rolled_back"
+msgstr "Terugzetten teruggedraaid"
+
+msgid "admin.updates.history.request_cancel"
+msgstr "Aanvraag ingetrokken"
+
+msgid "admin.updates.history.version_changed"
+msgstr "Versie gewisseld"
+
+msgid "admin.updates.history.other"
+msgstr "Overige gebeurtenis"
+
+msgid "admin.updates.actor.system"
+msgstr "systeem (automatisch bijwerken)"
+
+msgid "admin.updates.actor.updater"
+msgstr "updater op de server"
+
+msgid "admin.updates.actor.host"
+msgstr "server, buiten het portaal om"
+
+msgid "admin.audit.subject"
+msgstr "Onderwerp"
+
+msgid "admin.audit.subject.updates"
+msgstr "Updates en versies"
+
+msgid "admin.audit.subject.login"
+msgstr "Inloggen"
+
+msgid "admin.audit.subject.settings"
+msgstr "Instellingen"
+
+msgid "admin.audit.subject.rights"
+msgstr "Rechten en medewerkers"
+
+msgid "admin.audit.subject.bookings"
+msgstr "Afspraken en taken"
+
+msgid "admin.audit.subject.organisation"
+msgstr "Organisatie en teams"
+
+msgid "admin.audit.subject.integrations"
+msgstr "Koppelingen"
+
 msgid "admin.updates.history"
 msgstr "Geschiedenis"
 
-msgid "admin.updates.requested_at"
-msgstr "Aangevraagd"
-
-msgid "admin.updates.action"
-msgstr "Actie"
-
 msgid "admin.updates.versions"
 msgstr "Van → naar"
-
-msgid "admin.updates.status"
-msgstr "Status"
-
-msgid "admin.updates.finished_at"
-msgstr "Klaar"
 
 msgid "admin.updates.none"
 msgstr "Nog geen updates aangevraagd."
@@ -6892,6 +6961,62 @@ msgstr "Waarschuwen bij certificaat korter geldig dan (dagen)"
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Melding over het certificaat herhalen elke (uren)"
 
+msgid "admin.field.offer"
+msgstr "Aanbod"
+
+msgid "admin.field.offer_hint"
+msgstr "Wat deelnemers in dit tijdblok kunnen: een afspraak boeken, direct een gesprek starten, of allebei."
+
+msgid "admin.offer.scheduled"
+msgstr "Afspraken"
+
+msgid "admin.offer.direct"
+msgstr "Direct gesprek"
+
+msgid "admin.offer.both"
+msgstr "Afspraken en direct gesprek"
+
+msgid "admin.group.direct_blocks"
+msgstr "In {count} tijdblok(ken)"
+
+msgid "admin.queue.video_pending"
+msgstr "Videolink wordt klaargezet"
+
+msgid "admin.queue.video_failed"
+msgstr "Videolink mislukt"
+
+msgid "admin.queue.video_pending_explained"
+msgstr "Het videogesprek wordt nog klaargezet. De knop verschijnt vanzelf zodra het klaarstaat."
+
+msgid "admin.queue.video_failed_explained"
+msgstr "Het videogesprek kon niet worden klaargezet. De deelnemer ziet dit ook en krijgt het advies een afspraak te maken. Geef de afspraak vrij."
+
+msgid "admin.queue.timeline"
+msgstr "Bekijk de tijdlijn van deze afspraak"
+
+msgid "admin.queue.citizen.not_yet"
+msgstr "Deelnemer nog niet in het gesprek"
+
+msgid "admin.queue.citizen.in_lobby"
+msgstr "Deelnemer wacht in de wachtruimte"
+
+msgid "admin.queue.citizen.in_call"
+msgstr "Gesprek bezig"
+
+msgid "admin.queue.citizen.ended"
+msgstr "Gesprek afgelopen"
+
+msgid "wait.preparing"
+msgstr "We zetten uw videogesprek klaar. De knop verschijnt vanzelf zodra het klaarstaat."
+
+msgid "wait.lobby_hint"
+msgstr "U kunt alvast naar de wachtruimte gaan."
+
+msgid "wait.failed"
+msgstr "Het videogesprek kon helaas niet worden klaargezet door een technische storing. Het team is op de hoogte. Maak een afspraak, dan bellen we op een moment dat u schikt."
+
+msgid "settings.field.queue_refresh_seconds.label"
+msgstr "Wachtrij en wachtpagina verversen (seconden)"
 msgid "admin.overview.view.label"
 msgstr "Weergave van {title}"
 

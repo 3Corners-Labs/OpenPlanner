@@ -66,8 +66,9 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     # The profile menu in the top bar has a select of its own; the form is in the main part.
     form = page.split('<main id="content"', 1)[1]
     assert '<option value="Europe/Amsterdam" selected>' in form
-    # time zone, dispatch kind, free pick, phone mode, trial call, direct call, embedding
-    assert form.count(" selected>") == 7
+    # time zone, dispatch kind, free pick, phone mode, trial call, embedding (the direct
+    # call is offered per staffing block since ADR 0072)
+    assert form.count(" selected>") == 6
 
 
 async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
@@ -209,7 +210,6 @@ SETTINGS_FORM = {
     "wxcc_business_address": "openplanner@example.biz",
     "wxcc_channel": "openplanner-video",
     "wxcc_routing_value": "team-42",
-    "direct_call_enabled": "yes",
     "not_picked_up_minutes": "10",
     "embedding_enabled": "yes",
 }
@@ -257,7 +257,6 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "queue_free_pick_allowed": "no",
         "calendar_invite_address": "team-demo@example.nl",
         "phone_mode": "optional",
-        "direct_call_enabled": "no",
         "embedding_enabled": "no",
         "planner_change_min_lead_minutes": "60",
         "not_picked_up_minutes": "10",
@@ -309,7 +308,6 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, 
         "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
         "phone_mode": "optional",
-        "direct_call_enabled": "no",
         "embedding_enabled": "no",
         "planner_change_min_lead_minutes": "60",
         "not_picked_up_minutes": "10",
@@ -344,7 +342,6 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "max_bookings_per_email": "3",
             "queue_free_pick_allowed": "no",
             "phone_mode": "optional",
-            "direct_call_enabled": "no",
             "not_picked_up_minutes": "10",
             "embedding_enabled": "no",
         },
@@ -654,7 +651,6 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "max_bookings_per_email": "3",
             "queue_free_pick_allowed": "no",
             "phone_mode": "optional",
-            "direct_call_enabled": "no",
             "not_picked_up_minutes": "10",
             "embedding_enabled": "no",
         },
@@ -695,7 +691,6 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
         "phone_mode": "optional",
-        "direct_call_enabled": "yes",
         "not_picked_up_minutes": "10",
         "embedding_enabled": "no",
     }

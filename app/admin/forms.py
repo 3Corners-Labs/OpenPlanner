@@ -126,7 +126,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "wxcc_business_address": "admin.form.error.integration_text",
     "wxcc_channel": "admin.form.error.integration_text",
     "wxcc_routing_value": "admin.form.error.integration_text",
-    "direct_call_enabled": "admin.form.error.choice",
+    "offer": "admin.form.error.choice",
     "embedding_enabled": "admin.form.error.choice",
     "trial_call_enabled": "admin.form.error.choice",
     "trial_call_minutes": "admin.form.error.trial_call_minutes",

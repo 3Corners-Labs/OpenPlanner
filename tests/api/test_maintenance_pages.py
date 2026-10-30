@@ -147,6 +147,7 @@ async def test_a_management_link_page_never_tells_whether_the_token_exists(site:
         ("GET", f"/b/{TOKEN}"),
         ("GET", f"/b/{TOKEN}/join"),
         ("GET", f"/b/{TOKEN}/wait"),
+        ("GET", f"/b/{TOKEN}/wait/status"),
         ("POST", "/webhooks/webex"),
         ("POST", "/webhooks/wxcc"),
         ("GET", "/o/demo/theme.css"),

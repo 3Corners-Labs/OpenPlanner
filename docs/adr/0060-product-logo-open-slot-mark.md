@@ -1,6 +1,6 @@
 # 0060. Product logo: the open-slot mark
 
-Status: proposed (2026-10-30), requested by the product owner. Closes the open point *Logo* of ADR 0047.
+Status: accepted (2026-10-30), requested by the product owner. Closes the open point *Logo* of ADR 0047. Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
 
 ## Context
 
@@ -26,8 +26,8 @@ None. The mark is product identity, not tunable per installation.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; backlog section 1 | #130 | merged 2026-10-30 |
-| 1 | LG-1, LG-2, LG-3: brand files, `--op-brand-slot`, mark in the admin top bar, favicons, citizen and email footer | #135 | merged 2026-10-30 |
+| 0 | ADR proposed; backlog section 1 | #130 | merged |
+| 1 | LG-1, LG-2, LG-3: brand files, `--op-brand-slot`, mark in the admin top bar, favicons, citizen and email footer | #135 | merged |
 | 2 | LG-4: optional motion (`brand-motion.js`, CSS-only loader) | | planned |
 
 ## Consequences
