@@ -16,8 +16,8 @@ package; when the two disagree, the code wins.
 
 | Built? | ADRs |
 |---|---|
-| BUILT | 45 |
-| PARTIAL | 20 |
+| BUILT | 47 |
+| PARTIAL | 19 |
 | NOT BUILT | 6 |
 | POLICY | 3 |
 
@@ -26,12 +26,12 @@ package; when the two disagree, the code wins.
 | 0001 | Record architecture decisions | POLICY | `docs/adr/` (template #52); the PR template asks for ADR status (ADR 0059); `tests/test_adr_status.py` checks the list | No CI check on numbering or on "ADR in the same PR"; only review and the PR template |
 | 0002 | Runtime layout of the skeleton | PARTIAL | #1, #4; migrations only in `web`; `api/health.py`; `jobs/healthcheck.py`; SQLite pragmas in `adapters/db/engine.py` | Per-request logging with route templates (§5): the access log stays off; Referrer-Policy is `same-origin`, not `no-referrer` |
 | 0003 | Licence exception for certifi | BUILT | #1; `scripts/check-licenses.sh` (`IGNORED="certifi"`), CI `pip-licenses`, `docs/dependencies.md` | – |
-| 0004 | Internationalisation module | PARTIAL | #1, #19, #85; `app/i18n/` (negotiation, `.po`, `missing_key`), `tests/i18n/`, import-linter contract, `group_texts` | Organisation override store and editor (only `NoOverrides` exists, CLAUDE.md still says overrides are editable), `.po` export and import, revision counter |
+| 0004 | Internationalisation module | PARTIAL | #1, #19, #85, #168; `app/i18n/` (negotiation, `.po`, `missing_key`), `tests/i18n/`, import-linter contract, `group_texts`; organisation texts: ADR 0074, migration 0074 | The global (superuser) override layer and its editor, `.po` export and import, a revision counter (the 5 s re-read of ADR 0074 stands in), locales added in the portal |
 | 0005 | Modularity and documentation | POLICY | #1; ruff `D` (google), import-linter layers, jscpd at 1%, each a CI job | Reviewer check of module overlap is not machine-checked; adapters use hand-written expectations, no recorded fixtures |
 | 0006 | Test tooling, image publishing and signing | BUILT | #1, #4, #94, #131; `e2e/`, `make mutation`, `.github/actions/publish-image` (cosign, SBOM) | – (CI results on GitHub not checked here) |
 | 0007 | Dispatch through the WxCC Tasks API | BUILT | #10; `ContactCenterDispatcher` port, `adapters/wxcc.py`, `verify_wxcc` (HMAC, 300 s); points 1–2 superseded by ADR 0018 | Live behaviour against a WxCC tenant is not visible in the code |
 | 0008 | Integration secrets in the admin UI, encrypted | PARTIAL | #10, #19, #106; `adapters/crypto.py` (AES-256-GCM), write-only inputs, audit, `integrations.manage` locked to the superuser | Key id per value and re-encryption on rotation: a new `SETTINGS_ENCRYPTION_KEY` makes secrets unreadable (runbook) |
-| 0009 | Notification channels, reminder rules, templates | PARTIAL | #2, #19; `domain/channels.py`, `job_plan.py`, `message_texts.py`, `admin/message_routes.py` | Organisation override layer of the text blocks (no store, no editor); group texts and reminder rules work |
+| 0009 | Notification channels, reminder rules, templates | BUILT | #2, #19, #168; `domain/channels.py`, `job_plan.py`, `message_texts.py`, `admin/message_routes.py`; organisation layer: ADR 0074 | – (WhatsApp stays a later channel kind, as the ADR says) |
 | 0010 | Live meeting status for group admins | BUILT | #10, #81, #167 (AG-3); `adapters/webhooks.py`, `domain/calls.py`, `admin/_agenda_row.html`, `MeetingStatusService` | Webex webhooks carry no timestamp, replays are caught by `event_key` |
 | 0011 | Derived management tokens | BUILT | #10; `domain/tokens.py`, migration 0003, `tests/domain/test_tokens.py` | – |
 | 0012 | Merge only on the product owner's instruction | POLICY | CLAUDE.md, Git section; merge commits record the instruction; merge queue in `ci.yml` | No check that the instruction is recorded; the ADR says five review questions, the PR template has seven |
@@ -44,7 +44,7 @@ package; when the two disagree, the code wins.
 | 0019 | Direct video call per group | BUILT | #10, #24, #155, #164 (AG-2, leave from the waiting page); `api/direct_pages.py`, `domain/direct_leave.py`, `direct_queue.py`, migration 0064 (switch moved by ADR 0072) | – |
 | 0020 | Citizen calendar, branding through tokens | BUILT | #11, #49; `calendar.js`, `slot_picker.py`, `SCRIPT_CSP`, `/o/{slug}/theme.css`, `domain/branding.py` | – |
 | 0021 | Ending the work item of a cancelled booking | BUILT | #12; `CallService.end_task`, `WxccDispatcher`, job `END_WXCC_TASK`, `diagnostics.py` | – |
-| 0022 | Channels per organisation, SMS, editable texts | BUILT | #19, #29; migration 0013; `admin/channel_routes.py`, `message_routes.py`, `adapters/senders.py` | Organisation-wide text editor (deferred by the ADR itself) |
+| 0022 | Channels per organisation, SMS, editable texts | BUILT | #19, #29, #168; migration 0013; `admin/channel_routes.py`, `message_routes.py`, `adapters/senders.py`; the organisation-wide editor: ADR 0074 | – |
 | 0023 | Machine API for contact-center bots | PARTIAL | #18, #67, #97; migration 0014; `api/agent/`, `domain/api_clients.py`, `docs/agent-api.md` | `POST` and `GET /change-requests` and scope `bookings:request_change` ("next step" in the ADR) |
 | 0024 | Emergency closure | BUILT | #21, #73; migration 0015; CLI `closure` | – |
 | 0025 | Holiday calendars | BUILT | #20; migration 0016 | Holiday names on the citizen calendar ("later" in the ADR) |
@@ -96,6 +96,7 @@ package; when the two disagree, the code wins.
 | 0071 | Trial call on Webex | BUILT | #154; migration 0063 | – |
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
 | 0073 | Email deliverability: sender domain check, system mail headers | PARTIAL | step 1 #166; no migration | Step 2 (a periodic check in the worker) is decided after step 1 is in use (ADR decision 6) |
+| 0074 | Organisation text overrides | BUILT | #168; migration 0074; `domain/text_overrides.py`, `adapters/db/text_overrides.py`, `admin/organisation_text_routes.py` | Step 2: the global (superuser) layer, `.po` export and import, revision counter (follow-up, listed in the ADR) |
 | 0077 | Terminology: participant, and organisation names for staff functions | NOT BUILT | accepted 2026-10-31; step 1a (column rename) in PR #172; `CLAUDE.md` wording changed with the ADR | Everything but step 1a: the rename (steps 2a to 2d), the guard test, function names per organisation and group, the column rename |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)

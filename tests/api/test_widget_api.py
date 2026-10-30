@@ -18,6 +18,7 @@ from app.adapters.db.models import (
     GroupRow,
     OrganisationOriginRow,
     OrganisationRow,
+    OrganisationTextRow,
 )
 from app.config import Settings
 from app.domain.maintenance import MaintenanceReason
@@ -324,3 +325,28 @@ async def test_during_maintenance_the_group_routes_close_but_texts_and_preflight
     assert await _bookings(demo_settings) == 0
     assert (texts.status_code, preflight.status_code) == (200, 204)
     assert foreign.status_code == 403  # the origin check comes first
+
+
+async def test_the_group_introduction_uses_the_organisations_own_text(
+    demo_settings: Settings,
+) -> None:
+    await _embed(demo_settings)
+    engine = create_engine(demo_settings.database_url)
+    async with AsyncSession(engine) as session, session.begin():
+        demo = await session.scalar(
+            select(OrganisationRow.id).where(OrganisationRow.slug == "demo")
+        )
+        session.add(
+            OrganisationTextRow(
+                organisation_id=demo,
+                locale="en",
+                key="group.intro",
+                text="Pick a time ({minutes}).",
+            )
+        )
+    await engine.dispose()
+
+    async with app_client(demo_settings, FixedClock(NOW)) as client:
+        body = (await client.get(f"{BASE}/?lang=en", headers={"origin": SITE})).json()
+
+    assert body["intro"] == "Pick a time (30)."

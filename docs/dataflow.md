@@ -56,7 +56,7 @@ provider (ADR 0028) adds a processor: add its row to the table above in the same
 ## Channel settings and message texts (ADR 0022)
 
 SMTP and SMS settings per organisation are organisation data; their password and SMS API key
-are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data.
+are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data. Organisation texts (ADR 0074, table `organisation_texts`) are the same kind of plain text, shown to every citizen of the organisation's groups on pages and in messages; they never hold personal data and leave the system only inside those messages.
 Neither leaves the system except as part of the messages above.
 
 ```

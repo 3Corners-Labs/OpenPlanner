@@ -33,6 +33,12 @@ class RequestLocale:
         """The locale code, e.g. ``"nl"``."""
         return self.gettext.locale
 
+    def for_organisation(self, organisation_id: int) -> "RequestLocale":
+        """Return the same locale with the organisation's own texts applied (ADR 0004 §4)."""
+        return RequestLocale(
+            self.translator.bind(self.code, organisation_id), self.remember, self.translator
+        )
+
     def apply_to(self, request: Request, response: Response) -> None:
         """Set the language headers, and the preference cookie after an explicit choice."""
         response.headers["content-language"] = self.code
@@ -63,3 +69,14 @@ def resolve_locale(request: Request) -> RequestLocale:
     )
     remember = match_locale(explicit, translator.locales) == locale
     return RequestLocale(translator.bind(locale), remember, translator)
+
+
+async def request_locale(request: Request) -> RequestLocale:
+    """FastAPI dependency: ``resolve_locale`` after bringing the organisation texts up to date.
+
+    Every page and form goes through this, so a text an admin just saved shows within
+    ``REFRESH_SECONDS`` on every process (ADR 0004 §9).
+    """
+    translator: Translator = request.app.state.translator
+    await translator.refresh()
+    return resolve_locale(request)

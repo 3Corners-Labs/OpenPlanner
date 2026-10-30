@@ -67,7 +67,7 @@ from app.domain.scheduling import Group
 from app.domain.services import BookingService, ContactInput
 from app.web.closure_labels import closure_view
 from app.web.errors import status_for
-from app.web.locale import RequestLocale, resolve_locale
+from app.web.locale import RequestLocale, request_locale
 from app.web.organisation_settings import follow_group_from_path
 from app.web.protection import booking_limit, limiter, read_limit
 from app.web.slot_values import parse_start
@@ -265,7 +265,7 @@ router = APIRouter(
     dependencies=[Depends(follow_group_from_path)],
 )
 texts_router = APIRouter(prefix=PREFIX, tags=["widget"])
-Locale = Annotated[RequestLocale, Depends(resolve_locale)]
+Locale = Annotated[RequestLocale, Depends(request_locale)]
 
 
 @texts_router.get("/texts", response_model=WidgetTexts, summary="Texts before the group")
@@ -305,7 +305,9 @@ async def group_info(request: Request, org: str, group: str, locale: Locale) -> 
     return WidgetGroup(
         name=found.name,
         locale=locale.code,
-        intro=locale.gettext("group.intro", minutes=found.slot_minutes),
+        intro=locale.for_organisation(found.organisation_id).gettext(
+            "group.intro", minutes=found.slot_minutes
+        ),
         page_url=f"{base}/g/{found.slug}",
         closure=WidgetClosure(
             title=banner.title,
