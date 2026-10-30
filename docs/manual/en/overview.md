@@ -20,8 +20,20 @@ The overview never shows citizens' personal data: only counts, group names and t
   reach, with who, when and where. A row opens the whole chain in the audit log; **Open the
   full list** opens the audit log itself.
 
-The widgets *Alerts*, *Queue across my groups*, *Running tasks* and *System status* follow in a
-later version.
+- **Queue across my groups**: for each group with an own queue within your reach, how many
+  citizens wait, how long the longest wait has been and how many staff who may work the queue
+  are signed in now. The group name opens the queue. Counts and minutes only, never names.
+  Colours for a wait that is too long follow with the wait thresholds.
+- **Running tasks**: the background jobs that are running now and the jobs that failed after
+  their last attempt, with type, state and time. Never the content of a job or the booking it
+  belongs to. If something here says *Failed*, something is stuck: tell the installation's
+  administrator.
+- **System status**: the running version and whether an update is available, whether
+  maintenance is on, whether the background worker gave a heartbeat recently, whether
+  diagnostic mode is on and which environment the installation runs in. The rows open the
+  pages that know more, as far as your role may open them.
+
+The widget *Alerts* follows in a later version.
 
 ## Default layout per role
 

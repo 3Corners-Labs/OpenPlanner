@@ -309,7 +309,7 @@ bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error
 The switch holds a subject identifier or a host actor, times and a reason code: no personal
 data. A refused change is audited with its permission and target only, never the form content.
 
-## HTTPS certificate (ADR 0030)
+## HTTPS certificate (ADR 0030, ADR 0064, ADR 0070)
 
 ```
 proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
@@ -319,8 +319,20 @@ worker ──TLS handshake, no request──> proxy (public name, port 443): rea
        ──> certificate_checks (issuer, names, validity, finding; no personal data; ADR 0064)
 ```
 
-The CA learns the domain name and the operator's e-mail address; no citizen data leaves through
-this flow. The proxy keeps no access log, so booking paths with management tokens are not
+```
+web ──> portal-certs volume (uid 10001, mode 600): private key + CSR made here (ADR 0070)
+superuser ──https, admin session──> web: the CSR (public) out; the certificate chain in
+   (a migration: chain + private key in, the key written to the volume only)
+web ──> own_certificates: chain (public), public key, fingerprint, subject, issuer, names,
+        validity; audit_events: fingerprint + expiry only
+web ──portal-certs volume──> proxy: privkey.pem, fullchain.pem, serial
+```
+
+**The database holds certificates but no private keys** (DPIA input): the key of an own
+certificate is made on the host or imported straight into the `portal-certs` volume, which the
+database backup leaves out on purpose; it is never in a log, an audit event, an error message or
+a page. It concerns the organisation's server identity, not a citizen. The CA learns the domain name and the operator's e-mail address; no citizen data
+leaves through this flow. The proxy keeps no access log, so booking paths with management tokens are not
 written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
 name only).
 

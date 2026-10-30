@@ -6329,6 +6329,135 @@ msgstr "De nieuwe inlogkoppeling is niet bewaard: met die koppeling zou u na het
 msgid "admin.form.error.login_lockout"
 msgstr "Met deze koppeling zou u geen superuser meer zijn; ze is niet bewaard."
 
+msgid "admin.overview.widget.queue.group"
+msgstr "Groep"
+
+msgid "admin.overview.widget.queue.waiting"
+msgstr "Wachtend"
+
+msgid "admin.overview.widget.queue.longest_wait"
+msgstr "Langste wacht"
+
+msgid "admin.overview.widget.queue.staff"
+msgstr "Aangemeld"
+
+msgid "admin.overview.widget.queue.minutes"
+msgstr "{minutes} min"
+
+msgid "admin.overview.widget.queue.queue_link"
+msgstr "Wachtrij van {name}"
+
+msgid "admin.overview.widget.queue.empty"
+msgstr "Geen eigen wachtrij in uw bereik."
+
+msgid "admin.overview.widget.tasks.empty"
+msgstr "Geen lopende of mislukte taken."
+
+msgid "admin.overview.widget.tasks.state.running"
+msgstr "Bezig"
+
+msgid "admin.overview.widget.tasks.state.failed"
+msgstr "Mislukt"
+
+msgid "admin.overview.widget.tasks.since"
+msgstr "sinds {time}"
+
+msgid "admin.overview.widget.tasks.attempts"
+msgstr "poging {count}"
+
+msgid "admin.overview.widget.status.version"
+msgstr "Versie"
+
+msgid "admin.overview.widget.status.version.none"
+msgstr "Geen release"
+
+msgid "admin.overview.widget.status.update"
+msgstr "Update"
+
+msgid "admin.overview.widget.status.update.current"
+msgstr "Actueel"
+
+msgid "admin.overview.widget.status.update.available"
+msgstr "{version} beschikbaar"
+
+msgid "admin.overview.widget.status.update.running"
+msgstr "Bezig: {version}"
+
+msgid "admin.overview.widget.status.update.problem"
+msgstr "{version}: {status}"
+
+msgid "admin.overview.widget.status.maintenance"
+msgstr "Onderhoud"
+
+msgid "admin.overview.widget.status.maintenance.off"
+msgstr "Uit"
+
+msgid "admin.overview.widget.status.maintenance.on"
+msgstr "Aan sinds {time}"
+
+msgid "admin.overview.widget.status.maintenance.environment"
+msgstr "Aan (omgeving)"
+
+msgid "admin.overview.widget.status.worker"
+msgstr "Achtergrondproces"
+
+msgid "admin.overview.widget.status.worker.alive"
+msgstr "Actief, {time}"
+
+msgid "admin.overview.widget.status.worker.stale"
+msgstr "Geen hartslag sinds {time}"
+
+msgid "admin.overview.widget.status.worker.unknown"
+msgstr "Geen hartslag gevonden"
+
+msgid "admin.overview.widget.status.diagnostics"
+msgstr "Diagnosemodus"
+
+msgid "admin.overview.widget.status.diagnostics.off"
+msgstr "Uit"
+
+msgid "admin.overview.widget.status.diagnostics.on"
+msgstr "{count} actief"
+
+msgid "admin.overview.widget.status.environment"
+msgstr "Omgeving"
+
+msgid "admin.overview.widget.status.environment.ok"
+msgstr "{environment}"
+
+msgid "admin.overview.widget.status.environment.problems"
+msgstr "{environment}, {count} niet productiewaardig"
+
+msgid "audit.job.send_rebook_request"
+msgstr "Verzoek om opnieuw te plannen versturen"
+
+msgid "audit.job.send_rebook_reminder"
+msgstr "Herinnering om opnieuw te plannen versturen"
+
+msgid "audit.job.send_rebook_lapsed"
+msgstr "Bericht verlopen herplanning versturen"
+
+msgid "audit.job.lapse_rebook"
+msgstr "Herplanning laten verlopen"
+
+msgid "audit.job.send_confirm_request"
+msgstr "Verzoek om te bevestigen versturen"
+
+msgid "audit.job.send_confirm_reminder"
+msgstr "Herinnering om te bevestigen versturen"
+
+msgid "audit.job.expire_unconfirmed"
+msgstr "Onbevestigde afspraak laten verlopen"
+
+msgid "audit.job.send_unconfirmed_lapsed"
+msgstr "Bericht verlopen afspraak versturen"
+
+msgid "audit.job.send_team_invite"
+msgstr "Agenda-uitnodiging aan het team versturen"
+
+msgid "audit.job.send_team_cancel"
+msgstr "Agenda-afzegging aan het team versturen"
+
 msgid "call.hint.meeting.rejected_400.unexplained"
 msgstr "Webex weigerde de meeting, maar deze gebeurtenis bewaart het antwoord van Webex niet: ze is geschreven door een versie die dat nog niet deed. Kijk bij Verzoeken aan Webex hieronder, of plan de meeting opnieuw bij Achtergrondtaken; een nieuwe weigering komt dan met het antwoord van Webex op deze pagina."
 
@@ -6690,3 +6819,147 @@ msgstr "Waarschuwen bij certificaat korter geldig dan (dagen)"
 
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Melding over het certificaat herhalen elke (uren)"
+
+msgid "admin.settings.tls.check_now"
+msgstr "Nu controleren"
+
+msgid "admin.settings.tls.check_now_hint"
+msgstr "Controleert het certificaat van het publieke adres meteen en slaat de uitslag op."
+
+msgid "admin.settings.tls.source.title"
+msgstr "Bron van het certificaat"
+
+msgid "admin.settings.tls.source.intro"
+msgstr "De meegeleverde HTTPS-proxy haalt het certificaat bij Let's Encrypt (automatisch verlengd) of gebruikt het eigen certificaat dat hier is geplaatst. De privésleutel blijft op deze server, in het volume van de proxy, en komt nooit in de database of een back-up daarvan. Een wisseling is binnen ongeveer een halve minuut actief; kies daarna Nu controleren."
+
+msgid "admin.settings.tls.source.not_applicable"
+msgstr "Niet van toepassing: HTTPS eindigt bij een eigen reverse proxy of load balancer. Het certificaat wordt daar beheerd; hierboven staat wat bezoekers zien."
+
+msgid "admin.settings.tls.source.current"
+msgstr "Huidige bron"
+
+msgid "admin.settings.tls.source.acme"
+msgstr "Let's Encrypt (automatisch)"
+
+msgid "admin.settings.tls.source.own"
+msgstr "Eigen certificaat (geüpload)"
+
+msgid "admin.settings.tls.source.locked"
+msgstr "De serverbeheerder beheert het certificaat op de server; uploaden kan hier niet."
+
+msgid "admin.settings.tls.source.uploaded_title"
+msgstr "Geüpload certificaat"
+
+msgid "admin.settings.tls.source.fingerprint"
+msgstr "Vingerafdruk (SHA-256)"
+
+msgid "admin.settings.tls.source.subject"
+msgstr "Onderwerp"
+
+msgid "admin.settings.tls.source.names"
+msgstr "Namen"
+
+msgid "admin.settings.tls.source.uploaded_at"
+msgstr "Geüpload op"
+
+msgid "admin.settings.tls.source.none_uploaded"
+msgstr "Er is geen eigen certificaat geüpload."
+
+msgid "admin.settings.tls.source.choose"
+msgstr "Bron"
+
+msgid "admin.settings.tls.source.upload_title"
+msgstr "Certificaatketen plaatsen of vervangen"
+
+msgid "admin.settings.tls.source.upload_hint"
+msgstr "PEM-bestanden van elk ten hoogste 64 KB. De keten (servercertificaat eerst, daarna de tussencertificaten) moet horen bij de sleutel op deze server: de aanvraag hierboven, of de sleutel die al in gebruik is. Het certificaat moet geldig zijn voor het publieke adres."
+
+msgid "admin.settings.tls.source.chain_file"
+msgstr "Certificaatketen (PEM)"
+
+msgid "admin.settings.tls.source.key_file"
+msgstr "Privésleutel (PEM, alleen bij overzetten)"
+
+msgid "admin.settings.tls.source.upload"
+msgstr "Certificaat opslaan"
+
+msgid "admin.settings.tls.source.remove"
+msgstr "Geüpload certificaat verwijderen"
+
+msgid "admin.settings.tls.source.in_use"
+msgstr "Dit certificaat is in gebruik; kies eerst Let's Encrypt als bron om het te verwijderen."
+
+msgid "admin.done.certificate_uploaded"
+msgstr "Het certificaat is opgeslagen."
+
+msgid "admin.done.certificate_removed"
+msgstr "Het geüploade certificaat is verwijderd."
+
+msgid "admin.done.certificate_checked"
+msgstr "Het certificaat is gecontroleerd. De uitslag staat hieronder."
+
+msgid "admin.form.error.tls_certificate_unreadable"
+msgstr "Dit bestand is geen leesbaar PEM-bestand (of de sleutel is met een wachtwoord beveiligd). Controleer het bestand en probeer opnieuw."
+
+msgid "admin.form.error.tls_key_mismatch"
+msgstr "De keten hoort niet bij een sleutel op deze server: maak eerst een aanvraag, of zet het bestaande certificaat over met zijn privésleutel. Een meegegeven sleutel moet bij het servercertificaat horen."
+
+msgid "admin.form.error.tls_name_mismatch"
+msgstr "Het certificaat is niet geldig voor het publieke adres van deze installatie."
+
+msgid "admin.form.error.tls_certificate_expired"
+msgstr "Het certificaat is verlopen."
+
+msgid "admin.form.error.tls_certificate_not_yet_valid"
+msgstr "Het certificaat is nog niet geldig."
+
+msgid "admin.form.error.tls_certificate_missing"
+msgstr "Upload eerst een eigen certificaat voordat u het als bron kiest."
+
+msgid "admin.form.error.tls_certificate_in_use"
+msgstr "Het certificaat is in gebruik; kies eerst Let's Encrypt als bron."
+
+msgid "admin.form.error.tls_source_not_applicable"
+msgstr "Deze installatie gebruikt een eigen reverse proxy; het certificaat wordt daar beheerd."
+
+msgid "settings.field.tls_certificate_source.label"
+msgstr "Bron van het certificaat van de meegeleverde proxy"
+
+msgid "admin.settings.tls.source.key_on_host"
+msgstr "Privésleutel op deze server"
+
+msgid "admin.settings.tls.source.key_present"
+msgstr "Aanwezig"
+
+msgid "admin.settings.tls.source.key_missing"
+msgstr "Ontbreekt op deze server"
+
+msgid "admin.settings.tls.source.key_missing_hint"
+msgstr "De database is op een andere server teruggezet; de sleutel reist niet mee. Maak een nieuwe aanvraag en plaats het nieuwe certificaat, of zet het bestaande certificaat over met zijn sleutel. Tot die tijd gebruikt de proxy Let's Encrypt."
+
+msgid "admin.settings.tls.source.csr_title"
+msgstr "Aanvraag voor een eigen certificaat"
+
+msgid "admin.settings.tls.source.csr_hint"
+msgstr "Maak een nieuwe sleutel op deze server met een certificaataanvraag (CSR) voor het publieke adres. Lever de aanvraag in bij uw certificaatautoriteit (bijvoorbeeld PKIoverheid) en plaats hieronder de keten die u terugkrijgt. De sleutel verlaat deze server nooit. Een aanvraag stoort een certificaat dat in gebruik is niet; een nieuwe aanvraag vervangt een eerdere."
+
+msgid "admin.settings.tls.source.csr_pending"
+msgstr "Aanvraag in afwachting van het certificaat"
+
+msgid "admin.settings.tls.source.csr_download"
+msgstr "Aanvraag downloaden (openplanner.csr)"
+
+msgid "admin.settings.tls.source.csr_generate"
+msgstr "Nieuwe sleutel en aanvraag maken"
+
+msgid "admin.settings.tls.source.key_hint"
+msgstr "Alleen om een bestaand certificaat met zijn sleutel over te zetten: de sleutel gaat zonder wachtwoord rechtstreeks naar het volume van de proxy, wordt nooit getoond en niet in de database bewaard."
+
+msgid "admin.done.csr_generated"
+msgstr "De sleutel en de aanvraag zijn gemaakt. Lever de aanvraag in bij de certificaatautoriteit en plaats daarna de keten."
+
+msgid "admin.form.error.tls_key_missing"
+msgstr "De privésleutel van het geplaatste certificaat staat niet op deze server. Maak een nieuwe aanvraag of zet het certificaat met zijn sleutel over."
+
+msgid "admin.form.error.tls_volume_unwritable"
+msgstr "De server kan de sleutel niet wegschrijven naar het volume van de proxy. Waarschuw de serverbeheerder."

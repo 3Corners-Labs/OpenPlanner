@@ -36,7 +36,58 @@ finding other than *fine* is also in the audit log as a system event `tls.certif
 while it lasts (setting *Repeat the certificate report every*). *Not checked yet* means the
 server has not run a round yet.
 
+**Check now** (superuser) checks the certificate at once instead of waiting for the next
+round, for example after changing the source below.
+
 Support may ask for a screenshot of this screen instead of the server's configuration.
+
+### Certificate source
+
+On a small installation the bundled HTTPS proxy serves the certificate, and the superuser
+chooses where it comes from:
+
+- **Let's Encrypt (automatic)**, the default: the proxy obtains the certificate itself and
+  renews it; nothing to do.
+- **Own certificate**: the proxy serves the certificate placed here, for example a PKIoverheid
+  or other organisation-validated certificate. Renewal is then yours: place the new chain
+  before the old one expires; the finding *expiring soon* above is the reminder.
+
+The private key of an own certificate is made on this server and never leaves it: it is not in
+the database, not in a backup of it, and never shown. To get an own certificate:
+
+1. Choose **Make a new key and request**. The screen shows a certificate signing request (CSR)
+   for the public address, as text and as a download. A request does not disturb a certificate
+   already in use; a new request replaces an earlier one.
+2. Hand the request to your certificate authority. You receive a certificate chain (PEM).
+3. Place the chain under **Place or replace the certificate chain** (server certificate first,
+   then the intermediates). The upload is checked before anything is stored: the file must be
+   readable, the chain must belong to the key made here (or to the key already in use, for a
+   renewal), the certificate must be valid for the public address of this installation, and it
+   must be neither expired nor not yet valid. A refusal names the reason at the field. The
+   screen then shows the certificate's fingerprint, subject, names, expiry date, when it was
+   placed, and that its key is present on this server.
+4. Choose **Own certificate** as the source and save. The proxy switches within about half a
+   minute; press **Check now** to see the result.
+
+To migrate an existing certificate once, place the chain and, in the second field, its
+private key together; the key goes straight to the proxy's storage on this server and is not
+kept anywhere else.
+
+Switching back to **Let's Encrypt (automatic)** takes effect the same way; the certificate and
+the key stay for later. **Remove the uploaded certificate** deletes the certificate (never the
+key) and is possible only while Let's Encrypt is the source.
+
+**Private key missing on this server** appears when the database was restored on another
+server: the certificate came along, the key did not. Make a new request and place its chain,
+or migrate the pair again; until then the proxy uses Let's Encrypt.
+
+Every request, upload and removal is recorded in the audit log with the certificate's
+fingerprint and expiry date, never a key. You need a recent login for any of these changes.
+
+When the server operator manages the certificate on the server itself, the setting is **locked
+by the server operator** and there are no forms. When HTTPS ends at a reverse proxy or load
+balancer of your own, the screen says the source does not apply: the certificate is managed
+there, and the block above still shows what visitors see.
 
 ## Platform settings
 

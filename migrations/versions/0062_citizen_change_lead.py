@@ -5,11 +5,11 @@ start the citizen can still move a booking; cancelling is possible until the sta
 groups get 60 minutes, or their dispatch lead when that is longer. ``queue_change_working_days``
 is dropped; the downgrade restores it at 1, the earlier default.
 
-Revises 0059 (the version on booking events). Open PRs also claim 0059 and 0060, so recheck
-the head before merging.
+Revises 0061 (own certificates). Open PRs also claim numbers, so recheck the head before
+merging.
 
-Revision ID: 0060
-Revises: 0059
+Revision ID: 0062
+Revises: 0061
 Create Date: 2026-10-30 18:00:00.000000
 """
 
@@ -18,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0060"
-down_revision: str | None = "0059"
+revision: str = "0062"
+down_revision: str | None = "0061"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
