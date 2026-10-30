@@ -53,6 +53,7 @@ from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
+from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
@@ -116,6 +117,16 @@ def oidc_provider(
         mapping=lambda: claim_mapping(current().login_values),
     )
     return OidcIdentityProvider(config, http)
+
+
+def _confirm_policy(settings: Settings) -> ConfirmPolicy:
+    """Return the rules for confirming a booking from one organisation's settings (ADR 0056)."""
+    return ConfirmPolicy.from_settings(
+        window_hours=settings.booking_confirm_window_hours,
+        cutoff_hours=settings.booking_confirm_cutoff_hours,
+        reminders=settings.booking_confirm_reminders,
+        min_minutes=settings.booking_confirm_min_minutes,
+    )
 
 
 def create_app(
@@ -238,6 +249,7 @@ def create_app(
             clock,
             token_key,
             phone_region=lambda org: per_organisation(org).phone_default_region,
+            confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
         )
         app.state.admin_service = AdminService(uow, clock)
         app.state.form_service = FormService(

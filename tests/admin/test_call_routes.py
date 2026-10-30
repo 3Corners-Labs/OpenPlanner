@@ -24,7 +24,7 @@ from app.domain.ports import RequestRecord
 from app.domain.request_log import RequestEvents
 from app.domain.services import BookingService
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.support.domain import ADA, TEST_TOKEN_KEY
+from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed
 
 FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # demo group: open weekdays
 
@@ -32,8 +32,12 @@ FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # demo group: open weekday
 async def _book(site: Site, slug: str) -> int:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     uow = SqlUnitOfWork(app.state.engine)
-    receipt = await BookingService(uow, site.clock, TEST_TOKEN_KEY).book(
-        group_slug=slug, start=FRIDAY_0900, contact=ADA, locale="nl"
+    receipt = await book_confirmed(
+        BookingService(uow, site.clock, TEST_TOKEN_KEY),
+        group_slug=slug,
+        start=FRIDAY_0900,
+        contact=ADA,
+        locale="nl",
     )
     booking_id = receipt.booking.id or 0
     integration = IntegrationService(uow, site.clock, AdminService(uow, site.clock))
