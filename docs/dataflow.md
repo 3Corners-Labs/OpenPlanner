@@ -278,8 +278,8 @@ audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
 ## Updates from the admin portal (ADR 0029)
 
 ```
-worker ──GET releases/latest, or the releases list on the rc channel (ADR 0059; no data
-        sent; optional read-only token)──> api.github.com
+worker ──GET releases?per_page=30; the channel is applied in the domain (ADR 0059, 0067;
+        no data sent; optional read-only token)──> api.github.com
         <── tag, release page, publication time, notes ── stored in release_checks and
             release_listing (notes as PR titles and numbers only; authors stripped, ADR 0067)
 superuser ──POST update / restore / cancel──> web ──SQL──> update_requests (versions, subject id)
