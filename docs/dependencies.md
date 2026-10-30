@@ -81,7 +81,7 @@ The widget itself has no runtime dependencies: vanilla JavaScript, no framework.
 
 | Image | Purpose | License | Maintenance | Note |
 |---|---|---|---|---|
-| caddy, caddy builder (official images) | TLS proxy with automatic ACME certificates and renewal (`--profile tls`) | Apache-2.0 | very active (release every few months, Go stdlib TLS) | ADR 0030; checked 2026-10-26. Own image in `deploy/proxy/` (Caddy rebuilt with current Go, see the Dockerfile), scanned in CI |
+| caddy, caddy builder (official images) | TLS proxy with automatic ACME certificates and renewal (`--profile tls`) | Apache-2.0 | very active (release every few months, Go stdlib TLS) | ADR 0030; checked 2026-10-26. Own image in `deploy/proxy/` (Caddy rebuilt with current Go, see the Dockerfile), built, scanned, signed and attested in CI as `ghcr.io/<owner>/<repo>-proxy` (ADR 0064 step 2); hosts pull it, never build it |
 
 ## Host packages (installed by `scripts/install.sh`)
 

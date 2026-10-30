@@ -564,6 +564,9 @@ msgstr "Administration"
 msgid "admin.nav.label"
 msgstr "Administration menu"
 
+msgid "admin.nav.more"
+msgstr "More"
+
 msgid "admin.nav.section.monitor"
 msgstr "Monitor"
 

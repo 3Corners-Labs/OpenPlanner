@@ -1,8 +1,9 @@
 # 0064. HTTPS by default: the certificate watched, shown, replaceable and tested end to end
 
-Status: proposed (2026-10-30), requested by the product owner. Extends ADR 0030 (HTTPS with
-ACME certificates) and ADR 0050 (host installer); builds on ADR 0038 (system events from the
-worker) and ADR 0042 §11 (System status).
+Status: proposed (2026-10-30), requested by the product owner; step 1 (decisions 1–4) and
+step 2 (decision 5) built 2026-10-30. Extends ADR 0030 (HTTPS with ACME certificates) and
+ADR 0050 (host installer); builds on ADR 0038 (system events from the worker), ADR 0042 §11
+(System status), ADR 0006 (signed images) and ADR 0029 (host updater).
 
 ## Context
 
@@ -71,20 +72,30 @@ manual override with an own certificate.
    production CA, see Let's Encrypt and `ok`; renewal is Caddy's, and the status page proves it
    month after month.
 
-5. **The proxy image becomes a release artefact (step 2, separate PR).** Every host builds
-   Caddy itself today (`xcaddy` with Go module downloads: slow, and a dependency on
-   proxy.golang.org). The release workflow will build, push and sign `ghcr.io/<repo>-proxy`
-   next to the app image; `.env.update` pins it by digest as `OPENPLANNER_PROXY_IMAGE`, and the
-   installer and host updater verify it like the app image. Until then `docker compose` builds
-   it from `deploy/proxy/` as before.
+5. **The proxy image is a release artefact (step 2).** Until step 2 every host built Caddy
+   itself (`xcaddy` with Go module downloads: slow, and a dependency on proxy.golang.org at
+   install time). Now `main.yml` builds, pushes and signs `ghcr.io/<repo>-proxy` from
+   `deploy/proxy/` next to the application image, for every release and every release
+   candidate, with the same keyless signature and its own SBOM attestation (`sbom-proxy.cdx.json`
+   on the release page). Where the proxy runs (`OPENPLANNER_TLS=1`), the installer pulls the
+   proxy image at the application's version, verifies it with the same identity and pins it by
+   digest as `OPENPLANNER_PROXY_IMAGE` in `.env.update`; a host installed before step 2 gets
+   the pin on its next installer run, at the version baked into its pinned application image.
+   The host updater resolves, verifies and pins both images on an update, starts the proxy with
+   `web` and `worker`, counts the proxy's health towards the health check, and returns both on
+   a rollback or a restore (a previous version that ran a locally built proxy gets that image
+   back). An installation without the proxy sees none of this. `docker-compose.yml` keeps
+   `build: deploy/proxy` behind `image: ${OPENPLANNER_PROXY_IMAGE:-openplanner-proxy:local}`
+   for development and `scripts/check-proxy.sh`, which still build the image locally in CI.
 
-Build steps: (1) this PR: decisions 1–4; (2) decision 5; (3) the certificate source managed by
-the superuser in the portal (own ADR). The product owner decided on 2026-10-30 that docker01
-runs the ACME flow by default, and that who manages the certificate depends on where TLS ends:
-with the bundled proxy (small installations) the superuser must be able to choose ACME or
-upload an own certificate from the portal; behind an enterprise reverse proxy (`--no-tls`)
-the certificate is theirs and OpenPlanner only shows what citizens see (decision 3 covers that
-already). Until step 3 the operator manages the source on the host, as decision 2 says.
+Build steps: (1) decisions 1–4 (PR #139); (2) decision 5 (PR #144, stacked on step 1); (3) the
+certificate source managed by the superuser in the portal (own ADR). The product owner decided
+on 2026-10-30 that docker01 runs the ACME flow by default, and that who manages the certificate
+depends on where TLS ends: with the bundled proxy (small installations) the superuser must be
+able to choose ACME or upload an own certificate from the portal; behind an enterprise reverse
+proxy (`--no-tls`) the certificate is theirs and OpenPlanner only shows what citizens see
+(decision 3 covers that already). Until step 3 the operator manages the source on the host, as
+decision 2 says.
 
 ## Settings
 
@@ -96,8 +107,13 @@ already). Until step 3 the operator manages the source on the host, as decision 
 | `tls_expiry_warning_days` | C platform | 20 | 1–60 | `settings.platform.manage` | below this many days left the finding is `expiring` |
 | `tls_alert_repeat_hours` | C platform | 24 | 1–168 | `settings.platform.manage` | a lasting finding is reported again at this interval |
 
+| `OPENPLANNER_PROXY_IMAGE` | B deployment | empty | an image reference by digest | — | `.env.update`, written by the installer and the updater, never by hand; empty means a locally built proxy |
+| `UPDATE_PROXY_IMAGE` | B deployment | `<UPDATE_IMAGE>-proxy` | registry name | — | `/etc/openplanner/updater.env`, written by the installer; the host side, like `UPDATE_IMAGE` |
+
 Unchanged: `TLS_DOMAIN`, `ACME_EMAIL`, `ACME_CA` (B, `proxy.env`, ADR 0030); `FORWARDED_ALLOW_IPS`
-(B, `.env`).
+(B, `.env`). Pins by digest and the registry name of the proxy image are host-side bootstrap
+values (needed before the application runs), so B, like `OPENPLANNER_IMAGE` and
+`UPDATE_IMAGE` (ADR 0029).
 
 **Fixed on purpose:** the probe's timeout (10 s) and that it probes the address citizens use,
 `PUBLIC_BASE_URL` (the CLI takes `--host` and `--port` for another server). The mount point `/certs` and the
@@ -121,5 +137,10 @@ probe's trust store (the image's CA bundle) are properties of the image, not of 
   on the runner (present on ubuntu-24.04).
 - An own certificate is the operator's to renew: the status page and the system event are the
   only safety net, so the runbook asks for a calendar entry too.
-- Step 2 (released proxy image) changes the release workflow, the installer and the updater and
-  is tracked as a follow-up; its absence costs build time on the host, not correctness.
+- Step 2: a release and a release candidate produce two signed images; the candidate job
+  takes a few minutes longer. A portal update now recreates the proxy as well (every release
+  has a new proxy digest), so the public address is unreachable for the seconds the proxy
+  restarts, inside the maintenance window the update already has; before, the proxy kept
+  running through an update. In return, an unhealthy proxy image rolls an update back, and a
+  production host never runs `xcaddy` or reaches proxy.golang.org. The proxy image is scanned
+  like the application image (hadolint and trivy per PR, the SBOM attested per release).
