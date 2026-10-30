@@ -1,9 +1,9 @@
 # 0070. The certificate source of the bundled proxy, managed by the superuser in the portal
 
-Status: proposed (2026-10-30), requested by the product owner. Build step 3 of ADR 0064 (HTTPS
+Status: accepted (2026-10-30), requested by the product owner. Build step 3 of ADR 0064 (HTTPS
 by default); extends ADR 0030 (TLS proxy) and ADR 0042 (settings classes, environment lock).
 The private key is deliberately not an integration secret in the sense of ADR 0008: it never
-enters the database.
+enters the database. Built, checked against the code on 2026-10-30 (status was *proposed*; `docs/adr-status.md`).
 
 ## Context
 
@@ -135,6 +135,14 @@ about 6 KB, a 4096-bit RSA key 3 KB; a larger file is not a certificate), the va
 (ECDSA P-256: every browser and every public CA accept it; another type arrives by import),
 the file names and the mount point `/portal-certs` in the proxy (properties of the image, like
 `/certs`), and the fingerprint algorithm (SHA-256).
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | Certificate source in the portal: own certificate upload, proxy watcher, `check-proxy.sh` (migration 0061) | #149 | merged |
+
+(State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
 
 ## Consequences
 

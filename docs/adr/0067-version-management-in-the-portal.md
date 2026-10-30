@@ -3,7 +3,7 @@
 Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0059 (points 4 and
 6: the channel and auto-apply move from class B to class C; the updater's identity follows the
 installer mode) and ADR 0029 (a chosen version instead of "the latest"; the history comes from
-the audit log). Extends ADR 0031 and 0040 (audit filter by subject) and ADR 0048.
+the audit log). Extends ADR 0031 and 0040 (audit filter by subject) and ADR 0048. Partly built; see `docs/adr-status.md` for what is built.
 
 ## Context
 

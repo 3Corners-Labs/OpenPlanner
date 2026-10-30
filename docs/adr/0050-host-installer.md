@@ -1,7 +1,7 @@
 # 0050. One host installer that installs, repairs and re-checks
 
-Status: proposed (2026-10-29), requested by the product owner. Extends ADR 0029 (host updater)
-and ADR 0030 (HTTPS proxy).
+Status: accepted (2026-10-29), requested by the product owner. Extends ADR 0029 (host updater)
+and ADR 0030 (HTTPS proxy). Built, checked against the code on 2026-10-30 (status was *proposed*; `docs/adr-status.md`).
 
 ## Context
 
