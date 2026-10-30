@@ -201,6 +201,7 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CLOSURE_NOT_FOUND: "admin.form.error.closure_not_found",
     ErrorCode.SCENARIO_NOT_FOUND: "admin.form.error.scenario_not_found",
     ErrorCode.BOOKING_NOT_ACTIVE: "error.booking_not_active",
+    ErrorCode.BOOKING_NOT_PENDING: "error.booking_not_pending",
     ErrorCode.BOOKING_LOCKED: "error.booking_locked",
     ErrorCode.GROUP_CLOSED: "error.group_closed",
     ErrorCode.SLOT_FULL: "error.slot_full",

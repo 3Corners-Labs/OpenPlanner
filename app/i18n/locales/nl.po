@@ -377,6 +377,9 @@ msgstr "Deze afspraak is niet door u opgepakt."
 msgid "error.booking_not_active"
 msgstr "Deze afspraak is niet meer actief."
 
+msgid "error.booking_not_pending"
+msgstr "Deze afspraak is al bevestigd of niet meer actief."
+
 msgid "error.same_slot"
 msgstr "Dit is het moment van uw huidige afspraak. Kies een ander moment."
 
@@ -5605,6 +5608,9 @@ msgstr "Medewerkers"
 msgid "settings.topic.planner"
 msgstr "Planner"
 
+msgid "settings.topic.confirmation"
+msgstr "Afspraken bevestigen"
+
 msgid "settings.field.log_level.label"
 msgstr "Logniveau"
 
@@ -5778,6 +5784,18 @@ msgstr "Verzoek om opnieuw te boeken vervalt na (dagen)"
 
 msgid "settings.field.planner_rebook_reminder_days.label"
 msgstr "Herinnering om opnieuw te boeken (dagen voor het vervallen)"
+
+msgid "settings.field.booking_confirm_min_minutes.label"
+msgstr "Minimale tijd om te bevestigen (minuten)"
+
+msgid "settings.field.booking_confirm_reminders.label"
+msgstr "Aantal herinneringen om te bevestigen"
+
+msgid "settings.field.booking_confirm_cutoff_hours.label"
+msgstr "Uiterlijk bevestigen (uren voor de afspraak)"
+
+msgid "settings.field.booking_confirm_window_hours.label"
+msgstr "Bevestigen binnen (uren na het boeken)"
 
 msgid "admin.settings.change"
 msgstr "Wijzigen"

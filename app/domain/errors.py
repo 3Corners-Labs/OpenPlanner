@@ -20,6 +20,7 @@ class ErrorCode(StrEnum):
     OUTSIDE_BOOKING_WINDOW = "outside_booking_window"
     BOOKING_NOT_FOUND = "booking_not_found"
     BOOKING_NOT_ACTIVE = "booking_not_active"
+    BOOKING_NOT_PENDING = "booking_not_pending"
     BOOKING_LOCKED = "booking_locked"
     SAME_SLOT = "same_slot"
     DATABASE_BUSY = "database_busy"
