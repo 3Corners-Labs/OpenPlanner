@@ -582,6 +582,9 @@ msgstr "Wachtrij in mijn groepen"
 msgid "admin.overview.widget.bookings_today.title"
 msgstr "Afspraken vandaag per groep"
 
+msgid "admin.overview.widget.bookings_today.agenda_link"
+msgstr "Agenda van {name}"
+
 msgid "admin.overview.widget.bookings_today.empty"
 msgstr "Geen groepen in uw bereik."
 

@@ -2,7 +2,7 @@
 {% if view.rows %}
 <ul class="widget-list" role="list">
   {% for row in view.rows %}
-  <li class="widget-list__item"><a class="widget-list__label" href="{{ row.href }}">{{ row.name }}</a><span class="widget-list__meta">{{ row.organisation }}</span><span class="widget__count">{{ row.count }}</span></li>
+  <li class="widget-list__item"><a class="widget-list__label" href="{{ row.href }}" aria-label="{{ _("admin.overview.widget.bookings_today.agenda_link", name=row.name) }}">{{ row.name }}</a><span class="widget-list__meta">{{ row.organisation }}</span><span class="widget__count">{{ row.count }}</span></li>
   {% endfor %}
 </ul>
 {% else %}

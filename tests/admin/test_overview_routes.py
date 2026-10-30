@@ -94,6 +94,8 @@ async def test_the_bookings_widget_counts_per_group_in_scope(site: Site) -> None
 
     assert "Andere" in text
     assert 'href="/admin/groups/andere-team/agenda"' in text
+    # The link's own name: the group card below the grid links the same text elsewhere (2.4.4).
+    assert 'aria-label="Agenda van Andere: team"' in text
     assert "/admin/groups/demo/agenda" not in text
 
 
