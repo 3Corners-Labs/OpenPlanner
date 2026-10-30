@@ -4,8 +4,8 @@ A proposal is a booking in the proposed slot that holds its place until the citi
 it or ``confirm_by`` passes; ``rescheduled_from_id`` points at the booking it would replace
 and ``change_reason`` carries the planner's reason. Only the status is new.
 
-Revision ID: 0057
-Revises: 0055
+Revision ID: 0058
+Revises: 0057
 Create Date: 2026-10-30 18:00:00.000000
 """
 
@@ -13,8 +13,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0057"
-down_revision: str | None = "0055"
+revision: str = "0058"
+down_revision: str | None = "0057"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

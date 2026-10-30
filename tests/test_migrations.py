@@ -427,7 +427,7 @@ def test_open_proposals_are_released_and_purged_on_downgrade(
     import sqlite3
     from contextlib import closing
 
-    command.upgrade(alembic_config, "0057")
+    command.upgrade(alembic_config, "0058")
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         database.executescript(
             """
@@ -447,7 +447,7 @@ def test_open_proposals_are_released_and_purged_on_downgrade(
             """
         )
 
-    command.downgrade(alembic_config, "0055")
+    command.downgrade(alembic_config, "0057")
 
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         statuses = database.execute("SELECT id, status FROM bookings ORDER BY id").fetchall()
