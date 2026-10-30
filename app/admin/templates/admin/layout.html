@@ -1,4 +1,4 @@
-{#- Logged-in portal: top bar (help, language, profile) and the navigation from the register (ADR 0047) through the matrix: side navigation in sections (an icon rail on tablet), and on phone a bottom bar with the first entries and the rest behind *More* (SH-1). Which one shows is CSS only. -#}
+{#- Logged-in portal: top bar (help, profile with theme, language and alert choices) and the navigation from the register (ADR 0047) through the matrix: side navigation in sections (an icon rail on tablet), and on phone a bottom bar with the first entries and the rest behind *More* (SH-1). Which one shows is CSS only. -#}
 {% extends "admin/_shell.html" %}
 {% from "admin/_icons.html" import icon %}
 {% macro nav_entry(item) -%}
@@ -15,6 +15,16 @@
 </div>
 {% endfor %}
 {%- endmacro %}
+{#- A row of small buttons that set one preference through a query link: the theme or the language. -#}
+{% macro choice(label_id, label, items) -%}
+<div>
+  <p class="admin-profile__label" id="{{ label_id }}">{{ label }}</p>
+  <div class="admin-profile__choices" role="group" aria-labelledby="{{ label_id }}">
+    {% for item in items %}<a class="button button--small{% if not item.current %} button--secondary{% endif %}" href="{{ item.href }}"{% if item.code is defined %} hreflang="{{ item.code }}" lang="{{ item.code }}"{% endif %}{% if item.current %} aria-current="true"{% endif %}>{{ item.autonym if item.autonym is defined else item.label }}</a>
+    {% endfor %}
+  </div>
+</div>
+{%- endmacro %}
 {% block page %}
 {% include "admin/_environment.html" %}
 {% include "admin/_maintenance.html" %}
@@ -30,28 +40,48 @@
       <a class="admin-topbar__link" href="{{ link.href }}"{% if link.current %} aria-current="page"{% endif %}>{{ icon(link.icon) }}<span>{{ link.label }}</span></a>
       {% endfor %}
       {% endif %}
-      {% include "_language_switcher.html" %}
       <details class="admin-profile">
         <summary>
           <span class="admin-profile__avatar" aria-hidden="true">{% for part in principal.display_name.split()[:2] %}{{ part[:1]|upper }}{% endfor %}</span>
           <span class="admin-profile__name"><span class="visually-hidden">{{ _("admin.signed_in_as", name="") }}</span>{{ principal.display_name }}</span>
         </summary>
         <div class="admin-profile__panel">
-          <p class="admin-profile__signed-in">{{ _("admin.signed_in_as", name=principal.display_name) }}</p>
-          {% if role_labels %}
-          <p class="admin-profile__roles-label">{{ _("admin.profile.roles") }}</p>
-          <ul class="admin-profile__roles">
-            {% for label in role_labels %}<li class="chip">{{ label }}</li>{% endfor %}
-          </ul>
+          <div class="admin-profile__head">
+            <p class="admin-profile__who">{{ principal.display_name }}</p>
+            {% if role_labels %}<p class="admin-profile__role">{{ role_labels | join(", ") }}</p>{% endif %}
+          </div>
+          <p class="admin-profile__source">{{ _("admin.profile.source") }}{% if can("rights.view") %} <a href="/admin/rights">{{ _("admin.profile.my_rights") }}</a>{% endif %}</p>
+          {% if can("dashboard.view") %}
+          <form method="get" action="/admin/preferences">
+            <input type="hidden" name="next" value="{{ back }}">
+            <p class="admin-profile__label" id="theme-label">{{ _("admin.theme.label") }}</p>
+            <div class="admin-profile__choices" role="group" aria-labelledby="theme-label">
+              {% for item in themes %}<button type="submit" name="theme" value="{{ item.value }}" class="button button--small{% if not item.current %} button--secondary{% endif %}"{% if item.current %} aria-current="true"{% endif %}>{{ item.label }}</button>
+              {% endfor %}
+            </div>
+          </form>
           {% endif %}
-          <nav class="admin-profile__themes" aria-labelledby="theme-label">
-            <p class="admin-profile__roles-label" id="theme-label">{{ _("admin.theme.label") }}</p>
-            <ul>
-              {% for option in themes %}<li><a href="{{ option.href }}"{% if option.current %} aria-current="true"{% endif %}>{{ option.label }}</a></li>{% endfor %}
-            </ul>
-          </nav>
+          {{ choice("language-label", _("language.switcher.label"), languages) }}
+          {% if can("dashboard.view") %}
+          <form class="admin-profile__alerts" method="get" action="/admin/preferences">
+            <fieldset>
+              <legend>{{ _("admin.alerts.label") }}</legend>
+              <input type="hidden" name="next" value="{{ back }}">
+              <input type="hidden" name="alert_prefs" value="1">
+              <label class="admin-profile__check"><input type="checkbox" name="alert_banner" value="1"{% if alert_prefs.banner %} checked{% endif %}>{{ _("admin.alerts.banner") }}</label>
+              <div class="field">
+                <label for="alert-popups">{{ _("admin.alerts.popups.label") }}</label>
+                <select id="alert-popups" name="alert_popups">
+                  {% for key, text in alert_popup_options %}<option value="{{ key }}"{% if key == alert_prefs.popups %} selected{% endif %}>{{ text }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <button type="submit" class="button button--small button--secondary">{{ _("admin.alerts.save") }}</button>
+            </fieldset>
+          </form>
+          {% endif %}
           <form method="post" action="/admin/logout">
-            <button type="submit" class="button button--secondary">{{ _("admin.logout") }}</button>
+            <button type="submit" class="button button--secondary">{{ icon("signout") }}{{ _("admin.logout") }}</button>
           </form>
         </div>
       </details>

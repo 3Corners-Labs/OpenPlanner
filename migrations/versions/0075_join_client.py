@@ -5,12 +5,12 @@ are matched on it). ``groups`` gains ``join_client`` (``browser`` or ``choice``,
 ``browser``): with ``browser`` the link carries Webex's own parameter for the web app, with
 ``choice`` it is the stored link unchanged. Existing groups get ``browser``, the ADR's default.
 
-Revises 0073 (release check requested), the head of ``main`` when this was written. PR #168 claims
-0072 (organisation texts): when it merges first, set ``down_revision`` to the head of ``main``
-before merging this one, so there is a single head (``tests/test_migrations.py`` checks it).
+Revises 0074 (organisation texts), the head of ``main`` when this was written. If another
+migration merges first, set ``down_revision`` to the head of ``main`` before merging this one, so
+there is a single head (``tests/test_migrations.py`` checks it).
 
-Revision ID: 0074
-Revises: 0073
+Revision ID: 0075
+Revises: 0074
 Create Date: 2026-10-30 22:00:00.000000
 """
 
@@ -19,8 +19,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0074"
-down_revision: str | None = "0073"
+revision: str = "0075"
+down_revision: str | None = "0074"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -113,15 +113,15 @@ probe meeting's title, lead and length stay as in the group check today.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1 | `join_client` on `groups` (migration 0074, reversible), `JoinClient`, `join_link()`, both redirects, group form and manual topic, texts per client in nl and en | #171 | in PR |
+| 1 | `join_client` on `groups` (migration 0075, reversible), `JoinClient`, `join_link()`, both redirects, group form and manual topic, texts per client in nl and en | #171 | in PR |
 | 2 | Group check: `webex.browser_link_*` and `webex.trial_lobby`, i18n of the findings | #171 | in PR |
 | 3 | Confirm on docker01 with the Webex app installed on the tester's computer that `browser` opens the web app and `choice` the Webex page; record in this table | | planned |
 
 ## Consequences
 
-- Migration 0074 (reversible): `groups.join_client` text, default `browser`; the downgrade drops
-  the column. It revises 0073, the head of `main`. PR #168 claims 0072 (organisation texts), so
-  when it merges first, `down_revision` becomes the head of `main` at that moment.
+- Migration 0075 (reversible): `groups.join_client` text, default `browser`; the downgrade drops
+  the column. It revises 0074 (organisation texts), the head of `main` when this was written; if
+  another migration merges first, `down_revision` becomes the head of `main` at that moment.
 - `docs/settings.md` unchanged (a group setting, not a `Settings` field); `docs/admin-map.md`
   unchanged (same screen); `docs/manual/{nl,en}/group-settings.md` gets the setting;
   `docs/authorization.md` unchanged.
