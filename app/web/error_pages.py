@@ -6,6 +6,8 @@ security events (ADR 0053).
 """
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import Response
 
@@ -25,6 +27,9 @@ from app.web.templates import create_templates, render
 
 templates = create_templates([])
 MANAGEMENT_LINK_PREFIX = "/b/"
+MACHINE_PREFIXES = ("/api/", "/webhooks/")
+"""Paths whose callers are programs: they keep FastAPI's JSON validation answer, which the
+OpenAPI spec documents (``HTTPValidationError``)."""
 """Path prefix of the citizen's management link; a 404 under it is a link that matches nothing."""
 
 _NOT_FOUND = {
@@ -73,6 +78,20 @@ async def rejected_request_page(request: Request, exc: Exception) -> Response:
     return _page(request, status, "error.title", "error.invalid_request")
 
 
+async def validation_error_page(request: Request, exc: Exception) -> Response:
+    """Render a page's malformed query or path parameter as the generic error page.
+
+    FastAPI's default answer repeats the submitted value in JSON; a page never echoes what
+    was typed into its address (ADR 0063 §3), so admin and citizen pages get the error page
+    with a catalogue text only. Machine paths keep the documented JSON answer.
+    """
+    if not isinstance(exc, RequestValidationError):  # pragma: no cover - registered for it only
+        raise TypeError("expected a RequestValidationError")
+    if request.url.path.startswith(MACHINE_PREFIXES):
+        return await request_validation_exception_handler(request, exc)
+    return _page(request, 422, "error.title", "error.invalid_request")
+
+
 async def rate_limited_page(request: Request, exc: Exception) -> Response:
     """Render the rate-limit page with a ``Retry-After`` hint."""
     await report(request, RATE_LIMITED, TOO_MANY_REQUESTS, detail="surface:web")
@@ -86,3 +105,4 @@ def register_error_pages(app: FastAPI) -> None:
     app.add_exception_handler(DomainError, domain_error_page)
     app.add_exception_handler(RejectedRequest, rejected_request_page)
     app.add_exception_handler(RateLimitExceeded, rate_limited_page)
+    app.add_exception_handler(RequestValidationError, validation_error_page)

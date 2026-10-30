@@ -66,6 +66,11 @@ they leave the system only to the mail server and to GitHub respectively.
 
 ## Stored personal data (WP2 schema)
 
+The fields below are the fixed list of `app/domain/privacy.py` (ADR 0063): personal data is
+shown in the admin portal only on the booking detail page and the queue item (first name only
+on the group's agenda and queue), never on overview, list, export or alert pages, and no list
+filter matches on it. The list and the rule are constants, not settings.
+
 | Data item | Table.column | Source | Retention | Leaves the system |
 |---|---|---|---|---|
 | First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |

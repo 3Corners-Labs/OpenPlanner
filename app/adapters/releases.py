@@ -9,6 +9,7 @@ release page, else the release is ignored.
 The optional token is for a private repository and needs read access to its contents only.
 """
 
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -37,6 +38,7 @@ class GitHubReleases:
         repository: ``owner/name`` on GitHub (validated by the settings).
         token: Optional read-only token for a private repository; never logged.
         channel: ``release`` asks ``/releases/latest``; ``rc`` lists releases and pre-releases.
+            A value, or a callable read on every lookup (the portal setting, ADR 0067).
     """
 
     def __init__(
@@ -44,19 +46,20 @@ class GitHubReleases:
         http: httpx.AsyncClient,
         repository: str,
         token: str | None,
-        channel: UpdateChannel = UpdateChannel.RELEASE,
+        channel: UpdateChannel | Callable[[], UpdateChannel] = UpdateChannel.RELEASE,
     ) -> None:
         """Store the collaborators."""
         self._http = http
-        self._channel = channel
-        releases = f"{API_BASE}/repos/{repository}/releases"
-        self._url = (
-            f"{releases}/latest"
-            if channel is UpdateChannel.RELEASE
-            else f"{releases}?per_page={LISTED}"
-        )
+        self._channel = channel if callable(channel) else (lambda: channel)
+        self._releases = f"{API_BASE}/repos/{repository}/releases"
         self._pages = f"https://github.com/{repository}/releases/"
         self._token = token
+
+    def _url(self, channel: UpdateChannel) -> str:
+        """Return the endpoint of ``channel``."""
+        if channel is UpdateChannel.RELEASE:
+            return f"{self._releases}/latest"
+        return f"{self._releases}?per_page={LISTED}"
 
     async def latest(self) -> Release | None:
         """Return the newest release the channel offers; ``None`` when there is none usable.
@@ -68,8 +71,9 @@ class GitHubReleases:
         headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
         if self._token:
             headers["Authorization"] = f"Bearer {self._token}"
+        channel = self._channel()
         try:
-            response = await self._http.get(self._url, headers=headers)
+            response = await self._http.get(self._url(channel), headers=headers)
         except httpx.HTTPError as exc:
             log.warning("integration.unreachable", error=type(exc).__name__)
             raise IntegrationError("unreachable", retryable=True) from exc
@@ -78,7 +82,7 @@ class GitHubReleases:
         if response.status_code != 200:
             raise http_failure(response)
         data = response.json()
-        if self._channel is UpdateChannel.RELEASE:
+        if channel is UpdateChannel.RELEASE:
             return self._release(data)
         return self._newest(data)
 
@@ -125,6 +129,7 @@ def update_service(
     http: httpx.AsyncClient,
     *,
     lookup: bool = True,
+    live: Callable[[], Settings] | None = None,
 ) -> UpdateService:
     """Return the update service the settings describe (web, worker and the CLI share it).
 
@@ -135,9 +140,16 @@ def update_service(
         http: Shared HTTP client.
         lookup: Whether this process looks up releases itself; the web process passes
             ``False`` and only reads the worker's checks (ADR 0029).
+        live: Returns the current effective settings, for the channel and auto-apply, which
+            the superuser changes in the portal (ADR 0067); the worker passes its live
+            settings, the web process rebuilds the service on every change instead.
     """
     token = settings.update_check_token
-    channel = UpdateChannel(settings.update_channel)
+    current = live or (lambda: settings)
+
+    def channel() -> UpdateChannel:
+        return UpdateChannel(current().update_channel)
+
     releases = (
         GitHubReleases(
             http,
@@ -156,5 +168,5 @@ def update_service(
         releases=releases,
         checking=settings.update_repository is not None,
         channel=channel,
-        auto_apply=settings.update_auto_apply,
+        auto_apply=lambda: current().update_auto_apply,
     )
