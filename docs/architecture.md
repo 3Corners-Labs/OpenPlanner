@@ -93,7 +93,7 @@ flowchart TB
         web["web<br/>FastAPI + uvicorn<br/>pages, migrations on start"]
         worker["worker<br/>job loop, heartbeat"]
         volume[("data volume<br/>SQLite (WAL)")]
-        certs[("portal-certs volume<br/>uploaded certificate")]
+        certs[("portal-certs volume<br/>own key, CSR, chain")]
         mailpit["mailpit<br/>dev profile only"]
     end
 
@@ -122,9 +122,10 @@ flowchart TB
   fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
   The worker probes the public address every few hours and shows the certificate's issuer,
   expiry and one finding on *System status*; a failing one is a system event. The superuser
-  chooses the source there (ADR 0066): Let's Encrypt, or a pair uploaded in the portal, stored
-  with the key sealed (ADR 0008) and handed to the proxy through the `portal-certs` volume,
-  where the entrypoint's watcher reloads Caddy on change. Without the profile (`--no-tls`), a
+  chooses the source there (ADR 0066): Let's Encrypt, or an own certificate whose key `web`
+  makes in the `portal-certs` volume (a signing request for the CA; the chain comes back
+  through the portal, the key never enters the database) and whose pair the entrypoint's
+  watcher reloads Caddy with on change. Without the profile (`--no-tls`), a
   load balancer of the host does TLS and the source is not the portal's.
 - **One image, two roles.** `web` runs `alembic upgrade head` and then uvicorn; `worker` runs
   `python -m app.jobs.worker` and starts only when `web` is healthy. Both run as uid 10001

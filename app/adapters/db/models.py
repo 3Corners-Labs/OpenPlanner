@@ -977,16 +977,15 @@ class RoleRow(Base):
 class OwnCertificateRow(Base):
     """The own certificate uploaded in the portal (ADR 0066); at most one row.
 
-    The chain is public and stored as text; the private key is sealed with AES-256-GCM under
-    ``tls:own_certificate`` (ADR 0008) and never readable in plain text.
+    The chain is public and stored as text with the leaf's public key; the private key is never
+    in the database (it lives on the volume the proxy reads), so a backup never carries it.
     """
 
     __tablename__ = "own_certificates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     chain_pem: Mapped[str] = mapped_column(Text)
-    key_nonce: Mapped[bytes] = mapped_column(LargeBinary)
-    key_ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary)
     fingerprint: Mapped[str] = mapped_column(String(64))
     subject: Mapped[str] = mapped_column(String(255))
     issuer: Mapped[str] = mapped_column(String(255))

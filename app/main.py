@@ -13,8 +13,8 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.adapters.certificate_delivery import FileCertificateDelivery
-from app.adapters.certificate_pem import PemPairReader
+from app.adapters.certificate_pem import CryptographyPemReader
+from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
@@ -267,8 +267,8 @@ def create_app(
             clock,
             app.state.admin_service,
             app.state.settings_service,
-            PemPairReader(),
-            FileCertificateDelivery(uow, settings.tls_portal_certificate_dir),
+            CryptographyPemReader(),
+            FileCertificateVolume(settings.tls_portal_certificate_dir),
             TlsWatch(
                 uow,
                 clock,

@@ -25,10 +25,12 @@ async def test_uploads_and_choices_are_refused(site: Site) -> None:
         files={"chain": ("c", pair.chain), "key": ("k", pair.key)},
         headers=SAME_ORIGIN,
     )
+    requested = await site.client.post(f"{URL}/tls/csr", headers=SAME_ORIGIN)
     chosen = await site.client.post(
         f"{URL}/tls_certificate_source", data={"value": "own"}, headers=SAME_ORIGIN
     )
 
     assert uploaded.status_code == 422
+    assert requested.status_code == 422
     assert chosen.status_code == 422
     assert "eigen reverse proxy" in chosen.text

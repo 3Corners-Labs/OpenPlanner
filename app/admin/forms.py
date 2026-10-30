@@ -70,6 +70,7 @@ DONE_MESSAGES: dict[str, str] = {
     "certificate_uploaded": "admin.done.certificate_uploaded",
     "certificate_removed": "admin.done.certificate_removed",
     "certificate_checked": "admin.done.certificate_checked",
+    "csr_generated": "admin.done.csr_generated",
     "maintenance_on": "admin.done.maintenance_on",
     "adopted": "admin.done.adopted",
     "login_mapping_saved": "admin.done.login_mapping_saved",
@@ -239,6 +240,8 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.TLS_CERTIFICATE_MISSING: "admin.form.error.tls_certificate_missing",
     ErrorCode.TLS_CERTIFICATE_IN_USE: "admin.form.error.tls_certificate_in_use",
     ErrorCode.TLS_SOURCE_NOT_APPLICABLE: "admin.form.error.tls_source_not_applicable",
+    ErrorCode.TLS_KEY_MISSING: "admin.form.error.tls_key_missing",
+    ErrorCode.TLS_VOLUME_UNWRITABLE: "admin.form.error.tls_volume_unwritable",
     ErrorCode.LOGIN_LOCKOUT: "admin.form.error.login_lockout",
 }
 

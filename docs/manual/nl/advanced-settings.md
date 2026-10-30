@@ -53,31 +53,48 @@ superuser waar het vandaan komt:
 
 - **Let's Encrypt (automatisch)**, de standaard: de proxy haalt het certificaat zelf en verlengt
   het; u hoeft niets te doen.
-- **Eigen certificaat (geüpload)**: de proxy gebruikt het certificaat dat u hier uploadt,
-  bijvoorbeeld een PKIoverheid-certificaat of een ander organisatiegevalideerd certificaat. De
-  verlenging is dan uw zaak: upload het nieuwe paar voordat het oude verloopt; de bevinding
-  *verloopt binnenkort* hierboven is de herinnering.
+- **Eigen certificaat**: de proxy gebruikt het certificaat dat u hier plaatst, bijvoorbeeld een
+  PKIoverheid-certificaat of een ander organisatiegevalideerd certificaat. De verlenging is dan
+  uw zaak: plaats de nieuwe keten voordat de oude verloopt; de bevinding *verloopt binnenkort*
+  hierboven is de herinnering.
 
-Voor een eigen certificaat uploadt u eerst twee PEM-bestanden onder **Eigen certificaat
-uploaden of vervangen**: de certificaatketen (servercertificaat eerst, daarna de
-tussencertificaten) en de bijbehorende privésleutel zonder wachtwoord. De upload wordt
-gecontroleerd voordat er iets wordt opgeslagen: beide bestanden moeten leesbaar zijn, de
-sleutel moet bij het servercertificaat horen, het certificaat moet geldig zijn voor het
-publieke adres van deze installatie, en het mag niet verlopen of nog niet geldig zijn. Een
-weigering noemt de reden bij het veld. De privésleutel wordt versleuteld bewaard en nooit meer
-getoond; het scherm toont de vingerafdruk, het onderwerp, de namen, de vervaldatum en het
-moment van uploaden. Kies daarna **Eigen certificaat (geüpload)** als bron en sla op. De proxy
-schakelt binnen ongeveer een halve minuut om; kies **Nu controleren** om het resultaat te zien.
+De privésleutel van een eigen certificaat wordt op deze server gemaakt en verlaat die nooit:
+hij staat niet in de database, niet in een back-up daarvan, en wordt nooit getoond. Zo krijgt u
+een eigen certificaat:
 
-Terugschakelen naar **Let's Encrypt (automatisch)** werkt op dezelfde manier. Het geüploade
-certificaat blijft bewaard voor later; **Geüpload certificaat verwijderen** wist het met de
-sleutel, en kan alleen zolang Let's Encrypt de bron is.
+1. Kies **Nieuwe sleutel en aanvraag maken**. Het scherm toont een certificaataanvraag (CSR)
+   voor het publieke adres, als tekst en als download. Een aanvraag stoort een certificaat dat
+   al in gebruik is niet; een nieuwe aanvraag vervangt een eerdere.
+2. Lever de aanvraag in bij uw certificaatautoriteit. U ontvangt een certificaatketen (PEM).
+3. Plaats de keten onder **Certificaatketen plaatsen of vervangen** (servercertificaat eerst,
+   daarna de tussencertificaten). De upload wordt gecontroleerd voordat er iets wordt
+   opgeslagen: het bestand moet leesbaar zijn, de keten moet horen bij de hier gemaakte sleutel
+   (of bij de sleutel die al in gebruik is, bij een verlenging), het certificaat moet geldig
+   zijn voor het publieke adres van deze installatie, en het mag niet verlopen of nog niet
+   geldig zijn. Een weigering noemt de reden bij het veld. Het scherm toont daarna de
+   vingerafdruk, het onderwerp, de namen, de vervaldatum, het moment van plaatsen en dat de
+   sleutel op deze server aanwezig is.
+4. Kies **Eigen certificaat** als bron en sla op. De proxy schakelt binnen ongeveer een halve
+   minuut om; kies **Nu controleren** om het resultaat te zien.
 
-Elke upload en verwijdering staat in het auditlog met de vingerafdruk en de vervaldatum van het
-certificaat, nooit de sleutel. Voor al deze wijzigingen is een recente inlog nodig.
+Om een bestaand certificaat eenmalig over te zetten plaatst u de keten en, in het tweede veld,
+de bijbehorende privésleutel samen; de sleutel gaat rechtstreeks naar de opslag van de proxy op
+deze server en wordt nergens anders bewaard.
+
+Terugschakelen naar **Let's Encrypt (automatisch)** werkt op dezelfde manier; het certificaat en
+de sleutel blijven bewaard voor later. **Geüpload certificaat verwijderen** wist het certificaat
+(nooit de sleutel) en kan alleen zolang Let's Encrypt de bron is.
+
+**Privésleutel ontbreekt op deze server** verschijnt als de database op een andere server is
+teruggezet: het certificaat reisde mee, de sleutel niet. Maak een nieuwe aanvraag en plaats de
+keten, of zet het paar opnieuw over; tot die tijd gebruikt de proxy Let's Encrypt.
+
+Elke aanvraag, upload en verwijdering staat in het auditlog met de vingerafdruk en de
+vervaldatum van het certificaat, nooit een sleutel. Voor al deze wijzigingen is een recente
+inlog nodig.
 
 Beheert de serverbeheerder het certificaat op de server zelf, dan is de instelling **vastgezet
-door de beheerder van de server** en is er geen uploadformulier. Eindigt HTTPS bij een eigen
+door de beheerder van de server** en zijn er geen formulieren. Eindigt HTTPS bij een eigen
 reverse proxy of load balancer, dan meldt het scherm dat de bron niet van toepassing is: het
 certificaat wordt daar beheerd, en het blok hierboven toont nog steeds wat bezoekers zien.
 

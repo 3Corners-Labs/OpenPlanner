@@ -405,10 +405,11 @@ REGISTRY: tuple[SettingSpec, ...] = (
     S(
         "tls_portal_certificate_dir",
         K.PATH,
-        "data/portal-certs",
+        "portal-certs",
         _B,
         T.HOST,
-        "Where web writes the own certificate for the proxy (the portal-certs volume; ADR 0066).",
+        "The volume shared with the proxy that holds the own certificate's private key, its "
+        "request and the served pair; never under data/ (ADR 0066).",
     ),
     S(
         "tls_portal_poll_seconds",
