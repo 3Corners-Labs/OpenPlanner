@@ -176,6 +176,12 @@ class Settings(BaseSettings):
     # ADR 0031: system events (job outcomes) in the audit log are deleted after this many
     # days; admin actions are kept.
     system_event_retention_days: int = Field(default=90, ge=1, le=3650)
+    # ADR 0068 (class C): request events (every call to Webex and WxCC for a booking) are
+    # many and only useful while a failure is fresh, so they go earlier than the rest.
+    integration_request_retention_days: int = Field(default=30, ge=1, le=365)
+    # ADR 0068 (class C): a pending job this many minutes past its planned time counts as
+    # overdue in a group's "Koppeling controleren".
+    job_overdue_minutes: int = Field(default=10, ge=1, le=1440)
     # ADR 0040: grades of the data volume. Below these free-space percentages (or above
     # DATABASE_MAX_MB, default no limit) the worker records a system event, logs a warning or
     # error every hour and /readyz answers "degraded".
@@ -491,6 +497,7 @@ class Settings(BaseSettings):
             system=timedelta(days=self.system_event_retention_days),
             security=timedelta(days=self.security_event_retention_days),
             diagnostic=timedelta(days=self.diagnostic_event_retention_days),
+            requests=timedelta(days=self.integration_request_retention_days),
         )
 
     @property
