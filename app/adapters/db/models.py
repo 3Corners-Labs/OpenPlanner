@@ -904,6 +904,26 @@ class MaintenanceStateRow(Base):
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 
 
+class CertificateCheckRow(Base):
+    """The latest check of the public address's certificate (ADR 0064); at most one row."""
+
+    __tablename__ = "certificate_checks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    checked_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    host: Mapped[str] = mapped_column(String(255))
+    finding: Mapped[str] = mapped_column(String(16))
+    trust: Mapped[str | None] = mapped_column(String(16))
+    error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+    subject: Mapped[str | None] = mapped_column(String(255))
+    issuer: Mapped[str | None] = mapped_column(String(255))
+    not_before: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    not_after: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    names: Mapped[str] = mapped_column(Text, server_default=text("'[]'"))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
 class PlatformSettingRow(Base):
     """The portal value of one class C setting (ADR 0042 §4), as JSON; never a secret."""
 
