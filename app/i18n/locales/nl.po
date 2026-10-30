@@ -463,6 +463,9 @@ msgstr "of uw browser het gesprek goed kan afspelen."
 msgid "trial.alone"
 msgstr "U zit er alleen in. Er komt niemand van het team binnen en niemand wacht op u. Webex vraagt u zelf om toestemming voor camera en microfoon, net als bij uw afspraak."
 
+msgid "trial.browser"
+msgstr "U hoeft niets te installeren: vraagt Webex om de app te openen, kies dan 'Deelnemen via deze browser'."
+
 msgid "trial.open_hint"
 msgstr "Het proefgesprek blijft {minutes} minuten open."
 
@@ -1509,7 +1512,7 @@ msgid "admin.group.not_connected"
 msgstr "Niet gekoppeld"
 
 msgid "message.join"
-msgstr "U neemt deel via uw browser; u hoeft niets te installeren. De link werkt vanaf 15 minuten voor de start."
+msgstr "U hoeft niets te installeren: vraagt Webex om de app te openen, kies dan 'Deelnemen via deze browser'. De link werkt vanaf 15 minuten voor de start."
 
 msgid "message.join_link"
 msgstr "Deelnemen aan het videogesprek"
