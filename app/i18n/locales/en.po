@@ -305,8 +305,6 @@ msgstr "Selected time"
 msgid "book.change_slot"
 msgstr "Choose another time"
 
-msgid "form.name"
-msgstr "Name"
 
 msgid "form.email"
 msgstr "Email address"
@@ -341,8 +339,6 @@ msgstr "There is a problem"
 msgid "error.title"
 msgstr "Something went wrong"
 
-msgid "error.field.name"
-msgstr "Enter your name, at most 100 characters."
 
 msgid "error.field.email"
 msgstr "Enter a valid email address, for example name@example.com."
@@ -5871,6 +5867,229 @@ msgstr "Use the platform value"
 
 msgid "admin.settings.source.organisation"
 msgstr "Organisation"
+
+msgid "admin.form.error.invalid_form_field"
+msgstr "This field is not set up correctly. Check the key, the options and the limits."
+
+msgid "admin.form.error.form_field_forbidden"
+msgstr "This field asks for data we may not ask for, such as a citizen service number, an identity document, or data about health, religion or origin."
+
+msgid "error.invalid_answer"
+msgstr "Please check your answer to this question."
+
+msgid "form.first_name"
+msgstr "First name"
+
+msgid "form.last_name"
+msgstr "Last name"
+
+
+msgid "error.field.first_name"
+msgstr "Enter your first name, at most 100 characters."
+
+msgid "error.field.last_name"
+msgstr "Enter your last name, at most 100 characters."
+
+msgid "error.invalid_answer_field"
+msgstr "Please check your answer to ‘{label}’."
+
+msgid "settings.topic.booking_form"
+msgstr "Booking form"
+
+msgid "settings.field.booking_form_max_custom_fields.label"
+msgstr "Custom fields per booking form (at most)"
+
+msgid "settings.field.phone_default_region.label"
+msgstr "Country of phone numbers without a country code"
+
+msgid "admin.done.field_retired"
+msgstr "The field is retired. Earlier answers stay until they are erased and count as personal data."
+
+msgid "admin.form_fields.title"
+msgstr "Booking form"
+
+msgid "admin.form_fields.lead"
+msgstr "Extra questions citizens answer when they book. Ask only what the team really needs."
+
+msgid "admin.form_fields.settings_lead"
+msgstr "Extra questions on the form, with checks and a personal data tag."
+
+msgid "admin.form_fields.open"
+msgstr "Manage the booking form"
+
+msgid "admin.form_fields.back"
+msgstr "Back to the settings"
+
+msgid "admin.form_fields.system"
+msgstr "The form always asks first name, last name and email address; the phone number is set in the settings."
+
+msgid "admin.form_fields.none"
+msgstr "This team has no custom fields yet."
+
+msgid "admin.form_fields.retired"
+msgstr "Retired (only on earlier bookings): {names}"
+
+msgid "admin.form_fields.label"
+msgstr "Question"
+
+msgid "admin.form_fields.key"
+msgstr "Key"
+
+msgid "admin.form_fields.key_hint"
+msgstr "Lower-case letters, digits and _, starting with a letter, for example customer_number. Fixed once saved."
+
+msgid "admin.form_fields.type"
+msgstr "Type"
+
+msgid "admin.form_fields.type_hint"
+msgstr "Decides how the answer is checked. Fixed once saved."
+
+msgid "admin.form_fields.type.short_text"
+msgstr "Short text (up to 100 characters)"
+
+msgid "admin.form_fields.type.long_text"
+msgstr "Free text (up to 1000 characters, always personal data)"
+
+msgid "admin.form_fields.type.email"
+msgstr "Email address"
+
+msgid "admin.form_fields.type.phone"
+msgstr "Phone number"
+
+msgid "admin.form_fields.type.number"
+msgstr "Whole number"
+
+msgid "admin.form_fields.type.date"
+msgstr "Date"
+
+msgid "admin.form_fields.type.postcode_nl"
+msgstr "Postcode (Netherlands)"
+
+msgid "admin.form_fields.type.choice"
+msgstr "Choice list"
+
+msgid "admin.form_fields.type.checkbox"
+msgstr "Checkbox"
+
+msgid "admin.form_fields.label_nl"
+msgstr "Question in Dutch"
+
+msgid "admin.form_fields.label_en"
+msgstr "Question in English"
+
+msgid "admin.form_fields.hint_nl"
+msgstr "Help text in Dutch"
+
+msgid "admin.form_fields.hint_en"
+msgstr "Help text in English"
+
+msgid "admin.form_fields.classification"
+msgstr "Personal data"
+
+msgid "admin.form_fields.classification_hint"
+msgstr "Personal data never appears in logs, exports, messages or the agents' queue."
+
+msgid "admin.form_fields.classification.pii"
+msgstr "Personal data"
+
+msgid "admin.form_fields.classification.not_pii"
+msgstr "Not personal data"
+
+msgid "admin.form_fields.options"
+msgstr "Choices"
+
+msgid "admin.form_fields.options_hint"
+msgstr "Choice lists only. One choice per line: key; Dutch; English. For example: rent; Huurtoeslag; Rent benefit"
+
+msgid "admin.form_fields.minimum"
+msgstr "Lower limit"
+
+msgid "admin.form_fields.maximum"
+msgstr "Upper limit"
+
+msgid "admin.form_fields.minimum_hint"
+msgstr "Numbers (the value) or dates (days from today, negative is in the past) only."
+
+msgid "admin.form_fields.maximum_hint"
+msgstr "The same; empty means no limit."
+
+msgid "admin.form_fields.required"
+msgstr "Required"
+
+msgid "admin.form_fields.required_hint"
+msgstr "For a checkbox, required means it must be ticked, for example for consent."
+
+msgid "admin.form_fields.confirm_not_pii"
+msgstr "I confirm that the answers to this question never say anything about a person."
+
+msgid "admin.form_fields.confirm_not_pii_hint"
+msgstr "Only needed when you choose ‘Not personal data’. When in doubt, keep it personal data."
+
+msgid "admin.form_fields.add"
+msgstr "Add a field"
+
+msgid "admin.form_fields.add_lead"
+msgstr "A form has at most {count} custom fields."
+
+msgid "admin.form_fields.add_button"
+msgstr "Add field"
+
+msgid "admin.form_fields.limit_reached"
+msgstr "The form already has {count} custom fields, the maximum. Retire a field first."
+
+msgid "admin.form_fields.edit_lead"
+msgstr "Key {field_key}, type {type}. Key and type are fixed."
+
+msgid "admin.form_fields.up"
+msgstr "Up"
+
+msgid "admin.form_fields.down"
+msgstr "Down"
+
+msgid "admin.form_fields.retire"
+msgstr "Retire"
+
+msgid "admin.form_fields.up_label"
+msgstr "Move {label} up"
+
+msgid "admin.form_fields.down_label"
+msgstr "Move {label} down"
+
+msgid "admin.form_fields.retire_label"
+msgstr "Retire {label}"
+
+msgid "admin.form_fields.error.key"
+msgstr "Choose a key of 2 to 40 characters: lower-case letters, digits and _, starting with a letter, not used before in this team and not first_name, last_name, email or phone."
+
+msgid "admin.form_fields.error.type"
+msgstr "Choose a type from the list."
+
+msgid "admin.form_fields.error.label"
+msgstr "Enter the question in Dutch and English, at most 200 characters."
+
+msgid "admin.form_fields.error.hint"
+msgstr "A help text has at most 300 characters."
+
+msgid "admin.form_fields.error.classification"
+msgstr "An email address, phone number or free text is always personal data."
+
+msgid "admin.form_fields.error.confirm_not_pii"
+msgstr "Confirm that the answers say nothing about a person, or keep the field personal data."
+
+msgid "admin.form_fields.error.options"
+msgstr "Give 1 to 30 choices, each on its own line as key; Dutch; English, with unique keys."
+
+msgid "admin.form_fields.error.bounds"
+msgstr "Limits are whole numbers, only for numbers or dates, and the lower limit is not above the upper limit."
+
+msgid "admin.form_fields.error.limit"
+msgstr "The form already has the maximum number of custom fields."
+
+msgid "admin.booking.answers"
+msgstr "Answers on the form"
+
+msgid "admin.booking.answers_lead"
+msgstr "Personal data; erased with the rest of the booking."
 
 msgid "admin.settings.secret_hint"
 msgstr "Leave empty to keep the current value; it is never shown."

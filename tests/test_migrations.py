@@ -335,3 +335,49 @@ def test_custom_roles_go_on_downgrade(alembic_config: Config, tmp_path: Path) ->
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
     assert "roles" not in tables
+
+
+def test_the_name_is_split_on_upgrade_and_joined_on_downgrade(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0055: first word to first_name, the rest to last_name; answers go on downgrade.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0044")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO organisations (id, name, slug) VALUES (1, 'Gemeente', 'gemeente');
+            INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+                min_notice_minutes, horizon_days, phone_mode)
+                VALUES (1, 1, 'Team', 'team', 'Europe/Amsterdam', 30, 60, 60, 'optional');
+            INSERT INTO slots (id, group_id, start, "end", capacity_snapshot)
+                VALUES (1, 1, '2026-01-05 08:00:00', '2026-01-05 08:30:00', 2);
+            INSERT INTO bookings (id, slot_id, group_id, status, name, email, locale,
+                management_token_hash, created_at)
+                VALUES (1, 1, 1, 'confirmed', 'Ada Augusta Lovelace', 'a@example.org', 'nl',
+                    'h1', '2026-01-01 08:00:00'),
+                (2, 1, 1, 'confirmed', 'Cher', 'c@example.org', 'nl', 'h2',
+                    '2026-01-01 08:00:00'),
+                (3, 1, 1, 'cancelled', NULL, NULL, 'nl', 'h3', '2026-01-01 08:00:00');
+            """
+        )
+
+    command.upgrade(alembic_config, "head")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        split = database.execute(
+            "SELECT first_name, last_name FROM bookings ORDER BY id"
+        ).fetchall()
+        database.execute("UPDATE bookings SET form_answers = '{}' WHERE id = 1")
+        database.commit()
+    assert split == [("Ada", "Augusta Lovelace"), ("Cher", ""), (None, None)]
+
+    command.downgrade(alembic_config, "0044")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        joined = database.execute("SELECT name FROM bookings ORDER BY id").fetchall()
+        tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
+    assert joined == [("Ada Augusta Lovelace",), ("Cher",), (None,)]
+    assert "group_form_fields" not in tables

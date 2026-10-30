@@ -21,13 +21,13 @@ from enum import StrEnum
 
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.form_fields import Answers, normalise_email, normalise_phone
 from app.domain.scheduling import PhoneMode
 
 MAX_NAME_LENGTH = 100
-MAX_EMAIL_LENGTH = 254
+DEFAULT_PHONE_REGION = "NL"
+"""Region for numbers without a country code when the organisation sets none (ADR 0055)."""
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
-_PHONE_SEPARATORS = re.compile(r"[\s\-().]")
-_PHONE = re.compile(r"^\+?[0-9]{8,15}$")
 
 
 def _invalid(field_name: str) -> DomainError:
@@ -35,72 +35,75 @@ def _invalid(field_name: str) -> DomainError:
     return DomainError(ErrorCode.INVALID_CONTACT, field_name)
 
 
-def _clean_name(raw: str) -> str:
+def _clean_name(raw: str, field_name: str) -> str:
     """Collapse whitespace; reject empty, too long or control characters."""
     if _CONTROL_CHARS.search(raw):
-        raise _invalid("name")
+        raise _invalid(field_name)
     name = " ".join(raw.split())
     if not name or len(name) > MAX_NAME_LENGTH:
-        raise _invalid("name")
+        raise _invalid(field_name)
     return name
 
 
 def _clean_email(raw: str) -> str:
-    """Basic structural check; full validation (MX, IDNA) happens at the HTTP edge."""
-    email = raw.strip()
-    local, at, domain = email.partition("@")
-    if (
-        not at
-        or not local
-        or "@" in domain
-        or "." not in domain.strip(".")
-        or len(email) > MAX_EMAIL_LENGTH
-        or any(ch.isspace() for ch in email)
-        or _CONTROL_CHARS.search(email)
-    ):
-        raise _invalid("email")
-    return email
+    """Basic structural check, shared with custom email fields (ADR 0055)."""
+    return normalise_email(raw, "email")
 
 
-def _clean_phone(raw: str | None, mode: PhoneMode) -> str | None:
-    """Normalise to digits with an optional leading ``+``; apply the group's phone mode."""
+def _clean_phone(raw: str | None, mode: PhoneMode, region: str) -> str | None:
+    """Return the number in E.164 (ADR 0055); apply the group's phone mode."""
     if mode is PhoneMode.HIDDEN:
         return None  # data minimisation: never store what the form does not ask for
-    phone = _PHONE_SEPARATORS.sub("", raw or "")
-    if phone.startswith("00"):
-        phone = "+" + phone[2:]
-    if not phone:
+    if not (raw or "").strip():
         if mode is PhoneMode.REQUIRED:
             raise _invalid("phone")
         return None
-    if not _PHONE.fullmatch(phone):
-        raise _invalid("phone")
-    return phone
+    return normalise_phone(raw or "", region, "phone")
 
 
 @dataclass(frozen=True)
 class Contact:
-    """Validated contact details of a citizen. Build it with ``Contact.create``."""
+    """Validated contact details of a citizen. Build it with ``Contact.create``.
 
-    name: str = field(repr=False)
+    ``answers`` are the answers to the group's custom form fields (ADR 0055); they are personal
+    data like the rest and are purged with it.
+    """
+
+    first_name: str = field(repr=False)
+    last_name: str = field(repr=False)
     email: str = field(repr=False)
     phone: str | None = field(repr=False)
+    answers: Answers | None = field(default=None, repr=False)
 
     @classmethod
     def create(
-        cls, *, name: str, email: str, phone: str | None, phone_mode: PhoneMode
+        cls,
+        *,
+        first_name: str,
+        last_name: str,
+        email: str,
+        phone: str | None,
+        phone_mode: PhoneMode,
+        region: str = DEFAULT_PHONE_REGION,
+        answers: Answers | None = None,
     ) -> "Contact":
         """Validate and normalise raw form input.
 
         Raises:
             DomainError: ``invalid_contact`` naming the offending field.
         """
-        return cls(_clean_name(name), _clean_email(email), _clean_phone(phone, phone_mode))
+        return cls(
+            _clean_name(first_name, "first_name"),
+            _clean_name(last_name, "last_name"),
+            _clean_email(email),
+            _clean_phone(phone, phone_mode, region),
+            answers,
+        )
 
     @property
-    def first_name(self) -> str:
-        """The first word of the name; the only name part sent to WxCC (CLAUDE.md)."""
-        return self.name.split()[0]
+    def name(self) -> str:
+        """The full name, for the planner's booking page and personal messages."""
+        return f"{self.first_name} {self.last_name}".strip()
 
 
 class BookingKind(StrEnum):

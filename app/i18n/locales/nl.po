@@ -305,8 +305,6 @@ msgstr "Gekozen moment"
 msgid "book.change_slot"
 msgstr "Ander moment kiezen"
 
-msgid "form.name"
-msgstr "Naam"
 
 msgid "form.email"
 msgstr "E-mailadres"
@@ -341,8 +339,6 @@ msgstr "Er is een probleem"
 msgid "error.title"
 msgstr "Er ging iets mis"
 
-msgid "error.field.name"
-msgstr "Vul uw naam in, maximaal 100 tekens."
 
 msgid "error.field.email"
 msgstr "Vul een geldig e-mailadres in, bijvoorbeeld naam@voorbeeld.nl."
@@ -5871,6 +5867,229 @@ msgstr "Platformwaarde gebruiken"
 
 msgid "admin.settings.source.organisation"
 msgstr "Organisatie"
+
+msgid "admin.form.error.invalid_form_field"
+msgstr "Dit veld is niet goed ingesteld. Controleer de sleutel, de opties en de grenzen."
+
+msgid "admin.form.error.form_field_forbidden"
+msgstr "Dit veld vraagt om gegevens die we niet mogen vragen, zoals een BSN, een identiteitsbewijs of gegevens over gezondheid, geloof of afkomst."
+
+msgid "error.invalid_answer"
+msgstr "Controleer uw antwoord op deze vraag."
+
+msgid "form.first_name"
+msgstr "Voornaam"
+
+msgid "form.last_name"
+msgstr "Achternaam"
+
+
+msgid "error.field.first_name"
+msgstr "Vul uw voornaam in, maximaal 100 tekens."
+
+msgid "error.field.last_name"
+msgstr "Vul uw achternaam in, maximaal 100 tekens."
+
+msgid "error.invalid_answer_field"
+msgstr "Controleer uw antwoord bij ‘{label}’."
+
+msgid "settings.topic.booking_form"
+msgstr "Boekingsformulier"
+
+msgid "settings.field.booking_form_max_custom_fields.label"
+msgstr "Eigen velden per boekingsformulier (maximaal)"
+
+msgid "settings.field.phone_default_region.label"
+msgstr "Land van telefoonnummers zonder landcode"
+
+msgid "admin.done.field_retired"
+msgstr "Het veld is uitgezet. Eerdere antwoorden blijven tot ze worden gewist en tellen als persoonsgegevens."
+
+msgid "admin.form_fields.title"
+msgstr "Boekingsformulier"
+
+msgid "admin.form_fields.lead"
+msgstr "Extra vragen die inwoners beantwoorden als ze een afspraak maken. Vraag alleen wat het team echt nodig heeft."
+
+msgid "admin.form_fields.settings_lead"
+msgstr "Extra vragen op het formulier, met controles en een markering voor persoonsgegevens."
+
+msgid "admin.form_fields.open"
+msgstr "Boekingsformulier beheren"
+
+msgid "admin.form_fields.back"
+msgstr "Terug naar de instellingen"
+
+msgid "admin.form_fields.system"
+msgstr "Voornaam, achternaam en e-mailadres vraagt het formulier altijd; het telefoonnummer stelt u in bij de instellingen."
+
+msgid "admin.form_fields.none"
+msgstr "Dit team heeft nog geen eigen velden."
+
+msgid "admin.form_fields.retired"
+msgstr "Uitgezet (alleen nog bij eerdere afspraken): {names}"
+
+msgid "admin.form_fields.label"
+msgstr "Vraag"
+
+msgid "admin.form_fields.key"
+msgstr "Sleutel"
+
+msgid "admin.form_fields.key_hint"
+msgstr "Kleine letters, cijfers en _, beginnend met een letter, bijvoorbeeld klantnummer. Ligt vast na opslaan."
+
+msgid "admin.form_fields.type"
+msgstr "Soort"
+
+msgid "admin.form_fields.type_hint"
+msgstr "Bepaalt de controle op het antwoord. Ligt vast na opslaan."
+
+msgid "admin.form_fields.type.short_text"
+msgstr "Korte tekst (tot 100 tekens)"
+
+msgid "admin.form_fields.type.long_text"
+msgstr "Vrij tekstveld (tot 1000 tekens, altijd persoonsgegeven)"
+
+msgid "admin.form_fields.type.email"
+msgstr "E-mailadres"
+
+msgid "admin.form_fields.type.phone"
+msgstr "Telefoonnummer"
+
+msgid "admin.form_fields.type.number"
+msgstr "Geheel getal"
+
+msgid "admin.form_fields.type.date"
+msgstr "Datum"
+
+msgid "admin.form_fields.type.postcode_nl"
+msgstr "Postcode (Nederland)"
+
+msgid "admin.form_fields.type.choice"
+msgstr "Keuzelijst"
+
+msgid "admin.form_fields.type.checkbox"
+msgstr "Vinkje"
+
+msgid "admin.form_fields.label_nl"
+msgstr "Vraag in het Nederlands"
+
+msgid "admin.form_fields.label_en"
+msgstr "Vraag in het Engels"
+
+msgid "admin.form_fields.hint_nl"
+msgstr "Toelichting in het Nederlands"
+
+msgid "admin.form_fields.hint_en"
+msgstr "Toelichting in het Engels"
+
+msgid "admin.form_fields.classification"
+msgstr "Persoonsgegeven"
+
+msgid "admin.form_fields.classification_hint"
+msgstr "Een persoonsgegeven komt nooit in logs, exports, berichten of de wachtrij van medewerkers."
+
+msgid "admin.form_fields.classification.pii"
+msgstr "Persoonsgegeven"
+
+msgid "admin.form_fields.classification.not_pii"
+msgstr "Geen persoonsgegeven"
+
+msgid "admin.form_fields.options"
+msgstr "Keuzes"
+
+msgid "admin.form_fields.options_hint"
+msgstr "Alleen bij een keuzelijst. Eén keuze per regel: sleutel; Nederlands; Engels. Bijvoorbeeld: huur; Huurtoeslag; Rent benefit"
+
+msgid "admin.form_fields.minimum"
+msgstr "Ondergrens"
+
+msgid "admin.form_fields.maximum"
+msgstr "Bovengrens"
+
+msgid "admin.form_fields.minimum_hint"
+msgstr "Alleen bij een getal (de waarde) of een datum (dagen vanaf vandaag, negatief is in het verleden)."
+
+msgid "admin.form_fields.maximum_hint"
+msgstr "Idem; leeg is geen grens."
+
+msgid "admin.form_fields.required"
+msgstr "Verplicht"
+
+msgid "admin.form_fields.required_hint"
+msgstr "Bij een vinkje betekent verplicht: het moet aangevinkt zijn, bijvoorbeeld voor toestemming."
+
+msgid "admin.form_fields.confirm_not_pii"
+msgstr "Ik bevestig dat de antwoorden op deze vraag nooit iets over een persoon zeggen."
+
+msgid "admin.form_fields.confirm_not_pii_hint"
+msgstr "Alleen nodig als u ‘Geen persoonsgegeven’ kiest. Twijfelt u, laat het dan een persoonsgegeven."
+
+msgid "admin.form_fields.add"
+msgstr "Veld toevoegen"
+
+msgid "admin.form_fields.add_lead"
+msgstr "Een formulier heeft hoogstens {count} eigen velden."
+
+msgid "admin.form_fields.add_button"
+msgstr "Veld toevoegen"
+
+msgid "admin.form_fields.limit_reached"
+msgstr "Het formulier heeft al {count} eigen velden, het maximum. Zet eerst een veld uit."
+
+msgid "admin.form_fields.edit_lead"
+msgstr "Sleutel {field_key}, soort {type}. Sleutel en soort liggen vast."
+
+msgid "admin.form_fields.up"
+msgstr "Omhoog"
+
+msgid "admin.form_fields.down"
+msgstr "Omlaag"
+
+msgid "admin.form_fields.retire"
+msgstr "Uitzetten"
+
+msgid "admin.form_fields.up_label"
+msgstr "{label} omhoog"
+
+msgid "admin.form_fields.down_label"
+msgstr "{label} omlaag"
+
+msgid "admin.form_fields.retire_label"
+msgstr "{label} uitzetten"
+
+msgid "admin.form_fields.error.key"
+msgstr "Kies een sleutel van 2 tot 40 tekens: kleine letters, cijfers en _, beginnend met een letter, nog niet eerder gebruikt in dit team en niet first_name, last_name, email of phone."
+
+msgid "admin.form_fields.error.type"
+msgstr "Kies een soort uit de lijst."
+
+msgid "admin.form_fields.error.label"
+msgstr "Vul de vraag in het Nederlands en het Engels in, maximaal 200 tekens."
+
+msgid "admin.form_fields.error.hint"
+msgstr "Een toelichting heeft maximaal 300 tekens."
+
+msgid "admin.form_fields.error.classification"
+msgstr "Een e-mailadres, telefoonnummer of vrij tekstveld is altijd een persoonsgegeven."
+
+msgid "admin.form_fields.error.confirm_not_pii"
+msgstr "Bevestig dat de antwoorden niets over een persoon zeggen, of laat het veld een persoonsgegeven."
+
+msgid "admin.form_fields.error.options"
+msgstr "Geef 1 tot 30 keuzes, elk op een eigen regel als sleutel; Nederlands; Engels, met unieke sleutels."
+
+msgid "admin.form_fields.error.bounds"
+msgstr "Grenzen zijn hele getallen, alleen bij een getal of datum, en de ondergrens ligt niet boven de bovengrens."
+
+msgid "admin.form_fields.error.limit"
+msgstr "Het formulier heeft het maximum aantal eigen velden al."
+
+msgid "admin.booking.answers"
+msgstr "Antwoorden op het formulier"
+
+msgid "admin.booking.answers_lead"
+msgstr "Persoonsgegevens; ze worden gewist met de rest van de afspraak."
 
 msgid "admin.settings.secret_hint"
 msgstr "Leeg laten houdt de huidige waarde; die wordt nooit getoond."
