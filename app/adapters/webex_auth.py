@@ -22,7 +22,7 @@ import httpx
 import structlog
 
 from app.domain.audit import Outcome
-from app.domain.ports import Clock, IntegrationError
+from app.domain.ports import REASON_LIMIT, Clock, IntegrationError
 from app.domain.security_log import TOKEN_REFRESH_FAILED, SecurityLog
 
 log = structlog.get_logger()
@@ -32,7 +32,6 @@ REFRESH_MARGIN = timedelta(minutes=5)
 EXPIRY_WARNING = timedelta(days=14)
 ADDRESS = re.compile(r"[^\s@'\"]+@[^\s@'\"]+")
 """An email address in Webex's error text (the group's host); masked before logging."""
-REASON_LIMIT = 300
 
 
 class TokenStore(Protocol):
@@ -250,8 +249,9 @@ def http_failure(response: httpx.Response, *, explain: bool = False) -> Integrat
 
     Shared by every HTTP adapter (Webex Meetings, WxCC, Webex Connect SMS, GitHub releases).
     The log line carries the status and the ``trackingId``, if any; with ``explain``
-    (requests without citizen data only) also the ``message`` with email addresses masked.
-    Never the rest of the body.
+    (requests without citizen data only) also Webex's reason with email addresses masked,
+    which the error then carries to the timeline and the system event (ADR 0065). Never the
+    rest of the body.
     """
     status = response.status_code
     reason, tracking_id = _refusal(response)
@@ -264,22 +264,32 @@ def http_failure(response: httpx.Response, *, explain: bool = False) -> Integrat
         tracking_id=tracking_id,
     )
     if status == 401:
-        return IntegrationError("unauthorized", retryable=False)
+        return IntegrationError("unauthorized", retryable=False, reason=reason)
     if status == 429:
-        return IntegrationError("rate_limited", retryable=True)
+        return IntegrationError("rate_limited", retryable=True, reason=reason)
     if status >= 500:
-        return IntegrationError("server_error", retryable=True)
-    return IntegrationError(f"rejected_{status}", retryable=False)
+        return IntegrationError("server_error", retryable=True, reason=reason)
+    return IntegrationError(f"rejected_{status}", retryable=False, reason=reason)
 
 
 def _refusal(response: httpx.Response) -> tuple[str, str]:
-    """Return Webex's error message (addresses masked, shortened) and tracking id, if any."""
+    """Return Webex's reason (addresses masked, shortened) and tracking id, if any.
+
+    Webex puts the specific reason in ``errors[].description`` and a generic sentence in
+    ``message`` ("malformed syntax, see 'errors'"); the descriptions win when there are any.
+    """
     try:
         body = response.json()
     except ValueError:
         return "", ""
     if not isinstance(body, dict):
         return "", ""
-    message, tracking_id = body.get("message"), body.get("trackingId")
-    reason = ADDRESS.sub("***", message)[:REASON_LIMIT] if isinstance(message, str) else ""
+    message, tracking_id, errors = body.get("message"), body.get("trackingId"), body.get("errors")
+    descriptions = [
+        error["description"]
+        for error in (errors if isinstance(errors, list) else [])
+        if isinstance(error, dict) and isinstance(error.get("description"), str)
+    ]
+    text = "; ".join(descriptions) if descriptions else message if isinstance(message, str) else ""
+    reason = ADDRESS.sub("***", text)[:REASON_LIMIT]
     return reason, tracking_id if isinstance(tracking_id, str) else ""

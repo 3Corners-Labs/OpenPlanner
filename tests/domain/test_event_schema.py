@@ -98,6 +98,7 @@ def test_record_has_every_field_in_order() -> None:
         detail="attempt:2",
         trace_id="a" * 32,
         service="worker",
+        message="timezone and offset do not match",
     )
 
     record = to_record(event, Envelope("1.4.0", "gemeente-test"))
@@ -122,6 +123,7 @@ def test_record_has_every_field_in_order() -> None:
         "service.version": "1.4.0",
         "installation": "gemeente-test",
         "detail": "attempt:2",
+        "message": "timezone and offset do not match",
     }
 
 

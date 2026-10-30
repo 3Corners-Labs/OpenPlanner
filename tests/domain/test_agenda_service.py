@@ -145,3 +145,19 @@ async def test_another_groups_agenda_is_refused(
 async def test_the_range_is_bounded(agenda: AgendaService, days: int) -> None:
     with pytest.raises(DomainError, match="invalid_range"):
         await agenda.days(SUPER, "demo", date(2026, 1, 5), days)
+
+
+async def test_counts_today_counts_confirmed_bookings_per_group_in_scope(
+    agenda: AgendaService, bookings: BookingService, clock: FixedClock
+) -> None:
+    """ADR 0061: the overview widget shows counts only, for the groups one may view."""
+    await book(bookings, SLOT_0900, "demo")
+    await book(bookings, SLOT_0930, "demo", citizen(2))
+    receipt = await book(bookings, SLOT_0900, "demo", citizen(3))
+    await bookings.cancel(receipt.management_token)
+
+    assert await agenda.counts_today(SUPER) == {"demo": 0, "demo-twee": 0, "andere-team": 0}
+    clock.advance(SLOT_0900 - NOW - timedelta(hours=2))
+    assert await agenda.counts_today(SUPER) == {"demo": 2, "demo-twee": 0, "andere-team": 0}
+    assert await agenda.counts_today(GROUP_ADMIN) == {"demo": 2}
+    assert await agenda.counts_today(AUDITOR) == {}

@@ -353,6 +353,9 @@ class Settings(BaseSettings):
     tls_check_interval_hours: int = Field(default=6, ge=1, le=168)
     tls_expiry_warning_days: int = Field(default=20, ge=1, le=60)
     tls_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # Class C: the worker checks every group with a Webex host whose latest integration check
+    # is older than this many hours, and records a system event on failure (ADR 0065 step 2).
+    integration_check_interval_hours: int = Field(default=24, ge=1, le=168)
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":
