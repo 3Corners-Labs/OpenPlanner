@@ -464,7 +464,7 @@ msgid "trial.alone"
 msgstr "You will be alone in it. Nobody from the team joins and nobody is waiting for you. Webex asks for permission to use your camera and microphone, just as for your appointment."
 
 msgid "trial.browser"
-msgstr "Nothing to install: if Webex asks to open the app, choose 'Join from this browser'."
+msgstr "On a computer there is nothing to install: if Webex asks to open the app, choose 'Join from this browser'. On a phone or tablet Webex asks for the Webex app."
 
 msgid "trial.open_hint"
 msgstr "The trial call stays open for {minutes} minutes."
@@ -1512,7 +1512,7 @@ msgid "admin.group.not_connected"
 msgstr "Not connected"
 
 msgid "message.join"
-msgstr "Nothing to install: if Webex asks to open the app, choose 'Join from this browser'. The link works from 15 minutes before the start."
+msgstr "On a computer there is nothing to install: if Webex asks to open the app, choose 'Join from this browser'. On a phone or tablet Webex asks for the Webex app. The link works from 15 minutes before the start."
 
 msgid "message.join_link"
 msgstr "Join the video call"
@@ -1530,7 +1530,7 @@ msgid "join.tips.title"
 msgstr "Good to know"
 
 msgid "join.tips.browser"
-msgstr "The call opens in your browser. You do not need to install anything."
+msgstr "The call opens in your browser; on a computer there is nothing to install. On a phone or tablet Webex asks for the Webex app."
 
 msgid "join.tips.devices"
 msgstr "Allow your browser to use the camera and microphone when it asks."
