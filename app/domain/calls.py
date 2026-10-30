@@ -25,7 +25,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import Group, JoinClient
 
 BROWSER_LINK_PARAMS: tuple[tuple[str, str], ...] = (("launchApp", "true"),)
-"""What Webex's own *join from this browser* button adds to the meeting link (ADR 0073).
+"""What Webex's own *join from this browser* button adds to the meeting link (ADR 0075).
 
 With it Webex's join page skips the choice between its app and the browser and opens the web
 app's prepare-to-join screen. A constant, not a setting: it is Webex's mechanism, and the group
@@ -42,12 +42,12 @@ class EventKind(StrEnum):
     JOIN_PAGE_OPENED = "join_page_opened"
     JOIN_CLICKED = "join_clicked"
     """The citizen pressed the button on the join page (detail: the page they were sent to,
-    ``browser`` or ``choice``, ADR 0073)."""
+    ``browser`` or ``choice``, ADR 0075)."""
     TRIAL_CREATED = "trial_created"
     """The citizen opened a trial call on Webex (ADR 0071)."""
     TRIAL_JOINED = "trial_joined"
     """The citizen followed the link into the trial call (detail: the page they were sent to,
-    ``browser`` or ``choice``, ADR 0073)."""
+    ``browser`` or ``choice``, ADR 0075)."""
     TRIAL_ENTERED = "trial_entered"
     """Webex reports that someone joined the trial meeting (detail ``host`` when a host did,
     which nobody from the team should). A click that is never followed by this means the

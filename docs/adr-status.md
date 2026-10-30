@@ -14,7 +14,7 @@ package; when the two disagree, the code wins.
 | Built? | ADRs |
 |---|---|
 | BUILT | 31 |
-| PARTIAL | 15 |
+| PARTIAL | 16 |
 | NOT BUILT | 5 |
 
 | ADR | Title | Built? | Evidence | What is missing |
@@ -70,6 +70,7 @@ package; when the two disagree, the code wins.
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
 | 0073 | Email deliverability: sender domain check, system mail headers | BUILT | step 1 #166; no migration | Step 2 (a periodic check in the worker) is decided after step 1 is in use (ADR decision 6) |
 | 0075 | Browser-direct join link per group | PARTIAL | Steps 1 and 2 (PR pending); migration 0074 | Step 3: confirmation with the Webex app installed, on docker01 |
+| 0076 | Participant journey: trial call events, the page sent to | PARTIAL | Step 1 (PR pending); no migration | Step 2: the signal *followed, nobody entered*; step 3: the merged journey view |
 
 ## Corrected on 2026-10-30
 

@@ -1,14 +1,15 @@
-"""Which Webex page the citizen's join link opens, per group (ADR 0073).
+"""Which Webex page the citizen's join link opens, per group (ADR 0075).
 
 ``groups`` gains ``join_client`` (``browser`` or ``choice``, default ``browser``): with
 ``browser`` the link carries Webex's own parameter for the web app, with ``choice`` it is the
 stored link unchanged. Existing groups get ``browser``, the ADR's default.
 
-Revises 0070 (running versions). PR #148 claims 0071 (release listing): when it merges first,
-change ``down_revision`` to ``0071`` before merging this one, so there is a single head.
+Revises 0071 (release listing), the head of ``main`` when this was written. PR #168 claims 0072
+and PR #170 claims 0073: when they merge first, set ``down_revision`` to the head of ``main``
+before merging this one, so there is a single head (``tests/test_migrations.py`` checks it).
 
-Revision ID: 0072
-Revises: 0070
+Revision ID: 0074
+Revises: 0071
 Create Date: 2026-10-30 22:00:00.000000
 """
 
@@ -17,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0072"
-down_revision: str | None = "0070"
+revision: str = "0074"
+down_revision: str | None = "0071"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

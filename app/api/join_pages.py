@@ -68,7 +68,7 @@ async def join_go(request: Request, token: str) -> Response:
     follow(request, details.group.organisation_id)
     booking = details.booking
     # The link comes from Webex: ``join_link`` refuses anything but https and sets the group's
-    # client (ADR 0073), so nothing else can ever become a redirect.
+    # client (ADR 0075), so nothing else can ever become a redirect.
     link = join_link(booking.meeting.link if booking.meeting else None, details.group.join_client)
     if join_state(booking, clock.now()) is not JoinState.OPEN or not link or booking.id is None:
         return RedirectResponse(f"/b/{token}/join", status_code=303)

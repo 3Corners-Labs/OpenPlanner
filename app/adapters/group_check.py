@@ -5,7 +5,7 @@ For one group it walks the chain a call depends on and turns every link into a `
     webex     a probe meeting is scheduled for the host exactly as a booking would schedule
               one (same adapter, same body: licence, scope, host, time zone and options in one
               go) and deleted at once (ADR 0065); a refusal carries Webex's reason. For a group
-              that opens the web app (ADR 0073) the probe's link is visited once, anonymously,
+              that opens the web app (ADR 0075) the probe's link is visited once, anonymously,
               before it is deleted: Webex must carry ``launchApp=true`` through its redirect.
               Then a second probe with the trial call's options (entry before the host, ADR
               0071): a warning when the site refuses it, and one when it accepts the request
@@ -163,7 +163,7 @@ class PlatformChecker:
         except IntegrationError as error:
             params = (("host", host), ("error", error.code), ("reason", error.reason or "-"))
             return [Finding(CheckArea.WEBEX, "webex.trial_refused", CheckStatus.WARN, params)]
-        if probe.ignored:  # accepted, but not kept: the citizen would wait in the lobby (ADR 0073)
+        if probe.ignored:  # accepted, but not kept: the citizen would wait in the lobby (ADR 0075)
             stored = ", ".join(f"{key}={_value(value)}" for key, value in probe.ignored.items())
             lobby = (("host", host), ("stored", stored))
             outcome = Finding(CheckArea.WEBEX, "webex.trial_lobby", CheckStatus.WARN, lobby)
@@ -177,7 +177,7 @@ class PlatformChecker:
     async def _browser_link(self, group: Group, link: str | None) -> list[Finding]:
         """Visit the probe's browser link once and see whether Webex still carries the parameter.
 
-        Only for a group that opens the web app (ADR 0073). The visit is anonymous, follows no
+        Only for a group that opens the web app (ADR 0075). The visit is anonymous, follows no
         redirect and sends nothing of a citizen: Webex answers the short link with a redirect to
         its join page, and that redirect must still contain ``launchApp=true``. A warning, never
         a failure: without the parameter the citizen gets Webex's own choice page.

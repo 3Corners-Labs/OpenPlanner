@@ -1,4 +1,4 @@
-"""The link a citizen is sent into the Webex meeting, per group (ADR 0073)."""
+"""The link a citizen is sent into the Webex meeting, per group (ADR 0075)."""
 
 from urllib.parse import parse_qs, urlsplit
 

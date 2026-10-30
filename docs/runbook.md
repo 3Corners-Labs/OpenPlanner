@@ -486,7 +486,7 @@ that participants may enter before the host (OpenPlanner sets `enabledJoinBefore
 The site must allow this. **Koppeling controleren** schedules and deletes a trial probe and
 shows `webex.trial_refused` with Webex's reason when it refuses the request, and
 `webex.trial_lobby` with the values it kept when it accepts the request but ignores the options
-(ADR 0073: the citizen would wait in the lobby for nobody; seen on the test site
+(ADR 0075: the citizen would wait in the lobby for nobody; seen on the test site
 `rijksvideotest.webex.com`, where Control Hub must allow entry before the host first). In
 both cases citizens cannot use a trial call, and the group's switch can be set to *Nee* until
 the site allows it. For a group that opens the Webex web app directly (`join_client`

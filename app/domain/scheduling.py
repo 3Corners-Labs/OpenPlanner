@@ -133,7 +133,7 @@ class DispatchKind(StrEnum):
 
 
 class JoinClient(StrEnum):
-    """Which Webex page a citizen's join link opens (ADR 0073, per group)."""
+    """Which Webex page a citizen's join link opens (ADR 0075, per group)."""
 
     BROWSER = "browser"
     """The Webex web app straight away; on a computer there is no app to choose or install."""
@@ -227,7 +227,7 @@ class Group:
         trial_calls_per_booking: How many trial calls one booking may open, 1 to 5, so the page
             cannot be used to create Webex meetings without end.
         join_client: Which Webex page the citizen's link to the appointment and the trial call
-            opens (ADR 0073): the web app straight away (the default) or Webex's own choice
+            opens (ADR 0075): the web app straight away (the default) or Webex's own choice
             between app and browser.
         embedding_enabled: Whether the group may appear in the widget on the websites its
             organisation allows (ADR 0035); off until the group switches it on.

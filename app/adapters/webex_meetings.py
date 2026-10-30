@@ -60,7 +60,7 @@ class ProbeMeeting:
 
     @property
     def ignored(self) -> dict[str, Any]:
-        """The trial options the site stored differently from what was asked (ADR 0073)."""
+        """The trial options the site stored differently from what was asked (ADR 0075)."""
         return {k: v for k, v in self.stored.items() if v != TRIAL_OPTIONS[k]}
 
 
@@ -100,7 +100,7 @@ class WebexMeetings:
         """Schedule the meeting like ``create_meeting`` and also return what the site stored.
 
         The group check uses it: Webex accepts the trial call's options on a site that does not
-        honour them and answers with the values it kept (ADR 0073).
+        honour them and answers with the values it kept (ADR 0075).
         """
         body = meeting_body(request, self._clock.now())
         response = await self._client.request(

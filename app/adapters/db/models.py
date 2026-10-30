@@ -197,7 +197,7 @@ class GroupRow(Base):
     trial_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
     trial_call_minutes: Mapped[int] = mapped_column(Integer, server_default=text("30"))
     trial_calls_per_booking: Mapped[int] = mapped_column(Integer, server_default=text("3"))
-    # ADR 0073: which Webex page the citizen's join link opens.
+    # ADR 0075: which Webex page the citizen's join link opens.
     join_client: Mapped[str] = mapped_column(String(16), server_default=text("'browser'"))
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     queue_visible_from_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))

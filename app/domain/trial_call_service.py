@@ -127,7 +127,7 @@ class TrialCallService:
         """
         async with self._uow.read() as tx:
             booking, group = await self._load(tx, management_token)
-        # Same builder as the appointment's link (ADR 0073): https only, the group's client.
+        # Same builder as the appointment's link (ADR 0075): https only, the group's client.
         link = client_link(booking.trial.meeting.link if booking.trial else None, group.join_client)
         if trial_state(booking, group, self._clock.now()) is not TrialState.ACTIVE or not link:
             return None

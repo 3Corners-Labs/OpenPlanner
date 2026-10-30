@@ -111,7 +111,7 @@ async def test_open_page_sends_the_citizen_to_webex(booked: tuple[str, int, Sett
     assert "Status verversen" not in page.text
     assert "wachtruimte" in page.text
     assert go.status_code == 303
-    assert go.headers["location"] == BROWSER_LINK  # the group's default: the web app (ADR 0073)
+    assert go.headers["location"] == BROWSER_LINK  # the group's default: the web app (ADR 0075)
     assert await _events(settings.database_url, booking_id) == [
         EventKind.JOIN_PAGE_OPENED,
         EventKind.JOIN_CLICKED,
