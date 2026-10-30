@@ -45,6 +45,7 @@
   <div class="inline-forms">
     {{ filter_select("audit-level", "level", _("admin.audit.level"), filters.levels, filters.level) }}
     {{ filter_select("audit-category", "category", _("admin.audit.category"), filters.categories, filters.category) }}
+    {{ filter_select("audit-subject", "subject", _("admin.audit.subject"), filters.subjects, filters.subject) }}
     {% if filters.groups | length > 1 %}
     {{ filter_select("audit-group", "group", _("admin.audit.group"), filters.groups, filters.group) }}
     {% endif %}

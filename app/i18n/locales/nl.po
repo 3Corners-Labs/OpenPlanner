@@ -3874,23 +3874,98 @@ msgstr "Gaat terug naar versie {version}. Gegevens die sinds de update zijn inge
 msgid "admin.updates.restore_now"
 msgstr "Terugzetten naar {version}"
 
+msgid "admin.updates.when"
+msgstr "Wanneer"
+
+msgid "admin.updates.what"
+msgstr "Wat"
+
+msgid "admin.updates.by"
+msgstr "Door"
+
+msgid "admin.updates.history_lead"
+msgstr "Elke aanvraag, uitkomst en versiewissel staat in het globale auditlog; dit is de samenvatting."
+
+msgid "admin.updates.history_audit_link"
+msgstr "Alle update-gebeurtenissen in het auditlog"
+
+msgid "admin.updates.outside_change"
+msgstr "Op {at} is de versie buiten het portaal om gewijzigd naar {version} (installer of handmatig op de server)."
+
+msgid "admin.updates.history.update_request"
+msgstr "Update aangevraagd"
+
+msgid "admin.updates.history.update_auto_request"
+msgstr "Update automatisch aangevraagd"
+
+msgid "admin.updates.history.update_succeeded"
+msgstr "Update geslaagd"
+
+msgid "admin.updates.history.update_failed"
+msgstr "Update mislukt"
+
+msgid "admin.updates.history.update_rolled_back"
+msgstr "Update teruggedraaid"
+
+msgid "admin.updates.history.restore_request"
+msgstr "Terugzetten aangevraagd"
+
+msgid "admin.updates.history.restore_succeeded"
+msgstr "Vorige versie teruggezet"
+
+msgid "admin.updates.history.restore_failed"
+msgstr "Terugzetten mislukt"
+
+msgid "admin.updates.history.restore_rolled_back"
+msgstr "Terugzetten teruggedraaid"
+
+msgid "admin.updates.history.request_cancel"
+msgstr "Aanvraag ingetrokken"
+
+msgid "admin.updates.history.version_changed"
+msgstr "Versie gewisseld"
+
+msgid "admin.updates.history.other"
+msgstr "Overige gebeurtenis"
+
+msgid "admin.updates.actor.system"
+msgstr "systeem (automatisch bijwerken)"
+
+msgid "admin.updates.actor.updater"
+msgstr "updater op de server"
+
+msgid "admin.updates.actor.host"
+msgstr "server, buiten het portaal om"
+
+msgid "admin.audit.subject"
+msgstr "Onderwerp"
+
+msgid "admin.audit.subject.updates"
+msgstr "Updates en versies"
+
+msgid "admin.audit.subject.login"
+msgstr "Inloggen"
+
+msgid "admin.audit.subject.settings"
+msgstr "Instellingen"
+
+msgid "admin.audit.subject.rights"
+msgstr "Rechten en medewerkers"
+
+msgid "admin.audit.subject.bookings"
+msgstr "Afspraken en taken"
+
+msgid "admin.audit.subject.organisation"
+msgstr "Organisatie en teams"
+
+msgid "admin.audit.subject.integrations"
+msgstr "Koppelingen"
+
 msgid "admin.updates.history"
 msgstr "Geschiedenis"
 
-msgid "admin.updates.requested_at"
-msgstr "Aangevraagd"
-
-msgid "admin.updates.action"
-msgstr "Actie"
-
 msgid "admin.updates.versions"
 msgstr "Van → naar"
-
-msgid "admin.updates.status"
-msgstr "Status"
-
-msgid "admin.updates.finished_at"
-msgstr "Klaar"
 
 msgid "admin.updates.none"
 msgstr "Nog geen updates aangevraagd."

@@ -479,6 +479,15 @@ class SqlTransaction(
             query = query.where(AuditEventRow.at < narrow.until)
         if narrow.trace_id is not None:
             query = query.where(AuditEventRow.trace_id == narrow.trace_id)
+        if narrow.actions:
+            query = query.where(
+                or_(
+                    *(
+                        AuditEventRow.action.startswith(prefix, autoescape=True)
+                        for prefix in sorted(narrow.actions)
+                    )
+                )
+            )
         return await self._entries(query, limit)
 
     async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:

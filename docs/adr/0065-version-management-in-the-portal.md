@@ -92,7 +92,7 @@ trust decision of the host team, never a portal setting.
 | Step | What | PR | State |
 |---|---|---|---|
 | 1 | `update_channel` and `update_auto_apply` class C, read live by web and worker; production rule in `usable`; installer identity by mode, `--channel` removed; settings docs | #145 | in PR |
-| 2 | `running_versions` and `system.version` at start-up; history from the audit log with *By*; audit filter *subject*; "changed outside the portal" notice | | planned |
+| 2 | `running_versions` and `system.version` at start-up; history from the audit log with *By*; audit filter *subject*; "changed outside the portal" notice | | in PR |
 | 3 | `release_listing` with notes; version picker and "Install this version"; `request_update(target)` | | planned |
 | 4 | docker01: channel switched in the portal, a chosen candidate installed, history shows who | | planned |
 

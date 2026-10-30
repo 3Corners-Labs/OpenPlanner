@@ -27,6 +27,20 @@ model, so Elastic, Splunk or an OpenTelemetry collector reads it without mapping
 | `installation` | `gemeente-prod` | `INSTALLATION_NAME`; empty when not set |
 | `detail` | `horizon_days,name` | what changed, as machine keys; never values |
 
+## Updates and versions (ADR 0029, 0065)
+
+Every update event is global (`system.update`), with the versions in its detail so the history
+can be read from the log alone: `update.request,from:0.3.0,to:0.4.0` (actor: the superuser's
+subject), `update.auto_request,…` (actor `system`, `UPDATE_AUTO_APPLY`), the updater's steps
+`update.start`, `update.pulling`, `update.verifying`, `update.backing_up`, `update.starting`,
+`update.rolling_back` and outcomes `update.succeeded`, `update.failed`, `update.rolled_back`
+(actor `host-updater`, `reason` the updater's code), the same for `restore.*`, and
+`request.cancel`. The web process notes at start-up when it runs another version or commit
+than the last time: `system.version` with detail
+`version.changed,from:<version>,to:<version>,commit:<12 hex>`, actor `host-updater` when a
+running update request brought it, else `host` (the installer, or a change by hand on the
+server). The updates page shows these events, filtered on the milestones, with who did it.
+
 ## On the log platform (ADR 0034)
 
 After commit, each audit, system and security event is written once to stdout as the record
