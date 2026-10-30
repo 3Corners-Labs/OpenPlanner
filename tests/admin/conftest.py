@@ -1,6 +1,7 @@
 """An app with the demo data, a fake identity provider and helpers to log in as any role."""
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
@@ -8,12 +9,14 @@ import pytest
 
 from app.adapters.db.engine import create_engine
 from app.adapters.db.seed import seed_demo
+from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.authorization import Principal, Role
 from app.main import create_app
 from tests.fakes.clock import FixedClock
 from tests.fakes.dns import FakeTxtResolver
 from tests.fakes.identity import FakeIdentityProvider
+from tests.fakes.integrations import FakeVideo
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
 
@@ -65,8 +68,11 @@ def admin_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     return migrated_database(tmp_path, monkeypatch, "admin")
 
 
-@pytest.fixture
-async def site(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
+@asynccontextmanager
+async def _running_site(
+    settings: Settings, admin_db: str, integrations: Integrations | None = None
+) -> AsyncIterator[Site]:
+    """Seed the demo data and run the app, with explicit integration adapters if given."""
     engine = create_engine(admin_db)
     await seed_demo(engine)
     await engine.dispose()
@@ -75,6 +81,7 @@ async def site(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
         settings.model_copy(update={"database_url": admin_db}),
         clock,
         idp,
+        integrations=integrations,
         mail_domain_resolver=dns,
     )
     async with (
@@ -84,3 +91,22 @@ async def site(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
         ) as client,
     ):
         yield Site(client, idp, clock, dns)
+
+
+@pytest.fixture
+async def site(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
+    async with _running_site(settings, admin_db) as running:
+        yield running
+
+
+@pytest.fixture
+def video() -> FakeVideo:
+    """The fake Webex that ``video_site`` talks to."""
+    return FakeVideo()
+
+
+@pytest.fixture
+async def video_site(settings: Settings, admin_db: str, video: FakeVideo) -> AsyncIterator[Site]:
+    """The app wired to ``video``, as when a Webex Service App is configured."""
+    async with _running_site(settings, admin_db, Integrations(video=video)) as running:
+        yield running

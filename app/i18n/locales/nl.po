@@ -1829,6 +1829,12 @@ msgstr "Geannuleerd"
 msgid "admin.agenda.not_picked_up"
 msgstr "Niet opgepakt"
 
+msgid "admin.agenda.refresh"
+msgstr "Vernieuwen"
+
+msgid "admin.agenda.live_status"
+msgstr "Status bijgewerkt: {running} gesprekken bezig, {unpicked} niet opgepakt."
+
 msgid "admin.agenda.empty"
 msgstr "Geen afspraken op deze dag."
 
@@ -6975,6 +6981,10 @@ msgstr "Het videogesprek kon helaas niet worden klaargezet door een technische s
 
 msgid "settings.field.queue_refresh_seconds.label"
 msgstr "Wachtrij en wachtpagina verversen (seconden)"
+
+msgid "settings.field.meeting_status_refresh_seconds.label"
+msgstr "Meetingstatus in de agenda verversen (seconden)"
+
 msgid "admin.overview.view.label"
 msgstr "Weergave van {title}"
 

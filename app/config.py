@@ -222,6 +222,9 @@ class Settings(BaseSettings):
     # ADR 0072 (announced in ADR 0043): how often the own queue, a claimed booking and the
     # citizen's waiting page ask the server for a change. Class C platform.
     queue_refresh_seconds: int = Field(default=10, ge=5, le=60)
+    # ADR 0010: how old a meeting status may be before the agenda asks the video provider, and
+    # how often the agenda's live region asks the server. Class C platform.
+    meeting_status_refresh_seconds: int = Field(default=30, ge=10, le=300)
     # ADR 0044: a planner's request to choose a new time lapses this many days after the
     # original start, with one reminder this many days before. Class D organisation (ADR 0042,
     # settings registry).

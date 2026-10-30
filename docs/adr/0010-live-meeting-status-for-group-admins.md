@@ -1,6 +1,6 @@
 # 0010. Live meeting status for group admins
 
-Status: accepted (2026-10-23). Implemented in work packages 5 (video adapter) and 7 (admin UI). Partly built, checked on 2026-10-30; see `docs/adr-status.md` for what is built.
+Status: accepted (2026-10-23), built. Webhooks and the agenda columns came with work packages 5 and 7; the polling fallback and the self-refreshing agenda came on 2026-10-30 (see *Build status*). Amended by *Amendments* below.
 
 ## Context
 
@@ -44,3 +44,53 @@ where the host never joins.
 - WP5 adds the webhook endpoint, the Meetings API polling and contract tests with recorded
   responses. WP7 adds the overview.
 - The threat model gets the webhook endpoint (forged events, replay, flooding).
+
+## Amendments (2026-10-30)
+
+Written when the missing parts were built; the decision above stays as it was.
+
+1. **Point 4, the 300 s window.** Webex's webhook carries no signed event time, so there is
+   nothing to compare with `now`: the WxCC check (`|now − ts| ≤ 300 s`) cannot exist for Webex.
+   What protects against replay is the signature plus the `event_key` that the domain remembers
+   for 30 days (`webhook_events`); a replayed or redelivered event is recorded once. The
+   threat model says so.
+2. **Point 5, HTMX.** The agenda refreshes through the polled-fragment pattern of ADR 0072
+   (`static/live-region.js`, one small own script, no HTMX), as ADR 0016 and 0048 allow. The
+   day view's table is a fragment (`GET /admin/groups/{slug}/agenda/live?day=…&seen=KEY`, `204`
+   while nothing changed) with the permission and scope of the page. Without the script the
+   page shows its status as loaded and offers a *Refresh* link. The script is allowed on the
+   day view only, with `SCRIPT_CSP` (`script-src 'self'`), like the queue; the week view stays
+   without scripts. Days in the past do not poll.
+3. **Point 2, polling.** `VideoProvider.meeting_status(meeting_id, host_email)` is the fallback.
+   The Webex adapter reads `GET /meetings/{id}` for the state and, once the meeting started,
+   `GET /meetingParticipants?meetingId=…`, and reduces them to `MeetingStatus` (state, count,
+   host joined, first join, last leave) inside the adapter. `MeetingStatusService` asks only for
+   a booking that is confirmed, has a meeting, lies between 15 minutes before its start and 30
+   minutes after its end and is not ended, whose status has not been touched for the refresh
+   window; a booking is asked at most once per window per process, whether Webex answered or
+   not; at most 25 bookings per view, 5 requests at once. The result replaces the counts built
+   from webhooks and adds a timeline event only for a transition (started, host joined, ended),
+   marked `polled`. A failure keeps the status as it was and goes to the timeline with the
+   provider's own reason (ADR 0065), once per distinct failure.
+4. **Open check.** The field names of the two Webex responses are taken from the Webex
+   reference and fixed in `tests/adapters/test_webex_meetings.py`; they have not yet been
+   compared with a recorded answer from the production Webex site. A probe on the test host
+   (`GET /meetings/{id}` for a running meeting) closes that.
+
+## Settings
+
+| Key | Class | Default | Bounds | Permission | Note |
+|---|---|---|---|---|---|
+| `MEETING_STATUS_REFRESH_SECONDS` | C platform | 30 | 10–300 | `settings.platform.manage` | How old a status may be before the provider is asked, and the interval of the agenda's live region. One value for both so what the page shows is never older than one window plus one poll. Bounded below to protect Webex's rate limit: each open agenda asks at most once per window per booking. |
+
+**Fixed on purpose:** the join window the poll covers (15 minutes before to 30 minutes after,
+the citizen's join window of `app.domain.calls`), the ceilings of 25 bookings per view and 5
+requests in flight (protections: raising them only multiplies Webex's load), and that past days
+do not poll.
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | `VideoProvider`, webhooks (`adapters/webhooks.py`), `CallStatus`, agenda columns | #10, #81 | merged |
+| 2 | `VideoProvider.meeting_status`, Webex adapter, `MeetingStatusService`, the agenda's polled fragment, `MEETING_STATUS_REFRESH_SECONDS` | AG-3 | in PR |
