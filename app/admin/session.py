@@ -3,11 +3,13 @@
 Stored in Starlette's signed session cookie (``op_admin``, path ``/admin``). Holds the
 principal's subject, display name, roles, organisations and groups, the other role claim
 values (custom roles link to them, ADR 0039; the roles themselves are looked up per request),
-the login time, when activity was last written to the staff record (ADR 0046) and the chosen
-theme. The absolute lifetime is enforced here; the cookie's own expiry slides with every
-response. The theme lives here so that it needs no cookie of its own.
+the login time, when activity was last written to the staff record (ADR 0046), the chosen
+theme and the alert preferences. The absolute lifetime is enforced here; the cookie's own expiry
+slides with every response. The theme and the preferences live here so that they need no cookie
+of their own.
 """
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -23,9 +25,30 @@ _SEEN_AT = "seen_at"
 _OIDC = "oidc"
 _TRIAL = "login_trial"
 _THEME = "theme"
+_ALERT_BANNER = "alert_banner"
+_ALERT_POPUPS = "alert_popups"
 
 THEMES = ("system", "light", "dark")
 """The portal's colour themes; ``system`` follows the device setting and is the default."""
+
+ALERT_POPUPS = ("all", "warnings", "outages", "off")
+"""Which alerts may pop up (ADR 0061 §7): all, warnings and outages, outages only, none."""
+
+DEFAULT_ALERT_POPUPS = "warnings"
+"""The pop-up choice until the admin picks one."""
+
+
+@dataclass(frozen=True)
+class AlertPrefs:
+    """What the admin chose for alerts in the profile menu (stored in the session for now).
+
+    Attributes:
+        banner: Whether the outage banner shows (ADR 0061 §7).
+        popups: One of ``ALERT_POPUPS``.
+    """
+
+    banner: bool
+    popups: str
 
 
 def save_login_start(request: Request, start: LoginStart, next_url: str) -> None:
@@ -81,12 +104,17 @@ def pop_login_start(request: Request) -> dict[str, str] | None:
 def start_session(request: Request, principal: Principal, now: datetime) -> None:
     """Replace the whole session with a fresh one for ``principal`` (no session fixation).
 
-    Only the theme carries over, so a fresh login (ADR 0015) keeps the admin's choice.
+    Only the theme and the alert preferences carry over, so a fresh login (ADR 0015) keeps the
+    admin's choices.
     """
     theme = session_theme(request)
+    prefs = session_alert_prefs(request)
     request.session.clear()
     if theme != THEMES[0]:
         request.session[_THEME] = theme
+    if prefs != AlertPrefs(True, DEFAULT_ALERT_POPUPS):
+        request.session[_ALERT_BANNER] = prefs.banner
+        request.session[_ALERT_POPUPS] = prefs.popups
     request.session[_PRINCIPAL] = {
         "subject": principal.subject,
         "name": principal.display_name,
@@ -169,3 +197,28 @@ def choose_theme(request: Request, theme: str | None) -> str:
     if theme in THEMES:
         request.session[_THEME] = theme
     return session_theme(request)
+
+
+def session_alert_prefs(request: Request) -> AlertPrefs:
+    """Return the alert preferences of this session: the banner on and ``warnings`` by default."""
+    banner: Any = request.session.get(_ALERT_BANNER)
+    popups: Any = request.session.get(_ALERT_POPUPS)
+    return AlertPrefs(
+        banner if isinstance(banner, bool) else True,
+        popups if popups in ALERT_POPUPS else DEFAULT_ALERT_POPUPS,
+    )
+
+
+def choose_alert_prefs(
+    request: Request, *, sent: bool, banner: bool, popups: str | None
+) -> AlertPrefs:
+    """Remember the alert preferences of a submitted form; return the session's preferences.
+
+    A ticked box sends a value and an unticked one sends nothing, so ``banner`` only counts when
+    the form was ``sent`` (its marker field arrived). An unknown ``popups`` value is ignored.
+    """
+    if sent:
+        request.session[_ALERT_BANNER] = banner
+        if popups in ALERT_POPUPS:
+            request.session[_ALERT_POPUPS] = popups
+    return session_alert_prefs(request)

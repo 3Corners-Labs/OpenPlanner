@@ -61,8 +61,10 @@ async def test_time_zone_is_a_select_with_amsterdam_preselected(site: Site) -> N
 async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    form = (await site.client.get(f"{GROUP}/settings")).text
+    page = (await site.client.get(f"{GROUP}/settings")).text
 
+    # The profile menu in the top bar has a select of its own; the form is in the main part.
+    form = page.split('<main id="content"', 1)[1]
     assert '<option value="Europe/Amsterdam" selected>' in form
     # time zone, dispatch kind, free pick, phone mode, trial call, direct call, embedding
     assert form.count(" selected>") == 7

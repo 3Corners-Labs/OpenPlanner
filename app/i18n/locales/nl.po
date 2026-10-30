@@ -580,6 +580,36 @@ msgstr "Groep"
 msgid "admin.profile.roles"
 msgstr "Uw rollen"
 
+msgid "admin.profile.source"
+msgstr "Uw rol komt uit uw organisatie-account en is hier niet te wijzigen."
+
+msgid "admin.profile.my_rights"
+msgstr "Mijn rechten bekijken"
+
+msgid "admin.alerts.label"
+msgstr "Meldingen"
+
+msgid "admin.alerts.banner"
+msgstr "Balk tonen bij storingen"
+
+msgid "admin.alerts.popups.label"
+msgstr "Pop-ups"
+
+msgid "admin.alerts.popups.all"
+msgstr "Alle meldingen"
+
+msgid "admin.alerts.popups.warnings"
+msgstr "Waarschuwingen en storingen"
+
+msgid "admin.alerts.popups.outages"
+msgstr "Alleen storingen"
+
+msgid "admin.alerts.popups.off"
+msgstr "Geen"
+
+msgid "admin.alerts.save"
+msgstr "Opslaan"
+
 msgid "admin.theme.label"
 msgstr "Weergave"
 
