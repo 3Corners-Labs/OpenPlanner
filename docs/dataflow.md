@@ -75,7 +75,9 @@ they leave the system only to the mail server and to GitHub respectively.
 
 Jobs, slots, schedules and audit events carry no personal data of citizens. A failed meeting
 job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
-the group name and the host's address (masked), never a citizen's data. The definitions of
+the group name and the host's address (masked), never a citizen's data; the system event of the
+automatic group check (ADR 0065 step 2) carries the same masked reason of the probe meeting,
+which belongs to no booking. The definitions of
 custom fields (`group_form_fields`: keys, labels, options) are the organisation's questions,
 not answers, and hold no personal data; the admin screen refuses questions about a BSN, an
 identity document or special categories of personal data (ADR 0055).

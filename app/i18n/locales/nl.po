@@ -553,7 +553,7 @@ msgid "admin.dashboard.title"
 msgstr "Overzicht"
 
 msgid "admin.dashboard.intro"
-msgstr "Hier ziet u de groepen waarvoor u rechten heeft."
+msgstr "Wat nu aandacht vraagt, en de groepen waarvoor u rechten heeft."
 
 msgid "admin.dashboard.groups"
 msgstr "Uw groepen"
@@ -563,6 +563,51 @@ msgstr "Uw groepen"
 
 msgid "admin.dashboard.no_groups"
 msgstr "U heeft (nog) geen rechten op een groep. Vraag uw beheerder om toegang."
+
+msgid "admin.overview.refresh"
+msgstr "Vernieuwen"
+
+msgid "admin.overview.no_widgets"
+msgstr "Er zijn geen widgets voor uw rol beschikbaar."
+
+msgid "admin.overview.widget.more"
+msgstr "Nog {count} meer"
+
+msgid "admin.overview.widget.open"
+msgstr "Alles bekijken"
+
+msgid "admin.overview.widget.alerts.title"
+msgstr "Meldingen"
+
+msgid "admin.overview.widget.queue.title"
+msgstr "Wachtrij in mijn groepen"
+
+msgid "admin.overview.widget.bookings_today.title"
+msgstr "Afspraken vandaag per groep"
+
+msgid "admin.overview.widget.bookings_today.agenda_link"
+msgstr "Agenda van {name}"
+
+msgid "admin.overview.widget.bookings_today.empty"
+msgstr "Geen groepen in uw bereik."
+
+msgid "admin.overview.widget.changes.title"
+msgstr "Recente configuratiewijzigingen"
+
+msgid "admin.overview.widget.changes.empty"
+msgstr "Nog geen wijzigingen in uw bereik."
+
+msgid "admin.overview.widget.tasks.title"
+msgstr "Lopende taken"
+
+msgid "admin.overview.widget.status.title"
+msgstr "Systeemstatus"
+
+msgid "admin.overview.widget.rights.title"
+msgstr "Mijn rol en bereik"
+
+msgid "admin.overview.widget.rights.empty"
+msgstr "Geen rechten gevonden."
 
 msgid "admin.group.settings"
 msgstr "Instellingen"
@@ -5257,6 +5302,9 @@ msgstr "Probeer het later opnieuw."
 msgid "audit.event.maintenance_overdue"
 msgstr "Onderhoudsmodus staat lang aan"
 
+msgid "audit.event.integration_check"
+msgstr "Koppeling gecontroleerd"
+
 msgid "admin.audit.detail.hours"
 msgstr "{count} uur"
 
@@ -5822,6 +5870,9 @@ msgstr "Melding bij lang onderhoud na (uren)"
 
 msgid "settings.field.maintenance_alert_repeat_hours.label"
 msgstr "Melding lang onderhoud herhalen elke (uren)"
+
+msgid "settings.field.integration_check_interval_hours.label"
+msgstr "Koppeling van elke groep controleren elke (uren)"
 
 msgid "settings.field.security_event_max_sources.label"
 msgstr "Maximaal aantal bijgehouden bronnen voor beveiligingsgebeurtenissen"

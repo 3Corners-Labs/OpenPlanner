@@ -553,7 +553,7 @@ msgid "admin.dashboard.title"
 msgstr "Overview"
 
 msgid "admin.dashboard.intro"
-msgstr "These are the groups you have rights for."
+msgstr "What needs attention now, and the groups you have rights for."
 
 msgid "admin.dashboard.groups"
 msgstr "Your groups"
@@ -563,6 +563,51 @@ msgstr "Your groups"
 
 msgid "admin.dashboard.no_groups"
 msgstr "You have no rights for any group yet. Ask your administrator for access."
+
+msgid "admin.overview.refresh"
+msgstr "Refresh"
+
+msgid "admin.overview.no_widgets"
+msgstr "No widgets are available for your role."
+
+msgid "admin.overview.widget.more"
+msgstr "{count} more"
+
+msgid "admin.overview.widget.open"
+msgstr "Open the full list"
+
+msgid "admin.overview.widget.alerts.title"
+msgstr "Alerts"
+
+msgid "admin.overview.widget.queue.title"
+msgstr "Queue across my groups"
+
+msgid "admin.overview.widget.bookings_today.title"
+msgstr "Bookings today per group"
+
+msgid "admin.overview.widget.bookings_today.agenda_link"
+msgstr "Agenda of {name}"
+
+msgid "admin.overview.widget.bookings_today.empty"
+msgstr "No groups within your reach."
+
+msgid "admin.overview.widget.changes.title"
+msgstr "Recent configuration changes"
+
+msgid "admin.overview.widget.changes.empty"
+msgstr "No changes within your reach yet."
+
+msgid "admin.overview.widget.tasks.title"
+msgstr "Running tasks"
+
+msgid "admin.overview.widget.status.title"
+msgstr "System status"
+
+msgid "admin.overview.widget.rights.title"
+msgstr "My role and reach"
+
+msgid "admin.overview.widget.rights.empty"
+msgstr "No rights found."
 
 msgid "admin.group.settings"
 msgstr "Settings"
@@ -5257,6 +5302,9 @@ msgstr "Please try again later."
 msgid "audit.event.maintenance_overdue"
 msgstr "Maintenance mode on for long"
 
+msgid "audit.event.integration_check"
+msgstr "Integration checked"
+
 msgid "admin.audit.detail.hours"
 msgstr "{count} hours"
 
@@ -5822,6 +5870,9 @@ msgstr "Report long maintenance after (hours)"
 
 msgid "settings.field.maintenance_alert_repeat_hours.label"
 msgstr "Repeat the long-maintenance report every (hours)"
+
+msgid "settings.field.integration_check_interval_hours.label"
+msgstr "Check every group's integration every (hours)"
 
 msgid "settings.field.security_event_max_sources.label"
 msgstr "Most sources tracked for security events"
