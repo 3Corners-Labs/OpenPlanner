@@ -3,10 +3,11 @@
 ``own_certificates`` holds one row: the PEM chain (public), the leaf's public key and the
 public data the page shows. Never a private key (it lives on the volume the proxy reads) and no
 personal data. The downgrade drops the table; the chain must be uploaded again afterwards.
-Revises 0057, the merge of the certificate checks (ADR 0064) with main's event messages.
+Revises 0058 (booking confirmation, ADR 0056), which landed first; the number 0059 is left to
+the release listing (ADR 0067) that is still in review.
 
 Revision ID: 0060
-Revises: 0057
+Revises: 0058
 Create Date: 2026-10-30 20:00:00.000000
 """
 
@@ -16,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0060"
-down_revision: str | None = "0057"
+down_revision: str | None = "0058"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
