@@ -474,7 +474,7 @@ def test_the_change_lead_column_is_renamed_with_its_values_and_back(
     """ADR 0077: the lead keeps its value under the new name, and the constraint follows."""
     import sqlite3
 
-    command.upgrade(alembic_config, "0073")
+    command.upgrade(alembic_config, "0074")
     database = sqlite3.connect(tmp_path / "migrate.db")
     database.executescript(
         """
@@ -495,7 +495,7 @@ def test_the_change_lead_column_is_renamed_with_its_values_and_back(
         database.execute("UPDATE groups SET participant_change_lead_minutes = 1441")
     database.close()
 
-    command.downgrade(alembic_config, "0073")
+    command.downgrade(alembic_config, "0074")
     database = sqlite3.connect(tmp_path / "migrate.db")
     lead = database.execute("SELECT citizen_change_lead_minutes FROM groups WHERE id = 1")
     assert lead.fetchone() == (180,)
