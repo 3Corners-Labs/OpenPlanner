@@ -7148,3 +7148,105 @@ msgstr "The private key of the placed certificate is not on this server. Make a 
 
 msgid "admin.form.error.tls_volume_unwritable"
 msgstr "The server cannot write the key to the proxy's volume. Tell the server operator."
+
+msgid "admin.channels.reply_to_address"
+msgstr "Reply address"
+
+msgid "admin.channels.reply_to_address_hint"
+msgstr "Where a citizen's reply goes (Reply-To). Empty: a reply goes to the sender address."
+
+msgid "admin.channels.dkim_selector"
+msgstr "DKIM selector"
+
+msgid "admin.channels.dkim_selector_hint"
+msgstr "The selector your mail server signs with, for example s1 or mail2026. Only for the sender domain check; ask your mail administrator."
+
+msgid "admin.form.error.reply_to_address"
+msgstr "Enter a valid email address, without line breaks or brackets."
+
+msgid "admin.form.error.dkim_selector"
+msgstr "A selector consists of letters, digits and hyphens, possibly with dots."
+
+msgid "admin.channels.domain_heading"
+msgstr "Sender domain"
+
+msgid "admin.channels.domain_lead"
+msgstr "Receivers judge by the DNS records of the sender domain (SPF, DKIM and DMARC) whether an email lands in the inbox or in the spam folder. This check reads those records and says per record what is there."
+
+msgid "admin.channels.domain_check"
+msgstr "Check sender domain"
+
+msgid "admin.channels.domain_result"
+msgstr "Result for {domain}"
+
+msgid "admin.channels.domain_hint"
+msgstr "The check reads DNS only. Whether your mail server really signs with this domain is explained in the manual of this screen. An independent test is internet.nl."
+
+msgid "admin.channels.domain_failed.no_server"
+msgstr "No mail server and no sender are configured; there is nothing to check."
+
+msgid "admin.channels.domain_column_record"
+msgstr "Record"
+
+msgid "admin.channels.domain_column_verdict"
+msgstr "Verdict"
+
+msgid "admin.channels.domain_column_explanation"
+msgstr "Explanation"
+
+msgid "admin.channels.domain_record.spf"
+msgstr "SPF"
+
+msgid "admin.channels.domain_record.dkim"
+msgstr "DKIM"
+
+msgid "admin.channels.domain_record.dmarc"
+msgstr "DMARC"
+
+msgid "admin.channels.domain_verdict.ok"
+msgstr "OK"
+
+msgid "admin.channels.domain_verdict.not_checked"
+msgstr "Not checked"
+
+msgid "admin.channels.domain_verdict.warning"
+msgstr "Attention"
+
+msgid "admin.channels.domain_verdict.unknown"
+msgstr "Could not determine"
+
+msgid "admin.channels.domain_verdict.missing"
+msgstr "Missing"
+
+msgid "admin.channels.domain_verdict.invalid"
+msgstr "Invalid"
+
+msgid "admin.channels.domain_reason.ok"
+msgstr "The {record} record was found and is in order."
+
+msgid "admin.channels.domain_reason.missing"
+msgstr "There is no {record} record for this domain. Ask your mail administrator to add one."
+
+msgid "admin.channels.domain_reason.multiple"
+msgstr "There are several {record} records; receivers treat that as an error. Keep one."
+
+msgid "admin.channels.domain_reason.invalid"
+msgstr "The {record} record is not well-formed. Ask your mail administrator to check it."
+
+msgid "admin.channels.domain_reason.unknown"
+msgstr "The DNS lookup for {record} failed (no answer or timeout). Try again later."
+
+msgid "admin.channels.domain_reason.spf_pass_all"
+msgstr "The SPF record ends in +all: anyone may send for this domain. Use -all or ~all."
+
+msgid "admin.channels.domain_reason.spf_neutral_all"
+msgstr "The SPF record ends in ?all or has no all at all: receivers draw no conclusion from it. End it with -all or ~all."
+
+msgid "admin.channels.domain_reason.dkim_no_selector"
+msgstr "Enter the DKIM selector with the mail server to check the key."
+
+msgid "admin.channels.domain_reason.dkim_revoked"
+msgstr "The DKIM key is empty (revoked). Ask your mail administrator to publish a new key."
+
+msgid "admin.channels.domain_reason.dmarc_policy_none"
+msgstr "DMARC is at p=none: receivers only report, nothing is rejected. Set the policy to quarantine or reject once SPF and DKIM are right."

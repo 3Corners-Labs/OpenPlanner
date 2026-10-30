@@ -177,10 +177,14 @@ Superusers configure SMTP and the SMS gateway (provider, today Webex Connect) pe
 `/admin/organisations/{org}/channels`; organisation admins add reminder rules per group at
 `/admin/groups/{slug}/reminders`; group admins edit message texts at
 `/admin/groups/{slug}/messages/{locale}`. The worker sends through the organisation's sender.
-Superusers can send a test email through that same sender to an address they type in.
+Superusers can send a test email through that same sender to an address they type in, and
+check the sender domain's SPF, DKIM and DMARC records (ADR 0073).
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
+| Abuse | The sender domain check is used to make the server query DNS for arbitrary names | Only the domain of the stored sender address (or the fallback sender) is looked up, never a typed-in name; superuser only with a fresh login, Fetch Metadata check, rate-limited like a booking (10/IP/hour), audited per check | `tests/domain/test_channel_service.py::test_the_domain_check_uses_the_stored_sender_and_selector_and_audits_the_finding`, `test_the_domain_check_is_superuser_only`, `tests/admin/test_authorization_matrix.py` |
+| Tampering | A crafted DNS answer reaches the page or a log as text | The records are reduced to a verdict and a reason code; the page and the audit event carry codes and translated texts only; a failed lookup logs the name and the error class | `tests/admin/test_channel_routes.py::test_the_sender_domain_check_shows_one_verdict_per_record_adr_0073`, `tests/adapters/test_mail_dns.py::test_a_failed_lookup_is_none_and_logged_without_the_answer` |
+| Spoofing / injection | Header injection through the reply address | Same address check as the sender address (no line breaks or `<>",;`); the selector is DNS labels only | `tests/domain/test_channel_settings.py::test_invalid_smtp_settings_name_the_field`, `tests/admin/test_channel_routes.py::test_an_invalid_reply_address_or_selector_is_refused` |
 | Information disclosure | SMTP password or SMS API key leaks through the UI, logs or the database | Write-only fields (always empty, `autocomplete=new-password`); sealed with AES-256-GCM under a per-record name; never returned by the `Transaction` port; audit names fields only | `tests/admin/test_channel_routes.py::test_smtp_is_saved_and_the_password_never_shown`, `tests/adapters/db/test_messaging_queries.py::test_channel_settings_round_trip_with_sealed_secret` |
 | Information disclosure | SMTP password sent unencrypted | A username requires STARTTLS or TLS, in the admin portal and for the `SMTP_*` fallback (the services refuse to start) | `tests/domain/test_channel_settings.py::test_invalid_smtp_settings_name_the_field`, `tests/adapters/test_senders.py::test_fallback_mail_refuses_a_login_in_clear_text` |
 | Tampering | A sealed secret copied to another organisation or channel | The record name is the associated data; a moved ciphertext fails to open | `test_a_secret_cannot_be_moved_to_another_channel` |
