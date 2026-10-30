@@ -964,3 +964,15 @@ class RunningVersionRow(Base):
     commit: Mapped[str] = mapped_column(String(40))
     since: Mapped[datetime] = mapped_column(UTCDateTime())
     request_id: Mapped[int | None] = mapped_column(Integer)
+
+
+class ReleaseListingRow(Base):
+    """A release or candidate the last check listed, with its notes (ADR 0067)."""
+
+    __tablename__ = "release_listing"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version: Mapped[str] = mapped_column(String(20), unique=True)
+    release_url: Mapped[str] = mapped_column(String(300))
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    notes: Mapped[str] = mapped_column(Text, server_default=text("''"))
