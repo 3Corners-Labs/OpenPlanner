@@ -14,6 +14,8 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.adapters.certificate_pem import CryptographyPemReader
+from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
@@ -28,6 +30,7 @@ from app.adapters.live_settings import LiveSettings, keep_current
 from app.adapters.oidc import OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
+from app.adapters.tls_probe import SslCertificateProbe
 from app.admin.routes import register_admin
 from app.api import (
     booking_pages,
@@ -49,10 +52,12 @@ from app.domain.admin import AdminService
 from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
+from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
+from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
@@ -67,8 +72,9 @@ from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.platform_settings import PlatformSettingsStore
-from app.domain.ports import Clock, IdentityProvider
+from app.domain.ports import CertificateProbe, Clock, IdentityProvider
 from app.domain.queue_service import QueueService
+from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
 from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
@@ -76,7 +82,9 @@ from app.domain.services import BookingService
 from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
 from app.domain.system_log import SystemLog
-from app.domain.tls_check import CertificateStatus
+from app.domain.tls import public_address
+from app.domain.tls_check import CertificateStatus, TlsWatch
+from app.domain.tls_source import CertificateSourceService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import (
@@ -91,6 +99,12 @@ from app.web.error_pages import register_error_pages
 from app.web.organisation_settings import ClockScopeMiddleware
 from app.web.protection import configure_rate_limits, limiter, set_rate_limits
 from app.web.templates import STATIC_DIR
+
+
+def _public_host(public_base_url: str) -> str | None:
+    """Return the host an own certificate must cover: that of an ``https`` public address."""
+    address = public_address(public_base_url)
+    return address.host if address else None
 
 
 def oidc_provider(
@@ -117,11 +131,22 @@ def oidc_provider(
     return OidcIdentityProvider(config, http)
 
 
+def _confirm_policy(settings: Settings) -> ConfirmPolicy:
+    """Return the rules for confirming a booking from one organisation's settings (ADR 0056)."""
+    return ConfirmPolicy.from_settings(
+        window_hours=settings.booking_confirm_window_hours,
+        cutoff_hours=settings.booking_confirm_cutoff_hours,
+        reminders=settings.booking_confirm_reminders,
+        min_minutes=settings.booking_confirm_min_minutes,
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     clock: Clock | None = None,
     identity_provider: IdentityProvider | None = None,
     integrations: Integrations | None = None,
+    certificate_probe: CertificateProbe | None = None,
 ) -> FastAPI:
     """Build the application.
 
@@ -132,6 +157,8 @@ def create_app(
             settings, or none (admin login disabled).
         integrations: Explicit Webex/WxCC adapters (tests); defaults to the ones the settings
             configure, or none.
+        certificate_probe: Explicit TLS probe for *Check now* (tests); defaults to a real
+            handshake.
 
     Returns:
         The FastAPI app with translator, booking service, rate limits and error pages. Its
@@ -163,6 +190,8 @@ def create_app(
         uow = SqlUnitOfWork(
             app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
         )
+        # ADR 0068: every request to Webex and WxCC becomes a system event of the booking.
+        request_log = RequestEvents(uow, clock, settings.app_version)
 
         def apply(current: Settings) -> None:
             app.state.settings = current
@@ -178,6 +207,10 @@ def create_app(
             configure_clock(current.time_format)
             # ADR 0042 step 6: the release repository and its token can change in the portal.
             app.state.update_service = update_service(current, uow, clock, http, lookup=False)
+            # ADR 0070: a changed certificate source (portal, CLI or lock) reaches the proxy.
+            source = getattr(app.state, "certificate_source", None)
+            if source is not None:
+                app.state.certificate_sync = asyncio.create_task(source.sync())
             # ADR 0042 step 6b: so can the Webex Service App and the WxCC host.
             wired_with = getattr(app.state, "webex_fingerprint", None)
             if wired_with is not None and wired_with != webex_fingerprint(current):
@@ -185,7 +218,7 @@ def create_app(
 
         def wire_integrations(current: Settings) -> None:
             wired = integrations or build_integrations(
-                current, app.state.engine, http, clock, app.state.security_log
+                current, app.state.engine, http, clock, app.state.security_log, request_log
             )
             app.state.integrations = wired
             app.state.call_service = CallService(
@@ -196,7 +229,14 @@ def create_app(
                 agent_start_label,
             )
             app.state.integration_check_service = IntegrationCheckService(
-                uow, clock, app.state.admin_service, wired.checker, SystemLog(uow, clock)
+                uow,
+                clock,
+                app.state.admin_service,
+                wired.checker,
+                SystemLog(uow, clock),
+                version=settings.app_version,
+                heartbeat_max_age=timedelta(seconds=settings.worker_heartbeat_max_age_seconds),
+                overdue_after=lambda: timedelta(minutes=live().job_overdue_minutes),
             )
             # Explicit adapters (tests) are never rebuilt.
             app.state.webex_fingerprint = None if integrations else webex_fingerprint(current)
@@ -228,6 +268,7 @@ def create_app(
             clock,
             token_key,
             phone_region=lambda org: per_organisation(org).phone_default_region,
+            confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
         )
         app.state.admin_service = AdminService(uow, clock)
         app.state.form_service = FormService(
@@ -243,8 +284,32 @@ def create_app(
             environment_value=app.state.live_settings.environment_value,
             production=settings.environment == "prod",
         )
-        # ADR 0038: read on every admin change (and citizen write), cached for a few seconds.
         app.state.certificate_status = CertificateStatus(uow)
+        # ADR 0070: the certificate source of the bundled proxy, with the pair handed to the
+        # proxy through the shared volume whenever the effective source changes.
+        app.state.certificate_source = CertificateSourceService(
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.settings_service,
+            CryptographyPemReader(),
+            FileCertificateVolume(settings.tls_portal_certificate_dir),
+            TlsWatch(
+                uow,
+                clock,
+                certificate_probe or SslCertificateProbe(),
+                SystemLog(uow, clock),
+                public_base_url=settings.public_base_url,
+                interval=lambda: timedelta(hours=live().tls_check_interval_hours),
+                warn_within=lambda: timedelta(days=live().tls_expiry_warning_days),
+                repeat=lambda: timedelta(hours=live().tls_alert_repeat_hours),
+            ),
+            host=lambda: _public_host(settings.public_base_url),
+            bundled=lambda: settings.tls_proxy_bundled,
+            source=lambda: live().tls_certificate_source,
+        )
+        app.state.certificate_sync = asyncio.create_task(app.state.certificate_source.sync())
+        # ADR 0038: read on every admin change (and citizen write), cached for a few seconds.
         app.state.maintenance_service = MaintenanceService(
             uow,
             clock,
@@ -256,7 +321,10 @@ def create_app(
         app.state.queue_service = QueueService(
             uow, clock, app.state.admin_service, agent_pseudonym_key(settings)
         )
-        app.state.integration_service = IntegrationService(uow, clock, app.state.admin_service)
+        app.state.integration_service = IntegrationService(
+            uow, clock, app.state.admin_service, settings.app_version
+        )
+        app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
         app.state.scenario_service = ScenarioService(uow, clock, app.state.admin_service)

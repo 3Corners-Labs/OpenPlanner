@@ -67,6 +67,17 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/overview/w/changes": {
         "/admin/overview/w/changes": statuses(200, 200, 200, 200, 200, 403, 403)
     },
+    # queue.work: not the auditor (no personal data); tasks: dashboard.view, every admin;
+    # status: settings.platform.view, the superuser and the auditor only.
+    "GET /admin/overview/w/queue": {
+        "/admin/overview/w/queue": statuses(200, 200, 200, 200, 403, 200, 403)
+    },
+    "GET /admin/overview/w/tasks": {
+        "/admin/overview/w/tasks": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "GET /admin/overview/w/status": {
+        "/admin/overview/w/status": statuses(200, 403, 403, 403, 200, 403, 403)
+    },
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 200, 200, 403)},
     # ADR 0039: the role editor is the superuser's (roles.manage is locked).
     "GET /admin/roles": {"/admin/roles": statuses(200, 403, 403, 403, 403, 403, 403)},
@@ -133,6 +144,25 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     "POST /admin/settings/{key}/reset": {
         "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
+    },
+    # ADR 0070: the certificate source, the key on this host and the chain, superuser only.
+    # Without the bundled proxy (the test settings) a request or an upload is refused (422), a
+    # removal is a conflict (409), there is no request to download (404); *Check now* always
+    # probes and returns to the page.
+    "POST /admin/settings/tls/csr": {
+        "/admin/settings/tls/csr": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    "GET /admin/settings/tls/csr.pem": {
+        "/admin/settings/tls/csr.pem": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/tls/certificate": {
+        "/admin/settings/tls/certificate": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/tls/certificate/remove": {
+        "/admin/settings/tls/certificate/remove": statuses(409, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/tls/check": {
+        "/admin/settings/tls/check": statuses(303, 403, 403, 403, 403, 403, 403),
     },
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
     "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403, 403)},
@@ -527,6 +557,14 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/andere-team/bookings/999999": statuses(404, 403, 403, 404, 403, 403, 403),
     },
     # Simulator (not in production): whoever edits the group; an empty form is refused (400).
+    # ADR 0068: plan a failed meeting or work item job again (bookings.manage, fresh login).
+    # An empty form names no job: 400 once the matrix allows it.
+    "POST /admin/groups/{slug}/bookings/{booking_id}/retry": {
+        "/admin/groups/demo/bookings/999999/retry": statuses(400, 400, 400, 403, 403, 403, 403),
+        "/admin/groups/andere-team/bookings/999999/retry": statuses(
+            400, 403, 403, 400, 403, 403, 403
+        ),
+    },
     "POST /admin/groups/{slug}/bookings/{booking_id}/simulate": {
         "/admin/groups/demo/bookings/999999/simulate": statuses(400, 400, 403, 403, 403, 403, 403),
         "/admin/groups/andere-team/bookings/999999/simulate": statuses(

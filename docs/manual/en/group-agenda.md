@@ -23,6 +23,25 @@ on a booking's detail page (**Details**).
 Use **Previous day**, **Today** and **Next day** to browse. **Week view** opens the week of the
 chosen day.
 
+## Looking into a booking
+
+A booking's detail page (**Details**) holds what you need when a video meeting or contact
+center task goes wrong:
+
+- **Timeline**: what happened to the meeting and the task. Each event shows the version of
+  OpenPlanner that wrote it, so on a test environment that updates often you can tell an error
+  of an older version. *Version unknown* means it was written before OpenPlanner kept it.
+- **Background jobs**: every job of the booking (video meeting, contact center task, messages,
+  removing personal data) with its planned time, state, attempts and error code. A failed video
+  meeting or contact center task has a **Try again** button, shown to those who may change the
+  group's bookings. The worker runs the job within a minute; reload the page for the outcome. A
+  job that had nothing to do (the meeting existed, or the group uses the own queue) shows in the
+  audit log as *Skipped* with its reason, not as succeeded.
+- **Requests to Webex and Webex Contact Center**: every call OpenPlanner made for the booking,
+  with the answer (status code), duration, *tracking id* and version. Give the tracking id to
+  Cisco support when Webex has to look into the error. It holds no personal data. These
+  requests are kept for 30 days by default.
+
 ## Week view
 
 A table with the times in the rows and the days from Monday to Sunday in the columns. Each cell

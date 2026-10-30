@@ -442,8 +442,6 @@ msgstr "Afspraak verplaatsen"
 msgid "manage.cancel"
 msgstr "Afspraak annuleren"
 
-msgid "manage.notice.booked"
-msgstr "Uw afspraak is gemaakt. U ontvangt een bevestiging per e-mail."
 
 msgid "manage.notice.rescheduled"
 msgstr "Uw afspraak is verplaatst. U ontvangt een bevestiging per e-mail."
@@ -497,6 +495,9 @@ msgstr "Beheer"
 
 msgid "admin.nav.label"
 msgstr "Beheermenu"
+
+msgid "admin.nav.more"
+msgstr "Meer"
 
 msgid "admin.nav.section.monitor"
 msgstr "Bewaken"
@@ -5581,7 +5582,7 @@ msgid "widget.more"
 msgstr "Meer mogelijkheden, zoals direct een gesprek starten, vindt u op de pagina van {name}."
 
 msgid "widget.done_title"
-msgstr "Uw afspraak is gemaakt"
+msgstr "Bevestig uw afspraak"
 
 msgid "widget.error_summary"
 msgstr "Er is iets niet goed ingevuld"
@@ -6292,6 +6293,437 @@ msgstr "De nieuwe inlogkoppeling is niet bewaard: met die koppeling zou u na het
 msgid "admin.form.error.login_lockout"
 msgstr "Met deze koppeling zou u geen superuser meer zijn; ze is niet bewaard."
 
+msgid "admin.overview.widget.queue.group"
+msgstr "Groep"
+
+msgid "admin.overview.widget.queue.waiting"
+msgstr "Wachtend"
+
+msgid "admin.overview.widget.queue.longest_wait"
+msgstr "Langste wacht"
+
+msgid "admin.overview.widget.queue.staff"
+msgstr "Aangemeld"
+
+msgid "admin.overview.widget.queue.minutes"
+msgstr "{minutes} min"
+
+msgid "admin.overview.widget.queue.queue_link"
+msgstr "Wachtrij van {name}"
+
+msgid "admin.overview.widget.queue.empty"
+msgstr "Geen eigen wachtrij in uw bereik."
+
+msgid "admin.overview.widget.tasks.empty"
+msgstr "Geen lopende of mislukte taken."
+
+msgid "admin.overview.widget.tasks.state.running"
+msgstr "Bezig"
+
+msgid "admin.overview.widget.tasks.state.failed"
+msgstr "Mislukt"
+
+msgid "admin.overview.widget.tasks.since"
+msgstr "sinds {time}"
+
+msgid "admin.overview.widget.tasks.attempts"
+msgstr "poging {count}"
+
+msgid "admin.overview.widget.status.version"
+msgstr "Versie"
+
+msgid "admin.overview.widget.status.version.none"
+msgstr "Geen release"
+
+msgid "admin.overview.widget.status.update"
+msgstr "Update"
+
+msgid "admin.overview.widget.status.update.current"
+msgstr "Actueel"
+
+msgid "admin.overview.widget.status.update.available"
+msgstr "{version} beschikbaar"
+
+msgid "admin.overview.widget.status.update.running"
+msgstr "Bezig: {version}"
+
+msgid "admin.overview.widget.status.update.problem"
+msgstr "{version}: {status}"
+
+msgid "admin.overview.widget.status.maintenance"
+msgstr "Onderhoud"
+
+msgid "admin.overview.widget.status.maintenance.off"
+msgstr "Uit"
+
+msgid "admin.overview.widget.status.maintenance.on"
+msgstr "Aan sinds {time}"
+
+msgid "admin.overview.widget.status.maintenance.environment"
+msgstr "Aan (omgeving)"
+
+msgid "admin.overview.widget.status.worker"
+msgstr "Achtergrondproces"
+
+msgid "admin.overview.widget.status.worker.alive"
+msgstr "Actief, {time}"
+
+msgid "admin.overview.widget.status.worker.stale"
+msgstr "Geen hartslag sinds {time}"
+
+msgid "admin.overview.widget.status.worker.unknown"
+msgstr "Geen hartslag gevonden"
+
+msgid "admin.overview.widget.status.diagnostics"
+msgstr "Diagnosemodus"
+
+msgid "admin.overview.widget.status.diagnostics.off"
+msgstr "Uit"
+
+msgid "admin.overview.widget.status.diagnostics.on"
+msgstr "{count} actief"
+
+msgid "admin.overview.widget.status.environment"
+msgstr "Omgeving"
+
+msgid "admin.overview.widget.status.environment.ok"
+msgstr "{environment}"
+
+msgid "admin.overview.widget.status.environment.problems"
+msgstr "{environment}, {count} niet productiewaardig"
+
+msgid "audit.job.send_rebook_request"
+msgstr "Verzoek om opnieuw te plannen versturen"
+
+msgid "audit.job.send_rebook_reminder"
+msgstr "Herinnering om opnieuw te plannen versturen"
+
+msgid "audit.job.send_rebook_lapsed"
+msgstr "Bericht verlopen herplanning versturen"
+
+msgid "audit.job.lapse_rebook"
+msgstr "Herplanning laten verlopen"
+
+msgid "audit.job.send_confirm_request"
+msgstr "Verzoek om te bevestigen versturen"
+
+msgid "audit.job.send_confirm_reminder"
+msgstr "Herinnering om te bevestigen versturen"
+
+msgid "audit.job.expire_unconfirmed"
+msgstr "Onbevestigde afspraak laten verlopen"
+
+msgid "audit.job.send_unconfirmed_lapsed"
+msgstr "Bericht verlopen afspraak versturen"
+
+msgid "audit.job.send_team_invite"
+msgstr "Agenda-uitnodiging aan het team versturen"
+
+msgid "audit.job.send_team_cancel"
+msgstr "Agenda-afzegging aan het team versturen"
+
+msgid "call.hint.meeting.rejected_400.unexplained"
+msgstr "Webex weigerde de meeting, maar deze gebeurtenis bewaart het antwoord van Webex niet: ze is geschreven door een versie die dat nog niet deed. Kijk bij Verzoeken aan Webex hieronder, of plan de meeting opnieuw bij Achtergrondtaken; een nieuwe weigering komt dan met het antwoord van Webex op deze pagina."
+
+msgid "audit.job.send_rebook_request"
+msgstr "Verzoek om nieuwe tijd sturen"
+
+msgid "audit.job.send_rebook_reminder"
+msgstr "Herinnering nieuwe tijd sturen"
+
+msgid "audit.job.send_rebook_lapsed"
+msgstr "Melding verlopen verzoek sturen"
+
+msgid "audit.job.lapse_rebook"
+msgstr "Verzoek om nieuwe tijd laten verlopen"
+
+msgid "audit.job.send_confirm_request"
+msgstr "Bevestigingsverzoek sturen"
+
+msgid "audit.job.send_confirm_reminder"
+msgstr "Herinnering bevestigen sturen"
+
+msgid "audit.job.expire_unconfirmed"
+msgstr "Onbevestigde afspraak laten vervallen"
+
+msgid "audit.job.send_unconfirmed_lapsed"
+msgstr "Melding vervallen afspraak sturen"
+
+msgid "audit.job.send_team_invite"
+msgstr "Agenda-uitnodiging naar het team sturen"
+
+msgid "audit.job.send_team_cancel"
+msgstr "Agenda-annulering naar het team sturen"
+
+msgid "admin.booking.version"
+msgstr "versie {version}"
+
+msgid "admin.booking.version_unknown"
+msgstr "versie onbekend"
+
+msgid "admin.booking.jobs"
+msgstr "Achtergrondtaken"
+
+msgid "admin.booking.jobs_lead"
+msgstr "Wat de worker voor deze afspraak doet of deed: videomeeting, contactcentertaak, berichten en het verwijderen van persoonsgegevens. Een mislukte videomeeting of contactcentertaak kunt u opnieuw laten proberen."
+
+msgid "admin.booking.job.type"
+msgstr "Taak"
+
+msgid "admin.booking.job.when"
+msgstr "Gepland"
+
+msgid "admin.booking.job.status"
+msgstr "Stand"
+
+msgid "admin.booking.job.attempts"
+msgstr "Pogingen"
+
+msgid "admin.booking.job.pending"
+msgstr "Gepland"
+
+msgid "admin.booking.job.running"
+msgstr "Bezig"
+
+msgid "admin.booking.job.done"
+msgstr "Klaar"
+
+msgid "admin.booking.job.failed"
+msgstr "Mislukt"
+
+msgid "admin.booking.retry"
+msgstr "Opnieuw proberen"
+
+msgid "admin.booking.no_jobs"
+msgstr "Er zijn geen taken voor deze afspraak."
+
+msgid "admin.booking.requests"
+msgstr "Verzoeken aan Webex en Webex Contact Center"
+
+msgid "admin.booking.requests_lead"
+msgstr "Elke oproep die OpenPlanner voor deze afspraak deed, met het antwoord van het platform. De tracking-id is wat Cisco-support nodig heeft. Er staan geen persoonsgegevens in."
+
+msgid "admin.booking.request.when"
+msgstr "Tijd"
+
+msgid "admin.booking.request.call"
+msgstr "Oproep"
+
+msgid "admin.booking.request.status"
+msgstr "Antwoord"
+
+msgid "admin.booking.request.tracking"
+msgstr "Tracking-id"
+
+msgid "admin.booking.request.version"
+msgstr "Versie"
+
+msgid "admin.booking.request.ms"
+msgstr "{ms} ms"
+
+msgid "admin.booking.no_requests"
+msgstr "Nog geen verzoeken vastgelegd voor deze afspraak."
+
+msgid "admin.check.area.worker"
+msgstr "Achtergrondtaken (worker)"
+
+msgid "admin.check.worker.never_seen"
+msgstr "De worker heeft zich nog nooit gemeld: er draait geen worker, of hij kan de database niet bereiken. Afspraken krijgen dan geen videomeeting."
+
+msgid "admin.check.worker.stale"
+msgstr "De worker meldde zich {minutes} minuten geleden voor het laatst (versie {version}): hij staat stil of is gestopt."
+
+msgid "admin.check.worker.alive"
+msgstr "De worker draait (versie {version})."
+
+msgid "admin.check.worker.version_differs"
+msgstr "De worker draait versie {worker}, de beheeromgeving versie {web}: een update is half doorgevoerd."
+
+msgid "admin.check.worker.no_video_jobs"
+msgstr "De worker maakt geen videomeetings: hij is gestart zonder de Webex-instellingen. Start de worker opnieuw nadat de Service App is ingesteld."
+
+msgid "admin.check.worker.jobs_ok"
+msgstr "Geen mislukte of achterstallige taken in deze groep."
+
+msgid "admin.check.worker.failed_jobs"
+msgstr "{count} taken van deze groep zijn mislukt. Open de afspraak in de agenda om te zien waarom en probeer het opnieuw."
+
+msgid "admin.check.worker.overdue_jobs"
+msgstr "{count} taken van deze groep wachten langer dan {minutes} minuten op de worker."
+
+msgid "audit.event.integration_request"
+msgstr "Verzoek aan Webex of Webex Contact Center"
+
+msgid "admin.audit.reason.already_done"
+msgstr "Al gedaan: de meeting of taak bestaat al."
+
+msgid "admin.audit.reason.no_video"
+msgstr "Niet nodig: deze groep heeft geen Webex-host."
+
+msgid "admin.audit.reason.own_queue"
+msgstr "Niet nodig: deze groep gebruikt de eigen wachtrij van OpenPlanner, er komt geen contactcentertaak."
+
+msgid "admin.audit.reason.no_dispatch"
+msgstr "Niet mogelijk: deze groep heeft geen werkitem-kanaal of business address."
+
+msgid "admin.audit.detail.retry_create_video_room"
+msgstr "videomeeting opnieuw gepland"
+
+msgid "admin.audit.detail.retry_dispatch_wxcc_task"
+msgstr "contactcentertaak opnieuw gepland"
+
+msgid "admin.done.retried"
+msgstr "De taak is opnieuw gepland. De worker voert hem binnen een minuut uit; vernieuw de pagina voor de uitkomst."
+
+msgid "admin.done.retry_not_possible"
+msgstr "Opnieuw proberen kan niet meer: de afspraak is niet actief, of de meeting of taak bestaat al."
+
+msgid "settings.field.integration_request_retention_days.label"
+msgstr "Verzoeken aan Webex en WxCC bewaren (dagen)"
+
+msgid "settings.field.job_overdue_minutes.label"
+msgstr "Taak achterstallig na (minuten)"
+
+# ADR 0056 step 2: confirming a booking by email link (pages and messages).
+
+msgid "booked.title"
+msgstr "Bevestig uw afspraak"
+
+msgid "booked.text"
+msgstr "We hebben u een e-mail gestuurd. Klik op de knop in die e-mail om uw afspraak te bevestigen. Pas dan is de afspraak definitief."
+
+msgid "booked.lapse"
+msgstr "Bevestigt u niet op tijd, dan vervalt de afspraak en komt de plek vrij voor iemand anders."
+
+msgid "booked.no_mail"
+msgstr "Geen e-mail ontvangen? Kijk ook bij uw ongewenste e-mail."
+
+msgid "booked.slot"
+msgstr "Gekozen moment"
+
+msgid "confirm.title"
+msgstr "Afspraak bevestigen"
+
+msgid "confirm.text"
+msgstr "Bevestig uw afspraak uiterlijk {deadline}. Daarna ontvangt u een e-mail met alle gegevens."
+
+msgid "confirm.submit"
+msgstr "Afspraak bevestigen"
+
+msgid "confirm.not_me"
+msgstr "Heeft u deze afspraak niet gemaakt? Annuleer hem dan."
+
+msgid "manage.status.pending_confirmation"
+msgstr "Niet bevestigd"
+
+msgid "manage.pending.title"
+msgstr "Nog niet bevestigd"
+
+msgid "manage.pending.text"
+msgstr "Bevestig uw afspraak uiterlijk {deadline}, anders vervalt hij."
+
+msgid "manage.pending.confirm"
+msgstr "Afspraak bevestigen"
+
+msgid "manage.notice.pending"
+msgstr "Uw afspraak is bijna klaar. Bevestig hem met de link in de e-mail die we u hebben gestuurd."
+
+msgid "manage.notice.confirmed"
+msgstr "Uw afspraak is bevestigd. U ontvangt een e-mail met alle gegevens."
+
+msgid "manage.notice.lapsed"
+msgstr "U heeft de afspraak niet op tijd bevestigd. De afspraak is vervallen."
+
+msgid "manage.book_again"
+msgstr "Nieuwe afspraak maken"
+
+msgid "message.greeting_anonymous"
+msgstr "Goedendag,"
+
+msgid "message.confirm_request.subject"
+msgstr "Bevestig uw afspraak met {group_name}"
+
+msgid "message.confirm_request.intro"
+msgstr "U heeft een videogesprek met {group_name} aangevraagd op {date} om {time}. Bevestig de afspraak; pas dan is hij definitief. Heeft u dit niet aangevraagd? Dan hoeft u niets te doen: de afspraak vervalt vanzelf."
+
+msgid "message.confirm_reminder.subject"
+msgstr "Herinnering: bevestig uw afspraak met {group_name}"
+
+msgid "message.confirm_reminder.intro"
+msgstr "U heeft uw videogesprek met {group_name} op {date} om {time} nog niet bevestigd. Bevestigt u niet op tijd, dan vervalt de afspraak."
+
+msgid "message.manage_confirm"
+msgstr "Bevestig uw afspraak uiterlijk {deadline}:"
+
+msgid "message.confirm_link"
+msgstr "Afspraak bevestigen"
+
+msgid "message.unconfirmed_lapsed.subject"
+msgstr "Uw afspraak met {group_name} is vervallen"
+
+msgid "message.unconfirmed_lapsed.intro"
+msgstr "U heeft uw videogesprek met {group_name} op {date} om {time} niet op tijd bevestigd. De afspraak is vervallen en de plek is vrijgegeven."
+
+msgid "message.book_again"
+msgstr "U kunt altijd een nieuwe afspraak maken."
+
+msgid "message.book_again_link"
+msgstr "Nieuwe afspraak maken"
+
+msgid "admin.settings.data_fields.title"
+msgstr "Gegevensvelden"
+
+msgid "admin.settings.data_fields.intro"
+msgstr "Welke velden van een afspraak persoonsgegevens van de burger zijn, en hoe gevoelig ze zijn."
+
+msgid "admin.settings.data_fields.rule"
+msgstr "Persoonsgegevens staan alleen bij de afspraak. Ze worden alleen getoond op de afspraakpagina en in de wachtrij, aan rollen die afspraken mogen bekijken of de wachtrij bedienen; de agenda toont alleen de voornaam. Ze staan nooit op het overzicht, in lijsten, in het auditlog of de export daarvan, in een zoekresultaat of in een melding, en zoeken of filteren werkt er nooit op."
+
+msgid "admin.settings.data_fields.fixed"
+msgstr "Deze lijst ligt vast in de software en kan hier noch elders worden gewijzigd."
+
+msgid "admin.settings.data_fields.manual"
+msgstr "Lees verder: Gegevensvelden en persoonsgegevens"
+
+msgid "admin.settings.data_fields.field"
+msgstr "Veld"
+
+msgid "admin.settings.data_fields.classification"
+msgstr "Classificatie"
+
+msgid "admin.settings.data_fields.stored_on"
+msgstr "Opgeslagen bij"
+
+msgid "admin.settings.data_fields.direct"
+msgstr "Direct: identificeert de burger op zichzelf"
+
+msgid "admin.settings.data_fields.sensitive"
+msgstr "Gevoelig: wat de burger ons vertelde, of een koppeling naar het gesprek"
+
+msgid "admin.settings.data_fields.field.first_name"
+msgstr "Voornaam"
+
+msgid "admin.settings.data_fields.field.last_name"
+msgstr "Achternaam"
+
+msgid "admin.settings.data_fields.field.email"
+msgstr "E-mailadres"
+
+msgid "admin.settings.data_fields.field.phone"
+msgstr "Telefoonnummer"
+
+msgid "admin.settings.data_fields.field.note"
+msgstr "Notitie"
+
+msgid "admin.settings.data_fields.field.form_answers"
+msgstr "Antwoorden op de eigen vragen van het team"
+
+msgid "admin.settings.data_fields.field.guest_join_url"
+msgstr "Deelnamekoppeling van de burger"
+
+msgid "admin.settings.data_fields.field.host_join_url"
+msgstr "Deelnamekoppeling van de medewerker"
+
 msgid "admin.settings.tls.title"
 msgstr "Certificaat van het publieke adres"
 
@@ -6348,3 +6780,147 @@ msgstr "Waarschuwen bij certificaat korter geldig dan (dagen)"
 
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Melding over het certificaat herhalen elke (uren)"
+
+msgid "admin.settings.tls.check_now"
+msgstr "Nu controleren"
+
+msgid "admin.settings.tls.check_now_hint"
+msgstr "Controleert het certificaat van het publieke adres meteen en slaat de uitslag op."
+
+msgid "admin.settings.tls.source.title"
+msgstr "Bron van het certificaat"
+
+msgid "admin.settings.tls.source.intro"
+msgstr "De meegeleverde HTTPS-proxy haalt het certificaat bij Let's Encrypt (automatisch verlengd) of gebruikt het eigen certificaat dat hier is geplaatst. De privésleutel blijft op deze server, in het volume van de proxy, en komt nooit in de database of een back-up daarvan. Een wisseling is binnen ongeveer een halve minuut actief; kies daarna Nu controleren."
+
+msgid "admin.settings.tls.source.not_applicable"
+msgstr "Niet van toepassing: HTTPS eindigt bij een eigen reverse proxy of load balancer. Het certificaat wordt daar beheerd; hierboven staat wat bezoekers zien."
+
+msgid "admin.settings.tls.source.current"
+msgstr "Huidige bron"
+
+msgid "admin.settings.tls.source.acme"
+msgstr "Let's Encrypt (automatisch)"
+
+msgid "admin.settings.tls.source.own"
+msgstr "Eigen certificaat (geüpload)"
+
+msgid "admin.settings.tls.source.locked"
+msgstr "De serverbeheerder beheert het certificaat op de server; uploaden kan hier niet."
+
+msgid "admin.settings.tls.source.uploaded_title"
+msgstr "Geüpload certificaat"
+
+msgid "admin.settings.tls.source.fingerprint"
+msgstr "Vingerafdruk (SHA-256)"
+
+msgid "admin.settings.tls.source.subject"
+msgstr "Onderwerp"
+
+msgid "admin.settings.tls.source.names"
+msgstr "Namen"
+
+msgid "admin.settings.tls.source.uploaded_at"
+msgstr "Geüpload op"
+
+msgid "admin.settings.tls.source.none_uploaded"
+msgstr "Er is geen eigen certificaat geüpload."
+
+msgid "admin.settings.tls.source.choose"
+msgstr "Bron"
+
+msgid "admin.settings.tls.source.upload_title"
+msgstr "Certificaatketen plaatsen of vervangen"
+
+msgid "admin.settings.tls.source.upload_hint"
+msgstr "PEM-bestanden van elk ten hoogste 64 KB. De keten (servercertificaat eerst, daarna de tussencertificaten) moet horen bij de sleutel op deze server: de aanvraag hierboven, of de sleutel die al in gebruik is. Het certificaat moet geldig zijn voor het publieke adres."
+
+msgid "admin.settings.tls.source.chain_file"
+msgstr "Certificaatketen (PEM)"
+
+msgid "admin.settings.tls.source.key_file"
+msgstr "Privésleutel (PEM, alleen bij overzetten)"
+
+msgid "admin.settings.tls.source.upload"
+msgstr "Certificaat opslaan"
+
+msgid "admin.settings.tls.source.remove"
+msgstr "Geüpload certificaat verwijderen"
+
+msgid "admin.settings.tls.source.in_use"
+msgstr "Dit certificaat is in gebruik; kies eerst Let's Encrypt als bron om het te verwijderen."
+
+msgid "admin.done.certificate_uploaded"
+msgstr "Het certificaat is opgeslagen."
+
+msgid "admin.done.certificate_removed"
+msgstr "Het geüploade certificaat is verwijderd."
+
+msgid "admin.done.certificate_checked"
+msgstr "Het certificaat is gecontroleerd. De uitslag staat hieronder."
+
+msgid "admin.form.error.tls_certificate_unreadable"
+msgstr "Dit bestand is geen leesbaar PEM-bestand (of de sleutel is met een wachtwoord beveiligd). Controleer het bestand en probeer opnieuw."
+
+msgid "admin.form.error.tls_key_mismatch"
+msgstr "De keten hoort niet bij een sleutel op deze server: maak eerst een aanvraag, of zet het bestaande certificaat over met zijn privésleutel. Een meegegeven sleutel moet bij het servercertificaat horen."
+
+msgid "admin.form.error.tls_name_mismatch"
+msgstr "Het certificaat is niet geldig voor het publieke adres van deze installatie."
+
+msgid "admin.form.error.tls_certificate_expired"
+msgstr "Het certificaat is verlopen."
+
+msgid "admin.form.error.tls_certificate_not_yet_valid"
+msgstr "Het certificaat is nog niet geldig."
+
+msgid "admin.form.error.tls_certificate_missing"
+msgstr "Upload eerst een eigen certificaat voordat u het als bron kiest."
+
+msgid "admin.form.error.tls_certificate_in_use"
+msgstr "Het certificaat is in gebruik; kies eerst Let's Encrypt als bron."
+
+msgid "admin.form.error.tls_source_not_applicable"
+msgstr "Deze installatie gebruikt een eigen reverse proxy; het certificaat wordt daar beheerd."
+
+msgid "settings.field.tls_certificate_source.label"
+msgstr "Bron van het certificaat van de meegeleverde proxy"
+
+msgid "admin.settings.tls.source.key_on_host"
+msgstr "Privésleutel op deze server"
+
+msgid "admin.settings.tls.source.key_present"
+msgstr "Aanwezig"
+
+msgid "admin.settings.tls.source.key_missing"
+msgstr "Ontbreekt op deze server"
+
+msgid "admin.settings.tls.source.key_missing_hint"
+msgstr "De database is op een andere server teruggezet; de sleutel reist niet mee. Maak een nieuwe aanvraag en plaats het nieuwe certificaat, of zet het bestaande certificaat over met zijn sleutel. Tot die tijd gebruikt de proxy Let's Encrypt."
+
+msgid "admin.settings.tls.source.csr_title"
+msgstr "Aanvraag voor een eigen certificaat"
+
+msgid "admin.settings.tls.source.csr_hint"
+msgstr "Maak een nieuwe sleutel op deze server met een certificaataanvraag (CSR) voor het publieke adres. Lever de aanvraag in bij uw certificaatautoriteit (bijvoorbeeld PKIoverheid) en plaats hieronder de keten die u terugkrijgt. De sleutel verlaat deze server nooit. Een aanvraag stoort een certificaat dat in gebruik is niet; een nieuwe aanvraag vervangt een eerdere."
+
+msgid "admin.settings.tls.source.csr_pending"
+msgstr "Aanvraag in afwachting van het certificaat"
+
+msgid "admin.settings.tls.source.csr_download"
+msgstr "Aanvraag downloaden (openplanner.csr)"
+
+msgid "admin.settings.tls.source.csr_generate"
+msgstr "Nieuwe sleutel en aanvraag maken"
+
+msgid "admin.settings.tls.source.key_hint"
+msgstr "Alleen om een bestaand certificaat met zijn sleutel over te zetten: de sleutel gaat zonder wachtwoord rechtstreeks naar het volume van de proxy, wordt nooit getoond en niet in de database bewaard."
+
+msgid "admin.done.csr_generated"
+msgstr "De sleutel en de aanvraag zijn gemaakt. Lever de aanvraag in bij de certificaatautoriteit en plaats daarna de keten."
+
+msgid "admin.form.error.tls_key_missing"
+msgstr "De privésleutel van het geplaatste certificaat staat niet op deze server. Maak een nieuwe aanvraag of zet het certificaat met zijn sleutel over."
+
+msgid "admin.form.error.tls_volume_unwritable"
+msgstr "De server kan de sleutel niet wegschrijven naar het volume van de proxy. Waarschuw de serverbeheerder."

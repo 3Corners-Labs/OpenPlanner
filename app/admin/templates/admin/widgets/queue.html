@@ -1,0 +1,21 @@
+{#- Queue across own groups: per own queue in reach, who waits and who is signed in (counts only; plain values until the QUEUE_WAIT_* settings of OV-7). -#}
+{% if view.rows %}
+<table class="widget-table">
+  <caption class="visually-hidden">{{ _(view.widget.title_key) }}</caption>
+  <thead>
+    <tr><th scope="col">{{ _("admin.overview.widget.queue.group") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.waiting") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.longest_wait") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.staff") }}</th></tr>
+  </thead>
+  <tbody>
+    {% for row in view.rows %}
+    <tr>
+      <th scope="row"><a href="{{ row.href }}" aria-label="{{ _("admin.overview.widget.queue.queue_link", name=row.name) }}">{{ row.name }}</a><br><span class="widget-list__meta">{{ row.organisation }}</span></th>
+      <td class="widget-table__number">{{ row.waiting }}</td>
+      <td class="widget-table__number">{{ _("admin.overview.widget.queue.minutes", minutes=row.longest_wait_minutes) }}</td>
+      <td class="widget-table__number">{{ row.staff_available }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="widget__empty">{{ _("admin.overview.widget.queue.empty") }}</p>
+{% endif %}

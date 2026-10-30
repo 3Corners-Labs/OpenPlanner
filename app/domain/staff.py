@@ -96,6 +96,16 @@ class StaffMember:
         """Whether the person has not logged in for longer than ``after``."""
         return now - self.last_login_at > after
 
+    def is_signed_in(self, now: datetime, lifetime: timedelta) -> bool:
+        """Whether the person's session can still be open at ``now``.
+
+        Open means: no logout since the last login, and seen within ``lifetime`` (the absolute
+        session lifetime, ``ADMIN_SESSION_HOURS``). A closed browser is not a logout, so this
+        is an upper bound.
+        """
+        logged_out = self.last_logout_at is not None and self.last_logout_at >= self.last_login_at
+        return not logged_out and now - self.last_seen_at <= lifetime
+
     def within(self, scope: Scope) -> "StaffMember":
         """Return the member with only the memberships ``scope`` covers."""
         if scope.everything:

@@ -71,6 +71,7 @@ from app.domain.integration_check import CHECK_EVENT
 from app.domain.maintenance import OVERDUE_EVENT, MaintenanceReason
 from app.domain.planner_service import ALERT_ACTION
 from app.domain.ports import Clock
+from app.domain.request_log import REQUEST_EVENT
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.scheduling import GroupSummary
 from app.domain.security_log import (
@@ -141,6 +142,8 @@ EVENT_LABELS: dict[str, str] = {
     OVERDUE_EVENT: "audit.event.maintenance_overdue",
     # ADR 0065: "Koppeling controleren", by hand or by the worker (at the group).
     CHECK_EVENT: "audit.event.integration_check",
+    # ADR 0068: every request to Webex and WxCC for a booking.
+    REQUEST_EVENT: "audit.event.integration_request",
     # Security events (ADR 0034): global, deduplicated per window.
     WEBHOOK_REJECTED: "audit.event.webhook_rejected",
     TOKEN_REFRESH_FAILED: "audit.event.token_refresh",
@@ -155,6 +158,9 @@ EVENT_LABELS: dict[str, str] = {
 """Readable label per event key that is not a permission."""
 
 DETAIL_LABELS: dict[str, str] = {
+    # ADR 0068: a meeting or work item job planned again from the booking page.
+    "retry.create_video_room": "admin.audit.detail.retry_create_video_room",
+    "retry.dispatch_wxcc_task": "admin.audit.detail.retry_dispatch_wxcc_task",
     "rule.add": "admin.audit.detail.rule_add",
     "rule.edit": "admin.audit.detail.rule_edit",
     "rule.remove": "admin.audit.detail.rule_remove",
@@ -280,6 +286,11 @@ REASON_LABELS: dict[str, str] = {
     "stale": "admin.audit.reason.stale",
     "no_recipient": "admin.audit.reason.no_recipient",
     "no_booking": "admin.audit.reason.no_booking",
+    # ADR 0068: a meeting or work item job with nothing to do.
+    "already_done": "admin.audit.reason.already_done",
+    "no_video": "admin.audit.reason.no_video",
+    "own_queue": "admin.audit.reason.own_queue",
+    "no_dispatch": "admin.audit.reason.no_dispatch",
     "channel_not_configured": "admin.audit.reason.channel_not_configured",
     FREE_SPACE_LOW: "admin.audit.reason.free_space_low",
     FREE_SPACE_CRITICAL: "admin.audit.reason.free_space_critical",

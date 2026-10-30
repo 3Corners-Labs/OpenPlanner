@@ -6,7 +6,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import PlatformSettingRow, SettingsVersionRow
+from app.admin.settings_routes import _FIELD_LABELS
 from app.domain.authorization import Principal
+from app.domain.privacy import PII_FIELDS
 from app.web.protection import booking_limit
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 
@@ -340,6 +342,30 @@ async def test_a_webex_service_app_set_in_the_portal_wires_the_integrations(site
     assert app.state.call_service is not None
     assert "client-secret" not in page
     assert "refresh-token" not in page
+
+
+async def test_the_data_fields_card_is_read_only_and_links_to_the_manual(site: Site) -> None:
+    """ADR 0063 §6: the auditor sees the fixed list with its classification; nobody edits it."""
+    await site.login_as(AUDITOR)
+
+    text = (await site.client.get("/admin/settings")).text
+    manual = await site.client.get("/admin/help/data-fields")
+
+    assert '<h2 id="data-fields-heading">Gegevensvelden</h2>' in text
+    for field in PII_FIELDS:
+        assert f'<code class="muted">{field}</code>' in text
+    assert text.count("Direct: identificeert de burger op zichzelf") == 4
+    assert text.count("Gevoelig: wat de burger ons vertelde") == 4
+    assert "ligt vast in de software" in text
+    assert 'href="/admin/help/data-fields"' in text
+    card = text.split('id="data-fields"')[1].split("</section>")[0]
+    assert "<form" not in card  # read-only, for every role
+    assert manual.status_code == 200
+    assert "Gegevensvelden en persoonsgegevens" in manual.text
+
+
+def test_every_personal_data_field_has_a_card_label() -> None:
+    assert set(_FIELD_LABELS) == set(PII_FIELDS)
 
 
 async def test_system_status_shows_the_latest_certificate_check(site: Site) -> None:

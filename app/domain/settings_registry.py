@@ -394,6 +394,36 @@ REGISTRY: tuple[SettingSpec, ...] = (
         in_config=False,
     ),
     S(
+        "tls_proxy_bundled",
+        K.BOOL,
+        False,
+        _B,
+        T.HOST,
+        "The bundled HTTPS proxy runs, so the portal manages the certificate source "
+        "(docker-compose.yml sets it from OPENPLANNER_TLS; ADR 0070).",
+    ),
+    S(
+        "tls_portal_certificate_dir",
+        K.PATH,
+        "portal-certs",
+        _B,
+        T.HOST,
+        "The volume shared with the proxy that holds the own certificate's private key, its "
+        "request and the served pair; never under data/ (ADR 0070).",
+    ),
+    S(
+        "tls_portal_poll_seconds",
+        K.INT,
+        10,
+        _B,
+        T.HOST,
+        "How often the proxy looks for a changed certificate from the portal (proxy.env, "
+        "ADR 0070).",
+        minimum=2,
+        maximum=300,
+        in_config=False,
+    ),
+    S(
         "worker_heartbeat_path",
         K.PATH,
         "data/worker.heartbeat",
@@ -576,6 +606,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=168,
     ),
     S(
+        "tls_certificate_source",
+        K.ENUM,
+        "acme",
+        _C,
+        T.OPERATIONS,
+        "Where the bundled proxy's certificate comes from: Let's Encrypt (acme) or the pair "
+        "uploaded in the portal (own); 'own' needs an upload (ADR 0070).",
+        choices=("acme", "own"),
+    ),
+    S(
         "integration_check_interval_hours",
         K.INT,
         24,
@@ -585,6 +625,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "chain as a system event (ADR 0065).",
         minimum=1,
         maximum=168,
+    ),
+    S(
+        "job_overdue_minutes",
+        K.INT,
+        10,
+        _C,
+        T.OPERATIONS,
+        "A pending job this many minutes past its planned time counts as overdue in a "
+        "group's integration check (ADR 0068).",
+        minimum=1,
+        maximum=1440,
     ),
     S(
         "staff_last_seen_interval_seconds",
@@ -605,6 +656,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Days after which system events leave the audit log (ADR 0031).",
         minimum=30,
         maximum=3650,
+    ),
+    S(
+        "integration_request_retention_days",
+        K.INT,
+        30,
+        _C,
+        T.RETENTION,
+        "Days after which request events (every call to Webex and WxCC for a booking) leave "
+        "the audit log, apart from the other system events (ADR 0068).",
+        minimum=1,
+        maximum=365,
     ),
     S(
         "audit_retention_days",

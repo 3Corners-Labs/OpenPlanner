@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_steps.html" import steps with context %}
+{% block title %}{{ _("booked.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+<p class="eyebrow">{{ group.name }}</p>
+<h1>{{ _("booked.title") }}</h1>
+{{ steps(3) }}
+<div class="notice notice--success" role="status">
+  <p>{{ _("booked.text") }}</p>
+</div>
+{% if slot_label %}
+<dl class="details">
+  <dt>{{ _("booked.slot") }}</dt><dd>{{ slot_label }}</dd>
+  <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
+</dl>
+{% endif %}
+<p>{{ _("booked.lapse") }}</p>
+<p class="hint">{{ _("booked.no_mail") }}</p>
+{% endblock %}

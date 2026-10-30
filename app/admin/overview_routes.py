@@ -1,4 +1,4 @@
-"""The overview as a grid of widgets, without script (ADR 0061 step 1, OV-1 and OV-2).
+"""The overview as a grid of widgets, without script (ADR 0061 steps 1 and 2, OV-1 to OV-3).
 
 Every widget is a server-rendered fragment with its own route and its own permission, both
 from the widget register ``app.web.widgets``. The page renders the visible widgets of the
@@ -6,27 +6,41 @@ admin's role default once at load, with a *Refresh* link; the fragment routes an
 HTML without the shell, for the live script of a later step (OV-5). A widget the admin may not
 see is not rendered and its route refuses (the matrix, ADR 0014).
 
-    GET  /admin/                              dashboard.view  the grid, then the group cards
-    GET  /admin/overview/w/rights             rights.view     my role and reach
-    GET  /admin/overview/w/bookings-today     bookings.view   confirmed bookings today, per group
-    GET  /admin/overview/w/changes            audit.view      recent configuration changes
+    GET  /admin/                           dashboard.view          the grid, then the group cards
+    GET  /admin/overview/w/rights          rights.view             my role and reach
+    GET  /admin/overview/w/bookings-today  bookings.view           bookings today, per group
+    GET  /admin/overview/w/changes         audit.view              recent configuration changes
+    GET  /admin/overview/w/queue           queue.work              own queues: waiting, wait, staff
+    GET  /admin/overview/w/tasks           dashboard.view          running and failed jobs
+    GET  /admin/overview/w/status          settings.platform.view  version, updates, maintenance
 
 No PII in any fragment: counts, group names, times and admins' display names only (ADR 0061
-§8). The widgets that need a data source this repository does not have yet (alerts, queue,
-tasks, status) are declared in the register but not available, so they have no route here.
+§8). The queue widget shows plain values; the on/over-target colouring waits for the
+``QUEUE_WAIT_*`` settings of OV-7. *Alerts* is declared in the register but not available: it
+needs the alert model of OV-6, so it has no route here.
 """
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse
 
+from app.adapters.heartbeat import read_heartbeat
 from app.admin.audit_routes import audit_views
-from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
-from app.admin.pages import Locale, page, role_labels, scope_text, templates
+from app.admin.authz import (
+    AdminContext,
+    RequirePermission,
+    admin_service,
+    can_function,
+    maintenance_service,
+)
+from app.admin.pages import Locale, admin_moment, page, role_labels, scope_text, templates
 from app.admin.shortfalls import agenda_service, shortfall_view
+from app.admin.update_routes import update_service
+from app.config import Settings
 from app.domain.admin import LOGIN_EVENT, LOGOUT_EVENT
 from app.domain.audit import AuditEntry, AuditFilter, Category, Outcome, Source
 from app.domain.authorization import (
@@ -35,10 +49,19 @@ from app.domain.authorization import (
     Principal,
     permissions_for,
 )
+from app.domain.diagnostics import DiagnosticsService
+from app.domain.ports import Clock
+from app.domain.queue_service import QueueService
 from app.domain.staff import CREATED_EVENT
+from app.domain.tasks import JobState
+from app.domain.update_service import UpdateNotice
+from app.domain.updates import UpdateStatus
+from app.i18n import BoundGettext
 from app.web.authz_labels import PERMISSION_LABELS
+from app.web.job_labels import JOB_TYPE_LABELS
 from app.web.locale import RequestLocale
 from app.web.templates import FragmentResponse, render
+from app.web.update_labels import STATUS_LABELS
 from app.web.widgets import Widget, visible, widget
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -93,6 +116,45 @@ class Change:
     target: str
     href: str
 
+
+@dataclass(frozen=True)
+class QueueRow:
+    """One own queue as the widget lists it (counts and a duration, ADR 0061 §8)."""
+
+    name: str
+    organisation: str
+    href: str
+    waiting: int
+    longest_wait_minutes: int
+    staff_available: int
+
+
+@dataclass(frozen=True)
+class TaskRow:
+    """One running or failed job, written out: type, state, moment, attempts."""
+
+    label: str
+    state: str
+    tone: str
+    since: str
+    attempts: str
+
+
+@dataclass(frozen=True)
+class StatusRow:
+    """One line of *System status*: a label, its value in words, a tone that repeats it."""
+
+    label: str
+    value: str
+    tone: str = ""
+    href: str | None = None
+
+
+JOB_STATE_LABELS: dict[JobState, tuple[str, str]] = {
+    JobState.RUNNING: ("admin.overview.widget.tasks.state.running", "accent"),
+    JobState.FAILED: ("admin.overview.widget.tasks.state.failed", "danger"),
+}
+"""Label and tone per job state."""
 
 Renderer = Callable[[Request, Locale, Principal], Awaitable[WidgetView]]
 
@@ -153,10 +215,175 @@ async def _changes(request: Request, locale: RequestLocale, principal: Principal
     return WidgetView(item, list(rows), len(changes), "/admin/audit")
 
 
+def _settings(request: Request) -> Settings:
+    """Return the settings the process started with."""
+    settings: Settings = request.app.state.settings
+    return settings
+
+
+async def _queue(request: Request, locale: RequestLocale, principal: Principal) -> WidgetView:
+    """Queue across own groups: per own queue in reach, waiting, longest wait, staff signed in."""
+    item = _declared("queue")
+    service: QueueService = request.app.state.queue_service
+    lifetime = timedelta(hours=_settings(request).admin_session_hours)
+    rows = [
+        QueueRow(
+            s.summary.group.name,
+            s.summary.organisation_name,
+            f"/admin/groups/{s.summary.group.slug}/queue",
+            s.waiting,
+            int(s.longest_wait.total_seconds() // 60),
+            s.staff_available,
+        )
+        for s in await service.summaries(principal, lifetime)
+    ]
+    return WidgetView(item, list(rows[: item.default_rows]), len(rows))
+
+
+async def _tasks(request: Request, locale: RequestLocale, principal: Principal) -> WidgetView:
+    """Running tasks: the running and failed background jobs, by type, state and moment."""
+    _ = locale.gettext
+    item = _declared("tasks")
+    active = await admin_service(request).active_jobs(item.default_rows)
+    rows = []
+    for job in active.jobs:
+        state_key, tone = JOB_STATE_LABELS[job.state]
+        rows.append(
+            TaskRow(
+                _(JOB_TYPE_LABELS[job.type]),
+                _(state_key),
+                tone,
+                _(
+                    "admin.overview.widget.tasks.since",
+                    time=admin_moment(request, locale, job.since),
+                ),
+                _("admin.overview.widget.tasks.attempts", count=job.attempts),
+            )
+        )
+    return WidgetView(item, list(rows), active.total)
+
+
+def _update_row(_: BoundGettext, notice: UpdateNotice) -> tuple[str, str]:
+    """Return the words and tone of the update line: running, problem, available or current."""
+    outcome = notice.outcome
+    if notice.open is not None:
+        version = str(notice.open.target)
+        return _("admin.overview.widget.status.update.running", version=version), "accent"
+    if outcome is not None and outcome.status is not UpdateStatus.SUCCEEDED:
+        text = _(
+            "admin.overview.widget.status.update.problem",
+            version=str(outcome.target),
+            status=_(STATUS_LABELS[outcome.status]),
+        )
+        return text, "danger"
+    if notice.available is not None:
+        version = str(notice.available.version)
+        return _("admin.overview.widget.status.update.available", version=version), "warning"
+    return _("admin.overview.widget.status.update.current"), "success"
+
+
+async def _status(request: Request, locale: RequestLocale, principal: Principal) -> WidgetView:
+    """System status: what the updates page, maintenance mode and the health checks know."""
+    _ = locale.gettext
+    item = _declared("status")
+    can = can_function(principal)
+    settings = _settings(request)
+    clock: Clock = request.app.state.clock
+    now = clock.now()
+    updates = update_service(request)
+    summary = await updates.summary()
+    maintenance = await maintenance_service(request).status()
+    diagnostics: DiagnosticsService = request.app.state.diagnostics_service
+    modes = len(await diagnostics.active())
+    problems = 0 if settings.environment == "prod" else len(settings.production_problems())
+    updates_href = "/admin/updates" if can(Permission.SYSTEM_UPDATE) else None
+    version = (
+        str(updates.current) if updates.current else _("admin.overview.widget.status.version.none")
+    )
+    update_text, update_tone = _update_row(_, summary)
+    if maintenance.environment:
+        maintenance_row = StatusRow(
+            _("admin.overview.widget.status.maintenance"),
+            _("admin.overview.widget.status.maintenance.environment"),
+            "warning",
+        )
+    elif maintenance.active and maintenance.state.since:
+        since = admin_moment(request, locale, maintenance.state.since)
+        maintenance_row = StatusRow(
+            _("admin.overview.widget.status.maintenance"),
+            _("admin.overview.widget.status.maintenance.on", time=since),
+            "warning",
+        )
+    else:
+        maintenance_row = StatusRow(
+            _("admin.overview.widget.status.maintenance"),
+            _("admin.overview.widget.status.maintenance.off"),
+            "success",
+        )
+    if can(Permission.SYSTEM_MAINTENANCE):
+        maintenance_row = StatusRow(
+            maintenance_row.label, maintenance_row.value, maintenance_row.tone, "/admin/maintenance"
+        )
+    beat = read_heartbeat(settings.worker_heartbeat_path)
+    if beat is None:
+        worker = StatusRow(
+            _("admin.overview.widget.status.worker"),
+            _("admin.overview.widget.status.worker.unknown"),
+            "warning",
+        )
+    elif now - beat <= timedelta(seconds=settings.worker_heartbeat_max_age_seconds):
+        worker = StatusRow(
+            _("admin.overview.widget.status.worker"),
+            _(
+                "admin.overview.widget.status.worker.alive",
+                time=admin_moment(request, locale, beat),
+            ),
+            "success",
+        )
+    else:
+        worker = StatusRow(
+            _("admin.overview.widget.status.worker"),
+            _(
+                "admin.overview.widget.status.worker.stale",
+                time=admin_moment(request, locale, beat),
+            ),
+            "danger",
+        )
+    rows = [
+        StatusRow(_("admin.overview.widget.status.version"), version, "", updates_href),
+        StatusRow(_("admin.overview.widget.status.update"), update_text, update_tone, updates_href),
+        maintenance_row,
+        worker,
+        StatusRow(
+            _("admin.overview.widget.status.diagnostics"),
+            _("admin.overview.widget.status.diagnostics.on", count=modes)
+            if modes
+            else _("admin.overview.widget.status.diagnostics.off"),
+            "warning" if modes else "",
+        ),
+        StatusRow(
+            _("admin.overview.widget.status.environment"),
+            _(
+                "admin.overview.widget.status.environment.problems",
+                environment=settings.environment,
+                count=problems,
+            )
+            if problems
+            else _("admin.overview.widget.status.environment.ok", environment=settings.environment),
+            "warning" if problems else "",
+            "/admin/settings",
+        ),
+    ]
+    return WidgetView(item, list(rows[: item.default_rows]), len(rows), "/admin/settings")
+
+
 RENDERERS: dict[str, Renderer] = {
     "rights": _rights,
     "bookings-today": _bookings_today,
     "changes": _changes,
+    "queue": _queue,
+    "tasks": _tasks,
+    "status": _status,
 }
 """The widgets this step renders; a test checks them against the register."""
 
@@ -238,3 +465,36 @@ async def changes_widget(
     """The fragment *Recent configuration changes*."""
     principal = context.principal
     return _fragment(request, locale, principal, await _changes(request, locale, principal))
+
+
+@router.get("/overview/w/queue", response_class=FragmentResponse)
+async def queue_widget(
+    request: Request,
+    locale: Locale,
+    context: Annotated[AdminContext, Depends(RequirePermission(Permission.QUEUE_WORK))],
+) -> HTMLResponse:
+    """The fragment *Queue across own groups*."""
+    principal = context.principal
+    return _fragment(request, locale, principal, await _queue(request, locale, principal))
+
+
+@router.get("/overview/w/tasks", response_class=FragmentResponse)
+async def tasks_widget(
+    request: Request,
+    locale: Locale,
+    context: Annotated[AdminContext, Depends(RequirePermission(Permission.DASHBOARD_VIEW))],
+) -> HTMLResponse:
+    """The fragment *Running tasks*."""
+    principal = context.principal
+    return _fragment(request, locale, principal, await _tasks(request, locale, principal))
+
+
+@router.get("/overview/w/status", response_class=FragmentResponse)
+async def status_widget(
+    request: Request,
+    locale: Locale,
+    context: Annotated[AdminContext, Depends(RequirePermission(Permission.SETTINGS_PLATFORM_VIEW))],
+) -> HTMLResponse:
+    """The fragment *System status*."""
+    principal = context.principal
+    return _fragment(request, locale, principal, await _status(request, locale, principal))
