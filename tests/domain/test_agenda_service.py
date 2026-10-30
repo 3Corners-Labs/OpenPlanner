@@ -20,6 +20,7 @@ from tests.support.domain import (
     SLOT_0930,
     TEST_TOKEN_KEY,
     book,
+    citizen,
     window,
 )
 
@@ -52,7 +53,7 @@ async def test_the_week_shows_agents_and_bookings_per_slot(
     agenda: AgendaService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     await book(bookings, SLOT_0900, "demo")
-    await book(bookings, SLOT_0900, "demo")
+    await book(bookings, SLOT_0900, "demo", citizen(2))
     _lower_staffing(uow, 1)
 
     days = await agenda.days(GROUP_ADMIN, "demo", MONDAY, 7)

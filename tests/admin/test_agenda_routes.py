@@ -11,7 +11,7 @@ from app.domain.scheduling import ScheduleOverride, TimeWindow
 from app.domain.services import BookingService
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SUPER, Site
 from tests.admin.test_call_routes import FRIDAY_0900
-from tests.support.domain import ADA, TEST_TOKEN_KEY
+from tests.support.domain import TEST_TOKEN_KEY, citizen
 
 FRIDAY = date(2026, 1, 2)
 
@@ -21,8 +21,9 @@ async def _short_friday(site: Site) -> None:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     uow = SqlUnitOfWork(app.state.engine)
     bookings = BookingService(uow, site.clock, TEST_TOKEN_KEY)
-    for _ in range(2):
-        await bookings.book(group_slug="demo", start=FRIDAY_0900, contact=ADA, locale="nl")
+    for number in range(2):
+        contact = citizen(number)
+        await bookings.book(group_slug="demo", start=FRIDAY_0900, contact=contact, locale="nl")
     planning = PlanningService(uow, site.clock, AdminService(uow, site.clock))
     one_agent = TimeWindow(time(9), time(10), 1)
     await planning.add_override(SUPER, "demo", ScheduleOverride(FRIDAY, one_agent))

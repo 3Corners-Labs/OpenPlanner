@@ -349,6 +349,9 @@ msgstr "Enter a valid phone number, for example +31 6 12345678."
 msgid "error.slot_full"
 msgstr "This time has just filled up. Choose another time."
 
+msgid "error.booking_limit_reached"
+msgstr "We cannot make this appointment. Do you already have an appointment with this team? Then use the link in the confirmation email to move or cancel it. Booking for someone else? Then use that person’s email address where possible."
+
 msgid "error.slot_unavailable"
 msgstr "This time is no longer available. Choose another time."
 
@@ -964,6 +967,12 @@ msgstr "How appointments reach staff"
 msgid "admin.field.dispatch_kind_hint"
 msgstr "Contact center: a task in the team's queue, shortly before the start. Own queue: staff sign in to OpenPlanner and pick up an appointment. Applies to appointments not yet dispatched."
 
+msgid "admin.field.max_bookings_per_email"
+msgstr "Appointments per email address"
+
+msgid "admin.field.max_bookings_per_email_hint"
+msgstr "How many future appointments one email address may have with this team at the same time. Above 1 so people can also book for someone else. The same address twice at the same time is never possible. 1 to 10."
+
 msgid "admin.field.calendar_invite_address"
 msgstr "Calendar invite to (own queue)"
 
@@ -1071,8 +1080,14 @@ msgstr "Enter a number of minutes from the send-to-queue time up to 1440."
 msgid "admin.form.error.planner_too_late"
 msgstr "This booking starts soon or has already gone to the contact center. Call the participant."
 
+msgid "admin.form.error.booking_limit_reached"
+msgstr "This email address already has an appointment in that slot, or already the maximum number of appointments with this team (see Appointments per email address in the settings). Choose another slot."
+
 msgid "admin.form.error.move_causes_shortfall"
 msgstr "This slot would then have more bookings than agents. Confirm that you accept the shortfall, or choose another slot."
+
+msgid "admin.form.error.max_bookings_per_email"
+msgstr "Enter a number from 1 to 10."
 
 msgid "admin.form.error.calendar_invite_address"
 msgstr "Enter a valid email address, or leave the field empty."

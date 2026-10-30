@@ -493,3 +493,82 @@ async def test_own_queue_team_gets_an_invite_and_its_withdrawal(uow: InMemoryUni
 
     assert JobType.SEND_TEAM_INVITE in planned
     assert JobType.SEND_TEAM_CANCEL in [j.type for j in uow.state.jobs[booking_id]]
+
+
+# --- bookings per email address (ADR 0059) ------------------------------------------------
+
+BEA = ContactInput(first_name="Bea", last_name="de Vries", email="bea@example.org")
+"""A second citizen, for tests that need two people in one slot."""
+
+
+def _limit_service(uow: InMemoryUnitOfWork, limit: int) -> BookingService:
+    """Return a service for group 1 with capacity 3 and ``limit`` bookings per address."""
+    uow.state.groups[1] = make_group(id=1, slug="aangifte", max_bookings_per_email=limit)
+    uow.state.rules[1] = [ScheduleRule(weekday=0, window=window("09:00", "12:00", 3))]
+    return BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+
+
+async def test_the_same_address_in_the_same_slot_is_refused(uow: InMemoryUnitOfWork) -> None:
+    service = _limit_service(uow, 10)
+    await book(service)
+    shouting = ContactInput(first_name="Ada", last_name="L.", email="ADA@Example.org")
+
+    with pytest.raises(DomainError) as excinfo:
+        await service.book(group_slug="aangifte", start=SLOT_0900, contact=shouting, locale="nl")
+
+    assert excinfo.value.code is ErrorCode.BOOKING_LIMIT_REACHED
+    await service.book(group_slug="aangifte", start=SLOT_0900, contact=BEA, locale="nl")
+
+
+async def test_an_address_may_hold_up_to_the_group_maximum(uow: InMemoryUnitOfWork) -> None:
+    service = _limit_service(uow, 2)
+    first = await book(service)  # on behalf of someone else: a second place is allowed
+    await book(service, SLOT_0930)
+
+    with pytest.raises(DomainError, match="booking_limit_reached"):
+        await book(service, SLOT_0930 + timedelta(minutes=30))
+
+    await service.cancel(first.management_token)  # a cancelled booking frees the address
+    await book(service, SLOT_0930 + timedelta(minutes=30))
+
+
+async def test_the_limit_counts_only_this_group_and_the_future(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    service = _limit_service(uow, 1)
+    await book(service)
+    uow.state.groups[2] = make_group(id=2, slug="toeslagen", max_bookings_per_email=1)
+    await service.book(group_slug="toeslagen", start=TUESDAY_0900, contact=ADA, locale="nl")
+
+    with pytest.raises(DomainError, match="booking_limit_reached"):
+        await book(service, SLOT_0930)
+
+    later = BookingService(uow, FixedClock(SLOT_0930 + timedelta(minutes=1)), TEST_TOKEN_KEY)
+    uow.state.groups[1] = make_group(
+        id=1,
+        slug="aangifte",
+        min_notice_minutes=0,
+        dispatch_lead_minutes=0,
+        max_bookings_per_email=1,
+    )
+    await book(later, SLOT_0930 + timedelta(minutes=30))  # the 09:00 booking has ended
+
+
+async def test_rescheduling_does_not_count_the_booking_it_moves(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    service = _limit_service(uow, 1)
+    old = await book(service)
+
+    moved = await service.reschedule(old.management_token, SLOT_0930)
+
+    assert moved.booking.start == SLOT_0930
+
+
+async def test_a_full_slot_is_reported_before_the_address_limit(
+    service: BookingService,
+) -> None:
+    await book(service)  # capacity 1: the slot is full for everyone, Ada included
+
+    with pytest.raises(DomainError, match="slot_full"):
+        await book(service)
