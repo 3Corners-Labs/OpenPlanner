@@ -85,6 +85,7 @@ from app.admin.session import (
     save_login_start,
     start_session,
 )
+from app.admin.top_bar import load_top_counts
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT
 from app.domain.audit import AuditEntry
 from app.domain.authorization import (
@@ -498,12 +499,14 @@ def register_admin(app: FastAPI) -> None:
     }
     for exc_type, handler in handlers.items():
         app.add_exception_handler(exc_type, handler)  # type: ignore[arg-type]
-    # Custom roles (ADR 0039) are attached first; then the update banner (ADR 0029) and the
-    # maintenance bar (ADR 0038) are loaded for every admin page in one place.
+    # Custom roles (ADR 0039) are attached first; then the update banner (ADR 0029), the
+    # maintenance bar (ADR 0038) and the counts of the top bar (SH-2) are loaded for every
+    # admin page in one place.
     banner = [
         Depends(load_principal),
         Depends(update_routes.load_update_notice),
         Depends(maintenance_routes.load_maintenance_notice),
+        Depends(load_top_counts),
     ]
     for module_router in (
         router,

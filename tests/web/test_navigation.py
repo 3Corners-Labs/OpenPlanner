@@ -14,10 +14,12 @@ from app.web.navigation import (
     OBJECTS,
     SECTIONS,
     TOP_BAR,
+    Screen,
     home_of,
     render_markdown,
     screens,
 )
+from app.web.widgets import widget
 from tests.support.routes import all_routes
 
 DOC = Path(__file__).resolve().parents[2] / "docs" / "admin-map.md"
@@ -101,7 +103,7 @@ def test_home_of_finds_entries_tabs_and_sub_pages() -> None:
     assert staffing_rule.entry == "monitor.overview"
     assert staffing_rule.tab == "group.staffing"
     assert help_topic is not None
-    assert help_topic.entry == TOP_BAR[0].key
+    assert help_topic.entry == "top.help"
     assert home_of("/admin/does-not-exist") is None
 
 
@@ -111,3 +113,35 @@ def test_published_admin_map_matches_the_code() -> None:
     assert DOC.read_text() == generated, (
         "docs/admin-map.md is out of date: run `python -m app.cli admin-map > docs/admin-map.md`"
     )
+
+
+def _shortcuts() -> list[Screen]:
+    return [link for link in TOP_BAR if link.target]
+
+
+def test_the_top_bar_has_three_shortcuts_before_help() -> None:
+    assert [link.key for link in TOP_BAR] == ["top.status", "top.tasks", "top.alerts", "top.help"]
+    assert [link.key for link in _shortcuts()] == ["top.status", "top.tasks", "top.alerts"]
+
+
+def test_a_shortcut_leads_into_an_entry_that_has_a_home() -> None:
+    entries = {entry.key: entry for section in SECTIONS for entry in section.entries}
+
+    for link in _shortcuts():
+        target = entries[link.target]
+        destination = link.path.split("#")[0].split("?")[0]
+        assert destination == target.path, link.key
+
+
+def test_a_shortcut_is_the_home_of_no_route() -> None:
+    assert all(link.routes == () for link in _shortcuts())
+    assert home_of("/admin/#widget-tasks") is None
+
+
+def test_a_shortcut_to_a_widget_names_an_available_widget() -> None:
+    for link in _shortcuts():
+        if link.widget:
+            item = widget(link.widget)
+            assert item is not None, link.key
+            assert item.available, link.key
+            assert link.path.endswith(f"#widget-{link.widget}")

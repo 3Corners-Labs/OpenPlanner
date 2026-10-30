@@ -1,6 +1,6 @@
 {#- One widget of the overview (ADR 0061): expects ``view`` (WidgetView). The same fragment is rendered on the page and by the widget's own route. -#}
 {% set widget = view.widget %}
-<section class="widget" data-widget="{{ widget.key }}" aria-labelledby="widget-{{ widget.key }}-title">
+<section class="widget" data-widget="{{ widget.key }}" id="widget-{{ widget.key }}" aria-labelledby="widget-{{ widget.key }}-title">
   <div class="widget__header">
     <h2 class="widget__title" id="widget-{{ widget.key }}-title">{{ _(widget.title_key) }}</h2>
     {% if view.choices %}

@@ -4203,6 +4203,18 @@ msgid "admin.updates.banner.step"
 msgstr "The update to version {version} is running: {step}."
 
 #. Context-sensitive help and the manual (ADR 0033).
+msgid "admin.nav.status"
+msgstr "Status"
+
+msgid "admin.nav.tasks"
+msgstr "Tasks"
+
+msgid "admin.nav.alerts"
+msgstr "Alerts"
+
+msgid "admin.topbar.tasks.count"
+msgstr "{label}, {count} running or failed"
+
 msgid "admin.nav.help"
 msgstr "Manual"
 

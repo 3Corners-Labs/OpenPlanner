@@ -71,3 +71,20 @@ works without JavaScript. From top to bottom:
 - **Sign out**.
 
 On a phone the bar keeps only its icons and your initials; your name is in the menu.
+
+## The top bar
+
+To the right of the portal's name sit a few shortcuts, from left to right. You only see what
+your role may open:
+
+- **Status** opens *Advanced settings* with the system status (superuser and compliance).
+- **Tasks** jumps to the widget *Running tasks* on this overview, with the number of running and
+  failed tasks next to it. A number above zero means something is running or stuck. The shortcut
+  is only there for admins who have that widget on their overview.
+- **Alerts** opens the audit log from level warning up. Once the alert model exists (ADR 0061)
+  the shortcut opens the list of alerts, and a number follows.
+- **Manual** opens the topic of the page you are on.
+
+On a phone the icons, the number and your initials stay; the words stay in the bar for screen
+readers. The number is also part of the shortcut's name, for example *Tasks, 2 running or
+failed*. A shortcut without a source for a number shows none.
