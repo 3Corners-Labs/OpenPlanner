@@ -74,6 +74,7 @@ from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
+from app.domain.system_log import SystemLog
 from app.domain.tls_check import CertificateStatus
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
@@ -194,7 +195,7 @@ def create_app(
                 agent_start_label,
             )
             app.state.integration_check_service = IntegrationCheckService(
-                uow, clock, app.state.admin_service, wired.checker
+                uow, clock, app.state.admin_service, wired.checker, SystemLog(uow, clock)
             )
             # Explicit adapters (tests) are never rebuilt.
             app.state.webex_fingerprint = None if integrations else webex_fingerprint(current)
