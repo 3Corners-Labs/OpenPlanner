@@ -3944,6 +3944,9 @@ msgstr "An update request is already open. Wait until it is done or withdraw it.
 msgid "admin.done.update_requested"
 msgstr "The update has been requested. The updater on the server carries it out within a minute."
 
+msgid "admin.done.check_requested"
+msgstr "The check has been requested. The worker looks for a new version within half a minute."
+
 msgid "admin.done.restore_requested"
 msgstr "The restore has been requested. The updater on the server carries it out within a minute."
 
@@ -3994,6 +3997,15 @@ msgstr "Last checked"
 
 msgid "admin.updates.never"
 msgstr "Not yet"
+
+msgid "admin.updates.check_requested"
+msgstr "Check requested"
+
+msgid "admin.updates.check_interval"
+msgstr "The server checks for a new version every {minutes} minutes. The interval is in Advanced settings, topic Updates."
+
+msgid "admin.updates.check_now"
+msgstr "Check now"
 
 msgid "admin.updates.check_failed"
 msgstr "Check failed ({code})"
@@ -6057,6 +6069,9 @@ msgstr "Update channel"
 
 msgid "settings.field.update_auto_apply.label"
 msgstr "Update automatically"
+
+msgid "settings.field.update_check_minutes.label"
+msgstr "Minutes between two version checks"
 
 msgid "settings.field.time_format.label"
 msgstr "Time format"
