@@ -19,7 +19,13 @@ from starlette.responses import HTMLResponse
 from app.admin.authz import can_function, session_principal
 from app.admin.forms import Field, moment_label
 from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
-from app.admin.session import THEMES, choose_theme, session_theme
+from app.admin.session import (
+    THEMES,
+    AlertPrefs,
+    choose_alert_prefs,
+    choose_theme,
+    session_theme,
+)
 from app.domain.authorization import Principal, Role, Scope
 from app.i18n import BoundGettext
 from app.web.authz_labels import ROLE_LABELS
@@ -64,6 +70,28 @@ THEME_LABELS = {
 
 THEME_PARAM = "theme"
 """Query parameter of the theme choice in the profile menu."""
+
+ALERT_FORM_PARAM = "alert_prefs"
+"""Marker field of the alert preferences form in the profile menu (its box may arrive unticked)."""
+
+ALERT_POPUP_LABELS = {
+    "all": "admin.alerts.popups.all",
+    "warnings": "admin.alerts.popups.warnings",
+    "outages": "admin.alerts.popups.outages",
+    "off": "admin.alerts.popups.off",
+}
+"""Label key per pop-up choice of ``session.ALERT_POPUPS`` (literal keys for the catalogue)."""
+
+
+def alert_prefs_of(request: Request) -> AlertPrefs:
+    """Apply a submitted alert preferences form (a GET of the profile menu), return the choice."""
+    query = request.query_params
+    return choose_alert_prefs(
+        request,
+        sent=query.get(ALERT_FORM_PARAM) == "1",
+        banner=query.get("alert_banner") == "1",
+        popups=query.get("alert_popups"),
+    )
 
 
 def theme_options(request: Request, locale: RequestLocale, current: str) -> list[NavView]:
@@ -182,6 +210,7 @@ def page(
     top_links = [_nav_view(locale, link, home) for link in TOP_BAR if can(link.permission)]
     bar, more = bottom_bar(nav)
     theme = choose_theme(request, request.query_params.get(THEME_PARAM))
+    alert_prefs = alert_prefs_of(request)
     maintenance = getattr(request.state, "maintenance_notice", None)
     response = render(
         templates,
@@ -199,6 +228,10 @@ def page(
             "role_labels": role_labels(principal, locale),
             "theme": theme,
             "themes": theme_options(request, locale, theme),
+            "alert_prefs": alert_prefs,
+            "alert_popup_options": [
+                (key, locale.gettext(label)) for key, label in ALERT_POPUP_LABELS.items()
+            ],
             # A message page (refusal, not found) keeps ``help_topic`` None: no help link.
             "help_topic": context["help_topic"] if "help_topic" in context else page_topic(request),
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).

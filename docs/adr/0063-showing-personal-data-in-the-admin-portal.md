@@ -25,11 +25,11 @@ None.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; backlog section 4 | #130 | in PR |
-| 1 | PI-1: `app/domain/privacy.py` with the fixed field list and classification | #143 | in PR |
-| 2 | PI-2: marker-value test over every list, overview, export and alert template | #143 | in PR |
-| 3 | PI-3: list search and filters never match PII fields; abuse case in the threat model | #143 | in PR |
-| 4 | PI-4: read-only card *Platform → Advanced settings → Data fields*; manual topic | #143 | in PR |
+| 0 | ADR proposed; backlog section 4 | #130 | merged 2026-10-30 |
+| 1 | PI-1: `app/domain/privacy.py` with the fixed field list and classification | #143 | merged 2026-10-30 |
+| 2 | PI-2: marker-value test over every list, overview, export and alert template | #143 | merged 2026-10-30 |
+| 3 | PI-3: list search and filters never match PII fields; abuse case in the threat model | #143 | merged 2026-10-30 |
+| 4 | PI-4: read-only card *Platform → Advanced settings → Data fields*; manual topic | #143 | merged 2026-10-30 |
 
 ## Consequences
 

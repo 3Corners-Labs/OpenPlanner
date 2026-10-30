@@ -56,3 +56,21 @@ staan ze rechtop. De lijn bij de wachtrij verbindt de groepen; het is dus geen v
 Elke rol begint met een eigen volgorde: een medewerker ziet de wachtrij vooraan, de rol
 Compliance en privacy de wijzigingen en de systeemstatus. Een eigen indeling per persoon komt
 later (ADR 0062). Op een tablet staan maximaal twee widgets naast elkaar, op een telefoon één.
+
+## Uw profielmenu
+
+Rechtsboven opent uw naam of uw initialen het profielmenu. Het staat op elke pagina van het
+beheer en werkt zonder JavaScript. Van boven naar beneden:
+
+- **Uw rollen** en waar ze vandaan komen. De rol komt uit uw organisatie-account en is hier niet
+  te wijzigen; **Mijn rechten bekijken** opent de pagina met wat uw rol toestaat en waar.
+- **Weergave**: Systeem (volgt uw apparaat), Licht of Donker. De keuze geldt voor deze sessie en
+  blijft ook na opnieuw inloggen; uitloggen zet haar terug op Systeem.
+- **Kies een taal**: Nederlands of English. De keuze onthoudt de browser.
+- **Meldingen**: of de balk bij storingen getoond wordt en welke meldingen als pop-up verschijnen
+  (alle, waarschuwingen en storingen, alleen storingen, geen). **Opslaan** bewaart de keuze voor
+  deze sessie. De meldingen zelf volgen in een volgende versie (ADR 0061); de keuze staat dan al klaar.
+- **Uitloggen**.
+
+Op een telefoon blijven in de balk alleen de pictogrammen en uw initialen staan; uw naam staat in
+het menu.

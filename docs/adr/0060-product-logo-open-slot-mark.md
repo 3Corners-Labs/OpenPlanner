@@ -26,8 +26,8 @@ None. The mark is product identity, not tunable per installation.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; backlog section 1 | #130 | in PR |
-| 1 | LG-1, LG-2, LG-3: brand files, `--op-brand-slot`, mark in the admin top bar, favicons, citizen and email footer | #135 | in PR |
+| 0 | ADR proposed; backlog section 1 | #130 | merged 2026-10-30 |
+| 1 | LG-1, LG-2, LG-3: brand files, `--op-brand-slot`, mark in the admin top bar, favicons, citizen and email footer | #135 | merged 2026-10-30 |
 | 2 | LG-4: optional motion (`brand-motion.js`, CSS-only loader) | | planned |
 
 ## Consequences
