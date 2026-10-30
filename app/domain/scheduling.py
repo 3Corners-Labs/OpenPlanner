@@ -60,11 +60,11 @@ DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES = 60
 """ADR 0069: a citizen can move a booking until this long before the start."""
 MAX_CITIZEN_CHANGE_LEAD_MINUTES = 1440
 DEFAULT_TRIAL_CALL_MINUTES = 30
-"""ADR 0069: how long a trial call stays open, from the moment the citizen starts it."""
+"""ADR 0070: how long a trial call stays open, from the moment the citizen starts it."""
 MIN_TRIAL_CALL_MINUTES = 10
 MAX_TRIAL_CALL_MINUTES = 60
 DEFAULT_TRIAL_CALLS_PER_BOOKING = 3
-"""ADR 0069: how often one booking may open a trial call; each one is a Webex meeting."""
+"""ADR 0070: how often one booking may open a trial call; each one is a Webex meeting."""
 MAX_TRIAL_CALLS_PER_BOOKING = 5
 DEFAULT_QUEUE_VISIBLE_FROM_MINUTES = 15
 MAX_QUEUE_VISIBLE_FROM_MINUTES = 120
@@ -194,7 +194,7 @@ class Group:
             or cancel a booking (ADR 0044, class D per group). Never below
             ``dispatch_lead_minutes``: a dispatched booking needs a phone call, not a mail.
         trial_call_enabled: Whether the citizen can open a trial call on Webex ahead of the
-            appointment (ADR 0069); needs video. On by default.
+            appointment (ADR 0070); needs video. On by default.
         trial_call_minutes: How long one trial call stays open, 10 to 60 minutes.
         trial_calls_per_booking: How many trial calls one booking may open, 1 to 5, so the page
             cannot be used to create Webex meetings without end.

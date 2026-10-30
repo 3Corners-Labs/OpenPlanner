@@ -34,7 +34,7 @@ class EventKind(StrEnum):
     JOIN_PAGE_OPENED = "join_page_opened"
     JOIN_CLICKED = "join_clicked"
     TRIAL_CREATED = "trial_created"
-    """The citizen opened a trial call on Webex (ADR 0069)."""
+    """The citizen opened a trial call on Webex (ADR 0070)."""
     TRIAL_JOINED = "trial_joined"
     """The citizen followed the link into the trial call."""
     TRIAL_FAILED = "trial_failed"
@@ -205,7 +205,7 @@ class MeetingRequest:
     timezone: str
     host_email: str
     join_before_host: bool = False
-    """A trial call (ADR 0069): the citizen can enter alone, without the lobby."""
+    """A trial call (ADR 0070): the citizen can enter alone, without the lobby."""
 
 
 @dataclass(frozen=True)

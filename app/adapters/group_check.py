@@ -5,7 +5,7 @@ For one group it walks the chain a call depends on and turns every link into a `
     webex     a probe meeting is scheduled for the host exactly as a booking would schedule
               one (same adapter, same body: licence, scope, host, time zone and options in one
               go) and deleted at once (ADR 0065); a refusal carries Webex's reason. Then a
-              second probe with the trial call's options (entry before the host, ADR 0069),
+              second probe with the trial call's options (entry before the host, ADR 0070),
               a warning when the site refuses it
     wxcc      region ─► channel ─► asset ─► schema ─► entry point ─► flow ─► queue ─► Screen Pop
               (``wxcc_config``, the same rules as ``wxcc-config-check``)
@@ -131,7 +131,7 @@ class PlatformChecker:
     async def _trial_probe(
         self, meetings: WebexMeetings, group: Group, host: str, start: datetime
     ) -> list[Finding]:
-        """Schedule a trial-call probe, the meeting a citizen's trial call is (ADR 0069).
+        """Schedule a trial-call probe, the meeting a citizen's trial call is (ADR 0070).
 
         Webex may refuse entry before the host on a site; that is a warning, since the booking's
         own meeting works without it.

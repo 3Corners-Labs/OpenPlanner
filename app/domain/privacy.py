@@ -10,7 +10,7 @@ Personal data (PII) lives only on ``Booking``:
 - *direct* fields identify the citizen on their own: first and last name, email, phone;
 - *sensitive* fields hold what the citizen told us or give access to the conversation: a
   note, the answers to the group's custom form fields (ADR 0055) and the join links (the
-  call's own and the trial call's, ADR 0069).
+  call's own and the trial call's, ADR 0070).
 
 Where it may appear: the booking detail page and the queue item, for a role holding a
 ``PII_PERMISSIONS`` permission (ADR 0039, 0063 §4), and the group's own agenda and queue show

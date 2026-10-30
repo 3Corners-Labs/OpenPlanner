@@ -1,4 +1,4 @@
-"""The trial call: a real Webex meeting the citizen opens ahead of the appointment (ADR 0069).
+"""The trial call: a real Webex meeting the citizen opens ahead of the appointment (ADR 0070).
 
 A first-time caller wants to know that camera, microphone, speakers and browser work, on the
 same Webex site and with the same client as the appointment, not in a lookalike. So the trial

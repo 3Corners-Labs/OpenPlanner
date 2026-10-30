@@ -604,7 +604,7 @@ class Transaction(Protocol):
         ...
 
     async def save_trial_call(self, booking_id: int, trial: TrialCall) -> None:
-        """Store a new trial call (ADR 0069) and add one to the booking's count."""
+        """Store a new trial call (ADR 0070) and add one to the booking's count."""
         ...
 
     async def clear_trial_call(self, booking_id: int) -> None:

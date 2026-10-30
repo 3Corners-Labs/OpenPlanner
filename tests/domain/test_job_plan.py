@@ -272,7 +272,7 @@ def test_team_invite_is_planned_now_and_cancelled_with_the_booking() -> None:
 
 
 def test_every_plan_that_replaces_all_jobs_cleans_up_an_open_trial_call() -> None:
-    """ADR 0069: replacing a booking's jobs would otherwise drop the pending delete of its trial
+    """ADR 0070: replacing a booking's jobs would otherwise drop the pending delete of its trial
     meeting at Webex."""
     from app.domain.job_plan import plan_for_rebook, plan_for_suspension
 

@@ -1,4 +1,4 @@
-"""The citizen's trial call on Webex (ADR 0069): ``/b/{token}/test``.
+"""The citizen's trial call on Webex (ADR 0070): ``/b/{token}/test``.
 
 Citizens, often first-timers, can try camera, microphone, speakers and browser in a real Webex
 meeting on the group's site, well before the appointment. The page offers a button that opens

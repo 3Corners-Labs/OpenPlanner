@@ -31,7 +31,7 @@ TRIAL_OPTIONS: dict[str, Any] = {
     "enableConnectAudioBeforeHost": True,
     "unlockedMeetingJoinSecurity": "allowJoin",
 }
-"""What a trial call (ADR 0069) changes: the citizen enters alone, without waiting in the lobby.
+"""What a trial call (ADR 0070) changes: the citizen enters alone, without waiting in the lobby.
 
 Everything else, the site, the host, the chat and file settings, is the booking's own, so the
 citizen tries the call they will have."""

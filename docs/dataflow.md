@@ -196,7 +196,7 @@ operator CLI <──HTTPS── Webex webhooks (ownedBy=org), WxCC subscriptions
 operator CLI ──DELETE──> Webex webhooks, WxCC subscriptions (webhooks-reset --yes): ids of stale registrations only
 operator CLI ──signed test events (unknown ids)──> WEBHOOK_BASE_URL/webhooks/* (webhooks-health) → outcome codes in integration_reports
 citizen ──GET /b/{token}/join/go──> OpenPlanner ──303──> Webex web app (no data added to the link)
-citizen ──POST /b/{token}/test──> OpenPlanner ──meeting (group name, times)──> Webex ──id, link──> OpenPlanner (ADR 0069)
+citizen ──POST /b/{token}/test──> OpenPlanner ──meeting (group name, times)──> Webex ──id, link──> OpenPlanner (ADR 0070)
 citizen ──GET /b/{token}/test/go──> OpenPlanner ──303──> the trial meeting in the Webex web app
 Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task events → booking_events, call_status
 ```
@@ -204,7 +204,7 @@ Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task e
 | Data item | Where | Source | Retention | Leaves the system |
 |---|---|---|---|---|
 | Meeting join link | `bookings.guest_join_url`, `host_join_url` | Webex | purged with the contact (PII field) | in the citizen's link (via OpenPlanner) and to WxCC (`meetingLink`) |
-| Trial call link | `bookings.trial_join_url` (with `trial_room_id`, `trial_expires_at`, `trial_count`) | Webex, when the citizen opens a trial call (ADR 0069) | link: purged with the contact (PII field); the meeting is deleted at Webex minutes after it closes | to the citizen only (via OpenPlanner's redirect); no WxCC task |
+| Trial call link | `bookings.trial_join_url` (with `trial_room_id`, `trial_expires_at`, `trial_count`) | Webex, when the citizen opens a trial call (ADR 0070) | link: purged with the contact (PII field); the meeting is deleted at Webex minutes after it closes | to the citizen only (via OpenPlanner's redirect); no WxCC task |
 | First name | `bookings.first_name` | booking form | as the contact | to WxCC (`firstName`, `origin.name`) |
 | Meeting and task ids, timeline, call status | `bookings.video_room_id`, `wxcc_task_id`, `booking_events`, `call_status` | Webex, WxCC | kept for statistics (no personal data) | no |
 | Participant names/emails in webhook payloads | processed in memory only; webhooks filtered on the groups' host accounts, so other meetings of the organisation are not delivered | Webex | not stored, not logged | no |
