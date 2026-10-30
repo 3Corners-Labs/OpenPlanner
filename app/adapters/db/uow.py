@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
+from app.adapters.db.certificate import CertificateQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, answers_json
@@ -68,6 +69,7 @@ from app.adapters.db.models import (
     StaffRow,
     WebhookEventRow,
 )
+from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
@@ -128,7 +130,7 @@ from app.domain.embedding import AllowedOrigins
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.images import PageImage
-from app.domain.job_plan import JobType, PlannedJob
+from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
 from app.domain.ports import EventSink
 from app.domain.scheduling import (
     DispatchKind,
@@ -140,7 +142,9 @@ from app.domain.scheduling import (
     ScheduleRule,
     TimeWindow,
 )
+from app.domain.tasks import ActiveJob, ActiveJobs, JobState
 from app.domain.theme import Theme
+from app.domain.worker_check import WorkerHeartbeat
 
 _PENDING = "pending"
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
@@ -149,6 +153,10 @@ _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
 def _check_name(group_id: int) -> str:
     """Return the integration report name of a group's latest check."""
     return f"group-check:{group_id}"
+
+
+HEARTBEAT_NAME = "worker-heartbeat"
+"""Integration report name of the worker's heartbeat row (ADR 0068)."""
 
 
 def _organisation(row: OrganisationRow) -> Organisation:
@@ -308,6 +316,8 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
         rebook_by=row.rebook_by,
+        confirm_by=row.confirm_by,
+        confirmed_at=row.confirmed_at,
         claim=Claim(row.claimed_at, row.claimed_by)
         if row.claimed_at is not None and row.claimed_by is not None
         else None,
@@ -377,6 +387,8 @@ class SqlTransaction(
     ScenarioQueries,
     PlatformSettingsQueries,
     FormFieldQueries,
+    CertificateQueries,
+    OwnCertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
@@ -386,7 +398,7 @@ class SqlTransaction(
     the maintenance switch from ``MaintenanceQueries`` (ADR 0038), custom roles from
     ``RoleQueries`` (ADR 0039), closure images and scenarios from ``ImageQueries`` and
     ``ScenarioQueries`` (ADR 0037), portal settings from ``PlatformSettingsQueries``
-    (ADR 0042).
+    (ADR 0042), the certificate check from ``CertificateQueries`` (ADR 0064).
 
     Args:
         session: The open session.
@@ -489,6 +501,8 @@ class SqlTransaction(
                     )
                 )
             )
+        if narrow.action is not None:
+            query = query.where(AuditEventRow.action == narrow.action)
         return await self._entries(query, limit)
 
     async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
@@ -530,13 +544,16 @@ class SqlTransaction(
             for row, name in rows
         ]
 
-    async def delete_audit_events(self, category: Category, before: datetime) -> int:
+    async def delete_audit_events(
+        self, category: Category, before: datetime, action: str | None = None
+    ) -> int:
         """Delete the events of ``category`` older than ``before``; return how many."""
-        result = await self._session.execute(
-            delete(AuditEventRow).where(
-                AuditEventRow.category == category.value, AuditEventRow.at < before
-            )
+        query = delete(AuditEventRow).where(
+            AuditEventRow.category == category.value, AuditEventRow.at < before
         )
+        if action is not None:
+            query = query.where(AuditEventRow.action == action)
+        result = await self._session.execute(query)
         return int(getattr(result, "rowcount", 0) or 0)
 
     async def active_diagnostic_modes(self, now: datetime) -> list[DiagnosticMode]:
@@ -641,6 +658,28 @@ class SqlTransaction(
             IntegrationReportRow(
                 name=_check_name(check.group_id), body=json.dumps(body), checked_at=check.checked_at
             )
+        )
+
+    async def save_worker_heartbeat(self, heartbeat: WorkerHeartbeat) -> None:
+        """Store the worker's heartbeat as an integration report (``worker-heartbeat``)."""
+        body = {"version": heartbeat.version, "job_types": list(heartbeat.job_types)}
+        await self._session.merge(
+            IntegrationReportRow(
+                name=HEARTBEAT_NAME, body=json.dumps(body), checked_at=heartbeat.seen_at
+            )
+        )
+
+    async def get_worker_heartbeat(self) -> WorkerHeartbeat | None:
+        """Return the worker's latest heartbeat, if it ever wrote one."""
+        row = await self._session.get(IntegrationReportRow, HEARTBEAT_NAME)
+        if row is None:
+            return None
+        body = json.loads(row.body)
+        types = body.get("job_types", [])
+        return WorkerHeartbeat(
+            row.checked_at,
+            str(body.get("version", "")),
+            tuple(str(t) for t in types) if isinstance(types, list) else (),
         )
 
     async def get_group_check(self, group_id: int) -> GroupCheck | None:
@@ -1126,6 +1165,7 @@ class SqlTransaction(
                 kind=event.kind.value,
                 detail=event.detail[:128],
                 message=event.message[:300],
+                version=event.version[:40],
             )
         )
         await self._session.flush()
@@ -1138,7 +1178,8 @@ class SqlTransaction(
             .order_by(BookingEventRow.at, BookingEventRow.id)
         )
         return [
-            BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail, r.message) for r in rows
+            BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail, r.message, r.version)
+            for r in rows
         ]
 
     async def list_bookings(
@@ -1392,7 +1433,7 @@ class SqlTransaction(
     async def upcoming_starts_for_email(
         self, group_id: int, email: str, after: datetime
     ) -> list[datetime]:
-        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0059).
+        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0066).
 
         ``lower()`` on both sides: SQLite folds ASCII only, the same for the stored and the
         submitted address. The address stays in this query; only start times come back.
@@ -1430,6 +1471,8 @@ class SqlTransaction(
             created_at=booking.created_at,
             cancelled_at=booking.cancelled_at,
             rescheduled_from_id=booking.rescheduled_from_id,
+            confirm_by=booking.confirm_by,
+            confirmed_at=booking.confirmed_at,
         )
         self._session.add(row)
         await self._session.flush()
@@ -1474,7 +1517,7 @@ class SqlTransaction(
         return _booking(*found) if found else None
 
     async def save_booking(self, booking: Booking) -> None:
-        """Persist the mutable fields of a booking (status, cancellation, closure, reason)."""
+        """Persist the mutable fields of a booking (status, times, closure, reason)."""
         await self._session.execute(
             update(BookingRow)
             .where(BookingRow.id == booking.id)
@@ -1484,6 +1527,7 @@ class SqlTransaction(
                 closure_id=booking.closure_id,
                 change_reason=booking.change_reason.value if booking.change_reason else None,
                 rebook_by=booking.rebook_by,
+                confirmed_at=booking.confirmed_at,
             )
         )
 
@@ -1520,6 +1564,65 @@ class SqlTransaction(
                 JobRow.type.in_(sorted(t.value for t in types)),
             )
         )
+
+    async def active_jobs(self, limit: int) -> ActiveJobs:
+        """Return the first ``limit`` running or failed jobs and their count, no payload.
+
+        Running jobs first (newest claim first), then failed ones (latest due first).
+        """
+        states = [JobState.RUNNING.value, JobState.FAILED.value]
+        since = func.coalesce(JobRow.claimed_at, JobRow.run_at)
+        rows = await self._session.execute(
+            select(JobRow.type, JobRow.status, JobRow.claimed_at, JobRow.run_at, JobRow.attempts)
+            .where(JobRow.status.in_(states))
+            .order_by(case((JobRow.status == JobState.RUNNING.value, 0), else_=1), since.desc())
+            .limit(limit)
+        )
+        total = await self._session.scalar(
+            select(func.count()).select_from(JobRow).where(JobRow.status.in_(states))
+        )
+        return ActiveJobs(
+            [
+                ActiveJob(JobType(job_type), JobState(status), claimed_at or run_at, attempts)
+                for job_type, status, claimed_at, run_at, attempts in rows
+            ],
+            int(total or 0),
+        )
+
+    async def get_booking_jobs(self, booking_id: int) -> list[JobSummary]:
+        """Return the booking's jobs, oldest first (ADR 0068)."""
+        rows = await self._session.scalars(
+            select(JobRow).where(JobRow.booking_id == booking_id).order_by(JobRow.run_at, JobRow.id)
+        )
+        return [
+            JobSummary(
+                JobType(r.type),
+                JobStatus(r.status),
+                r.run_at,
+                int(r.attempts or 0),
+                r.last_error or "",
+                ChannelKind(r.channel) if r.channel else None,
+            )
+            for r in rows
+        ]
+
+    async def count_group_jobs(self, group_id: int, overdue_before: datetime) -> JobCounts:
+        """Count the group's failed jobs and its pending jobs planned before ``overdue_before``."""
+        failed = await self._session.scalar(
+            select(func.count(JobRow.id))
+            .join(BookingRow, BookingRow.id == JobRow.booking_id)
+            .where(BookingRow.group_id == group_id, JobRow.status == JobStatus.FAILED.value)
+        )
+        overdue = await self._session.scalar(
+            select(func.count(JobRow.id))
+            .join(BookingRow, BookingRow.id == JobRow.booking_id)
+            .where(
+                BookingRow.group_id == group_id,
+                JobRow.status == _PENDING,
+                JobRow.run_at < overdue_before,
+            )
+        )
+        return JobCounts(int(failed or 0), int(overdue or 0))
 
     async def get_shortfall_acceptances(
         self, group_id: int, lower: datetime, upper: datetime

@@ -31,7 +31,7 @@ from app.adapters.webhook_selftest import self_test
 from app.adapters.wxcc_config import GroupRouting, check_group, fetch_config, region_check
 from app.domain.calls import MeetingRequest
 from app.domain.checks import CheckArea, CheckStatus, Finding
-from app.domain.ports import Clock, IntegrationError
+from app.domain.ports import Clock, IntegrationError, RequestLog
 from app.domain.scheduling import Group
 
 PROBE_TITLE = "OpenPlanner controle"
@@ -73,15 +73,21 @@ class PlatformChecker:
         tokens: The Service App's tokens.
         config: Platform addresses, webhook base and secrets.
         clock: Current time, for the signed test events.
+        request_log: Where the probe meeting's requests are reported (ADR 0068).
     """
 
     def __init__(
-        self, http: httpx.AsyncClient, tokens: WebexTokens, config: CheckerConfig, clock: Clock
+        self,
+        http: httpx.AsyncClient,
+        tokens: WebexTokens,
+        config: CheckerConfig,
+        clock: Clock,
+        request_log: RequestLog | None = None,
     ) -> None:
         """Store the collaborators."""
         self._http = http
         self._tokens = tokens
-        self._client = AuthorizedClient(http, tokens)
+        self._client = AuthorizedClient(http, tokens, request_log)
         self._config = config
         self._clock = clock
 

@@ -204,6 +204,7 @@ class AuditFilter:
         trace_id: Only the events of this request or job: the whole chain (ADR 0040).
         actions: Only events whose action starts with one of these prefixes (a subject,
             ADR 0067); empty for all.
+        action: Only events with this action, e.g. the request events of a booking (ADR 0068).
     """
 
     source: Source | None = None
@@ -217,6 +218,7 @@ class AuditFilter:
     until: datetime | None = None
     trace_id: str | None = None
     actions: frozenset[str] = frozenset()
+    action: str | None = None
 
     def matches(self, event: AuditEvent) -> bool:
         """Return whether ``event`` passes the filter (the SQL adapter applies the same rules)."""
@@ -232,6 +234,7 @@ class AuditFilter:
             and (self.until is None or event.at < self.until)
             and (self.trace_id is None or event.trace_id == self.trace_id)
             and (not self.actions or any(event.action.startswith(p) for p in self.actions))
+            and (self.action is None or event.action == self.action)
         )
 
 

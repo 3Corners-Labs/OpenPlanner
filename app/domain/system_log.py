@@ -3,15 +3,17 @@
 The worker records every job it runs (message, meeting, work item, purge) as a system event
 in the audit log. An event about a booking is placed at that booking's group, so the
 group's admins, the organisation's admins and the superuser see it, and nobody else. An event
-without a known booking is global and only the superuser sees it.
+about a group itself (the automatic integration check, ADR 0065) is placed at that group the
+same way. An event without a known booking or group is global and only the superuser sees it.
 
-    record(action, outcome, booking_id) ─► booking ─► group ─► organisation slug
-                                        ─► AuditEvent(source=system) at that level
+    record(action, outcome, booking_id)  ─► booking ─► group ─► organisation slug
+    record(action, outcome, group_slug=) ─► group ─► organisation slug
+                                         ─► AuditEvent(source=system) at that level
 
 System events carry codes only (job type, error code, attempt, channel): no personal data, no
 message text, no addresses. Every category of event is pruned after its own retention period
 (ADR 0040, part 4): diagnostic 7 days, system 90 days, security 1 year, admin actions 2 years
-by default, each a setting.
+by default, each a setting; request events (ADR 0068) 30 days, before the other system events.
 """
 
 from dataclasses import dataclass
@@ -20,6 +22,7 @@ from datetime import timedelta
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
 from app.domain.event_context import bind_level
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.request_log import REQUEST_EVENT
 
 
 @dataclass(frozen=True)
@@ -31,12 +34,15 @@ class EventRetention:
         system: System events (``SYSTEM_EVENT_RETENTION_DAYS``).
         security: Security events (``SECURITY_EVENT_RETENTION_DAYS``).
         diagnostic: Debug events (``DIAGNOSTIC_EVENT_RETENTION_DAYS``).
+        requests: Request events, ``integration.request`` (ADR 0068,
+            ``INTEGRATION_REQUEST_RETENTION_DAYS``); system events, pruned on their own.
     """
 
     audit: timedelta = timedelta(days=730)
     system: timedelta = timedelta(days=90)
     security: timedelta = timedelta(days=365)
     diagnostic: timedelta = timedelta(days=7)
+    requests: timedelta = timedelta(days=30)
 
     def of(self, category: Category) -> timedelta:
         """Return the retention period of ``category``."""
@@ -67,22 +73,26 @@ class SystemLog:
         outcome: Outcome,
         *,
         booking_id: int | None = None,
+        group_slug: str | None = None,
         reason: str = "",
         detail: str = "",
         message: str = "",
     ) -> None:
-        """Write one system event at the level of ``booking_id``'s group (global without one).
+        """Write one system event at the level of ``booking_id``'s group or of ``group_slug``.
+
+        Without either the event is global.
 
         Args:
             action: Event key, e.g. ``job.send_reminder``.
             outcome: Success, retry, failure or skipped.
             booking_id: The booking the event is about, if any.
+            group_slug: The group the event is about, when it is about no booking.
             reason: Machine-readable reason or error code.
             detail: Further machine keys, e.g. ``attempt:2,channel:sms``.
             message: The provider's own reason for a failure (ADR 0065), if it gave one.
         """
         async with self._uow.locked() as tx:
-            organisation, group = await _level(tx, booking_id)
+            organisation, group = await _level(tx, booking_id, group_slug)
             await tx.add_audit_event(
                 AuditEvent(
                     self._clock.now(),
@@ -108,17 +118,22 @@ class SystemLog:
         """Delete every event older than its category's retention; return how many."""
         now = self._clock.now()
         async with self._uow.locked() as tx:
-            removed = 0
+            removed = await tx.delete_audit_events(
+                Category.SYSTEM, now - retention.requests, REQUEST_EVENT
+            )
             for category in Category:
                 removed += await tx.delete_audit_events(category, now - retention.of(category))
             return removed
 
 
-async def _level(tx: Transaction, booking_id: int | None) -> tuple[str | None, str | None]:
-    """Return the organisation and group slugs of a booking; ``(None, None)`` if unknown."""
+async def _level(
+    tx: Transaction, booking_id: int | None, group_slug: str | None = None
+) -> tuple[str | None, str | None]:
+    """Return the organisation and group slugs of a booking or a group, if known."""
     booking = await tx.get_booking(booking_id) if booking_id is not None else None
     group = await tx.get_group_by_id(booking.group_id) if booking is not None else None
-    summary = await tx.get_group_summary(group.slug) if group is not None else None
+    slug = group.slug if group is not None else group_slug
+    summary = await tx.get_group_summary(slug) if slug is not None else None
     if summary is None:
         return None, None
     return summary.organisation_slug, summary.group.slug

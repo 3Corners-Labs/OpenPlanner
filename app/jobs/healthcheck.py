@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.adapters.clock import SystemClock
+from app.adapters.heartbeat import read_heartbeat
 from app.config import Settings
 
 
@@ -16,13 +17,8 @@ def heartbeat_is_fresh(path: Path, max_age: timedelta, now: datetime) -> bool:
 
     A missing file, unparsable content or a naive timestamp counts as not fresh.
     """
-    try:
-        beat = datetime.fromisoformat(path.read_text().strip())
-    except (OSError, ValueError):
-        return False
-    if beat.tzinfo is None:
-        return False
-    return now - beat <= max_age
+    beat = read_heartbeat(path)
+    return beat is not None and now - beat <= max_age
 
 
 def main() -> int:

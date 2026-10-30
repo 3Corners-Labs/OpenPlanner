@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 
@@ -7,14 +8,19 @@ import httpx
 import pytest
 
 from app.adapters.db.engine import create_engine
+from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.integrations import Integrations
 from app.config import Settings
+from app.domain.audit import Outcome
 from app.domain.authorization import Scope
+from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.domain.maintenance import MaintenanceState
 from app.domain.updates import Version
 from app.jobs.healthcheck import heartbeat_is_fresh
 from app.jobs.worker import run_worker
 from tests.fakes.clock import FixedClock
+from tests.fakes.integrations import FakeChecker
 from tests.support.database import migrated_database
 
 DEADLINE = 15.0
@@ -155,4 +161,79 @@ async def test_worker_reports_maintenance_that_has_been_on_too_long(
         await engine.dispose()
     assert [e.event.detail for e in events if e.event.action == "maintenance.overdue"] == [
         "hours:5"
+    ]
+
+
+async def test_worker_records_what_it_finds_about_the_public_address(
+    settings: Settings, migrated_url: str
+) -> None:
+    # ADR 0064: the test settings use http, so the stored check says not_https.
+    from app.domain.tls import Finding
+    from app.domain.tls_check import CertificateStatus
+
+    configured = settings.model_copy(update={"database_url": migrated_url})
+    stop = asyncio.Event()
+    task = asyncio.create_task(run_worker(configured, stop, clock=FixedClock()))
+    await _until(configured.worker_heartbeat_path.exists)
+    stop.set()
+    await asyncio.wait_for(task, timeout=2)
+
+    engine = create_engine(migrated_url)
+    try:
+        check = await CertificateStatus(SqlUnitOfWork(engine)).latest()
+    finally:
+        await engine.dispose()
+    assert check is not None
+    assert check.finding is Finding.NOT_HTTPS
+
+
+REFUSED = Finding(
+    CheckArea.WEBEX,
+    "webex.schedule_refused",
+    CheckStatus.FAIL,
+    (("host", "host@example.nl"), ("error", "rejected_400"), ("reason", "no licence")),
+)
+
+
+async def test_worker_checks_every_group_with_a_host_once_per_interval(
+    settings: Settings, migrated_url: str
+) -> None:
+    # ADR 0065 step 2: the sweep checks groups with a Webex host and reports a broken chain
+    # as a system event at the group; a group without a host is left alone.
+    url = migrated_url
+    configured = settings.model_copy(update={"database_url": url})
+    clock = FixedClock()
+    engine = create_engine(url)
+    try:
+        await seed_demo(engine)
+        async with SqlUnitOfWork(engine).locked() as tx:
+            demo = await tx.get_group("demo")
+            assert demo is not None
+            await tx.save_group(replace(demo, video_host_email="host@example.nl"))
+    finally:
+        await engine.dispose()
+    checker = FakeChecker([REFUSED])
+
+    stop = asyncio.Event()
+    task = asyncio.create_task(
+        run_worker(configured, stop, clock=clock, integrations=Integrations(checker=checker))
+    )
+    await _until(configured.worker_heartbeat_path.exists)
+    await asyncio.sleep(0.05)  # more iterations: the clock stands still, so no second check
+    stop.set()
+    await asyncio.wait_for(task, timeout=DEADLINE)
+
+    assert [slug for slug, _ in checker.calls] == ["demo"]
+    engine = create_engine(url)
+    try:
+        async with SqlUnitOfWork(engine).read() as tx:
+            check = await tx.get_group_check(demo.id)
+            events = await tx.list_audit_events(Scope(everything=True), 50)
+    finally:
+        await engine.dispose()
+    assert check is not None
+    assert [f for f in check.findings if f.area is not CheckArea.WORKER] == [REFUSED]
+    checks = [e.event for e in events if e.event.action == "integration.check"]
+    assert [(e.actor, e.outcome, e.reason, e.message, e.organisation, e.group) for e in checks] == [
+        ("system", Outcome.FAILURE, "webex.schedule_refused", "no licence", "demo", "demo")
     ]
