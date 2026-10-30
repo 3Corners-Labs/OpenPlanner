@@ -67,6 +67,7 @@ from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
 from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
+from app.domain.integration_check import CHECK_EVENT
 from app.domain.maintenance import OVERDUE_EVENT, MaintenanceReason
 from app.domain.planner_service import ALERT_ACTION
 from app.domain.ports import Clock
@@ -138,6 +139,8 @@ EVENT_LABELS: dict[str, str] = {
     staff.CHANGED_EVENT: "audit.event.staff_changed",
     # ADR 0038: maintenance on longer than the alert threshold (global).
     OVERDUE_EVENT: "audit.event.maintenance_overdue",
+    # ADR 0065: "Koppeling controleren", by hand or by the worker (at the group).
+    CHECK_EVENT: "audit.event.integration_check",
     # Security events (ADR 0034): global, deduplicated per window.
     WEBHOOK_REJECTED: "audit.event.webhook_rejected",
     TOKEN_REFRESH_FAILED: "audit.event.token_refresh",
