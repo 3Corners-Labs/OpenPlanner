@@ -93,13 +93,21 @@ wait_for_issuer() { # wait_for_issuer FRAGMENT: the watcher polls every 10 s (AD
 # Pass 1b: the own certificate managed in the portal reaches the proxy through the
 # portal-certs volume (ADR 0068): web keeps the key there and adds fullchain.pem and serial.
 self_signed portal "OpenPlanner portal check"
-compose cp "$certs/portal.crt" web:/srv/portal-certs/fullchain.pem
-compose cp "$certs/portal.key" web:/srv/portal-certs/privkey.pem
-compose exec -T web sh -c 'chmod 600 /srv/portal-certs/privkey.pem && echo portal-1 > /srv/portal-certs/serial'
+# Through web's own adapter, as the portal does it: the volume belongs to uid 10001 and the key is
+# written mode 600 by that user (`docker cp` would leave root-owned files the app cannot manage).
+portal_volume() { # portal_volume PYTHON_STATEMENTS: run them with a FileCertificateVolume as `volume`
+  compose exec -T -e KEY="$(cat "$certs/portal.key")" -e CHAIN="$(cat "$certs/portal.crt")" web python -c "
+import os
+from pathlib import Path
+from app.adapters.certificate_volume import FileCertificateVolume
+volume = FileCertificateVolume(Path('/srv/portal-certs'))
+$1"
+}
+portal_volume "volume.import_key(os.environ['KEY'] + chr(10)); volume.publish(os.environ['CHAIN'] + chr(10), 'portal-1')"
 wait_for_issuer 'OpenPlanner portal check'
 edge_checks
 tls_check untrusted "OpenPlanner portal check"
-compose exec -T web sh -c 'rm /srv/portal-certs/serial /srv/portal-certs/privkey.pem /srv/portal-certs/fullchain.pem'
+portal_volume "volume.withdraw()"
 wait_for_issuer 'Pebble'
 echo "pass 1b ok: portal certificate served from the volume and withdrawn again, tls-check"
 
