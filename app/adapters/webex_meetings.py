@@ -7,7 +7,7 @@ the group's name and times only (``app.domain.calls.meeting_request``). Start an
 sent in the group's time zone: Webex refuses a ``timezone`` whose offset differs from the one
 in the times (ADR 0065), so UTC times next to ``Europe/Amsterdam`` would never schedule.
 
-Two more rules of the Meetings API, found with a direct call (ADR 0070): a time with
+Two more rules of the Meetings API, found with a direct call (ADR 0071): a time with
 microseconds is refused ("format is wrong"), and so is a start more than about a minute in the
 past ("before current time"), while a start a few seconds ago is accepted. The body therefore
 carries whole seconds, and a start that has passed (a direct call, or its retry by the worker)

@@ -15,7 +15,7 @@ exactly one wins; the other gets ``already_claimed`` (a chosen row) or the next 
 The meeting link is shown only after a claim, so two agents cannot both start the same
 meeting unannounced. The agent is recorded as a pseudonym (``tokens.agent_pseudonym``).
 Every row and the claimed booking carry the video link's state and the citizen's state
-(ADR 0070), so the page can say what is going on instead of showing "no meeting".
+(ADR 0071), so the page can say what is going on instead of showing "no meeting".
 """
 
 from dataclasses import dataclass, field
@@ -70,7 +70,7 @@ class QueueRow:
         mine: The viewing agent picked it up.
         direct: A direct call (ADR 0019) rather than a scheduled appointment.
         overdue: Not claimed ``not_picked_up_minutes`` after its start.
-        video: Whether the meeting is ready, pending or failed (ADR 0070).
+        video: Whether the meeting is ready, pending or failed (ADR 0071).
     """
 
     booking_id: int
@@ -125,7 +125,7 @@ class ClaimedBooking:
     answers: tuple[LabelledAnswer, ...] = field(default=(), repr=False)
     """Answers to the group's custom fields an agent may see: never PII (ADR 0055)."""
     video: VideoState = VideoState.PENDING
-    """Whether the meeting is ready, pending or failed (ADR 0070)."""
+    """Whether the meeting is ready, pending or failed (ADR 0071)."""
     citizen: CitizenState = CitizenState.NOT_YET
     """Where the citizen is: not yet joined, in the lobby, in the call, or gone."""
 

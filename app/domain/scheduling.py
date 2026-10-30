@@ -128,7 +128,7 @@ class DispatchKind(StrEnum):
 
 
 class Offer(StrEnum):
-    """What a staffing block offers citizens (ADR 0070): slots, direct calls, or both."""
+    """What a staffing block offers citizens (ADR 0071): slots, direct calls, or both."""
 
     SCHEDULED = "scheduled"
     """Appointments in the slot grid; the default."""
@@ -380,7 +380,7 @@ class TimeWindow:
         capacity: Number of agents, 0 to ``MAX_CAPACITY``; 0 offers no slots (lunch).
         label: Optional admin note such as "Lunch"; admin content only, never shown to
             citizens or logged, and no part of equality or ordering.
-        offer: Slots, direct calls or both (ADR 0070); ``scheduled`` by default.
+        offer: Slots, direct calls or both (ADR 0071); ``scheduled`` by default.
     """
 
     opens: time
@@ -415,7 +415,7 @@ class TimeWindow:
 
     @property
     def offers_direct(self) -> bool:
-        """Whether a citizen can start a direct call during the block (ADR 0070)."""
+        """Whether a citizen can start a direct call during the block (ADR 0071)."""
         return self.staffed and self.offer.direct
 
     def overlaps(self, other: "TimeWindow") -> bool:
@@ -521,7 +521,7 @@ def open_for_direct(
     overrides: Iterable[ScheduleOverride],
     now: datetime,
 ) -> bool:
-    """Return whether ``now`` falls inside a staffed block that offers direct calls (ADR 0070)."""
+    """Return whether ``now`` falls inside a staffed block that offers direct calls (ADR 0071)."""
     local = now.astimezone(group.tz)
     return any(
         window.offers_direct and window.opens <= local.time() < window.closes

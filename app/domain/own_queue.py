@@ -13,7 +13,7 @@ has. The lobby wait itself is not stored, so among waiting citizens the earliest
 first, which is nearly always the one waiting longest.
 
 Every row also says whether the video link is ready, still being prepared or failed, and the
-claimed booking where the citizen is (ADR 0070): an agent never waits for a link that will
+claimed booking where the citizen is (ADR 0071): an agent never waits for a link that will
 not come.
 ``summarise`` and ``works_queue`` feed the overview's *Queue across own groups* widget (ADR
 0061 §2): how many citizens wait per group, for how long at most, and how many staff who may
@@ -52,7 +52,7 @@ NO_WAIT = timedelta(0)
 
 
 class VideoState(StrEnum):
-    """Whether a booking's meeting can be joined (ADR 0070)."""
+    """Whether a booking's meeting can be joined (ADR 0071)."""
 
     READY = "ready"
     PENDING = "pending"
@@ -115,7 +115,7 @@ class QueueEntry:
 
     @property
     def video(self) -> VideoState:
-        """Whether the meeting is ready, pending or failed (ADR 0070)."""
+        """Whether the meeting is ready, pending or failed (ADR 0071)."""
         return video_state(self.booking, self.status)
 
     @property

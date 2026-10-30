@@ -269,7 +269,7 @@ class BookingService:
 
         Raises:
             DomainError: ``group_not_found``, ``invalid_contact``, ``direct_call_unavailable``
-                (no staffed block offers direct calls now, ADR 0070) or ``direct_call_full``
+                (no staffed block offers direct calls now, ADR 0071) or ``direct_call_full``
                 (the group's cap of open direct calls is reached).
         """
         async with self._uow.locked() as tx:
@@ -430,7 +430,7 @@ class BookingService:
     async def _direct_open(self, tx: Transaction, group: Group, now: datetime) -> bool:
         """Return whether the group is open for a direct call at ``now``.
 
-        That takes a staffed block that offers direct calls (ADR 0070). Holidays count as
+        That takes a staffed block that offers direct calls (ADR 0071). Holidays count as
         closed days (ADR 0025), and so does an active emergency closure.
         """
         today = group.today(now)

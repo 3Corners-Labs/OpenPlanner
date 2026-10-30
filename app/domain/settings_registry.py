@@ -400,7 +400,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _B,
         T.HOST,
         "The bundled HTTPS proxy runs, so the portal manages the certificate source "
-        "(docker-compose.yml sets it from OPENPLANNER_TLS; ADR 0070).",
+        "(docker-compose.yml sets it from OPENPLANNER_TLS; ADR 0071).",
     ),
     S(
         "tls_portal_certificate_dir",
@@ -409,7 +409,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _B,
         T.HOST,
         "The volume shared with the proxy that holds the own certificate's private key, its "
-        "request and the served pair; never under data/ (ADR 0070).",
+        "request and the served pair; never under data/ (ADR 0071).",
     ),
     S(
         "tls_portal_poll_seconds",
@@ -418,7 +418,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _B,
         T.HOST,
         "How often the proxy looks for a changed certificate from the portal (proxy.env, "
-        "ADR 0070).",
+        "ADR 0071).",
         minimum=2,
         maximum=300,
         in_config=False,
@@ -612,7 +612,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _C,
         T.OPERATIONS,
         "Where the bundled proxy's certificate comes from: Let's Encrypt (acme) or the pair "
-        "uploaded in the portal (own); 'own' needs an upload (ADR 0070).",
+        "uploaded in the portal (own); 'own' needs an upload (ADR 0071).",
         choices=("acme", "own"),
     ),
     S(
@@ -1105,7 +1105,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _C,
         T.PLANNER,
         "Seconds between two refreshes of the own queue, a claimed booking and the citizen's "
-        "waiting page (ADR 0070).",
+        "waiting page (ADR 0071).",
         minimum=5,
         maximum=60,
     ),

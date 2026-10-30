@@ -3,7 +3,7 @@
 Every route needs ``queue.work`` on the group; a group that dispatches to the contact center
 has no queue (404). The list shows the first name only. The meeting link appears only on the
 page of a booking the agent claimed. The list and the claimed booking refresh themselves
-through a fragment that ``static/live-region.js`` polls (ADR 0070); without the script the
+through a fragment that ``static/live-region.js`` polls (ADR 0071); without the script the
 "Refresh" link reloads, and new and waiting rows are announced in a polite live region.
 
     GET  /admin/groups/{slug}/queue                         queue.work

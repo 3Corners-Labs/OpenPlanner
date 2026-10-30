@@ -23,7 +23,7 @@ async def own_queue(site: Site, *, meeting: bool = True, **changes: object) -> i
     """Switch the demo group to the own queue, book Friday 09:00 and move to its start.
 
     ``meeting=False`` leaves the booking without a meeting (a pending or failed video link,
-    ADR 0070).
+    ADR 0071).
     """
     uow = site_uow(site)
     async with uow.locked() as tx:

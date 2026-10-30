@@ -112,7 +112,7 @@ def test_direct_calls_are_marked() -> None:
 
 
 def test_the_video_link_is_ready_pending_or_failed() -> None:
-    """ADR 0070: a failed meeting is said so, even when a stale link is still stored."""
+    """ADR 0071: a failed meeting is said so, even when a stale link is still stored."""
     booking = entry(1, 0).booking
     with_link = replace(booking, meeting=MeetingRef("m-1", "https://webex.example/j/1"))
 

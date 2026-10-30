@@ -1,4 +1,4 @@
-# 0070. Direct calls per staffing block, live status for citizen and agent, visible failures
+# 0071. Direct calls per staffing block, live status for citizen and agent, visible failures
 
 Status: proposed (2026-10-30), requested by the product owner after testing the own queue
 on docker01. Amends ADR 0019 (direct call per group) and ADR 0026 (cap and queue feedback),

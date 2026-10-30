@@ -257,13 +257,13 @@ class GroupContactsRow(Base):
 
 
 OFFERS = "('scheduled', 'direct', 'both')"
-"""What a staffing block offers (ADR 0070), as the database checks it."""
+"""What a staffing block offers (ADR 0071), as the database checks it."""
 
 
 class ScheduleRuleRow(Base):
     """A weekly staffing block of a group; capacity 0 is a block without agents (ADR 0027).
 
-    ``offer`` says whether the block offers slots, direct calls or both (ADR 0070).
+    ``offer`` says whether the block offers slots, direct calls or both (ADR 0071).
     """
 
     __tablename__ = "schedule_rules"
@@ -990,7 +990,7 @@ class RoleRow(Base):
 
 
 class OwnCertificateRow(Base):
-    """The own certificate uploaded in the portal (ADR 0070); at most one row.
+    """The own certificate uploaded in the portal (ADR 0071); at most one row.
 
     The chain is public and stored as text with the leaf's public key; the private key is never
     in the database (it lives on the volume the proxy reads), so a backup never carries it.

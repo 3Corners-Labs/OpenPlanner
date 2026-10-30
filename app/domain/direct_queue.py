@@ -11,7 +11,7 @@ not counted.
                 meeting or task ends, at most JOIN_CLOSES_AFTER after the end
     DONE      ─ anything else: ended, failed, cancelled, or stale (a lost webhook frees the place)
 
-``wait_state`` is what the citizen's waiting page tells them (ADR 0070), for both dispatch
+``wait_state`` is what the citizen's waiting page tells them (ADR 0071), for both dispatch
 kinds: a claim in the own queue counts as accepted, a failed meeting is said so.
 
 Pure Python, no I/O; ``BookingService`` loads the calls and applies the cap in its locked
@@ -76,7 +76,7 @@ class DirectCall:
 
 
 class WaitState(StrEnum):
-    """What the citizen's waiting page says about a direct call (ADR 0070)."""
+    """What the citizen's waiting page says about a direct call (ADR 0071)."""
 
     SEARCHING = "searching"
     """No agent yet; the citizen may wait in the lobby once the meeting is ready."""

@@ -65,7 +65,7 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
 
     assert '<option value="Europe/Amsterdam" selected>' in form
     # time zone, dispatch kind, free pick, phone mode, embedding (the direct call is offered
-    # per staffing block since ADR 0070)
+    # per staffing block since ADR 0071)
     assert form.count(" selected>") == 5
 
 

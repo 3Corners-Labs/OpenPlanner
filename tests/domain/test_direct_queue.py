@@ -147,7 +147,7 @@ def test_seconds_round_up_to_a_whole_minute() -> None:
     assert typical_wait(quick) == 1
 
 
-# --- the citizen's waiting page (ADR 0070) ---------------------------------------------------
+# --- the citizen's waiting page (ADR 0071) ---------------------------------------------------
 
 
 def _direct_booking(*, claimed: bool = False, active: bool = True) -> Booking:
