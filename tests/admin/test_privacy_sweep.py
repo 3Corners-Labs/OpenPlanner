@@ -26,6 +26,7 @@ from fastapi.routing import APIRoute
 from jinja2 import Environment, Template
 
 from app.adapters.db.uow import SqlUnitOfWork
+from app.admin.overview_charts import CHART_SERIES, KIND_OF_VIEW
 from app.admin.routes import PUBLIC_ADMIN_PATHS
 from app.config import Settings
 from app.domain.admin import AdminService
@@ -39,6 +40,7 @@ from app.domain.scheduling import DispatchKind, ScheduleOverride, TimeWindow
 from app.domain.services import BookingService, ContactInput
 from app.domain.staff import StaffFilter
 from app.domain.updates import Release, ReleaseCheck, Version
+from app.web.widgets import OVERVIEW_PATH, WIDGETS
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.routes import all_routes
@@ -445,6 +447,21 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
     lost = await site.client.get(found.fill(QUEUE_ITEM_LIVE))
     assert lost.status_code == 200
     assert not _leaks(lost.text, set()), "claim lost fragment"
+
+    # The chart views of the overview widgets (ADR 0061 §5) are other templates on the same
+    # routes, reached only by asking for them: counts and group names, never a marker.
+    for item in WIDGETS:
+        if not (item.available and item.key in CHART_SERIES):
+            continue
+        for chart_view in (v for v in item.views if v in KIND_OF_VIEW):
+            for path in (
+                f"{item.path}?view={chart_view.value}",
+                f"{OVERVIEW_PATH}?{item.key}={chart_view.value}",
+            ):
+                response = await site.client.get(path)
+                assert response.status_code == 200, path
+                assert "<svg" in response.text or "widget__empty" in response.text, path
+                assert not _leaks(response.text, set()), path
 
     # The pages outside the happy path: a refusal, and the sign-out pages without a session.
     for path, response in (
