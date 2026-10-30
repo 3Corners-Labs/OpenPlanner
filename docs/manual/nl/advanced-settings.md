@@ -40,8 +40,63 @@ elke*). Een bevinding die niet *in orde* is, staat ook in het auditlog als syste
 `tls.certificate`, en wordt herhaald zolang hij duurt (instelling *Melding over het certificaat
 herhalen elke*). Staat er *Nog niet gecontroleerd*, dan heeft de server nog geen ronde gedraaid.
 
+**Nu controleren** (superuser) controleert het certificaat meteen in plaats van bij de volgende
+ronde, bijvoorbeeld na het wisselen van de bron hieronder.
+
 De ondersteuning kan u om een schermafdruk van dit scherm vragen in plaats van de configuratie
 van de server.
+
+### Bron van het certificaat
+
+Bij een kleine installatie verzorgt de meegeleverde HTTPS-proxy het certificaat, en kiest de
+superuser waar het vandaan komt:
+
+- **Let's Encrypt (automatisch)**, de standaard: de proxy haalt het certificaat zelf en verlengt
+  het; u hoeft niets te doen.
+- **Eigen certificaat**: de proxy gebruikt het certificaat dat u hier plaatst, bijvoorbeeld een
+  PKIoverheid-certificaat of een ander organisatiegevalideerd certificaat. De verlenging is dan
+  uw zaak: plaats de nieuwe keten voordat de oude verloopt; de bevinding *verloopt binnenkort*
+  hierboven is de herinnering.
+
+De privésleutel van een eigen certificaat wordt op deze server gemaakt en verlaat die nooit:
+hij staat niet in de database, niet in een back-up daarvan, en wordt nooit getoond. Zo krijgt u
+een eigen certificaat:
+
+1. Kies **Nieuwe sleutel en aanvraag maken**. Het scherm toont een certificaataanvraag (CSR)
+   voor het publieke adres, als tekst en als download. Een aanvraag stoort een certificaat dat
+   al in gebruik is niet; een nieuwe aanvraag vervangt een eerdere.
+2. Lever de aanvraag in bij uw certificaatautoriteit. U ontvangt een certificaatketen (PEM).
+3. Plaats de keten onder **Certificaatketen plaatsen of vervangen** (servercertificaat eerst,
+   daarna de tussencertificaten). De upload wordt gecontroleerd voordat er iets wordt
+   opgeslagen: het bestand moet leesbaar zijn, de keten moet horen bij de hier gemaakte sleutel
+   (of bij de sleutel die al in gebruik is, bij een verlenging), het certificaat moet geldig
+   zijn voor het publieke adres van deze installatie, en het mag niet verlopen of nog niet
+   geldig zijn. Een weigering noemt de reden bij het veld. Het scherm toont daarna de
+   vingerafdruk, het onderwerp, de namen, de vervaldatum, het moment van plaatsen en dat de
+   sleutel op deze server aanwezig is.
+4. Kies **Eigen certificaat** als bron en sla op. De proxy schakelt binnen ongeveer een halve
+   minuut om; kies **Nu controleren** om het resultaat te zien.
+
+Om een bestaand certificaat eenmalig over te zetten plaatst u de keten en, in het tweede veld,
+de bijbehorende privésleutel samen; de sleutel gaat rechtstreeks naar de opslag van de proxy op
+deze server en wordt nergens anders bewaard.
+
+Terugschakelen naar **Let's Encrypt (automatisch)** werkt op dezelfde manier; het certificaat en
+de sleutel blijven bewaard voor later. **Geüpload certificaat verwijderen** wist het certificaat
+(nooit de sleutel) en kan alleen zolang Let's Encrypt de bron is.
+
+**Privésleutel ontbreekt op deze server** verschijnt als de database op een andere server is
+teruggezet: het certificaat reisde mee, de sleutel niet. Maak een nieuwe aanvraag en plaats de
+keten, of zet het paar opnieuw over; tot die tijd gebruikt de proxy Let's Encrypt.
+
+Elke aanvraag, upload en verwijdering staat in het auditlog met de vingerafdruk en de
+vervaldatum van het certificaat, nooit een sleutel. Voor al deze wijzigingen is een recente
+inlog nodig.
+
+Beheert de serverbeheerder het certificaat op de server zelf, dan is de instelling **vastgezet
+door de beheerder van de server** en zijn er geen formulieren. Eindigt HTTPS bij een eigen
+reverse proxy of load balancer, dan meldt het scherm dat de bron niet van toepassing is: het
+certificaat wordt daar beheerd, en het blok hierboven toont nog steeds wat bezoekers zien.
 
 ## Platforminstellingen
 
