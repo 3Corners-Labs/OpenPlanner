@@ -2102,6 +2102,9 @@ msgstr "Task could not be ended"
 msgid "call.event.task_marked_cancelled"
 msgstr "Task marked as cancelled"
 
+msgid "call.event.citizen_left"
+msgstr "The citizen stopped waiting"
+
 msgid "admin.booking.end_not_possible"
 msgstr "The booking was cancelled and the task was marked as cancelled through the v2 API (Kind: cancelled; see the timeline), but WxCC did not let OpenPlanner end the task. End the task in Agent Desktop if it is still open."
 
@@ -7124,3 +7127,30 @@ msgstr "The private key of the placed certificate is not on this server. Make a 
 
 msgid "admin.form.error.tls_volume_unwritable"
 msgstr "The server cannot write the key to the proxy's volume. Tell the server operator."
+
+msgid "wait.inactive"
+msgstr "This call has ended."
+
+msgid "wait.leave.link"
+msgstr "Stop waiting"
+
+msgid "wait.leave.title"
+msgstr "Stop waiting?"
+
+msgid "wait.leave.question.waiting"
+msgstr "Are you sure you want to stop? You lose your place in line and we tell the team you are no longer waiting. You can start a new call or book an appointment afterwards."
+
+msgid "wait.leave.question.agent"
+msgstr "An agent has already accepted your call. If you stop, this link no longer works. The agent stays in the call and is told. You can start a new call or book an appointment afterwards."
+
+msgid "wait.leave.confirm"
+msgstr "Yes, stop waiting"
+
+msgid "wait.leave.back"
+msgstr "No, keep waiting"
+
+msgid "wait.left.waiting"
+msgstr "You are no longer waiting. No call is requested any more and the team knows you stopped waiting. You can start a new call or book an appointment later."
+
+msgid "wait.left.agent"
+msgstr "You have left the call. This link no longer works and the team has been told. You can start a new call or book an appointment later."

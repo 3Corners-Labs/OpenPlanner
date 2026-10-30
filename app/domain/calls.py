@@ -48,6 +48,8 @@ class EventKind(StrEnum):
     END_NOT_POSSIBLE = "end_not_possible"
     """WxCC refused to end the task (detail: the code, e.g. ``rejected_403``)."""
     TASK_MARKED_CANCELLED = "task_marked_cancelled"
+    CITIZEN_LEFT = "citizen_left"
+    """The citizen stopped waiting for a direct call (detail: ``waiting`` or ``agent``)."""
     MEETING_STARTED = "meeting_started"
     HOST_JOINED = "host_joined"
     GUEST_JOINED = "guest_joined"

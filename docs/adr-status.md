@@ -16,8 +16,8 @@ package; when the two disagree, the code wins.
 
 | Built? | ADRs |
 |---|---|
-| BUILT | 43 |
-| PARTIAL | 21 |
+| BUILT | 44 |
+| PARTIAL | 20 |
 | NOT BUILT | 5 |
 | POLICY | 3 |
 
@@ -41,7 +41,7 @@ package; when the two disagree, the code wins.
 | 0016 | Admin forms without JavaScript | BUILT | #7, #8; `HTML_CSP`, `admin.css`; amended by ADR 0048, 0061, 0072 | – (HTMX is not used; own scripts on three pages) |
 | 0017 | Video calls through the Webex Meetings API | BUILT | #10, #12, #138, #154; `adapters/webex_meetings.py`, `webex_auth.py`, `api/join_pages.py` | `templateId` per group ("later" in the ADR); blur and backgrounds are a runbook checklist |
 | 0018 | Dispatch to WxCC as work items | BUILT | #10, #12, #125; `adapters/wxcc.py` (`task_body`), `verify_wxcc`, migration 0007; point 5 superseded by ADR 0021 | – |
-| 0019 | Direct video call per group | PARTIAL | #10, #24, #155; `api/direct_pages.py`, `direct_queue.py`, migration 0064 (switch moved by ADR 0072) | Point 4: the citizen cannot leave or cancel to end the task; only a "schedule instead" link exists |
+| 0019 | Direct video call per group | BUILT | #10, #24, #155, AG-2 (leave from the waiting page); `api/direct_pages.py`, `domain/direct_leave.py`, `direct_queue.py`, migration 0064 (switch moved by ADR 0072) | – |
 | 0020 | Citizen calendar, branding through tokens | BUILT | #11, #49; `calendar.js`, `slot_picker.py`, `SCRIPT_CSP`, `/o/{slug}/theme.css`, `domain/branding.py` | – |
 | 0021 | Ending the work item of a cancelled booking | BUILT | #12; `CallService.end_task`, `WxccDispatcher`, job `END_WXCC_TASK`, `diagnostics.py` | – |
 | 0022 | Channels per organisation, SMS, editable texts | BUILT | #19, #29; migration 0013; `admin/channel_routes.py`, `message_routes.py`, `adapters/senders.py` | Organisation-wide text editor (deferred by the ADR itself) |
@@ -100,7 +100,7 @@ package; when the two disagree, the code wins.
 
 - ADR 0001 to 0023 were not in this list. Each was checked against the code by reading the ADR
   and finding what runs, not by trusting its own words. Seven turned out partly built (0002,
-  0004, 0008, 0009, 0010, 0019, 0023) and now say so in their Status line; three are policy
+  0004, 0008, 0009, 0010, 0019, 0023; 0019 was completed by AG-2 afterwards) and now say so in their Status line; three are policy
   (0001, 0005, 0012). Two things worth knowing: CLAUDE.md says organisation text overrides are
   editable in the admin UI, but the override store of ADR 0004 and ADR 0009 does not exist
   (group texts do); ADR 0010's polling fallback and 30-second refresh were never built.
