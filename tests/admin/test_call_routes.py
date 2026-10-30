@@ -69,7 +69,12 @@ async def test_a_failed_meeting_explains_what_to_check(site: Site) -> None:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     uow = SqlUnitOfWork(app.state.engine)
     integration = IntegrationService(uow, site.clock, AdminService(uow, site.clock))
-    await integration.record(booking_id, EventKind.MEETING_FAILED, detail="rejected_400")
+    await integration.record(
+        booking_id,
+        EventKind.MEETING_FAILED,
+        detail="rejected_400",
+        message="timezone 'Europe/Amsterdam' and timezone offset in '+00:00' do not match",
+    )
     await site.login_as(GROUP_ADMIN)
 
     text = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
@@ -77,6 +82,8 @@ async def test_a_failed_meeting_explains_what_to_check(site: Site) -> None:
     assert "Videomeeting aanmaken mislukt" in text
     assert "<code>rejected_400</code>" in text
     assert "Webex-host" in text  # the hint names the field to check
+    # ADR 0065: Webex's own words, escaped, under the event.
+    assert "Antwoord van Webex: timezone &#39;Europe/Amsterdam&#39;" in text
 
 
 async def test_an_unknown_code_still_gets_a_hint(site: Site) -> None:

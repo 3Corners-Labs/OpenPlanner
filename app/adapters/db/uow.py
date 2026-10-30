@@ -443,6 +443,7 @@ class SqlTransaction(
                 category=event.event_category.value,
                 trace_id=event.trace_id[:32],
                 service=event.service[:16],
+                message=event.message[:300],
             )
         )
         await self._session.flush()
@@ -522,6 +523,7 @@ class SqlTransaction(
                     trace_id=row.trace_id,
                     service=row.service,
                     event_id=row.event_id,
+                    message=row.message,
                 ),
                 name,
             )
@@ -1123,6 +1125,7 @@ class SqlTransaction(
                 at=event.at,
                 kind=event.kind.value,
                 detail=event.detail[:128],
+                message=event.message[:300],
             )
         )
         await self._session.flush()
@@ -1134,7 +1137,9 @@ class SqlTransaction(
             .where(BookingEventRow.booking_id == booking_id)
             .order_by(BookingEventRow.at, BookingEventRow.id)
         )
-        return [BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail) for r in rows]
+        return [
+            BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail, r.message) for r in rows
+        ]
 
     async def list_bookings(
         self, scope: Scope, group_id: int, lower: datetime, upper: datetime
