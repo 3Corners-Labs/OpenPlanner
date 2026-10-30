@@ -41,6 +41,11 @@ class Screen:
         permission: The permission it needs; the matrix decides whether it shows.
         icon: The icon name from ``admin/_icons.html``.
         subpages: Further route templates that belong here (detail and edit pages).
+        target: For a top-bar shortcut: the key of the entry it leads into. A shortcut links to
+            a place that already has a home, so it is the home of no route (``path`` may carry
+            a query or a fragment); the rule "one home per screen" (ADR 0047) stays whole.
+        widget: For a shortcut to an overview widget: that widget's key. The link shows only
+            while the widget is on the admin's overview, so it never leads nowhere.
     """
 
     key: str
@@ -49,11 +54,13 @@ class Screen:
     permission: Permission
     icon: str
     subpages: tuple[str, ...] = ()
+    target: str = ""
+    widget: str = ""
 
     @property
     def routes(self) -> tuple[str, ...]:
-        """Return every route template this screen is the home of."""
-        return (self.path, *self.subpages)
+        """Return every route template this screen is the home of (none for a shortcut)."""
+        return () if self.target else (self.path, *self.subpages)
 
 
 @dataclass(frozen=True)
@@ -258,6 +265,34 @@ SECTIONS = (
 """The side navigation, in order."""
 
 TOP_BAR = (
+    # Shortcuts (ADR 0047 stays whole: they own no route). Status opens System status; tasks
+    # the overview widget of the same name; alerts the log from warnings up, until the alert
+    # model of ADR 0061 step 4 brings its own list.
+    Screen(
+        "top.status",
+        "admin.nav.status",
+        "/admin/settings",
+        Permission.SETTINGS_PLATFORM_VIEW,
+        "status",
+        target="platform.settings",
+    ),
+    Screen(
+        "top.tasks",
+        "admin.nav.tasks",
+        "/admin/#widget-tasks",
+        Permission.DASHBOARD_VIEW,
+        "tasks",
+        target="monitor.overview",
+        widget="tasks",
+    ),
+    Screen(
+        "top.alerts",
+        "admin.nav.alerts",
+        "/admin/audit?level=warning",
+        Permission.AUDIT_VIEW,
+        "bell",
+        target="monitor.audit",
+    ),
     Screen(
         "top.help",
         "admin.nav.help",
@@ -267,7 +302,7 @@ TOP_BAR = (
         ("/admin/help/{topic}",),
     ),
 )
-"""Links in the top bar next to the language switch and the profile."""
+"""Links in the top bar before the profile: three shortcuts, then the manual."""
 
 _GROUP = "/admin/groups/{slug}"
 
@@ -411,7 +446,11 @@ def _rows(translator: Translator, locale: str, items: tuple[Screen, ...]) -> lis
     """Return Markdown table rows for ``items``."""
     return [
         f"| {translator.gettext(locale, s.label_key)} | `{s.path}` | `{s.permission.value}` | "
-        + (", ".join(f"`{p}`" for p in s.subpages) or "–")
+        + (
+            f"shortcut to `{s.target}`"
+            if s.target
+            else ", ".join(f"`{p}`" for p in s.subpages) or "–"
+        )
         + " |"
         for s in items
     ]

@@ -4308,6 +4308,18 @@ msgid "admin.updates.banner.step"
 msgstr "Update naar versie {version} is bezig: {step}."
 
 #. Context-sensitive help and the manual (ADR 0033).
+msgid "admin.nav.status"
+msgstr "Status"
+
+msgid "admin.nav.tasks"
+msgstr "Taken"
+
+msgid "admin.nav.alerts"
+msgstr "Meldingen"
+
+msgid "admin.topbar.tasks.count"
+msgstr "{label}, {count} lopend of mislukt"
+
 msgid "admin.nav.help"
 msgstr "Handleiding"
 

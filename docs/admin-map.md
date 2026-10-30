@@ -42,6 +42,9 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 
 | Entry | Path | Permission | Also the home of |
 |---|---|---|---|
+| Status | `/admin/settings` | `settings.platform.view` | shortcut to `platform.settings` |
+| Tasks | `/admin/#widget-tasks` | `dashboard.view` | shortcut to `monitor.overview` |
+| Alerts | `/admin/audit?level=warning` | `audit.view` | shortcut to `monitor.audit` |
 | Manual | `/admin/help` | `dashboard.view` | `/admin/help/{topic}` |
 
 ## Object pages
