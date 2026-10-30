@@ -25,7 +25,7 @@ from app.domain.authorization import Principal, Role, Scope
 from app.i18n import BoundGettext
 from app.web.authz_labels import ROLE_LABELS
 from app.web.help import HelpTopic, shipped_manual, topic_for_path
-from app.web.locale import RequestLocale, resolve_locale
+from app.web.locale import RequestLocale, request_locale
 from app.web.navigation import BOTTOM_BAR_ENTRIES, SECTIONS, TOP_BAR, Home, Screen, home_of
 from app.web.organisation_settings import settings_for
 from app.web.protection import require_same_origin
@@ -33,7 +33,7 @@ from app.web.templates import create_templates, kept_query, render
 
 templates = create_templates([Path(__file__).parent / "templates"])
 
-Locale = Annotated[RequestLocale, Depends(resolve_locale)]
+Locale = Annotated[RequestLocale, Depends(request_locale)]
 SameOrigin = Annotated[None, Depends(require_same_origin)]
 
 

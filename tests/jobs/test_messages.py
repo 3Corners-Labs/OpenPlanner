@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from app.adapters.db.text_overrides import CachedTextOverrides
 from app.domain.booking import Booking, BookingStatus, ChangeReason, Contact
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
@@ -14,6 +15,8 @@ from app.domain.scheduling import DispatchKind, PhoneMode
 from app.domain.tokens import derive_token, new_token_salt
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
+from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.admin import two_organisations
 from tests.support.domain import NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY, make_group
 
 SALT = new_token_salt()
@@ -561,3 +564,68 @@ def test_no_trial_link_without_video_or_when_the_group_switched_it_off(
 
     assert "/test" not in no_video.text
     assert "/test" not in off.text
+
+
+async def _with_organisation_texts(
+    texts: dict[tuple[str, str], str], organisation_id: int = 1
+) -> MessageComposer:
+    """Return a composer whose translator reads ``texts`` as the organisation's own."""
+    uow = InMemoryUnitOfWork(two_organisations())
+    uow.state.organisation_texts[organisation_id] = texts
+    translator = Translator(load_catalogues(), CachedTextOverrides(uow))
+    composer = MessageComposer(translator, TEST_TOKEN_KEY, "https://afspraak.example.nl/")
+    await composer.refresh()
+    return composer
+
+
+async def test_an_organisation_text_replaces_the_catalogue_in_an_email_and_an_sms() -> None:
+    composer = await _with_organisation_texts(
+        {
+            ("nl", "message.reminder.subject"): "Tot snel op {date}",
+            ("nl", "message.reminder.sms"): "Tot {date}, {first_name}! {manage_url}",
+        }
+    )
+
+    email = composer.compose(JobType.SEND_REMINDER, BOOKING, GROUP, NOW)
+    sms = composer.compose(JobType.SEND_REMINDER, SMS_BOOKING, GROUP, NOW, channel=ChannelKind.SMS)
+    english = composer.compose(JobType.SEND_REMINDER, replace(BOOKING, locale="en"), GROUP, NOW)
+
+    assert email.subject == "Tot snel op maandag 5 januari 2026"
+    assert "Dit is een herinnering" in email.text  # blocks without an organisation text
+    assert sms.text.startswith("Tot maandag 5 januari 2026, Ada! https://afspraak.example.nl/b/")
+    assert english.subject.startswith("Reminder:")  # the other locale keeps the catalogue
+
+
+async def test_a_group_text_goes_before_the_organisation_text() -> None:
+    composer = await _with_organisation_texts(
+        {("nl", "message.reminder.subject"): "Organisatie {date}"}
+    )
+    group_texts = {("nl", "message.reminder.subject"): "Groep {date}"}
+
+    own = composer.compose(JobType.SEND_REMINDER, BOOKING, GROUP, NOW, texts=group_texts)
+    other = composer.compose(JobType.SEND_REMINDER, BOOKING, GROUP, NOW, texts={})
+
+    assert own.subject == "Groep maandag 5 januari 2026"
+    assert other.subject == "Organisatie maandag 5 januari 2026"
+
+
+async def test_another_organisations_text_does_not_apply() -> None:
+    composer = await _with_organisation_texts(
+        {("nl", "message.reminder.subject"): "Andere organisatie"}, organisation_id=2
+    )
+
+    email = composer.compose(JobType.SEND_REMINDER, BOOKING, GROUP, NOW)
+
+    assert email.subject.startswith("Herinnering:")
+
+
+async def test_an_organisation_text_is_escaped_in_the_html_part() -> None:
+    composer = await _with_organisation_texts(
+        {("nl", "message.reminder.intro"): "<script>alert(1)</script> voor {group_name}"}
+    )
+
+    email = composer.compose(JobType.SEND_REMINDER, BOOKING, GROUP, NOW)
+
+    assert "<script>" not in (email.html or "")
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in (email.html or "")
+    assert "<script>alert(1)</script>" in email.text  # the plain-text part is text
