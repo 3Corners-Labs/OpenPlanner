@@ -1,5 +1,5 @@
 {
-  "$comment": "Public pages under test. Single source for axe (tests/a11y.spec.ts) and Lighthouse (scripts/lighthouse.mjs). Each page is checked in every listed locale via ?lang=. /g/demo needs the demo seed (python -m app.cli seed-demo); the closure pages (ADR 0037) need python -m app.cli seed-closures > e2e/fixtures.json, which also resolves \"{name}\" paths. The widget pages (ADR 0035) are on the test host page of another origin, http://localhost:8001 (e2e/host/serve.mjs). The maintenance page (ADR 0038) closes every page, so it is checked in tests/maintenance.spec.ts, in its own CI step.",
+  "$comment": "Public pages under test. Single source for axe (tests/a11y.spec.ts) and Lighthouse (scripts/lighthouse.mjs). Each page is checked in every listed locale via ?lang=. /g/demo needs the demo seed (python -m app.cli seed-demo); the closure pages (ADR 0037) need python -m app.cli seed-closures > e2e/fixtures.json, which also resolves \"{name}\" paths. The widget pages (ADR 0035) are on the test host page of another origin, http://localhost:8001 (e2e/host/serve.mjs). The maintenance page (ADR 0038) closes every page, so it is checked in tests/maintenance.spec.ts, in its own CI step. The admin pages need a login at Keycloak as \"user\" and are checked by tests/admin-shell.spec.ts at phone, tablet and desktop width (SH-1); Lighthouse leaves them out.",
   "pages": [
     {
       "name": "home",
@@ -79,6 +79,57 @@
       "locales": [
         "nl",
         "en"
+      ]
+    }
+  ],
+  "admin": [
+    {
+      "name": "overview",
+      "path": "/admin/",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "audit log",
+      "path": "/admin/audit",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "group page",
+      "path": "/admin/groups/demo",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "advanced settings",
+      "path": "/admin/settings",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "overview as group admin",
+      "path": "/admin/",
+      "user": "groupadmin",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "my rights as agent",
+      "path": "/admin/rights",
+      "user": "agent",
+      "locales": [
+        "nl"
       ]
     }
   ]
