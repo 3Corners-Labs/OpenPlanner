@@ -11,21 +11,16 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, Request
 from starlette.responses import HTMLResponse
 
-from app.admin.authz import can_function, session_principal
+from app.admin.authz import can_function, return_path, session_principal
 from app.admin.forms import Field, moment_label
 from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
-from app.admin.session import (
-    THEMES,
-    AlertPrefs,
-    choose_alert_prefs,
-    choose_theme,
-    session_theme,
-)
+from app.admin.session import THEMES, session_alert_prefs, session_theme
 from app.domain.authorization import Principal, Role, Scope
 from app.i18n import BoundGettext
 from app.web.authz_labels import ROLE_LABELS
@@ -34,7 +29,7 @@ from app.web.locale import RequestLocale, resolve_locale
 from app.web.navigation import BOTTOM_BAR_ENTRIES, SECTIONS, TOP_BAR, Home, Screen, home_of
 from app.web.organisation_settings import settings_for
 from app.web.protection import require_same_origin
-from app.web.templates import create_templates, render, switch_href
+from app.web.templates import create_templates, kept_query, render
 
 templates = create_templates([Path(__file__).parent / "templates"])
 
@@ -68,11 +63,15 @@ THEME_LABELS = {
 }
 """Label key per theme of ``session.THEMES`` (literal keys, so the catalogue test sees them)."""
 
-THEME_PARAM = "theme"
-"""Query parameter of the theme choice in the profile menu."""
 
-ALERT_FORM_PARAM = "alert_prefs"
-"""Marker field of the alert preferences form in the profile menu (its box may arrive unticked)."""
+@dataclass(frozen=True)
+class Choice:
+    """One option of a choice row in the profile menu (theme), rendered as a submit button."""
+
+    value: str
+    label: str
+    current: bool
+
 
 ALERT_POPUP_LABELS = {
     "all": "admin.alerts.popups.all",
@@ -83,25 +82,21 @@ ALERT_POPUP_LABELS = {
 """Label key per pop-up choice of ``session.ALERT_POPUPS`` (literal keys for the catalogue)."""
 
 
-def alert_prefs_of(request: Request) -> AlertPrefs:
-    """Apply a submitted alert preferences form (a GET of the profile menu), return the choice."""
-    query = request.query_params
-    return choose_alert_prefs(
-        request,
-        sent=query.get(ALERT_FORM_PARAM) == "1",
-        banner=query.get("alert_banner") == "1",
-        popups=query.get("alert_popups"),
-    )
+def back_href(request: Request) -> str:
+    """Return the current page as the "return to" target of the profile menu's forms.
+
+    The path is ``return_path`` (a GET returns to itself, a page rendered by a POST to the page
+    that sent the form) and the query is filtered like a link's (``kept_query``), so typed
+    input is never echoed; ``preference_routes`` still checks the value with ``safe_next``.
+    """
+    query = urlencode(kept_query(request))
+    path = return_path(request)
+    return f"{path}?{query}" if query else path
 
 
-def theme_options(request: Request, locale: RequestLocale, current: str) -> list[NavView]:
-    """Return the theme choice as query-only links, the current one marked."""
-    return [
-        NavView(
-            locale.gettext(THEME_LABELS[t]), switch_href(request, THEME_PARAM, t), t == current, ""
-        )
-        for t in THEMES
-    ]
+def theme_options(locale: RequestLocale, current: str) -> list[Choice]:
+    """Return the theme choice of the profile menu, the current one marked."""
+    return [Choice(t, locale.gettext(THEME_LABELS[t]), t == current) for t in THEMES]
 
 
 def route_template(request: Request) -> str:
@@ -209,8 +204,7 @@ def page(
     nav = [section for section in sections if section.entries]
     top_links = [_nav_view(locale, link, home) for link in TOP_BAR if can(link.permission)]
     bar, more = bottom_bar(nav)
-    theme = choose_theme(request, request.query_params.get(THEME_PARAM))
-    alert_prefs = alert_prefs_of(request)
+    theme = session_theme(request)
     maintenance = getattr(request.state, "maintenance_notice", None)
     response = render(
         templates,
@@ -227,8 +221,10 @@ def page(
             "can": can,
             "role_labels": role_labels(principal, locale),
             "theme": theme,
-            "themes": theme_options(request, locale, theme),
-            "alert_prefs": alert_prefs,
+            "themes": theme_options(locale, theme),
+            "alert_prefs": session_alert_prefs(request),
+            # Where the preference forms of the profile menu return to (``preference_routes``).
+            "back": back_href(request),
             "alert_popup_options": [
                 (key, locale.gettext(label)) for key, label in ALERT_POPUP_LABELS.items()
             ],

@@ -142,6 +142,21 @@ def _choices(page: str, label_id: str) -> list[tuple[str, str, bool]]:
     ]
 
 
+def _buttons(page: str, label_id: str) -> list[tuple[str, str, bool]]:
+    """Return (text, value, current) of the submit buttons of the row named by ``label_id``."""
+    group = _panel(page).split(f'aria-labelledby="{label_id}"', 1)[1].split("</div>", 1)[0]
+    return [
+        (text, re.search(r'value="([^"]+)"', attrs).group(1), 'aria-current="true"' in attrs)  # type: ignore[union-attr]
+        for attrs, text in re.findall(r"<button ([^>]*)>([^<]+)</button>", group)
+    ]
+
+
+def _back(page: str, form_class: str = "") -> str:
+    """Return the ``next`` the profile menu's forms return to."""
+    form = _panel(page).split(f'<form{form_class} method="get" action="/admin/preferences">', 1)[1]
+    return re.search(r'name="next" value="([^"]*)"', form).group(1)  # type: ignore[union-attr]
+
+
 def _theme(page: str) -> str | None:
     """Return the theme the page's body declares, if any."""
     found = re.search(r'<body class="admin" data-theme="([a-z]+)"', page)
@@ -154,40 +169,68 @@ async def test_the_theme_follows_the_system_until_the_admin_chooses(site: Site) 
     page = (await site.client.get("/admin/")).text
 
     assert _theme(page) == "system"
-    assert _choices(page, "theme-label") == [
-        ("Systeem", "?theme=system", True),
-        ("Licht", "?theme=light", False),
-        ("Donker", "?theme=dark", False),
+    assert _buttons(page, "theme-label") == [
+        ("Systeem", "system", True),
+        ("Licht", "light", False),
+        ("Donker", "dark", False),
     ]
+    assert _back(page) == "/admin/"
 
 
-async def test_a_chosen_theme_stays_for_the_session_without_a_new_cookie(site: Site) -> None:
+async def test_a_chosen_theme_redirects_back_and_stays_for_the_session(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
-    chosen = await site.client.get("/admin/audit?theme=dark")
+    chosen = await site.client.get("/admin/preferences?next=/admin/audit&theme=dark")
+    back = await site.client.get(chosen.headers["location"])
     later = (await site.client.get("/admin/")).text
 
+    assert (chosen.status_code, chosen.headers["location"]) == (303, "/admin/audit")
     cookies = {c.split("=", 1)[0] for c in chosen.headers.get_list("set-cookie")}
     assert cookies <= {"op_admin"}
-    assert _theme(chosen.text) == "dark"
+    assert _theme(back.text) == "dark"
     assert _theme(later) == "dark"
-    assert ("Donker", "?theme=dark", True) in _choices(later, "theme-label")
+    assert ("Donker", "dark", True) in _buttons(later, "theme-label")
 
 
 async def test_an_unknown_theme_is_ignored_and_never_reflected(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
-    await site.client.get("/admin/?theme=light")
+    await site.client.get("/admin/preferences?theme=light")
 
-    page = (await site.client.get("/admin/?theme=%22%3E%3Cx")).text
+    chosen = await site.client.get("/admin/preferences?theme=%22%3E%3Cx&next=/admin/")
+    page = (await site.client.get("/admin/")).text
 
+    assert chosen.status_code == 303
     assert _theme(page) == "light"
     assert "%22%3E%3Cx" not in page
     assert '"><x' not in page
 
 
+async def test_the_return_target_stays_inside_the_portal(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    elsewhere = await site.client.get("/admin/preferences?theme=dark&next=https://evil.example/")
+    scheme_less = await site.client.get("/admin/preferences?theme=dark&next=//evil.example/")
+    itself = await site.client.get(
+        "/admin/preferences?theme=dark&next=/admin/preferences%3Ftheme%3Dlight"
+    )
+    missing = await site.client.get("/admin/preferences?theme=dark")
+
+    assert {r.headers["location"] for r in (elsewhere, scheme_less, itself, missing)} == {"/admin/"}
+
+
+async def test_the_forms_return_to_the_page_with_its_date_filters_only(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    page = (await site.client.get("/admin/audit?from=2026-10-01&level=x&booking=%3Cy")).text
+
+    assert _back(page) == "/admin/audit?from=2026-10-01"
+    assert _back(page, ' class="admin-profile__alerts"') == "/admin/audit?from=2026-10-01"
+    assert "%3Cy" not in _panel(page)
+
+
 async def test_the_theme_survives_a_fresh_login_but_not_a_logout(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
-    await site.client.get("/admin/?theme=dark")
+    await site.client.get("/admin/preferences?theme=dark")
 
     await site.login_as(GROUP_ADMIN)
     after_login = (await site.client.get("/admin/")).text
@@ -201,12 +244,14 @@ async def test_the_theme_survives_a_fresh_login_but_not_a_logout(site: Site) -> 
 
 async def test_the_choices_are_buttons_and_the_current_one_is_primary(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
+    await site.client.get("/admin/preferences?theme=dark")
 
-    page = (await site.client.get("/admin/?theme=dark")).text
+    page = (await site.client.get("/admin/")).text
 
     group = _panel(page).split('aria-labelledby="theme-label"', 1)[1].split("</div>", 1)[0]
-    assert '<a class="button button--small" href="?theme=dark" aria-current="true">' in group
-    assert '<a class="button button--small button--secondary" href="?theme=light">' in group
+    small = 'class="button button--small'
+    assert f'<button type="submit" name="theme" value="dark" {small}" aria-current="true">' in group
+    assert f'<button type="submit" name="theme" value="light" {small} button--secondary">' in group
 
 
 async def test_the_language_is_chosen_in_the_panel_not_in_the_top_bar(site: Site) -> None:
@@ -222,14 +267,28 @@ async def test_the_language_is_chosen_in_the_panel_not_in_the_top_bar(site: Site
     assert 'hreflang="en" lang="en"' in _panel(page)
 
 
+async def test_the_panel_head_shows_the_name_in_bold_and_the_role_under_it(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    panel = _panel((await site.client.get("/admin/?lang=en")).text)
+    await site.login_as(SUPER)
+    super_panel = _panel((await site.client.get("/admin/?lang=en")).text)
+
+    head = panel.split('<div class="admin-profile__head">', 1)[1].split("</div>", 1)[0]
+    assert f'<p class="admin-profile__who">{GROUP_ADMIN.display_name}</p>' in head
+    assert '<p class="admin-profile__role">Group admin</p>' in head
+    assert "Signed in as" not in panel
+    assert 'class="chip"' not in panel
+    assert '<p class="admin-profile__role">Superuser</p>' in super_panel
+
+
 async def test_the_panel_follows_the_order_of_the_design(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
     panel = _panel((await site.client.get("/admin/?lang=en")).text)
 
     order = [
-        "admin-profile__signed-in",
-        "admin-profile__roles",
+        "admin-profile__who",
+        "admin-profile__role",
         "admin-profile__source",
         'href="/admin/rights"',
         'id="theme-label"',
@@ -242,13 +301,17 @@ async def test_the_panel_follows_the_order_of_the_design(site: Site) -> None:
     assert "Your role comes from your organisation account" in panel
 
 
-async def test_my_rights_is_offered_only_to_who_may_see_it(site: Site) -> None:
+async def test_my_rights_and_the_preferences_are_offered_only_to_who_may_use_them(
+    site: Site,
+) -> None:
     await site.login_as(NO_ROLE)
 
     page = (await site.client.get("/admin/")).text
 
     assert "<fieldset" not in page
+    assert 'id="theme-label"' not in page
     assert 'href="/admin/rights"' not in page
+    assert _choices(page, "language-label")
 
 
 def _alerts(page: str) -> tuple[bool, str | None]:
@@ -273,29 +336,33 @@ async def test_alert_preferences_start_with_the_banner_on_and_warnings_popping_u
 async def test_alert_preferences_are_kept_in_the_session(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
-    chosen = await site.client.get("/admin/audit?alert_prefs=1&alert_popups=outages")
+    chosen = await site.client.get(
+        "/admin/preferences?next=/admin/audit&alert_prefs=1&alert_popups=outages"
+    )
     later = (await site.client.get("/admin/")).text
 
+    assert (chosen.status_code, chosen.headers["location"]) == (303, "/admin/audit")
     cookies = {c.split("=", 1)[0] for c in chosen.headers.get_list("set-cookie")}
     assert cookies <= {"op_admin"}
-    assert _alerts(chosen.text) == (False, "outages")
     assert _alerts(later) == (False, "outages")
 
 
 async def test_an_unticked_banner_box_only_counts_when_the_form_was_sent(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
-    await site.client.get("/admin/?alert_popups=off")
-    page = (await site.client.get("/admin/?alert_prefs=1&alert_banner=1&alert_popups=all")).text
+    await site.client.get("/admin/preferences?alert_popups=off")
+    await site.client.get("/admin/preferences?alert_prefs=1&alert_banner=1&alert_popups=all")
+    page = (await site.client.get("/admin/")).text
 
     assert _alerts(page) == (True, "all")
 
 
 async def test_an_unknown_pop_up_choice_is_ignored_and_never_reflected(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
-    await site.client.get("/admin/?alert_prefs=1&alert_popups=all")
+    await site.client.get("/admin/preferences?alert_prefs=1&alert_popups=all")
 
-    page = (await site.client.get("/admin/?alert_prefs=1&alert_popups=%22%3E%3Cx")).text
+    await site.client.get("/admin/preferences?alert_prefs=1&alert_popups=%22%3E%3Cx")
+    page = (await site.client.get("/admin/")).text
 
     assert _alerts(page)[1] == "all"
     assert "%22%3E%3Cx" not in page
@@ -304,7 +371,7 @@ async def test_an_unknown_pop_up_choice_is_ignored_and_never_reflected(site: Sit
 
 async def test_alert_preferences_survive_a_fresh_login_but_not_a_logout(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
-    await site.client.get("/admin/?alert_prefs=1&alert_popups=off")
+    await site.client.get("/admin/preferences?alert_prefs=1&alert_popups=off")
 
     await site.login_as(GROUP_ADMIN)
     after_login = (await site.client.get("/admin/")).text

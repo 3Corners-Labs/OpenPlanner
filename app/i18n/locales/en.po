@@ -577,9 +577,6 @@ msgstr "Platform"
 msgid "admin.nav.object.group"
 msgstr "Group"
 
-msgid "admin.profile.roles"
-msgstr "Your roles"
-
 msgid "admin.profile.source"
 msgstr "Your role comes from your organisation account and cannot be changed here."
 
