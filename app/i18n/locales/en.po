@@ -5838,6 +5838,12 @@ msgstr "Release repository"
 msgid "settings.field.update_check_token.label"
 msgstr "Repository read token"
 
+msgid "settings.field.update_channel.label"
+msgstr "Update channel"
+
+msgid "settings.field.update_auto_apply.label"
+msgstr "Update automatically"
+
 msgid "settings.field.time_format.label"
 msgstr "Time format"
 

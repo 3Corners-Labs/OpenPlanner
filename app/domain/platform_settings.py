@@ -112,14 +112,27 @@ _TYPES: dict[Kind, tuple[type, ...]] = {
 TIMEZONE_KEYS = frozenset({"admin_timezone"})
 """String settings whose value must be an IANA time zone known to this installation."""
 
+PRODUCTION_REFUSED: Mapping[str, frozenset[object]] = {
+    "update_channel": frozenset({"rc"}),
+    "update_auto_apply": frozenset({True}),
+}
+"""Portal values that are never usable with ``ENVIRONMENT=prod`` (ADR 0067 point 1).
 
-def usable(spec: SettingSpec, value: object) -> bool:
+Production follows releases on a superuser's click. A stored value in this table is ignored
+and flagged, like any value outside the bounds; the environment may still lock the setting.
+"""
+
+
+def usable(spec: SettingSpec, value: object, *, production: bool = False) -> bool:
     """Return whether ``value`` may be applied as the portal value of ``spec``.
 
     Only class C and D settings that are not secrets, with a value of the right type within
-    the portal bounds. Secrets are stored sealed elsewhere (ADR 0008), never here.
+    the portal bounds. Secrets are stored sealed elsewhere (ADR 0008), never here. With
+    ``production``, the values of ``PRODUCTION_REFUSED`` are not usable either.
     """
     if not spec.in_portal or spec.secret:
+        return False
+    if production and value in PRODUCTION_REFUSED.get(spec.key, frozenset()):
         return False
     if value is None:
         return within_bounds(spec, None)
@@ -143,6 +156,8 @@ def resolve(
     env_source: Source | None,
     portal: PortalValues,
     now: datetime | None = None,
+    *,
+    production: bool = False,
 ) -> Resolved:
     """Resolve one setting: code default, then portal value, then environment lock.
 
@@ -154,11 +169,17 @@ def resolve(
         portal: The stored portal values.
         now: The current time; a value that lapsed before it no longer applies. ``None``
             applies every stored value.
+        production: Whether ``ENVIRONMENT=prod``: the values of ``PRODUCTION_REFUSED`` are
+            then ignored (ADR 0067).
     """
     if spec.secret:
         return _resolve_secret(spec, env_value, env_source, portal)
     stored = portal.applies(spec.key, now)
-    ignored = stored and spec.in_portal and not usable(spec, portal.values[spec.key])
+    ignored = (
+        stored
+        and spec.in_portal
+        and not usable(spec, portal.values[spec.key], production=production)
+    )
     if env_source is not None:
         outside = spec.in_portal and not spec.secret and not within_bounds(spec, env_value)
         return Resolved(spec, env_value, env_source, spec.lockable, outside, ignored)
