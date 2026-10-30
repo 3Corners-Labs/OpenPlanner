@@ -1,6 +1,6 @@
 # 0033. Context-sensitive help from one manual
 
-Status: accepted (2026-10-27), requested by the product owner.
+Status: accepted (2026-10-27), requested by the product owner. Partly built; see `docs/adr-status.md` for what is built.
 
 ## Context
 

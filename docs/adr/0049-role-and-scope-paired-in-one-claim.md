@@ -5,7 +5,7 @@ Amends ADR 0013 (point 3: which
 claims carry rights, and that their values are slugs), ADR 0014 (how `decide` and `scope_for`
 combine roles and scopes), ADR 0039 (points 3 and 6: how a custom role is linked to the identity
 provider) and ADR 0046 (a membership carries a role). Relates to open point O4 (agents in
-multiple groups) and O3 (IdP claim names).
+multiple groups) and O3 (IdP claim names). Not built yet; see `docs/adr-status.md` for what is built.
 
 ## Context
 

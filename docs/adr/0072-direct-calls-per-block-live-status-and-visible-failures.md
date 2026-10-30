@@ -1,9 +1,9 @@
 # 0072. Direct calls per staffing block, live status for citizen and agent, visible failures
 
-Status: proposed (2026-10-30), requested by the product owner after testing the own queue
+Status: accepted (2026-10-30), requested by the product owner after testing the own queue
 on docker01. Amends ADR 0019 (direct call per group) and ADR 0026 (cap and queue feedback),
 extends ADR 0043 (own queue) and follows the pattern of ADR 0048 and ADR 0061 (a small own
-script that polls a server-rendered fragment).
+script that polls a server-rendered fragment). Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
 
 ## Context
 
@@ -118,7 +118,7 @@ echo the request).
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1 | Everything above in one PR: offer per block with migration, `wait_state`, video state in the queue, three fragments and `live-region.js`, Webex fix, `QUEUE_REFRESH_SECONDS` | this PR | in PR |
+| 1 | Everything above in one PR: offer per block with migration, `wait_state`, video state in the queue, three fragments and `live-region.js`, Webex fix, `QUEUE_REFRESH_SECONDS` | #155 | merged |
 | 2 | Updates page on `live-region.js` instead of `update-progress.js` | | follow-up |
 
 ## Consequences

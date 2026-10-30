@@ -1,7 +1,7 @@
 # Handover: groepsagenda met Webex Contact Center
 
 Datum: 22 oktober 2026
-Status: ontwerp vastgesteld op hoofdlijnen, bouw nog niet gestart
+Status: ontwerp vastgesteld; de bouw loopt. Per besluit staat in `docs/adr-status.md` wat gebouwd is (gecontroleerd tegen de code op 30 oktober 2026)
 Doel van dit document: alles wat een ontwikkelaar (of Claude Code) nodig heeft om zonder deze gespreksgeschiedenis te starten.
 
 ---
