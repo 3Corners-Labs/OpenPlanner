@@ -54,6 +54,7 @@ class HelpTopic:
 
 
 TOPICS = (
+    HelpTopic("overview", ("/admin/",), Permission.DASHBOARD_VIEW),
     HelpTopic("group-settings", ("/admin/groups/{slug}/settings",), Permission.GROUP_EDIT),
     HelpTopic("branding", ("/admin/organisations/{org}/branding",), Permission.BRANDING_MANAGE),
     HelpTopic("rights-matrix", ("/admin/matrix",), Permission.MATRIX_VIEW),

@@ -4,7 +4,7 @@ Every log line, from structlog or the stdlib (uvicorn, SQLAlchemy, ...), passes 
 ``mask_pii`` before rendering. Masking is a safety net: code must still never pass PII
 to a logger (enforced by the semgrep rules in ``.semgrep/``).
 
-Lines use the envelope of ``openplanner.event/1`` (ADR 0040, part 2), so a log platform reads
+Lines use the envelope of ``openplanner.event/2`` (ADR 0040, part 2), so a log platform reads
 them without mapping: ``@timestamp`` (RFC 3339 UTC, milliseconds), ``log.level``, ``message``,
 ``service.name``, ``service.version``, ``installation``, and, inside a request or job,
 ``trace.id``, ``organisation`` and ``group`` from ``app.domain.event_context``.

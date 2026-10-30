@@ -19,6 +19,18 @@
   <dl class="facts">
     <div><dt>{{ _("admin.settings.status.environment") }}</dt><dd><code>{{ environment }}</code></dd></div>
   </dl>
+  <h3 id="tls-heading">{{ _("admin.settings.tls.title") }}</h3>
+  {% if certificate %}
+  <dl class="facts" aria-labelledby="tls-heading">
+    <div><dt>{{ _("admin.settings.tls.host") }}</dt><dd><code>{{ certificate.host }}</code></dd></div>
+    <div><dt>{{ _("admin.settings.tls.checked_at") }}</dt><dd>{{ certificate.checked_at }}</dd></div>
+    {% if certificate.issuer %}<div><dt>{{ _("admin.settings.tls.issuer") }}</dt><dd>{{ certificate.issuer }}</dd></div>{% endif %}
+    {% if certificate.valid_until %}<div><dt>{{ _("admin.settings.tls.valid_until") }}</dt><dd>{{ certificate.valid_until }}</dd></div>{% endif %}
+  </dl>
+  <p><span class="chip chip--{{ certificate.chip }}">{{ _("admin.settings.tls.finding") }}</span> {{ certificate.finding }}</p>
+  {% else %}
+  <p>{{ _("admin.settings.tls.none") }}</p>
+  {% endif %}
   {% if problems %}
   <div class="alert alert--info">
     <p>{{ _("admin.settings.status.problems") }}</p>

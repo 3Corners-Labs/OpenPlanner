@@ -1,9 +1,13 @@
-# Test overlay for scripts/check-proxy.sh (ADR 0030): Let's Encrypt's test CA (Pebble) instead
-# of the real one, on loopback ports, with the app in development mode. Never for production.
+# Test overlay for scripts/check-proxy.sh (ADR 0030, ADR 0064): Let's Encrypt's test CA
+# (Pebble) instead of the real one, on loopback ports, with the app in development mode; the
+# second pass serves an own certificate from the same mounted directory. Never for production.
 services:
   web:
     environment:
       ENVIRONMENT: dev
+    # `tls-check --host booking.test --port 8443` from web reaches the proxy on the edge network.
+    extra_hosts:
+      - "booking.test:172.31.240.2"
     ports: !override
       - "127.0.0.1:18000:8000"
   worker:
@@ -25,6 +29,9 @@ services:
       ACME_CA: https://pebble:14000/dir
       # Trust Pebble's own TLS certificate (Go reads SSL_CERT_FILE).
       SSL_CERT_FILE: /pebble/pebble.minica.pem
+      # Second pass of check-proxy.sh: an own certificate from the mounted directory.
+      TLS_CERT_FILE: ${PROXY_CERT_FILE:-}
+      TLS_KEY_FILE: ${PROXY_KEY_FILE:-}
     volumes:
       - ${PEBBLE_CERTS:?set by scripts/check-proxy.sh}:/pebble:ro
     depends_on:

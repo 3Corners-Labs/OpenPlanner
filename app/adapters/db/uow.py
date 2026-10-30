@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
+from app.adapters.db.certificate import CertificateQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, answers_json
@@ -377,6 +378,7 @@ class SqlTransaction(
     ScenarioQueries,
     PlatformSettingsQueries,
     FormFieldQueries,
+    CertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
@@ -386,7 +388,7 @@ class SqlTransaction(
     the maintenance switch from ``MaintenanceQueries`` (ADR 0038), custom roles from
     ``RoleQueries`` (ADR 0039), closure images and scenarios from ``ImageQueries`` and
     ``ScenarioQueries`` (ADR 0037), portal settings from ``PlatformSettingsQueries``
-    (ADR 0042).
+    (ADR 0042), the certificate check from ``CertificateQueries`` (ADR 0064).
 
     Args:
         session: The open session.
@@ -443,6 +445,7 @@ class SqlTransaction(
                 category=event.event_category.value,
                 trace_id=event.trace_id[:32],
                 service=event.service[:16],
+                message=event.message[:300],
             )
         )
         await self._session.flush()
@@ -513,6 +516,7 @@ class SqlTransaction(
                     trace_id=row.trace_id,
                     service=row.service,
                     event_id=row.event_id,
+                    message=row.message,
                 ),
                 name,
             )
@@ -1114,6 +1118,7 @@ class SqlTransaction(
                 at=event.at,
                 kind=event.kind.value,
                 detail=event.detail[:128],
+                message=event.message[:300],
             )
         )
         await self._session.flush()
@@ -1125,7 +1130,9 @@ class SqlTransaction(
             .where(BookingEventRow.booking_id == booking_id)
             .order_by(BookingEventRow.at, BookingEventRow.id)
         )
-        return [BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail) for r in rows]
+        return [
+            BookingEvent(r.booking_id, r.at, EventKind(r.kind), r.detail, r.message) for r in rows
+        ]
 
     async def list_bookings(
         self, scope: Scope, group_id: int, lower: datetime, upper: datetime

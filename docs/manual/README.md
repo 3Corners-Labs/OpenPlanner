@@ -10,6 +10,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 
 | Screen / scherm | Nederlands | English |
 |---|---|---|
+| Overview / overzicht | [Overzicht](nl/overview.md) | [Overview](en/overview.md) |
 | Group settings / groepsinstellingen | [Groepsinstellingen](nl/group-settings.md) | [Group settings](en/group-settings.md) |
 | Branding / huisstijl | [Huisstijl](nl/branding.md) | [Branding](en/branding.md) |
 | Rights matrix / rechtenmatrix | [Rechtenmatrix](nl/rights-matrix.md) | [Rights matrix](en/rights-matrix.md) |
