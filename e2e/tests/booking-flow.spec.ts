@@ -67,8 +67,9 @@ test('book, confirm, move and cancel with the keyboard only', async ({ page }, t
   await expect(page.getByRole('status')).toContainText('We hebben u een e-mail gestuurd');
   await expectNoAxeViolations(page);
 
-  // The emailed link opens the confirm page; only its button confirms.
-  await page.goto(fixture('pending_flow'));
+  // The emailed link opens the confirm page; only its button confirms. Each browser confirms
+  // its own seeded booking, since a confirmed one no longer shows the button.
+  await page.goto(fixture(`pending_flow_${testInfo.project.name}`));
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Afspraak bevestigen');
   await expectNoAxeViolations(page);
   await tabTo(page, page.getByRole('button', { name: 'Afspraak bevestigen' }));
