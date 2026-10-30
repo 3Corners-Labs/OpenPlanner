@@ -31,7 +31,7 @@ lint:
 # renovate: datasource=pypi depName=shellcheck-py
 SHELLCHECK_VERSION := 0.11.0.1
 shellcheck:
-	uvx --from shellcheck-py==$(SHELLCHECK_VERSION) shellcheck scripts/*.sh scripts/updater/*.sh .githooks/*
+	uvx --from shellcheck-py==$(SHELLCHECK_VERSION) shellcheck scripts/*.sh scripts/updater/*.sh deploy/proxy/*.sh .githooks/*
 
 type:
 	$(UV) mypy
