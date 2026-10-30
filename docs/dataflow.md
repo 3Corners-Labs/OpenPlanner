@@ -22,6 +22,9 @@ It identifies nobody and is strictly functional, so no consent banner is needed.
 ```
 worker ──SMTP──> mail provider of the organisation (admin portal; else SMTP_HOST) ──> citizen
    reads booking at send time: first name, email, date, time, team, management link
+   request to confirm a new booking and its reminder (ADR 0056): email, date, time, team
+   and the confirm link only; no name, join link or calendar file (the address is not
+   verified yet); the lapse message links the group page instead of the booking
    closure mails also: the closure's notice and heading, its copy of the contact options
    (organisation data) and the link to the closure page (ADR 0037 §5); never the image
 ```
@@ -82,7 +85,12 @@ Jobs, slots, schedules and audit events carry no personal data of citizens. A fa
 job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
 the group name and the host's address (masked), never a citizen's data; the system event of the
 automatic group check (ADR 0065 step 2) carries the same masked reason of the probe meeting,
-which belongs to no booking. The definitions of
+which belongs to no booking. A request event (`integration.request`, ADR 0068) records each
+call to Webex and WxCC made for a booking as method, path without its query string, status,
+duration, the platform's tracking id and the version: never a body, a query or a header, so
+neither the host's address (a query parameter of `DELETE /meetings`) nor a citizen's first name
+(the work item body) reaches it. Request events are kept `INTEGRATION_REQUEST_RETENTION_DAYS`
+(default 30). The definitions of
 custom fields (`group_form_fields`: keys, labels, options) are the organisation's questions,
 not answers, and hold no personal data; the admin screen refuses questions about a BSN, an
 identity document or special categories of personal data (ADR 0055).

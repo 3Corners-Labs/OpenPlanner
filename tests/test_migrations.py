@@ -383,13 +383,51 @@ def test_the_name_is_split_on_upgrade_and_joined_on_downgrade(
     assert "group_form_fields" not in tables
 
 
+def test_unconfirmed_bookings_are_cancelled_and_purged_on_downgrade(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    import sqlite3
+
+    command.upgrade(alembic_config, "0058")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    database.executescript(
+        """
+        INSERT INTO organisations (id, name, slug) VALUES (1, 'Gemeente', 'gemeente');
+        INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+            min_notice_minutes, horizon_days, phone_mode)
+            VALUES (1, 1, 'Team', 'team', 'Europe/Amsterdam', 30, 60, 60, 'optional');
+        INSERT INTO slots (id, group_id, start, "end", capacity_snapshot)
+            VALUES (1, 1, '2026-01-05 08:00:00', '2026-01-05 08:30:00', 2);
+        INSERT INTO bookings (id, slot_id, group_id, status, locale, management_token_hash,
+            management_token_salt, created_at, consents, confirm_by, confirmed_at)
+            VALUES (1, 1, 1, 'pending_confirmation', 'nl', 'h1', 's', '2026-01-01 08:00:00',
+                '', '2026-01-02 08:00:00', NULL),
+            (2, 1, 1, 'confirmed', 'nl', 'h2', 's', '2026-01-01 08:00:00', '', NULL,
+                '2026-01-01 09:00:00');
+        """
+    )
+    database.commit()
+    database.close()
+
+    command.downgrade(alembic_config, "0057")
+
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    statuses = database.execute("SELECT id, status FROM bookings ORDER BY id").fetchall()
+    purges = database.execute("SELECT booking_id FROM jobs WHERE type = 'purge_pii'").fetchall()
+    columns = {row[1] for row in database.execute("PRAGMA table_info(bookings)")}
+    database.close()
+    assert statuses == [(1, "cancelled"), (2, "confirmed")]
+    assert purges == [(1,)]
+    assert not {"confirm_by", "confirmed_at"} & columns
+
+
 def test_the_direct_call_switch_becomes_an_offer_per_block_and_back(
     alembic_config: Config, tmp_path: Path
 ) -> None:
     """ADR 0070: the switch becomes blocks that offer both; the downgrade restores it."""
     import sqlite3
 
-    command.upgrade(alembic_config, "0057")
+    command.upgrade(alembic_config, "0059")
     database = sqlite3.connect(tmp_path / "migrate.db")
     database.executescript(
         """
@@ -423,7 +461,7 @@ def test_the_direct_call_switch_becomes_an_offer_per_block_and_back(
     database.commit()
     database.close()
 
-    command.downgrade(alembic_config, "0057")
+    command.downgrade(alembic_config, "0059")
     database = sqlite3.connect(tmp_path / "migrate.db")
     switches = database.execute("SELECT id, direct_call_enabled FROM groups ORDER BY id")
     assert switches.fetchall() == [(1, 1), (2, 1)]

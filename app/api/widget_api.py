@@ -459,8 +459,8 @@ def _read_booking(raw: bytes) -> WidgetBookingRequest:
 async def book(request: Request, org: str, group: str, locale: Locale) -> JSONResponse:
     """Book a slot for the citizen. Needs an allowed ``Origin``.
 
-    The answer confirms the appointment; the management link goes to the citizen by email
-    only and never to the host page.
+    The answer says the appointment awaits confirmation by the link in the citizen's email
+    (ADR 0056); that link, like the management link, never goes to the host page.
     """
     found = _group(request)
     body = _read_booking(await request.body())
@@ -479,7 +479,7 @@ async def book(request: Request, org: str, group: str, locale: Locale) -> JSONRe
         start=slot_value(booking.start),
         end=slot_value(booking.end),
         label=slot_label(booking.start, booking.end, found, locale),
-        message=locale.gettext("manage.notice.booked"),
+        message=locale.gettext("manage.notice.pending"),  # ADR 0056: confirm by email
     )
     return JSONResponse(answer.model_dump(), status_code=201)
 

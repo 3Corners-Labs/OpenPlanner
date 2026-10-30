@@ -22,6 +22,8 @@ from tests.support.domain import (
     NOW,
     SLOT_0900,
     SLOT_0930,
+    book_confirmed,
+    book_pending,
     with_team_invite,
 )
 
@@ -41,7 +43,7 @@ def uow() -> InMemoryUnitOfWork:
 
 
 async def _book(bookings: BookingService, start: datetime = SLOT_0900, slug: str = "demo") -> int:
-    receipt = await bookings.book(group_slug=slug, start=start, contact=ADA, locale="nl")
+    receipt = await book_confirmed(bookings, group_slug=slug, start=start, contact=ADA, locale="nl")
     return receipt.booking.id or 0
 
 
@@ -91,6 +93,20 @@ async def test_open_ended_closure_has_no_purge_until_it_ends(
         JobType.PURGE_PII,
     ]
     assert uow.state.jobs[booking_id][-1].run_at == NOW + RETENTION_AFTER_CLOSURE
+
+
+async def test_a_closure_leaves_an_unconfirmed_booking_to_its_deadline(
+    closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    # ADR 0056 §2: it is not suspended; it lapses or is confirmed, and then suspended.
+    receipt = await book_pending(bookings, SLOT_0900, "demo")
+    booking_id = receipt.booking.id or 0
+    jobs = list(uow.state.jobs[booking_id])
+
+    assert await closures.close_group(GROUP_ADMIN, "demo", UNTIL_TUESDAY) == 0
+
+    assert _status(uow, booking_id) is BookingStatus.PENDING_CONFIRMATION
+    assert uow.state.jobs[booking_id] == jobs
 
 
 async def test_closed_group_offers_and_accepts_no_slots(
@@ -167,7 +183,9 @@ async def test_other_groups_admin_cannot_close_or_touch_bookings(
 async def test_citizen_can_reschedule_a_suspended_booking_after_the_deadline(
     closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    receipt = await bookings.book(group_slug="demo", start=SLOT_0900, contact=ADA, locale="nl")
+    receipt = await book_confirmed(
+        bookings, group_slug="demo", start=SLOT_0900, contact=ADA, locale="nl"
+    )
     await closures.close_group(GROUP_ADMIN, "demo", UNTIL_TUESDAY)
     clock.advance(SLOT_0900 - NOW - timedelta(minutes=1))  # past the change deadline
 
@@ -185,7 +203,9 @@ async def test_citizen_can_reschedule_a_suspended_booking_after_the_deadline(
 async def test_citizen_can_cancel_a_suspended_booking(
     closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
-    receipt = await bookings.book(group_slug="demo", start=SLOT_0900, contact=ADA, locale="nl")
+    receipt = await book_confirmed(
+        bookings, group_slug="demo", start=SLOT_0900, contact=ADA, locale="nl"
+    )
     await closures.close_group(GROUP_ADMIN, "demo", UNTIL_TUESDAY)
 
     cancelled = await bookings.cancel(receipt.management_token)

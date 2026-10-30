@@ -178,6 +178,14 @@ systeemmelding *Koppeling gecontroleerd* in het logboek van de groep, met het an
 Webex eronder; die melding herhaalt zich tot het is opgelost en meldt één keer dat het weer
 goed is. Zo hoort u het voordat een burger een afspraak zonder videogesprek krijgt.
 
+De controle kijkt ook naar de **achtergrondtaken (worker)**: het onderdeel van OpenPlanner dat
+de videomeetings echt aanmaakt. De proefmeeting draait in de beheeromgeving, de afspraken in de
+worker. De controle meldt of de worker draait en welke versie, of hij dezelfde versie draait
+als de beheeromgeving (anders is een update half doorgevoerd), of hij met de Webex-instellingen
+is gestart, en hoeveel taken van deze groep mislukt zijn of te lang wachten. Een taak wacht te
+lang als hij langer dan de platforminstelling *Taak achterstallig na* (standaard 10 minuten)
+over zijn tijd is.
+
 <!-- field: wxcc_business_address -->
 ### WxCC business address
 

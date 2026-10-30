@@ -49,6 +49,8 @@ _ISO_DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 DONE_MESSAGES: dict[str, str] = {
     "created": "admin.done.created",
+    "retried": "admin.done.retried",
+    "retry_not_possible": "admin.done.retry_not_possible",
     "diagnostics_on": "admin.done.diagnostics_on",
     "diagnostics_off": "admin.done.diagnostics_off",
     "released": "admin.done.released",

@@ -5,14 +5,14 @@ Every staffing block (``schedule_rules``) and every exception with a window
 (direct calls only) or ``both``. The group switch ``direct_call_enabled`` goes: the blocks of
 a group that had it on become ``both``, so citizens see no change.
 
-Revises 0057 (the merge of certificate checks and event messages); the open branches 0058 to
-0060 claim their own numbers, so a merge revision will join the heads later.
+Revises 0059 (booking event version), the head of ``main`` at merge time; the open branches
+that claim 0060 will need a merge revision, as before.
 
 The downgrade sets the switch again for every group with a block that offers direct calls,
 then drops the ``offer`` columns.
 
 Revision ID: 0061
-Revises: 0057
+Revises: 0059
 Create Date: 2026-10-30 18:00:00.000000
 """
 
@@ -22,7 +22,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0061"
-down_revision: str | None = "0057"
+down_revision: str | None = "0059"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

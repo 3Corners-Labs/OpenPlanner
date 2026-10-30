@@ -106,7 +106,9 @@ class BookingEvent:
     """One entry of a booking's timeline; ``detail`` is a reason code, never personal data.
 
     ``message`` is the provider's own reason for a failure (ADR 0065): masked, capped, and
-    only from requests without citizen data; empty for every other event.
+    only from requests without citizen data; empty for every other event. ``version`` is the
+    ``APP_VERSION`` of the process that wrote the event (ADR 0068); empty in development and
+    for events written before it was recorded.
     """
 
     booking_id: int
@@ -114,6 +116,7 @@ class BookingEvent:
     kind: EventKind
     detail: str = ""
     message: str = ""
+    version: str = ""
 
 
 @dataclass(frozen=True)

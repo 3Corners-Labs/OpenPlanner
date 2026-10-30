@@ -6,6 +6,7 @@ open on Monday 5 January 09:00-10:00 Amsterdam time (08:00-09:00 UTC) in 30-minu
 
 from dataclasses import replace
 from datetime import UTC, date, datetime, time
+from typing import Any
 
 from app.domain.authorization import Principal, Role
 from app.domain.scheduling import DispatchKind, Group, Offer, TimeWindow
@@ -58,6 +59,23 @@ def with_team_invite(group: Group) -> Group:
     )
 
 
+async def book_confirmed(service: BookingService, **arguments: Any) -> BookingReceipt:
+    """Book with ``service.book(**arguments)`` and confirm it, as the citizen would by link."""
+    receipt = await service.book(**arguments)
+    confirmed = await service.confirm(receipt.management_token)
+    return BookingReceipt(confirmed, receipt.management_token)
+
+
+async def book_pending(
+    service: BookingService,
+    start: datetime = SLOT_0900,
+    slug: str = "aangifte",
+    contact: ContactInput = ADA,
+) -> BookingReceipt:
+    """Book ``start`` for ``contact`` (Ada) in group ``slug``; it awaits confirmation."""
+    return await service.book(group_slug=slug, start=start, contact=contact, locale="nl")
+
+
 def citizen(number: int) -> ContactInput:
     """Return Ada's details under address ``number``: another citizen for the address limit."""
     return replace(ADA, email=f"citizen{number}@example.org")
@@ -69,5 +87,5 @@ async def book(
     slug: str = "aangifte",
     contact: ContactInput = ADA,
 ) -> BookingReceipt:
-    """Book ``start`` for ``contact`` (Ada) in group ``slug``."""
-    return await service.book(group_slug=slug, start=start, contact=contact, locale="nl")
+    """Book ``start`` for ``contact`` (Ada) in ``slug`` and confirm it, as by email link."""
+    return await book_confirmed(service, group_slug=slug, start=start, contact=contact, locale="nl")
