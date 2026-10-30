@@ -3,6 +3,15 @@
 <section class="widget" data-widget="{{ widget.key }}" aria-labelledby="widget-{{ widget.key }}-title">
   <div class="widget__header">
     <h2 class="widget__title" id="widget-{{ widget.key }}-title">{{ _(widget.title_key) }}</h2>
+    {% if view.choices %}
+    <nav class="widget__views" aria-label="{{ _("admin.overview.view.label", title=_(widget.title_key)) }}">
+      <ul role="list">
+        {% for choice in view.choices %}
+        <li>{% if choice.current %}<span class="widget__view widget__view--current" aria-current="true">{{ choice.label }}</span>{% else %}<a class="widget__view" href="{{ choice.href }}">{{ choice.label }}</a>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </nav>
+    {% endif %}
   </div>
   <div class="widget__body">
     {% include "admin/widgets/" ~ widget.key ~ ".html" %}

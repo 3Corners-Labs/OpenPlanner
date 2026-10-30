@@ -36,6 +36,21 @@ tijden.
 
 De widget *Meldingen* volgt in een volgende versie.
 
+## Weergave kiezen
+
+*Afspraken vandaag per groep* en *Wachtrij in mijn groepen* laten zich op meer manieren
+tonen. Onder de titel staan de weergaven die de widget kent: lijst, staaf of taart voor de
+afspraken, tabel, staaf of lijn voor de wachtrij. Een weergave kiezen laadt de pagina opnieuw
+met die keuze in het adres (bijvoorbeeld `/admin/?bookings-today=bar`); de andere widgets
+blijven zoals ze waren. Wat u niet kiest, is de eerste weergave. Een eigen vaste keuze per
+persoon komt later (ADR 0062).
+
+Elke grafiek is een plaatje met een tekst die alle waarden noemt, voor wie het plaatje niet
+ziet. De waarden staan ook in de grafiek zelf als getal, en kleur is nooit het enige teken: bij
+de taart staat een legenda met waarde en aandeel. Onder elke grafiek opent **Gegevens als
+tabel** dezelfde cijfers als gewone tabel. Boven vier groepen liggen de staven; tot en met vier
+staan ze rechtop. De lijn bij de wachtrij verbindt de groepen; het is dus geen verloop in de tijd.
+
 ## Standaardindeling per rol
 
 Elke rol begint met een eigen volgorde: een medewerker ziet de wachtrij vooraan, de rol
