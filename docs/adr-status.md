@@ -104,6 +104,8 @@ package; when the two disagree, the code wins.
   (0001, 0005, 0012). Two things worth knowing: CLAUDE.md says organisation text overrides are
   editable in the admin UI, but the override store of ADR 0004 and ADR 0009 does not exist
   (group texts do); ADR 0010's polling fallback and 30-second refresh were never built.
+- What it found that is not built is listed with a size and an owner of the decision in
+  `docs/backlog-adr-gaps.md` (AG-1 to AG-7).
 - A test (`tests/test_adr_status.py`) now fails when an ADR is missing from this list, when the
   counts are wrong, or when an ADR's Status line says something else than its row.
 
