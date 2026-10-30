@@ -324,7 +324,7 @@ erDiagram
         int horizon_days
         int dispatch_lead_minutes
         string dispatch_kind "contact_center | openplanner_queue"
-        int queue_change_working_days
+        int citizen_change_lead_minutes
         int queue_visible_from_minutes
         bool queue_free_pick_allowed
         int max_bookings_per_email
@@ -407,14 +407,13 @@ Rules that matter for the rest of the system:
   organisation chooses the ones its groups follow, a group inherits or picks its own (or
   none) and may keep single holidays open. On a date the group's own override wins, then a
   holiday closes the day, then the weekly rules apply (`app/domain/holidays.py`).
-- **The dispatch lead** (`dispatch_lead_minutes`, default 5) sets two moments: when the WxCC
-  task is created, and when the booking becomes read-only. The minimum notice can never be
-  shorter than it.
+- **The dispatch lead** (`dispatch_lead_minutes`, default 5) sets when the WxCC task is
+  created. The minimum notice can never be shorter than it. The citizen can cancel until the
+  start and move until `citizen_change_lead_minutes` (default 60, ADR 0069).
 - **Dispatch kind per group** (ADR 0043): `contact_center` (the WxCC task above) or
   `openplanner_queue`, where agents sign in and claim bookings in the group's own queue
-  (`app/domain/own_queue.py`, `queue_service.py`). An own-queue group sends no task and its
-  bookings become read-only `queue_change_working_days` working days before the start
-  (`Group.change_deadline`).
+  (`app/domain/own_queue.py`, `queue_service.py`). An own-queue group sends no task; both
+  kinds share the citizen's change rule (`Group.change_deadline`, `Group.cancel_deadline`).
 - **All times are stored in UTC.** They are converted to the group's time zone only when
   rendering and parsing.
 

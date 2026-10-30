@@ -56,13 +56,11 @@ MAX_DIRECT_CALLS = MAX_CAPACITY
 
 DEFAULT_DISPATCH_LEAD_MINUTES = 5
 MAX_DISPATCH_LEAD_MINUTES = 60
-DEFAULT_QUEUE_CHANGE_WORKING_DAYS = 1
-"""Own queue: a citizen can change or cancel until this many working days before the start."""
-MAX_QUEUE_CHANGE_WORKING_DAYS = 5
+DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES = 60
+"""ADR 0069: a citizen can move a booking until this long before the start."""
+MAX_CITIZEN_CHANGE_LEAD_MINUTES = 1440
 DEFAULT_QUEUE_VISIBLE_FROM_MINUTES = 15
 MAX_QUEUE_VISIBLE_FROM_MINUTES = 120
-WORKING_DAYS = frozenset(range(5))
-"""Monday to Friday; holidays do not count as non-working days here (ADR 0043)."""
 MAX_PLANNER_LEAD_MINUTES = 1440
 """ADR 0044: upper bound of ``planner_change_min_lead_minutes`` (one day)."""
 DEFAULT_MAX_BOOKINGS_PER_EMAIL = 3
@@ -176,14 +174,15 @@ class Group:
         direct_call_max_concurrent: How many direct calls may be open (waiting or with an
             agent) at once, typically the number of agents for direct calls; ``None`` leaves
             it to WxCC (ADR 0026).
-        dispatch_lead_minutes: How long before the start the WxCC task is created; from
-            that moment the booking is read-only (``job_plan.change_deadline``). At most
-            ``min_notice_minutes``, so no booking is read-only when it is made. Used only
-            with ``DispatchKind.CONTACT_CENTER``.
+        dispatch_lead_minutes: How long before the start the WxCC task is created
+            (``job_plan.dispatch_moment``). At most ``min_notice_minutes``, so a booking is
+            never dispatched the moment it is made. Used only with
+            ``DispatchKind.CONTACT_CENTER``.
         dispatch_kind: Contact center or OpenPlanner's own queue (ADR 0043).
-        queue_change_working_days: With the own queue, how many working days (Monday to
-            Friday) before the start the booking becomes read-only, at the same local time.
-            A booking made later than that is read-only from the start.
+        citizen_change_lead_minutes: How long before the start the citizen may still move
+            the booking (ADR 0069, class D per group); cancelling is possible until the start.
+            Never below ``dispatch_lead_minutes``. A booking made later than that cannot be
+            moved by the citizen, only cancelled.
         planner_change_min_lead_minutes: How long before the start a planner may still move
             or cancel a booking (ADR 0044, class D per group). Never below
             ``dispatch_lead_minutes``: a dispatched booking needs a phone call, not a mail.
@@ -221,7 +220,7 @@ class Group:
     direct_call_max_concurrent: int | None = None
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
     dispatch_kind: DispatchKind = DispatchKind.CONTACT_CENTER
-    queue_change_working_days: int = DEFAULT_QUEUE_CHANGE_WORKING_DAYS
+    citizen_change_lead_minutes: int = DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES
     planner_change_min_lead_minutes: int = 60
     embedding_enabled: bool = False
     queue_visible_from_minutes: int = DEFAULT_QUEUE_VISIBLE_FROM_MINUTES
@@ -246,8 +245,9 @@ class Group:
             raise _invalid("dispatch_lead_minutes")
         if self.min_notice_minutes < self.dispatch_lead_minutes:
             raise _invalid("min_notice_minutes")
-        if not 1 <= self.queue_change_working_days <= MAX_QUEUE_CHANGE_WORKING_DAYS:
-            raise _invalid("queue_change_working_days")
+        change_lead = self.citizen_change_lead_minutes
+        if not self.dispatch_lead_minutes <= change_lead <= MAX_CITIZEN_CHANGE_LEAD_MINUTES:
+            raise _invalid("citizen_change_lead_minutes")
         planner_lead = self.planner_change_min_lead_minutes
         if not self.dispatch_lead_minutes <= planner_lead <= MAX_PLANNER_LEAD_MINUTES:
             raise _invalid("planner_change_min_lead_minutes")
@@ -321,28 +321,21 @@ class Group:
         return self.has_own_queue and self.calendar_invite_address is not None
 
     def change_deadline(self, start: datetime) -> datetime:
-        """Return the moment a booking starting at ``start`` becomes read-only.
+        """Return the moment the citizen can no longer move a booking starting at ``start``.
 
-        Contact center: when its task is dispatched, since an agent may pick it up from then
-        on. Own queue: ``queue_change_working_days`` working days earlier (ADR 0043).
+        ``citizen_change_lead_minutes`` before the start, for both dispatch kinds (ADR 0069).
+        A booking already dispatched to the contact center is moved with its task ended
+        (ADR 0021), so the lead is never shorter than the dispatch lead.
         """
-        if self.has_own_queue:
-            return working_days_before(start, self.queue_change_working_days, self.tz)
-        return start - self.dispatch_lead
+        return start - timedelta(minutes=self.citizen_change_lead_minutes)
 
+    def cancel_deadline(self, start: datetime) -> datetime:
+        """Return the moment the citizen can no longer cancel: the start itself (ADR 0069).
 
-def working_days_before(moment: datetime, days: int, tz: ZoneInfo) -> datetime:
-    """Return ``moment`` moved back ``days`` working days, at the same local time in ``tz``.
-
-    Weekend days are skipped; from a weekend day the first step lands on Friday.
-    """
-    local = moment.astimezone(tz)
-    day = local.date()
-    while days:
-        day -= timedelta(days=1)
-        if day.weekday() in WORKING_DAYS:
-            days -= 1
-    return datetime.combine(day, local.time(), tz).astimezone(moment.tzinfo)
+        A late cancellation beats a no-show; after dispatch the task is marked cancelled
+        (ADR 0021) and the team's invite withdrawn (ADR 0043).
+        """
+        return start
 
 
 @dataclass(frozen=True)

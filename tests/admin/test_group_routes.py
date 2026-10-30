@@ -194,7 +194,7 @@ SETTINGS_FORM = {
     "horizon_days": "30",
     "dispatch_lead_minutes": "5",
     "dispatch_kind": "contact_center",
-    "queue_change_working_days": "1",
+    "citizen_change_lead_minutes": "60",
     "planner_change_min_lead_minutes": "60",
     "queue_visible_from_minutes": "15",
     "max_bookings_per_email": "3",
@@ -243,7 +243,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "horizon_days": "60",
         "dispatch_lead_minutes": "5",
         "dispatch_kind": "openplanner_queue",
-        "queue_change_working_days": "2",
+        "citizen_change_lead_minutes": "120",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
@@ -262,7 +262,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
     assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
     after = (await site.client.get(f"{GROUP}/settings")).text
     assert '<option value="openplanner_queue" selected' in after
-    assert 'name="queue_change_working_days" type="number" value="2"' in after
+    assert 'name="citizen_change_lead_minutes" type="number" value="120"' in after
     overview = (await site.client.get(GROUP)).text
     assert "team-demo@example.nl" in overview
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
@@ -272,13 +272,18 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
 
 
 @pytest.mark.parametrize(
-    ("kind", "days", "error"),
+    ("kind", "minutes", "error"),
     [
-        ("genesys", "1", '<a href="#dispatch_kind">'),
-        ("openplanner_queue", "9", '<a href="#queue_change_working_days">Vul een aantal werkdagen'),
+        ("genesys", "60", '<a href="#dispatch_kind">'),
+        (
+            "openplanner_queue",
+            "2000",
+            '<a href="#citizen_change_lead_minutes">Vul een aantal minuten',
+        ),
+        ("contact_center", "3", '<a href="#citizen_change_lead_minutes">Vul een aantal minuten'),
     ],
 )
-async def test_dispatch_fields_are_checked(site: Site, kind: str, days: str, error: str) -> None:
+async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, error: str) -> None:
     await site.login_as(SUPER)
     form = {
         "name": "Demo",
@@ -288,7 +293,7 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, days: str, err
         "horizon_days": "60",
         "dispatch_lead_minutes": "5",
         "dispatch_kind": kind,
-        "queue_change_working_days": days,
+        "citizen_change_lead_minutes": minutes,
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
         "queue_free_pick_allowed": "no",
@@ -319,7 +324,7 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "horizon_days": "60",
             "dispatch_lead_minutes": "5",
             "dispatch_kind": "contact_center",
-            "queue_change_working_days": "1",
+            "citizen_change_lead_minutes": "60",
             "planner_change_min_lead_minutes": "60",
             "queue_visible_from_minutes": "15",
             "max_bookings_per_email": "3",
@@ -626,7 +631,7 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "horizon_days": "45",
             "dispatch_lead_minutes": "5",
             "dispatch_kind": "contact_center",
-            "queue_change_working_days": "1",
+            "citizen_change_lead_minutes": "60",
             "planner_change_min_lead_minutes": "60",
             "queue_visible_from_minutes": "15",
             "max_bookings_per_email": "3",
@@ -664,7 +669,7 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "horizon_days": "60",
         "dispatch_lead_minutes": "5",
         "dispatch_kind": "contact_center",
-        "queue_change_working_days": "1",
+        "citizen_change_lead_minutes": "60",
         "planner_change_min_lead_minutes": "60",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",

@@ -55,7 +55,7 @@ msgid "message.team"
 msgstr "Team"
 
 msgid "message.manage"
-msgstr "U kunt de afspraak bekijken, wijzigen of annuleren tot {deadline}. Daarna staat de afspraak vast."
+msgstr "U kunt de afspraak bekijken en verplaatsen tot {deadline}. Annuleren kan tot het gesprek begint."
 
 msgid "message.manage_link"
 msgstr "Afspraak bekijken of wijzigen"
@@ -365,7 +365,7 @@ msgid "error.outside_booking_window"
 msgstr "Dit moment kan niet meer worden geboekt. Kies een ander moment."
 
 msgid "error.booking_locked"
-msgstr "Deze afspraak staat vast en kan niet meer worden gewijzigd."
+msgstr "Deze afspraak kan niet meer worden gewijzigd, want het gesprek is al begonnen of begint zo."
 
 msgid "error.queue_empty"
 msgstr "Er is geen afspraak meer om op te pakken."
@@ -428,10 +428,13 @@ msgid "manage.status.no_show"
 msgstr "Niet doorgegaan"
 
 msgid "manage.deadline"
-msgstr "U kunt deze afspraak wijzigen of annuleren tot {deadline}."
+msgstr "U kunt deze afspraak verplaatsen tot {deadline}. Annuleren kan tot het gesprek begint."
 
 msgid "manage.locked"
-msgstr "Deze afspraak staat vast. Het gesprek begint binnenkort; wijzigen of annuleren kan niet meer."
+msgstr "Verplaatsen kan niet meer, want het gesprek begint binnenkort. U kunt de afspraak nog wel annuleren als u niet kunt komen."
+
+msgid "manage.started"
+msgstr "Het gesprek is begonnen. Deze afspraak kan niet meer worden gewijzigd."
 
 msgid "manage.inactive"
 msgstr "Deze afspraak is niet meer actief."
@@ -1043,11 +1046,11 @@ msgstr "Medewerkers mogen zelf een afspraak kiezen (eigen wachtrij)"
 msgid "admin.field.queue_free_pick_allowed_hint"
 msgstr "Nee: medewerkers pakken altijd de volgende op. Ja: ze kunnen ook een andere afspraak uit de lijst oppakken."
 
-msgid "admin.field.queue_change_working_days"
-msgstr "Wijzigen tot (werkdagen vooraf, eigen wachtrij)"
+msgid "admin.field.citizen_change_lead_minutes"
+msgstr "Verplaatsen door de burger tot (minuten vooraf)"
 
-msgid "admin.field.queue_change_working_days_hint"
-msgstr "Bij de eigen wachtrij kan de deelnemer de afspraak wijzigen of annuleren tot dit aantal werkdagen (maandag tot en met vrijdag) voor de start, op dezelfde tijd. 1 tot 5."
+msgid "admin.field.citizen_change_lead_minutes_hint"
+msgstr "Tot hoeveel minuten voor de start de burger de afspraak nog kan verplaatsen. Annuleren kan altijd tot de start. Niet korter dan Doorzetten naar de wachtrij, hoogstens 1440. Standaard 60."
 
 msgid "admin.field.planner_change_min_lead_minutes"
 msgstr "Wijzigen door een planner (minuten vooraf)"
@@ -1123,8 +1126,8 @@ msgstr "Vul een aantal dagen in van 1 tot 366."
 msgid "admin.form.error.dispatch_lead_minutes"
 msgstr "Vul een aantal minuten in van 0 tot 60."
 
-msgid "admin.form.error.queue_change_working_days"
-msgstr "Vul een aantal werkdagen in van 1 tot 5."
+msgid "admin.form.error.citizen_change_lead_minutes"
+msgstr "Vul een aantal minuten in van 0 tot 1440, niet korter dan Doorzetten naar de wachtrij."
 
 msgid "admin.form.error.planner_change_min_lead_minutes"
 msgstr "Vul een aantal minuten in van het doorzetten naar de wachtrij tot 1440."
