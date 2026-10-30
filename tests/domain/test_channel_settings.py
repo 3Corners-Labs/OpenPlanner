@@ -75,12 +75,25 @@ def test_valid_smtp_settings_build_the_from_header() -> None:
         ({"sender_name": "Demo\r\nBcc: y@evil.nl"}, "sender_name"),
         ({"sender_name": "  "}, "sender_name"),
         ({"sender_name": "x" * 101}, "sender_name"),
+        ({"reply_to_address": "no-at-sign"}, "reply_to_address"),
+        ({"reply_to_address": "x@demo.nl\r\nBcc: y@evil.nl"}, "reply_to_address"),
+        ({"dkim_selector": "s 1"}, "dkim_selector"),
+        ({"dkim_selector": "-s1"}, "dkim_selector"),
+        ({"dkim_selector": ""}, "dkim_selector"),
+        ({"dkim_selector": "s1\n"}, "dkim_selector"),
     ],
 )
 def test_invalid_smtp_settings_name_the_field(overrides: dict[str, object], field: str) -> None:
     with pytest.raises(DomainError) as error:
         smtp(**overrides)
     assert field_of(error) == field
+
+
+def test_reply_address_and_dkim_selector_are_optional_adr_0073() -> None:
+    assert smtp().reply_to_address is None
+    assert smtp().dkim_selector is None
+    settings = smtp(reply_to_address="info@demo.nl", dkim_selector="mail2026.s1")
+    assert (settings.reply_to_address, settings.dkim_selector) == ("info@demo.nl", "mail2026.s1")
 
 
 def test_valid_sms_settings() -> None:

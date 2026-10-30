@@ -59,6 +59,12 @@ SMTP and SMS settings per organisation are organisation data; their password and
 are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data.
 Neither leaves the system except as part of the messages above.
 
+```
+web ──DNS (TXT)──> the host's resolver          sender domain check (ADR 0073)
+   the domain of the sender address, _dmarc.<domain> and <selector>._domainkey.<domain>;
+   organisation data only, on the superuser's request; the answers are judged, not stored
+```
+
 The platform's fallback mail server, the update check's read token and the Webex Service App
 (client secret, refresh token) can also be set in the portal (ADR 0042 step 6). Their password and token are sealed the same way, under
 `setting:<key>` in `integration_credentials`, and are never shown, logged or audited by value;
@@ -278,9 +284,10 @@ audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
 ## Updates from the admin portal (ADR 0029)
 
 ```
-worker ──GET releases/latest, or the releases list on the rc channel (ADR 0059; no data
-        sent; optional read-only token)──> api.github.com
-        <── tag and release page ── stored in release_checks
+worker ──GET releases?per_page=30; the channel is applied in the domain (ADR 0059, 0067;
+        no data sent; optional read-only token)──> api.github.com
+        <── tag, release page, publication time, notes ── stored in release_checks and
+            release_listing (notes as PR titles and numbers only; authors stripped, ADR 0067)
 superuser ──POST update / restore / cancel──> web ──SQL──> update_requests (versions, subject id)
 superuser's browser ──GET /admin/updates/progress (every 5 s while open; ADR 0048)──> web
         <── steps and status of the request (no personal data) ──
