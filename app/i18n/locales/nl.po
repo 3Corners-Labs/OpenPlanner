@@ -6218,6 +6218,135 @@ msgstr "De nieuwe inlogkoppeling is niet bewaard: met die koppeling zou u na het
 msgid "admin.form.error.login_lockout"
 msgstr "Met deze koppeling zou u geen superuser meer zijn; ze is niet bewaard."
 
+msgid "admin.overview.widget.queue.group"
+msgstr "Groep"
+
+msgid "admin.overview.widget.queue.waiting"
+msgstr "Wachtend"
+
+msgid "admin.overview.widget.queue.longest_wait"
+msgstr "Langste wacht"
+
+msgid "admin.overview.widget.queue.staff"
+msgstr "Aangemeld"
+
+msgid "admin.overview.widget.queue.minutes"
+msgstr "{minutes} min"
+
+msgid "admin.overview.widget.queue.queue_link"
+msgstr "Wachtrij van {name}"
+
+msgid "admin.overview.widget.queue.empty"
+msgstr "Geen eigen wachtrij in uw bereik."
+
+msgid "admin.overview.widget.tasks.empty"
+msgstr "Geen lopende of mislukte taken."
+
+msgid "admin.overview.widget.tasks.state.running"
+msgstr "Bezig"
+
+msgid "admin.overview.widget.tasks.state.failed"
+msgstr "Mislukt"
+
+msgid "admin.overview.widget.tasks.since"
+msgstr "sinds {time}"
+
+msgid "admin.overview.widget.tasks.attempts"
+msgstr "poging {count}"
+
+msgid "admin.overview.widget.status.version"
+msgstr "Versie"
+
+msgid "admin.overview.widget.status.version.none"
+msgstr "Geen release"
+
+msgid "admin.overview.widget.status.update"
+msgstr "Update"
+
+msgid "admin.overview.widget.status.update.current"
+msgstr "Actueel"
+
+msgid "admin.overview.widget.status.update.available"
+msgstr "{version} beschikbaar"
+
+msgid "admin.overview.widget.status.update.running"
+msgstr "Bezig: {version}"
+
+msgid "admin.overview.widget.status.update.problem"
+msgstr "{version}: {status}"
+
+msgid "admin.overview.widget.status.maintenance"
+msgstr "Onderhoud"
+
+msgid "admin.overview.widget.status.maintenance.off"
+msgstr "Uit"
+
+msgid "admin.overview.widget.status.maintenance.on"
+msgstr "Aan sinds {time}"
+
+msgid "admin.overview.widget.status.maintenance.environment"
+msgstr "Aan (omgeving)"
+
+msgid "admin.overview.widget.status.worker"
+msgstr "Achtergrondproces"
+
+msgid "admin.overview.widget.status.worker.alive"
+msgstr "Actief, {time}"
+
+msgid "admin.overview.widget.status.worker.stale"
+msgstr "Geen hartslag sinds {time}"
+
+msgid "admin.overview.widget.status.worker.unknown"
+msgstr "Geen hartslag gevonden"
+
+msgid "admin.overview.widget.status.diagnostics"
+msgstr "Diagnosemodus"
+
+msgid "admin.overview.widget.status.diagnostics.off"
+msgstr "Uit"
+
+msgid "admin.overview.widget.status.diagnostics.on"
+msgstr "{count} actief"
+
+msgid "admin.overview.widget.status.environment"
+msgstr "Omgeving"
+
+msgid "admin.overview.widget.status.environment.ok"
+msgstr "{environment}"
+
+msgid "admin.overview.widget.status.environment.problems"
+msgstr "{environment}, {count} niet productiewaardig"
+
+msgid "audit.job.send_rebook_request"
+msgstr "Verzoek om opnieuw te plannen versturen"
+
+msgid "audit.job.send_rebook_reminder"
+msgstr "Herinnering om opnieuw te plannen versturen"
+
+msgid "audit.job.send_rebook_lapsed"
+msgstr "Bericht verlopen herplanning versturen"
+
+msgid "audit.job.lapse_rebook"
+msgstr "Herplanning laten verlopen"
+
+msgid "audit.job.send_confirm_request"
+msgstr "Verzoek om te bevestigen versturen"
+
+msgid "audit.job.send_confirm_reminder"
+msgstr "Herinnering om te bevestigen versturen"
+
+msgid "audit.job.expire_unconfirmed"
+msgstr "Onbevestigde afspraak laten verlopen"
+
+msgid "audit.job.send_unconfirmed_lapsed"
+msgstr "Bericht verlopen afspraak versturen"
+
+msgid "audit.job.send_team_invite"
+msgstr "Agenda-uitnodiging aan het team versturen"
+
+msgid "audit.job.send_team_cancel"
+msgstr "Agenda-afzegging aan het team versturen"
+
 msgid "call.hint.meeting.rejected_400.unexplained"
 msgstr "Webex weigerde de meeting, maar deze gebeurtenis bewaart het antwoord van Webex niet: ze is geschreven door een versie die dat nog niet deed. Kijk bij Verzoeken aan Webex hieronder, of plan de meeting opnieuw bij Achtergrondtaken; een nieuwe weigering komt dan met het antwoord van Webex op deze pagina."
 
