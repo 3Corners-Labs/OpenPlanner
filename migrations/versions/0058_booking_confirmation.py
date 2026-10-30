@@ -4,8 +4,8 @@ A citizen's new booking starts as ``pending_confirmation``: it holds its place u
 confirmed or lapses at ``confirm_by``. ``confirmed_at`` records when the citizen confirmed,
 which is also when the email address was verified. Both are times, not personal data.
 
-Revision ID: 0057
-Revises: 0056
+Revision ID: 0058
+Revises: 0057
 Create Date: 2026-10-30 14:00:00.000000
 """
 
@@ -16,8 +16,8 @@ from alembic import op
 
 from app.adapters.db.types import UTCDateTime
 
-revision: str = "0057"
-down_revision: str | None = "0056"
+revision: str = "0058"
+down_revision: str | None = "0057"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
+from app.adapters.db.certificate import CertificateQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, answers_json
@@ -379,6 +380,7 @@ class SqlTransaction(
     ScenarioQueries,
     PlatformSettingsQueries,
     FormFieldQueries,
+    CertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
 
@@ -388,7 +390,7 @@ class SqlTransaction(
     the maintenance switch from ``MaintenanceQueries`` (ADR 0038), custom roles from
     ``RoleQueries`` (ADR 0039), closure images and scenarios from ``ImageQueries`` and
     ``ScenarioQueries`` (ADR 0037), portal settings from ``PlatformSettingsQueries``
-    (ADR 0042).
+    (ADR 0042), the certificate check from ``CertificateQueries`` (ADR 0064).
 
     Args:
         session: The open session.

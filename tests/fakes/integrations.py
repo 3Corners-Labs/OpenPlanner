@@ -58,10 +58,13 @@ class FakeDispatcher:
 class FakeChecker:
     """``IntegrationChecker`` that returns fixed findings and remembers what it was asked."""
 
-    def __init__(self, findings: Sequence[Finding]) -> None:
+    def __init__(self, findings: Sequence[Finding], error: Exception | None = None) -> None:
         self.findings = list(findings)
+        self.error = error
         self.calls: list[tuple[str, list[str]]] = []
 
     async def check_group(self, group: Group, peers: Sequence[Group]) -> list[Finding]:
         self.calls.append((group.slug, sorted(p.slug for p in peers)))
+        if self.error is not None:
+            raise self.error
         return self.findings
