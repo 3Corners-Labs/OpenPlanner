@@ -2,7 +2,9 @@
 
 Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0052 (point 1: no
 pre-release tags) and ADR 0029 (§1: an image of `main` is never offered to an installation).
-Extends ADR 0050 (installer modes) and ADR 0058 (what runs where in CI).
+Extends ADR 0050 (installer modes) and ADR 0058 (what runs where in CI). Amended the same day
+by ADR 0067 (points 4 and 6: channel and auto-apply are class C portal settings; the updater's
+identity follows the installer mode, not the channel).
 
 ## Context
 

@@ -1,8 +1,10 @@
 # TLS termination for OpenPlanner (ADR 0030). Caddy obtains the certificate for TLS_DOMAIN
 # from a public ACME CA (Let's Encrypt by default), renews it on its own when a third of its
 # lifetime is left, and staples OCSP. Certificates and the ACME account live in /data.
+# With an own certificate (ADR 0064) entrypoint.sh sets TLS_DIRECTIVE to `tls <cert> <key>`,
+# which turns Caddy's certificate management off for the site; the mailbox is then unused.
 {
-	email {$ACME_EMAIL}
+	email {$ACME_EMAIL:nobody@openplanner.invalid}
 	acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
 	# Unprivileged ports inside the container; docker-compose publishes them as 80 and 443.
 	http_port 8080
@@ -29,6 +31,7 @@ http://{$TLS_DOMAIN}:8080 {
 }
 
 {$TLS_DOMAIN}:8443 {
+	{$TLS_DIRECTIVE}
 	# No access log: request paths carry management tokens (/b/{token}).
 	# Public form posts are small; the limit keeps oversized bodies away from the app.
 	@public path /g/* /b/*

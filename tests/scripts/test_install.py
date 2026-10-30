@@ -190,6 +190,7 @@ def test_production_install_from_scratch(host: Host) -> None:
     }
     assert host.settings(".env.update") == {
         "OPENPLANNER_MODE": "production",
+        "OPENPLANNER_TLS": "1",
         "COMPOSE_PROFILES": "tls",
         "OPENPLANNER_IMAGE": RELEASE,
     }
@@ -449,7 +450,108 @@ def test_the_installer_generates_the_keys_app_cli_init_generates() -> None:
     assert sorted(keys.split()) == sorted(KEYS)
 
 
-# Update channel (ADR 0059): test and lab hosts may follow release candidates.
+def test_test_mode_runs_the_https_proxy_by_default(host: Host) -> None:
+    # ADR 0064: HTTPS is the standard shape; only --no-tls leaves it to a proxy of your own.
+    result = host.run(
+        "--mode",
+        "test",
+        "--version",
+        "1.4.0",
+        "--non-interactive",
+        TLS_DOMAIN="test.example.nl",
+        ACME_EMAIL="ops@example.nl",
+    )
+
+    assert result.returncode == 0, result.stderr
+    env = host.settings(".env")
+    assert env["ENVIRONMENT"] == "test"
+    assert env["PUBLIC_BASE_URL"] == "https://test.example.nl"
+    assert host.settings("proxy.env") == {
+        "TLS_DOMAIN": "test.example.nl",
+        "ACME_EMAIL": "ops@example.nl",
+    }
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "tls"
+    assert host.file("certs").is_dir()
+    assert not host.ran("--profile tls rm --stop --force proxy")
+
+
+def test_no_tls_leaves_https_to_a_proxy_of_your_own(host: Host) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if k not in ("TLS_DOMAIN", "ACME_EMAIL")}
+    result = host.run(
+        "--mode",
+        "production",
+        "--no-tls",
+        "--non-interactive",
+        PUBLIC_BASE_URL="https://afspraak.example.nl",
+        FORWARDED_ALLOW_IPS="10.0.0.5",
+        **settings,
+    )
+
+    assert result.returncode == 0, result.stderr
+    env = host.settings(".env")
+    assert env["PUBLIC_BASE_URL"] == "https://afspraak.example.nl"
+    assert env["FORWARDED_ALLOW_IPS"] == "10.0.0.5"
+    assert not host.file("proxy.env").exists()
+    assert "COMPOSE_PROFILES" not in host.settings(".env.update")
+    assert host.ran("--profile tls rm --stop --force proxy")
+    # A rerun remembers the choice through the pin file.
+    again = host.run("--non-interactive")
+    assert again.returncode == 0, again.stderr
+    assert not host.file("proxy.env").exists()
+
+
+def test_a_lab_opts_in_to_https_with_a_domain(host: Host) -> None:
+    result = host.run(
+        "--mode",
+        "lab",
+        "--version",
+        "1.4.0",
+        "--tls-domain",
+        "docker01.example.nl",
+        "--acme-staging",
+        "--non-interactive",
+        ACME_EMAIL="ops@example.nl",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(".env")["PUBLIC_BASE_URL"] == "https://docker01.example.nl"
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "dev,tls"
+    assert host.settings("proxy.env") == {
+        "TLS_DOMAIN": "docker01.example.nl",
+        "ACME_EMAIL": "ops@example.nl",
+        "ACME_CA": "https://acme-staging-v02.api.letsencrypt.org/directory",
+    }
+
+
+def test_an_own_certificate_replaces_acme_and_needs_both_files(host: Host) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if k != "ACME_EMAIL"}
+    missing = host.run("--mode", "production", "--own-certificate", "--non-interactive", **settings)
+    assert missing.returncode == 1
+    assert "fullchain.pem and privkey.pem" in missing.stderr
+    assert not host.file("proxy.env").exists()
+
+    host.file("certs").mkdir(exist_ok=True)
+    host.file("certs/fullchain.pem").write_text("cert")
+    host.file("certs/privkey.pem").write_text("key")
+    result = host.run("--mode", "production", "--own-certificate", "--non-interactive", **settings)
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings("proxy.env") == {
+        "TLS_DOMAIN": "afspraak.example.nl",
+        "TLS_CERT_FILE": "/certs/fullchain.pem",
+        "TLS_KEY_FILE": "/certs/privkey.pem",
+    }
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "tls"
+
+
+def test_own_certificate_without_the_proxy_is_refused(host: Host) -> None:
+    result = host.run("--mode", "production", "--no-tls", "--own-certificate", "--non-interactive")
+
+    assert result.returncode == 1
+    assert "--own-certificate needs the HTTPS proxy" in result.stderr
+
+
+# Trust by installer mode (ADR 0067): the channel itself is chosen in the portal.
 
 
 def _identity(host: Host) -> str:
@@ -459,61 +561,36 @@ def _identity(host: Host) -> str:
     ].strip("'")
 
 
-def test_the_rc_channel_follows_candidates_and_trusts_images_signed_on_main(host: Host) -> None:
-    host.given("latest", "v1.5.0-rc.3\n")
-
-    result = host.run("--mode", "lab", "--channel", "rc", "--non-interactive")
-
-    assert result.returncode == 0, result.stderr
-    assert host.settings(".env")["UPDATE_CHANNEL"] == "rc"
-    assert host.ran("repos/3Corners-Labs/OpenPlanner/releases?per_page=1")
-    assert host.ran(f"pull -q {IMAGE}:1.5.0-rc.3")
-    assert host.settings(".env.update")["OPENPLANNER_IMAGE"] == digest(IMAGE, "1.5.0-rc.3")
-    workflow = "https://github.com/3Corners-Labs/OpenPlanner/.github/workflows/main.yml"
-    identity = _identity(host)
-    assert re.fullmatch(identity, f"{workflow}@refs/heads/main")
-    assert re.fullmatch(identity, f"{workflow}@refs/tags/v1.5.0")
-    assert not re.fullmatch(identity, f"{workflow}@refs/heads/feature")
+WORKFLOW = "https://github.com/3Corners-Labs/OpenPlanner/.github/workflows/main.yml"
 
 
-def test_the_release_channel_is_the_default_and_never_trusts_main(host: Host) -> None:
-    result = host.run("--mode", "lab", "--version", "1.4.0", "--non-interactive")
-
-    assert result.returncode == 0, result.stderr
-    assert host.settings(".env")["UPDATE_CHANNEL"] == "release"
-    workflow = "https://github.com/3Corners-Labs/OpenPlanner/.github/workflows/main.yml"
-    assert not re.fullmatch(_identity(host), f"{workflow}@refs/heads/main")
-
-
-def test_production_refuses_the_rc_channel(host: Host) -> None:
-    result = host.run("--mode", "production", "--channel", "rc", "--non-interactive", **PRODUCTION)
-
-    assert result.returncode != 0
-    assert "refused in production" in result.stderr
-    assert not host.file(".env").exists()
-    assert not host.ran("pull")
-
-
-def test_a_candidate_version_needs_the_rc_channel(host: Host) -> None:
+def test_a_lab_host_trusts_images_signed_on_main_and_may_pin_a_candidate(host: Host) -> None:
     result = host.run("--mode", "lab", "--version", "1.5.0-rc.3", "--non-interactive")
 
-    assert result.returncode != 0
-    assert "needs --channel rc" in result.stderr
-
-
-def test_a_rerun_with_another_channel_rewrites_only_that_key(host: Host) -> None:
-    assert host.run("--mode", "lab", "--version", "1.4.0", "--non-interactive").returncode == 0
-    before = host.settings(".env")
-
-    result = host.run("--channel", "rc")
-
     assert result.returncode == 0, result.stderr
-    after = host.settings(".env")
-    assert after.pop("UPDATE_CHANNEL") == "rc"
-    before.pop("UPDATE_CHANNEL")
-    assert after == before
-    assert host.settings(".env")  # still readable after the rewrite
-    assert "heads/main" in _identity(host)
-    # Remembered: the next run without --channel keeps rc.
-    assert host.run().returncode == 0
-    assert host.settings(".env")["UPDATE_CHANNEL"] == "rc"
+    assert host.ran(f"pull -q {IMAGE}:1.5.0-rc.3")
+    assert host.settings(".env.update")["OPENPLANNER_IMAGE"] == digest(IMAGE, "1.5.0-rc.3")
+    assert "UPDATE_CHANNEL" not in host.settings(".env")  # the portal's, not the host's
+    identity = _identity(host)
+    assert re.fullmatch(identity, f"{WORKFLOW}@refs/heads/main")
+    assert re.fullmatch(identity, f"{WORKFLOW}@refs/tags/v1.5.0")
+    assert not re.fullmatch(identity, f"{WORKFLOW}@refs/heads/feature")
+
+
+def test_a_production_host_trusts_release_tags_only_and_refuses_a_candidate(host: Host) -> None:
+    assert host.run("--mode", "production", "--non-interactive", **PRODUCTION).returncode == 0
+    assert not re.fullmatch(_identity(host), f"{WORKFLOW}@refs/heads/main")
+
+    result = host.run("--version", "1.5.0-rc.3", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode != 0
+    assert "production runs releases only" in result.stderr
+    assert not host.ran(f"pull -q {IMAGE}:1.5.0-rc.3")
+
+
+def test_the_channel_flag_is_gone(host: Host) -> None:
+    result = host.run("--mode", "lab", "--channel", "rc", "--non-interactive")
+
+    assert result.returncode != 0
+    assert "/admin/updates" in result.stderr
+    assert not host.file(".env").exists()
