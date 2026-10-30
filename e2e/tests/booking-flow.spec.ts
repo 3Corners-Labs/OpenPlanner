@@ -36,10 +36,16 @@ test('book, move and cancel with the keyboard only', async ({ page }, testInfo) 
   await expectNoAxeViolations(page);
 
   // Submitting an invalid email shows the error summary, focused, linked to the field.
-  await tabTo(page, page.getByLabel('Naam'));
-  await page.keyboard.type('Ada Lovelace');
+  await tabTo(page, page.getByLabel('Voornaam'));
+  await page.keyboard.type('Ada');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('Lovelace');
   await page.keyboard.press('Tab');
   await page.keyboard.type('not-an-email');
+  // A custom field of the demo group (ADR 0055): a checkbox, ticked with the space bar.
+  await tabTo(page, page.getByLabel('Ik wil graag een tolk'));
+  await page.keyboard.press('Space');
+  await expect(page.getByLabel('Ik wil graag een tolk')).toBeChecked();
   await tabTo(page, page.getByRole('button', { name: 'Afspraak maken' }));
   await page.keyboard.press('Enter');
   const summary = page.getByRole('alert');

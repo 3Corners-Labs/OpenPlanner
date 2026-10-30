@@ -15,6 +15,15 @@
     <div><dt>{{ _("admin.agenda.participants") }}</dt><dd>{{ status.participants }}</dd></div>
   </dl>
 </section>
+{% if answers %}
+<section class="card" aria-labelledby="answers-heading">
+  <div class="card__header">
+    <h2 id="answers-heading">{{ _("admin.booking.answers") }}</h2>
+    <p class="card__lead">{{ _("admin.booking.answers_lead") }}</p>
+  </div>
+  <dl class="facts">{% include "admin/_answers.html" %}</dl>
+</section>
+{% endif %}
 {% if end_not_possible %}
 <div class="alert alert--info"><p>{{ _("admin.booking.end_not_possible") }}</p></div>
 {% endif %}

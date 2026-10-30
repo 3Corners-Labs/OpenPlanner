@@ -39,7 +39,7 @@ from pydantic import ValidationError
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse, Response
 
-from app.api.contact_form import HONEYPOT_FIELD, contact_fields
+from app.api.contact_form import ANSWER_PREFIX, HONEYPOT_FIELD, load_contact_form
 from app.api.labels import slot_label
 from app.api.maintenance import WidgetMaintenance, retry_after
 from app.api.slot_picker import PickerView, picker, slot_value
@@ -53,6 +53,7 @@ from app.api.widget_schemas import (
     WidgetField,
     WidgetGroup,
     WidgetMonth,
+    WidgetOption,
     WidgetTexts,
     WidgetTime,
     WidgetTimeGroup,
@@ -61,6 +62,7 @@ from app.api.widget_schemas import (
 )
 from app.domain.embedding_service import EmbeddingService, WidgetAccess
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.form_fields import UNKNOWN_FIELD
 from app.domain.scheduling import Group
 from app.domain.services import BookingService, ContactInput
 from app.web.closure_labels import closure_view
@@ -122,9 +124,11 @@ TEXT_KEYS = (
     "error.database_busy",
     "error.rate_limited",
     "error.invalid_request",
-    "error.field.name",
+    "error.field.first_name",
+    "error.field.last_name",
     "error.field.email",
     "error.field.phone",
+    "error.invalid_answer",
 )
 """Catalogue keys the Web Component shows; sent with the group in the requested locale."""
 
@@ -222,7 +226,7 @@ class WidgetRoute(APIRoute):
                 response = problem(refused.code, refused.status, refused.field)
             except DomainError as error:
                 status = 404 if error.code is ErrorCode.GROUP_NOT_FOUND else status_for(error)
-                field = error.field if error.code is ErrorCode.INVALID_CONTACT else None
+                field = _error_field(error)
                 response = problem(error.code.value, status, field)
             except RequestValidationError as invalid:
                 # Only the names of the offending parameters, never their values.
@@ -243,6 +247,15 @@ class WidgetRoute(APIRoute):
             return response
 
         return route
+
+
+def _error_field(error: DomainError) -> str | None:
+    """Return the input a refusal concerns: a contact field, or ``q_<key>`` for an answer."""
+    if error.code is ErrorCode.INVALID_CONTACT:
+        return error.field
+    if error.code is ErrorCode.INVALID_ANSWER and error.field != UNKNOWN_FIELD:
+        return f"{ANSWER_PREFIX}{error.field}"
+    return None
 
 
 router = APIRouter(
@@ -283,6 +296,7 @@ async def group_info(request: Request, org: str, group: str, locale: Locale) -> 
     """Return the group's name, contact form, closure notice and the widget's texts."""
     found = _group(request)
     service = _booking_service(request)
+    contact = await load_contact_form(service, found, request.app.state.clock.now())
     closure = await service.closure_notice(found)
     banner = (
         closure_view(closure, found, locale, request.app.state.clock.now()) if closure else None
@@ -310,8 +324,13 @@ async def group_info(request: Request, org: str, group: str, locale: Locale) -> 
                 label=f.label,
                 required=f.required,
                 hint=f.hint,
+                kind=f.kind,
+                options=[WidgetOption(value=v, label=label) for v, label in f.options],
+                min=f.minimum,
+                max=f.maximum,
+                inputmode=f.inputmode,
             )
-            for f in contact_fields(found, locale, [], {})
+            for f in contact.fields(locale, [], {})
         ],
         honeypot=HONEYPOT_FIELD,
         texts=_texts(locale, found),
@@ -451,7 +470,7 @@ async def book(request: Request, org: str, group: str, locale: Locale) -> JSONRe
     receipt = await _booking_service(request).book(
         group_slug=found.slug,
         start=start,
-        contact=ContactInput(body.name, body.email, body.phone or None),
+        contact=ContactInput(*body.names(), body.email, body.phone or None, body.answers),
         locale=locale.code,
     )
     booking = receipt.booking

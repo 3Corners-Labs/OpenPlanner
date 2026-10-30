@@ -7,7 +7,13 @@ No response holds personal data or a management token; errors are codes, never t
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+MAX_ANSWERS = 15
+"""At most as many answers as the platform's highest field limit (ADR 0055)."""
+MAX_KEY_LENGTH = 40
+MAX_ANSWER_LENGTH = 1001
+"""One more than a long text allows, so the domain refuses it rather than this cut it short."""
 
 
 class WidgetError(BaseModel):
@@ -18,7 +24,11 @@ class WidgetError(BaseModel):
         "`invalid_contact`, `slot_unavailable`, `slot_full`, `booking_limit_reached`, "
         "`outside_booking_window`, `group_closed`, `rate_limited`, …"
     )
-    field: str | None = Field(default=None, description="`name`, `email` or `phone`.")
+    field: str | None = Field(
+        default=None,
+        description="`first_name`, `last_name`, `email`, `phone`, or `q_<key>` for a custom "
+        "field (`invalid_answer`).",
+    )
 
 
 class WidgetTexts(BaseModel):
@@ -28,8 +38,19 @@ class WidgetTexts(BaseModel):
     texts: dict[str, str]
 
 
+class WidgetOption(BaseModel):
+    """One choice of a radio group."""
+
+    value: str
+    label: str
+
+
 class WidgetField(BaseModel):
-    """One input of the contact form: name, email and, per group, phone."""
+    """One input of the contact form.
+
+    First and last name, email, per group phone, and the group's custom fields (``q_<key>``,
+    ADR 0055).
+    """
 
     name: str
     type: str
@@ -37,6 +58,11 @@ class WidgetField(BaseModel):
     label: str
     required: bool
     hint: str | None = None
+    kind: Literal["input", "textarea", "radio", "checkbox"] = "input"
+    options: list[WidgetOption] = []
+    min: str | None = None
+    max: str | None = None
+    inputmode: str | None = None
 
 
 class WidgetClosure(BaseModel):
@@ -130,10 +156,37 @@ class WidgetBookingRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     start: str = Field(max_length=40, description="A `start` from the availability.")
-    name: str = Field(max_length=300)
+    first_name: str | None = Field(default=None, max_length=300)
+    last_name: str | None = Field(default=None, max_length=300)
+    name: str | None = Field(
+        default=None,
+        max_length=300,
+        description="Deprecated: the full name, split at the first space when `first_name` "
+        "is missing (ADR 0055).",
+    )
     email: str = Field(max_length=300)
     phone: str | None = Field(default=None, max_length=300)
+    answers: dict[str, str] = Field(
+        default_factory=dict,
+        max_length=MAX_ANSWERS,
+        description="Answers to the group's custom fields, by key (without `q_`).",
+    )
     website: str | None = Field(default=None, max_length=300)
+
+    @field_validator("answers")
+    @classmethod
+    def _bounded_answers(cls, value: dict[str, str]) -> dict[str, str]:
+        """Refuse keys and values longer than any field allows."""
+        if any(len(k) > MAX_KEY_LENGTH or len(v) > MAX_ANSWER_LENGTH for k, v in value.items()):
+            raise ValueError("answer too long")
+        return value
+
+    def names(self) -> tuple[str, str]:
+        """Return first and last name, from the two fields or the deprecated ``name``."""
+        if self.first_name is not None or self.name is None:
+            return self.first_name or "", self.last_name or ""
+        first, _, last = self.name.strip().partition(" ")
+        return first, last
 
 
 class WidgetBooking(BaseModel):

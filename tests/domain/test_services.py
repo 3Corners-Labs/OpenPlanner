@@ -77,7 +77,7 @@ async def test_book_creates_slot_booking_and_jobs(
     assert booking.token_hash == hash_token(receipt.management_token)
     assert receipt.management_token == derive_token(TEST_TOKEN_KEY, booking.token_salt)
     assert booking.contact is not None
-    assert booking.contact.phone == "0612345678"
+    assert booking.contact.phone == "+31612345678"
     slot = uow.state.slots[booking.slot_id]
     assert slot.capacity_snapshot == 1
     types = [job.type for job in uow.state.jobs[booking.id or 0]]
@@ -167,7 +167,7 @@ async def test_invalid_contact_stores_nothing(
         await service.book(
             group_slug="aangifte",
             start=SLOT_0900,
-            contact=ContactInput(name="Ada", email="not-an-email"),
+            contact=ContactInput(first_name="Ada", last_name="Lovelace", email="not-an-email"),
             locale="nl",
         )
 
@@ -181,7 +181,7 @@ async def test_group_phone_mode_is_applied(service: BookingService) -> None:
         await service.book(
             group_slug="toeslagen",
             start=TUESDAY_0900,
-            contact=ContactInput(name="Ada", email="ada@example.org"),
+            contact=ContactInput(first_name="Ada", last_name="Lovelace", email="ada@example.org"),
             locale="en",
         )
 

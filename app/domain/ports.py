@@ -33,6 +33,7 @@ from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
+from app.domain.form_fields import FormDefinition
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobType, PlannedJob
@@ -351,6 +352,24 @@ class Transaction(Protocol):
 
     async def get_group_by_id(self, group_id: int) -> Group | None:
         """Return the group with ``group_id``."""
+        ...
+
+    async def get_form(self, group_id: int) -> FormDefinition:
+        """Return the custom fields of the group's booking form, active and retired (ADR 0055).
+
+        A group without custom fields has an empty form at version 1.
+        """
+        ...
+
+    async def save_form(self, group_id: int, form: FormDefinition) -> None:
+        """Store the group's form as a whole: its version, active and retired fields in order."""
+        ...
+
+    async def raise_answers_to_pii(self, group_id: int, key: str) -> int:
+        """Make field ``key`` count as PII in every stored answer of the group; return how many.
+
+        Called when a field is raised to ``pii`` or retired (ADR 0055 point 4).
+        """
         ...
 
     async def get_schedule(
