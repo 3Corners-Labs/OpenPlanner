@@ -17,7 +17,12 @@ from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
-from app.adapters.integrations import Integrations, build_integrations, secret_box
+from app.adapters.integrations import (
+    Integrations,
+    build_integrations,
+    secret_box,
+    webex_fingerprint,
+)
 from app.adapters.live_settings import LiveSettings, keep_current
 from app.adapters.oidc import OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
@@ -169,6 +174,28 @@ def create_app(
             configure_clock(current.time_format)
             # ADR 0042 step 6: the release repository and its token can change in the portal.
             app.state.update_service = update_service(current, uow, clock, http, lookup=False)
+            # ADR 0042 step 6b: so can the Webex Service App and the WxCC host.
+            wired_with = getattr(app.state, "webex_fingerprint", None)
+            if wired_with is not None and wired_with != webex_fingerprint(current):
+                wire_integrations(current)
+
+        def wire_integrations(current: Settings) -> None:
+            wired = integrations or build_integrations(
+                current, app.state.engine, http, clock, app.state.security_log
+            )
+            app.state.integrations = wired
+            app.state.call_service = CallService(
+                uow,
+                app.state.integration_service,
+                wired.video,
+                wired.dispatcher,
+                agent_start_label,
+            )
+            app.state.integration_check_service = IntegrationCheckService(
+                uow, clock, app.state.admin_service, wired.checker
+            )
+            # Explicit adapters (tests) are never rebuilt.
+            app.state.webex_fingerprint = None if integrations else webex_fingerprint(current)
 
         def live() -> Settings:
             now: Settings = app.state.settings
@@ -292,16 +319,7 @@ def create_app(
             ):
                 setattr(agent_api.state, name, getattr(app.state, name))
             agent_api.state.settings = app.state.settings
-        wired = integrations or build_integrations(
-            settings, app.state.engine, http, clock, app.state.security_log
-        )
-        app.state.integrations = wired
-        app.state.call_service = CallService(
-            uow, app.state.integration_service, wired.video, wired.dispatcher, agent_start_label
-        )
-        app.state.integration_check_service = IntegrationCheckService(
-            uow, clock, app.state.admin_service, wired.checker
-        )
+        wire_integrations(live())
         # The simulator plays platform events through our own webhooks: only when switched on
         # (SIMULATOR_ENABLED), which the settings refuse in production.
         app.state.simulation_service = SimulationService(
