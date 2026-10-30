@@ -86,6 +86,9 @@ class SettingRow:
     from_portal: bool = False
     expires: bool = False
     error: str | None = None
+    secret: bool = False
+    adoptable: bool = False
+    adopted: bool = False
 
 
 @dataclass(frozen=True)
@@ -117,6 +120,9 @@ async def change_setting(
 ) -> Response:
     """Change one setting within its portal bounds; the processes apply it within 10 s."""
     form = await read_form(request, locale)
+    spec = BY_KEY.get(key)
+    if spec is not None and spec.secret and not form.text("value").strip():
+        return redirect_done(URL, "unchanged", anchor=_anchor(key))  # write-only: empty keeps it
     raw_hours = form.text("hours")
     hours = int(raw_hours) if raw_hours.isdigit() and len(raw_hours) <= 3 else None
     try:
@@ -138,6 +144,19 @@ async def reset_setting(
         raise_refusal(error)
         return await _overview(request, locale, context, (key, error), 409)
     return redirect_done(URL, "saved", anchor=_anchor(key))
+
+
+@router.post("/settings/{key}/adopt", response_class=HTMLResponse)
+async def adopt_setting(
+    request: Request, key: str, locale: Locale, _: SameOrigin, context: Change
+) -> Response:
+    """Take a value the environment locks over into the portal (ADR 0042 §12)."""
+    try:
+        await _service(request).adopt(context.principal, key)
+    except DomainError as error:
+        raise_refusal(error)
+        return await _overview(request, locale, context, (key, error), 409)
+    return redirect_done(URL, "adopted", anchor=_anchor(key))
 
 
 def _service(request: Request) -> SettingsService:
@@ -189,7 +208,9 @@ async def _overview(
             "refused": live.refused,
             "status": status_rows,
             "problems": problems,
-            "sections": _sections(states, locale, manage=manage, errors=errors),
+            "sections": _sections(
+                states, locale, manage=manage, errors=errors, stored=_stored(live)
+            ),
             "done": done_message(request, locale.gettext),
             "max_hours": LOG_LEVEL_MAX_EXPIRY_HOURS,
             "manage": manage,
@@ -206,8 +227,13 @@ def _sections(
     *,
     manage: bool = False,
     errors: dict[str, str] | None = None,
+    stored: frozenset[str] = frozenset(),
 ) -> list[TopicSection]:
-    """Group the class C and D settings by topic, in the registry's topic order."""
+    """Group the class C and D settings by topic, in the registry's topic order.
+
+    ``stored`` names the keys the portal holds a value for, so a locked one that was taken
+    over says which variable to remove.
+    """
     _ = locale.gettext
     errors = errors or {}
     by_topic: dict[Topic, list[SettingRow]] = {}
@@ -230,6 +256,12 @@ def _sections(
                 from_portal=state.source.value == "portal",
                 expires=state.spec.key == LOG_LEVEL,
                 error=errors.get(state.spec.key),
+                secret=state.spec.secret,
+                adoptable=manage
+                and editable(state.spec)
+                and state.locked
+                and state.spec.key not in stored,
+                adopted=state.locked and state.spec.key in stored,
             )
         )
     return [
@@ -258,3 +290,9 @@ def _input(state: SettingState) -> str:
     if isinstance(state.value, bool):
         return "true" if state.value else "false"
     return str(state.value)
+
+
+def _stored(live: LiveSettings) -> frozenset[str]:
+    """Return the keys the portal holds a value for (secrets included, values never)."""
+    portal = live.portal
+    return frozenset(portal.values) | frozenset(portal.secrets)

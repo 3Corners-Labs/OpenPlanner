@@ -49,10 +49,13 @@ EDITABLE_TOPICS = frozenset(
         Topic.ADMIN_SESSION,
         Topic.STAFF,
         Topic.PLANNER,
+        Topic.MAIL,
+        Topic.UPDATES,
         Topic.CONFIRMATION,
     }
 )
-"""The topics of class C settings the portal changes from build step 4 on."""
+"""The topics of class C settings the portal changes: step 4, and mail and updates with their
+secrets from step 6 (sealed, ADR 0008). Webex/WxCC and the login mapping follow."""
 
 LOG_LEVEL = "log_level"
 
@@ -64,10 +67,8 @@ _FALSE = frozenset({"false", "off", "no", "0"})
 
 def editable(spec: SettingSpec) -> bool:
     """Return whether the portal and the CLI may change ``spec``'s platform value."""
-    if spec.secret:
-        return False
     if spec.class_ is SettingClass.ORGANISATION:
-        return True
+        return not spec.secret
     return spec.class_ is SettingClass.PLATFORM and spec.topic in EDITABLE_TOPICS
 
 
@@ -78,6 +79,10 @@ def parse(spec: SettingSpec, raw: str) -> object:
         DomainError: ``setting_invalid`` with the key as field (never the text).
     """
     text = raw.strip()
+    if spec.secret:
+        if not text:
+            raise DomainError(ErrorCode.SETTING_INVALID, spec.key)
+        return text
     value: object
     try:
         if not text:
@@ -152,6 +157,7 @@ class SettingsService:
         locked: Callable[[], Collection[str]],
         combination: Callable[[Mapping[str, object]], str | None],
         organisation_combination: Callable[[int, Mapping[str, object]], str | None] | None = None,
+        environment_value: Callable[[str], object] = lambda _: None,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -159,6 +165,7 @@ class SettingsService:
         self._admin = admin
         self._locked = locked
         self._combination = combination
+        self._environment_value = environment_value
         self._organisation_combination = organisation_combination or (
             lambda _, proposed: combination(proposed)
         )
@@ -287,6 +294,9 @@ class SettingsService:
         Raises:
             DomainError: As ``change``, apart from ``not_permitted``.
         """
+        spec = BY_KEY.get(key)
+        if spec is not None and spec.secret:  # ADR 0042 §10: secrets never through the CLI
+            raise DomainError(ErrorCode.SETTING_NOT_EDITABLE, key)
         await self._change(CLI_ACTOR, key, raw, hours)
 
     async def reset_host(self, key: str) -> bool:
@@ -329,6 +339,9 @@ class SettingsService:
         value = parse(spec, raw)
         now = self._clock.now()
         expires = self._expiry(spec, hours, now)
+        if spec.secret:
+            await self._seal(actor, spec, str(value), "set")
+            return
         async with self._uow.locked() as tx:
             stored = await tx.platform_settings()
             if self._combination({**stored, key: value}):
@@ -338,10 +351,25 @@ class SettingsService:
             await tx.bump_settings_version()
             await _audit(tx, now, actor, f"set:{key}:{_text(old)}->{_text(value)}")
 
+    async def _seal(self, actor: str, spec: SettingSpec, value: str, verb: str) -> None:
+        """Seal one secret and audit that it was set, never its value.
+
+        Raises:
+            DomainError: ``setting_no_key`` without ``SETTINGS_ENCRYPTION_KEY``.
+        """
+        now = self._clock.now()
+        async with self._uow.locked() as tx:
+            if not await tx.secrets_available():
+                raise DomainError(ErrorCode.SETTING_NO_KEY, spec.key)
+            await tx.save_platform_secret(spec.key, value, now)
+            await tx.bump_settings_version()
+            await _audit(tx, now, actor, f"{verb}:{spec.key}:secret")
+
     async def _reset(self, actor: str, keys: list[str]) -> bool:
         """Remove the values of ``keys`` (one, in practice), then audit it."""
-        for key in keys:
-            self._spec(key)
+        specs = [self._spec(key) for key in keys]
+        if any(spec.secret for spec in specs):
+            return await self._reset_secrets(actor, keys)
         now = self._clock.now()
         async with self._uow.locked() as tx:
             stored = await tx.platform_settings()
@@ -356,6 +384,57 @@ class SettingsService:
                 await _audit(tx, now, actor, f"reset:{key}:{_text(stored[key])}")
             await tx.bump_settings_version()
         return True
+
+    async def _reset_secrets(self, actor: str, keys: list[str]) -> bool:
+        """Remove sealed portal secrets, then audit it without a value."""
+        now = self._clock.now()
+        removed = False
+        async with self._uow.locked() as tx:
+            for key in keys:
+                if await tx.delete_platform_secret(key):
+                    removed = True
+                    await _audit(tx, now, actor, f"reset:{key}:secret")
+            if removed:
+                await tx.bump_settings_version()
+        return removed
+
+    async def adopt(self, principal: Principal, key: str) -> None:
+        """Take a value the environment locks over into the portal (ADR 0042 §12).
+
+        A secret is sealed by the server; the superuser never sees it. The setting stays
+        locked until the operator removes the variable and restarts the containers.
+
+        Raises:
+            DomainError: ``not_permitted``, ``setting_not_editable``, ``setting_not_locked``,
+                ``setting_invalid`` or ``setting_no_key``.
+        """
+        require(await self._admin.authorize(principal, _PERMISSION))
+        try:
+            await self._adopt(principal.subject, key)
+        except DomainError as error:
+            await self._refused(principal.subject, error, f"adopt:{_known(key)}")
+            raise
+
+    async def _adopt(self, actor: str, key: str) -> None:
+        """Copy the environment's value of a locked setting into the portal."""
+        spec = BY_KEY.get(key)
+        if spec is None or not editable(spec):
+            raise DomainError(ErrorCode.SETTING_NOT_EDITABLE, key if spec else None)
+        if key not in self._locked():
+            raise DomainError(ErrorCode.SETTING_NOT_LOCKED, key)
+        value = self._environment_value(key)
+        if spec.secret:
+            if not isinstance(value, str) or not value:
+                raise DomainError(ErrorCode.SETTING_INVALID, key)
+            await self._seal(actor, spec, value, "adopt")
+            return
+        if not usable(spec, value):
+            raise DomainError(ErrorCode.SETTING_INVALID, key)
+        now = self._clock.now()
+        async with self._uow.locked() as tx:
+            await tx.save_platform_setting(key, value, now, None)
+            await tx.bump_settings_version()
+            await _audit(tx, now, actor, f"adopt:{key}:{_text(value)}")
 
     @staticmethod
     def _expiry(spec: SettingSpec, hours: int | None, now: datetime) -> datetime | None:

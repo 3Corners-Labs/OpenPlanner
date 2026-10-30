@@ -167,3 +167,57 @@ async def test_a_locked_setting_has_no_form(site: Site) -> None:
 
     assert 'action="/admin/settings/admin_session_hours"' not in page
     assert 'action="/admin/settings/admin_reauth_minutes"' in page
+
+
+# Secrets and taking over from the environment (ADR 0042 step 6).
+
+SECRET = "never-shown-anywhere"  # noqa: S105 - test value
+
+
+async def test_a_secret_is_written_but_never_shown(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+
+    response = await site.client.post(
+        "/admin/settings/smtp_password", data={"value": SECRET}, headers=SAME_ORIGIN
+    )
+    page = (await site.client.get("/admin/settings")).text
+
+    assert response.status_code == 303
+    assert SECRET not in page
+    assert 'type="password"' in page
+    assert app.state.settings.smtp_password.get_secret_value() == SECRET
+
+
+async def test_an_empty_secret_keeps_the_current_one(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    await site.client.post(
+        "/admin/settings/smtp_password", data={"value": SECRET}, headers=SAME_ORIGIN
+    )
+
+    response = await site.client.post(
+        "/admin/settings/smtp_password", data={"value": ""}, headers=SAME_ORIGIN
+    )
+    await site.client.get("/admin/settings")
+
+    assert "done=unchanged" in response.headers["location"]
+    assert app.state.settings.smtp_password.get_secret_value() == SECRET
+
+
+@pytest.mark.usefixtures("lock_session_hours")
+async def test_a_locked_value_is_taken_over_and_names_the_variable_to_remove(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+
+    before = (await site.client.get("/admin/settings")).text
+    response = await site.client.post(
+        "/admin/settings/admin_session_hours/adopt", headers=SAME_ORIGIN
+    )
+    after = (await site.client.get("/admin/settings")).text
+
+    assert 'action="/admin/settings/admin_session_hours/adopt"' in before
+    assert response.status_code == 303
+    assert "Overgenomen in het portaal" in after
+    assert 'action="/admin/settings/admin_session_hours/adopt"' not in after

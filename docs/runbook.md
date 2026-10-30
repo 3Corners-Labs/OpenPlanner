@@ -134,7 +134,13 @@ docker compose exec web python -m app.cli settings reset ADMIN_SESSION_HOURS
 docker compose exec web python -m app.cli settings reset --all-class-c
 ```
 
-A setting the environment locks is refused; change the variable and restart instead. A value set in
+A setting the environment locks is refused; change the variable and restart instead.
+
+**Moving a value from `.env` into the portal** (ADR 0042 §12): on *Advanced settings* a locked
+setting has *Manage this here from now on*. It copies the current value into the portal
+(a password or token sealed under `SETTINGS_ENCRYPTION_KEY`); then remove the variable from
+`.env` and restart `web` and `worker`. Secrets set in the portal make the key backup more
+important still: without `SETTINGS_ENCRYPTION_KEY` they cannot be read. A value set in
 the environment outside the portal bounds still applies, but is marked
 `! outside portal bounds`. A stored portal value that no longer meets the rules (for example a
 row edited by hand) is not applied and is marked `! stored portal value ignored`. A change

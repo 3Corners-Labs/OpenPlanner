@@ -910,6 +910,22 @@ class Transaction(Protocol):
         """Raise ``settings_version`` by one and return the new value (ADR 0042 §6)."""
         ...
 
+    async def platform_secrets(self) -> dict[str, str]:
+        """Return the class C secrets set in the portal, opened (empty without a settings key)."""
+        ...
+
+    async def secrets_available(self) -> bool:
+        """Return whether secrets can be sealed here (``SETTINGS_ENCRYPTION_KEY`` is set)."""
+        ...
+
+    async def save_platform_secret(self, key: str, value: str, updated_at: datetime) -> None:
+        """Seal and store the portal value of the secret ``key`` (ADR 0008)."""
+        ...
+
+    async def delete_platform_secret(self, key: str) -> bool:
+        """Remove the sealed portal value of ``key``; return whether there was one."""
+        ...
+
     async def organisation_settings(self) -> dict[int, dict[str, object]]:
         """Return every organisation's stored class D values by organisation id (step 5)."""
         ...
