@@ -4,8 +4,8 @@
 # for sudo only to install the host updater (ADR 0029).
 #
 #   ./scripts/install.sh --mode production|test|lab [--version X.Y.Z] [--repository owner/name]
-#                        [--non-interactive] [--acme-staging] [--no-updater]
-#                        [--upgrade-docker] [--no-packages]
+#                        [--channel release|rc] [--non-interactive] [--acme-staging]
+#                        [--no-updater] [--upgrade-docker] [--no-packages]
 #
 #   0. host packages   Ubuntu/Debian: curl, flock, Compose plugin and cosign at their newest
 #                      version on every run; Docker Engine from Docker's own repository when
@@ -46,7 +46,8 @@ READY_URL=http://127.0.0.1:8000/readyz
 HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-300}
 # not a pin: the oldest Compose that reads env_file with path/required; packages stay newest
 COMPOSE_MIN=2.24.0
-VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$'
+VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(-rc\.[0-9]{1,4})?$'
+RELEASE_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$'
 REPOSITORY_RE='^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
 
 OS_RELEASE=$ROOT/etc/os-release
@@ -79,6 +80,7 @@ parse_args() {
       --mode) MODE=${2:?--mode needs a value} && shift ;;
       --version) VERSION=${2:?--version needs a value} && shift ;;
       --repository) REPOSITORY=${2:?--repository needs a value} && shift ;;
+      --channel) CHANNEL=${2:?--channel needs a value} && shift ;;
       --non-interactive) INTERACTIVE=0 ;;
       --acme-staging) ACME_STAGING=1 ;;
       --no-updater) UPDATER=0 ;;
@@ -97,7 +99,18 @@ parse_args() {
     '') usage >&2 && die "--mode is required on the first run" ;;
     *) die "--mode must be production, test or lab, not '$MODE'" ;;
   esac
-  [[ -z $VERSION || $VERSION =~ $VERSION_RE ]] || die "--version must look like 1.2.3"
+  # ADR 0059: the channel is remembered in .env; production follows releases only.
+  CHANNEL=${CHANNEL:-$(value "$ENV_FILE" UPDATE_CHANNEL)}
+  CHANNEL=${CHANNEL:-release}
+  case $CHANNEL in
+    release | rc) ;;
+    *) die "--channel must be release or rc, not '$CHANNEL'" ;;
+  esac
+  [[ $MODE != production || $CHANNEL == release ]] \
+    || die "--channel rc is refused in production mode: production follows releases (ADR 0059)"
+  [[ -z $VERSION || $VERSION =~ $VERSION_RE ]] || die "--version must look like 1.2.3 (or 1.2.3-rc.4 on the rc channel)"
+  [[ -z $VERSION || $CHANNEL == rc || $VERSION =~ $RELEASE_RE ]] \
+    || die "--version $VERSION is a release candidate; it needs --channel rc"
   REPOSITORY=${REPOSITORY:-$(value "$ENV_FILE" UPDATE_REPOSITORY)}
   REPOSITORY=${REPOSITORY:-3Corners-Labs/OpenPlanner}
   [[ $REPOSITORY =~ $REPOSITORY_RE ]] || die "--repository must be owner/name"
@@ -315,6 +328,7 @@ new_env() {
     put MAIL_FROM "${MAIL_FROM:-}"
     put UPDATE_REPOSITORY "$REPOSITORY"
     put UPDATE_CHECK_TOKEN "$UPDATE_CHECK_TOKEN"
+    put UPDATE_CHANNEL "$CHANNEL"
     printf '# Webex and WxCC: docs/runbook.md, "Webex meetings and Webex Contact Center".\n'
   } | write_private "$ENV_FILE"
 }
@@ -343,6 +357,21 @@ repair_env() {
     warn "$ENV_FILE set ${duplicates% } more than once; kept the last value of each (the one in use), backup: $backup"
   fi
   chmod 600 "$ENV_FILE"
+  set_channel
+}
+
+# UPDATE_CHANNEL in .env follows --channel (ADR 0059): replaced when it differs, added when
+# missing and not the default. The application reads it from .env, the updater's identity below.
+set_channel() {
+  local current backup
+  current=$(value "$ENV_FILE" UPDATE_CHANNEL)
+  [[ ${current:-release} != "$CHANNEL" ]] || return 0
+  # shellcheck disable=SC2016 # an awk program
+  backup=$(rewrite_env -v channel="$CHANNEL" '
+    /^UPDATE_CHANNEL=/ { if (!done) { print "UPDATE_CHANNEL=" channel; done = 1 }; next }
+    { print }
+    END { if (!done) print "UPDATE_CHANNEL=" channel }')
+  log "UPDATE_CHANNEL=$CHANNEL written to $ENV_FILE (backup: $backup)"
 }
 
 # The bootstrap keys live in secrets/secrets.env, which Compose reads after .env (ADR 0042 §9):
@@ -409,6 +438,8 @@ check_env() {
         || problems+=("$key is missing")
     done
     [[ $(value "$ENV_FILE" SIMULATOR_ENABLED) != true ]] || problems+=("SIMULATOR_ENABLED=true is refused in production")
+    [[ ${CHANNEL} == release && $(value "$ENV_FILE" UPDATE_CHANNEL) != rc ]] || problems+=("UPDATE_CHANNEL=rc is refused in production (ADR 0059)")
+    [[ $(value "$ENV_FILE" UPDATE_AUTO_APPLY) != true ]] || problems+=("UPDATE_AUTO_APPLY=true is refused in production (ADR 0059)")
     case $(value "$ENV_FILE" OIDC_DISCOVERY_URL) in
       '') ;;
       https://*)
@@ -465,14 +496,22 @@ settings() {
 # 4. The pinned release -------------------------------------------------------------------------
 
 image_name() { printf 'ghcr.io/%s' "$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"; }
-identity_regexp() { printf '^https://github\\.com/%s/\\.github/workflows/main\\.yml@refs/tags/v[0-9]+\\.[0-9]+\\.[0-9]+$' "${REPOSITORY//./\\.}"; }
+# What the host's cosign accepts (ADR 0006): images signed by main.yml for a release tag. On
+# the rc channel also those signed on main, where release candidates are built (ADR 0059).
+identity_regexp() {
+  local ref='tags/v[0-9]+\.[0-9]+\.[0-9]+' # through %s: single backslashes here
+  [[ $CHANNEL == release ]] || ref="(heads/main|$ref)"
+  printf '^https://github\\.com/%s/\\.github/workflows/main\\.yml@refs/%s$' "${REPOSITORY//./\\.}" "$ref"
+}
 
 latest_version() {
-  local token tag
+  local token tag url="https://api.github.com/repos/$REPOSITORY/releases/latest"
+  # The rc channel takes the newest release or pre-release (GitHub lists newest first).
+  [[ $CHANNEL == release ]] || url="https://api.github.com/repos/$REPOSITORY/releases?per_page=1"
   token=$(value "$ENV_FILE" UPDATE_CHECK_TOKEN)
   # The token goes in through a file descriptor, never on the command line (visible in ps).
   tag=$(curl -fsS -H "Accept: application/vnd.github+json" -H @<(printf 'Authorization: Bearer %s\n' "$token") \
-    "https://api.github.com/repos/$REPOSITORY/releases/latest" 2>/dev/null \
+    "$url" 2>/dev/null \
     | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' | head -n 1) || true
   [[ $tag =~ $VERSION_RE ]] \
     || die "cannot find the latest release of $REPOSITORY: pass --version, or set UPDATE_CHECK_TOKEN for a private repository"

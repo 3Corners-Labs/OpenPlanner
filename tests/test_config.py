@@ -80,6 +80,11 @@ def test_production_is_the_default_and_refuses_development_defaults(
 
     with pytest.raises(ValueError, match="SIMULATOR_ENABLED"):
         Settings(**production, simulator_enabled=True)  # type: ignore[arg-type]
+    # ADR 0059: production follows releases, on a superuser's click.
+    with pytest.raises(ValueError, match="UPDATE_CHANNEL"):
+        Settings(**production, update_channel="rc")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="UPDATE_AUTO_APPLY"):
+        Settings(**production, update_auto_apply=True)  # type: ignore[arg-type]
 
     settings = Settings(**production)  # type: ignore[arg-type]
     assert settings.environment == "prod"

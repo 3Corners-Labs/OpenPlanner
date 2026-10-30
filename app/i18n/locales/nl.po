@@ -17,6 +17,12 @@ msgstr "Afspraak maken"
 msgid "site.skip_to_content"
 msgstr "Naar de inhoud"
 
+msgid "site.product_footer_via"
+msgstr "Afspraken via"
+
+msgid "site.product_name"
+msgstr "OpenPlanner"
+
 msgid "home.title"
 msgstr "Een videogesprek plannen"
 
@@ -3806,6 +3812,18 @@ msgstr "Geen releaseversie (ontwikkelversie); updates worden niet aangeboden."
 msgid "admin.updates.commit"
 msgstr "Commit"
 
+msgid "admin.updates.channel"
+msgstr "Kanaal"
+
+msgid "admin.updates.channel.release"
+msgstr "Releases"
+
+msgid "admin.updates.channel.rc"
+msgstr "Releasekandidaten (elke merge naar main) en releases"
+
+msgid "admin.updates.auto_apply"
+msgstr "werkt zichzelf bij"
+
 msgid "admin.updates.latest"
 msgstr "Nieuwste versie"
 
@@ -5763,6 +5781,9 @@ msgstr "Tijdnotatie"
 
 msgid "settings.field.admin_timezone.label"
 msgstr "Tijdzone beheerportaal"
+
+msgid "settings.field.product_footer.label"
+msgstr "Toon \"Afspraken via OpenPlanner\" onderaan"
 
 msgid "settings.field.staff_dormant_after_days.label"
 msgstr "Medewerker inactief na (dagen)"
