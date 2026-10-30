@@ -32,11 +32,85 @@
   {% if events %}
   <ol class="timeline">
     {% for event in events %}
-    <li><span class="timeline__time">{{ event.time }}</span> <span class="timeline__label">{{ event.label }}</span>{% if event.detail %} <code>{{ event.detail }}</code>{% endif %}{% if event.message %}<p class="timeline__hint">{{ event.message }}</p>{% endif %}{% if event.hint %}<p class="timeline__hint">{{ event.hint }}</p>{% endif %}</li>
+    <li><span class="timeline__time">{{ event.time }}</span> <span class="timeline__label">{{ event.label }}</span>{% if event.detail %} <code>{{ event.detail }}</code>{% endif %} <span class="muted">{% if event.version %}{{ _("admin.booking.version", version=event.version) }}{% else %}{{ _("admin.booking.version_unknown") }}{% endif %}</span>{% if event.message %}<p class="timeline__hint">{{ event.message }}</p>{% endif %}{% if event.hint %}<p class="timeline__hint">{{ event.hint }}</p>{% endif %}</li>
     {% endfor %}
   </ol>
   {% else %}
   <p class="empty-state">{{ _("admin.booking.no_events") }}</p>
+  {% endif %}
+</section>
+<section class="card" id="jobs" aria-labelledby="jobs-heading">
+  <div class="card__header">
+    <h2 id="jobs-heading">{{ _("admin.booking.jobs") }}</h2>
+    <p class="card__lead">{{ _("admin.booking.jobs_lead") }}</p>
+  </div>
+  {% if jobs %}
+  <div class="table-scroll" role="region" aria-label="{{ _('admin.booking.jobs') }}" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.booking.jobs") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.booking.job.type") }}</th>
+        <th scope="col">{{ _("admin.booking.job.when") }}</th>
+        <th scope="col">{{ _("admin.booking.job.status") }}</th>
+        <th scope="col">{{ _("admin.booking.job.attempts") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr>
+        <td>{{ job.label }}</td>
+        <td class="nowrap">{{ job.when }}</td>
+        <td><span class="chip{% if job.tone %} chip--{{ job.tone }}{% endif %}">{{ job.status }}</span>{% if job.error %}<br><code>{{ job.error }}</code>{% endif %}
+          {%- if job.retry %}
+          <form method="post" action="{{ retry_action }}" class="inline-form">
+            <input type="hidden" name="job" value="{{ job.retry }}">
+            <button type="submit" class="button button--secondary">{{ _("admin.booking.retry") }}</button>
+          </form>
+          {%- endif %}</td>
+        <td>{{ job.attempts }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.booking.no_jobs") }}</p>
+  {% endif %}
+</section>
+<section class="card" id="requests" aria-labelledby="requests-heading">
+  <div class="card__header">
+    <h2 id="requests-heading">{{ _("admin.booking.requests") }}</h2>
+    <p class="card__lead">{{ _("admin.booking.requests_lead") }}</p>
+  </div>
+  {% if requests %}
+  <div class="table-scroll" role="region" aria-label="{{ _('admin.booking.requests') }}" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.booking.requests") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.booking.request.when") }}</th>
+        <th scope="col">{{ _("admin.booking.request.call") }}</th>
+        <th scope="col">{{ _("admin.booking.request.status") }}</th>
+        <th scope="col">{{ _("admin.booking.request.tracking") }}</th>
+        <th scope="col">{{ _("admin.booking.request.version") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in requests %}
+      <tr>
+        <td class="nowrap">{{ r.when }}</td>
+        <td><code>{{ r.method }} {{ r.path }}</code></td>
+        <td><span class="chip chip--{{ r.tone }}">{{ r.status }}</span>{% if r.error %}<br><code>{{ r.error }}</code>{% endif %}<br><span class="muted">{{ _("admin.booking.request.ms", ms=r.ms) }}</span></td>
+        <td>{% if r.tracking %}<code>{{ r.tracking }}</code>{% else %}–{% endif %}</td>
+        <td>{{ r.version }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.booking.no_requests") }}</p>
   {% endif %}
 </section>
 {% if simulator %}
