@@ -170,6 +170,8 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/staff/999": statuses(404, 404, 404, 404, 404, 403, 403)
     },
     # ADR 0033: the manual is public, every admin may read every topic.
+    # Step 2b: the profile menu's theme and alert choices, stored in the own session (303 back).
+    "GET /admin/preferences": {"/admin/preferences": statuses(303, 303, 303, 303, 303, 303, 403)},
     "GET /admin/help": {"/admin/help": statuses(200, 200, 200, 200, 200, 200, 403)},
     "GET /admin/help/{topic}": {
         "/admin/help/group-settings": statuses(200, 200, 200, 200, 200, 200, 403),
@@ -352,6 +354,12 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             422, 403, 403, 403, 403, 403, 403
         ),
     },
+    # ADR 0073: the sender domain check; without a sender there is nothing to check (422).
+    "POST /admin/organisations/{org}/channels/email/domain": {
+        "/admin/organisations/demo/channels/email/domain": statuses(
+            422, 403, 403, 403, 403, 403, 403
+        ),
+    },
     "POST /admin/organisations/{org}/channels/sms": {
         "/admin/organisations/demo/channels/sms": statuses(422, 403, 403, 403, 403, 403, 403),
     },
@@ -494,6 +502,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/groups/{slug}/agenda": {
         "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403, 403, 403),
         "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    # ADR 0010, 0072: the fragment the agenda polls carries the page's permission and scope.
+    "GET /admin/groups/{slug}/agenda/live": {
+        "/admin/groups/demo/agenda/live": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/live": statuses(200, 403, 403, 200, 403, 403, 403),
     },
     # ADR 0044: a planner's changes; an unknown booking is a 404, an empty form a 400.
     "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
@@ -887,6 +900,7 @@ WRITABLE_IN_MAINTENANCE = frozenset(
     {
         "POST /admin/organisations/{org}/channels/email",
         "POST /admin/organisations/{org}/channels/email/test",
+        "POST /admin/organisations/{org}/channels/email/domain",
         "POST /admin/organisations/{org}/channels/sms",
         "POST /admin/organisations/{org}/channels/{channel}/remove",
         "POST /admin/updates/update",

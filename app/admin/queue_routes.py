@@ -15,19 +15,19 @@ through a fragment that ``static/live-region.js`` polls (ADR 0072); without the 
     POST /admin/groups/{slug}/queue/{booking_id}/release    queue.work  (claimer, group admin)
 """
 
-import hashlib
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import tzinfo
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.admin.authz import AdminContext, RequirePermission, can_function
+from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import raise_refusal, redirect_done
 from app.admin.group_routes import group_page
-from app.admin.pages import Locale, SameOrigin, templates
+from app.admin.live import Seen, fragment, key
+from app.admin.pages import Locale, SameOrigin
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.own_queue import CitizenState, VideoState
@@ -37,7 +37,7 @@ from app.i18n.dates import format_clock
 from app.web.errors import ERROR_KEYS
 from app.web.locale import RequestLocale
 from app.web.organisation_settings import settings_for
-from app.web.templates import FragmentResponse, render
+from app.web.templates import FragmentResponse
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -45,8 +45,6 @@ WorkQueue = Annotated[
     AdminContext,
     Depends(RequirePermission(Permission.QUEUE_WORK, group_param="slug")),
 ]
-Seen = Annotated[str, Query(max_length=64)]
-"""The key of the fragment the page shows; the server answers 204 while it is current."""
 LOST = "claim-lost"
 """Key of the fragment that says the claim is gone; no page ever polls with it."""
 
@@ -131,11 +129,6 @@ def _url(slug: str) -> str:
     return f"/admin/groups/{slug}/queue"
 
 
-def _key(*parts: object) -> str:
-    """Return a short digest of what the fragment shows, so the poller can ask "still this?"."""
-    return hashlib.sha256(repr(parts).encode()).hexdigest()[:16]
-
-
 def _poll(request: Request, url: str, key: str, polling: bool = True) -> dict[str, object]:
     """Return the fragment's poll attributes: its URL with the key, and the interval."""
     return {
@@ -191,7 +184,7 @@ async def _list_view(
         has_next,
         view.free_pick,
         _("admin.queue.announcement", count=len(rows), waiting=waiting),
-        _key(shown, has_next),
+        key(shown, has_next),
     )
 
 
@@ -257,7 +250,7 @@ def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) ->
         citizen=locale.gettext(citizen_key),
         citizen_tone=citizen_tone,
         video=locale.gettext(video_key) if video_key else None,
-        key=_key(booking.video, booking.citizen, booking.join_url is not None),
+        key=key(booking.video, booking.citizen, booking.join_url is not None),
         polling=booking.video is not VideoState.FAILED
         and booking.citizen is not CitizenState.ENDED,
     )
@@ -283,25 +276,6 @@ async def _claimed_or_list(
     return _claimed_view(booking, locale, context.group.group.tz)
 
 
-def _fragment(
-    request: Request,
-    locale: RequestLocale,
-    context: AdminContext,
-    name: str,
-    seen: str,
-    key: str,
-    extra: dict[str, object],
-) -> Response:
-    """Answer the poller: 204 while ``seen`` is current, otherwise the fragment.
-
-    The fragment gets the group and ``can()`` like the page, for its links and actions.
-    """
-    if key == seen:
-        return Response(status_code=204, headers={"cache-control": "no-store"})
-    shared = {"summary": context.group, "can": can_function(context.principal)}
-    return render(templates, request, name, locale, {**shared, **extra})
-
-
 @router.get("/groups/{slug}/queue", response_class=HTMLResponse)
 async def queue(request: Request, locale: Locale, slug: str, context: WorkQueue) -> HTMLResponse:
     """Show the group's own queue."""
@@ -314,7 +288,7 @@ async def queue_live(
 ) -> Response:
     """Return the list fragment for the page's poller; 204 while ``seen`` is current."""
     view = await _list_view(request, locale, context, slug)
-    return _fragment(
+    return fragment(
         request,
         locale,
         context,
@@ -382,9 +356,9 @@ async def claimed_live(
         if error.code not in SHOWN_ON_THE_LIST:
             raise
         lost: dict[str, object] = {"message": locale.gettext(ERROR_KEYS[error.code]), "poll": None}
-        return _fragment(request, locale, context, "admin/_queue_claim_lost.html", seen, LOST, lost)
+        return fragment(request, locale, context, "admin/_queue_claim_lost.html", seen, LOST, lost)
     view = _claimed_view(booking, locale, context.group.group.tz)
-    return _fragment(
+    return fragment(
         request,
         locale,
         context,
