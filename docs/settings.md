@@ -74,8 +74,10 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `TLS_ALERT_REPEAT_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | A lasting certificate finding is reported again at this interval (ADR 0064). |
 | `TLS_CERTIFICATE_SOURCE` | enum | `acme` | acme, own | `settings.platform.manage` | Where the bundled proxy's certificate comes from: Let's Encrypt (acme) or the pair uploaded in the portal (own); 'own' needs an upload (ADR 0068). |
 | `INTEGRATION_CHECK_INTERVAL_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The worker checks every group with a Webex host this often and reports a broken chain as a system event (ADR 0065). |
+| `JOB_OVERDUE_MINUTES` | int | `10` | 1–1440 | `settings.platform.manage` | A pending job this many minutes past its planned time counts as overdue in a group's integration check (ADR 0068). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
 | `SYSTEM_EVENT_RETENTION_DAYS` | int | `90` | 30–3650 | `settings.platform.manage` | Days after which system events leave the audit log (ADR 0031). |
+| `INTEGRATION_REQUEST_RETENTION_DAYS` | int | `30` | 1–365 | `settings.platform.manage` | Days after which request events (every call to Webex and WxCC for a booking) leave the audit log, apart from the other system events (ADR 0068). |
 | `AUDIT_RETENTION_DAYS` | int | `730` | 365–3650 | `settings.platform.manage` | Days after which admin actions leave the audit log (ADR 0040). |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |

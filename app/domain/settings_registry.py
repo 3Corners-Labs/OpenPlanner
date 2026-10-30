@@ -627,6 +627,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=168,
     ),
     S(
+        "job_overdue_minutes",
+        K.INT,
+        10,
+        _C,
+        T.OPERATIONS,
+        "A pending job this many minutes past its planned time counts as overdue in a "
+        "group's integration check (ADR 0068).",
+        minimum=1,
+        maximum=1440,
+    ),
+    S(
         "staff_last_seen_interval_seconds",
         K.INT,
         300,
@@ -645,6 +656,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Days after which system events leave the audit log (ADR 0031).",
         minimum=30,
         maximum=3650,
+    ),
+    S(
+        "integration_request_retention_days",
+        K.INT,
+        30,
+        _C,
+        T.RETENTION,
+        "Days after which request events (every call to Webex and WxCC for a booking) leave "
+        "the audit log, apart from the other system events (ADR 0068).",
+        minimum=1,
+        maximum=365,
     ),
     S(
         "audit_retention_days",

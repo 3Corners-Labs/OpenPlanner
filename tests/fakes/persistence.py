@@ -33,7 +33,7 @@ from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
 from app.domain.form_fields import Answers, FormDefinition, raise_to_pii
 from app.domain.images import ImageFile, ImageText
-from app.domain.job_plan import PlannedJob
+from app.domain.job_plan import JobCounts, JobStatus, JobSummary, PlannedJob
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import OwnCertificate
@@ -49,6 +49,7 @@ from app.domain.scheduling import (
 from app.domain.staff import StaffFilter, StaffMember, visible
 from app.domain.tls import CertificateCheck
 from app.domain.updates import ReleaseCheck, UpdateRequest
+from app.domain.worker_check import WorkerHeartbeat
 
 
 @dataclass
@@ -104,6 +105,8 @@ class State:
     purged_at: dict[int, datetime] = field(default_factory=dict)
     forms: dict[int, FormDefinition] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
+    failed_jobs: dict[int, list[JobSummary]] = field(default_factory=dict)
+    worker_heartbeat: WorkerHeartbeat | None = None
     next_id: int = 1
 
 
@@ -151,8 +154,16 @@ class InMemoryTransaction:
             for e in reversed(events)
         ][:limit]
 
-    async def delete_audit_events(self, category: Category, before: datetime) -> int:
-        kept = [e for e in self.state.audit if e.event_category is not category or e.at >= before]
+    async def delete_audit_events(
+        self, category: Category, before: datetime, action: str | None = None
+    ) -> int:
+        kept = [
+            e
+            for e in self.state.audit
+            if e.event_category is not category
+            or e.at >= before
+            or (action is not None and e.action != action)
+        ]
         removed = len(self.state.audit) - len(kept)
         self.state.audit = kept
         return removed
@@ -249,6 +260,12 @@ class InMemoryTransaction:
 
     async def get_group_check(self, group_id: int) -> GroupCheck | None:
         return self.state.group_checks.get(group_id)
+
+    async def save_worker_heartbeat(self, heartbeat: WorkerHeartbeat) -> None:
+        self.state.worker_heartbeat = heartbeat
+
+    async def get_worker_heartbeat(self) -> WorkerHeartbeat | None:
+        return self.state.worker_heartbeat
 
     async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
         return self.state.organisations.get(organisation_id)
@@ -653,6 +670,24 @@ class InMemoryTransaction:
     async def delete_pending_jobs(self, booking_id: int, types: Collection[object]) -> None:
         jobs = self.state.jobs.get(booking_id, [])
         self.state.jobs[booking_id] = [j for j in jobs if j.type not in types]
+
+    async def get_booking_jobs(self, booking_id: int) -> list[JobSummary]:
+        # Planned jobs are pending; ``failed_jobs`` holds what a test says failed (ADR 0068).
+        pending = [
+            JobSummary(j.type, JobStatus.PENDING, j.run_at, 0, "", j.channel)
+            for j in self.state.jobs.get(booking_id, [])
+        ]
+        return sorted(
+            [*self.state.failed_jobs.get(booking_id, []), *pending], key=lambda j: j.run_at
+        )
+
+    async def count_group_jobs(self, group_id: int, overdue_before: datetime) -> JobCounts:
+        bookings = {b.id for b in self.state.bookings.values() if b.group_id == group_id}
+        failed = sum(len(self.state.failed_jobs.get(b, [])) for b in bookings)
+        overdue = sum(
+            1 for b in bookings for j in self.state.jobs.get(b, []) if j.run_at < overdue_before
+        )
+        return JobCounts(failed, overdue)
 
     async def get_shortfall_acceptances(
         self, group_id: int, lower: datetime, upper: datetime
