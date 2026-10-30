@@ -442,8 +442,6 @@ msgstr "Afspraak verplaatsen"
 msgid "manage.cancel"
 msgstr "Afspraak annuleren"
 
-msgid "manage.notice.booked"
-msgstr "Uw afspraak is gemaakt. U ontvangt een bevestiging per e-mail."
 
 msgid "manage.notice.rescheduled"
 msgstr "Uw afspraak is verplaatst. U ontvangt een bevestiging per e-mail."
@@ -497,6 +495,9 @@ msgstr "Beheer"
 
 msgid "admin.nav.label"
 msgstr "Beheermenu"
+
+msgid "admin.nav.more"
+msgstr "Meer"
 
 msgid "admin.nav.section.monitor"
 msgstr "Bewaken"
@@ -5506,7 +5507,7 @@ msgid "widget.more"
 msgstr "Meer mogelijkheden, zoals direct een gesprek starten, vindt u op de pagina van {name}."
 
 msgid "widget.done_title"
-msgstr "Uw afspraak is gemaakt"
+msgstr "Bevestig uw afspraak"
 
 msgid "widget.error_summary"
 msgstr "Er is iets niet goed ingevuld"
@@ -6345,6 +6346,92 @@ msgstr "Agenda-uitnodiging aan het team versturen"
 
 msgid "audit.job.send_team_cancel"
 msgstr "Agenda-afzegging aan het team versturen"
+
+# ADR 0056 step 2: confirming a booking by email link (pages and messages).
+
+msgid "booked.title"
+msgstr "Bevestig uw afspraak"
+
+msgid "booked.text"
+msgstr "We hebben u een e-mail gestuurd. Klik op de knop in die e-mail om uw afspraak te bevestigen. Pas dan is de afspraak definitief."
+
+msgid "booked.lapse"
+msgstr "Bevestigt u niet op tijd, dan vervalt de afspraak en komt de plek vrij voor iemand anders."
+
+msgid "booked.no_mail"
+msgstr "Geen e-mail ontvangen? Kijk ook bij uw ongewenste e-mail."
+
+msgid "booked.slot"
+msgstr "Gekozen moment"
+
+msgid "confirm.title"
+msgstr "Afspraak bevestigen"
+
+msgid "confirm.text"
+msgstr "Bevestig uw afspraak uiterlijk {deadline}. Daarna ontvangt u een e-mail met alle gegevens."
+
+msgid "confirm.submit"
+msgstr "Afspraak bevestigen"
+
+msgid "confirm.not_me"
+msgstr "Heeft u deze afspraak niet gemaakt? Annuleer hem dan."
+
+msgid "manage.status.pending_confirmation"
+msgstr "Niet bevestigd"
+
+msgid "manage.pending.title"
+msgstr "Nog niet bevestigd"
+
+msgid "manage.pending.text"
+msgstr "Bevestig uw afspraak uiterlijk {deadline}, anders vervalt hij."
+
+msgid "manage.pending.confirm"
+msgstr "Afspraak bevestigen"
+
+msgid "manage.notice.pending"
+msgstr "Uw afspraak is bijna klaar. Bevestig hem met de link in de e-mail die we u hebben gestuurd."
+
+msgid "manage.notice.confirmed"
+msgstr "Uw afspraak is bevestigd. U ontvangt een e-mail met alle gegevens."
+
+msgid "manage.notice.lapsed"
+msgstr "U heeft de afspraak niet op tijd bevestigd. De afspraak is vervallen."
+
+msgid "manage.book_again"
+msgstr "Nieuwe afspraak maken"
+
+msgid "message.greeting_anonymous"
+msgstr "Goedendag,"
+
+msgid "message.confirm_request.subject"
+msgstr "Bevestig uw afspraak met {group_name}"
+
+msgid "message.confirm_request.intro"
+msgstr "U heeft een videogesprek met {group_name} aangevraagd op {date} om {time}. Bevestig de afspraak; pas dan is hij definitief. Heeft u dit niet aangevraagd? Dan hoeft u niets te doen: de afspraak vervalt vanzelf."
+
+msgid "message.confirm_reminder.subject"
+msgstr "Herinnering: bevestig uw afspraak met {group_name}"
+
+msgid "message.confirm_reminder.intro"
+msgstr "U heeft uw videogesprek met {group_name} op {date} om {time} nog niet bevestigd. Bevestigt u niet op tijd, dan vervalt de afspraak."
+
+msgid "message.manage_confirm"
+msgstr "Bevestig uw afspraak uiterlijk {deadline}:"
+
+msgid "message.confirm_link"
+msgstr "Afspraak bevestigen"
+
+msgid "message.unconfirmed_lapsed.subject"
+msgstr "Uw afspraak met {group_name} is vervallen"
+
+msgid "message.unconfirmed_lapsed.intro"
+msgstr "U heeft uw videogesprek met {group_name} op {date} om {time} niet op tijd bevestigd. De afspraak is vervallen en de plek is vrijgegeven."
+
+msgid "message.book_again"
+msgstr "U kunt altijd een nieuwe afspraak maken."
+
+msgid "message.book_again_link"
+msgstr "Nieuwe afspraak maken"
 
 msgid "admin.settings.data_fields.title"
 msgstr "Gegevensvelden"

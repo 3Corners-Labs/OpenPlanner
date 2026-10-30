@@ -310,6 +310,8 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
         rebook_by=row.rebook_by,
+        confirm_by=row.confirm_by,
+        confirmed_at=row.confirmed_at,
         claim=Claim(row.claimed_at, row.claimed_by)
         if row.claimed_at is not None and row.claimed_by is not None
         else None,
@@ -1424,6 +1426,8 @@ class SqlTransaction(
             created_at=booking.created_at,
             cancelled_at=booking.cancelled_at,
             rescheduled_from_id=booking.rescheduled_from_id,
+            confirm_by=booking.confirm_by,
+            confirmed_at=booking.confirmed_at,
         )
         self._session.add(row)
         await self._session.flush()
@@ -1468,7 +1472,7 @@ class SqlTransaction(
         return _booking(*found) if found else None
 
     async def save_booking(self, booking: Booking) -> None:
-        """Persist the mutable fields of a booking (status, cancellation, closure, reason)."""
+        """Persist the mutable fields of a booking (status, times, closure, reason)."""
         await self._session.execute(
             update(BookingRow)
             .where(BookingRow.id == booking.id)
@@ -1478,6 +1482,7 @@ class SqlTransaction(
                 closure_id=booking.closure_id,
                 change_reason=booking.change_reason.value if booking.change_reason else None,
                 rebook_by=booking.rebook_by,
+                confirmed_at=booking.confirmed_at,
             )
         )
 
