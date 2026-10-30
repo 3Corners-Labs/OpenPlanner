@@ -198,17 +198,32 @@ class GovBooking extends HTMLElement {
   }
 
   async submit(values) {
-    const details = { start: this.chosen.start, name: values.name ?? '', email: values.email ?? '' };
+    const details = {
+      start: this.chosen.start,
+      first_name: values.first_name ?? '',
+      last_name: values.last_name ?? '',
+      email: values.email ?? '',
+      answers: answers(this.group.fields, values),
+    };
     if ('phone' in values) details.phone = values.phone;
     if (values[this.group.honeypot]) details.website = values[this.group.honeypot];
     try {
       const booking = await this.api.book(details);
       this.done(booking);
     } catch (error) {
-      const field = error instanceof ApiError && error.code === 'invalid_contact' ? error.field : null;
-      const key = field ? `error.field.${field}` : ERROR_TEXTS[error.code] ?? 'error.invalid_request';
-      this.form({ ...this.chosen, values, errors: [{ field, message: this.t(key) }] });
+      const coded = error instanceof ApiError && ['invalid_contact', 'invalid_answer'].includes(error.code);
+      const field = coded ? error.field : null;
+      this.form({ ...this.chosen, values, errors: [{ field, message: this.message(error, field) }] });
     }
+  }
+
+  message(error, field) {
+    if (error.code === 'invalid_answer' && field) {
+      const label = this.group.fields.find((f) => f.name === field)?.label;
+      return label ? `${label}: ${this.t('error.invalid_answer')}` : this.t('error.invalid_answer');
+    }
+    const key = field ? `error.field.${field}` : ERROR_TEXTS[error.code] ?? 'error.invalid_request';
+    return this.t(key);
   }
 
   done(booking) {
@@ -221,6 +236,19 @@ class GovBooking extends HTMLElement {
       ),
     ), 'done-title');
   }
+}
+
+/**
+ * The answers to the group's custom fields (inputs named `q_<key>`), keyed without the prefix.
+ * An unticked checkbox is not in the form data and is sent as empty.
+ * @param {{ name: string }[]} fields
+ * @param {Record<string, string>} values
+ * @returns {Record<string, string>}
+ */
+function answers(fields, values) {
+  return Object.fromEntries(fields
+    .filter((field) => field.name.startsWith('q_'))
+    .map((field) => [field.name.slice(2), values[field.name] ?? '']));
 }
 
 if (!customElements.get('gov-booking')) customElements.define('gov-booking', GovBooking);

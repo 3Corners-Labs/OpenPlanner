@@ -22,7 +22,7 @@ from tests.fakes.integrations import FakeDispatcher, FakeVideo
 from tests.support.domain import NOW
 
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
-ADA = {"name": "Ada Lovelace", "email": "ada@example.org", "phone": ""}
+ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
 
 
 async def _configure(database_url: str, **changes: object) -> None:

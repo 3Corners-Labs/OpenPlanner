@@ -68,7 +68,8 @@ test('a citizen starts a call right away and the admin sees it', async ({ page, 
   await citizen.getByRole('link', { name: 'Nu een gesprek starten' }).click();
   await expect(citizen.getByRole('heading', { level: 1 })).toHaveText('Nu een videogesprek starten');
   await expectNoAxeViolations(citizen);
-  await citizen.getByLabel('Naam').fill('Ada Lovelace');
+  await citizen.getByLabel('Voornaam').fill('Ada');
+  await citizen.getByLabel('Achternaam').fill('Lovelace');
   await citizen.getByLabel('E-mailadres').fill('ada@example.org');
   await citizen.getByRole('button', { name: 'Gesprek starten' }).press('Enter');
   await expect(citizen).toHaveURL(/\/b\/[A-Za-z0-9_-]+\/wait$/);
