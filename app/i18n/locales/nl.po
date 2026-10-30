@@ -6221,6 +6221,168 @@ msgstr "De nieuwe inlogkoppeling is niet bewaard: met die koppeling zou u na het
 msgid "admin.form.error.login_lockout"
 msgstr "Met deze koppeling zou u geen superuser meer zijn; ze is niet bewaard."
 
+msgid "call.hint.meeting.rejected_400.unexplained"
+msgstr "Webex weigerde de meeting, maar deze gebeurtenis bewaart het antwoord van Webex niet: ze is geschreven door een versie die dat nog niet deed. Kijk bij Verzoeken aan Webex hieronder, of plan de meeting opnieuw bij Achtergrondtaken; een nieuwe weigering komt dan met het antwoord van Webex op deze pagina."
+
+msgid "audit.job.send_rebook_request"
+msgstr "Verzoek om nieuwe tijd sturen"
+
+msgid "audit.job.send_rebook_reminder"
+msgstr "Herinnering nieuwe tijd sturen"
+
+msgid "audit.job.send_rebook_lapsed"
+msgstr "Melding verlopen verzoek sturen"
+
+msgid "audit.job.lapse_rebook"
+msgstr "Verzoek om nieuwe tijd laten verlopen"
+
+msgid "audit.job.send_confirm_request"
+msgstr "Bevestigingsverzoek sturen"
+
+msgid "audit.job.send_confirm_reminder"
+msgstr "Herinnering bevestigen sturen"
+
+msgid "audit.job.expire_unconfirmed"
+msgstr "Onbevestigde afspraak laten vervallen"
+
+msgid "audit.job.send_unconfirmed_lapsed"
+msgstr "Melding vervallen afspraak sturen"
+
+msgid "audit.job.send_team_invite"
+msgstr "Agenda-uitnodiging naar het team sturen"
+
+msgid "audit.job.send_team_cancel"
+msgstr "Agenda-annulering naar het team sturen"
+
+msgid "admin.booking.version"
+msgstr "versie {version}"
+
+msgid "admin.booking.version_unknown"
+msgstr "versie onbekend"
+
+msgid "admin.booking.jobs"
+msgstr "Achtergrondtaken"
+
+msgid "admin.booking.jobs_lead"
+msgstr "Wat de worker voor deze afspraak doet of deed: videomeeting, contactcentertaak, berichten en het verwijderen van persoonsgegevens. Een mislukte videomeeting of contactcentertaak kunt u opnieuw laten proberen."
+
+msgid "admin.booking.job.type"
+msgstr "Taak"
+
+msgid "admin.booking.job.when"
+msgstr "Gepland"
+
+msgid "admin.booking.job.status"
+msgstr "Stand"
+
+msgid "admin.booking.job.attempts"
+msgstr "Pogingen"
+
+msgid "admin.booking.job.pending"
+msgstr "Gepland"
+
+msgid "admin.booking.job.running"
+msgstr "Bezig"
+
+msgid "admin.booking.job.done"
+msgstr "Klaar"
+
+msgid "admin.booking.job.failed"
+msgstr "Mislukt"
+
+msgid "admin.booking.retry"
+msgstr "Opnieuw proberen"
+
+msgid "admin.booking.no_jobs"
+msgstr "Er zijn geen taken voor deze afspraak."
+
+msgid "admin.booking.requests"
+msgstr "Verzoeken aan Webex en Webex Contact Center"
+
+msgid "admin.booking.requests_lead"
+msgstr "Elke oproep die OpenPlanner voor deze afspraak deed, met het antwoord van het platform. De tracking-id is wat Cisco-support nodig heeft. Er staan geen persoonsgegevens in."
+
+msgid "admin.booking.request.when"
+msgstr "Tijd"
+
+msgid "admin.booking.request.call"
+msgstr "Oproep"
+
+msgid "admin.booking.request.status"
+msgstr "Antwoord"
+
+msgid "admin.booking.request.tracking"
+msgstr "Tracking-id"
+
+msgid "admin.booking.request.version"
+msgstr "Versie"
+
+msgid "admin.booking.request.ms"
+msgstr "{ms} ms"
+
+msgid "admin.booking.no_requests"
+msgstr "Nog geen verzoeken vastgelegd voor deze afspraak."
+
+msgid "admin.check.area.worker"
+msgstr "Achtergrondtaken (worker)"
+
+msgid "admin.check.worker.never_seen"
+msgstr "De worker heeft zich nog nooit gemeld: er draait geen worker, of hij kan de database niet bereiken. Afspraken krijgen dan geen videomeeting."
+
+msgid "admin.check.worker.stale"
+msgstr "De worker meldde zich {minutes} minuten geleden voor het laatst (versie {version}): hij staat stil of is gestopt."
+
+msgid "admin.check.worker.alive"
+msgstr "De worker draait (versie {version})."
+
+msgid "admin.check.worker.version_differs"
+msgstr "De worker draait versie {worker}, de beheeromgeving versie {web}: een update is half doorgevoerd."
+
+msgid "admin.check.worker.no_video_jobs"
+msgstr "De worker maakt geen videomeetings: hij is gestart zonder de Webex-instellingen. Start de worker opnieuw nadat de Service App is ingesteld."
+
+msgid "admin.check.worker.jobs_ok"
+msgstr "Geen mislukte of achterstallige taken in deze groep."
+
+msgid "admin.check.worker.failed_jobs"
+msgstr "{count} taken van deze groep zijn mislukt. Open de afspraak in de agenda om te zien waarom en probeer het opnieuw."
+
+msgid "admin.check.worker.overdue_jobs"
+msgstr "{count} taken van deze groep wachten langer dan {minutes} minuten op de worker."
+
+msgid "audit.event.integration_request"
+msgstr "Verzoek aan Webex of Webex Contact Center"
+
+msgid "admin.audit.reason.already_done"
+msgstr "Al gedaan: de meeting of taak bestaat al."
+
+msgid "admin.audit.reason.no_video"
+msgstr "Niet nodig: deze groep heeft geen Webex-host."
+
+msgid "admin.audit.reason.own_queue"
+msgstr "Niet nodig: deze groep gebruikt de eigen wachtrij van OpenPlanner, er komt geen contactcentertaak."
+
+msgid "admin.audit.reason.no_dispatch"
+msgstr "Niet mogelijk: deze groep heeft geen werkitem-kanaal of business address."
+
+msgid "admin.audit.detail.retry_create_video_room"
+msgstr "videomeeting opnieuw gepland"
+
+msgid "admin.audit.detail.retry_dispatch_wxcc_task"
+msgstr "contactcentertaak opnieuw gepland"
+
+msgid "admin.done.retried"
+msgstr "De taak is opnieuw gepland. De worker voert hem binnen een minuut uit; vernieuw de pagina voor de uitkomst."
+
+msgid "admin.done.retry_not_possible"
+msgstr "Opnieuw proberen kan niet meer: de afspraak is niet actief, of de meeting of taak bestaat al."
+
+msgid "settings.field.integration_request_retention_days.label"
+msgstr "Verzoeken aan Webex en WxCC bewaren (dagen)"
+
+msgid "settings.field.job_overdue_minutes.label"
+msgstr "Taak achterstallig na (minuten)"
+
 # ADR 0056 step 2: confirming a booking by email link (pages and messages).
 
 msgid "booked.title"

@@ -1233,6 +1233,26 @@ is no way from a pseudonym back to an address. Rotating `MANAGEMENT_TOKEN_KEY` c
 pseudonym (and every management link). At most `SECURITY_EVENT_MAX_SOURCES` callers (default
 1000) are tracked per window and process; beyond that, events count under `client:many`.
 
+### A booking without a video meeting (ADR 0068)
+
+Open the booking from the group's agenda (**Details**). Three blocks tell the story:
+
+1. **Verloop** (timeline): each event names the version that wrote it. On docker01 or another
+   host on the `rc` channel, an error of an older version may already be fixed: compare with
+   `python -m app.cli version`.
+2. **Achtergrondtaken** (jobs): `create_video_room` *Mislukt* with its code. **Opnieuw
+   proberen** (needs `bookings.manage`) plans it again; the worker runs it within a minute.
+   *Gepland* long past its time means the worker is not taking it: see step 4.
+3. **Verzoeken aan Webex en Webex Contact Center**: every call with status, duration and
+   Webex's `trackingId`. Give the tracking id to Cisco TAC; it identifies the request in
+   Webex's logs. Request events are kept `INTEGRATION_REQUEST_RETENTION_DAYS` (30) and survive
+   container restarts and updates, unlike `docker compose logs`.
+4. **Koppeling controleren** on the group's settings now also checks the worker: never seen
+   or stale (the worker container is down or cannot reach the database), a version that
+   differs from web (an update is half way), `worker.no_video_jobs` (the worker started
+   without the Webex settings: restart it), failed and overdue jobs of the group (overdue after
+   `JOB_OVERDUE_MINUTES`, default 10).
+
 ## Log lines and the event schema (ADR 0040)
 
 Every line on stdout is one JSON object in the field names of `openplanner.event/2`
