@@ -9,7 +9,7 @@ from app.domain.booking import MeetingRef
 from app.domain.scheduling import DispatchKind
 from app.domain.services import BookingService
 from tests.admin.conftest import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
-from tests.support.domain import ADA, TEST_TOKEN_KEY
+from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed
 
 FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # demo group: open weekdays
 QUEUE = "/admin/groups/demo/queue"
@@ -31,8 +31,12 @@ async def _own_queue(site: Site, **changes: object) -> int:
         assert summary is not None
         group = replace(summary.group, dispatch_kind=DispatchKind.OPENPLANNER_QUEUE, **changes)
         await tx.save_group(group)
-    receipt = await BookingService(uow, site.clock, TEST_TOKEN_KEY).book(
-        group_slug="demo", start=FRIDAY_0900, contact=ADA, locale="nl"
+    receipt = await book_confirmed(
+        BookingService(uow, site.clock, TEST_TOKEN_KEY),
+        group_slug="demo",
+        start=FRIDAY_0900,
+        contact=ADA,
+        locale="nl",
     )
     booking_id = receipt.booking.id or 0
     async with uow.locked() as tx:

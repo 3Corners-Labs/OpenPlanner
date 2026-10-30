@@ -442,8 +442,6 @@ msgstr "Move appointment"
 msgid "manage.cancel"
 msgstr "Cancel appointment"
 
-msgid "manage.notice.booked"
-msgstr "Your appointment has been booked. You will receive a confirmation by email."
 
 msgid "manage.notice.rescheduled"
 msgstr "Your appointment has been moved. You will receive a confirmation by email."
@@ -5509,7 +5507,7 @@ msgid "widget.more"
 msgstr "More options, such as starting a call right away, are on the page of {name}."
 
 msgid "widget.done_title"
-msgstr "Your appointment is booked"
+msgstr "Confirm your appointment"
 
 msgid "widget.error_summary"
 msgstr "Something was not filled in correctly"
@@ -6219,6 +6217,92 @@ msgstr "The new login mapping was not saved: with it you would no longer be supe
 
 msgid "admin.form.error.login_lockout"
 msgstr "With this mapping you would no longer be superuser; it was not saved."
+
+# ADR 0056 step 2: confirming a booking by email link (pages and messages).
+
+msgid "booked.title"
+msgstr "Confirm your appointment"
+
+msgid "booked.text"
+msgstr "We have sent you an email. Select the button in that email to confirm your appointment. Only then is the appointment final."
+
+msgid "booked.lapse"
+msgstr "If you do not confirm in time, the appointment lapses and the place becomes free for someone else."
+
+msgid "booked.no_mail"
+msgstr "No email? Please also check your junk mail."
+
+msgid "booked.slot"
+msgstr "Chosen time"
+
+msgid "confirm.title"
+msgstr "Confirm appointment"
+
+msgid "confirm.text"
+msgstr "Please confirm your appointment by {deadline}. You will then receive an email with all the details."
+
+msgid "confirm.submit"
+msgstr "Confirm appointment"
+
+msgid "confirm.not_me"
+msgstr "Did you not make this appointment? Then cancel it."
+
+msgid "manage.status.pending_confirmation"
+msgstr "Not confirmed"
+
+msgid "manage.pending.title"
+msgstr "Not confirmed yet"
+
+msgid "manage.pending.text"
+msgstr "Please confirm your appointment by {deadline}, or it lapses."
+
+msgid "manage.pending.confirm"
+msgstr "Confirm appointment"
+
+msgid "manage.notice.pending"
+msgstr "Your appointment is almost done. Confirm it with the link in the email we sent you."
+
+msgid "manage.notice.confirmed"
+msgstr "Your appointment is confirmed. You will receive an email with all the details."
+
+msgid "manage.notice.lapsed"
+msgstr "You did not confirm the appointment in time. The appointment has lapsed."
+
+msgid "manage.book_again"
+msgstr "Make a new appointment"
+
+msgid "message.greeting_anonymous"
+msgstr "Hello,"
+
+msgid "message.confirm_request.subject"
+msgstr "Confirm your appointment with {group_name}"
+
+msgid "message.confirm_request.intro"
+msgstr "You requested a video call with {group_name} on {date} at {time}. Please confirm the appointment; only then is it final. Did you not request this? Then you need not do anything: the appointment lapses by itself."
+
+msgid "message.confirm_reminder.subject"
+msgstr "Reminder: confirm your appointment with {group_name}"
+
+msgid "message.confirm_reminder.intro"
+msgstr "You have not yet confirmed your video call with {group_name} on {date} at {time}. If you do not confirm in time, the appointment lapses."
+
+msgid "message.manage_confirm"
+msgstr "Please confirm your appointment by {deadline}:"
+
+msgid "message.confirm_link"
+msgstr "Confirm appointment"
+
+msgid "message.unconfirmed_lapsed.subject"
+msgstr "Your appointment with {group_name} has lapsed"
+
+msgid "message.unconfirmed_lapsed.intro"
+msgstr "You did not confirm your video call with {group_name} on {date} at {time} in time. The appointment has lapsed and the place has been freed."
+
+msgid "message.book_again"
+msgstr "You can always make a new appointment."
+
+msgid "message.book_again_link"
+msgstr "Make a new appointment"
 
 msgid "admin.settings.data_fields.title"
 msgstr "Data fields"
