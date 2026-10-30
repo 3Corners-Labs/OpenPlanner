@@ -2,6 +2,10 @@
 
 Every role × every admin route × own and other organisation/group, against an expectation
 table written by hand from HANDOVER §6. It must not be derived from the implementation.
+
+The sweeps over role × route carry the ``matrix`` marker: they run in the merge queue and on a
+pull request labelled ``ci:full``, not on every push (ADR 0058). The structural tests at the
+end of this file run everywhere, so a route without a permission is still caught at once.
 """
 
 import pytest
@@ -772,6 +776,7 @@ CASES = [
 ]
 
 
+@pytest.mark.matrix
 @pytest.mark.parametrize(("role", "method", "path", "status"), CASES)
 async def test_matrix(site: Site, role: str, method: str, path: str, status: int) -> None:
     assert await answer(site, role, method, path) == status, (role, method, path)
@@ -823,6 +828,7 @@ MAINTENANCE_CASES = [
 ]
 
 
+@pytest.mark.matrix
 @pytest.mark.parametrize(("role", "method", "path", "status"), MAINTENANCE_CASES)
 async def test_matrix_during_maintenance(
     site: Site, role: str, method: str, path: str, status: int
@@ -846,6 +852,7 @@ async def maintenance_on(site: Site) -> None:
 GET_PATHS = [p for key, routes in EXPECTED.items() if key.startswith("GET ") for p in routes]
 
 
+@pytest.mark.matrix
 @pytest.mark.parametrize("path", GET_PATHS)
 async def test_anonymous_visitors_are_sent_to_the_login(site: Site, path: str) -> None:
     response = await site.client.get(path)
