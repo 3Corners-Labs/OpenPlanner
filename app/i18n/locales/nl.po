@@ -5299,6 +5299,9 @@ msgstr "Probeer het later opnieuw."
 msgid "audit.event.maintenance_overdue"
 msgstr "Onderhoudsmodus staat lang aan"
 
+msgid "audit.event.integration_check"
+msgstr "Koppeling gecontroleerd"
+
 msgid "admin.audit.detail.hours"
 msgstr "{count} uur"
 
@@ -5864,6 +5867,9 @@ msgstr "Melding bij lang onderhoud na (uren)"
 
 msgid "settings.field.maintenance_alert_repeat_hours.label"
 msgstr "Melding lang onderhoud herhalen elke (uren)"
+
+msgid "settings.field.integration_check_interval_hours.label"
+msgstr "Koppeling van elke groep controleren elke (uren)"
 
 msgid "settings.field.security_event_max_sources.label"
 msgstr "Maximaal aantal bijgehouden bronnen voor beveiligingsgebeurtenissen"

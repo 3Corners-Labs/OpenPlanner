@@ -5299,6 +5299,9 @@ msgstr "Please try again later."
 msgid "audit.event.maintenance_overdue"
 msgstr "Maintenance mode on for long"
 
+msgid "audit.event.integration_check"
+msgstr "Integration checked"
+
 msgid "admin.audit.detail.hours"
 msgstr "{count} hours"
 
@@ -5864,6 +5867,9 @@ msgstr "Report long maintenance after (hours)"
 
 msgid "settings.field.maintenance_alert_repeat_hours.label"
 msgstr "Repeat the long-maintenance report every (hours)"
+
+msgid "settings.field.integration_check_interval_hours.label"
+msgstr "Check every group's integration every (hours)"
 
 msgid "settings.field.security_event_max_sources.label"
 msgstr "Most sources tracked for security events"

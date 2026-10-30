@@ -15,6 +15,7 @@ SETTING_LABELS: dict[str, str] = {
     "maintenance_retry_after_seconds": "settings.field.maintenance_retry_after_seconds.label",
     "maintenance_alert_hours": "settings.field.maintenance_alert_hours.label",
     "maintenance_alert_repeat_hours": "settings.field.maintenance_alert_repeat_hours.label",
+    "integration_check_interval_hours": "settings.field.integration_check_interval_hours.label",
     "staff_last_seen_interval_seconds": "settings.field.staff_last_seen_interval_seconds.label",
     "system_event_retention_days": "settings.field.system_event_retention_days.label",
     "audit_retention_days": "settings.field.audit_retention_days.label",
