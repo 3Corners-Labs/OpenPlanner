@@ -28,6 +28,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Group agenda / agenda van de groep | [Agenda van de groep](nl/group-agenda.md) | [Group agenda](en/group-agenda.md) |
 | Maintenance mode / onderhoudsmodus | [Onderhoudsmodus](nl/maintenance.md) | [Maintenance mode](en/maintenance.md) |
 | Advanced settings / geavanceerde instellingen | [Geavanceerde instellingen](nl/advanced-settings.md) | [Advanced settings](en/advanced-settings.md) |
+| Data fields and personal data / gegevensvelden en persoonsgegevens | [Gegevensvelden en persoonsgegevens](nl/data-fields.md) | [Data fields and personal data](en/data-fields.md) |
 | Organisation settings / organisatie-instellingen | [Organisatie-instellingen](nl/organisation-settings.md) | [Organisation settings](en/organisation-settings.md) |
 
 ## Writing a topic
