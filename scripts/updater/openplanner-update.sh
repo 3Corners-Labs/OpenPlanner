@@ -15,6 +15,12 @@
 #              no:  restore backup, pin the newer digest again -> report rolled_back,
 #                   maintenance off
 #
+# Where the HTTPS proxy runs (OPENPLANNER_TLS=1 or the tls profile in .env.update; ADR 0064
+# step 2) the proxy image <image>-proxy:<version> is pulled, verified, pinned
+# (OPENPLANNER_PROXY_IMAGE), started and rolled back together with the application image, and
+# a proxy that does not become healthy rolls the update back like an unhealthy worker. An
+# installation without the proxy sees none of this.
+#
 # Maintenance mode (ADR 0038) keeps citizens and admins from writing what a rollback would
 # lose. It is switched on before the backup, so a restored backup has it on as well. An update
 # or restore that ends as `failed` after the switch leaves it on: citizens see the maintenance
@@ -24,9 +30,10 @@
 # Before each step it reports the step (`update-progress`: pulling, verifying, backing_up,
 # migrating, starting, rolling_back) so the updates page can show where it is (ADR 0048).
 #
-# Configuration: /etc/openplanner/updater.env (see updater.env.example). The pinned image is
-# OPENPLANNER_IMAGE in $COMPOSE_DIR/.env.update (written by scripts/install.sh); compose commands pass
-# `--env-file .env.update`. Backups live in the data volume and expire after 24 hours.
+# Configuration: /etc/openplanner/updater.env (see updater.env.example). The pinned images are
+# OPENPLANNER_IMAGE and OPENPLANNER_PROXY_IMAGE in $COMPOSE_DIR/.env.update (written by
+# scripts/install.sh); compose commands pass `--env-file .env.update`. Backups live in the data
+# volume and expire after 24 hours.
 set -Eeuo pipefail
 
 CONFIG=${OPENPLANNER_UPDATER_CONFIG:-/etc/openplanner/updater.env}
@@ -35,6 +42,8 @@ CONFIG=${OPENPLANNER_UPDATER_CONFIG:-/etc/openplanner/updater.env}
 : "${COMPOSE_DIR:?COMPOSE_DIR is not set}"
 : "${UPDATE_IMAGE:?UPDATE_IMAGE is not set}"
 : "${CERT_IDENTITY_REGEXP:?CERT_IDENTITY_REGEXP is not set}"
+# The proxy image is released next to the application image under the same name plus -proxy.
+UPDATE_PROXY_IMAGE=${UPDATE_PROXY_IMAGE:-$UPDATE_IMAGE-proxy}
 HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-300}
 READY_URL=${READY_URL:-http://127.0.0.1:8000/readyz}
 STATE_DIR=${STATE_DIR:-/var/lib/openplanner-updater}
@@ -48,16 +57,33 @@ app() { compose exec -T web python -m app.cli "$@"; }
 # One-off command in a fresh web container with the pinned image (web and worker stopped).
 offline() { compose run --rm --no-deps -T web "$@"; }
 pinned() { sed -n 's/^OPENPLANNER_IMAGE=//p' "$PIN_FILE"; }
+pinned_proxy() { sed -n 's/^OPENPLANNER_PROXY_IMAGE=//p' "$PIN_FILE"; }
+# Whether the HTTPS proxy is part of this installation: the installer records the choice
+# (ADR 0064); an older pin file only has the profile.
+tls_on() {
+  [[ $(sed -n 's/^OPENPLANNER_TLS=//p' "$PIN_FILE") == 1 ]] \
+    || sed -n 's/^COMPOSE_PROFILES=//p' "$PIN_FILE" | grep -qw tls
+}
+# The services an update or restore (re)starts: set in main, once the pin file is known.
+SERVICES=(web worker)
+PROXY=0
 # Everything that comes out of the container is data, never shell: it is checked against these
 # patterns before use, and the state file is read with sed, never sourced.
 VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(-rc\.[0-9]{1,4})?$'
 REVISION_RE='^[0-9A-Za-z_]{1,32}$'
 IMAGE_RE='^[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?(@sha256:[0-9a-f]{64})?$'
 state() { sed -n "s/^$1=//p" "$STATE_FILE"; }
-# Replaces only the image: the installer keeps COMPOSE_PROFILES and OPENPLANNER_MODE in this file.
-pin() {
-  { grep -v '^OPENPLANNER_IMAGE=' "$PIN_FILE" || true; printf 'OPENPLANNER_IMAGE=%s\n' "$1"; } \
-    >"$PIN_FILE.tmp" && mv "$PIN_FILE.tmp" "$PIN_FILE"
+# Replaces only the image pins: the installer keeps COMPOSE_PROFILES, OPENPLANNER_TLS and
+# OPENPLANNER_MODE in this file.
+pin_key() { # pin_key KEY VALUE: an empty value removes the key
+  {
+    grep -v "^$1=" "$PIN_FILE" || true
+    [[ -z $2 ]] || printf '%s=%s\n' "$1" "$2"
+  } >"$PIN_FILE.tmp" && mv "$PIN_FILE.tmp" "$PIN_FILE"
+}
+pin() { # pin IMAGE [PROXY_IMAGE]: with the proxy, an empty PROXY_IMAGE unpins it (local build)
+  pin_key OPENPLANNER_IMAGE "$1"
+  ((!PROXY)) || pin_key OPENPLANNER_PROXY_IMAGE "${2:-}"
 }
 
 report() { # report ID STATUS [REASON]; never fails the script (the old version may lack it)
@@ -81,13 +107,18 @@ maintenance() { # maintenance on|off; never fails the script (a version before A
   fi
 }
 
-healthy() { # web answers /readyz and the worker container reports healthy
+container_healthy() { # container_healthy SERVICE: the service's container reports healthy
+  local container
+  container=$(compose ps -q "$1")
+  [[ -n $container && $(docker inspect -f '{{.State.Health.Status}}' "$container") == healthy ]]
+}
+
+healthy() { # web answers /readyz; the worker, and the proxy where it runs, report healthy
   # Check before looking at the deadline: SECONDS may tick past it before the first check.
-  local deadline=$((SECONDS + HEALTH_TIMEOUT)) worker
+  local deadline=$((SECONDS + HEALTH_TIMEOUT))
   while true; do
-    worker=$(compose ps -q worker)
-    if curl -fsS -o /dev/null "$READY_URL" \
-      && [[ -n $worker && $(docker inspect -f '{{.State.Health.Status}}' "$worker") == healthy ]]; then
+    if curl -fsS -o /dev/null "$READY_URL" && container_healthy worker \
+      && { ((!PROXY)) || container_healthy proxy; }; then
       return 0
     fi
     ((SECONDS < deadline)) || return 1
@@ -95,48 +126,56 @@ healthy() { # web answers /readyz and the worker container reports healthy
   done
 }
 
-switch_to() { # pin an image and (re)start web and worker
-  pin "$1"
-  compose up -d web worker
+switch_to() { # switch_to IMAGE [PROXY_IMAGE]: pin and (re)start web, worker and the proxy
+  pin "$1" "${2:-}"
+  compose up -d "${SERVICES[@]}"
 }
 
-put_back() { # put_back BACKUP IMAGE: restore the backup, run IMAGE again
-  local backup=$1 image=$2
+put_back() { # put_back BACKUP IMAGE [PROXY_IMAGE]: restore the backup, run the images again
+  local backup=$1 image=$2 proxy_image=${3:-}
   compose stop web worker
   # The restore runs with the pinned (newer) image, which knows `restore-db`; if that image is
   # too broken to run at all, the one we return to tries.
   if ! offline python -m app.cli restore-db "$backup"; then
-    pin "$image"
+    pin "$image" "$proxy_image"
     offline python -m app.cli restore-db "$backup" || return 1
   fi
-  switch_to "$image"
+  switch_to "$image" "$proxy_image"
   healthy
 }
 
-resolve() { # resolve VERSION: pull the release image and print its digest reference
-  docker pull -q "$UPDATE_IMAGE:$1" >/dev/null 2>&1 || return 1
-  docker image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$UPDATE_IMAGE:$1" \
-    | grep -m1 "^$UPDATE_IMAGE@sha256:"
+resolve() { # resolve IMAGE VERSION: pull the release image and print its digest reference
+  docker pull -q "$1:$2" >/dev/null 2>&1 || return 1
+  docker image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$1:$2" \
+    | grep -m1 "^$1@sha256:"
+}
+
+verified() { # verified DIGEST: signed by this repository's release workflow (ADR 0006)
+  cosign verify "$1" \
+    --certificate-identity-regexp "$CERT_IDENTITY_REGEXP" \
+    --certificate-oidc-issuer "$OIDC_ISSUER" >/dev/null 2>&1
 }
 
 do_update() { # do_update ID TARGET FROM
-  local id=$1 target=$2 from=$3 previous digest revision backup="request-$1"
+  local id=$1 target=$2 from=$3 previous previous_proxy digest proxy_digest='' revision
+  local backup="request-$1"
   previous=$(pinned)
+  previous_proxy=$(pinned_proxy)
   step "$id" pulling
-  if ! digest=$(resolve "$target"); then
+  if ! digest=$(resolve "$UPDATE_IMAGE" "$target") \
+    || { ((PROXY)) && ! proxy_digest=$(resolve "$UPDATE_PROXY_IMAGE" "$target"); }; then
     report "$id" failed image_not_found
     return
   fi
   step "$id" verifying
-  if ! cosign verify "$digest" \
-    --certificate-identity-regexp "$CERT_IDENTITY_REGEXP" \
-    --certificate-oidc-issuer "$OIDC_ISSUER" >/dev/null 2>&1; then
+  if ! verified "$digest" || { ((PROXY)) && ! verified "$proxy_digest"; }; then
     report "$id" failed signature_invalid
     return
   fi
   step "$id" backing_up
   revision=$(compose exec -T web alembic current 2>/dev/null | awk 'NR==1 {print $1}')
-  if ! [[ $revision =~ $REVISION_RE && $previous =~ $IMAGE_RE ]]; then
+  if ! [[ $revision =~ $REVISION_RE && $previous =~ $IMAGE_RE ]] \
+    || ! [[ -z $previous_proxy || $previous_proxy =~ $IMAGE_RE ]]; then
     report "$id" failed backup_failed
     return
   fi
@@ -148,9 +187,11 @@ do_update() { # do_update ID TARGET FROM
   fi
   printf 'PREVIOUS_IMAGE=%s\nPREVIOUS_REVISION=%s\nPREVIOUS_VERSION=%s\nNEWER_IMAGE=%s\n' \
     "$previous" "$revision" "$from" "$digest" >"$STATE_FILE"
-  log "request $id: $from -> $target ($digest)"
+  printf 'PREVIOUS_PROXY_IMAGE=%s\nNEWER_PROXY_IMAGE=%s\n' "$previous_proxy" "$proxy_digest" \
+    >>"$STATE_FILE"
+  log "request $id: $from -> $target ($digest${proxy_digest:+, proxy $proxy_digest})"
   step "$id" starting
-  switch_to "$digest"
+  switch_to "$digest" "$proxy_digest"
   if healthy; then
     report "$id" succeeded
     maintenance off
@@ -158,7 +199,7 @@ do_update() { # do_update ID TARGET FROM
   fi
   log "request $id: $target did not become healthy; rolling back"
   step "$id" rolling_back
-  if put_back "$backup" "$previous"; then
+  if put_back "$backup" "$previous" "$previous_proxy"; then
     report "$id" rolled_back health_check_failed
     maintenance off
   else
@@ -170,6 +211,7 @@ do_update() { # do_update ID TARGET FROM
 do_restore() { # do_restore ID TARGET
   local id=$1 target=$2 backup="request-$1-restore"
   local PREVIOUS_IMAGE PREVIOUS_REVISION PREVIOUS_VERSION NEWER_IMAGE
+  local PREVIOUS_PROXY_IMAGE NEWER_PROXY_IMAGE
   if [[ ! -f $STATE_FILE ]]; then
     report "$id" failed updater_error
     return
@@ -178,8 +220,13 @@ do_restore() { # do_restore ID TARGET
   PREVIOUS_REVISION=$(state PREVIOUS_REVISION)
   PREVIOUS_VERSION=$(state PREVIOUS_VERSION)
   NEWER_IMAGE=$(state NEWER_IMAGE)
+  # Empty before ADR 0064 step 2, or when the previous version ran a locally built proxy.
+  PREVIOUS_PROXY_IMAGE=$(state PREVIOUS_PROXY_IMAGE)
+  NEWER_PROXY_IMAGE=$(state NEWER_PROXY_IMAGE)
   if [[ $PREVIOUS_VERSION != "$target" ]] \
     || ! [[ $PREVIOUS_IMAGE =~ $IMAGE_RE && $NEWER_IMAGE =~ $IMAGE_RE ]] \
+    || ! [[ -z $PREVIOUS_PROXY_IMAGE || $PREVIOUS_PROXY_IMAGE =~ $IMAGE_RE ]] \
+    || ! [[ -z $NEWER_PROXY_IMAGE || $NEWER_PROXY_IMAGE =~ $IMAGE_RE ]] \
     || ! [[ $PREVIOUS_REVISION =~ $REVISION_RE ]]; then
     report "$id" failed updater_error
     return
@@ -195,12 +242,12 @@ do_restore() { # do_restore ID TARGET
   compose stop web worker
   # The newer image knows its own migrations, so it takes the schema down.
   if ! offline alembic downgrade "$PREVIOUS_REVISION"; then
-    switch_to "$NEWER_IMAGE"
+    switch_to "$NEWER_IMAGE" "$NEWER_PROXY_IMAGE"
     report "$id" failed migration_failed
     return
   fi
-  log "request $id: back to $target ($PREVIOUS_IMAGE)"
-  switch_to "$PREVIOUS_IMAGE"
+  log "request $id: back to $target ($PREVIOUS_IMAGE${PREVIOUS_PROXY_IMAGE:+, proxy $PREVIOUS_PROXY_IMAGE})"
+  switch_to "$PREVIOUS_IMAGE" "$PREVIOUS_PROXY_IMAGE"
   # web was stopped for the downgrade, so the version we return to records this step.
   step "$id" starting
   if healthy; then
@@ -211,8 +258,8 @@ do_restore() { # do_restore ID TARGET
   fi
   log "request $id: $target did not become healthy; returning to the newer version"
   step "$id" rolling_back
-  pin "$NEWER_IMAGE"
-  if put_back "$backup" "$NEWER_IMAGE"; then
+  pin "$NEWER_IMAGE" "$NEWER_PROXY_IMAGE"
+  if put_back "$backup" "$NEWER_IMAGE" "$NEWER_PROXY_IMAGE"; then
     report "$id" rolled_back health_check_failed
     maintenance off
   else
@@ -227,6 +274,10 @@ main() {
   if [[ ! -f $PIN_FILE ]]; then
     log "missing $PIN_FILE: pin the running image first (docs/runbook.md, Updates)"
     exit 1
+  fi
+  if tls_on; then
+    PROXY=1
+    SERVICES+=(proxy)
   fi
   app backup-db --prune >/dev/null || log "could not prune old backups"
   local claim id action target from

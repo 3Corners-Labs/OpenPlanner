@@ -66,7 +66,9 @@ Kubernetes mounts secrets with mode 0644 unless the volume sets `defaultMode: 04
 
 ## Verifying the image signature
 
-Only deploy images signed by the `main` workflow of this repository:
+Only deploy images signed by the `main` workflow of this repository. Every version has two:
+the application `ghcr.io/<owner>/<repo>` and the HTTPS proxy `ghcr.io/<owner>/<repo>-proxy`
+(ADR 0064 step 2), signed by the same workflow run:
 
 ```sh
 cosign verify ghcr.io/<owner>/<repo>@sha256:<digest> \
@@ -74,7 +76,8 @@ cosign verify ghcr.io/<owner>/<repo>@sha256:<digest> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-Deploy by digest, not by tag.
+Deploy by digest, not by tag. The installer and the host updater do exactly this for both
+images (`OPENPLANNER_IMAGE` and `OPENPLANNER_PROXY_IMAGE` in `.env.update`).
 
 ## Health
 
@@ -208,10 +211,16 @@ Day to day:
   more than 5 per week for the same name are refused.
 - **Another ACME CA** (for example ZeroSSL, or a government CA that speaks ACME): set `ACME_CA`
   in `proxy.env` to its directory URL and restart the proxy.
-- **Updates from the admin portal** (ADR 0029) restart only `web` and `worker`; the proxy keeps
-  running and answers 502 for the seconds `web` is down. `.env.update` carries
-  `COMPOSE_PROFILES=tls`, so `docker compose --env-file .env.update up -d` keeps the proxy in
-  the stack.
+- **Updates from the admin portal** (ADR 0029) also update the proxy (ADR 0064 step 2): the
+  updater pulls and verifies `ghcr.io/<owner>/<repo>-proxy` at the new version, pins it as
+  `OPENPLANNER_PROXY_IMAGE` next to the application image and recreates `web`, `worker` and
+  `proxy` together, so the public address answers nothing for the seconds the proxy restarts
+  (inside the maintenance window). The certificate stays in the `proxy-data` volume, so no
+  new certificate is requested. A proxy that does not become healthy rolls the whole update
+  back, and a rollback or a restore returns the previous proxy image as well. `.env.update`
+  carries `COMPOSE_PROFILES=tls` and `OPENPLANNER_TLS=1`, so `docker compose --env-file
+  .env.update up -d` keeps the proxy in the stack. No host builds the proxy: `deploy/proxy/`
+  is built only in CI (and by `make proxy-check`).
 - **Webhooks**: with a public domain, `WEBHOOK_BASE_URL` can stay empty; Webex and WxCC use
   `PUBLIC_BASE_URL`.
 - `web` stays reachable on `127.0.0.1:8000` of the host itself, without the proxy's limits;
@@ -804,8 +813,8 @@ tag); everything after the tag is automatic and visible in the Actions tab.
 | Event | What runs | Result | Offered to installations? |
 |---|---|---|---|
 | PR | `ci.yml` | checks only | no |
-| Merge to `main` | `main.yml`: ZAP, then build, sign, tag `vX.Y.Z-rc.N`, pre-release (ADR 0059); mutation runs alongside | image `:X.Y.Z-rc.N`, `:main` and `:sha-<commit>`, with `APP_VERSION=X.Y.Z-rc.N` and `APP_COMMIT`; pre-release page with SBOM | only on the `rc` channel (below) |
-| Tag `vX.Y.Z` pushed | `main.yml`: tag check, ZAP, mutation, build, sign, SBOM, GitHub release | image `:X.Y.Z` with `APP_VERSION` and `APP_COMMIT`; release page with SBOM | yes, within an hour |
+| Merge to `main` | `main.yml`: ZAP, then build, sign, tag `vX.Y.Z-rc.N`, pre-release (ADR 0059); mutation runs alongside | application and proxy images `:X.Y.Z-rc.N`, `:main` and `:sha-<commit>` (the application with `APP_VERSION=X.Y.Z-rc.N` and `APP_COMMIT`); pre-release page with both SBOMs | only on the `rc` channel (below) |
+| Tag `vX.Y.Z` pushed | `main.yml`: tag check, ZAP, mutation, build, sign, SBOM, GitHub release | application image `:X.Y.Z` with `APP_VERSION` and `APP_COMMIT`, proxy image `:X.Y.Z` (ADR 0064 step 2); release page with `sbom.cdx.json` and `sbom-proxy.cdx.json` | yes, within an hour |
 
 ### Step 1: decide the number
 
@@ -847,8 +856,10 @@ the image is signed, and a hand-made release would make that step fail.
 
 1. GitHub → *Actions* → workflow *main* for `v0.3.0`. First "release tag matches main and
    pyproject.toml" (fails if the tag is not on `main` or `pyproject.toml` says another
-   version), then ZAP and mutation, then *build, push and sign image*.
-2. When it is green, GitHub → *Releases* shows `v0.3.0` with `sbom.cdx.json`.
+   version), then ZAP and mutation, then *build, push and sign the release* (the application
+   image, then the proxy image).
+2. When it is green, GitHub → *Releases* shows `v0.3.0` with `sbom.cdx.json` and
+   `sbom-proxy.cdx.json`.
 3. Within an hour the superuser sees the update banner in the portal and starts the update on
    `/admin/updates` (section *Updates from the admin portal* below).
 
@@ -969,15 +980,17 @@ operator's ghcr.io login to `/var/lib/openplanner-updater/.docker/` so root can 
 image; after a new `docker login`, run the installer again. Check it with
 `systemctl list-timers openplanner-updater.timer` and `sudo journalctl -u openplanner-updater`.
 
-The updater replaces only `OPENPLANNER_IMAGE` in `.env.update` and keeps the profiles and mode
-the installer wrote there.
+The updater replaces only the image pins in `.env.update` (`OPENPLANNER_IMAGE` and, where the
+HTTPS proxy runs, `OPENPLANNER_PROXY_IMAGE`; ADR 0064 step 2) and keeps the profiles, the TLS
+choice and the mode the installer wrote there. The proxy image comes from `UPDATE_PROXY_IMAGE`
+in `updater.env` (default: the application image's name plus `-proxy`).
 
 ### What the updater does
 
 | Request | Steps | When something fails |
 |---|---|---|
-| Update | pull `<image>:<version>`, take its digest, `cosign verify` it (release tag of this repository), note the current digest and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digest, `up -d`, wait up to `HEALTH_TIMEOUT` for `/readyz` and a healthy worker | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digest, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
-| Restore previous version (≤ 24 h after an update) | switch maintenance on, back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digest, start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
+| Update | pull `<image>:<version>` and, where the proxy runs, `<image>-proxy:<version>`, take their digests, `cosign verify` both (release tag of this repository), note the current digests and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digests, `up -d` (`web`, `worker` and `proxy`), wait up to `HEALTH_TIMEOUT` for `/readyz`, a healthy worker and a healthy proxy | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digests, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
+| Restore previous version (≤ 24 h after an update) | switch maintenance on, back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digests (application and proxy), start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
 
 Before each step the updater reports it (`python -m app.cli update-progress ID STEP`: pulling,
 verifying, backing_up, migrating, starting, rolling_back; ADR 0048), and at the end the outcome
@@ -998,9 +1011,12 @@ the image from `previous.env`:
 ```sh
 docker compose --env-file .env.update stop web worker
 docker compose --env-file .env.update run --rm --no-deps web python -m app.cli restore-db request-<id>
-echo "OPENPLANNER_IMAGE=<PREVIOUS_IMAGE>" > .env.update
+sed -i 's|^OPENPLANNER_IMAGE=.*|OPENPLANNER_IMAGE=<PREVIOUS_IMAGE>|; s|^OPENPLANNER_PROXY_IMAGE=.*|OPENPLANNER_PROXY_IMAGE=<PREVIOUS_PROXY_IMAGE>|' .env.update
 docker compose --env-file .env.update up -d
 ```
+
+(`previous.env` has both; an empty `PREVIOUS_PROXY_IMAGE` means the previous version ran a
+locally built proxy: remove the `OPENPLANNER_PROXY_IMAGE` line then.)
 
 Backups hold personal data: they stay in the data volume (mode 600) and every updater run
 deletes those older than 24 hours (`backup-db --prune`). Never copy them off the host.
@@ -1008,9 +1024,10 @@ deletes those older than 24 hours (`backup-db --prune`). Never copy them off the
 ## Rollback
 
 Prefer "Restore previous version" in the portal (above) within 24 hours of an update. By hand:
-deploy the previous image tag. If the release contained a migration, first run
+`./scripts/install.sh --version <previous>` pins both images (application and proxy) at that
+version, verified. If the release contained a migration, first run
 `docker compose run --rm web alembic downgrade <previous-revision>` with the *new* image, then
-deploy the old image. Every migration is reversible (enforced in CI).
+deploy the old images. Every migration is reversible (enforced in CI).
 
 ## Backup and restore
 

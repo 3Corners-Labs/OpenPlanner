@@ -25,7 +25,7 @@ from app.i18n import BoundGettext
 from app.web.authz_labels import ROLE_LABELS
 from app.web.help import HelpTopic, shipped_manual, topic_for_path
 from app.web.locale import RequestLocale, resolve_locale
-from app.web.navigation import SECTIONS, TOP_BAR, Home, Screen, home_of
+from app.web.navigation import BOTTOM_BAR_ENTRIES, SECTIONS, TOP_BAR, Home, Screen, home_of
 from app.web.organisation_settings import settings_for
 from app.web.protection import require_same_origin
 from app.web.templates import create_templates, render, switch_href
@@ -90,6 +90,20 @@ def _nav_view(locale: RequestLocale, screen: Screen, home: Home | None) -> NavVi
     """Return the view of a side-navigation entry or top-bar link."""
     current = home is not None and home.entry == screen.key
     return NavView(locale.gettext(screen.label_key), screen.path, current, screen.icon)
+
+
+def bottom_bar(nav: list[SectionView]) -> tuple[list[NavView], list[SectionView]]:
+    """Split the user's menu for the phone bottom bar (backlog SH-1, ADR 0047).
+
+    Returns the first ``BOTTOM_BAR_ENTRIES`` entries in register order, and the remaining entries
+    still grouped in their sections for the *More* panel; sections left empty are dropped.
+    """
+    entries = [entry for section in nav for entry in section.entries]
+    shown = entries[:BOTTOM_BAR_ENTRIES]
+    rest = [
+        replace(section, entries=[e for e in section.entries if e not in shown]) for section in nav
+    ]
+    return shown, [section for section in rest if section.entries]
 
 
 def page_topic(request: Request) -> HelpTopic | None:
@@ -166,6 +180,7 @@ def page(
     ]
     nav = [section for section in sections if section.entries]
     top_links = [_nav_view(locale, link, home) for link in TOP_BAR if can(link.permission)]
+    bar, more = bottom_bar(nav)
     theme = choose_theme(request, request.query_params.get(THEME_PARAM))
     maintenance = getattr(request.state, "maintenance_notice", None)
     response = render(
@@ -178,6 +193,8 @@ def page(
             "principal": principal,
             "nav": nav,
             "top_links": top_links,
+            "bottom_bar": bar,
+            "bottom_more": more,
             "can": can,
             "role_labels": role_labels(principal, locale),
             "theme": theme,
