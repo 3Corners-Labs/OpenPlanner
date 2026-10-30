@@ -115,6 +115,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/{key}/adopt": {
         "/admin/settings/admin_session_hours/adopt": statuses(409, 403, 403, 403, 403, 403, 403),
     },
+    # ADR 0042 §8: the login mapping, superuser only (settings.login.manage); an empty form is
+    # refused before any login.
+    "POST /admin/settings/login/test": {
+        "/admin/settings/login/test": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
     "POST /admin/settings/{key}/reset": {
         "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
     },

@@ -62,6 +62,19 @@ items again within about ten seconds. Set the client id, client secret and refre
 You need a recent login to change a setting. Every change is recorded in the audit log with
 the old and the new value; a refused change is recorded too.
 
+## Changing the login mapping
+
+Only the superuser can change which claims of the identity provider carry the roles,
+organisations and groups, and which value is which role. Fill in **Change the login mapping**
+and choose **Test with a new login**. You are sent to the identity provider to log in again.
+The new mapping is applied to that login: it is saved only if it still makes you superuser.
+Otherwise nothing changes and the screen says so. This keeps anyone from locking everybody out
+by mistake.
+
+When a value is locked by the server operator, the whole mapping is theirs and the form is not
+shown. If the identity provider changes a claim or role value later, the server operator can
+put the mapping right from the server.
+
 ## Notes
 
 - **Outside the portal bounds**: the server operator set a value the portal itself would not

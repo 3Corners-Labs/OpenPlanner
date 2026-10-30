@@ -22,8 +22,9 @@ from datetime import datetime, timedelta
 
 from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, Outcome
-from app.domain.authorization import Permission, Principal, scope_for
+from app.domain.authorization import Permission, Principal, Role, scope_for
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
 from app.domain.platform_settings import usable
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Organisation
@@ -65,6 +66,7 @@ LOG_LEVEL = "log_level"
 
 _PERMISSION = Permission.SETTINGS_PLATFORM_MANAGE
 _ORGANISATION = Permission.SETTINGS_ORGANISATION_MANAGE
+_LOGIN = Permission.SETTINGS_LOGIN_MANAGE
 _TRUE = frozenset({"true", "on", "yes", "1"})
 _FALSE = frozenset({"false", "off", "no", "0"})
 
@@ -208,6 +210,45 @@ class SettingsService:
             await self._refused(principal.subject, error, f"reset:{_known(key)}")
             raise
 
+    # --- login mapping (§8) ---------------------------------------------------------------
+
+    async def change_login_mapping(
+        self, principal: Principal, values: Mapping[str, str], *, trial: Principal
+    ) -> None:
+        """Save a new login mapping, but only if the dry run kept the superuser (ADR 0042 §8).
+
+        ``trial`` is what the new mapping made of the superuser's own fresh login: it must be
+        the same person and still a superuser, else nobody could change it back from the
+        portal. A key the environment locks refuses the whole change.
+
+        Raises:
+            DomainError: ``not_permitted``, ``setting_locked``, ``setting_invalid`` or
+                ``login_lockout``.
+        """
+        require(await self._admin.authorize(principal, _LOGIN))
+        try:
+            found = validate_mapping(values)
+            locked = self._locked()
+            for key in LOGIN_KEYS:
+                if key in locked:
+                    raise DomainError(ErrorCode.SETTING_LOCKED, key)
+            if trial.subject != principal.subject or Role.SUPERUSER not in trial.roles:
+                raise DomainError(ErrorCode.LOGIN_LOCKOUT)
+            now = self._clock.now()
+            async with self._uow.locked() as tx:
+                stored = await tx.platform_settings()
+                for key, value in found.items():
+                    old = stored.get(key, BY_KEY[key].default)
+                    if old == value:
+                        continue
+                    await tx.save_platform_setting(key, value, now, None)
+                    detail = f"set:{key}:{_text(old)}->{_text(value)}"
+                    await _audit(tx, now, principal.subject, detail, _LOGIN)
+                await tx.bump_settings_version()
+        except DomainError as error:
+            await self._refused(principal.subject, error, "login_mapping", _LOGIN)
+            raise
+
     # --- organisation admin --------------------------------------------------------------
 
     async def organisations(self, principal: Principal) -> list[Organisation]:
@@ -303,7 +344,7 @@ class SettingsService:
         spec = BY_KEY.get(key)
         if spec is not None and spec.secret:  # ADR 0042 §10: secrets never through the CLI
             raise DomainError(ErrorCode.SETTING_NOT_EDITABLE, key)
-        await self._change(CLI_ACTOR, key, raw, hours)
+        await self._change(CLI_ACTOR, key, raw, hours, host=True)
 
     async def reset_host(self, key: str) -> bool:
         """Remove one portal value from the host; return whether there was one.
@@ -312,7 +353,7 @@ class SettingsService:
             DomainError: ``setting_not_editable``, ``setting_locked`` or
                 ``setting_combination``.
         """
-        return await self._reset(CLI_ACTOR, [key])
+        return await self._reset(CLI_ACTOR, [key], host=True)
 
     async def reset_all_host(self) -> int:
         """Remove every portal value this step can change; return how many were removed."""
@@ -321,27 +362,33 @@ class SettingsService:
         keys = [k for k in stored if k in BY_KEY and editable(BY_KEY[k])]
         removed = 0
         for key in keys:
-            removed += await self._reset(CLI_ACTOR, [key])
+            removed += await self._reset(CLI_ACTOR, [key], host=True)
         return removed
 
     # --- shared --------------------------------------------------------------------------
 
-    def _spec(self, key: str) -> SettingSpec:
-        """Return the entry of a key this step may change.
+    def _spec(self, key: str, *, host: bool = False) -> SettingSpec:
+        """Return the entry of a key this caller may change.
+
+        The login mapping changes in the portal only after a dry run
+        (``change_login_mapping``); the host may set or reset it directly to recover (§8).
 
         Raises:
             DomainError: ``setting_not_editable`` or ``setting_locked``.
         """
         spec = BY_KEY.get(key)
-        if spec is None or not editable(spec):
+        allowed = spec is not None and (editable(spec) or (host and key in LOGIN_KEYS))
+        if spec is None or not allowed:
             raise DomainError(ErrorCode.SETTING_NOT_EDITABLE, key if spec else None)
         if key in self._locked():
             raise DomainError(ErrorCode.SETTING_LOCKED, key)
         return spec
 
-    async def _change(self, actor: str, key: str, raw: str, hours: int | None) -> None:
+    async def _change(
+        self, actor: str, key: str, raw: str, hours: int | None, *, host: bool = False
+    ) -> None:
         """Validate and store one value, then audit it."""
-        spec = self._spec(key)
+        spec = self._spec(key, host=host)
         value = parse(spec, raw)
         now = self._clock.now()
         expires = self._expiry(spec, hours, now)
@@ -371,9 +418,9 @@ class SettingsService:
             await tx.bump_settings_version()
             await _audit(tx, now, actor, f"{verb}:{spec.key}:secret")
 
-    async def _reset(self, actor: str, keys: list[str]) -> bool:
+    async def _reset(self, actor: str, keys: list[str], *, host: bool = False) -> bool:
         """Remove the values of ``keys`` (one, in practice), then audit it."""
-        specs = [self._spec(key) for key in keys]
+        specs = [self._spec(key, host=host) for key in keys]
         if any(spec.secret for spec in specs):
             return await self._reset_secrets(actor, keys)
         now = self._clock.now()
