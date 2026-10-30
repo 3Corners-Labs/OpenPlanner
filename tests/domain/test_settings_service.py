@@ -458,6 +458,89 @@ async def test_the_cli_never_sets_a_secret(uow: InMemoryUnitOfWork, clock: Fixed
     assert uow.state.platform_secrets == {}
 
 
+# The login mapping after a dry run (ADR 0042 step 7, §8).
+
+MAPPING = {
+    "oidc_role_claim": "realm_roles",
+    "oidc_organisation_claim": "organisations",
+    "oidc_group_claim": "groups",
+    "oidc_role_superuser": "op-super",
+    "oidc_role_org_admin": "op-org",
+    "oidc_role_group_admin": "op-group",
+    "oidc_role_auditor": "op-audit",
+    "oidc_role_agent": "op-agent",
+}
+
+
+async def test_a_mapping_that_keeps_the_superuser_is_saved_and_audited(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await _service(uow, clock).change_login_mapping(SUPER, MAPPING, trial=SUPER)
+
+    assert uow.state.platform_settings["oidc_role_claim"] == "realm_roles"
+    assert uow.state.settings_version == 1
+    actions = {e.action for e in uow.state.audit if e.outcome is Outcome.SUCCESS}
+    assert actions == {"settings.login.manage"}
+    assert "set:oidc_role_superuser:openplanner-superuser->op-super" in {
+        e.detail for e in uow.state.audit
+    }
+
+
+async def test_a_mapping_that_would_lock_the_superuser_out_is_refused(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    no_roles = Principal("sub-super", "S", frozenset(), frozenset(), frozenset())
+
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change_login_mapping(SUPER, MAPPING, trial=no_roles)
+
+    assert caught.value.code is ErrorCode.LOGIN_LOCKOUT
+    assert uow.state.platform_settings == {}
+    assert uow.state.audit[-1].reason == "login_lockout"
+
+
+async def test_a_dry_run_of_another_person_does_not_count(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    other = Principal("sub-other", "O", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change_login_mapping(SUPER, MAPPING, trial=other)
+
+    assert caught.value.code is ErrorCode.LOGIN_LOCKOUT
+
+
+async def test_only_the_superuser_changes_the_login_mapping(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    with pytest.raises(DomainError) as caught:
+        await _service(uow, clock).change_login_mapping(AUDITOR, MAPPING, trial=AUDITOR)
+
+    assert caught.value.code is ErrorCode.NOT_PERMITTED
+
+
+async def test_a_locked_key_of_the_mapping_refuses_the_whole_change(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    service = _service(uow, clock, locked=frozenset({"oidc_group_claim"}))
+
+    with pytest.raises(DomainError) as caught:
+        await service.change_login_mapping(SUPER, MAPPING, trial=SUPER)
+
+    assert caught.value.code is ErrorCode.SETTING_LOCKED
+    assert uow.state.platform_settings == {}
+
+
+async def test_the_host_can_set_and_reset_the_mapping_to_recover(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    service = _service(uow, clock)
+
+    await service.change_host("oidc_role_claim", "realm_roles")
+    assert uow.state.platform_settings == {"oidc_role_claim": "realm_roles"}
+    assert await service.reset_host("oidc_role_claim")
+
+
 # Webex and WxCC (ADR 0042 step 6b-1).
 
 

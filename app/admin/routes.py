@@ -18,8 +18,8 @@ their branding in ``branding_routes``.
 
 import hmac
 from collections.abc import Callable
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
 from typing import Annotated
 from urllib.parse import quote
 
@@ -75,7 +75,14 @@ from app.admin.integration_views import check_view
 from app.admin.pages import Locale, SameOrigin, admin_moment, role_labels, templates
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
-from app.admin.session import end_session, pop_login_start, save_login_start, start_session
+from app.admin.session import (
+    end_session,
+    has_login_trial,
+    pop_login_start,
+    pop_login_trial,
+    save_login_start,
+    start_session,
+)
 from app.admin.shortfalls import agenda_service, shortfall_view
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT
 from app.domain.audit import AuditEntry
@@ -83,13 +90,16 @@ from app.domain.authorization import (
     API_SCOPES,
     CITIZEN_ACTIONS,
     Permission,
+    Principal,
     Role,
     Scope,
     permissions_for,
     role_keys,
 )
+from app.domain.errors import DomainError
 from app.domain.ports import Clock, IdentityError, IdentityProvider
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
+from app.domain.settings_service import SettingsService
 from app.i18n import BoundGettext
 from app.web.authz_labels import (
     API_SCOPE_LABELS,
@@ -133,15 +143,22 @@ def _callback_url(request: Request) -> str:
 
 @router.get("/login", response_class=HTMLResponse)
 @limiter.limit(read_limit)
-async def login(request: Request, locale: Locale, next: str | None = None) -> Response:  # noqa: A002
-    """Send the admin to the identity provider."""
+async def login(
+    request: Request,
+    locale: Locale,
+    next: str | None = None,  # noqa: A002
+    fresh: bool = False,
+) -> Response:
+    """Send the admin to the identity provider; ``fresh`` for a mapping dry run (§8)."""
     provider = _identity_provider(request)
     if provider is None:
         return _message(
             request, locale, 503, "admin.not_configured.title", "admin.not_configured.text"
         )
     try:
-        start = await provider.start_login(_callback_url(request))
+        start = await provider.start_login(
+            _callback_url(request), fresh=fresh and has_login_trial(request)
+        )
     except IdentityError:
         return _message(request, locale, 503, "admin.login_failed.title", "admin.login_failed.text")
     save_login_start(request, start, safe_next(next))
@@ -157,6 +174,11 @@ async def callback(
     provider = _identity_provider(request)
     service = admin_service(request)
     pending = pop_login_start(request)
+    trial = pop_login_trial(
+        request,
+        _clock(request).now(),
+        timedelta(minutes=request.app.state.settings.admin_reauth_minutes),
+    )
     if (
         provider is None
         or pending is None
@@ -166,13 +188,23 @@ async def callback(
     ):
         await report(request, LOGIN_EVENT, "invalid_state", actor=ANONYMOUS)
         return _message(request, locale, 400, "admin.login_failed.title", "admin.login_failed.text")
+    tried: Principal | None = None
     try:
-        principal = await provider.finish_login(
-            code=code,
-            redirect_uri=_callback_url(request),
-            code_verifier=pending["verifier"],
-            nonce=pending["nonce"],
-        )
+        if trial is None:
+            principal = await provider.finish_login(
+                code=code,
+                redirect_uri=_callback_url(request),
+                code_verifier=pending["verifier"],
+                nonce=pending["nonce"],
+            )
+        else:
+            principal, tried = await provider.finish_trial_login(
+                code=code,
+                redirect_uri=_callback_url(request),
+                code_verifier=pending["verifier"],
+                nonce=pending["nonce"],
+                trial=trial[1],
+            )
     except IdentityError as error:
         await report(request, LOGIN_EVENT, error.code, actor=ANONYMOUS)
         return _message(request, locale, 401, "admin.login_failed.title", "admin.login_failed.text")
@@ -180,7 +212,28 @@ async def callback(
     start_session(request, principal, _clock(request).now())
     await service.record_login(principal)
     log.info("admin.login", actor=principal.subject, roles=role_keys(principal))
+    if trial is not None and tried is not None:
+        return await _finish_login_trial(request, principal, trial, tried)
     return RedirectResponse(safe_next(pending.get("next")), status_code=303)
+
+
+async def _finish_login_trial(
+    request: Request, principal: Principal, trial: tuple[str, dict[str, str]], tried: Principal
+) -> Response:
+    """Save the proposed login mapping if the dry run kept this superuser (ADR 0042 §8).
+
+    The proposal belongs to the admin who made it: a login by anyone else counts as a failed
+    dry run, never as theirs.
+    """
+    proposer, values = trial
+    if proposer != principal.subject:
+        tried = replace(tried, subject=proposer)
+    service: SettingsService = request.app.state.settings_service
+    try:
+        await service.change_login_mapping(principal, values, trial=tried)
+    except DomainError:
+        return RedirectResponse("/admin/settings?done=login_mapping_refused", status_code=303)
+    return RedirectResponse("/admin/settings?done=login_mapping_saved", status_code=303)
 
 
 @router.post("/logout", response_class=HTMLResponse)
