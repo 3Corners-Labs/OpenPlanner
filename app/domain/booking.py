@@ -127,7 +127,7 @@ class MeetingRef:
 
 @dataclass(frozen=True)
 class TrialCall:
-    """A trial call on Webex ahead of the appointment (ADR 0069): meeting and when it closes.
+    """A trial call on Webex ahead of the appointment (ADR 0070): meeting and when it closes.
 
     The meeting's link is personal data like the appointment's own (it gives access to a
     meeting room), so it is excluded from ``repr`` and purged with the contact.

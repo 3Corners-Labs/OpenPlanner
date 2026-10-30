@@ -138,7 +138,7 @@ class CallService:
         await self._integration.record(_id(booking), EventKind.MEETING_DELETED)
 
     async def delete_trial_call(self, booking: Booking, group: Group) -> None:
-        """Delete the booking's trial meeting, if it has one, and forget it (ADR 0069).
+        """Delete the booking's trial meeting, if it has one, and forget it (ADR 0070).
 
         Runs after the trial call closed, and at once when the booking is cancelled or moved.
         """
