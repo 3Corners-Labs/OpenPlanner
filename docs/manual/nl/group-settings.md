@@ -84,14 +84,14 @@ Een wijziging geldt voor afspraken die nog niet zijn doorgezet. Een afspraak die
 het contactcenter staat, blijft daar. Lukt het contactcenter niet (storing van Webex Connect of
 Webex Contact Center), dan kunt u de groep tijdelijk op de eigen wachtrij zetten.
 
-<!-- field: queue_change_working_days -->
-### Wijzigen tot (werkdagen vooraf, eigen wachtrij)
+<!-- field: participant_change_lead_minutes -->
+### Verplaatsen door de deelnemer tot (minuten vooraf)
 
-Alleen bij de eigen wachtrij. Tot hoeveel werkdagen voor de start de deelnemer de afspraak kan
-wijzigen of annuleren, van 1 tot 5, op dezelfde tijd van de dag. Werkdagen zijn maandag tot en
-met vrijdag; feestdagen tellen hier als werkdag. Voorbeeld met 1: een afspraak op maandag om
-10:00 kan tot vrijdag 10:00 worden gewijzigd. Een afspraak die later wordt geboekt, kan de
-deelnemer niet meer zelf wijzigen.
+Tot hoeveel minuten voor de start de deelnemer de afspraak kan verplaatsen, standaard 60. Het
+getal is nooit kleiner dan **Doorzetten naar de wachtrij** en hoogstens 1440 (een dag).
+Annuleren kan altijd tot het gesprek begint; dat is vast en niet instelbaar. Het geldt voor
+contactcenter en eigen wachtrij. Een afspraak die later wordt geboekt dan dit getal, kan de
+deelnemer alleen nog annuleren.
 
 <!-- field: queue_visible_from_minutes -->
 ### Zichtbaar in de wachtrij (minuten vooraf, eigen wachtrij)
@@ -125,8 +125,8 @@ overzichtspagina van de groep en in het auditlog.
 ### Doorzetten naar de wachtrij
 
 Hoeveel minuten voor de start de afspraak als taak naar Webex Contact Center gaat, van 0 tot 60.
-Vanaf dat moment kan de deelnemer de afspraak niet meer wijzigen of annuleren via de link in de
-bevestiging.
+De deelnemer kan de afspraak daarna nog annuleren via de link in de bevestiging; verplaatsen kan
+tot **Verplaatsen door de deelnemer tot**.
 
 Kies dit ruim genoeg dat een medewerker de taak kan oppakken voordat de deelnemer in het
 videogesprek wacht, bijvoorbeeld 5 minuten.
