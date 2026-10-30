@@ -7,7 +7,7 @@
 <div class="admin-shell{% if not nav %} admin-shell--no-nav{% endif %}">
   <header class="admin-topbar">
     {#- Without a menu (no role) the overview would only loop back to the refusal. -#}
-    {% if nav %}<a class="admin-brand" href="/admin/">{% else %}<span class="admin-brand">{% endif %}<span class="admin-brand__mark" aria-hidden="true">OP</span><span>{{ _("admin.title") }}</span>{% if nav %}</a>{% else %}</span>{% endif %}
+    {% if nav %}<a class="admin-brand" href="/admin/">{% else %}<span class="admin-brand">{% endif %}<img class="admin-brand__mark" src="/static/brand/mark.svg" alt="" width="26" height="26"><span>{{ _("admin.title") }}</span>{% if nav %}</a>{% else %}</span>{% endif %}
     <div class="admin-topbar__end">
       {% if help_topic %}
       <a class="admin-topbar__link page-help" href="/admin/help/{{ help_topic.slug }}">{{ icon("help") }}<span>{{ _("help.page_link") }}</span></a>

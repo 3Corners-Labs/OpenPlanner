@@ -118,6 +118,8 @@ class JobRunner:
         retention: How long each category of event is kept (ADR 0040, part 4).
         clock_style: The time format of an organisation by id (ADR 0042 step 5); messages
             write times in their group's organisation's format.
+        product_footer: Whether an organisation (by id) keeps "Appointments via OpenPlanner"
+            in its emails (ADR 0060 §6); ``None`` keeps it.
     """
 
     def __init__(
@@ -133,12 +135,14 @@ class JobRunner:
         integration: IntegrationService | None = None,
         retention: EventRetention | Callable[[], EventRetention] | None = None,
         clock_style: Callable[[int], str] | None = None,
+        product_footer: Callable[[int], bool] | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
         self._system_log = SystemLog(uow, clock)
         self._retention = retention or EventRetention()
         self._clock_style = clock_style
+        self._product_footer = product_footer
         self._diagnostics = DiagnosticLog(uow, clock)
         self._pruned_at: datetime | None = None
         self._uow = uow
@@ -269,7 +273,15 @@ class JobRunner:
                 message = self._composer.compose_team_invite(job.type, booking, group, now, locale)
             else:
                 message = self._composer.compose(
-                    job.type, booking, group, now, channel=channel, texts=texts, closure=closure
+                    job.type,
+                    booking,
+                    group,
+                    now,
+                    channel=channel,
+                    texts=texts,
+                    closure=closure,
+                    product_footer=self._product_footer is None
+                    or self._product_footer(group.organisation_id),
                 )
         await sender.send(message)
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)
