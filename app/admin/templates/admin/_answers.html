@@ -1,0 +1,4 @@
+{#- Answers to the group's custom fields (ADR 0055), already filtered for this screen's purpose. -#}
+{% for answer in answers %}
+<div><dt>{{ answer.label }}</dt><dd>{% if answer.value is sameas true %}{{ _("admin.yes") }}{% elif answer.value is sameas false %}{{ _("admin.no") }}{% else %}{{ answer.value }}{% endif %}</dd></div>
+{% endfor %}

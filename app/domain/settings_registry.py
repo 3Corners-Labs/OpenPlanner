@@ -15,6 +15,8 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 
+import phonenumbers
+
 from app.domain.authorization import Permission
 
 
@@ -75,6 +77,7 @@ class Topic(StrEnum):
     DISPLAY = "display"
     STAFF = "staff"
     PLANNER = "planner"
+    BOOKING_FORM = "booking_form"
     CONFIRMATION = "confirmation"
 
 
@@ -98,6 +101,9 @@ ORGANISATION_SETTINGS_TOPIC = "organisation-settings"
 
 CLOCK_STYLES = ("24h", "12h", "locale")
 """Values of ``TIME_FORMAT``; a test checks them against ``app.i18n.dates.ClockStyle``."""
+
+PHONE_REGIONS = tuple(sorted(phonenumbers.SUPPORTED_REGIONS))
+"""Values of ``PHONE_DEFAULT_REGION``: the regions ``phonenumbers`` knows (ADR 0055)."""
 
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 """Values of ``LOG_LEVEL``."""
@@ -980,6 +986,25 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Days before the lapse at which the one reminder to rebook goes (below the lapse).",
         minimum=1,
         maximum=29,
+    ),
+    S(
+        "booking_form_max_custom_fields",
+        K.INT,
+        5,
+        _C,
+        T.BOOKING_FORM,
+        "Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055).",
+        minimum=0,
+        maximum=15,
+    ),
+    S(
+        "phone_default_region",
+        K.ENUM,
+        "NL",
+        _D,
+        T.BOOKING_FORM,
+        "Country of phone numbers typed without a country code (ADR 0055).",
+        choices=PHONE_REGIONS,
     ),
     S(
         "booking_confirm_window_hours",

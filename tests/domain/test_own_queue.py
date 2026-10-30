@@ -28,7 +28,7 @@ def entry(
         start=start,
         end=start + timedelta(minutes=30),
         status=status,
-        contact=Contact("Ada Lovelace", "ada@example.org", None),
+        contact=Contact("Ada", "Lovelace", "ada@example.org", None),
         locale="nl",
         token_hash="h",
         created_at=NOW - timedelta(days=1),

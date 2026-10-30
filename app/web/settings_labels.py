@@ -65,6 +65,8 @@ SETTING_LABELS: dict[str, str] = {
     "planner_changes_alert_per_hour": "settings.field.planner_changes_alert_per_hour.label",
     "planner_rebook_days": "settings.field.planner_rebook_days.label",
     "planner_rebook_reminder_days": "settings.field.planner_rebook_reminder_days.label",
+    "booking_form_max_custom_fields": "settings.field.booking_form_max_custom_fields.label",
+    "phone_default_region": "settings.field.phone_default_region.label",
     "booking_confirm_window_hours": "settings.field.booking_confirm_window_hours.label",
     "booking_confirm_cutoff_hours": "settings.field.booking_confirm_cutoff_hours.label",
     "booking_confirm_reminders": "settings.field.booking_confirm_reminders.label",
@@ -90,6 +92,7 @@ TOPIC_LABELS: dict[Topic, str] = {
     Topic.DISPLAY: "settings.topic.display",
     Topic.STAFF: "settings.topic.staff",
     Topic.PLANNER: "settings.topic.planner",
+    Topic.BOOKING_FORM: "settings.topic.booking_form",
     Topic.CONFIRMATION: "settings.topic.confirmation",
 }
 """The heading of every topic."""
