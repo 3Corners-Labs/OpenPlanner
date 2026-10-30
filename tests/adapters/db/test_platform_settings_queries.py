@@ -4,7 +4,13 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from app.adapters.db.models import OrganisationRow, PlatformSettingRow, SettingsVersionRow
+from app.adapters.crypto import SecretBox
+from app.adapters.db.models import (
+    IntegrationCredentialRow,
+    OrganisationRow,
+    PlatformSettingRow,
+    SettingsVersionRow,
+)
 from app.adapters.db.uow import SqlUnitOfWork
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
@@ -88,3 +94,28 @@ async def test_organisation_values_are_kept_per_organisation(engine: AsyncEngine
         assert not await tx.delete_organisation_setting(first_id, "time_format")
     async with uow.read() as tx:
         assert await tx.organisation_settings() == {other_id: {"shortfall_horizon_days": 30}}
+
+
+async def test_a_secret_is_sealed_never_stored_in_plain_text(engine: AsyncEngine) -> None:
+    box = SecretBox(b"k" * 32)
+    uow = SqlUnitOfWork(engine, box)
+    async with uow.locked() as tx:
+        assert await tx.secrets_available()
+        await tx.save_platform_secret("smtp_password", "s3cret-value", NOW)
+
+    async with uow.read() as tx:
+        assert await tx.platform_secrets() == {"smtp_password": "s3cret-value"}
+    async with AsyncSession(engine) as session:
+        row = await session.get(IntegrationCredentialRow, "setting:smtp_password")
+    assert row is not None
+    assert b"s3cret-value" not in row.ciphertext
+
+    async with uow.locked() as tx:
+        assert await tx.delete_platform_secret("smtp_password")
+        assert not await tx.delete_platform_secret("smtp_password")
+
+
+async def test_without_a_settings_key_no_secret_is_read_or_sealed(engine: AsyncEngine) -> None:
+    async with SqlUnitOfWork(engine).read() as tx:
+        assert not await tx.secrets_available()
+        assert await tx.platform_secrets() == {}

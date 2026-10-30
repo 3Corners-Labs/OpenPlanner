@@ -35,8 +35,8 @@ A changed value applies within about ten seconds, without a restart.
 ## Changing a setting
 
 The superuser changes the settings for operations, retention, storage, rate limits, admin
-sessions, staff and the planner. The fallback mail server, Webex, updates and the login
-mapping follow in a later version.
+sessions, staff and the planner, the fallback mail server and the update check. Webex and the
+login mapping follow in a later version.
 
 - Enter the new value under **Change** and choose **Save**. The portal only accepts values
   within its bounds, for example 1 to 30 bookings per hour per address. A value outside them
@@ -47,7 +47,13 @@ mapping follow in a later version.
 - **Use the default** removes the value set here; the default (or the server's value)
   applies again.
 - A setting **locked by the server operator** has no form: change it in the server's
-  environment, or ask the operator.
+  environment, or ask the operator. **Manage this here from now on** copies the server's value
+  into the portal; then ask the operator to remove the variable named on the row and restart.
+  Until then the server's value still applies.
+- **Passwords and tokens** (the mail server's password, the update check's read token) are
+  write-only: the screen only says whether one is set. Leave the field empty to keep the
+  current one; **Use the default** removes it. They are stored encrypted and need the server's
+  `SETTINGS_ENCRYPTION_KEY`.
 - The **log level** always falls back to the default by itself, after at most 24 hours. Enter
   after how many hours. Personal data stays masked in the log at every level.
 

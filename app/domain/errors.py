@@ -65,6 +65,8 @@ class ErrorCode(StrEnum):
     SETTING_INVALID = "setting_invalid"
     SETTING_COMBINATION = "setting_combination"
     SETTING_EXPIRY = "setting_expiry"
+    SETTING_NO_KEY = "setting_no_key"
+    SETTING_NOT_LOCKED = "setting_not_locked"
 
 
 class DomainError(Exception):

@@ -211,3 +211,45 @@ async def test_the_store_reads_the_organisation_values() -> None:
     await store.refresh()
 
     assert store.current.organisations == {7: {"time_format": "12h"}}
+
+
+# Secrets of class C (ADR 0042 step 6).
+
+PASSWORD = BY_KEY["smtp_password"]
+
+
+def test_a_secret_comes_only_from_the_sealed_store() -> None:
+    sealed = PortalValues(1, secrets={"smtp_password": "s3cret"})
+    in_json = PortalValues(1, {"smtp_password": "s3cret"})
+
+    from_store = resolve(PASSWORD, None, None, sealed)
+    from_json = resolve(PASSWORD, None, None, in_json)
+
+    assert (from_store.value, from_store.source) == ("s3cret", Source.PORTAL)
+    assert (from_json.value, from_json.source, from_json.portal_ignored) == (
+        None,
+        Source.DEFAULT,
+        True,
+    )
+
+
+def test_the_environment_wins_over_a_sealed_secret() -> None:
+    sealed = PortalValues(1, secrets={"smtp_password": "portal"})
+
+    resolved = resolve(PASSWORD, "from-env", Source.ENV, sealed)
+
+    assert (resolved.value, resolved.source, resolved.locked) == ("from-env", Source.ENV, True)
+
+
+def test_secrets_never_show_in_the_repr_of_the_portal_values() -> None:
+    assert "s3cret" not in repr(PortalValues(1, secrets={"smtp_password": "s3cret"}))
+
+
+async def test_the_store_reads_the_sealed_secrets() -> None:
+    uow = InMemoryUnitOfWork()
+    uow.state.platform_secrets = {"update_check_token": "ghp_x"}
+    store = PlatformSettingsStore(uow)
+
+    await store.refresh()
+
+    assert store.current.secrets == {"update_check_token": "ghp_x"}
