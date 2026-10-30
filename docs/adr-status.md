@@ -15,7 +15,7 @@ package; when the two disagree, the code wins.
 |---|---|
 | BUILT | 30 |
 | PARTIAL | 14 |
-| NOT BUILT | 5 |
+| NOT BUILT | 6 |
 
 | ADR | Title | Built? | Evidence | What is missing |
 |---|---|---|---|---|
@@ -68,6 +68,7 @@ package; when the two disagree, the code wins.
 | 0070 | Certificate source in the portal | BUILT | #149; migration 0061 | – |
 | 0071 | Trial call on Webex | BUILT | #154; migration 0063 | – |
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
+| 0073 | Browser-direct join link per group | NOT BUILT | ADR only | Steps 1–3: `join_client`, the two checks in the group check, confirmation on docker01 |
 
 ## Corrected on 2026-10-30
 
