@@ -38,8 +38,10 @@ Een gewijzigde waarde geldt binnen ongeveer tien seconden, zonder herstart.
 ## Een instelling wijzigen
 
 De superuser wijzigt de instellingen voor bedrijfsvoering, bewaartermijnen, opslag,
-snelheidslimieten, sessies van het beheerportaal, medewerkers en de planner, de reservemailserver
-en de updatecontrole. Webex en de inlogkoppeling volgen in een latere versie.
+snelheidslimieten, sessies van het beheerportaal, medewerkers en de planner, de reservemailserver,
+de updatecontrole en de Webex Service App met het WxCC-adres. De webhookgeheimen (die de server
+zelf maakt) en de inlogkoppeling volgen in een latere versie. Na een gewijzigde Webex-waarde
+worden videogesprekken en werkitems binnen ongeveer tien seconden opnieuw gekoppeld. Zet bij een nieuwe Service App de client-ID, het client secret en het refresh token tegelijk.
 
 - Vul onder **Wijzigen** de nieuwe waarde in en kies **Opslaan**. Het portaal accepteert alleen
   waarden binnen zijn grenzen, bijvoorbeeld 1 tot 30 afspraken per uur per adres. Een waarde
@@ -62,6 +64,19 @@ en de updatecontrole. Webex en de inlogkoppeling volgen in een latere versie.
 
 Voor een wijziging moet u kort geleden zijn ingelogd. Elke wijziging staat in het auditlog met
 de oude en de nieuwe waarde; een geweigerde wijziging ook.
+
+## De inlogkoppeling wijzigen
+
+Alleen de superuser kan wijzigen welke claims van de identity provider de rollen, organisaties
+en groepen dragen, en welke waarde welke rol is. Vul **Inlogkoppeling wijzigen** in en kies
+**Testen met een nieuwe login**. U wordt naar de identity provider gestuurd om opnieuw in te
+loggen. De nieuwe koppeling wordt op die login toegepast: hij wordt alleen bewaard als u er nog
+superuser mee bent. Anders verandert er niets en meldt het scherm dat. Zo kan niemand per
+ongeluk iedereen buitensluiten.
+
+Is een waarde vastgezet door de beheerder van de server, dan is de hele koppeling van de
+beheerder en staat het formulier er niet. Verandert de identity provider later een claim of
+rolwaarde, dan kan de beheerder van de server de koppeling vanaf de server herstellen.
 
 ## Opmerkingen
 

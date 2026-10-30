@@ -70,6 +70,7 @@ class ErrorCode(StrEnum):
     INVALID_ANSWER = "invalid_answer"
     SETTING_NO_KEY = "setting_no_key"
     SETTING_NOT_LOCKED = "setting_not_locked"
+    LOGIN_LOCKOUT = "login_lockout"
 
 
 class DomainError(Exception):

@@ -14,7 +14,13 @@ import pytest
 import structlog.testing
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from app.adapters.oidc import ClaimMapping, OidcConfig, OidcIdentityProvider, principal_from_claims
+from app.adapters.oidc import (
+    ClaimMapping,
+    OidcConfig,
+    OidcIdentityProvider,
+    claim_mapping,
+    principal_from_claims,
+)
 from app.domain.authorization import Role
 from app.domain.ports import IdentityError
 
@@ -396,3 +402,54 @@ def test_claim_names_in_the_diagnostics_are_bounded() -> None:
     (event,) = events
     assert len(event["claims_present"]) == 50
     assert max(len(name) for name in event["claims_present"]) <= 64
+
+
+# The login mapping as settings, and its dry run (ADR 0042 §8).
+
+TRIAL = {
+    "oidc_role_claim": "realm_roles",
+    "oidc_organisation_claim": "org",
+    "oidc_group_claim": "groups",
+    "oidc_role_superuser": "op-root",
+    "oidc_role_org_admin": "op-org-admin",
+    "oidc_role_group_admin": "op-group-admin",
+    "oidc_role_auditor": "op-audit",
+    "oidc_role_agent": "op-agent",
+}
+
+
+async def test_a_fresh_login_asks_the_provider_to_authenticate_again(
+    oidc: OidcIdentityProvider,
+) -> None:
+    query = parse_qs(urlsplit((await oidc.start_login(REDIRECT, fresh=True)).url).query)
+    plain = parse_qs(urlsplit((await oidc.start_login(REDIRECT)).url).query)
+
+    assert (query["prompt"], query["max_age"]) == (["login"], ["0"])
+    assert "prompt" not in plain
+
+
+async def test_a_trial_login_maps_the_same_claims_twice(
+    oidc: OidcIdentityProvider, provider: FakeProvider
+) -> None:
+    provider.claims = {"realm_roles": ["op-root"]}
+    start = await oidc.start_login(REDIRECT, fresh=True)
+    provider.nonce = start.nonce
+
+    current, trial = await oidc.finish_trial_login(
+        code="abc",
+        redirect_uri=REDIRECT,
+        code_verifier=start.code_verifier,
+        nonce=start.nonce,
+        trial=TRIAL,
+    )
+
+    assert current.roles == {Role.GROUP_ADMIN}  # the "roles" claim, current mapping
+    assert trial.roles == {Role.SUPERUSER}  # the "realm_roles" claim, proposed mapping
+    assert current.subject == trial.subject
+
+
+def test_the_mapping_follows_the_settings_at_every_login() -> None:
+    mapping = claim_mapping(TRIAL)
+
+    assert mapping.role_claim == "realm_roles"
+    assert mapping.role_values["op-agent"] is Role.AGENT
