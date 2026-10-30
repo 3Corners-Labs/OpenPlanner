@@ -7,6 +7,7 @@ portal shows (class C and D), at the key the registry names.
 
 from app.domain.platform_settings import Source
 from app.domain.settings_registry import SettingClass, Topic
+from app.domain.tls import Finding
 
 SETTING_LABELS: dict[str, str] = {
     "log_level": "settings.field.log_level.label",
@@ -15,6 +16,9 @@ SETTING_LABELS: dict[str, str] = {
     "maintenance_retry_after_seconds": "settings.field.maintenance_retry_after_seconds.label",
     "maintenance_alert_hours": "settings.field.maintenance_alert_hours.label",
     "maintenance_alert_repeat_hours": "settings.field.maintenance_alert_repeat_hours.label",
+    "tls_check_interval_hours": "settings.field.tls_check_interval_hours.label",
+    "tls_expiry_warning_days": "settings.field.tls_expiry_warning_days.label",
+    "tls_alert_repeat_hours": "settings.field.tls_alert_repeat_hours.label",
     "integration_check_interval_hours": "settings.field.integration_check_interval_hours.label",
     "staff_last_seen_interval_seconds": "settings.field.staff_last_seen_interval_seconds.label",
     "system_event_retention_days": "settings.field.system_event_retention_days.label",
@@ -127,3 +131,15 @@ PROBLEM_LABELS: dict[str, str] = {
     "oidc_incomplete": "admin.settings.problem.oidc_incomplete",
 }
 """What production would refuse, by the code of ``Settings.production_problems``."""
+
+TLS_FINDING_LABELS: dict[Finding, str] = {
+    Finding.OK: "admin.settings.tls.finding.ok",
+    Finding.EXPIRING: "admin.settings.tls.finding.expiring",
+    Finding.EXPIRED: "admin.settings.tls.finding.expired",
+    Finding.NOT_YET_VALID: "admin.settings.tls.finding.not_yet_valid",
+    Finding.UNTRUSTED: "admin.settings.tls.finding.untrusted",
+    Finding.NAME_MISMATCH: "admin.settings.tls.finding.name_mismatch",
+    Finding.UNREACHABLE: "admin.settings.tls.finding.unreachable",
+    Finding.NOT_HTTPS: "admin.settings.tls.finding.not_https",
+}
+"""What the certificate check found (ADR 0064), on System status."""
