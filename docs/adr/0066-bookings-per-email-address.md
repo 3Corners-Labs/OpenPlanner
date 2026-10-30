@@ -1,4 +1,4 @@
-# 0059. Bookings per email address
+# 0066. Bookings per email address
 
 Status: accepted (2026-10-30), requested by the product owner. Extends ADR 0027 and ADR 0056.
 
