@@ -6093,3 +6093,21 @@ msgstr "Geheimen kunnen pas worden opgeslagen als de server een SETTINGS_ENCRYPT
 
 msgid "admin.form.error.setting_not_locked"
 msgstr "Deze instelling staat niet in de omgeving van de server; er is niets over te nemen."
+
+msgid "admin.settings.login.title"
+msgstr "Inlogkoppeling wijzigen"
+
+msgid "admin.settings.login.intro"
+msgstr "Welke claims van de identity provider de rollen, organisaties en groepen dragen, en welke waarde welke rol is. Na het testen logt u opnieuw in; de nieuwe koppeling wordt alleen bewaard als u daarna nog superuser bent."
+
+msgid "admin.settings.login.test"
+msgstr "Testen met een nieuwe login"
+
+msgid "admin.done.login_mapping_saved"
+msgstr "De nieuwe inlogkoppeling is getest met uw nieuwe login en bewaard."
+
+msgid "admin.done.login_mapping_refused"
+msgstr "De nieuwe inlogkoppeling is niet bewaard: met die koppeling zou u na het inloggen geen superuser meer zijn. Er is niets veranderd."
+
+msgid "admin.form.error.login_lockout"
+msgstr "Met deze koppeling zou u geen superuser meer zijn; ze is niet bewaard."

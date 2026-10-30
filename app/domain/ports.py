@@ -6,7 +6,7 @@ live meeting status per ADR 0010), ``ContactCenterDispatcher`` (WP6, ADR 0007),
 ``IdentityProvider`` (WP7).
 """
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -218,14 +218,37 @@ class ReleaseSource(Protocol):
 class IdentityProvider(Protocol):
     """The admin portal's identity provider (OIDC; PingFederate in production, ADR 0013)."""
 
-    async def start_login(self, redirect_uri: str) -> LoginStart:
-        """Prepare an authorisation request with fresh ``state``, ``nonce`` and PKCE."""
+    async def start_login(self, redirect_uri: str, *, fresh: bool = False) -> LoginStart:
+        """Prepare an authorisation request with fresh ``state``, ``nonce`` and PKCE.
+
+        ``fresh`` asks the provider to authenticate again instead of single sign-on (the dry
+        run of a new login mapping, ADR 0042 §8).
+        """
         ...
 
     async def finish_login(
         self, *, code: str, redirect_uri: str, code_verifier: str, nonce: str
     ) -> Principal:
         """Exchange the code, verify the ID token and return the admin it describes.
+
+        Raises:
+            IdentityError: If the exchange or any token check fails.
+        """
+        ...
+
+    async def finish_trial_login(
+        self,
+        *,
+        code: str,
+        redirect_uri: str,
+        code_verifier: str,
+        nonce: str,
+        trial: Mapping[str, str],
+    ) -> tuple[Principal, Principal]:
+        """Like ``finish_login``, and also map the same claims with the ``trial`` mapping.
+
+        Returns the admin under the current mapping and under the proposed one; the claims
+        themselves are never returned or stored.
 
         Raises:
             IdentityError: If the exchange or any token check fails.

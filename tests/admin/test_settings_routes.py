@@ -1,11 +1,12 @@
 """System status and Advanced settings, read-only (ADR 0042 §11, build step 3)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import PlatformSettingRow, SettingsVersionRow
+from app.domain.authorization import Principal
 from app.web.protection import booking_limit
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 
@@ -221,3 +222,121 @@ async def test_a_locked_value_is_taken_over_and_names_the_variable_to_remove(
     assert response.status_code == 303
     assert "Overgenomen in het portaal" in after
     assert 'action="/admin/settings/admin_session_hours/adopt"' not in after
+
+
+# The login mapping, saved only after a dry run (ADR 0042 step 7, §8).
+
+LOGIN_FORM = {
+    "oidc_role_claim": "realm_roles",
+    "oidc_organisation_claim": "organisations",
+    "oidc_group_claim": "groups",
+    "oidc_role_superuser": "op-root",
+    "oidc_role_org_admin": "op-org",
+    "oidc_role_group_admin": "op-group",
+    "oidc_role_auditor": "op-audit",
+    "oidc_role_agent": "op-agent",
+}
+
+
+async def _try(site: Site, trial: Principal) -> str:
+    """Propose ``LOGIN_FORM``, log in again with ``trial`` as the dry run's verdict."""
+    response = await site.client.post(
+        "/admin/settings/login/test", data=LOGIN_FORM, headers=SAME_ORIGIN
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin/login?next=/admin/settings&fresh=1"
+    site.idp.trial_principal = trial
+    start = await site.client.get(response.headers["location"])
+    assert start.status_code == 303
+    done = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+    return done.headers["location"]
+
+
+async def test_a_mapping_that_keeps_the_superuser_is_saved_after_a_fresh_login(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+
+    location = await _try(site, SUPER)
+
+    assert location == "/admin/settings?done=login_mapping_saved"
+    assert site.idp.fresh[-1] is True
+    await site.client.get("/admin/settings")
+    assert app.state.settings.oidc_role_claim == "realm_roles"
+
+
+async def test_a_mapping_that_would_lock_out_is_not_saved(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    nobody = Principal("sub-super", "Sanne Super", frozenset(), frozenset(), frozenset())
+
+    location = await _try(site, nobody)
+
+    assert location == "/admin/settings?done=login_mapping_refused"
+    await site.client.get("/admin/settings")
+    assert app.state.settings.oidc_role_claim == "roles"
+
+
+async def test_an_invalid_mapping_is_refused_before_any_login(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    response = await site.client.post(
+        "/admin/settings/login/test",
+        data={**LOGIN_FORM, "oidc_role_auditor": "op-root"},
+        headers=SAME_ORIGIN,
+    )
+
+    assert response.status_code == 422
+    assert 'id="error-login-oidc_role_auditor"' in response.text
+
+
+async def test_only_the_superuser_sees_and_posts_the_login_mapping(site: Site) -> None:
+    await site.login_as(AUDITOR)
+
+    page = (await site.client.get("/admin/settings")).text
+    response = await site.client.post(
+        "/admin/settings/login/test", data=LOGIN_FORM, headers=SAME_ORIGIN
+    )
+
+    assert 'action="/admin/settings/login/test"' not in page
+    assert response.status_code == 403
+
+
+async def test_a_proposal_older_than_the_reauth_limit_is_dropped(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    response = await site.client.post(
+        "/admin/settings/login/test", data=LOGIN_FORM, headers=SAME_ORIGIN
+    )
+    site.clock.advance(timedelta(minutes=app.state.settings.admin_reauth_minutes + 1))
+    site.idp.trial_principal = SUPER
+    await site.client.get(response.headers["location"])
+
+    done = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+    await site.client.get("/admin/settings")
+
+    assert "login_mapping" not in done.headers["location"]
+    assert app.state.settings.oidc_role_claim == "roles"
+
+
+async def test_a_webex_service_app_set_in_the_portal_wires_the_integrations(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    assert app.state.integrations.video is None
+
+    for key, value in (
+        ("webex_client_id", "client-1"),
+        ("webex_client_secret", "client-secret"),
+        ("webex_refresh_token", "refresh-token"),
+    ):
+        response = await site.client.post(
+            f"/admin/settings/{key}", data={"value": value}, headers=SAME_ORIGIN
+        )
+        assert response.status_code == 303, key
+    page = (await site.client.get("/admin/settings")).text
+
+    assert app.state.integrations.video is not None
+    assert app.state.call_service is not None
+    assert "client-secret" not in page
+    assert "refresh-token" not in page

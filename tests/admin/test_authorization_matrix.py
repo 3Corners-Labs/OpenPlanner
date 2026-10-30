@@ -115,6 +115,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/{key}/adopt": {
         "/admin/settings/admin_session_hours/adopt": statuses(409, 403, 403, 403, 403, 403, 403),
     },
+    # ADR 0042 §8: the login mapping, superuser only (settings.login.manage); an empty form is
+    # refused before any login.
+    "POST /admin/settings/login/test": {
+        "/admin/settings/login/test": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
     "POST /admin/settings/{key}/reset": {
         "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
     },
@@ -848,11 +853,27 @@ def in_maintenance(key: str, role: str, status: int) -> int:
     return 503
 
 
+def maintenance_relevant(key: str, role: str, status: int) -> bool:
+    """Whether a case says something maintenance changes (ADR 0038: every endpoint once).
+
+    The superuser runs every endpoint, which covers each one once and every writable change.
+    Of the other roles, a POST the matrix allows must now get 503, and "no role" on every POST
+    proves the matrix refuses (403) before maintenance does. A GET or a refused POST of
+    another role answers exactly as in ``test_matrix``, which runs those cases already.
+    """
+    if role == "superuser":
+        return True
+    if not key.startswith("POST "):
+        return False
+    return status != 403 or role == "no role"
+
+
 MAINTENANCE_CASES = [
     (role, key.split(" ", 1)[0], path, in_maintenance(key, role, status))
     for key, routes in EXPECTED.items()
     for path, by_role in routes.items()
     for role, status in by_role.items()
+    if maintenance_relevant(key, role, status)
 ]
 
 
@@ -868,6 +889,22 @@ async def test_matrix_during_maintenance(
 
 def test_writable_routes_exist() -> None:
     assert WRITABLE_IN_MAINTENANCE <= set(EXPECTED)
+
+
+def test_the_maintenance_sweep_covers_every_endpoint_and_every_allowed_change() -> None:
+    swept = {(role, path) for role, _, path, _ in MAINTENANCE_CASES}
+    every_path = {path for routes in EXPECTED.values() for path in routes}
+    allowed_posts = {
+        (role, path)
+        for key, routes in EXPECTED.items()
+        if key.startswith("POST ")
+        for path, by_role in routes.items()
+        for role, status in by_role.items()
+        if status != 403
+    }
+
+    assert {path for role, path in swept if role == "superuser"} == every_path
+    assert allowed_posts <= swept
 
 
 async def maintenance_on(site: Site) -> None:

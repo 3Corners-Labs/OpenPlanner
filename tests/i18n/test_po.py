@@ -1,7 +1,10 @@
+import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from app.i18n import po
 from app.i18n.po import load_catalogues
 
 PO = """\
@@ -73,3 +76,40 @@ def test_rejects_malformed_files(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match=r"nl\.po"):
         load_catalogues(tmp_path)
+
+
+def test_an_unchanged_directory_is_parsed_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write(tmp_path, "nl", "Welkom")
+    calls: list[object] = []
+    real = po.read_po
+
+    def counting(handle: Any, **kwargs: Any) -> Any:
+        calls.append(handle)
+        return real(handle, **kwargs)
+
+    monkeypatch.setattr(po, "read_po", counting)
+    first = load_catalogues(tmp_path)
+    second = load_catalogues(tmp_path)
+
+    assert first == second
+    assert first["nl"]["home.title"] == "Welkom"
+    assert len(calls) == 1
+
+
+def test_each_caller_gets_its_own_copy(tmp_path: Path) -> None:
+    _write(tmp_path, "nl", "Welkom")
+    load_catalogues(tmp_path)["nl"]["home.title"] = "changed"
+
+    assert load_catalogues(tmp_path)["nl"]["home.title"] == "Welkom"
+
+
+def test_a_changed_file_is_read_again(tmp_path: Path) -> None:
+    _write(tmp_path, "nl", "Welkom")
+    load_catalogues(tmp_path)
+    _write(tmp_path, "nl", "Hallo")
+    path = tmp_path / "nl.po"
+    os.utime(path, ns=(path.stat().st_atime_ns, path.stat().st_mtime_ns + 1_000_000))
+
+    assert load_catalogues(tmp_path)["nl"]["home.title"] == "Hallo"

@@ -69,6 +69,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.INVALID_ANSWER: "error.invalid_answer",
     ErrorCode.SETTING_NO_KEY: "admin.form.error.setting_no_key",
     ErrorCode.SETTING_NOT_LOCKED: "admin.form.error.setting_not_locked",
+    ErrorCode.LOGIN_LOCKOUT: "admin.form.error.login_lockout",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {
