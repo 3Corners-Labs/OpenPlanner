@@ -1,9 +1,9 @@
 # 0064. HTTPS by default: the certificate watched, shown, replaceable and tested end to end
 
-Status: proposed (2026-10-30), requested by the product owner; step 1 (decisions 1–4) and
+Status: accepted (2026-10-30), requested by the product owner; step 1 (decisions 1–4) and
 step 2 (decision 5) built 2026-10-30. Extends ADR 0030 (HTTPS with ACME certificates) and
 ADR 0050 (host installer); builds on ADR 0038 (system events from the worker), ADR 0042 §11
-(System status), ADR 0006 (signed images) and ADR 0029 (host updater).
+(System status), ADR 0006 (signed images) and ADR 0029 (host updater). Built, checked against the code on 2026-10-30 (status was *proposed*; `docs/adr-status.md`).
 
 ## Context
 
@@ -118,6 +118,16 @@ values (needed before the application runs), so B, like `OPENPLANNER_IMAGE` and
 **Fixed on purpose:** the probe's timeout (10 s) and that it probes the address citizens use,
 `PUBLIC_BASE_URL` (the CLI takes `--host` and `--port` for another server). The mount point `/certs` and the
 probe's trust store (the image's CA bundle) are properties of the image, not of a deployment.
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | Decisions 1–4: HTTPS as the default shape of the installer, own certificate files, `tls-check`, `certificate_checks`, `check-proxy.sh` | #139 | merged |
+| 2 | Decision 5: the proxy image is signed and pinned next to the application image | #144 | merged |
+| 3 | Certificate source managed in the portal | #149 | merged (ADR 0070) |
+
+(State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
 
 ## Consequences
 

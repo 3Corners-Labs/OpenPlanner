@@ -64,25 +64,27 @@
   <div class="card__header">
     <h2 id="history-heading">{{ _("admin.updates.history") }}</h2>
   </div>
+  {% if outside_change %}
+  <div class="alert alert--warning" role="status"><p>{{ _("admin.updates.outside_change", at=outside_change, version=outside_version) }}</p></div>
+  {% endif %}
+  <p class="hint">{{ _("admin.updates.history_lead") }} <a href="/admin/audit?subject=updates">{{ _("admin.updates.history_audit_link") }}</a></p>
   {% if history %}
   <div class="table-scroll" role="region" aria-labelledby="history-heading" tabindex="0">
   <table class="data-table">
     <caption class="visually-hidden">{{ _("admin.updates.history") }}</caption>
     <thead><tr>
-      <th scope="col">{{ _("admin.updates.requested_at") }}</th>
-      <th scope="col">{{ _("admin.updates.action") }}</th>
+      <th scope="col">{{ _("admin.updates.when") }}</th>
+      <th scope="col">{{ _("admin.updates.what") }}</th>
       <th scope="col">{{ _("admin.updates.versions") }}</th>
-      <th scope="col">{{ _("admin.updates.status") }}</th>
-      <th scope="col">{{ _("admin.updates.finished_at") }}</th>
+      <th scope="col">{{ _("admin.updates.by") }}</th>
     </tr></thead>
     <tbody>
       {% for view in history %}
-      <tr>
-        <th scope="row">{{ view.requested_at }}</th>
-        <td>{{ view.action }}</td>
-        <td><code>{{ view.request.from_version }}</code> → <code>{{ view.request.target }}</code></td>
-        <td>{{ view.status }}{% if view.reason %}<br><span class="hint">{{ view.reason }}</span>{% endif %}</td>
-        <td>{{ view.finished_at or "–" }}</td>
+      <tr{% if view.problem %} class="data-table__row--problem"{% endif %}>
+        <th scope="row">{{ view.at }}</th>
+        <td>{{ view.what }}{% if view.reason %}<br><span class="hint">{{ view.reason }}</span>{% endif %}</td>
+        <td>{% if view.to_version %}{% if view.from_version %}<code>{{ view.from_version }}</code> → {% endif %}<code>{{ view.to_version }}</code>{% else %}–{% endif %}</td>
+        <td>{{ view.by }}</td>
       </tr>
       {% endfor %}
     </tbody>

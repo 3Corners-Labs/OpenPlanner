@@ -10,13 +10,16 @@ from datetime import timedelta
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.audit import Outcome
+from app.domain.audit import Outcome, Source
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import IntegrationError
 from app.domain.update_service import SYSTEM_ACTOR, UPDATER_ACTOR, UpdateService
 from app.domain.updates import (
     CHECK_INTERVAL,
+    HISTORY_DETAILS,
+    HOST_ACTOR,
     RESTORE_WINDOW,
+    VERSION_ACTION,
     Release,
     ReleaseCheck,
     UpdateAction,
@@ -146,7 +149,7 @@ async def test_superuser_requests_the_available_update_and_it_is_audited(
     assert (event.action, event.outcome, event.detail) == (
         "system.update",
         Outcome.SUCCESS,
-        "update.request",
+        "update.request,from:1.3.0,to:1.4.0",
     )
 
 
@@ -207,7 +210,7 @@ async def test_updater_claims_the_waiting_request_once(
     assert (started.id, started.status) == (created.id, UpdateStatus.RUNNING)
     assert await updates.claim() is None
     event = uow.state.audit[-1]
-    assert (event.actor, event.detail) == (UPDATER_ACTOR, "update.start")
+    assert (event.actor, event.detail) == (UPDATER_ACTOR, "update.start,from:1.3.0,to:1.4.0")
 
 
 async def running(uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases) -> int:
@@ -266,7 +269,11 @@ async def test_updater_reports_its_steps(
     overview = await service(uow, clock).overview(DEMO_SUPERUSER)
     assert overview.open == moved
     event = uow.state.audit[-1]
-    assert (event.actor, event.detail, event.at) == (UPDATER_ACTOR, "update.verifying", clock.now())
+    assert (event.actor, event.detail, event.at) == (
+        UPDATER_ACTOR,
+        "update.verifying,from:1.3.0,to:1.4.0",
+        clock.now(),
+    )
 
 
 async def test_a_repeated_step_is_not_audited_again(
@@ -305,7 +312,7 @@ async def test_restore_previous_version_within_the_window(
         V1,
         V2,
     )
-    assert uow.state.audit[-1].detail == "restore.request"
+    assert uow.state.audit[-1].detail == "restore.request,from:1.4.0,to:1.3.0"
 
 
 async def test_no_restore_after_the_window(
@@ -399,7 +406,7 @@ async def test_auto_apply_requests_the_newer_version_as_the_system(
         SYSTEM_ACTOR,
         "system.update",
         Outcome.SUCCESS,
-        "update.auto_request",
+        "update.auto_request,from:1.3.0,to:1.4.0",
     )
 
 
@@ -423,6 +430,76 @@ async def test_auto_apply_leaves_an_open_request_alone_and_asks_nothing_when_cur
     )
     assert await current.check_if_due()
     assert (await current.overview(DEMO_SUPERUSER)).open is None
+
+
+# Running versions and the history from the audit log (ADR 0067).
+
+
+async def test_the_first_running_version_is_recorded_without_an_event(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    first = await service(uow, clock).note_running("1.3.0", "a" * 40)
+    again = await service(uow, clock).note_running("1.3.0", "a" * 40)
+
+    assert first is not None
+    assert (first.version, first.commit, first.request_id) == ("1.3.0", "a" * 40, None)
+    assert again is None
+    assert len(uow.state.running_versions) == 1
+    assert not [e for e in uow.state.audit if e.action == VERSION_ACTION]
+
+
+async def test_a_version_change_outside_the_portal_is_audited_as_the_host(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await service(uow, clock).note_running("1.3.0", "a" * 40)
+    clock.advance(timedelta(hours=1))
+
+    changed = await service(uow, clock, current=Version(1, 4, 0, 2)).note_running(
+        "1.4.0-rc.2", "b" * 40
+    )
+
+    assert changed is not None
+    assert changed.request_id is None
+    event = uow.state.audit[-1]
+    assert (event.actor, event.action, event.source) == (HOST_ACTOR, VERSION_ACTION, Source.SYSTEM)
+    assert event.detail == f"version.changed,from:1.3.0,to:1.4.0-rc.2,commit:{'b' * 12}"
+    overview = await service(uow, clock, current=Version(1, 4, 0, 2)).overview(DEMO_SUPERUSER)
+    assert overview.outside_change == changed
+
+
+async def test_a_version_change_the_updater_made_carries_its_request(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await service(uow, clock).note_running("1.3.0", "a" * 40)
+    await checked(uow, clock, releases)
+    created = await service(uow, clock).request_update(DEMO_SUPERUSER)
+    assert await service(uow, clock).claim() is not None
+
+    # The new container starts on the requested version while the request is running.
+    changed = await service(uow, clock, current=V2).note_running("1.4.0", "c" * 40)
+
+    assert changed is not None
+    assert changed.request_id == created.id
+    assert uow.state.audit[-1].actor == UPDATER_ACTOR
+    overview = await service(uow, clock, current=V2).overview(DEMO_SUPERUSER)
+    assert overview.outside_change is None
+
+
+async def test_the_history_is_the_audit_log_of_updates_milestones_only(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await finish_update(uow, clock, releases)  # request, start, steps, succeeded
+    await service(uow, clock, current=V2).note_running("1.4.0", "d" * 40)
+
+    history = await service(uow, clock, current=V2).history(DEMO_SUPERUSER)
+
+    details = [e.event.detail.split(",")[0] for e in history]
+    assert details[0] == "update.succeeded"
+    assert details[-1] == "update.request"
+    assert "update.start" not in details  # steps stay in the audit log itself
+    assert all(d in HISTORY_DETAILS for d in details)
+    with pytest.raises(DomainError, match="not_permitted"):
+        await service(uow, clock, current=V2).history(DEMO_ORG_ADMIN)
 
 
 async def test_summary_tells_any_reader_what_the_banner_tells_the_superuser(

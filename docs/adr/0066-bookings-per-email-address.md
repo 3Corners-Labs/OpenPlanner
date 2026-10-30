@@ -1,6 +1,6 @@
 # 0066. Bookings per email address
 
-Status: accepted (2026-10-30), requested by the product owner. Extends ADR 0027 and ADR 0056.
+Status: accepted (2026-10-30), requested by the product owner. Extends ADR 0027 and ADR 0056. Partly built; see `docs/adr-status.md` for what is built.
 
 ## Context
 
@@ -57,6 +57,15 @@ No off switch: the limit is a protection (ADR 0042), so the bound is 10, not "un
 
 **Fixed on purpose:** the same address twice in one slot is always refused; that has no
 legitimate use. The case folding rule is fixed (ASCII, both sides).
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1–7 | Per-email limit: same slot refused, maximum per group, setting, migration 0054 | #128 | merged |
+| 8 | A refused booking is explained by email only (prerequisite ADR 0056 step 2 is merged) |  | planned |
+
+(State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
 
 ## Consequences
 

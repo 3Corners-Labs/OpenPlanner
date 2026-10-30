@@ -58,6 +58,14 @@ What the code already supports:
 a tunable value: shortening it brings back the problem this ADR solves. If a group needs to
 stop late cancellations, that is a policy for the organisation to decide with a new ADR.
 
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | The citizen cancels until the start and moves until a lead (migration 0062) | #151 | merged |
+
+(State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
+
 ## Consequences
 
 - A team can have a task or calendar entry withdrawn shortly before the start. The cancel

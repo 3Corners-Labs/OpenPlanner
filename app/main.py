@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
 
 import httpx
+import structlog
 from fastapi import Depends, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -391,6 +392,11 @@ def create_app(
         )
         # ADR 0029: the web process only reads checks and stores requests; no release lookup.
         app.state.update_service = update_service(live(), uow, clock, http, lookup=False)
+        # ADR 0067: a version change nobody requested in the portal still leaves a trace.
+        try:
+            await app.state.update_service.note_running(settings.app_version, settings.app_commit)
+        except Exception as exc:  # an old schema without the table must not stop the start
+            structlog.get_logger().warning("updates.version_note_failed", error=type(exc).__name__)
         if agent_api is not None:
             for name in (
                 "api_access",
