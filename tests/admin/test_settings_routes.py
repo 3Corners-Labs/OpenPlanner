@@ -56,6 +56,20 @@ async def test_a_development_installation_shows_what_production_refuses(site: Si
     assert "PUBLIC_BASE_URL moet in productie https gebruiken." in text
 
 
+async def test_the_rc_channel_in_a_development_installation_is_listed_not_fatal(site: Site) -> None:
+    """ADR 0067: choosing rc outside production shows what production would refuse; no crash."""
+    await site.login_as(SUPER)
+
+    saved = await site.client.post(
+        "/admin/settings/update_channel", data={"value": "rc"}, headers=SAME_ORIGIN
+    )
+    page = await site.client.get("/admin/settings")
+
+    assert saved.status_code == 303
+    assert page.status_code == 200
+    assert "het updatekanaal rc mag in productie niet gekozen zijn" in page.text
+
+
 async def test_a_stored_portal_value_applies_without_a_restart(site: Site) -> None:
     await _store(site, admin_session_hours="4", rate_limit_bookings='"99/hour"')
     await site.login_as(SUPER)

@@ -277,6 +277,17 @@ class CertificateProbe(Protocol):
         ...
 
 
+class MailDomainResolver(Protocol):
+    """Looks up the TXT records of a DNS name, for the sender domain check (ADR 0073)."""
+
+    async def txt_records(self, name: str) -> tuple[str, ...] | None:
+        """Return the TXT records of ``name`` (``()`` when it has none).
+
+        Returns ``None`` when the lookup failed (timeout, no resolver); never raises.
+        """
+        ...
+
+
 class PemReader(Protocol):
     """Parses an uploaded certificate chain or private key (ADR 0070)."""
 

@@ -59,6 +59,12 @@ SMTP and SMS settings per organisation are organisation data; their password and
 are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data. Organisation texts (ADR 0074, table `organisation_texts`) are the same kind of plain text, shown to every citizen of the organisation's groups on pages and in messages; they never hold personal data and leave the system only inside those messages.
 Neither leaves the system except as part of the messages above.
 
+```
+web ──DNS (TXT)──> the host's resolver          sender domain check (ADR 0073)
+   the domain of the sender address, _dmarc.<domain> and <selector>._domainkey.<domain>;
+   organisation data only, on the superuser's request; the answers are judged, not stored
+```
+
 The platform's fallback mail server, the update check's read token and the Webex Service App
 (client secret, refresh token) can also be set in the portal (ADR 0042 step 6). Their password and token are sealed the same way, under
 `setting:<key>` in `integration_credentials`, and are never shown, logged or audited by value;
