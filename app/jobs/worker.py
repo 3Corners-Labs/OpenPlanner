@@ -23,6 +23,7 @@ from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.maintenance import storage_limits
+from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import (
@@ -137,7 +138,7 @@ async def run_worker(
                 clock,
                 ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
                 MessageComposer(
-                    Translator(load_catalogues()),
+                    Translator(load_catalogues(), CachedTextOverrides(uow)),
                     management_token_key(settings),
                     settings.public_base_url,
                 ),

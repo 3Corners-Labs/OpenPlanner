@@ -55,6 +55,7 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.SETTINGS_PLATFORM_MANAGE: "authz.permission.settings_platform_manage",
     Permission.SETTINGS_LOGIN_MANAGE: "authz.permission.settings_login_manage",
     Permission.SETTINGS_ORGANISATION_MANAGE: "authz.permission.settings_organisation_manage",
+    Permission.TEXTS_ORGANISATION_MANAGE: "authz.permission.texts_organisation_manage",
 }
 
 API_SCOPE_LABELS: dict[ApiScope, str] = {

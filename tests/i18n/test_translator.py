@@ -105,3 +105,21 @@ def test_has_key() -> None:
 
     assert translator.has_key("greeting")
     assert not translator.has_key("nope")
+
+
+async def test_refresh_without_overrides_does_nothing() -> None:
+    await Translator(CATALOGS).refresh()
+
+
+async def test_refresh_goes_to_the_override_source() -> None:
+    source = DictOverrides()
+    called: list[bool] = []
+
+    async def refresh() -> None:
+        called.append(True)
+
+    source.refresh = refresh  # type: ignore[method-assign]
+
+    await Translator(CATALOGS, source).refresh()
+
+    assert called == [True]

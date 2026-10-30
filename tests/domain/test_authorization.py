@@ -83,6 +83,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.EMBEDDING_MANAGE,  # ADR 0035
         Permission.QUEUE_WORK,  # ADR 0043
         Permission.SETTINGS_ORGANISATION_MANAGE,  # ADR 0042: the own organisation's settings
+        Permission.TEXTS_ORGANISATION_MANAGE,  # ADR 0004: the organisation's own wording
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -263,6 +264,19 @@ def test_every_permission_has_a_level() -> None:
         (
             GROUP,
             Permission.SETTINGS_ORGANISATION_MANAGE,
+            OWN_ORG,
+            Decision(False, Reason.NOT_PERMITTED),
+        ),
+        (ORG, Permission.TEXTS_ORGANISATION_MANAGE, OWN_ORG, Decision(True, Reason.ORGANISATION)),
+        (
+            ORG,
+            Permission.TEXTS_ORGANISATION_MANAGE,
+            OTHER_ORG,
+            Decision(False, Reason.OUT_OF_SCOPE),
+        ),
+        (
+            GROUP,
+            Permission.TEXTS_ORGANISATION_MANAGE,
             OWN_ORG,
             Decision(False, Reason.NOT_PERMITTED),
         ),

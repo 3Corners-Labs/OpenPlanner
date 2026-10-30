@@ -18,6 +18,7 @@ from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
+from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import (
@@ -69,6 +70,7 @@ from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.messaging_service import MessagingService
+from app.domain.organisation_text_service import OrganisationTextService
 from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
@@ -358,6 +360,14 @@ def create_app(
         app.state.channel_service = ChannelSettingsService(
             uow, clock, app.state.admin_service, senders
         )
+        text_overrides.attach(uow)
+        app.state.organisation_text_service = OrganisationTextService(
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.translator.locales,
+            on_change=text_overrides.invalidate,
+        )
         app.state.messaging_service = MessagingService(
             uow, clock, app.state.admin_service, app.state.translator.locales
         )
@@ -440,8 +450,10 @@ def create_app(
     app.state.identity_provider = identity_provider or oidc_provider(
         settings, http, lambda: app.state.settings
     )
-    # Admin-edited overrides are wired in here once the database adapter exists (WP7).
-    app.state.translator = Translator(load_catalogues())
+    # ADR 0074: the organisations' own texts; the source reads the database once the lifespan
+    # has opened it (until then, and in tools without one, the shipped texts apply).
+    text_overrides = CachedTextOverrides()
+    app.state.translator = Translator(load_catalogues(), text_overrides)
     # Admin session (ADR 0013): only sent to /admin, signed, HttpOnly, SameSite=Lax.
     app.add_middleware(
         SessionMiddleware,
