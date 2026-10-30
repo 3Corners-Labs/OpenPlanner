@@ -353,6 +353,10 @@ class Settings(BaseSettings):
     tls_check_interval_hours: int = Field(default=6, ge=1, le=168)
     tls_expiry_warning_days: int = Field(default=20, ge=1, le=60)
     tls_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # ADR 0066: the certificate source of the bundled proxy, managed in the portal.
+    tls_certificate_source: Literal["acme", "own"] = "acme"
+    tls_proxy_bundled: bool = False
+    tls_portal_certificate_dir: Path = Path("data/portal-certs")
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":

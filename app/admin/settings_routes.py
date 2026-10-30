@@ -17,11 +17,20 @@ the audit log.
 
 The page reloads the portal values first, so it always shows what the processes now apply.
 
-    GET  /admin/settings              settings.platform.view
-    POST /admin/settings/{key}        settings.platform.manage (recent login)
-    POST /admin/settings/{key}/reset  settings.platform.manage (recent login)
-    POST /admin/settings/{key}/adopt  settings.platform.manage (recent login)
-    POST /admin/settings/login/test   settings.login.manage (recent login): dry run (§8)
+The certificate block (ADR 0066) also carries the source of the bundled proxy's certificate
+and the uploaded own certificate: the source is the setting ``tls_certificate_source``,
+changed through the generic route but checked by ``CertificateSourceService`` (``own`` needs an
+upload); the pair is uploaded as two files, replaced or removed there, and *Check now* runs the
+worker's probe at once. Without the bundled proxy the block says the source does not apply.
+
+    GET  /admin/settings                          settings.platform.view
+    POST /admin/settings/{key}                    settings.platform.manage (recent login)
+    POST /admin/settings/{key}/reset              settings.platform.manage (recent login)
+    POST /admin/settings/{key}/adopt              settings.platform.manage (recent login)
+    POST /admin/settings/login/test               settings.login.manage (recent login): dry run (§8)
+    POST /admin/settings/tls/certificate          settings.platform.manage (recent login): upload
+    POST /admin/settings/tls/certificate/remove   settings.platform.manage (recent login)
+    POST /admin/settings/tls/check                settings.platform.manage (recent login)
 """
 
 from dataclasses import dataclass
@@ -37,14 +46,17 @@ from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_for
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.session import save_login_trial
+from app.admin.uploads import read_uploads
 from app.config import Settings
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
+from app.domain.own_certificate import MAX_PEM_BYTES, SOURCE_KEY, SOURCES, OwnCertificate
 from app.domain.settings_registry import BY_KEY, LOG_LEVEL_MAX_EXPIRY_HOURS, SettingClass, Topic
 from app.domain.settings_service import LOG_LEVEL, SettingsService, editable
 from app.domain.tls import Finding
 from app.domain.tls_check import CertificateStatus
+from app.domain.tls_source import CertificateSourceService
 from app.web.locale import RequestLocale
 from app.web.settings_labels import (
     CLASS_LABELS,
@@ -113,6 +125,38 @@ class CertificateView:
 
 _DANGER = (Finding.EXPIRED, Finding.NOT_YET_VALID)
 
+TLS_URL = f"{URL}#tls-heading"
+CERTIFICATE_FIELDS = ("chain", "key")
+REMOVE_KEY = "tls_certificate"
+"""The error key of the remove form (the upload's errors sit at ``chain`` or ``key``)."""
+
+
+@dataclass(frozen=True)
+class UploadedView:
+    """The own certificate uploaded in the portal, as the source form shows it (ADR 0066)."""
+
+    fingerprint: str
+    subject: str
+    issuer: str
+    names: str
+    valid_until: str
+    uploaded_at: str
+
+
+@dataclass(frozen=True)
+class SourceView:
+    """The certificate source block: the setting, the upload and what the admin may do."""
+
+    applicable: bool
+    source: str
+    choices: tuple[str, ...]
+    locked: bool
+    variable: str
+    editable: bool
+    uploaded: UploadedView | None
+    removable: bool
+    errors: dict[str, str]
+
 
 @dataclass(frozen=True)
 class TopicSection:
@@ -172,7 +216,10 @@ async def change_setting(
     raw_hours = form.text("hours")
     hours = int(raw_hours) if raw_hours.isdigit() and len(raw_hours) <= 3 else None
     try:
-        await _service(request).change(context.principal, key, form.text("value"), hours=hours)
+        if key == SOURCE_KEY:  # ADR 0066: `own` needs an upload, and the proxy is told at once
+            await (await _source(request)).choose(context.principal, form.text("value"))
+        else:
+            await _service(request).change(context.principal, key, form.text("value"), hours=hours)
     except DomainError as error:
         raise_refusal(error)
         return await _overview(request, locale, context, (key, error), 422)
@@ -189,7 +236,51 @@ async def reset_setting(
     except DomainError as error:
         raise_refusal(error)
         return await _overview(request, locale, context, (key, error), 409)
+    if key == SOURCE_KEY:
+        await (await _source(request)).sync(SOURCES[0])  # back to the default: ACME
     return redirect_done(URL, "saved", anchor=_anchor(key))
+
+
+@router.post("/settings/tls/certificate", response_class=HTMLResponse)
+async def upload_certificate(
+    request: Request, locale: Locale, _: SameOrigin, context: Change
+) -> Response:
+    """Store an uploaded chain and key as the own certificate (ADR 0066)."""
+    uploads = await read_uploads(request, CERTIFICATE_FIELDS, MAX_PEM_BYTES)
+    try:
+        await (await _source(request)).upload(
+            context.principal, uploads.files["chain"], uploads.files["key"]
+        )
+    except DomainError as error:
+        raise_refusal(error)
+        return await _overview(request, locale, context, (error.field or "chain", error), 422)
+    return redirect_done(URL, "certificate_uploaded", anchor="tls-heading")
+
+
+@router.post("/settings/tls/certificate/remove", response_class=HTMLResponse)
+async def remove_certificate(
+    request: Request, locale: Locale, _: SameOrigin, context: Change
+) -> Response:
+    """Remove the own certificate; refused while the source is ``own`` (ADR 0066)."""
+    try:
+        removed = await (await _source(request)).remove(context.principal)
+    except DomainError as error:
+        raise_refusal(error)
+        return await _overview(request, locale, context, (REMOVE_KEY, error), 409)
+    return redirect_done(
+        URL, "certificate_removed" if removed else "unchanged", anchor="tls-heading"
+    )
+
+
+@router.post("/settings/tls/check", response_class=HTMLResponse)
+async def check_certificate(request: Request, _: SameOrigin, context: Change) -> Response:
+    """Probe the public address now and store the outcome (ADR 0066, *Check now*)."""
+    try:
+        await (await _source(request)).check_now(context.principal)
+    except DomainError as error:
+        raise_refusal(error)
+        raise
+    return redirect_done(URL, "certificate_checked", anchor="tls-heading")
 
 
 @router.post("/settings/{key}/adopt", response_class=HTMLResponse)
@@ -208,6 +299,18 @@ async def adopt_setting(
 def _service(request: Request) -> SettingsService:
     """Return the application's settings service."""
     service: SettingsService = request.app.state.settings_service
+    return service
+
+
+async def _source(request: Request) -> CertificateSourceService:
+    """Return the certificate source service (ADR 0066), with the portal values reloaded first.
+
+    A change in the portal applies to the processes within ten seconds; the service's rules
+    (``own`` in use, the lock) must see it at once, so the reload happens here.
+    """
+    live: LiveSettings = request.app.state.live_settings
+    await live.refresh()
+    service: CertificateSourceService = request.app.state.certificate_source
     return service
 
 
@@ -252,6 +355,7 @@ async def _overview(
         {
             "environment": current.environment,
             "certificate": await _certificate(request, locale),
+            "source": await _source_view(request, locale, states, manage=manage, errors=errors),
             "refused": live.refused,
             "status": status_rows,
             "problems": problems,
@@ -295,6 +399,47 @@ async def _certificate(request: Request, locale: RequestLocale) -> CertificateVi
     )
 
 
+async def _source_view(
+    request: Request,
+    locale: RequestLocale,
+    states: list[SettingState],
+    *,
+    manage: bool,
+    errors: dict[str, str],
+) -> SourceView:
+    """Describe the certificate source block (ADR 0066) from the setting's state."""
+    service = await _source(request)
+    state = next(s for s in states if s.spec.key == SOURCE_KEY)
+    uploaded = await service.uploaded() if service.applicable() else None
+    return SourceView(
+        service.applicable(),
+        str(state.value),
+        state.spec.choices,
+        state.locked,
+        state.spec.env,
+        manage and not state.locked,
+        None if uploaded is None else _uploaded_view(request, locale, uploaded),
+        uploaded is not None and state.value != SOURCES[1],
+        {k: v for k, v in errors.items() if k in (SOURCE_KEY, REMOVE_KEY, *CERTIFICATE_FIELDS)},
+    )
+
+
+def _uploaded_view(
+    request: Request, locale: RequestLocale, uploaded: OwnCertificate
+) -> UploadedView:
+    """Write the uploaded certificate's public data for the page."""
+    days = uploaded.certificate.days_left(request.app.state.clock.now())
+    return UploadedView(
+        uploaded.fingerprint_text(),
+        uploaded.certificate.subject,
+        uploaded.certificate.issuer,
+        ", ".join(uploaded.certificate.names),
+        f"{admin_moment(request, locale, uploaded.certificate.not_after)} "
+        f"({locale.gettext('admin.settings.tls.days_left', days=days)})",
+        admin_moment(request, locale, uploaded.uploaded_at),
+    )
+
+
 def _sections(
     states: list[SettingState],
     locale: RequestLocale,
@@ -312,7 +457,7 @@ def _sections(
     errors = errors or {}
     by_topic: dict[Topic, list[SettingRow]] = {}
     for state in states:
-        if not state.spec.in_portal:
+        if not state.spec.in_portal or state.spec.key == SOURCE_KEY:  # its own block (ADR 0066)
             continue
         by_topic.setdefault(state.spec.topic, []).append(
             SettingRow(

@@ -969,3 +969,27 @@ class RoleRow(Base):
     claim_value: Mapped[str] = mapped_column(String(128), unique=True)
     permissions: Mapped[str] = mapped_column(Text)
     version: Mapped[int] = mapped_column(Integer)
+
+
+class OwnCertificateRow(Base):
+    """The own certificate uploaded in the portal (ADR 0066); at most one row.
+
+    The chain is public and stored as text; the private key is sealed with AES-256-GCM under
+    ``tls:own_certificate`` (ADR 0008) and never readable in plain text.
+    """
+
+    __tablename__ = "own_certificates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chain_pem: Mapped[str] = mapped_column(Text)
+    key_nonce: Mapped[bytes] = mapped_column(LargeBinary)
+    key_ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    subject: Mapped[str] = mapped_column(String(255))
+    issuer: Mapped[str] = mapped_column(String(255))
+    not_before: Mapped[datetime] = mapped_column(UTCDateTime())
+    not_after: Mapped[datetime] = mapped_column(UTCDateTime())
+    names: Mapped[str] = mapped_column(Text, server_default=text("'[]'"))
+    uploaded_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)

@@ -238,6 +238,58 @@ For a PKIoverheid or other organisation-validated certificate, or any CA without
 Back to ACME: remove `TLS_CERT_FILE` and `TLS_KEY_FILE` from `proxy.env`, make sure
 `ACME_EMAIL` is there, and restart the proxy; it obtains a certificate again.
 
+### Own certificate from the portal (ADR 0066)
+
+On a small installation (the bundled proxy, the installer's default) the superuser manages the
+certificate source without the host: *Platform → Advanced settings → System status →
+Certificate source*.
+
+1. **Upload** the PEM chain (server certificate first, then the intermediates) and the matching
+   private key (unencrypted) under *Upload or replace the own certificate*. The upload is
+   refused with the reason when a file is not PEM, the key does not fit, the certificate does
+   not cover the public address, or it is expired. The key is stored encrypted with
+   `SETTINGS_ENCRYPTION_KEY` and never shown; the page shows the fingerprint, subject, names
+   and expiry date.
+2. **Switch the source** to *Own certificate (uploaded)* and save. `web` writes the pair into
+   the `portal-certs` volume (`fullchain.pem`, `privkey.pem`, `serial`); the proxy's watcher
+   sees the new `serial` within `TLS_PORTAL_POLL_SECONDS` (10) and reloads Caddy with the pair.
+   The proxy's log says `portal certificate <fingerprint> applied`.
+3. **Check now** probes the public address at once: *System status* shows the uploaded
+   certificate's issuer and the finding (*in orde* for a publicly trusted CA, *niet vertrouwd*
+   for a private one).
+4. **Replace** before expiry by uploading the new pair: with the source on *own* it reaches the
+   proxy at once. **Renewal is the organisation's**: the worker's *expiring* finding and the
+   system event `tls.certificate` are the safety net, so put a calendar entry at the expiry date
+   minus a month.
+5. **Back to Let's Encrypt**: switch the source to *Let's Encrypt (automatic)*. The pair is
+   withdrawn from the volume (`serial` first), the watcher reloads Caddy without it and ACME
+   applies again; the certificate Caddy kept in `proxy-data` is still there, renewed as before.
+   The uploaded pair stays stored until *Remove the uploaded certificate*, which is allowed only
+   while Let's Encrypt is the source.
+
+Precedence in the proxy: files named in `proxy.env` (`TLS_CERT_FILE`/`TLS_KEY_FILE`, above) win
+over the portal, then the portal's pair, then ACME. The installer's `--own-certificate` also
+writes `TLS_CERTIFICATE_SOURCE=own` into `.env`, which locks the portal setting: the page then
+says the host manages the certificate and offers no upload. An operator who wants the choice out
+of the portal altogether sets `TLS_CERTIFICATE_SOURCE=acme` in `.env` (ADR 0042 lock). Behind a
+load balancer of your own (`--no-tls`) the block says the source does not apply.
+
+Every upload and removal is in the audit log with the fingerprint and the expiry date only.
+Losing `SETTINGS_ENCRYPTION_KEY` (see *Rotating secrets*) makes the stored key unreadable: the
+proxy keeps serving the working copy in `portal-certs` until the source changes; upload the
+pair again afterwards. Include `portal-certs` in the backup next to `proxy-data`, or just
+upload again after a restore.
+
+On the host, the volume and the proxy's view of it:
+
+```bash
+docker compose --env-file .env.update exec web ls -l /srv/portal-certs
+```
+
+```bash
+docker compose --env-file .env.update logs proxy | grep 'portal certificate'
+```
+
 ### Test the certificate flow end to end (ADR 0064)
 
 On a host with a public DNS name and ports 80 and 443 open (docker01 in the lab):
@@ -255,6 +307,9 @@ On a host with a public DNS name and ports 80 and 443 open (docker01 in the lab)
    expiry date then, and *expiring* appears only if it did not happen.
 5. Optionally the own-certificate path: a self-signed pair in `certs/`, `--own-certificate`,
    System status says *niet vertrouwd* with your own issuer; back to ACME as above.
+6. The portal path (ADR 0066): upload a self-signed pair for the host on *Advanced settings*,
+   switch the source to *own*, press *Check now* and see your own issuer with *niet vertrouwd*;
+   switch back to Let's Encrypt and see *ok* again, without touching the host.
 
 ## Time zones and clock format
 

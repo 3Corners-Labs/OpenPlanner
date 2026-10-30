@@ -289,7 +289,7 @@ bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error
 The switch holds a subject identifier or a host actor, times and a reason code: no personal
 data. A refused change is audited with its permission and target only, never the form content.
 
-## HTTPS certificate (ADR 0030)
+## HTTPS certificate (ADR 0030, ADR 0064, ADR 0066)
 
 ```
 proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
@@ -299,8 +299,18 @@ worker ──TLS handshake, no request──> proxy (public name, port 443): rea
        ──> certificate_checks (issuer, names, validity, finding; no personal data; ADR 0064)
 ```
 
-The CA learns the domain name and the operator's e-mail address; no citizen data leaves through
-this flow. The proxy keeps no access log, so booking paths with management tokens are not
+```
+superuser ──https, multipart──> web: PEM chain + private key (ADR 0066)
+web ──> own_certificates: chain (public), key sealed AES-256-GCM (SETTINGS_ENCRYPTION_KEY),
+        fingerprint, subject, issuer, names, validity; audit_events: fingerprint + expiry only
+web ──portal-certs volume──> proxy: fullchain.pem, privkey.pem (mode 600), serial
+```
+
+The uploaded private key is an integration secret (ADR 0008): it is in the database only
+sealed, in the shared volume as the proxy's working copy, and nowhere else (not in logs, audit
+events, error messages or the page). It concerns the organisation's server identity, not a
+citizen. The CA learns the domain name and the operator's e-mail address; no citizen data
+leaves through this flow. The proxy keeps no access log, so booking paths with management tokens are not
 written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
 name only).
 
