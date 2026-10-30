@@ -334,9 +334,10 @@ class Settings(BaseSettings):
     app_commit: str = Field(default="", pattern=r"^([0-9a-f]{7,40})?$")
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
-    # ADR 0059: UPDATE_CHANNEL (class B, deployment: what this host is for, like the installer
-    # mode) says whether release candidates are offered too; UPDATE_AUTO_APPLY (B) lets the
-    # worker request an update itself. Neither is allowed in production.
+    # ADR 0059, 0065: UPDATE_CHANNEL (class C) says whether release candidates are offered too;
+    # UPDATE_AUTO_APPLY (C) lets the worker request an update itself. The superuser sets both
+    # in the portal; here they are the code defaults and, when set, the environment lock.
+    # Neither is allowed in production, from the environment or from the portal.
     update_channel: Literal["release", "rc"] = "release"
     update_auto_apply: bool = False
 
@@ -354,6 +355,11 @@ class Settings(BaseSettings):
     # worker (ADR 0038 §6), and again every MAINTENANCE_ALERT_REPEAT_HOURS while it lasts.
     maintenance_alert_hours: int = Field(default=4, ge=1, le=72)
     maintenance_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # Class C: the certificate of the public address (ADR 0064): how often the worker probes
+    # it, below how many days left it warns, and how often a lasting finding is repeated.
+    tls_check_interval_hours: int = Field(default=6, ge=1, le=168)
+    tls_expiry_warning_days: int = Field(default=20, ge=1, le=60)
+    tls_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
     # Class C: the worker checks every group with a Webex host whose latest integration check
     # is older than this many hours, and records a system event on failure (ADR 0065 step 2).
     integration_check_interval_hours: int = Field(default=24, ge=1, le=168)

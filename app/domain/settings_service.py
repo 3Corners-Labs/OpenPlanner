@@ -154,6 +154,9 @@ class SettingsService:
             cross-field rules of the settings), or ``None``.
         organisation_combination: The same for one organisation's proposed class D values
             over the platform values; defaults to ``combination`` on those values alone.
+        environment_value: Returns the environment's value of a key, for ``adopt``.
+        production: Whether ``ENVIRONMENT=prod``: the values of ``PRODUCTION_REFUSED`` are
+            then refused as invalid (ADR 0067).
     """
 
     def __init__(
@@ -166,6 +169,7 @@ class SettingsService:
         combination: Callable[[Mapping[str, object]], str | None],
         organisation_combination: Callable[[int, Mapping[str, object]], str | None] | None = None,
         environment_value: Callable[[str], object] = lambda _: None,
+        production: bool = False,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -174,6 +178,7 @@ class SettingsService:
         self._locked = locked
         self._combination = combination
         self._environment_value = environment_value
+        self._production = production
         self._organisation_combination = organisation_combination or (
             lambda _, proposed: combination(proposed)
         )
@@ -390,6 +395,8 @@ class SettingsService:
         """Validate and store one value, then audit it."""
         spec = self._spec(key, host=host)
         value = parse(spec, raw)
+        if not spec.secret and not usable(spec, value, production=self._production):
+            raise DomainError(ErrorCode.SETTING_INVALID, key)
         now = self._clock.now()
         expires = self._expiry(spec, hours, now)
         if spec.secret:

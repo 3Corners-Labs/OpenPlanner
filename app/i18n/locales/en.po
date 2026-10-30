@@ -5838,6 +5838,12 @@ msgstr "Release repository"
 msgid "settings.field.update_check_token.label"
 msgstr "Repository read token"
 
+msgid "settings.field.update_channel.label"
+msgstr "Update channel"
+
+msgid "settings.field.update_auto_apply.label"
+msgstr "Update automatically"
+
 msgid "settings.field.time_format.label"
 msgstr "Time format"
 
@@ -6372,3 +6378,60 @@ msgstr "Keep requests to Webex and WxCC (days)"
 
 msgid "settings.field.job_overdue_minutes.label"
 msgstr "Job overdue after (minutes)"
+
+msgid "admin.settings.tls.title"
+msgstr "Certificate of the public address"
+
+msgid "admin.settings.tls.host"
+msgstr "Address"
+
+msgid "admin.settings.tls.finding"
+msgstr "Finding"
+
+msgid "admin.settings.tls.issuer"
+msgstr "Issued by"
+
+msgid "admin.settings.tls.valid_until"
+msgstr "Valid until"
+
+msgid "admin.settings.tls.checked_at"
+msgstr "Last checked"
+
+msgid "admin.settings.tls.days_left"
+msgstr "{days} days left"
+
+msgid "admin.settings.tls.none"
+msgstr "Not checked yet. The worker checks the certificate every few hours; on the server, python -m app.cli tls-check does it at once."
+
+msgid "admin.settings.tls.finding.ok"
+msgstr "Fine: the certificate is trusted and valid for a good while."
+
+msgid "admin.settings.tls.finding.expiring"
+msgstr "Expiring soon: automatic renewal seems to be failing. Check the proxy's log (runbook, HTTPS certificate)."
+
+msgid "admin.settings.tls.finding.expired"
+msgstr "Expired: visitors get a browser warning. Repair the renewal or install a new certificate."
+
+msgid "admin.settings.tls.finding.not_yet_valid"
+msgstr "Not yet valid: the server's clock or the certificate's start date is wrong."
+
+msgid "admin.settings.tls.finding.untrusted"
+msgstr "Not trusted: the certificate comes from a test, private or unknown certificate authority (for example Let's Encrypt's staging environment). Browsers warn visitors."
+
+msgid "admin.settings.tls.finding.name_mismatch"
+msgstr "Wrong name: the certificate was not issued for this address."
+
+msgid "admin.settings.tls.finding.unreachable"
+msgstr "Unreachable: the server could not reach its own public address on port 443. Check DNS, the firewall and whether the proxy is running."
+
+msgid "admin.settings.tls.finding.not_https"
+msgstr "No https: the public address uses http, so there is no certificate to check. Production does not allow this."
+
+msgid "settings.field.tls_check_interval_hours.label"
+msgstr "Check the certificate every (hours)"
+
+msgid "settings.field.tls_expiry_warning_days.label"
+msgstr "Warn when the certificate is valid for fewer than (days)"
+
+msgid "settings.field.tls_alert_repeat_hours.label"
+msgstr "Repeat the certificate report every (hours)"

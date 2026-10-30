@@ -35,6 +35,8 @@ Settings (ADR 0042 §10; changes audited as ``system:cli``):
 
 When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
     ``python -m app.cli oidc-check``  check the login configuration and print the claim mapping
+    ``python -m app.cli tls-check [--host H] [--port P]``  the certificate of the public address
+        (ADR 0064): stored for System status; with ``--host`` another server, stored nowhere
     ``python -m app.cli closure start (--group SLUG | --organisation SLUG) --notice-nl TEXT
     --notice-en TEXT [--end ISO]``  emergency closure (ADR 0024), audited as ``system:cli``
     ``python -m app.cli closure lift (--group SLUG | --organisation SLUG)``  end it now
@@ -92,6 +94,7 @@ from app.adapters.settings_report import (
     format_one,
     locked_keys,
 )
+from app.adapters.tls_probe import SslCertificateProbe
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
@@ -105,11 +108,14 @@ from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
-from app.domain.ports import IntegrationError
+from app.domain.ports import CertificateProbe, IntegrationError
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.domain.settings_registry import lookup
 from app.domain.settings_service import SettingsService
+from app.domain.system_log import SystemLog
+from app.domain.tls import Address, CertificateCheck
+from app.domain.tls_check import TlsWatch
 from app.domain.update_service import UpdateService
 from app.domain.updates import OUTCOMES, REPORTED_STEPS
 from app.i18n import Translator, load_catalogues
@@ -378,6 +384,62 @@ async def _maintenance(settings: Settings, action: str, reason: str, actor: str)
         return _maintenance_line(await service.stored())
     finally:
         await engine.dispose()
+
+
+async def _tls_check(
+    settings: Settings,
+    host: str | None = None,
+    port: int | None = None,
+    probe: CertificateProbe | None = None,
+) -> tuple[str, bool]:
+    """Probe the certificate of the public address (stored) or of ``host`` (not stored).
+
+    Returns the report and whether the finding is ``ok``. The thresholds are the environment's
+    or the defaults; the worker applies the portal's.
+    """
+    engine = create_engine(settings.database_url)
+    try:
+        uow, clock = SqlUnitOfWork(engine), SystemClock()
+        watch = TlsWatch(
+            uow,
+            clock,
+            probe or SslCertificateProbe(),
+            SystemLog(uow, clock),
+            public_base_url=settings.public_base_url,
+            interval=timedelta(hours=settings.tls_check_interval_hours),
+            warn_within=timedelta(days=settings.tls_expiry_warning_days),
+            repeat=timedelta(hours=settings.tls_alert_repeat_hours),
+        )
+        if host:
+            check = await watch.probe(Address(host, port or 443))
+        else:
+            check = await watch.check()
+        return _tls_lines(check, clock.now()), check.ok
+    finally:
+        await engine.dispose()
+
+
+def _tls_lines(check: CertificateCheck, now: datetime) -> str:
+    """Write a check as ``name  value`` lines."""
+    certificate = check.certificate
+    rows = [
+        ("host", check.host),
+        ("finding", check.finding.value),
+        ("trust", check.trust.value if check.trust else "-"),
+        ("error", check.error or "-"),
+    ]
+    if certificate is not None:
+        rows += [
+            ("subject", certificate.subject),
+            ("issuer", certificate.issuer),
+            ("names", ", ".join(certificate.names) or "-"),
+            ("valid from", certificate.not_before.isoformat()),
+            (
+                "valid until",
+                f"{certificate.not_after.isoformat()} ({certificate.days_left(now)} days)",
+            ),
+        ]
+    return "".join(f"{name:<12}{value}\n" for name, value in rows)
 
 
 def _backup_dir(settings: Settings) -> tuple[Path, Path]:
@@ -826,6 +888,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     pseudonym_cmd.add_argument("address")
     commands.add_parser("oidc-check", help="check the login configuration (no login started)")
+    tls_cmd = commands.add_parser("tls-check", help="the certificate of the public address")
+    tls_cmd.add_argument("--host", help="probe another server instead (stored nowhere)")
+    tls_cmd.add_argument("--port", type=int, help="its port (default 443)")
     _closure_parser(commands)
     settings_cmd = commands.add_parser("settings", help="show settings and their source")
     settings_actions = settings_cmd.add_subparsers(dest="action", required=True)
@@ -855,6 +920,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0 if pseudonym != UNKNOWN_CLIENT else 1
     if args.command == "oidc-check":
         return _write(asyncio.run(_oidc_check(Settings())))
+    if args.command == "tls-check":
+        return _write(asyncio.run(_tls_check(Settings(), args.host, args.port)))
     if args.command == "closure":
         return _closure(Settings(), args)
     if args.command == "settings" and args.action in ("set", "reset"):
