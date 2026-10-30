@@ -13,6 +13,7 @@ SETTING_LABELS: dict[str, str] = {
     "log_level": "settings.field.log_level.label",
     "worker_poll_seconds": "settings.field.worker_poll_seconds.label",
     "queue_refresh_seconds": "settings.field.queue_refresh_seconds.label",
+    "meeting_status_refresh_seconds": "settings.field.meeting_status_refresh_seconds.label",
     "maintenance_cache_seconds": "settings.field.maintenance_cache_seconds.label",
     "maintenance_retry_after_seconds": "settings.field.maintenance_retry_after_seconds.label",
     "maintenance_alert_hours": "settings.field.maintenance_alert_hours.label",

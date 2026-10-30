@@ -501,6 +501,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/agenda": statuses(200, 200, 200, 403, 403, 403, 403),
         "/admin/groups/andere-team/agenda": statuses(200, 403, 403, 200, 403, 403, 403),
     },
+    # ADR 0010, 0072: the fragment the agenda polls carries the page's permission and scope.
+    "GET /admin/groups/{slug}/agenda/live": {
+        "/admin/groups/demo/agenda/live": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/agenda/live": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
     # ADR 0044: a planner's changes; an unknown booking is a 404, an empty form a 400.
     "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/move": {
         "/admin/groups/demo/agenda/bookings/999999/move": statuses(
