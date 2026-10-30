@@ -5842,6 +5842,12 @@ msgstr "Webex heeft in productie WEBEX_CLIENT_SECRET, WEBEX_REFRESH_TOKEN en SET
 msgid "admin.settings.problem.oidc_incomplete"
 msgstr "inloggen (OIDC) heeft in productie een https-adres en een client secret nodig."
 
+msgid "admin.settings.problem.update_channel"
+msgstr "het updatekanaal rc mag in productie niet gekozen zijn: productie volgt releases."
+
+msgid "admin.settings.problem.update_auto_apply"
+msgstr "automatisch bijwerken mag in productie niet aan staan: een superuser start de update."
+
 msgid "authz.permission.settings_platform_view"
 msgstr "Systeemstatus en geavanceerde instellingen bekijken"
 
@@ -7164,3 +7170,105 @@ msgstr "De privésleutel van het geplaatste certificaat staat niet op deze serve
 
 msgid "admin.form.error.tls_volume_unwritable"
 msgstr "De server kan de sleutel niet wegschrijven naar het volume van de proxy. Waarschuw de serverbeheerder."
+
+msgid "admin.channels.reply_to_address"
+msgstr "Antwoordadres"
+
+msgid "admin.channels.reply_to_address_hint"
+msgstr "Waar een antwoord van een burger naartoe gaat (Reply-To). Leeg: een antwoord gaat naar het afzenderadres."
+
+msgid "admin.channels.dkim_selector"
+msgstr "DKIM-selector"
+
+msgid "admin.channels.dkim_selector_hint"
+msgstr "De selector waarmee uw mailserver ondertekent, bijvoorbeeld s1 of mail2026. Alleen voor de controle van het afzenderdomein; vraag hem aan uw mailbeheerder."
+
+msgid "admin.form.error.reply_to_address"
+msgstr "Vul een geldig e-mailadres in, zonder regeleinden of haakjes."
+
+msgid "admin.form.error.dkim_selector"
+msgstr "Een selector bestaat uit letters, cijfers en koppeltekens, eventueel met punten."
+
+msgid "admin.channels.domain_heading"
+msgstr "Afzenderdomein"
+
+msgid "admin.channels.domain_lead"
+msgstr "Ontvangers beoordelen op de DNS-records van het afzenderdomein (SPF, DKIM en DMARC) of een e-mail in het postvak of in de spammap belandt. Deze controle leest die records en zegt per record wat er is."
+
+msgid "admin.channels.domain_check"
+msgstr "Afzenderdomein controleren"
+
+msgid "admin.channels.domain_result"
+msgstr "Resultaat voor {domain}"
+
+msgid "admin.channels.domain_hint"
+msgstr "De controle leest alleen DNS. Of uw mailserver ook echt met dit domein ondertekent, ziet u in de handleiding bij dit scherm. Een onafhankelijke test is internet.nl."
+
+msgid "admin.channels.domain_failed.no_server"
+msgstr "Er is geen mailserver en geen afzender ingesteld; er is niets te controleren."
+
+msgid "admin.channels.domain_column_record"
+msgstr "Record"
+
+msgid "admin.channels.domain_column_verdict"
+msgstr "Oordeel"
+
+msgid "admin.channels.domain_column_explanation"
+msgstr "Toelichting"
+
+msgid "admin.channels.domain_record.spf"
+msgstr "SPF"
+
+msgid "admin.channels.domain_record.dkim"
+msgstr "DKIM"
+
+msgid "admin.channels.domain_record.dmarc"
+msgstr "DMARC"
+
+msgid "admin.channels.domain_verdict.ok"
+msgstr "In orde"
+
+msgid "admin.channels.domain_verdict.not_checked"
+msgstr "Niet gecontroleerd"
+
+msgid "admin.channels.domain_verdict.warning"
+msgstr "Aandachtspunt"
+
+msgid "admin.channels.domain_verdict.unknown"
+msgstr "Niet vast te stellen"
+
+msgid "admin.channels.domain_verdict.missing"
+msgstr "Ontbreekt"
+
+msgid "admin.channels.domain_verdict.invalid"
+msgstr "Ongeldig"
+
+msgid "admin.channels.domain_reason.ok"
+msgstr "Het {record}-record is gevonden en in orde."
+
+msgid "admin.channels.domain_reason.missing"
+msgstr "Er is geen {record}-record voor dit domein. Laat uw mailbeheerder het toevoegen."
+
+msgid "admin.channels.domain_reason.multiple"
+msgstr "Er staan meerdere {record}-records; ontvangers behandelen dat als een fout. Laat er één staan."
+
+msgid "admin.channels.domain_reason.invalid"
+msgstr "Het {record}-record is niet geldig opgebouwd. Laat uw mailbeheerder het nakijken."
+
+msgid "admin.channels.domain_reason.unknown"
+msgstr "De DNS-opzoeking voor {record} is mislukt (geen antwoord of time-out). Probeer het later opnieuw."
+
+msgid "admin.channels.domain_reason.spf_pass_all"
+msgstr "Het SPF-record eindigt op +all: iedereen mag namens dit domein mailen. Gebruik -all of ~all."
+
+msgid "admin.channels.domain_reason.spf_neutral_all"
+msgstr "Het SPF-record sluit af met ?all of helemaal niet: ontvangers trekken er geen conclusie uit. Sluit af met -all of ~all."
+
+msgid "admin.channels.domain_reason.dkim_no_selector"
+msgstr "Vul de DKIM-selector in bij de mailserver om de sleutel te controleren."
+
+msgid "admin.channels.domain_reason.dkim_revoked"
+msgstr "De DKIM-sleutel is leeg (ingetrokken). Laat uw mailbeheerder een nieuwe sleutel plaatsen."
+
+msgid "admin.channels.domain_reason.dmarc_policy_none"
+msgstr "DMARC staat op p=none: ontvangers rapporteren alleen, maar weren niets. Zet het beleid op quarantine of reject zodra SPF en DKIM kloppen."
