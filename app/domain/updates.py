@@ -19,6 +19,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from enum import StrEnum
+from functools import total_ordering
 
 from app.domain.errors import DomainError, ErrorCode
 
@@ -37,35 +38,74 @@ OUTCOME_SHOWN = timedelta(hours=24)
 SNOOZE = timedelta(minutes=60)
 """How long "remind me later" hides the banner."""
 
-_VERSION = re.compile(r"^v?(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$")
+_VERSION = re.compile(
+    r"^v?(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})(?:-rc\.([1-9]\d{0,3}))?$"
+)
 _REASON = re.compile(r"^[a-z_]{1,40}$")
 _RELEASE_PAGE = "https://github.com/"
 
 
-@dataclass(frozen=True, order=True)
+class UpdateChannel(StrEnum):
+    """What an installation follows (ADR 0059): releases only, or release candidates too."""
+
+    RELEASE = "release"
+    CANDIDATE = "rc"
+
+
+@total_ordering
+@dataclass(frozen=True)
 class Version:
-    """A release version (``MAJOR.MINOR.PATCH``), ordered numerically."""
+    """A release version (``MAJOR.MINOR.PATCH``) or a release candidate of one (``-rc.N``).
+
+    Ordered as SemVer 2.0.0 orders them: ``0.4.0-rc.3 < 0.4.0`` and ``0.4.0-rc.3 > 0.3.0``;
+    candidates of one version order by their number (ADR 0059).
+
+    Attributes:
+        major: MAJOR.
+        minor: MINOR.
+        patch: PATCH.
+        candidate: ``N`` of ``-rc.N``; ``None`` for a release.
+    """
 
     major: int
     minor: int
     patch: int
+    candidate: int | None = None
 
     @classmethod
     def parse(cls, raw: str) -> "Version | None":
-        """Return the version of ``1.4.0`` or ``v1.4.0``; ``None`` for anything else.
+        """Return the version of ``1.4.0``, ``v1.4.0`` or ``1.4.0-rc.2``; ``None`` otherwise.
 
-        Pre-releases, branch names (``main``) and local builds are not versions: such an
-        installation is never offered an update.
+        Branch names (``main``), local builds and any other pre-release form are not
+        versions: such an installation is never offered an update.
         """
         match = _VERSION.fullmatch(raw)
         if match is None:
             return None
-        major, minor, patch = (int(part) for part in match.groups())
-        return cls(major, minor, patch)
+        major, minor, patch, candidate = match.groups()
+        return cls(int(major), int(minor), int(patch), int(candidate) if candidate else None)
+
+    @property
+    def is_candidate(self) -> bool:
+        """Whether this is a release candidate rather than a release."""
+        return self.candidate is not None
+
+    def _key(self) -> tuple[int, int, int, int, int]:
+        """Return the sort key: a release sorts above every candidate of its number."""
+        if self.candidate is None:
+            return (self.major, self.minor, self.patch, 1, 0)
+        return (self.major, self.minor, self.patch, 0, self.candidate)
+
+    def __lt__(self, other: object) -> bool:
+        """Order as SemVer 2.0.0 does."""
+        if not isinstance(other, Version):
+            return NotImplemented
+        return self._key() < other._key()
 
     def __str__(self) -> str:
-        """Return ``MAJOR.MINOR.PATCH`` without the ``v`` of the tag."""
-        return f"{self.major}.{self.minor}.{self.patch}"
+        """Return ``MAJOR.MINOR.PATCH`` or ``MAJOR.MINOR.PATCH-rc.N``, without the tag's ``v``."""
+        release = f"{self.major}.{self.minor}.{self.patch}"
+        return release if self.candidate is None else f"{release}-rc.{self.candidate}"
 
 
 @dataclass(frozen=True)
@@ -198,9 +238,19 @@ def check_due(last: ReleaseCheck | None, now: datetime) -> bool:
     return last is None or now >= last.checked_at + CHECK_INTERVAL
 
 
-def available_update(current: Version | None, check: ReleaseCheck | None) -> Release | None:
-    """Return the latest release if it is newer than the running release build."""
+def available_update(
+    current: Version | None,
+    check: ReleaseCheck | None,
+    channel: UpdateChannel = UpdateChannel.RELEASE,
+) -> Release | None:
+    """Return the latest release if it is newer than the running release build.
+
+    On the ``release`` channel a candidate is never offered, whatever the check found; on
+    ``rc`` both are (ADR 0059 point 4).
+    """
     if current is None or check is None or check.latest is None:
+        return None
+    if channel is UpdateChannel.RELEASE and check.latest.version.is_candidate:
         return None
     return check.latest if check.latest.version > current else None
 

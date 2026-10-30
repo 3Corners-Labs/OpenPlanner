@@ -44,5 +44,10 @@
     {% endif %}
     <p>{{ signoff }}</p>
   </main>
+  {% if product_footer %}
+  <footer>
+    <p>{{ product_footer.via }} <img src="{{ product_footer.mark_url }}" alt="" width="24" height="24"> <strong>{{ product_footer.name }}</strong></p>
+  </footer>
+  {% endif %}
 </body>
 </html>

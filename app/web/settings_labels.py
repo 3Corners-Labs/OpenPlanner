@@ -64,6 +64,7 @@ SETTING_LABELS: dict[str, str] = {
     "update_check_token": "settings.field.update_check_token.label",  # nosec B105 - an i18n key
     "time_format": "settings.field.time_format.label",
     "admin_timezone": "settings.field.admin_timezone.label",
+    "product_footer": "settings.field.product_footer.label",
     "staff_dormant_after_days": "settings.field.staff_dormant_after_days.label",
     "shortfall_horizon_days": "settings.field.shortfall_horizon_days.label",
     "planner_changes_alert_per_hour": "settings.field.planner_changes_alert_per_hour.label",

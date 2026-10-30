@@ -56,8 +56,16 @@ def with_team_invite(group: Group) -> Group:
     )
 
 
+def citizen(number: int) -> ContactInput:
+    """Return Ada's details under address ``number``: another citizen for the address limit."""
+    return replace(ADA, email=f"citizen{number}@example.org")
+
+
 async def book(
-    service: BookingService, start: datetime = SLOT_0900, slug: str = "aangifte"
+    service: BookingService,
+    start: datetime = SLOT_0900,
+    slug: str = "aangifte",
+    contact: ContactInput = ADA,
 ) -> BookingReceipt:
-    """Book ``start`` for Ada in group ``slug``."""
-    return await service.book(group_slug=slug, start=start, contact=ADA, locale="nl")
+    """Book ``start`` for ``contact`` (Ada) in group ``slug``."""
+    return await service.book(group_slug=slug, start=start, contact=contact, locale="nl")

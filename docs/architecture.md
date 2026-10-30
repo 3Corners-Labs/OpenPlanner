@@ -316,6 +316,7 @@ erDiagram
         int queue_change_working_days
         int queue_visible_from_minutes
         bool queue_free_pick_allowed
+        int max_bookings_per_email
         string phone_mode
         string wxcc_queue_id
         string holiday_source "inherit | own"

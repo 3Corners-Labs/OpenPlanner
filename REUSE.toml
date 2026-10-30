@@ -12,3 +12,11 @@ path = "**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 3Corners Internetworking Services BV and the OpenPlanner contributors"
 SPDX-License-Identifier = "EUPL-1.2"
+
+# ADR 0060: the product mark and favicons. The open tile's corner shape (three rounded corners,
+# one square) comes from the 3corners logo and is used with the owner's permission.
+[[annotations]]
+path = "app/web/static/brand/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 3Corners Internetworking Services BV and the OpenPlanner contributors"
+SPDX-License-Identifier = "EUPL-1.2"

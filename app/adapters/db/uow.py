@@ -199,6 +199,7 @@ def _group(row: GroupRow) -> Group:
         embedding_enabled=row.embedding_enabled,
         queue_visible_from_minutes=row.queue_visible_from_minutes,
         queue_free_pick_allowed=row.queue_free_pick_allowed,
+        max_bookings_per_email=row.max_bookings_per_email,
         calendar_invite_address=row.calendar_invite_address,
     )
 
@@ -269,6 +270,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "embedding_enabled": group.embedding_enabled,
         "queue_visible_from_minutes": group.queue_visible_from_minutes,
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
+        "max_bookings_per_email": group.max_bookings_per_email,
         "calendar_invite_address": group.calendar_invite_address,
     }
 
@@ -1374,6 +1376,28 @@ class SqlTransaction(
             )
         )
         return int(count or 0)
+
+    async def upcoming_starts_for_email(
+        self, group_id: int, email: str, after: datetime
+    ) -> list[datetime]:
+        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0059).
+
+        ``lower()`` on both sides: SQLite folds ASCII only, the same for the stored and the
+        submitted address. The address stays in this query; only start times come back.
+        """
+        starts = await self._session.scalars(
+            select(SlotRow.start)
+            .select_from(BookingRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(
+                BookingRow.group_id == group_id,
+                BookingRow.status.in_(_HOLDS_PLACE),
+                SlotRow.end > after,
+                SlotRow.kind == BookingKind.SCHEDULED.value,
+                func.lower(BookingRow.email) == func.lower(email),
+            )
+        )
+        return list(starts)
 
     async def add_booking(self, booking: Booking) -> Booking:
         """Insert a booking and return it with its ID."""
