@@ -16,7 +16,6 @@ SETTINGS = "/admin/groups/demo/settings"
 
 NOT_YET_DOCUMENTED: frozenset[str] = frozenset(
     {
-        "/admin/",
         "/admin/api",
         "/admin/api/clients/new",
         "/admin/api/clients/{client_id}",

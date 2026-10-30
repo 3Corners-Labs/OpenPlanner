@@ -45,7 +45,7 @@ The overview (`/admin/`, `dashboard.view`) lists groups as cards. Admins asked f
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed; backlog section 5 | #130 | in PR |
-| 1 | OV-1, OV-2: widget register, fragment routes, overview without script, role defaults | | planned |
+| 1 | OV-1, OV-2: widget register, fragment routes, overview without script, role defaults | #141 | in PR |
 | 2 | OV-3, OV-4: the seven widgets and the server-rendered SVG charts | | planned |
 | 3 | OV-5: `overview-live.js`, live endpoint, CSP on this page only, "poll flood" abuse case | | planned |
 | 4 | OV-6, OV-7: alerts, banner, pop-ups, level filter; `QUEUE_WAIT_*` settings | | planned |

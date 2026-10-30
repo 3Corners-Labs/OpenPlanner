@@ -601,6 +601,8 @@ class AuditEventRow(Base):
     organisation: Mapped[str | None] = mapped_column(String(64))
     group: Mapped[str | None] = mapped_column(String(64))
     detail: Mapped[str] = mapped_column(String(255), server_default=text("''"))
+    # The provider's reason for a failed job (ADR 0065): masked, capped, no citizen data.
+    message: Mapped[str] = mapped_column(String(300), server_default=text("''"))
     source: Mapped[str] = mapped_column(String(16), server_default=text("'admin'"))
     booking_id: Mapped[int | None] = mapped_column(Integer)
     # ADR 0040, part 2: the fields of the one event schema that are not derived on export.
@@ -694,6 +696,7 @@ class BookingEventRow(Base):
     at: Mapped[datetime] = mapped_column(UTCDateTime())
     kind: Mapped[str] = mapped_column(String(32))
     detail: Mapped[str] = mapped_column(String(128), server_default=text("''"))
+    message: Mapped[str] = mapped_column(String(300), server_default=text("''"))
 
     __table_args__ = (Index("ix_booking_events_booking_id", "booking_id"),)
 

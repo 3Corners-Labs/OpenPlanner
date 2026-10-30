@@ -22,7 +22,8 @@
         {%- elif event.booking_id %}<br><span class="muted">{{ _("admin.audit.booking_link", id=event.booking_id) }}</span>{% endif %}
         {%- if event.trace_url %}<br><a href="{{ event.trace_url }}">{{ _("admin.audit.trace_link") }}</a>{% endif %}</td>
       <td><span class="chip{% if event.tone %} chip--{{ event.tone }}{% endif %}">{{ event.outcome }}</span>
-        {%- if event.code %}<br><span class="muted">{% if event.reason %}{{ event.reason }} {% endif %}<code>{{ event.code }}</code></span>{% endif %}</td>
+        {%- if event.code %}<br><span class="muted">{% if event.reason %}{{ event.reason }} {% endif %}<code>{{ event.code }}</code></span>{% endif %}
+        {%- if event.message %}<br><span class="muted">{{ _("admin.audit.provider_message", message=event.message) }}</span>{% endif %}</td>
       <td>{{ event.target }}</td>
     </tr>
     {% endfor %}

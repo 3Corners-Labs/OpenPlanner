@@ -6,14 +6,14 @@ ones are listed in ``PUBLIC_ADMIN_PATHS`` and the route-coverage test checks bot
     GET  /admin/login        → identity provider (state, nonce, PKCE in the session)
     GET  /admin/callback     → verify, start a fresh session, audit the login
     POST /admin/logout       → end the session here and at the provider, audit the logout
-    GET  /admin/             dashboard.view   groups in scope
     GET  /admin/rights       rights.view      own permissions with their scope
     GET  /admin/matrix       matrix.view      the whole matrix (same data as the docs)
 
-The audit log lives in ``audit_routes``, the retention overview in ``retention_routes``, the
-staff directory in ``staff_routes``, System status and Advanced settings in ``settings_routes``,
-groups and their planning in ``group_routes``, organisations in ``organisation_routes`` and
-their branding in ``branding_routes``.
+The overview (``/admin/``, ADR 0061) lives in ``overview_routes``, the audit log in
+``audit_routes``, the retention overview in ``retention_routes``, the staff directory in
+``staff_routes``, System status and Advanced settings in ``settings_routes``, groups and their
+planning in ``group_routes``, organisations in ``organisation_routes`` and their branding in
+``branding_routes``.
 """
 
 import hmac
@@ -49,6 +49,7 @@ from app.admin import (
     message_routes,
     organisation_routes,
     organisation_settings_routes,
+    overview_routes,
     planner_routes,
     queue_routes,
     retention_routes,
@@ -73,7 +74,7 @@ from app.admin.authz import (
 )
 from app.admin.forms import safe_next
 from app.admin.integration_views import check_view
-from app.admin.pages import Locale, SameOrigin, admin_moment, role_labels, templates
+from app.admin.pages import Locale, SameOrigin, admin_moment, role_labels, scope_text, templates
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
 from app.admin.session import (
@@ -84,7 +85,6 @@ from app.admin.session import (
     save_login_start,
     start_session,
 )
-from app.admin.shortfalls import agenda_service, shortfall_view
 from app.domain.admin import ANONYMOUS, LOGIN_EVENT
 from app.domain.audit import AuditEntry
 from app.domain.authorization import (
@@ -93,7 +93,6 @@ from app.domain.authorization import (
     Permission,
     Principal,
     Role,
-    Scope,
     permissions_for,
     role_keys,
 )
@@ -101,7 +100,6 @@ from app.domain.errors import DomainError
 from app.domain.ports import Clock, IdentityError, IdentityProvider
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.settings_service import SettingsService
-from app.i18n import BoundGettext
 from app.web.authz_labels import (
     API_SCOPE_LABELS,
     CITIZEN_LABELS,
@@ -263,45 +261,6 @@ async def logged_out(request: Request, locale: Locale) -> HTMLResponse:
     return _message(request, locale, 200, "admin.logged_out.title", "admin.logged_out.text")
 
 
-@router.get("/", response_class=HTMLResponse)
-async def dashboard(
-    request: Request,
-    locale: Locale,
-    context: Annotated[AdminContext, Depends(RequirePermission(Permission.DASHBOARD_VIEW))],
-) -> HTMLResponse:
-    """List the groups in the admin's scope, with their shortfalls ahead (ADR 0044)."""
-    groups = await admin_service(request).groups(context.principal)
-    summaries = await agenda_service(request).summaries(context.principal)
-    shortfalls = {
-        g.group.slug: shortfall_view(summaries[g.group.slug], g.group, locale)
-        for g in groups
-        if g.group.slug in summaries and summaries[g.group.slug].count
-    }
-    return _page(
-        request,
-        locale,
-        "admin/dashboard.html",
-        context.principal,
-        {"groups": groups, "shortfalls": shortfalls},
-    )
-
-
-def _scope_text(scope: Scope | None, _: BoundGettext) -> str:
-    """Describe a scope in words for the rights page."""
-    if scope is None:
-        return _("admin.rights.scope_portal")
-    if scope.everything:
-        return _("admin.rights.scope_everything")
-    parts = []
-    if scope.organisations:
-        parts.append(
-            _("admin.rights.scope_organisations", names=", ".join(sorted(scope.organisations)))
-        )
-    if scope.groups:
-        parts.append(_("admin.rights.scope_groups", names=", ".join(sorted(scope.groups))))
-    return "; ".join(parts)
-
-
 @router.get("/rights", response_class=HTMLResponse)
 async def rights(
     request: Request,
@@ -312,7 +271,7 @@ async def rights(
     _ = locale.gettext
     principal = context.principal
     rows = [
-        (_(PERMISSION_LABELS[permission]), _scope_text(scope, _))
+        (_(PERMISSION_LABELS[permission]), scope_text(scope, _))
         for permission, scope in permissions_for(principal)
     ]
     roles = role_labels(principal, locale)
@@ -548,6 +507,7 @@ def register_admin(app: FastAPI) -> None:
     ]
     for module_router in (
         router,
+        overview_routes.router,
         audit_routes.router,
         retention_routes.router,
         settings_routes.router,

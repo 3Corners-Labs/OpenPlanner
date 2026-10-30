@@ -1,4 +1,4 @@
-# Event schema `openplanner.event/1`
+# Event schema `openplanner.event/2`
 
 One schema for the audit log table, the container log, the CSV export and a log platform
 (ADR 0040, part 2). It follows Elastic Common Schema (ECS) and the OpenTelemetry log data
@@ -9,7 +9,7 @@ model, so Elastic, Splunk or an OpenTelemetry collector reads it without mapping
 
 | Field | Example | Meaning |
 |---|---|---|
-| `schema` | `openplanner.event/1` | name and version of this schema |
+| `schema` | `openplanner.event/2` | name and version of this schema; version 2 (ADR 0065) added `message`, nothing else changed |
 | `event_id` | `3f2b…` (32 hex) | unique per event; the same id as the row in `audit_events` |
 | `@timestamp` | `2026-10-27T14:03:12.345Z` | RFC 3339, UTC, milliseconds |
 | `log.level` | `warning` | `debug`, `info`, `warning`, `error`, `critical`; for audit and system events it follows the outcome: success and skipped `info`, retry and denied `warning`, failure `error` |
@@ -26,6 +26,7 @@ model, so Elastic, Splunk or an OpenTelemetry collector reads it without mapping
 | `service.version` | `1.4.0` | `APP_VERSION`; empty in development |
 | `installation` | `gemeente-prod` | `INSTALLATION_NAME`; empty when not set |
 | `detail` | `horizon_days,name` | what changed, as machine keys; never values |
+| `message` | `timezone 'Europe/Amsterdam' and timezone offset in '...+00:00' do not match` | the provider's own reason for a failed job (ADR 0065): Webex's `errors[].description` or `message`, email addresses masked, at most 300 characters, only from requests that carry no citizen data; empty for every other event |
 
 ## Updates and versions (ADR 0029, 0065)
 

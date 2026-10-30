@@ -42,6 +42,7 @@ GROUP_RETRY = AuditEvent(
     "attempt:2,channel:sms",
     Source.SYSTEM,
     7,
+    message="SMTP said: 421 try again later",  # ADR 0065: the provider's own words
 )
 OTHER_GROUP = AuditEvent(
     NOW - timedelta(minutes=1),
@@ -106,6 +107,7 @@ async def test_a_system_event_explains_itself(logged: Site) -> None:
     assert "Wordt opnieuw geprobeerd" in text
     assert "<code>smtp_unreachable</code>" in text
     assert "poging 2, sms" in text
+    assert "Antwoord van Webex: SMTP said: 421 try again later" in text
     assert "<td>Systeem</td>" in text
     assert 'href="/admin/groups/demo/bookings/7"' in text
 
@@ -253,7 +255,7 @@ async def test_an_admin_action_is_shipped_once_as_an_audit_line(
     shipped = [line for line in lines if line.get("log_type") == "audit"]
     denied = [line for line in shipped if line["outcome"] == "denied"]
     assert len(denied) == 1
-    assert denied[0]["schema"] == "openplanner.event/1"
+    assert denied[0]["schema"] == "openplanner.event/2"
     assert denied[0]["service.name"] == "web"
     assert denied[0]["actor"] == GROUP_ADMIN.subject
     assert len({line["event_id"] for line in shipped}) == len(shipped)
