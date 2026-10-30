@@ -119,8 +119,8 @@ probe meeting's title, lead and length stay as in the group check today.
 ## Consequences
 
 - Migration 0074 (reversible): `groups.join_client` text, default `browser`; the downgrade drops
-  the column. It revises 0071, the head of `main`. PR #168 claims 0072 and PR #170 claims 0073,
-  so when they merge first, `down_revision` becomes the head of `main` at that moment.
+  the column. It revises 0073, the head of `main`. PR #168 claims 0072 (organisation texts), so
+  when it merges first, `down_revision` becomes the head of `main` at that moment.
 - `docs/settings.md` unchanged (a group setting, not a `Settings` field); `docs/admin-map.md`
   unchanged (same screen); `docs/manual/{nl,en}/group-settings.md` gets the setting;
   `docs/authorization.md` unchanged.
