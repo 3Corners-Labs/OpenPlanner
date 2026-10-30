@@ -35,6 +35,12 @@ async def test_a_closed_team_a_planned_closure_and_a_suspended_booking(
         (upcoming,) = await tx.get_closures(planned.id, NOW)
         token = examples.suspended_booking.removeprefix("/b/")
         booking = await tx.get_booking_by_token_hash(hash_token(token))
+        pending = [
+            await tx.get_booking_by_token_hash(
+                hash_token(path.removeprefix("/b/").removesuffix("/confirm"))
+            )
+            for path in (examples.pending_confirm, examples.pending_flow)
+        ]
     assert active.is_active(NOW)
     assert active.heading("en")
     assert active.contacts is not None
@@ -47,6 +53,8 @@ async def test_a_closed_team_a_planned_closure_and_a_suspended_booking(
     assert booking is not None
     assert booking.status is BookingStatus.SUSPENDED
     assert booking.closure_id == active.id
+    assert [b.status if b else None for b in pending] == [BookingStatus.PENDING_CONFIRMATION] * 2
+    assert len({b.start for b in pending if b}) == 2  # one per slot
     assert examples.closed_group == f"/g/{CLOSED_GROUP_SLUG}"
     assert examples.planned_closure == f"/g/{PLANNED_GROUP_SLUG}/closure"
 

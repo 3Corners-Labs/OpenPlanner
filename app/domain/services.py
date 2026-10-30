@@ -5,8 +5,15 @@ booking and its jobs commit together or not at all (CLAUDE.md architecture rules
 
     book ─► locked tx ─► _place: window ─► offered? ─► slot (create, snapshot capacity)
                                 ─► capacity (minus overlapping old-grid bookings)
-                                ─► booking + token ─► replace_jobs
+                                ─► booking (pending) + token ─► jobs: request to confirm
+    confirm ─► locked tx ─► pending and before confirm_by? ─► confirmed ─► jobs as booked
+                                                    else ─► lapses (ADR 0056)
     reschedule ─► locked tx ─► cancel old (jobs: purge only) ─► _place new in the SAME group
+
+A citizen's new booking awaits confirmation by email link (ADR 0056): it holds its place but
+gets no meeting, reminders or task until confirmed; its deadline ``confirm_by`` follows the
+organisation's ``ConfirmPolicy``. A booking that is moved or rescheduled keeps the
+confirmation it had (the address was already verified), so it is placed confirmed.
 
 A booking is read-only from its change deadline (``Group.change_deadline``: the group's
 dispatch lead before the start, T−5 min by default, or with the own queue a number of working
@@ -17,6 +24,7 @@ or booked (``group_closed``), and no direct call starts while one is active. A d
 also needs room under the group's cap of open direct calls (``direct_call_full``, ADR 0026).
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
@@ -30,8 +38,10 @@ from app.domain.availability import (
     validate_range,
 )
 from app.domain.booking import Booking, BookingKind, BookingStatus, Contact, Slot
+from app.domain.booking_changes import lapse_unconfirmed
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure, covering
+from app.domain.confirmation import DEFAULT_CONFIRM_POLICY, ConfirmPolicy, confirm_window
 from app.domain.direct_queue import (
     ESTIMATE_WINDOW,
     DirectAvailability,
@@ -45,9 +55,11 @@ from app.domain.holiday_service import effective_schedule
 from app.domain.images import ImageFile
 from app.domain.job_plan import (
     JobType,
+    PlannedJob,
     plan_for_booking,
     plan_for_cancellation,
     plan_for_direct,
+    plan_for_pending,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, is_open
@@ -58,6 +70,7 @@ from app.domain.tokens import (
     new_token_salt,
     token_matches,
 )
+from app.domain.tunable import value_for
 
 
 @dataclass(frozen=True)
@@ -73,7 +86,9 @@ class ContactInput:
 class BookingDetails:
     """What the management page needs: the booking, its group and whether it may change.
 
-    ``closure`` is the closure that suspended the booking, for its notice.
+    ``closure`` is the closure that suspended the booking, for its notice. ``cancellable`` is
+    also true for a booking that awaits confirmation ("this was not me", ADR 0056), which
+    cannot be rescheduled.
     """
 
     booking: Booking
@@ -81,6 +96,7 @@ class BookingDetails:
     change_deadline: datetime
     changeable: bool
     closure: Closure | None = None
+    cancellable: bool = False
 
 
 @dataclass(frozen=True)
@@ -98,18 +114,28 @@ class BookingService:
         uow: Opens database transactions.
         clock: Current time.
         token_key: Server key for deriving management tokens (ADR 0011).
+        confirm_policy: The rules for confirming a new booking (ADR 0056), per organisation
+            id when it is a function (class D settings, read live).
 
     Raises:
         ValueError: If ``token_key`` is shorter than 32 bytes.
     """
 
-    def __init__(self, uow: UnitOfWork, clock: Clock, token_key: bytes) -> None:
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        token_key: bytes,
+        *,
+        confirm_policy: ConfirmPolicy | Callable[[int], ConfirmPolicy] = DEFAULT_CONFIRM_POLICY,
+    ) -> None:
         """Store the collaborators."""
         if len(token_key) < MIN_KEY_BYTES:
             raise ValueError(f"the token key must be at least {MIN_KEY_BYTES} bytes")
         self._uow = uow
         self._clock = clock
         self._token_key = token_key
+        self._confirm_policy = confirm_policy
 
     async def get_group(self, group_slug: str) -> Group:
         """Return the group behind a booking page.
@@ -175,7 +201,7 @@ class BookingService:
         locale: str,
         consents: frozenset[ChannelKind] = frozenset(),
     ) -> BookingReceipt:
-        """Book the slot at ``start`` for a citizen.
+        """Book the slot at ``start`` for a citizen; it awaits confirmation (ADR 0056).
 
         Raises:
             DomainError: ``group_not_found``, ``invalid_contact``, ``outside_booking_window``,
@@ -190,7 +216,9 @@ class BookingService:
                 phone=contact.phone,
                 phone_mode=group.phone_mode,
             )
-            return await self._place(tx, group, start, details, locale, consents, None)
+            return await self._place(
+                tx, group, start, details, locale, consents, None, pending=True
+            )
 
     async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
         """Return whether a direct call can be started now: switched on, open, and room.
@@ -275,8 +303,35 @@ class BookingService:
                 else None
             )
         deadline = group.change_deadline(booking.start)
-        changeable = booking.on_hold or (booking.is_active and self._clock.now() < deadline)
-        return BookingDetails(booking, group, deadline, changeable, closure)
+        before = self._clock.now() < deadline
+        changeable = booking.on_hold or (booking.is_active and before)
+        cancellable = changeable or (booking.awaits_confirmation and before)
+        return BookingDetails(booking, group, deadline, changeable, closure, cancellable)
+
+    async def confirm(self, management_token: str) -> Booking:
+        """Confirm a booking by its email link (ADR 0056) and return it as it now is.
+
+        A pending booking before its ``confirm_by`` is confirmed: the meeting, reminders,
+        task and purge are planned as for any booking, with the full confirmation mail. After
+        ``confirm_by`` it lapses here, as the worker would. Any other booking is returned
+        unchanged, so a second click shows the booking (idempotent).
+
+        Raises:
+            DomainError: ``booking_not_found`` or ``group_not_found``.
+        """
+        async with self._uow.locked() as tx:
+            booking = await self._booking(tx, management_token)
+            if not booking.awaits_confirmation:
+                return booking
+            now = self._clock.now()
+            if booking.confirm_by is not None and now >= booking.confirm_by:
+                await lapse_unconfirmed(tx, booking, now)
+                return booking.expire(now)
+            group = await self._group_by_id(tx, booking.group_id)
+            confirmed = booking.confirm(now)
+            await tx.save_booking(confirmed)
+            await tx.replace_jobs(_id(booking), await self._booked_jobs(tx, group, confirmed))
+            return confirmed
 
     async def cancel(self, management_token: str) -> Booking:
         """Cancel the booking; its pending jobs become a cancellation mail and the purge.
@@ -303,11 +358,14 @@ class BookingService:
         mail and a new management token. A failure anywhere leaves the old booking untouched.
 
         Raises:
-            DomainError: ``booking_not_found``, ``booking_locked``, ``booking_not_active``,
-                ``same_slot``, or any error of ``book`` for the new start.
+            DomainError: ``booking_not_found``, ``booking_locked``, ``booking_not_active``
+                (also while it awaits confirmation), ``same_slot``, or any error of ``book``
+                for the new start.
         """
         async with self._uow.locked() as tx:
             old = await self._booking(tx, management_token)
+            if old.awaits_confirmation:  # ADR 0056 §3: confirm first, then move
+                raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
             group = await self._group_by_id(tx, old.group_id)
             _ensure_changeable(old, group, self._clock.now())
             return await self.relocate(tx, old, group, new_start)
@@ -342,7 +400,16 @@ class BookingService:
         )
         await tx.replace_jobs(_id(old), jobs)
         return await self._place(
-            tx, group, new_start, old.contact, old.locale, old.consents, _id(old), sms=sms
+            tx,
+            group,
+            new_start,
+            old.contact,
+            old.locale,
+            old.consents,
+            _id(old),
+            sms=sms,
+            pending=old.awaits_confirmation,
+            confirmed_at=old.confirmed_at,
         )
 
     async def _direct_open(self, tx: Transaction, group: Group, now: datetime) -> bool:
@@ -394,8 +461,15 @@ class BookingService:
         rescheduled_from: int | None,
         *,
         sms: bool = False,
+        pending: bool = False,
+        confirmed_at: datetime | None = None,
     ) -> BookingReceipt:
-        """Reserve a place at ``start`` and store the booking with its jobs."""
+        """Reserve a place at ``start`` and store the booking with its jobs.
+
+        ``pending`` places it awaiting confirmation with its own ``confirm_by`` (a citizen's
+        new booking, or a moved one that was still pending, ADR 0056); otherwise it is placed
+        confirmed and keeps ``confirmed_at`` of the booking it replaces.
+        """
         if start.tzinfo is None:
             raise ValueError("start must be timezone-aware")
         now = self._clock.now()
@@ -419,6 +493,16 @@ class BookingService:
         overlap = overlapping_active(offered.start, length, {u.start: u.active for u in usage})
         if await tx.count_active_bookings(_id(slot)) + overlap >= slot.capacity_snapshot:
             raise DomainError(ErrorCode.SLOT_FULL)
+        window = (
+            confirm_window(
+                now=now,
+                start=slot.start,
+                dispatch_lead=group.dispatch_lead,
+                policy=value_for(self._confirm_policy, group.organisation_id),
+            )
+            if pending
+            else None
+        )
         salt = new_token_salt()
         token = derive_token(self._token_key, salt)
         booking = await tx.add_booking(
@@ -428,7 +512,7 @@ class BookingService:
                 slot_id=_id(slot),
                 start=slot.start,
                 end=slot.end,
-                status=BookingStatus.CONFIRMED,
+                status=BookingStatus.PENDING_CONFIRMATION if window else BookingStatus.CONFIRMED,
                 contact=contact,
                 locale=locale,
                 token_hash=hash_token(token),
@@ -436,22 +520,42 @@ class BookingService:
                 token_salt=salt,
                 consents=consents,
                 rescheduled_from_id=rescheduled_from,
+                confirm_by=window.confirm_by if window else None,
+                confirmed_at=confirmed_at,
             )
         )
-        jobs = plan_for_booking(
-            start=slot.start,
-            end=slot.end,
-            contact=contact,
-            consents=consents,
-            rules=await tx.get_reminder_rules(group.id),
-            now=now,
-            dispatch_lead=group.dispatch_lead,
-            message=JobType.SEND_CHANGE if rescheduled_from else JobType.SEND_CONFIRMATION,
-            sms=sms,
-            team_invite=group.sends_team_invite,
+        jobs = (
+            plan_for_pending(now=now, window=window)
+            if window
+            else await self._booked_jobs(tx, group, booking, sms=sms)
         )
         await tx.replace_jobs(_id(booking), jobs)
         return BookingReceipt(booking, token)
+
+    async def _booked_jobs(
+        self, tx: Transaction, group: Group, booking: Booking, *, sms: bool = False
+    ) -> list[PlannedJob]:
+        """Return the jobs of a booking that goes ahead: meeting, mails, reminders, task, purge.
+
+        The first mail is the change mail for a booking that replaces another, else the
+        confirmation.
+        """
+        if booking.contact is None:
+            raise ValueError("booking has no contact details")
+        return plan_for_booking(
+            start=booking.start,
+            end=booking.end,
+            contact=booking.contact,
+            consents=booking.consents,
+            rules=await tx.get_reminder_rules(group.id),
+            now=self._clock.now(),
+            dispatch_lead=group.dispatch_lead,
+            message=JobType.SEND_CHANGE
+            if booking.rescheduled_from_id
+            else JobType.SEND_CONFIRMATION,
+            sms=sms,
+            team_invite=group.sends_team_invite,
+        )
 
 
 def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:

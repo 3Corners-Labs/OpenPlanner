@@ -91,14 +91,17 @@ HTTP endpoints follow in WP3; the rules below are enforced in `app/domain/servic
 
 ## Flow: public booking pages (WP3)
 
-Public, unauthenticated: `GET /g/{slug}`, `GET/POST /g/{slug}/book`, `GET /b/{token}`,
-`GET/POST /b/{token}/cancel`, `GET/POST /b/{token}/reschedule`.
+Public, unauthenticated: `GET /g/{slug}`, `GET/POST /g/{slug}/book`, `GET /g/{slug}/booked`,
+`GET /b/{token}`, `GET/POST /b/{token}/confirm` (ADR 0056), `GET/POST /b/{token}/cancel`,
+`GET/POST /b/{token}/reschedule`.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
 | Denial of service | Slot exhaustion by bots | slowapi: 10 writes/IP/hour, 60 reads/IP/minute; honeypot field; minimal form | `tests/api/test_booking_pages.py::test_bookings_are_rate_limited`, `test_honeypot_is_refused`; detection: `tests/api/test_security_events.py` (ADR 0053) |
 | Tampering (CSRF) | A third-party site posts a booking or cancellation | Fetch Metadata: `Sec-Fetch-Site` must be same-origin/none; without it `Origin` must match. `Referrer-Policy: same-origin` (with `no-referrer` browsers send `Origin: null` on form posts) | `test_cross_site_posts_are_refused`, `test_same_origin_posts_are_accepted` |
 | Information disclosure | PII through error responses | Error summary and error pages use catalogue texts only; submitted values are only re-filled into the visitor's own form | `test_invalid_input_is_explained_and_kept`, `test_honeypot_is_refused` |
+| Denial of service | Slot exhaustion with unconfirmed bookings: a bot books with made-up addresses (ADR 0056) | Every new booking awaits confirmation by its email link and holds its place only until `confirm_by` (at most `booking_confirm_window_hours`, 72 h); then `expire_unconfirmed` cancels it and frees the place; the rate limits above stay | `tests/domain/test_services_confirmation.py::test_an_unconfirmed_booking_holds_its_place`, `test_a_confirmation_after_the_deadline_lapses_the_booking`, `tests/jobs/test_runner.py::test_an_unconfirmed_booking_lapses_at_its_deadline` |
+| Spoofing | Someone books with another person's address, or a mail scanner "confirms" it by opening the link (ADR 0056 §8) | The token reaches only the mailbox: after booking the browser is sent to "check your email" without it; `GET /b/{token}/confirm` shows a page, only its same-origin POST confirms; the first mail carries no name, join link or calendar file | `tests/api/test_booking_pages.py::test_full_booking_flow`, `test_opening_the_confirm_link_never_confirms`, `test_confirming_needs_a_same_origin_post`, `tests/jobs/test_messages.py::test_a_request_to_confirm_links_the_confirm_page_and_names_nobody` |
 | Information disclosure | Leaked management link shows personal data | The management page shows date, team and status only, never name, email or phone; old links of moved bookings show only "cancelled" | `test_full_booking_flow`, `test_reschedule_flow` |
 | Spoofing | Token guessing at `/b/{token}` | 256-bit tokens (HMAC, ADR 0011); lookup by SHA-256, constant-time compare; same 404 for every unknown token; rate-limited; each unknown link is a security event with the caller's pseudonym (ADR 0053) | `test_unknown_token_is_a_404_page`, `tests/domain/test_tokens.py`, `tests/api/test_security_events.py::test_an_unknown_management_link_is_a_security_event` |
 | Tampering | Changing a booking after the WxCC task is dispatched | Read-only from the change deadline; cancel/reschedule pages redirect, POSTs return 409 | `test_booking_is_read_only_from_the_dispatch_moment` |

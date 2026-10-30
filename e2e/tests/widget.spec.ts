@@ -61,8 +61,9 @@ test('book through the widget with the keyboard only', async ({ page }, info) =>
   await tabTo(page, widget.getByRole('button', { name: 'Afspraak maken' }));
   await page.keyboard.press('Enter');
 
-  await expect(widget.getByRole('heading', { level: 2, name: 'Uw afspraak is gemaakt' })).toBeFocused();
-  await expect(widget.getByRole('status')).toContainText('bevestiging per e-mail');
+  // ADR 0056: the appointment awaits confirmation by the link in the email.
+  await expect(widget.getByRole('heading', { level: 2, name: 'Bevestig uw afspraak' })).toBeFocused();
+  await expect(widget.getByRole('status')).toContainText('Bevestig hem met de link in de e-mail');
   await expectNoAxeViolations(page);
   // No CSP violations or script errors on the strict host page; the refused email above is
   // an expected 422, which browsers log as a failed resource.

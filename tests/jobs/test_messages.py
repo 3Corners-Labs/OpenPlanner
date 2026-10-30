@@ -446,3 +446,50 @@ def test_team_cancel_withdraws_the_same_event_without_the_name(
     assert "METHOD:CANCEL" in cancel.attachments[0].data.decode()
     assert "Ada" not in cancel.text
     assert "OP-000042" in cancel.text
+
+
+PENDING = replace(
+    BOOKING,
+    status=BookingStatus.PENDING_CONFIRMATION,
+    confirm_by=NOW + timedelta(hours=24),
+    group_id=1,
+)
+
+
+@pytest.mark.parametrize("job_type", [JobType.SEND_CONFIRM_REQUEST, JobType.SEND_CONFIRM_REMINDER])
+def test_a_request_to_confirm_links_the_confirm_page_and_names_nobody(
+    composer: MessageComposer, job_type: JobType
+) -> None:
+    message = composer.compose(
+        job_type, PENDING, replace(GROUP, video_host_email="host@example.nl"), NOW
+    )
+    confirm = f"https://afspraak.example.nl/b/{derive_token(TEST_TOKEN_KEY, SALT)}/confirm"
+
+    # ADR 0056 §7: the address is not verified yet, so no name, join link or calendar file.
+    assert "Ada" not in message.text
+    assert "Goedendag," in message.text
+    assert confirm in message.text
+    assert f'href="{confirm}"' in (message.html or "")
+    assert "/join" not in message.text
+    assert message.attachments == ()
+    assert "uiterlijk vrijdag 2 januari 2026, 09:00" in message.text
+
+
+def test_the_request_to_confirm_in_english(composer: MessageComposer) -> None:
+    message = composer.compose(
+        JobType.SEND_CONFIRM_REQUEST, replace(PENDING, locale="en"), GROUP, NOW
+    )
+
+    assert message.subject == "Confirm your appointment with Aangifte <Inkomstenbelasting>"
+    assert "Hello," in message.text
+
+
+def test_a_lapsed_booking_links_the_group_page_to_book_again(composer: MessageComposer) -> None:
+    lapsed = PENDING.expire(NOW + timedelta(hours=24))
+
+    message = composer.compose(JobType.SEND_UNCONFIRMED_LAPSED, lapsed, GROUP, NOW)
+
+    assert "/b/" not in message.text
+    assert f"https://afspraak.example.nl/g/{GROUP.slug}" in message.text
+    assert "vervallen" in message.subject
+    assert message.attachments == ()

@@ -11,7 +11,7 @@ from app.domain.job_plan import PURGE_AFTER, JobType, PlannedJob, is_stale
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.domain import ADA, NOW, SLOT_0900, SLOT_0930, book
+from tests.support.domain import ADA, NOW, SLOT_0900, SLOT_0930, book, book_confirmed
 
 REASON = ChangeReason.STAFFING
 
@@ -64,8 +64,8 @@ async def test_a_request_to_rebook_frees_the_place_and_plans_its_messages(
 async def test_without_a_phone_number_the_request_goes_by_email_only(
     uow: InMemoryUnitOfWork, bookings: BookingService
 ) -> None:
-    receipt = await bookings.book(
-        group_slug="demo", start=SLOT_0900, contact=replace(ADA, phone=None), locale="nl"
+    receipt = await book_confirmed(
+        bookings, group_slug="demo", start=SLOT_0900, contact=replace(ADA, phone=None), locale="nl"
     )
     await _request(uow, receipt.booking.id or 0)
 

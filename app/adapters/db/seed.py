@@ -52,6 +52,10 @@ DEMO_CALENDAR_SLUG = "nationaal"
 DEMO_WIDGET_HOST = "http://localhost:8001"
 CLOSED_GROUP_SLUG = "demo-gesloten"
 PLANNED_GROUP_SLUG = "demo-gepland"
+PENDING_TIMES = (time(11), time(11, 30))
+"""Local times of the two example bookings awaiting confirmation, one per slot."""
+FIRST_WEEKEND_DAY = 5
+"""``date.weekday()`` of Saturday: the demo team works on weekdays only."""
 EXAMPLE_NOTICES = {
     "nl": "Door een storing in ons systeem kunnen wij u nu niet te woord staan.\n"
     "Wij werken aan een oplossing.",
@@ -92,11 +96,16 @@ class ClosureExamples:
         closed_group: The group page of a team that is closed now.
         planned_closure: The closure page of a team whose closure is still to come.
         suspended_booking: The management page of a booking on hold (a new link each run).
+        pending_confirm: The confirm page of a demo booking that awaits confirmation
+            (ADR 0056), for the page checks; never confirmed by them.
+        pending_flow: Another such confirm page, which the keyboard flow confirms.
     """
 
     closed_group: str
     planned_closure: str
     suspended_booking: str
+    pending_confirm: str
+    pending_flow: str
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -154,10 +163,14 @@ async def seed_closure_examples(
             await tx.add_closure(_example_closure(group, start, start + timedelta(days=2), now))
         (closure,) = await tx.get_closures(closed_group.id, now)
         token = await _suspended_booking(tx, closed_group, closure, now, token_key)
+        demo = await _group(tx, DEMO_SLUG)
+        pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
     return ClosureExamples(
         closed_group=f"/g/{CLOSED_GROUP_SLUG}",
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
         suspended_booking=f"/b/{token}",
+        pending_confirm=f"/b/{pending[0]}/confirm",
+        pending_flow=f"/b/{pending[1]}/confirm",
     )
 
 
@@ -230,6 +243,44 @@ async def _suspended_booking(
         )
     )
     await tx.save_booking(booking.suspend(closure.id))
+    return token
+
+
+async def _pending_booking(
+    tx: Transaction, group: Group, now: datetime, token_key: bytes, at: time
+) -> str:
+    """Store a demo booking that awaits confirmation (ADR 0056) and return its token.
+
+    It lies on the next weekday at ``at`` and has a day to be confirmed.
+    """
+    days = 1
+    while (now + timedelta(days=days)).astimezone(group.tz).weekday() >= FIRST_WEEKEND_DAY:
+        days += 1
+    start = _local(group, now, days, at)
+    end = start + timedelta(minutes=group.slot_minutes)
+    slot = await tx.get_slot(group.id, start) or await tx.add_slot(
+        Slot(None, group.id, start, end, DEMO_CAPACITY)
+    )
+    if slot.id is None:
+        raise ValueError("the slot must be stored")
+    salt = new_token_salt()
+    token = derive_token(token_key, salt)
+    await tx.add_booking(
+        Booking(
+            id=None,
+            group_id=group.id,
+            slot_id=slot.id,
+            start=start,
+            end=end,
+            status=BookingStatus.PENDING_CONFIRMATION,
+            contact=EXAMPLE_CITIZEN,
+            locale="nl",
+            token_hash=hash_token(token),
+            created_at=now,
+            token_salt=salt,
+            confirm_by=now + timedelta(days=1),
+        )
+    )
     return token
 
 

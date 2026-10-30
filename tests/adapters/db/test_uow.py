@@ -24,6 +24,7 @@ from tests.support.domain import (
     TEST_TOKEN_KEY,
     TUESDAY_0900,
     book,
+    book_pending,
 )
 
 
@@ -247,3 +248,21 @@ async def test_salt_is_stored_and_purge_clears_personal_data(
         ).one()
     assert row[:5] == (None, None, None, None, None)
     assert row[5] == NOW
+
+
+async def test_the_confirmation_moments_round_trip(
+    engine: AsyncEngine, service: BookingService
+) -> None:
+    await seed_group(engine)
+
+    receipt = await book_pending(service)
+    pending = (await service.find(receipt.management_token)).booking
+    confirmed = await service.confirm(receipt.management_token)
+    found = (await service.find(receipt.management_token)).booking
+
+    assert pending.status is BookingStatus.PENDING_CONFIRMATION
+    assert pending.confirm_by == receipt.booking.confirm_by
+    assert pending.confirm_by is not None
+    assert pending.confirm_by.tzinfo is UTC
+    assert (found.status, found.confirmed_at) == (BookingStatus.CONFIRMED, NOW)
+    assert found == confirmed
