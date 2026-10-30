@@ -128,6 +128,18 @@ ENVIRONMENT_LABELS = {
 """Bar label per non-production ``ENVIRONMENT``; production shows no bar."""
 
 
+def product_footer_of(request: Request) -> bool:
+    """Whether the page shows "Appointments via OpenPlanner" (ADR 0060 §6, class D).
+
+    The organisation the request follows decides (``app.web.organisation_settings``); a
+    request that follows none shows the platform's value.
+    """
+    current = getattr(request.state, "organisation_settings", None) or getattr(
+        request.app.state, "settings", None
+    )
+    return bool(getattr(current, "product_footer", True))
+
+
 def environment_of(request: Request) -> EnvironmentNotice | None:
     """Return the environment bar for this installation, or ``None`` in production."""
     settings = getattr(request.app.state, "settings", None)
@@ -148,8 +160,9 @@ def render(
 ) -> HTMLResponse:
     """Render template ``name`` in the request's locale.
 
-    The template receives ``_`` (bound gettext), ``locale`` and ``languages`` in addition
-    to ``context``. ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``).
+    The template receives ``_`` (bound gettext), ``locale``, ``languages``, ``environment``
+    and ``product_footer`` in addition to ``context``. ``scripts=True`` allows the page's own
+    scripts (``SCRIPT_CSP``).
     """
     response = templates.TemplateResponse(
         request,
@@ -160,6 +173,7 @@ def render(
             "locale": locale.code,
             "languages": language_options(request, locale),
             "environment": environment_of(request),
+            "product_footer": product_footer_of(request),
         },
     )
     response.headers["content-security-policy"] = SCRIPT_CSP if scripts else HTML_CSP

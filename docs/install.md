@@ -142,6 +142,7 @@ Webex Contact Center*.
 | `--mode production\|test\|lab` | required on the first run; remembered afterwards |
 | `--version X.Y.Z` | pin this release (pulled, signature verified); without it a pinned release stays, and a first run takes the latest |
 | `--repository owner/name` | another repository's releases (default `3Corners-Labs/OpenPlanner`, or `UPDATE_REPOSITORY` from `.env`) |
+| `--channel release\|rc` | follow releases only, or release candidates too (ADR 0059); remembered in `.env`; `rc` refused in production |
 | `--non-interactive` | never ask; take answers from the environment (also when there is no terminal) |
 | `--acme-staging` | production: the first `proxy.env` points at Let's Encrypt's staging CA |
 | `--upgrade-docker` | also upgrade Docker Engine (restarts every container on the host) |
@@ -163,6 +164,27 @@ Webex Contact Center*.
 | an HTTPS proxy running outside production (restarts for ever without `proxy.env`) | removes it |
 | `PUBLIC_BASE_URL` or the OIDC URL on `http` in production, a missing OIDC client secret, `ENVIRONMENT` not matching the mode | stops with the list; nothing is pulled or started |
 | a release that does not pass `cosign verify` | stops; the running version stays |
+
+## Update channel (ADR 0059)
+
+Every merge to `main` becomes a signed release candidate `vX.Y.Z-rc.N` (runbook, *Release
+candidates*). An installation follows one of two channels, remembered in `.env` as
+`UPDATE_CHANNEL`:
+
+| Channel | Offers | Allowed in | Updater trusts images signed on |
+|---|---|---|---|
+| `release` (default) | releases `vX.Y.Z` | every mode | release tags |
+| `rc` | the newest of releases and release candidates | `test` and `lab`; refused in `production` | release tags and `main` |
+
+```sh
+./scripts/install.sh --channel rc          # or --channel release to go back
+```
+
+With `UPDATE_AUTO_APPLY=true` in `.env` (test and lab only) the worker requests a newer
+version itself as soon as its hourly check finds one; the host updater then carries it out
+with the usual backup and rollback, and the updates page and audit log show the request as
+actor `system`. docker01 runs `rc` with auto-apply, so every merge is live there within the
+hour.
 
 ## Upgrading
 

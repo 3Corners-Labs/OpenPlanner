@@ -94,7 +94,7 @@ channel: the candidate is live within the hour, or within a minute after "Update
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1 | `main.yml`: candidate version, image, tag, pre-release; publish without waiting for mutation; `release_plan --candidate`; runbook | #131 | in PR |
+| 1 | `main.yml`: candidate version, image, tag, pre-release; publish without waiting for mutation; `release_plan --candidate`; runbook | #131 | merged 2026-10-30 |
 | 2 | `Version` with `rc`, channel `rc` in the release adapter, `UPDATE_CHANNEL` and `UPDATE_AUTO_APPLY`, auto request in the worker, updater and installer `--channel`, `/admin/updates` shows the channel | #132 | in PR |
 | 3 | docker01 on `rc` with auto-apply; first candidate seen live | | planned |
 
