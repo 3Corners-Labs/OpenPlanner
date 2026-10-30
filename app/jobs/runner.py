@@ -40,7 +40,7 @@ from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_context import current, trace_scope
 from app.domain.integration import IntegrationService
-from app.domain.job_plan import JobType, is_stale
+from app.domain.job_plan import TEAM_INVITES, JobType, is_stale
 from app.domain.ports import (
     Clock,
     ContactCenterDispatcher,
@@ -51,6 +51,7 @@ from app.domain.ports import (
 )
 from app.domain.system_log import EventRetention, SystemLog
 from app.domain.tunable import value_of
+from app.i18n import DEFAULT_LOCALE
 from app.i18n.dates import clock_scope, use_clock
 from app.jobs.calls import CALL_JOBS, STALE, CallJobs
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
@@ -94,6 +95,9 @@ class JobQueue(Protocol):
 
 NO_RECIPIENT = "no_recipient"
 """Skip reason: the booking, its group, its contact details or (for SMS) its phone is gone."""
+
+NO_TEAM_INVITE = "no_team_invite"
+"""Skip reason: the group no longer has an own queue with an invite address (ADR 0043)."""
 
 MESSAGE_CHANNELS = frozenset({ChannelKind.EMAIL, ChannelKind.SMS})
 """Channels whose message jobs are claimed when a sender directory is available."""
@@ -143,7 +147,7 @@ class JobRunner:
         self._composer = composer
         self._types: set[JobType] = {JobType.PURGE_PII, JobType.LAPSE_REBOOK}
         if senders is not None:
-            self._types |= set(MESSAGE_KINDS)
+            self._types |= set(MESSAGE_KINDS) | TEAM_INVITES
         self._calls = (
             CallJobs(uow, CallService(uow, integration, video, dispatcher, agent_start_label))
             if integration is not None
@@ -232,6 +236,11 @@ class JobRunner:
                 else None
             )
             texts = await tx.get_group_texts(group.id) if group else {}
+            organisation = (
+                await tx.get_organisation_by_id(group.organisation_id)
+                if group and job.type in TEAM_INVITES
+                else None
+            )
         contact = booking.contact if booking else None
         if (
             booking is None
@@ -244,6 +253,9 @@ class JobRunner:
         if is_stale(job.pinned_start, booking, job.type):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
+        if job.type in TEAM_INVITES and not group.sends_team_invite:
+            log.info("job.skipped", job_id=job.id, reason=NO_TEAM_INVITE)
+            return NO_TEAM_INVITE
         if self._senders is None:  # pragma: no cover - message jobs are not claimed then
             raise RuntimeError("no sender directory")
         sender = await self._senders.sender(group.organisation_id, channel)
@@ -252,9 +264,13 @@ class JobRunner:
         with clock_scope():
             if self._clock_style is not None:
                 use_clock(self._clock_style(group.organisation_id))
-            message = self._composer.compose(
-                job.type, booking, group, now, channel=channel, texts=texts, closure=closure
-            )
+            if job.type in TEAM_INVITES:
+                locale = organisation.default_locale if organisation else DEFAULT_LOCALE
+                message = self._composer.compose_team_invite(job.type, booking, group, now, locale)
+            else:
+                message = self._composer.compose(
+                    job.type, booking, group, now, channel=channel, texts=texts, closure=closure
+                )
         await sender.send(message)
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)
         return None

@@ -475,3 +475,21 @@ async def test_get_group(service: BookingService) -> None:
 def test_token_key_must_be_long_enough(uow: InMemoryUnitOfWork) -> None:
     with pytest.raises(ValueError, match="32 bytes"):
         BookingService(uow, FixedClock(NOW), b"short")
+
+
+async def test_own_queue_team_gets_an_invite_and_its_withdrawal(uow: InMemoryUnitOfWork) -> None:
+    uow.state.groups[1] = make_group(
+        id=1,
+        slug="aangifte",
+        dispatch_kind=DispatchKind.OPENPLANNER_QUEUE,
+        calendar_invite_address="team-aangifte@example.org",
+    )
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    receipt = await book(service)
+    booking_id = receipt.booking.id or 0
+    planned = [j.type for j in uow.state.jobs[booking_id]]
+
+    await service.cancel(receipt.management_token)
+
+    assert JobType.SEND_TEAM_INVITE in planned
+    assert JobType.SEND_TEAM_CANCEL in [j.type for j in uow.state.jobs[booking_id]]
