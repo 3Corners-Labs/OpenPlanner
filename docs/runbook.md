@@ -724,7 +724,7 @@ tag); everything after the tag is automatic and visible in the Actions tab.
 | Event | What runs | Result | Offered to installations? |
 |---|---|---|---|
 | PR | `ci.yml` | checks only | no |
-| Merge to `main` | `main.yml`: ZAP, mutation, build, sign | image `:main` and `:sha-<commit>`, with `APP_COMMIT`, no version | no |
+| Merge to `main` | `main.yml`: ZAP, then build, sign, tag `vX.Y.Z-rc.N`, pre-release (ADR 0059); mutation runs alongside | image `:X.Y.Z-rc.N`, `:main` and `:sha-<commit>`, with `APP_VERSION=X.Y.Z-rc.N` and `APP_COMMIT`; pre-release page with SBOM | only on the `rc` channel (below) |
 | Tag `vX.Y.Z` pushed | `main.yml`: tag check, ZAP, mutation, build, sign, SBOM, GitHub release | image `:X.Y.Z` with `APP_VERSION` and `APP_COMMIT`; release page with SBOM | yes, within an hour |
 
 ### Step 1: decide the number
@@ -779,6 +779,17 @@ the image is signed, and a hand-made release would make that step fail.
 - Has a given fix landed? In a checkout: `git tag --contains <fix commit>` lists every release
   that holds it. If the running version is not in that list, the fix is not live.
 
+### When the host says the signature is invalid
+
+The updater verifies with the host's `cosign`. A newer cosign in CI can write a signature
+format an older host cannot read (cosign 3 writes OCI bundles; cosign 2 then reports
+`no signatures found` and the portal says *signature invalid; nothing changed*). The image is
+fine. Bring the host's tools up to date first, then update again: on the host
+`git fetch --tags && git checkout vX.Y.Z && ./scripts/install.sh` (it upgrades cosign and the
+updater, and keeps the pinned release), then "Update now" in the portal. In general: when a
+release changes the host side (installer, updater, compose file, cosign), the installer runs
+before the portal update, not after it.
+
 ### When the tag was wrong
 
 If the tag check failed, nothing was published. Remove the tag and set it on the right commit:
@@ -789,6 +800,26 @@ git push --delete origin v0.3.0 && git tag -d v0.3.0
 
 Once a release has been published, never move or reuse its tag: installations may already run
 it. Fix forward with the next number.
+
+### Release candidates (ADR 0059)
+
+Every merge to `main` is also a **release candidate** `vX.Y.Z-rc.N`: `X.Y.Z` is the number
+`make release-plan` would give (or `pyproject.toml`'s, once the release PR is merged) and `N`
+counts the candidates of that version. CI tags it, publishes the signed image `:X.Y.Z-rc.N`
+and a GitHub *pre-release* with the SBOM, about three minutes after the merge (it waits for the
+ZAP baseline only; the mutation test runs alongside and still fails the run). Nobody tags a
+candidate by hand: the tag check refuses an `-rc.` tag.
+
+Installations on the `rc` channel (`UPDATE_CHANNEL=rc` in `.env`, written by
+`scripts/install.sh --channel rc`; refused in mode `production`) are offered candidates and
+releases alike, and move to the release when it comes. With `UPDATE_AUTO_APPLY=true` the
+worker requests the update itself, so a lab host such as docker01 runs every merge within the
+hour, or within a minute after "Update now". Installations on `release` (the default) never see
+a candidate. The candidates of a released version may be deleted afterwards:
+
+```sh
+git tag --list 'v0.4.0-rc.*' | xargs -n1 -I{} sh -c 'gh release delete {} --yes --cleanup-tag'
+```
 
 ### Security fixes
 

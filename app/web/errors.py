@@ -64,19 +64,26 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.SETTING_INVALID: "admin.form.error.setting_invalid",
     ErrorCode.SETTING_COMBINATION: "admin.form.error.setting_combination",
     ErrorCode.SETTING_EXPIRY: "admin.form.error.setting_expiry",
+    ErrorCode.INVALID_FORM_FIELD: "admin.form.error.invalid_form_field",
+    ErrorCode.FORM_FIELD_FORBIDDEN: "admin.form.error.form_field_forbidden",
+    ErrorCode.INVALID_ANSWER: "error.invalid_answer",
     ErrorCode.SETTING_NO_KEY: "admin.form.error.setting_no_key",
     ErrorCode.SETTING_NOT_LOCKED: "admin.form.error.setting_not_locked",
     ErrorCode.LOGIN_LOCKOUT: "admin.form.error.login_lockout",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {
-    "name": "error.field.name",
+    "first_name": "error.field.first_name",
+    "last_name": "error.field.last_name",
     "email": "error.field.email",
     "phone": "error.field.phone",
 }
 
 HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.INVALID_CONTACT: 422,
+    ErrorCode.INVALID_ANSWER: 422,
+    ErrorCode.INVALID_FORM_FIELD: 422,
+    ErrorCode.FORM_FIELD_FORBIDDEN: 422,
     ErrorCode.INVALID_RANGE: 400,
     ErrorCode.GROUP_NOT_FOUND: 404,
     ErrorCode.BOOKING_NOT_FOUND: 404,

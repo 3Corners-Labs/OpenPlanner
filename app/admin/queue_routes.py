@@ -184,7 +184,7 @@ async def claimed(
 ) -> Response:
     """Show a booking the agent claimed, with the link to join its meeting."""
     try:
-        booking = await _service(request).claimed(context.principal, slug, booking_id)
+        booking = await _service(request).claimed(context.principal, slug, booking_id, locale.code)
     except DomainError as error:
         raise_refusal(error)
         if error.code not in SHOWN_ON_THE_LIST:

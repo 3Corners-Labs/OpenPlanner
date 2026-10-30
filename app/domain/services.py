@@ -17,6 +17,7 @@ or booked (``group_closed``), and no direct call starts while one is active. A d
 also needs room under the group's cap of open direct calls (``direct_call_full``, ADR 0026).
 """
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
@@ -29,7 +30,14 @@ from app.domain.availability import (
     utc_bounds,
     validate_range,
 )
-from app.domain.booking import Booking, BookingKind, BookingStatus, Contact, Slot
+from app.domain.booking import (
+    DEFAULT_PHONE_REGION,
+    Booking,
+    BookingKind,
+    BookingStatus,
+    Contact,
+    Slot,
+)
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure, covering
 from app.domain.direct_queue import (
@@ -41,6 +49,7 @@ from app.domain.direct_queue import (
     queue_info,
 )
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.form_fields import FormDefinition, Purpose, validate_answers
 from app.domain.holiday_service import effective_schedule
 from app.domain.images import ImageFile
 from app.domain.job_plan import (
@@ -62,11 +71,17 @@ from app.domain.tokens import (
 
 @dataclass(frozen=True)
 class ContactInput:
-    """Raw contact fields from the booking form, validated by ``Contact.create``."""
+    """Raw contact fields from the booking form, validated by ``Contact.create``.
 
-    name: str = field(repr=False)
+    ``answers`` maps the keys of the group's custom form fields to the submitted strings
+    (ADR 0055); they are validated by ``validate_answers``.
+    """
+
+    first_name: str = field(repr=False)
+    last_name: str = field(repr=False)
     email: str = field(repr=False)
     phone: str | None = field(default=None, repr=False)
+    answers: Mapping[str, str | None] = field(default_factory=dict, repr=False)
 
 
 @dataclass(frozen=True)
@@ -103,13 +118,27 @@ class BookingService:
         ValueError: If ``token_key`` is shorter than 32 bytes.
     """
 
-    def __init__(self, uow: UnitOfWork, clock: Clock, token_key: bytes) -> None:
-        """Store the collaborators."""
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        token_key: bytes,
+        phone_region: Callable[[int], str] = lambda _organisation_id: DEFAULT_PHONE_REGION,
+    ) -> None:
+        """Store the collaborators.
+
+        Args:
+            uow: The unit of work.
+            clock: The clock.
+            token_key: Key for management tokens (ADR 0011).
+            phone_region: The organisation's default phone region (class D, ADR 0055).
+        """
         if len(token_key) < MIN_KEY_BYTES:
             raise ValueError(f"the token key must be at least {MIN_KEY_BYTES} bytes")
         self._uow = uow
         self._clock = clock
         self._token_key = token_key
+        self._phone_region = phone_region
 
     async def get_group(self, group_slug: str) -> Group:
         """Return the group behind a booking page.
@@ -184,12 +213,7 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
-            details = Contact.create(
-                name=contact.name,
-                email=contact.email,
-                phone=contact.phone,
-                phone_mode=group.phone_mode,
-            )
+            details = await self._contact(tx, group, contact)
             return await self._place(tx, group, start, details, locale, consents, None)
 
     async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
@@ -231,12 +255,7 @@ class BookingService:
                 raise DomainError(ErrorCode.DIRECT_CALL_UNAVAILABLE)
             if not await self._direct_room(tx, group, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_FULL)
-            details = Contact.create(
-                name=contact.name,
-                email=contact.email,
-                phone=contact.phone,
-                phone_mode=group.phone_mode,
-            )
+            details = await self._contact(tx, group, contact)
             end = now + timedelta(minutes=group.slot_minutes)
             slot = await tx.add_slot(Slot(None, group.id, now, end, 1, BookingKind.DIRECT))
             salt = new_token_salt()
@@ -361,6 +380,34 @@ class BookingService:
         if group.direct_call_max_concurrent is None:
             return True
         return has_room(group, await tx.get_direct_calls(group.id, load_since(group, now)), now)
+
+    async def get_form(self, group: Group) -> FormDefinition:
+        """Return the custom fields of ``group``'s booking form (ADR 0055)."""
+        async with self._uow.read() as tx:
+            return await tx.get_form(group.id)
+
+    async def _contact(self, tx: Transaction, group: Group, contact: ContactInput) -> Contact:
+        """Validate the contact details and the answers to the group's custom fields.
+
+        Raises:
+            DomainError: ``invalid_contact`` or ``invalid_answer`` naming the field.
+        """
+        region = self._phone_region(group.organisation_id)
+        answers = validate_answers(
+            await tx.get_form(group.id),
+            contact.answers,
+            today=self._clock.now().astimezone(group.tz).date(),
+            region=region,
+        )
+        return Contact.create(
+            first_name=contact.first_name,
+            last_name=contact.last_name,
+            email=contact.email,
+            phone=contact.phone,
+            phone_mode=group.phone_mode,
+            region=region,
+            answers=answers if answers.visible(Purpose.PLANNER_VIEW) else None,
+        )
 
     async def _group(self, tx: Transaction, slug: str) -> Group:
         """Return the group or raise ``group_not_found``."""

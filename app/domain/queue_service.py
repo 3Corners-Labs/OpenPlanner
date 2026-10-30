@@ -23,6 +23,13 @@ from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Permission, Principal, Target, decide, scope_for
 from app.domain.booking import Booking, Claim
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.form_fields import (
+    FALLBACK_LOCALE,
+    FormDefinition,
+    LabelledAnswer,
+    Purpose,
+    labelled_answers,
+)
 from app.domain.own_queue import QueueEntry, next_up, not_claimed_in_time, visible
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, GroupSummary
@@ -80,6 +87,8 @@ class ClaimedBooking:
     start: datetime
     first_name: str = field(repr=False)
     join_url: str | None = field(repr=False)
+    answers: tuple[LabelledAnswer, ...] = field(default=(), repr=False)
+    """Answers to the group's custom fields an agent may see: never PII (ADR 0055)."""
 
 
 class QueueService:
@@ -153,8 +162,12 @@ class QueueService:
                 raise DomainError(ErrorCode.ALREADY_CLAIMED)
             return await self._claim(tx, principal, summary, booking, self._clock.now())
 
-    async def claimed(self, principal: Principal, slug: str, booking_id: int) -> ClaimedBooking:
+    async def claimed(
+        self, principal: Principal, slug: str, booking_id: int, locale: str = FALLBACK_LOCALE
+    ) -> ClaimedBooking:
         """Return a booking ``principal`` claimed, with its meeting link.
+
+        The answers an agent may see (never PII) come with the labels in ``locale``.
 
         Raises:
             DomainError: ``not_claimed`` unless ``principal`` holds the claim, or as ``claim``.
@@ -162,9 +175,10 @@ class QueueService:
         group = (await self._group(principal, slug)).group
         async with self._uow.read() as tx:
             booking = await _booking_of(tx, group, booking_id)
+            form = await tx.get_form(group.id)
         if not self._holds(principal, booking):
             raise DomainError(ErrorCode.NOT_CLAIMED)
-        return _claimed(booking)
+        return _claimed(booking, form, locale)
 
     async def release(self, principal: Principal, slug: str, booking_id: int) -> None:
         """Put a claimed booking back at the top of the queue.
@@ -280,14 +294,23 @@ def _row(entry: QueueEntry, me: str, overdue: bool) -> QueueRow:
     )
 
 
-def _claimed(booking: Booking) -> ClaimedBooking:
-    """Return what the claiming agent sees of ``booking``."""
+def _claimed(
+    booking: Booking, form: FormDefinition | None = None, locale: str = FALLBACK_LOCALE
+) -> ClaimedBooking:
+    """Return what the claiming agent sees of ``booking``: first name and non-PII answers."""
+    contact = booking.contact
     return ClaimedBooking(
         booking_id=_id(booking),
         reference=booking.reference,
         start=booking.start,
-        first_name=booking.contact.first_name if booking.contact else "",
+        first_name=contact.first_name if contact else "",
         join_url=booking.meeting.link if booking.meeting else None,
+        answers=labelled_answers(
+            contact.answers if contact else None,
+            form or FormDefinition(1),
+            Purpose.AGENT_VIEW,
+            locale,
+        ),
     )
 
 

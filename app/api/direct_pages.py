@@ -21,7 +21,12 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.api.citizen import citizen_page
-from app.api.contact_form import HONEYPOT_FIELD, contact_fields, read_contact
+from app.api.contact_form import (
+    HONEYPOT_FIELD,
+    contact_input,
+    load_contact_form,
+    read_contact,
+)
 from app.api.trace import bind_group_from_path
 from app.domain.booking import BookingKind
 from app.domain.call_service import CallService
@@ -31,8 +36,8 @@ from app.domain.errors import DomainError
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, IntegrationError
 from app.domain.scheduling import Group
-from app.domain.services import BookingService, ContactInput
-from app.web.errors import FormError, form_errors, status_for
+from app.domain.services import BookingService
+from app.web.errors import status_for
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.organisation_settings import follow, follow_group_from_path
 from app.web.protection import booking_limit, limiter, read_limit, require_same_origin
@@ -59,21 +64,24 @@ async def _form_page(
     group: Group,
     *,
     availability: DirectAvailability,
-    errors: list[FormError] | None = None,
+    error: DomainError | None = None,
     values: dict[str, str] | None = None,
-    status: int = 200,
 ) -> HTMLResponse:
     """Render the direct-call form with the queue, or the page saying it is not possible now."""
-    errors = errors or []
+    service = _bookings(request)
+    clock: Clock = request.app.state.clock
+    contact = await load_contact_form(service, group, clock.now())
+    errors = contact.errors(error, locale) if error else []
     available = availability is DirectAvailability.AVAILABLE
     context: dict[str, object] = {
         "group": group,
         "availability": availability.value,
-        "queue": await _bookings(request).direct_queue(group) if available else None,
-        "fields": contact_fields(group, locale, errors, values or {}),
+        "queue": await service.direct_queue(group) if available else None,
+        "fields": contact.fields(locale, errors, values or {}),
         "errors": errors,
         "honeypot": HONEYPOT_FIELD,
     }
+    status = status_for(error) if error else 200
     return await citizen_page(request, locale, "direct.html", group, context, status)
 
 
@@ -98,7 +106,7 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
     try:
         receipt = await service.start_direct(
             group_slug=slug,
-            contact=ContactInput(values["name"], values["email"], values["phone"] or None),
+            contact=contact_input(values),
             locale=locale.code,
         )
     except DomainError as error:
@@ -107,9 +115,8 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
             locale,
             group,
             availability=await service.direct_call_availability(slug),
-            errors=form_errors(error, locale.gettext),
+            error=error,
             values=values,
-            status=status_for(error),
         )
     calls: CallService = request.app.state.call_service
     try:
