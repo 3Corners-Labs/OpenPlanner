@@ -491,6 +491,7 @@ class BookingRow(Base):
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),
         Index("ix_bookings_video_room_id", "video_room_id"),
+        Index("ix_bookings_trial_room_id", "trial_room_id"),
         Index("ix_bookings_wxcc_task_id", "wxcc_task_id"),
         CheckConstraint(
             "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended', "
