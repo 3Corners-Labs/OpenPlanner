@@ -2,8 +2,8 @@
 
 Status: accepted (2026-10-30), requested by the product owner after the question whether a
 guest can be given the browser option only. Extends ADR 0017 (video through the Webex Meetings
-API) and ADR 0071 (trial call); settings per ADR 0042. Step 1 built on a branch, steps 2 and 3
-not: see *Build status*.
+API) and ADR 0071 (trial call); settings per ADR 0042. Steps 1 and 2 built on a branch,
+step 3 not: see *Build status*.
 
 ## Context
 
@@ -78,17 +78,23 @@ that happens.
    probe meeting's short link with the parameter, anonymously and without following further
    than the first redirect, and reports `webex.browser_link_ok` when the `302` keeps
    `launchApp=true`, else the warning `webex.browser_link_lost` ("Webex no longer carries the
-   browser option through; citizens get the choice page"). No name or e-mail is sent; the
-   request is logged like every probe request (ADR 0068).
+   browser option through; citizens get the choice page"). When Webex cannot be reached for the
+   visit it is the warning `webex.browser_link_unreachable`, so a network error is not taken
+   for a lost parameter. The visit happens before the probe is deleted, uses no credentials,
+   follows no redirect and is reported to the request log like every probe request (ADR 0068),
+   with its path and without its query. No name or e-mail is sent. It was tried against the
+   test site with the check's own client: with the parameter Webex answered `302` and kept it,
+   without it Webex answered `302` without it.
 5. **The group check verifies the trial call's options** (finding 5). After creating the
-   trial probe it compares the response with `TRIAL_OPTIONS`; when the site stored something
-   else it reports the warning `webex.trial_lobby` naming the values ("the site does not allow
-   entry before the host: the citizen waits in the lobby and nobody comes; enable *join before
-   host* and *guests may join unlocked meetings* for this site in Control Hub"). The automatic
-   check per group (ADR 0065 step 2) raises the same system event. Until the site allows it,
-   the trial page tells the citizen nothing new; the warning is for the administrator. The
-   trial probe's cleanup also tolerates `403 Meeting is in progress` as a warning naming the
-   meeting, as `webex.trial_left` does today.
+   trial probe it compares the keys of `TRIAL_OPTIONS` in Webex's answer with what was asked;
+   when the site stored something else it reports the warning `webex.trial_lobby` naming the
+   values it kept, instead of `webex.trial_ok` ("the site does not allow entry before the
+   host: the citizen waits in the lobby and nobody comes"). A key the answer leaves out is not
+   a refusal. It is a warning, not a failure, because the appointment's own meeting works; and
+   as for every warning (ADR 0065) the automatic check stores it with the group's latest
+   check but raises no system event, so the administrator sees it on the check page. The trial
+   probe's cleanup already reports a refused deletion (such as `403 Meeting is in progress`)
+   as the warning `webex.trial_left` naming the meeting; nothing more is needed there.
 6. **No page of ours imitates Webex.** The join page keeps one button; it never shows a
    fake "app or browser" choice of its own, and never embeds the Webex page.
 
@@ -107,7 +113,7 @@ probe meeting's title, lead and length stay as in the group check today.
 | Step | What | PR | State |
 |---|---|---|---|
 | 1 | `join_client` on `groups` (migration 0072, reversible), `JoinClient`, `join_link()`, both redirects, group form and manual topic, texts per client in nl and en | | built on the branch, PR pending |
-| 2 | Group check: `webex.browser_link_*` and `webex.trial_lobby`, tolerant trial cleanup, i18n of the findings | | pending |
+| 2 | Group check: `webex.browser_link_*` and `webex.trial_lobby`, i18n of the findings | | built on the branch, PR pending |
 | 3 | Confirm on docker01 with the Webex app installed on the tester's computer that `browser` opens the web app and `choice` the Webex page; record in this table | | pending |
 
 ## Consequences
