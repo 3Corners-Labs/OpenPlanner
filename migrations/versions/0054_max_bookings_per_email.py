@@ -1,4 +1,4 @@
-"""Bookings per email address: the group setting ``max_bookings_per_email`` (ADR 0059).
+"""Bookings per email address: the group setting ``max_bookings_per_email`` (ADR 0066).
 
 ``groups`` gains ``max_bookings_per_email`` (default 3, 1 to 10): how many future bookings
 that hold a place one email address may have in the group. Existing groups get the default.
