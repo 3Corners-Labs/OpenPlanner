@@ -424,7 +424,7 @@ def test_unconfirmed_bookings_are_cancelled_and_purged_on_downgrade(
 def test_the_direct_call_switch_becomes_an_offer_per_block_and_back(
     alembic_config: Config, tmp_path: Path
 ) -> None:
-    """ADR 0070: the switch becomes blocks that offer both; the downgrade restores it."""
+    """ADR 0071: the switch becomes blocks that offer both; the downgrade restores it."""
     import sqlite3
 
     command.upgrade(alembic_config, "0059")
@@ -446,7 +446,7 @@ def test_the_direct_call_switch_becomes_an_offer_per_block_and_back(
     database.commit()
     database.close()
 
-    command.upgrade(alembic_config, "0061")
+    command.upgrade(alembic_config, "0062")
     database = sqlite3.connect(tmp_path / "migrate.db")
     rules = database.execute("SELECT group_id, offer FROM schedule_rules ORDER BY group_id")
     overrides = database.execute("SELECT group_id, offer FROM schedule_overrides ORDER BY group_id")

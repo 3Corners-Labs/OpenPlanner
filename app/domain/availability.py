@@ -6,7 +6,7 @@ ambiguous local times (fall back) use their first occurrence.
 
 Touching windows with agents form one *run* (ADR 0027): the slot grid starts at the run's
 start and continues across window borders, and a slot gets the lowest agent count among the
-windows it covers. A window with 0 agents, a window that offers direct calls only (ADR 0070)
+windows it covers. A window with 0 agents, a window that offers direct calls only (ADR 0071)
 or a gap ends the run.
 
     09:00 ──── 3 ──── 10:15 ──── 2 ──── 12:00     one run

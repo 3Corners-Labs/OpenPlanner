@@ -113,7 +113,7 @@ RELEASE = Release(Version(1, 4, 0), "https://github.com/acme/openplanner/release
 DETAIL = "/admin/groups/demo/bookings/{id}"
 QUEUE_ITEM = "/admin/groups/demo/queue/{queued}"
 QUEUE_ITEM_LIVE = QUEUE_ITEM + "/live"
-"""The claimed booking's status fragment (ADR 0070): the join link travels with it."""
+"""The claimed booking's status fragment (ADR 0071): the join link travels with it."""
 FIRST_NAME_PAGES = frozenset(
     {
         "/admin/groups/demo/queue/live",
@@ -433,13 +433,13 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         if found_leaks := _leaks(response.text, _allowed(path, found)):
             leaks[path] = found_leaks
     assert leaks == {}, "personal data on a list, overview, export or alert page (ADR 0063 §2)"
-    # An image route has none to show; the certificate request download (ADR 0070) has no
+    # An image route has none to show; the certificate request download (ADR 0071) has no
     # request waiting. Both answer 404 on purpose and carry no personal data.
     no_content = ("/image", "/tls/csr.pem")
     not_reached = {p: s for p, s in statuses.items() if s >= 400 and not p.endswith(no_content)}
     assert not_reached == {}, "a swept page did not render; fix its path or the fixture"
 
-    # ADR 0070: the claimed booking's fragment once the claim is gone carries no booking data.
+    # ADR 0071: the claimed booking's fragment once the claim is gone carries no booking data.
     async with _uow(site).locked() as tx:
         await tx.release_claim(found.queued_id)
     lost = await site.client.get(found.fill(QUEUE_ITEM_LIVE))

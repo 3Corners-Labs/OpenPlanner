@@ -171,7 +171,7 @@ def group_page(
 ) -> HTMLResponse:
     """Render a group page with header, the tabs the matrix allows, and any confirmation.
 
-    ``scripts=True`` allows the page's own script (the queue's live region, ADR 0070).
+    ``scripts=True`` allows the page's own script (the queue's live region, ADR 0071).
     """
     summary = context.group
     can = can_function(context.principal)
@@ -337,7 +337,7 @@ class WindowView:
     label: str | None
     staffed: bool
     offer: str | None = None
-    """The block's offer in words when it is not the default (ADR 0070)."""
+    """The block's offer in words when it is not the default (ADR 0071)."""
 
 
 @dataclass(frozen=True)
@@ -379,7 +379,7 @@ OFFER_LABELS: dict[Offer, str] = {
     Offer.DIRECT: "admin.offer.direct",
     Offer.BOTH: "admin.offer.both",
 }
-"""Catalogue key per offer of a block (ADR 0070), for the select and the week view."""
+"""Catalogue key per offer of a block (ADR 0071), for the select and the week view."""
 
 
 def _offer_text(window: TimeWindow, _: BoundGettext) -> str | None:
@@ -487,7 +487,7 @@ async def group(
             "exceptions": _exceptions(schedule, locale),
             "preview": _preview(preview, summary, locale),
             "shortfalls": await group_shortfalls(request, locale, context),
-            # ADR 0070: direct calls are offered per block, not per group.
+            # ADR 0071: direct calls are offered per block, not per group.
             "direct_blocks": sum(1 for r in schedule.rules if r.window.offers_direct),
         },
     )
@@ -770,7 +770,7 @@ def _read_offer(form: FormData) -> str | None:
 
 
 def _offer_field(form: FormData, locale: RequestLocale) -> Field:
-    """Return the offer select of a block: slots, direct calls or both (ADR 0070)."""
+    """Return the offer select of a block: slots, direct calls or both (ADR 0071)."""
     _ = locale.gettext
     return Field(
         "offer",

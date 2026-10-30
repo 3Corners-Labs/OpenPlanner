@@ -39,7 +39,7 @@ def _meetings(
 
 
 async def test_a_direct_call_is_sent_in_whole_seconds_from_now() -> None:
-    """Webex refuses microseconds and a start over a minute ago (ADR 0070)."""
+    """Webex refuses microseconds and a start over a minute ago (ADR 0071)."""
     seen: list[dict[str, object]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
