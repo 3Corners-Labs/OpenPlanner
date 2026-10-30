@@ -189,9 +189,10 @@ or will close (no booking while closed), "first possible", the month grid and th
 times of the chosen day. Step 2, details: first and last name, email, per group phone, and the
 group's own questions (text, choice list, checkbox, date …; ADR 0055), with the same
 validation as the standalone page. Every input, select and textarea is exposed as
-`part="input"`, so your `::part(input)` rule styles them all; a checkbox sits before its label. Step 3, done: the appointment and "you will receive a
-confirmation by email". The management link (view, move, cancel) arrives by email only; it is
-never shown to or readable by your page.
+`part="input"`, so your `::part(input)` rule styles them all; a checkbox sits before its label. Step 3, done: the appointment and "confirm it
+with the link in the email we sent you" (ADR 0056: a new appointment awaits confirmation and
+lapses when it is not confirmed in time). The confirm link and the management link (view,
+move, cancel) arrive by email only; they are never shown to or readable by your page.
 
 Not in the widget: starting a call right away (O9) and the time filters. The widget links to
 the group's standalone page for those.

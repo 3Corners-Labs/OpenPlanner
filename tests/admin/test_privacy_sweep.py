@@ -40,7 +40,7 @@ from app.domain.services import BookingService, ContactInput
 from app.domain.staff import StaffFilter
 from app.domain.updates import Release, ReleaseCheck, Version
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.support.domain import NOW, TEST_TOKEN_KEY
+from tests.support.domain import NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.routes import all_routes
 
 ADMIN_TEMPLATES = Path("app/admin/templates")
@@ -319,8 +319,8 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     service = BookingService(uow, site.clock, TEST_TOKEN_KEY)
 
     async def book(number: int, start: datetime) -> int:
-        receipt = await service.book(
-            group_slug="demo", start=start, contact=citizen(number), locale="nl"
+        receipt = await book_confirmed(
+            service, group_slug="demo", start=start, contact=citizen(number), locale="nl"
         )
         return receipt.booking.id or 0
 

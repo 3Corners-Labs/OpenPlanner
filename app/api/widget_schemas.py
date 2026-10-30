@@ -190,7 +190,7 @@ class WidgetBookingRequest(BaseModel):
 
 
 class WidgetBooking(BaseModel):
-    """The booking as confirmed; the management link goes to the citizen by email only."""
+    """The booking as made; it awaits confirmation by the link in the citizen's email."""
 
     status: Literal["booked"]
     start: str
