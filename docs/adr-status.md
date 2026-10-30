@@ -68,7 +68,7 @@ package; when the two disagree, the code wins.
 | 0070 | Certificate source in the portal | BUILT | #149; migration 0061 | – |
 | 0071 | Trial call on Webex | BUILT | #154; migration 0063 | – |
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
-| 0073 | Browser-direct join link per group | PARTIAL | Step 1 (PR pending); migration 0072 | Step 2: the two checks in the group check; step 3: confirmation on docker01 |
+| 0073 | Browser-direct join link per group | PARTIAL | Steps 1 and 2 (PR pending); migration 0072 | Step 3: confirmation with the Webex app installed, on docker01 |
 
 ## Corrected on 2026-10-30
 
