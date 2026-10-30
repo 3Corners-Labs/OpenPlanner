@@ -1,9 +1,9 @@
 # 0077. Terminology: "participant", and organisation names for staff functions
 
-Status: proposed (2026-10-30), requested by the product owner. Extends ADR 0004 (texts), ADR
-0039 (roles) and ADR 0074 (organisation text overrides, PR #168). Changes no right: ADR 0014
-stays as it is. Nothing is built; the rename is part 2 and waits for the product owner's
-acceptance.
+Status: accepted (2026-10-31), not built: step 1a is in PR #172, the rest is planned. Requested
+by the product owner, who accepted it on 2026-10-31 together with the recommendations of
+Q12 and Q13. Extends ADR 0004 (texts), ADR 0039 (roles) and ADR 0074 (organisation text
+overrides, PR #168). Changes no right: ADR 0014 stays as it is.
 
 ## Context
 
@@ -215,7 +215,7 @@ labels may differ from the standard (point 9), not about policy.
 
 ## Decisions of the product owner and open questions
 
-Answered by the product owner on 2026-10-30 (the points above already follow them):
+Answered by the product owner on 2026-10-30 and 2026-10-31 (the points above already follow them):
 
 | # | Question | Decided |
 |---|---|---|
@@ -229,25 +229,18 @@ Answered by the product owner on 2026-10-30 (the points above already follow the
 | Q10 | Does the function name also appear in texts to participants? | Yes, configurable, through a replaceable tag (`{agent}`), so "een behandelaar neemt contact op" (point 9). |
 | Q11 | May a group rename the agent only, or also the group admin? | The group admin does it, for the agent term (point 13). Read this way; confirm in Q12. |
 | Q8 | Rename the column `citizen_change_lead_minutes` before go-live? | Yes, as soon as possible: the impact is already large and grows with every change (point 3a). No go-live date was given, so the step does not wait for one. |
+| Q12 | Are the readings of Q3 and Q11 right? | Yes (2026-10-31): a name per scope, never a choice among organisations; the group admin sets the group's agent term, a group does not rename its group admin role. |
+| Q13 | The standard word when nobody sets one? | nl "Medewerker", en "Agent", as today (2026-10-31). The word is only a default: an organisation or group sets its own (point 8). |
 | Q9 | Does the guard test fail CI? | No preference; the recommendation, fail, is taken (point 6). |
 
-Still open; none is guessed in the code:
-
-- **Q12.** Two readings to confirm. Q3: a name per scope (group, organisation), never a choice
-  among several organisations. Q11: "alleen de groepsbeheerder" means that the *group admin* is
-  the one who may set the group's agent term, not that a group may rename its group admin role.
-- **Q13.** What is the standard word when nobody sets one: nl "Medewerker" and en "Agent" as
-  today, or "Agent" in both? "Agent" is the internal name and avoids confusion with the
-  planner and group admin, who are also *medewerkers*; but in Dutch a participant of a
-  government client may read "een agent" as police. Recommendation: keep nl "Medewerker", en
-  "Agent". One catalogue line either way.
+Nothing is open at the time of acceptance. A new question gets a row here, not a guess in the code.
 
 ## Build status
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1a | Column `citizen_change_lead_minutes` → `participant_change_lead_minutes`, migration, audit alias (point 3a) | | planned, first in line; branch `feat/participant-change-lead` is checked, no PR yet |
-| 1b | This ADR and the `CLAUDE.md` wording (point 7) | | planned, this change is in review |
+| 1a | Column `citizen_change_lead_minutes` → `participant_change_lead_minutes`, migration, audit alias (point 3a) | #172 | in PR #172 |
+| 1b | This ADR and the `CLAUDE.md` wording (point 7) | | planned |
 | 2a | `nl.po` and `en.po` with the tests that assert their texts, `widget/`, `docs/widget.md` (keys unchanged) | | planned |
 | 2b | Admin manual `docs/manual/{nl,en}/` | | planned |
 | 2c | `docs/*.md` except HANDOVER (which gets its one line), and `CONTRIBUTING.md` | | planned |
