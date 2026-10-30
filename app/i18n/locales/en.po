@@ -3797,6 +3797,18 @@ msgstr "Not a release (development build); no updates are offered."
 msgid "admin.updates.commit"
 msgstr "Commit"
 
+msgid "admin.updates.channel"
+msgstr "Channel"
+
+msgid "admin.updates.channel.release"
+msgstr "Releases"
+
+msgid "admin.updates.channel.rc"
+msgstr "Release candidates (every merge to main) and releases"
+
+msgid "admin.updates.auto_apply"
+msgstr "updates itself"
+
 msgid "admin.updates.latest"
 msgstr "Latest version"
 

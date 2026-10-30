@@ -50,7 +50,7 @@ offline() { compose run --rm --no-deps -T web "$@"; }
 pinned() { sed -n 's/^OPENPLANNER_IMAGE=//p' "$PIN_FILE"; }
 # Everything that comes out of the container is data, never shell: it is checked against these
 # patterns before use, and the state file is read with sed, never sourced.
-VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$'
+VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(-rc\.[0-9]{1,4})?$'
 REVISION_RE='^[0-9A-Za-z_]{1,32}$'
 IMAGE_RE='^[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?(@sha256:[0-9a-f]{64})?$'
 state() { sed -n "s/^$1=//p" "$STATE_FILE"; }

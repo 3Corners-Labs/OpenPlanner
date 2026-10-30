@@ -4,6 +4,14 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ## Unreleased
 
+### Features
+
+- Update channel per installation (ADR 0059, step 2): `UPDATE_CHANNEL=rc` offers release
+  candidates `X.Y.Z-rc.N` next to releases (test and lab hosts; refused in production), and
+  `UPDATE_AUTO_APPLY=true` lets the worker request a newer version itself (actor `system`,
+  audited). `scripts/install.sh --channel rc` writes the channel and lets the updater trust
+  images signed on `main`; the updates page shows the channel.
+
 ## 0.3.0 (2026-10-29)
 
 ### Features

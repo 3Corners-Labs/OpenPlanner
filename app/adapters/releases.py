@@ -1,9 +1,11 @@
-"""``ReleaseSource`` on the GitHub releases API (ADR 0029).
+"""``ReleaseSource`` on the GitHub releases API (ADR 0029, ADR 0059).
 
-Asks for the latest published release of one repository; GitHub leaves drafts and
-pre-releases out of ``/releases/latest``. Only the tag and the release page are used: the tag
-must be a version (``v1.4.0``) and the page must be this repository's release page, else the
-release is ignored.
+On the ``release`` channel it asks for the latest published release of one repository;
+GitHub leaves drafts and pre-releases out of ``/releases/latest``. On the ``rc`` channel it
+lists the newest releases and takes the highest version among releases and pre-releases
+(drafts are never listed for a read token). Only the tag and the release page are used: the
+tag must be a version (``v1.4.0``, ``v1.4.0-rc.2``) and the page must be this repository's
+release page, else the release is ignored.
 The optional token is for a private repository and needs read access to its contents only.
 """
 
@@ -18,11 +20,13 @@ from app.domain.admin import AdminService
 from app.domain.errors import DomainError
 from app.domain.ports import Clock, IntegrationError, UnitOfWork
 from app.domain.update_service import UpdateService
-from app.domain.updates import Release, Version
+from app.domain.updates import Release, UpdateChannel, Version
 
 log = structlog.get_logger()
 
 API_BASE = "https://api.github.com"
+LISTED = 30
+"""How many of the newest releases the ``rc`` channel looks at; candidates come often."""
 
 
 class GitHubReleases:
@@ -32,17 +36,30 @@ class GitHubReleases:
         http: Shared HTTP client.
         repository: ``owner/name`` on GitHub (validated by the settings).
         token: Optional read-only token for a private repository; never logged.
+        channel: ``release`` asks ``/releases/latest``; ``rc`` lists releases and pre-releases.
     """
 
-    def __init__(self, http: httpx.AsyncClient, repository: str, token: str | None) -> None:
+    def __init__(
+        self,
+        http: httpx.AsyncClient,
+        repository: str,
+        token: str | None,
+        channel: UpdateChannel = UpdateChannel.RELEASE,
+    ) -> None:
         """Store the collaborators."""
         self._http = http
-        self._url = f"{API_BASE}/repos/{repository}/releases/latest"
+        self._channel = channel
+        releases = f"{API_BASE}/repos/{repository}/releases"
+        self._url = (
+            f"{releases}/latest"
+            if channel is UpdateChannel.RELEASE
+            else f"{releases}?per_page={LISTED}"
+        )
         self._pages = f"https://github.com/{repository}/releases/"
         self._token = token
 
     async def latest(self) -> Release | None:
-        """Return the latest release; ``None`` when there is none or it is not usable.
+        """Return the newest release the channel offers; ``None`` when there is none usable.
 
         Raises:
             IntegrationError: ``unauthorized``, ``rate_limited``, ``server_error``,
@@ -60,10 +77,26 @@ class GitHubReleases:
             return None
         if response.status_code != 200:
             raise http_failure(response)
-        return self._release(response.json())
+        data = response.json()
+        if self._channel is UpdateChannel.RELEASE:
+            return self._release(data)
+        return self._newest(data)
+
+    def _newest(self, data: Any) -> Release | None:
+        """Return the highest usable version in a ``/releases`` list (``rc`` channel)."""
+        if not isinstance(data, list):
+            log.warning("updates.release_ignored", reason="not_a_list")
+            return None
+        usable = [
+            release
+            for item in data
+            if isinstance(item, dict) and not item.get("draft")
+            if (release := self._release(item)) is not None
+        ]
+        return max(usable, key=lambda release: release.version, default=None)
 
     def _release(self, data: Any) -> Release | None:
-        """Return the release in a ``/releases/latest`` body, if it is a usable one."""
+        """Return the release in one release body, if it is a usable one."""
         tag = data.get("tag_name") if isinstance(data, dict) else None
         page = data.get("html_url") if isinstance(data, dict) else None
         version = Version.parse(tag) if isinstance(tag, str) else None
@@ -104,9 +137,13 @@ def update_service(
             ``False`` and only reads the worker's checks (ADR 0029).
     """
     token = settings.update_check_token
+    channel = UpdateChannel(settings.update_channel)
     releases = (
         GitHubReleases(
-            http, settings.update_repository, token.get_secret_value() if token else None
+            http,
+            settings.update_repository,
+            token.get_secret_value() if token else None,
+            channel,
         )
         if settings.update_repository and lookup
         else None
@@ -118,4 +155,6 @@ def update_service(
         current=running_version(settings),
         releases=releases,
         checking=settings.update_repository is not None,
+        channel=channel,
+        auto_apply=settings.update_auto_apply,
     )
