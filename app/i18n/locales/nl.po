@@ -5838,6 +5838,12 @@ msgstr "Repository met releases"
 msgid "settings.field.update_check_token.label"
 msgstr "Leestoken repository"
 
+msgid "settings.field.update_channel.label"
+msgstr "Updatekanaal"
+
+msgid "settings.field.update_auto_apply.label"
+msgstr "Automatisch bijwerken"
+
 msgid "settings.field.time_format.label"
 msgstr "Tijdnotatie"
 
@@ -6372,3 +6378,60 @@ msgstr "Verzoeken aan Webex en WxCC bewaren (dagen)"
 
 msgid "settings.field.job_overdue_minutes.label"
 msgstr "Taak achterstallig na (minuten)"
+
+msgid "admin.settings.tls.title"
+msgstr "Certificaat van het publieke adres"
+
+msgid "admin.settings.tls.host"
+msgstr "Adres"
+
+msgid "admin.settings.tls.finding"
+msgstr "Bevinding"
+
+msgid "admin.settings.tls.issuer"
+msgstr "Uitgegeven door"
+
+msgid "admin.settings.tls.valid_until"
+msgstr "Geldig tot"
+
+msgid "admin.settings.tls.checked_at"
+msgstr "Laatst gecontroleerd"
+
+msgid "admin.settings.tls.days_left"
+msgstr "nog {days} dagen"
+
+msgid "admin.settings.tls.none"
+msgstr "Nog niet gecontroleerd. De worker controleert het certificaat elke paar uur; op de server kan dat direct met python -m app.cli tls-check."
+
+msgid "admin.settings.tls.finding.ok"
+msgstr "In orde: het certificaat wordt vertrouwd en is nog ruim geldig."
+
+msgid "admin.settings.tls.finding.expiring"
+msgstr "Verloopt binnenkort: de automatische verlenging lijkt te mislukken. Controleer het log van de proxy (runbook, HTTPS-certificaat)."
+
+msgid "admin.settings.tls.finding.expired"
+msgstr "Verlopen: bezoekers krijgen een waarschuwing in de browser. Herstel de verlenging of plaats een nieuw certificaat."
+
+msgid "admin.settings.tls.finding.not_yet_valid"
+msgstr "Nog niet geldig: de klok van de server of de ingangsdatum van het certificaat klopt niet."
+
+msgid "admin.settings.tls.finding.untrusted"
+msgstr "Niet vertrouwd: het certificaat komt van een test-, eigen of onbekende certificaatautoriteit (bijvoorbeeld de staging-omgeving van Let's Encrypt). Browsers waarschuwen bezoekers."
+
+msgid "admin.settings.tls.finding.name_mismatch"
+msgstr "Verkeerde naam: het certificaat is niet uitgegeven voor dit adres."
+
+msgid "admin.settings.tls.finding.unreachable"
+msgstr "Niet bereikbaar: de server kon zijn eigen publieke adres op poort 443 niet bereiken. Controleer DNS, de firewall en of de proxy draait."
+
+msgid "admin.settings.tls.finding.not_https"
+msgstr "Geen https: het publieke adres gebruikt http, dus er is geen certificaat te controleren. In productie is dit niet toegestaan."
+
+msgid "settings.field.tls_check_interval_hours.label"
+msgstr "Certificaat controleren elke (uren)"
+
+msgid "settings.field.tls_expiry_warning_days.label"
+msgstr "Waarschuwen bij certificaat korter geldig dan (dagen)"
+
+msgid "settings.field.tls_alert_repeat_hours.label"
+msgstr "Melding over het certificaat herhalen elke (uren)"

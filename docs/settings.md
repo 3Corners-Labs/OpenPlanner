@@ -40,6 +40,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `TLS_DOMAIN` | string | — | Certificate domain (proxy.env, ADR 0030). |
 | `ACME_EMAIL` | string | — | Mailbox for CA notices (proxy.env). |
 | `ACME_CA` | url | — | ACME directory (proxy.env). |
+| `TLS_CERT_FILE` | path | — | Own certificate chain (PEM) for the proxy; with TLS_KEY_FILE it replaces ACME (proxy.env, ADR 0064). |
+| `TLS_KEY_FILE` | path | — | Private key of the own certificate (proxy.env, ADR 0064). |
 | `WORKER_HEARTBEAT_PATH` | path | `data/worker.heartbeat` | Heartbeat file the worker healthcheck reads. |
 | `WORKER_HEARTBEAT_MAX_AGE_SECONDS` | float | `120.0` | Age after which the worker healthcheck fails. |
 | `APP_VERSION` | string | `""` | Baked into release images (ADR 0029). |
@@ -53,8 +55,6 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DEV_TOKEN_KEY_PATH` | path | `data/dev-token.key` | Development management-token key file. |
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
 | `DEV_SETTINGS_KEY_PATH` | path | `data/dev-settings.key` | Development settings key file. |
-| `UPDATE_CHANNEL` | enum | `release` | What the installation follows (ADR 0059): releases only, or release candidates (`rc`) too; `rc` is refused in production. |
-| `UPDATE_AUTO_APPLY` | bool | `false` | The worker requests a newer version itself as soon as the check finds one (ADR 0059); refused in production. |
 
 ## C. Platform (portal, *Advanced settings*; lockable by env)
 
@@ -66,6 +66,9 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `MAINTENANCE_RETRY_AFTER_SECONDS` | int | `300` | 30–3600 | `settings.platform.manage` | Retry-After of the 503 that citizens and the machine API get during maintenance (ADR 0038). |
 | `MAINTENANCE_ALERT_HOURS` | int | `4` | 1–72 | `settings.platform.manage` | Maintenance on longer than this is reported as a system event (ADR 0038). |
 | `MAINTENANCE_ALERT_REPEAT_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The overdue maintenance event repeats at this interval while it lasts (ADR 0038). |
+| `TLS_CHECK_INTERVAL_HOURS` | int | `6` | 1–168 | `settings.platform.manage` | How often the worker probes the certificate of the public address (ADR 0064). |
+| `TLS_EXPIRY_WARNING_DAYS` | int | `20` | 1–60 | `settings.platform.manage` | Fewer days left than this makes the certificate finding 'expiring' (ADR 0064). |
+| `TLS_ALERT_REPEAT_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | A lasting certificate finding is reported again at this interval (ADR 0064). |
 | `INTEGRATION_CHECK_INTERVAL_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The worker checks every group with a Webex host this often and reports a broken chain as a system event (ADR 0065). |
 | `JOB_OVERDUE_MINUTES` | int | `10` | 1–1440 | `settings.platform.manage` | A pending job this many minutes past its planned time counts as overdue in a group's integration check (ADR 0068). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
@@ -112,6 +115,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WXCC_WEBHOOK_SECRET` | secret | — | — | `settings.platform.manage` | WxCC webhook secret; to be generated and rotated by the server. |
 | `UPDATE_REPOSITORY` | string | — | — | `settings.platform.manage` | owner/name of the release repository (ADR 0029). |
 | `UPDATE_CHECK_TOKEN` | secret | — | — | `settings.platform.manage` | Read token for a private repository; write-only. |
+| `UPDATE_CHANNEL` | enum | `release` | release, rc | `settings.platform.manage` | What the installation follows (ADR 0059, 0065): releases only, or release candidates (`rc`) too; `rc` is not usable in production. |
+| `UPDATE_AUTO_APPLY` | bool | `false` | — | `settings.platform.manage` | The worker requests a newer version itself as soon as the check finds one (ADR 0059, 0065); not usable in production. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |

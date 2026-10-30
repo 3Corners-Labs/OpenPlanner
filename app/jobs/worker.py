@@ -4,8 +4,8 @@ Run with ``python -m app.jobs.worker``. Each iteration checks the database, runs
 (``app.jobs.runner``), watches the data volume and reclaims freed database pages
 (``app.jobs.housekeeping``, ADR 0040), looks up the latest release when that is due (hourly,
 ADR 0029), reports maintenance that has been on too long (ADR 0038), checks every group's
-integration chain once per ``integration_check_interval_hours`` (ADR 0065) and writes the
-heartbeat.
+integration chain once per ``integration_check_interval_hours`` (ADR 0065), probes the
+certificate of the public address when that is due (ADR 0064) and writes the heartbeat.
 The worker never pauses for maintenance: confirmed appointments and the privacy jobs go on.
 It reloads the portal settings when they changed (ADR 0042 §6); the poll interval follows at
 once.
@@ -34,6 +34,7 @@ from app.adapters.integrations import (
 from app.adapters.live_settings import LiveSettings
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
+from app.adapters.tls_probe import SslCertificateProbe
 from app.config import Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
 from app.domain.diagnostics import DiagnosticsService
@@ -46,6 +47,7 @@ from app.domain.ports import Clock, UnitOfWork
 from app.domain.request_log import RequestEvents
 from app.domain.security_log import SecurityLog
 from app.domain.system_log import SystemLog
+from app.domain.tls_check import TlsWatch
 from app.domain.update_service import UpdateService
 from app.domain.worker_check import WorkerHeartbeat, heartbeat_due
 from app.i18n import Translator, load_catalogues
@@ -168,13 +170,23 @@ async def run_worker(
         settings.database_url,
         diagnostics.brake,
     )
-    updates = update_service(settings, uow, clock, http)
+    updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(
         uow,
         clock,
         system_log,
         alert_after=lambda: timedelta(hours=live.settings.maintenance_alert_hours),
         repeat=lambda: timedelta(hours=live.settings.maintenance_alert_repeat_hours),
+    )
+    tls = TlsWatch(
+        uow,
+        clock,
+        SslCertificateProbe(),
+        SystemLog(uow, clock),
+        public_base_url=settings.public_base_url,
+        interval=lambda: timedelta(hours=live.settings.tls_check_interval_hours),
+        warn_within=lambda: timedelta(days=live.settings.tls_expiry_warning_days),
+        repeat=lambda: timedelta(hours=live.settings.tls_alert_repeat_hours),
     )
     log.info(
         "worker.started",
@@ -203,6 +215,7 @@ async def run_worker(
                     await housekeeping.run()
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)
+                    await _watch_certificate(tls)
                     await _check_integrations(watch)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
@@ -255,6 +268,17 @@ async def _heartbeat(
         log.warning("worker.heartbeat_failed", error=type(exc).__name__)
         return last
     return now
+
+
+async def _watch_certificate(watch: TlsWatch) -> None:
+    """Probe the public address's certificate when due; a failure never stops the loop."""
+    try:
+        check = await watch.check_if_due()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("tls.watch_failed", error=type(exc).__name__)
+        return
+    if check is not None and not check.ok:
+        log.warning("tls.certificate", finding=check.finding.value, host=check.host)
 
 
 async def _check_integrations(watch: IntegrationWatch) -> None:

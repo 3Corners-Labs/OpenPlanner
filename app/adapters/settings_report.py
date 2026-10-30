@@ -150,7 +150,7 @@ def _resolve(
     source = Source.FILE if from_file else Source.ENV if from_env else None
     value = getattr(settings, spec.key) if spec.in_config else _env_value(spec, environ)
     plain = value if isinstance(value, SecretStr) else _plain(value)
-    return resolve(spec, plain, source, portal, now)
+    return resolve(spec, plain, source, portal, now, production=settings.environment == "prod")
 
 
 def _state(resolved: Resolved) -> SettingState:

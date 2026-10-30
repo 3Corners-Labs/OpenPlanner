@@ -196,7 +196,7 @@ class GroupRow(Base):
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     queue_visible_from_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))
     queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
-    # ADR 0059: future bookings one email address may hold in this group.
+    # ADR 0066: future bookings one email address may hold in this group.
     max_bookings_per_email: Mapped[int] = mapped_column(Integer, server_default=text("3"))
     calendar_invite_address: Mapped[str | None] = mapped_column(String(254))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
@@ -899,6 +899,26 @@ class MaintenanceStateRow(Base):
     switched_by: Mapped[str] = mapped_column(String(255), server_default=text("''"))
     expected_end: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reason: Mapped[str | None] = mapped_column(String(16))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class CertificateCheckRow(Base):
+    """The latest check of the public address's certificate (ADR 0064); at most one row."""
+
+    __tablename__ = "certificate_checks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    checked_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    host: Mapped[str] = mapped_column(String(255))
+    finding: Mapped[str] = mapped_column(String(16))
+    trust: Mapped[str | None] = mapped_column(String(16))
+    error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+    subject: Mapped[str | None] = mapped_column(String(255))
+    issuer: Mapped[str | None] = mapped_column(String(255))
+    not_before: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    not_after: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    names: Mapped[str] = mapped_column(Text, server_default=text("'[]'"))
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 

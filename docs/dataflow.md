@@ -304,6 +304,8 @@ data. A refused change is audited with its permission and target only, never the
 proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
 Let's Encrypt ──HTTP-01 / TLS-ALPN-01──> proxy (ports 80/443): challenge token only
 visitor ──https──> proxy ──http, edge network──> web (X-Forwarded-For set by the proxy)
+worker ──TLS handshake, no request──> proxy (public name, port 443): reads the public certificate
+       ──> certificate_checks (issuer, names, validity, finding; no personal data; ADR 0064)
 ```
 
 The CA learns the domain name and the operator's e-mail address; no citizen data leaves through
