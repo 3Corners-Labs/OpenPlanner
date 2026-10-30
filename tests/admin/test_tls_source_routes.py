@@ -1,4 +1,4 @@
-"""The certificate source block on Advanced settings (ADR 0068)."""
+"""The certificate source block on Advanced settings (ADR 0070)."""
 
 from collections.abc import AsyncIterator
 from datetime import timedelta

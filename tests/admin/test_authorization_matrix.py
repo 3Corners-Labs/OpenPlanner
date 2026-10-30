@@ -134,7 +134,7 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/{key}/reset": {
         "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
     },
-    # ADR 0068: the certificate source, the key on this host and the chain, superuser only.
+    # ADR 0070: the certificate source, the key on this host and the chain, superuser only.
     # Without the bundled proxy (the test settings) a request or an upload is refused (422), a
     # removal is a conflict (409), there is no request to download (404); *Check now* always
     # probes and returns to the page.

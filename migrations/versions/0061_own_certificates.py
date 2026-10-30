@@ -1,13 +1,14 @@
-"""The own certificate uploaded in the portal (ADR 0068).
+"""The own certificate uploaded in the portal (ADR 0070).
 
 ``own_certificates`` holds one row: the PEM chain (public), the leaf's public key and the
 public data the page shows. Never a private key (it lives on the volume the proxy reads) and no
 personal data. The downgrade drops the table; the chain must be uploaded again afterwards.
-Revises 0058 (booking confirmation, ADR 0056), which landed first; the number 0059 is left to
-the release listing (ADR 0067) that is still in review.
+Revises 0059 (booking event version), the head of main when this landed. Parallel PRs add
+migrations too: when the merge queue reports two heads, only this line (and the two below)
+needs to follow the new head.
 
-Revision ID: 0060
-Revises: 0058
+Revision ID: 0061
+Revises: 0059
 Create Date: 2026-10-30 20:00:00.000000
 """
 
@@ -16,8 +17,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0060"
-down_revision: str | None = "0058"
+revision: str = "0061"
+down_revision: str | None = "0059"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

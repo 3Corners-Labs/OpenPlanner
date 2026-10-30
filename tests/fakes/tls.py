@@ -1,4 +1,4 @@
-"""Fakes of the certificate ports: probe (ADR 0064), PEM reader and delivery (ADR 0068)."""
+"""Fakes of the certificate ports: probe (ADR 0064), PEM reader and delivery (ADR 0070)."""
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.own_certificate import HostKeys, ParsedChain, ParsedKey

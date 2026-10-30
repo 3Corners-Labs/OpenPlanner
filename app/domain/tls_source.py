@@ -1,4 +1,4 @@
-"""The certificate source of the bundled proxy, managed in the portal (ADR 0068).
+"""The certificate source of the bundled proxy, managed in the portal (ADR 0070).
 
 ::
 

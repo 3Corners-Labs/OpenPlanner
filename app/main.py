@@ -206,7 +206,7 @@ def create_app(
             configure_clock(current.time_format)
             # ADR 0042 step 6: the release repository and its token can change in the portal.
             app.state.update_service = update_service(current, uow, clock, http, lookup=False)
-            # ADR 0068: a changed certificate source (portal, CLI or lock) reaches the proxy.
+            # ADR 0070: a changed certificate source (portal, CLI or lock) reaches the proxy.
             source = getattr(app.state, "certificate_source", None)
             if source is not None:
                 app.state.certificate_sync = asyncio.create_task(source.sync())
@@ -284,7 +284,7 @@ def create_app(
             production=settings.environment == "prod",
         )
         app.state.certificate_status = CertificateStatus(uow)
-        # ADR 0068: the certificate source of the bundled proxy, with the pair handed to the
+        # ADR 0070: the certificate source of the bundled proxy, with the pair handed to the
         # proxy through the shared volume whenever the effective source changes.
         app.state.certificate_source = CertificateSourceService(
             uow,

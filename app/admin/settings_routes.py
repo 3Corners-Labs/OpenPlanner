@@ -19,7 +19,7 @@ the audit log.
 
 The page reloads the portal values first, so it always shows what the processes now apply.
 
-The certificate block (ADR 0068) also carries the source of the bundled proxy's certificate
+The certificate block (ADR 0070) also carries the source of the bundled proxy's certificate
 and the own certificate: the source is the setting ``tls_certificate_source``, changed through
 the generic route but checked by ``CertificateSourceService`` (``own`` needs a chain whose key
 is on this host); a key is made here with its signing request (downloaded as text), the chain
@@ -150,7 +150,7 @@ CSR_KEY = "tls_csr"
 
 @dataclass(frozen=True)
 class UploadedView:
-    """The own certificate uploaded in the portal, as the source form shows it (ADR 0068)."""
+    """The own certificate uploaded in the portal, as the source form shows it (ADR 0070)."""
 
     fingerprint: str
     subject: str
@@ -300,7 +300,7 @@ async def change_setting(
     raw_hours = form.text("hours")
     hours = int(raw_hours) if raw_hours.isdigit() and len(raw_hours) <= 3 else None
     try:
-        if key == SOURCE_KEY:  # ADR 0068: `own` needs an upload, and the proxy is told at once
+        if key == SOURCE_KEY:  # ADR 0070: `own` needs an upload, and the proxy is told at once
             await (await _source(request)).choose(context.principal, form.text("value"))
         else:
             await _service(request).change(context.principal, key, form.text("value"), hours=hours)
@@ -329,7 +329,7 @@ async def reset_setting(
 async def request_certificate(
     request: Request, locale: Locale, _: SameOrigin, context: Change
 ) -> Response:
-    """Make a new key on this host and its signing request (ADR 0068)."""
+    """Make a new key on this host and its signing request (ADR 0070)."""
     try:
         await (await _source(request)).generate_csr(context.principal)
     except DomainError as error:
@@ -355,7 +355,7 @@ async def download_request(request: Request, context: Manage) -> Response:
 async def upload_certificate(
     request: Request, locale: Locale, _: SameOrigin, context: Change
 ) -> Response:
-    """Store an uploaded chain; with a key, import an existing certificate (ADR 0068)."""
+    """Store an uploaded chain; with a key, import an existing certificate (ADR 0070)."""
     uploads = await read_uploads(request, CERTIFICATE_FIELDS, MAX_PEM_BYTES)
     try:
         await (await _source(request)).upload(
@@ -371,7 +371,7 @@ async def upload_certificate(
 async def remove_certificate(
     request: Request, locale: Locale, _: SameOrigin, context: Change
 ) -> Response:
-    """Remove the own certificate; refused while the source is ``own`` (ADR 0068)."""
+    """Remove the own certificate; refused while the source is ``own`` (ADR 0070)."""
     try:
         removed = await (await _source(request)).remove(context.principal)
     except DomainError as error:
@@ -384,7 +384,7 @@ async def remove_certificate(
 
 @router.post("/settings/tls/check", response_class=HTMLResponse)
 async def check_certificate(request: Request, _: SameOrigin, context: Change) -> Response:
-    """Probe the public address now and store the outcome (ADR 0068, *Check now*)."""
+    """Probe the public address now and store the outcome (ADR 0070, *Check now*)."""
     try:
         await (await _source(request)).check_now(context.principal)
     except DomainError as error:
@@ -413,7 +413,7 @@ def _service(request: Request) -> SettingsService:
 
 
 async def _source(request: Request) -> CertificateSourceService:
-    """Return the certificate source service (ADR 0068), with the portal values reloaded first.
+    """Return the certificate source service (ADR 0070), with the portal values reloaded first.
 
     A change in the portal applies to the processes within ten seconds; the service's rules
     (``own`` in use, the lock) must see it at once, so the reload happens here.
@@ -518,7 +518,7 @@ async def _source_view(
     manage: bool,
     errors: dict[str, str],
 ) -> SourceView:
-    """Describe the certificate source block (ADR 0068) from the setting's state."""
+    """Describe the certificate source block (ADR 0070) from the setting's state."""
     service = await _source(request)
     state = next(s for s in states if s.spec.key == SOURCE_KEY)
     status = await service.status() if service.applicable() else SourceStatus(None, False, None)
@@ -572,7 +572,7 @@ def _sections(
     errors = errors or {}
     by_topic: dict[Topic, list[SettingRow]] = {}
     for state in states:
-        if not state.spec.in_portal or state.spec.key == SOURCE_KEY:  # its own block (ADR 0068)
+        if not state.spec.in_portal or state.spec.key == SOURCE_KEY:  # its own block (ADR 0070)
             continue
         by_topic.setdefault(state.spec.topic, []).append(
             SettingRow(

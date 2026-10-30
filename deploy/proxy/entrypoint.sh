@@ -1,5 +1,5 @@
 #!/bin/sh
-# Start Caddy with one of three certificate sources (ADR 0030, ADR 0064, ADR 0068), in this
+# Start Caddy with one of three certificate sources (ADR 0030, ADR 0064, ADR 0070), in this
 # order of precedence:
 #   operator files    TLS_CERT_FILE and TLS_KEY_FILE under /certs (proxy.env): Caddy serves the
 #                     files and manages nothing; renewal is the operator's, and the portal's

@@ -521,7 +521,7 @@ proxy_settings() {
   getent hosts "$TLS_DOMAIN" >/dev/null 2>&1 || warn "$TLS_DOMAIN does not resolve yet; the certificate will wait for DNS"
 }
 
-# ADR 0068: with the operator's files the proxy ignores the portal's choice, so the portal
+# ADR 0070: with the operator's files the proxy ignores the portal's choice, so the portal
 # setting is locked to `own` in .env; the page then says the host manages the certificate.
 lock_certificate_source() {
   local backup

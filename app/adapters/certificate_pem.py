@@ -1,11 +1,11 @@
-"""``PemReader`` and key generation on ``cryptography`` (ADR 0068).
+"""``PemReader`` and key generation on ``cryptography`` (ADR 0070).
 
 A chain is read certificate by certificate and written back in canonical PEM (comments and
 stray bytes dropped, the server certificate first as uploaded); an imported key is accepted in
 PKCS#8 or the traditional RSA/EC forms, unencrypted, and written back as PKCS#8. Keys are
 matched by their public key (SubjectPublicKeyInfo, DER). The leaf's public data comes from the
 same parser the probe uses, so the page shows an upload exactly as it shows a served
-certificate. A new key for a signing request is ECDSA P-256 (ADR 0068 decision 2).
+certificate. A new key for a signing request is ECDSA P-256 (ADR 0070 decision 2).
 """
 
 from cryptography import x509

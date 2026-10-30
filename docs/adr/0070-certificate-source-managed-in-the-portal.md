@@ -1,4 +1,4 @@
-# 0068. The certificate source of the bundled proxy, managed by the superuser in the portal
+# 0070. The certificate source of the bundled proxy, managed by the superuser in the portal
 
 Status: proposed (2026-10-30), requested by the product owner. Build step 3 of ADR 0064 (HTTPS
 by default); extends ADR 0030 (TLS proxy) and ADR 0042 (settings classes, environment lock).
@@ -143,7 +143,7 @@ the file names and the mount point `/portal-certs` in the proxy (properties of t
   threats (key at rest on the host volume, key never in a backup or a log, upload over the admin
   session only, a chain that takes the site down) with their tests; the runbook's backup
   section says the volume is left out on purpose and what to do after a restore elsewhere.
-- New table `own_certificates` (migration 0060, reversible: the downgrade drops it, the chain
+- New table `own_certificates` (migration 0061, reversible: the downgrade drops it, the chain
   must be uploaded again) and a new volume `portal-certs` in `docker-compose.yml` (empty with
   ACME; not in the database backup). The web image gets `/srv/portal-certs` owned by uid 10001.
   The proxy image's entrypoint gains the watcher; `scripts/check-proxy.sh` gains the volume

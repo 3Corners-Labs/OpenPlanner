@@ -43,7 +43,7 @@ COPY --from=widget /widget/dist/gov-booking.js ./widget/dist/gov-booking.js
 # The manual is rendered in the portal (ADR 0033).
 COPY docs/manual ./docs/manual
 # The data volume (SQLite database, worker heartbeat) and the portal-certs volume (the own
-# certificate handed to the proxy, ADR 0068) are the only writable paths.
+# certificate handed to the proxy, ADR 0070) are the only writable paths.
 RUN mkdir /srv/data /srv/portal-certs && chown app:app /srv/data /srv/portal-certs
 # Summer and winter time come from the pinned `tzdata` package (uv.lock, Renovate), not from
 # whatever the base image happens to ship: an empty PYTHONTZPATH makes zoneinfo use only it.
