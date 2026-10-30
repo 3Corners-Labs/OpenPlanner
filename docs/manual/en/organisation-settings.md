@@ -15,6 +15,10 @@ sets on **Advanced settings**. The **Source** column says which one applies:
   text messages of the organisation's groups, and to its admins' pages.
 - **Admin portal time zone**: the time zone of times on the admin pages, for example
   `Europe/Amsterdam`. Each group keeps its own time zone for its appointments.
+- **Show "Appointments via OpenPlanner" at the bottom**: whether the booking pages and the
+  emails to citizens end with the product mark and the line "Appointments via OpenPlanner".
+  The organisation's own logo and name stay in the header; the plain-text part of an email
+  never carries the line. `true` or `false`.
 - **Staff member dormant after**: days without a login after which someone is marked dormant
   on the **Staff** screen.
 - **Shortfall look-ahead**: how many days ahead the shortfall notice on group pages looks.

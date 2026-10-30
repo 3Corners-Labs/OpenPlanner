@@ -20,6 +20,9 @@
   --adm-text: light-dark(#1b1f24, #e8ebef);
   --adm-text-muted: light-dark(#545d68, #aab3be);
   --adm-accent: light-dark(#01689b, #6cb4ee);
+  /* ADR 0060: the open tile of the product mark. 3:1 or more against --adm-surface on both
+     sides (#d46e00 on white 3.5:1; the ADR's #ee7f01 reaches only 2.7:1; #f39a3a on dark 7.6:1). */
+  --op-brand-slot: light-dark(#d46e00, #f39a3a);
   --adm-accent-strong: light-dark(#004f78, #a5d2f5);
   --adm-accent-soft: light-dark(#e5f0f6, #15324a);
   --adm-on-accent: light-dark(#ffffff, #0b1a26);
@@ -184,16 +187,12 @@ body.admin {
   color: var(--adm-text);
 }
 
+/* ADR 0060: the product mark, a 26 px image; the product name next to it stays text. */
 .admin-brand__mark {
-  display: inline-grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--adm-radius-s);
-  background: var(--adm-accent);
-  color: var(--adm-on-accent);
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
+  display: block;
+  width: 26px;
+  height: 26px;
+  flex: none;
 }
 
 .admin-topbar__end {

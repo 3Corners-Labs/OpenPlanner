@@ -477,3 +477,31 @@ async def test_team_invite_goes_to_the_teams_address_only_while_the_group_sends_
     assert JobType.SEND_TEAM_INVITE in queue.requested_types
     assert [m.recipient for m in sender.sent] == ["team@example.org"]
     assert later.done == [2]
+
+
+async def test_the_product_footer_is_asked_per_organisation(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    asked: list[int] = []
+
+    def footer(organisation_id: int) -> bool:
+        asked.append(organisation_id)
+        return False
+
+    queue, sender = FakeQueue([job(bid, JobType.SEND_CONFIRMATION)]), RecordingSender()
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer, product_footer=footer).run_due()
+
+    assert asked == [uow.state.groups[uow.state.bookings[bid].group_id].organisation_id]
+    assert "<footer>" not in (sender.sent[0].html or "")
+
+
+async def test_without_the_setting_the_product_footer_stays(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    queue, sender = FakeQueue([job(bid, JobType.SEND_CONFIRMATION)]), RecordingSender()
+
+    await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert "<footer>" in (sender.sent[0].html or "")

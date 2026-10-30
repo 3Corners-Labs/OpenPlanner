@@ -165,6 +165,9 @@ class Settings(BaseSettings):
     # How clock times are written everywhere (admin agenda, booking pages, messages):
     # ``24h`` (default), ``12h`` or ``locale`` (per language). Dates always follow the locale.
     time_format: ClockStyle = ClockStyle.H24
+    # ADR 0060 §6 (class D): "Appointments via OpenPlanner" with the product mark at the foot of
+    # the booking pages and in the HTML part of the citizen's emails.
+    product_footer: bool = True
 
     # Worker loop: poll interval and the heartbeat file its container healthcheck reads.
     worker_poll_seconds: float = 30.0
