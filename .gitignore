@@ -42,3 +42,5 @@ ds-bundle/
 .design-sync/pkg/dist/
 # Own TLS certificate and key of the proxy (ADR 0064); never committed.
 certs/
+# The own certificate's key and request of a local run (ADR 0068); never committed.
+portal-certs/

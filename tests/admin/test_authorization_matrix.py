@@ -134,6 +134,25 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/{key}/reset": {
         "/admin/settings/admin_session_hours/reset": statuses(303, 403, 403, 403, 403, 403, 403),
     },
+    # ADR 0068: the certificate source, the key on this host and the chain, superuser only.
+    # Without the bundled proxy (the test settings) a request or an upload is refused (422), a
+    # removal is a conflict (409), there is no request to download (404); *Check now* always
+    # probes and returns to the page.
+    "POST /admin/settings/tls/csr": {
+        "/admin/settings/tls/csr": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    "GET /admin/settings/tls/csr.pem": {
+        "/admin/settings/tls/csr.pem": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/tls/certificate": {
+        "/admin/settings/tls/certificate": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/tls/certificate/remove": {
+        "/admin/settings/tls/certificate/remove": statuses(409, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/tls/check": {
+        "/admin/settings/tls/check": statuses(303, 403, 403, 403, 403, 403, 403),
+    },
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
     "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403, 403)},
     "GET /admin/staff/{member_id}": {

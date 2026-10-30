@@ -36,6 +36,7 @@ from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import PlannedJob
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
+from app.domain.own_certificate import OwnCertificate
 from app.domain.retention import GroupRetentionCounts, PurgeCandidate, RetentionFacts
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
@@ -90,6 +91,7 @@ class State:
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
     certificate_check: CertificateCheck | None = None
+    own_certificate: OwnCertificate | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     custom_roles: dict[int, CustomRole] = field(default_factory=dict)
@@ -841,6 +843,17 @@ class InMemoryTransaction:
 
     async def save_certificate_check(self, check: CertificateCheck) -> None:
         self.state.certificate_check = check
+
+    async def get_own_certificate(self) -> OwnCertificate | None:
+        return self.state.own_certificate
+
+    async def save_own_certificate(self, certificate: OwnCertificate) -> None:
+        self.state.own_certificate = certificate
+
+    async def delete_own_certificate(self) -> bool:
+        had = self.state.own_certificate is not None
+        self.state.own_certificate = None
+        return had
 
     async def get_maintenance_state(self) -> MaintenanceState:
         return self.state.maintenance
