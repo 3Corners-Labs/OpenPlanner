@@ -1387,7 +1387,7 @@ class SqlTransaction(
     async def upcoming_starts_for_email(
         self, group_id: int, email: str, after: datetime
     ) -> list[datetime]:
-        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0059).
+        """Return the starts of the group's scheduled bookings for ``email`` (ADR 0066).
 
         ``lower()`` on both sides: SQLite folds ASCII only, the same for the stored and the
         submitted address. The address stays in this query; only start times come back.
