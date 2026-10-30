@@ -74,6 +74,14 @@
       ]
     },
     {
+      "name": "trial call (not available)",
+      "path": "{trial_page}",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "widget on a host page",
       "path": "http://localhost:8001/",
       "locales": [

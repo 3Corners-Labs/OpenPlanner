@@ -40,6 +40,10 @@ EVENT_LABELS: dict[EventKind, str] = {
     EventKind.MEETING_DELETED: "call.event.meeting_deleted",
     EventKind.JOIN_PAGE_OPENED: "call.event.join_page_opened",
     EventKind.JOIN_CLICKED: "call.event.join_clicked",
+    EventKind.TRIAL_CREATED: "call.event.trial_created",
+    EventKind.TRIAL_JOINED: "call.event.trial_joined",
+    EventKind.TRIAL_FAILED: "call.event.trial_failed",
+    EventKind.TRIAL_DELETED: "call.event.trial_deleted",
     EventKind.TASK_CREATED: "call.event.task_created",
     EventKind.TASK_FAILED: "call.event.task_failed",
     EventKind.TASK_CONNECTED: "call.event.task_connected",
@@ -103,6 +107,7 @@ def failure_hint(kind: EventKind, code: str, *, explained: bool = True) -> str |
 JOB_LABELS: dict[JobType, str] = {
     JobType.CREATE_VIDEO_ROOM: "audit.job.create_video_room",
     JobType.DELETE_VIDEO_ROOM: "audit.job.delete_video_room",
+    JobType.DELETE_TRIAL_CALL: "audit.job.delete_trial_call",
     JobType.SEND_CONFIRMATION: "audit.job.send_confirmation",
     JobType.SEND_CHANGE: "audit.job.send_change",
     JobType.SEND_REMINDER: "audit.job.send_reminder",

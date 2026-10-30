@@ -26,12 +26,13 @@ from fastapi.routing import APIRoute
 from jinja2 import Environment, Template
 
 from app.adapters.db.uow import SqlUnitOfWork
+from app.admin.overview_charts import CHART_SERIES, KIND_OF_VIEW
 from app.admin.routes import PUBLIC_ADMIN_PATHS
 from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.audit import AuditFilter
 from app.domain.authorization import MATRIX, Role
-from app.domain.booking import ChangeReason, MeetingRef
+from app.domain.booking import ChangeReason, MeetingRef, TrialCall
 from app.domain.form_fields import FieldDefinition, FieldType, FormDefinition
 from app.domain.planning import PlanningService
 from app.domain.privacy import ALIASES, PII_FIELDS
@@ -39,6 +40,7 @@ from app.domain.scheduling import DispatchKind, ScheduleOverride, TimeWindow
 from app.domain.services import BookingService, ContactInput
 from app.domain.staff import StaffFilter
 from app.domain.updates import Release, ReleaseCheck, Version
+from app.web.widgets import OVERVIEW_PATH, WIDGETS
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.routes import all_routes
@@ -64,6 +66,7 @@ MARKERS = {
     "form_answers": "Zqanswer7x",
     "guest_join_url": "https://video.example/zqjoin7x",
     "host_join_url": "https://video.example/zqjoin7x",
+    "trial_join_url": "https://video.example/zqtrial7x",
 }
 """Marker per personal-data field (one join link: the adapter stores it under both)."""
 
@@ -112,8 +115,11 @@ RELEASE = Release(Version(1, 4, 0), "https://github.com/acme/openplanner/release
 
 DETAIL = "/admin/groups/demo/bookings/{id}"
 QUEUE_ITEM = "/admin/groups/demo/queue/{queued}"
+QUEUE_ITEM_LIVE = QUEUE_ITEM + "/live"
+"""The claimed booking's status fragment (ADR 0072): the join link travels with it."""
 FIRST_NAME_PAGES = frozenset(
     {
+        "/admin/groups/demo/queue/live",
         "/admin/groups/demo/agenda",
         "/admin/groups/demo/agenda/week",
         "/admin/groups/demo/agenda/waiting",
@@ -160,6 +166,8 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/bookings/{booking_id}": DETAIL,
     "/admin/groups/{slug}/queue": "/admin/groups/demo/queue",
     "/admin/groups/{slug}/queue/{booking_id}": QUEUE_ITEM,
+    "/admin/groups/{slug}/queue/live": "/admin/groups/demo/queue/live",
+    "/admin/groups/{slug}/queue/{booking_id}/live": QUEUE_ITEM_LIVE,
     "/admin/groups/{slug}/closure": "/admin/groups/demo/closure",
     "/admin/groups/{slug}/closure/contacts": "/admin/groups/demo/closure/contacts",
     "/admin/groups/{slug}/closure/scenarios": "/admin/groups/demo/closure/scenarios",
@@ -334,6 +342,8 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     await planning.add_override(SUPER, "demo", one_agent)
     async with uow.locked() as tx:
         await tx.save_meeting(found.queued_id, MeetingRef("m-zq", MARKERS["guest_join_url"]))
+        trial = TrialCall(MeetingRef("t-zq", MARKERS["trial_join_url"]), site.clock.now())
+        await tx.save_trial_call(found.queued_id, trial)  # ADR 0071: no admin page shows it
         waiting = await tx.get_booking(waiting_id)
         assert waiting is not None
         await tx.save_booking(waiting.request_rebook(ChangeReason.STAFFING, site.clock.now()))
@@ -393,7 +403,7 @@ def _allowed(path: str, found: Fixture) -> set[str]:
     """The markers ADR 0063 §4 allows on ``path``."""
     if path == found.fill(DETAIL):
         return set(MARKERS.values())
-    if path == found.fill(QUEUE_ITEM):
+    if path in {found.fill(QUEUE_ITEM), found.fill(QUEUE_ITEM_LIVE)}:
         return {MARKERS["first_name"], MARKERS["guest_join_url"]}
     if path in {found.fill(p) for p in FIRST_NAME_PAGES}:
         return {MARKERS["first_name"]}
@@ -428,11 +438,33 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         if found_leaks := _leaks(response.text, _allowed(path, found)):
             leaks[path] = found_leaks
     assert leaks == {}, "personal data on a list, overview, export or alert page (ADR 0063 §2)"
-    # An image route has none to show; the certificate request download (ADR 0070) has no
+    # An image route has none to show; the certificate request download (ADR 0072) has no
     # request waiting. Both answer 404 on purpose and carry no personal data.
     no_content = ("/image", "/tls/csr.pem")
     not_reached = {p: s for p, s in statuses.items() if s >= 400 and not p.endswith(no_content)}
     assert not_reached == {}, "a swept page did not render; fix its path or the fixture"
+
+    # ADR 0072: the claimed booking's fragment once the claim is gone carries no booking data.
+    async with _uow(site).locked() as tx:
+        await tx.release_claim(found.queued_id)
+    lost = await site.client.get(found.fill(QUEUE_ITEM_LIVE))
+    assert lost.status_code == 200
+    assert not _leaks(lost.text, set()), "claim lost fragment"
+
+    # The chart views of the overview widgets (ADR 0061 §5) are other templates on the same
+    # routes, reached only by asking for them: counts and group names, never a marker.
+    for item in WIDGETS:
+        if not (item.available and item.key in CHART_SERIES):
+            continue
+        for chart_view in (v for v in item.views if v in KIND_OF_VIEW):
+            for path in (
+                f"{item.path}?view={chart_view.value}",
+                f"{OVERVIEW_PATH}?{item.key}={chart_view.value}",
+            ):
+                response = await site.client.get(path)
+                assert response.status_code == 200, path
+                assert "<svg" in response.text or "widget__empty" in response.text, path
+                assert not _leaks(response.text, set()), path
 
     # The pages outside the happy path: a refusal, and the sign-out pages without a session.
     for path, response in (

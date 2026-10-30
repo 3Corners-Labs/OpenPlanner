@@ -139,11 +139,13 @@ def test_suspension_plan_mails_now_and_purges_after_the_closure() -> None:
 
     assert plan_for_suspension(now=NOW, purge_at=purge_at) == [
         PlannedJob(JobType.END_WXCC_TASK, NOW, None),
+        PlannedJob(JobType.DELETE_TRIAL_CALL, NOW, None),
         PlannedJob(JobType.SEND_SUSPENSION, NOW, None, ChannelKind.EMAIL),
         PlannedJob(JobType.PURGE_PII, purge_at, None),
     ]
     assert [j.type for j in plan_for_suspension(now=NOW, purge_at=None)] == [
         JobType.END_WXCC_TASK,
+        JobType.DELETE_TRIAL_CALL,
         JobType.SEND_SUSPENSION,
     ]
     assert plan_purge(None) == []

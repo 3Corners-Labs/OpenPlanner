@@ -1,0 +1,6 @@
+{#- The claimed booking's status fragment when the claim is gone (ADR 0072): released by a
+    group admin or cancelled meanwhile. No poll URL, so static/live-region.js stops. -#}
+<div data-live-fragment>
+  <div class="alert alert--error" role="alert"><p data-live-status>{{ message }}</p></div>
+  <p><a class="button button--secondary" href="/admin/groups/{{ summary.group.slug }}/queue">{{ _("admin.queue.back") }}</a></p>
+</div>

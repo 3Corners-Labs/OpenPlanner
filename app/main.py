@@ -39,6 +39,7 @@ from app.api import (
     health,
     join_pages,
     pages,
+    trial_pages,
     webhooks,
     widget_api,
     widget_script,
@@ -85,6 +86,7 @@ from app.domain.system_log import SystemLog
 from app.domain.tls import public_address
 from app.domain.tls_check import CertificateStatus, TlsWatch
 from app.domain.tls_source import CertificateSourceService
+from app.domain.trial_call_service import TrialCallService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import (
@@ -227,6 +229,9 @@ def create_app(
                 wired.video,
                 wired.dispatcher,
                 agent_start_label,
+            )
+            app.state.trial_call_service = TrialCallService(
+                uow, wired.video, app.state.integration_service, clock
             )
             app.state.integration_check_service = IntegrationCheckService(
                 uow,
@@ -462,6 +467,7 @@ def create_app(
         pages.router,
         booking_pages.router,
         join_pages.router,
+        trial_pages.router,
         direct_pages.router,
         brand_assets.router,
         webhooks.router,
