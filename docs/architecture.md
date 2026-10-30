@@ -106,17 +106,21 @@ flowchart TB
     worker <--> volume
     worker -- SMTP --> smtp
     worker -- hourly release check --> github
+    worker -. "certificate probe, https :443" .-> proxy
     updater -- "app.cli: claim, progress, report, backup" --> web
     updater -- "pull, verify, pin digest" --> github
     worker -. dev .-> mailpit
 
 ```
 
-- **TLS at the edge (ADR 0030).** With `--profile tls` the `proxy` service (Caddy) gets a
-  certificate for `TLS_DOMAIN` from Let's Encrypt and renews it on its own; port 80 only
-  redirects. It runs as uid 10001 on a read-only filesystem, keeps certificates in the
-  `proxy-data` volume and has a fixed address on the `edge` network, the only address `web`
-  accepts `X-Forwarded-For` from. Without the profile, a load balancer of the host does this.
+- **TLS at the edge (ADR 0030, ADR 0064).** With `--profile tls` (the installer's default) the
+  `proxy` service (Caddy) gets a certificate for `TLS_DOMAIN` from Let's Encrypt and renews it
+  on its own, or serves an own certificate from `./certs`; port 80 only redirects. It runs as
+  uid 10001 on a read-only filesystem, keeps certificates in the `proxy-data` volume and has a
+  fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
+  The worker probes the public address every few hours and shows the certificate's issuer,
+  expiry and one finding on *System status*; a failing one is a system event. Without the
+  profile (`--no-tls`), a load balancer of the host does TLS.
 - **One image, two roles.** `web` runs `alembic upgrade head` and then uvicorn; `worker` runs
   `python -m app.jobs.worker` and starts only when `web` is healthy. Both run as uid 10001
   with a read-only root filesystem, no capabilities and `no-new-privileges`.

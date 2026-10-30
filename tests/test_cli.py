@@ -11,6 +11,7 @@ from sqlalchemy import update
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import GroupRow
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore, StoredReport
+from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.wxcc_config import PROJECT_ID
 from app.cli import (
     _register_webhooks,
@@ -419,3 +420,62 @@ def test_client_pseudonym_prints_the_pseudonym_of_an_address(
 
     assert len(first) == 16
     assert "203.0.113.7" not in first
+
+
+async def test_tls_check_stores_the_public_address_and_fails_on_a_finding(
+    migrated: Settings, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # ADR 0064: the test settings use http, so there is no certificate to check.
+    from app.cli import _tls_check
+    from app.domain.tls_check import CertificateStatus
+    from tests.fakes.tls import FakeCertificateProbe
+
+    report, ok = await _tls_check(migrated, probe=FakeCertificateProbe())
+
+    assert not ok
+    assert "finding     not_https" in report
+    engine = create_engine(migrated.database_url)
+    try:
+        stored = await CertificateStatus(SqlUnitOfWork(engine)).latest()
+    finally:
+        await engine.dispose()
+    assert stored is not None
+    assert stored.host == "127.0.0.1"
+
+
+async def test_tls_check_of_another_host_reports_the_certificate_and_stores_nothing(
+    migrated: Settings,
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from app.cli import _tls_check
+    from app.domain.tls import Certificate, ProbeResult, Trust
+    from app.domain.tls_check import CertificateStatus
+    from tests.fakes.tls import FakeCertificateProbe
+
+    now = datetime.now(UTC)
+    probe = FakeCertificateProbe(
+        ProbeResult(
+            Certificate(
+                "booking.test",
+                "Pebble Intermediate CA",
+                now - timedelta(days=1),
+                now + timedelta(days=5),
+                ("booking.test",),
+            ),
+            Trust.UNTRUSTED,
+        )
+    )
+
+    report, ok = await _tls_check(migrated, "booking.test", 8443, probe=probe)
+
+    assert not ok
+    assert probe.asked == [("booking.test", 8443)]
+    assert "finding     untrusted" in report
+    assert "issuer      Pebble Intermediate CA" in report
+    assert "(4 days)" in report
+    engine = create_engine(migrated.database_url)
+    try:
+        assert await CertificateStatus(SqlUnitOfWork(engine)).latest() is None
+    finally:
+        await engine.dispose()
