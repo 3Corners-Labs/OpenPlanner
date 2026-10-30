@@ -221,3 +221,25 @@ async def test_a_locked_value_is_taken_over_and_names_the_variable_to_remove(
     assert response.status_code == 303
     assert "Overgenomen in het portaal" in after
     assert 'action="/admin/settings/admin_session_hours/adopt"' not in after
+
+
+async def test_a_webex_service_app_set_in_the_portal_wires_the_integrations(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    assert app.state.integrations.video is None
+
+    for key, value in (
+        ("webex_client_id", "client-1"),
+        ("webex_client_secret", "client-secret"),
+        ("webex_refresh_token", "refresh-token"),
+    ):
+        response = await site.client.post(
+            f"/admin/settings/{key}", data={"value": value}, headers=SAME_ORIGIN
+        )
+        assert response.status_code == 303, key
+    page = (await site.client.get("/admin/settings")).text
+
+    assert app.state.integrations.video is not None
+    assert app.state.call_service is not None
+    assert "client-secret" not in page
+    assert "refresh-token" not in page
