@@ -20,12 +20,12 @@ No PII in any fragment: counts, group names, times and admins' display names onl
 needs the alert model of OV-6, so it has no route here.
 """
 
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse
 
 from app.adapters.heartbeat import read_heartbeat
@@ -36,6 +36,13 @@ from app.admin.authz import (
     admin_service,
     can_function,
     maintenance_service,
+)
+from app.admin.overview_charts import (
+    ChartView,
+    ViewChoice,
+    chart_view,
+    explicit_views,
+    view_choices,
 )
 from app.admin.pages import Locale, admin_moment, page, role_labels, scope_text, templates
 from app.admin.shortfalls import agenda_service, shortfall_view
@@ -58,13 +65,17 @@ from app.domain.update_service import UpdateNotice
 from app.domain.updates import UpdateStatus
 from app.i18n import BoundGettext
 from app.web.authz_labels import PERMISSION_LABELS
+from app.web.charts import Datum
 from app.web.job_labels import JOB_TYPE_LABELS
 from app.web.locale import RequestLocale
 from app.web.templates import FragmentResponse, render
 from app.web.update_labels import STATUS_LABELS
-from app.web.widgets import Widget, visible, widget
+from app.web.widgets import View, Widget, resolve_view, visible, widget
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
+
+ViewName = Annotated[str | None, Query(max_length=16)]
+"""The ``view`` a chart-capable fragment is asked for; anything unsupported is the default."""
 
 FRAME = "admin/widgets/_frame.html"
 """The template that renders one widget: title, body, empty state and footer."""
@@ -87,6 +98,9 @@ class WidgetView:
         total: How many rows there are in all; more than ``rows`` shows a "more" link.
         more_href: Where the whole list lives, if the admin may open it.
         extra: Further template context (the rights widget's role chips).
+        shown: The view the widget draws (ADR 0061 §5); its first view unless one is asked for.
+        chart: The chart of a bar, line or pie view; ``None`` shows the list, table or empty state.
+        choices: The links that switch the widget between its views; none for a single view.
     """
 
     widget: Widget
@@ -94,6 +108,9 @@ class WidgetView:
     total: int
     more_href: str | None = None
     extra: dict[str, object] | None = None
+    shown: View = View.LIST
+    chart: ChartView | None = None
+    choices: tuple[ViewChoice, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -396,17 +413,77 @@ def _declared(key: str) -> Widget:
     return found
 
 
+def _bookings_data(rows: list[object]) -> list[Datum]:
+    """The bookings widget's chart data: bookings today per group."""
+    return [Datum(r.name, r.count) for r in rows if isinstance(r, GroupCount)]
+
+
+def _queue_data(rows: list[object]) -> list[Datum]:
+    """The queue widget's chart data: citizens waiting per group."""
+    return [Datum(r.name, r.waiting) for r in rows if isinstance(r, QueueRow)]
+
+
+CHART_DATA: dict[str, Callable[[list[object]], list[Datum]]] = {
+    "bookings-today": _bookings_data,
+    "queue": _queue_data,
+}
+"""The widgets that can draw a chart, and the data of their one series; see ``CHART_SERIES``."""
+
+
+def _shaped(
+    view: WidgetView,
+    locale: RequestLocale,
+    shown: View,
+    selected: Mapping[str, View],
+    on_page: Mapping[str, Widget],
+) -> WidgetView:
+    """Give ``view`` the view to draw, its chart if that view is one, and its switcher links.
+
+    ``selected`` are the views the address asks for, so a link switching one widget keeps the
+    others as they are; ``on_page`` are the widgets the address may name.
+    """
+    _ = locale.gettext
+    item = view.widget
+    data = CHART_DATA[item.key](view.rows) if item.key in CHART_DATA else []
+    chart = chart_view(shown, item, data, _(item.title_key), _)
+    choices = view_choices(item, shown, selected, on_page, _)
+    return replace(view, shown=shown, chart=chart, choices=choices)
+
+
 async def _views(request: Request, locale: RequestLocale, principal: Principal) -> list[WidgetView]:
-    """Render every visible widget of the admin's default layout."""
+    """Render every visible widget of the admin's default layout, in the views asked for.
+
+    The address names a view per widget (``/admin/?bookings-today=bar``); what it asks that a
+    widget does not support is ignored (``resolve_view``).
+    """
     allowed = can_function(principal)
-    return [await RENDERERS[w.key](request, locale, principal) for w in visible(principal, allowed)]
+    items = visible(principal, allowed)
+    on_page = {w.key: w for w in items}
+    selected = explicit_views(on_page, request.query_params)
+    return [
+        _shaped(
+            await RENDERERS[w.key](request, locale, principal),
+            locale,
+            selected.get(w.key, w.views[0]),
+            selected,
+            on_page,
+        )
+        for w in items
+    ]
 
 
 def _fragment(
-    request: Request, locale: RequestLocale, principal: Principal, view: WidgetView
+    request: Request,
+    locale: RequestLocale,
+    principal: Principal,
+    view: WidgetView,
+    requested: str | None = None,
 ) -> HTMLResponse:
-    """Answer one widget without the shell."""
-    return render(templates, request, FRAME, locale, {"view": view, "principal": principal})
+    """Answer one widget without the shell, in the view ``requested`` if it supports it."""
+    item = view.widget
+    shown = resolve_view(item, requested)
+    shaped = _shaped(view, locale, shown, {item.key: shown}, {item.key: item})
+    return render(templates, request, FRAME, locale, {"view": shaped, "principal": principal})
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -450,10 +527,12 @@ async def bookings_today_widget(
     request: Request,
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.BOOKINGS_VIEW))],
+    view: ViewName = None,
 ) -> HTMLResponse:
-    """The fragment *Bookings today per group*."""
+    """The fragment *Bookings today per group*, as list, bar or pie."""
     principal = context.principal
-    return _fragment(request, locale, principal, await _bookings_today(request, locale, principal))
+    shaped = await _bookings_today(request, locale, principal)
+    return _fragment(request, locale, principal, shaped, view)
 
 
 @router.get("/overview/w/changes", response_class=FragmentResponse)
@@ -472,10 +551,11 @@ async def queue_widget(
     request: Request,
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.QUEUE_WORK))],
+    view: ViewName = None,
 ) -> HTMLResponse:
-    """The fragment *Queue across own groups*."""
+    """The fragment *Queue across own groups*, as table, bar or line."""
     principal = context.principal
-    return _fragment(request, locale, principal, await _queue(request, locale, principal))
+    return _fragment(request, locale, principal, await _queue(request, locale, principal), view)
 
 
 @router.get("/overview/w/tasks", response_class=FragmentResponse)

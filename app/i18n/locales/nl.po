@@ -6709,6 +6709,51 @@ msgstr "Waarschuwen bij certificaat korter geldig dan (dagen)"
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Melding over het certificaat herhalen elke (uren)"
 
+msgid "admin.overview.view.label"
+msgstr "Weergave van {title}"
+
+msgid "admin.overview.view.list"
+msgstr "Lijst"
+
+msgid "admin.overview.view.table"
+msgstr "Tabel"
+
+msgid "admin.overview.view.bar"
+msgstr "Staaf"
+
+msgid "admin.overview.view.line"
+msgstr "Lijn"
+
+msgid "admin.overview.view.pie"
+msgstr "Taart"
+
+msgid "admin.overview.chart.bar"
+msgstr "Staafdiagram"
+
+msgid "admin.overview.chart.line"
+msgstr "Lijndiagram"
+
+msgid "admin.overview.chart.pie"
+msgstr "Taartdiagram"
+
+msgid "admin.overview.chart.joiner"
+msgstr "; "
+
+msgid "admin.overview.chart.group"
+msgstr "Groep"
+
+msgid "admin.overview.chart.table"
+msgstr "Gegevens als tabel"
+
+msgid "admin.overview.widget.bookings_today.series"
+msgstr "Afspraken vandaag"
+
+msgid "admin.overview.widget.bookings_today.chart_item"
+msgstr "{label}: {value} afspraken vandaag"
+
+msgid "admin.overview.widget.queue.chart_item"
+msgstr "{label}: {value} wachtend"
+
 msgid "admin.settings.tls.check_now"
 msgstr "Nu controleren"
 
