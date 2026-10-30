@@ -63,9 +63,9 @@ from app.domain.planning import (
 )
 from app.domain.scheduling import (
     MAX_BOOKINGS_PER_EMAIL,
-    MAX_CITIZEN_CHANGE_LEAD_MINUTES,
     MAX_DIRECT_CALLS,
     MAX_LABEL_LENGTH,
+    MAX_PARTICIPANT_CHANGE_LEAD_MINUTES,
     MAX_PLANNER_LEAD_MINUTES,
     MAX_QUEUE_VISIBLE_FROM_MINUTES,
     MAX_TRIAL_CALL_MINUTES,
@@ -118,7 +118,7 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
         "admin.field.dispatch_lead_minutes",
         "admin.field.dispatch_lead_minutes_hint",
     ),
-    "citizen_change_lead_minutes": (
+    "participant_change_lead_minutes": (
         "admin.field.citizen_change_lead_minutes",
         "admin.field.citizen_change_lead_minutes_hint",
     ),
@@ -569,9 +569,9 @@ def _settings_fields(
         ),
         number("dispatch_lead_minutes", current.dispatch_lead_minutes, {"min": "0", "max": "60"}),
         number(
-            "citizen_change_lead_minutes",
-            current.citizen_change_lead_minutes,
-            {"min": "0", "max": str(MAX_CITIZEN_CHANGE_LEAD_MINUTES), "step": "5"},
+            "participant_change_lead_minutes",
+            current.participant_change_lead_minutes,
+            {"min": "0", "max": str(MAX_PARTICIPANT_CHANGE_LEAD_MINUTES), "step": "5"},
         ),
         number(
             "planner_change_min_lead_minutes",

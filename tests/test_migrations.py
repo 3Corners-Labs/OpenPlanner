@@ -466,3 +466,39 @@ def test_the_direct_call_switch_becomes_an_offer_per_block_and_back(
     switches = database.execute("SELECT id, direct_call_enabled FROM groups ORDER BY id")
     assert switches.fetchall() == [(1, 1), (2, 1)]
     database.close()
+
+
+def test_the_change_lead_column_is_renamed_with_its_values_and_back(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    """ADR 0077: the lead keeps its value under the new name, and the constraint follows."""
+    import sqlite3
+
+    command.upgrade(alembic_config, "0073")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    database.executescript(
+        """
+        INSERT INTO organisations (id, name, slug) VALUES (1, 'Gemeente', 'gemeente');
+        INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+            min_notice_minutes, horizon_days, phone_mode, citizen_change_lead_minutes)
+            VALUES (1, 1, 'Team', 'team', 'Europe/Amsterdam', 30, 60, 60, 'optional', 180);
+        """
+    )
+    database.commit()
+    database.close()
+
+    command.upgrade(alembic_config, "0075")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    lead = database.execute("SELECT participant_change_lead_minutes FROM groups WHERE id = 1")
+    assert lead.fetchone() == (180,)
+    with pytest.raises(sqlite3.IntegrityError, match="participant_lead"):
+        database.execute("UPDATE groups SET participant_change_lead_minutes = 1441")
+    database.close()
+
+    command.downgrade(alembic_config, "0073")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    lead = database.execute("SELECT citizen_change_lead_minutes FROM groups WHERE id = 1")
+    assert lead.fetchone() == (180,)
+    with pytest.raises(sqlite3.IntegrityError, match="citizen_lead"):
+        database.execute("UPDATE groups SET citizen_change_lead_minutes = 1441")
+    database.close()

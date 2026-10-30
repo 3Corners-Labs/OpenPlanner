@@ -67,7 +67,7 @@ class GroupSettings:
     phone_mode: PhoneMode
     dispatch_lead_minutes: int
     dispatch_kind: DispatchKind
-    citizen_change_lead_minutes: int
+    participant_change_lead_minutes: int
     planner_change_min_lead_minutes: int
     trial_call_enabled: bool
     trial_call_minutes: int

@@ -84,7 +84,7 @@ Een wijziging geldt voor afspraken die nog niet zijn doorgezet. Een afspraak die
 het contactcenter staat, blijft daar. Lukt het contactcenter niet (storing van Webex Connect of
 Webex Contact Center), dan kunt u de groep tijdelijk op de eigen wachtrij zetten.
 
-<!-- field: citizen_change_lead_minutes -->
+<!-- field: participant_change_lead_minutes -->
 ### Verplaatsen door de burger tot (minuten vooraf)
 
 Tot hoeveel minuten voor de start de burger de afspraak kan verplaatsen, standaard 60. Het

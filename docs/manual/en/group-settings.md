@@ -81,7 +81,7 @@ A change applies to appointments not yet dispatched. An appointment already in t
 center as a task stays there. When the contact center fails (Webex Connect or Webex Contact
 Center outage), you can switch the group to the own queue for the time being.
 
-<!-- field: citizen_change_lead_minutes -->
+<!-- field: participant_change_lead_minutes -->
 ### Citizen can move until (minutes ahead)
 
 Until how many minutes before the start the citizen can move the appointment, 60 by default.

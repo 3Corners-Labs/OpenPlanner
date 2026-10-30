@@ -326,7 +326,7 @@ erDiagram
         int horizon_days
         int dispatch_lead_minutes
         string dispatch_kind "contact_center | openplanner_queue"
-        int citizen_change_lead_minutes
+        int participant_change_lead_minutes
         int queue_visible_from_minutes
         bool queue_free_pick_allowed
         int max_bookings_per_email
@@ -412,7 +412,7 @@ Rules that matter for the rest of the system:
   holiday closes the day, then the weekly rules apply (`app/domain/holidays.py`).
 - **The dispatch lead** (`dispatch_lead_minutes`, default 5) sets when the WxCC task is
   created. The minimum notice can never be shorter than it. The citizen can cancel until the
-  start and move until `citizen_change_lead_minutes` (default 60, ADR 0069).
+  start and move until `participant_change_lead_minutes` (default 60, ADR 0069).
 - **Dispatch kind per group** (ADR 0043): `contact_center` (the WxCC task above) or
   `openplanner_queue`, where agents sign in and claim bookings in the group's own queue
   (`app/domain/own_queue.py`, `queue_service.py`). An own-queue group sends no task; both
