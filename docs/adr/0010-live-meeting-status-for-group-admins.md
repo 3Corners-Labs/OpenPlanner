@@ -93,4 +93,4 @@ do not poll.
 | Step | What | PR | State |
 |---|---|---|---|
 | 1 | `VideoProvider`, webhooks (`adapters/webhooks.py`), `CallStatus`, agenda columns | #10, #81 | merged |
-| 2 | `VideoProvider.meeting_status`, Webex adapter, `MeetingStatusService`, the agenda's polled fragment, `MEETING_STATUS_REFRESH_SECONDS` | AG-3 | in PR |
+| 2 | `VideoProvider.meeting_status`, Webex adapter, `MeetingStatusService`, the agenda's polled fragment, `MEETING_STATUS_REFRESH_SECONDS` | #167 | merged |

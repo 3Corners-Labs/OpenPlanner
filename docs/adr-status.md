@@ -16,8 +16,8 @@ package; when the two disagree, the code wins.
 
 | Built? | ADRs |
 |---|---|
-| BUILT | 44 |
-| PARTIAL | 21 |
+| BUILT | 45 |
+| PARTIAL | 20 |
 | NOT BUILT | 5 |
 | POLICY | 3 |
 
@@ -32,7 +32,7 @@ package; when the two disagree, the code wins.
 | 0007 | Dispatch through the WxCC Tasks API | BUILT | #10; `ContactCenterDispatcher` port, `adapters/wxcc.py`, `verify_wxcc` (HMAC, 300 s); points 1–2 superseded by ADR 0018 | Live behaviour against a WxCC tenant is not visible in the code |
 | 0008 | Integration secrets in the admin UI, encrypted | PARTIAL | #10, #19, #106; `adapters/crypto.py` (AES-256-GCM), write-only inputs, audit, `integrations.manage` locked to the superuser | Key id per value and re-encryption on rotation: a new `SETTINGS_ENCRYPTION_KEY` makes secrets unreadable (runbook) |
 | 0009 | Notification channels, reminder rules, templates | PARTIAL | #2, #19; `domain/channels.py`, `job_plan.py`, `message_texts.py`, `admin/message_routes.py` | Organisation override layer of the text blocks (no store, no editor); group texts and reminder rules work |
-| 0010 | Live meeting status for group admins | PARTIAL | #10, #81; `adapters/webhooks.py`, `domain/calls.py`, `admin/_agenda_row.html` | No `meeting_status` on the provider and no polling fallback, no 30 s refresh of the agenda; Webex webhooks carry no timestamp, replays are caught by `event_key` |
+| 0010 | Live meeting status for group admins | BUILT | #10, #81, #167 (AG-3); `adapters/webhooks.py`, `domain/calls.py`, `admin/_agenda_row.html`, `MeetingStatusService` | Webex webhooks carry no timestamp, replays are caught by `event_key` |
 | 0011 | Derived management tokens | BUILT | #10; `domain/tokens.py`, migration 0003, `tests/domain/test_tokens.py` | – |
 | 0012 | Merge only on the product owner's instruction | POLICY | CLAUDE.md, Git section; merge commits record the instruction; merge queue in `ci.yml` | No check that the instruction is recorded; the ADR says five review questions, the PR template has seven |
 | 0013 | Admin login with OIDC | BUILT | #7; `adapters/oidc.py` (PKCE, nonce, PyJWT), `admin/session.py`, Keycloak in `docker-compose.yml` | – (the session holds roles and scope as well, more than the ADR says) |
