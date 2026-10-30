@@ -352,6 +352,12 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             422, 403, 403, 403, 403, 403, 403
         ),
     },
+    # ADR 0073: the sender domain check; without a sender there is nothing to check (422).
+    "POST /admin/organisations/{org}/channels/email/domain": {
+        "/admin/organisations/demo/channels/email/domain": statuses(
+            422, 403, 403, 403, 403, 403, 403
+        ),
+    },
     "POST /admin/organisations/{org}/channels/sms": {
         "/admin/organisations/demo/channels/sms": statuses(422, 403, 403, 403, 403, 403, 403),
     },
@@ -887,6 +893,7 @@ WRITABLE_IN_MAINTENANCE = frozenset(
     {
         "POST /admin/organisations/{org}/channels/email",
         "POST /admin/organisations/{org}/channels/email/test",
+        "POST /admin/organisations/{org}/channels/email/domain",
         "POST /admin/organisations/{org}/channels/sms",
         "POST /admin/organisations/{org}/channels/{channel}/remove",
         "POST /admin/updates/update",
