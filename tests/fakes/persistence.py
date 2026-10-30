@@ -46,6 +46,7 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.staff import StaffFilter, StaffMember, visible
+from app.domain.tls import CertificateCheck
 from app.domain.updates import ReleaseCheck, UpdateRequest
 
 
@@ -88,6 +89,7 @@ class State:
     channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
+    certificate_check: CertificateCheck | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     custom_roles: dict[int, CustomRole] = field(default_factory=dict)
@@ -819,6 +821,12 @@ class InMemoryTransaction:
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
         self.state.release_check = check
+
+    async def get_certificate_check(self) -> CertificateCheck | None:
+        return self.state.certificate_check
+
+    async def save_certificate_check(self, check: CertificateCheck) -> None:
+        self.state.certificate_check = check
 
     async def get_maintenance_state(self) -> MaintenanceState:
         return self.state.maintenance

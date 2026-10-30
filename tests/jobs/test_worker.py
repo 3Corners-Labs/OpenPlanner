@@ -156,3 +156,26 @@ async def test_worker_reports_maintenance_that_has_been_on_too_long(
     assert [e.event.detail for e in events if e.event.action == "maintenance.overdue"] == [
         "hours:5"
     ]
+
+
+async def test_worker_records_what_it_finds_about_the_public_address(
+    settings: Settings, migrated_url: str
+) -> None:
+    # ADR 0064: the test settings use http, so the stored check says not_https.
+    from app.domain.tls import Finding
+    from app.domain.tls_check import CertificateStatus
+
+    configured = settings.model_copy(update={"database_url": migrated_url})
+    stop = asyncio.Event()
+    task = asyncio.create_task(run_worker(configured, stop, clock=FixedClock()))
+    await _until(configured.worker_heartbeat_path.exists)
+    stop.set()
+    await asyncio.wait_for(task, timeout=2)
+
+    engine = create_engine(migrated_url)
+    try:
+        check = await CertificateStatus(SqlUnitOfWork(engine)).latest()
+    finally:
+        await engine.dispose()
+    assert check is not None
+    assert check.finding is Finding.NOT_HTTPS

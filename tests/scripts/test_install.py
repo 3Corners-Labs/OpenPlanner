@@ -190,6 +190,7 @@ def test_production_install_from_scratch(host: Host) -> None:
     }
     assert host.settings(".env.update") == {
         "OPENPLANNER_MODE": "production",
+        "OPENPLANNER_TLS": "1",
         "COMPOSE_PROFILES": "tls",
         "OPENPLANNER_IMAGE": RELEASE,
     }
@@ -447,3 +448,104 @@ def test_the_installer_generates_the_keys_app_cli_init_generates() -> None:
 
     (keys,) = re.findall(r"^BOOTSTRAP_KEYS=\((.*)\)$", script, flags=re.MULTILINE)
     assert sorted(keys.split()) == sorted(KEYS)
+
+
+def test_test_mode_runs_the_https_proxy_by_default(host: Host) -> None:
+    # ADR 0064: HTTPS is the standard shape; only --no-tls leaves it to a proxy of your own.
+    result = host.run(
+        "--mode",
+        "test",
+        "--version",
+        "1.4.0",
+        "--non-interactive",
+        TLS_DOMAIN="test.example.nl",
+        ACME_EMAIL="ops@example.nl",
+    )
+
+    assert result.returncode == 0, result.stderr
+    env = host.settings(".env")
+    assert env["ENVIRONMENT"] == "test"
+    assert env["PUBLIC_BASE_URL"] == "https://test.example.nl"
+    assert host.settings("proxy.env") == {
+        "TLS_DOMAIN": "test.example.nl",
+        "ACME_EMAIL": "ops@example.nl",
+    }
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "tls"
+    assert host.file("certs").is_dir()
+    assert not host.ran("--profile tls rm --stop --force proxy")
+
+
+def test_no_tls_leaves_https_to_a_proxy_of_your_own(host: Host) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if k not in ("TLS_DOMAIN", "ACME_EMAIL")}
+    result = host.run(
+        "--mode",
+        "production",
+        "--no-tls",
+        "--non-interactive",
+        PUBLIC_BASE_URL="https://afspraak.example.nl",
+        FORWARDED_ALLOW_IPS="10.0.0.5",
+        **settings,
+    )
+
+    assert result.returncode == 0, result.stderr
+    env = host.settings(".env")
+    assert env["PUBLIC_BASE_URL"] == "https://afspraak.example.nl"
+    assert env["FORWARDED_ALLOW_IPS"] == "10.0.0.5"
+    assert not host.file("proxy.env").exists()
+    assert "COMPOSE_PROFILES" not in host.settings(".env.update")
+    assert host.ran("--profile tls rm --stop --force proxy")
+    # A rerun remembers the choice through the pin file.
+    again = host.run("--non-interactive")
+    assert again.returncode == 0, again.stderr
+    assert not host.file("proxy.env").exists()
+
+
+def test_a_lab_opts_in_to_https_with_a_domain(host: Host) -> None:
+    result = host.run(
+        "--mode",
+        "lab",
+        "--version",
+        "1.4.0",
+        "--tls-domain",
+        "docker01.example.nl",
+        "--acme-staging",
+        "--non-interactive",
+        ACME_EMAIL="ops@example.nl",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(".env")["PUBLIC_BASE_URL"] == "https://docker01.example.nl"
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "dev,tls"
+    assert host.settings("proxy.env") == {
+        "TLS_DOMAIN": "docker01.example.nl",
+        "ACME_EMAIL": "ops@example.nl",
+        "ACME_CA": "https://acme-staging-v02.api.letsencrypt.org/directory",
+    }
+
+
+def test_an_own_certificate_replaces_acme_and_needs_both_files(host: Host) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if k != "ACME_EMAIL"}
+    missing = host.run("--mode", "production", "--own-certificate", "--non-interactive", **settings)
+    assert missing.returncode == 1
+    assert "fullchain.pem and privkey.pem" in missing.stderr
+    assert not host.file("proxy.env").exists()
+
+    host.file("certs").mkdir(exist_ok=True)
+    host.file("certs/fullchain.pem").write_text("cert")
+    host.file("certs/privkey.pem").write_text("key")
+    result = host.run("--mode", "production", "--own-certificate", "--non-interactive", **settings)
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings("proxy.env") == {
+        "TLS_DOMAIN": "afspraak.example.nl",
+        "TLS_CERT_FILE": "/certs/fullchain.pem",
+        "TLS_KEY_FILE": "/certs/privkey.pem",
+    }
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "tls"
+
+
+def test_own_certificate_without_the_proxy_is_refused(host: Host) -> None:
+    result = host.run("--mode", "production", "--no-tls", "--own-certificate", "--non-interactive")
+
+    assert result.returncode == 1
+    assert "--own-certificate needs the HTTPS proxy" in result.stderr

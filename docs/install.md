@@ -44,10 +44,13 @@ would build a local image instead of running the signed release.
 | `--mode` | `ENVIRONMENT` | Services | For |
 |---|---|---|---|
 | `production` | `prod` | web, worker, HTTPS proxy (Let's Encrypt) | real citizens; public DNS name, ports 80 and 443 |
-| `test` | `test` | web, worker | acceptance behind your own address or proxy |
-| `lab` | `test` | web, worker, Keycloak, Mailpit | internal demo and integration tests (as on docker01) |
+| `test` | `test` | web, worker, HTTPS proxy (Let's Encrypt) | acceptance on its own public DNS name; `--no-tls` behind your own proxy |
+| `lab` | `test` | web, worker, Keycloak, Mailpit; HTTPS proxy with `--tls-domain` | internal demo and integration tests (as on docker01) |
 
-The script remembers the mode in `.env.update`, so later runs need no `--mode`.
+HTTPS is the standard shape (ADR 0064): `production` and `test` run the proxy unless `--no-tls`
+says a load balancer of your own does TLS; a `lab` runs it when `--tls-domain <host>` names a
+public DNS name. The script remembers the mode and that choice in `.env.update`, so later runs
+need neither.
 
 ## Prerequisites
 
@@ -118,9 +121,10 @@ system.
    healthy. `docker compose --env-file .env.update ps` shows them, and
    `systemctl list-timers openplanner-updater.timer` shows the updater.
 
-For production, a trial run against Let's Encrypt's staging CA first keeps you clear of its rate
-limits: add `--acme-staging` on the first run, then follow *HTTPS certificate* in
-`docs/runbook.md` to switch to the real CA.
+With the HTTPS proxy, a trial run against Let's Encrypt's staging CA first keeps you clear of its
+rate limits: add `--acme-staging` on the first run, then follow *HTTPS certificate* in
+`docs/runbook.md` to switch to the real CA; *System status* in the portal shows which
+certificate is served and whether browsers trust it.
 
 Without prompts, for automation, set the answers as environment variables named after the
 setting and add `--non-interactive`:
@@ -143,7 +147,10 @@ Webex Contact Center*.
 | `--version X.Y.Z` | pin this release (pulled, signature verified); without it a pinned release stays, and a first run takes the latest |
 | `--repository owner/name` | another repository's releases (default `3Corners-Labs/OpenPlanner`, or `UPDATE_REPOSITORY` from `.env`) |
 | `--non-interactive` | never ask; take answers from the environment (also when there is no terminal) |
-| `--acme-staging` | production: the first `proxy.env` points at Let's Encrypt's staging CA |
+| `--no-tls` | production, test: no HTTPS proxy; asks the public address and your proxy's address (`FORWARDED_ALLOW_IPS`) |
+| `--tls-domain HOST` | lab: run the HTTPS proxy for this host name (also sets it for the other modes) |
+| `--own-certificate` | `proxy.env` names `certs/fullchain.pem` and `certs/privkey.pem` instead of ACME (runbook, *Own certificate*) |
+| `--acme-staging` | with the HTTPS proxy: the first `proxy.env` points at Let's Encrypt's staging CA |
 | `--upgrade-docker` | also upgrade Docker Engine (restarts every container on the host) |
 | `--no-packages` | leave the host's packages alone; only check them |
 | `--no-updater` | do not install the host updater (portal update requests then wait) |
@@ -160,7 +167,7 @@ Webex Contact Center*.
 | `.env` readable by others | sets mode 600 |
 | a host package missing or outdated, cosign older than the latest release | installs or upgrades it |
 | updater, units, drop-in or `updater.env` missing or changed | installs them again from the checkout |
-| an HTTPS proxy running outside production (restarts for ever without `proxy.env`) | removes it |
+| an HTTPS proxy running where `--no-tls` was chosen (restarts for ever without `proxy.env`) | removes it |
 | `PUBLIC_BASE_URL` or the OIDC URL on `http` in production, a missing OIDC client secret, `ENVIRONMENT` not matching the mode | stops with the list; nothing is pulled or started |
 | a release that does not pass `cosign verify` | stops; the running version stays |
 

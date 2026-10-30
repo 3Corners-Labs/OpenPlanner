@@ -18,12 +18,13 @@ Public, unauthenticated: `GET /healthz`, `GET /readyz`.
 
 ## Flow: TLS termination (ADR 0030)
 
-Public: ports 80 and 443 of the `proxy` service (`--profile tls`).
+Public: ports 80 and 443 of the `proxy` service (`--profile tls`, the installer's default; ADR 0064).
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
 | Information disclosure | Traffic, session cookies or management tokens read on the network | HTTPS only: port 80 answers ACME challenges and otherwise redirects (308); HSTS from the app | `scripts/check-proxy.sh` (CI step "proxy check") |
-| Denial of service | Certificate expires unnoticed: bookings, admin login and webhooks stop together | Caddy renews at a third of the lifetime with retries; certificates kept in `proxy-data`; expiry check in the runbook | — (operational) |
+| Denial of service | Certificate expires unnoticed: bookings, admin login and webhooks stop together | Caddy renews at a third of the lifetime with retries; certificates kept in `proxy-data`; the worker probes the public address every 6 h, shows the finding on System status and raises `tls.certificate` below 20 days left (ADR 0064) | `tests/domain/test_tls.py`, `tests/domain/test_tls_check.py`, `scripts/check-proxy.sh` (`tls-check`) |
+| Information disclosure | An own certificate's private key readable by others on the host | `certs/` is git-ignored; the runbook sets the key to uid 10001 mode 600; the proxy mounts it read-only | `tests/scripts/test_install.py` (own certificate) |
 | Spoofing | Client forges `X-Forwarded-For` to dodge or exhaust per-IP rate limits | Caddy sets the header itself (no `trusted_proxies`); `web` trusts it only from the proxy's fixed address on the `edge` network | — (configuration in `docker-compose.yml`) |
 | Denial of service | Oversized bodies on public forms | 64 KB on `/g/*` and `/b/*`, 1 MB elsewhere (HTTP 413) | `scripts/check-proxy.sh` |
 | Denial of service | Slow-loris clients hold connections open | Header 10 s, body 30 s, write 60 s, idle 2 min in the Caddyfile | — |

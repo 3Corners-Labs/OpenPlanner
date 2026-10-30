@@ -102,7 +102,8 @@ production there is no bar. An acceptance environment where real citizens book m
 
 The image refuses to start in production (`ENVIRONMENT` defaults to `prod`) without
 `MANAGEMENT_TOKEN_KEY` and an `https` `PUBLIC_BASE_URL`. With the bundled TLS proxy (next
-section) nothing else is needed. Behind a reverse proxy of your own also set:
+section; the installer's default) nothing else is needed. Behind a reverse proxy of your own
+(`scripts/install.sh --no-tls`) also set:
 
 - `FORWARDED_ALLOW_IPS=<proxy address>` (read by uvicorn), so rate limits see the visitor's IP
   instead of one shared proxy address. Without it, a single bot can exhaust the booking limit
@@ -146,10 +147,28 @@ the environment outside the portal bounds still applies, but is marked
 row edited by hand) is not applied and is marked `! stored portal value ignored`. A change
 applies within 10 seconds in `web` and in the next loop of the worker, without a restart.
 
-## HTTPS certificate (ADR 0030)
+## HTTPS certificate (ADR 0030, ADR 0064)
 
 The `proxy` service (Caddy, profile `tls`) gets a certificate from Let's Encrypt over ACME and
-renews it on its own; nobody has to install or renew a certificate by hand.
+renews it on its own; nobody has to install or renew a certificate by hand. The installer runs
+it in `production` and `test` mode by default and in a `lab` with `--tls-domain`; `--no-tls`
+leaves HTTPS to a load balancer of your own.
+
+**Where to look.** *Platform → Advanced settings → System status* shows the certificate of the
+public address: issuer, valid until, days left, when it was last checked, and one finding
+(*in orde*, *verloopt binnenkort*, *niet vertrouwd*, …). The worker probes it every
+`TLS_CHECK_INTERVAL_HOURS` (6) and writes a system event `tls.certificate` when the finding
+changes or keeps failing (every `TLS_ALERT_REPEAT_HOURS`); below `TLS_EXPIRY_WARNING_DAYS`
+(20) left the finding is *expiring*, which means Caddy's renewal (at 30 days) is failing. On
+the host:
+
+```bash
+docker compose --env-file .env.update exec web python -m app.cli tls-check
+```
+
+prints the same and exits 1 on any finding (`--host`/`--port` probe another server without
+storing). *Unreachable* from the worker while browsers are fine means the host cannot reach its
+own public address (hairpin NAT or a firewall rule); open it, or accept the finding.
 
 First start:
 
@@ -157,7 +176,8 @@ First start:
    record, it must allow `letsencrypt.org`.
 2. Open ports 80 and 443 from the internet. Port 80 is needed for the ACME challenge and
    redirects everything else to https.
-3. `scripts/install.sh --mode production --acme-staging` does steps 3 and 4 (`docs/install.md`).
+3. `scripts/install.sh --mode production --acme-staging` does steps 3 and 4 (`docs/install.md`;
+   `--mode test` or `--mode lab --tls-domain <host>` for an acceptance or lab host).
    By hand: `cp proxy.env.example proxy.env` and fill in `TLS_DOMAIN=<host name>` and
    `ACME_EMAIL=<operations mailbox>`. The proxy reads only this file, not `.env`, so it never
    holds the app's secrets and works with `--env-file .env.update` (updater, ADR 0029) too.
@@ -167,7 +187,8 @@ First start:
    `ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory`, then
    `docker compose --env-file .env.update up -d` and look for `certificate obtained
    successfully` in `docker compose --env-file .env.update logs proxy`. Browsers will not trust
-   the staging certificate; that is expected.
+   the staging certificate, and System status says *niet vertrouwd* with the staging issuer;
+   that is expected.
 5. Remove `ACME_CA` (default: Let's Encrypt production), delete the staging certificate with
    `docker compose --env-file .env.update stop proxy && docker compose --env-file .env.update rm -f proxy && docker volume rm openplanner_proxy-data`,
    and start again with `docker compose --env-file .env.update up -d`.
@@ -176,10 +197,12 @@ Day to day:
 
 - **Renewal** happens inside the running proxy when a third of the lifetime is left (about 30
   days before expiry for 90-day certificates), with retries. A restart is not needed.
-- **Check the expiry date** (monthly, or in monitoring; Let's Encrypt sends no expiry mail):
+- **The expiry date is watched** by the worker (above): the finding *expiring* on System
+  status, the system event `tls.certificate` and `python -m app.cli tls-check` all say so, and
+  Let's Encrypt sends no expiry mail. Less than 20 days left means renewal is failing: read
+  `docker compose logs proxy` (`tls.obtain` / `tls.renew`). Usual causes: port 80 or 443
+  closed, DNS changed, a `CAA` record. By hand:
   `echo | openssl s_client -connect <host>:443 -servername <host> 2>/dev/null | openssl x509 -noout -enddate`.
-  Less than 20 days left means renewal is failing: read `docker compose logs proxy` (`tls.obtain`
-  / `tls.renew`). Usual causes: port 80 or 443 closed, DNS changed, a `CAA` record.
 - **Keep the `proxy-data` volume** and include it in the backup. It holds the certificate, its
   private key and the ACME account; without it every start requests a new certificate, and
   more than 5 per week for the same name are refused.
@@ -188,13 +211,50 @@ Day to day:
 - **Updates from the admin portal** (ADR 0029) restart only `web` and `worker`; the proxy keeps
   running and answers 502 for the seconds `web` is down. `.env.update` carries
   `COMPOSE_PROFILES=tls`, so `docker compose --env-file .env.update up -d` keeps the proxy in
-  the stack. An organisation-validated (PKIoverheid)
-  certificate without ACME is not supported by this profile (ADR 0030).
+  the stack.
 - **Webhooks**: with a public domain, `WEBHOOK_BASE_URL` can stay empty; Webex and WxCC use
   `PUBLIC_BASE_URL`.
 - `web` stays reachable on `127.0.0.1:8000` of the host itself, without the proxy's limits;
   keep shell access to the host restricted.
-- `make proxy-check` (also in CI) runs the whole flow against Pebble, Let's Encrypt's test CA.
+- `make proxy-check` (also in CI) runs the whole flow against Pebble, Let's Encrypt's test CA,
+  then the own-certificate mode below, and `tls-check` against both.
+
+### Own certificate instead of ACME (ADR 0064)
+
+For a PKIoverheid or other organisation-validated certificate, or any CA without ACME:
+
+1. Put the certificate chain (server certificate first, then the intermediates, PEM) and the
+   private key in `~/openplanner/certs/` as `fullchain.pem` and `privkey.pem`. The proxy runs
+   as uid 10001 and must read them: `sudo chown 10001:10001 certs/*.pem && chmod 600 certs/*.pem`
+   (the directory itself stays 755).
+2. `scripts/install.sh --own-certificate` writes `proxy.env` with `TLS_CERT_FILE=/certs/fullchain.pem`
+   and `TLS_KEY_FILE=/certs/privkey.pem` (by hand: those two lines, `ACME_EMAIL` may go) and
+   restarts the stack. The proxy's log says `own certificate from /certs/fullchain.pem`.
+3. System status shows the new issuer and expiry date. **Renewal is now yours**: put a calendar
+   entry at the expiry date minus a month, replace the two files and run
+   `docker compose --env-file .env.update restart proxy`. The worker's finding *expiring* is the
+   safety net, not the plan.
+
+Back to ACME: remove `TLS_CERT_FILE` and `TLS_KEY_FILE` from `proxy.env`, make sure
+`ACME_EMAIL` is there, and restart the proxy; it obtains a certificate again.
+
+### Test the certificate flow end to end (ADR 0064)
+
+On a host with a public DNS name and ports 80 and 443 open (docker01 in the lab):
+
+1. `scripts/install.sh --mode lab --tls-domain <host> --acme-staging` (or `--mode test`). The
+   proxy obtains a staging certificate; the log says `certificate obtained successfully`.
+2. Open *Platform → Advanced settings*: the certificate block shows the staging issuer and the
+   finding *niet vertrouwd*; the audit log (superuser) has a system event `tls.certificate`
+   with reason `untrusted`. The browser warns, as expected.
+3. Remove `ACME_CA` from `proxy.env`, delete the staging certificate
+   (`docker compose --env-file .env.update stop proxy && docker compose --env-file .env.update rm -f proxy && docker volume rm openplanner_proxy-data`)
+   and start again. Within the check interval (or at once with `tls-check`) System status says
+   *Let's Encrypt* and *in orde*, and the system event records the return to `ok`.
+4. The renewal itself is Caddy's: it runs when 30 days are left. The status page shows the new
+   expiry date then, and *expiring* appears only if it did not happen.
+5. Optionally the own-certificate path: a self-signed pair in `certs/`, `--own-certificate`,
+   System status says *niet vertrouwd* with your own issuer; back to ACME as above.
 
 ## Time zones and clock format
 
