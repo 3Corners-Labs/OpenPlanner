@@ -105,7 +105,7 @@ trust decision of the host team, never a portal setting.
 | 2 | `running_versions` and `system.version` at start-up; history from the audit log with *By*; audit filter *subject*; "changed outside the portal" notice | #146 | merged 2026-10-30 |
 | 3 | `release_listing` with notes; version picker and "Install this version"; `request_update(target)` | #148 | in PR |
 | 4 | docker01: channel switched in the portal, a chosen candidate installed, history shows who | | planned |
-| 5 | `update_check_minutes` (class C) and "Check now" (point 7); migration 0073 | #169 | in PR |
+| 5 | `update_check_minutes` (class C) and "Check now" (point 7); migration 0073 | #170 | in PR |
 
 ## Consequences
 
