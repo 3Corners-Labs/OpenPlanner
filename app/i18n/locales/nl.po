@@ -3808,6 +3808,18 @@ msgstr "Geen releaseversie (ontwikkelversie); updates worden niet aangeboden."
 msgid "admin.updates.commit"
 msgstr "Commit"
 
+msgid "admin.updates.channel"
+msgstr "Kanaal"
+
+msgid "admin.updates.channel.release"
+msgstr "Releases"
+
+msgid "admin.updates.channel.rc"
+msgstr "Releasekandidaten (elke merge naar main) en releases"
+
+msgid "admin.updates.auto_apply"
+msgstr "werkt zichzelf bij"
+
 msgid "admin.updates.latest"
 msgstr "Nieuwste versie"
 

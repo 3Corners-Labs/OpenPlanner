@@ -447,3 +447,73 @@ def test_the_installer_generates_the_keys_app_cli_init_generates() -> None:
 
     (keys,) = re.findall(r"^BOOTSTRAP_KEYS=\((.*)\)$", script, flags=re.MULTILINE)
     assert sorted(keys.split()) == sorted(KEYS)
+
+
+# Update channel (ADR 0059): test and lab hosts may follow release candidates.
+
+
+def _identity(host: Host) -> str:
+    text = (host.staged / "etc/openplanner/updater.env").read_text()
+    return next(line for line in text.splitlines() if line.startswith("CERT_IDENTITY_REGEXP="))[
+        len("CERT_IDENTITY_REGEXP=") :
+    ].strip("'")
+
+
+def test_the_rc_channel_follows_candidates_and_trusts_images_signed_on_main(host: Host) -> None:
+    host.given("latest", "v1.5.0-rc.3\n")
+
+    result = host.run("--mode", "lab", "--channel", "rc", "--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(".env")["UPDATE_CHANNEL"] == "rc"
+    assert host.ran("repos/3Corners-Labs/OpenPlanner/releases?per_page=1")
+    assert host.ran(f"pull -q {IMAGE}:1.5.0-rc.3")
+    assert host.settings(".env.update")["OPENPLANNER_IMAGE"] == digest(IMAGE, "1.5.0-rc.3")
+    workflow = "https://github.com/3Corners-Labs/OpenPlanner/.github/workflows/main.yml"
+    identity = _identity(host)
+    assert re.fullmatch(identity, f"{workflow}@refs/heads/main")
+    assert re.fullmatch(identity, f"{workflow}@refs/tags/v1.5.0")
+    assert not re.fullmatch(identity, f"{workflow}@refs/heads/feature")
+
+
+def test_the_release_channel_is_the_default_and_never_trusts_main(host: Host) -> None:
+    result = host.run("--mode", "lab", "--version", "1.4.0", "--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(".env")["UPDATE_CHANNEL"] == "release"
+    workflow = "https://github.com/3Corners-Labs/OpenPlanner/.github/workflows/main.yml"
+    assert not re.fullmatch(_identity(host), f"{workflow}@refs/heads/main")
+
+
+def test_production_refuses_the_rc_channel(host: Host) -> None:
+    result = host.run("--mode", "production", "--channel", "rc", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode != 0
+    assert "refused in production" in result.stderr
+    assert not host.file(".env").exists()
+    assert not host.ran("pull")
+
+
+def test_a_candidate_version_needs_the_rc_channel(host: Host) -> None:
+    result = host.run("--mode", "lab", "--version", "1.5.0-rc.3", "--non-interactive")
+
+    assert result.returncode != 0
+    assert "needs --channel rc" in result.stderr
+
+
+def test_a_rerun_with_another_channel_rewrites_only_that_key(host: Host) -> None:
+    assert host.run("--mode", "lab", "--version", "1.4.0", "--non-interactive").returncode == 0
+    before = host.settings(".env")
+
+    result = host.run("--channel", "rc")
+
+    assert result.returncode == 0, result.stderr
+    after = host.settings(".env")
+    assert after.pop("UPDATE_CHANNEL") == "rc"
+    before.pop("UPDATE_CHANNEL")
+    assert after == before
+    assert host.settings(".env")  # still readable after the rewrite
+    assert "heads/main" in _identity(host)
+    # Remembered: the next run without --channel keeps rc.
+    assert host.run().returncode == 0
+    assert host.settings(".env")["UPDATE_CHANNEL"] == "rc"

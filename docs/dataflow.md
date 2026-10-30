@@ -258,7 +258,8 @@ audited with keys only (`<calendar>:holiday.add`, `calendars`, `holiday.open`).
 ## Updates from the admin portal (ADR 0029)
 
 ```
-worker ──GET releases/latest (no data sent; optional read-only token)──> api.github.com
+worker ──GET releases/latest, or the releases list on the rc channel (ADR 0059; no data
+        sent; optional read-only token)──> api.github.com
         <── tag and release page ── stored in release_checks
 superuser ──POST update / restore / cancel──> web ──SQL──> update_requests (versions, subject id)
 superuser's browser ──GET /admin/updates/progress (every 5 s while open; ADR 0048)──> web
