@@ -47,9 +47,11 @@ from app.domain.booking import (
     Slot,
 )
 from app.domain.booking_changes import lapse_unconfirmed
+from app.domain.calls import apply_event, new_status
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure, covering
 from app.domain.confirmation import DEFAULT_CONFIRM_POLICY, ConfirmPolicy, confirm_window
+from app.domain.direct_leave import DirectLeft, plan_leave
 from app.domain.direct_queue import (
     ESTIMATE_WINDOW,
     DirectAvailability,
@@ -369,6 +371,32 @@ class BookingService:
             jobs = plan_for_cancellation(cancelled_at=now, team_invite=group.sends_team_invite)
             await tx.replace_jobs(_id(booking), jobs)
             return cancelled
+
+    async def leave_direct(self, management_token: str) -> DirectLeft:
+        """Stop waiting for a direct call: cancel it and end its work item (ADR 0019 point 4).
+
+        The pending jobs are replaced in the same transaction by the work item's ending (ADR
+        0021) and the purge; the meeting is deleted too unless an agent already took the call.
+        The place under the group's cap is free at once. A second request changes nothing.
+
+        Raises:
+            DomainError: ``booking_not_found`` for an unknown token, and for a token of a
+                scheduled booking, which is cancelled through ``cancel``.
+        """
+        async with self._uow.locked() as tx:
+            booking = await self._booking(tx, management_token)
+            if booking.kind is not BookingKind.DIRECT or booking.id is None:
+                raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+            if not booking.is_active:
+                return DirectLeft(booking, changed=False)
+            now = self._clock.now()
+            status = await tx.get_call_status(booking.id) or new_status(booking.id)
+            plan = plan_leave(booking, status, now)
+            await tx.save_booking(plan.booking)
+            await tx.replace_jobs(booking.id, plan.jobs)
+            await tx.add_booking_event(plan.event)
+            await tx.save_call_status(apply_event(status, plan.event.kind, now))
+            return DirectLeft(plan.booking, changed=True, agent_present=plan.agent_present)
 
     async def reschedule(self, management_token: str, new_start: datetime) -> BookingReceipt:
         """Move a booking to another slot of the same group, keeping contact and locale.

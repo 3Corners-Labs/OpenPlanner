@@ -16,6 +16,7 @@ from app.adapters.registrations import (
 )
 from app.adapters.webhook_selftest import Delivery, Outcome, deliveries_to_report
 from app.domain.admin import AdminService
+from app.domain.booking import MeetingRef
 from app.domain.calls import EventKind
 from app.domain.event_context import bind_booking, bind_level, trace_scope
 from app.domain.integration import IntegrationService
@@ -301,3 +302,35 @@ async def test_retry_plans_the_meeting_again_and_says_so(site: Site) -> None:
     assert 'name="job" value="create_video_room"' not in page  # pending now: no second button
     again = await site.client.post(url, data={"job": "send_confirmation"}, headers=SAME_ORIGIN)
     assert "done=retry_not_possible" in again.headers["location"]
+
+
+async def _with_meeting(site: Site, booking_id: int, meeting_id: str) -> None:
+    """Give the booking the Webex meeting ``meeting_id``, as the worker would."""
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        await tx.save_meeting(booking_id, MeetingRef(meeting_id, "https://site.webex.com/m/1"))
+
+
+async def test_the_meeting_id_is_on_the_agenda_and_the_booking_page(site: Site) -> None:
+    """A planner can quote the meeting id to Webex support, also after the citizen left."""
+    booking_id = await _book(site, "demo")
+    await _with_meeting(site, booking_id, "meeting-abc123")
+    await site.login_as(GROUP_ADMIN)
+
+    agenda = (await site.client.get("/admin/groups/demo/agenda?day=2026-01-02")).text
+    detail = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
+    english = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}?lang=en")).text
+
+    assert '<code class="muted">meeting-abc123</code>' in agenda
+    assert "<dt>Meeting-ID</dt><dd><code>meeting-abc123</code></dd>" in detail
+    assert "<dt>Meeting ID</dt>" in english
+    assert "https://site.webex.com/m/1" not in agenda + detail  # the join link stays out
+
+
+async def test_a_booking_without_a_meeting_shows_no_meeting_id(site: Site) -> None:
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+
+    detail = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
+
+    assert "Meeting-ID" not in detail

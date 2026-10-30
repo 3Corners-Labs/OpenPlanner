@@ -21,9 +21,17 @@
     <div><dt>{{ _("admin.updates.running") }}</dt><dd>{% if overview.current %}<code>{{ overview.current }}</code>{% else %}{{ _("admin.updates.no_release_build") }}{% endif %}</dd></div>
     <div><dt>{{ _("admin.updates.commit") }}</dt><dd>{% if commit and commit.url %}<a href="{{ commit.url }}"><code>{{ commit.short }}</code></a>{% elif commit %}<code>{{ commit.short }}</code>{% else %}{{ _("admin.updates.unknown") }}{% endif %}</dd></div>
     <div><dt>{{ _("admin.updates.channel") }}</dt><dd>{% if overview.channel.value == "rc" %}{{ _("admin.updates.channel.rc") }}{% else %}{{ _("admin.updates.channel.release") }}{% endif %}{% if overview.auto_apply %} <span class="chip">{{ _("admin.updates.auto_apply") }}</span>{% endif %}</dd></div>
-    <div><dt>{{ _("admin.updates.latest") }}</dt><dd>{% if overview.check and overview.check.latest %}<a href="{{ overview.check.latest.url }}">{{ overview.check.latest.version }}</a>{% else %}{{ _("admin.updates.unknown") }}{% endif %}</dd></div>
-    <div><dt>{{ _("admin.updates.checked_at") }}</dt><dd>{{ checked_at or _("admin.updates.never") }}{% if check_error %} <span class="chip chip--warning">{{ _("admin.updates.check_failed", code=check_error) }}</span>{% endif %}</dd></div>
+    <div><dt>{{ _("admin.updates.latest") }}</dt><dd>{% set newest = overview.newest or (overview.check.latest if overview.check else None) %}{% if newest %}<a href="{{ newest.url }}">{{ newest.version }}</a>{% else %}{{ _("admin.updates.unknown") }}{% endif %}</dd></div>
+    <div><dt>{{ _("admin.updates.checked_at") }}</dt><dd>{{ checked_at or _("admin.updates.never") }}{% if check_error %} <span class="chip chip--warning">{{ _("admin.updates.check_failed", code=check_error) }}</span>{% endif %}{% if overview.check_requested %} <span class="chip">{{ _("admin.updates.check_requested") }}</span>{% endif %}</dd></div>
   </dl>
+  {% if overview.enabled %}
+  <form method="post" action="/admin/updates/check">
+    <p class="hint">{{ _("admin.updates.check_interval", minutes=check_minutes) }}</p>
+    <div class="form-actions">
+      <button type="submit" class="button button--secondary"{% if overview.check_requested %} disabled{% endif %}>{{ _("admin.updates.check_now") }}</button>
+    </div>
+  </form>
+  {% endif %}
 </section>
 {% if progress %}
 <section class="card" aria-labelledby="open-heading">
@@ -38,16 +46,36 @@
 </section>
 {% endif %}
 {% if overview.available %}
-<form class="card" method="post" action="/admin/updates/update" aria-labelledby="update-heading">
+<section class="card" aria-labelledby="update-heading">
   <div class="card__header">
     <h2 id="update-heading">{{ _("admin.updates.update_heading", version=overview.available.version) }}</h2>
-    <p class="card__lead">{{ _("admin.updates.update_lead") }}</p>
+    <p class="card__lead">{{ _("admin.updates.update_lead") }} {{ _("admin.updates.choose_lead") }}</p>
   </div>
-  <p><a href="{{ overview.available.url }}">{{ icon("external") }}<span>{{ _("admin.updates.release_notes") }}</span></a></p>
-  <div class="form-actions">
-    <button type="submit" class="button">{{ _("admin.updates.update_now", version=overview.available.version) }}</button>
-  </div>
-</form>
+  {% if offered %}
+  <ul class="stack" aria-label="{{ _("admin.updates.choose_heading") }}">
+    {% for item in offered %}
+    <li class="stack__item">
+      <form method="post" action="/admin/updates/update">
+        <h3><code>{{ item.version }}</code>{% if item.candidate %} <span class="chip">{{ _("admin.updates.candidate") }}</span>{% endif %}{% if item.published %} <span class="hint">{{ _("admin.updates.published", at=item.published) }}</span>{% endif %}</h3>
+        {% if item.notes %}<ul class="hint">{% for line in item.notes %}<li>{{ line }}</li>{% endfor %}</ul>{% else %}<p class="hint">{{ _("admin.updates.no_notes") }}</p>{% endif %}
+        <p><a href="{{ item.url }}">{{ icon("external") }}<span>{{ _("admin.updates.release_notes") }}</span></a></p>
+        <input type="hidden" name="target" value="{{ item.version }}">
+        <div class="form-actions">
+          <button type="submit" class="button{% if not loop.first %} button--secondary{% endif %}">{% if loop.first %}{{ _("admin.updates.update_now", version=item.version) }}{% else %}{{ _("admin.updates.install_this", version=item.version) }}{% endif %}</button>
+        </div>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <form method="post" action="/admin/updates/update">
+    <p><a href="{{ overview.available.url }}">{{ icon("external") }}<span>{{ _("admin.updates.release_notes") }}</span></a></p>
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.updates.update_now", version=overview.available.version) }}</button>
+    </div>
+  </form>
+  {% endif %}
+</section>
 {% endif %}
 {% if overview.restore %}
 <form class="card" method="post" action="/admin/updates/restore" aria-labelledby="restore-heading">

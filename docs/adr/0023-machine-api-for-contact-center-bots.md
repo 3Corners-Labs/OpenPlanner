@@ -1,6 +1,6 @@
 # 0023. Machine API for contact-center bots (WxCC AI Agent)
 
-Status: accepted (2026-10-25). First step of open point O11.
+Status: accepted (2026-10-25). First step of open point O11. Partly built, checked on 2026-10-30; see `docs/adr-status.md` for what is built.
 
 ## Context
 

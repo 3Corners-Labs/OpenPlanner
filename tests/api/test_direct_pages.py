@@ -7,6 +7,7 @@ from datetime import timedelta
 
 import httpx
 import pytest
+import structlog.testing
 
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
@@ -16,12 +17,14 @@ from app.domain.admin import AdminService
 from app.domain.booking import Claim
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
+from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import DispatchKind, Offer
 from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
+from tests.support.citizen import confirm_newest
 from tests.support.domain import NOW
 
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
@@ -297,3 +300,228 @@ async def test_a_failed_meeting_is_told_instead_of_waiting_for_nothing(site: Sit
     assert 'href="/g/demo"' in failed  # schedule instead
     assert "/join/go" not in failed
     assert _poll_url(failed) is None
+
+
+async def _jobs(site: Site, booking_id: int) -> list[JobType]:
+    """Return the types of the booking's jobs, as the worker would find them."""
+    engine = create_engine(site.database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        jobs = await tx.get_booking_jobs(booking_id)
+    await engine.dispose()
+    return [job.type for job in jobs]
+
+
+async def _events(site: Site, booking_id: int) -> list[EventKind]:
+    """Return the kinds on the booking's timeline."""
+    engine = create_engine(site.database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        events = await tx.get_booking_events(booking_id)
+    await engine.dispose()
+    return [event.kind for event in events]
+
+
+def _leave_url(wait: str) -> str:
+    """Return the page that asks the citizen to confirm leaving, from the waiting page's URL."""
+    return f"{wait}/leave"
+
+
+async def test_the_waiting_page_offers_to_stop_waiting_with_a_form_that_needs_no_script(
+    site: Site,
+) -> None:
+    wait = (await site.start()).headers["location"]
+
+    page = (await site.client.get(wait)).text
+    confirm = (await site.client.get(_leave_url(wait))).text
+
+    assert f'href="{_leave_url(wait)}"' in page
+    assert "Stoppen met wachten" in page
+    assert f'<form method="post" action="{_leave_url(wait)}"' in confirm
+    assert 'type="submit"' in confirm
+    assert "<script" not in confirm
+    assert 'href="' + wait + '"' in confirm  # a way back that does not leave
+
+
+async def test_leaving_a_waiting_call_ends_the_work_item_and_says_so(site: Site) -> None:
+    wait = (await site.start()).headers["location"]
+    booking_id = await site.latest_booking_id()
+
+    response = await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
+    page = (await site.client.get(response.headers["location"])).text
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{wait}?status=left"
+    assert JobType.END_WXCC_TASK in await _jobs(site, booking_id)
+    assert JobType.DISPATCH_WXCC_TASK not in await _jobs(site, booking_id)
+    assert await _events(site, booking_id) == [
+        EventKind.MEETING_CREATED,
+        EventKind.TASK_CREATED,
+        EventKind.CITIZEN_LEFT,
+    ]
+    assert "U wacht niet meer" in page
+    assert "Er is geen gesprek meer" in page
+    assert 'href="/g/demo"' in page  # schedule instead
+    assert "/join/go" not in page
+    assert _poll_url(page) is None
+    assert "Stoppen met wachten" not in page
+
+
+async def test_leaving_frees_the_place_for_the_next_citizen(site: Site) -> None:
+    await _configure(site.database_url, direct_call_max_concurrent=1)
+    wait = (await site.start()).headers["location"]
+    assert (await site.start()).status_code == 409
+
+    await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
+
+    assert (await site.start()).status_code == 303
+
+
+async def test_leaving_after_an_agent_accepted_leaves_the_meeting_to_the_agent(
+    site: Site,
+) -> None:
+    wait = (await site.start()).headers["location"]
+    booking_id = await site.latest_booking_id()
+    await site.record("task-1", EventKind.TASK_CONNECTED)
+
+    confirm = (await site.client.get(_leave_url(wait))).text
+    response = await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
+    page = (await site.client.get(response.headers["location"])).text
+
+    assert "medewerker" in confirm  # the page warns that an agent has accepted
+    jobs = await _jobs(site, booking_id)
+    assert JobType.END_WXCC_TASK in jobs
+    assert JobType.DELETE_VIDEO_ROOM not in jobs
+    assert response.headers["location"] == f"{wait}?status=left_agent"
+    assert "U hebt het gesprek verlaten" in page
+
+
+async def test_leaving_a_call_in_the_own_queue_takes_it_off_the_agents_list(site: Site) -> None:
+    await _configure(site.database_url, dispatch_kind=DispatchKind.OPENPLANNER_QUEUE)
+    wait = (await site.start()).headers["location"]
+    booking_id = await site.latest_booking_id()
+
+    await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
+
+    engine = create_engine(site.database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        booking = await tx.get_booking(booking_id)
+    await engine.dispose()
+    assert booking is not None
+    assert not booking.is_active  # the queue shows confirmed bookings only
+    assert site.dispatcher.items == []
+
+
+async def test_leaving_twice_and_visiting_afterwards_is_harmless(site: Site) -> None:
+    wait = (await site.start()).headers["location"]
+    booking_id = await site.latest_booking_id()
+    await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
+    events = await _events(site, booking_id)
+
+    again = await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
+    later = (await site.client.get(wait)).text
+    confirm = await site.client.get(_leave_url(wait))
+
+    assert again.status_code == 303
+    assert await _events(site, booking_id) == events
+    assert "Dit gesprek is beëindigd" in later
+    assert "U wacht niet meer" not in later  # only the request that left says so
+    assert confirm.status_code == 303
+    assert confirm.headers["location"] == wait
+
+
+async def test_a_call_nobody_took_no_longer_offers_waiting_but_can_still_be_cleared(
+    site: Site,
+) -> None:
+    """Nobody came in time: no "stop waiting" on the page; a stale work item is still ended."""
+    wait = (await site.start()).headers["location"]
+    booking_id = await site.latest_booking_id()
+    site.clock.advance(timedelta(minutes=11))
+
+    page = (await site.client.get(wait)).text
+    response = await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
+
+    assert "geen medewerker beschikbaar" in page
+    assert "wait/leave" not in page
+    assert response.status_code == 303
+    assert JobType.END_WXCC_TASK in await _jobs(site, booking_id)
+
+
+async def test_a_wrong_token_leaves_nothing_and_says_nothing(site: Site) -> None:
+    wait = (await site.start()).headers["location"]
+    booking_id = await site.latest_booking_id()
+
+    post = await site.client.post("/b/not-a-real-token/wait/leave", headers=SAME_ORIGIN)
+    get = await site.client.get("/b/not-a-real-token/wait/leave")
+
+    assert (post.status_code, get.status_code) == (404, 404)
+    assert JobType.END_WXCC_TASK not in await _jobs(site, booking_id)
+    assert "We zoeken een medewerker" in (await site.client.get(wait)).text
+
+
+async def test_someone_elses_token_cannot_end_my_call(site: Site) -> None:
+    """Abuse case: guessing or altering a token never reaches another citizen's call."""
+    await _configure(site.database_url, direct_call_max_concurrent=None)
+    mine = (await site.start()).headers["location"]
+    my_id = await site.latest_booking_id()
+    other_token = mine.split("/")[2][:-1] + ("A" if not mine.split("/")[2].endswith("A") else "B")
+
+    forged = await site.client.post(f"/b/{other_token}/wait/leave", headers=SAME_ORIGIN)
+
+    assert forged.status_code == 404
+    assert JobType.END_WXCC_TASK not in await _jobs(site, my_id)
+    assert EventKind.CITIZEN_LEFT not in await _events(site, my_id)
+
+
+async def test_the_token_of_an_appointment_is_not_a_way_to_leave_it_as_a_call(site: Site) -> None:
+    """Abuse case: an appointment's management link must not run through the direct-call route."""
+    booked = await site.client.post(
+        "/g/demo/book", data={"start": "2026-01-02T08:00:00Z", **ADA}, headers=SAME_ORIGIN
+    )
+    assert booked.status_code == 303
+    token = await confirm_newest(site.client)
+
+    page = await site.client.get(f"/b/{token}/wait/leave")
+    post = await site.client.post(f"/b/{token}/wait/leave", headers=SAME_ORIGIN)
+
+    assert page.status_code == 303
+    assert page.headers["location"] == f"/b/{token}"
+    assert post.status_code == 303
+    assert post.headers["location"] == f"/b/{token}"
+    assert "Geannuleerd" not in (await site.client.get(f"/b/{token}")).text
+
+
+async def test_leaving_is_refused_across_sites(site: Site) -> None:
+    wait = (await site.start()).headers["location"]
+    booking_id = await site.latest_booking_id()
+
+    cross = await site.client.post(_leave_url(wait), headers={"sec-fetch-site": "cross-site"})
+
+    assert cross.status_code == 403
+    assert EventKind.CITIZEN_LEFT not in await _events(site, booking_id)
+
+
+async def test_leaving_is_rate_limited_like_booking(demo_settings: Settings) -> None:
+    """Abuse case: repeated attempts on the leave route are bounded by the booking limit."""
+    await _configure(demo_settings.database_url, **WIRED)
+    limited = demo_settings.model_copy(
+        update={"rate_limit_enabled": True, "rate_limit_bookings": "2/hour"}
+    )
+    integrations = Integrations(None, FakeVideo(), FakeDispatcher())
+    async with app_client(limited, FixedClock(NOW), integrations) as client:
+        statuses = [
+            (await client.post("/b/guess/wait/leave", headers=SAME_ORIGIN)).status_code
+            for _ in range(3)
+        ]
+
+    assert statuses == [404, 404, 429]
+
+
+async def test_leaving_logs_the_booking_and_meeting_ids_but_no_token(site: Site) -> None:
+    wait = (await site.start()).headers["location"]
+    token = wait.split("/")[2]
+
+    with structlog.testing.capture_logs() as events:
+        await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
+
+    logged = [e for e in events if e["event"] == "direct.left"]
+    assert [(e["meeting_id"], e["agent_present"]) for e in logged] == [("meeting-1", False)]
+    assert token not in repr(events)

@@ -9,7 +9,7 @@ reach production, which uses PingFederate.
 
 | User | Role | Scope | Purpose |
 |---|---|---|---|
-| `super` | superuser | everything | full access |
+| `super` | superuser + org_admin + group_admin + auditor + agent | everything (also organisation `demo` and group `demo`) | full access; holds every built-in role at once, so the portal can be tried as an admin with several roles |
 | `orgadmin` | org_admin | organisation `demo` | own organisation and its groups |
 | `groupadmin` | group_admin | group `demo` | own group only |
 | `auditor` | auditor | organisation `demo` | compliance and privacy: reads the log, no personal data (ADR 0039) |

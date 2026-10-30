@@ -2,9 +2,10 @@
 
 Three callers, three paths:
 
-    worker         check_if_due ─► ReleaseSource.latest (at most hourly) ─► release_checks
-    superuser      notice (banner) · overview · request_update · request_restore · cancel
-                   (system.update, every change audited)
+    worker         check_if_due ─► ReleaseSource.latest (once per interval, or when asked)
+                   ─► release_checks
+    superuser      notice (banner) · overview · request_check · request_update ·
+                   request_restore · cancel (system.update, every change audited)
     overview page  summary: the notice without a principal, for the *System status* widget
                    (its route carries settings.platform.view, ADR 0061 §2)
     host updater   claim ─► running ─► report_step(step)* ─► report(succeeded | rolled_back
@@ -14,8 +15,9 @@ The service never touches containers or images: it only records what is asked an
 happened. The host updater does the work and checks the image signature.
 """
 
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field, replace
+from datetime import timedelta
 
 from app.domain.admin import AdminService, record_change, require
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Outcome, Source
@@ -23,10 +25,12 @@ from app.domain.authorization import Permission, Principal, Scope, Target, decid
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, IntegrationError, ReleaseSource, Transaction, UnitOfWork
 from app.domain.updates import (
+    CHECK_INTERVAL,
     HISTORY_ACTIONS,
     HISTORY_DETAILS,
     HOST_ACTOR,
     VERSION_ACTION,
+    ListedRelease,
     Release,
     ReleaseCheck,
     RunningVersion,
@@ -41,6 +45,8 @@ from app.domain.updates import (
     claimed,
     detail_key,
     finished,
+    offered,
+    on_channel,
     open_request,
     progressed,
     recent_outcome,
@@ -86,13 +92,19 @@ class UpdateOverview:
         enabled: Whether the installation checks for releases (``UPDATE_REPOSITORY``).
         channel: What it follows: releases only, or release candidates too (ADR 0059).
         auto_apply: Whether the worker requests a newer version itself.
+        interval: How often the worker checks (``update_check_minutes``).
         current: The running version; ``None`` for a build that is not a release.
         check: The latest release check.
+        check_requested: Whether a superuser asked for a check the worker has not run yet.
+        newest: The newest version on the channel, from the stored listing; ``None`` when
+            nothing is listed (the page then shows the check's latest, if any).
         available: A newer release that can be requested now.
         open: The request that is waiting or running.
         unclaimed: Whether ``open`` has waited so long that no updater seems installed.
         restore: The update whose previous version can be restored now.
         history: The newest requests, newest first.
+        offered: The listed versions newer than the running one on the channel, newest
+            first, with their notes (ADR 0067 point 3); empty while a request is open.
         outside_change: The running version when it came from outside the portal (installer,
             by hand) and is the latest change (ADR 0067 point 6); else ``None``.
     """
@@ -102,12 +114,16 @@ class UpdateOverview:
     auto_apply: bool
     current: Version | None
     check: ReleaseCheck | None
+    newest: Release | None
     available: Release | None
     open: UpdateRequest | None
     unclaimed: bool
     restore: UpdateRequest | None
     history: list[UpdateRequest]
     outside_change: RunningVersion | None = None
+    offered: list[ListedRelease] = field(default_factory=list)
+    interval: timedelta = CHECK_INTERVAL
+    check_requested: bool = False
 
 
 class UpdateService:
@@ -127,6 +143,8 @@ class UpdateService:
             (ADR 0067).
         auto_apply: Whether a check that finds a newer version requests the update itself;
             a value or a callable, as ``channel``.
+        interval: How often the worker checks for releases (``update_check_minutes``); a
+            value or a callable, as ``channel``.
     """
 
     def __init__(
@@ -140,6 +158,7 @@ class UpdateService:
         checking: bool | None = None,
         channel: UpdateChannel | Callable[[], UpdateChannel] = UpdateChannel.RELEASE,
         auto_apply: bool | Callable[[], bool] = False,
+        interval: timedelta | Callable[[], timedelta] = CHECK_INTERVAL,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -150,6 +169,7 @@ class UpdateService:
         self._checking = releases is not None if checking is None else checking
         self._channel = channel if callable(channel) else _constant(channel)
         self._auto_apply = auto_apply if callable(auto_apply) else _constant(auto_apply)
+        self._interval = interval if callable(interval) else _constant(interval)
 
     @property
     def current(self) -> Version | None:
@@ -159,37 +179,75 @@ class UpdateService:
     # --- worker ------------------------------------------------------------------------
 
     async def check_if_due(self) -> bool:
-        """Look up the latest release when the last check is an hour old; return if it did.
+        """Look up the latest release when the interval has passed or a superuser asked.
 
-        A failed lookup is stored as an error code next to the release found before, so the
-        page can say the check fails without forgetting what is known. With ``auto_apply``, a
-        newer version becomes an update request at once (actor ``system``, audited), unless a
-        request is already open (ADR 0059 point 6).
+        Returns whether it did. A failed lookup is stored as an error code next to the
+        release found before, so the page can say the check fails without forgetting what is
+        known. With ``auto_apply``, a newer version becomes an update request at once (actor
+        ``system``, audited), unless a request is already open (ADR 0059 point 6).
         """
         if self._releases is None:
             return False
         now = self._clock.now()
         async with self._uow.read() as tx:
             last = await tx.get_release_check()
-        if not check_due(last, now):
+        if not check_due(last, now, self._interval()):
             return False
+        listing: list[ListedRelease] | None
         try:
-            check = ReleaseCheck(now, await self._releases.latest())
+            listing = await self._releases.listing()
+            ranked = sorted(listing, key=lambda item: item.version, reverse=True)
+            check = ReleaseCheck(now, ranked[0].release if ranked else None)
         except IntegrationError as error:
+            listing = None
             check = ReleaseCheck(now, last.latest if last else None, error.code)
         async with self._uow.locked() as tx:
             await tx.save_release_check(check)
-            release = self._available(check)
+            if listing is not None:
+                await tx.save_release_listing(listing)
+            release = self._available(check, listing or await tx.get_release_listing())
             if self._auto_apply() and release is not None and self._current is not None:
                 if open_request(await tx.get_update_requests()) is None:
                     await self._add(tx, None, UpdateAction.UPDATE, release.version)
         return True
 
-    def _available(self, check: ReleaseCheck | None) -> Release | None:
-        """Return the newer version the channel offers, if any."""
+    def _available(
+        self, check: ReleaseCheck | None, listing: Sequence[ListedRelease]
+    ) -> Release | None:
+        """Return the newest version the channel offers above the running one, if any.
+
+        From the stored listing (ADR 0067); without one (an installation that never listed),
+        from the check's latest as before.
+        """
+        choices = offered(self._current, listing, self._channel())
+        if choices:
+            return choices[0].release
+        if listing:
+            return None
         return available_update(self._current, check, self._channel())
 
     # --- superuser ---------------------------------------------------------------------
+
+    async def request_check(self, principal: Principal) -> None:
+        """Ask the worker to check for releases at its next poll instead of at the interval.
+
+        The web process never asks GitHub itself (ADR 0029): the request is a mark on the
+        stored check, which the worker's next check clears. Before the first check there is
+        nothing to mark; the worker checks on its next poll anyway.
+
+        Raises:
+            DomainError: ``not_permitted``; ``update_not_available`` when the installation
+                does not check for releases (no ``UPDATE_REPOSITORY``).
+        """
+        require(await self._admin.authorize(principal, _PERMISSION))
+        if not self._checking:
+            raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
+        now = self._clock.now()
+        async with self._uow.locked() as tx:
+            last = await tx.get_release_check()
+            if last is not None and last.requested_at is None:
+                await tx.save_release_check(replace(last, requested_at=now))
+            await record_change(tx, now, principal, _PERMISSION, None, None, "check.request")
 
     async def notice(self, principal: Principal) -> UpdateNotice | None:
         """Return the banner for ``principal``, or ``None`` when there is nothing to show.
@@ -212,9 +270,10 @@ class UpdateService:
         async with self._uow.read() as tx:
             check = await tx.get_release_check()
             history = await tx.get_update_requests()
+            listing = await tx.get_release_listing()
         current = open_request(history)
         return UpdateNotice(
-            None if current else self._available(check),
+            None if current else self._available(check, listing),
             recent_outcome(history, now),
             current,
         )
@@ -231,20 +290,26 @@ class UpdateService:
             check = await tx.get_release_check()
             history = await tx.get_update_requests()
             versions = await tx.get_running_versions(2)
+            listing = await tx.get_release_listing()
         current = open_request(history)
         outside = versions[0] if len(versions) > 1 and versions[0].request_id is None else None
+        on_this_channel = on_channel(listing, self._channel())
         return UpdateOverview(
             enabled=self._checking,
             channel=self._channel(),
             auto_apply=self._auto_apply(),
+            interval=self._interval(),
             current=self._current,
             check=check,
-            available=None if current else self._available(check),
+            check_requested=check is not None and check.requested_at is not None,
+            newest=on_this_channel[0].release if on_this_channel else None,
+            available=None if current else self._available(check, listing),
             open=current,
             unclaimed=current is not None and unclaimed(current, now),
             restore=None if current else restore_candidate(history, self._current, now),
             history=history,
             outside_change=outside,
+            offered=[] if current else offered(self._current, listing, self._channel()),
         )
 
     async def history(self, principal: Principal, limit: int = 30) -> list[AuditEntry]:
@@ -301,20 +366,36 @@ class UpdateService:
                 await tx.add_audit_event(event)
         return stored
 
-    async def request_update(self, principal: Principal) -> UpdateRequest:
-        """Ask the host updater to move to the latest release.
+    async def request_update(
+        self, principal: Principal, target: Version | None = None
+    ) -> UpdateRequest:
+        """Ask the host updater to move to ``target``, or to the newest version offered.
+
+        ``target`` must be in the listing and newer than the running version (ADR 0067
+        point 3: forward only; going back is ``request_restore``).
 
         Raises:
             DomainError: ``not_permitted``; ``update_in_progress`` while a request is open;
-                ``update_not_available`` without a newer release (or on a development build).
+                ``update_not_available`` without a newer release, for a target that is not
+                offered, or on a development build.
         """
         require(await self._admin.authorize(principal, _PERMISSION))
         async with self._uow.locked() as tx:
             await _refuse_when_open(tx)
-            release = self._available(await tx.get_release_check())
-            if release is None or self._current is None:
+            if self._current is None:
                 raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
-            return await self._add(tx, principal, UpdateAction.UPDATE, release.version)
+            listing = await tx.get_release_listing()
+            choices = offered(self._current, listing, self._channel())
+            if target is None:
+                release = self._available(await tx.get_release_check(), listing)
+                if release is None:
+                    raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
+                chosen = release.version
+            else:
+                if target not in {item.version for item in choices}:
+                    raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
+                chosen = target
+            return await self._add(tx, principal, UpdateAction.UPDATE, chosen)
 
     async def request_restore(self, principal: Principal) -> UpdateRequest:
         """Ask the host updater to go back to the version the latest update replaced.
