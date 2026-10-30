@@ -15,6 +15,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.OUTSIDE_BOOKING_WINDOW: "error.outside_booking_window",
     ErrorCode.BOOKING_LOCKED: "error.booking_locked",
     ErrorCode.BOOKING_NOT_ACTIVE: "error.booking_not_active",
+    ErrorCode.BOOKING_NOT_PENDING: "error.booking_not_pending",
     ErrorCode.SAME_SLOT: "error.same_slot",
     ErrorCode.DATABASE_BUSY: "error.database_busy",
     ErrorCode.INVALID_CONTACT: "error.invalid_request",
@@ -63,6 +64,9 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.SETTING_INVALID: "admin.form.error.setting_invalid",
     ErrorCode.SETTING_COMBINATION: "admin.form.error.setting_combination",
     ErrorCode.SETTING_EXPIRY: "admin.form.error.setting_expiry",
+    ErrorCode.SETTING_NO_KEY: "admin.form.error.setting_no_key",
+    ErrorCode.SETTING_NOT_LOCKED: "admin.form.error.setting_not_locked",
+    ErrorCode.LOGIN_LOCKOUT: "admin.form.error.login_lockout",
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {

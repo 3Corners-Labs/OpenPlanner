@@ -67,6 +67,9 @@ DONE_MESSAGES: dict[str, str] = {
     "scenario_deleted": "admin.done.scenario_deleted",
     "checked": "admin.done.checked",
     "maintenance_on": "admin.done.maintenance_on",
+    "adopted": "admin.done.adopted",
+    "login_mapping_saved": "admin.done.login_mapping_saved",
+    "login_mapping_refused": "admin.done.login_mapping_refused",
     "maintenance_off": "admin.done.maintenance_off",
     "simulated": "admin.done.simulated",
     "simulated_prepared": "admin.done.simulated_prepared",
@@ -109,6 +112,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "planner_change_min_lead_minutes": "admin.form.error.planner_change_min_lead_minutes",
     "queue_visible_from_minutes": "admin.form.error.queue_visible_from_minutes",
     "queue_free_pick_allowed": "admin.form.error.choice",
+    "calendar_invite_address": "admin.form.error.calendar_invite_address",
     "phone_mode": "admin.form.error.phone_mode",
     "video_host_email": "admin.form.error.video_host_email",
     "wxcc_business_address": "admin.form.error.integration_text",
@@ -200,6 +204,7 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CLOSURE_NOT_FOUND: "admin.form.error.closure_not_found",
     ErrorCode.SCENARIO_NOT_FOUND: "admin.form.error.scenario_not_found",
     ErrorCode.BOOKING_NOT_ACTIVE: "error.booking_not_active",
+    ErrorCode.BOOKING_NOT_PENDING: "error.booking_not_pending",
     ErrorCode.BOOKING_LOCKED: "error.booking_locked",
     ErrorCode.GROUP_CLOSED: "error.group_closed",
     ErrorCode.SLOT_FULL: "error.slot_full",
@@ -218,6 +223,9 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SETTING_INVALID: "admin.form.error.setting_invalid",
     ErrorCode.SETTING_COMBINATION: "admin.form.error.setting_combination",
     ErrorCode.SETTING_EXPIRY: "admin.form.error.setting_expiry",
+    ErrorCode.SETTING_NO_KEY: "admin.form.error.setting_no_key",
+    ErrorCode.SETTING_NOT_LOCKED: "admin.form.error.setting_not_locked",
+    ErrorCode.LOGIN_LOCKOUT: "admin.form.error.login_lockout",
 }
 
 

@@ -326,7 +326,7 @@ class ClosureService:
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
             group = await _group(tx, slug)
-            await self._cancel(tx, await _suspended(tx, group, booking_id))
+            await self._cancel(tx, group, await _suspended(tx, group, booking_id))
             await self._audit(tx, principal, authorization, slug, "booking.cancel")
 
     async def cancel_all(self, principal: Principal, slug: str) -> BulkOutcome:
@@ -340,7 +340,7 @@ class ClosureService:
             group = await _group(tx, slug)
             bookings = await tx.list_suspended_bookings(self._scope(principal), group.id)
             for booking in bookings:
-                await self._cancel(tx, booking)
+                await self._cancel(tx, group, booking)
             detail = f"booking.cancel_all,bookings:{len(bookings)}"
             await self._audit(tx, principal, authorization, slug, detail)
         return BulkOutcome(len(bookings))
@@ -501,9 +501,10 @@ class ClosureService:
         bookings = await tx.find_confirmed_bookings(group.id, closure.starts_at, closure.ends_at)
         for booking in bookings:
             await tx.save_booking(booking.suspend(closure_id))
-            await tx.replace_jobs(
-                _id(booking), plan_for_suspension(now=now, purge_at=closure.purge_at)
+            jobs = plan_for_suspension(
+                now=now, purge_at=closure.purge_at, team_invite=group.sends_team_invite
             )
+            await tx.replace_jobs(_id(booking), jobs)
         return len(bookings)
 
     async def _lift(
@@ -555,12 +556,14 @@ class ClosureService:
             now=now,
             dispatch_lead=group.dispatch_lead,
             message=JobType.SEND_REINSTATEMENT,
+            team_invite=group.sends_team_invite,
         )
         await tx.replace_jobs(_id(booking), jobs)
 
-    async def _cancel(self, tx: Transaction, booking: Booking) -> None:
-        """Cancel ``booking`` with the cancellation mail and the usual purge."""
-        await booking_changes.cancel(tx, booking, self._clock.now())
+    async def _cancel(self, tx: Transaction, group: Group, booking: Booking) -> None:
+        """Cancel ``booking`` with the cancellation mail, the team's withdrawal and the purge."""
+        now = self._clock.now()
+        await booking_changes.cancel(tx, booking, now, team_invite=group.sends_team_invite)
 
     async def _closure_bookings(
         self, tx: Transaction, principal: Principal, group: Group, closure: Closure

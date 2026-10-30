@@ -134,7 +134,13 @@ docker compose exec web python -m app.cli settings reset ADMIN_SESSION_HOURS
 docker compose exec web python -m app.cli settings reset --all-class-c
 ```
 
-A setting the environment locks is refused; change the variable and restart instead. A value set in
+A setting the environment locks is refused; change the variable and restart instead.
+
+**Moving a value from `.env` into the portal** (ADR 0042 §12): on *Advanced settings* a locked
+setting has *Manage this here from now on*. It copies the current value into the portal
+(a password or token sealed under `SETTINGS_ENCRYPTION_KEY`); then remove the variable from
+`.env` and restart `web` and `worker`. Secrets set in the portal make the key backup more
+important still: without `SETTINGS_ENCRYPTION_KEY` they cannot be read. A value set in
 the environment outside the portal bounds still applies, but is marked
 `! outside portal bounds`. A stored portal value that no longer meets the rules (for example a
 row edited by hand) is not applied and is marked `! stored portal value ignored`. A change
@@ -258,7 +264,16 @@ There is no login bypass, fallback IdP or local account. Diagnose and act from t
    came in but matched none of `OIDC_ROLE_*`, and `claims_present`, the *names* of the
    claims in the ID token. Values are never logged. Typical cause: the claim or a role value
    was renamed at PingFederate. Fix it there, or set the matching `OIDC_*` variable and
-   restart `web`.
+   restart `web`. A mapping changed in the portal (ADR 0042 §8) is undone from the host
+   without a restart:
+
+   ```sh
+   docker compose exec web python -m app.cli settings reset OIDC_ROLE_CLAIM
+   docker compose exec web python -m app.cli settings set OIDC_ROLE_SUPERUSER openplanner-superuser
+   ```
+
+   Both are audited as `system:cli`; the portal itself only saves a mapping after a dry run
+   on the superuser's own fresh login.
 3. **Teams must close while the IdP is down** (ADR 0024, same rules, mails and audit as the
    portal; the audit log shows the actor `system:cli`):
 

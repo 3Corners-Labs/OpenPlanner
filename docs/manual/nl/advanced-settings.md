@@ -38,8 +38,10 @@ Een gewijzigde waarde geldt binnen ongeveer tien seconden, zonder herstart.
 ## Een instelling wijzigen
 
 De superuser wijzigt de instellingen voor bedrijfsvoering, bewaartermijnen, opslag,
-snelheidslimieten, sessies van het beheerportaal, medewerkers en de planner. De reservemailserver,
-Webex, updates en de inlogkoppeling volgen in een latere versie.
+snelheidslimieten, sessies van het beheerportaal, medewerkers en de planner, de reservemailserver,
+de updatecontrole en de Webex Service App met het WxCC-adres. De webhookgeheimen (die de server
+zelf maakt) en de inlogkoppeling volgen in een latere versie. Na een gewijzigde Webex-waarde
+worden videogesprekken en werkitems binnen ongeveer tien seconden opnieuw gekoppeld. Zet bij een nieuwe Service App de client-ID, het client secret en het refresh token tegelijk.
 
 - Vul onder **Wijzigen** de nieuwe waarde in en kies **Opslaan**. Het portaal accepteert alleen
   waarden binnen zijn grenzen, bijvoorbeeld 1 tot 30 afspraken per uur per adres. Een waarde
@@ -50,12 +52,31 @@ Webex, updates en de inlogkoppeling volgen in een latere versie.
 - **Standaardwaarde gebruiken** haalt de hier ingestelde waarde weg; dan geldt weer de
   standaardwaarde (of de waarde van de server).
 - Een instelling die **vastgezet is door de beheerder van de server** heeft geen formulier:
-  wijzig die in de omgeving van de server, of vraag het de beheerder.
+  wijzig die in de omgeving van de server, of vraag het de beheerder. **Beheer dit voortaan hier**
+  neemt de waarde van de server over in het portaal; vraag de beheerder daarna de variabele die
+  bij de regel staat weg te halen en te herstarten. Tot dan geldt de waarde van de server nog.
+- **Wachtwoorden en tokens** (het wachtwoord van de mailserver, het leestoken van de
+  updatecontrole) kunt u alleen schrijven: het scherm zegt alleen of er een is ingesteld. Laat het
+  veld leeg om de huidige te houden; **Standaardwaarde gebruiken** haalt hem weg. Ze worden
+  versleuteld opgeslagen en vragen de `SETTINGS_ENCRYPTION_KEY` van de server.
 - Het **logniveau** valt altijd vanzelf terug naar de standaard, na hooguit 24 uur. Vul in na
   hoeveel uur. Persoonsgegevens blijven op elk niveau gemaskeerd in het log.
 
 Voor een wijziging moet u kort geleden zijn ingelogd. Elke wijziging staat in het auditlog met
 de oude en de nieuwe waarde; een geweigerde wijziging ook.
+
+## De inlogkoppeling wijzigen
+
+Alleen de superuser kan wijzigen welke claims van de identity provider de rollen, organisaties
+en groepen dragen, en welke waarde welke rol is. Vul **Inlogkoppeling wijzigen** in en kies
+**Testen met een nieuwe login**. U wordt naar de identity provider gestuurd om opnieuw in te
+loggen. De nieuwe koppeling wordt op die login toegepast: hij wordt alleen bewaard als u er nog
+superuser mee bent. Anders verandert er niets en meldt het scherm dat. Zo kan niemand per
+ongeluk iedereen buitensluiten.
+
+Is een waarde vastgezet door de beheerder van de server, dan is de hele koppeling van de
+beheerder en staat het formulier er niet. Verandert de identity provider later een claim of
+rolwaarde, dan kan de beheerder van de server de koppeling vanaf de server herstellen.
 
 ## Opmerkingen
 
