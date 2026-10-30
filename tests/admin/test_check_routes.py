@@ -1,6 +1,7 @@
 """The "Koppeling controleren" button on a group's settings page."""
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import httpx
 import pytest
@@ -13,6 +14,7 @@ from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.main import create_app
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, Site
 from tests.admin.test_admin_flow import audit_events
+from tests.admin.test_group_routes import SETTINGS_FORM
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.integrations import FakeChecker
@@ -38,12 +40,13 @@ FINDINGS = [
 ]
 
 
-@pytest.fixture
-async def checked(settings: Settings, admin_db: str) -> AsyncIterator[tuple[Site, FakeChecker]]:
+@asynccontextmanager
+async def _site(settings: Settings, admin_db: str, checker: FakeChecker) -> AsyncIterator[Site]:
+    """The admin site with ``checker`` as the only configured integration."""
     engine = create_engine(admin_db)
     await seed_demo(engine)
     await engine.dispose()
-    idp, checker = FakeIdentityProvider(), FakeChecker(FINDINGS)
+    idp = FakeIdentityProvider()
     app = create_app(
         settings.model_copy(update={"database_url": admin_db}),
         FixedClock(NOW),
@@ -56,7 +59,21 @@ async def checked(settings: Settings, admin_db: str) -> AsyncIterator[tuple[Site
             transport=httpx.ASGITransport(app=app), base_url="http://testserver"
         ) as client,
     ):
-        yield Site(client, idp, FixedClock(NOW)), checker
+        yield Site(client, idp, FixedClock(NOW))
+
+
+@pytest.fixture
+async def checked(settings: Settings, admin_db: str) -> AsyncIterator[tuple[Site, FakeChecker]]:
+    checker = FakeChecker(FINDINGS)
+    async with _site(settings, admin_db, checker) as site:
+        yield site, checker
+
+
+@pytest.fixture
+async def broken(settings: Settings, admin_db: str) -> AsyncIterator[tuple[Site, FakeChecker]]:
+    checker = FakeChecker([], error=RuntimeError("adapter crashed"))
+    async with _site(settings, admin_db, checker) as site:
+        yield site, checker
 
 
 async def test_the_settings_page_offers_the_check(checked: tuple[Site, FakeChecker]) -> None:
@@ -118,3 +135,52 @@ async def test_cross_site_check_is_refused(checked: tuple[Site, FakeChecker]) ->
 
     assert response.status_code == 403
     assert checker.calls == []
+
+
+# --- ADR 0065 step 2: a changed host is checked at once ---------------------------------------
+
+
+async def _save(site: Site, host: str) -> httpx.Response:
+    form = {**SETTINGS_FORM, "video_host_email": host}
+    return await site.client.post(SETTINGS, data=form, headers=SAME_ORIGIN)
+
+
+async def test_saving_a_new_host_checks_the_group_and_reports_the_failure(
+    checked: tuple[Site, FakeChecker],
+) -> None:
+    site, checker = checked
+    await site.login_as(ORG_ADMIN)
+
+    response = await _save(site, "host@example.nl")
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{SETTINGS}?done=saved"
+    assert checker.calls == [("demo", ["demo"])]
+    page = (await site.client.get(SETTINGS)).text
+    assert 'Uitslag: <span class="chip chip--danger">Fout</span>' in page  # the latest check
+    events = [(a, b, str(c), d) for a, b, c, d in await audit_events(site)]
+    assert ("system", "integration.check", "failure", "wxcc.schema.refused") in events
+    # Saving the same host again, or other settings, checks nothing.
+    await _save(site, "host@example.nl")
+    await site.client.post(
+        SETTINGS,
+        data={**SETTINGS_FORM, "video_host_email": "host@example.nl", "name": "X"},
+        headers=SAME_ORIGIN,
+    )
+    assert len(checker.calls) == 1
+
+
+async def test_a_crashing_check_never_blocks_the_save(
+    broken: tuple[Site, FakeChecker],
+) -> None:
+    site, checker = broken
+    await site.login_as(ORG_ADMIN)
+
+    response = await _save(site, "host@example.nl")
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{SETTINGS}?done=saved"
+    assert checker.calls == [("demo", ["demo"])]
+    page = (await site.client.get(SETTINGS)).text
+    assert 'value="host@example.nl"' in page
+    assert "Deze groep is nog niet gecontroleerd." in page
