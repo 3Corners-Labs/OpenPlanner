@@ -564,6 +564,9 @@ msgstr "Beheer"
 msgid "admin.nav.label"
 msgstr "Beheermenu"
 
+msgid "admin.nav.more"
+msgstr "Meer"
+
 msgid "admin.nav.section.monitor"
 msgstr "Bewaken"
 
