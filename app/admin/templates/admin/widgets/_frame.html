@@ -1,0 +1,15 @@
+{#- One widget of the overview (ADR 0061): expects ``view`` (WidgetView). The same fragment is rendered on the page and by the widget's own route. -#}
+{% set widget = view.widget %}
+<section class="widget" data-widget="{{ widget.key }}" aria-labelledby="widget-{{ widget.key }}-title">
+  <div class="widget__header">
+    <h2 class="widget__title" id="widget-{{ widget.key }}-title">{{ _(widget.title_key) }}</h2>
+  </div>
+  <div class="widget__body">
+    {% include "admin/widgets/" ~ widget.key ~ ".html" %}
+  </div>
+  {% if view.more_href %}
+  <div class="widget__footer">
+    <a href="{{ view.more_href }}">{% if view.total > view.rows|length %}{{ _("admin.overview.widget.more", count=view.total - view.rows|length) }}{% else %}{{ _("admin.overview.widget.open") }}{% endif %}</a>
+  </div>
+  {% endif %}
+</section>

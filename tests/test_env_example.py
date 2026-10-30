@@ -11,7 +11,7 @@ from app.config import FILE_SECRETS
 from app.domain.settings_registry import REGISTRY, SettingClass, lookup
 
 ROOT = Path(__file__).resolve().parents[1]
-PROXY = {"tls_domain", "acme_email", "acme_ca"}
+PROXY = {"tls_domain", "acme_email", "acme_ca", "tls_cert_file", "tls_key_file"}
 """Read by the proxy container only, from ``proxy.env``."""
 
 _ASSIGNMENT = re.compile(r"^#?\s*([A-Z][A-Z0-9_]*)=", re.MULTILINE)

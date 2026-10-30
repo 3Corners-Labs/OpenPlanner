@@ -177,6 +177,22 @@ async def test_a_refused_meeting_fails_at_once_as_meeting_failed(setup: Setup) -
     assert (events[-1].kind, events[-1].detail) == (EventKind.MEETING_FAILED, "rejected_400")
 
 
+async def test_webexs_reason_goes_with_the_failure_to_the_timeline_and_the_system_event(
+    setup: Setup,
+) -> None:
+    # ADR 0065: the admin reads why on the page, not in the worker log.
+    bid = await setup.booking()
+    reason = "timezone 'Europe/Amsterdam' and timezone offset in '+00:00' do not match"
+    setup.video.error = IntegrationError("rejected_400", retryable=False, reason=reason)
+
+    await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
+
+    events = setup.uow.state.booking_events[bid]
+    assert (events[-1].detail, events[-1].message) == ("rejected_400", reason)
+    failure = next(e for e in setup.uow.state.audit if e.action == "job.create_video_room")
+    assert (failure.reason, failure.message) == ("rejected_400", reason)
+
+
 async def test_stale_dispatch_does_nothing(setup: Setup) -> None:
     bid = await setup.booking()
     await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()

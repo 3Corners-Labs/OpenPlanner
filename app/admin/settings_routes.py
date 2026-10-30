@@ -3,8 +3,9 @@
 One page for ``settings.platform.view`` (superuser and auditor):
 
 - *System status*: every class A and B variable with whether it is set and where from, never
-  its value; for a development or test installation, what production would refuse, in the
-  words of the start-up check;
+  its value; the latest check of the public address's certificate (ADR 0064); for a
+  development or test installation, what production would refuse, in the words of the
+  start-up check;
 - *Data fields* (ADR 0063 §6): the fixed list of personal-data fields of a booking with
   its classification, read-only, with a link to the manual topic ``data-fields``;
 - every class C and D setting by topic, with its effective value, its source and a lock note
@@ -35,7 +36,7 @@ from app.adapters.live_settings import LiveSettings
 from app.adapters.settings_report import SettingState
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
-from app.admin.pages import Locale, SameOrigin
+from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.session import save_login_trial
 from app.config import Settings
@@ -45,12 +46,15 @@ from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
 from app.domain.privacy import DATA_FIELDS, ENTITY, Classification
 from app.domain.settings_registry import BY_KEY, LOG_LEVEL_MAX_EXPIRY_HOURS, SettingClass, Topic
 from app.domain.settings_service import LOG_LEVEL, SettingsService, editable
+from app.domain.tls import Finding
+from app.domain.tls_check import CertificateStatus
 from app.web.locale import RequestLocale
 from app.web.settings_labels import (
     CLASS_LABELS,
     PROBLEM_LABELS,
     SETTING_LABELS,
     SOURCE_LABELS,
+    TLS_FINDING_LABELS,
     TOPIC_LABELS,
 )
 
@@ -96,6 +100,21 @@ class SettingRow:
     secret: bool = False
     adoptable: bool = False
     adopted: bool = False
+
+
+@dataclass(frozen=True)
+class CertificateView:
+    """The latest certificate check as System status shows it (ADR 0064)."""
+
+    host: str
+    finding: str
+    chip: str
+    checked_at: str
+    issuer: str = ""
+    valid_until: str = ""
+
+
+_DANGER = (Finding.EXPIRED, Finding.NOT_YET_VALID)
 
 
 @dataclass(frozen=True)
@@ -286,6 +305,7 @@ async def _overview(
         context.principal,
         {
             "environment": current.environment,
+            "certificate": await _certificate(request, locale),
             "refused": live.refused,
             "status": status_rows,
             "problems": problems,
@@ -302,6 +322,32 @@ async def _overview(
     )
     response.status_code = status
     return response
+
+
+async def _certificate(request: Request, locale: RequestLocale) -> CertificateView | None:
+    """Return the latest certificate check for the page, if the worker or the CLI ran one."""
+    status: CertificateStatus = request.app.state.certificate_status
+    check = await status.latest()
+    if check is None:
+        return None
+    _ = locale.gettext
+    valid_until = issuer = ""
+    if check.certificate is not None:
+        days = check.certificate.days_left(request.app.state.clock.now())
+        valid_until = (
+            f"{admin_moment(request, locale, check.certificate.not_after)} "
+            f"({_('admin.settings.tls.days_left', days=days)})"
+        )
+        issuer = check.certificate.issuer
+    chip = "success" if check.ok else "danger" if check.finding in _DANGER else "warning"
+    return CertificateView(
+        check.host,
+        _(TLS_FINDING_LABELS[check.finding]),
+        chip,
+        admin_moment(request, locale, check.checked_at),
+        issuer,
+        valid_until,
+    )
 
 
 def _sections(

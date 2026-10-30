@@ -601,6 +601,8 @@ class AuditEventRow(Base):
     organisation: Mapped[str | None] = mapped_column(String(64))
     group: Mapped[str | None] = mapped_column(String(64))
     detail: Mapped[str] = mapped_column(String(255), server_default=text("''"))
+    # The provider's reason for a failed job (ADR 0065): masked, capped, no citizen data.
+    message: Mapped[str] = mapped_column(String(300), server_default=text("''"))
     source: Mapped[str] = mapped_column(String(16), server_default=text("'admin'"))
     booking_id: Mapped[int | None] = mapped_column(Integer)
     # ADR 0040, part 2: the fields of the one event schema that are not derived on export.
@@ -694,6 +696,7 @@ class BookingEventRow(Base):
     at: Mapped[datetime] = mapped_column(UTCDateTime())
     kind: Mapped[str] = mapped_column(String(32))
     detail: Mapped[str] = mapped_column(String(128), server_default=text("''"))
+    message: Mapped[str] = mapped_column(String(300), server_default=text("''"))
 
     __table_args__ = (Index("ix_booking_events_booking_id", "booking_id"),)
 
@@ -894,6 +897,26 @@ class MaintenanceStateRow(Base):
     switched_by: Mapped[str] = mapped_column(String(255), server_default=text("''"))
     expected_end: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reason: Mapped[str | None] = mapped_column(String(16))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class CertificateCheckRow(Base):
+    """The latest check of the public address's certificate (ADR 0064); at most one row."""
+
+    __tablename__ = "certificate_checks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    checked_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    host: Mapped[str] = mapped_column(String(255))
+    finding: Mapped[str] = mapped_column(String(16))
+    trust: Mapped[str | None] = mapped_column(String(16))
+    error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+    subject: Mapped[str | None] = mapped_column(String(255))
+    issuer: Mapped[str | None] = mapped_column(String(255))
+    not_before: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    not_after: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    names: Mapped[str] = mapped_column(Text, server_default=text("'[]'"))
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 

@@ -3,7 +3,9 @@
 Run with ``python -m app.jobs.worker``. Each iteration checks the database, runs due jobs
 (``app.jobs.runner``), watches the data volume and reclaims freed database pages
 (``app.jobs.housekeeping``, ADR 0040), looks up the latest release when that is due (hourly,
-ADR 0029), reports maintenance that has been on too long (ADR 0038) and writes the heartbeat.
+ADR 0029), reports maintenance that has been on too long (ADR 0038), checks every group's
+integration chain once per ``integration_check_interval_hours`` (ADR 0065), probes the
+certificate of the public address when that is due (ADR 0064) and writes the heartbeat.
 The worker never pauses for maintenance: confirmed appointments and the privacy jobs go on.
 It reloads the portal settings when they changed (ADR 0042 §6); the poll interval follows at
 once.
@@ -32,16 +34,19 @@ from app.adapters.integrations import (
 from app.adapters.live_settings import LiveSettings
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
+from app.adapters.tls_probe import SslCertificateProbe
 from app.config import Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.integration import IntegrationService
+from app.domain.integration_check import IntegrationCheckService, IntegrationWatch
 from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock
 from app.domain.security_log import SecurityLog
 from app.domain.system_log import SystemLog
+from app.domain.tls_check import TlsWatch
 from app.domain.update_service import UpdateService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
@@ -59,6 +64,7 @@ async def run_worker(
     stop: asyncio.Event,
     clock: Clock,
     transport: httpx.AsyncBaseTransport | None = None,
+    integrations: Integrations | None = None,
 ) -> None:
     """Run the poll loop until ``stop`` is set.
 
@@ -71,6 +77,8 @@ async def run_worker(
         stop: Set by a signal handler (or a test) to end the loop after the current iteration.
         clock: Source of the current time.
         transport: HTTP transport for outgoing calls (tests); defaults to the network.
+        integrations: Explicit adapters (tests); defaults to building them from the settings,
+            and rebuilding them when the Webex settings change.
     """
     configure_clock(settings.time_format)
     engine = create_engine(settings.database_url)
@@ -93,27 +101,43 @@ async def run_worker(
         max_sources=lambda: live.settings.security_event_max_sources,
     )
 
-    def build_runner(current: Settings) -> tuple[Integrations, JobRunner]:
-        wired = build_integrations(current, engine, http, clock, security)
-        return wired, JobRunner(
-            SqlJobQueue(engine),
-            uow,
-            clock,
-            ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
-            MessageComposer(
-                Translator(load_catalogues()),
-                management_token_key(settings),
-                settings.public_base_url,
+    system_log = SystemLog(uow, clock)
+
+    def build_runner(current: Settings) -> tuple[Integrations, JobRunner, IntegrationWatch]:
+        wired = integrations or build_integrations(current, engine, http, clock, security)
+        # ADR 0065 step 2: the automatic group check, with the checker of this wiring.
+        watch = IntegrationWatch(
+            IntegrationCheckService(
+                uow, clock, AdminService(uow, clock), wired.checker, system_log
             ),
-            video=wired.video,
-            dispatcher=wired.dispatcher,
-            integration=IntegrationService(uow, clock, AdminService(uow, clock)),
-            retention=lambda: live.settings.event_retention,
-            clock_style=lambda organisation: live.for_organisation(organisation).time_format,
-            product_footer=lambda organisation: live.for_organisation(organisation).product_footer,
+            clock,
+            lambda: timedelta(hours=live.settings.integration_check_interval_hours),
+        )
+        return (
+            wired,
+            JobRunner(
+                SqlJobQueue(engine),
+                uow,
+                clock,
+                ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
+                MessageComposer(
+                    Translator(load_catalogues()),
+                    management_token_key(settings),
+                    settings.public_base_url,
+                ),
+                video=wired.video,
+                dispatcher=wired.dispatcher,
+                integration=IntegrationService(uow, clock, AdminService(uow, clock)),
+                retention=lambda: live.settings.event_retention,
+                clock_style=lambda organisation: live.for_organisation(organisation).time_format,
+                product_footer=lambda organisation: (
+                    live.for_organisation(organisation).product_footer
+                ),
+            ),
+            watch,
         )
 
-    integrations, runner = build_runner(settings)
+    wired, runner, watch = build_runner(settings)
     wired_with = webex_fingerprint(settings)
     diagnostics = DiagnosticsService(
         uow,
@@ -133,16 +157,26 @@ async def run_worker(
     maintenance = MaintenanceWatch(
         uow,
         clock,
-        SystemLog(uow, clock),
+        system_log,
         alert_after=lambda: timedelta(hours=live.settings.maintenance_alert_hours),
         repeat=lambda: timedelta(hours=live.settings.maintenance_alert_repeat_hours),
+    )
+    tls = TlsWatch(
+        uow,
+        clock,
+        SslCertificateProbe(),
+        SystemLog(uow, clock),
+        public_base_url=settings.public_base_url,
+        interval=lambda: timedelta(hours=live.settings.tls_check_interval_hours),
+        warn_within=lambda: timedelta(days=live.settings.tls_expiry_warning_days),
+        repeat=lambda: timedelta(hours=live.settings.tls_alert_repeat_hours),
     )
     log.info(
         "worker.started",
         poll_seconds=settings.worker_poll_seconds,
         fallback_mail=fallback_mail(settings) is not None,
-        video_enabled=integrations.video is not None,
-        dispatch_enabled=integrations.dispatcher is not None,
+        video_enabled=wired.video is not None,
+        dispatch_enabled=wired.dispatcher is not None,
         release_check=settings.update_repository is not None,
     )
     try:
@@ -151,7 +185,7 @@ async def run_worker(
                 if await live.refresh():  # the release repository or token may have changed
                     updates = update_service(live.settings, uow, clock, http)
                     if webex_fingerprint(live.settings) != wired_with:  # ADR 0042 step 6b
-                        integrations, runner = build_runner(live.settings)
+                        wired, runner, watch = build_runner(live.settings)
                         wired_with = webex_fingerprint(live.settings)
                 # One trace per round for housekeeping; every job gets its own inside it.
                 with trace_scope():
@@ -162,6 +196,8 @@ async def run_worker(
                     await housekeeping.run()
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)
+                    await _watch_certificate(tls)
+                    await _check_integrations(watch)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=live.settings.worker_poll_seconds)
@@ -195,6 +231,28 @@ async def _watch_maintenance(watch: MaintenanceWatch) -> None:
         return
     if hours is not None:
         log.warning("maintenance.overdue", hours=hours)
+
+
+async def _watch_certificate(watch: TlsWatch) -> None:
+    """Probe the public address's certificate when due; a failure never stops the loop."""
+    try:
+        check = await watch.check_if_due()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("tls.watch_failed", error=type(exc).__name__)
+        return
+    if check is not None and not check.ok:
+        log.warning("tls.certificate", finding=check.finding.value, host=check.host)
+
+
+async def _check_integrations(watch: IntegrationWatch) -> None:
+    """Check the groups that are due; a failure is logged and never stops the loop."""
+    try:
+        checked = await watch.run()
+    except Exception as exc:  # e.g. schema not migrated yet, or a platform adapter crashed
+        log.warning("integration.check_failed", error=type(exc).__name__)
+        return
+    if checked:
+        log.info("integration.checked", groups=len(checked))
 
 
 async def _main() -> None:

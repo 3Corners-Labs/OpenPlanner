@@ -106,17 +106,21 @@ flowchart TB
     worker <--> volume
     worker -- SMTP --> smtp
     worker -- hourly release check --> github
+    worker -. "certificate probe, https :443" .-> proxy
     updater -- "app.cli: claim, progress, report, backup" --> web
     updater -- "pull, verify, pin digest" --> github
     worker -. dev .-> mailpit
 
 ```
 
-- **TLS at the edge (ADR 0030).** With `--profile tls` the `proxy` service (Caddy) gets a
-  certificate for `TLS_DOMAIN` from Let's Encrypt and renews it on its own; port 80 only
-  redirects. It runs as uid 10001 on a read-only filesystem, keeps certificates in the
-  `proxy-data` volume and has a fixed address on the `edge` network, the only address `web`
-  accepts `X-Forwarded-For` from. Without the profile, a load balancer of the host does this.
+- **TLS at the edge (ADR 0030, ADR 0064).** With `--profile tls` (the installer's default) the
+  `proxy` service (Caddy) gets a certificate for `TLS_DOMAIN` from Let's Encrypt and renews it
+  on its own, or serves an own certificate from `./certs`; port 80 only redirects. It runs as
+  uid 10001 on a read-only filesystem, keeps certificates in the `proxy-data` volume and has a
+  fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
+  The worker probes the public address every few hours and shows the certificate's issuer,
+  expiry and one finding on *System status*; a failing one is a system event. Without the
+  profile (`--no-tls`), a load balancer of the host does TLS.
 - **One image, two roles.** `web` runs `alembic upgrade head` and then uvicorn; `worker` runs
   `python -m app.jobs.worker` and starts only when `web` is healthy. Both run as uid 10001
   with a read-only root filesystem, no capabilities and `no-new-privileges`.
@@ -630,7 +634,7 @@ flowchart LR
 | Management tokens: 256 bits, HMAC-derived, only the salt and hash stored | `app/domain/tokens.py` | ADR 0011 |
 | No PII in logs (masking processor and semgrep rule), errors, URLs or jobs | `app/logging.py`, `.semgrep/` | CLAUDE.md |
 | Audit events shipped after commit as `log_type: audit` lines; security events deduplicated | `app/adapters/event_sink.py`, `app/domain/security_log.py` | ADR 0034 |
-| One event schema (`openplanner.event/1`) for audit table and log lines; a trace id per request and job, set by the server only | `app/domain/event_schema.py`, `app/domain/event_context.py`, `app/api/trace.py` | ADR 0040 |
+| One event schema (`openplanner.event/2`) for audit table and log lines; a trace id per request and job, set by the server only | `app/domain/event_schema.py`, `app/domain/event_context.py`, `app/api/trace.py` | ADR 0040 |
 | Authorisation matrix: one `RequirePermission` per admin route, scoped SQL, audit of denials and logins | `app/domain/authorization.py`, `app/admin/authz.py` | ADR 0014 |
 | OIDC with PKCE, nonce, asymmetric algorithms only; RP-initiated logout | `app/adapters/oidc.py` | ADR 0013 |
 | Encrypted, write-only integration secrets | WP7 | ADR 0008 |

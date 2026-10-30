@@ -78,7 +78,11 @@ filter matches on it. The list and the rule are constants, not settings.
 | Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the citizen, host URL to WxCC |
 | Management token | `bookings.management_token_hash` (SHA-256 only) | generated | kept (not personal data once the booking is purged) | token itself only in the confirmation mail |
 
-Jobs, slots, schedules and audit events carry no personal data of citizens. The definitions of
+Jobs, slots, schedules and audit events carry no personal data of citizens. A failed meeting
+job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
+the group name and the host's address (masked), never a citizen's data; the system event of the
+automatic group check (ADR 0065 step 2) carries the same masked reason of the probe meeting,
+which belongs to no booking. The definitions of
 custom fields (`group_form_fields`: keys, labels, options) are the organisation's questions,
 not answers, and hold no personal data; the admin screen refuses questions about a BSN, an
 identity document or special categories of personal data (ADR 0055).
@@ -300,6 +304,8 @@ data. A refused change is audited with its permission and target only, never the
 proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
 Let's Encrypt ──HTTP-01 / TLS-ALPN-01──> proxy (ports 80/443): challenge token only
 visitor ──https──> proxy ──http, edge network──> web (X-Forwarded-For set by the proxy)
+worker ──TLS handshake, no request──> proxy (public name, port 443): reads the public certificate
+       ──> certificate_checks (issuer, names, validity, finding; no personal data; ADR 0064)
 ```
 
 The CA learns the domain name and the operator's e-mail address; no citizen data leaves through
