@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 
 from app.domain.booking import MeetingRef
-from app.domain.calls import MeetingRequest, WorkItem
+from app.domain.calls import CallState, MeetingRequest, MeetingStatus, WorkItem
 from app.domain.checks import Finding
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import Group
@@ -14,6 +14,9 @@ class FakeVideo:
         self.created: list[MeetingRequest] = []
         self.deleted: list[tuple[str, str]] = []
         self.error: IntegrationError | None = None
+        self.polled: list[tuple[str, str]] = []
+        self.statuses: dict[str, MeetingStatus] = {}
+        self.status_error: IntegrationError | None = None
 
     async def create_meeting(self, request: MeetingRequest) -> MeetingRef:
         if self.error:
@@ -27,6 +30,12 @@ class FakeVideo:
         if self.error:
             raise self.error
         self.deleted.append((meeting_id, host_email))
+
+    async def meeting_status(self, meeting_id: str, host_email: str) -> MeetingStatus:
+        self.polled.append((meeting_id, host_email))
+        if self.status_error:
+            raise self.status_error
+        return self.statuses.get(meeting_id, MeetingStatus(CallState.SCHEDULED))
 
 
 class FakeDispatcher:

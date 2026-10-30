@@ -44,6 +44,9 @@ VERSION_ACTION = "system.version"
 HOST_ACTOR = "host"
 """Audit actor of a version change nobody requested in the portal: installer or by hand."""
 
+NOTES_CHARS = 4000
+"""How much of a release's notes is kept, as plain text (ADR 0067 point 3)."""
+
 HISTORY_ACTIONS = frozenset({"system.update", VERSION_ACTION})
 """The audit actions the updates page shows as its history (ADR 0067 point 5)."""
 
@@ -150,6 +153,61 @@ class Release:
         """Refuse a release page that is not on GitHub."""
         if not self.url.startswith(_RELEASE_PAGE) or len(self.url) > 300:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "url")
+
+
+@dataclass(frozen=True)
+class ListedRelease:
+    """A release or candidate in the repository's listing (ADR 0067 point 3).
+
+    Attributes:
+        version: The version, from the tag.
+        url: Its release page on GitHub.
+        published_at: When it was published; ``None`` when unknown.
+        notes: The generated notes as plain text (PR titles and numbers), at most
+            ``NOTES_CHARS``; empty when there are none.
+
+    Raises:
+        DomainError: ``invalid_configuration`` for ``url`` when it is not a GitHub https page.
+    """
+
+    version: Version
+    url: str
+    published_at: datetime | None = None
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        """Refuse a release page that is not on GitHub and cut the notes."""
+        if not self.url.startswith(_RELEASE_PAGE) or len(self.url) > 300:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "url")
+        if len(self.notes) > NOTES_CHARS:
+            object.__setattr__(self, "notes", self.notes[:NOTES_CHARS])
+
+    @property
+    def release(self) -> Release:
+        """The same release as the banner and the check know it."""
+        return Release(self.version, self.url)
+
+
+def on_channel(listing: Sequence[ListedRelease], channel: UpdateChannel) -> list[ListedRelease]:
+    """Return the listed releases the channel offers, newest version first."""
+    allowed = [
+        item
+        for item in listing
+        if channel is UpdateChannel.CANDIDATE or not item.version.is_candidate
+    ]
+    return sorted(allowed, key=lambda item: item.version, reverse=True)
+
+
+def offered(
+    current: Version | None, listing: Sequence[ListedRelease], channel: UpdateChannel
+) -> list[ListedRelease]:
+    """Return the listed versions newer than ``current`` on ``channel``, newest first.
+
+    A build that is no release (``current`` is ``None``) is offered nothing.
+    """
+    if current is None:
+        return []
+    return [item for item in on_channel(listing, channel) if item.version > current]
 
 
 @dataclass(frozen=True)

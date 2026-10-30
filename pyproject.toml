@@ -26,6 +26,7 @@ dependencies = [
     "tzdata>=2025.2",
     "markdown-it-py>=4.0",
     "phonenumbers>=9.0",
+    "dnspython>=2.7",
 ]
 
 [dependency-groups]

@@ -31,6 +31,7 @@ from app.domain.calls import (
     BookingOverview,
     CallStatus,
     MeetingRequest,
+    MeetingStatus,
     WorkItem,
 )
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
@@ -59,7 +60,7 @@ from app.domain.scheduling import (
 from app.domain.staff import StaffFilter, StaffMember
 from app.domain.tasks import ActiveJobs
 from app.domain.tls import CertificateCheck, ProbeResult
-from app.domain.updates import Release, ReleaseCheck, RunningVersion, UpdateRequest
+from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -211,6 +212,17 @@ class VideoProvider(Protocol):
         """Delete a meeting; deleting one that no longer exists is not an error."""
         ...
 
+    async def meeting_status(self, meeting_id: str, host_email: str) -> MeetingStatus:
+        """Return the meeting's state, participant count and whether the host joined (ADR 0010).
+
+        The polling fallback for webhooks that did not arrive. Aggregates only: names and
+        addresses of participants never leave the adapter.
+
+        Raises:
+            IntegrationError: If the provider refuses or cannot be reached.
+        """
+        ...
+
 
 class IntegrationChecker(Protocol):
     """Checks a group's integration chain at the platforms (read-only; verify button)."""
@@ -253,10 +265,12 @@ class ContactCenterDispatcher(Protocol):
 
 
 class ReleaseSource(Protocol):
-    """Where the latest published release is looked up (GitHub releases, ADR 0029)."""
+    """Where the published releases are looked up (GitHub releases, ADR 0029, 0067)."""
 
-    async def latest(self) -> Release | None:
-        """Return the latest published release; ``None`` when there is none or it is no version.
+    async def listing(self) -> list[ListedRelease]:
+        """Return the newest published releases and candidates with their notes.
+
+        Drafts and anything that is no version are left out. Empty when there is none.
 
         Raises:
             IntegrationError: If the source refuses or cannot be reached.
@@ -271,6 +285,17 @@ class CertificateProbe(Protocol):
         """Connect to ``host:port``, verify the chain against the host's CA bundle, read the leaf.
 
         Never raises: a failed connection or handshake is a result with an error code.
+        """
+        ...
+
+
+class MailDomainResolver(Protocol):
+    """Looks up the TXT records of a DNS name, for the sender domain check (ADR 0073)."""
+
+    async def txt_records(self, name: str) -> tuple[str, ...] | None:
+        """Return the TXT records of ``name`` (``()`` when it has none).
+
+        Returns ``None`` when the lookup failed (timeout, no resolver); never raises.
         """
         ...
 
@@ -1023,6 +1048,14 @@ class Transaction(Protocol):
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
         """Replace the outcome of the latest release check."""
+        ...
+
+    async def get_release_listing(self) -> list[ListedRelease]:
+        """Return the listing the last successful check stored (ADR 0067), newest first."""
+        ...
+
+    async def save_release_listing(self, listing: Sequence[ListedRelease]) -> None:
+        """Replace the stored listing."""
         ...
 
     async def get_running_versions(self, limit: int = 2) -> list[RunningVersion]:
