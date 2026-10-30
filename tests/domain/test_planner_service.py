@@ -24,6 +24,7 @@ from tests.support.domain import (
     NOW,
     SLOT_0900,
     SLOT_0930,
+    book_confirmed,
     citizen,
     window,
     with_team_invite,
@@ -44,7 +45,8 @@ _CITIZENS = itertools.count(1)
 async def _book(
     bookings: BookingService, start=SLOT_0900, slug: str = "demo", consents=frozenset()
 ) -> int:
-    receipt = await bookings.book(
+    receipt = await book_confirmed(
+        bookings,
         group_slug=slug,
         start=start,
         contact=citizen(next(_CITIZENS)),
@@ -87,8 +89,8 @@ async def test_a_move_places_a_new_booking_and_tells_the_citizen(
 async def test_without_a_phone_number_only_an_email_goes_out(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
-    receipt = await bookings.book(
-        group_slug="demo", start=SLOT_0900, contact=replace(ADA, phone=None), locale="nl"
+    receipt = await book_confirmed(
+        bookings, group_slug="demo", start=SLOT_0900, contact=replace(ADA, phone=None), locale="nl"
     )
     old_id = receipt.booking.id or 0
 

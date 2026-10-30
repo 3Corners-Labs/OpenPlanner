@@ -12,6 +12,8 @@ locked transaction, and the planner's limits:
                          end task, delete meeting, request now, one reminder, lapse at
                          rebook_by, purge 24 h later (ADR 0044)
     lapse                still awaiting at rebook_by ─► cancelled, lapse message
+    lapse unconfirmed    still pending at confirm_by ─► cancelled at confirm_by, lapse
+                         message (ADR 0056; the citizen's own lapse, kept beside the other)
 """
 
 from datetime import datetime, timedelta
@@ -19,7 +21,12 @@ from datetime import datetime, timedelta
 from app.domain.booking import Booking, BookingKind, ChangeReason
 from app.domain.channels import ChannelKind, reachable
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.job_plan import plan_for_cancellation, plan_for_lapse, plan_for_rebook
+from app.domain.job_plan import (
+    plan_for_cancellation,
+    plan_for_lapse,
+    plan_for_rebook,
+    plan_for_unconfirmed_lapse,
+)
 from app.domain.ports import Transaction
 from app.domain.scheduling import Group
 
@@ -140,6 +147,20 @@ async def lapse(tx: Transaction, booking: Booking, now: datetime) -> bool:
         return False
     await tx.save_booking(booking.cancel(now))
     await tx.add_jobs(_id(booking), plan_for_lapse(now=now, sms=sms_reachable(booking)))
+    return True
+
+
+async def lapse_unconfirmed(tx: Transaction, booking: Booking, now: datetime) -> bool:
+    """Cancel ``booking`` if it still awaits confirmation; return whether it lapsed (ADR 0056).
+
+    Run by ``expire_unconfirmed`` at ``confirm_by``, and by a confirmation that comes too
+    late. The place is freed and the citizen gets the short lapse message; the purge planned
+    with the request to confirm stays.
+    """
+    if not booking.awaits_confirmation:
+        return False
+    await tx.save_booking(booking.expire(now))
+    await tx.add_jobs(_id(booking), plan_for_unconfirmed_lapse(now=now))
     return True
 
 
