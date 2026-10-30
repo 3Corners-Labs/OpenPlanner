@@ -33,13 +33,9 @@
     {#- Without a menu (no role) the overview would only loop back to the refusal. -#}
     {% if nav %}<a class="admin-brand" href="/admin/">{% else %}<span class="admin-brand">{% endif %}<img class="admin-brand__mark" src="{{ static_url('brand/mark.svg') }}" alt="" width="26" height="26"><span>{{ _("admin.title") }}</span>{% if nav %}</a>{% else %}</span>{% endif %}
     <div class="admin-topbar__end">
-      {% if help_topic %}
-      <a class="admin-topbar__link page-help" href="/admin/help/{{ help_topic.slug }}">{{ icon("help") }}<span>{{ _("help.page_link") }}</span></a>
-      {% else %}
       {% for link in top_links %}
-      <a class="admin-topbar__link" href="{{ link.href }}"{% if link.current %} aria-current="page"{% endif %}>{{ icon(link.icon) }}<span>{{ link.label }}</span></a>
+      <a class="admin-topbar__link" href="{{ link.href }}"{% if link.aria_label %} aria-label="{{ link.aria_label }}"{% endif %}{% if link.current %} aria-current="page"{% endif %}>{{ icon(link.icon) }}<span class="admin-topbar__label">{{ link.label }}</span>{% if link.count %}<span class="chip chip--accent">{{ link.count }}</span>{% endif %}</a>
       {% endfor %}
-      {% endif %}
       <details class="admin-profile">
         <summary>
           <span class="admin-profile__avatar" aria-hidden="true">{% for part in principal.display_name.split()[:2] %}{{ part[:1]|upper }}{% endfor %}</span>

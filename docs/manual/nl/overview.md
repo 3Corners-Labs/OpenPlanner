@@ -75,3 +75,20 @@ beheer en werkt zonder JavaScript. Van boven naar beneden:
 
 Op een telefoon blijven in de balk alleen de pictogrammen en uw initialen staan; uw naam staat in
 het menu.
+
+## De balk bovenin
+
+Rechts van de naam van het beheer staan, van links naar rechts, kleine snelkoppelingen. U ziet
+alleen wat uw rol mag openen:
+
+- **Status** opent *Geavanceerde instellingen* met de systeemstatus (superuser en compliance).
+- **Taken** springt naar de widget *Lopende taken* op dit overzicht, met het aantal lopende en
+  mislukte taken ernaast. Een getal groter dan nul betekent dat er iets draait of vastzit. De
+  snelkoppeling staat er alleen voor wie die widget op het overzicht heeft.
+- **Meldingen** opent het auditlog vanaf het niveau waarschuwing. Zodra het meldingenmodel er is
+  (ADR 0061) opent de snelkoppeling de lijst met meldingen; een getal volgt dan ook.
+- **Handleiding** opent het onderwerp van de pagina waar u op staat.
+
+Op een telefoon blijven de pictogrammen, het getal en uw initialen staan; de woorden staan
+voor schermlezers in de balk. Het getal staat ook in de naam van de snelkoppeling, bijvoorbeeld
+*Taken, 2 lopend of mislukt*. Een snelkoppeling zonder bron voor een getal toont er geen.
