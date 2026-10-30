@@ -1829,6 +1829,12 @@ msgstr "Cancelled"
 msgid "admin.agenda.not_picked_up"
 msgstr "Not picked up"
 
+msgid "admin.agenda.refresh"
+msgstr "Refresh"
+
+msgid "admin.agenda.live_status"
+msgstr "Status updated: {running} calls in progress, {unpicked} not picked up."
+
 msgid "admin.agenda.empty"
 msgstr "No appointments on this day."
 
@@ -6954,6 +6960,10 @@ msgstr "Unfortunately the video call could not be set up because of a technical 
 
 msgid "settings.field.queue_refresh_seconds.label"
 msgstr "Refresh of the queue and waiting page (seconds)"
+
+msgid "settings.field.meeting_status_refresh_seconds.label"
+msgstr "Refresh of meeting status on the agenda (seconds)"
+
 msgid "admin.overview.view.label"
 msgstr "View of {title}"
 

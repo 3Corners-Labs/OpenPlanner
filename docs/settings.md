@@ -123,6 +123,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_AUTO_APPLY` | bool | `false` | — | `settings.platform.manage` | The worker requests a newer version itself as soon as the check finds one (ADR 0059, 0065); not usable in production. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the citizen's waiting page (ADR 0072). |
+| `MEETING_STATUS_REFRESH_SECONDS` | int | `30` | 10–300 | `settings.platform.manage` | Seconds a meeting status on the agenda may be old before the video provider is asked (webhooks come first), and between two refreshes of the agenda's status columns (ADR 0010). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |
 
