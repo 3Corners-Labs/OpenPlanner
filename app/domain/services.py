@@ -5,7 +5,7 @@ booking and its jobs commit together or not at all (CLAUDE.md architecture rules
 
     book ─► locked tx ─► _place: window ─► offered? ─► slot (create, snapshot capacity)
                                 ─► capacity (minus overlapping old-grid bookings)
-                                ─► address limit (same slot, max per group; ADR 0059)
+                                ─► address limit (same slot, max per group; ADR 0066)
                                 ─► booking + token ─► replace_jobs
     reschedule ─► locked tx ─► cancel old (jobs: purge only) ─► _place new in the SAME group
 
@@ -517,7 +517,7 @@ async def _check_address_limit(
 
     Runs after the capacity check, so a full slot is reported as full to everyone. The
     refusal does not say which rule applied; the page must not reveal that an address
-    already has a booking (ADR 0059).
+    already has a booking (ADR 0066).
 
     Raises:
         DomainError: ``booking_limit_reached``.

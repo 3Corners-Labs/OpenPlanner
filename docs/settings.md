@@ -55,8 +55,6 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DEV_TOKEN_KEY_PATH` | path | `data/dev-token.key` | Development management-token key file. |
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
 | `DEV_SETTINGS_KEY_PATH` | path | `data/dev-settings.key` | Development settings key file. |
-| `UPDATE_CHANNEL` | enum | `release` | What the installation follows (ADR 0059): releases only, or release candidates (`rc`) too; `rc` is refused in production. |
-| `UPDATE_AUTO_APPLY` | bool | `false` | The worker requests a newer version itself as soon as the check finds one (ADR 0059); refused in production. |
 
 ## C. Platform (portal, *Advanced settings*; lockable by env)
 
@@ -115,6 +113,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WXCC_WEBHOOK_SECRET` | secret | — | — | `settings.platform.manage` | WxCC webhook secret; to be generated and rotated by the server. |
 | `UPDATE_REPOSITORY` | string | — | — | `settings.platform.manage` | owner/name of the release repository (ADR 0029). |
 | `UPDATE_CHECK_TOKEN` | secret | — | — | `settings.platform.manage` | Read token for a private repository; write-only. |
+| `UPDATE_CHANNEL` | enum | `release` | release, rc | `settings.platform.manage` | What the installation follows (ADR 0059, 0065): releases only, or release candidates (`rc`) too; `rc` is not usable in production. |
+| `UPDATE_AUTO_APPLY` | bool | `false` | — | `settings.platform.manage` | The worker requests a newer version itself as soon as the check finds one (ADR 0059, 0065); not usable in production. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |

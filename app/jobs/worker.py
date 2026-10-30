@@ -153,7 +153,7 @@ async def run_worker(
         settings.database_url,
         diagnostics.brake,
     )
-    updates = update_service(settings, uow, clock, http)
+    updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(
         uow,
         clock,

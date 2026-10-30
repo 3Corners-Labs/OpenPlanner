@@ -891,12 +891,14 @@ and a GitHub *pre-release* with the SBOM, about three minutes after the merge (i
 ZAP baseline only; the mutation test runs alongside and still fails the run). Nobody tags a
 candidate by hand: the tag check refuses an `-rc.` tag.
 
-Installations on the `rc` channel (`UPDATE_CHANNEL=rc` in `.env`, written by
-`scripts/install.sh --channel rc`; refused in mode `production`) are offered candidates and
-releases alike, and move to the release when it comes. With `UPDATE_AUTO_APPLY=true` the
-worker requests the update itself, so a lab host such as docker01 runs every merge within the
-hour, or within a minute after "Update now". Installations on `release` (the default) never see
-a candidate. The candidates of a released version may be deleted afterwards:
+Installations on the `rc` channel are offered candidates and releases alike, and move to the
+release when it comes. The superuser chooses the channel in the portal (`update_channel`, class
+C, settings page or `/admin/updates`; not usable in production, ADR 0067), and with
+`update_auto_apply` the worker requests the update itself, so a lab host such as docker01 runs
+every merge within the hour, or within a minute after "Update now". Installations on `release`
+(the default) never see a candidate. The host side needs nothing for a channel switch: the
+installer mode (`test`, `lab`) already trusts images signed on `main`. The candidates of a
+released version may be deleted afterwards:
 
 ```sh
 git tag --list 'v0.4.0-rc.*' | xargs -n1 -I{} sh -c 'gh release delete {} --yes --cleanup-tag'
