@@ -5841,6 +5841,12 @@ msgstr "Repository met releases"
 msgid "settings.field.update_check_token.label"
 msgstr "Leestoken repository"
 
+msgid "settings.field.update_channel.label"
+msgstr "Updatekanaal"
+
+msgid "settings.field.update_auto_apply.label"
+msgstr "Automatisch bijwerken"
+
 msgid "settings.field.time_format.label"
 msgstr "Tijdnotatie"
 
@@ -6213,6 +6219,60 @@ msgstr "De nieuwe inlogkoppeling is niet bewaard: met die koppeling zou u na het
 
 msgid "admin.form.error.login_lockout"
 msgstr "Met deze koppeling zou u geen superuser meer zijn; ze is niet bewaard."
+
+msgid "admin.settings.data_fields.title"
+msgstr "Gegevensvelden"
+
+msgid "admin.settings.data_fields.intro"
+msgstr "Welke velden van een afspraak persoonsgegevens van de burger zijn, en hoe gevoelig ze zijn."
+
+msgid "admin.settings.data_fields.rule"
+msgstr "Persoonsgegevens staan alleen bij de afspraak. Ze worden alleen getoond op de afspraakpagina en in de wachtrij, aan rollen die afspraken mogen bekijken of de wachtrij bedienen; de agenda toont alleen de voornaam. Ze staan nooit op het overzicht, in lijsten, in het auditlog of de export daarvan, in een zoekresultaat of in een melding, en zoeken of filteren werkt er nooit op."
+
+msgid "admin.settings.data_fields.fixed"
+msgstr "Deze lijst ligt vast in de software en kan hier noch elders worden gewijzigd."
+
+msgid "admin.settings.data_fields.manual"
+msgstr "Lees verder: Gegevensvelden en persoonsgegevens"
+
+msgid "admin.settings.data_fields.field"
+msgstr "Veld"
+
+msgid "admin.settings.data_fields.classification"
+msgstr "Classificatie"
+
+msgid "admin.settings.data_fields.stored_on"
+msgstr "Opgeslagen bij"
+
+msgid "admin.settings.data_fields.direct"
+msgstr "Direct: identificeert de burger op zichzelf"
+
+msgid "admin.settings.data_fields.sensitive"
+msgstr "Gevoelig: wat de burger ons vertelde, of een koppeling naar het gesprek"
+
+msgid "admin.settings.data_fields.field.first_name"
+msgstr "Voornaam"
+
+msgid "admin.settings.data_fields.field.last_name"
+msgstr "Achternaam"
+
+msgid "admin.settings.data_fields.field.email"
+msgstr "E-mailadres"
+
+msgid "admin.settings.data_fields.field.phone"
+msgstr "Telefoonnummer"
+
+msgid "admin.settings.data_fields.field.note"
+msgstr "Notitie"
+
+msgid "admin.settings.data_fields.field.form_answers"
+msgstr "Antwoorden op de eigen vragen van het team"
+
+msgid "admin.settings.data_fields.field.guest_join_url"
+msgstr "Deelnamekoppeling van de burger"
+
+msgid "admin.settings.data_fields.field.host_join_url"
+msgstr "Deelnamekoppeling van de medewerker"
 
 msgid "admin.settings.tls.title"
 msgstr "Certificaat van het publieke adres"

@@ -197,7 +197,7 @@ class GroupRow(Base):
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     queue_visible_from_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))
     queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
-    # ADR 0059: future bookings one email address may hold in this group.
+    # ADR 0066: future bookings one email address may hold in this group.
     max_bookings_per_email: Mapped[int] = mapped_column(Integer, server_default=text("3"))
     calendar_invite_address: Mapped[str | None] = mapped_column(String(254))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))

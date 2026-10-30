@@ -64,9 +64,9 @@ MAX_QUEUE_VISIBLE_FROM_MINUTES = 120
 MAX_PLANNER_LEAD_MINUTES = 1440
 """ADR 0044: upper bound of ``planner_change_min_lead_minutes`` (one day)."""
 DEFAULT_MAX_BOOKINGS_PER_EMAIL = 3
-"""ADR 0059: future bookings one email address may hold in a group; room to book for others."""
+"""ADR 0066: future bookings one email address may hold in a group; room to book for others."""
 MAX_BOOKINGS_PER_EMAIL = 10
-"""ADR 0059: upper bound of ``max_bookings_per_email``; there is no "unlimited" (a protection)."""
+"""ADR 0066: upper bound of ``max_bookings_per_email``; there is no "unlimited" (a protection)."""
 
 
 def _invalid(field: str) -> DomainError:
@@ -192,7 +192,7 @@ class Group:
         queue_free_pick_allowed: Own queue: whether agents may claim any row, not only the
             next one (a working agreement against cherry picking, not a protection).
         max_bookings_per_email: How many future bookings that hold a place one email address
-            may have in this group, 1 to ``MAX_BOOKINGS_PER_EMAIL`` (ADR 0059). Above 1 so
+            may have in this group, 1 to ``MAX_BOOKINGS_PER_EMAIL`` (ADR 0066). Above 1 so
             citizens can book on behalf of others; the same address twice in one slot is
             always refused.
         calendar_invite_address: Own queue: the team's shared mailbox or list that gets an

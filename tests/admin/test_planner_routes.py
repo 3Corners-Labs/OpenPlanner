@@ -26,7 +26,7 @@ def _uow(site: Site) -> SqlUnitOfWork:
 
 
 _CITIZENS = itertools.count(1)
-"""Each booking of ``_book`` is another citizen, so the address limit (ADR 0059) stays out."""
+"""Each booking of ``_book`` is another citizen, so the address limit (ADR 0066) stays out."""
 
 
 async def _book(site: Site, start: datetime = FRIDAY_0900) -> int:

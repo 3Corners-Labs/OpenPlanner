@@ -536,7 +536,7 @@ async def test_own_queue_team_gets_an_invite_and_its_withdrawal(uow: InMemoryUni
     assert JobType.SEND_TEAM_CANCEL in [j.type for j in uow.state.jobs[booking_id]]
 
 
-# --- bookings per email address (ADR 0059) ------------------------------------------------
+# --- bookings per email address (ADR 0066) ------------------------------------------------
 
 BEA = ContactInput(first_name="Bea", last_name="de Vries", email="bea@example.org")
 """A second citizen, for tests that need two people in one slot."""
