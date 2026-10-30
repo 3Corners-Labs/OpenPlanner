@@ -46,20 +46,27 @@
           <span class="admin-profile__name"><span class="visually-hidden">{{ _("admin.signed_in_as", name="") }}</span>{{ principal.display_name }}</span>
         </summary>
         <div class="admin-profile__panel">
-          <p class="admin-profile__signed-in">{{ _("admin.signed_in_as", name=principal.display_name) }}</p>
-          {% if role_labels %}
-          <p class="admin-profile__label">{{ _("admin.profile.roles") }}</p>
-          <ul class="admin-profile__roles">
-            {% for label in role_labels %}<li class="chip">{{ label }}</li>{% endfor %}
-          </ul>
-          {% endif %}
+          <div class="admin-profile__head">
+            <p class="admin-profile__who">{{ principal.display_name }}</p>
+            {% if role_labels %}<p class="admin-profile__role">{{ role_labels | join(", ") }}</p>{% endif %}
+          </div>
           <p class="admin-profile__source">{{ _("admin.profile.source") }}{% if can("rights.view") %} <a href="/admin/rights">{{ _("admin.profile.my_rights") }}</a>{% endif %}</p>
-          {{ choice("theme-label", _("admin.theme.label"), themes) }}
+          {% if can("dashboard.view") %}
+          <form method="get" action="/admin/preferences">
+            <input type="hidden" name="next" value="{{ back }}">
+            <p class="admin-profile__label" id="theme-label">{{ _("admin.theme.label") }}</p>
+            <div class="admin-profile__choices" role="group" aria-labelledby="theme-label">
+              {% for item in themes %}<button type="submit" name="theme" value="{{ item.value }}" class="button button--small{% if not item.current %} button--secondary{% endif %}"{% if item.current %} aria-current="true"{% endif %}>{{ item.label }}</button>
+              {% endfor %}
+            </div>
+          </form>
+          {% endif %}
           {{ choice("language-label", _("language.switcher.label"), languages) }}
           {% if can("dashboard.view") %}
-          <form class="admin-profile__alerts" method="get">
+          <form class="admin-profile__alerts" method="get" action="/admin/preferences">
             <fieldset>
               <legend>{{ _("admin.alerts.label") }}</legend>
+              <input type="hidden" name="next" value="{{ back }}">
               <input type="hidden" name="alert_prefs" value="1">
               <label class="admin-profile__check"><input type="checkbox" name="alert_banner" value="1"{% if alert_prefs.banner %} checked{% endif %}>{{ _("admin.alerts.banner") }}</label>
               <div class="field">
