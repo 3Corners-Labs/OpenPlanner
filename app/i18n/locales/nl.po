@@ -57,6 +57,33 @@ msgstr "Afspraak bekijken of wijzigen"
 msgid "message.signoff"
 msgstr "Met vriendelijke groet, {group_name}"
 
+msgid "message.team_invite.subject"
+msgstr "Videoafspraak {date} {time}, {group_name} ({reference})"
+
+msgid "message.team_invite.greeting"
+msgstr "Beste collega's,"
+
+msgid "message.team_invite.intro"
+msgstr "Er is een videoafspraak geboekt bij {group_name}: {first_name}, afspraaknummer {reference}. Een medewerker pakt hem op in de wachtrij van OpenPlanner."
+
+msgid "message.team_invite.queue"
+msgstr "De link naar het gesprek krijgt u als u de afspraak oppakt."
+
+msgid "message.team_invite.queue_link"
+msgstr "Naar de wachtrij"
+
+msgid "message.team_invite.summary"
+msgstr "Videoafspraak {group_name} ({reference})"
+
+msgid "message.team_invite.signoff"
+msgstr "Dit bericht is automatisch verstuurd door OpenPlanner."
+
+msgid "message.team_cancel.subject"
+msgstr "Vervallen: videoafspraak {date} {time}, {group_name} ({reference})"
+
+msgid "message.team_cancel.intro"
+msgstr "De videoafspraak {reference} bij {group_name} gaat niet door op dit tijdstip. Hij is uit uw agenda gehaald."
+
 msgid "message.calendar_summary"
 msgstr "Videogesprek met {group_name}"
 
@@ -553,6 +580,9 @@ msgstr "Taak naar de wachtrij en afspraak vast"
 msgid "admin.group.dispatch_value"
 msgstr "{minutes} minuten voor de start"
 
+msgid "admin.group.no_invite"
+msgstr "Geen uitnodiging"
+
 msgid "admin.group.phone"
 msgstr "Telefoonnummer"
 
@@ -938,6 +968,12 @@ msgstr "Hoe afspraken bij medewerkers komen"
 msgid "admin.field.dispatch_kind_hint"
 msgstr "Contactcenter: een taak in de wachtrij van het team, kort voor de start. Eigen wachtrij: medewerkers loggen in op OpenPlanner en pakken een afspraak op. Geldt voor afspraken die nog niet zijn doorgezet."
 
+msgid "admin.field.calendar_invite_address"
+msgstr "Agenda-uitnodiging naar (eigen wachtrij)"
+
+msgid "admin.field.calendar_invite_address_hint"
+msgstr "Optioneel. Een gedeelde mailbox of verzendlijst van het team. Per afspraak komt daar een agenda-uitnodiging met voornaam en afspraaknummer, zonder link naar het gesprek. Controleer het adres goed: de uitnodiging valt buiten de bewaartermijn van OpenPlanner."
+
 msgid "admin.field.queue_visible_from_minutes"
 msgstr "Zichtbaar in de wachtrij (minuten vooraf, eigen wachtrij)"
 
@@ -1041,6 +1077,9 @@ msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Bel de 
 
 msgid "admin.form.error.move_causes_shortfall"
 msgstr "In dit tijdslot zijn dan meer afspraken dan medewerkers. Bevestig dat u het tekort accepteert, of kies een ander tijdslot."
+
+msgid "admin.form.error.calendar_invite_address"
+msgstr "Vul een geldig e-mailadres in, of laat het veld leeg."
 
 msgid "admin.form.error.queue_visible_from_minutes"
 msgstr "Vul een aantal minuten in van 0 tot 120."

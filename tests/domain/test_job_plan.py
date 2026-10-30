@@ -234,3 +234,28 @@ def test_confirm_notices_only_while_the_booking_awaits_confirmation() -> None:
         assert is_stale(None, replace(pending, contact=None), job_type)
     assert not is_stale(None, pending.expire(NOW), JobType.SEND_UNCONFIRMED_LAPSED)
     assert not is_stale(None, pending, JobType.EXPIRE_UNCONFIRMED)
+
+
+def test_team_invite_is_planned_now_and_cancelled_with_the_booking() -> None:
+    from app.domain.job_plan import plan_for_suspension
+
+    booked = plan_for_booking(
+        start=START,
+        end=END,
+        contact=NO_PHONE,
+        consents=frozenset(),
+        rules=[],
+        now=NOW,
+        dispatch_lead=LEAD,
+        team_invite=True,
+    )
+    invite = [j for j in booked if j.type is JobType.SEND_TEAM_INVITE]
+    cancelled = plan_for_cancellation(cancelled_at=NOW, team_invite=True)
+    moved = plan_for_cancellation(cancelled_at=NOW, notify=False, team_invite=True)
+    suspended = plan_for_suspension(now=NOW, purge_at=None, team_invite=True)
+
+    assert [(j.run_at, j.pinned_start) for j in invite] == [(NOW, START)]
+    for jobs in (cancelled, moved, suspended):
+        assert [j.run_at for j in jobs if j.type is JobType.SEND_TEAM_CANCEL] == [NOW]
+    plain = plan_for_cancellation(cancelled_at=NOW)
+    assert not any(j.type is JobType.SEND_TEAM_CANCEL for j in plain)

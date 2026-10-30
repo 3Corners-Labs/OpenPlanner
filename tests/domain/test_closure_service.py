@@ -20,6 +20,7 @@ from tests.support.domain import (
     NOW,
     SLOT_0900,
     SLOT_0930,
+    with_team_invite,
 )
 
 SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
@@ -348,6 +349,18 @@ async def test_cancel_one_or_all(
     assert outcome.done == 1
     assert {_status(uow, first), _status(uow, second)} == {BookingStatus.CANCELLED}
     assert JobType.SEND_CANCELLATION in _jobs(uow, second)
+
+
+async def test_cancelling_a_booking_on_hold_withdraws_the_team_invite(
+    closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    uow.state.groups[1] = with_team_invite(uow.state.groups[1])
+    booking_id = await _book(bookings)
+    await closures.close_group(GROUP_ADMIN, "demo", UNTIL_TUESDAY)
+
+    await closures.cancel(GROUP_ADMIN, "demo", booking_id)
+
+    assert JobType.SEND_TEAM_CANCEL in _jobs(uow, booking_id)
 
 
 async def test_overview_lists_bookings_on_hold(

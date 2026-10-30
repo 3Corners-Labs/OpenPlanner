@@ -241,6 +241,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "queue_change_working_days": "2",
         "queue_visible_from_minutes": "15",
         "queue_free_pick_allowed": "no",
+        "calendar_invite_address": "team-demo@example.nl",
         "phone_mode": "optional",
         "direct_call_enabled": "no",
         "embedding_enabled": "no",
@@ -256,6 +257,8 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
     after = (await site.client.get(f"{GROUP}/settings")).text
     assert '<option value="openplanner_queue" selected' in after
     assert 'name="queue_change_working_days" type="number" value="2"' in after
+    overview = (await site.client.get(GROUP)).text
+    assert "team-demo@example.nl" in overview
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     async with SqlUnitOfWork(app.state.engine).read() as tx:
         events = await tx.list_audit_events(Scope(everything=True), limit=5)
