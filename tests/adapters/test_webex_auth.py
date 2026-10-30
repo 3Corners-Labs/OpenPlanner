@@ -183,16 +183,44 @@ def test_a_refusal_logs_webexs_reason_and_tracking_id_without_addresses() -> Non
     assert "example.org" not in str(logs)
 
 
-def test_without_explain_only_the_tracking_id_is_logged() -> None:
+def test_the_specific_descriptions_win_over_the_generic_message() -> None:
+    # Recorded on 2026-10-30: Webex's message says "see 'errors'"; the description says why.
+    request = httpx.Request("POST", "https://webexapis.com/v1/meetings")
+    body = {
+        "message": "The request could not be understood by the server due to malformed syntax. "
+        "See 'errors' for more details.",
+        "errors": [
+            {
+                "description": "timezone 'Europe/Amsterdam' and timezone offset in "
+                "'2026-10-31T13:43:04+00:00' do not match"
+            }
+        ],
+        "trackingId": "ROUTERGW_c9b1",
+    }
+    response = httpx.Response(400, json=body, request=request)
+
+    with capture_logs() as logs:
+        error = http_failure(response, explain=True)
+
+    expected = (
+        "timezone 'Europe/Amsterdam' and timezone offset in '2026-10-31T13:43:04+00:00' "
+        "do not match"
+    )
+    assert logs[0]["reason"] == expected
+    assert error.reason == expected
+
+
+def test_without_explain_only_the_tracking_id_is_logged_and_the_error_has_no_reason() -> None:
     request = httpx.Request("POST", "https://webexapis.com/v1/tasks")
     body = {"message": "Invalid value Ada for firstName", "trackingId": "ROUTER_456"}
     response = httpx.Response(400, json=body, request=request)
 
     with capture_logs() as logs:
-        http_failure(response)
+        error = http_failure(response)
 
     assert (logs[0]["reason"], logs[0]["tracking_id"]) == ("", "ROUTER_456")
     assert "Ada" not in str(logs)
+    assert error.reason == ""  # citizen data may be echoed: never kept
 
 
 def test_a_refusal_without_a_json_body_still_logs_the_status() -> None:

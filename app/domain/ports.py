@@ -135,18 +135,26 @@ class IdentityError(Exception):
         self.code = code
 
 
+REASON_LIMIT = 300
+"""Longest provider reason kept on an error or an event (the column size, ADR 0065)."""
+
+
 class IntegrationError(Exception):
     """A call to Webex or WxCC failed; ``code`` says why, ``retryable`` whether to try again.
 
     The code is a short machine key (``unauthorized``, ``rate_limited``, ``server_error``,
     ``rejected``); it never contains response bodies, which could hold personal data.
+    ``reason`` is the provider's own explanation (ADR 0065): set only by adapters for requests
+    that carry no citizen data, with addresses masked and cut at ``REASON_LIMIT``; it is kept
+    with the failure on the timeline and the system event, so admins read it on the page.
     """
 
-    def __init__(self, code: str, *, retryable: bool) -> None:
-        """Store the code and whether a retry can help."""
+    def __init__(self, code: str, *, retryable: bool, reason: str = "") -> None:
+        """Store the code, whether a retry can help, and the provider's reason, if any."""
         super().__init__(code)
         self.code = code
         self.retryable = retryable
+        self.reason = reason[:REASON_LIMIT]
 
 
 class VideoProvider(Protocol):

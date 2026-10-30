@@ -213,7 +213,7 @@ def create_app(
                 agent_start_label,
             )
             app.state.integration_check_service = IntegrationCheckService(
-                uow, clock, app.state.admin_service, wired.checker
+                uow, clock, app.state.admin_service, wired.checker, SystemLog(uow, clock)
             )
             # Explicit adapters (tests) are never rebuilt.
             app.state.webex_fingerprint = None if integrations else webex_fingerprint(current)

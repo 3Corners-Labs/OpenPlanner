@@ -163,6 +163,15 @@ run the call without the host being present.
 Use a functional account (for example `videocalls@municipality.nl`), not a personal one: it
 must keep working when someone leaves.
 
+As soon as you save a new address, OpenPlanner checks the integration right away, just like the
+**Check integration** button at the bottom of the page: a probe meeting is scheduled and removed
+again. The result is shown under **Check integration** after saving. From then on the platform
+checks every group with a host by itself, once a day by default. When something is wrong (no
+licence, wrong account, missing rights), the group's audit log shows a system entry
+*Integration checked* with Webex's answer under it; it repeats until it is fixed and reports
+once that all is well again. So you hear about it before a citizen gets an appointment without
+a video call.
+
 <!-- field: wxcc_business_address -->
 ### WxCC business address
 

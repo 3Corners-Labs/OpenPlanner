@@ -56,6 +56,17 @@ def statuses(*codes: int) -> dict[str, int]:
 EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 200, 403)},
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 200, 403)},
+    # ADR 0061: overview widgets, each with the permission of the widget register. The
+    # auditor and the agent hold no bookings.view; the agent holds no audit.view.
+    "GET /admin/overview/w/rights": {
+        "/admin/overview/w/rights": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "GET /admin/overview/w/bookings-today": {
+        "/admin/overview/w/bookings-today": statuses(200, 200, 200, 200, 403, 403, 403)
+    },
+    "GET /admin/overview/w/changes": {
+        "/admin/overview/w/changes": statuses(200, 200, 200, 200, 200, 403, 403)
+    },
     "GET /admin/matrix": {"/admin/matrix": statuses(200, 200, 200, 200, 200, 200, 403)},
     # ADR 0039: the role editor is the superuser's (roles.manage is locked).
     "GET /admin/roles": {"/admin/roles": statuses(200, 403, 403, 403, 403, 403, 403)},
