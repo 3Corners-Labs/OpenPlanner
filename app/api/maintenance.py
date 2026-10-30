@@ -9,7 +9,9 @@ no route can forget it.
               ─► 503 + Retry-After: the maintenance page instead of the form or the write
     open      the booking page /b/{token}, the closure page /g/{slug}/closure (ADR 0037),
               waiting and join pages, health, brand assets, webhooks (they record what
-              happens in running calls)
+              happens in running calls); confirming by email link and the "check your
+              email" page (ADR 0056): the worker lets unconfirmed bookings lapse during
+              maintenance too, so the citizen must be able to confirm
     widget    the group, availability and booking routes of the embedded widget (ADR 0035)
               ─► 503 ``{"error": "maintenance"}`` + Retry-After, readable by the host page;
               its texts, its script and the CORS preflight stay open
@@ -63,6 +65,8 @@ OPEN_ROUTES = frozenset(
         "/api/v1/widget/texts",
         "/widget/v1/gov-booking.js",
         "/b/{token}",
+        "/b/{token}/confirm",
+        "/g/{slug}/booked",
         "/g/{slug}/closure",
         "/g/{slug}/closure/image",
         "/b/{token}/wait",

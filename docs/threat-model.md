@@ -89,13 +89,14 @@ HTTP endpoints follow in WP3; the rules below are enforced in `app/domain/servic
 | Spoofing | Guessing a management token | 32 random bytes; only SHA-256 stored; constant-time comparison; unknown and wrong tokens give the same `booking_not_found` | `tests/domain/test_tokens.py`, `test_unknown_tokens_are_not_found` |
 | Information disclosure | PII in error messages or repr | `DomainError` carries a code and a field name only; contact fields and tokens are excluded from `repr` | `test_invalid_contact_names_the_field_only`, `test_booking_repr_hides_personal_data`, `test_receipt_repr_hides_the_token` |
 | Tampering | Booking a time that is not offered (unaligned, closed day, past, beyond horizon) | Start must match a slot of the current schedule; notice and horizon checked; closing a day blocks new bookings in existing slots | `test_unbookable_starts`, `test_closing_a_day_stops_new_bookings_in_existing_slots` |
-| Tampering | Cancelling or rescheduling after the task is in the WxCC queue, leaving an agent with a dead appointment | A move is refused from `change_deadline` (`citizen_change_lead_minutes` before the start, default 60, never shorter than the dispatch lead) and a cancel from the start (`cancel_deadline`): `booking_locked` (ADR 0068). A cancel after dispatch ends the task and marks it cancelled (ADR 0021) | `test_booking_cannot_be_moved_from_the_change_lead`, `test_booking_cannot_be_cancelled_from_the_start`, `test_booking_can_be_cancelled_after_the_change_lead_and_dispatch` |
+| Tampering | Cancelling or rescheduling after the task is in the WxCC queue, leaving an agent with a dead appointment | A move is refused from `change_deadline` (`citizen_change_lead_minutes` before the start, default 60, never shorter than the dispatch lead) and a cancel from the start (`cancel_deadline`): `booking_locked` (ADR 0069). A cancel after dispatch ends the task and marks it cancelled (ADR 0021) | `test_booking_cannot_be_moved_from_the_change_lead`, `test_booking_cannot_be_cancelled_from_the_start`, `test_booking_can_be_cancelled_after_the_change_lead_and_dispatch` |
 | Repudiation / integrity | Partial writes when a reschedule fails | One transaction; any error rolls back the cancellation of the old booking | `test_failed_reschedule_rolls_back` |
 
 ## Flow: public booking pages (WP3)
 
-Public, unauthenticated: `GET /g/{slug}`, `GET/POST /g/{slug}/book`, `GET /b/{token}`,
-`GET/POST /b/{token}/cancel`, `GET/POST /b/{token}/reschedule`.
+Public, unauthenticated: `GET /g/{slug}`, `GET/POST /g/{slug}/book`, `GET /g/{slug}/booked`,
+`GET /b/{token}`, `GET/POST /b/{token}/confirm` (ADR 0056), `GET/POST /b/{token}/cancel`,
+`GET/POST /b/{token}/reschedule`.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -104,6 +105,8 @@ Public, unauthenticated: `GET /g/{slug}`, `GET/POST /g/{slug}/book`, `GET /b/{to
 | Information disclosure | The limit refusal reveals that someone else's address has an appointment | One code for both rules; the message does not say an appointment exists; only start times leave the adapter. Residual signal until ADR 0066 step 8 (refusal by email only) | `tests/api/test_booking_pages.py::test_the_same_address_twice_in_a_slot_is_refused_without_saying_why` |
 | Tampering (CSRF) | A third-party site posts a booking or cancellation | Fetch Metadata: `Sec-Fetch-Site` must be same-origin/none; without it `Origin` must match. `Referrer-Policy: same-origin` (with `no-referrer` browsers send `Origin: null` on form posts) | `test_cross_site_posts_are_refused`, `test_same_origin_posts_are_accepted` |
 | Information disclosure | PII through error responses | Error summary and error pages use catalogue texts only; submitted values are only re-filled into the visitor's own form | `test_invalid_input_is_explained_and_kept`, `test_honeypot_is_refused` |
+| Denial of service | Slot exhaustion with unconfirmed bookings: a bot books with made-up addresses (ADR 0056) | Every new booking awaits confirmation by its email link and holds its place only until `confirm_by` (at most `booking_confirm_window_hours`, 72 h); then `expire_unconfirmed` cancels it and frees the place; the rate limits above stay | `tests/domain/test_services_confirmation.py::test_an_unconfirmed_booking_holds_its_place`, `test_a_confirmation_after_the_deadline_lapses_the_booking`, `tests/jobs/test_runner.py::test_an_unconfirmed_booking_lapses_at_its_deadline` |
+| Spoofing | Someone books with another person's address, or a mail scanner "confirms" it by opening the link (ADR 0056 §8) | The token reaches only the mailbox: after booking the browser is sent to "check your email" without it; `GET /b/{token}/confirm` shows a page, only its same-origin POST confirms; the first mail carries no name, join link or calendar file | `tests/api/test_booking_pages.py::test_full_booking_flow`, `test_opening_the_confirm_link_never_confirms`, `test_confirming_needs_a_same_origin_post`, `tests/jobs/test_messages.py::test_a_request_to_confirm_links_the_confirm_page_and_names_nobody` |
 | Information disclosure | Leaked management link shows personal data | The management page shows date, team and status only, never name, email or phone; old links of moved bookings show only "cancelled" | `test_full_booking_flow`, `test_reschedule_flow` |
 | Spoofing | Token guessing at `/b/{token}` | 256-bit tokens (HMAC, ADR 0011); lookup by SHA-256, constant-time compare; same 404 for every unknown token; rate-limited; each unknown link is a security event with the caller's pseudonym (ADR 0053) | `test_unknown_token_is_a_404_page`, `tests/domain/test_tokens.py`, `tests/api/test_security_events.py::test_an_unknown_management_link_is_a_security_event` |
 | Tampering | Changing a booking after the WxCC task is dispatched | Read-only from the change deadline; cancel/reschedule pages redirect, POSTs return 409 | `test_booking_is_read_only_from_the_dispatch_moment` |
@@ -503,6 +506,22 @@ Inputs from outside: the slug and booking id in the path. Agents are portal user
 | Repudiation / human error | An admin changes settings in the wrong environment | A striped environment bar on every admin page outside production; none in production | `tests/web/test_environment_bar.py`, `tests/admin/test_environment_bar.py` |
 | Tampering | Simulated ids overwrite a real meeting or task | `prepare` sets ids only where none exist; stand-ins are marked `simulated` on the timeline | `tests/domain/test_simulation.py::test_real_platform_ids_are_never_overwritten` |
 | Tampering (CSRF) | A third-party site triggers a check or a simulated event | Fetch Metadata check on both POSTs | `tests/admin/test_check_routes.py::test_cross_site_check_is_refused`, `tests/admin/test_simulator_routes.py::test_unknown_events_and_cross_site_posts_are_refused` |
+
+## Flow: troubleshooting per booking (ADR 0068)
+
+`POST /admin/groups/{slug}/bookings/{id}/retry` plans a failed meeting or work item job again;
+every request to Webex and WxCC becomes an `integration.request` system event; the worker
+writes a heartbeat row that the group check reads.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Elevation of privilege | An auditor, agent or another organisation's admin plans jobs | `bookings.manage` on the route (fresh login) and again in the domain; the booking must belong to the group | `tests/admin/test_authorization_matrix.py`, `tests/domain/test_call_retry.py::test_only_who_manages_the_groups_bookings_may_retry` |
+| Denial of service | Repeated clicks flood Webex or WxCC | One pending job per type: a click replaces it; only for an active booking that still lacks the meeting or task; messages cannot be retried | `tests/domain/test_call_retry.py::test_a_failed_meeting_is_planned_again_now_and_audited`, `test_nothing_is_retried_that_exists_is_not_retryable_or_is_cancelled` |
+| Information disclosure | A request event leaks personal data or a token | Only method, path (no query), status, duration, tracking id, version; never body, query or header | `tests/adapters/test_webex_auth.py::test_every_request_is_reported_without_query_or_body` |
+| Information disclosure | Request events show a booking to the wrong admins | Written at the booking's organisation and group from the trace; read through `list_audit_events` with the `bookings.view` scope | `tests/domain/test_request_log.py::test_a_request_is_a_system_event_at_the_bookings_level_in_its_trace` |
+| Denial of service | Request events fill the disk | Own retention `INTEGRATION_REQUEST_RETENTION_DAYS` (1–365, default 30) before the other system events | `tests/domain/test_request_log.py::test_request_events_are_pruned_on_their_own_retention` |
+| Tampering (CSRF) | A third-party site triggers a retry | Fetch Metadata check on the POST | `tests/admin/test_authorization_matrix.py` (same-origin header required) |
+| Repudiation | Nobody knows who retried | Audited as `bookings.manage` with detail `retry.<job type>` | `tests/domain/test_call_retry.py::test_a_failed_meeting_is_planned_again_now_and_audited` |
 
 ## Flow: machine API for contact-center bots (ADR 0023)
 

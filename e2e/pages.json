@@ -58,6 +58,22 @@
       ]
     },
     {
+      "name": "check your email",
+      "path": "/g/demo/booked",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "confirm appointment",
+      "path": "{pending_confirm}",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "trial call (not available)",
       "path": "{trial_page}",
       "locales": [

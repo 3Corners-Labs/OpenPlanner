@@ -1,15 +1,15 @@
-"""Citizen change lead per group, replacing the working days of the own queue (ADR 0068).
+"""Citizen change lead per group, replacing the working days of the own queue (ADR 0069).
 
 ``groups`` gains ``citizen_change_lead_minutes`` (default 60, 0 to 1440): how long before the
 start the citizen can still move a booking; cancelling is possible until the start. Existing
 groups get 60 minutes, or their dispatch lead when that is longer. ``queue_change_working_days``
 is dropped; the downgrade restores it at 1, the earlier default.
 
-Revises 0057 (the merge of the certificate checks and the event messages). Open PRs also claim
-0057 and 0058, so recheck the head before merging.
+Revises 0059 (the version on booking events). Open PRs also claim 0059 and 0060, so recheck
+the head before merging.
 
-Revision ID: 0059
-Revises: 0057
+Revision ID: 0060
+Revises: 0059
 Create Date: 2026-10-30 18:00:00.000000
 """
 
@@ -18,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0059"
-down_revision: str | None = "0057"
+revision: str = "0060"
+down_revision: str | None = "0059"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

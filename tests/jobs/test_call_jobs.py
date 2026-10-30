@@ -5,11 +5,12 @@ from datetime import timedelta
 import pytest
 
 from app.domain.admin import AdminService
+from app.domain.audit import Outcome
 from app.domain.calls import CallState, EventKind, TaskState
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
-from app.domain.scheduling import ScheduleRule
+from app.domain.scheduling import DispatchKind, ScheduleRule
 from app.domain.services import BookingService
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
@@ -307,6 +308,47 @@ async def test_nothing_to_end_without_a_task_or_after_it_ended(setup: Setup) -> 
 
     assert setup.dispatcher.ended == []
     assert setup.dispatcher.marked == []
+
+
+def _skips(setup: Setup) -> list[tuple[str, str]]:
+    return [
+        (e.action, e.reason)
+        for e in setup.uow.state.audit
+        if e.outcome is Outcome.SKIPPED and e.action.startswith("job.")
+    ]
+
+
+async def test_a_job_with_nothing_to_do_is_skipped_with_its_reason(setup: Setup) -> None:
+    # ADR 0068: never "succeeded" for a meeting or work item that was not made.
+    bid = await setup.booking()
+    await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
+
+    await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
+
+    assert _skips(setup) == [("job.create_video_room", "already_done")]
+
+
+@pytest.mark.parametrize(
+    ("group", "job_type", "reason"),
+    [
+        ({}, JobType.CREATE_VIDEO_ROOM, "no_video"),
+        ({"video_host_email": "h@example.nl"}, JobType.DISPATCH_WXCC_TASK, "no_dispatch"),
+        (
+            {**WIRED, "dispatch_kind": DispatchKind.OPENPLANNER_QUEUE},
+            JobType.DISPATCH_WXCC_TASK,
+            "own_queue",
+        ),
+    ],
+)
+async def test_a_group_that_wants_no_meeting_or_task_skips_the_job(
+    group: dict[str, object], job_type: JobType, reason: str
+) -> None:
+    setup = Setup(_uow(**group))
+    bid = await setup.booking()
+
+    await setup.runner(FakeQueue([job(bid, job_type)])).run_due()
+
+    assert _skips(setup) == [(f"job.{job_type.value}", reason)]
 
 
 async def test_the_trial_meeting_is_deleted_and_forgotten(setup: Setup) -> None:

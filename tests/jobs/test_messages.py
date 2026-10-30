@@ -487,6 +487,53 @@ def test_the_product_footer_speaks_the_citizens_language(composer: MessageCompos
     assert "Appointments via" in (message.html or "")
 
 
+PENDING = replace(
+    BOOKING,
+    status=BookingStatus.PENDING_CONFIRMATION,
+    confirm_by=NOW + timedelta(hours=24),
+    group_id=1,
+)
+
+
+@pytest.mark.parametrize("job_type", [JobType.SEND_CONFIRM_REQUEST, JobType.SEND_CONFIRM_REMINDER])
+def test_a_request_to_confirm_links_the_confirm_page_and_names_nobody(
+    composer: MessageComposer, job_type: JobType
+) -> None:
+    message = composer.compose(
+        job_type, PENDING, replace(GROUP, video_host_email="host@example.nl"), NOW
+    )
+    confirm = f"https://afspraak.example.nl/b/{derive_token(TEST_TOKEN_KEY, SALT)}/confirm"
+
+    # ADR 0056 §7: the address is not verified yet, so no name, join link or calendar file.
+    assert "Ada" not in message.text
+    assert "Goedendag," in message.text
+    assert confirm in message.text
+    assert f'href="{confirm}"' in (message.html or "")
+    assert "/join" not in message.text
+    assert message.attachments == ()
+    assert "uiterlijk vrijdag 2 januari 2026, 09:00" in message.text
+
+
+def test_the_request_to_confirm_in_english(composer: MessageComposer) -> None:
+    message = composer.compose(
+        JobType.SEND_CONFIRM_REQUEST, replace(PENDING, locale="en"), GROUP, NOW
+    )
+
+    assert message.subject == "Confirm your appointment with Aangifte <Inkomstenbelasting>"
+    assert "Hello," in message.text
+
+
+def test_a_lapsed_booking_links_the_group_page_to_book_again(composer: MessageComposer) -> None:
+    lapsed = PENDING.expire(NOW + timedelta(hours=24))
+
+    message = composer.compose(JobType.SEND_UNCONFIRMED_LAPSED, lapsed, GROUP, NOW)
+
+    assert "/b/" not in message.text
+    assert f"https://afspraak.example.nl/g/{GROUP.slug}" in message.text
+    assert "vervallen" in message.subject
+    assert message.attachments == ()
+
+
 def test_the_confirmation_offers_a_trial_call_next_to_the_join_link(
     composer: MessageComposer,
 ) -> None:

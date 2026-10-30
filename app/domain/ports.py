@@ -44,7 +44,7 @@ from app.domain.embedding import AllowedOrigins
 from app.domain.form_fields import FormDefinition
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.images import ImageFile, ImageText
-from app.domain.job_plan import JobType, PlannedJob
+from app.domain.job_plan import JobCounts, JobSummary, JobType, PlannedJob
 from app.domain.maintenance import MaintenanceState
 from app.domain.retention import RetentionFacts
 from app.domain.scenarios import ClosureScenario
@@ -58,6 +58,7 @@ from app.domain.scheduling import (
 from app.domain.staff import StaffFilter, StaffMember
 from app.domain.tls import CertificateCheck, ProbeResult
 from app.domain.updates import Release, ReleaseCheck, UpdateRequest
+from app.domain.worker_check import WorkerHeartbeat
 
 
 class EventSink(Protocol):
@@ -162,6 +163,35 @@ class IntegrationError(Exception):
         self.code = code
         self.retryable = retryable
         self.reason = reason[:REASON_LIMIT]
+
+
+@dataclass(frozen=True)
+class RequestRecord:
+    """One HTTP request an adapter made to a platform (ADR 0068): codes and numbers only.
+
+    Attributes:
+        method: ``POST``, ``DELETE``, ...
+        path: The URL path without its query string (a query may carry an address).
+        status: The HTTP status, or ``0`` when the platform could not be reached.
+        error: The ``IntegrationError`` code the request ended in; empty on success.
+        tracking_id: The platform's id of the request (Webex ``trackingId``), for its support.
+        duration_ms: How long the request took.
+    """
+
+    method: str
+    path: str
+    status: int
+    error: str = ""
+    tracking_id: str = ""
+    duration_ms: int = 0
+
+
+class RequestLog(Protocol):
+    """Where an adapter reports every request it made (ADR 0068); never raises to the caller."""
+
+    async def record(self, record: RequestRecord) -> None:
+        """Keep ``record`` for the booking page and the audit log's chain view."""
+        ...
 
 
 class VideoProvider(Protocol):
@@ -328,8 +358,13 @@ class Transaction(Protocol):
         """
         ...
 
-    async def delete_audit_events(self, category: Category, before: datetime) -> int:
-        """Delete the events of ``category`` older than ``before``; return how many (ADR 0040)."""
+    async def delete_audit_events(
+        self, category: Category, before: datetime, action: str | None = None
+    ) -> int:
+        """Delete the events of ``category`` older than ``before``; return how many (ADR 0040).
+
+        With ``action`` only the events with that action go (the request events, ADR 0068).
+        """
         ...
 
     async def active_diagnostic_modes(self, now: datetime) -> list[DiagnosticMode]:
@@ -743,6 +778,22 @@ class Transaction(Protocol):
 
     async def delete_pending_jobs(self, booking_id: int, types: Collection[JobType]) -> None:
         """Delete the booking's pending jobs of the given types."""
+        ...
+
+    async def get_booking_jobs(self, booking_id: int) -> list[JobSummary]:
+        """Return the booking's jobs, oldest first, for its page (ADR 0068)."""
+        ...
+
+    async def count_group_jobs(self, group_id: int, overdue_before: datetime) -> JobCounts:
+        """Count the group's failed jobs and its pending jobs planned before ``overdue_before``."""
+        ...
+
+    async def save_worker_heartbeat(self, heartbeat: WorkerHeartbeat) -> None:
+        """Store the worker's heartbeat row, replacing the previous one (ADR 0068)."""
+        ...
+
+    async def get_worker_heartbeat(self) -> WorkerHeartbeat | None:
+        """Return the worker's latest heartbeat row, if it ever wrote one."""
         ...
 
     async def get_shortfall_acceptances(

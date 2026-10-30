@@ -7,6 +7,7 @@ context lives in ``contextvars``, so concurrent requests never see each other's 
 
     request / job ─► trace_scope()        new trace id, no level yet
                   ─► bind_level(org, grp)  once the route or job knows its target
+                  ─► bind_booking(id)      once it knows the booking (request events, ADR 0068)
                   ─► log line, AuditEvent  read current() and carry both
 
 The service (``web`` or ``worker``) is set once per process. This module is plain Python so
@@ -23,6 +24,7 @@ from uuid import uuid4
 _TRACE_ID: ContextVar[str] = ContextVar("trace_id", default="")
 _ORGANISATION: ContextVar[str | None] = ContextVar("organisation", default=None)
 _GROUP: ContextVar[str | None] = ContextVar("group", default=None)
+_BOOKING: ContextVar[int | None] = ContextVar("booking", default=None)
 _service = ""
 
 TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
@@ -38,12 +40,14 @@ class EventContext:
         organisation: Slug of the organisation concerned, once known.
         group: Slug of the group concerned, once known.
         service: ``web`` or ``worker``; empty until the process sets it.
+        booking_id: The booking the job or request is about, once known (ADR 0068).
     """
 
     trace_id: str
     organisation: str | None
     group: str | None
     service: str
+    booking_id: int | None = None
 
 
 def new_id() -> str:
@@ -65,10 +69,16 @@ def trace_scope() -> Iterator[str]:
     or job that runs in the same task.
     """
     trace_id = new_id()
-    tokens = (_TRACE_ID.set(trace_id), _ORGANISATION.set(None), _GROUP.set(None))
+    tokens = (
+        _TRACE_ID.set(trace_id),
+        _ORGANISATION.set(None),
+        _GROUP.set(None),
+        _BOOKING.set(None),
+    )
     try:
         yield trace_id
     finally:
+        _BOOKING.reset(tokens[3])
         _GROUP.reset(tokens[2])
         _ORGANISATION.reset(tokens[1])
         _TRACE_ID.reset(tokens[0])
@@ -80,9 +90,16 @@ def bind_level(organisation: str | None, group: str | None) -> None:
     _GROUP.set(group)
 
 
+def bind_booking(booking_id: int | None) -> None:
+    """Record the booking the current job or request is about (ADR 0068)."""
+    _BOOKING.set(booking_id)
+
+
 def current() -> EventContext:
     """Return the context of the current request or job."""
-    return EventContext(_TRACE_ID.get(), _ORGANISATION.get(), _GROUP.get(), _service)
+    return EventContext(
+        _TRACE_ID.get(), _ORGANISATION.get(), _GROUP.get(), _service, _BOOKING.get()
+    )
 
 
 def current_trace_id() -> str:

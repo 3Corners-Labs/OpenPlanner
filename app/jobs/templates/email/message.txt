@@ -41,5 +41,10 @@
 {{ manage_text }}
 {{ manage_link }}: {{ manage_url }}
 {% endif %}
+{% if book_url %}
+
+{{ book_text }}
+{{ book_link }}: {{ book_url }}
+{% endif %}
 
 {{ signoff }}

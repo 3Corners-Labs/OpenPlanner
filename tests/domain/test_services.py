@@ -26,6 +26,7 @@ from tests.support.domain import (
     TEST_TOKEN_KEY,
     TUESDAY_0900,
     book,
+    book_confirmed,
     make_group,
     window,
 )
@@ -347,8 +348,13 @@ async def test_consents_are_stored_and_kept_on_reschedule(
 ) -> None:
     uow.state.reminder_rules[1] = [ReminderRule(ChannelKind.WHATSAPP, minutes_before=60)]
     consents = frozenset({ChannelKind.WHATSAPP})
-    old = await service.book(
-        group_slug="aangifte", start=SLOT_0900, contact=ADA, locale="nl", consents=consents
+    old = await book_confirmed(
+        service,
+        group_slug="aangifte",
+        start=SLOT_0900,
+        contact=ADA,
+        locale="nl",
+        consents=consents,
     )
 
     new = await service.reschedule(old.management_token, SLOT_0930)
@@ -421,7 +427,7 @@ async def test_booking_cannot_be_cancelled_from_the_start(
 async def test_booking_can_be_cancelled_after_the_change_lead_and_dispatch(
     uow: InMemoryUnitOfWork, minutes_before: int
 ) -> None:
-    """ADR 0068: no cancel-lock before the start; the task is ended by the job (ADR 0021)."""
+    """ADR 0069: no cancel-lock before the start; the task is ended by the job (ADR 0021)."""
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     late = BookingService(
         uow, FixedClock(SLOT_0900 - timedelta(minutes=minutes_before)), TEST_TOKEN_KEY

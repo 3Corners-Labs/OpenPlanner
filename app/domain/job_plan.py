@@ -39,7 +39,7 @@ def dispatch_moment(start: datetime, dispatch_lead: timedelta) -> datetime:
 
     From then on an agent may pick up the task and join the meeting. A booking cancelled or
     moved after it gets its task marked cancelled (ADR 0021); the citizen's own change lead
-    (``Group.change_deadline``, ADR 0068) is never shorter than the dispatch lead.
+    (``Group.change_deadline``, ADR 0069) is never shorter than the dispatch lead.
     """
     return start - dispatch_lead
 
@@ -98,6 +98,45 @@ class PlannedJob:
     run_at: datetime
     pinned_start: datetime | None
     channel: ChannelKind | None = None
+
+
+class JobStatus(StrEnum):
+    """Where a stored job is in its life (``app.adapters.db.jobs``)."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class JobSummary:
+    """One stored job as the booking page shows it (ADR 0068): ids and codes only."""
+
+    type: JobType
+    status: JobStatus
+    run_at: datetime
+    attempts: int = 0
+    last_error: str = ""
+    channel: ChannelKind | None = None
+
+
+@dataclass(frozen=True)
+class JobCounts:
+    """What the group check reports about a group's queue (ADR 0068).
+
+    Attributes:
+        failed: Jobs that failed after their last attempt.
+        overdue: Pending jobs whose planned time lies longer ago than the overdue threshold.
+    """
+
+    failed: int = 0
+    overdue: int = 0
+
+
+RETRYABLE_JOBS = frozenset({JobType.CREATE_VIDEO_ROOM, JobType.DISPATCH_WXCC_TASK})
+"""Jobs an admin may plan again from the booking page (ADR 0068): the ones that create
+something at a platform. Messages are not among them: the citizen must not be mailed twice."""
 
 
 def plan_for_booking(

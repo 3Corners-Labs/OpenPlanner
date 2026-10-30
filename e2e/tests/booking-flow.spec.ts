@@ -1,14 +1,17 @@
 /**
  * The citizen's booking flow with the keyboard only (no mouse), checked with axe at every
  * step: choose a day in the calendar grid (arrow keys, ADR 0020) and a time, fill in the form,
- * book, view, move and cancel the appointment. A second test runs the same pages without
- * JavaScript. Needs the demo group (python -m app.cli seed-demo).
+ * book, confirm by the emailed link (ADR 0056), move and cancel the appointment. The link is
+ * only in the email, so the confirming part starts from a seeded booking that awaits
+ * confirmation. A second test runs the same pages without JavaScript. Needs the demo group
+ * (python -m app.cli seed-demo) and the seeded examples (seed-closures > e2e/fixtures.json).
  */
 import { expect, test } from '@playwright/test';
 
 import { citizenEmail, expectNoAxeViolations, tabTo } from '../helpers';
+import { fixture } from '../pages';
 
-test('book, move and cancel with the keyboard only', async ({ page }, testInfo) => {
+test('book, confirm, move and cancel with the keyboard only', async ({ page }, testInfo) => {
   await page.goto('/g/demo');
   await expectNoAxeViolations(page);
 
@@ -59,7 +62,19 @@ test('book, move and cancel with the keyboard only', async ({ page }, testInfo) 
   await tabTo(page, page.getByRole('button', { name: 'Afspraak maken' }));
   await page.keyboard.press('Enter');
 
-  await expect(page.getByRole('status')).toContainText('Uw afspraak is gemaakt');
+  // ADR 0056: the citizen is asked to confirm by the link in the email.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bevestig uw afspraak');
+  await expect(page.getByRole('status')).toContainText('We hebben u een e-mail gestuurd');
+  await expectNoAxeViolations(page);
+
+  // The emailed link opens the confirm page; only its button confirms. Each browser confirms
+  // its own seeded booking, since a confirmed one no longer shows the button.
+  await page.goto(fixture(`pending_flow_${testInfo.project.name}`));
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Afspraak bevestigen');
+  await expectNoAxeViolations(page);
+  await tabTo(page, page.getByRole('button', { name: 'Afspraak bevestigen' }));
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status')).toContainText('Uw afspraak is bevestigd');
   await expectNoAxeViolations(page);
 
   // Move the appointment.

@@ -190,7 +190,7 @@ class GroupRow(Base):
     direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
     dispatch_kind: Mapped[str] = mapped_column(String(32), server_default=text("'contact_center'"))
-    # ADR 0068: the citizen moves a booking up to this long before the start.
+    # ADR 0069: the citizen moves a booking up to this long before the start.
     citizen_change_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     # ADR 0044: a planner changes bookings up to this long before the start.
     planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
@@ -438,7 +438,7 @@ class BookingRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     slot_id: Mapped[int] = mapped_column(ForeignKey("slots.id", ondelete="RESTRICT"))
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="RESTRICT"), index=True)
-    status: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(24))
     first_name: Mapped[str | None] = mapped_column(String(100))
     last_name: Mapped[str | None] = mapped_column(String(100))
     email: Mapped[str | None] = mapped_column(String(254))
@@ -469,6 +469,9 @@ class BookingRow(Base):
     rebook_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
     claimed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     claimed_by: Mapped[str | None] = mapped_column(String(64))
+    # ADR 0056: the deadline to confirm by email link, and when the citizen did.
+    confirm_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     # ADR 0055: answers to the group's custom fields as JSON; PII, purged as a whole.
     form_answers: Mapped[str | None] = mapped_column(Text)
 
@@ -478,7 +481,7 @@ class BookingRow(Base):
         Index("ix_bookings_wxcc_task_id", "wxcc_task_id"),
         CheckConstraint(
             "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended', "
-            "'awaiting_rebook')",
+            "'awaiting_rebook', 'pending_confirmation')",
             name="status",
         ),
         CheckConstraint(
@@ -709,6 +712,8 @@ class BookingEventRow(Base):
     kind: Mapped[str] = mapped_column(String(32))
     detail: Mapped[str] = mapped_column(String(128), server_default=text("''"))
     message: Mapped[str] = mapped_column(String(300), server_default=text("''"))
+    # ADR 0068: the APP_VERSION of the process that wrote the event.
+    version: Mapped[str] = mapped_column(String(40), server_default=text("''"))
 
     __table_args__ = (Index("ix_booking_events_booking_id", "booking_id"),)
 
