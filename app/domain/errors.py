@@ -68,6 +68,8 @@ class ErrorCode(StrEnum):
     INVALID_FORM_FIELD = "invalid_form_field"
     FORM_FIELD_FORBIDDEN = "form_field_forbidden"
     INVALID_ANSWER = "invalid_answer"
+    SETTING_NO_KEY = "setting_no_key"
+    SETTING_NOT_LOCKED = "setting_not_locked"
 
 
 class DomainError(Exception):

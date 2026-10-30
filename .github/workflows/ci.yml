@@ -1,7 +1,13 @@
 name: ci
 
+# ADR 0058: two lanes. The fast lane runs everywhere; the full lane (`matrix`, `container`,
+# `e2e`) runs in the merge queue, on `main`, and on a pull request labelled `ci:full`. On any
+# other pull request those jobs end as skipped, which a required check accepts, and the queue
+# runs them before anything reaches `main`.
 on:
   pull_request:
+    # `labeled`: adding `ci:full` starts the full lane without a new push.
+    types: [opened, synchronize, reopened, labeled]
   # The merge queue builds main plus the queued pull requests before it merges them, so two
   # PRs that are green on their own (for example two Alembic heads) cannot both land.
   merge_group:
@@ -33,9 +39,8 @@ jobs:
   python:
     name: lint, types, tests, migrations
     runs-on: ubuntu-24.04
-    # The test suite alone takes about 26 minutes on main (the authorisation matrix starts an
-    # app per role and route); 30 left no headroom and cancelled runs that were passing.
-    timeout-minutes: 45
+    # Every test but the authorisation matrix sweeps, with the coverage gates (ADR 0058).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -57,6 +62,26 @@ jobs:
         run: make migrations
       - name: bandit
         run: make security
+
+  # The role × admin route sweeps of the authorisation matrix (ADR 0014), the slowest tests:
+  # each case starts an app. Full lane only (ADR 0058); the structural matrix tests run in
+  # `python`, so a route without a permission still fails every pull request.
+  matrix:
+    name: authorisation matrix
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'ci:full')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --locked
+      - name: pytest -m matrix
+        run: make matrix
 
   duplication:
     name: copy-paste detection
@@ -168,6 +193,9 @@ jobs:
 
   container:
     name: image build, scan, SBOM, API fuzzing
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'ci:full')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -244,6 +272,9 @@ jobs:
 
   e2e:
     name: accessibility (Playwright, axe-core, Lighthouse)
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'ci:full')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -300,7 +331,7 @@ jobs:
   # annotation that nobody reads. Runs after every other job, also when one of them failed.
   deprecations:
     name: no deprecation warnings
-    needs: [python, duplication, dependencies, semgrep, gitleaks, container, e2e]
+    needs: [python, matrix, duplication, dependencies, semgrep, gitleaks, container, e2e]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10

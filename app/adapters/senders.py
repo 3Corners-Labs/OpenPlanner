@@ -21,6 +21,7 @@ from app.config import Settings
 from app.domain.channel_settings import SmsProvider, SmsSettings, SmtpSecurity, SmtpSettings
 from app.domain.channels import ChannelKind
 from app.domain.ports import MessageSender
+from app.domain.tunable import value_of
 
 SMS_GATEWAYS: dict[SmsProvider, Callable[[SmsGatewayConfig, httpx.AsyncClient], MessageSender]] = {
     SmsProvider.WEBEX_CONNECT: WebexConnectSmsSender,
@@ -34,11 +35,15 @@ class ConfiguredSenders:
     Args:
         uow: Reads channel settings and secrets (needs the settings key for secrets).
         http: Shared HTTP client for the SMS gateway.
-        fallback_mail: SMTP from the environment for organisations without their own.
+        fallback_mail: The platform's fallback SMTP server for organisations without their own,
+            or a function returning it, read at each send (portal changes apply live, ADR 0042).
     """
 
     def __init__(
-        self, uow: SqlUnitOfWork, http: httpx.AsyncClient, fallback_mail: SmtpConfig | None
+        self,
+        uow: SqlUnitOfWork,
+        http: httpx.AsyncClient,
+        fallback_mail: SmtpConfig | None | Callable[[], SmtpConfig | None],
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -54,8 +59,9 @@ class ConfiguredSenders:
             )
             secret = await tx.get_channel_secret(organisation_id, channel) if stored else None
         if stored is None:
-            if channel is ChannelKind.EMAIL and self._fallback_mail is not None:
-                return SmtpMailSender(self._fallback_mail)
+            fallback = value_of(self._fallback_mail)
+            if channel is ChannelKind.EMAIL and fallback is not None:
+                return SmtpMailSender(fallback)
             return None
         if not stored.ready:
             return None
@@ -66,7 +72,7 @@ class ConfiguredSenders:
 
 
 def fallback_mail(settings: Settings) -> SmtpConfig | None:
-    """Return the SMTP server from the environment, or ``None`` when ``SMTP_HOST`` is not set.
+    """Return the platform's fallback SMTP server, or ``None`` when ``SMTP_HOST`` is not set.
 
     Used for organisations without their own SMTP settings (ADR 0022).
     """

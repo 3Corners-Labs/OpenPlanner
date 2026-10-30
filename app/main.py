@@ -172,6 +172,8 @@ def create_app(
             )
             set_log_level(current.log_level)
             configure_clock(current.time_format)
+            # ADR 0042 step 6: the release repository and its token can change in the portal.
+            app.state.update_service = update_service(current, uow, clock, http, lookup=False)
 
         def live() -> Settings:
             now: Settings = app.state.settings
@@ -212,6 +214,7 @@ def create_app(
             app.state.admin_service,
             locked=app.state.live_settings.locked,
             combination=app.state.live_settings.combination_problem,
+            environment_value=app.state.live_settings.environment_value,
         )
         # ADR 0038: read on every admin change (and citizen write), cached for a few seconds.
         app.state.maintenance_service = MaintenanceService(
@@ -250,7 +253,7 @@ def create_app(
             lambda: timedelta(hours=live().diagnostic_mode_hours),
         )
         # Test emails go through exactly the senders the worker uses (ADR 0022).
-        senders = ConfiguredSenders(uow, http, fallback_mail(settings))
+        senders = ConfiguredSenders(uow, http, lambda: fallback_mail(live()))
         app.state.channel_service = ChannelSettingsService(
             uow, clock, app.state.admin_service, senders
         )
@@ -288,7 +291,7 @@ def create_app(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled
         )
         # ADR 0029: the web process only reads checks and stores requests; no release lookup.
-        app.state.update_service = update_service(settings, uow, clock, http, lookup=False)
+        app.state.update_service = update_service(live(), uow, clock, http, lookup=False)
         if agent_api is not None:
             for name in (
                 "api_access",
