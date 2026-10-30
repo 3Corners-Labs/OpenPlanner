@@ -101,6 +101,7 @@ from app.domain.booking import (
     MeetingRef,
     Slot,
     SlotUsage,
+    TrialCall,
 )
 from app.domain.branding import Branding, FontFile, FontRef, FontRole, HeaderStyle, Logo, LogoRef
 from app.domain.calls import (
@@ -136,6 +137,7 @@ from app.domain.scheduling import (
     DispatchKind,
     Group,
     GroupSummary,
+    Offer,
     Organisation,
     PhoneMode,
     ScheduleOverride,
@@ -196,13 +198,15 @@ def _group(row: GroupRow) -> Group:
         wxcc_business_address=row.wxcc_business_address,
         wxcc_channel=row.wxcc_channel,
         wxcc_routing_value=row.wxcc_routing_value,
-        direct_call_enabled=row.direct_call_enabled,
         not_picked_up_minutes=row.not_picked_up_minutes,
         direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
         dispatch_kind=DispatchKind(row.dispatch_kind),
-        queue_change_working_days=row.queue_change_working_days,
+        citizen_change_lead_minutes=row.citizen_change_lead_minutes,
         planner_change_min_lead_minutes=row.planner_change_min_lead_minutes,
+        trial_call_enabled=row.trial_call_enabled,
+        trial_call_minutes=row.trial_call_minutes,
+        trial_calls_per_booking=row.trial_calls_per_booking,
         embedding_enabled=row.embedding_enabled,
         queue_visible_from_minutes=row.queue_visible_from_minutes,
         queue_free_pick_allowed=row.queue_free_pick_allowed,
@@ -216,7 +220,9 @@ def _override(row: ScheduleOverrideRow) -> ScheduleOverride:
     if row.opens is None or row.closes is None or row.capacity is None:
         return ScheduleOverride(day=row.day, window=None, id=row.id)
     return ScheduleOverride(
-        day=row.day, window=TimeWindow(row.opens, row.closes, row.capacity, row.label), id=row.id
+        day=row.day,
+        window=TimeWindow(row.opens, row.closes, row.capacity, row.label, Offer(row.offer)),
+        id=row.id,
     )
 
 
@@ -234,7 +240,7 @@ def _rule(row: ScheduleRuleRow) -> ScheduleRule:
     """Map a weekly rule row."""
     return ScheduleRule(
         weekday=row.weekday,
-        window=TimeWindow(row.opens, row.closes, row.capacity, row.label),
+        window=TimeWindow(row.opens, row.closes, row.capacity, row.label, Offer(row.offer)),
         valid_from=row.valid_from,
         valid_to=row.valid_to,
         id=row.id,
@@ -249,6 +255,7 @@ def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
         "closes": rule.window.closes,
         "capacity": rule.window.capacity,
         "label": rule.window.label,
+        "offer": rule.window.offer.value,
         "valid_from": rule.valid_from,
         "valid_to": rule.valid_to,
     }
@@ -267,13 +274,15 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "wxcc_business_address": group.wxcc_business_address,
         "wxcc_channel": group.wxcc_channel,
         "wxcc_routing_value": group.wxcc_routing_value,
-        "direct_call_enabled": group.direct_call_enabled,
         "not_picked_up_minutes": group.not_picked_up_minutes,
         "direct_call_max_concurrent": group.direct_call_max_concurrent,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
         "dispatch_kind": group.dispatch_kind.value,
-        "queue_change_working_days": group.queue_change_working_days,
+        "citizen_change_lead_minutes": group.citizen_change_lead_minutes,
         "planner_change_min_lead_minutes": group.planner_change_min_lead_minutes,
+        "trial_call_enabled": group.trial_call_enabled,
+        "trial_call_minutes": group.trial_call_minutes,
+        "trial_calls_per_booking": group.trial_calls_per_booking,
         "embedding_enabled": group.embedding_enabled,
         "queue_visible_from_minutes": group.queue_visible_from_minutes,
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
@@ -311,6 +320,10 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         cancelled_at=row.cancelled_at,
         rescheduled_from_id=row.rescheduled_from_id,
         meeting=MeetingRef(row.video_room_id, row.guest_join_url) if row.video_room_id else None,
+        trial=TrialCall(MeetingRef(row.trial_room_id, row.trial_join_url), row.trial_expires_at)
+        if row.trial_room_id and row.trial_expires_at
+        else None,
+        trial_count=row.trial_count,
         wxcc_task_id=row.wxcc_task_id,
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
@@ -939,6 +952,7 @@ class SqlTransaction(
             closes=window.closes if window else None,
             capacity=window.capacity if window else None,
             label=window.label if window else None,
+            offer=window.offer.value if window else Offer.SCHEDULED.value,
         )
         self._session.add(row)
         await self._session.flush()
@@ -1093,6 +1107,27 @@ class SqlTransaction(
             )
         )
 
+    async def save_trial_call(self, booking_id: int, trial: TrialCall) -> None:
+        """Store a new trial call and count it; a previous one is replaced."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(
+                trial_room_id=trial.meeting.id,
+                trial_join_url=trial.meeting.link,
+                trial_expires_at=trial.expires_at,
+                trial_count=BookingRow.trial_count + 1,
+            )
+        )
+
+    async def clear_trial_call(self, booking_id: int) -> None:
+        """Forget the trial call's meeting and link after the meeting is deleted."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(trial_room_id=None, trial_join_url=None, trial_expires_at=None)
+        )
+
     async def save_task_id(self, booking_id: int, task_id: str) -> None:
         """Store the booking's WxCC task id."""
         await self._session.execute(
@@ -1211,7 +1246,14 @@ class SqlTransaction(
     async def get_direct_calls(self, group_id: int, since: datetime) -> list[DirectCall]:
         """Return the group's direct calls started at or after ``since``, with their status."""
         rows = await self._session.execute(
-            select(BookingRow.id, BookingRow.status, SlotRow.start, SlotRow.end, CallStatusRow)
+            select(
+                BookingRow.id,
+                BookingRow.status,
+                SlotRow.start,
+                SlotRow.end,
+                CallStatusRow,
+                BookingRow.claimed_at,
+            )
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
             .outerjoin(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
             .where(
@@ -1228,8 +1270,9 @@ class SqlTransaction(
                 end,
                 status == BookingStatus.CONFIRMED.value,
                 _call_status(call) if call else new_status(booking_id),
+                claimed=claimed_at is not None,
             )
-            for booking_id, status, start, end, call in rows
+            for booking_id, status, start, end, call, claimed_at in rows
         ]
 
     async def get_call_status(self, booking_id: int) -> CallStatus | None:
@@ -1501,6 +1544,7 @@ class SqlTransaction(
                 form_answers=None,
                 guest_join_url=None,
                 host_join_url=None,
+                trial_join_url=None,
                 claimed_by=None,
                 pii_purged_at=now,
             )

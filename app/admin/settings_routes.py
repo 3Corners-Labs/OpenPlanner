@@ -236,6 +236,7 @@ _FIELD_LABELS = {
     "form_answers": "admin.settings.data_fields.field.form_answers",
     "guest_join_url": "admin.settings.data_fields.field.guest_join_url",
     "host_join_url": "admin.settings.data_fields.field.host_join_url",
+    "trial_join_url": "admin.settings.data_fields.field.trial_join_url",
 }
 """Label per personal-data field; a test fails when the list and this map drift apart."""
 _CLASS_LABELS = {

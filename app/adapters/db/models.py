@@ -185,14 +185,18 @@ class GroupRow(Base):
     wxcc_business_address: Mapped[str | None] = mapped_column(String(255))
     wxcc_channel: Mapped[str | None] = mapped_column(String(255))
     wxcc_routing_value: Mapped[str | None] = mapped_column(String(512))
-    direct_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     not_picked_up_minutes: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
     dispatch_kind: Mapped[str] = mapped_column(String(32), server_default=text("'contact_center'"))
-    queue_change_working_days: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+    # ADR 0069: the citizen moves a booking up to this long before the start.
+    citizen_change_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     # ADR 0044: a planner changes bookings up to this long before the start.
     planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
+    # ADR 0071: a trial call on Webex ahead of the appointment.
+    trial_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
+    trial_call_minutes: Mapped[int] = mapped_column(Integer, server_default=text("30"))
+    trial_calls_per_booking: Mapped[int] = mapped_column(Integer, server_default=text("3"))
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     queue_visible_from_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))
     queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
@@ -208,8 +212,10 @@ class GroupRow(Base):
         CheckConstraint(
             "dispatch_kind IN ('contact_center', 'openplanner_queue')", name="dispatch_kind"
         ),
-        CheckConstraint("queue_change_working_days BETWEEN 1 AND 5", name="queue_change_days"),
+        CheckConstraint("citizen_change_lead_minutes BETWEEN 0 AND 1440", name="citizen_lead"),
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
+        CheckConstraint("trial_call_minutes BETWEEN 10 AND 60", name="trial_call_minutes"),
+        CheckConstraint("trial_calls_per_booking BETWEEN 1 AND 5", name="trial_calls_per_booking"),
         CheckConstraint("queue_visible_from_minutes BETWEEN 0 AND 120", name="queue_visible_from"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
         CheckConstraint("max_bookings_per_email BETWEEN 1 AND 10", name="max_bookings_per_email"),
@@ -257,8 +263,15 @@ class GroupContactsRow(Base):
     body: Mapped[str] = mapped_column(Text)
 
 
+OFFERS = "('scheduled', 'direct', 'both')"
+"""What a staffing block offers (ADR 0072), as the database checks it."""
+
+
 class ScheduleRuleRow(Base):
-    """A weekly staffing block of a group; capacity 0 is a block without agents (ADR 0027)."""
+    """A weekly staffing block of a group; capacity 0 is a block without agents (ADR 0027).
+
+    ``offer`` says whether the block offers slots, direct calls or both (ADR 0072).
+    """
 
     __tablename__ = "schedule_rules"
 
@@ -269,6 +282,7 @@ class ScheduleRuleRow(Base):
     closes: Mapped[time] = mapped_column(Time)
     capacity: Mapped[int] = mapped_column(Integer)
     label: Mapped[str | None] = mapped_column(String(50))
+    offer: Mapped[str] = mapped_column(String(9), server_default=text("'scheduled'"))
     valid_from: Mapped[date | None] = mapped_column(Date)
     valid_to: Mapped[date | None] = mapped_column(Date)
 
@@ -276,6 +290,7 @@ class ScheduleRuleRow(Base):
         CheckConstraint("weekday BETWEEN 0 AND 6", name="weekday"),
         CheckConstraint("opens < closes", name="window"),
         CheckConstraint("capacity >= 0", name="capacity"),
+        CheckConstraint(f"offer IN {OFFERS}", name="offer"),
     )
 
 
@@ -291,6 +306,7 @@ class ScheduleOverrideRow(Base):
     closes: Mapped[time | None] = mapped_column(Time)
     capacity: Mapped[int | None] = mapped_column(Integer)
     label: Mapped[str | None] = mapped_column(String(50))
+    offer: Mapped[str] = mapped_column(String(9), server_default=text("'scheduled'"))
 
     __table_args__ = (
         Index("ix_schedule_overrides_group_day", "group_id", "day"),
@@ -299,6 +315,7 @@ class ScheduleOverrideRow(Base):
             "OR (opens < closes AND capacity >= 0)",
             name="window_or_closed",
         ),
+        CheckConstraint(f"offer IN {OFFERS}", name="offer"),
     )
 
 
@@ -444,6 +461,11 @@ class BookingRow(Base):
     host_join_url: Mapped[str | None] = mapped_column(String(2048))
     video_room_id: Mapped[str | None] = mapped_column(String(255))
     wxcc_task_id: Mapped[str | None] = mapped_column(String(255))
+    # ADR 0071: the trial call on Webex; the link is PII and purged with the contact.
+    trial_room_id: Mapped[str | None] = mapped_column(String(255))
+    trial_join_url: Mapped[str | None] = mapped_column(String(2048))
+    trial_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    trial_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
     cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     pii_purged_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
@@ -992,7 +1014,7 @@ class RunningVersionRow(Base):
 
 
 class OwnCertificateRow(Base):
-    """The own certificate uploaded in the portal (ADR 0070); at most one row.
+    """The own certificate uploaded in the portal (ADR 0072); at most one row.
 
     The chain is public and stored as text with the leaf's public key; the private key is never
     in the database (it lives on the volume the proxy reads), so a backup never carries it.

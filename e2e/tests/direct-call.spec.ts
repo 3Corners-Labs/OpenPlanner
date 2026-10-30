@@ -1,7 +1,8 @@
 /**
  * Direct video call (ADR 0019) end to end, without Webex: the org admin creates a group that is
- * open around the clock and switches direct calls on; a citizen starts a call and lands on the
- * waiting page; the org admin sees it in the agenda. axe (WCAG 2.2 AA) on every page.
+ * open around the clock with blocks that offer direct calls (ADR 0072); a citizen starts a call
+ * and lands on the waiting page; the org admin sees it in the agenda. axe (WCAG 2.2 AA) on every
+ * page.
  *
  * Without a Webex Service App the meeting and work item are skipped, so the waiting page keeps
  * "looking for an agent" without a join button: the citizen-facing flow is what is tested here.
@@ -35,6 +36,7 @@ async function addAllDayHours(page: Page): Promise<void> {
     await page.getByLabel('Van uu:mm', { exact: true }).fill('00:00');
     await page.getByLabel('Tot uu:mm', { exact: true }).fill('23:55');
     await page.getByLabel('Aantal medewerkers').fill('1');
+    await page.getByLabel('Aanbod', { exact: true }).selectOption({ label: 'Afspraken en direct gesprek' });
     await page.getByRole('button', { name: 'Tijdblok toevoegen' }).press('Enter');
     await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
   }
@@ -44,7 +46,7 @@ test('a citizen starts a call right away and the admin sees it', async ({ page, 
   const slug = `e2e-direct-${testInfo.project.name}-${Date.now().toString(36)}`;
   const tabs = page.getByRole('navigation', { name: 'Onderdelen van de groep' });
 
-  // Admin: group open around the clock (but 23:55–00:00), direct calls on.
+  // Admin: group open around the clock (but 23:55–00:00), every block offers direct calls.
   await loginAs(page, 'orgadmin', '/admin/groups/new');
   await page.getByLabel('Naam', { exact: true }).fill(`Direct ${testInfo.project.name}`);
   await page.getByLabel('Webadres', { exact: true }).fill(slug);
@@ -53,10 +55,7 @@ test('a citizen starts a call right away and the admin sees it', async ({ page, 
   await expect(page.getByRole('status')).toContainText('De groep is aangemaakt');
   await tabs.getByRole('link', { name: 'Bezetting', exact: true }).click();
   await addAllDayHours(page);
-  await tabs.getByRole('link', { name: 'Instellingen' }).click();
-  await page.getByLabel('Direct gesprek starten').selectOption({ label: 'Ja' });
-  await page.getByRole('button', { name: 'Opslaan' }).press('Enter');
-  await expect(page.getByRole('status')).toHaveText('De wijzigingen zijn opgeslagen.');
+  await expect(page.locator('.window__offer', { hasText: 'Afspraken en direct gesprek' })).toHaveCount(WEEKDAYS.length);
   await expectNoAxeViolations(page);
 
   // Citizen (no admin session): group page offers the direct call.

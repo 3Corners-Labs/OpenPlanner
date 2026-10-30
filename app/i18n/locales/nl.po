@@ -55,7 +55,7 @@ msgid "message.team"
 msgstr "Team"
 
 msgid "message.manage"
-msgstr "U kunt de afspraak bekijken, wijzigen of annuleren tot {deadline}. Daarna staat de afspraak vast."
+msgstr "U kunt de afspraak bekijken en verplaatsen tot {deadline}. Annuleren kan tot het gesprek begint."
 
 msgid "message.manage_link"
 msgstr "Afspraak bekijken of wijzigen"
@@ -365,7 +365,7 @@ msgid "error.outside_booking_window"
 msgstr "Dit moment kan niet meer worden geboekt. Kies een ander moment."
 
 msgid "error.booking_locked"
-msgstr "Deze afspraak staat vast en kan niet meer worden gewijzigd."
+msgstr "Deze afspraak kan niet meer worden gewijzigd, want het gesprek is al begonnen of begint zo."
 
 msgid "error.queue_empty"
 msgstr "Er is geen afspraak meer om op te pakken."
@@ -428,10 +428,76 @@ msgid "manage.status.no_show"
 msgstr "Niet doorgegaan"
 
 msgid "manage.deadline"
-msgstr "U kunt deze afspraak wijzigen of annuleren tot {deadline}."
+msgstr "U kunt deze afspraak verplaatsen tot {deadline}. Annuleren kan tot het gesprek begint."
 
 msgid "manage.locked"
-msgstr "Deze afspraak staat vast. Het gesprek begint binnenkort; wijzigen of annuleren kan niet meer."
+msgstr "Verplaatsen kan niet meer, want het gesprek begint binnenkort. U kunt de afspraak nog wel annuleren als u niet kunt komen."
+
+msgid "manage.started"
+msgstr "Het gesprek is begonnen. Deze afspraak kan niet meer worden gewijzigd."
+
+msgid "trial.title"
+msgstr "Proefgesprek"
+
+msgid "trial.from_manage"
+msgstr "Uw verbinding vooraf uitproberen"
+
+msgid "trial.from_join"
+msgstr "Liever eerst uw verbinding uitproberen? Open een proefgesprek."
+
+msgid "trial.intro"
+msgstr "Met een proefgesprek ziet u vooraf of het videogesprek bij u werkt. Het is een echte Webex-vergadering, op dezelfde plek en met dezelfde Webex als uw afspraak. U kunt controleren:"
+
+msgid "trial.check.camera"
+msgstr "of uw camera werkt en uw beeld goed te zien is;"
+
+msgid "trial.check.microphone"
+msgstr "of uw microfoon u oppikt;"
+
+msgid "trial.check.speakers"
+msgstr "of u via uw luidsprekers of koptelefoon kunt horen;"
+
+msgid "trial.check.browser"
+msgstr "of uw browser het gesprek goed kan afspelen."
+
+msgid "trial.alone"
+msgstr "U zit er alleen in. Er komt niemand van het team binnen en niemand wacht op u. Webex vraagt u zelf om toestemming voor camera en microfoon, net als bij uw afspraak."
+
+msgid "trial.open_hint"
+msgstr "Het proefgesprek blijft {minutes} minuten open."
+
+msgid "trial.open"
+msgstr "Proefgesprek openen"
+
+msgid "trial.calls_left"
+msgstr "Proefgesprekken die u nog kunt openen: {count}."
+
+msgid "trial.active"
+msgstr "Uw proefgesprek staat open tot {time}."
+
+msgid "trial.join"
+msgstr "Naar het proefgesprek"
+
+msgid "trial.failed"
+msgstr "Het proefgesprek openen lukt nu niet. Probeer het over een paar minuten opnieuw. Uw afspraak zelf blijft gewoon staan."
+
+msgid "trial.limit"
+msgstr "U heeft het aantal proefgesprekken voor deze afspraak gebruikt. Lukt het niet? Neem dan contact met ons op."
+
+msgid "trial.too_late"
+msgstr "Uw afspraak begint of is al begonnen. Gebruik de link voor het gesprek zelf."
+
+msgid "trial.off"
+msgstr "Voor deze afspraak is geen proefgesprek beschikbaar."
+
+msgid "trial.back"
+msgstr "Terug naar uw afspraak"
+
+msgid "message.trial"
+msgstr "Wilt u vooraf uitproberen of beeld en geluid bij u werken? Open dan een proefgesprek in Webex, op elk moment voor uw afspraak."
+
+msgid "message.trial_link"
+msgstr "Proefgesprek openen"
 
 msgid "manage.inactive"
 msgstr "Deze afspraak is niet meer actief."
@@ -1043,11 +1109,47 @@ msgstr "Medewerkers mogen zelf een afspraak kiezen (eigen wachtrij)"
 msgid "admin.field.queue_free_pick_allowed_hint"
 msgstr "Nee: medewerkers pakken altijd de volgende op. Ja: ze kunnen ook een andere afspraak uit de lijst oppakken."
 
-msgid "admin.field.queue_change_working_days"
-msgstr "Wijzigen tot (werkdagen vooraf, eigen wachtrij)"
+msgid "admin.field.citizen_change_lead_minutes"
+msgstr "Verplaatsen door de burger tot (minuten vooraf)"
 
-msgid "admin.field.queue_change_working_days_hint"
-msgstr "Bij de eigen wachtrij kan de deelnemer de afspraak wijzigen of annuleren tot dit aantal werkdagen (maandag tot en met vrijdag) voor de start, op dezelfde tijd. 1 tot 5."
+msgid "admin.field.citizen_change_lead_minutes_hint"
+msgstr "Tot hoeveel minuten voor de start de burger de afspraak nog kan verplaatsen. Annuleren kan altijd tot de start. Niet korter dan Doorzetten naar de wachtrij, hoogstens 1440. Standaard 60."
+
+msgid "admin.field.trial_call_enabled"
+msgstr "Proefgesprek voor de burger"
+
+msgid "admin.field.trial_call_enabled_hint"
+msgstr "Ja: de burger kan vooraf in een echte Webex-meeting uitproberen of camera, microfoon en luidsprekers werken. De meeting is van de Webex-host van deze groep; er komt niemand van het team in. Alleen met een Webex-host."
+
+msgid "admin.field.trial_call_minutes"
+msgstr "Proefgesprek blijft open (minuten)"
+
+msgid "admin.field.trial_call_minutes_hint"
+msgstr "Hoe lang één proefgesprek openstaat, van 10 tot 60 minuten. Standaard 30."
+
+msgid "admin.field.trial_calls_per_booking"
+msgstr "Proefgesprekken per afspraak"
+
+msgid "admin.field.trial_calls_per_booking_hint"
+msgstr "Hoe vaak één afspraak een proefgesprek mag openen, van 1 tot 5. Elk proefgesprek is een Webex-meeting. Standaard 3."
+
+msgid "admin.form.error.trial_call_minutes"
+msgstr "Vul een aantal minuten in van 10 tot 60."
+
+msgid "admin.form.error.trial_calls_per_booking"
+msgstr "Vul een aantal in van 1 tot 5."
+
+msgid "call.event.trial_created"
+msgstr "Proefgesprek geopend door de burger"
+
+msgid "call.event.trial_joined"
+msgstr "Burger ging het proefgesprek in"
+
+msgid "call.event.trial_failed"
+msgstr "Proefgesprek openen mislukt"
+
+msgid "call.event.trial_deleted"
+msgstr "Proefgesprek opgeruimd"
 
 msgid "admin.field.planner_change_min_lead_minutes"
 msgstr "Wijzigen door een planner (minuten vooraf)"
@@ -1123,8 +1225,8 @@ msgstr "Vul een aantal dagen in van 1 tot 366."
 msgid "admin.form.error.dispatch_lead_minutes"
 msgstr "Vul een aantal minuten in van 0 tot 60."
 
-msgid "admin.form.error.queue_change_working_days"
-msgstr "Vul een aantal werkdagen in van 1 tot 5."
+msgid "admin.form.error.citizen_change_lead_minutes"
+msgstr "Vul een aantal minuten in van 0 tot 1440, niet korter dan Doorzetten naar de wachtrij."
 
 msgid "admin.form.error.planner_change_min_lead_minutes"
 msgstr "Vul een aantal minuten in van het doorzetten naar de wachtrij tot 1440."
@@ -1358,9 +1460,6 @@ msgstr "De flow kiest hiermee de wachtrij. Leeg: het webadres van de groep."
 msgid "admin.field.direct_call_enabled"
 msgstr "Direct gesprek starten"
 
-msgid "admin.field.direct_call_enabled_hint"
-msgstr "Deelnemers kunnen meteen een gesprek starten tijdens een tijdblok met medewerkers."
-
 msgid "admin.field.embedding_enabled"
 msgstr "Insluiten op websites"
 
@@ -1497,7 +1596,7 @@ msgid "wait.title"
 msgstr "Uw videogesprek"
 
 msgid "wait.searching"
-msgstr "We zoeken een medewerker voor u. U kunt alvast naar de wachtruimte gaan."
+msgstr "We zoeken een medewerker voor u."
 
 msgid "wait.accepted"
 msgstr "Een medewerker heeft uw gesprek aangenomen en komt zo naar de wachtruimte."
@@ -1675,9 +1774,6 @@ msgstr "Deelnemen aan het gesprek"
 
 msgid "admin.queue.new_window"
 msgstr "(opent in een nieuw venster)"
-
-msgid "admin.queue.no_meeting"
-msgstr "Voor deze afspraak is nog geen videogesprek klaar. Probeer het over een minuut opnieuw of geef de afspraak vrij."
 
 msgid "admin.queue.state.mine"
 msgstr "Door u opgepakt"
@@ -3635,6 +3731,9 @@ msgstr "Videogesprek aanmaken"
 msgid "audit.job.delete_video_room"
 msgstr "Videogesprek verwijderen"
 
+msgid "audit.job.delete_trial_call"
+msgstr "Proefgesprek verwijderen"
+
 msgid "audit.job.send_confirmation"
 msgstr "Bevestiging versturen"
 
@@ -4396,6 +4495,15 @@ msgstr "Webex weigerde een proefmeeting voor host {host} ({error}): {reason}"
 
 msgid "admin.check.webex.probe_left"
 msgstr "De proefmeeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
+
+msgid "admin.check.webex.trial_ok"
+msgstr "Een proefgesprek-meeting voor host {host} (deelnemers mogen vóór de host binnen) is gepland en weer verwijderd."
+
+msgid "admin.check.webex.trial_refused"
+msgstr "Webex weigerde een proefgesprek-meeting voor host {host} ({error}): {reason}. Burgers kunnen dan geen proefgesprek openen; controleer op de Webex-site of deelnemers vóór de host mogen binnenkomen."
+
+msgid "admin.check.webex.trial_left"
+msgstr "De proefgesprek-meeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
 
 msgid "admin.check.wxcc.not_configured"
 msgstr "Webex Contact Center is niet ingesteld; de routering is niet gecontroleerd."
@@ -6724,6 +6832,9 @@ msgstr "Deelnamekoppeling van de burger"
 msgid "admin.settings.data_fields.field.host_join_url"
 msgstr "Deelnamekoppeling van de medewerker"
 
+msgid "admin.settings.data_fields.field.trial_join_url"
+msgstr "Deelnamekoppeling van het proefgesprek"
+
 msgid "admin.settings.tls.title"
 msgstr "Certificaat van het publieke adres"
 
@@ -6780,6 +6891,107 @@ msgstr "Waarschuwen bij certificaat korter geldig dan (dagen)"
 
 msgid "settings.field.tls_alert_repeat_hours.label"
 msgstr "Melding over het certificaat herhalen elke (uren)"
+
+msgid "admin.field.offer"
+msgstr "Aanbod"
+
+msgid "admin.field.offer_hint"
+msgstr "Wat deelnemers in dit tijdblok kunnen: een afspraak boeken, direct een gesprek starten, of allebei."
+
+msgid "admin.offer.scheduled"
+msgstr "Afspraken"
+
+msgid "admin.offer.direct"
+msgstr "Direct gesprek"
+
+msgid "admin.offer.both"
+msgstr "Afspraken en direct gesprek"
+
+msgid "admin.group.direct_blocks"
+msgstr "In {count} tijdblok(ken)"
+
+msgid "admin.queue.video_pending"
+msgstr "Videolink wordt klaargezet"
+
+msgid "admin.queue.video_failed"
+msgstr "Videolink mislukt"
+
+msgid "admin.queue.video_pending_explained"
+msgstr "Het videogesprek wordt nog klaargezet. De knop verschijnt vanzelf zodra het klaarstaat."
+
+msgid "admin.queue.video_failed_explained"
+msgstr "Het videogesprek kon niet worden klaargezet. De deelnemer ziet dit ook en krijgt het advies een afspraak te maken. Geef de afspraak vrij."
+
+msgid "admin.queue.timeline"
+msgstr "Bekijk de tijdlijn van deze afspraak"
+
+msgid "admin.queue.citizen.not_yet"
+msgstr "Deelnemer nog niet in het gesprek"
+
+msgid "admin.queue.citizen.in_lobby"
+msgstr "Deelnemer wacht in de wachtruimte"
+
+msgid "admin.queue.citizen.in_call"
+msgstr "Gesprek bezig"
+
+msgid "admin.queue.citizen.ended"
+msgstr "Gesprek afgelopen"
+
+msgid "wait.preparing"
+msgstr "We zetten uw videogesprek klaar. De knop verschijnt vanzelf zodra het klaarstaat."
+
+msgid "wait.lobby_hint"
+msgstr "U kunt alvast naar de wachtruimte gaan."
+
+msgid "wait.failed"
+msgstr "Het videogesprek kon helaas niet worden klaargezet door een technische storing. Het team is op de hoogte. Maak een afspraak, dan bellen we op een moment dat u schikt."
+
+msgid "settings.field.queue_refresh_seconds.label"
+msgstr "Wachtrij en wachtpagina verversen (seconden)"
+msgid "admin.overview.view.label"
+msgstr "Weergave van {title}"
+
+msgid "admin.overview.view.list"
+msgstr "Lijst"
+
+msgid "admin.overview.view.table"
+msgstr "Tabel"
+
+msgid "admin.overview.view.bar"
+msgstr "Staaf"
+
+msgid "admin.overview.view.line"
+msgstr "Lijn"
+
+msgid "admin.overview.view.pie"
+msgstr "Taart"
+
+msgid "admin.overview.chart.bar"
+msgstr "Staafdiagram"
+
+msgid "admin.overview.chart.line"
+msgstr "Lijndiagram"
+
+msgid "admin.overview.chart.pie"
+msgstr "Taartdiagram"
+
+msgid "admin.overview.chart.joiner"
+msgstr "; "
+
+msgid "admin.overview.chart.group"
+msgstr "Groep"
+
+msgid "admin.overview.chart.table"
+msgstr "Gegevens als tabel"
+
+msgid "admin.overview.widget.bookings_today.series"
+msgstr "Afspraken vandaag"
+
+msgid "admin.overview.widget.bookings_today.chart_item"
+msgstr "{label}: {value} afspraken vandaag"
+
+msgid "admin.overview.widget.queue.chart_item"
+msgstr "{label}: {value} wachtend"
 
 msgid "admin.settings.tls.check_now"
 msgstr "Nu controleren"

@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import httpx
 import pytest
@@ -12,8 +12,9 @@ from app.adapters.webex_meetings import WebexMeetings
 from app.domain.booking import MeetingRef
 from app.domain.calls import MeetingRequest
 from app.domain.ports import IntegrationError
+from tests.fakes.clock import FixedClock
 from tests.fakes.tokens import authorized_client
-from tests.support.domain import SLOT_0900
+from tests.support.domain import NOW, SLOT_0900
 
 REQUEST = MeetingRequest(
     "Videogesprek Demo",
@@ -31,8 +32,35 @@ CREATED = {  # recorded shape of POST /v1/meetings (trimmed)
 }
 
 
-def _meetings(handler: Callable[[httpx.Request], httpx.Response]) -> WebexMeetings:
-    return WebexMeetings(authorized_client(handler), "https://webexapis.com/v1")
+def _meetings(
+    handler: Callable[[httpx.Request], httpx.Response], now: datetime = NOW
+) -> WebexMeetings:
+    return WebexMeetings(authorized_client(handler), "https://webexapis.com/v1", FixedClock(now))
+
+
+async def test_a_direct_call_is_sent_in_whole_seconds_from_now() -> None:
+    """Webex refuses microseconds and a start over a minute ago (ADR 0072)."""
+    seen: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json=CREATED)
+
+    started = SLOT_0900 + timedelta(seconds=3, microseconds=473110)  # a direct call: "now"
+    direct = MeetingRequest(
+        "Videogesprek Demo", started, started + timedelta(minutes=30), "Europe/Amsterdam", "h@x.nl"
+    )
+    retry = started + timedelta(minutes=1, seconds=2)  # the worker's first retry (ADR 0019)
+
+    await _meetings(handler, now=started).create_meeting(direct)
+    await _meetings(handler, now=retry).create_meeting(direct)
+
+    assert (seen[0]["start"], seen[0]["end"]) == (
+        "2026-01-05T09:00:03+01:00",
+        "2026-01-05T09:30:03+01:00",
+    )
+    assert seen[1]["start"] == "2026-01-05T09:01:05+01:00"  # moved to now, end unchanged
+    assert seen[1]["end"] == "2026-01-05T09:30:03+01:00"
 
 
 async def test_meeting_is_created_with_the_agreed_defaults() -> None:
@@ -95,3 +123,22 @@ async def test_a_refused_meeting_logs_and_carries_webexs_reason() -> None:
     refused = next(entry for entry in logs if entry["event"] == "integration.refused")
     assert (refused["reason"], refused["tracking_id"]) == ("Invalid hostEmail.", "ROUTER_789")
     assert error.value.reason == "Invalid hostEmail."  # ADR 0065: shown on the timeline
+
+
+async def test_a_trial_meeting_differs_only_in_who_may_enter_first() -> None:
+    from dataclasses import replace
+
+    from app.adapters.webex_meetings import meeting_body
+
+    booking = meeting_body(REQUEST, NOW)
+    trial = meeting_body(replace(REQUEST, join_before_host=True), NOW)
+
+    assert trial["enabledJoinBeforeHost"] is True
+    assert trial["enableConnectAudioBeforeHost"] is True
+    assert trial["unlockedMeetingJoinSecurity"] == "allowJoin"
+    same = {k: v for k, v in trial.items() if k in booking and trial[k] == booking[k]}
+    assert same["hostEmail"] == "host@example.nl"
+    assert same["meetingOptions"] == booking["meetingOptions"]
+    assert same["sendEmail"] is False
+    assert same["allowAnyUserToBeCoHost"] is True
+    assert "enableConnectAudioBeforeHost" not in booking

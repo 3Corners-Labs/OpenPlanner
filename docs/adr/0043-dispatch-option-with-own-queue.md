@@ -1,7 +1,8 @@
 # 0043. Dispatch option per group: contact center or OpenPlanner's own queue
 
 Status: accepted (2026-10-28), decided by the product owner with the amendments under
-*Acceptance* below; built without ADR 0032. Extends ADR 0032 (provider-neutral
+*Acceptance* below; built without ADR 0032. Extended by ADR 0072 (`queue_refresh_seconds`, the
+live queue, the video link's state, and the claim on the citizen's waiting page). Extends ADR 0032 (provider-neutral
 contact center) and ADR 0039 (adjustable roles). Builds on ADR 0010 and 0017 (meeting status
 from Webex webhooks), ADR 0019 and 0026 (direct calls), and ADR 0042 (settings).
 
@@ -173,7 +174,8 @@ The product owner accepted this ADR with these choices, so it can be built befor
 - **The `BookingDispatcher` port (point 2)** arrives with the calendar invite (point 9), its
   first hooks that do something beyond today's WxCC calls (ADR 0005: extract at the second
   use).
-- **Change deadline per kind.** Contact center: unchanged, the dispatch moment. Own queue:
+- **Change deadline per kind** (superseded by ADR 0069: both kinds cancel until the start and
+  move until `citizen_change_lead_minutes`). Contact center: unchanged, the dispatch moment. Own queue:
   `queue_change_working_days` working days before the start, at the same local time (product
   owner: "1 werkdag van te voren"). Working days are Monday to Friday; public holidays are not
   skipped (an assumption, recorded in the PR). A booking made later than that is read-only

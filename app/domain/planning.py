@@ -67,8 +67,11 @@ class GroupSettings:
     phone_mode: PhoneMode
     dispatch_lead_minutes: int
     dispatch_kind: DispatchKind
-    queue_change_working_days: int
+    citizen_change_lead_minutes: int
     planner_change_min_lead_minutes: int
+    trial_call_enabled: bool
+    trial_call_minutes: int
+    trial_calls_per_booking: int
     queue_visible_from_minutes: int
     queue_free_pick_allowed: bool
     max_bookings_per_email: int
@@ -77,7 +80,6 @@ class GroupSettings:
     wxcc_business_address: str | None
     wxcc_channel: str | None
     wxcc_routing_value: str | None
-    direct_call_enabled: bool
     not_picked_up_minutes: int
     direct_call_max_concurrent: int | None
     embedding_enabled: bool
@@ -307,7 +309,9 @@ class PlanningService:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "split_at")
             first = replace(old, window=replace(old.window, closes=at), id=None)
             second = replace(
-                old, window=TimeWindow(at, old.window.closes, capacity, label), id=None
+                old,
+                window=TimeWindow(at, old.window.closes, capacity, label, old.window.offer),
+                id=None,
             )
             others = [r for r in rules if r.id != rule_id]
             validate_schedule([*others, first, second], overrides)

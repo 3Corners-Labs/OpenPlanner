@@ -11,11 +11,13 @@ from app.main import create_app
 from app.web.job_labels import JOB_TYPE_LABELS
 from app.web.widgets import (
     DEFAULT_LAYOUTS,
+    VIEW_LABELS,
     WIDGETS,
     View,
     WidgetScope,
     default_layout,
     fragment_path,
+    resolve_view,
     visible,
     widget,
 )
@@ -173,3 +175,44 @@ def test_every_job_type_has_a_label_in_dutch_and_english() -> None:
     for job_type, key in JOB_TYPE_LABELS.items():
         for locale in REQUIRED_LOCALES:
             assert catalogues[locale].get(key, "").strip(), (job_type, locale)
+
+
+def test_a_requested_view_is_used_when_the_widget_supports_it() -> None:
+    bookings, queue = widget("bookings-today"), widget("queue")
+    assert bookings is not None
+    assert queue is not None
+
+    assert resolve_view(bookings, "bar") is View.BAR
+    assert resolve_view(bookings, "pie") is View.PIE
+    assert resolve_view(queue, "line") is View.LINE
+    assert resolve_view(queue, "table") is View.TABLE
+
+
+def test_a_view_the_widget_does_not_support_falls_back_to_its_first_view() -> None:
+    bookings, queue, changes = widget("bookings-today"), widget("queue"), widget("changes")
+    assert bookings is not None
+    assert queue is not None
+    assert changes is not None
+
+    assert resolve_view(bookings, "line") is View.LIST  # list is the first view of the register
+    assert resolve_view(queue, "pie") is View.TABLE
+    assert resolve_view(changes, "bar") is View.LIST
+
+
+def test_a_missing_or_unknown_view_falls_back_to_the_first_view() -> None:
+    bookings = widget("bookings-today")
+    assert bookings is not None
+
+    assert resolve_view(bookings, None) is View.LIST
+    assert resolve_view(bookings, "") is View.LIST
+    assert resolve_view(bookings, "<script>") is View.LIST
+    assert resolve_view(bookings, "BAR") is View.LIST  # exact values only
+
+
+def test_every_widget_view_has_a_label_in_dutch_and_english() -> None:
+    catalogues = load_catalogues(CATALOGUE_DIR)
+
+    assert set(VIEW_LABELS) == set(View)
+    for key in VIEW_LABELS.values():
+        for locale in REQUIRED_LOCALES:
+            assert catalogues[locale].get(key, "").strip(), (key, locale)

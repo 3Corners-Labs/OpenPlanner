@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -10,6 +11,7 @@ from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
+from app.domain.scheduling import Offer
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -68,7 +70,12 @@ async def test_closing_suspends_covered_bookings_and_keeps_their_data(
     booking = uow.state.bookings[inside]
     assert booking.status is BookingStatus.SUSPENDED
     assert booking.contact is not None  # nothing deleted (product owner, 2026-10-25)
-    assert _jobs(uow, inside) == [JobType.END_WXCC_TASK, JobType.SEND_SUSPENSION, JobType.PURGE_PII]
+    assert _jobs(uow, inside) == [
+        JobType.END_WXCC_TASK,
+        JobType.DELETE_TRIAL_CALL,
+        JobType.SEND_SUSPENSION,
+        JobType.PURGE_PII,
+    ]
     purge = uow.state.jobs[inside][-1]
     assert purge.run_at == UNTIL_TUESDAY.ends_at + RETENTION_AFTER_CLOSURE  # type: ignore[operator]
     assert _status(uow, outside) is BookingStatus.CONFIRMED
@@ -82,11 +89,16 @@ async def test_open_ended_closure_has_no_purge_until_it_ends(
     booking_id = await _book(bookings, NEXT_MONDAY)
 
     await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
-    assert _jobs(uow, booking_id) == [JobType.END_WXCC_TASK, JobType.SEND_SUSPENSION]
+    assert _jobs(uow, booking_id) == [
+        JobType.END_WXCC_TASK,
+        JobType.DELETE_TRIAL_CALL,
+        JobType.SEND_SUSPENSION,
+    ]
 
     await closures.lift(GROUP_ADMIN, "demo", reinstate=False)
     assert _jobs(uow, booking_id) == [
         JobType.END_WXCC_TASK,
+        JobType.DELETE_TRIAL_CALL,
         JobType.SEND_SUSPENSION,
         JobType.PURGE_PII,
     ]
@@ -215,8 +227,9 @@ async def test_citizen_can_cancel_a_suspended_booking(
 async def test_no_direct_call_while_closed(
     closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    group = uow.state.groups[1]
-    uow.state.groups[1] = group.__class__(**{**group.__dict__, "direct_call_enabled": True})
+    uow.state.rules[1] = [
+        replace(r, window=replace(r.window, offer=Offer.BOTH)) for r in uow.state.rules[1]
+    ]
     clock.advance(SLOT_0900 - NOW)  # Monday 09:00, the group is open
     assert await bookings.direct_call_availability("demo") is DirectAvailability.AVAILABLE
 
@@ -244,13 +257,19 @@ async def test_update_mails_everyone_on_hold_and_suspends_newly_covered(
     assert (outcome.notified, outcome.suspended) == (1, 1)
     assert _jobs(uow, first) == [
         JobType.END_WXCC_TASK,
+        JobType.DELETE_TRIAL_CALL,
         JobType.SEND_SUSPENSION,
         JobType.PURGE_PII,
         JobType.SEND_CLOSURE_UPDATE,
     ]
-    assert uow.state.jobs[first][2].run_at == new_end + RETENTION_AFTER_CLOSURE
+    assert uow.state.jobs[first][3].run_at == new_end + RETENTION_AFTER_CLOSURE
     assert _status(uow, later) is BookingStatus.SUSPENDED
-    assert _jobs(uow, later) == [JobType.END_WXCC_TASK, JobType.SEND_SUSPENSION, JobType.PURGE_PII]
+    assert _jobs(uow, later) == [
+        JobType.END_WXCC_TASK,
+        JobType.DELETE_TRIAL_CALL,
+        JobType.SEND_SUSPENSION,
+        JobType.PURGE_PII,
+    ]
     stored = next(iter(uow.state.closures.values()))
     assert stored.notices == texts
 
@@ -267,6 +286,7 @@ async def test_update_without_notify_sends_nothing_and_checks_the_end(
     assert outcome.notified == 0
     assert _jobs(uow, first) == [
         JobType.END_WXCC_TASK,
+        JobType.DELETE_TRIAL_CALL,
         JobType.SEND_SUSPENSION,
     ]  # open-ended again: no purge yet
     with pytest.raises(DomainError, match="ends_at"):
@@ -350,6 +370,7 @@ async def test_admin_moves_a_suspended_booking(
     assert _jobs(uow, booking_id) == [
         JobType.END_WXCC_TASK,
         JobType.DELETE_VIDEO_ROOM,
+        JobType.DELETE_TRIAL_CALL,
         JobType.PURGE_PII,
     ]
     with pytest.raises(DomainError, match="booking_not_active"):

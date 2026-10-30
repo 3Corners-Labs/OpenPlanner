@@ -327,21 +327,46 @@ async def test_reschedule_confirmation_needs_a_free_other_time(site: httpx.Async
         assert 'id="month-heading"' in response.text  # back on the picker
 
 
-async def test_booking_is_read_only_from_the_dispatch_moment(demo_settings: Settings) -> None:
+async def test_booking_cannot_be_moved_from_the_change_lead_but_can_be_cancelled(
+    demo_settings: Settings,
+) -> None:
     async with app_client(demo_settings, FixedClock(NOW)) as early:
         token = await booked(early)
     late_clock = FixedClock(NOW + timedelta(days=1) - timedelta(minutes=5))  # Fri 07:55 UTC
 
     async with app_client(demo_settings, late_clock) as late:
         page = await late.get(f"/b/{token}")
+        reschedule_page = await late.get(f"/b/{token}/reschedule")
+        cancel_page = await late.get(f"/b/{token}/cancel")
+        move = await late.post(
+            f"/b/{token}/reschedule", data={"start": FRIDAY_0930}, headers=SAME_ORIGIN
+        )
+        cancel = await late.post(f"/b/{token}/cancel", headers=SAME_ORIGIN)
+
+    assert "Verplaatsen kan niet meer" in page.text
+    assert f'href="/b/{token}/cancel"' in page.text
+    assert f'href="/b/{token}/reschedule"' not in page.text
+    assert reschedule_page.status_code == 303
+    assert cancel_page.status_code == 200
+    assert move.status_code == 303  # back to the booking page, which says moving is closed
+    assert move.headers["location"] == f"/b/{token}"
+    assert cancel.status_code == 303
+    assert cancel.headers["location"] == f"/b/{token}?status=cancelled"
+
+
+async def test_booking_cannot_be_changed_once_the_call_has_begun(demo_settings: Settings) -> None:
+    async with app_client(demo_settings, FixedClock(NOW)) as early:
+        token = await booked(early)
+    started = FixedClock(NOW + timedelta(days=1))  # Fri 08:00 UTC, the start
+
+    async with app_client(demo_settings, started) as late:
+        page = await late.get(f"/b/{token}")
         cancel_page = await late.get(f"/b/{token}/cancel")
         cancel = await late.post(f"/b/{token}/cancel", headers=SAME_ORIGIN)
-        reschedule_page = await late.get(f"/b/{token}/reschedule")
 
-    assert "Deze afspraak staat vast" in page.text
+    assert "Het gesprek is begonnen" in page.text
     assert "/cancel" not in page.text
     assert cancel_page.status_code == 303
-    assert reschedule_page.status_code == 303
     assert cancel.status_code == 409
     assert "kan niet meer worden gewijzigd" in cancel.text
 
