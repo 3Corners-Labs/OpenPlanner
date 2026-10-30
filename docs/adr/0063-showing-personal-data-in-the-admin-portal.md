@@ -21,6 +21,16 @@ None.
 
 **Fixed on purpose:** the PII field list, its classification and the rules of §2–§5. They are protections, so they cannot be settings (ADR 0042).
 
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 0 | ADR proposed; backlog section 4 | #130 | in PR |
+| 1 | PI-1: `app/domain/privacy.py` with the fixed field list and classification | | planned |
+| 2 | PI-2: marker-value test over every list, overview, export and alert template | | planned |
+| 3 | PI-3: list search and filters never match PII fields; abuse case in the threat model | | planned |
+| 4 | PI-4: read-only card *Platform → Advanced settings → Data fields*; manual topic | | planned |
+
 ## Consequences
 
 - New: `app/domain/privacy.py` (classification), the marker-value template test, a read-only card under Advanced settings.
