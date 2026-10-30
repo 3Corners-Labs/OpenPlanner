@@ -18,7 +18,7 @@ from app.adapters.diagnostics import CheckResult
 from app.adapters.group_check import CheckerConfig, PlatformChecker
 from app.adapters.webex_auth import ServiceAppConfig, WebexTokens
 from app.adapters.webhook_registration import WEBEX_EVENTS
-from app.domain.checks import CheckStatus, Finding
+from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.domain.ports import IntegrationError
 from tests.adapters.test_wxcc_config import _config
 from tests.fakes.clock import FixedClock
@@ -93,6 +93,7 @@ class Platforms:
     def __init__(self) -> None:
         self.host_status = 200
         self.delete_status = 204
+        self.trial_status = 200
         self.reason = "Host host@example.nl is not a valid user."
         self.hooks = _hooks()
         self.subscriptions = _subscriptions()
@@ -105,9 +106,11 @@ class Platforms:
         if request.url.path.endswith("/access_token"):
             return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
         if url == f"{WEBEX}/meetings" and request.method == "POST":
-            if self.host_status != 200:
+            trial = json.loads(request.content).get("enabledJoinBeforeHost") is True
+            status = self.trial_status if trial else self.host_status
+            if status != 200:
                 refusal = {"message": "Refused.", "errors": [{"description": self.reason}]}
-                return httpx.Response(self.host_status, json=refusal)
+                return httpx.Response(status, json=refusal)
             return httpx.Response(200, json={"id": "probe-1", "webLink": "https://w.example/j"})
         if url.startswith(f"{WEBEX}/meetings/probe-1") and request.method == "DELETE":
             return httpx.Response(self.delete_status)
@@ -176,6 +179,8 @@ async def test_the_probe_meeting_is_scheduled_as_a_booking_would_and_deleted_aga
     assert [(r.method, r.url.path) for r in webex] == [
         ("POST", "/v1/meetings"),
         ("DELETE", "/v1/meetings/probe-1"),
+        ("POST", "/v1/meetings"),  # then the trial call's probe (ADR 0069)
+        ("DELETE", "/v1/meetings/probe-1"),
     ]
     body = json.loads(webex[0].content)
     assert body["title"] == "OpenPlanner controle"
@@ -202,7 +207,12 @@ async def test_besides_the_probe_nothing_is_written_and_no_token_leaves_for_our_
         and not str(r.url).startswith(BASE)
         and not r.url.path.endswith("/access_token")
     ]
-    assert [r.url.path for r in writes] == ["/v1/meetings", "/v1/meetings/probe-1"]
+    assert [r.url.path for r in writes] == [
+        "/v1/meetings",
+        "/v1/meetings/probe-1",
+        "/v1/meetings",
+        "/v1/meetings/probe-1",
+    ]
     assert not any(
         "authorization" in r.headers for r in platforms.requests if str(r.url).startswith(BASE)
     )
@@ -321,3 +331,59 @@ async def test_groups_sharing_an_asset_are_named_only_from_the_peers_given() -> 
     assert shared
     assert shared[0].params == (("groups", "aangifte, vergunning"),)
     assert json.dumps([f.params for f in findings])  # params are plain strings
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_trial_call_probe_follows_the_booking_probe_with_entry_before_the_host() -> None:
+    platforms = Platforms()
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    webex = [f for f in findings if f.area is CheckArea.WEBEX]
+    assert [f.code for f in webex] == ["webex.host_ok", "webex.trial_ok"]
+    bodies = [
+        json.loads(r.content)
+        for r in platforms.requests
+        if r.method == "POST" and str(r.url) == f"{WEBEX}/meetings"
+    ]
+    assert [b["enabledJoinBeforeHost"] for b in bodies] == [False, True]
+    assert [b["unlockedMeetingJoinSecurity"] for b in bodies] == ["allowJoinWithLobby", "allowJoin"]
+    assert bodies[0]["title"] == bodies[1]["title"] == "OpenPlanner controle"
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_site_that_refuses_entry_before_the_host_is_a_warning_with_the_reason() -> None:
+    platforms = Platforms()
+    platforms.trial_status = 400
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    webex = [f for f in findings if f.area is CheckArea.WEBEX]
+    assert [f.code for f in webex] == ["webex.host_ok", "webex.trial_refused"]
+    assert webex[1].status is CheckStatus.WARN  # the appointment's own meeting still works
+    assert ("reason", "Host *** is not a valid user.") in webex[1].params  # addresses masked
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_no_trial_probe_when_the_group_has_no_trial_call() -> None:
+    platforms = Platforms()
+    group = replace(GROUP, trial_call_enabled=False)
+
+    findings = await _checker(platforms).check_group(group, [group])
+
+    assert [f.code for f in findings if f.area is CheckArea.WEBEX] == ["webex.host_ok"]
+    assert (
+        sum(1 for r in platforms.requests if r.method == "POST" and r.url.path == "/v1/meetings")
+        == 1
+    )
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_trial_probe_that_cannot_be_deleted_is_a_warning_naming_it() -> None:
+    platforms = Platforms()
+    platforms.delete_status = 500
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    codes = [f.code for f in findings if f.area is CheckArea.WEBEX]
+    assert codes == ["webex.host_ok", "webex.probe_left", "webex.trial_ok", "webex.trial_left"]

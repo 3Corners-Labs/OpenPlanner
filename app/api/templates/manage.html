@@ -15,6 +15,9 @@
 {% if active and group.video_enabled %}
 <p><a class="button button--large" href="/b/{{ token }}/join">{{ _("join.from_manage") }}</a></p>
 {% endif %}
+{% if active and trial_offered %}
+<p><a href="/b/{{ token }}/test">{{ _("trial.from_manage") }}</a></p>
+{% endif %}
 {% if suspended %}
 <div class="notice notice--warning">
   <h2>{{ _("manage.suspended.title") }}</h2>

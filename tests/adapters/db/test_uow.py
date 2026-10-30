@@ -105,6 +105,7 @@ async def test_full_slot_and_cancel_frees_it(engine: AsyncEngine, service: Booki
             [
                 JobType.END_WXCC_TASK,
                 JobType.DELETE_VIDEO_ROOM,
+                JobType.DELETE_TRIAL_CALL,
                 JobType.SEND_CANCELLATION,
                 JobType.PURGE_PII,
             ]
@@ -238,7 +239,7 @@ async def test_salt_is_stored_and_purge_clears_personal_data(
     columns = [
         getattr(BookingRow, name) for name in sorted(PII_FIELDS) if hasattr(BookingRow, name)
     ]
-    assert len(columns) == 7
+    assert len(columns) == 8
     async with engine.connect() as conn:
         row = (await conn.execute(select(*columns, BookingRow.pii_purged_at))).one()
     assert row[:-1] == (None,) * len(columns)
@@ -264,3 +265,38 @@ async def test_upcoming_starts_for_email_counts_place_holding_bookings_only(
     assert ada == [kept.booking.start]
     assert gone == []
     assert ended == []
+
+
+async def test_a_trial_call_is_stored_counted_cleared_and_its_link_purged(
+    engine: AsyncEngine, service: BookingService
+) -> None:
+    from app.domain.booking import MeetingRef, TrialCall
+
+    await seed_group(engine)
+    receipt = await book(service)
+    booking_id = receipt.booking.id or 0
+    uow = SqlUnitOfWork(engine)
+    trial = TrialCall(MeetingRef("trial-1", "https://x.webex.com/t/1"), NOW)
+
+    async with uow.locked() as tx:
+        await tx.save_trial_call(booking_id, trial)
+    async with uow.read() as tx:
+        stored = await tx.get_booking(booking_id)
+    assert stored is not None
+    assert stored.trial == trial
+    assert stored.trial_count == 1
+    assert "https://x.webex.com/t/1" not in repr(stored)  # a link is personal data
+
+    async with uow.locked() as tx:
+        await tx.clear_trial_call(booking_id)
+        await tx.save_trial_call(booking_id, trial)
+        await tx.purge_personal_data(booking_id, NOW)
+    async with uow.read() as tx:
+        purged = await tx.get_booking(booking_id)
+    assert purged is not None
+    assert purged.trial_count == 2  # clearing never gives a fresh allowance
+    async with engine.connect() as conn:
+        link = (
+            await conn.execute(select(BookingRow.trial_join_url).where(BookingRow.id == booking_id))
+        ).scalar_one()
+    assert link is None

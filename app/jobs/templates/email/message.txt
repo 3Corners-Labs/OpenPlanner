@@ -31,6 +31,11 @@
 {{ join_text }}
 {{ join_link }}: {{ join_url }}
 {% endif %}
+{% if trial_url %}
+
+{{ trial_text }}
+{{ trial_link }}: {{ trial_url }}
+{% endif %}
 {% if manage_url %}
 
 {{ manage_text }}

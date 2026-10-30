@@ -269,6 +269,7 @@ def _manage_context(
         "active": booking.is_active,
         "changeable": details.changeable,
         "cancellable": details.cancellable,
+        "trial_offered": group.trial_call_enabled and group.video_enabled,
         "deadline": (
             f"{format_day(local_day(deadline, group.tz), locale.code)}, "
             f"{format_clock(deadline, group.tz, locale.code)}"

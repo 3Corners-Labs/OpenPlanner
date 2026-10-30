@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ _("trial.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+<p class="eyebrow">{{ group.name }}</p>
+<h1>{{ _("trial.title") }}</h1>
+<dl class="details">
+  <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
+  <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
+</dl>
+{% if failed %}
+<div class="notice notice--warning" role="alert"><p>{{ _("trial.failed") }}</p></div>
+{% endif %}
+{% if state == "available" or state == "active" %}
+<p>{{ _("trial.intro") }}</p>
+<ul>
+  <li>{{ _("trial.check.camera") }}</li>
+  <li>{{ _("trial.check.microphone") }}</li>
+  <li>{{ _("trial.check.speakers") }}</li>
+  <li>{{ _("trial.check.browser") }}</li>
+</ul>
+<p>{{ _("trial.alone") }}</p>
+{% endif %}
+{% if state == "available" %}
+<form method="post" action="/b/{{ token }}/test">
+  <p>{{ _("trial.open_hint", minutes=minutes) }}</p>
+  <p><button type="submit" class="button button--large">{{ _("trial.open") }}</button></p>
+</form>
+<p>{{ _("trial.calls_left", count=calls_left) }}</p>
+{% elif state == "active" %}
+<div class="notice notice--success" role="status"><p>{{ _("trial.active", time=closes_at) }}</p></div>
+<p><a class="button button--large" href="/b/{{ token }}/test/go">{{ _("trial.join") }}</a></p>
+<p>{{ _("trial.calls_left", count=calls_left) }}</p>
+{% elif state == "limit_reached" %}
+<div class="notice"><p>{{ _("trial.limit") }}</p></div>
+{% elif state == "too_late" %}
+<div class="notice"><p>{{ _("trial.too_late") }}</p></div>
+{% elif state == "off" %}
+<div class="notice"><p>{{ _("trial.off") }}</p></div>
+{% else %}
+<div class="notice"><p>{{ _("manage.inactive") }}</p></div>
+{% endif %}
+<p><a href="/b/{{ token }}">{{ _("trial.back") }}</a></p>
+{% endblock %}

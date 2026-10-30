@@ -53,6 +53,7 @@ class JobType(StrEnum):
 
     CREATE_VIDEO_ROOM = "create_video_room"
     DELETE_VIDEO_ROOM = "delete_video_room"
+    DELETE_TRIAL_CALL = "delete_trial_call"
     SEND_CONFIRMATION = "send_confirmation"
     SEND_CHANGE = "send_change"
     SEND_REMINDER = "send_reminder"
@@ -186,11 +187,12 @@ def plan_for_cancellation(
     """
     end = PlannedJob(JobType.END_WXCC_TASK, cancelled_at, None)
     delete = PlannedJob(JobType.DELETE_VIDEO_ROOM, cancelled_at, None)
+    trial = PlannedJob(JobType.DELETE_TRIAL_CALL, cancelled_at, None)
     message = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.EMAIL)
     text = PlannedJob(JobType.SEND_CANCELLATION, cancelled_at, None, ChannelKind.SMS)
     purge = PlannedJob(JobType.PURGE_PII, cancelled_at + PURGE_AFTER, None)
     notices = ([message, text] if sms else [message]) if notify else []
-    return [end, delete, *notices, *_team_cancel(cancelled_at, team_invite), purge]
+    return [end, delete, trial, *notices, *_team_cancel(cancelled_at, team_invite), purge]
 
 
 def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:
@@ -230,6 +232,7 @@ def plan_for_rebook(
     jobs = [
         PlannedJob(JobType.END_WXCC_TASK, now, None),
         PlannedJob(JobType.DELETE_VIDEO_ROOM, now, None),
+        PlannedJob(JobType.DELETE_TRIAL_CALL, now, None),
         *(PlannedJob(JobType.SEND_REBOOK_REQUEST, now, None, c) for c in channels),
         *_team_cancel(now, team_invite),
     ]
@@ -285,12 +288,14 @@ def plan_for_suspension(
     """Return the jobs that replace all pending jobs of a booking put on hold (ADR 0024).
 
     Reminders and the planned WxCC task go, and a work item that already exists is ended;
-    the meeting stays, so a reinstated booking keeps its link. The purge waits for the end of
-    the closure (``Closure.purge_at``); while the closure is open-ended there is none, and
-    ``plan_purge`` adds it once the end is known.
+    the meeting stays, so a reinstated booking keeps its link. An open trial call is deleted
+    (ADR 0069): replacing the jobs would otherwise drop its pending clean-up. The purge waits
+    for the end of the closure (``Closure.purge_at``); while the closure is open-ended there is
+    none, and ``plan_purge`` adds it once the end is known.
     """
     jobs = [
         PlannedJob(JobType.END_WXCC_TASK, now, None),
+        PlannedJob(JobType.DELETE_TRIAL_CALL, now, None),
         PlannedJob(JobType.SEND_SUSPENSION, now, None, ChannelKind.EMAIL),
     ]
     return jobs + _team_cancel(now, team_invite) + plan_purge(purge_at)

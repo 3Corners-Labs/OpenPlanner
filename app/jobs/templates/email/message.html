@@ -38,6 +38,10 @@
     <p>{{ join_text }}</p>
     <p><a href="{{ join_url }}">{{ join_link }}</a></p>
     {% endif %}
+    {% if trial_url %}
+    <p>{{ trial_text }}</p>
+    <p><a href="{{ trial_url }}">{{ trial_link }}</a></p>
+    {% endif %}
     {% if manage_url %}
     <p>{{ manage_text }}</p>
     <p><a href="{{ manage_url }}">{{ manage_link }}</a></p>
