@@ -29,7 +29,13 @@ def uow(engine: AsyncEngine) -> SqlUnitOfWork:
 async def test_release_check_round_trip_keeps_one_row(uow: SqlUnitOfWork) -> None:
     async with uow.read() as tx:
         assert await tx.get_release_check() is None
-    for check in (ReleaseCheck(NOW, RELEASE), ReleaseCheck(NOW, None, "server_error")):
+    checks = (
+        ReleaseCheck(NOW, RELEASE),
+        ReleaseCheck(NOW, None, "server_error"),
+        ReleaseCheck(NOW, RELEASE, requested_at=NOW + timedelta(minutes=5)),
+        ReleaseCheck(NOW + timedelta(minutes=6), RELEASE),
+    )
+    for check in checks:
         async with uow.locked() as tx:
             await tx.save_release_check(check)
         async with uow.read() as tx:

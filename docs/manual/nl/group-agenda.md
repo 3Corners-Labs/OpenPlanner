@@ -13,7 +13,7 @@ meteen in de agenda.
 
 Elk tijdslot van de dag staat in een eigen blok, met de tijd, het aantal medewerkers en het
 aantal bevestigde afspraken. Daaronder staan de afspraken met de voornaam van de deelnemer,
-de stand van de videomeeting en de contactcentertaak. Het e-mailadres en het telefoonnummer
+de stand van de videomeeting (met daaronder het Webex-meeting-ID) en de contactcentertaak. Het e-mailadres en het telefoonnummer
 ziet u alleen op de detailpagina van een afspraak (**Details**).
 
 - **Gesloten**: een noodsluiting valt over dit tijdslot.
@@ -53,6 +53,10 @@ laadde en ververst de link **Vernieuwen** hem.
 Op de detailpagina van een afspraak (**Details**) staat alles wat nodig is als een
 videogesprek of contactcentertaak niet goed gaat:
 
+- **Meeting-ID**: het eigen ID van de Webex-meeting, om aan Webex-support door te geven. Het
+  blijft staan als een burger stopt met wachten op een direct gesprek: OpenPlanner blijft de
+  meeting volgen zolang de medewerker erin zit, en de plaats van dat gesprek blijft bezet tot
+  Webex het einde van de meeting meldt.
 - **Verloop**: wat er met de meeting en de taak gebeurde. Achter elke gebeurtenis staat de
   versie van OpenPlanner die haar schreef. Op een testomgeving die vaak bijwerkt, ziet u zo of
   een fout van een oudere versie komt. *Versie onbekend* betekent: geschreven voordat

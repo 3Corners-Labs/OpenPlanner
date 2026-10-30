@@ -8,6 +8,7 @@ one, which shows the open request's steps itself.
     GET  /admin/updates                         running version, latest release, history
     GET  /admin/updates/progress?seen=KEY       the steps of the open request, as a fragment
                                                 (204 while unchanged; ADR 0048)
+    POST /admin/updates/check                   ask the worker to check for releases now
     POST /admin/updates/update                  request the latest release
     POST /admin/updates/restore                 request the version the last update replaced
     POST /admin/updates/requests/{id}/cancel    withdraw a request not yet claimed
@@ -356,6 +357,7 @@ async def _overview(
             "commit": _commit(request),
             "checked_at": admin_moment(request, locale, check.checked_at) if check else None,
             "check_error": check.error if check else "",
+            "check_minutes": int(found.interval.total_seconds() // 60),
             "history": _audit_history(request, locale, entries),
             "offered": [
                 {
@@ -411,6 +413,17 @@ async def progress_fragment(
     if view is not None and view.key == seen:
         return Response(status_code=204, headers={"cache-control": "no-store"})
     return render(templates, request, "admin/_update_progress.html", locale, {"progress": view})
+
+
+@router.post("/updates/check", response_class=HTMLResponse)
+async def request_check(request: Request, locale: Locale, _: SameOrigin, context: View) -> Response:
+    """Ask the worker to check for releases at its next poll ("Check now")."""
+    try:
+        await update_service(request).request_check(context.principal)
+    except DomainError as error:
+        raise_refusal(error)
+        return await _overview(request, locale, context, error)
+    return redirect_done(URL, "check_requested")
 
 
 @router.post("/updates/update", response_class=HTMLResponse)

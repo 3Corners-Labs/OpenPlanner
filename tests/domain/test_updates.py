@@ -135,6 +135,14 @@ def test_check_is_due_first_time_and_after_an_hour() -> None:
     assert check_due(last, NOW + CHECK_INTERVAL)
 
 
+def test_check_follows_the_given_interval_and_a_request_makes_it_due_at_once() -> None:
+    last = ReleaseCheck(NOW, RELEASE)
+    assert not check_due(last, NOW + timedelta(minutes=5), timedelta(minutes=10))
+    assert check_due(last, NOW + timedelta(minutes=10), timedelta(minutes=10))
+    requested = replace(last, requested_at=NOW + timedelta(minutes=1))
+    assert check_due(requested, NOW + timedelta(minutes=1), timedelta(hours=1))
+
+
 def test_update_is_available_only_when_newer_than_a_release_build() -> None:
     check = ReleaseCheck(NOW, RELEASE)
     assert available_update(V1, check) == RELEASE
