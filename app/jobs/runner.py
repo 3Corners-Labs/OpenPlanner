@@ -204,7 +204,9 @@ class JobRunner:
         try:
             skipped = await self._run(job, now)
         except IntegrationError as exc:
-            await self._handle_failure(job, now, exc.code, retryable=exc.retryable)
+            await self._handle_failure(
+                job, now, exc.code, retryable=exc.retryable, message=exc.reason
+            )
         except DomainError as exc:  # e.g. integration_not_ready: retrying will not help
             await self._handle_failure(job, now, exc.code.value, retryable=False)
         except Exception as exc:  # any failure is retried; the type is logged, not the text
@@ -308,21 +310,32 @@ class JobRunner:
         return None
 
     async def _handle_failure(
-        self, job: ClaimedJob, now: datetime, error: str, *, retryable: bool = True
+        self,
+        job: ClaimedJob,
+        now: datetime,
+        error: str,
+        *,
+        retryable: bool = True,
+        message: str = "",
     ) -> None:
-        """Retry with backoff, or fail after the last attempt (refusals fail at once)."""
+        """Retry with backoff, or fail after the last attempt (refusals fail at once).
+
+        ``message`` is the provider's own reason (ADR 0065); it goes with the event.
+        """
         if retryable and job.attempts <= len(BACKOFF):
             await self._queue.retry(job.id, now + BACKOFF[job.attempts - 1], error)
             log.warning("job.retry", job_id=job.id, attempt=job.attempts, error=error)
-            await self._record(job, Outcome.RETRY, error)
+            await self._record(job, Outcome.RETRY, error, message)
             return
         await self._queue.fail(job.id, error)
         log.error("job.failed", job_id=job.id, type=job.type.value, error=error)
-        await self._record(job, Outcome.FAILURE, error)
+        await self._record(job, Outcome.FAILURE, error, message)
         if job.type in CALL_JOBS and self._calls is not None:
-            await self._calls.record_failure(job, error)
+            await self._calls.record_failure(job, error, message)
 
-    async def _record(self, job: ClaimedJob, outcome: Outcome, reason: str) -> None:
+    async def _record(
+        self, job: ClaimedJob, outcome: Outcome, reason: str, message: str = ""
+    ) -> None:
         """Write the job's outcome as a system event; a failure here is only logged."""
         detail = f"attempt:{job.attempts}"
         if job.channel is not None:
@@ -334,6 +347,7 @@ class JobRunner:
                 booking_id=job.booking_id,
                 reason=reason,
                 detail=detail,
+                message=message,
             )
         except Exception as exc:  # the job's own outcome is already settled
             log.warning("system_log.failed", job_id=job.id, error=type(exc).__name__)

@@ -341,6 +341,7 @@ class AuditView:
     booking_id: int | None
     booking_url: str | None
     trace_url: str | None
+    message: str = ""
 
 
 @dataclass(frozen=True)
@@ -537,6 +538,7 @@ def audit_views(
             e.booking_id,
             _booking_url(principal, entry),
             f"/admin/audit?trace={e.trace_id}" if e.trace_id else None,
+            e.message,
         )
         for entry in entries
         for e in (entry.event,)
