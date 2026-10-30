@@ -59,7 +59,7 @@ from app.domain.scheduling import (
 from app.domain.staff import StaffFilter, StaffMember
 from app.domain.tasks import ActiveJobs
 from app.domain.tls import CertificateCheck, ProbeResult
-from app.domain.updates import Release, ReleaseCheck, UpdateRequest
+from app.domain.updates import Release, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -1023,6 +1023,14 @@ class Transaction(Protocol):
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
         """Replace the outcome of the latest release check."""
+        ...
+
+    async def get_running_versions(self, limit: int = 2) -> list[RunningVersion]:
+        """Return the versions this installation ran, newest first (ADR 0067)."""
+        ...
+
+    async def add_running_version(self, running: RunningVersion) -> RunningVersion:
+        """Record a version seen at start-up."""
         ...
 
     async def get_update_requests(self, limit: int = 20) -> list[UpdateRequest]:

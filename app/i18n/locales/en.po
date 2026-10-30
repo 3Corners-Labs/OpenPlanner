@@ -4025,23 +4025,98 @@ msgstr "Goes back to version {version}. Data entered since the update is kept. P
 msgid "admin.updates.restore_now"
 msgstr "Restore {version}"
 
+msgid "admin.updates.when"
+msgstr "When"
+
+msgid "admin.updates.what"
+msgstr "What"
+
+msgid "admin.updates.by"
+msgstr "By"
+
+msgid "admin.updates.history_lead"
+msgstr "Every request, outcome and version change is in the global audit log; this is the summary."
+
+msgid "admin.updates.history_audit_link"
+msgstr "All update events in the audit log"
+
+msgid "admin.updates.outside_change"
+msgstr "On {at} the version was changed to {version} outside the portal (installer or by hand on the server)."
+
+msgid "admin.updates.history.update_request"
+msgstr "Update requested"
+
+msgid "admin.updates.history.update_auto_request"
+msgstr "Update requested automatically"
+
+msgid "admin.updates.history.update_succeeded"
+msgstr "Update succeeded"
+
+msgid "admin.updates.history.update_failed"
+msgstr "Update failed"
+
+msgid "admin.updates.history.update_rolled_back"
+msgstr "Update rolled back"
+
+msgid "admin.updates.history.restore_request"
+msgstr "Restore requested"
+
+msgid "admin.updates.history.restore_succeeded"
+msgstr "Previous version restored"
+
+msgid "admin.updates.history.restore_failed"
+msgstr "Restore failed"
+
+msgid "admin.updates.history.restore_rolled_back"
+msgstr "Restore rolled back"
+
+msgid "admin.updates.history.request_cancel"
+msgstr "Request withdrawn"
+
+msgid "admin.updates.history.version_changed"
+msgstr "Version changed"
+
+msgid "admin.updates.history.other"
+msgstr "Other event"
+
+msgid "admin.updates.actor.system"
+msgstr "system (automatic updates)"
+
+msgid "admin.updates.actor.updater"
+msgstr "updater on the server"
+
+msgid "admin.updates.actor.host"
+msgstr "server, outside the portal"
+
+msgid "admin.audit.subject"
+msgstr "Subject"
+
+msgid "admin.audit.subject.updates"
+msgstr "Updates and versions"
+
+msgid "admin.audit.subject.login"
+msgstr "Sign-in"
+
+msgid "admin.audit.subject.settings"
+msgstr "Settings"
+
+msgid "admin.audit.subject.rights"
+msgstr "Rights and staff"
+
+msgid "admin.audit.subject.bookings"
+msgstr "Appointments and tasks"
+
+msgid "admin.audit.subject.organisation"
+msgstr "Organisation and teams"
+
+msgid "admin.audit.subject.integrations"
+msgstr "Integrations"
+
 msgid "admin.updates.history"
 msgstr "History"
 
-msgid "admin.updates.requested_at"
-msgstr "Requested"
-
-msgid "admin.updates.action"
-msgstr "Action"
-
 msgid "admin.updates.versions"
 msgstr "From → to"
-
-msgid "admin.updates.status"
-msgstr "Status"
-
-msgid "admin.updates.finished_at"
-msgstr "Finished"
 
 msgid "admin.updates.none"
 msgstr "No updates requested yet."
