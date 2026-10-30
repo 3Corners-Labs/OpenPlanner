@@ -283,6 +283,7 @@ class JobRunner:
         sender = await self._senders.sender(group.organisation_id, channel)
         if sender is None:
             raise DomainError(ErrorCode.CHANNEL_NOT_CONFIGURED)
+        await self._composer.refresh()
         with clock_scope():
             if self._clock_style is not None:
                 use_clock(self._clock_style(group.organisation_id))

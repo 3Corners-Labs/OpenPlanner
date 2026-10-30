@@ -109,6 +109,7 @@ class Permission(StrEnum):
     SETTINGS_PLATFORM_MANAGE = "settings.platform.manage"
     SETTINGS_LOGIN_MANAGE = "settings.login.manage"
     SETTINGS_ORGANISATION_MANAGE = "settings.organisation.manage"
+    TEXTS_ORGANISATION_MANAGE = "texts.organisation.manage"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -159,6 +160,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.SETTINGS_LOGIN_MANAGE: Level.GLOBAL,
     # ADR 0042 §5: the settings of one organisation (class D).
     Permission.SETTINGS_ORGANISATION_MANAGE: Level.ORGANISATION,
+    # ADR 0004, 0009: the organisation's own wording of citizen pages and messages.
+    Permission.TEXTS_ORGANISATION_MANAGE: Level.ORGANISATION,
 }
 
 LOCKED_PERMISSIONS = frozenset(
@@ -257,6 +260,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.QUEUE_WORK,
         # ADR 0042 §5: the settings of the own organisation (class D).
         Permission.SETTINGS_ORGANISATION_MANAGE,
+        # ADR 0004: the organisation's own wording of citizen pages and messages.
+        Permission.TEXTS_ORGANISATION_MANAGE,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: EVERY_ADMIN

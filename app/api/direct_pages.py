@@ -50,7 +50,7 @@ from app.domain.ports import Clock, IntegrationError
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.web.errors import status_for
-from app.web.locale import RequestLocale, resolve_locale
+from app.web.locale import RequestLocale, request_locale
 from app.web.organisation_settings import follow, follow_group_from_path
 from app.web.protection import booking_limit, limiter, read_limit, require_same_origin
 from app.web.templates import render
@@ -61,7 +61,7 @@ router = APIRouter(
 )
 log = structlog.get_logger()
 
-Locale = Annotated[RequestLocale, Depends(resolve_locale)]
+Locale = Annotated[RequestLocale, Depends(request_locale)]
 SameOrigin = Annotated[None, Depends(require_same_origin)]
 Seen = Annotated[str, Query(max_length=64)]
 """The key of the status the page shows; the fragment answers 204 while it is current."""
