@@ -608,7 +608,7 @@ def test_a_new_version_pins_both_images_at_that_version(host: Host) -> None:
     assert host.settings(".env.update")["OPENPLANNER_PROXY_IMAGE"] == digest(PROXY_IMAGE, "1.5.0")
 
 
-# Update channel (ADR 0059): test and lab hosts may follow release candidates.
+# Trust by installer mode (ADR 0067): the channel itself is chosen in the portal.
 
 
 def _identity(host: Host) -> str:
@@ -618,61 +618,36 @@ def _identity(host: Host) -> str:
     ].strip("'")
 
 
-def test_the_rc_channel_follows_candidates_and_trusts_images_signed_on_main(host: Host) -> None:
-    host.given("latest", "v1.5.0-rc.3\n")
-
-    result = host.run("--mode", "lab", "--channel", "rc", "--non-interactive")
-
-    assert result.returncode == 0, result.stderr
-    assert host.settings(".env")["UPDATE_CHANNEL"] == "rc"
-    assert host.ran("repos/3Corners-Labs/OpenPlanner/releases?per_page=1")
-    assert host.ran(f"pull -q {IMAGE}:1.5.0-rc.3")
-    assert host.settings(".env.update")["OPENPLANNER_IMAGE"] == digest(IMAGE, "1.5.0-rc.3")
-    workflow = "https://github.com/3Corners-Labs/OpenPlanner/.github/workflows/main.yml"
-    identity = _identity(host)
-    assert re.fullmatch(identity, f"{workflow}@refs/heads/main")
-    assert re.fullmatch(identity, f"{workflow}@refs/tags/v1.5.0")
-    assert not re.fullmatch(identity, f"{workflow}@refs/heads/feature")
+WORKFLOW = "https://github.com/3Corners-Labs/OpenPlanner/.github/workflows/main.yml"
 
 
-def test_the_release_channel_is_the_default_and_never_trusts_main(host: Host) -> None:
-    result = host.run("--mode", "lab", "--version", "1.4.0", "--non-interactive")
-
-    assert result.returncode == 0, result.stderr
-    assert host.settings(".env")["UPDATE_CHANNEL"] == "release"
-    workflow = "https://github.com/3Corners-Labs/OpenPlanner/.github/workflows/main.yml"
-    assert not re.fullmatch(_identity(host), f"{workflow}@refs/heads/main")
-
-
-def test_production_refuses_the_rc_channel(host: Host) -> None:
-    result = host.run("--mode", "production", "--channel", "rc", "--non-interactive", **PRODUCTION)
-
-    assert result.returncode != 0
-    assert "refused in production" in result.stderr
-    assert not host.file(".env").exists()
-    assert not host.ran("pull")
-
-
-def test_a_candidate_version_needs_the_rc_channel(host: Host) -> None:
+def test_a_lab_host_trusts_images_signed_on_main_and_may_pin_a_candidate(host: Host) -> None:
     result = host.run("--mode", "lab", "--version", "1.5.0-rc.3", "--non-interactive")
 
-    assert result.returncode != 0
-    assert "needs --channel rc" in result.stderr
-
-
-def test_a_rerun_with_another_channel_rewrites_only_that_key(host: Host) -> None:
-    assert host.run("--mode", "lab", "--version", "1.4.0", "--non-interactive").returncode == 0
-    before = host.settings(".env")
-
-    result = host.run("--channel", "rc")
-
     assert result.returncode == 0, result.stderr
-    after = host.settings(".env")
-    assert after.pop("UPDATE_CHANNEL") == "rc"
-    before.pop("UPDATE_CHANNEL")
-    assert after == before
-    assert host.settings(".env")  # still readable after the rewrite
-    assert "heads/main" in _identity(host)
-    # Remembered: the next run without --channel keeps rc.
-    assert host.run().returncode == 0
-    assert host.settings(".env")["UPDATE_CHANNEL"] == "rc"
+    assert host.ran(f"pull -q {IMAGE}:1.5.0-rc.3")
+    assert host.settings(".env.update")["OPENPLANNER_IMAGE"] == digest(IMAGE, "1.5.0-rc.3")
+    assert "UPDATE_CHANNEL" not in host.settings(".env")  # the portal's, not the host's
+    identity = _identity(host)
+    assert re.fullmatch(identity, f"{WORKFLOW}@refs/heads/main")
+    assert re.fullmatch(identity, f"{WORKFLOW}@refs/tags/v1.5.0")
+    assert not re.fullmatch(identity, f"{WORKFLOW}@refs/heads/feature")
+
+
+def test_a_production_host_trusts_release_tags_only_and_refuses_a_candidate(host: Host) -> None:
+    assert host.run("--mode", "production", "--non-interactive", **PRODUCTION).returncode == 0
+    assert not re.fullmatch(_identity(host), f"{WORKFLOW}@refs/heads/main")
+
+    result = host.run("--version", "1.5.0-rc.3", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode != 0
+    assert "production runs releases only" in result.stderr
+    assert not host.ran(f"pull -q {IMAGE}:1.5.0-rc.3")
+
+
+def test_the_channel_flag_is_gone(host: Host) -> None:
+    result = host.run("--mode", "lab", "--channel", "rc", "--non-interactive")
+
+    assert result.returncode != 0
+    assert "/admin/updates" in result.stderr
+    assert not host.file(".env").exists()
