@@ -180,12 +180,24 @@ async def test_invalid_input_is_explained_and_kept(site: httpx.AsyncClient) -> N
 
 async def test_full_slot_is_reported(site: httpx.AsyncClient) -> None:
     await book(site)
-    await book(site)
+    await book(site, email="bea@example.org")
 
-    response = await book(site)
+    response = await book(site, email="cor@example.org")
 
     assert response.status_code == 409
     assert "net vol geraakt" in response.text
+
+
+async def test_the_same_address_twice_in_a_slot_is_refused_without_saying_why(
+    site: httpx.AsyncClient,
+) -> None:
+    await book(site)
+
+    response = await book(site, name="Ada Byron")
+
+    assert response.status_code == 409
+    assert "Heeft u al een afspraak bij dit team?" in response.text
+    assert "ada@example.org" not in response.text.split("<form", 1)[0]
 
 
 async def test_honeypot_is_refused(site: httpx.AsyncClient) -> None:

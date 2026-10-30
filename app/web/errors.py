@@ -11,6 +11,7 @@ from app.i18n import BoundGettext
 
 ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.SLOT_FULL: "error.slot_full",
+    ErrorCode.BOOKING_LIMIT_REACHED: "error.booking_limit_reached",
     ErrorCode.SLOT_UNAVAILABLE: "error.slot_unavailable",
     ErrorCode.OUTSIDE_BOOKING_WINDOW: "error.outside_booking_window",
     ErrorCode.BOOKING_LOCKED: "error.booking_locked",

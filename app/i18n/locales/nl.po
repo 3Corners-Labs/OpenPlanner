@@ -326,6 +326,9 @@ msgstr "Vul een geldig telefoonnummer in, bijvoorbeeld 06 12345678."
 msgid "error.slot_full"
 msgstr "Dit moment is net vol geraakt. Kies een ander moment."
 
+msgid "error.booking_limit_reached"
+msgstr "We kunnen deze afspraak niet maken. Heeft u al een afspraak bij dit team? Gebruik dan de link in de bevestigingsmail om die te verzetten of te annuleren. Boekt u voor iemand anders? Gebruik dan zo mogelijk het e-mailadres van die persoon."
+
 msgid "error.slot_unavailable"
 msgstr "Dit moment is niet meer beschikbaar. Kies een ander moment."
 
@@ -935,6 +938,12 @@ msgstr "Hoe afspraken bij medewerkers komen"
 msgid "admin.field.dispatch_kind_hint"
 msgstr "Contactcenter: een taak in de wachtrij van het team, kort voor de start. Eigen wachtrij: medewerkers loggen in op OpenPlanner en pakken een afspraak op. Geldt voor afspraken die nog niet zijn doorgezet."
 
+msgid "admin.field.max_bookings_per_email"
+msgstr "Afspraken per e-mailadres"
+
+msgid "admin.field.max_bookings_per_email_hint"
+msgstr "Hoeveel toekomstige afspraken één e-mailadres tegelijk bij dit team mag hebben. Hoger dan 1 zodat mensen ook voor een ander kunnen boeken. Hetzelfde adres twee keer op hetzelfde moment kan nooit. 1 tot 10."
+
 msgid "admin.field.queue_visible_from_minutes"
 msgstr "Zichtbaar in de wachtrij (minuten vooraf, eigen wachtrij)"
 
@@ -1036,8 +1045,14 @@ msgstr "Vul een aantal minuten in van het doorzetten naar de wachtrij tot 1440."
 msgid "admin.form.error.planner_too_late"
 msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Bel de deelnemer."
 
+msgid "admin.form.error.booking_limit_reached"
+msgstr "Dit e-mailadres heeft al een afspraak in dat tijdslot, of al het maximum aantal afspraken bij dit team (zie Afspraken per e-mailadres in de instellingen). Kies een ander tijdslot."
+
 msgid "admin.form.error.move_causes_shortfall"
 msgstr "In dit tijdslot zijn dan meer afspraken dan medewerkers. Bevestig dat u het tekort accepteert, of kies een ander tijdslot."
+
+msgid "admin.form.error.max_bookings_per_email"
+msgstr "Vul een aantal in van 1 tot 10."
 
 msgid "admin.form.error.queue_visible_from_minutes"
 msgstr "Vul een aantal minuten in van 0 tot 120."

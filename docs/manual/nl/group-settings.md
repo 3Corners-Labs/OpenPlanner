@@ -59,6 +59,16 @@ geboekt zijn voordat hij naar het contactcenter gaat.
 Hoeveel dagen vooruit burgers kunnen kiezen, van 1 tot 366. Houd dit in lijn met hoe ver het
 rooster van het team vaststaat: een tijdslot dat te boeken is, moet ook bemand zijn.
 
+<!-- field: max_bookings_per_email -->
+### Afspraken per e-mailadres
+
+Hoeveel toekomstige afspraken één e-mailadres tegelijk bij dit team mag hebben, van 1 tot 10.
+Standaard 3. Mensen boeken vaak voor een ander, bijvoorbeeld een ouder voor een kind of een
+mantelzorger voor een naaste; zet het getal daarom niet te laag. Een afspraak die is geannuleerd
+of voorbij is, telt niet mee. Hetzelfde e-mailadres twee keer op hetzelfde moment kan nooit:
+dat is bijna altijd een dubbele klik. De burger krijgt bij een weigering een algemene melding,
+zonder dat de pagina zegt dat er al een afspraak is.
+
 <!-- field: dispatch_kind -->
 ### Hoe afspraken bij medewerkers komen
 

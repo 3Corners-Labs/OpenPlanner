@@ -24,6 +24,7 @@ from tests.support.domain import (
     TEST_TOKEN_KEY,
     TUESDAY_0900,
     book,
+    citizen,
 )
 
 
@@ -247,3 +248,24 @@ async def test_salt_is_stored_and_purge_clears_personal_data(
         ).one()
     assert row[:5] == (None, None, None, None, None)
     assert row[5] == NOW
+
+
+async def test_upcoming_starts_for_email_counts_place_holding_bookings_only(
+    engine: AsyncEngine, service: BookingService
+) -> None:
+    group_id = await seed_group(engine, capacity=3)
+    await seed_group(engine, slug="toeslagen", capacity=3)
+    kept = await book(service)
+    cancelled = await book(service, SLOT_0930, contact=citizen(2))
+    await service.cancel(cancelled.management_token)
+    await book(service, SLOT_0930, contact=citizen(3))
+    await book(service, SLOT_0930, "toeslagen")
+
+    async with SqlUnitOfWork(engine).read() as tx:
+        ada = await tx.upcoming_starts_for_email(group_id, "ADA@example.ORG", NOW)
+        gone = await tx.upcoming_starts_for_email(group_id, "citizen2@example.org", NOW)
+        ended = await tx.upcoming_starts_for_email(group_id, "ada@example.org", SLOT_0930)
+
+    assert ada == [kept.booking.start]
+    assert gone == []
+    assert ended == []

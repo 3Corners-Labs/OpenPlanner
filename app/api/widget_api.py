@@ -115,6 +115,7 @@ TEXT_KEYS = (
     "form.honeypot",
     "error.title",
     "error.slot_full",
+    "error.booking_limit_reached",
     "error.slot_unavailable",
     "error.outside_booking_window",
     "error.group_closed",

@@ -4,6 +4,7 @@ All tests use the same calendar: "now" is Thursday 1 January 2026 08:00 UTC; the
 open on Monday 5 January 09:00-10:00 Amsterdam time (08:00-09:00 UTC) in 30-minute slots.
 """
 
+from dataclasses import replace
 from datetime import UTC, date, datetime, time
 
 from app.domain.authorization import Principal, Role
@@ -44,8 +45,16 @@ def make_group(**overrides: object) -> Group:
     return Group(**fields)  # type: ignore[arg-type]
 
 
+def citizen(number: int) -> ContactInput:
+    """Return Ada's details under address ``number``: another citizen for the address limit."""
+    return replace(ADA, email=f"citizen{number}@example.org")
+
+
 async def book(
-    service: BookingService, start: datetime = SLOT_0900, slug: str = "aangifte"
+    service: BookingService,
+    start: datetime = SLOT_0900,
+    slug: str = "aangifte",
+    contact: ContactInput = ADA,
 ) -> BookingReceipt:
-    """Book ``start`` for Ada in group ``slug``."""
-    return await service.book(group_slug=slug, start=start, contact=ADA, locale="nl")
+    """Book ``start`` for ``contact`` (Ada) in group ``slug``."""
+    return await service.book(group_slug=slug, start=start, contact=contact, locale="nl")
