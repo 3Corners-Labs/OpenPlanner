@@ -88,3 +88,21 @@ your role may open:
 On a phone the icons, the number and your initials stay; the words stay in the bar for screen
 readers. The number is also part of the shortcut's name, for example *Tasks, 2 running or
 failed*. A shortcut without a source for a number shows none.
+
+## Choosing a scope
+
+At the left of the top bar is a button with a filter icon, and on a wide screen your choice next to
+it (*Scope: All organisations › All groups*). In it you choose an organisation, a group or both,
+and **Show** narrows the overview to that choice: the groups at the bottom, *Bookings today per
+group*, *Queue across my groups* and *Recent configuration changes*. *Running tasks*, *System
+status* and *My role and reach* are platform-wide and do not change. **Show everything** removes
+the choice.
+
+The filter only shows what your role may already see. You choose from the organisations and groups
+within your reach; any other value in the address is ignored. It is an ordinary form that changes
+nothing. Above the lists the chosen organisation and group are links to their pages (the
+organisation page only for those who manage organisations). The choice holds for this session: you
+see it again when you return to the overview, and after signing in again the filter is back on
+everything. While a choice is active the button has a coloured background, also when only the icon
+fits on a smaller screen. For now the filter works on the overview; the other lists have their own
+filters.

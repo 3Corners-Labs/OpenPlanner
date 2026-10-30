@@ -4215,6 +4215,33 @@ msgstr "Alerts"
 msgid "admin.topbar.tasks.count"
 msgstr "{label}, {count} running or failed"
 
+msgid "admin.scope.label"
+msgstr "Scope"
+
+msgid "admin.scope.crumbs"
+msgstr "Chosen scope"
+
+msgid "admin.scope.organisation"
+msgstr "Organisation"
+
+msgid "admin.scope.group"
+msgstr "Group"
+
+msgid "admin.scope.all_organisations"
+msgstr "All organisations"
+
+msgid "admin.scope.all_groups"
+msgstr "All groups"
+
+msgid "admin.scope.hint"
+msgstr "Narrows the groups, bookings, queue and changes on this page to what you may already see. Tasks, status and rights stay platform-wide."
+
+msgid "admin.scope.apply"
+msgstr "Show"
+
+msgid "admin.scope.reset"
+msgstr "Show everything"
+
 msgid "admin.nav.help"
 msgstr "Manual"
 
