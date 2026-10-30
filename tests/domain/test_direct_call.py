@@ -1,4 +1,4 @@
-"""Direct calls (ADR 0019): only when enabled and open now, a booking in its own slot."""
+"""Direct calls (ADR 0019): only in a block that offers them (ADR 0072), in its own slot."""
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -10,44 +10,57 @@ from app.domain.calls import CallStatus, TaskState
 from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError
 from app.domain.job_plan import JobType
-from app.domain.scheduling import ScheduleOverride, ScheduleRule, is_open
+from app.domain.scheduling import Offer, ScheduleOverride, ScheduleRule, open_for_direct
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import ADA, TEST_TOKEN_KEY, make_group, window
 
 MONDAY_0915 = datetime(2026, 1, 5, 8, 15, tzinfo=UTC)  # 09:15 Amsterdam
-GROUP = make_group(id=1, slug="aangifte", direct_call_enabled=True)
-RULES = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 1))]
+GROUP = make_group(id=1, slug="aangifte")
+RULES = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 1, Offer.BOTH))]
+SLOTS_ONLY = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 1))]
+"""The same block offering appointments only: no direct call (ADR 0072)."""
 
 
 def test_open_follows_windows_and_exceptions() -> None:
-    assert is_open(GROUP, RULES, [], MONDAY_0915)
-    assert not is_open(GROUP, RULES, [], MONDAY_0915 + timedelta(hours=1))  # 10:15
-    assert not is_open(GROUP, RULES, [], MONDAY_0915 + timedelta(days=1))  # Tuesday
+    assert open_for_direct(GROUP, RULES, [], MONDAY_0915)
+    assert not open_for_direct(GROUP, RULES, [], MONDAY_0915 + timedelta(hours=1))  # 10:15
+    assert not open_for_direct(GROUP, RULES, [], MONDAY_0915 + timedelta(days=1))  # Tuesday
     closed = [ScheduleOverride(MONDAY_0915.date(), None)]
-    assert not is_open(GROUP, RULES, closed, MONDAY_0915)
+    assert not open_for_direct(GROUP, RULES, closed, MONDAY_0915)
 
 
 def test_closed_during_a_block_without_agents() -> None:
     rules = [
-        ScheduleRule(weekday=0, window=window("09:00", "12:00", 3)),
-        ScheduleRule(weekday=0, window=window("12:00", "12:30", 0)),
-        ScheduleRule(weekday=0, window=window("12:30", "17:00", 3)),
+        ScheduleRule(weekday=0, window=window("09:00", "12:00", 3, Offer.BOTH)),
+        ScheduleRule(weekday=0, window=window("12:00", "12:30", 0, Offer.BOTH)),
+        ScheduleRule(weekday=0, window=window("12:30", "17:00", 3, Offer.BOTH)),
     ]
+    at = MONDAY_0915
 
-    assert is_open(GROUP, rules, [], MONDAY_0915 + timedelta(hours=2, minutes=44))  # 11:59
-    assert not is_open(GROUP, rules, [], MONDAY_0915 + timedelta(hours=2, minutes=45))  # 12:00
-    assert not is_open(GROUP, rules, [], MONDAY_0915 + timedelta(hours=3, minutes=14))  # 12:29
-    assert is_open(GROUP, rules, [], MONDAY_0915 + timedelta(hours=3, minutes=15))  # 12:30
+    assert open_for_direct(GROUP, rules, [], at + timedelta(hours=2, minutes=44))  # 11:59
+    assert not open_for_direct(GROUP, rules, [], at + timedelta(hours=2, minutes=45))  # 12:00
+    assert not open_for_direct(GROUP, rules, [], at + timedelta(hours=3, minutes=14))  # 12:29
+    assert open_for_direct(GROUP, rules, [], at + timedelta(hours=3, minutes=15))  # 12:30
+
+
+def test_only_a_block_that_offers_direct_calls_opens_them() -> None:
+    """ADR 0072: the offer is per block; a direct-only block opens them as well."""
+    direct_only = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 1, Offer.DIRECT))]
+    exception = [ScheduleOverride(MONDAY_0915.date(), window("09:00", "10:00", 1, Offer.BOTH))]
+
+    assert not open_for_direct(GROUP, SLOTS_ONLY, [], MONDAY_0915)
+    assert open_for_direct(GROUP, direct_only, [], MONDAY_0915)
+    assert open_for_direct(GROUP, SLOTS_ONLY, exception, MONDAY_0915)  # the exception wins
 
 
 def _service(
-    group: object = GROUP, now: datetime = MONDAY_0915
+    group: object = GROUP, now: datetime = MONDAY_0915, rules: list[ScheduleRule] = RULES
 ) -> tuple[BookingService, InMemoryUnitOfWork]:
     state = State()
     state.groups[1] = group  # type: ignore[assignment]
-    state.rules[1] = list(RULES)
+    state.rules[1] = list(rules)
     uow = InMemoryUnitOfWork(state)
     return BookingService(uow, FixedClock(now), TEST_TOKEN_KEY), uow
 
@@ -83,14 +96,16 @@ async def test_direct_calls_do_not_take_scheduled_capacity() -> None:
 
 
 @pytest.mark.parametrize(
-    ("group", "now"),
+    ("rules", "now"),
     [
-        (replace(GROUP, direct_call_enabled=False), MONDAY_0915),
-        (GROUP, MONDAY_0915 + timedelta(hours=2)),
+        (SLOTS_ONLY, MONDAY_0915),
+        (RULES, MONDAY_0915 + timedelta(hours=2)),
     ],
 )
-async def test_direct_call_only_when_enabled_and_open(group: object, now: datetime) -> None:
-    service, uow = _service(group, now)
+async def test_direct_call_only_when_enabled_and_open(
+    rules: list[ScheduleRule], now: datetime
+) -> None:
+    service, uow = _service(GROUP, now, rules)
 
     with pytest.raises(DomainError, match="direct_call_unavailable"):
         await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
@@ -100,7 +115,7 @@ async def test_direct_call_only_when_enabled_and_open(group: object, now: dateti
 async def test_availability_of_direct_calls_for_the_group_page() -> None:
     service, _ = _service()
     closed, _ = _service(now=MONDAY_0915 + timedelta(hours=2))
-    off, _ = _service(group=replace(GROUP, direct_call_enabled=False))
+    off, _ = _service(rules=SLOTS_ONLY)
 
     assert await service.direct_call_availability("aangifte") is DirectAvailability.AVAILABLE
     assert await closed.direct_call_availability("aangifte") is DirectAvailability.UNAVAILABLE

@@ -106,7 +106,7 @@ class PlatformChecker:
         host = group.video_host_email
         if not host:
             return [Finding(CheckArea.WEBEX, "webex.no_host", CheckStatus.WARN)]
-        meetings = WebexMeetings(self._client, self._config.webex_base_url)
+        meetings = WebexMeetings(self._client, self._config.webex_base_url, self._clock)
         start = self._clock.now().replace(second=0, microsecond=0) + PROBE_AHEAD
         request = MeetingRequest(PROBE_TITLE, start, start + PROBE_LENGTH, group.timezone, host)
         try:

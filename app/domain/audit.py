@@ -11,6 +11,7 @@ An event sits at exactly one level: global (no organisation), an organisation (n
 a group. The audit log shows each admin the levels of their own scope and nothing above it.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -148,6 +149,44 @@ class AuditEvent:
         return self.level if self.level is not None else LEVEL_BY_OUTCOME[self.outcome]
 
 
+class Subject(StrEnum):
+    """A subject of the audit log: a fixed set of action prefixes, for the filter (ADR 0067)."""
+
+    UPDATES = "updates"
+    LOGIN = "login"
+    SETTINGS = "settings"
+    RIGHTS = "rights"
+    BOOKINGS = "bookings"
+    ORGANISATION = "organisation"
+    INTEGRATIONS = "integrations"
+
+
+SUBJECT_ACTIONS: Mapping[Subject, frozenset[str]] = {
+    Subject.UPDATES: frozenset({"system.update", "system.version"}),
+    Subject.LOGIN: frozenset({"admin.login", "admin.logout", "admin.session"}),
+    Subject.SETTINGS: frozenset({"settings."}),
+    Subject.RIGHTS: frozenset({"roles.", "role.", "rights.", "matrix.", "staff."}),
+    Subject.BOOKINGS: frozenset({"bookings.", "booking.", "job.", "queue.", "schedule."}),
+    Subject.ORGANISATION: frozenset(
+        {
+            "organisation.",
+            "group.",
+            "closure.",
+            "branding.",
+            "holidays.",
+            "embedding.",
+            "texts.",
+            "reminders.",
+        }
+    ),
+    Subject.INTEGRATIONS: frozenset(
+        {"integrations.", "webhook.", "webex.", "api_clients.", "token."}
+    ),
+}
+"""The action prefixes of each subject; an event belongs to a subject when its action starts
+with one of them. The updates page filters on ``Subject.UPDATES``."""
+
+
 @dataclass(frozen=True)
 class AuditFilter:
     """What an admin narrowed the audit log to; always applied inside their scope.
@@ -163,6 +202,8 @@ class AuditFilter:
         since: Only events at or after this time (UTC).
         until: Only events before this time (UTC).
         trace_id: Only the events of this request or job: the whole chain (ADR 0040).
+        actions: Only events whose action starts with one of these prefixes (a subject,
+            ADR 0067); empty for all.
         action: Only events with this action, e.g. the request events of a booking (ADR 0068).
     """
 
@@ -176,6 +217,7 @@ class AuditFilter:
     since: datetime | None = None
     until: datetime | None = None
     trace_id: str | None = None
+    actions: frozenset[str] = frozenset()
     action: str | None = None
 
     def matches(self, event: AuditEvent) -> bool:
@@ -191,6 +233,7 @@ class AuditFilter:
             and (self.since is None or event.at >= self.since)
             and (self.until is None or event.at < self.until)
             and (self.trace_id is None or event.trace_id == self.trace_id)
+            and (not self.actions or any(event.action.startswith(p) for p in self.actions))
             and (self.action is None or event.action == self.action)
         )
 

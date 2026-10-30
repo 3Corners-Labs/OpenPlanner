@@ -1,9 +1,9 @@
 # 0047. Admin information architecture: scope, object, tab, and one navigation register
 
-Status: proposed (2026-10-28), requested by the product owner. Builds on ADR 0014 and 0039
+Status: accepted (2026-10-28), requested by the product owner. Builds on ADR 0014 and 0039
 (authorisation matrix, adjustable roles), ADR 0016 (HTMX only where needed), ADR 0033
 (context-sensitive help and manual) and ADR 0042 (settings registry). Leaves the portal's logo
-open (see *Open points*).
+open (see *Open points*). Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
 
 ## Context
 
