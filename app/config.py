@@ -363,6 +363,10 @@ class Settings(BaseSettings):
     tls_check_interval_hours: int = Field(default=6, ge=1, le=168)
     tls_expiry_warning_days: int = Field(default=20, ge=1, le=60)
     tls_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # ADR 0070: the certificate source of the bundled proxy, managed in the portal.
+    tls_certificate_source: Literal["acme", "own"] = "acme"
+    tls_proxy_bundled: bool = False
+    tls_portal_certificate_dir: Path = Path("portal-certs")
     # Class C: the worker checks every group with a Webex host whose latest integration check
     # is older than this many hours, and records a system event on failure (ADR 0065 step 2).
     integration_check_interval_hours: int = Field(default=24, ge=1, le=168)

@@ -1,0 +1,6 @@
+{#- System status: version and updates, maintenance, the worker's heartbeat, diagnostic mode and the environment; the words carry the state, the colour only repeats it. -#}
+<ul class="widget-list" role="list">
+  {% for row in view.rows %}
+  <li class="widget-list__item"><span class="widget-list__label">{% if row.href %}<a href="{{ row.href }}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}</span><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %} widget-list__state">{{ row.value }}</span></li>
+  {% endfor %}
+</ul>

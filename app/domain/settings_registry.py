@@ -394,6 +394,36 @@ REGISTRY: tuple[SettingSpec, ...] = (
         in_config=False,
     ),
     S(
+        "tls_proxy_bundled",
+        K.BOOL,
+        False,
+        _B,
+        T.HOST,
+        "The bundled HTTPS proxy runs, so the portal manages the certificate source "
+        "(docker-compose.yml sets it from OPENPLANNER_TLS; ADR 0070).",
+    ),
+    S(
+        "tls_portal_certificate_dir",
+        K.PATH,
+        "portal-certs",
+        _B,
+        T.HOST,
+        "The volume shared with the proxy that holds the own certificate's private key, its "
+        "request and the served pair; never under data/ (ADR 0070).",
+    ),
+    S(
+        "tls_portal_poll_seconds",
+        K.INT,
+        10,
+        _B,
+        T.HOST,
+        "How often the proxy looks for a changed certificate from the portal (proxy.env, "
+        "ADR 0070).",
+        minimum=2,
+        maximum=300,
+        in_config=False,
+    ),
+    S(
         "worker_heartbeat_path",
         K.PATH,
         "data/worker.heartbeat",
@@ -574,6 +604,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "A lasting certificate finding is reported again at this interval (ADR 0064).",
         minimum=1,
         maximum=168,
+    ),
+    S(
+        "tls_certificate_source",
+        K.ENUM,
+        "acme",
+        _C,
+        T.OPERATIONS,
+        "Where the bundled proxy's certificate comes from: Let's Encrypt (acme) or the pair "
+        "uploaded in the portal (own); 'own' needs an upload (ADR 0070).",
+        choices=("acme", "own"),
     ),
     S(
         "integration_check_interval_hours",

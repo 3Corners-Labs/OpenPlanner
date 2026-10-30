@@ -20,6 +20,7 @@ SETTING_LABELS: dict[str, str] = {
     "tls_check_interval_hours": "settings.field.tls_check_interval_hours.label",
     "tls_expiry_warning_days": "settings.field.tls_expiry_warning_days.label",
     "tls_alert_repeat_hours": "settings.field.tls_alert_repeat_hours.label",
+    "tls_certificate_source": "settings.field.tls_certificate_source.label",
     "integration_check_interval_hours": "settings.field.integration_check_interval_hours.label",
     "job_overdue_minutes": "settings.field.job_overdue_minutes.label",
     "staff_last_seen_interval_seconds": "settings.field.staff_last_seen_interval_seconds.label",
