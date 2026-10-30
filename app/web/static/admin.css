@@ -802,6 +802,33 @@ fieldset.card {
   padding: 1rem 1.25rem;
 }
 
+.widget__views ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.widget__view {
+  display: inline-block;
+  min-width: 1.5rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius-s);
+  font-size: 0.85rem;
+  text-align: center;
+  text-decoration: none;
+}
+
+.widget__view--current {
+  border-color: var(--adm-accent);
+  background: var(--adm-accent-soft);
+  color: var(--adm-accent-strong);
+  font-weight: 700;
+}
+
 .widget__body > .group-card__meta {
   margin-bottom: 0.75rem;
 }
@@ -898,6 +925,141 @@ fieldset.card {
   padding-left: 0.5rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* --- Charts (ADR 0061 §5): colours from the --adm-* tokens, one class per series, no style
+   attributes in the SVG. The sizes are design values in SVG units, fixed on purpose. ----------- */
+.chart {
+  margin: 0;
+}
+
+.chart__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart--pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.chart--pie .chart__svg {
+  flex: none;
+  width: 8.75rem;
+}
+
+.chart--pie .chart-data {
+  flex-basis: 100%;
+}
+
+.chart-series-0 {
+  fill: var(--adm-accent);
+  background: var(--adm-accent);
+}
+
+.chart-series-1 {
+  fill: var(--adm-warning);
+  background: var(--adm-warning);
+}
+
+.chart-series-2 {
+  fill: var(--adm-success);
+  background: var(--adm-success);
+}
+
+.chart-series-3 {
+  fill: var(--adm-danger);
+  background: var(--adm-danger);
+}
+
+.chart-series-4 {
+  fill: var(--adm-accent-strong);
+  background: var(--adm-accent-strong);
+}
+
+.chart-series-5 {
+  fill: var(--adm-text-muted);
+  background: var(--adm-text-muted);
+}
+
+.chart__axis {
+  stroke: var(--adm-border-strong);
+  stroke-width: 1;
+}
+
+.chart__line {
+  fill: none;
+  stroke: var(--adm-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.chart__marker {
+  fill: var(--adm-accent);
+  stroke: var(--adm-surface);
+  stroke-width: 1.5;
+}
+
+.chart__slice {
+  stroke: var(--adm-surface);
+  stroke-width: 1.5;
+}
+
+.chart__value,
+.chart__total {
+  fill: var(--adm-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.chart__total {
+  font-size: 16px;
+}
+
+.chart__label {
+  fill: var(--adm-text-muted);
+  font-size: 10px;
+}
+
+.chart-legend {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  min-width: 8rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.chart-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.chart-swatch {
+  flex: none;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+}
+
+.chart-data {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.chart-data summary {
+  cursor: pointer;
+}
+
+.chart-data[open] summary {
+  margin-bottom: 0.5rem;
 }
 
 /* ADR 0062 §6: the column count is at most 2 on a tablet and 1 on a phone. Fixed on purpose:
