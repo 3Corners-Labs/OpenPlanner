@@ -1,6 +1,6 @@
 # 0009. Notification channels, reminder rules and message templates
 
-Status: accepted (2026-10-23)
+Status: accepted (2026-10-23) Partly built, checked on 2026-10-30; see `docs/adr-status.md` for what is built.
 
 ## Context
 

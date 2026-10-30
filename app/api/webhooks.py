@@ -84,7 +84,12 @@ async def webex(request: Request) -> Response:
         outcome = await _service(request).record_meeting_event(
             event.target_id, event.kind, clock.now(), event_key=event.event_key
         )
-        log.info("webhook.webex", kind=event.kind.value, outcome=outcome.value)
+        log.info(
+            "webhook.webex",
+            kind=event.kind.value,
+            outcome=outcome.value,
+            meeting_id=event.target_id.split("_I_", 1)[0],
+        )
     return Response(status_code=204)
 
 
