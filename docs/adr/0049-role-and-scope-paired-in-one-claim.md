@@ -347,10 +347,10 @@ setting for any of them could only make it weaker.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | Legacy safety net (point 14, `ambiguous_claims`), test A3 | this PR | in PR |
-| 1 | Domain: `Grant`, `Principal` with grants, `parse_entitlements`, `decide`/`scope_for` per grant, `Scope.groups` as pairs, resolution per request (`LoginService`); tests A1, A2, A4–A8, A11, A13 | this PR | in PR |
-| 2 | `idp_key` on organisations and groups (migration 0076) with the forms, `OIDC_CLAIM_MODE` with `shadow`, refused values on the staff record and page, the staff filter, *My rights*, audit events; tests A9, A10, A12, A14 | this PR | in PR |
-| 3 | Page *Koppeling identiteitsprovider* with the download, `oidc-check --claims`, runbook, manual, Keycloak realm users | this PR | in PR |
+| 0 | Legacy safety net (point 14, `ambiguous_claims`), test A3 | #179 | in PR |
+| 1 | Domain: `Grant`, `Principal` with grants, `parse_entitlements`, `decide`/`scope_for` per grant, `Scope.groups` as pairs, resolution per request (`LoginService`); tests A1, A2, A4–A8, A11, A13 | #179 | in PR |
+| 2 | `idp_key` on organisations and groups (migration 0076) with the forms, `OIDC_CLAIM_MODE` with `shadow`, refused values on the staff record and page, the staff filter, *My rights*, audit events; tests A9, A10, A12, A14 | #179 | in PR |
+| 3 | Page *Koppeling identiteitsprovider* with the download, `oidc-check --claims`, runbook, manual, Keycloak realm users | #179 | in PR |
 | 4 | Count of `auth.entitlement_mismatch` on the system status screen; memberships by id instead of slug (point 12); the `deleted` reason code (point 5); `entitlements` as the default and removal of `legacy`/`shadow` (point 13, E4) | | follow-up |
 
 Deviations recorded while building: the role segment of the grammar (point 2) also allows a

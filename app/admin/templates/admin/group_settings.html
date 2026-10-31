@@ -37,12 +37,7 @@
   {% if idp.can_manage %}
   <form method="post" action="/admin/groups/{{ summary.group.slug }}/settings/idp-key" novalidate>
     <div class="form-grid">
-      <div class="field{% if idp.error %} field--error{% endif %}">
-        <label for="idp_key">{{ _("admin.idp_mapping.idp_key") }}</label>
-        <input id="idp_key" name="idp_key" type="text" value="{{ idp.value }}" required maxlength="63" pattern="{{ idp.pattern }}" autocapitalize="none" spellcheck="false" aria-describedby="idp_key-hint{% if idp.error %} idp_key-error{% endif %}"{% if idp.error %} aria-invalid="true"{% endif %}>
-        <p class="hint" id="idp_key-hint">{{ _("admin.group.idp_key.hint") }}{% if idp.holders %} {{ _("admin.idp_mapping.holders_warning", count=idp.holders) }}{% endif %}</p>
-        {% if idp.error %}<p class="field__error" id="idp_key-error">{{ idp.error }}</p>{% endif %}
-      </div>
+      {{ field(idp.field) }}
     </div>
     <div class="form-actions">
       <button type="submit" class="button">{{ _("admin.save") }}</button>

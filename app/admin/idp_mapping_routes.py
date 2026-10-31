@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission
-from app.admin.forms import FormData
+from app.admin.forms import Field, FormData
 from app.admin.pages import Locale, admin_moment, page
 from app.domain.authorization import Permission, Role, Target, decide
 from app.domain.entitlements import IDP_KEY_PATTERN, ClaimMode, RefusalReason
@@ -114,15 +114,14 @@ class GroupIdpView:
         value: The current or submitted value.
         can_manage: Whether the viewer may change it (``idp_mapping.manage``).
         holders: How many people last held a grant on the group (lose access on a change).
-        pattern: The input's ``pattern`` attribute (the grammar of ADR 0049 point 2).
-        error: The message for the field, if the form was refused.
+        field: The input, for the field macro (with its manual section attached by the
+            group routes); ``None`` when the viewer may not change the value.
     """
 
     value: str
     can_manage: bool
     holders: int
-    pattern: str
-    error: str | None = None
+    field: Field | None = None
 
 
 def _role_label(key: str, overview: MappingOverview, locale: RequestLocale) -> str:
@@ -214,7 +213,7 @@ async def export_idp_mapping(request: Request, locale: Locale, context: View) ->
 
 
 async def group_idp_view(
-    request: Request, context: AdminContext, form: FormData | None = None
+    request: Request, locale: RequestLocale, context: AdminContext, form: FormData | None = None
 ) -> GroupIdpView:
     """Build the IdP value form of the group's settings page (ADR 0049 point 4)."""
     summary = context.group
@@ -225,11 +224,27 @@ async def group_idp_view(
         holders = await idp_mapping_service(request).group_holders(
             context.principal, summary.group.slug
         )
-    value = form.values.get("idp_key", summary.group.idp_key) if form else summary.group.idp_key
-    return GroupIdpView(
-        value=str(value),
-        can_manage=can_manage,
-        holders=holders,
-        pattern=IDP_KEY_PATTERN,
-        error=form.error_for("idp_key") if form else None,
+    value = str(
+        form.values.get("idp_key", summary.group.idp_key) if form else summary.group.idp_key
     )
+    if not can_manage:
+        return GroupIdpView(value, False, 0)
+    _ = locale.gettext
+    hint = _("admin.group.idp_key.hint")
+    if holders:
+        hint = f"{hint} {_('admin.idp_mapping.holders_warning', count=holders)}"
+    field = Field(
+        "idp_key",
+        _("admin.idp_mapping.idp_key"),
+        value=value,
+        hint=hint,
+        error=form.error_for("idp_key") if form else None,
+        required=True,
+        attributes={
+            "autocapitalize": "none",
+            "spellcheck": "false",
+            "pattern": IDP_KEY_PATTERN,
+            "maxlength": "63",
+        },
+    )
+    return GroupIdpView(value, True, holders, field)

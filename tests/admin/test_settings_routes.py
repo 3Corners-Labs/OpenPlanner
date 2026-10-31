@@ -252,6 +252,8 @@ LOGIN_FORM = {
     "oidc_role_group_admin": "op-group",
     "oidc_role_auditor": "op-audit",
     "oidc_role_agent": "op-agent",
+    "oidc_entitlement_claim": "op_entitlements",
+    "oidc_entitlement_prefix": "op-acc",
 }
 
 

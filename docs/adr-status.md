@@ -71,7 +71,7 @@ package; when the two disagree, the code wins.
 | 0046 | Staff directory, SCIM | PARTIAL | step 1 #61; migration 0026 | Step 2 (suspend, end sessions, erase, retention, CSV), step 3 (SCIM) |
 | 0047 | Admin information architecture | PARTIAL | steps 1–2 (#62, #80): `web/navigation.py`, `docs/admin-map.md` | Steps 3–6: organisation page with tabs, six group tabs, readiness checklist, `return` keys |
 | 0048 | Live update progress | BUILT | #63; migration 0027 | – |
-| 0049 | Role and scope in one claim | PARTIAL | steps 0–3 (this PR); `domain/entitlements.py`, `domain/login_service.py`, `domain/idp_mapping.py`, migration 0076, `admin/idp_mapping_routes.py`, `OIDC_CLAIM_MODE` | Step 4: mismatch count on System status, memberships by id, `entitlements` as default and removal of `legacy`/`shadow` (E4) |
+| 0049 | Role and scope in one claim | PARTIAL | steps 0–3 #179; `domain/entitlements.py`, `domain/login_service.py`, `domain/idp_mapping.py`, migration 0076, `admin/idp_mapping_routes.py`, `OIDC_CLAIM_MODE` | Step 4: mismatch count on System status, memberships by id, `entitlements` as default and removal of `legacy`/`shadow` (E4) |
 | 0050 | Host installer | BUILT | #82; `scripts/install.sh`; extended by #139, #144 | – |
 | 0051 | Dependency currency | BUILT (repository side) | #94; `renovate.json`, `make pins`, `freshness.yml` | Unsure: the Renovate app installed, the required check on `main` (GitHub settings) |
 | 0052 | Releases and versioning | BUILT | #96; `release_plan.py`; v0.3.0 (#113) | – |
@@ -97,7 +97,7 @@ package; when the two disagree, the code wins.
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
 | 0073 | Email deliverability: sender domain check, system mail headers | PARTIAL | step 1 #166; no migration | Step 2 (a periodic check in the worker) is decided after step 1 is in use (ADR decision 6) |
 | 0074 | Organisation text overrides | BUILT | #168; migration 0074; `domain/text_overrides.py`, `adapters/db/text_overrides.py`, `admin/organisation_text_routes.py` | Step 2: the global (superuser) layer, `.po` export and import, revision counter (follow-up, listed in the ADR) |
-| 0078 | Subjects and routing attributes next to the group | NOT BUILT | ADR only; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
+| 0078 | Subjects and routing attributes next to the group | NOT BUILT | #179; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 
