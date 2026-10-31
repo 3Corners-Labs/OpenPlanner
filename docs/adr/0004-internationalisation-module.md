@@ -110,7 +110,7 @@ without a restart.
 |---|---|---|---|
 | 1 | Core, `nl`/`en` catalogues, negotiation, switcher (§1–§6) | #1, #19, #85 | built |
 | 2 | Group texts (`group_texts`, §7 last bullet) | #29 | built |
-| 3 | Organisation overrides: store, cached source, editor (§4 step 1, §7 org_admin, §9) | #168 | in PR |
+| 3 | Organisation overrides: store, cached source, editor (§4 step 1, §7 org_admin, §9) | #168 | merged |
 | 4 | Global (superuser) overrides, enable locales, `.po` export and import, revision counter (§4 step 2, §7) | | follow-up |
 
 ## Consequences

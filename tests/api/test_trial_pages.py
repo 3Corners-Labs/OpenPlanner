@@ -12,6 +12,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.ports import IntegrationError
+from app.domain.scheduling import JoinClient
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
@@ -97,7 +98,7 @@ async def test_the_way_in_leads_to_the_meeting_only_while_it_is_open(site: Site)
     after = await site.client.get(f"/b/{site.token}/test/go")
 
     assert during.status_code == 303
-    assert during.headers["location"] == "https://site.webex.com/m/1"
+    assert during.headers["location"] == "https://site.webex.com/m/1?launchApp=true"
     assert after.headers["location"] == f"/b/{site.token}/test"
 
 
@@ -195,3 +196,17 @@ async def test_a_booking_that_awaits_confirmation_has_no_trial_call(site: Site) 
     assert "Proefgesprek openen" not in page.text
     assert opened.status_code == 303
     assert site.video.created == []
+
+
+async def test_the_trial_page_follows_the_groups_join_client(
+    site: Site, demo_settings: Settings
+) -> None:
+    browser = (await site.client.get(f"/b/{site.token}/test")).text
+    await _configure(demo_settings.database_url, join_client=JoinClient.CHOICE)
+    choice = (await site.client.get(f"/b/{site.token}/test")).text
+    await site.open()
+    go = await site.client.get(f"/b/{site.token}/test/go")
+
+    assert "Deelnemen via deze browser" not in browser
+    assert "Deelnemen via deze browser" in choice
+    assert go.headers["location"] == "https://site.webex.com/m/1"

@@ -130,6 +130,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "offer": "admin.form.error.choice",
     "embedding_enabled": "admin.form.error.choice",
     "trial_call_enabled": "admin.form.error.choice",
+    "join_client": "admin.form.error.choice",
     "trial_call_minutes": "admin.form.error.trial_call_minutes",
     "trial_calls_per_booking": "admin.form.error.trial_calls_per_booking",
     "not_picked_up_minutes": "admin.form.error.not_picked_up_minutes",

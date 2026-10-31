@@ -16,6 +16,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 from starlette.responses import HTMLResponse
 
 from app.web.locale import LANG_PARAM, RequestLocale
+from app.web.static_assets import ASSETS
 
 KEPT_QUERY_PARAMS = ("start", "month", "day", "days", "from", "until")
 """Query parameters the language switcher carries over; anything else is dropped so that
@@ -27,9 +28,6 @@ address bar, a personal-data value, ADR 0063 §3) is dropped instead of echoed i
 
 SHARED_TEMPLATE_DIR = Path(__file__).parent / "templates"
 """Layout and partials shared by all entry points."""
-
-STATIC_DIR = Path(__file__).parent / "static"
-"""Stylesheets and images, served under ``/static``."""
 
 
 class FragmentResponse(HTMLResponse):
@@ -80,15 +78,18 @@ def create_environment(template_dirs: Sequence[Path]) -> Environment:
     """Return the one Jinja2 configuration used for pages and emails.
 
     HTML templates are autoescaped; ``.txt`` templates (plain-text email parts) are not.
-    Undefined variables raise instead of rendering empty.
+    Undefined variables raise instead of rendering empty. ``static_url('admin.css')`` is how
+    a template links a file under ``/static``: the URL carries the file's version.
     """
-    return Environment(
+    environment = Environment(
         loader=FileSystemLoader(list(template_dirs)),
         autoescape=select_autoescape(["html"]),
         undefined=StrictUndefined,
         trim_blocks=True,
         lstrip_blocks=True,
     )
+    environment.globals["static_url"] = ASSETS.url
+    return environment
 
 
 def create_templates(page_dirs: Sequence[Path]) -> Jinja2Templates:

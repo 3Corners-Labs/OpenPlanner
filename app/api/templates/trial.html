@@ -19,6 +19,7 @@
   <li>{{ _("trial.check.browser") }}</li>
 </ul>
 <p>{{ _("trial.alone") }}</p>
+<p>{{ _("trial.browser_choice" if group.join_client.value == "choice" else "trial.browser") }}</p>
 {% endif %}
 {% if state == "available" %}
 <form method="post" action="/b/{{ token }}/test">
