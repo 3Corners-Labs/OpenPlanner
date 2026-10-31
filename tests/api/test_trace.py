@@ -1,8 +1,14 @@
+import io
+import json
+import logging
+
 import httpx
+import structlog
 from fastapi import APIRouter, Depends, FastAPI
 
 from app.api.trace import TraceMiddleware, bind_group_from_path
 from app.domain.event_context import TRACE_ID, current, current_trace_id
+from app.logging import configure_logging
 
 
 def _app() -> FastAPI:
@@ -43,3 +49,29 @@ async def test_a_malformed_slug_is_not_bound() -> None:
         body = await _get(client, "/g/Not%20A%20Slug")
 
     assert body["group"] is None
+
+
+# ADR 0085 point 9: the ``http.request`` trace point carries the route template, never the path.
+
+
+async def test_a_request_leaves_one_trace_line_with_its_route_template() -> None:
+    out = io.StringIO()
+    configure_logging("TRACE", stream=out)
+    try:
+        transport = httpx.ASGITransport(app=_app())
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.get("/g/burgerzaken?token=secret-token")
+            await client.get("/nowhere")
+    finally:
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    lines = [json.loads(line) for line in out.getvalue().splitlines()]
+    traced = [line for line in lines if line["message"] == "http.request"]
+    assert [(t["method"], t["route"], t["status"]) for t in traced] == [
+        ("GET", "/g/{slug}", 200),
+        ("GET", "", 404),
+    ]
+    assert all(isinstance(t["ms"], int) and TRACE_ID.fullmatch(t["trace.id"]) for t in traced)
+    assert all("burgerzaken" not in str(t["route"]) for t in traced)  # the group tag may
+    assert "secret-token" not in out.getvalue()

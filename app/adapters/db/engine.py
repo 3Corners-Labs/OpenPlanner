@@ -5,16 +5,20 @@ transaction handling is switched off so that we emit ``BEGIN`` ourselves: a plai
 for reads and ``BEGIN IMMEDIATE`` for booking transactions, selected per connection with the
 ``sqlite_begin`` execution option (see ``app.adapters.db.uow``). A new database is created in
 incremental auto-vacuum mode, so pages freed by pruning can go back to the disk (ADR 0040,
-``app.adapters.db.maintenance``).
+``app.adapters.db.maintenance``). A statement slower than ``set_slow_query_ms`` leaves a
+``sql.slow`` trace line with its kind and first table, never its text (ADR 0085 point 9).
 """
 
 from functools import partial
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Literal
 
 import structlog
 from sqlalchemy import Connection, event, make_url, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+
+from app.logging import tracer
 
 SQLITE_BUSY_TIMEOUT_MS = 5000
 """How long a SQLite writer waits for a lock before failing (milliseconds)."""
@@ -25,6 +29,56 @@ BEGIN_MODE_OPTION = "sqlite_begin"
 BeginMode = Literal["DEFERRED", "IMMEDIATE"]
 
 log = structlog.get_logger()
+
+_SLOW_QUERY_MS: list[int] = [200]
+"""Threshold of ``sql.slow`` (``SQL_SLOW_MS``, class C); a list so it can change live."""
+
+_STARTED = "openplanner_started"
+"""Key under which the start of a statement is kept on its execution context."""
+
+
+def set_slow_query_ms(milliseconds: int) -> None:
+    """Change the ``sql.slow`` threshold live (settings refresh of web and worker)."""
+    _SLOW_QUERY_MS[0] = milliseconds
+
+
+def _before_execute(
+    _conn: Connection, _cursor: Any, _statement: str, _params: Any, context: Any, _many: bool
+) -> None:
+    """Note when the statement starts."""
+    if context is not None:
+        setattr(context, _STARTED, perf_counter())
+
+
+def _after_execute(
+    _conn: Connection, _cursor: Any, _statement: str, _params: Any, context: Any, _many: bool
+) -> None:
+    """Trace the statement's kind and table when it took longer than the threshold."""
+    started = getattr(context, _STARTED, None) if context is not None else None
+    if started is None:
+        return
+    ms = int((perf_counter() - started) * 1000)
+    if ms < _SLOW_QUERY_MS[0]:
+        return
+    compiled = getattr(context, "compiled", None)
+    statement = getattr(compiled, "statement", None)
+    tracer.trace(
+        "sql.slow",
+        statement=type(statement).__name__ if statement is not None else "raw",
+        table=_first_table(statement),
+        ms=ms,
+    )
+
+
+def _first_table(statement: Any) -> str:
+    """The name of the first table a compiled statement touches, or an empty string."""
+    table = getattr(statement, "table", None)
+    if table is None:
+        froms = getattr(statement, "get_final_froms", None)
+        tables = froms() if callable(froms) else []
+        table = tables[0] if tables else None
+    name = getattr(table, "name", None)
+    return str(name) if name is not None else ""
 
 
 def _sqlite_connect(busy_timeout_ms: int, dbapi_connection: Any, _record: Any) -> None:
@@ -66,6 +120,8 @@ def create_engine(database_url: str, busy_timeout_ms: int = SQLITE_BUSY_TIMEOUT_
         Path(url.database).parent.mkdir(parents=True, exist_ok=True)
 
     engine = create_async_engine(url, pool_pre_ping=True)
+    event.listen(engine.sync_engine, "before_cursor_execute", _before_execute)
+    event.listen(engine.sync_engine, "after_cursor_execute", _after_execute)
     if engine.dialect.name == "sqlite":
         event.listen(engine.sync_engine, "connect", partial(_sqlite_connect, busy_timeout_ms))
         event.listen(engine.sync_engine, "begin", _sqlite_begin)

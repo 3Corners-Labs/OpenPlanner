@@ -127,8 +127,10 @@ items again within about ten seconds. Set the client id, client secret and refre
   write-only: the screen only says whether one is set. Leave the field empty to keep the
   current one; **Use the default** removes it. They are stored encrypted and need the server's
   `SETTINGS_ENCRYPTION_KEY`.
-- The **log level** always falls back to the default by itself, after at most 24 hours. Enter
-  after how many hours. Personal data stays masked in the log at every level.
+- The **log level** always falls back to the default by itself, after at most 24 hours; the
+  level TRACE after at most the hours of *TRACE_LEVEL_MAX_HOURS* (4 by default). Enter after
+  how many hours. Personal data stays masked in the log at every level; TRACE lines carry only
+  the fixed fields of `docs/logging.md`.
 
 You need a recent login to change a setting. Every change is recorded in the audit log with
 the old and the new value; a refused change is recorded too.

@@ -96,7 +96,6 @@ def test_parse_turns_text_into_the_registry_kind(key: str, raw: str, value: obje
         ("admin_session_hours", ""),  # not optional
         ("rate_limit_bookings", "31/hour"),
         ("rate_limit_bookings", "10/minute"),  # another period
-        ("log_level", "TRACE"),
         ("database_max_mb", "99"),
     ],
 )
@@ -594,3 +593,34 @@ async def test_production_refuses_the_rc_channel_and_auto_apply(
     async with uow.read() as tx:
         stored = await tx.platform_settings()
     assert (stored["update_channel"], stored["update_auto_apply"]) == ("rc", True)
+
+
+# ADR 0085 point 8: TRACE falls back sooner than the other levels.
+
+
+async def test_trace_expires_within_trace_level_max_hours(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    service = _service(uow, clock)
+
+    with pytest.raises(DomainError) as caught:
+        await service.change(SUPER, "log_level", "TRACE", hours=5)  # the default cap is 4
+    assert caught.value.code is ErrorCode.SETTING_EXPIRY
+
+    await service.change(SUPER, "log_level", "TRACE", hours=4)
+    assert uow.state.platform_expiries == {"log_level": clock.now() + timedelta(hours=4)}
+
+
+async def test_the_trace_cap_follows_the_setting_from_the_portal_or_the_environment(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    await _service(uow, clock).change(SUPER, "trace_level_max_hours", "2")
+    with pytest.raises(DomainError):
+        await _service(uow, clock).change(SUPER, "log_level", "TRACE", hours=3)
+
+    locked = _service(uow, clock, environment={"trace_level_max_hours": 1})
+    with pytest.raises(DomainError):
+        await locked.change(SUPER, "log_level", "TRACE", hours=2)
+    await locked.change(SUPER, "log_level", "TRACE", hours=1)
+    # DEBUG keeps the general cap of 24 hours.
+    await locked.change(SUPER, "log_level", "DEBUG", hours=24)
