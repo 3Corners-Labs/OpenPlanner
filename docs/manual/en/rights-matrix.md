@@ -37,12 +37,12 @@ Each permission applies at one level:
 
 - **Superuser only**: this permission is fixed. It affects more than one organisation or
   concerns secrets, such as passwords of integrations. No other role can get it.
-- **Personal data**: with this permission you see citizens' data, such as name and email
+- **Personal data**: with this permission you see participants' data, such as name and email
   address. The Compliance and privacy role never gets it.
 
-## Citizens and integrations
+## Participants and integrations
 
-Below the matrix is what citizens can do without logging in: with the link in their
+Below the matrix is what participants can do without logging in: with the link in their
 confirmation email they can view their booking, and move or cancel it until the change
 deadline.
 Below that are the rights of connected systems, such as a contact-center bot. The superuser

@@ -1,6 +1,6 @@
 # Alternative contact options
 
-When citizens cannot book an appointment, they want to know how else to reach the
+When participants cannot book an appointment, they want to know how else to reach the
 organisation. On this screen you record that once for the whole organisation. The block is
 shown on the page of an emergency closure and on the maintenance page (ADR 0037 and 0038). You
 open it through **Organisations → organisation → Contact**. An
@@ -15,18 +15,18 @@ A team with its own desk or number can get a block of its own (screen **A team's
 options**). That block then applies instead of this one. A closure takes a copy of the block
 that applies when it starts; later changes do not alter a running closure.
 
-## What citizens see
+## What participants see
 
 A heading (by default "Other ways to reach us") followed by the contact options in your order.
 Phone numbers and email addresses are links that call or mail straight away on a phone. The
 preview at the top of the screen shows the block as it is saved now.
 
-Citizens see the block in three places, always as the copy that belongs to the closure:
+Participants see the block in three places, always as the copy that belongs to the closure:
 
 - **During a closure** the team's page shows no calendar but the closure page: the closure's
   heading, the period, the text and this block below it.
 - **Before a planned closure** the calendar stays. The notice above it links to the closure
-  page, so citizens already see how to reach you during the closure.
+  page, so participants already see how to reach you during the closure.
 - **For an appointment on hold** the block is on that appointment's page, above the buttons to
   choose a new time or cancel.
 

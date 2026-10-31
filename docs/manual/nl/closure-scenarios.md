@@ -27,7 +27,7 @@ voorbeeld bovenaan laat zien hoe de sluitingspagina er dan uitziet.
 ### Naam
 
 Hoe beheerders het scenario herkennen, bijvoorbeeld "Storing", "Staking" of "Gebouw dicht".
-Hoogstens 80 tekens. Burgers zien deze naam nooit.
+Hoogstens 80 tekens. Deelnemers zien deze naam nooit.
 
 ### Contactalternatieven
 
@@ -51,7 +51,7 @@ Pas de tekst zo nodig aan, vul het begin en het einde in en sluit het team.
 
 Op het moment van sluiten neemt de sluiting een **kopie** van het scenario: de tekst uit het
 formulier, de contactalternatieven en de afbeelding. Wijzigt of verwijdert u het scenario later,
-dan blijft de lopende sluiting tonen wat burgers per e-mail kregen.
+dan blijft de lopende sluiting tonen wat deelnemers per e-mail kregen.
 
 Sluit u de hele organisatie, dan kunt u alleen een scenario van de organisatie kiezen. Elk team
 krijgt zijn eigen kopie en kan die daarna apart aanpassen.

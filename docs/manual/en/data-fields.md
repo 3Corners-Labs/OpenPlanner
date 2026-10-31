@@ -1,7 +1,7 @@
 # Data fields and personal data
 
 The card **Data fields** on the **Advanced settings** screen lists which fields of an
-appointment are personal data of the citizen, and how sensitive each one is. The superuser
+appointment are personal data of the participant, and how sensitive each one is. The superuser
 and the Compliance and privacy role can read it. Nobody can change it: the list is fixed in
 the software, so no installation can switch this protection off.
 
@@ -10,9 +10,9 @@ the software, so no installation can switch this protection off.
 Personal data is stored only on the appointment (the booking), never on a team, an
 organisation, a message text or a log line.
 
-- **Direct** fields identify the citizen on their own: first name, last name, email address
+- **Direct** fields identify the participant on their own: first name, last name, email address
   and phone number.
-- **Sensitive** fields hold what the citizen told us, or give access to the conversation: a
+- **Sensitive** fields hold what the participant told us, or give access to the conversation: a
   note, the answers to the team's own questions on the booking form, and the links to join the
   video call and the trial call (a link for the call itself, one for the host, and one for the
   trial call before it).
@@ -24,7 +24,7 @@ The answers to a team's own questions count as personal data unless the question
 
 - **The appointment page** of a team's agenda (behind *Details*) shows the answers to the
   team's questions, for roles that may view appointments.
-- **The queue** shows the first name of the citizen whose turn it is, and the picked-up
+- **The queue** shows the first name of the participant whose turn it is, and the picked-up
   appointment shows the link to join the call, for agents who work the queue.
 - **The agenda** and the planner's pages show the first name only.
 

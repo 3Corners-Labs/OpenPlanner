@@ -1,6 +1,6 @@
 # Group settings
 
-A group is one team that holds video calls with citizens, with its own booking page at
+A group is one team that holds video calls with participants, with its own booking page at
 `/g/<web address>`. On this screen you set what those appointments look like and where they
 end up. Open it through **Overview → group → Settings**. Only an organisation admin or a
 superuser can change settings; before saving, the portal may ask you to log in again.
@@ -23,8 +23,8 @@ new group.
 <!-- field: name -->
 ### Name
 
-The group's name as citizens and staff see it: on the booking page, in confirmations and
-reminders, and in the contact-centre task. Choose a name a citizen recognises, for example
+The group's name as participants and staff see it: on the booking page, in confirmations and
+reminders, and in the contact-centre task. Choose a name a participant recognises, for example
 "Permits" rather than an internal team code.
 
 <!-- field: timezone -->
@@ -37,7 +37,7 @@ are handled automatically. For the Netherlands that is `Europe/Amsterdam`.
 ### Length of a call
 
 How long one appointment lasts, in minutes: a multiple of 5, from 5 to 480. The group's blocks
-are divided into pieces of this length; each piece is a slot a citizen can choose.
+are divided into pieces of this length; each piece is a slot a participant can choose.
 
 While appointments lie ahead, you cannot change the length, because those appointments would
 no longer fit a slot. Wait until they are over, or move them first.
@@ -45,7 +45,7 @@ no longer fit a slot. Wait until they are over, or move them first.
 <!-- field: min_notice_minutes -->
 ### Minimum notice
 
-How long before the start a slot closes for new bookings. With 60, a citizen cannot book
+How long before the start a slot closes for new bookings. With 60, a participant cannot book
 10:30 at 10:00, but can still book 11:00.
 
 This value must be at least **Send to the queue**. An appointment has to be booked before it
@@ -54,7 +54,7 @@ goes to the contact centre.
 <!-- field: horizon_days -->
 ### Book ahead
 
-How many days ahead citizens can choose, from 1 to 366. Keep this in line with how far ahead
+How many days ahead participants can choose, from 1 to 366. Keep this in line with how far ahead
 the team's roster is fixed: a slot that can be booked must also be staffed.
 
 <!-- field: max_bookings_per_email -->
@@ -64,7 +64,7 @@ How many future appointments one email address may have with this team at the sa
 1 to 10. Default 3. People often book for someone else, such as a parent for a child or a carer
 for a relative, so do not set the number too low. A cancelled or past appointment does not
 count. The same email address twice at the same time is never possible: that is almost always
-a double click. A refused citizen gets a general message; the page does not say that an
+a double click. A refused participant gets a general message; the page does not say that an
 appointment already exists.
 
 <!-- field: dispatch_kind -->
@@ -74,7 +74,7 @@ appointment already exists.
   becomes a task in the team's contact-center queue. The first free agent picks it up. This is
   the default.
 - **OpenPlanner's own queue**: for teams without a contact center. Staff sign in to OpenPlanner
-  and pick up a waiting appointment. The citizen always gets the first free agent. No task goes
+  and pick up a waiting appointment. The participant always gets the first free agent. No task goes
   to the contact center, even when the fields below are filled in.
 
 A change applies to appointments not yet dispatched. An appointment already in the contact
@@ -82,12 +82,12 @@ center as a task stays there. When the contact center fails (Webex Connect or We
 Center outage), you can switch the group to the own queue for the time being.
 
 <!-- field: participant_change_lead_minutes -->
-### Citizen can move until (minutes ahead)
+### Participant can move until (minutes ahead)
 
-Until how many minutes before the start the citizen can move the appointment, 60 by default.
+Until how many minutes before the start the participant can move the appointment, 60 by default.
 The number is never smaller than **Send to the queue** and at most 1440 (one day). Cancelling
 is always possible until the call begins; that is fixed and not a setting. It applies to the
-contact center and the own queue. A citizen can only cancel an appointment that was booked
+contact center and the own queue. A participant can only cancel an appointment that was booked
 later than this number.
 
 <!-- field: queue_visible_from_minutes -->
@@ -119,18 +119,18 @@ the address carefully; it is also shown on the group's overview page and in the 
 ### Send to the queue
 
 How many minutes before the start the appointment goes to Webex Contact Center as a task, from
-0 to 60. The citizen can still cancel after that through the link in the confirmation; moving is
-possible until **Citizen can move until**.
+0 to 60. The participant can still cancel after that through the link in the confirmation; moving is
+possible until **Participant can move until**.
 
-Choose enough time for an agent to pick up the task before the citizen waits in the video call,
+Choose enough time for an agent to pick up the task before the participant waits in the video call,
 for example 5 minutes.
 
 <!-- field: planner_change_min_lead_minutes -->
 ### Changes by a planner
 
 Up to how many minutes before the start a planner may move or cancel a booking from the
-[agenda](group-agenda.md), 60 by default. After that a message would not reach the citizen in
-time: call the citizen instead. The number is never less than **Send to the queue** and at most
+[agenda](group-agenda.md), 60 by default. After that a message would not reach the participant in
+time: call the participant instead. The number is never less than **Send to the queue** and at most
 1440 (one day).
 
 <!-- field: phone_mode -->
@@ -141,8 +141,8 @@ Whether the booking form asks for a phone number:
 | Choice | Meaning |
 |---|---|
 | Not asked | The form has no phone field. |
-| Optional | The citizen may give a number, for example for a text-message reminder. |
-| Required | The citizen cannot book without a number. |
+| Optional | The participant may give a number, for example for a text-message reminder. |
+| Required | The participant cannot book without a number. |
 
 Only ask for a number if the team actually uses it. Like the name and email address, the
 number is erased 24 hours after the appointment.
@@ -169,7 +169,7 @@ again. The result is shown under **Check integration** after saving. From then o
 checks every group with a host by itself, once a day by default. When something is wrong (no
 licence, wrong account, missing rights), the group's audit log shows a system entry
 *Integration checked* with Webex's answer under it; it repeats until it is fixed and reports
-once that all is well again. So you hear about it before a citizen gets an appointment without
+once that all is well again. So you hear about it before a participant gets an appointment without
 a video call.
 
 The check also looks at the **background jobs (worker)**: the part of OpenPlanner that really
@@ -199,12 +199,12 @@ portal sends the group's web address. Only fill in something else if the flow ex
 value.
 
 <!-- field: trial_call_enabled -->
-### Trial call for the citizen
+### Trial call for the participant
 
-With **Yes** the citizen can try, before the appointment and in a real Webex meeting, whether
+With **Yes** the participant can try, before the appointment and in a real Webex meeting, whether
 camera, microphone, speakers and browser work. It is not a separate test on our page: it is the
 same Webex site and the same Webex environment as the call itself, so a problem shows up now.
-The citizen is alone in it; nobody from the team joins and no task is created. The link is in
+The participant is alone in it; nobody from the team joins and no task is created. The link is in
 the confirmation, the reminder, on the appointment page and on the page for the call. It only
 works with a **Webex host**. The trial call uses the host's Webex site, which must allow
 participants to enter before the host. **Check the integration** shows whether it does.
@@ -213,7 +213,7 @@ participants to enter before the host. **Check the integration** shows whether i
 ### Trial call stays open (minutes)
 
 How long one trial call stays open, from 10 to 60 minutes. Default 30. After that the Webex
-meeting is deleted; the citizen can open a new trial call.
+meeting is deleted; the participant can open a new trial call.
 
 <!-- field: trial_calls_per_booking -->
 ### Trial calls per appointment
@@ -237,7 +237,7 @@ app and browser anyway, set it to **Webex lets the participant choose**.
 <!-- field: offer -->
 ### Offer per block
 
-For every staffing block you choose what citizens can do in it: **Appointments** (the block's
+For every staffing block you choose what participants can do in it: **Appointments** (the block's
 slots, the default), **Direct call** (start a video call right away, without an appointment;
 the block then offers no slots) or **Appointments and direct call**. A staffing exception for
 one day has the same choice.
@@ -259,7 +259,7 @@ towards the maximum below.
 ### Maximum number of direct calls at once
 
 How many direct calls may be open at once: waiting, or in a call with an agent. Usually that is
-the number of agents who take direct calls. When the maximum is reached, the citizen sees that
+the number of agents who take direct calls. When the maximum is reached, the participant sees that
 all agents are busy, with the choice to try again later or to book an appointment.
 
 Empty means no limit: Webex Contact Center then distributes every call. Scheduled appointments

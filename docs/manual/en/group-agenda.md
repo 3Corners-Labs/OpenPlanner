@@ -53,7 +53,7 @@ A booking's detail page (**Details**) holds what you need when a video meeting o
 center task goes wrong:
 
 - **Meeting ID**: the Webex meeting's own ID, the one to quote to Webex support. It stays on
-  the page when a citizen stopped waiting for a direct call: OpenPlanner keeps following the
+  the page when a participant stopped waiting for a direct call: OpenPlanner keeps following the
   meeting while the agent is still in it, and the place of that call stays taken until Webex
   reports the meeting's end.
 - **Timeline**: what happened to the meeting and the task. Each event shows the version of
@@ -92,16 +92,16 @@ Solve a shortfall by raising the staffing again, or by changing bookings (below)
 
 With the right **Change bookings** (group admins, organisation admins and a custom Planner
 role), the day view shows the links **Move** and **Cancel** next to every booking that can
-still be changed. The citizen is always told about a change: by email, and by SMS when they
+still be changed. The participant is always told about a change: by email, and by SMS when they
 gave a phone number. You may be asked to log in again first.
 
 A booking can no longer be changed when it starts within the group's **Changes by a planner**
 time (60 minutes by default), when it has already gone to the contact center, or when it is
-cancelled. Call the citizen instead.
+cancelled. Call the participant instead.
 
 ### Move
 
-Choose a free slot of the same team in the next 28 days. The citizen gets a message with the
+Choose a free slot of the same team in the next 28 days. The participant gets a message with the
 new time and a new link to change it themselves. If the chosen slot would then have more
 bookings than agents, OpenPlanner first asks you to confirm with the box **I accept that the
 new slot will then have more bookings than agents**.
@@ -109,22 +109,22 @@ new slot will then have more bookings than agents**.
 ### Cancel
 
 Choose one of the fixed reasons: **Not enough agents**, **Technical failure** or **Unforeseen
-circumstances**. The citizen reads the matching text in the message. You cannot type a text
+circumstances**. The participant reads the matching text in the message. You cannot type a text
 yourself; the organisation changes the wording under **Message texts**, in **Reasons for
 changes by a planner**.
 
 ### Ask for a new time
 
-With **Ask for a new time** at a booking, the citizen chooses a new time themselves. The place
-in the slot is freed at once, so the shortfall goes away immediately. The citizen gets a
+With **Ask for a new time** at a booking, the participant chooses a new time themselves. The place
+in the slot is freed at once, so the shortfall goes away immediately. The participant gets a
 message with the reason and a link to choose a new time, without entering their details
-again. One reminder follows three days before the request lapses. If the citizen chooses
-nothing within 14 days after the original time, the appointment lapses; the citizen gets a
+again. One reminder follows three days before the request lapses. If the participant chooses
+nothing within 14 days after the original time, the appointment lapses; the participant gets a
 short message and the personal data is removed a day later.
 
-A slot with a shortfall also offers **Ask citizens for a new time**. You first see which
+A slot with a shortfall also offers **Ask participants for a new time**. You first see which
 bookings it concerns: the most recently made ones, as many as the shortfall. After your
-confirmation exactly those citizens get the request. If the slot has changed in the meantime,
+confirmation exactly those participants get the request. If the slot has changed in the meantime,
 OpenPlanner shows the new list and asks you to confirm again.
 
 The bookings awaiting a new time are in the list **Awaiting a new time** in the agenda, with

@@ -1,6 +1,6 @@
 # Bewaartermijnen
 
-Dit scherm laat per groep zien of persoonsgegevens van burgers op tijd worden verwijderd. U
+Dit scherm laat per groep zien of persoonsgegevens van deelnemers op tijd worden verwijderd. U
 opent het via **Bewaartermijnen** in het menu. Organisatiebeheerders, de rol Compliance en
 privacy en de superuser kunnen het bekijken, elk voor hun eigen organisaties.
 

@@ -1,6 +1,6 @@
 # A team's booking form
 
-The form always asks a citizen for first name, last name and email address. Whether it also
+The form always asks a participant for first name, last name and email address. Whether it also
 asks for a phone number is set in the [team's settings](group-settings.md). Does the team need
 more, such as a customer number or the subject of the conversation? Then add custom fields
 here. You open the screen with **team → Settings → Manage the booking form**. Organisation
@@ -30,7 +30,7 @@ booking always means what the question meant at the time.
 The type decides how the answer is checked. You cannot write a check of your own.
 
 - **Short text**: up to 100 characters.
-- **Free text**: up to 1000 characters. This is always personal data, because a citizen can
+- **Free text**: up to 1000 characters. This is always personal data, because a participant can
   write anything in it.
 - **Email address** and **phone number**: checked like the fixed fields; always personal data.
   A phone number without a country code is read as a number of the country the organisation
@@ -39,7 +39,7 @@ The type decides how the answer is checked. You cannot write a check of your own
   such as a customer number, is a short text.
 - **Date**: with limits in days from the day of booking.
 - **Postcode (Netherlands)**: four digits and two letters, stored as `1234 AB`.
-- **Choice list**: the citizen picks one of your choices; free text is never stored.
+- **Choice list**: the participant picks one of your choices; free text is never stored.
 - **Checkbox**: ticked or not. A required checkbox must be ticked, for example for consent.
 
 The type is fixed once saved as well. If you want another type, retire the field and add a new
@@ -49,7 +49,7 @@ one.
 ## Question and help text
 
 Every question has a text in Dutch and in English. A help text is optional; it appears below
-the question. The citizen sees the language of the page, otherwise Dutch.
+the question. The participant sees the language of the page, otherwise Dutch.
 
 <!-- field: classification -->
 ## Personal data
@@ -86,7 +86,7 @@ days. Empty means no limit.
 
 ## Order and retiring
 
-**Up** and **Down** put the fields in the order the citizen sees them. **Retire** takes a field
+**Up** and **Down** put the fields in the order the participant sees them. **Retire** takes a field
 off the form. Answers already given stay on the booking until they are erased, and from then on
 count as personal data.
 

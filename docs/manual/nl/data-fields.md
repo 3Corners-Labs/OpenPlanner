@@ -1,7 +1,7 @@
 # Gegevensvelden en persoonsgegevens
 
 Het kaartje **Gegevensvelden** op het scherm **Geavanceerde instellingen** laat zien welke
-velden van een afspraak persoonsgegevens van de burger zijn, en hoe gevoelig elk veld is. De
+velden van een afspraak persoonsgegevens van de deelnemer zijn, en hoe gevoelig elk veld is. De
 superuser en de rol Compliance en privacy kunnen het lezen. Niemand kan het wijzigen: de lijst
 ligt vast in de software, zodat geen enkele installatie deze bescherming kan uitzetten.
 
@@ -10,9 +10,9 @@ ligt vast in de software, zodat geen enkele installatie deze bescherming kan uit
 Persoonsgegevens staan alleen bij de afspraak (de boeking), nooit bij een team, een
 organisatie, een berichttekst of een logregel.
 
-- **Directe** velden identificeren de burger op zichzelf: voornaam, achternaam, e-mailadres en
+- **Directe** velden identificeren de deelnemer op zichzelf: voornaam, achternaam, e-mailadres en
   telefoonnummer.
-- **Gevoelige** velden bevatten wat de burger ons heeft verteld, of geven toegang tot het
+- **Gevoelige** velden bevatten wat de deelnemer ons heeft verteld, of geven toegang tot het
   gesprek: een notitie, de antwoorden op de eigen vragen van het team op het
   boekingsformulier, en de koppelingen om aan het videogesprek en aan het proefgesprek deel te nemen (twee voor het
   gesprek zelf en één voor het proefgesprek ervoor).
@@ -25,7 +25,7 @@ het toevoegen is gemarkeerd als *geen persoonsgegevens* (zie
 
 - **De afspraakpagina** in de agenda van een team (achter *Details*) toont de antwoorden op de
   vragen van het team, voor rollen die afspraken mogen bekijken.
-- **De wachtrij** toont de voornaam van de burger die aan de beurt is, en de opgepakte afspraak
+- **De wachtrij** toont de voornaam van de deelnemer die aan de beurt is, en de opgepakte afspraak
   toont de koppeling om aan het gesprek deel te nemen, voor medewerkers die de wachtrij
   bedienen.
 - **De agenda** en de pagina's van de planner tonen alleen de voornaam.

@@ -5,7 +5,7 @@ gedaan. U opent het met **Auditlog** in het menu. U ziet alleen uw eigen niveau:
 groepsbeheerder de eigen groepen, een organisatiebeheerder en de rol Compliance en privacy ook
 de eigen organisatie, de superuser alles.
 
-Het log bevat nooit gegevens van burgers: geen namen, e-mailadressen of telefoonnummers.
+Het log bevat nooit gegevens van deelnemers: geen namen, e-mailadressen of telefoonnummers.
 
 ## Wat een regel laat zien
 

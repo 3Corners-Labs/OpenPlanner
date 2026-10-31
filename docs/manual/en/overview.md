@@ -8,7 +8,7 @@ have rights on, with their staffing shortfalls.
 The page works without JavaScript. What you see is the state at the moment of loading;
 **Refresh** reloads the page. A later version refreshes the widgets by itself.
 
-The overview never shows citizens' personal data: only counts, group names and times.
+The overview never shows participants' personal data: only counts, group names and times.
 
 ## Widgets
 
@@ -21,7 +21,7 @@ The overview never shows citizens' personal data: only counts, group names and t
   full list** opens the audit log itself.
 
 - **Queue across my groups**: for each group with an own queue within your reach, how many
-  citizens wait, how long the longest wait has been and how many staff who may work the queue
+  participants wait, how long the longest wait has been and how many staff who may work the queue
   are signed in now. A participant with an appointment counts once they are in the lobby; a
   direct call counts from the request, even before the link is opened. The group name opens
   the queue. Counts and minutes only, never names. Colours for a wait that is too long follow

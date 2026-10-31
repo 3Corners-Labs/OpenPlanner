@@ -54,7 +54,7 @@ Some permissions need another one; it says so. Whoever may change the planning, 
 must also be able to view the group. The overview, **My rights** and the rights matrix belong
 to every admin. On **Save** the portal says what is missing.
 
-A permission marked **Personal data** shows citizens' data. A copy of Compliance and privacy
+A permission marked **Personal data** shows participants' data. A copy of Compliance and privacy
 can never get it.
 
 ## Changing and deleting
