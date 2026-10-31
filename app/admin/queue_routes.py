@@ -242,7 +242,7 @@ async def _claimed(
 
 def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) -> ClaimedView:
     """Write the claimed booking out; polling stops once nothing can change any more."""
-    citizen_key, citizen_tone = PARTICIPANT_LABELS[booking.citizen]
+    citizen_key, citizen_tone = PARTICIPANT_LABELS[booking.participant]
     video_key, _tone = VIDEO_LABELS[booking.video]
     return ClaimedView(
         booking=booking,
@@ -250,9 +250,9 @@ def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) ->
         citizen=locale.gettext(citizen_key),
         citizen_tone=citizen_tone,
         video=locale.gettext(video_key) if video_key else None,
-        key=key(booking.video, booking.citizen, booking.join_url is not None),
+        key=key(booking.video, booking.participant, booking.join_url is not None),
         polling=booking.video is not VideoState.FAILED
-        and booking.citizen is not ParticipantState.ENDED,
+        and booking.participant is not ParticipantState.ENDED,
     )
 
 
