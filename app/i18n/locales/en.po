@@ -926,6 +926,9 @@ msgstr "View an organisation"
 msgid "authz.permission.organisation_manage"
 msgstr "Manage organisations"
 
+msgid "authz.permission.organisation_delete"
+msgstr "Delete organisations"
+
 msgid "authz.permission.audit_view"
 msgstr "View audit log"
 
@@ -940,6 +943,9 @@ msgstr "Manage integrations and secrets"
 
 msgid "authz.permission.group_create"
 msgstr "Create groups"
+
+msgid "authz.permission.group_delete"
+msgstr "Archive groups"
 
 msgid "authz.permission.group_view"
 msgstr "View group"
