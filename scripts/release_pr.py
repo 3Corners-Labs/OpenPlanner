@@ -9,8 +9,9 @@ number is here and tested in ``tests/scripts/test_release_pr.py``:
   ADR 0078 (a minor or major version, ``X.Y.0``). Printed as ``key=value`` lines for
   ``$GITHUB_OUTPUT``.
 - ``prepare --version X.Y.Z --body FILE``: sets the version in ``pyproject.toml`` and
-  ``uv.lock``, moves *Unreleased* in ``CHANGELOG.md`` under ``## X.Y.Z (date)`` and writes the
-  pull request body, the PR template filled in, to ``FILE``.
+  ``uv.lock``, the version and the date in ``publiccode.yml`` (ADR 0054), moves *Unreleased*
+  in ``CHANGELOG.md`` under ``## X.Y.Z (date)`` and writes the pull request body, the PR
+  template filled in, to ``FILE``.
 - ``audit --body FILE --findings FILE``: puts the audit's findings into the body under
   ``## Release audit``, ending with ``Verdict: open``. Changing that line to ``Verdict: pass``
   stays the product owner's act (ADR 0078 point 4).
@@ -35,6 +36,8 @@ VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 _PYPROJECT_VERSION = re.compile(r'^(version = ")[^"]+(")$', re.M)
 _LOCK_VERSION = re.compile(r'(\[\[package\]\]\nname = "openplanner"\nversion = ")[^"]+(")')
 _UNRELEASED = re.compile(r"^## Unreleased\n", re.M)
+_PUBLICCODE_VERSION = re.compile(r'^(softwareVersion: ")[^"]+(")$', re.M)
+_PUBLICCODE_DATE = re.compile(r'^(releaseDate: ")[^"]+(")$', re.M)
 _AUDIT_SECTION = re.compile(r"^## Release audit\n.*?(?=^## |\Z)", re.M | re.S)
 _HEADING = re.compile(r"^#+\s+(.*)$", re.M)
 
@@ -104,6 +107,21 @@ def bump_lock(text: str, version: str) -> str:
     return text
 
 
+def bump_publiccode(text: str, version: str, date: str) -> str:
+    """Return ``publiccode.yml`` with ``softwareVersion`` and ``releaseDate`` set (ADR 0054).
+
+    Catalogues such as developer.overheid.nl read both; the rest of the file is left as it is,
+    comments included, so no YAML library rewrites it.
+    """
+    text, versions = _PUBLICCODE_VERSION.subn(rf"\g<1>{version}\g<2>", text, count=1)
+    text, dates = _PUBLICCODE_DATE.subn(rf"\g<1>{date}\g<2>", text, count=1)
+    if versions != 1 or dates != 1:
+        raise ValueError(
+            'publiccode.yml needs a `softwareVersion: "..."` and a `releaseDate: "..."` line'
+        )
+    return text
+
+
 def release_changelog(text: str, version: str, date: str) -> str:
     """Return ``CHANGELOG.md`` with *Unreleased* released as ``version`` on ``date``.
 
@@ -140,8 +158,9 @@ def pr_body(version: str, previous: str, subjects: Sequence[str], actor: str, da
     )
     return (
         "## What\n\n"
-        f"Release v{version}: `pyproject.toml` and `uv.lock` say `{version}`, and *Unreleased* "
-        f"in `CHANGELOG.md` is now `## {version} ({date})`. Opened by the `release` workflow on "
+        f"Release v{version}: `pyproject.toml`, `uv.lock` and `publiccode.yml` say `{version}`, "
+        f"and *Unreleased* in `CHANGELOG.md` is now `## {version} ({date})`. Opened by the "
+        "`release` workflow on "
         f"the dispatch of {actor} (ADR 0079); nothing else changes.\n\n"
         f"Commits since {previous} ({len(subjects)}):\n\n{listed}\n\n"
         "## Why\n\n"
@@ -166,7 +185,7 @@ def pr_body(version: str, previous: str, subjects: Sequence[str], actor: str, da
         "6. **Which settings does this add or change?** None; no tunable value.\n"
         "7. **Which admin screen or setting is new or moved?** None.\n\n"
         "## Security review\n\n"
-        "Not applicable: three files change, each by a tested edit; the independent audit "
+        "Not applicable: four files change, each by a tested edit; the independent audit "
         + ("is the section below.\n\n" if audit else "is not needed for a patch release.\n\n")
         + audit_section
         + "## How tested\n\n"
@@ -254,6 +273,7 @@ def _prepare(args: argparse.Namespace) -> None:
     for name, edit in (
         ("pyproject.toml", bump_pyproject),
         ("uv.lock", bump_lock),
+        ("publiccode.yml", lambda text, v: bump_publiccode(text, v, date)),
         ("CHANGELOG.md", lambda text, v: release_changelog(text, v, date)),
     ):
         path = Path(name)

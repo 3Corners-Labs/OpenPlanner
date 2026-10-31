@@ -34,6 +34,8 @@ env:
   GITLEAKS_VERSION: "v8.30.1"
   # renovate: datasource=docker depName=fsfe/reuse
   REUSE_VERSION: "5.0.2"
+  # renovate: datasource=docker depName=publiccodeyml/libpubliccode
+  PUBLICCODE_PARSER_VERSION: "v5.5.1"
 
 jobs:
   python:
@@ -163,6 +165,14 @@ jobs:
       # ADR 0054: every file carries licence and copyright information (REUSE.toml).
       - name: reuse lint
         run: docker run --rm -v "$PWD:/data" "fsfe/reuse:$REUSE_VERSION" lint
+      # ADR 0054: publiccode.yml (Standaard voor Publieke Code) is valid for catalogues such as
+      # developer.overheid.nl, checked by the standard's own parser. Offline, so the job does not
+      # depend on other sites being up; the logo and other local paths are still checked.
+      - name: publiccode.yml
+        run: >-
+          docker run --rm -v "$PWD:/data:ro" -w /data
+          "publiccodeyml/libpubliccode:$PUBLICCODE_PARSER_VERSION"
+          -no-network -path /data publiccode.yml
       # Outside contributors tick the CLA box (docs/cla.md). Whoever can write to this
       # repository is exempt: members (also with a private membership, which
       # author_association reports as CONTRIBUTOR) and collaborators. The permission and the
