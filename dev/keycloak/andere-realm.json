@@ -1,0 +1,169 @@
+{
+  "realm": "andere",
+  "enabled": true,
+  "displayName": "Andere organisatie (organisatie-IdP, ADR 0083)",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"unmanagedAttributePolicy\": \"ADMIN_EDIT\", \"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}], \"groups\": [{\"name\": \"user-metadata\", \"displayHeader\": \"User metadata\"}]}"
+          ]
+        }
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "openplanner-admin",
+      "name": "OpenPlanner admin portal (organisation provider of andere)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-only-andere-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://127.0.0.1:8000/admin/callback"
+      ],
+      "webOrigins": [
+        "http://127.0.0.1:8000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://127.0.0.1:8000/admin/logged-out"
+      },
+      "protocolMappers": [
+        {
+          "name": "openplanner_entitlements",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "entitlements",
+            "claim.name": "openplanner_entitlements",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false",
+            "aggregate.attrs": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "beheer",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Bram",
+      "lastName": "Beheer",
+      "email": "beheer@andere.test",
+      "attributes": {
+        "entitlements": [
+          "openplanner:org_admin:andere"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "team",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Tess",
+      "lastName": "Team",
+      "email": "team@andere.test",
+      "attributes": {
+        "entitlements": [
+          "openplanner:group_admin:andere/andere-team"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "overmoedig",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Olga",
+      "lastName": "Overmoedig",
+      "email": "overmoedig@andere.test",
+      "attributes": {
+        "entitlements": [
+          "openplanner:superuser",
+          "openplanner:org_admin:demo",
+          "openplanner:org_admin:andere"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "buitendomein",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Bas",
+      "lastName": "Buitendomein",
+      "email": "bas@openplanner.test",
+      "attributes": {
+        "entitlements": [
+          "openplanner:org_admin:andere"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "onbevestigd",
+      "enabled": true,
+      "emailVerified": false,
+      "firstName": "Otje",
+      "lastName": "Onbevestigd",
+      "email": "onbevestigd@andere.test",
+      "attributes": {
+        "entitlements": [
+          "openplanner:org_admin:andere"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-password",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

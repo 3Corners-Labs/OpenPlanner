@@ -295,6 +295,20 @@ The entitlement claim is a new trust boundary input: it is extracted by the OIDC
 every refusal carries a reason code. Values hold prefixes, role keys and IdP values, never
 personal data; they are kept on the staff record and in `auth.entitlement_refused` events.
 
+### Identity providers per organisation (ADR 0083)
+
+Inputs from outside: the provider a pending login started at (in the signed session), the
+`sub` of every ID token, and, from step 2 on, provider addresses typed in the portal. The
+numbers are those of the ADR's abuse-case table; the rows below are built (step 1), the others
+arrive with steps 2 to 5.
+
+| # | STRIDE | Abuse | Mitigation | Test |
+|---|---|---|---|---|
+| B5 | Spoofing | Mix-up: an answer is completed at a provider the login did not start at | the pending login records its provider; the callback completes it only there and refuses an unknown provider like a forged `state` | `tests/admin/test_login_provider.py::test_b5_a_callback_for_a_provider_that_is_not_known_is_refused` |
+| B6 | Spoofing | Two providers hand out the same `sub` for two people | an organisation provider's subject is `idp:<key>:<sub>`; the platform keeps the bare `sub` | `tests/domain/test_identity.py::test_b6_the_same_sub_at_two_providers_is_two_identities`, `tests/adapters/test_oidc.py::test_b6_an_organisation_provider_qualifies_the_subject` |
+| B7 | Elevation | A platform `sub` crafted as `idp:<key>:<sub>` poses as an organisation's admin | a platform `sub` starting with `idp:` refuses the login (`reserved_subject`); an empty or too long subject too | `tests/domain/test_identity.py::test_b7_a_platform_sub_shaped_as_a_qualified_one_is_refused`, `tests/adapters/test_oidc.py::test_b7_a_platform_sub_shaped_as_an_organisation_subject_refuses_the_login` |
+| B8 | Information disclosure / elevation (SSRF) | A provider address pointing to cloud metadata, loopback or an internal host, a DNS answer that changes after the check, or a redirect inward | `guarded_request`: https only, no credentials in the URL, every resolved address public (IPv4-mapped IPv6 included), the request goes to the checked address with Host and TLS SNI keeping the name, no redirects, 1 MB cap, 10 s timeout; relaxed only in development and test | `tests/adapters/test_outbound.py::test_b8_internal_addresses_are_not_public`, `test_b8_refused_before_anything_is_sent`, `test_b8_a_redirect_is_not_followed`, `test_the_request_goes_to_the_checked_address_with_the_name_for_tls` |
+
 ## Flow: groups and planning in the admin portal (WP7b)
 
 Admins only. `GET/POST /admin/groups/new`, `/admin/groups`, `/admin/groups/{slug}/settings`,

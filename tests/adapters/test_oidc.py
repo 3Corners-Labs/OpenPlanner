@@ -542,3 +542,66 @@ def test_the_dev_realm_super_user_holds_every_built_in_role() -> None:
     assert set(attributes[mapping.role_claim]) == set(mapping.role_values)
     assert attributes[mapping.organisation_claim] == ["demo"]
     assert attributes[mapping.group_claim] == ["demo"]
+
+
+def test_b7_a_platform_sub_shaped_as_an_organisation_subject_refuses_the_login() -> None:
+    # ADR 0083 point 16: `idp:` is reserved for the subjects of organisation providers.
+    with pytest.raises(IdentityError) as refused:
+        login_claims({"sub": "idp:gem-a:1234", "roles": ["op-org-admin"]}, MAPPING)
+
+    assert refused.value.code == "reserved_subject"
+
+
+def test_b6_an_organisation_provider_qualifies_the_subject() -> None:
+    claims = login_claims({"sub": "1234"}, MAPPING, provider="gem-a")
+
+    assert claims.subject == "idp:gem-a:1234"
+
+
+async def test_the_platform_provider_keeps_the_bare_subject(
+    oidc: OidcIdentityProvider, provider: FakeProvider
+) -> None:
+    _, claims = await login(oidc, provider)
+
+    assert claims.subject == "user-1"
+
+
+async def test_a_configured_provider_key_qualifies_every_login(provider: FakeProvider) -> None:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        config = OidcConfig(
+            discovery_url=f"{ISSUER}/.well-known/openid-configuration",
+            client_id=CLIENT,
+            client_secret="s3cret",
+            scopes="openid profile",
+            mapping=MAPPING,
+            provider_key="gem-a",
+        )
+        _, claims = await login(OidcIdentityProvider(config, http), provider)
+
+    assert claims.subject == "idp:gem-a:user-1"
+
+
+ORGANISATION_REALM = DEV_REALM.with_name("andere-realm.json")
+"""The dev realm standing in for the organisation provider of ``andere`` (ADR 0083)."""
+
+
+def test_the_organisation_dev_realm_sends_entitlements_only() -> None:
+    """An organisation provider resolves in entitlements mode only (ADR 0083 point 2)."""
+    realm = json.loads(ORGANISATION_REALM.read_text(encoding="utf-8"))
+    (client,) = realm["clients"]
+    claims = {m["config"]["claim.name"] for m in client["protocolMappers"]}
+
+    assert claims == {"openplanner_entitlements"}
+    assert client["attributes"]["pkce.code.challenge.method"] == "S256"
+    assert all(set(u["attributes"]) == {"entitlements"} for u in realm["users"])
+
+
+def test_the_organisation_dev_realm_holds_a_user_per_abuse_case() -> None:
+    """B1/B2 (rights outside the organisation), B3 (foreign domain), B4 (unverified email)."""
+    users = {u["username"]: u for u in json.loads(ORGANISATION_REALM.read_text("utf-8"))["users"]}
+
+    assert "openplanner:superuser" in users["overmoedig"]["attributes"]["entitlements"]
+    assert "openplanner:org_admin:demo" in users["overmoedig"]["attributes"]["entitlements"]
+    assert not users["buitendomein"]["email"].endswith("@andere.test")
+    assert users["onbevestigd"]["emailVerified"] is False
+    assert users["beheer"]["attributes"]["entitlements"] == ["openplanner:org_admin:andere"]
