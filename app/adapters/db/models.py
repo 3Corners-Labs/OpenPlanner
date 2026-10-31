@@ -228,7 +228,9 @@ class GroupRow(Base):
         CheckConstraint(
             "dispatch_kind IN ('contact_center', 'openplanner_queue')", name="dispatch_kind"
         ),
-        CheckConstraint("participant_change_lead_minutes BETWEEN 0 AND 1440", name="participant_lead"),
+        CheckConstraint(
+            "participant_change_lead_minutes BETWEEN 0 AND 1440", name="participant_lead"
+        ),
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
         CheckConstraint("trial_call_minutes BETWEEN 10 AND 60", name="trial_call_minutes"),
         CheckConstraint("trial_calls_per_booking BETWEEN 1 AND 5", name="trial_calls_per_booking"),
