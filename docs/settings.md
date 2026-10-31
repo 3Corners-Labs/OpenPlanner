@@ -114,6 +114,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `OIDC_ENTITLEMENT_PREFIX` | string | `openplanner` | — | `settings.login.manage` | Prefix of every entitlement value; separates installations that share one IdP. |
 | `OIDC_ENTITLEMENTS_MAX_VALUES` | int | `200` | 20–1000 | `settings.login.manage` | Values in the entitlement claim above which the login is refused (ADR 0049). |
 | `IDP_MAPPING_REFUSED_WINDOW_DAYS` | int | `30` | 7–365 | `settings.platform.manage` | How far back the identity provider mapping page lists refused values (ADR 0049). |
+| `IDP_MAX_PER_ORGANISATION` | int | `2` | 1–5 | `settings.login.manage` | Identity providers an organisation may register (ADR 0083); two allows moving from one to the next without a gap. |
 | `SMTP_HOST` | string | — | — | `settings.platform.manage` | Fallback mail server (ADR 0022); empty means no fallback mail. |
 | `SMTP_PORT` | int | `25` | 1–65535 | `settings.platform.manage` | Port of the fallback mail server. |
 | `SMTP_STARTTLS` | bool | `false` | — | `settings.platform.manage` | Upgrade the connection with STARTTLS. |

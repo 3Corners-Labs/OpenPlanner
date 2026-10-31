@@ -886,6 +886,42 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/organisations/demo/embedding": statuses(303, 303, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/embedding": statuses(303, 403, 403, 303, 403, 403, 403),
     },
+    # ADR 0083 step 2: the Login sub-tab. The status is for the organisation's own admins
+    # and auditors; registering and changing is the superuser's (identity_providers.manage is
+    # locked). No provider is registered, so a key answers 404 to whoever may look.
+    "GET /admin/organisations/{org}/login": {
+        "/admin/organisations/demo/login": statuses(200, 200, 403, 403, 200, 403, 403),
+        "/admin/organisations/andere/login": statuses(200, 403, 403, 200, 403, 403, 403),
+        "/admin/organisations/nope/login": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    "GET /admin/organisations/{org}/login/new": {
+        "/admin/organisations/demo/login/new": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/nope/login/new": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/login": {
+        "/admin/organisations/demo/login": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    "GET /admin/organisations/{org}/login/{idp_key}": {
+        "/admin/organisations/demo/login/gem-x": statuses(404, 404, 403, 403, 404, 403, 403),
+        "/admin/organisations/andere/login/gem-x": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/login/{idp_key}": {
+        "/admin/organisations/demo/login/gem-x": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/login/{idp_key}/enable": {
+        "/admin/organisations/demo/login/gem-x/enable": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/login/{idp_key}/delete": {
+        "/admin/organisations/demo/login/gem-x/delete": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/login/{idp_key}/rotate-key": {
+        "/admin/organisations/demo/login/gem-x/rotate-key": statuses(
+            404, 403, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/login/{idp_key}/test": {
+        "/admin/organisations/demo/login/gem-x/test": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
     "GET /admin/organisations/{org}/contacts": {
         "/admin/organisations/demo/contacts": statuses(200, 200, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/contacts": statuses(200, 403, 403, 200, 403, 403, 403),

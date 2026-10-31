@@ -8,9 +8,13 @@ development. The adapter only extracts (``LoginClaims``); what a value means is 
 ``app.domain.entitlements.resolve`` with the directory (ADR 0049 point 3).
 
     start_login ──► authorization_endpoint?…&state&nonce&code_challenge
-    finish_login ─► token_endpoint (code + code_verifier, client_secret_basic)
+    finish_login ─► token_endpoint (code + code_verifier; client_secret_basic, or the
+                    private_key_jwt assertion of RFC 7523 for an organisation provider)
                  ─► verify id_token: signature (JWKS, kid), iss, aud/azp, exp, iat, nonce
                  ─► claims ──ClaimMapping──► LoginClaims
+
+An organisation provider (ADR 0083) is registered in the portal, so its addresses are fetched
+through the outbound guard (``Guard``); the platform provider of the environment is not.
 """
 
 import base64
@@ -27,19 +31,39 @@ import httpx
 import jwt
 import structlog
 
+from app.adapters.outbound import OutboundRefusedError, Resolver, guarded_request, system_resolver
 from app.domain.authorization import Role
 from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM, SubjectRefusedError, qualify
-from app.domain.ports import IdentityError, LoginStart
+from app.domain.identity_providers import ASYMMETRIC_ALGORITHMS, ClientAuth
+from app.domain.ports import IdentityError, LoginStart, LoginTestReport
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 from app.domain.tunable import value_of
 
 log = structlog.get_logger()
 
-ALLOWED_ALGORITHMS = ("RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384")
+ALLOWED_ALGORITHMS = ASYMMETRIC_ALGORITHMS
 """Asymmetric only: ``none`` and HMAC (``HS*``) are never accepted."""
 
 METADATA_TTL_SECONDS = 3600
+
+ASSERTION_LIFETIME_SECONDS = 60
+"""How long a ``private_key_jwt`` client assertion is valid (RFC 7523 §3: short)."""
+
+ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+
+
+@dataclass(frozen=True)
+class Guard:
+    """How a registered provider's addresses are fetched (ADR 0083 point 8).
+
+    Attributes:
+        allow_private: Relax the guard for a lab provider (development and test only).
+        resolve: The name resolver (the system's; tests inject one).
+    """
+
+    allow_private: bool = False
+    resolve: Resolver = system_resolver
 
 
 @dataclass(frozen=True)
@@ -71,6 +95,9 @@ class OidcConfig:
 
     ``provider_key`` is empty for the platform provider of the environment and the
     organisation provider's key otherwise; it qualifies every subject (ADR 0083 point 16).
+    ``client_auth`` picks the token-endpoint authentication: ``client_secret_basic`` with
+    ``client_secret``, or ``private_key_jwt`` with ``signing_key`` (key id and private PEM).
+    ``guard`` is set for a registered provider, whose addresses came from the portal.
     """
 
     discovery_url: str
@@ -80,6 +107,9 @@ class OidcConfig:
     mapping: ClaimMapping | Callable[[], ClaimMapping]
     leeway_seconds: int = 60
     provider_key: str = PLATFORM
+    client_auth: ClientAuth = ClientAuth.CLIENT_SECRET_BASIC
+    signing_key: tuple[str, str] | None = field(default=None, repr=False)
+    guard: Guard | None = None
 
 
 def _values(claim: object) -> frozenset[str]:
@@ -263,6 +293,33 @@ class OidcIdentityProvider:
             claims, value_of(self._config.mapping), provider=self._config.provider_key
         )
 
+    async def finish_test_login(
+        self, *, code: str, redirect_uri: str, code_verifier: str, nonce: str
+    ) -> LoginTestReport:
+        """Return the claims and what arrived, for the guided test login (ADR 0083 point 9).
+
+        Raises:
+            IdentityError: As ``finish_login``.
+        """
+        claims = await self._claims(code, redirect_uri, code_verifier, nonce)
+        found = login_claims(
+            claims,
+            value_of(self._config.mapping),
+            log_lockout=False,
+            provider=self._config.provider_key,
+        )
+        verified = claims.get("email_verified")
+        email = claims.get("email")
+        domain = (
+            email.rpartition("@")[2].lower() if isinstance(email, str) and "@" in email else None
+        )
+        return LoginTestReport(
+            found,
+            tuple(_claim_names(claims)),
+            verified if isinstance(verified, bool) else None,
+            domain or None,
+        )
+
     async def finish_trial_login(
         self,
         *,
@@ -293,26 +350,79 @@ class OidcIdentityProvider:
             IdentityError: ``token_exchange_failed``, ``invalid_token`` or ``nonce_mismatch``.
         """
         metadata = await self._discover()
+        data = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "code_verifier": code_verifier,
+        }
+        auth: tuple[str, str] | None = None
+        if self._config.client_auth is ClientAuth.PRIVATE_KEY_JWT:
+            data["client_id"] = self._config.client_id
+            data["client_assertion_type"] = ASSERTION_TYPE
+            data["client_assertion"] = self._client_assertion(metadata["token_endpoint"])
+        else:
+            auth = (self._config.client_id, self._config.client_secret)
         try:
-            response = await self._http.post(
-                metadata["token_endpoint"],
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": redirect_uri,
-                    "code_verifier": code_verifier,
-                },
-                auth=(self._config.client_id, self._config.client_secret),
-            )
+            response = await self._fetch("POST", metadata["token_endpoint"], data=data, auth=auth)
             response.raise_for_status()
             id_token = response.json()["id_token"]
-        except (httpx.HTTPError, KeyError, ValueError) as exc:
+        except (httpx.HTTPError, KeyError, ValueError, OutboundRefusedError) as exc:
             log.warning("oidc.token_exchange_failed", error=type(exc).__name__)
             raise IdentityError("token_exchange_failed") from exc
         claims = await self._verify(id_token, metadata)
         if not hmac.compare_digest(str(claims.get("nonce", "")), nonce):
             raise IdentityError("nonce_mismatch")
         return claims
+
+    def _client_assertion(self, token_endpoint: str) -> str:
+        """Return the signed client assertion of RFC 7523 / OIDC Core §9.
+
+        ``iss`` and ``sub`` are the client id, ``aud`` the token endpoint, ``jti`` fresh, and
+        the lifetime a minute; signed with the provider's current key (``ES256``, ``kid``).
+
+        Raises:
+            IdentityError: ``no_signing_key`` when the provider has none.
+        """
+        if self._config.signing_key is None:
+            raise IdentityError("no_signing_key")
+        kid, pem = self._config.signing_key
+        now = int(time.time())
+        return jwt.encode(
+            {
+                "iss": self._config.client_id,
+                "sub": self._config.client_id,
+                "aud": token_endpoint,
+                "jti": secrets.token_urlsafe(16),
+                "iat": now,
+                "exp": now + ASSERTION_LIFETIME_SECONDS,
+            },
+            pem,
+            algorithm="ES256",
+            headers={"kid": kid},
+        )
+
+    async def _fetch(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        """Send a request to the provider: through the guard for a registered one.
+
+        ``auth=(user, password)`` becomes a basic ``Authorization`` header, so the guard,
+        which builds the request itself, sends the same thing httpx would.
+        """
+        auth: tuple[str, str] | None = kwargs.pop("auth", None)
+        if auth is not None:
+            token = base64.b64encode(f"{auth[0]}:{auth[1]}".encode()).decode()
+            kwargs["headers"] = {**kwargs.get("headers", {}), "authorization": f"Basic {token}"}
+        guard = self._config.guard
+        if guard is None:
+            return await self._http.request(method, url, **kwargs)
+        return await guarded_request(
+            self._http,
+            method,
+            url,
+            resolve=guard.resolve,
+            allow_private=guard.allow_private,
+            **kwargs,
+        )
 
     async def logout_url(self, post_logout_redirect_uri: str) -> str | None:
         """Return the RP-initiated logout URL (OIDC ``end_session_endpoint``), if offered."""
@@ -347,7 +457,7 @@ class OidcIdentityProvider:
                 leeway=self._config.leeway_seconds,
                 options={"require": ["exp", "iat", "iss", "aud", "sub"]},
             )
-        except (jwt.PyJWTError, KeyError, ValueError, httpx.HTTPError) as exc:
+        except (jwt.PyJWTError, KeyError, ValueError, httpx.HTTPError, OutboundRefusedError) as exc:
             log.warning("oidc.invalid_token", error=type(exc).__name__)
             raise IdentityError("invalid_token") from exc
         audiences = claims["aud"] if isinstance(claims["aud"], list) else [claims["aud"]]
@@ -361,7 +471,7 @@ class OidcIdentityProvider:
         """Return the JWKS key with ``kid``, refreshing the key set once (rotation)."""
         for refresh in (False, True):
             if self._keys is None or refresh:
-                response = await self._http.get(metadata["jwks_uri"])
+                response = await self._fetch("GET", metadata["jwks_uri"])
                 response.raise_for_status()
                 self._keys = jwt.PyJWKSet.from_dict(response.json())
             for key in self._keys.keys:
@@ -381,13 +491,13 @@ class OidcIdentityProvider:
         ):
             return self._metadata
         try:
-            response = await self._http.get(self._config.discovery_url)
+            response = await self._fetch("GET", self._config.discovery_url)
             response.raise_for_status()
             metadata: dict[str, Any] = response.json()
             for key in ("issuer", "authorization_endpoint", "token_endpoint", "jwks_uri"):
                 if not isinstance(metadata.get(key), str):
                     raise ValueError(key)
-        except (httpx.HTTPError, ValueError) as exc:
+        except (httpx.HTTPError, ValueError, OutboundRefusedError) as exc:
             log.warning("oidc.discovery_failed", error=type(exc).__name__)
             raise IdentityError("discovery_failed") from exc
         self._metadata, self._metadata_at = metadata, time.monotonic()

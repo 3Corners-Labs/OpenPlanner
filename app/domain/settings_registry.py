@@ -1009,6 +1009,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=365,
     ),
     S(
+        "idp_max_per_organisation",
+        K.INT,
+        2,
+        _C,
+        T.LOGIN_MAPPING,
+        "Identity providers an organisation may register (ADR 0083); two allows moving from "
+        "one to the next without a gap.",
+        minimum=1,
+        maximum=5,
+    ),
+    S(
         "smtp_host",
         K.STRING,
         None,

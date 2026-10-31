@@ -59,6 +59,7 @@ Side navigation: *Organisations*. A row *Tab › Sub-tab* is a sub-tab of that t
 | Overview › Settings | `/admin/organisations/{org}/settings` | `settings.organisation.manage` | standard | – |
 | Overview › Texts | `/admin/organisations/{org}/texts` | `texts.organisation.manage` | standard | `/admin/organisations/{org}/texts/{text_locale}` |
 | Overview › Embedding | `/admin/organisations/{org}/embedding` | `embedding.manage` | standard | – |
+| Overview › Login | `/admin/organisations/{org}/login` | `identity_providers.view` | standard | `/admin/organisations/{org}/login/new`, `/admin/organisations/{org}/login/{idp_key}` |
 | Branding | `/admin/organisations/{org}/branding` | `branding.manage` | standard | – |
 | Channels | `/admin/organisations/{org}/channels` | `integrations.manage` | standard | – |
 | Contact | `/admin/organisations/{org}/contacts` | `organisation.closure` | standard | – |
