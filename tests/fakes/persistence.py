@@ -143,8 +143,10 @@ class InMemoryTransaction:
         slug = self.state.organisation_slugs.get(group.organisation_id, "org")
         return GroupSummary(group, slug, slug.title())
 
-    async def list_groups(self, scope: Scope) -> list[GroupSummary]:
-        summaries = [self._summary(g) for g in self.state.groups.values()]
+    async def list_groups(self, scope: Scope, *, archived: bool = False) -> list[GroupSummary]:
+        summaries = [
+            self._summary(g) for g in self.state.groups.values() if g.is_archived == archived
+        ]
         return [s for s in summaries if scope.contains(s.organisation_slug, s.group.slug)]
 
     async def get_group_summary(self, slug: str) -> GroupSummary | None:

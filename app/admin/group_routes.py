@@ -10,6 +10,8 @@ The domain (``PlanningService``) authorises again, validates and audits.
     GET  /admin/groups/{slug}                      group.view        overview and preview
     GET  /admin/groups/{slug}/settings             group.edit        form
     POST /admin/groups/{slug}/settings             group.edit        save
+    GET  /admin/groups/{slug}/settings/archive     group.delete      confirmation page
+    POST /admin/groups/{slug}/settings/archive     group.delete      archive (ADR 0084)
     GET  /admin/groups/{slug}/staffing             schedule.manage   weekly staffing blocks
     POST /admin/groups/{slug}/staffing             schedule.manage   add a block
     GET  /admin/groups/{slug}/staffing/{id}        schedule.manage   change-block form
@@ -805,6 +807,75 @@ async def save_settings(
                 f"/admin/groups/{slug}/settings", "saved" if changed else "unchanged"
             )
     return await _settings_response(request, locale, context, form, 422)
+
+
+# --- archive (ADR 0084) ---------------------------------------------------------------------
+
+
+ARCHIVE_FIELD = "confirmation"
+"""The input on the confirmation page: the group's name, typed back (ADR 0084 point 5)."""
+
+
+async def _archive_response(
+    request: Request, locale: RequestLocale, context: AdminContext, form: FormData, status: int
+) -> HTMLResponse:
+    """Render the confirmation page with the count of bookings that still lie ahead."""
+    ahead = await planning_service(request).future_bookings(
+        context.principal, context.group.group.slug
+    )
+    confirmation = Field(
+        ARCHIVE_FIELD,
+        locale.gettext("admin.group.archive.confirmation"),
+        hint=locale.gettext("admin.group.archive.confirmation_hint", name=context.group.group.name),
+        error=form.error_for(ARCHIVE_FIELD),
+        attributes={"maxlength": "200", "autocomplete": "off"},
+    )
+    return group_page(
+        request,
+        locale,
+        context,
+        "admin/group_archive.html",
+        {"confirmation": confirmation, "errors": form.errors, "bookings_ahead": ahead},
+        status,
+    )
+
+
+@router.get("/groups/{slug}/settings/archive", response_class=HTMLResponse)
+async def archive_form(
+    request: Request,
+    locale: Locale,
+    slug: str,
+    context: Annotated[
+        AdminContext,
+        Depends(RequirePermission(Permission.GROUP_DELETE, group_param="slug", fresh=True)),
+    ],
+) -> HTMLResponse:
+    """Show what archiving removes and keeps, and ask for the group's name."""
+    return await _archive_response(request, locale, context, FormData({}, locale.gettext), 200)
+
+
+@router.post("/groups/{slug}/settings/archive", response_class=HTMLResponse)
+async def archive_group(
+    request: Request,
+    locale: Locale,
+    slug: str,
+    _: SameOrigin,
+    context: Annotated[
+        AdminContext,
+        Depends(RequirePermission(Permission.GROUP_DELETE, group_param="slug", fresh=True)),
+    ],
+) -> Response:
+    """Archive the group when the name matches and nothing lies ahead; then to the list."""
+    form = await read_form(request, locale)
+    try:
+        await planning_service(request).archive_group(
+            context.principal, slug, form.text(ARCHIVE_FIELD)
+        )
+    except DomainError as error:
+        raise_refusal(error)
+        form.refusal(error)
+        return await _archive_response(request, locale, context, form, 422)
+    return redirect_done("/admin/groups", "archived")
 
 
 async def _check_host(request: Request, slug: str) -> None:
