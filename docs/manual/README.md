@@ -35,6 +35,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Data fields and personal data / gegevensvelden en persoonsgegevens | [Gegevensvelden en persoonsgegevens](nl/data-fields.md) | [Data fields and personal data](en/data-fields.md) |
 | Organisation settings / organisatie-instellingen | [Organisatie-instellingen](nl/organisation-settings.md) | [Organisation settings](en/organisation-settings.md) |
 | Texts for participants / teksten voor deelnemers | [Teksten voor deelnemers](nl/organisation-texts.md) | [Texts for participants](en/organisation-texts.md) |
+| Login: identity providers of an organisation / inloggen (ADR 0083) | [Inloggen: identity providers](nl/organisation-login.md) | [Login: identity providers](en/organisation-login.md) |
 
 ## Writing a topic
 

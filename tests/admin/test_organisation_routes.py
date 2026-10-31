@@ -79,6 +79,7 @@ async def test_tabs_follow_the_rights_of_the_role(site: Site) -> None:
         "/admin/organisations/demo/settings",
         "/admin/organisations/demo/texts",
         "/admin/organisations/demo/embedding",
+        "/admin/organisations/demo/login",
     ]
     assert "/admin/organisations/demo/branding" not in org_admin
     assert "/admin/organisations/demo/channels" not in org_admin

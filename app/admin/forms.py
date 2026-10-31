@@ -61,6 +61,10 @@ DONE_MESSAGES: dict[str, str] = {
     "field_retired": "admin.done.field_retired",
     "added": "admin.done.added",
     "removed": "admin.done.removed",
+    "idp_created": "admin.done.idp_created",
+    "idp_enabled": "admin.done.idp_enabled",
+    "idp_disabled": "admin.done.idp_disabled",
+    "idp_key_rotated": "admin.done.idp_key_rotated",
     "logo_saved": "admin.done.logo_saved",
     "logo_removed": "admin.done.logo_removed",
     "font_saved": "admin.done.font_saved",
@@ -204,6 +208,13 @@ FIELD_MESSAGES: dict[str, str] = {
     "claim_value": "admin.form.error.claim_value",
     "permissions": "admin.form.error.permissions",
     "template": "admin.form.error.choice",
+    "key": "admin.form.error.idp_key",
+    "discovery_url": "admin.form.error.discovery_url",
+    "client_id": "admin.form.error.integration_text",
+    "client_auth": "admin.form.error.choice",
+    "client_secret": "admin.form.error.client_secret",  # noqa: S105  # nosec B105 - a key
+    "entitlement_claim": "admin.form.error.entitlement_claim",
+    "entitlement_prefix": "admin.form.error.entitlement_prefix",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -221,6 +232,9 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.ORGANISATION_HAS_GROUPS: "admin.form.error.organisation_has_groups",
     ErrorCode.ORGANISATION_HAS_API_CLIENTS: "admin.form.error.organisation_has_api_clients",
     ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
+    ErrorCode.IDENTITY_PROVIDER_LIMIT_REACHED: "admin.form.error.identity_provider_limit",
+    ErrorCode.ISSUER_TAKEN: "admin.form.error.issuer_taken",
+    ErrorCode.DISCOVERY_REFUSED: "admin.form.error.discovery_refused",
     ErrorCode.ORGANISATION_NOT_FOUND: "admin.form.error.organisation",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
     ErrorCode.DATABASE_BUSY: "error.database_busy",

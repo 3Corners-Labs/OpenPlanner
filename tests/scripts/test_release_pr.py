@@ -9,6 +9,7 @@ from scripts.release_pr import (
     AUDIT_HEADING,
     VERDICT_OPEN,
     bump_lock,
+    bump_publiccode,
     bump_pyproject,
     main,
     needs_audit,
@@ -177,12 +178,42 @@ def released(git: Git, tmp_path: Path) -> Path:
     (tmp_path / "pyproject.toml").write_text(PYPROJECT)
     (tmp_path / "uv.lock").write_text(LOCK)
     (tmp_path / "CHANGELOG.md").write_text(CHANGELOG)
+    (tmp_path / "publiccode.yml").write_text(PUBLICCODE)
     commit_all(git, "chore(release): v0.3.0 (#10)")
     git("tag", "-a", "v0.3.0", "-m", "v0.3.0")
     (tmp_path / "a.txt").write_text("a\n")
     commit_all(git, "feat: a")
     git("tag", "-a", "v0.4.0-rc.1", "-m", "candidate")
     return tmp_path
+
+
+PUBLICCODE = """# comment kept
+publiccodeYmlVersion: "0"
+name: OpenPlanner
+softwareVersion: "0.3.0"
+releaseDate: "2026-10-30"
+"""
+
+
+def test_bump_publiccode_sets_version_and_date_and_keeps_the_rest() -> None:
+    result = bump_publiccode(PUBLICCODE, "0.4.0", "2026-11-02")
+    assert result == PUBLICCODE.replace("0.3.0", "0.4.0").replace("2026-10-30", "2026-11-02")
+
+
+def test_bump_publiccode_refuses_a_file_without_the_two_lines() -> None:
+    with pytest.raises(ValueError, match="softwareVersion"):
+        bump_publiccode('name: OpenPlanner\nsoftwareVersion: "0.3.0"\n', "0.4.0", "2026-11-02")
+
+
+def test_publiccode_says_the_version_of_pyproject() -> None:
+    """Between releases both carry the last release; the release PR moves both at once."""
+    pyproject = re.search(r'^version = "([^"]+)"$', (ROOT / "pyproject.toml").read_text(), re.M)
+    publiccode = re.search(
+        r'^softwareVersion: "([^"]+)"$', (ROOT / "publiccode.yml").read_text(), re.M
+    )
+    assert pyproject is not None
+    assert publiccode is not None
+    assert publiccode.group(1) == pyproject.group(1)
 
 
 def _merge_release(git: Git, repo: Path, version: str, pyproject: str, number: int) -> str:
@@ -228,7 +259,7 @@ def test_plan_prints_outputs_for_the_workflow(
     assert "::error::0.3.0 is not above the last release v0.3.0" in capsys.readouterr().err
 
 
-def test_prepare_edits_the_three_files_and_writes_the_body(
+def test_prepare_edits_the_four_files_and_writes_the_body(
     released: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     body = released / "body.md"
@@ -251,6 +282,9 @@ def test_prepare_edits_the_three_files_and_writes_the_body(
     assert 'version = "0.4.0"' in (released / "pyproject.toml").read_text()
     assert 'name = "openplanner"\nversion = "0.4.0"' in (released / "uv.lock").read_text()
     assert "## Unreleased\n\n## 0.4.0 (2026-11-02)" in (released / "CHANGELOG.md").read_text()
+    publiccode = (released / "publiccode.yml").read_text()
+    assert 'softwareVersion: "0.4.0"' in publiccode
+    assert 'releaseDate: "2026-11-02"' in publiccode
     assert "- feat: a" in body.read_text()
     assert "Commits since v0.3.0 (1)" in body.read_text()
 

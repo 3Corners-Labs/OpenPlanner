@@ -7995,3 +7995,273 @@ msgstr "Het portaal weigert zolang de organisatie niet leeg is."
 
 msgid "admin.audit.detail.deleted"
 msgstr "verwijderd"
+
+msgid "admin.tab.login"
+msgstr "Inloggen"
+
+msgid "authz.permission.identity_providers_view"
+msgstr "Identity providers van de organisatie bekijken"
+
+msgid "authz.permission.identity_providers_manage"
+msgstr "Identity providers registreren en wijzigen"
+
+msgid "settings.field.idp_max_per_organisation.label"
+msgstr "Identity providers per organisatie (maximum)"
+
+msgid "admin.done.idp_created"
+msgstr "De identity provider is geregistreerd en staat nog uit. Doe eerst een proeflogin en zet hem daarna aan."
+
+msgid "admin.done.idp_enabled"
+msgstr "De identity provider staat aan."
+
+msgid "admin.done.idp_disabled"
+msgstr "De identity provider staat uit."
+
+msgid "admin.done.idp_key_rotated"
+msgstr "Er is een nieuwe sleutel gemaakt. De oude blijft nog 24 uur gepubliceerd."
+
+msgid "admin.form.error.client_secret"
+msgstr "Vul het client secret in (maximaal 512 tekens, zonder stuurtekens)."
+
+msgid "admin.form.error.discovery_refused"
+msgstr "Het discovery-document is niet opgehaald of voldoet niet: controleer het adres (https, openbaar bereikbaar, geen doorverwijzing), de issuer, de code-flow met PKCE S256, een asymmetrische handtekening en de gekozen client-authenticatie."
+
+msgid "admin.form.error.discovery_url"
+msgstr "Vul een https-adres in dat eindigt op /.well-known/openid-configuration."
+
+msgid "admin.form.error.entitlement_claim"
+msgstr "Vul een claimnaam in: letters, cijfers, punt, streepje of laag streepje, maximaal 64 tekens."
+
+msgid "admin.form.error.entitlement_prefix"
+msgstr "Vul een prefix in van 2 tot 31 kleine letters, cijfers of streepjes, beginnend met een letter."
+
+msgid "admin.form.error.identity_provider_limit"
+msgstr "Deze organisatie heeft het maximum aantal identity providers bereikt. Verwijder er eerst een, of verhoog het maximum bij Geavanceerde instellingen."
+
+msgid "admin.form.error.issuer_taken"
+msgstr "Deze issuer is al geregistreerd, bij deze organisatie, een andere organisatie of als platformprovider."
+
+msgid "admin.idp.title"
+msgstr "Inloggen"
+
+msgid "admin.idp.lead"
+msgstr "De identity providers waar medewerkers van deze organisatie inloggen. Een eigen provider geeft alleen rechten binnen deze organisatie; de e-maildomeinen die de provider kiest, volgen in een volgende stap."
+
+msgid "admin.idp.providers"
+msgstr "Identity providers"
+
+msgid "admin.idp.none"
+msgstr "Deze organisatie heeft geen eigen identity provider; medewerkers loggen in met een platformaccount."
+
+msgid "admin.idp.limit"
+msgstr "Een organisatie kan maximaal {limit} identity providers registreren."
+
+msgid "admin.idp.limit_reached"
+msgstr "Het maximum is bereikt. Verwijder eerst een provider om een nieuwe toe te voegen."
+
+msgid "admin.idp.add"
+msgstr "Identity provider toevoegen"
+
+msgid "admin.idp.create"
+msgstr "Registreren"
+
+msgid "admin.idp.name"
+msgstr "Naam"
+
+msgid "admin.idp.name_hint"
+msgstr "Zoals medewerkers de inlogdienst kennen, bijvoorbeeld de naam van de organisatie."
+
+msgid "admin.idp.key"
+msgstr "Sleutel"
+
+msgid "admin.idp.key_hint"
+msgstr "Kleine letters, cijfers en streepjes; uniek op deze installatie en na registratie niet te wijzigen. Elke identiteit van deze provider begint ermee."
+
+msgid "admin.idp.discovery_url"
+msgstr "Discovery-adres"
+
+msgid "admin.idp.discovery_url_hint"
+msgstr "Het adres van het OpenID Connect discovery-document, eindigend op /.well-known/openid-configuration. Het wordt bij opslaan opgehaald en gecontroleerd."
+
+msgid "admin.idp.client_id"
+msgstr "Client-id"
+
+msgid "admin.idp.client_id_hint"
+msgstr "De registratie van OpenPlanner bij de provider."
+
+msgid "admin.idp.client_auth"
+msgstr "Client-authenticatie"
+
+msgid "admin.idp.client_auth_hint"
+msgstr "Standaard een ondertekende assertion met een eigen sleutelpaar (NL GOV-profiel). Kies een client secret alleen als de provider geen private_key_jwt ondersteunt."
+
+msgid "admin.idp.auth.private_key_jwt"
+msgstr "Sleutelpaar (private_key_jwt)"
+
+msgid "admin.idp.auth.client_secret_basic"
+msgstr "Client secret (client_secret_basic)"
+
+msgid "admin.idp.client_secret"
+msgstr "Client secret"
+
+msgid "admin.idp.client_secret_hint"
+msgstr "Alleen bij client secret. Wordt versleuteld opgeslagen en nooit getoond; leeg laten behoudt het opgeslagen secret."
+
+msgid "admin.idp.scopes"
+msgstr "Scopes"
+
+msgid "admin.idp.scopes_hint"
+msgstr "Gescheiden door spaties; openid is verplicht, email nodig om het domein te bevestigen."
+
+msgid "admin.idp.entitlement_claim"
+msgstr "Entitlement-claim"
+
+msgid "admin.idp.entitlement_claim_hint"
+msgstr "De claim in het ID-token met de rechten van de medewerker."
+
+msgid "admin.idp.entitlement_prefix"
+msgstr "Entitlement-prefix"
+
+msgid "admin.idp.entitlement_prefix_hint"
+msgstr "Alleen waarden die hiermee beginnen tellen mee."
+
+msgid "admin.idp.state"
+msgstr "Status"
+
+msgid "admin.idp.status"
+msgstr "Status"
+
+msgid "admin.idp.on"
+msgstr "Aan"
+
+msgid "admin.idp.off"
+msgstr "Uit"
+
+msgid "admin.idp.issuer"
+msgstr "Issuer"
+
+msgid "admin.idp.checked"
+msgstr "Discovery gecontroleerd"
+
+msgid "admin.idp.updated"
+msgstr "Laatst gewijzigd"
+
+msgid "admin.idp.never"
+msgstr "Nog niet"
+
+msgid "admin.idp.callback_url"
+msgstr "Redirect-URI bij de provider"
+
+msgid "admin.idp.jwks_url"
+msgstr "JWKS-adres (publieke sleutels)"
+
+msgid "admin.idp.current_key"
+msgstr "Huidige sleutel (kid)"
+
+msgid "admin.idp.no_key"
+msgstr "Geen sleutel"
+
+msgid "admin.idp.retired_keys"
+msgstr "Ingetrokken sleutels"
+
+msgid "admin.idp.secret_set"
+msgstr "Opgeslagen (wordt niet getoond)"
+
+msgid "admin.idp.secret_missing"
+msgstr "Niet opgeslagen"
+
+msgid "admin.idp.test"
+msgstr "Proeflogin"
+
+msgid "admin.idp.enable"
+msgstr "Aanzetten"
+
+msgid "admin.idp.disable"
+msgstr "Uitzetten"
+
+msgid "admin.idp.rotate_key"
+msgstr "Sleutel roteren"
+
+msgid "admin.idp.delete"
+msgstr "Verwijderen"
+
+msgid "admin.idp.actions_hint"
+msgstr "Een proeflogin stuurt u naar de provider en laat zien welke claims en rechten terugkomen, zonder in te loggen. Verwijderen wist ook het secret en de sleutels. Elke actie staat in het auditlog."
+
+msgid "admin.idp.registration"
+msgstr "Registratie"
+
+msgid "admin.idp.registration_lead"
+msgstr "Registreer OpenPlanner eerst bij de provider met de redirect-URI en, bij een sleutelpaar, het JWKS-adres hierboven."
+
+msgid "admin.idp.testing.title"
+msgstr "Proeflogin gestart"
+
+msgid "admin.idp.testing.text"
+msgstr "U gaat nu naar {name}. Na het inloggen ziet u wat de provider terugstuurde; er wordt geen sessie gestart."
+
+msgid "admin.idp.testing.continue"
+msgstr "Verder naar de provider"
+
+msgid "admin.idp.test_result.title"
+msgstr "Uitslag van de proeflogin"
+
+msgid "admin.idp.test_result.succeeded"
+msgstr "De proeflogin is geslaagd: het ID-token is ontvangen en gecontroleerd. Uw eigen sessie is ongewijzigd."
+
+msgid "admin.idp.test_result.token"
+msgstr "Het ID-token"
+
+msgid "admin.idp.test_result.claims"
+msgstr "Ontvangen claims (namen)"
+
+msgid "admin.idp.test_result.email_verified"
+msgstr "E-mailadres geverifieerd"
+
+msgid "admin.idp.test_result.email_domain"
+msgstr "Domein van het e-mailadres"
+
+msgid "admin.idp.test_result.entitlements"
+msgstr "Entitlement-waarden met de prefix"
+
+msgid "admin.idp.test_result.yes"
+msgstr "Ja"
+
+msgid "admin.idp.test_result.no"
+msgstr "Nee"
+
+msgid "admin.idp.test_result.absent"
+msgstr "Ontbreekt"
+
+msgid "admin.idp.test_result.hint"
+msgstr "Alleen namen en uitkomsten worden getoond; waarden niet. Voor echte logins moet email_verified waar zijn en moet het domein bij een geverifieerd domein van de provider horen."
+
+msgid "admin.idp.test_result.grants"
+msgstr "Rechten die de waarden opleveren"
+
+msgid "admin.idp.test_result.no_grants"
+msgstr "Geen rechten: de waarden ontbreken, hebben een andere prefix of noemen onbekende organisaties of groepen."
+
+msgid "admin.idp.test_result.refused"
+msgstr "Geweigerde waarden"
+
+msgid "admin.idp.test_result.back"
+msgstr "Terug naar de provider"
+
+msgid "admin.idp.test_failed.generic"
+msgstr "De proeflogin is mislukt. Controleer het discovery-adres en de registratie bij de provider; de reden staat in het auditlog."
+
+msgid "admin.idp.test_failed.discovery_failed"
+msgstr "De proeflogin is mislukt: het discovery-document kon niet worden opgehaald."
+
+msgid "admin.idp.test_failed.token_exchange_failed"
+msgstr "De proeflogin is mislukt: de provider wees de code-inwisseling af. Controleer de client-id, de client-authenticatie en de redirect-URI."
+
+msgid "admin.idp.test_failed.invalid_token"
+msgstr "De proeflogin is mislukt: het ID-token was ongeldig (handtekening, issuer, audience of nonce)."
+
+msgid "admin.idp.test_failed.no_signing_key"
+msgstr "De proeflogin is mislukt: deze provider heeft geen sleutel. Roteer de sleutel om er een te maken."
+
+msgid "admin.idp.test_failed.too_many_entitlements"
+msgstr "De proeflogin is mislukt: het token bevat meer entitlement-waarden dan toegestaan."
