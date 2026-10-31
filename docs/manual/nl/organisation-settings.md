@@ -30,7 +30,8 @@ die van het platform (standaardwaarde, beheerportaal of omgeving).
 
 ## Een instelling wijzigen
 
-Vul de nieuwe waarde in en kies **Opslaan**; die geldt binnen ongeveer tien seconden.
+Vul de nieuwe waarden in en kies **Opslaan** onderaan; alleen de waarden die afwijken van de
+huidige worden opgeslagen, en ze gelden binnen ongeveer tien seconden.
 **Platformwaarde gebruiken** haalt de waarde van de organisatie weg. Voor een wijziging moet u
 kort geleden zijn ingelogd. Elke wijziging staat in het auditlog met de oude en de nieuwe
 waarde.
