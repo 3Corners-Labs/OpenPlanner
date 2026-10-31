@@ -63,7 +63,7 @@ test('the participant tries the connection, joins the call, and the admin follow
   await expect(page.getByRole('heading', { name: 'Simulator (alleen in test)' })).toBeVisible();
   await expectNoAxeViolations(page);
   await play(page, PREPARE, /nep-proefgesprek/);
-  await expect(timeline(page, 'Proefgesprek geopend door de burger')).toHaveCount(1);
+  await expect(timeline(page, 'Proefgesprek geopend door de deelnemer')).toHaveCount(1);
 
   // The participant now has the way in, straight into Webex's web app (ADR 0075).
   await citizen.reload();
@@ -76,7 +76,7 @@ test('the participant tries the connection, joins the call, and the admin follow
   // journey; the appointment's own call status stays untouched (ADR 0076).
   await play(page, 'Deelnemer komt het proefgesprek binnen', /afgeleverd/);
   await play(page, 'Deelnemer verlaat het proefgesprek', /afgeleverd/);
-  await expect(timeline(page, 'Burger ging het proefgesprek in')).toContainText('browser');
+  await expect(timeline(page, 'Deelnemer ging het proefgesprek in')).toContainText('browser');
   await expect(timeline(page, 'Deelnemer kwam het proefgesprek binnen')).toHaveCount(1);
   await expect(timeline(page, 'Deelnemer verliet het proefgesprek')).toHaveCount(1);
   await expect(fact(page, 'Deelnemers')).toHaveText('0');
@@ -98,7 +98,7 @@ test('the participant tries the connection, joins the call, and the admin follow
   expect(await destinationOf(citizen, joinLink)).toBe(SIMULATED_MEETING);
 
   // The call as the contact center and Webex would report it.
-  for (const name of ['Agent neemt taak aan', 'Agent komt binnen', 'Burger komt binnen', 'Meeting beëindigd']) {
+  for (const name of ['Agent neemt taak aan', 'Agent komt binnen', 'Deelnemer komt binnen', 'Meeting beëindigd']) {
     await play(page, name, /afgeleverd/);
   }
   await expect(timeline(page, 'Deelnemer klikte op deelnemen')).toContainText('browser');

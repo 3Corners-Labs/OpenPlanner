@@ -792,7 +792,7 @@ msgid "admin.matrix.title"
 msgstr "Rights matrix"
 
 msgid "admin.matrix.intro"
-msgstr "What each role may do, per organisation and per group. Permissions marked Superuser only are fixed. Permissions marked Personal data show citizens' data. Only the superuser can adjust roles; every change is recorded and listed at the bottom of this page. Your organisation assigns roles in its identity provider."
+msgstr "What each role may do, per organisation and per group. Permissions marked Superuser only are fixed. Permissions marked Personal data show participants' data. Only the superuser can adjust roles; every change is recorded and listed at the bottom of this page. Your organisation assigns roles in its identity provider."
 
 msgid "admin.matrix.level"
 msgstr "Level"
@@ -1149,16 +1149,16 @@ msgid "admin.field.queue_free_pick_allowed_hint"
 msgstr "No: agents always pick up the next one. Yes: they can also pick up another appointment from the list."
 
 msgid "admin.field.citizen_change_lead_minutes"
-msgstr "Citizen can move until (minutes ahead)"
+msgstr "Participant can move until (minutes ahead)"
 
 msgid "admin.field.citizen_change_lead_minutes_hint"
-msgstr "Until how many minutes before the start the citizen can still move the appointment. Cancelling is always possible until the start. Not shorter than Send to the queue, at most 1440. Default 60."
+msgstr "Until how many minutes before the start the participant can still move the appointment. Cancelling is always possible until the start. Not shorter than Send to the queue, at most 1440. Default 60."
 
 msgid "admin.field.trial_call_enabled"
-msgstr "Trial call for the citizen"
+msgstr "Trial call for the participant"
 
 msgid "admin.field.trial_call_enabled_hint"
-msgstr "Yes: the citizen can try beforehand, in a real Webex meeting, whether camera, microphone and speakers work. The meeting belongs to this group's Webex host; nobody from the team joins. Only with a Webex host."
+msgstr "Yes: the participant can try beforehand, in a real Webex meeting, whether camera, microphone and speakers work. The meeting belongs to this group's Webex host; nobody from the team joins. Only with a Webex host."
 
 msgid "admin.field.join_client"
 msgstr "Webex page for the participant"
@@ -1191,10 +1191,10 @@ msgid "admin.form.error.trial_calls_per_booking"
 msgstr "Enter a number from 1 to 5."
 
 msgid "call.event.trial_created"
-msgstr "Citizen opened a trial call"
+msgstr "Participant opened a trial call"
 
 msgid "call.event.trial_joined"
-msgstr "Citizen entered the trial call"
+msgstr "Participant entered the trial call"
 
 msgid "call.event.trial_entered"
 msgstr "Someone entered the trial call"
@@ -2001,7 +2001,7 @@ msgid "admin.planner.accept_shortfall_hint"
 msgstr "Only needed if the chosen slot gets a shortfall as a result."
 
 msgid "admin.planner.citizen_told"
-msgstr "The citizen is always told by email, and by SMS when there is a phone number."
+msgstr "The participant is always told by email, and by SMS when there is a phone number."
 
 msgid "admin.planner.back"
 msgstr "Back to the agenda"
@@ -2010,7 +2010,7 @@ msgid "admin.planner.cancel_title"
 msgstr "Cancel booking {reference}"
 
 msgid "admin.planner.cancel_lead"
-msgstr "{first_name}, {when}. Choose the reason the citizen reads in the message."
+msgstr "{first_name}, {when}. Choose the reason the participant reads in the message."
 
 msgid "admin.planner.reason"
 msgstr "Reason"
@@ -2040,7 +2040,7 @@ msgid "admin.agenda.rebook"
 msgstr "Ask for a new time"
 
 msgid "admin.agenda.slot_rebook"
-msgstr "Ask citizens for a new time"
+msgstr "Ask participants for a new time"
 
 msgid "admin.agenda.waiting_list"
 msgstr "Awaiting a new time"
@@ -2049,10 +2049,10 @@ msgid "admin.planner.rebook_title"
 msgstr "Ask for a new time for {reference}"
 
 msgid "admin.planner.rebook_lead"
-msgstr "{first_name}, {when}. The citizen chooses a new time themselves."
+msgstr "{first_name}, {when}. The participant chooses a new time themselves."
 
 msgid "admin.planner.rebook_explain"
-msgstr "The place in this slot is freed at once. The citizen gets a message with the reason and a link to choose a new time, and a reminder {reminder} days before it lapses. If the citizen chooses nothing within {days} days after the original time, the appointment lapses."
+msgstr "The place in this slot is freed at once. The participant gets a message with the reason and a link to choose a new time, and a reminder {reminder} days before it lapses. If the participant chooses nothing within {days} days after the original time, the appointment lapses."
 
 msgid "admin.planner.rebook_button"
 msgstr "Ask for a new time"
@@ -2073,7 +2073,7 @@ msgid "admin.planner.waiting_title"
 msgstr "Awaiting a new time"
 
 msgid "admin.planner.waiting_lead"
-msgstr "Bookings whose citizen was asked to choose a new time. You can move or cancel them yourself."
+msgstr "Bookings whose participant was asked to choose a new time. You can move or cancel them yourself."
 
 msgid "admin.planner.waiting_booking"
 msgstr "Booking"
@@ -2088,7 +2088,7 @@ msgid "admin.planner.waiting_empty"
 msgstr "No bookings are awaiting a new time."
 
 msgid "admin.done.rebook_requested"
-msgstr "Citizens asked to choose a new time: {count}. The places have been freed."
+msgstr "Participants asked to choose a new time: {count}. The places have been freed."
 
 msgid "admin.form.error.slot_changed"
 msgstr "This slot has changed in the meantime. Check the list and confirm again."
@@ -2172,7 +2172,7 @@ msgid "call.event.task_marked_cancelled"
 msgstr "Task marked as cancelled"
 
 msgid "call.event.citizen_left"
-msgstr "The citizen stopped waiting"
+msgstr "The participant stopped waiting"
 
 msgid "admin.booking.end_not_possible"
 msgstr "The booking was cancelled and the task was marked as cancelled through the v2 API (Kind: cancelled; see the timeline), but WxCC did not let OpenPlanner end the task. End the task in Agent Desktop if it is still open."
@@ -2539,7 +2539,7 @@ msgid "admin.tab.closure"
 msgstr "Emergency closure"
 
 msgid "admin.done.closure_started"
-msgstr "The emergency closure is in place. Appointments on hold: {count}. The citizens receive an email."
+msgstr "The emergency closure is in place. Appointments on hold: {count}. The participants receive an email."
 
 msgid "admin.done.closure_updated"
 msgstr "The emergency closure has been updated. Update emails: {count}."
@@ -2548,13 +2548,13 @@ msgid "admin.done.closure_lifted"
 msgstr "The emergency closure has been lifted. Appointments confirmed again: {count}."
 
 msgid "admin.done.reinstated"
-msgstr "Appointments confirmed again: {count}. The citizens are informed."
+msgstr "Appointments confirmed again: {count}. The participants are informed."
 
 msgid "admin.done.cancelled"
-msgstr "Appointments cancelled: {count}. The citizens are informed."
+msgstr "Appointments cancelled: {count}. The participants are informed."
 
 msgid "admin.done.moved"
-msgstr "The appointment has been moved. The citizen receives an email with the new time."
+msgstr "The appointment has been moved. The participant receives an email with the new time."
 
 msgid "admin.done.organisation_closed"
 msgstr "Teams closed: {count}. Teams that were already closed are unchanged."
@@ -2614,7 +2614,7 @@ msgid "admin.audit.detail.planner_cancel"
 msgstr "booking cancelled by a planner"
 
 msgid "admin.audit.detail.planner_rebook"
-msgstr "citizen asked to choose a new time"
+msgstr "participant asked to choose a new time"
 
 msgid "admin.audit.detail.bulk"
 msgstr "for a whole slot"
@@ -2650,10 +2650,10 @@ msgid "admin.closure.ends_at_hint"
 msgstr "Leave empty for until further notice. Team time."
 
 msgid "admin.closure.notice_nl"
-msgstr "Explanation for citizens (Dutch)"
+msgstr "Explanation for participants (Dutch)"
 
 msgid "admin.closure.notice_en"
-msgstr "Explanation for citizens (English)"
+msgstr "Explanation for participants (English)"
 
 msgid "admin.closure.notice_hint"
 msgstr "Shown on the booking page and in the email. Plain text, at most {limit} characters; no personal data."
@@ -2662,7 +2662,7 @@ msgid "admin.closure.current"
 msgstr "Current emergency closure"
 
 msgid "admin.closure.current_lead"
-msgstr "This is how citizens see the notice on the booking page."
+msgstr "This is how participants see the notice on the booking page."
 
 msgid "admin.closure.update"
 msgstr "Change the emergency closure"
@@ -2671,7 +2671,7 @@ msgid "admin.closure.update_lead"
 msgstr "Extend or shorten the closure and update the explanation. Appointments that a later end brings inside the closure are put on hold."
 
 msgid "admin.closure.notify"
-msgstr "Email the new explanation to every citizen with an appointment on hold ({count})"
+msgstr "Email the new explanation to every participant with an appointment on hold ({count})"
 
 msgid "admin.closure.update_button"
 msgstr "Save"
@@ -2683,7 +2683,7 @@ msgid "admin.closure.lift_lead"
 msgstr "The team can be booked again right away. Appointments on hold stay until they are moved, confirmed or cancelled."
 
 msgid "admin.closure.lift_reinstate"
-msgstr "Confirm again the appointments that can still go ahead (the citizen is informed)"
+msgstr "Confirm again the appointments that can still go ahead (the participant is informed)"
 
 msgid "admin.closure.lift_button"
 msgstr "Lift"
@@ -2692,7 +2692,7 @@ msgid "admin.closure.start"
 msgstr "Close the team in an emergency"
 
 msgid "admin.closure.start_lead"
-msgstr "{count} confirmed appointments lie ahead. Appointments inside the closure are put on hold, not deleted: the citizen gets an email with your explanation and can choose a new time."
+msgstr "{count} confirmed appointments lie ahead. Appointments inside the closure are put on hold, not deleted: the participant gets an email with your explanation and can choose a new time."
 
 msgid "admin.closure.start_button"
 msgstr "Close the team"
@@ -2743,7 +2743,7 @@ msgid "admin.closure.move_title"
 msgstr "Move appointment {reference}"
 
 msgid "admin.closure.move_lead"
-msgstr "Original time: {when}. The citizen gets an email with the new time and a new management link."
+msgstr "Original time: {when}. The participant gets an email with the new time and a new management link."
 
 msgid "admin.closure.move_start"
 msgstr "New time"
@@ -2785,7 +2785,7 @@ msgid "admin.closures.start"
 msgstr "Close every team"
 
 msgid "admin.closures.start_lead"
-msgstr "Appointments inside the closure are put on hold, not deleted; every citizen gets an email with your explanation. Times are in the teams' time zone."
+msgstr "Appointments inside the closure are put on hold, not deleted; every participant gets an email with your explanation. Times are in the teams' time zone."
 
 msgid "admin.closures.start_button"
 msgstr "Close every team"
@@ -2812,7 +2812,7 @@ msgid "admin.channels.title"
 msgstr "Message channels"
 
 msgid "admin.channels.lead"
-msgstr "The mail server and SMS service through which citizens receive messages from this organisation."
+msgstr "The mail server and SMS service through which participants receive messages from this organisation."
 
 msgid "admin.integrations.channels_lead"
 msgstr "Mail server and SMS service per organisation. Choose an organisation to configure them."
@@ -2887,7 +2887,7 @@ msgid "admin.channels.sender_address"
 msgstr "Sender address"
 
 msgid "admin.channels.sender_address_hint"
-msgstr "The address citizens see and can reply to."
+msgstr "The address participants see and can reply to."
 
 msgid "admin.channels.sender_name"
 msgstr "Sender name"
@@ -2992,7 +2992,7 @@ msgid "admin.reminders.title"
 msgstr "Reminders"
 
 msgid "admin.reminders.lead"
-msgstr "When and how citizens are reminded of their appointment. Changes apply to new bookings; reminders already planned for existing bookings stay."
+msgstr "When and how participants are reminded of their appointment. Changes apply to new bookings; reminders already planned for existing bookings stay."
 
 msgid "admin.reminders.none"
 msgstr "No reminders are configured."
@@ -3043,7 +3043,7 @@ msgid "admin.reminders.add"
 msgstr "Add a reminder"
 
 msgid "admin.reminders.add_lead"
-msgstr "An SMS only goes to citizens who entered a phone number."
+msgstr "An SMS only goes to participants who entered a phone number."
 
 msgid "admin.reminders.no_phone"
 msgstr "This group's booking form does not ask for a phone number, so SMS is not possible."
@@ -3073,7 +3073,7 @@ msgid "admin.messages.title"
 msgstr "Message texts"
 
 msgid "admin.messages.lead"
-msgstr "The texts of the messages to citizens. Layout, links and the calendar attachment stay fixed; you only change the text."
+msgstr "The texts of the messages to participants. Layout, links and the calendar attachment stay fixed; you only change the text."
 
 msgid "admin.messages.languages"
 msgstr "Language of the texts"
@@ -3531,7 +3531,7 @@ msgid "admin.holidays.upcoming"
 msgstr "Upcoming holidays"
 
 msgid "admin.holidays.upcoming_lead"
-msgstr "The holidays of the coming year from the calendars that apply to this group. Citizens cannot book on a closed day."
+msgstr "The holidays of the coming year from the calendars that apply to this group. Participants cannot book on a closed day."
 
 msgid "admin.holidays.state"
 msgstr "This group"
@@ -4617,7 +4617,7 @@ msgid "admin.check.webex.trial_ok"
 msgstr "A trial-call meeting for host {host} (participants may enter before the host) was scheduled and deleted again."
 
 msgid "admin.check.webex.trial_refused"
-msgstr "Webex refused a trial-call meeting for host {host} ({error}): {reason}. Citizens cannot then open a trial call; check on the Webex site whether participants may join before the host."
+msgstr "Webex refused a trial-call meeting for host {host} ({error}): {reason}. Participants cannot then open a trial call; check on the Webex site whether participants may join before the host."
 
 msgid "admin.check.webex.trial_lobby"
 msgstr "Webex accepted a trial call meeting for host {host} but did not keep its settings ({stored}). The participant would then wait in the lobby and nobody lets them in. Ask the administrator of the Webex site to allow participants to join before the host and without a lobby; until then the trial call does not work."
@@ -4775,7 +4775,7 @@ msgid "admin.simulator.event.host_joined"
 msgstr "Agent joins"
 
 msgid "admin.simulator.event.guest_joined"
-msgstr "Citizen joins"
+msgstr "Participant joins"
 
 msgid "admin.simulator.event.participant_left"
 msgstr "Participant leaves"
@@ -4825,7 +4825,7 @@ msgid "admin.environment.test"
 msgstr "Test environment"
 
 msgid "admin.environment.text"
-msgstr "Not for real appointments of citizens."
+msgstr "Not for real appointments of participants."
 
 msgid "admin.environment.simulator"
 msgstr "Simulator is on"
@@ -4846,7 +4846,7 @@ msgid "admin.retention.title"
 msgstr "Retention"
 
 msgid "admin.retention.intro"
-msgstr "Checks, per group, whether citizens' personal data is removed on time. This page shows counts and times only, never citizens' data."
+msgstr "Checks, per group, whether participants' personal data is removed on time. This page shows counts and times only, never participants' data."
 
 msgid "admin.retention.in_order"
 msgstr "In order: no personal data is past its retention period and no removal failed."
@@ -4918,7 +4918,7 @@ msgid "admin.contacts.title"
 msgstr "Alternative contact options"
 
 msgid "admin.contacts.lead"
-msgstr "How citizens can reach {name} when they cannot book an appointment. This block is shown on the page of an emergency closure and on the maintenance page."
+msgstr "How participants can reach {name} when they cannot book an appointment. This block is shown on the page of an emergency closure and on the maintenance page."
 
 msgid "admin.contacts.manage"
 msgstr "Manage alternative contact options"
@@ -4930,10 +4930,10 @@ msgid "admin.contacts.preview"
 msgstr "Preview"
 
 msgid "admin.contacts.preview_lead"
-msgstr "How citizens see the block, as currently saved."
+msgstr "How participants see the block, as currently saved."
 
 msgid "admin.contacts.empty"
-msgstr "No alternative contact options set yet. Citizens then see only the text of the closure."
+msgstr "No alternative contact options set yet. Participants then see only the text of the closure."
 
 msgid "admin.contacts.form"
 msgstr "Contact options"
@@ -5043,7 +5043,7 @@ msgid "admin.group_contacts.back"
 msgstr "Back to this team's closure"
 
 msgid "admin.group_contacts.preview_lead"
-msgstr "How citizens see the block that applies to this team now: its own block, or else the organisation's default."
+msgstr "How participants see the block that applies to this team now: its own block, or else the organisation's default."
 
 msgid "admin.group_contacts.summary_own"
 msgstr "Own block with {count} contact options."
@@ -5133,7 +5133,7 @@ msgid "admin.roles.permissions_hint"
 msgstr "Only the permissions this role may get are listed. A permission that needs another one says so."
 
 msgid "admin.roles.permissions_hint_read_only"
-msgstr "A copy of Compliance and privacy can only read and never sees citizens' personal data."
+msgstr "A copy of Compliance and privacy can only read and never sees participants' personal data."
 
 msgid "admin.roles.requires"
 msgstr "Needs: {permissions}"
@@ -5250,7 +5250,7 @@ msgid "admin.closure.image"
 msgstr "Image"
 
 msgid "admin.closure.image_lead"
-msgstr "One image on the closure page, below the notice, such as a pictogram for ‘closed’ or ‘outage’. Never put information in the image only: citizens who cannot see it read just the text."
+msgstr "One image on the closure page, below the notice, such as a pictogram for ‘closed’ or ‘outage’. Never put information in the image only: participants who cannot see it read just the text."
 
 msgid "admin.closure.image_current"
 msgstr "This is how the image appears on the closure page now."
@@ -5337,7 +5337,7 @@ msgid "admin.scenarios.name"
 msgstr "Name"
 
 msgid "admin.scenarios.name_hint"
-msgstr "For admins, for instance ‘Outage’ or ‘Strike’; citizens do not see this name. At most {limit} characters."
+msgstr "For admins, for instance ‘Outage’ or ‘Strike’; participants do not see this name. At most {limit} characters."
 
 msgid "admin.scenarios.own_group"
 msgstr "This team's scenarios"
@@ -5412,7 +5412,7 @@ msgid "admin.scenarios.back_to_scenario"
 msgstr "Back to the scenario"
 
 msgid "admin.scenarios.contacts_preview_lead"
-msgstr "This is how citizens see this scenario's block. Empty: on closing, the team's or organisation's block applies."
+msgstr "This is how participants see this scenario's block. Empty: on closing, the team's or organisation's block applies."
 
 msgid "admin.form.error.scenario_name"
 msgstr "Give the scenario a name of at most 80 characters on one line."
@@ -5499,7 +5499,7 @@ msgid "admin.maintenance.title"
 msgstr "Maintenance mode"
 
 msgid "admin.maintenance.lead"
-msgstr "Put the whole installation on read only while you work on the platform. Citizens then cannot book or change appointments; confirmed appointments go ahead as planned."
+msgstr "Put the whole installation on read only while you work on the platform. Participants then cannot book or change appointments; confirmed appointments go ahead as planned."
 
 msgid "admin.maintenance.state"
 msgstr "Status"
@@ -5553,7 +5553,7 @@ msgid "admin.maintenance.off_heading"
 msgstr "Switch maintenance mode off"
 
 msgid "admin.maintenance.off_lead"
-msgstr "Citizens and admins can then do everything they are used to again."
+msgstr "Participants and admins can then do everything they are used to again."
 
 msgid "admin.maintenance.off_lead_environment"
 msgstr "Switching off only clears the switch in the portal; maintenance mode stays on as long as the server switches it on."
@@ -6236,7 +6236,7 @@ msgid "admin.org_settings.page_title"
 msgstr "Settings of {name}"
 
 msgid "admin.org_settings.page_lead"
-msgstr "These values apply to this organisation's groups, citizen pages, emails and admins. A change applies within ten seconds."
+msgstr "These values apply to this organisation's groups, participant pages, emails and admins. A change applies within ten seconds."
 
 msgid "admin.org_settings.settings"
 msgstr "Settings"
@@ -6288,7 +6288,7 @@ msgid "admin.form_fields.title"
 msgstr "Booking form"
 
 msgid "admin.form_fields.lead"
-msgstr "Extra questions citizens answer when they book. Ask only what the team really needs."
+msgstr "Extra questions participants answer when they book. Ask only what the team really needs."
 
 msgid "admin.form_fields.settings_lead"
 msgstr "Extra questions on the form, with checks and a personal data tag."
@@ -6875,7 +6875,7 @@ msgid "admin.settings.data_fields.title"
 msgstr "Data fields"
 
 msgid "admin.settings.data_fields.intro"
-msgstr "Which fields of an appointment are personal data of the citizen, and how sensitive they are."
+msgstr "Which fields of an appointment are personal data of the participant, and how sensitive they are."
 
 msgid "admin.settings.data_fields.rule"
 msgstr "Personal data is stored only on the appointment. It is shown only on the appointment page and in the queue, to roles that may view appointments or work the queue; the agenda shows the first name only. It never appears on the overview, in lists, in the audit log or its export, in a search result or in an alert, and no search or filter matches on it."
@@ -6896,10 +6896,10 @@ msgid "admin.settings.data_fields.stored_on"
 msgstr "Stored on"
 
 msgid "admin.settings.data_fields.direct"
-msgstr "Direct: identifies the citizen on its own"
+msgstr "Direct: identifies the participant on its own"
 
 msgid "admin.settings.data_fields.sensitive"
-msgstr "Sensitive: what the citizen told us, or a link into the conversation"
+msgstr "Sensitive: what the participant told us, or a link into the conversation"
 
 msgid "admin.settings.data_fields.field.first_name"
 msgstr "First name"
@@ -6920,7 +6920,7 @@ msgid "admin.settings.data_fields.field.form_answers"
 msgstr "Answers to the team's own questions"
 
 msgid "admin.settings.data_fields.field.guest_join_url"
-msgstr "Join link of the citizen"
+msgstr "Join link of the participant"
 
 msgid "admin.settings.data_fields.field.host_join_url"
 msgstr "Join link of the agent"
@@ -6989,7 +6989,7 @@ msgid "admin.field.offer"
 msgstr "Offer"
 
 msgid "admin.field.offer_hint"
-msgstr "What citizens can do in this block: book an appointment, start a call right away, or both."
+msgstr "What participants can do in this block: book an appointment, start a call right away, or both."
 
 msgid "admin.offer.scheduled"
 msgstr "Appointments"
@@ -7013,16 +7013,16 @@ msgid "admin.queue.video_pending_explained"
 msgstr "The video call is still being prepared. The button appears by itself once it is ready."
 
 msgid "admin.queue.video_failed_explained"
-msgstr "The video call could not be set up. The citizen sees this too and is advised to book an appointment. Release the booking."
+msgstr "The video call could not be set up. The participant sees this too and is advised to book an appointment. Release the booking."
 
 msgid "admin.queue.timeline"
 msgstr "Open this booking's timeline"
 
 msgid "admin.queue.citizen.not_yet"
-msgstr "Citizen not in the call yet"
+msgstr "Participant not in the call yet"
 
 msgid "admin.queue.citizen.in_lobby"
-msgstr "Citizen waiting in the lobby"
+msgstr "Participant waiting in the lobby"
 
 msgid "admin.queue.citizen.in_call"
 msgstr "Call in progress"
@@ -7237,10 +7237,10 @@ msgstr "The server cannot write the key to the proxy's volume. Tell the server o
 # ADR 0074: the organisation's own texts for citizens.
 
 msgid "admin.org_texts.title"
-msgstr "Texts for citizens"
+msgstr "Texts for participants"
 
 msgid "admin.org_texts.lead"
-msgstr "Change the texts that citizens of {name} see on the group pages and in emails and text messages. Layout, links and the calendar attachment stay fixed; you only change the text."
+msgstr "Change the texts that participants of {name} see on the group pages and in emails and text messages. Layout, links and the calendar attachment stay fixed; you only change the text."
 
 msgid "admin.org_texts.languages_heading"
 msgstr "Language of the texts"
@@ -7255,7 +7255,7 @@ msgid "admin.org_texts.save_hint"
 msgstr "Empty a field to restore the default text. Texts are plain text: markup or code is shown as text."
 
 msgid "admin.org_texts.section_pages"
-msgstr "Pages for citizens"
+msgstr "Pages for participants"
 
 msgid "admin.org_texts.page.group_intro"
 msgstr "Introduction on the group's page"
@@ -7330,7 +7330,7 @@ msgid "admin.channels.reply_to_address"
 msgstr "Reply address"
 
 msgid "admin.channels.reply_to_address_hint"
-msgstr "Where a citizen's reply goes (Reply-To). Empty: a reply goes to the sender address."
+msgstr "Where a participant's reply goes (Reply-To). Empty: a reply goes to the sender address."
 
 msgid "admin.channels.dkim_selector"
 msgstr "DKIM selector"
