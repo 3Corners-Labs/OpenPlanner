@@ -1,6 +1,6 @@
 # 0084. Everything an admin creates can be changed and deleted
 
-Status: accepted (2026-10-31, product owner), step 1 in PR, steps 2–7 not built. Requested by the product owner. Extends ADR 0014 (one
+Status: accepted (2026-10-31, product owner), partly built: step 1 in PR, steps 2–7 not built. Requested by the product owner. Extends ADR 0014 (one
 authorisation matrix), ADR 0024 (emergency closure), ADR 0047 (admin structure) and ADR 0025
 (holiday calendars).
 
