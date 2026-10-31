@@ -30,7 +30,7 @@ The group's holiday tab (``/admin/groups/{slug}/holidays``) lives in ``holiday_r
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Annotated
 
 import structlog
@@ -48,7 +48,7 @@ from app.admin.forms import (
     read_form,
     redirect_done,
 )
-from app.admin.idp_mapping_routes import group_idp_view, idp_mapping_service
+from app.admin.idp_mapping_routes import GroupIdpView, group_idp_view, idp_mapping_service
 from app.admin.pages import Locale, NavView, SameOrigin, current_home, page, with_manual
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
@@ -681,10 +681,19 @@ async def _settings_response(
             "integration_fields": with_manual(request, locale, integrations),
             "errors": form.errors + (idp_form.errors if idp_form else []),
             "check": await check_view(request, locale, context),
-            "idp": await group_idp_view(request, context, idp_form),
+            "idp": _with_manual_field(
+                request, locale, await group_idp_view(request, locale, context, idp_form)
+            ),
         },
         status,
     )
+
+
+def _with_manual_field(request: Request, locale: RequestLocale, view: GroupIdpView) -> GroupIdpView:
+    """Attach the manual section to the IdP value input, like the other settings fields."""
+    if view.field is None:
+        return view
+    return replace(view, field=with_manual(request, locale, [view.field])[0])
 
 
 @router.post("/groups/{slug}/settings/idp-key", response_class=HTMLResponse)

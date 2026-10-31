@@ -339,6 +339,42 @@ def test_other_role_values_are_kept_for_custom_roles_within_bounds() -> None:
     assert principal.role_claims == frozenset(others[:20])
 
 
+def test_entitlement_values_with_the_prefix_are_kept_and_the_rest_ignored() -> None:
+    # ADR 0049: the adapter extracts; what a value means is decided with the directory.
+    claims = login_claims(
+        {
+            "sub": "s",
+            "openplanner_entitlements": [
+                "openplanner:org_admin:gem-a",
+                "openplanner-acc:org_admin:gem-a",
+                "cn=admins",
+            ],
+        },
+        MAPPING,
+    )
+
+    assert claims.entitlements == frozenset({"openplanner:org_admin:gem-a"})
+    assert claims.roles == frozenset()
+
+
+def test_a11_a_claim_flood_refuses_the_login() -> None:
+    flood = {"sub": "s", "openplanner_entitlements": [f"openplanner:x:{n}" for n in range(5000)]}
+
+    with pytest.raises(IdentityError) as caught:
+        login_claims(flood, MAPPING)
+
+    assert caught.value.code == "too_many_entitlements"
+    assert (
+        len(
+            login_claims(
+                {**flood, "openplanner_entitlements": flood["openplanner_entitlements"][:200]},
+                MAPPING,
+            ).entitlements
+        )
+        == 200
+    )
+
+
 # --- lockout diagnostics (ADR 0042 §8 rule 4) ----------------------------------------------
 
 CLAIM_VALUES = ("Jan Jansen", "jan@example.nl", "op-unknown-role", "secret-org", "dept-7")

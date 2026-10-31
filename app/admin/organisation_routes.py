@@ -209,7 +209,7 @@ async def save_organisation(
     current = await service.get(context.principal, org)
     form = await read_form(request, locale)
     settings = OrganisationSettings(
-        form.text("name"), form.text("default_locale"), form.text("idp_key")
+        form.text("name"), form.text("default_locale"), form.text("idp_key") or None
     )
     try:
         changed = await service.update(context.principal, org, settings)

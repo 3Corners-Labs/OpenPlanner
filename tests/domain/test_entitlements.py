@@ -36,6 +36,7 @@ from app.domain.entitlements import (
     recognised_values,
     resolve,
 )
+from app.domain.settings_registry import CLAIM_MODES
 from app.domain.staff import RefusedEntitlement, StaffMember
 from tests.support.domain import NOW
 
@@ -345,7 +346,8 @@ def test_a13_shadow_mode_grants_the_legacy_claims_only() -> None:
     assert shadow.principal.grants == legacy.principal.grants == {Grant("auditor", "gem-a")}
     assert shadow.mismatch == "legacy_only:auditor:gem-a;entitlements_only:org_admin:gem-a"
     assert [r.reason for r in shadow.refused] == [RefusalReason.UNKNOWN_ORGANISATION]
-    assert legacy.mismatch is None and legacy.refused == ()
+    assert legacy.mismatch is None
+    assert legacy.refused == ()
     assert entitled.principal.grants == {Grant("org_admin", "gem-a")}
     assert entitled.mismatch is None
 
@@ -411,3 +413,7 @@ def test_the_directory_knows_every_role_key_with_its_reach(reach: Reach) -> None
     assert built_in <= keys
     if reach is Reach.GROUPS:
         assert "custom.3" in keys
+
+
+def test_the_registry_offers_exactly_the_claim_modes() -> None:
+    assert set(CLAIM_MODES) == {mode.value for mode in ClaimMode}

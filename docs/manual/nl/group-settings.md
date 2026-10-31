@@ -278,3 +278,12 @@ van het webadres als waarde. Alleen een organisatiebeheerder of de superuser wij
 waarde; het formulier waarschuwt hoeveel medewerkers toegang verliezen tot de
 identiteitsprovider de nieuwe waarde stuurt. De volledige lijst staat op **Koppeling
 identiteitsprovider**.
+
+<!-- field: idp_key -->
+### IdP-waarde
+
+De naam waarmee de identiteitsprovider deze groep noemt in een recht, bijvoorbeeld
+`burgerzaken` in `openplanner:group_admin:gem-a/burgerzaken`. Kleine letters, cijfers en
+koppeltekens; uniek binnen de organisatie. Een nieuwe groep begint met de code van het
+webadres. Wijzigt u de waarde, dan verliezen de medewerkers met een recht op de oude waarde hun
+toegang tot de identiteitsprovider de nieuwe stuurt; het formulier telt hoeveel dat er zijn.

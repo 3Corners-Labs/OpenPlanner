@@ -7626,3 +7626,6 @@ msgstr "The identity provider sent these values at your last login, but this ins
 
 msgid "admin.roles.entitlement_notice"
 msgstr "When the installation uses an entitlement claim (ADR 0049), the identity provider sends one value per organisation or group with this role's key, for example openplanner:custom.3:gem-a. The key and the exact values are on the Identity provider mapping page."
+
+msgid "admin.form.error.idp_key"
+msgstr "Use only lower-case letters, digits and hyphens (at most 63 characters), starting with a letter or digit."

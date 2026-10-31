@@ -267,3 +267,12 @@ example `openplanner:group_admin:gem-a/burgerzaken`. A new group starts with the
 web address as value. Only an organisation admin or the superuser changes the value; the form
 warns how many staff members lose access until the identity provider sends the new value. The
 full list is on **Identity provider mapping**.
+
+<!-- field: idp_key -->
+### IdP value
+
+The name the identity provider uses for this group in a right, for example `burgerzaken` in
+`openplanner:group_admin:gem-a/burgerzaken`. Lower-case letters, digits and hyphens; unique
+within the organisation. A new group starts with the code of its web address. When you change
+the value, staff with a right on the old value lose access until the identity provider sends
+the new one; the form counts how many that are.

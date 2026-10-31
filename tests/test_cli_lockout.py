@@ -209,3 +209,45 @@ async def test_oidc_check_without_a_discovery_url(settings: Settings) -> None:
 
     assert not ok
     assert report == "OIDC_DISCOVERY_URL is not set: the admin portal is disabled.\n"
+
+
+@pytest.fixture
+def claims_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """A migrated database for the claims check (made outside the event loop)."""
+    from tests.support.database import migrated_database
+
+    return migrated_database(tmp_path, monkeypatch, "claims")
+
+
+async def test_oidc_check_resolves_sample_claims_without_a_login(
+    settings: Settings, tmp_path: Path, claims_db: str
+) -> None:
+    # ADR 0049 point 16: the IdP team tests an attribute contract from the host.
+    from app.adapters.db.engine import create_engine
+    from app.adapters.db.seed import seed_demo
+    from app.cli import _oidc_claims, _read_claims
+
+    configured = _oidc(settings, database_url=claims_db)
+    engine = create_engine(configured.database_url)
+    await seed_demo(engine)
+    await engine.dispose()
+    sample = tmp_path / "claims.json"
+    sample.write_text(
+        '{"sub": "u-1", "openplanner_entitlements": ["openplanner:org_admin:demo", '
+        '"openplanner:org_admin:gem-x"]}'
+    )
+
+    report, ok = await _oidc_claims(configured, _read_claims(sample))
+    unreadable, bad = await _oidc_claims(configured, _read_claims(tmp_path / "missing.json"))
+
+    assert not ok  # legacy mode ignores the entitlement claim: this login holds nothing
+    assert "mode: legacy" in report
+    assert "grant: org_admin:demo" not in report
+    assert "no grant" in report
+    entitled = configured.model_copy(update={"oidc_claim_mode": "entitlements"})
+    report, ok = await _oidc_claims(entitled, _read_claims(sample))
+    assert ok
+    assert "grant: org_admin:demo" in report
+    assert "refused value: openplanner:org_admin:gem-x (unknown_organisation)" in report
+    assert not bad
+    assert "cannot read" in unreadable

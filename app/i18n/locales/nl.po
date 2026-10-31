@@ -7638,3 +7638,6 @@ msgstr "Deze waarden stuurde de identiteitsprovider bij uw laatste login mee, ma
 
 msgid "admin.roles.entitlement_notice"
 msgstr "Werkt de installatie met een rechtenclaim (ADR 0049), dan stuurt de identiteitsprovider per organisatie of groep één waarde met de sleutel van deze rol, bijvoorbeeld openplanner:custom.3:gem-a. De sleutel en de exacte waarden staan op de pagina Koppeling identiteitsprovider."
+
+msgid "admin.form.error.idp_key"
+msgstr "Gebruik alleen kleine letters, cijfers en koppeltekens (hoogstens 63 tekens), beginnend met een letter of cijfer."
