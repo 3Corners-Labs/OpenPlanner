@@ -439,8 +439,13 @@ OBJECTS = (
                 f"{_GROUP}/settings",
                 Permission.GROUP_EDIT,
                 "settings",
-                # ADR 0055: the booking form is a sub-page of the settings.
-                (f"{_GROUP}/settings/form", f"{_GROUP}/settings/form/{{key}}"),
+                # ADR 0055: the booking form is a sub-page of the settings; ADR 0084: so is
+                # the page that archives the group.
+                (
+                    f"{_GROUP}/settings/form",
+                    f"{_GROUP}/settings/form/{{key}}",
+                    f"{_GROUP}/settings/archive",
+                ),
             ),
             Screen(
                 "group.staffing",

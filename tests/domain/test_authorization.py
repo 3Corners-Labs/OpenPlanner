@@ -71,6 +71,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.ORGANISATION_VIEW,  # ADR 0047 step 3: the own organisations' pages
         Permission.HOLIDAYS_ASSIGN,  # ADR 0025
         Permission.GROUP_CREATE,
+        Permission.GROUP_DELETE,  # ADR 0084: archive what they create
         Permission.GROUP_VIEW,
         Permission.GROUP_EDIT,
         Permission.SCHEDULE_MANAGE,
@@ -152,6 +153,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
 def test_locked_permissions_belong_to_the_superuser_only() -> None:
     assert {
         Permission.ORGANISATION_MANAGE,
+        Permission.ORGANISATION_DELETE,  # ADR 0084: superuser only, like managing
         Permission.HOLIDAYS_MANAGE,
         Permission.INTEGRATIONS_MANAGE,
         Permission.API_CLIENTS_MANAGE,

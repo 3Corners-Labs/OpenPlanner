@@ -220,6 +220,7 @@ def _group(row: GroupRow) -> Group:
         max_bookings_per_email=row.max_bookings_per_email,
         calendar_invite_address=row.calendar_invite_address,
         idp_key=row.idp_key or row.slug,
+        archived_at=row.archived_at,
     )
 
 
@@ -298,6 +299,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "max_bookings_per_email": group.max_bookings_per_email,
         "calendar_invite_address": group.calendar_invite_address,
         "idp_key": group.idp_key,
+        "archived_at": group.archived_at,
     }
 
 
@@ -437,12 +439,18 @@ class SqlTransaction(
         self.written_events: list[AuditEvent] = []
         """Audit events added in this transaction, for the post-commit emit (ADR 0034)."""
 
-    async def list_groups(self, scope: Scope) -> list[GroupSummary]:
-        """Return the groups inside ``scope``, ordered by organisation and name."""
+    async def list_groups(self, scope: Scope, *, archived: bool = False) -> list[GroupSummary]:
+        """Return the groups inside ``scope``, ordered by organisation and name.
+
+        The groups in use, or with ``archived`` the archived ones (ADR 0084).
+        """
+        archive_filter = (
+            GroupRow.archived_at.is_not(None) if archived else GroupRow.archived_at.is_(None)
+        )
         rows = await self._session.execute(
             select(GroupRow, OrganisationRow)
             .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
-            .where(scope_filter(scope, OrganisationRow.slug, GroupRow.slug))
+            .where(scope_filter(scope, OrganisationRow.slug, GroupRow.slug), archive_filter)
             .order_by(OrganisationRow.name, GroupRow.name)
         )
         return [GroupSummary(_group(group), org.slug, org.name) for group, org in rows]

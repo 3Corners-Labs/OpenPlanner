@@ -49,6 +49,7 @@ _ISO_DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 DONE_MESSAGES: dict[str, str] = {
     "created": "admin.done.created",
+    "archived": "admin.done.archived",
     "retried": "admin.done.retried",
     "retry_not_possible": "admin.done.retry_not_possible",
     "diagnostics_on": "admin.done.diagnostics_on",
@@ -110,6 +111,8 @@ DONE_MESSAGES: dict[str, str] = {
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
 FIELD_MESSAGES: dict[str, str] = {
+    # ADR 0084 point 5: the name typed back on a confirmation page.
+    "confirmation": "admin.form.error.confirmation_mismatch",
     "name": "admin.form.error.name",
     "slug": "admin.form.error.slug",
     "idp_key": "admin.form.error.idp_key",
@@ -223,6 +226,8 @@ FIELD_TARGET: dict[str, str] = {
 
 CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
+    ErrorCode.GROUP_ARCHIVED: "admin.form.error.group_archived",
+    ErrorCode.CONFIRMATION_MISMATCH: "admin.form.error.confirmation_mismatch",
     ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
     ErrorCode.IDENTITY_PROVIDER_LIMIT_REACHED: "admin.form.error.identity_provider_limit",
     ErrorCode.ISSUER_TAKEN: "admin.form.error.issuer_taken",

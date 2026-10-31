@@ -8,6 +8,8 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_admin_flow import audit_events
+from tests.support.participant import SAME_ORIGIN as PARTICIPANT
+from tests.support.participant import confirm_newest
 
 GROUP = "/admin/groups/demo"
 
@@ -862,3 +864,87 @@ async def test_an_unknown_join_client_is_refused_and_nothing_changes(site: Site)
 
     assert refused.status_code == 422
     assert '<option value="browser" selected' in after
+
+
+# --- archiving (ADR 0084) --------------------------------------------------------------------
+
+
+async def test_the_settings_offer_archiving_to_those_who_may(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    settings = (await site.client.get(f"{GROUP}/settings")).text
+    assert f"{GROUP}/settings/archive" in settings
+
+    page = await site.client.get(f"{GROUP}/settings/archive")
+    assert page.status_code == 200
+    assert 'name="confirmation"' in page.text
+    assert "Typ “Demo: videogesprek” over om te bevestigen." in page.text
+
+    await site.login_as(GROUP_ADMIN)
+    assert f"{GROUP}/settings/archive" not in (await site.client.get(GROUP)).text
+    assert (await site.client.get(f"{GROUP}/settings/archive")).status_code == 403
+
+
+async def test_a_wrong_name_keeps_the_group(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    refused = await _post(site, f"{GROUP}/settings/archive", {"confirmation": "Demo-team"})
+
+    assert refused.status_code == 422  # type: ignore[attr-defined]
+    assert "Typ de naam precies zo over" in refused.text  # type: ignore[attr-defined]
+    assert 'aria-invalid="true"' in refused.text  # type: ignore[attr-defined]
+    assert (await site.client.get("/g/demo")).status_code == 200
+
+
+async def test_archiving_removes_the_public_page_and_makes_the_group_read_only(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    done = await _post(site, f"{GROUP}/settings/archive", {"confirmation": " demo: VIDEOGESPREK "})
+
+    assert done.headers["location"] == "/admin/groups?done=archived"  # type: ignore[attr-defined]
+    listing = (await site.client.get("/admin/groups?done=archived")).text
+    assert "De groep is gearchiveerd" in listing
+    assert f'href="{GROUP}"' not in listing
+    archived = (await site.client.get("/admin/groups?archived=1")).text
+    assert f'href="{GROUP}"' in archived
+    assert "Gearchiveerde groepen" in archived
+
+    assert (await site.client.get("/g/demo")).status_code == 404
+    overview = await site.client.get(GROUP)
+    assert overview.status_code == 200
+    assert "Deze groep is gearchiveerd" in overview.text
+    refused = await _post(site, f"{GROUP}/settings", dict(SETTINGS_FORM))
+    assert refused.status_code == 409  # type: ignore[attr-defined]
+    assert "gearchiveerd en kan niet meer worden gewijzigd" in refused.text  # type: ignore[attr-defined]
+    again = await _post(site, f"{GROUP}/settings/archive", {"confirmation": "Demo: videogesprek"})
+    assert again.status_code == 409  # type: ignore[attr-defined]
+
+    assert ("sub-org", "group.delete", "success", "") in [
+        (a, b, str(c), d) for a, b, c, d in await audit_events(site)
+    ]
+    assert "gearchiveerd" in (await site.client.get("/admin/audit?group=demo")).text
+
+
+async def test_archiving_is_refused_while_bookings_lie_ahead(site: Site) -> None:
+    booked = await site.client.post(
+        "/g/demo/book",
+        data={
+            "start": "2026-01-02T08:00:00Z",
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "email": "ada@example.org",
+            "phone": "",
+        },
+        headers=PARTICIPANT,
+    )
+    assert booked.status_code == 303
+    await confirm_newest(site.client)
+    await site.login_as(SUPER)
+
+    page = (await site.client.get(f"{GROUP}/settings/archive")).text
+    refused = await _post(site, f"{GROUP}/settings/archive", {"confirmation": "Demo: videogesprek"})
+
+    assert "afspraken in de toekomst" in page
+    assert refused.status_code == 422  # type: ignore[attr-defined]
+    assert (await site.client.get("/g/demo")).status_code == 200

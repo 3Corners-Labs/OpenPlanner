@@ -7,11 +7,11 @@ switch and, for ``client_secret_basic``, the sealed client secret (ADR 0008).
 clear, the private key sealed, and when a rotation retired it. No personal data in either.
 The domains of step 3 get their own migration.
 
-Revises 0077 (participant change lead). Open PRs also claim numbers, so recheck the head
+Revises 0078 (group archived_at, ADR 0084). Open PRs also claim numbers, so recheck the head
 before merging.
 
-Revision ID: 0078
-Revises: 0077
+Revision ID: 0079
+Revises: 0078
 Create Date: 2026-10-31 21:00:00.000000
 """
 
@@ -20,8 +20,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0078"
-down_revision: str | None = "0077"
+revision: str = "0079"
+down_revision: str | None = "0078"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
