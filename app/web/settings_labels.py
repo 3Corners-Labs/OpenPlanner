@@ -61,6 +61,7 @@ SETTING_LABELS: dict[str, str] = {
     "oidc_entitlement_prefix": "settings.field.oidc_entitlement_prefix.label",
     "oidc_entitlements_max_values": "settings.field.oidc_entitlements_max_values.label",
     "idp_mapping_refused_window_days": "settings.field.idp_mapping_refused_window_days.label",
+    "idp_max_per_organisation": "settings.field.idp_max_per_organisation.label",
     "smtp_host": "settings.field.smtp_host.label",
     "smtp_port": "settings.field.smtp_port.label",
     "smtp_starttls": "settings.field.smtp_starttls.label",
