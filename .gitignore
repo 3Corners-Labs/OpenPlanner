@@ -45,3 +45,5 @@ ds-bundle/
 certs/
 # The own certificate's key and request of a local run (ADR 0070); never committed.
 portal-certs/
+site/dist/
+.claude/launch.json

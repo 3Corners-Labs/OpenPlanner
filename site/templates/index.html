@@ -1,0 +1,475 @@
+{#- The one page of openplanner.nl (ADR 0087). Rendered once per locale by scripts/build_site.py
+    with `c` (the locale's content), `releases`, `commit`, `version` and `base` (the asset root). -#}
+<!doctype html>
+<html lang="{{ c.lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="{{ c.meta.description }}">
+<meta property="og:title" content="{{ c.meta.title }}">
+<meta property="og:description" content="{{ c.meta.description }}">
+<meta property="og:image" content="https://openplanner.nl/static/og-{{ c.lang }}.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://openplanner.nl{{ c.path }}">
+<meta property="og:locale" content="{{ "nl_NL" if c.lang == "nl" else "en_GB" }}">
+<meta name="twitter:card" content="summary_large_image">
+<title>{{ c.meta.title }}</title>
+<link rel="canonical" href="https://openplanner.nl{{ c.path }}">
+<link rel="alternate" hreflang="nl" href="https://openplanner.nl/">
+<link rel="alternate" hreflang="en" href="https://openplanner.nl/en/">
+<link rel="alternate" hreflang="x-default" href="https://openplanner.nl/">
+<link rel="icon" href="{{ base }}static/brand/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{{ base }}static/brand/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="{{ base }}static/brand/apple-touch-icon.png">
+<link rel="stylesheet" href="{{ base }}static/site.css">
+<script src="{{ base }}static/site.js" defer></script>
+{%- for block in structured_data %}
+<script type="application/ld+json">{{ block | tojson }}</script>
+{%- endfor %}
+</head>
+<body>
+<a class="skip" href="#main">{{ c.skip }}</a>
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3z"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="4" rx="1"/><rect x="4" y="10" width="16" height="4" rx="1"/><rect x="4" y="16" width="16" height="4" rx="1"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-brush" viewBox="0 0 24 24"><path d="M14 3l7 7-9 9H5v-7z"/><path d="M5 19 3 21"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.2-3.4-1.2-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5a3.9 3.9 0 0 1 1-2.7c-.1-.3-.5-1.3.1-2.7 0 0 .9-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .6 1.4.2 2.4.1 2.7a3.9 3.9 0 0 1 1 2.7c0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10 10 0 0 0 12 2z"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap top__row">
+    <a class="brand" href="{{ c.path }}">
+      <span class="brand__mark">{{ mark }}</span>
+      <span class="brand__name">Open<b>Planner</b></span>
+    </a>
+    <nav class="top__nav" aria-label="{{ c.nav_github }}">
+      <ul>
+        {%- for item in c.nav %}
+        <li><a href="{{ item.href }}">{{ item.label }}</a></li>
+        {%- endfor %}
+      </ul>
+    </nav>
+    <div class="top__tools">
+      <a class="lang" href="{{ c.other.path }}" lang="{{ c.other.lang }}" hreflang="{{ c.other.lang }}" aria-label="{{ c.other.aria }}">{{ c.other.label }}</a>
+      <a class="btn btn--ghost btn--small" href="https://github.com/3Corners-Labs/OpenPlanner"><svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>{{ c.nav_github }}</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap hero__grid">
+    <div class="hero__copy">
+      <p class="eyebrow">{{ c.hero.eyebrow }}</p>
+      <h1 id="hero-title">{{ c.hero.title_a }} <span class="accent">{{ c.hero.title_b }}</span></h1>
+      <p class="lead">{{ c.hero.lead }}</p>
+      <p class="actions">
+        <a class="btn btn--primary" href="#demo">{{ c.hero.cta_demo }}</a>
+        <a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md">{{ c.hero.cta_install }}</a>
+        <a class="btn btn--ghost" href="https://github.com/3Corners-Labs/OpenPlanner">{{ c.hero.cta_source }}</a>
+      </p>
+    </div>
+    <div class="hero__art" aria-hidden="true">
+      <div class="bigmark">{{ mark }}</div>
+    </div>
+  </div>
+  <div class="wrap">
+    <dl class="facts">
+      {%- for fact in c.hero.facts %}
+      <div class="fact"><dt class="fact__value">{{ fact.value }}</dt><dd class="fact__label">{{ fact.label }}</dd></div>
+      {%- endfor %}
+    </dl>
+  </div>
+</section>
+
+<section class="section" id="demo" aria-labelledby="demo-title">
+  <div class="wrap">
+    <h2 id="demo-title">{{ c.demo.title }}</h2>
+    <p class="lead">{{ c.demo.lead }}</p>
+    <div class="demo" data-demo data-i18n='{{ c.demo | tojson }}'>
+      <noscript><p class="notice">{{ c.demo.nojs }}</p></noscript>
+      <div class="demo__frame" hidden data-demo-frame>
+        <div class="demo__chrome" aria-hidden="true"><span></span><span></span><span></span><em>{{ c.integrations.center }} · /g/demo</em></div>
+        <div class="demo__body">
+          <ol class="demo__steps" data-demo-steps>
+            <li data-step="day">{{ c.demo.step_day }}</li>
+            <li data-step="time">{{ c.demo.step_time }}</li>
+            <li data-step="form">{{ c.demo.step_form }}</li>
+            <li data-step="done">{{ c.demo.step_done }}</li>
+          </ol>
+          <div class="demo__panel" data-demo-panel></div>
+          <p class="sr-only" aria-live="polite" data-demo-live></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--tint" id="tour" aria-labelledby="tour-title">
+  <div class="wrap">
+    <h2 id="tour-title">{{ c.tour.title }}</h2>
+    <p class="lead">{{ c.tour.lead }}</p>
+    {%- set a = c.tour.art %}
+    <div class="tour" data-tour>
+      <div class="tour__scene" role="img" aria-label="{{ c.tour.scene_label }}">
+        {#- Participant track #}
+        <div class="scene" data-scene="book">
+          <div class="mini">
+            <div class="mini__bar"><i></i><i></i><i></i></div>
+            <div class="mini__cal">
+              {%- for i in range(21) %}<b class="{% if i == 9 %}mini__free{% elif i in (4, 13, 16) %}mini__busy{% endif %}"></b>{% endfor %}
+            </div>
+            <div class="mini__times"><b class="pick"></b><b></b><b></b><b></b></div>
+            <div class="mini__form"><b></b><b></b><b class="mini__btn"></b></div>
+            <span class="cursor"></span>
+          </div>
+        </div>
+        <div class="scene" data-scene="direct">
+          <div class="mini mini--direct">
+            <div class="mini__bar"><i></i><i></i><i></i></div>
+            <b class="mini__line mini__line--w"></b><b class="mini__line"></b>
+            <div class="direct__btn"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg>{{ a.direct_btn }}</div>
+            <div class="direct__wait">{{ a.direct_wait }}</div>
+            <span class="cursor cursor--direct"></span>
+          </div>
+        </div>
+        <div class="scene" data-scene="mail">
+          <div class="mail">
+            <div class="mail__head"><span class="mail__dot"></span><b class="mail__from"></b></div>
+            <div class="mail__subject">{{ a.mail_subject }}</div>
+            <b class="mini__line mini__line--w"></b><b class="mini__line"></b><b class="mini__line mini__line--s"></b>
+            <div class="mail__row"><span class="mail__btn">{{ a.mail_btn }}</span><span class="ics ics--inline">.ics</span></div>
+          </div>
+        </div>
+        <div class="scene" data-scene="manage">
+          <div class="mini mini--manage">
+            <div class="mini__bar"><i></i><i></i><i></i></div>
+            <div class="manage__summary"><b class="mini__line mini__line--w"></b></div>
+            <div class="manage__btns"><span class="manage__btn manage__btn--primary">{{ a.manage_move }}</span><span class="manage__btn">{{ a.manage_cancel }}</span></div>
+            <div class="mini__times mini__times--manage"><b></b><b class="pick"></b><b></b><b></b></div>
+            <span class="cursor cursor--manage"></span>
+          </div>
+        </div>
+        <div class="scene" data-scene="trial">
+          <div class="trial">
+            <div class="trial__tile"><span class="trial__cam"></span><span class="trial__label">{{ a.trial_cam }}</span><span class="trial__ok"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span></div>
+            <div class="trial__tile"><span class="trial__mic"></span><span class="trial__label">{{ a.trial_mic }}</span><span class="trial__ok"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span></div>
+            <div class="card__pill trial__pill"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>{{ a.trial_ok }}</div>
+          </div>
+        </div>
+        <div class="scene" data-scene="join">
+          <div class="call call--join">
+            <div class="call__tile call__tile--wide"><span class="join__btn">{{ a.join_btn }}</span></div>
+            <div class="call__tile call__tile--p"><span class="avatar avatar--p"></span><span class="label">{{ a.lobby }}</span></div>
+            <div class="call__tile call__tile--agent"><span class="avatar"></span><span class="label">{{ a.cohost }}</span></div>
+          </div>
+        </div>
+        {#- Team and admin track #}
+        <div class="scene" data-scene="orgs">
+          <div class="portal">
+            <div class="portal__side"><i></i><i></i><i></i><i></i></div>
+            <div class="portal__main">
+              {%- for org in a.orgs %}
+              <div class="portal__row"><img src="{{ base }}static/brand/mark-mono.svg" alt="" width="14" height="14"><span>{{ org }}</span></div>
+              {%- endfor %}
+              <div class="portal__roles">{% for role in a.roles %}<span class="chip">{{ role }}</span>{% endfor %}</div>
+            </div>
+          </div>
+        </div>
+        <div class="scene" data-scene="groups">
+          <div class="groups">
+            {%- for g in a.groups %}
+            <div class="group"><span class="tag">{{ a.skill }}</span><strong>{{ g[0] }}</strong><span class="group__meta">{{ g[1] }}</span><b class="mini__line"></b></div>
+            {%- endfor %}
+          </div>
+        </div>
+        <div class="scene" data-scene="staffing">
+          <div class="week">
+            {%- for day in a.days %}
+            <div class="week__day"><span class="week__name">{{ day }}</span><b class="block block--{{ loop.index }}"></b><b class="block block--b{{ loop.index }}"></b></div>
+            {%- endfor %}
+          </div>
+        </div>
+        <div class="scene" data-scene="agenda">
+          <div class="agenda">
+            {%- for row in a.agenda %}
+            <div class="agenda__row agenda__row--{{ loop.index }}"><span class="agenda__time">{{ row[0] }}</span><b class="mini__line"></b><span class="pill pill--{{ loop.index }}">{{ row[1] }}</span></div>
+            {%- endfor %}
+          </div>
+        </div>
+        <div class="scene" data-scene="queue">
+          <div class="queue">
+            <div class="queue__kinds"><span class="queue__kind is-on">{{ a.queue_cc }}</span><span class="queue__kind">{{ a.queue_own }}</span></div>
+            <div class="queue__head">Webex Contact Center</div>
+            <div class="queue__item"></div>
+            <div class="queue__item"></div>
+            <div class="queue__item queue__item--new"><span class="badge">T−5</span></div>
+          </div>
+        </div>
+        <div class="scene" data-scene="agent">
+          <div class="call">
+            <div class="call__tile call__tile--agent"><span class="avatar"></span><span class="label">{{ a.cohost }}</span></div>
+            <div class="call__tile"><span class="avatar avatar--p"></span><span class="label">Sam</span></div>
+            <div class="call__bar"><span class="purge"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>24 h</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="tour__tracks" data-tour-steps>
+        {%- set n = namespace(i=0) %}
+        {%- for track in c.tour.tracks %}
+        <section class="tour__track" aria-labelledby="track-{{ track.key }}">
+          <h3 id="track-{{ track.key }}" class="tour__track-title">{{ track.title }}</h3>
+          <ol class="tour__steps">
+            {%- for step in track.steps %}
+            <li class="tour__step">
+              <button type="button" class="tour__pick" aria-pressed="{{ 'true' if n.i == 0 else 'false' }}" data-tour-go="{{ n.i }}">
+                <span class="tour__num">{{ loop.index }}</span>
+                <span class="tour__text"><strong>{{ step.title }}</strong><span>{{ step.text }}</span></span>
+              </button>
+            </li>
+            {%- set n.i = n.i + 1 %}
+            {%- endfor %}
+          </ol>
+        </section>
+        {%- endfor %}
+      </div>
+      <div class="tour__controls">
+        <button type="button" class="btn btn--small" data-tour-toggle aria-pressed="false" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-pause" data-tour-icon/></svg><span data-tour-label>{{ c.tour.pause }}</span>
+        </button>
+        <span class="sr-only" data-tour-play="{{ c.tour.play }}" data-tour-pause="{{ c.tour.pause }}"></span>
+      </div>
+    </div>
+    <div class="video">
+      <h3>{{ c.tour.video_title }}</h3>
+      <p>{{ c.tour.video_text }}</p>
+      {%- if tour_video %}
+      <video controls preload="metadata" playsinline poster="{{ base }}static/media/tour.jpg" width="1280" height="720">
+        <source src="{{ base }}static/media/tour.webm" type="video/webm">
+        <track kind="captions" src="{{ base }}static/media/tour.{{ c.lang }}.vtt" srclang="{{ c.lang }}" label="{{ c.lang | upper }}" default>
+      </video>
+      {%- else %}
+      <p class="video__placeholder"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>{{ c.tour.video_soon }}</p>
+      {%- endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section" id="how" aria-labelledby="how-title">
+  <div class="wrap">
+    <h2 id="how-title">{{ c.how.title }}</h2>
+    <ol class="steps">
+      {%- for step in c.how.steps %}
+      <li class="step reveal"><span class="step__num">{{ loop.index }}</span><h3>{{ step.title }}</h3><p>{{ step.text }}</p></li>
+      {%- endfor %}
+    </ol>
+  </div>
+</section>
+
+<section class="section section--tint" id="features" aria-labelledby="features-title">
+  <div class="wrap">
+    <h2 id="features-title">{{ c.features.title }}</h2>
+    <p class="lead">{{ c.features.lead }}</p>
+    <ul class="cards">
+      {%- for f in c.features['items'] %}
+      <li class="card reveal"><svg class="card__icon" aria-hidden="true"><use href="#i-{{ f.icon }}"/></svg><h3>{{ f.title }}</h3><p>{{ f.text }}</p></li>
+      {%- endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section" id="integrations" aria-labelledby="integrations-title">
+  <div class="wrap">
+    <h2 id="integrations-title">{{ c.integrations.title }}</h2>
+    <p class="lead">{{ c.integrations.lead }}</p>
+    <div class="hub">
+      <svg class="hub__lines" viewBox="0 0 300 300" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M150 150 L50 50 M150 150 L150 50 M150 150 L250 50 M150 150 L50 250 M150 150 L150 250 M150 150 L250 250"/>
+      </svg>
+      <div class="hub__center">
+        <span class="hub__mark">{{ mark }}</span>
+        <strong>{{ c.integrations.center }}</strong>
+      </div>
+      {%- for it in c.integrations['items'] %}
+      <article class="hub__node hub__node--{{ it.key }} reveal" aria-labelledby="int-{{ it.key }}">
+        <p class="tag">{{ it.tag }}</p>
+        <h3 id="int-{{ it.key }}">{{ it.name }}</h3>
+        <p>{{ it.text }}</p>
+        <a href="{{ it.href }}">{{ it.link }}</a>
+      </article>
+      {%- endfor %}
+    </div>
+    <aside class="roadmap">
+      <h3>{{ c.integrations.roadmap_title }}</h3>
+      <p>{{ c.integrations.roadmap }}</p>
+    </aside>
+  </div>
+</section>
+
+<section class="section section--dark" id="enterprise" aria-labelledby="enterprise-title">
+  <div class="wrap">
+    <h2 id="enterprise-title">{{ c.enterprise.title }}</h2>
+    <p class="lead">{{ c.enterprise.lead }}</p>
+    <ul class="grid2">
+      {%- for e in c.enterprise['items'] %}
+      <li class="reveal"><h3>{{ e.title }}</h3><p>{{ e.text }}</p></li>
+      {%- endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section" id="standards" aria-labelledby="standards-title">
+  <div class="wrap">
+    <h2 id="standards-title">{{ c.standards.title }}</h2>
+    <p class="lead">{{ c.standards.lead }}</p>
+    <div class="table-scroll">
+      <table class="standards">
+        <thead><tr><th scope="col">{{ c.standards.col_standard }}</th><th scope="col">{{ c.standards.col_what }}</th><th scope="col">{{ c.standards.col_status }}</th><th scope="col">{{ c.standards.col_proof }}</th></tr></thead>
+        <tbody>
+          {%- for row in c.standards['items'] %}
+          <tr>
+            <th scope="row">{{ row.name }}</th>
+            <td>{{ row.what }}</td>
+            <td><span class="status status--{{ row.status }}"><span class="status__dot" aria-hidden="true"></span>{{ c.standards.status[row.status] }}</span></td>
+            <td><a href="{{ row.href }}">{{ row.link }}</a></td>
+          </tr>
+          {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="twocol">
+      <div>
+        <h3>{{ c.standards.code_title }}</h3>
+        <ul class="ticks">{% for line in c.standards.code %}<li>{{ line }}</li>{% endfor %}</ul>
+      </div>
+      <div>
+        <h3>{{ c.standards.update_title }}</h3>
+        <ul class="ticks">{% for line in c.standards['update'] %}<li>{{ line }}</li>{% endfor %}</ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="open-source" aria-labelledby="os-title">
+  <div class="wrap">
+    <h2 id="os-title">{{ c.opensource.title }}</h2>
+    <p class="lead">{{ c.opensource.lead }}</p>
+    <ul class="cards cards--4">
+      {%- for p in c.opensource.points %}
+      <li class="card reveal"><h3>{{ p.title }}</h3><p>{{ p.text }}</p></li>
+      {%- endfor %}
+    </ul>
+    <p class="actions">
+      <a class="btn btn--primary" href="https://github.com/3Corners-Labs/OpenPlanner"><svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>{{ c.opensource.cta_github }}</a>
+      <a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/CONTRIBUTING.md">{{ c.opensource.cta_contribute }}</a>
+      <a class="btn btn--ghost" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/SECURITY.md">{{ c.opensource.cta_security }}</a>
+    </p>
+  </div>
+</section>
+
+<section class="section" id="roadmap" aria-labelledby="roadmap-title">
+  <div class="wrap">
+    <h2 id="roadmap-title">{{ c.roadmap.title }}</h2>
+    <p class="lead">{{ c.roadmap.lead }}</p>
+    {%- if roadmap %}
+    {%- set total = roadmap | sum(attribute='open_steps') %}
+    <p class="small">{{ c.roadmap.total.replace("{n}", total | string).replace("{m}", roadmap | length | string) }}</p>
+    <ul class="roadmap-list">
+      {%- for item in roadmap %}
+      <li>
+        <a class="roadmap-list__adr" href="{{ item.adr_url }}">ADR {{ item.number }}</a>
+        <span class="roadmap-list__title">{{ item.title }}</span>
+        <a class="roadmap-list__steps" href="{{ item.issues_url }}">{{ c.roadmap.step if item.open_steps == 1 else c.roadmap.steps.replace("{n}", item.open_steps | string) }}</a>
+      </li>
+      {%- endfor %}
+    </ul>
+    {%- else %}
+    <p class="notice">{{ c.roadmap.no_data }}</p>
+    {%- endif %}
+    <p class="actions"><a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen+label%3Aadr%3A">{{ c.roadmap.all }}</a></p>
+  </div>
+</section>
+
+<section class="section section--tint" id="releases" aria-labelledby="releases-title">
+  <div class="wrap">
+    <h2 id="releases-title">{{ c.releases.title }}</h2>
+    <p class="lead">{{ c.releases.lead }}</p>
+    {%- if releases %}
+    <div class="release-grid">
+      <div class="release release--latest">
+        <p class="tag">{{ c.releases.latest }}</p>
+        {%- if releases.latest %}
+        <p class="release__version"><a href="{{ releases.latest.url }}">{{ releases.latest.tag }}</a></p>
+        <p class="release__date"><time datetime="{{ releases.latest.date }}">{{ releases.latest.date }}</time></p>
+        {%- else %}<p>{{ c.releases.none }}</p>{%- endif %}
+      </div>
+      <div class="release">
+        <p class="tag">{{ c.releases.candidate }}</p>
+        {%- if releases.candidate %}
+        <p class="release__version"><a href="{{ releases.candidate.url }}">{{ releases.candidate.tag }}</a></p>
+        <p class="release__date"><time datetime="{{ releases.candidate.date }}">{{ releases.candidate.date }}</time></p>
+        {%- else %}<p>{{ c.releases.none }}</p>{%- endif %}
+      </div>
+    </div>
+    <ul class="release-list">
+      {%- for r in releases.recent %}
+      <li><a href="{{ r.url }}">{{ r.tag }}</a> <time datetime="{{ r.date }}">{{ r.date }}</time>{% if r.prerelease %} <span class="tag">{{ c.releases.prerelease }}</span>{% endif %}</li>
+      {%- endfor %}
+    </ul>
+    {%- else %}
+    <p class="notice">{{ c.releases.no_data }}</p>
+    {%- endif %}
+    <p class="actions">
+      <a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/releases">{{ c.releases.all }}</a>
+      <a class="btn btn--ghost" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md">{{ c.releases.install }}</a>
+    </p>
+    <p class="small">{{ c.releases.fresh }}{% if commit %} {{ c.releases.built.replace("{commit}", commit[:12]) }}{% endif %}</p>
+  </div>
+</section>
+
+<section class="section cta" aria-labelledby="cta-title">
+  <div class="wrap cta__box">
+    <h2 id="cta-title">{{ c.cta.title }}</h2>
+    <p>{{ c.cta.text }}</p>
+    <p class="actions">
+      <a class="btn btn--primary" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md">{{ c.cta.primary }}</a>
+      <a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner#quick-start-demo">{{ c.cta.secondary }}</a>
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot__grid">
+    <div>
+      <a class="brand" href="{{ c.path }}"><span class="brand__mark">{{ mark }}</span><span class="brand__name">Open<b>Planner</b></span></a>
+      <p>{{ c.footer.tagline }}</p>
+    </div>
+    <ul class="foot__links">
+      {%- for l in c.footer.links %}
+      <li><a href="{{ l.href }}">{{ l.label }}</a></li>
+      {%- endfor %}
+      <li><a href="{{ c.other.path }}" lang="{{ c.other.lang }}" hreflang="{{ c.other.lang }}">{{ c.other.label }}</a></li>
+    </ul>
+    <p class="foot__legal">{{ c.footer.nocookies }}<br>{{ c.footer.license }}</p>
+  </div>
+</footer>
+</body>
+</html>
