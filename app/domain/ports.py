@@ -30,8 +30,10 @@ from app.domain.calls import (
     BookingEvent,
     BookingOverview,
     CallStatus,
+    EventKind,
     MeetingRequest,
     MeetingStatus,
+    TaskSnapshot,
     WorkItem,
 )
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
@@ -262,6 +264,38 @@ class ContactCenterDispatcher(Protocol):
         Raises:
             IntegrationError: If WxCC refuses or cannot be reached.
         """
+        ...
+
+    async def read_task(self, task_id: str) -> TaskSnapshot:
+        """Return the task's state as the platform has it (ADR 0082 point 1).
+
+        Only the state, the platform's status word and the time of the last change come back,
+        never the task's attributes. A task the platform does not know is ``TaskState.NONE``.
+
+        Raises:
+            IntegrationError: If WxCC refuses or cannot be reached.
+        """
+        ...
+
+
+class ProbeRegistry(Protocol):
+    """Remembers the probe work item of a group check and the events it got (ADR 0082).
+
+    The group check creates a work item with kind ``probe`` and waits for its ``task:new``
+    and ``task:ended`` events on the webhook. The webhook handler asks the registry whether
+    an unknown task id is the open probe and notes the event; the check polls the events.
+    """
+
+    async def open(self, task_id: str, at: datetime) -> None:
+        """Start waiting for the events of probe ``task_id``; replaces an earlier probe."""
+        ...
+
+    async def note(self, task_id: str, kind: EventKind, at: datetime) -> bool:
+        """Note an event of ``task_id`` if it is the open probe; return whether it was."""
+        ...
+
+    async def events(self, task_id: str) -> tuple[EventKind, ...]:
+        """Return the events noted for ``task_id``, in order; empty for another task."""
         ...
 
 

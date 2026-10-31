@@ -41,6 +41,37 @@
   </table>
   </div>
 </section>
+<section class="card" id="service-app" aria-labelledby="service-app-heading">
+  <div class="card__header">
+    <h2 id="service-app-heading">{{ _("admin.integrations.service_app_check") }}</h2>
+    <p class="card__lead">{{ _("admin.integrations.service_app_check_lead") }}</p>
+  </div>
+  <form method="post" action="/admin/integrations/service-app-check">
+    <button type="submit" class="button">{{ _("admin.integrations.service_app_check_button") }}</button>
+  </form>
+  {% if checks.service_app_at %}
+  <p>{{ _("admin.integrations.service_app_checked_at", date=checks.service_app_at) }}
+  {% if checks.service_app_passed %}<span class="chip chip--success">{{ _("admin.integrations.service_app_passed") }}</span>{% else %}<span class="chip chip--danger">{{ _("admin.integrations.service_app_failed") }}</span>{% endif %}</p>
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.integrations.service_app_check") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.integrations.col.probe") }}</th><th scope="col">{{ _("admin.integrations.col.http") }}</th><th scope="col">{{ _("admin.integrations.col.verdict") }}</th><th scope="col">{{ _("admin.integrations.col.hint") }}</th></tr></thead>
+    <tbody>
+      {% for row in checks.probes %}
+      <tr>
+        <th scope="row"><code>{{ row.name }}</code></th>
+        <td>{{ row.status }}</td>
+        <td><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %}">{{ row.verdict }}</span></td>
+        <td>{{ row.hint }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>{{ _("admin.integrations.service_app_not_checked", command="python -m app.cli wxcc-check") }}</p>
+  {% endif %}
+</section>
 <section class="card" aria-labelledby="webhooks-heading">
   <div class="card__header">
     <h2 id="webhooks-heading">{{ _("admin.integrations.webhooks") }}</h2>

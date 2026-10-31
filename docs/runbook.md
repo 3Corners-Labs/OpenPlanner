@@ -560,13 +560,19 @@ Work Items is in beta; the organisation must be enabled by Cisco.
    | `startTime` | Starttijd | no | yes |
    | `groupName` | Team | no | yes |
    | `meetingLink` | Videogesprek | no | yes |
-   | `kind` | Soort (scheduled/direct/cancelled) | no | yes |
+   | `kind` | Soort (scheduled/direct/cancelled/probe) | no | yes |
 
 3. **Entry point and flow** for the asset. The flow reads the flow setting
    `openplannerGroup` (the group's routing value, by default its web address) and routes with
    **Queue Contact** to the right queue. Add a **Screen Pop** of `meetingLink` so the agent opens
    the meeting in one click (in the Webex app, signed in: cohost). Direct calls can get a higher
-   priority with **Set Contact Priority** on `kind = direct`.
+   priority with **Set Contact Priority** on `kind = direct`. Add a **Case** on `kind = probe`
+   that ends the contact before any queue (ADR 0082): **Koppeling controleren** sends a probe
+   work item through the asset and the flow and waits for its `task:new` and `task:ended`;
+   without the branch OpenPlanner ends the probe itself (End Task, `cjp:user`) and warns, and
+   an agent may see it for a moment. **To verify on the test tenant:** that the flow can read
+   `kind` from the work item data; if it cannot, route the probe on a flow setting instead
+   (the Case value stays `probe`).
 4. **Queues** with channel type Work Item, the **multimedia profile** capacity for work items,
    and a **RONA** timeout.
 5. Set `WXCC_API_BASE_URL` to your region's API host.
@@ -682,7 +688,10 @@ anyway, but a named tunnel with an ingress rule for that path alone is the tidie
 ### 6. Checking the Service App (`wxcc-check`)
 
 After creating the Service App, after changing its scopes or authorisation in Control Hub, and
-whenever calls fail with `unauthorized` or `rejected_403`, run:
+whenever calls fail with `unauthorized` or `rejected_403`, press **Service App controleren**
+on **Koppelingen** in the admin portal (`integrations.manage`, fresh login, 6 runs per minute;
+audited as `integration.service_app_check`, the last verdicts stay on the page; ADR 0082), or
+run the same probes on the command line:
 
 ```sh
 docker compose exec web python -m app.cli wxcc-check
@@ -815,17 +824,30 @@ runs what sections 6–8 check, but for that one group:
   (ADR 0065). That proves licence, scope, host, time zone and meeting options in one go; a
   refusal shows Webex's own reason on the line. Nothing else is written at the platforms.
 - **Webex Contact Center:** region, channel, asset, asset schema, entry point, flow
-  (`openplannerGroup` and a branch for the routing value), queue, Screen Pop. These are the
-  same rules as `wxcc-config-check`.
+  (`openplannerGroup` and a branch for the routing value, a `probe` branch), queue, Screen
+  Pop. These are the same rules as `wxcc-config-check`. Then a **probe work item** (ADR
+  0082): created on the group's channel and business address exactly as a booking's would be
+  (`kind: probe`, reference `probe-…`, first name "Probe", the probe meeting's link), and
+  watched on `/webhooks/wxcc` until its `task:new` and `task:ended` arrive, at most
+  `INTEGRATION_PROBE_TIMEOUT_SECONDS` (platform setting, default 60, 10–300). That proves the
+  token, the scopes, the asset, the flow, the subscription and the webhook path in one go.
+  `wxcc.probe.no_events`: nothing came back (subscription inactive, or the webhook does not
+  reach OpenPlanner); `wxcc.probe.not_ended`: the flow has the branch but did not end it;
+  `wxcc.probe.ended_here` (warning): no branch, OpenPlanner ended the probe itself;
+  `wxcc.probe.left` (warning): it could not (no `cjp:user`), end it in Agent Desktop. The
+  probe's requests are request events at the group's level, like the probe meeting's.
 - **Webhooks:** `WEBHOOK_BASE_URL` is https; this host's webhooks and the WxCC subscription
   exist on the current address; a signed self-test event arrives.
+- **Worker:** alive, version, claims the meeting jobs (group with a host) and the work item
+  jobs (group that dispatches: `worker.no_dispatch_jobs` means the worker started without
+  `WXCC_API_BASE_URL`), failed and overdue jobs of the group.
 
 Each line says OK, Waarschuwing, Fout or Overgeslagen, and what to change. The latest result
 stays on the page with its time, and every run is audited as `integration.check`. Save
 changes first: the check uses the saved settings. It is limited to 6 runs per minute.
 
 **The worker runs the same check on its own** (ADR 0065 step 2). Every group with a Webex host
-is checked once per `INTEGRATION_CHECK_INTERVAL_HOURS` (platform setting, default 24, 1–168;
+or a contact-center mapping (ADR 0082) is checked once per `INTEGRATION_CHECK_INTERVAL_HOURS` (platform setting, default 24, 1–168;
 the worker looks every ten minutes which groups are due) and right after an admin saves a new
 host address. The result replaces the group's latest check on its settings page, exactly as
 the button's does, and a broken chain is a system event `integration.check` at the group's
@@ -833,8 +855,8 @@ level: outcome *mislukt*, the reason is the first failing line's code (for insta
 `webex.schedule_refused`) and Webex's own answer stands under it. The audit log (Logboek,
 kind *Systeem*) shows it to the group's and the organisation's admins and the superuser; it
 repeats once per interval while the chain stays broken, and a check that is fine again is
-recorded once as *gelukt*. Without a Service App, or for a group without a host, the worker
-checks nothing. The log line `integration.checked` says how many groups a sweep checked.
+recorded once as *gelukt*. Without a Service App, or for a group with neither a host nor a
+mapping, the worker checks nothing. The log line `integration.checked` says how many groups a sweep checked.
 
 When a meeting still fails later, the booking's timeline (Agenda → the booking) shows the
 code and, under it, Webex's own answer ("Antwoord van Webex: ..."); the audit log shows the

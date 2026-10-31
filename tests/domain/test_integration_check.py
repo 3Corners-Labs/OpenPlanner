@@ -284,3 +284,35 @@ async def test_the_watch_looks_every_ten_minutes_at_most(uow: InMemoryUnitOfWork
     assert await watch.run() == []  # looked again; demo is not due for a day
     clock.advance(INTERVAL)
     assert await watch.run() == ["demo"]
+
+
+def _with_mapping(uow: InMemoryUnitOfWork, *ids: int) -> None:
+    for group_id in ids:
+        uow.state.groups[group_id] = replace(
+            uow.state.groups[group_id],
+            wxcc_channel="openplanner-video",
+            wxcc_business_address="openplanner@example.biz",
+        )
+
+
+async def test_a_group_with_a_contact_center_mapping_is_checked_without_a_host(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    """ADR 0082 point 4: the automatic check covers every group with a chain to prove."""
+    _with_mapping(uow, 1)  # demo: work items, no video host
+    checker = FakeChecker([OK])
+    service = _service(uow, checker)
+
+    assert await service.check_as_system("demo") is not None
+    assert await service.check_due_groups(timedelta(0)) == ["demo"]
+    assert [slug for slug, _ in checker.calls] == ["demo", "demo"]
+
+
+async def test_every_check_asks_the_worker_about_dispatch_jobs_when_the_group_dispatches(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    _with_mapping(uow, 1)  # the heartbeat of the fixture claims meeting jobs only
+
+    check = await _service(uow, FakeChecker([OK])).run(ORG_ADMIN, "demo")
+
+    assert "worker.no_dispatch_jobs" in {f.code for f in check.findings}

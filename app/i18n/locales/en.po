@@ -4386,6 +4386,45 @@ msgstr "Read more in the manual"
 
 #. Webhook registrations and delivery self-test (integrations page).
 
+msgid "admin.integrations.service_app_check"
+msgstr "Check the Service App"
+
+msgid "admin.integrations.service_app_check_lead"
+msgstr "Makes every kind of call OpenPlanner makes to Webex and Webex Contact Center without changing anything: an empty task and an unknown task id are refused by WxCC. Per call you see the HTTP status and, on 401 or 403, the scope that is probably missing."
+
+msgid "admin.integrations.service_app_check_button"
+msgstr "Check the Service App"
+
+msgid "admin.integrations.service_app_not_checked"
+msgstr "Not checked from the portal yet. On the command line: {command}."
+
+msgid "admin.integrations.service_app_checked_at"
+msgstr "Last checked on {date}."
+
+msgid "admin.integrations.service_app_passed"
+msgstr "Every required call succeeds."
+
+msgid "admin.integrations.service_app_failed"
+msgstr "A required call fails: see the lines below and the runbook (Service App)."
+
+msgid "admin.integrations.col.probe"
+msgstr "Call"
+
+msgid "admin.integrations.col.verdict"
+msgstr "Result"
+
+msgid "admin.integrations.col.hint"
+msgstr "Explanation"
+
+msgid "admin.integrations.verdict.ok"
+msgstr "OK"
+
+msgid "admin.integrations.verdict.fail"
+msgstr "Failed"
+
+msgid "admin.integrations.verdict.warn"
+msgstr "Warning"
+
 msgid "admin.integrations.registrations"
 msgstr "Registrations at Webex and WxCC"
 
@@ -4723,6 +4762,30 @@ msgstr "The flow shows a Screen Pop to the agent."
 
 msgid "admin.check.wxcc.screenpop.missing"
 msgstr "No Screen Pop: add one with meetingLink so the agent sees the link at once."
+
+msgid "admin.check.wxcc.probe.ok"
+msgstr "Probe work item {task} was created and ended by the flow ({seconds} s): token, scopes, asset, flow, subscription and webhook work."
+
+msgid "admin.check.wxcc.probe.missing"
+msgstr "The flow has no branch for kind 'probe': a probe work item is ended by OpenPlanner itself (End Task) or reaches an agent. Add a Case on kind == probe to the flow that ends the contact."
+
+msgid "admin.check.wxcc.probe.refused"
+msgstr "The probe work item was refused ({error}): {reason}"
+
+msgid "admin.check.wxcc.probe.failed"
+msgstr "WxCC reported probe work item {task} as failed ({seconds} s): the flow or the queue refuses it."
+
+msgid "admin.check.wxcc.probe.no_events"
+msgstr "Probe work item {task} was created, but no task:new arrived within {seconds} s: the subscription is off or the webhook does not reach OpenPlanner. OpenPlanner ended the item itself."
+
+msgid "admin.check.wxcc.probe.not_ended"
+msgstr "Probe work item {task} arrived (task:new), but the flow did not end it within {seconds} s: check the branch on kind == probe. OpenPlanner ended the item itself."
+
+msgid "admin.check.wxcc.probe.ended_here"
+msgstr "Probe work item {task} arrived (task:new); as the flow has no branch for 'probe', OpenPlanner ended it itself after {seconds} s."
+
+msgid "admin.check.wxcc.probe.left"
+msgstr "Probe work item {task} could not be ended ({error}): end it in Agent Desktop, or add the scope cjp:user."
 
 msgid "admin.check.webhooks.not_https"
 msgstr "The webhook address {base} is not https: Webex and Webex Contact Center cannot deliver."
@@ -6743,6 +6806,9 @@ msgstr "The worker runs version {worker}, the admin portal version {web}: an upd
 msgid "admin.check.worker.no_video_jobs"
 msgstr "The worker creates no video meetings: it was started without the Webex settings. Restart the worker once the Service App is set up."
 
+msgid "admin.check.worker.no_dispatch_jobs"
+msgstr "The worker creates no work items: it was started without the WxCC settings. Restart the worker once WXCC_API_BASE_URL is set."
+
 msgid "admin.check.worker.jobs_ok"
 msgstr "No failed or overdue jobs in this group."
 
@@ -6751,6 +6817,9 @@ msgstr "{count} jobs of this group failed. Open the booking in the agenda to see
 
 msgid "admin.check.worker.overdue_jobs"
 msgstr "{count} jobs of this group have waited longer than {minutes} minutes for the worker."
+
+msgid "audit.event.integration_service_app_check"
+msgstr "Service App checked"
 
 msgid "audit.event.integration_request"
 msgstr "Request to Webex or Webex Contact Center"
@@ -6781,6 +6850,9 @@ msgstr "Trying again is no longer possible: the booking is not active, or the me
 
 msgid "settings.field.integration_request_retention_days.label"
 msgstr "Keep requests to Webex and WxCC (days)"
+
+msgid "settings.field.integration_probe_timeout_seconds.label"
+msgstr "Wait for the probe work item's events (seconds)"
 
 msgid "settings.field.job_overdue_minutes.label"
 msgstr "Job overdue after (minutes)"
