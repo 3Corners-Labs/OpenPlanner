@@ -1,4 +1,4 @@
-.PHONY: setup fast check matrix pins fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation release-plan release-audit e2e proxy-check diagrams up down
+.PHONY: setup fast check matrix pins fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation release-plan release-audit e2e proxy-check diagrams site up down
 
 UV := uv run
 
@@ -86,6 +86,10 @@ duplication:
 # app and Chrome locally; python-docx is added for this run only (not a project dependency).
 # renovate: datasource=pypi depName=python-docx
 PYTHON_DOCX_VERSION := 1.2.0
+# ADR 0087: the public website, rendered into site/dist/ (serve it with any static server).
+site:
+	$(UV) python -m scripts.build_site --out site/dist --commit "$$(git rev-parse HEAD)"
+
 diagrams:
 	uv run --with python-docx==$(PYTHON_DOCX_VERSION) python -m scripts.diagrams.build
 
