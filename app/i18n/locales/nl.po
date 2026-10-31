@@ -7930,7 +7930,6 @@ msgstr "Gearchiveerde groepen: alleen-lezen, zonder pagina voor deelnemers."
 msgid "admin.audit.detail.archived"
 msgstr "gearchiveerd"
 
-<<<<<<< HEAD
 msgid "admin.done.organisation_deleted"
 msgstr "De organisatie is verwijderd."
 
@@ -8026,7 +8025,7 @@ msgstr "Het webadres van de kalender blijft hetzelfde; organisaties en groepen d
 
 msgid "admin.holidays.calendar_name"
 msgstr "Naam van de kalender"
-=======
+
 msgid "admin.tab.login"
 msgstr "Inloggen"
 
@@ -8296,4 +8295,3 @@ msgstr "De proeflogin is mislukt: deze provider heeft geen sleutel. Roteer de sl
 
 msgid "admin.idp.test_failed.too_many_entitlements"
 msgstr "De proeflogin is mislukt: het token bevat meer entitlement-waarden dan toegestaan."
->>>>>>> bb2906369313551169dc43f1a8772eb159f53555
