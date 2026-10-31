@@ -25,6 +25,9 @@
   </ul>
 </nav>
 {% endif %}
+{% if summary.group.is_archived %}
+<div class="alert alert--info" role="status"><p>{{ _("admin.group.archived_notice") }}</p></div>
+{% endif %}
 {% if done %}
 <div class="alert alert--success" role="status"><p>{{ done }}</p></div>
 {% endif %}

@@ -67,7 +67,11 @@ TOPICS = (
         ),
         Permission.ORGANISATION_VIEW,
     ),
-    HelpTopic("group-settings", ("/admin/groups/{slug}/settings",), Permission.GROUP_EDIT),
+    HelpTopic(
+        "group-settings",
+        ("/admin/groups/{slug}/settings", "/admin/groups/{slug}/settings/archive"),
+        Permission.GROUP_EDIT,
+    ),
     HelpTopic("branding", ("/admin/organisations/{org}/branding",), Permission.BRANDING_MANAGE),
     HelpTopic("rights-matrix", ("/admin/matrix",), Permission.MATRIX_VIEW),
     HelpTopic(
