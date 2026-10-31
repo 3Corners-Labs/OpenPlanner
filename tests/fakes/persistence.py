@@ -482,6 +482,16 @@ class InMemoryTransaction:
             None,
         )
 
+    async def get_booking_by_trial_meeting(self, meeting_id: str) -> Booking | None:
+        return next(
+            (
+                b
+                for b in self.state.bookings.values()
+                if b.trial and b.trial.meeting.id == meeting_id
+            ),
+            None,
+        )
+
     async def claim_booking(self, booking_id: int, claim: Claim) -> bool:
         booking = self.state.bookings[booking_id]
         if booking.claim is not None or not booking.is_active:

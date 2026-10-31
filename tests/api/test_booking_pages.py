@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import BookingRow, GroupRow, ScheduleRuleRow
 from app.config import Settings
+from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.citizen import confirm_by_link, confirm_newest, emailed_token
@@ -76,7 +77,7 @@ async def test_group_page_shows_the_month_and_the_first_free_day(
     assert 'aria-current="true"' in text  # the day whose times are shown
     assert "Vorige maand" not in text  # current month
     assert 'href="/g/demo?month=2026-02"' in text
-    assert '<script src="/static/calendar.js" defer>' in text
+    assert f'<script src="{ASSETS.url("calendar.js")}" defer>' in text
     assert "script-src 'self'" in response.headers["content-security-policy"]
 
 

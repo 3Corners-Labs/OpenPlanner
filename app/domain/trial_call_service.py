@@ -16,6 +16,7 @@ from datetime import datetime
 
 from app.domain.booking import Booking, MeetingRef, TrialCall
 from app.domain.calls import EventKind, MeetingRequest
+from app.domain.calls import join_link as client_link
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType, PlannedJob
@@ -126,12 +127,13 @@ class TrialCallService:
         """
         async with self._uow.read() as tx:
             booking, group = await self._load(tx, management_token)
-        link = booking.trial.meeting.link if booking.trial else None
+        # Same builder as the appointment's link (ADR 0075): https only, the group's client.
+        link = client_link(booking.trial.meeting.link if booking.trial else None, group.join_client)
         if trial_state(booking, group, self._clock.now()) is not TrialState.ACTIVE or not link:
             return None
-        if not link.startswith("https://"):  # the link comes from Webex; never redirect elsewhere
-            return None
-        await self._integration.record(_id(booking), EventKind.TRIAL_JOINED)
+        await self._integration.record(
+            _id(booking), EventKind.TRIAL_JOINED, detail=group.join_client.value
+        )
         return link
 
     def _view(self, booking: Booking, group: Group) -> TrialView:

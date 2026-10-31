@@ -17,6 +17,7 @@ from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.availability import utc_bounds
 from app.domain.booking import Booking
 from app.domain.calls import (
+    TRIAL_MEETING_EVENTS,
     BookingEvent,
     BookingOverview,
     CallStatus,
@@ -46,6 +47,8 @@ class EventOutcome(StrEnum):
     """The meeting or task is not OpenPlanner's; nothing is stored."""
     DUPLICATE = "duplicate"
     """The same event was recorded before (replay or redelivery)."""
+    IGNORED = "ignored"
+    """An event of a known trial meeting that the timeline does not show (its start and end)."""
 
 
 @dataclass(frozen=True)
@@ -112,12 +115,23 @@ class IntegrationService:
         Webex may report an instance id (``<meetingId>_I_<n>``); it is matched on the series.
         Keys are only remembered for OpenPlanner's meetings: org-owned webhooks also report
         every other meeting of the organisation.
+
+        The booking's trial call (ADR 0071) is a meeting of its own: its events are recorded
+        as the trial kinds of ``TRIAL_MEETING_EVENTS`` and never change the call status.
         """
         series = meeting_id.split("_I_", 1)[0]
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_meeting(series)
+            trial = booking is None
+            if booking is None:
+                booking = await tx.get_booking_by_trial_meeting(series)
             if booking is None or booking.id is None:
                 return EventOutcome.UNKNOWN
+            if trial:
+                if kind not in TRIAL_MEETING_EVENTS:
+                    return EventOutcome.IGNORED
+                detail = "host" if kind is EventKind.HOST_JOINED else detail
+                kind = TRIAL_MEETING_EVENTS[kind]
             if event_key:
                 await tx.forget_webhook_events(at - WEBHOOK_MEMORY)
                 if not await tx.claim_webhook_event(WEBEX_SOURCE, event_key, at):

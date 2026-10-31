@@ -70,6 +70,16 @@ gitleaks (MIT), semgrep (LGPL-2.1, CI container) likewise.
 @playwright/test, @axe-core/playwright (MPL-2.0, required by CLAUDE.md), lighthouse,
 chrome-launcher: all active (ADR 0006).
 
+`e2e/package.json` overrides `glob` (14.0.3) and `minimatch` (11.0.3) since 2026-10-31. `npm audit`
+(CI job *lockfile, audit, licenses*) began to fail on two moderate advisories,
+GHSA-3g3m-2fjr-6pw4 (glob) and GHSA-g3hv-75wg-m249 (minimatch), reached through
+lighthouse 13.6.0, @sentry/node and @sentry/bundler-plugins; only the patched majors fix them, and
+`npm audit fix` would downgrade lighthouse. Both packages are by the same maintainer and
+BlueOak-1.0.0/ISC, like before; the new transitive `@isaacs/nonrecursive-glob-match` and
+`path-scurry` 3 are BlueOak-1.0.0 too. They run in CI only, and only to upload source maps in a
+code path lighthouse does not use here. Remove the overrides when lighthouse ships with patched
+dependencies (Renovate's weekly lock file maintenance will show it).
+
 ## Widget build (npm, CI and image build only)
 
 | Package | Purpose | License | Maintenance | Note |
