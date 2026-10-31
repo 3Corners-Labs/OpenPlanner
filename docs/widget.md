@@ -7,7 +7,7 @@ website embeds it, its `::part()` names and the CSP a host needs are in
 
 ## Design tokens (`--booking-*`)
 
-All colours, spacing, radius and font of the citizen pages come from these CSS custom
+All colours, spacing, radius and font of the participant pages come from these CSS custom
 properties (`app/web/static/site.css`). Defaults follow NL Design System conventions.
 
 | Token | Default | Used for |
@@ -54,7 +54,7 @@ The superuser sets the branding per organisation (Admin → Huisstijl, ADR 0020 
 
 Pages load `/o/{slug}/theme.css`, generated from the validated values. Colour tokens other
 than the accent sit in `@media not (prefers-contrast: more)`, so the high-contrast defaults
-win when a citizen asks for them. Theme, logo and font URLs carry a version, so browsers may
+win when a participant asks for them. Theme, logo and font URLs carry a version, so browsers may
 cache them.
 
 | Editable token | Values |
@@ -82,7 +82,7 @@ See ADR 0020: without JavaScript a table of links; with `static/calendar.js` an 
 The standalone page `/g/{slug}` is the default: link to it from your website and you are
 done. If you would rather show the calendar inside a page of your own website, use the Web
 Component `<gov-booking>`. It runs in your page, inherits your font and takes your colours
-through the tokens below, and talks directly to OpenPlanner: what citizens type never passes
+through the tokens below, and talks directly to OpenPlanner: what participants type never passes
 your servers. There is no iframe variant; a site that cannot add a script uses the link.
 
 ### 1. Allow your website and switch the group on
@@ -206,7 +206,7 @@ of a chosen day, errors and the result; no time limits; `prefers-reduced-motion`
 ### 6. Privacy
 
 Your website learns that a visitor opened a page with the widget and which group the tag
-names, as for any element on your page. The widget sends no cookies, and the citizen's name,
+names, as for any element on your page. The widget sends no cookies, and the participant's name,
 email, phone and answers go from their browser to OpenPlanner directly (`docs/dataflow.md`). Answers
 to your page hold no personal data and no management token.
 
