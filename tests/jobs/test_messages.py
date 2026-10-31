@@ -629,3 +629,59 @@ async def test_an_organisation_text_is_escaped_in_the_html_part() -> None:
     assert "<script>" not in (email.html or "")
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in (email.html or "")
     assert "<script>alert(1)</script>" in email.text  # the plain-text part is text
+
+
+TERM_NL = {("nl", "term.agent"): "behandelaar", ("nl", "term.agents"): "behandelaars"}
+
+
+async def test_the_organisation_term_fills_the_agent_placeholders_of_a_mail() -> None:
+    composer = await _with_organisation_texts(TERM_NL)
+
+    email = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW)
+    english = composer.compose(JobType.SEND_CONFIRMATION, replace(BOOKING, locale="en"), GROUP, NOW)
+
+    assert "Een behandelaar neemt op het afgesproken moment contact met u op." in email.text
+    assert "medewerker" not in email.text
+    assert "One of our agents will contact you" in english.text  # another locale keeps its word
+
+
+async def test_the_shipped_term_is_what_a_mail_said_before() -> None:
+    composer = await _with_organisation_texts({})
+
+    email = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW)
+
+    assert "Een medewerker neemt op het afgesproken moment contact met u op." in email.text
+
+
+async def test_the_term_of_a_group_goes_before_the_term_of_its_organisation() -> None:
+    uow = InMemoryUnitOfWork(two_organisations())
+    uow.state.organisation_texts[1] = dict(TERM_NL)
+    uow.state.group_texts[GROUP.id] = {
+        ("nl", "term.agent"): "agent",
+        ("nl", "term.agents"): "agenten",
+    }
+    composer = MessageComposer(
+        Translator(load_catalogues(), CachedTextOverrides(uow)),
+        TEST_TOKEN_KEY,
+        "https://afspraak.example.nl/",
+    )
+    await composer.refresh()
+
+    email = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW)
+    other = composer.compose(
+        JobType.SEND_CONFIRMATION, BOOKING, replace(GROUP, id=GROUP.id + 1), NOW
+    )
+
+    assert "Een agent neemt" in email.text
+    assert (
+        "Een behandelaar neemt" in other.text
+    )  # a group without its own word follows the organisation
+
+
+async def test_a_group_text_may_use_the_agent_placeholders() -> None:
+    composer = await _with_organisation_texts(TERM_NL)
+    own = {("nl", "message.reminder.subject"): "{Agent} belt op {date}"}
+
+    email = composer.compose(JobType.SEND_REMINDER, BOOKING, GROUP, NOW, texts=own)
+
+    assert email.subject == "Behandelaar belt op maandag 5 januari 2026"

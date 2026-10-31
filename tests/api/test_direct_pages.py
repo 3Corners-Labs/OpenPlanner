@@ -94,6 +94,19 @@ class Site:
         await service.record(booking_id, kind, detail=detail)
         await engine.dispose()
 
+    async def save_term(self, singular: str, plural: str, *, group: bool = False) -> None:
+        """Store the agent term in Dutch for the organisation, or for the group when ``group``."""
+        engine = create_engine(self.database_url)
+        async with SqlUnitOfWork(engine).locked() as tx:
+            found = await tx.get_group("demo")
+            assert found is not None
+            for key, text in (("term.agent", singular), ("term.agents", plural)):
+                if group:
+                    await tx.save_group_text(found.id, "nl", key, text)
+                else:
+                    await tx.save_organisation_text(found.organisation_id, "nl", key, text)
+        await engine.dispose()
+
     async def claim(self, booking_id: int) -> None:
         """Let an agent of the own queue pick the call up (ADR 0043)."""
         engine = create_engine(self.database_url)
@@ -268,7 +281,7 @@ async def test_a_claim_in_the_own_queue_shows_as_accepted(site: Site) -> None:
     assert "wachtruimte gaan" in searching  # the meeting is ready: wait in the lobby
     assert "heeft uw gesprek aangenomen" in accepted
     assert "/join/go" in accepted
-    assert "De medewerker is in het gesprek" in in_call
+    assert "Uw medewerker is in het gesprek" in in_call
     assert _poll_url(in_call) is None  # nothing left to wait for
 
 
@@ -525,3 +538,21 @@ async def test_leaving_logs_the_booking_and_meeting_ids_but_no_token(site: Site)
     logged = [e for e in events if e["event"] == "direct.left"]
     assert [(e["meeting_id"], e["agent_present"]) for e in logged] == [("meeting-1", False)]
     assert token not in repr(events)
+
+
+async def test_the_direct_page_says_what_the_organisation_and_the_group_call_the_agent(
+    site: Site, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("app.adapters.db.text_overrides.REFRESH_SECONDS", 0.0)
+    shipped = (await site.client.get("/g/demo/direct")).text
+    assert "een medewerker laat u binnen" in shipped
+
+    await site.save_term("behandelaar", "behandelaars")
+    organisation = (await site.client.get("/g/demo/direct")).text
+    await site.save_term("agent", "agenten", group=True)
+    group = (await site.client.get("/g/demo/direct")).text
+    english = (await site.client.get("/g/demo/direct?lang=en")).text
+
+    assert "een behandelaar laat u binnen" in organisation
+    assert "een agent laat u binnen" in group
+    assert "one of our agents lets you in" in english  # the words are per locale

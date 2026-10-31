@@ -27,7 +27,7 @@ msgid "home.title"
 msgstr "Een videogesprek plannen"
 
 msgid "home.intro"
-msgstr "Via de website van uw organisatie komt u op de afspraakpagina van het juiste team. Daar kiest u een moment voor een videogesprek met een medewerker."
+msgstr "Via de website van uw organisatie komt u op de afspraakpagina van het juiste team. Daar kiest u een moment voor een videogesprek met een {agent}."
 
 msgid "home.how.title"
 msgstr "Zo werkt het"
@@ -70,7 +70,7 @@ msgid "message.team_invite.greeting"
 msgstr "Beste collega's,"
 
 msgid "message.team_invite.intro"
-msgstr "Er is een videoafspraak geboekt bij {group_name}: {first_name}, afspraaknummer {reference}. Een medewerker pakt hem op in de wachtrij van OpenPlanner."
+msgstr "Er is een videoafspraak geboekt bij {group_name}: {first_name}, afspraaknummer {reference}. Een {agent} pakt hem op in de wachtrij van OpenPlanner."
 
 msgid "message.team_invite.queue"
 msgstr "De link naar het gesprek krijgt u als u de afspraak oppakt."
@@ -97,7 +97,7 @@ msgid "message.confirmation.subject"
 msgstr "Bevestiging van uw videogesprek op {date}"
 
 msgid "message.confirmation.intro"
-msgstr "Uw videogesprek met {group_name} is ingepland. Een medewerker neemt op het afgesproken moment contact met u op."
+msgstr "Uw videogesprek met {group_name} is ingepland. Een {agent} neemt op het afgesproken moment contact met u op."
 
 msgid "message.change.subject"
 msgstr "Uw videogesprek is verplaatst naar {date}"
@@ -121,7 +121,7 @@ msgid "message.reason"
 msgstr "Reden"
 
 msgid "message.reason.staffing"
-msgstr "Er zijn op dat moment niet genoeg medewerkers beschikbaar."
+msgstr "Er zijn op dat moment niet genoeg {agents} beschikbaar."
 
 msgid "message.reason.technical"
 msgstr "Er is een technische storing."
@@ -178,7 +178,7 @@ msgid "admin.messages.purpose_reason"
 msgstr "Redenen bij wijzigingen door een planner"
 
 msgid "admin.messages.part_reason_staffing"
-msgstr "Te weinig medewerkers"
+msgstr "Te weinig {agents}"
 
 msgid "admin.messages.part_reason_technical"
 msgstr "Technische storing"
@@ -900,7 +900,7 @@ msgid "authz.role.auditor"
 msgstr "Compliance en privacy (alleen lezen)"
 
 msgid "authz.role.agent"
-msgstr "Medewerker"
+msgstr "{Agent}"
 
 msgid "authz.level.global"
 msgstr "Portaal"
@@ -1068,7 +1068,7 @@ msgid "admin.new_group.title"
 msgstr "Nieuwe groep"
 
 msgid "admin.new_group.lead"
-msgstr "Een groep is een team met één wachtrij in het contactcenter. Na het aanmaken stelt u de bezetting in: per tijdblok het aantal medewerkers."
+msgstr "Een groep is een team met één wachtrij in het contactcenter. Na het aanmaken stelt u de bezetting in: per tijdblok het aantal {agents}."
 
 msgid "admin.new_group.create"
 msgstr "Groep aanmaken"
@@ -1119,10 +1119,10 @@ msgid "admin.field.dispatch_lead_minutes_hint"
 msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de deelnemer. 0 tot 60."
 
 msgid "admin.field.dispatch_kind"
-msgstr "Hoe afspraken bij medewerkers komen"
+msgstr "Hoe afspraken bij {agents} komen"
 
 msgid "admin.field.dispatch_kind_hint"
-msgstr "Contactcenter: een taak in de wachtrij van het team, kort voor de start. Eigen wachtrij: medewerkers loggen in op OpenPlanner en pakken een afspraak op. Geldt voor afspraken die nog niet zijn doorgezet."
+msgstr "Contactcenter: een taak in de wachtrij van het team, kort voor de start. Eigen wachtrij: {agents} loggen in op OpenPlanner en pakken een afspraak op. Geldt voor afspraken die nog niet zijn doorgezet."
 
 msgid "admin.field.max_bookings_per_email"
 msgstr "Afspraken per e-mailadres"
@@ -1143,10 +1143,10 @@ msgid "admin.field.queue_visible_from_minutes_hint"
 msgstr "Hoeveel minuten voor de start een afspraak in de wachtrij verschijnt. 0 tot 120."
 
 msgid "admin.field.queue_free_pick_allowed"
-msgstr "Medewerkers mogen zelf een afspraak kiezen (eigen wachtrij)"
+msgstr "{Agents} mogen zelf een afspraak kiezen (eigen wachtrij)"
 
 msgid "admin.field.queue_free_pick_allowed_hint"
-msgstr "Nee: medewerkers pakken altijd de volgende op. Ja: ze kunnen ook een andere afspraak uit de lijst oppakken."
+msgstr "Nee: {agents} pakken altijd de volgende op. Ja: ze kunnen ook een andere afspraak uit de lijst oppakken."
 
 msgid "admin.field.citizen_change_lead_minutes"
 msgstr "Verplaatsen door de deelnemer tot (minuten vooraf)"
@@ -1229,7 +1229,7 @@ msgid "admin.field.closes"
 msgstr "Tot"
 
 msgid "admin.field.capacity"
-msgstr "Aantal medewerkers"
+msgstr "Aantal {agents}"
 
 msgid "admin.field.capacity_hint"
 msgstr "Zoveel deelnemers kunnen in hetzelfde tijdslot boeken. Vul 0 in voor bijvoorbeeld lunch: dan zijn er geen tijdsloten."
@@ -1295,7 +1295,7 @@ msgid "admin.form.error.booking_limit_reached"
 msgstr "Dit e-mailadres heeft al een afspraak in dat tijdslot, of al het maximum aantal afspraken bij dit team (zie Afspraken per e-mailadres in de instellingen). Kies een ander tijdslot."
 
 msgid "admin.form.error.move_causes_shortfall"
-msgstr "In dit tijdslot zijn dan meer afspraken dan medewerkers. Bevestig dat u het tekort accepteert, of kies een ander tijdslot."
+msgstr "In dit tijdslot zijn dan meer afspraken dan {agents}. Bevestig dat u het tekort accepteert, of kies een ander tijdslot."
 
 msgid "admin.form.error.max_bookings_per_email"
 msgstr "Vul een aantal in van 1 tot 10."
@@ -1347,7 +1347,7 @@ msgid "admin.hours.title"
 msgstr "Bezetting per week"
 
 msgid "admin.hours.lead"
-msgstr "Per dag één of meer tijdblokken, elk met een aantal medewerkers; 0 voor bijvoorbeeld lunch. Aansluitende tijdblokken met medewerkers worden samen verdeeld in tijdsloten van de gespreksduur; deelnemers boeken een tijdslot."
+msgstr "Per dag één of meer tijdblokken, elk met een aantal {agents}; 0 voor bijvoorbeeld lunch. Aansluitende tijdblokken met {agents} worden samen verdeeld in tijdsloten van de gespreksduur; deelnemers boeken een tijdslot."
 
 msgid "admin.hours.manage"
 msgstr "Bezetting beheren"
@@ -1356,13 +1356,13 @@ msgid "admin.hours.closed"
 msgstr "Geen bezetting"
 
 msgid "admin.hours.capacity"
-msgstr "{count} medewerkers"
+msgstr "{count} {agents}"
 
 msgid "admin.hours.capacity_one"
-msgstr "1 medewerker"
+msgstr "1 {agent}"
 
 msgid "admin.hours.capacity_none"
-msgstr "geen medewerkers"
+msgstr "geen {agents}"
 
 msgid "admin.hours.validity"
 msgstr "{start} t/m {end}"
@@ -1404,7 +1404,7 @@ msgid "admin.hours.split_title"
 msgstr "Tijdblok splitsen"
 
 msgid "admin.hours.split_lead"
-msgstr "{block}. Het tijdblok wordt twee aansluitende tijdblokken: het eerste deel houdt het aantal medewerkers en het label, voor het tweede deel kiest u ze hier, bijvoorbeeld 0 en Lunch."
+msgstr "{block}. Het tijdblok wordt twee aansluitende tijdblokken: het eerste deel houdt het aantal {agents} en het label, voor het tweede deel kiest u ze hier, bijvoorbeeld 0 en Lunch."
 
 msgid "admin.hours.split_button"
 msgstr "Splitsen"
@@ -1500,7 +1500,7 @@ msgid "admin.field.video_host_email"
 msgstr "Webex-host (e-mailadres)"
 
 msgid "admin.field.video_host_email_hint"
-msgstr "Gelicentieerd account waarop de meetings worden ingepland. Medewerkers met een account van de organisatie worden cohost."
+msgstr "Gelicentieerd account waarop de meetings worden ingepland. {Agents} met een account van de organisatie worden cohost."
 
 msgid "admin.field.wxcc_business_address"
 msgstr "WxCC business address"
@@ -1527,13 +1527,13 @@ msgid "admin.field.not_picked_up_minutes"
 msgstr "Niet opgepakt na (minuten)"
 
 msgid "admin.field.not_picked_up_minutes_hint"
-msgstr "Zo lang mag een gesprek zonder medewerker blijven voordat het opvalt. 1 tot 120."
+msgstr "Zo lang mag een gesprek zonder {agent} blijven voordat het opvalt. 1 tot 120."
 
 msgid "admin.field.direct_call_max_concurrent"
 msgstr "Maximaal aantal directe gesprekken tegelijk"
 
 msgid "admin.field.direct_call_max_concurrent_hint"
-msgstr "Meestal het aantal medewerkers voor directe gesprekken. Telt wachtende gesprekken en gesprekken met een medewerker. Leeg: geen grens, WxCC verdeelt."
+msgstr "Meestal het aantal {agents} voor directe gesprekken. Telt wachtende gesprekken en gesprekken met een {agent}. Leeg: geen grens, WxCC verdeelt."
 
 msgid "admin.form.error.video_host_email"
 msgstr "Vul een geldig e-mailadres in."
@@ -1596,7 +1596,7 @@ msgid "join.tips.devices"
 msgstr "Geef uw browser toestemming voor camera en microfoon als daarom wordt gevraagd."
 
 msgid "join.tips.lobby"
-msgstr "U wacht eerst in een wachtruimte. De medewerker laat u binnen."
+msgstr "U wacht eerst in een wachtruimte. Uw {agent} laat u binnen."
 
 msgid "join.too_early"
 msgstr "U kunt deelnemen vanaf {time}."
@@ -1614,13 +1614,13 @@ msgid "error.direct_call_unavailable"
 msgstr "Nu een gesprek starten kan op dit moment niet. Maak een afspraak."
 
 msgid "error.direct_call_full"
-msgstr "Alle medewerkers zijn net in gesprek. Probeer het over een paar minuten opnieuw of maak een afspraak."
+msgstr "Alle {agents} zijn net in gesprek. Probeer het over een paar minuten opnieuw of maak een afspraak."
 
 msgid "direct.title"
 msgstr "Nu een videogesprek starten"
 
 msgid "direct.intro"
-msgstr "Vul uw gegevens in. U komt meteen in de wachtruimte van {group_name}; een medewerker laat u binnen."
+msgstr "Vul uw gegevens in. U komt meteen in de wachtruimte van {group_name}; een {agent} laat u binnen."
 
 msgid "direct.submit"
 msgstr "Gesprek starten"
@@ -1641,7 +1641,7 @@ msgid "direct.card.button"
 msgstr "Nu een gesprek starten"
 
 msgid "direct.full"
-msgstr "Alle medewerkers zijn nu in gesprek. Probeer het over een paar minuten opnieuw of maak een afspraak."
+msgstr "Alle {agents} zijn nu in gesprek. Probeer het over een paar minuten opnieuw of maak een afspraak."
 
 msgid "queue.position"
 msgstr "Uw plaats in de rij: {position}."
@@ -1653,22 +1653,22 @@ msgid "queue.nobody"
 msgstr "Er wacht op dit moment niemand."
 
 msgid "queue.typical_wait"
-msgstr "Meestal neemt een medewerker binnen ongeveer {minutes} min. op."
+msgstr "Meestal neemt een {agent} binnen ongeveer {minutes} min. op."
 
 msgid "wait.title"
 msgstr "Uw videogesprek"
 
 msgid "wait.searching"
-msgstr "We zoeken een medewerker voor u."
+msgstr "We zoeken een {agent} voor u."
 
 msgid "wait.accepted"
-msgstr "Een medewerker heeft uw gesprek aangenomen en komt zo naar de wachtruimte."
+msgstr "Een {agent} heeft uw gesprek aangenomen en komt zo naar de wachtruimte."
 
 msgid "wait.in_call"
-msgstr "De medewerker is in het gesprek."
+msgstr "Uw {agent} is in het gesprek."
 
 msgid "wait.unavailable"
-msgstr "Er is nu helaas geen medewerker beschikbaar. Maak een afspraak, dan bellen we op een moment dat u schikt."
+msgstr "Er is nu helaas geen {agent} beschikbaar. Maak een afspraak, dan bellen we op een moment dat u schikt."
 
 msgid "call.state.none"
 msgstr "Geen meeting"
@@ -1719,7 +1719,7 @@ msgid "call.event.task_failed"
 msgstr "Taak mislukt"
 
 msgid "call.event.task_connected"
-msgstr "Medewerker nam de taak aan"
+msgstr "{Agent} nam de taak aan"
 
 msgid "call.event.task_ended"
 msgstr "Taak beëindigd"
@@ -1728,7 +1728,7 @@ msgid "call.event.meeting_started"
 msgstr "Meeting gestart"
 
 msgid "call.event.host_joined"
-msgstr "Medewerker kwam binnen"
+msgstr "{Agent} kwam binnen"
 
 msgid "call.event.guest_joined"
 msgstr "Deelnemer kwam binnen"
@@ -1791,7 +1791,7 @@ msgid "admin.queue.title"
 msgstr "Wachtende afspraken"
 
 msgid "admin.queue.lead"
-msgstr "Afspraken van vandaag die binnenkort beginnen of nog bezig zijn. Pak de volgende op; de deelnemer krijgt altijd de eerste vrije medewerker."
+msgstr "Afspraken van vandaag die binnenkort beginnen of nog bezig zijn. Pak de volgende op; de deelnemer krijgt altijd een {agent} die vrij is."
 
 msgid "admin.queue.announcement"
 msgstr "{count} afspraken in de wachtrij, waarvan {waiting} met een wachtende deelnemer."
@@ -1878,7 +1878,7 @@ msgid "admin.agenda.task"
 msgstr "Contactcentertaak"
 
 msgid "admin.agenda.agent"
-msgstr "Medewerker binnen"
+msgstr "{Agent} binnen"
 
 msgid "admin.agenda.participants"
 msgstr "Deelnemers"
@@ -1920,7 +1920,7 @@ msgid "admin.agenda.next_week"
 msgstr "Volgende week"
 
 msgid "admin.agenda.slot_staffing"
-msgstr "Medewerkers: {agents}, afspraken: {booked}"
+msgstr "{Agents}: {agents}, afspraken: {booked}"
 
 msgid "admin.agenda.shortfall"
 msgstr "Tekort: {count}"
@@ -1941,13 +1941,13 @@ msgid "admin.agenda.week_title"
 msgstr "Week van {day}"
 
 msgid "admin.agenda.week_caption"
-msgstr "Medewerkers en afspraken per tijdslot, {week}"
+msgstr "{Agents} en afspraken per tijdslot, {week}"
 
 msgid "admin.agenda.week_shortfalls"
-msgstr "Tijdsloten met meer afspraken dan medewerkers deze week: {count}."
+msgstr "Tijdsloten met meer afspraken dan {agents} deze week: {count}."
 
 msgid "admin.agenda.week_no_shortfalls"
-msgstr "Deze week heeft elk tijdslot genoeg medewerkers."
+msgstr "Deze week heeft elk tijdslot genoeg {agents}."
 
 msgid "admin.agenda.week_empty"
 msgstr "Geen tijdsloten in deze week."
@@ -1956,7 +1956,7 @@ msgid "admin.agenda.no_slot"
 msgstr "Geen tijdslot"
 
 msgid "admin.shortfall.some"
-msgstr "Tijdsloten met meer afspraken dan medewerkers in de komende {days} dagen: {count}."
+msgstr "Tijdsloten met meer afspraken dan {agents} in de komende {days} dagen: {count}."
 
 msgid "admin.shortfall.first"
 msgstr "Eerste tekort: {when}"
@@ -1995,7 +1995,7 @@ msgid "admin.planner.move_none"
 msgstr "Er is geen vrij tijdslot in de komende weken. Verhoog de bezetting of annuleer de afspraak."
 
 msgid "admin.planner.accept_shortfall"
-msgstr "Ik accepteer dat het nieuwe tijdslot dan meer afspraken dan medewerkers heeft"
+msgstr "Ik accepteer dat het nieuwe tijdslot dan meer afspraken dan {agents} heeft"
 
 msgid "admin.planner.accept_shortfall_hint"
 msgstr "Alleen nodig als het gekozen tijdslot daardoor een tekort krijgt."
@@ -2019,7 +2019,7 @@ msgid "admin.planner.reason_hint"
 msgstr "Een vaste tekst; de organisatie kan de woorden aanpassen bij Berichtteksten."
 
 msgid "admin.planner.reason_staffing"
-msgstr "Te weinig medewerkers"
+msgstr "Te weinig {agents}"
 
 msgid "admin.planner.reason_technical"
 msgstr "Technische storing"
@@ -2061,7 +2061,7 @@ msgid "admin.planner.slot_title"
 msgstr "Om een nieuwe tijd vragen: tijdslot {when}"
 
 msgid "admin.planner.slot_lead"
-msgstr "Dit tijdslot heeft meer afspraken dan medewerkers. Deze laatst gemaakte afspraken ({count}) krijgen een vraag om een nieuwe tijd te kiezen; hun plekken komen meteen vrij. Zonder nieuwe tijd vervallen ze {days} dagen na deze tijd."
+msgstr "Dit tijdslot heeft meer afspraken dan {agents}. Deze laatst gemaakte afspraken ({count}) krijgen een vraag om een nieuwe tijd te kiezen; hun plekken komen meteen vrij. Zonder nieuwe tijd vervallen ze {days} dagen na deze tijd."
 
 msgid "admin.planner.slot_bookings"
 msgstr "Betrokken afspraken"
@@ -3567,7 +3567,7 @@ msgid "admin.holidays.group_choice"
 msgstr "Welke kalenders gelden"
 
 msgid "admin.holidays.group_choice_lead"
-msgstr "Een eigen afwijkende bezetting op een feestdag gaat altijd voor; zo kunt u op een feestdag toch medewerkers inplannen."
+msgstr "Een eigen afwijkende bezetting op een feestdag gaat altijd voor; zo kunt u op een feestdag toch {agents} inplannen."
 
 msgid "admin.holidays.source"
 msgstr "Kalenders voor deze groep"
@@ -6429,7 +6429,7 @@ msgid "admin.form_fields.classification"
 msgstr "Persoonsgegeven"
 
 msgid "admin.form_fields.classification_hint"
-msgstr "Een persoonsgegeven komt nooit in logs, exports, berichten of de wachtrij van medewerkers."
+msgstr "Een persoonsgegeven komt nooit in logs, exports, berichten of de wachtrij van {agents}."
 
 msgid "admin.form_fields.classification.pii"
 msgstr "Persoonsgegeven"
@@ -7007,7 +7007,7 @@ msgid "admin.settings.data_fields.field.guest_join_url"
 msgstr "Deelnamekoppeling van de deelnemer"
 
 msgid "admin.settings.data_fields.field.host_join_url"
-msgstr "Deelnamekoppeling van de medewerker"
+msgstr "Deelnamekoppeling van een {agent}"
 
 msgid "admin.settings.data_fields.field.trial_join_url"
 msgstr "Deelnamekoppeling van het proefgesprek"
@@ -7393,7 +7393,7 @@ msgid "wait.leave.question.waiting"
 msgstr "Weet u zeker dat u wilt stoppen? Uw plaats in de rij vervalt en we laten het team weten dat u niet meer wacht. U kunt daarna opnieuw een gesprek starten of een afspraak maken."
 
 msgid "wait.leave.question.agent"
-msgstr "Een medewerker heeft uw gesprek al aangenomen. Als u stopt, werkt deze link niet meer. De medewerker blijft in het gesprek en wordt op de hoogte gebracht. U kunt daarna opnieuw een gesprek starten of een afspraak maken."
+msgstr "Een {agent} heeft uw gesprek al aangenomen. Als u stopt, werkt deze link niet meer. Uw {agent} blijft in het gesprek en wordt op de hoogte gebracht. U kunt daarna opnieuw een gesprek starten of een afspraak maken."
 
 msgid "wait.leave.confirm"
 msgstr "Ja, stoppen met wachten"
@@ -7818,3 +7818,24 @@ msgstr "Openbare pagina"
 
 msgid "admin.groups.search_active"
 msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."
+
+msgid "term.agent"
+msgstr "medewerker"
+
+msgid "term.agents"
+msgstr "medewerkers"
+
+msgid "admin.org_texts.term.singular"
+msgstr "Eén medewerker die het gesprek aanneemt"
+
+msgid "admin.org_texts.term.plural"
+msgstr "Meer medewerkers die het gesprek aannemen"
+
+msgid "admin.org_texts.section_terms"
+msgstr "Hoe u de medewerker noemt"
+
+msgid "admin.form.error.agent_term"
+msgstr "Vul een woord in van {min} tot {max} tekens, zonder accolades. Enkelvoud en meervoud wijzigt u samen."
+
+msgid "admin.org_texts.term.use"
+msgstr "In een tekst gebruikt u {{agent}}, {{agents}}, {{Agent}} en {{Agents}} voor dit woord."

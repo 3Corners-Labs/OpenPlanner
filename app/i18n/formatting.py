@@ -1,9 +1,10 @@
 """Safe placeholder formatting and validation of admin-edited texts.
 
-Messages use ``{name}`` placeholders (lower case, letters, digits, underscore, not starting
-with an underscore) and ``{{`` / ``}}`` for literal braces. Unlike ``str.format`` there is no
-attribute access, indexing, conversion or format spec, so a text edited in the admin UI
-cannot reach object internals (``{x.__class__}`` stays literal text).
+Messages use ``{name}`` placeholders (letters, digits and underscore, starting with a letter;
+a capital first letter, as in ``{Agent}``, asks for the capitalised form of a word) and
+``{{`` / ``}}`` for literal braces. Unlike ``str.format`` there is no attribute access,
+indexing, conversion or format spec, so a text edited in the admin UI cannot reach object
+internals (``{x.__class__}`` stays literal text).
 """
 
 import re
@@ -12,7 +13,7 @@ from collections.abc import Mapping
 MAX_TEXT_LENGTH = 2000
 """Upper bound for a single admin-edited text, in characters."""
 
-_TOKEN = re.compile(r"\{\{|\}\}|\{([a-z][a-z0-9_]*)\}")
+_TOKEN = re.compile(r"\{\{|\}\}|\{([A-Za-z][A-Za-z0-9_]*)\}")
 
 
 class InvalidOverride(ValueError):  # noqa: N818 - reads as a domain term in the admin UI

@@ -2,8 +2,9 @@
 
 ``app.i18n.Translator`` looks texts up synchronously while the database is asynchronous, so this
 ``OverrideSource`` keeps every organisation's texts in memory (a few dozen rows per organisation
-at most: the allow-list of ``app.domain.text_overrides`` bounds it). ``refresh`` re-reads the
-table at most every ``REFRESH_SECONDS`` (ADR 0004 §9); a process that saves a text calls
+at most: the allow-list of ``app.domain.text_overrides`` bounds it), and the agent term words of
+the groups (two per locale and group at most, ADR 0077). ``refresh`` re-reads both tables at
+most every ``REFRESH_SECONDS`` (ADR 0004 §9); a process that saves a text calls
 ``invalidate`` so its own next request already shows the change, and the other process (web or
 worker) converges within the interval.
 """
@@ -37,13 +38,19 @@ class CachedTextOverrides:
         self._uow = uow
         self._monotonic = monotonic
         self._texts: dict[tuple[int, str, str], str] = {}
+        self._group_terms: dict[tuple[int, str, str], str] = {}
         self._loaded_at: float | None = None
 
-    def get(self, locale: str, key: str, organisation_id: int | None) -> str | None:
-        """Return the organisation's text of ``key`` in ``locale``, or ``None``.
+    def get(
+        self, locale: str, key: str, organisation_id: int | None, group_id: int | None = None
+    ) -> str | None:
+        """Return the text of ``key`` in ``locale`` for the group or the organisation, or ``None``.
 
+        A ``group_id`` asks for the group's own word of the agent term (ADR 0077);
         ``organisation_id=None`` asks for a global override, which is not built (ADR 0074).
         """
+        if group_id is not None:
+            return self._group_terms.get((group_id, locale, key))
         if organisation_id is None:
             return None
         return self._texts.get((organisation_id, locale, key))
@@ -71,6 +78,7 @@ class CachedTextOverrides:
         try:
             async with self._uow.read() as tx:
                 self._texts = await tx.get_all_organisation_texts()
+                self._group_terms = await tx.get_all_group_terms()
         except Exception as exc:  # a missing table or a busy database must not fail a page
             log.warning("i18n.overrides_refresh_failed", error=type(exc).__name__)
         self._loaded_at = now

@@ -21,6 +21,27 @@ A text you change here applies to all groups of the organisation. The order is:
 
 Other texts, such as buttons, form labels and error messages, cannot be changed.
 
+## What you call the person who takes the call
+
+OpenPlanner calls the person who takes the video call an *agent* ("medewerker" in the Dutch
+texts). Your organisation may use another word, such as "handler" or "advisor", for its own
+groups. At the bottom of this screen, in the card *What you call the person who takes the
+call*, you enter that word in the singular and in the plural, per language. Both change
+together: the form refuses a singular without a plural.
+
+The word then appears wherever the shipped texts speak of this person: in the emails and the
+text messages, on the pages for participants and on the screens of your groups (opening hours,
+queue, agenda). The word is only a label. It changes no rights, and the audit log and the
+rights matrix keep their own names.
+
+A group can use a word of its own, for example when one team calls them "advisors": the group
+admin sets it in [the group's message texts](group-settings.md), where it goes before the word
+of the organisation. In a text of your own you write `{agent}` or `{agents}` for the word, and
+`{Agent}` or `{Agents}` where the word starts a sentence or a label. Write "our {agent}" or "one
+of our {agents}" rather than "a {agent}": a word may start with a vowel or be a *het*-word.
+
+The pages of this manual use the shipped words. Your own word replaces them on screen.
+
 ## Changing a text
 
 First choose the language. An organisation can have its own texts for each language. Change the
