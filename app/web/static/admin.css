@@ -43,6 +43,8 @@
   );
   --adm-shadow-popover: 0 8px 24px rgb(0 0 0 / 18%), 0 2px 6px rgb(0 0 0 / 12%);
   --adm-nav-width: 15rem;
+  /* The icon rail: the collapsed menu, and the column the menu button in the top bar sits in. */
+  --adm-rail-width: 3.75rem;
   /* Page widths beside the side navigation (ADR 0080). Which screen gets which is decided in
      app/web/navigation.py and arrives as <main data-width>; nothing else sets a page width. */
   --adm-width-standard: 72rem;
@@ -163,8 +165,11 @@ body.admin {
     "main";
 }
 
-/* A fixed 3.5 rem row that stays in view while the page scrolls; the items sit on its middle. */
+/* A fixed 3.5 rem row that stays in view while the page scrolls; the items sit on its middle.
+   The menu button and the product mark form one cluster on the left, as in Control Hub (ADR 0047);
+   everything after it keeps to the right. */
 .admin-topbar {
+  --adm-topbar-pad: 1.5rem;
   position: sticky;
   top: 0;
   z-index: 30;
@@ -172,10 +177,9 @@ body.admin {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem 1.5rem;
+  gap: 0.75rem;
   height: 3.5rem;
-  padding: 0 1.5rem;
+  padding: 0 var(--adm-topbar-pad);
   border-bottom: 1px solid var(--adm-border);
   background: var(--adm-surface);
 }
@@ -214,6 +218,7 @@ html {
   flex-wrap: nowrap;
   align-items: center;
   gap: 0.5rem 1rem;
+  margin-left: auto;
 }
 
 .admin-topbar__link {
@@ -245,7 +250,6 @@ html {
 .admin-scope {
   position: relative;
   min-width: 0;
-  margin-right: auto;
   margin-left: 0.5rem;
 }
 
@@ -584,7 +588,7 @@ html {
 
 @media (min-width: 48rem) {
   .admin-shell--nav-collapsed {
-    --adm-nav-width: 3.75rem;
+    --adm-nav-width: var(--adm-rail-width);
   }
 
   .admin-shell--nav-collapsed .admin-nav {
@@ -594,7 +598,7 @@ html {
 
 @media (min-width: 48rem) and (max-width: 63.99rem) {
   .admin-shell:not(.admin-shell--nav-expanded) {
-    --adm-nav-width: 3.75rem;
+    --adm-nav-width: var(--adm-rail-width);
   }
 
   .admin-shell:not(.admin-shell--nav-expanded) .admin-nav {
@@ -602,7 +606,7 @@ html {
   }
 
   .admin-topbar {
-    padding: 0 1rem;
+    --adm-topbar-pad: 1rem;
   }
 
   .admin-main {
@@ -657,11 +661,15 @@ html {
 }
 
 /* --- The menu button (admin shell design): one form with a button per direction; only the
-   one that applies shows, by the menu's state at this width. A phone has no rail. --------- */
+   one that applies shows, by the menu's state at this width. A phone has no rail. The form is as
+   wide as the rail and starts at the window's edge, so the button sits right above the rail's
+   icons whatever the bar's padding. ------------------------------------------------------- */
 .admin-nav-toggle {
   display: none;
   flex: none;
-  margin: 0;
+  justify-content: center;
+  width: var(--adm-rail-width);
+  margin: 0 0 0 calc(-1 * var(--adm-topbar-pad));
 }
 
 .admin-nav-toggle__button {
@@ -814,7 +822,7 @@ html {
   }
 
   .admin-topbar {
-    padding: 0 1rem;
+    --adm-topbar-pad: 1rem;
   }
 
   .admin-topbar__end {
