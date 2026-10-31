@@ -3953,6 +3953,9 @@ msgstr "on the web pages"
 msgid "admin.audit.detail.surface_agent"
 msgstr "on the machine API"
 
+msgid "admin.audit.detail.surface_links"
+msgstr "on unknown management links"
+
 msgid "admin.audit.detail.client"
 msgstr "caller {value}"
 
@@ -6093,6 +6096,9 @@ msgstr "Bookings per IP address"
 
 msgid "settings.field.rate_limit_reads.label"
 msgstr "Availability reads per IP address"
+
+msgid "settings.field.rate_limit_unknown_links.label"
+msgstr "Unknown management links per IP address"
 
 msgid "settings.field.rate_limit_agent_tokens.label"
 msgstr "Machine API token requests per client"

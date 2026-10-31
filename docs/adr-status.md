@@ -100,7 +100,7 @@ package; when the two disagree, the code wins.
 | 0075 | Browser-direct join link per group | PARTIAL | Steps 1 and 2 (#171); migration 0075 | Step 3: confirmation with the Webex app installed, on docker01 |
 | 0076 | Participant journey: trial call events, the page sent to | PARTIAL | Step 1 (#171); no migration | Step 2: the signal *followed, nobody entered*; step 3: the merged journey view |
 | 0077 | Terminology: participant, and organisation names for staff functions | NOT BUILT | accepted 2026-10-31; step 1a (column rename) in PR #172; `CLAUDE.md` wording changed with the ADR | Everything but step 1a: the rename (steps 2a to 2d), the guard test, function names per organisation and group, the column rename |
-| 0078 | Build work merges on green; decisions and releases wait for the product owner; audit before a minor release | PARTIAL | step 0 (#177) | Steps 1–5: the decision gate, the numbering test, the release audit, the required check and label, issues per build step, the first audited minor release |
+| 0078 | Build work merges on green; decisions and releases wait for the product owner; audit before a minor release | PARTIAL | steps 0–2 (#177); step 4 (#180): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | Steps 3 and 5: the required check and the label on GitHub, the first audited minor release |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 
