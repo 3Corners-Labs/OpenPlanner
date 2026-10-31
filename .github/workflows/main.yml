@@ -187,10 +187,62 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" sbom.cdx.json sbom-proxy.cdx.json --verify-tag --generate-notes
 
+  # ADR 0087: the public website, openplanner.nl. Built from site/ on every merge to main and
+  # on every release tag, with the releases baked in; the tarball goes on the release the tag
+  # made; the deploy by rsync over SSH runs only where the secrets of the environment `website`
+  # are set, so a fork or a pull request never deploys.
+  site:
+    name: public website (build, attach, deploy)
+    # On a tag it waits for `publish`, whose first step refuses a tag that is not on main or
+    # that was made by hand (ADR 0052, ADR 0059): such a tag then deploys nothing. On a merge
+    # to main `publish` is skipped and the site goes out on its own.
+    needs: [publish]
+    if: ${{ !cancelled() && (github.ref_type == 'branch' || needs.publish.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: website
+    permissions:
+      contents: write   # the site tarball on the release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --locked
+      - name: the releases, for the page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/$GITHUB_REPOSITORY/releases?per_page=20" > "$RUNNER_TEMP/releases.json"
+      - name: build
+        run: |
+          video=""
+          [ -f site/static/media/tour.webm ] && video="--tour-video"
+          uv run python -m scripts.build_site --out site/dist --releases "$RUNNER_TEMP/releases.json" --commit "$GITHUB_SHA" $video
+          tar -C site/dist -czf "site-${GITHUB_REF_NAME#v}.tar.gz" .
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: site
+          path: site-*.tar.gz
+          retention-days: 14
+      - name: attach the site to the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" site-*.tar.gz --clobber
+      - name: deploy to the web server (rsync over SSH; skipped without the secrets)
+        env:
+          SITE_DEPLOY_HOST: ${{ secrets.SITE_DEPLOY_HOST }}
+          SITE_DEPLOY_USER: ${{ secrets.SITE_DEPLOY_USER }}
+          SITE_DEPLOY_PATH: ${{ secrets.SITE_DEPLOY_PATH }}
+          SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
+          SITE_DEPLOY_KNOWN_HOSTS: ${{ secrets.SITE_DEPLOY_KNOWN_HOSTS }}
+        run: scripts/deploy-site.sh site/dist
+
   # ADR 0051: same gate as in ci.yml, for the jobs that run only on main.
   deprecations:
     name: no deprecation warnings
-    needs: [zap-baseline, mutation, candidate, publish]
+    needs: [zap-baseline, mutation, candidate, publish, site]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10

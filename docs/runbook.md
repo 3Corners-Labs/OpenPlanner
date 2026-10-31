@@ -959,6 +959,60 @@ an SMTP 5xx), `channel_not_configured` (the organisation has no sender on that c
 `integration_not_ready` (the settings key is missing). The reminders page of a group warns
 when a rule's channel is not configured.
 
+## The public website, openplanner.nl (ADR 0087)
+
+The website is static: `site/` in the repository, built by `scripts/build_site.py` and
+published by the job `site` of `main.yml` on every merge to `main` and on every release tag.
+It is hosted on a web server at TransIP, apart from the application; the application never
+reads from it and it never calls the application.
+
+| Event | What runs | Result |
+|---|---|---|
+| Merge to `main` | `site`: build with the releases from GitHub, upload the artifact, rsync | the site on the web server, with the newest release candidate on it |
+| Tag `vX.Y.Z` | the same, plus `gh release upload` | `site-X.Y.Z.tar.gz` on the release page, and the site on the web server with the new release on it |
+| Pull request, fork | nothing (`main.yml` only) | a local `make site` is the preview |
+
+### Once: the deploy secrets
+
+Set by a repository admin in the GitHub environment `website` (*Settings → Environments*),
+so only the job `site` on `main` can read them:
+
+| Name | What |
+|---|---|
+| `SITE_DEPLOY_HOST` | the SSH host of the TransIP web server |
+| `SITE_DEPLOY_USER` | the SSH user; give it write access to the site directory only |
+| `SITE_DEPLOY_PATH` | the absolute directory the web server serves for `openplanner.nl` |
+| `SITE_DEPLOY_KEY` | the private key of a deploy-only key pair (`ssh-keygen -t ed25519 -C openplanner-site-deploy`); the public key goes in the user's `authorized_keys` on the server |
+| `SITE_DEPLOY_KNOWN_HOSTS` | the server's host key line (`ssh-keyscan -t ed25519 <host>`), so the job refuses a different server |
+
+Without `SITE_DEPLOY_HOST` the job builds and uploads the artifact and prints a notice; it
+never deploys half. The deploy is `rsync --delete`: the server mirrors the build, so a page
+removed from `site/` disappears from the server.
+
+### Rotating the deploy key
+
+Make a new key pair, put the new public key in `authorized_keys`, replace `SITE_DEPLOY_KEY`,
+re-run the last `main.yml` run (the job `site` is idempotent), then remove the old public key
+from the server. Nothing else holds the key.
+
+### When the deploy fails
+
+The build is in the run's artifact `site` (fourteen days). Download it and copy it by hand:
+
+```sh
+tar -xzf site-*.tar.gz -C /tmp/site
+rsync -az --delete /tmp/site/ <user>@<host>:<path>/
+```
+
+### The web server
+
+Serve `SITE_DEPLOY_PATH` as the document root of `openplanner.nl` and `www.openplanner.nl`
+(redirect `www` to the apex), HTTPS only with HSTS, and these headers, which the page also sets
+as meta tags where it can: `Content-Security-Policy: default-src 'self'; img-src 'self' data:;
+media-src 'self'; frame-ancestors 'none'`, `Referrer-Policy: no-referrer`,
+`X-Content-Type-Options: nosniff`. The site sets no cookie; the server's access log is the
+host's concern and is not shipped anywhere by us.
+
 ## Management token key
 
 `MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Rotating it invalidates every

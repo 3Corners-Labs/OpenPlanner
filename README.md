@@ -1,5 +1,7 @@
 # OpenPlanner
 
+[openplanner.nl](https://openplanner.nl)
+
 **Video appointments with your team, booked in seconds, privacy by default.**
 
 OpenPlanner is an open-source scheduler for Webex video meetings. Your customers pick a free
@@ -116,6 +118,7 @@ make check
 - `docs/widget.md` — embedding the calendar on your website, and its styling tokens.
 - `docs/agent-api.md` — connecting a contact-center bot to the machine API.
 - `docs/install.md` — installing and repairing a host with `scripts/install.sh`.
+- `site/` — the public website, openplanner.nl, built from the repository (ADR 0087).
 - `docs/runbook.md` — operating the service.
 - `docs/adr/` — decisions.
 - `CONTRIBUTING.md` — dev setup, tests, PR checklist.

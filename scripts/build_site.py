@@ -1,0 +1,293 @@
+"""Build the public website, openplanner.nl, from ``site/`` into plain files (ADR 0087).
+
+The site is one page per locale (``/`` Dutch, ``/en/`` English) rendered from
+``site/templates/index.html`` with the texts of ``site/content/<locale>.json``, plus the
+static files, the brand mark from the application (one source for the logo, ADR 0060) and
+what search engines and AI crawlers read: ``sitemap.xml``, ``robots.txt``, ``llms.txt`` and the
+JSON-LD inside the page. Release data is baked in from a GitHub releases JSON handed over by
+the workflow; the visitor's browser never calls GitHub (ADR 0087 point 4).
+
+Run ``make site`` (output in ``site/dist/``), or::
+
+    python -m scripts.build_site --out site/dist --releases releases.json --commit <sha>
+"""
+
+import argparse
+import json
+import shutil
+import sys
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+
+ROOT = Path(__file__).resolve().parent.parent
+SITE = ROOT / "site"
+BRAND = ROOT / "app" / "web" / "static" / "brand"
+LOCALES = ("nl", "en")
+ORIGIN = "https://openplanner.nl"
+REPOSITORY = "https://github.com/3Corners-Labs/OpenPlanner"
+RECENT = 5
+
+
+@dataclass(frozen=True)
+class Release:
+    """One GitHub release as the page shows it."""
+
+    tag: str
+    date: str
+    url: str
+    prerelease: bool
+
+
+@dataclass(frozen=True)
+class Releases:
+    """The release data baked into the page: the latest of each kind and the recent list."""
+
+    latest: Release | None
+    candidate: Release | None
+    recent: list[Release] = field(default_factory=list)
+
+
+def parse_releases(raw: list[dict[str, Any]]) -> Releases:
+    """Pick the latest release, the latest candidate and the recent list from GitHub's JSON.
+
+    Args:
+        raw: The array ``GET /repos/{owner}/{repo}/releases`` returns, newest first. Drafts
+            are left out; a release without ``published_at`` is treated as a draft.
+
+    Returns:
+        The latest stable release, the latest pre-release and the first five entries.
+    """
+    releases = [
+        Release(
+            tag=str(item["tag_name"]),
+            date=str(item["published_at"])[:10],
+            url=str(item["html_url"]),
+            prerelease=bool(item.get("prerelease")),
+        )
+        for item in raw
+        if not item.get("draft")
+        and item.get("published_at")
+        and str(item["html_url"]).startswith(REPOSITORY + "/releases/")
+    ]
+    releases.sort(key=lambda r: r.date, reverse=True)
+    latest = next((r for r in releases if not r.prerelease), None)
+    candidate = next((r for r in releases if r.prerelease), None)
+    return Releases(latest=latest, candidate=candidate, recent=releases[:RECENT])
+
+
+def load_content(locale: str) -> dict[str, Any]:
+    """Read ``site/content/<locale>.json``."""
+    with (SITE / "content" / f"{locale}.json").open(encoding="utf-8") as handle:
+        content: dict[str, Any] = json.load(handle)
+    return content
+
+
+def structured_data(content: dict[str, Any], releases: Releases | None) -> list[dict[str, Any]]:
+    """The JSON-LD blocks of a page: the software, its publisher and the questions it answers.
+
+    Search engines and AI assistants read these before the prose. Every value comes from the
+    locale's content so the two languages never drift from the page.
+    """
+    software: dict[str, Any] = {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "OpenPlanner",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Linux (Docker)",
+        "url": ORIGIN + content["path"],
+        "inLanguage": content["lang"],
+        "description": content["meta"]["description"],
+        "license": "https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12",
+        "isAccessibleForFree": True,
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"},
+        "codeRepository": REPOSITORY,
+        "featureList": [item["title"] for item in content["features"]["items"]],
+        "publisher": {"@type": "Organization", "name": "3Corners", "url": "https://3corners.nl"},
+    }
+    if releases and releases.latest:
+        software["softwareVersion"] = releases.latest.tag.lstrip("v")
+        software["releaseNotes"] = releases.latest.url
+    faq = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": item["name"],
+                "acceptedAnswer": {"@type": "Answer", "text": item["text"]},
+            }
+            for item in content["integrations"]["items"]
+        ],
+    }
+    return [software, faq]
+
+
+def llms_text(contents: dict[str, dict[str, Any]], releases: Releases | None) -> str:
+    """``llms.txt``: the site in Markdown for AI tools, with the links that carry the facts.
+
+    The format (llmstxt.org) is a title, a blockquote summary, sections of links. English
+    first, Dutch after it, so a model that reads only the top gets the full picture.
+    """
+    en, nl = contents["en"], contents["nl"]
+    lines = [
+        "# OpenPlanner",
+        "",
+        f"> {en['meta']['description']}",
+        "",
+        "OpenPlanner is open source (EUPL-1.2), written in Python (FastAPI, SQLite) with a",
+        "server-rendered admin portal and a vanilla-JavaScript booking widget. Every design",
+        "decision is an Architecture Decision Record in the repository with its build status.",
+        "",
+        "## Key facts",
+        "",
+    ]
+    lines += [f"- {item['title']}: {item['text']}" for item in en["features"]["items"]]
+    lines += ["", "## Integrations", ""]
+    lines += [
+        f"- {item['name']} ({item['tag']}): {item['text']} [{item['link']}]({item['href']})"
+        for item in en["integrations"]["items"]
+    ]
+    lines += ["", "## Enterprise", ""]
+    lines += [f"- {item['title']}: {item['text']}" for item in en["enterprise"]["items"]]
+    if releases and releases.latest:
+        lines += [
+            "",
+            "## Releases",
+            "",
+            f"- Latest release: {releases.latest.tag} ({releases.latest.date}): "
+            f"{releases.latest.url}",
+        ]
+    lines += [
+        "",
+        "## Documentation",
+        "",
+        f"- [Repository]({REPOSITORY})",
+        f"- [README]({REPOSITORY}#readme)",
+        f"- [Installation guide]({REPOSITORY}/blob/main/docs/install.md)",
+        f"- [Architecture]({REPOSITORY}/blob/main/docs/architecture.md)",
+        f"- [Architecture Decision Records]({REPOSITORY}/tree/main/docs/adr)",
+        f"- [Embedding the widget]({REPOSITORY}/blob/main/docs/widget.md)",
+        f"- [Machine API for bots]({REPOSITORY}/blob/main/docs/agent-api.md)",
+        f"- [Security policy]({REPOSITORY}/blob/main/SECURITY.md)",
+        f"- [Releases]({REPOSITORY}/releases)",
+        "",
+        "## Nederlands",
+        "",
+        f"> {nl['meta']['description']}",
+        "",
+        f"- [Nederlandse pagina]({ORIGIN}/)",
+        f"- [English page]({ORIGIN}/en/)",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def sitemap(built: datetime) -> str:
+    """``sitemap.xml`` with both locales as alternates of each other."""
+    day = built.strftime("%Y-%m-%d")
+    alternates = "".join(
+        f'<xhtml:link rel="alternate" hreflang="{loc}" href="{ORIGIN}{path}"/>'
+        for loc, path in (("nl", "/"), ("en", "/en/"), ("x-default", "/"))
+    )
+    urls = "".join(
+        f"<url><loc>{ORIGIN}{path}</loc><lastmod>{day}</lastmod>{alternates}</url>"
+        for path in ("/", "/en/")
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+        f"{urls}</urlset>\n"
+    )
+
+
+ROBOTS = f"""# openplanner.nl: a public, static site. Everyone may read it, including AI crawlers.
+User-agent: *
+Allow: /
+
+Sitemap: {ORIGIN}/sitemap.xml
+"""
+
+
+def build(
+    out: Path, releases: Releases | None, commit: str, tour_video: bool, base: str = "/"
+) -> list[Path]:
+    """Render every locale into ``out`` and copy the static files. Returns the files written.
+
+    ``base`` is the root the assets are linked from: ``/`` on the web server; a relative
+    root for a preview served from a sub-path.
+    """
+    env = Environment(
+        loader=FileSystemLoader(SITE / "templates"),
+        autoescape=select_autoescape(default=True),
+        undefined=StrictUndefined,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    template = env.get_template("index.html")
+    built = datetime.now(tz=UTC)
+    if out.exists():
+        shutil.rmtree(out)
+    shutil.copytree(SITE / "static", out / "static")
+    shutil.copytree(BRAND, out / "static" / "brand")
+    written: list[Path] = []
+    contents = {locale: load_content(locale) for locale in LOCALES}
+    for content in contents.values():
+        page = out / content["path"].strip("/") / "index.html"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        # A relative asset root is one level deeper for the English page.
+        page_base = (
+            base if page.parent == out or not base.startswith(".") else "../" + base.lstrip("./")
+        )
+        page.write_text(
+            template.render(
+                c=content,
+                releases=releases,
+                commit=commit,
+                base=page_base,
+                tour_video=tour_video,
+                structured_data=structured_data(content, releases),
+                built=built.strftime("%Y-%m-%d"),
+            ),
+            encoding="utf-8",
+        )
+        written.append(page)
+    for name, text in (
+        ("sitemap.xml", sitemap(built)),
+        ("robots.txt", ROBOTS),
+        ("llms.txt", llms_text(contents, releases)),
+    ):
+        (out / name).write_text(text, encoding="utf-8")
+        written.append(out / name)
+    return written
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Command line: ``--out``, ``--releases`` (GitHub JSON), ``--commit``, ``--tour-video``."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--out", type=Path, default=SITE / "dist")
+    parser.add_argument(
+        "--releases", type=Path, help="JSON from GET /repos/{owner}/{repo}/releases"
+    )
+    parser.add_argument("--commit", default="", help="the commit the site is built from")
+    parser.add_argument(
+        "--base", default="/", help="asset root: '/' on the server, './' for a preview"
+    )
+    parser.add_argument(
+        "--tour-video", action="store_true", help="static/media/tour.webm is present"
+    )
+    args = parser.parse_args(argv)
+    releases = None
+    if args.releases:
+        with args.releases.open(encoding="utf-8") as handle:
+            releases = parse_releases(json.load(handle))
+    written = build(args.out, releases, args.commit, args.tour_video, args.base)
+    sys.stdout.write(f"built {len(written)} files into {args.out}\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
