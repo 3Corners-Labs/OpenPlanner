@@ -6,6 +6,12 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ### Features
 
+- The release is a workflow (ADR 0079, steps 1 and 2): `release.yml` opens the release PR
+  (`release-pr` dispatch; `scripts/release_pr.py` edits `pyproject.toml`, `uv.lock` and
+  `CHANGELOG.md` and fills the PR template), runs the audit of a minor or major release
+  with `openai/codex-action` and writes it into the PR with `Verdict: open`, and sets the
+  annotated tag on the merged release (`tag` dispatch) with the dispatcher as the recorded
+  instruction. A `dry_run` input shows the result without opening or tagging anything.
 - Version picker (ADR 0067, step 3): the updates page lists every version newer than the
   running one on the channel, with the release notes as plain text (PR titles and numbers),
   and installs the chosen one; going back stays the 24-hour restore. The worker stores the
