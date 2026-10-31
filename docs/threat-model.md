@@ -267,6 +267,34 @@ other `/admin` route declares one permission of the matrix (ADR 0014). Inputs fr
 | Information disclosure | The top bar offers a link to a screen the admin may not open, or its count tells more than the screen behind it | Each link is a register shortcut shown only when the matrix grants the permission of what it leads to (and, for a widget, only while the widget is on the admin's overview); the destination enforces its own permission anyway; the one count is a whole number, the same figure as the *Running tasks* widget under `dashboard.view`, never a name, type or booking | `tests/admin/test_top_bar.py::test_each_link_shows_only_to_who_may_open_what_it_leads_to`, `test_a_page_without_rights_has_no_links_to_screens`, `test_the_links_are_on_every_admin_page_and_the_count_is_a_number_only` |
 | Information disclosure (filter value outside scope) | The scope filter's `org` and `group` values name an organisation or group the admin may not see, to read its rows, to learn that it exists, or to have the value echoed | A value is used only if it is one of the groups the matrix gives the admin (`admin_service.groups`, database-side scope); anything else is no choice, is not stored in the session and is not echoed; the options of the form are built from the same groups; the filter only removes rows from what each widget already returned, so it can never add a row; the form is a GET form and changes nothing | `tests/admin/test_scope_filter.py::test_a_value_outside_the_scope_is_ignored_and_never_echoed`, `test_a_value_outside_the_scope_is_not_kept_in_the_session`, `test_the_options_are_only_what_the_admin_may_see`, `test_the_overview_has_the_filter_as_a_get_form` |
 
+### Entitlements: role and scope in one claim value (ADR 0049)
+
+Inputs from outside: the entitlement claim (`OIDC_ENTITLEMENT_CLAIM`, values
+`<prefix>:<role>:<org>[/<group>]`), the three legacy claims, the IdP values an admin types
+for an organisation or group, and the session cookie's claims.
+
+| # | STRIDE | Abuse | Mitigation | Test |
+|---|---|---|---|---|
+| A1 | Elevation | A role from organisation B leaks into A (`org_admin:gem-a` and `auditor:gem-b`) | `decide` looks at one grant at a time; `scope_for` is the union of covering grants; no step combines a role of one grant with the scope of another | `tests/domain/test_entitlements.py::test_a1_a_role_from_one_organisation_never_reaches_another` |
+| A2 | Elevation | Same for groups: `group_admin:gem-a/g1` and a read-only custom role on `gem-a/g2` | as A1, with `Scope.groups` as `(organisation, group)` pairs | `test_a2_group_grants_stay_with_their_group` |
+| A3 | Elevation | Ambiguous legacy claims (`roles=[org_admin, auditor]`, `organisations=[gem-a, gem-b]`) | `is_ambiguous`: the login is refused with `ambiguous_claims` and audited; the session is never started | `test_a3_ambiguous_legacy_claims_are_refused`, `tests/admin/test_entitlement_routes.py::test_a3_an_ambiguous_legacy_login_is_refused_and_audited` |
+| A4 | Elevation | Group entitlement with a foreign organisation: `group_admin:gem-b/<group of gem-a>` | refused `group_not_in_organisation`; a group is looked up by IdP value within the named organisation | `test_a4_a_group_of_another_organisation_is_refused` |
+| A5 | Elevation | Scope smuggled onto the superuser: `superuser:gem-a`; a custom role with key `superuser` | refused `scope_not_allowed_for_role`; custom keys are `custom.<id>` by construction | `test_a5_the_superuser_takes_no_scope` |
+| A6 | Elevation | Reach mismatch: `org_admin:gem-a/g1`, `group_admin:gem-a` | both refused `scope_not_allowed_for_role` | `test_a6_the_reach_decides_the_form` |
+| A7 | Tampering | Case, whitespace or wildcard tricks (`OpenPlanner:ORG_ADMIN:gem-a`, `gem-a/*`, trailing control characters) | exact match against the grammar; anything else is refused or ignored, never a grant (property test over generated strings) | `test_a7_anything_outside_the_grammar_yields_no_grant` |
+| A8 | Elevation | A production entitlement presented to acceptance (other prefix) | values without the installation's prefix are ignored | `test_a8_another_prefix_is_ignored` |
+| A9 | Elevation | A slug rename, or a new group whose slug equals an old IdP value | access follows `idp_key`, which never changes with the slug; a new group starts with its own slug as value, unique within the organisation | `tests/admin/test_entitlement_routes.py::test_a9_access_follows_the_idp_value_not_the_slug` |
+| A10 | Elevation | IdP value hijack: an org admin sets a group's value to one used in another organisation; a group admin changes their own group's value | every entitlement names its organisation, so the pair never matches across organisations; `idp_mapping.manage` is organisation level and not held by `group_admin` (matrix row) | `test_a10_a_group_admin_may_not_change_the_idp_value`, `tests/admin/test_authorization_matrix.py::test_matrix` (idp-key row) |
+| A11 | Denial of service | Claim flood: thousands of values | more than `oidc_entitlements_max_values` refuses the login (`too_many_entitlements`); more than 60 recognised values too (session bound) | `tests/adapters/test_oidc.py::test_a11_a_claim_flood_refuses_the_login` |
+| A12 | Elevation | An open session after the IdP value of its group changes, or after the group is deleted | the session holds values, not slugs; every request resolves them against the directory, so the next request holds no grant for it | `test_a12_a_changed_idp_value_takes_effect_on_the_next_request` |
+| A13 | Elevation | `shadow` mode with a richer entitlement claim than the legacy claims | rights follow the legacy claims only; the difference is audited (`auth.entitlement_mismatch`), never granted | `test_a13_shadow_mode_grants_the_legacy_claims_only` |
+| A14 | Information disclosure | A refused value naming an unknown organisation shown to an org admin | `StaffMember.within` keeps a refusal only when its organisation is in the viewer's scope; the superuser sees the rest | `tests/domain/test_entitlements.py::test_a14_refusals_naming_no_known_organisation_are_for_the_superuser_only`, `tests/admin/test_entitlement_routes.py::test_a14_an_org_admin_does_not_see_refusals_of_unknown_organisations` |
+
+The entitlement claim is a new trust boundary input: it is extracted by the OIDC adapter
+(`login_claims`), judged by the domain (`parse_entitlements`) against the directory, and
+every refusal carries a reason code. Values hold prefixes, role keys and IdP values, never
+personal data; they are kept on the staff record and in `auth.entitlement_refused` events.
+
 ## Flow: groups and planning in the admin portal (WP7b)
 
 Admins only. `GET/POST /admin/groups/new`, `/admin/groups`, `/admin/groups/{slug}/settings`,

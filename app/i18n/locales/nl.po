@@ -7440,6 +7440,217 @@ msgstr "De DKIM-sleutel is leeg (ingetrokken). Laat uw mailbeheerder een nieuwe 
 msgid "admin.channels.domain_reason.dmarc_policy_none"
 msgstr "DMARC staat op p=none: ontvangers rapporteren alleen, maar weren niets. Zet het beleid op quarantine of reject zodra SPF en DKIM kloppen."
 
+# ADR 0049: entitlements, the identity provider mapping and refused values.
+msgid "admin.nav.idp_mapping"
+msgstr "Koppeling identiteitsprovider"
+
+msgid "authz.permission.idp_mapping_view"
+msgstr "Koppeling identiteitsprovider bekijken"
+
+msgid "authz.permission.idp_mapping_manage"
+msgstr "IdP-waarde van een groep wijzigen"
+
+msgid "settings.field.oidc_entitlement_claim.label"
+msgstr "Claim met rechten (entitlements)"
+
+msgid "settings.field.oidc_entitlement_prefix.label"
+msgstr "Voorvoegsel van elke rechtwaarde"
+
+msgid "settings.field.oidc_entitlements_max_values.label"
+msgstr "Maximum aantal waarden in de rechtenclaim"
+
+msgid "settings.field.idp_mapping_refused_window_days.label"
+msgstr "Niet-herkende waarden tonen over (dagen)"
+
+msgid "admin.form.error.idp_key_taken"
+msgstr "Deze IdP-waarde is al in gebruik. Kies een andere."
+
+msgid "admin.login_refused.ambiguous_claims"
+msgstr "Uw account heeft meer dan één rol voor meer dan één organisatie of groep. Zo kan OpenPlanner niet zien welke rol waar geldt. Vraag het IdP-team om rechten per organisatie of groep (entitlements) of om de rollen te splitsen."
+
+msgid "admin.login_refused.too_many_entitlements"
+msgstr "Uw account stuurt meer rechten mee dan OpenPlanner kan verwerken. Vraag het IdP-team om alleen de rechten voor OpenPlanner mee te sturen."
+
+msgid "admin.rights_not_recognised.text"
+msgstr "Uw account heeft rechten voor OpenPlanner die deze installatie niet herkent. Neem contact op met uw beheerder; die ziet op uw pagina bij Medewerkers welke waarden niet herkend zijn."
+
+msgid "admin.audit.detail.grant_add"
+msgstr "recht erbij: {value}"
+
+msgid "admin.audit.detail.grant_remove"
+msgstr "recht eraf: {value}"
+
+msgid "audit.event.entitlement_refused"
+msgstr "Rechten niet herkend bij inloggen"
+
+msgid "audit.event.entitlement_mismatch"
+msgstr "Rechtenclaim wijkt af van de rolclaims (schaduwmodus)"
+
+msgid "audit.event.ambiguous_claims"
+msgstr "Inloggen geweigerd: rollen dubbelzinnig"
+
+msgid "audit.event.organisation_idp_key_changed"
+msgstr "IdP-waarde van de organisatie gewijzigd"
+
+msgid "audit.event.group_idp_key_changed"
+msgstr "IdP-waarde van de groep gewijzigd"
+
+msgid "audit.event.idp_mapping_exported"
+msgstr "Koppeling identiteitsprovider gedownload"
+
+msgid "admin.idp_mapping.title"
+msgstr "Koppeling identiteitsprovider"
+
+msgid "admin.idp_mapping.intro"
+msgstr "Deze waarden moet de identiteitsprovider meesturen in de claim {claim}. Eén waarde per rol per organisatie of groep. Rechten toekennen doet het IdP-team; hier ziet u wat het moet sturen en wat er binnenkwam."
+
+msgid "admin.idp_mapping.export"
+msgstr "Downloaden als tekst"
+
+msgid "admin.idp_mapping.settings"
+msgstr "Instellingen"
+
+msgid "admin.idp_mapping.mode"
+msgstr "Bron van de rechten"
+
+msgid "admin.idp_mapping.mode.legacy"
+msgstr "Drie claims (rollen, organisaties, groepen)"
+
+msgid "admin.idp_mapping.mode.shadow"
+msgstr "Drie claims, rechtenclaim wordt vergeleken (schaduwmodus)"
+
+msgid "admin.idp_mapping.mode.entitlements"
+msgstr "Rechtenclaim (één waarde per rol en doel)"
+
+msgid "admin.idp_mapping.claim"
+msgstr "Claim"
+
+msgid "admin.idp_mapping.prefix"
+msgstr "Voorvoegsel"
+
+msgid "admin.idp_mapping.superuser"
+msgstr "Superuser"
+
+msgid "admin.idp_mapping.idp_key"
+msgstr "IdP-waarde"
+
+msgid "admin.idp_mapping.holders_warning"
+msgstr "Let op: {count} medewerker(s) hebben nu een recht met de huidige waarde; zij verliezen toegang tot de identiteitsprovider de nieuwe waarde stuurt."
+
+msgid "admin.idp_mapping.values_of"
+msgstr "Waarden van {name}"
+
+msgid "admin.idp_mapping.role"
+msgstr "Rol"
+
+msgid "admin.idp_mapping.value"
+msgstr "Waarde"
+
+msgid "admin.idp_mapping.holders"
+msgstr "Medewerkers"
+
+msgid "admin.idp_mapping.last_login"
+msgstr "Laatst ingelogd"
+
+msgid "admin.idp_mapping.never"
+msgstr "nooit"
+
+msgid "admin.idp_mapping.group"
+msgstr "Groep"
+
+msgid "admin.idp_mapping.organisations_empty"
+msgstr "Er zijn geen organisaties binnen uw bereik."
+
+msgid "admin.idp_mapping.refused_title"
+msgstr "Niet herkende waarden"
+
+msgid "admin.idp_mapping.refused_intro"
+msgstr "Waarden met het voorvoegsel die bij een login in de afgelopen {days} dagen binnenkwamen maar geen recht gaven. Een typefout in de identiteitsprovider staat hier."
+
+msgid "admin.idp_mapping.refused_empty"
+msgstr "Geen niet-herkende waarden in deze periode."
+
+msgid "admin.idp_mapping.reason"
+msgstr "Reden"
+
+msgid "admin.idp_mapping.organisation"
+msgstr "Organisatie"
+
+msgid "admin.idp_mapping.people"
+msgstr "Personen"
+
+msgid "admin.idp_mapping.received"
+msgstr "Laatst ontvangen"
+
+msgid "admin.idp_mapping.no_organisation"
+msgstr "(onbekend)"
+
+msgid "admin.idp_mapping.reason.malformed"
+msgstr "voldoet niet aan de vorm voorvoegsel:rol:organisatie/groep"
+
+msgid "admin.idp_mapping.reason.unknown_role"
+msgstr "onbekende rol"
+
+msgid "admin.idp_mapping.reason.unknown_organisation"
+msgstr "onbekende organisatie"
+
+msgid "admin.idp_mapping.reason.unknown_group"
+msgstr "onbekende groep"
+
+msgid "admin.idp_mapping.reason.group_not_in_organisation"
+msgstr "groep hoort niet bij deze organisatie"
+
+msgid "admin.idp_mapping.reason.scope_not_allowed"
+msgstr "doel past niet bij het bereik van de rol"
+
+msgid "admin.organisation.idp_key_hint"
+msgstr "De waarde waarmee de identiteitsprovider deze organisatie noemt in een recht, bijvoorbeeld openplanner:org_admin:gem-a. Kleine letters, cijfers en koppeltekens. Wijzigen vraagt een nieuwe login."
+
+msgid "admin.group.idp_key.title"
+msgstr "Koppeling identiteitsprovider"
+
+msgid "admin.group.idp_key.lead"
+msgstr "De waarde waarmee de identiteitsprovider deze groep noemt in een recht, bijvoorbeeld openplanner:group_admin:gem-a/burgerzaken. De volledige lijst staat op de pagina Koppeling identiteitsprovider."
+
+msgid "admin.group.idp_key.hint"
+msgstr "Kleine letters, cijfers en koppeltekens; uniek binnen de organisatie. Wijzigen vraagt een nieuwe login."
+
+msgid "admin.group.idp_key.readonly"
+msgstr "Alleen een organisatiebeheerder of de superuser wijzigt deze waarde."
+
+msgid "admin.staff.unrecognised_only"
+msgstr "Alleen met niet-herkende rechten"
+
+msgid "admin.staff.refused"
+msgstr "Niet herkende rechten"
+
+msgid "admin.staff.refused_intro"
+msgstr "Waarden die bij de laatste login binnenkwamen maar geen recht gaven. Laat het IdP-team de waarde corrigeren; de juiste waarden staan op Koppeling identiteitsprovider."
+
+msgid "admin.staff.refused_value"
+msgstr "Waarde"
+
+msgid "admin.staff.refused_reason"
+msgstr "Reden"
+
+msgid "admin.staff.refused_received"
+msgstr "Ontvangen"
+
+msgid "admin.rights.grants"
+msgstr "Rechten per organisatie of groep"
+
+msgid "admin.rights.refused"
+msgstr "Niet herkende rechten"
+
+msgid "admin.rights.refused_intro"
+msgstr "Deze waarden stuurde de identiteitsprovider bij uw laatste login mee, maar deze installatie herkent ze niet. Geef ze door aan het IdP-team."
+
+msgid "admin.roles.entitlement_notice"
+msgstr "Werkt de installatie met een rechtenclaim (ADR 0049), dan stuurt de identiteitsprovider per organisatie of groep één waarde met de sleutel van deze rol, bijvoorbeeld openplanner:custom.3:gem-a. De sleutel en de exacte waarden staan op de pagina Koppeling identiteitsprovider."
+
+msgid "admin.form.error.idp_key"
+msgstr "Gebruik alleen kleine letters, cijfers en koppeltekens (hoogstens 63 tekens), beginnend met een letter of cijfer."
+
 msgid "admin.nav.groups"
 msgstr "Groepen"
 

@@ -17,13 +17,14 @@ from app.domain.audit_export import (
     safe_cell,
     to_csv,
 )
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.event_schema import FIELDS, Envelope, to_record
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW
+from tests.support.principals import principal
 
-ORG_ADMIN = Principal(
+ORG_ADMIN = principal(
     "sub-org", "Olga", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset()
 )
 LIMITS = ExportLimits(max_rows=3, max_days=31)

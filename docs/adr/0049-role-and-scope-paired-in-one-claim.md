@@ -1,11 +1,11 @@
 # 0049. Role and scope paired in one claim value
 
-Status: accepted (2026-10-28), requested by the product owner; E1–E4 settled as recommended.
-Amends ADR 0013 (point 3: which
-claims carry rights, and that their values are slugs), ADR 0014 (how `decide` and `scope_for`
-combine roles and scopes), ADR 0039 (points 3 and 6: how a custom role is linked to the identity
-provider) and ADR 0046 (a membership carries a role). Relates to open point O4 (agents in
-multiple groups) and O3 (IdP claim names). Not built yet; see `docs/adr-status.md` for what is built.
+Status: accepted (2026-10-28), requested by the product owner; E1–E4 settled as recommended;
+partly built (steps 0–3 in one PR, 2026-10-31; see *Build status*). Amends ADR 0013 (point 3:
+which claims carry rights, and that their values are slugs), ADR 0014 (how `decide` and
+`scope_for` combine roles and scopes), ADR 0039 (points 3 and 6: how a custom role is linked
+to the identity provider) and ADR 0046 (a membership carries a role). Relates to open point O4
+(agents in multiple groups) and O3 (IdP claim names).
 
 ## Context
 
@@ -342,6 +342,23 @@ setting for any of them could only make it weaker.
 - **Delivery.** (0) the `legacy` safety net of point 14 on its own, with test A3 (E3); (1)
   domain: `Grant`, parsing, `decide`/`scope_for`, tests A1, A2, A4–A8, A11, A13; (2) `idp_key` columns and forms, `shadow` mode, audit, staff detail block,
   A9, A10, A12, A14; (3) the mapping page, `oidc-check --claims`, runbook and manual.
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 0 | Legacy safety net (point 14, `ambiguous_claims`), test A3 | #179 | in PR |
+| 1 | Domain: `Grant`, `Principal` with grants, `parse_entitlements`, `decide`/`scope_for` per grant, `Scope.groups` as pairs, resolution per request (`LoginService`); tests A1, A2, A4–A8, A11, A13 | #179 | in PR |
+| 2 | `idp_key` on organisations and groups (migration 0076) with the forms, `OIDC_CLAIM_MODE` with `shadow`, refused values on the staff record and page, the staff filter, *My rights*, audit events; tests A9, A10, A12, A14 | #179 | in PR |
+| 3 | Page *Koppeling identiteitsprovider* with the download, `oidc-check --claims`, runbook, manual, Keycloak realm users | #179 | in PR |
+| 4 | Count of `auth.entitlement_mismatch` on the system status screen; memberships by id instead of slug (point 12); the `deleted` reason code (point 5); `entitlements` as the default and removal of `legacy`/`shadow` (point 13, E4) | | follow-up |
+
+Deviations recorded while building: the role segment of the grammar (point 2) also allows a
+dot, because a custom role's key is `custom.<id>`; `staff_memberships` carry the role key next
+to the slugs (not ids), since the record is refreshed at every login and is never a source of
+rights; a login with more than 60 recognised values is refused (`too_many_entitlements`, a
+fixed bound of the 4 kB session cookie); the `deleted` reason is not distinguished from
+`unknown_*`, because a deleted organisation or group leaves no trace to tell them apart.
 
 ## Decision points (settled 2026-10-28)
 
