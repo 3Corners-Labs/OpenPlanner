@@ -3,7 +3,8 @@
  * on every admin page in pages.json at 375, 768 and 1280 px, and the menu usable with the
  * keyboard alone at each width. On tablet the side navigation is an icon rail whose label shows
  * on focus; on phone the bottom bar carries the first entries and the rest open from *More*, a
- * <details> without script.
+ * <details> without script. On tablet and desktop the top bar's menu button collapses the menu
+ * to the rail or expands it, a form without script that holds for the session (#208).
  *
  * Needs Keycloak and the demo seed, like admin-roles.spec.ts.
  */
@@ -61,5 +62,32 @@ for (const [name, width] of Object.entries(WIDTHS)) {
       await expect(current).toBeVisible();
       await expectNoAxeViolations(page);
     });
+
+    if (name !== 'phone') {
+      test('the menu button collapses or expands the menu for the session', async ({ page }) => {
+        await loginAs(page, 'super');
+        const shell = page.locator('.admin-shell');
+        const button = page.getByRole('button', { name: 'Menu in- of uitklappen' });
+        const label = adminMenu(page).getByRole('link', { name: 'Huisstijl' }).locator('span');
+        // The tablet starts with the rail, the desktop with the full menu.
+        const startsCollapsed = name === 'tablet';
+        await expect(button).toHaveAttribute('aria-expanded', String(!startsCollapsed));
+        await expect(label).toBeVisible({ visible: !startsCollapsed });
+
+        await tabTo(page, button);
+        await page.keyboard.press('Enter');
+        await expect(shell).toHaveClass(new RegExp(startsCollapsed ? 'nav-expanded' : 'nav-collapsed'));
+        await expect(button).toHaveAttribute('aria-expanded', String(startsCollapsed));
+        await expect(label).toBeVisible({ visible: startsCollapsed });
+        await expectNoAxeViolations(page);
+
+        // The choice holds on the next page, and the button turns the menu back.
+        await page.goto('/admin/audit');
+        await expect(button).toHaveAttribute('aria-expanded', String(startsCollapsed));
+        await button.click();
+        await expect(button).toHaveAttribute('aria-expanded', String(!startsCollapsed));
+        await expect(label).toBeVisible({ visible: !startsCollapsed });
+      });
+    }
   });
 }
