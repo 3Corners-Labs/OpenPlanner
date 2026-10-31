@@ -269,9 +269,30 @@ def scope_text(scope: Scope | None, _: BoundGettext) -> str:
     return "; ".join(parts)
 
 
-def role_labels(principal: Principal, locale: RequestLocale) -> list[str]:
+def role_name(role: Role, locale: RequestLocale, *, with_standard: bool = False) -> str:
+    """Return the name of a built-in role: the organisation's own, else the shipped one.
+
+    With ``with_standard`` a name that differs from the shipped one is followed by it in
+    brackets, wherever the name stands next to rights, so a reader of the rights matrix or of
+    "My rights" can always tell which role is meant (ADR 0077).
+    """
+    key = ROLE_LABELS[role]
+    chosen = locale.gettext(key)
+    if not with_standard:
+        return chosen
+    standard = locale.translator.gettext(locale.code, key)
+    return chosen if chosen == standard else f"{chosen} ({standard})"
+
+
+def role_labels(
+    principal: Principal, locale: RequestLocale, *, with_standard: bool = False
+) -> list[str]:
     """Name the principal's roles: built-in ones translated, custom ones by their own name."""
-    built_in = [locale.gettext(ROLE_LABELS[role]) for role in Role if role in principal.roles]
+    built_in = [
+        role_name(role, locale, with_standard=with_standard)
+        for role in Role
+        if role in principal.roles
+    ]
     custom = sorted(role.name(locale.code) for role in principal.custom_roles)
     return built_in + custom
 

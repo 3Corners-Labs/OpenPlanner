@@ -10,7 +10,7 @@ audited in the same transaction with the keys, never the texts.
     save    texts.organisation.manage   store or, with ``None``, remove texts of one locale
 """
 
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change, require
@@ -19,6 +19,7 @@ from app.domain.authorization import Permission, Principal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, UnitOfWork
+from app.domain.role_names import ROLE_NAME_KEYS
 from app.domain.scheduling import Organisation
 from app.domain.text_overrides import EDITABLE_BY_KEY, OrganisationTexts, clean_override
 
@@ -41,6 +42,8 @@ class OrganisationTextService:
         clock: Current time, for audit events.
         admin: Authorises changes and audits refusals.
         locales: The locales a text can be written in (those with a shipped catalogue).
+        role_names: The shipped name of every role per locale and role key, for the rule that
+            a role name may not be the name of another role (ADR 0077).
         on_change: Called after texts were stored, so this process shows them at once.
     """
 
@@ -50,10 +53,12 @@ class OrganisationTextService:
         clock: Clock,
         admin: AdminService,
         locales: Collection[str],
+        role_names: Mapping[str, Mapping[str, str]] | None = None,
         *,
         on_change: Callable[[], None] | None = None,
     ) -> None:
         """Store the collaborators."""
+        self._role_names = role_names or {}
         self._on_change = on_change
         self._uow = uow
         self._clock = clock
@@ -94,7 +99,8 @@ class OrganisationTextService:
         for key, text in texts.items():
             if key not in EDITABLE_BY_KEY:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "key")
-            cleaned[key] = clean_override(key, text) if text is not None else None
+            taken = self._names_taken(locale, key, texts)
+            cleaned[key] = clean_override(key, text, taken) if text is not None else None
         check_term_pair(cleaned)
         async with self._uow.locked() as tx:
             organisation = await organisation_by_slug(tx, slug)
@@ -110,6 +116,17 @@ class OrganisationTextService:
         if changed and self._on_change is not None:
             self._on_change()
         return changed
+
+    def _names_taken(self, locale: str, key: str, texts: Mapping[str, str | None]) -> list[str]:
+        """Return the names the role ``key`` may not get.
+
+        Those are the shipped names of the other roles and the other role name in the same form.
+        """
+        if key not in ROLE_NAME_KEYS:
+            return []
+        shipped = self._role_names.get(locale, {})
+        others = [name for role, name in shipped.items() if role != key]
+        return others + [t for k, t in texts.items() if k in ROLE_NAME_KEYS and k != key and t]
 
     async def _authorize(self, principal: Principal, slug: str) -> None:
         """Raise ``not_permitted`` unless the matrix grants the permission on ``slug``."""

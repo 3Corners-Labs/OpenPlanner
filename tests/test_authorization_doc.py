@@ -22,7 +22,12 @@ def test_the_term_changes_no_rights_document() -> None:
     """The agent term is a label (ADR 0077): the generated matrix is the same with a term set."""
     plain = render_markdown(Translator(load_catalogues()))
     overrides = DictOverrides(
-        {(1, "nl", "term.agent"): "behandelaar", (1, "nl", "term.agents"): "behandelaars"},
+        {
+            (1, "nl", "term.agent"): "behandelaar",
+            (1, "nl", "term.agents"): "behandelaars",
+            (1, "nl", "authz.role.org_admin"): "Hoofdbeheer",
+            (1, "nl", "authz.role.group_admin"): "Teamleider",
+        },
         group_texts={(1, "nl", "term.agent"): "agent", (1, "nl", "term.agents"): "agenten"},
     )
 

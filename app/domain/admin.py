@@ -158,6 +158,15 @@ class AdminService:
             return Authorization(Decision(False, reason), Target.everything())
         return Authorization(Decision(True, Reason.ROLE), Target.everything())
 
+    async def organisation_id(self, slug: str) -> int | None:
+        """Return the id of the organisation ``slug``, or ``None`` when there is none.
+
+        A request on an organisation shows that organisation's own words (ADR 0077).
+        """
+        async with self._uow.read() as tx:
+            found = await tx.get_organisation(slug)
+        return found.id if found is not None else None
+
     async def home_organisation(self, principal: Principal) -> str | None:
         """Return the one organisation ``principal`` belongs to, or ``None`` (ADR 0042 step 5).
 

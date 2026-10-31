@@ -7839,3 +7839,18 @@ msgstr "Vul een woord in van {min} tot {max} tekens, zonder accolades. Enkelvoud
 
 msgid "admin.org_texts.term.use"
 msgstr "In een tekst gebruikt u {{agent}}, {{agents}}, {{Agent}} en {{Agents}} voor dit woord."
+
+msgid "admin.org_texts.section_roles"
+msgstr "Hoe u de beheerders noemt"
+
+msgid "admin.org_texts.role.org_admin"
+msgstr "Naam van de organisatiebeheerder"
+
+msgid "admin.org_texts.role.group_admin"
+msgstr "Naam van de groepsbeheerder"
+
+msgid "admin.org_texts.role.hint"
+msgstr "Alleen een naam op het scherm: de rechten veranderen niet. Naast de rechten blijft de standaardnaam zichtbaar."
+
+msgid "admin.form.error.role_display_name"
+msgstr "Vul een naam in van {min} tot {max} tekens, zonder accolades, die niet de naam van een andere rol is."

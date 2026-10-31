@@ -7827,3 +7827,18 @@ msgstr "Enter a word of {min} to {max} characters, without braces. Change the si
 
 msgid "admin.org_texts.term.use"
 msgstr "In a text, use {{agent}}, {{agents}}, {{Agent}} and {{Agents}} for this word."
+
+msgid "admin.org_texts.section_roles"
+msgstr "What you call the administrators"
+
+msgid "admin.org_texts.role.org_admin"
+msgstr "Name of the organisation admin"
+
+msgid "admin.org_texts.role.group_admin"
+msgstr "Name of the group admin"
+
+msgid "admin.org_texts.role.hint"
+msgstr "Only a name on the screen: the rights do not change. Next to the rights, the standard name stays visible."
+
+msgid "admin.form.error.role_display_name"
+msgstr "Enter a name of {min} to {max} characters, without braces, that is not the name of another role."

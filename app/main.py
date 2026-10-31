@@ -104,6 +104,7 @@ from app.keys import (
     session_secret,
 )
 from app.logging import configure_logging, set_log_level, warn_loose_secret_files
+from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
 from app.web.organisation_settings import ClockScopeMiddleware
@@ -424,6 +425,14 @@ def create_app(
             clock,
             app.state.admin_service,
             app.state.translator.locales,
+            {
+                code: {
+                    key: app.state.translator.gettext(code, key)
+                    for key in ROLE_LABELS.values()
+                    if key.startswith("authz.role.")
+                }
+                for code in app.state.translator.locales
+            },
             on_change=text_overrides.invalidate,
         )
         app.state.messaging_service = MessagingService(
