@@ -38,7 +38,14 @@ from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.planner_routes import REASON_LABELS as CHANGE_REASON_LABELS
 from app.domain import staff
-from app.domain.admin import ANONYMOUS, LOGIN_EVENT, LOGOUT_EVENT
+from app.domain.admin import (
+    AMBIGUOUS_CLAIMS_EVENT,
+    ANONYMOUS,
+    ENTITLEMENT_MISMATCH_EVENT,
+    ENTITLEMENT_REFUSED_EVENT,
+    LOGIN_EVENT,
+    LOGOUT_EVENT,
+)
 from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
 from app.domain.audit import (
     SUBJECT_ACTIONS,
@@ -67,8 +74,10 @@ from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
 from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
+from app.domain.idp_mapping import EXPORTED_EVENT, GROUP_IDP_KEY_CHANGED
 from app.domain.integration_check import CHECK_EVENT
 from app.domain.maintenance import OVERDUE_EVENT, MaintenanceReason
+from app.domain.organisations import IDP_KEY_CHANGED as ORGANISATION_IDP_KEY_CHANGED
 from app.domain.planner_service import ALERT_ACTION
 from app.domain.ports import Clock
 from app.domain.request_log import REQUEST_EVENT
@@ -133,6 +142,13 @@ EVENT_LABELS: dict[str, str] = {
     "job.send_reinstatement": "audit.job.send_reinstatement",
     # ADR 0044: one planner made many changes within an hour.
     ALERT_ACTION: "audit.event.planner_changes_alert",
+    # ADR 0049: entitlements and IdP values.
+    ENTITLEMENT_REFUSED_EVENT: "audit.event.entitlement_refused",
+    ENTITLEMENT_MISMATCH_EVENT: "audit.event.entitlement_mismatch",
+    AMBIGUOUS_CLAIMS_EVENT: "audit.event.ambiguous_claims",
+    ORGANISATION_IDP_KEY_CHANGED: "audit.event.organisation_idp_key_changed",
+    GROUP_IDP_KEY_CHANGED: "audit.event.group_idp_key_changed",
+    EXPORTED_EVENT: "audit.event.idp_mapping_exported",
     # Storage watch (ADR 0040): global, so only the superuser sees it.
     STORAGE_EVENT: "audit.event.storage_check",
     # Staff directory (ADR 0046): first login, and roles or memberships changed at login.
@@ -273,10 +289,13 @@ COUNT_LABELS: dict[str, str] = {
 VALUE_LABELS: dict[str, str] = {
     staff.ROLE_ADDED: "admin.audit.detail.role_add",
     staff.ROLE_REMOVED: "admin.audit.detail.role_remove",
-    staff.ORGANISATION_ADDED: "admin.audit.detail.organisation_add",
-    staff.ORGANISATION_REMOVED: "admin.audit.detail.organisation_remove",
-    staff.GROUP_ADDED: "admin.audit.detail.group_add",
-    staff.GROUP_REMOVED: "admin.audit.detail.group_remove",
+    staff.GRANT_ADDED: "admin.audit.detail.grant_add",
+    staff.GRANT_REMOVED: "admin.audit.detail.grant_remove",
+    # Events written before ADR 0049 recorded memberships without their role.
+    "organisation.add": "admin.audit.detail.organisation_add",
+    "organisation.remove": "admin.audit.detail.organisation_remove",
+    "group.add": "admin.audit.detail.group_add",
+    "group.remove": "admin.audit.detail.group_remove",
     "client": "admin.audit.detail.client",
     "reason": "admin.audit.detail.reason",
     "actor": "admin.audit.detail.actor",

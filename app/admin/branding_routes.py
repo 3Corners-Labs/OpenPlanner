@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, Response
+from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import (
@@ -32,7 +32,13 @@ from app.admin.forms import (
     read_form,
     redirect_done,
 )
-from app.admin.pages import Locale, SameOrigin, with_manual
+from app.admin.pages import (
+    Locale,
+    SameOrigin,
+    organisation_header,
+    organisation_redirect,
+    with_manual,
+)
 from app.admin.pages import page as _page
 from app.admin.uploads import read_upload
 from app.domain.authorization import Permission
@@ -286,6 +292,9 @@ async def _form_page(
         context.principal,
         {
             "organisation": organisation,
+            "org_header": organisation_header(
+                request, locale, context.principal, organisation.name, organisation.slug
+            ),
             "brand": brand_view(organisation),
             "name_fields": with_manual(request, locale, _name_fields(form, organisation, locale)),
             "colour_fields": with_manual(
@@ -310,17 +319,12 @@ async def _form_page(
     return response
 
 
-@router.get("/branding", response_class=HTMLResponse)
+@router.get("/branding")
 async def organisations(
-    request: Request,
-    locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.BRANDING_MANAGE))],
-) -> HTMLResponse:
-    """List the organisations whose branding the admin may change."""
-    found = await branding_service(request).organisations(context.principal)
-    return _page(
-        request, locale, "admin/branding_list.html", context.principal, {"organisations": found}
-    )
+) -> RedirectResponse:
+    """Send the old branding list to the organisation's Branding tab (ADR 0047 §4)."""
+    return organisation_redirect(context.principal, Permission.BRANDING_MANAGE, "branding")
 
 
 @router.get("/organisations/{org}/branding", response_class=HTMLResponse)

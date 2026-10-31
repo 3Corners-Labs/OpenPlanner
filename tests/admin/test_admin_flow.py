@@ -168,7 +168,7 @@ async def test_denials_are_audited(site: Site) -> None:
 
     events = await audit_events(site)
     assert ("sub-group", "group.view", Outcome.DENIED, "out_of_scope") in events
-    assert ("sub-group", "organisation.manage", Outcome.DENIED, "not_permitted") in events
+    assert ("sub-group", "organisation.view", Outcome.DENIED, "out_of_scope") in events
 
 
 async def test_dashboard_lists_only_groups_in_scope(site: Site) -> None:

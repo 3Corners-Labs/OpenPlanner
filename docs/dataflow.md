@@ -158,7 +158,9 @@ web ──SQL──> staff, staff_memberships (sub, display name, roles, organis
 |---|---|---|---|---|
 | Admin subject identifier | `audit_events.actor`, `staff.subject`, session cookie | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
 | Admin display name | `staff.display_name`, session cookie | identity provider | replaced at every login; to be erased for admins inactive longer than `staff_retention_days` (ADR 0046, step 2) | no |
-| Admin roles and memberships | `staff.roles`, `staff_memberships` (organisation and group slugs) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed` | no |
+| Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed` | no |
+| Entitlement values (ADR 0049) | session cookie (the recognised values), `staff_refused_entitlements` (value, reason code, organisation), `audit_events` (`auth.entitlement_refused`, `auth.entitlement_mismatch`, `auth.ambiguous_claims`) | identity provider claim `openplanner_entitlements` | session: its lifetime; refusals: replaced at every login; events: as admin actions | no; the values hold the prefix, a role key and the IdP values of organisations and groups, linked to the employee's subject |
+| IdP values of organisations and groups | `organisations.idp_key`, `groups.idp_key` | superuser and org admins in the portal | as the organisation or group; changes audited with old and new value | no (they are what PingFederate sends) |
 | Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
 | System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
 | Audit events on the log platform (ADR 0034) | one JSON line per audit, system and security event on stdout, shipped by the host to the organisation's log platform (SIEM) | web, worker | the organisation's log policy | no participant data; **admin subjects** (personal data of employees): the log platform is a recipient |
@@ -345,6 +347,11 @@ written anywhere. Certificates are logged publicly in Certificate Transparency l
 name only).
 
 ## Planned flows
+
+Subjects and routing attributes (ADR 0081, not built): the participant's chosen subject and the
+switched-on attributes (preferred language, channel preference) are stored on the booking as codes
+from a closed list and leave the system only as routing variables in the contact-center task,
+next to the first name and the host join URL; purged with the booking.
 
 To be added per work package: purge sweep and backups (WP8). Each flow lists: data items, source, destination, legal
 basis owner, retention.

@@ -108,6 +108,7 @@ DONE_MESSAGES: dict[str, str] = {
 FIELD_MESSAGES: dict[str, str] = {
     "name": "admin.form.error.name",
     "slug": "admin.form.error.slug",
+    "idp_key": "admin.form.error.idp_key",
     "organisation": "admin.form.error.organisation",
     "default_locale": "admin.form.error.default_locale",
     "timezone": "admin.form.error.timezone",
@@ -211,6 +212,7 @@ FIELD_TARGET: dict[str, str] = {
 
 CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
+    ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
     ErrorCode.ORGANISATION_NOT_FOUND: "admin.form.error.organisation",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
     ErrorCode.DATABASE_BUSY: "error.database_busy",

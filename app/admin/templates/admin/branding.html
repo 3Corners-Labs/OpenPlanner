@@ -3,13 +3,9 @@
 {% block title %}{{ _("admin.branding.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
 {% block admin_head %}<link rel="stylesheet" href="{{ brand.theme_href }}">{% endblock %}
 {% block content %}
-<div class="page-header">
-  <div>
-    <p class="page-header__lead"><a href="/admin/branding">{{ _("admin.branding.title") }}</a></p>
-    <h1>{{ organisation.name }}</h1>
-    <p class="page-header__lead">{{ _("admin.branding.page_lead") }}</p>
-  </div>
-</div>
+{% include "admin/_organisation_header.html" %}
+<h2 class="section-title">{{ _("admin.branding.title") }}</h2>
+<p>{{ _("admin.branding.page_lead") }}</p>
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
 <section class="card" aria-labelledby="preview-heading">
