@@ -1,7 +1,8 @@
 """The simulator on an admin booking page: play platform events without agents (not in prod).
 
     POST /admin/groups/{slug}/bookings/{booking_id}/simulate   group.edit (fresh)
-         event=prepare            stand-in meeting and task ids for a booking without them
+         event=prepare            stand-in meeting and task ids for a booking without them,
+                                  and an open stand-in trial call where the group offers one
          event=<SimulatedEvent>   sign and post that event to OpenPlanner's own webhook
 
 Each played event takes the real webhook path (signature, parsing, deduplication, timeline,
@@ -45,6 +46,8 @@ EVENT_LABELS: dict[SimulatedEvent, str] = {
     SimulatedEvent.MEETING_ENDED: "admin.simulator.event.meeting_ended",
     SimulatedEvent.TASK_FAILED: "admin.simulator.event.task_failed",
     SimulatedEvent.TASK_ENDED: "admin.simulator.event.task_ended",
+    SimulatedEvent.TRIAL_ENTERED: "admin.simulator.event.trial_entered",
+    SimulatedEvent.TRIAL_LEFT: "admin.simulator.event.trial_left",
 }
 """Button label per event, in the order a call usually goes."""
 
@@ -119,6 +122,7 @@ async def simulate(
             event,
             meeting_id=ids.meeting_id,
             task_id=ids.task_id,
+            trial_meeting_id=ids.trial_meeting_id,
             webex_secret=webex.get_secret_value() if webex else None,
             wxcc_secret=wxcc.get_secret_value() if wxcc else None,
             now=clock.now(),
