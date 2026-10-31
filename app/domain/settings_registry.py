@@ -711,6 +711,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=365,
     ),
     S(
+        "group_erase_after_days",
+        K.INT,
+        30,
+        _C,
+        T.RETENTION,
+        "Days after a group was archived before the worker erases its row, once nothing refers "
+        "to it any more (ADR 0084); the audit log keeps the slug meanwhile.",
+        minimum=1,
+        maximum=365,
+    ),
+    S(
         "audit_retention_days",
         K.INT,
         730,

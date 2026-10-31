@@ -38,6 +38,7 @@ from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, ans
 from app.adapters.db.images import ImageQueries, page_image
 from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
+    ApiClientGroupRow,
     AuditEventRow,
     BookingEventRow,
     BookingRow,
@@ -910,6 +911,37 @@ class SqlTransaction(
         await self._session.execute(
             update(GroupRow).where(GroupRow.id == group.id).values(**_group_columns(group))
         )
+
+    async def erasable_groups(self, archived_before: datetime) -> list[Group]:
+        """Return the archived groups nothing refers to any more (ADR 0084 step 3).
+
+        The five tables with ``ON DELETE RESTRICT`` on ``groups`` decide: a row in any of them
+        keeps the group. Bookings and slots leave through the purge job, closures end, API
+        client grants are the superuser's to remove.
+        """
+        referenced = [
+            select(SlotRow.id).where(SlotRow.group_id == GroupRow.id),
+            select(BookingRow.id).where(BookingRow.group_id == GroupRow.id),
+            select(ClosureRow.id).where(ClosureRow.group_id == GroupRow.id),
+            select(ShortfallAcceptanceRow.group_id).where(
+                ShortfallAcceptanceRow.group_id == GroupRow.id
+            ),
+            select(ApiClientGroupRow.group_id).where(ApiClientGroupRow.group_id == GroupRow.id),
+        ]
+        rows = await self._session.scalars(
+            select(GroupRow)
+            .where(
+                GroupRow.archived_at.is_not(None),
+                GroupRow.archived_at <= archived_before,
+                *(~query.exists() for query in referenced),
+            )
+            .order_by(GroupRow.archived_at, GroupRow.id)
+        )
+        return [_group(row) for row in rows]
+
+    async def delete_group(self, group_id: int) -> None:
+        """Erase the group's row; the schema's cascades take the rest."""
+        await self._session.execute(delete(GroupRow).where(GroupRow.id == group_id))
 
     async def count_future_bookings(self, group_id: int, now: datetime) -> int:
         """Return how many bookings of the group that hold a place start after ``now``."""

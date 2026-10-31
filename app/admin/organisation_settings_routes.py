@@ -7,6 +7,7 @@ superuser sets on *Advanced settings*. The environment lock binds only the platf
 
     GET  /admin/organisation-settings                       organisations in scope
     GET  /admin/organisations/{org}/settings                the six settings with source
+    POST /admin/organisations/{org}/settings                set every changed value (recent login)
     POST /admin/organisations/{org}/settings/{key}          set (recent login)
     POST /admin/organisations/{org}/settings/{key}/reset    back to the platform value
 """
@@ -24,7 +25,7 @@ from app.admin.pages import page as _page
 from app.admin.settings_routes import SettingRow, _input, _value
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
-from app.domain.settings_registry import BY_KEY
+from app.domain.settings_registry import BY_KEY, Kind
 from app.domain.settings_service import SettingsService
 from app.web.locale import RequestLocale
 from app.web.settings_labels import SETTING_LABELS, SOURCE_LABELS
@@ -71,6 +72,30 @@ async def organisation_settings(
 ) -> HTMLResponse:
     """Show one organisation's settings, each with its value and where it comes from."""
     return await _overview(request, locale, context, org)
+
+
+@router.post("/organisations/{org}/settings", response_class=HTMLResponse)
+async def change_organisation_settings(
+    request: Request, locale: Locale, org: str, _: SameOrigin, context: Change
+) -> Response:
+    """Save every value that differs from the current one; the first refusal shows at its row."""
+    form = await read_form(request, locale)
+    service = _service(request)
+    organisation = await service.organisation(context.principal, org)
+    live: LiveSettings = request.app.state.live_settings
+    await live.refresh()
+    changed = 0
+    for state in live.organisation_states(organisation.id):
+        key = state.spec.key
+        if key not in form.values or form.text(key) == _input(state):
+            continue
+        try:
+            await service.change_organisation(context.principal, org, key, form.text(key))
+        except DomainError as error:
+            raise_refusal(error)
+            return await _overview(request, locale, context, org, (key, error), 422)
+        changed += 1
+    return redirect_done(_url(org), "saved" if changed else "unchanged")
 
 
 @router.post("/organisations/{org}/settings/{key}", response_class=HTMLResponse)
@@ -136,6 +161,7 @@ async def _overview(
             choices=state.spec.choices,
             from_portal=state.source.value == "organisation",
             error=errors.get(state.spec.key),
+            boolean=state.spec.kind is Kind.BOOL,
         )
         for state in live.organisation_states(organisation.id)
     ]
