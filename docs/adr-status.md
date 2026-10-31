@@ -16,7 +16,7 @@ package; when the two disagree, the code wins.
 
 | Built? | ADRs |
 |---|---|
-| BUILT | 47 |
+| BUILT | 48 |
 | PARTIAL | 22 |
 | NOT BUILT | 5 |
 | POLICY | 3 |
@@ -100,6 +100,7 @@ package; when the two disagree, the code wins.
 | 0075 | Browser-direct join link per group | PARTIAL | Steps 1 and 2 (#171); migration 0075 | Step 3: confirmation with the Webex app installed, on docker01 |
 | 0076 | Participant journey: trial call events, the page sent to | PARTIAL | Step 1 (#171); no migration | Step 2: the signal *followed, nobody entered*; step 3: the merged journey view |
 | 0078 | Build work merges on green; decisions and releases wait for the product owner; audit before a minor release | PARTIAL | steps 0–2 (#177); step 4 (#180): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | Steps 3 and 5: the required check and the label on GitHub, the first audited minor release |
+| 0080 | Page width: two classes, declared in the register, and a week that never wraps | BUILT | `app/web/navigation.py` (`Width`, `Screen.width`, `wide_subpages`), `data-width` in `admin/layout.html`, tokens and `.week-frame` in `admin.css`, `docs/admin-map.md`; `tests/web/test_navigation.py`, `tests/web/test_shell_styles.py`, `tests/admin/test_pages.py` | – (further list screens go wide when a table needs the room, step 2) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 
