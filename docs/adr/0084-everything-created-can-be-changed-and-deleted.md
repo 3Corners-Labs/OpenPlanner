@@ -129,7 +129,7 @@ groups exist (data integrity, not a threshold).
 |---|---|---|---|
 | 0 | ADR proposed | #262 | in PR |
 | 1 | Permissions `organisation.delete` and `group.delete` in the matrix, docs and sweep; the guard test of point 8 with today's gaps on its exception list | #264, merged into #262 | in PR |
-| 2 | Group archive: migration `archived_at`, domain rule, route, confirmation page, 404 on `/g/{slug}`, lists and navigation, audit events, manual topic (nl/en) | #PR2 | in PR |
+| 2 | Group archive: migration `archived_at`, domain rule, route, confirmation page, 404 on `/g/{slug}`, lists and navigation, audit events, manual topic (nl/en) | #270 | in PR |
 | 3 | Group erase in the nightly sweep, setting `group_erase_after_days`, threat model and data flow updated | | planned |
 | 4 | Organisation delete: domain rule, route, confirmation page, cascades checked up and down in the migration test, manual topic | | planned |
 | 5 | Change in place: staffing exception, reminder rule, holiday calendar rename | | planned |
