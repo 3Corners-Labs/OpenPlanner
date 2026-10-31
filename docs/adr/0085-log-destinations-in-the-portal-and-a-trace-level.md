@@ -1,6 +1,6 @@
 # 0085. Log destinations in the portal (syslog, Splunk, Elastic) and a trace level
 
-Status: accepted (2026-10-31) by the product owner; partly built: step 1 (the `TRACE` level and the trace points) is in PR, steps 2–5 are planned. Amends ADR 0034
+Status: accepted (2026-10-31) by the product owner; partly built: step 1 (the `TRACE` level and the trace points) is merged, steps 2–5 are planned. Amends ADR 0034
 point 4 (shipping is the host's job only) and extends ADR 0040 (levels) and ADR 0042 (`LOG_LEVEL`
 with expiry). ADR 0008 (encrypted integration secrets) and ADR 0047 (one home per screen)
 apply.
@@ -151,8 +151,8 @@ oldest on a full queue (a request is never blocked by logging).
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #263 | in PR |
-| 1 | `TRACE` level, `tracer.trace()`, the trace points, `TRACE_LEVEL_MAX_HOURS`, `SQL_SLOW_MS`, `docs/logging.md` | #266 | in PR |
+| 0 | ADR proposed | #263, landed through #266 | merged |
+| 1 | `TRACE` level, `tracer.trace()`, the trace points, `TRACE_LEVEL_MAX_HOURS`, `SQL_SLOW_MS`, `docs/logging.md` | #266 | merged |
 | 2 | Domain: `LogDestination` Protocol, destination model and validation, queue and sender with drop and backoff, counters, system event; `logging.manage` and `logging.view` in the matrix; migration | | planned |
 | 3 | Adapters: `syslog` (TLS, TCP, UDP), `splunk_hec`, `elastic`, `http`; contract tests against recorded fixtures and a local receiver in the test suite | | planned |
 | 4 | Admin: *Log destinations* list, sub-page, *Send test line*, status on *System status*; manual topic (nl, en); `docs/admin-map.md`, `docs/authorization.md`, `docs/settings.md` regenerated | | planned |
