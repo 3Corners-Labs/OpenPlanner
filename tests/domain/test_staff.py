@@ -16,12 +16,12 @@ from app.domain.staff import (
 )
 
 NOW = datetime(2026, 10, 28, 9, 0, tzinfo=UTC)
-DEMO = Membership("demo")
-DEMO_TEAM = Membership("demo", "team")
-OTHER = Membership("andere")
+DEMO = Membership("org_admin", "demo")
+DEMO_TEAM = Membership("group_admin", "demo", "team")
+OTHER = Membership("org_admin", "andere")
 
 ORG_SCOPE = Scope(organisations=frozenset({"demo"}))
-GROUP_SCOPE = Scope(groups=frozenset({"team"}))
+GROUP_SCOPE = Scope(groups=frozenset({("demo", "team")}))
 EVERYTHING = Scope(everything=True)
 
 
@@ -41,7 +41,7 @@ def test_an_organisation_scope_sees_members_of_the_organisation_and_its_groups()
 def test_a_group_scope_sees_only_members_of_the_group() -> None:
     assert visible(member(DEMO_TEAM), GROUP_SCOPE)
     assert not visible(member(DEMO), GROUP_SCOPE)
-    assert not visible(member(Membership("demo", "elders")), GROUP_SCOPE)
+    assert not visible(member(Membership("group_admin", "demo", "elders")), GROUP_SCOPE)
 
 
 def test_superusers_are_seen_by_the_superuser_only() -> None:
@@ -93,8 +93,18 @@ def test_a_first_login_is_recorded_in_each_membership() -> None:
     events = change_events(None, member(DEMO, DEMO_TEAM))
 
     assert [(e.action, e.organisation, e.group, e.detail) for e in events] == [
-        (CREATED_EVENT, "demo", None, "role.add:org_admin,organisation.add:demo,group.add:team"),
-        (CREATED_EVENT, "demo", "team", "role.add:org_admin,organisation.add:demo,group.add:team"),
+        (
+            CREATED_EVENT,
+            "demo",
+            None,
+            "role.add:org_admin,grant.add:org_admin:demo,grant.add:group_admin:demo/team",
+        ),
+        (
+            CREATED_EVENT,
+            "demo",
+            "team",
+            "role.add:org_admin,grant.add:org_admin:demo,grant.add:group_admin:demo/team",
+        ),
     ]
     assert all(e.outcome is Outcome.SUCCESS and e.actor == "sub-1" for e in events)
     assert all(e.at == NOW for e in events)
@@ -122,8 +132,8 @@ def test_a_move_is_shown_to_both_organisations_without_the_other_ones_slug() -> 
     events = change_events(member(DEMO), member(OTHER))
 
     assert [(e.action, e.organisation, e.detail) for e in events] == [
-        (CHANGED_EVENT, "andere", "organisation.add:andere"),
-        (CHANGED_EVENT, "demo", "organisation.remove:demo"),
+        (CHANGED_EVENT, "andere", "grant.add:org_admin:andere"),
+        (CHANGED_EVENT, "demo", "grant.remove:org_admin:demo"),
     ]
 
 
@@ -142,7 +152,7 @@ def test_losing_every_membership_is_still_shown_where_it_was() -> None:
     events = change_events(member(DEMO_TEAM), member())
 
     assert [(e.organisation, e.group, e.detail) for e in events] == [
-        ("demo", "team", "group.remove:team")
+        ("demo", "team", "grant.remove:group_admin:demo/team")
     ]
 
 

@@ -1,12 +1,13 @@
 """The admin session: who is logged in, and the OIDC login in progress (ADR 0013).
 
-Stored in Starlette's signed session cookie (``op_admin``, path ``/admin``). Holds the
-principal's subject, display name, roles, organisations and groups, the other role claim
-values (custom roles link to them, ADR 0039; the roles themselves are looked up per request),
-the login time, when activity was last written to the staff record (ADR 0046), the chosen
-theme and the alert preferences. The absolute lifetime is enforced here; the cookie's own expiry
-slides with every response. The theme and the preferences live here so that they need no cookie
-of their own.
+Stored in Starlette's signed session cookie (``op_admin``, path ``/admin``). Holds what the
+ID token said (``LoginClaims``: subject, display name, the legacy roles, organisations and
+groups, the other role claim values and the recognised entitlement values of ADR 0049), the
+login time, when activity was last written to the staff record (ADR 0046), the chosen theme
+and the alert preferences. The grants themselves are resolved from those claims on every
+request (``app.domain.login_service``), never stored. The absolute lifetime is enforced here;
+the cookie's own expiry slides with every response. The theme and the preferences live here so
+that they need no cookie of their own.
 """
 
 from dataclasses import dataclass
@@ -15,7 +16,8 @@ from typing import Any
 
 from fastapi import Request
 
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
+from app.domain.entitlements import MAX_SESSION_GRANTS, LoginClaims
 from app.domain.ports import LoginStart
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 
@@ -101,11 +103,12 @@ def pop_login_start(request: Request) -> dict[str, str] | None:
     return value if isinstance(value, dict) else None
 
 
-def start_session(request: Request, principal: Principal, now: datetime) -> None:
-    """Replace the whole session with a fresh one for ``principal`` (no session fixation).
+def start_session(request: Request, claims: LoginClaims, now: datetime) -> None:
+    """Replace the whole session with a fresh one for ``claims`` (no session fixation).
 
     Only the theme and the alert preferences carry over, so a fresh login (ADR 0015) keeps the
-    admin's choices.
+    admin's choices. ``claims.entitlements`` should hold the recognised values only (the
+    login service sees to that), so the cookie stays within its 4 kB.
     """
     theme = session_theme(request)
     prefs = session_alert_prefs(request)
@@ -116,26 +119,27 @@ def start_session(request: Request, principal: Principal, now: datetime) -> None
         request.session[_ALERT_BANNER] = prefs.banner
         request.session[_ALERT_POPUPS] = prefs.popups
     request.session[_PRINCIPAL] = {
-        "subject": principal.subject,
-        "name": principal.display_name,
-        "roles": sorted(principal.roles),
-        "organisations": sorted(principal.organisations),
-        "groups": sorted(principal.groups),
-        "claims": sorted(principal.role_claims),
+        "subject": claims.subject,
+        "name": claims.display_name,
+        "roles": sorted(claims.roles),
+        "organisations": sorted(claims.organisations),
+        "groups": sorted(claims.groups),
+        "claims": sorted(claims.role_claims),
+        "entitlements": sorted(claims.entitlements)[:MAX_SESSION_GRANTS],
     }
     request.session[_LOGIN_AT] = now.isoformat()
     request.session[_SEEN_AT] = now.isoformat()
 
 
-def current_principal(request: Request, now: datetime, lifetime: timedelta) -> Principal | None:
-    """Return the logged-in principal, or ``None`` (not logged in, expired or tampered)."""
+def current_login(request: Request, now: datetime, lifetime: timedelta) -> LoginClaims | None:
+    """Return the logged-in admin's claims, or ``None`` (not logged in, expired or tampered)."""
     data: Any = request.session.get(_PRINCIPAL)
     login_at: Any = request.session.get(_LOGIN_AT)
     if not isinstance(data, dict) or not isinstance(login_at, str):
         return None
     try:
         started = datetime.fromisoformat(login_at)
-        principal = Principal(
+        claims = LoginClaims(
             subject=str(data["subject"]),
             display_name=str(data["name"]),
             roles=frozenset(Role(r) for r in data["roles"]),
@@ -144,6 +148,9 @@ def current_principal(request: Request, now: datetime, lifetime: timedelta) -> P
             role_claims=frozenset(
                 str(c) for c in data.get("claims", [])[:MAX_ROLE_CLAIMS] if is_claim_value(str(c))
             ),
+            entitlements=frozenset(
+                str(e) for e in data.get("entitlements", [])[:MAX_SESSION_GRANTS]
+            ),
         )
     except (KeyError, TypeError, ValueError):
         request.session.clear()
@@ -151,7 +158,7 @@ def current_principal(request: Request, now: datetime, lifetime: timedelta) -> P
     if now - started > lifetime:
         request.session.clear()
         return None
-    return principal
+    return claims
 
 
 def login_age(request: Request, now: datetime) -> timedelta | None:

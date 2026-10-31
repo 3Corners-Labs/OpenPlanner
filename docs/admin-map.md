@@ -25,6 +25,7 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 | Holidays | `/admin/holidays` | `holidays.assign` | `/admin/holidays/{calendar}`, `/admin/organisations/{org}/holidays` |
 | Emergency closure | `/admin/closures` | `organisation.closure` | `/admin/organisations/{org}/closure`, `/admin/organisations/{org}/closure/scenarios`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts` |
 | Staff | `/admin/staff` | `staff.view` | `/admin/staff/{member_id}` |
+| Identity provider mapping | `/admin/idp-mapping` | `idp_mapping.view` | – |
 | My rights | `/admin/rights` | `rights.view` | – |
 | Rights matrix | `/admin/matrix` | `matrix.view` | `/admin/roles`, `/admin/roles/new`, `/admin/roles/{role_id}` |
 

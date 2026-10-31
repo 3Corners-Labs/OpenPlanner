@@ -12,6 +12,7 @@ from app.adapters.db.seed import seed_demo
 from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.authorization import Principal, Role
+from app.domain.entitlements import LoginClaims
 from app.main import create_app
 from tests.fakes.clock import FixedClock
 from tests.fakes.dns import FakeTxtResolver
@@ -19,24 +20,25 @@ from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.integrations import FakeVideo
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
+from tests.support.principals import legacy_claims, principal
 
-SUPER = Principal("sub-super", "Sanne Super", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-ORG_ADMIN = Principal(
+SUPER = principal("sub-super", "Sanne Super", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+ORG_ADMIN = principal(
     "sub-org", "Olaf Org", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset()
 )
-GROUP_ADMIN = Principal(
+GROUP_ADMIN = principal(
     "sub-group", "Gina Group", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"})
 )
-OUTSIDER = Principal(
+OUTSIDER = principal(
     "sub-outsider", "Otto Other", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset()
 )
-AUDITOR = Principal(
+AUDITOR = principal(
     "sub-auditor", "Anouk Audit", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset()
 )
-AGENT = Principal(
+AGENT = principal(
     "sub-agent", "Mo Medewerker", frozenset({Role.AGENT}), frozenset(), frozenset({"demo"})
 )
-NO_ROLE = Principal("sub-none", "Nina None", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
+NO_ROLE = principal("sub-none", "Nina None", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
 
 SAME_ORIGIN = {"sec-fetch-site": "same-origin"}
 
@@ -57,7 +59,12 @@ class Site:
         self.dns = dns or FakeTxtResolver()
 
     async def login_as(self, principal: Principal) -> httpx.Response:
-        self.idp.next_principal = principal
+        """Log in as ``principal`` through the legacy claims that resolve to it."""
+        return await self.login_with(legacy_claims(principal))
+
+    async def login_with(self, claims: LoginClaims) -> httpx.Response:
+        """Log in with exactly ``claims`` (entitlement values, ambiguous claims; ADR 0049)."""
+        self.idp.next_claims = claims
         start = await self.client.get("/admin/login")
         assert start.status_code == 303
         return await self.client.get("/admin/callback", params={"code": "c", "state": "state-1"})

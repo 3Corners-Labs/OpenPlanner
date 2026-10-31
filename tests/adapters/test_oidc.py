@@ -20,7 +20,7 @@ from app.adapters.oidc import (
     OidcConfig,
     OidcIdentityProvider,
     claim_mapping,
-    principal_from_claims,
+    login_claims,
 )
 from app.domain.authorization import Role
 from app.domain.ports import IdentityError
@@ -294,7 +294,7 @@ async def test_unreachable_discovery(unreachable: OidcIdentityProvider) -> None:
 def test_claim_mapping(
     claims: dict[str, Any], roles: set[Role], orgs: set[str], groups: set[str]
 ) -> None:
-    principal = principal_from_claims({"sub": "u", **claims}, MAPPING)
+    principal = login_claims({"sub": "u", **claims}, MAPPING)
 
     assert (principal.roles, principal.organisations, principal.groups) == (roles, orgs, groups)
     assert principal.display_name == "u"
@@ -331,13 +331,12 @@ async def test_logout_url_is_none_when_discovery_fails(
 def test_other_role_values_are_kept_for_custom_roles_within_bounds() -> None:
     # ADR 0039: custom roles link to role claim values; only well-shaped ones, at most 20.
     others = [f"op-team-{n:02d}" for n in range(25)]
-    principal = principal_from_claims(
+    principal = login_claims(
         {"sub": "s", "roles": ["op-group-admin", "<bad value>", *others]}, MAPPING
     )
 
     assert principal.roles == frozenset({Role.GROUP_ADMIN})
     assert principal.role_claims == frozenset(others[:20])
-    assert principal.custom_roles == frozenset()
 
 
 # --- lockout diagnostics (ADR 0042 §8 rule 4) ----------------------------------------------
@@ -355,7 +354,7 @@ def test_a_missing_role_claim_is_logged_by_name_without_any_claim_value() -> Non
     claims = {"sub": "u", "name": "Jan Jansen", "email": "jan@example.nl", "dept": "dept-7"}
 
     with structlog.testing.capture_logs() as events:
-        principal = principal_from_claims(claims, MAPPING)
+        principal = login_claims(claims, MAPPING)
 
     assert principal.roles == frozenset()
     (event,) = [e for e in events if e["event"] == "oidc.no_role"]
@@ -369,7 +368,7 @@ def test_role_values_that_match_nothing_are_counted_never_shown() -> None:
     claims = {"sub": "u", "roles": ["op-unknown-role", "other"], "org": "secret-org"}
 
     with structlog.testing.capture_logs() as events:
-        principal_from_claims(claims, MAPPING)
+        login_claims(claims, MAPPING)
 
     (event,) = [e for e in events if e["event"] == "oidc.no_role"]
     assert event["missing_claim"] is None
@@ -381,7 +380,7 @@ def test_role_values_that_match_nothing_are_counted_never_shown() -> None:
 @pytest.mark.parametrize(("role", "claim"), [("op-org-admin", "org"), ("op-group-admin", "groups")])
 def test_a_scoped_role_without_its_scope_claim_is_logged(role: str, claim: str) -> None:
     with structlog.testing.capture_logs() as events:
-        principal_from_claims({"sub": "u", "roles": [role]}, MAPPING)
+        login_claims({"sub": "u", "roles": [role]}, MAPPING)
 
     (event,) = [e for e in events if e["event"] == "oidc.no_scope"]
     assert event["missing_claim"] == claim
@@ -390,7 +389,7 @@ def test_a_scoped_role_without_its_scope_claim_is_logged(role: str, claim: str) 
 
 def test_a_resolved_login_logs_no_diagnostics() -> None:
     with structlog.testing.capture_logs() as events:
-        principal_from_claims({"sub": "u", "roles": "op-superuser"}, MAPPING)
+        login_claims({"sub": "u", "roles": "op-superuser"}, MAPPING)
 
     assert events == []
 
@@ -399,7 +398,7 @@ def test_claim_names_in_the_diagnostics_are_bounded() -> None:
     claims: dict[str, Any] = {"sub": "u", **{f"c{i:03}" + "x" * 100: i for i in range(80)}}
 
     with structlog.testing.capture_logs() as events:
-        principal_from_claims(claims, MAPPING)
+        login_claims(claims, MAPPING)
 
     (event,) = events
     assert len(event["claims_present"]) == 50
@@ -490,7 +489,7 @@ def test_a_login_holding_every_role_value_holds_every_built_in_role() -> None:
         mapping.group_claim: ["demo"],
     }
 
-    principal = principal_from_claims(claims, mapping)
+    principal = login_claims(claims, mapping)
 
     assert principal.roles == frozenset(Role)
     assert (principal.organisations, principal.groups) == ({"demo"}, {"demo"})

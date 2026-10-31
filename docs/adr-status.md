@@ -17,8 +17,8 @@ package; when the two disagree, the code wins.
 | Built? | ADRs |
 |---|---|
 | BUILT | 47 |
-| PARTIAL | 19 |
-| NOT BUILT | 6 |
+| PARTIAL | 20 |
+| NOT BUILT | 5 |
 | POLICY | 3 |
 
 | ADR | Title | Built? | Evidence | What is missing |
@@ -71,7 +71,7 @@ package; when the two disagree, the code wins.
 | 0046 | Staff directory, SCIM | PARTIAL | step 1 #61; migration 0026 | Step 2 (suspend, end sessions, erase, retention, CSV), step 3 (SCIM) |
 | 0047 | Admin information architecture | PARTIAL | steps 1–2 (#62, #80): `web/navigation.py`, `docs/admin-map.md` | Steps 3–6: organisation page with tabs, six group tabs, readiness checklist, `return` keys |
 | 0048 | Live update progress | BUILT | #63; migration 0027 | – |
-| 0049 | Role and scope in one claim | NOT BUILT | ADR only (#64) | Everything |
+| 0049 | Role and scope in one claim | PARTIAL | steps 0–3 (this PR); `domain/entitlements.py`, `domain/login_service.py`, `domain/idp_mapping.py`, migration 0076, `admin/idp_mapping_routes.py`, `OIDC_CLAIM_MODE` | Step 4: mismatch count on System status, memberships by id, `entitlements` as default and removal of `legacy`/`shadow` (E4) |
 | 0050 | Host installer | BUILT | #82; `scripts/install.sh`; extended by #139, #144 | – |
 | 0051 | Dependency currency | BUILT (repository side) | #94; `renovate.json`, `make pins`, `freshness.yml` | Unsure: the Renovate app installed, the required check on `main` (GitHub settings) |
 | 0052 | Releases and versioning | BUILT | #96; `release_plan.py`; v0.3.0 (#113) | – |

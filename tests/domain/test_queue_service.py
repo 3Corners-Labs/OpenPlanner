@@ -28,13 +28,14 @@ from tests.support.domain import (
     make_group,
     window,
 )
+from tests.support.principals import principal
 
 KEY = b"p" * 32
-AGENT = Principal("a-1", "A", frozenset({Role.AGENT}), frozenset(), frozenset({"demo"}))
-COLLEAGUE = Principal("a-2", "B", frozenset({Role.AGENT}), frozenset(), frozenset({"demo"}))
-GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
-OTHER_TEAM = Principal("a-3", "C", frozenset({Role.AGENT}), frozenset(), frozenset({"andere"}))
-AUDITOR = Principal("u-1", "U", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
+AGENT = principal("a-1", "A", frozenset({Role.AGENT}), frozenset(), frozenset({"demo"}))
+COLLEAGUE = principal("a-2", "B", frozenset({Role.AGENT}), frozenset(), frozenset({"demo"}))
+GROUP_ADMIN = principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
+OTHER_TEAM = principal("a-3", "C", frozenset({Role.AGENT}), frozenset(), [("demo", "andere")])
+AUDITOR = principal("u-1", "U", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
 QUEUE = DispatchKind.OPENPLANNER_QUEUE
 
 
@@ -190,9 +191,9 @@ async def test_another_groups_booking_does_not_exist_here(
     await _book(uow, clock)
     clock.advance(SLOT_0900 - clock.now())
 
-    for principal, slug, booking_id in ((OTHER_TEAM, "andere", 999), (AGENT, "demo", other)):
+    for admin, slug, booking_id in ((OTHER_TEAM, "andere", 999), (AGENT, "demo", other)):
         with pytest.raises(DomainError) as excinfo:
-            await queue.claim(principal, slug, booking_id)
+            await queue.claim(admin, slug, booking_id)
         assert excinfo.value.code is ErrorCode.BOOKING_NOT_FOUND
 
 
@@ -208,7 +209,7 @@ async def test_others_are_refused_and_audited(
 
 
 async def test_a_contact_center_group_has_no_own_queue(queue: QueueService) -> None:
-    admin = Principal("s", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+    admin = principal("s", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 
     with pytest.raises(DomainError) as excinfo:
         await queue.view(admin, "wxcc")
@@ -248,12 +249,12 @@ async def test_the_summaries_cover_the_own_queues_in_reach_with_waiting_and_staf
     uow.state.call_status[waiting] = CallStatus(
         waiting, participants=1, updated_at=clock.now() - timedelta(minutes=4)
     )
-    demo_team, now = Membership("demo", "demo"), clock.now()
+    demo_team, now = Membership("agent", "demo", "demo"), clock.now()
     uow.state.staff = {
         "a-1": _staff("a-1", frozenset({Role.AGENT}), now, demo_team),
         "a-9": _staff("a-9", frozenset({Role.AGENT}), now, demo_team, last_logout_at=now),
-        "u-1": _staff("u-1", frozenset({Role.AUDITOR}), now, Membership("demo")),
-        "a-3": _staff("a-3", frozenset({Role.AGENT}), now, Membership("demo", "andere")),
+        "u-1": _staff("u-1", frozenset({Role.AUDITOR}), now, Membership("auditor", "demo")),
+        "a-3": _staff("a-3", frozenset({Role.AGENT}), now, Membership("agent", "demo", "andere")),
         "a-0": _staff("a-0", frozenset({Role.AGENT}), now - timedelta(hours=9), demo_team),
     }
 
@@ -269,7 +270,7 @@ async def test_the_summaries_leave_out_contact_center_groups_and_groups_outside_
     queue: QueueService, uow: InMemoryUnitOfWork
 ) -> None:
     everything = await queue.summaries(
-        Principal("s", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset()),
+        principal("s", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset()),
         timedelta(hours=8),
     )
 

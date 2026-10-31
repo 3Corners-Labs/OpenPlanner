@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.admin import AdminService
-from app.domain.authorization import Principal, Role, Scope
+from app.domain.authorization import Role, Scope
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.images import ImageFile, ImageText
@@ -16,9 +16,10 @@ from tests.fakes.clock import FixedClock
 from tests.support.closures import NOTICES
 from tests.support.domain import NOW, TEST_TOKEN_KEY
 from tests.support.images import png
+from tests.support.principals import principal
 
 EVERYTHING = Scope(everything=True)
-ADMIN = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+ADMIN = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "14 020"),), {"nl": "Bel ons"})
 TEXT = ImageText({"nl": "Deur", "en": "Door"})
 
@@ -121,8 +122,8 @@ async def test_listing_follows_the_scope(engine: AsyncEngine) -> None:
         assert summary is not None
         slug = summary.organisation_slug
 
-    in_group = Scope(groups=frozenset({"aangifte"}))
-    other_group = Scope(groups=frozenset({"elders"}))
+    in_group = Scope(groups=frozenset({(slug, "aangifte")}))
+    other_group = Scope(groups=frozenset({(slug, "elders")}))
     in_organisation = Scope(organisations=frozenset({slug}))
     async with uow.read() as tx:
         seen = {

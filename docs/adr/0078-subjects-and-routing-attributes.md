@@ -90,7 +90,7 @@ a privacy rule, not a preference.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR, privacy rule in `CLAUDE.md` and `docs/dataflow.md` | #TBD | in PR |
+| 0 | ADR, privacy rule in `CLAUDE.md` and `docs/dataflow.md` | this PR | planned |
 | 1 | Subjects per group: domain, migration, form question, agenda and queue display | | planned |
 | 2 | Attribute catalogue (`preferred_language`, `channel_preference`), form questions | | planned |
 | 3 | Routing mapping per group and the dispatcher payload, with the payload test of point 6 | | planned |

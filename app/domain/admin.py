@@ -9,13 +9,15 @@ cannot disagree.
         ├─ decide() ──► allowed  ──► return
         └─────────────► denied   ──► audit event (denied, reason) ──► return
 
-Logins and logouts are recorded once per organisation and group the admin holds a role in
+Logins and logouts are recorded once per organisation and group the admin holds a grant on
 (their ``Membership``s), so an organisation admin sees the logins of the admins of their own
 organisation; without such a context (superuser, no role) the event is global and only the
-superuser sees it. Each login also refreshes the admin's staff record and audits what changed
-in their roles and memberships since the last one (ADR 0046).
+superuser sees it. Each login also refreshes the admin's staff record, with the entitlement
+values that were refused (ADR 0049), and audits what changed in their roles and memberships
+since the last one (ADR 0046).
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 
@@ -43,12 +45,19 @@ from app.domain.authorization import (
     role_keys,
     scope_for,
 )
+from app.domain.entitlements import Refusal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_schema import Envelope, to_record
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.retention import RetentionOverview, candidates_before, summarise
 from app.domain.scheduling import GroupSummary
-from app.domain.staff import Membership, StaffFilter, StaffMember, change_events
+from app.domain.staff import (
+    Membership,
+    RefusedEntitlement,
+    StaffFilter,
+    StaffMember,
+    change_events,
+)
 from app.domain.tasks import ActiveJobs
 
 ANONYMOUS = "anonymous"
@@ -56,6 +65,12 @@ ANONYMOUS = "anonymous"
 
 LOGIN_EVENT = "admin.login"
 LOGOUT_EVENT = "admin.logout"
+ENTITLEMENT_REFUSED_EVENT = "auth.entitlement_refused"
+"""ADR 0049 point 7: a login carried entitlement values this installation does not recognise."""
+ENTITLEMENT_MISMATCH_EVENT = "auth.entitlement_mismatch"
+"""ADR 0049 point 13: in shadow mode the entitlement claim disagrees with the legacy claims."""
+AMBIGUOUS_CLAIMS_EVENT = "auth.ambiguous_claims"
+"""ADR 0049 point 14: a login refused because its legacy claims were ambiguous."""
 
 
 @dataclass(frozen=True)
@@ -96,15 +111,19 @@ class AdminService:
         """
         level = LEVELS[permission]
         group: GroupSummary | None = None
-        if level is Level.GROUP:
-            if group_slug is None:
-                raise ValueError(f"{permission} needs a group")
+        if level is not Level.GLOBAL and group_slug is not None:
             async with self._uow.read() as tx:
                 group = await tx.get_group_summary(group_slug)
             if group is None:
                 raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+        if level is Level.GROUP:
+            if group is None:
+                raise ValueError(f"{permission} needs a group")
             target = Target.for_group(group.group.slug, group.organisation_slug)
         elif level is Level.ORGANISATION:
+            # An organisation-level permission on a group's page: the group's organisation.
+            if group is not None:
+                organisation_slug = group.organisation_slug
             if organisation_slug is None:
                 raise ValueError(f"{permission} needs an organisation")
             target = Target.for_organisation(organisation_slug)
@@ -147,11 +166,7 @@ class AdminService:
         """
         if Reach.EVERYTHING in reaches(principal):
             return None
-        slugs = set(principal.organisations)
-        if principal.groups:
-            async with self._uow.read() as tx:
-                groups = await tx.list_groups(Scope(groups=frozenset(principal.groups)))
-            slugs |= {g.organisation_slug for g in groups}
+        slugs = {g.organisation for g in principal.grants if g.organisation is not None}
         return next(iter(slugs)) if len(slugs) == 1 else None
 
     async def record(
@@ -171,11 +186,21 @@ class AdminService:
         async with self._uow.locked() as tx:
             await tx.add_audit_event(event)
 
-    async def record_login(self, principal: Principal) -> None:
-        """Audit a login and refresh the admin's staff record, in one transaction (ADR 0046)."""
+    async def record_login(
+        self,
+        principal: Principal,
+        refused: Sequence[Refusal] = (),
+        mismatch: str | None = None,
+    ) -> None:
+        """Audit a login and refresh the admin's staff record, in one transaction (ADR 0046).
+
+        ``refused`` entitlement values are kept on the record and audited once per
+        organisation they name (global for values naming none), with the values and reason
+        codes as detail (ADR 0049 point 7). A shadow-mode ``mismatch`` is audited as well.
+        """
         now = self._clock.now()
+        memberships = memberships_of(principal)
         async with self._uow.locked() as tx:
-            memberships = await _memberships(tx, principal)
             await self._record_session_event(tx, principal, LOGIN_EVENT, memberships)
             old = await tx.get_staff(principal.subject)
             new = StaffMember(
@@ -187,15 +212,38 @@ class AdminService:
                 last_login_at=now,
                 last_seen_at=now,
                 last_logout_at=old.last_logout_at if old else None,
+                refused=tuple(
+                    RefusedEntitlement(r.value, r.reason.value, r.organisation, now)
+                    for r in refused
+                ),
             )
             for event in change_events(old, new):
                 await tx.add_audit_event(event)
+            for event in refusal_events(principal.subject, now, refused):
+                await tx.add_audit_event(event)
+            if mismatch is not None:
+                await tx.add_audit_event(
+                    AuditEvent(
+                        now,
+                        principal.subject,
+                        ENTITLEMENT_MISMATCH_EVENT,
+                        Outcome.FAILURE,
+                        "",
+                        None,
+                        None,
+                        mismatch,
+                    )
+                )
             await tx.save_staff(new)
+
+    async def record_refused_login(self, subject: str, reason: str) -> None:
+        """Audit a refused login (``ambiguous_claims`` or ``too_many_entitlements``)."""
+        await self.record(subject, AMBIGUOUS_CLAIMS_EVENT, Outcome.DENIED, reason)
 
     async def record_logout(self, principal: Principal) -> None:
         """Audit a logout and note it on the admin's staff record."""
+        memberships = memberships_of(principal)
         async with self._uow.locked() as tx:
-            memberships = await _memberships(tx, principal)
             await self._record_session_event(tx, principal, LOGOUT_EVENT, memberships)
             await tx.set_staff_logout(principal.subject, self._clock.now())
 
@@ -232,6 +280,15 @@ class AdminService:
         """Return one person if ``principal`` may see them, else ``None`` (as if unknown)."""
         found = await self.staff(principal, StaffFilter(id=member_id))
         return found[0] if found else None
+
+    async def own_refusals(self, principal: Principal) -> tuple[RefusedEntitlement, ...]:
+        """Return the entitlement values of the admin's own last login that were refused.
+
+        For the *My rights* page (ADR 0049 point 8): one's own record, no scope involved.
+        """
+        async with self._uow.read() as tx:
+            member = await tx.get_staff(principal.subject)
+        return member.refused if member else ()
 
     async def groups(
         self, principal: Principal, permission: Permission = Permission.GROUP_VIEW
@@ -333,22 +390,47 @@ class AdminService:
         return summarise(facts, now)
 
 
-async def _memberships(tx: Transaction, principal: Principal) -> list[Membership]:
-    """Return the organisations and groups the principal's roles reach, in a stable order.
+def memberships_of(principal: Principal) -> list[Membership]:
+    """Return one membership per grant on an organisation or group, in a stable order.
 
-    Organisation claims count for roles that reach organisations, group claims for roles
-    that reach groups. A claim for a group we do not know grants nothing and is left out.
+    The superuser's grant names no target and is no membership; its role is on the record.
     """
-    memberships: list[Membership] = []
-    reach = reaches(principal)
-    if Reach.ORGANISATIONS in reach:
-        memberships += [Membership(o) for o in sorted(principal.organisations)]
-    if Reach.GROUPS in reach:
-        for slug in sorted(principal.groups):
-            summary = await tx.get_group_summary(slug)
-            if summary is not None:
-                memberships.append(Membership(summary.organisation_slug, slug))
-    return memberships
+    found = [
+        Membership(g.role, g.organisation, g.group)
+        for g in principal.grants
+        if g.organisation is not None
+    ]
+    return sorted(found, key=lambda m: m.sort_key)
+
+
+def refusal_events(subject: str, now: datetime, refused: Sequence[Refusal]) -> list[AuditEvent]:
+    """Return one ``auth.entitlement_refused`` event per organisation named (ADR 0049 point 7).
+
+    Values naming no known organisation go into one global event, which only the superuser
+    sees. The detail lists ``value=reason`` pairs; values hold prefixes, role keys and IdP
+    values, never personal data. A detail that would not fit is counted instead.
+    """
+    by_organisation: dict[str | None, list[Refusal]] = {}
+    for refusal in refused:
+        by_organisation.setdefault(refusal.organisation, []).append(refusal)
+    events = []
+    for organisation, found in sorted(by_organisation.items(), key=lambda item: item[0] or ""):
+        detail = ",".join(f"{r.value}={r.reason.value}" for r in found)
+        if len(detail) > 255:
+            detail = f"refused:{len(found)}"
+        events.append(
+            AuditEvent(
+                now,
+                subject,
+                ENTITLEMENT_REFUSED_EVENT,
+                Outcome.FAILURE,
+                "",
+                organisation,
+                None,
+                detail,
+            )
+        )
+    return events
 
 
 def require(authorization: Authorization) -> Authorization:

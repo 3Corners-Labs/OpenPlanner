@@ -297,6 +297,14 @@ class Settings(BaseSettings):
     oidc_role_group_admin: str = "openplanner-group-admin"
     oidc_role_auditor: str = "openplanner-auditor"
     oidc_role_agent: str = "openplanner-agent"
+    # ADR 0049: one claim with role and scope per value. The mode is class B: moving back to
+    # ``legacy`` weakens a protection, which the portal may never do.
+    oidc_claim_mode: Literal["legacy", "shadow", "entitlements"] = "legacy"
+    oidc_entitlement_claim: str = "openplanner_entitlements"
+    oidc_entitlement_prefix: str = "openplanner"
+    oidc_entitlements_max_values: int = Field(default=200, ge=20, le=1000)
+    # ADR 0049 point 17: how far back the mapping page lists refused values.
+    idp_mapping_refused_window_days: int = Field(default=30, ge=7, le=365)
 
     # Integration secrets at rest (ADR 0008): AES-256-GCM under a key derived from this value.
     settings_encryption_key: SecretStr | None = None

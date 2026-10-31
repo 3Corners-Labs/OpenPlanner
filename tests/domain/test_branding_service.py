@@ -4,7 +4,7 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.branding import Branding, FontFile, FontRole, HeaderStyle, Logo
 from app.domain.branding_service import BrandingService
 from app.domain.errors import DomainError, ErrorCode
@@ -13,9 +13,10 @@ from app.domain.theme import Theme, ThemeFileError
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW, make_group
+from tests.support.principals import principal
 
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+SUPER = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+ORG_ADMIN = principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 
 

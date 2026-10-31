@@ -8,7 +8,8 @@ redirect and a confirmation. ``OrganisationService`` authorises again, validates
     GET  /admin/organisations/new    organisation.manage   form for a new organisation
     POST /admin/organisations        organisation.manage   create
     GET  /admin/organisations/{org}  organisation.manage   edit form
-    POST /admin/organisations/{org}  organisation.manage   save name and default language
+    POST /admin/organisations/{org}  organisation.manage   save name, default language and
+                                                           the IdP value (ADR 0049 point 4)
 """
 
 from typing import Annotated
@@ -28,6 +29,7 @@ from app.admin.forms import (
 )
 from app.admin.pages import Locale, SameOrigin, page
 from app.domain.authorization import Permission
+from app.domain.entitlements import IDP_KEY_PATTERN
 from app.domain.errors import DomainError
 from app.domain.organisations import NewOrganisation, OrganisationService, OrganisationSettings
 from app.domain.scheduling import Organisation
@@ -61,9 +63,16 @@ def _languages(locale: RequestLocale) -> tuple[Option, ...]:
 
 
 def _fields(
-    form: FormData, locale: RequestLocale, current: Organisation | None = None
+    form: FormData,
+    locale: RequestLocale,
+    current: Organisation | None = None,
+    holders: int = 0,
 ) -> list[Field]:
-    """Return the inputs; without ``current`` (a new organisation) the slug is editable."""
+    """Return the inputs; without ``current`` (a new organisation) the slug is editable.
+
+    An existing organisation also gets its IdP value (ADR 0049 point 4), with a warning
+    naming how many people (``holders``) lose access until the IdP sends the new value.
+    """
     _ = locale.gettext
     fields = [
         Field(
@@ -95,6 +104,25 @@ def _fields(
             options=_languages(locale),
         )
     )
+    if current is not None:
+        hint = _("admin.organisation.idp_key_hint")
+        if holders:
+            hint = f"{hint} {_('admin.idp_mapping.holders_warning', count=holders)}"
+        fields.append(
+            Field(
+                "idp_key",
+                _("admin.idp_mapping.idp_key"),
+                value=form.values.get("idp_key", current.idp_key),
+                hint=hint,
+                error=form.error_for("idp_key"),
+                attributes={
+                    "autocapitalize": "none",
+                    "spellcheck": "false",
+                    "pattern": IDP_KEY_PATTERN,
+                    "maxlength": "63",
+                },
+            )
+        )
     return fields
 
 
@@ -105,6 +133,7 @@ def _form_page(
     form: FormData,
     current: Organisation | None = None,
     status: int = 200,
+    holders: int = 0,
 ) -> HTMLResponse:
     """Render the form for a new (``current`` is ``None``) or an existing organisation."""
     response = page(
@@ -115,7 +144,7 @@ def _form_page(
         {
             "organisation": current,
             "heading": current.name if current else locale.gettext("admin.new_organisation.title"),
-            "fields": _fields(form, locale, current),
+            "fields": _fields(form, locale, current, holders),
             "errors": form.errors,
             "done": done_message(request, locale.gettext),
         },
@@ -165,23 +194,28 @@ async def organisation_form(
     request: Request, locale: Locale, org: str, context: Manage
 ) -> HTMLResponse:
     """Show the settings of one organisation."""
-    current = await organisation_service(request).get(context.principal, org)
-    return _form_page(request, locale, context, FormData({}, locale.gettext), current)
+    service = organisation_service(request)
+    current = await service.get(context.principal, org)
+    holders = await service.holders_of(context.principal, org)
+    return _form_page(request, locale, context, FormData({}, locale.gettext), current, 200, holders)
 
 
 @router.post("/organisations/{org}", response_class=HTMLResponse)
 async def save_organisation(
     request: Request, locale: Locale, org: str, _: SameOrigin, context: Manage
 ) -> Response:
-    """Save name and default language; the slug never changes."""
+    """Save name, default language and the IdP value; the slug never changes."""
     service = organisation_service(request)
     current = await service.get(context.principal, org)
     form = await read_form(request, locale)
-    settings = OrganisationSettings(form.text("name"), form.text("default_locale"))
+    settings = OrganisationSettings(
+        form.text("name"), form.text("default_locale"), form.text("idp_key")
+    )
     try:
         changed = await service.update(context.principal, org, settings)
     except DomainError as error:
         raise_refusal(error)
         form.refusal(error)
-        return _form_page(request, locale, context, form, current, 422)
+        holders = await service.holders_of(context.principal, org)
+        return _form_page(request, locale, context, form, current, 422, holders)
     return redirect_done(f"{LIST_URL}/{org}", "saved" if changed else "unchanged")

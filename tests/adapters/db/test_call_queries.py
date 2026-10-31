@@ -106,8 +106,12 @@ async def test_bookings_are_listed_per_day_within_the_scope(engine: AsyncEngine)
 
     async with uow.read() as tx:
         everything = await tx.list_bookings(Scope(everything=True), group.id, lower, upper)
-        own = await tx.list_bookings(Scope(groups=frozenset({"aangifte"})), group.id, lower, upper)
-        other = await tx.list_bookings(Scope(groups=frozenset({"other"})), group.id, lower, upper)
+        own = await tx.list_bookings(
+            Scope(groups=frozenset({("org-aangifte", "aangifte")})), group.id, lower, upper
+        )
+        other = await tx.list_bookings(
+            Scope(groups=frozenset({("org-aangifte", "other")})), group.id, lower, upper
+        )
         next_day = await tx.list_bookings(
             Scope(everything=True), group.id, upper, upper + timedelta(days=1)
         )

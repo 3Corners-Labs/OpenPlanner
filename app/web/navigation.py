@@ -199,6 +199,14 @@ SECTIONS = (
                 "people",
                 ("/admin/staff/{member_id}",),
             ),
+            # ADR 0049 point 17: the values the identity provider must send, read-only.
+            Screen(
+                "manage.idp_mapping",
+                "admin.nav.idp_mapping",
+                "/admin/idp-mapping",
+                Permission.IDP_MAPPING_VIEW,
+                "key",
+            ),
             Screen(
                 "manage.rights",
                 "admin.nav.rights",

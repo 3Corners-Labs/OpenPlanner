@@ -48,6 +48,7 @@ from app.admin.forms import (
     read_form,
     redirect_done,
 )
+from app.admin.idp_mapping_routes import group_idp_view, idp_mapping_service
 from app.admin.pages import Locale, NavView, SameOrigin, current_home, page, with_manual
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
@@ -657,9 +658,17 @@ def _settings_fields(
 
 
 async def _settings_response(
-    request: Request, locale: RequestLocale, context: AdminContext, form: FormData, status: int
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    form: FormData,
+    status: int,
+    idp_form: FormData | None = None,
 ) -> HTMLResponse:
-    """Render the settings form with the latest "Koppeling controleren" result."""
+    """Render the settings form with the latest "Koppeling controleren" result.
+
+    ``idp_form`` is the refused IdP value form (ADR 0049 point 4), when that one was sent.
+    """
     current = settings_of(context.group.group)
     planning, integrations = _settings_fields(form, current, locale.gettext)
     return group_page(
@@ -670,11 +679,38 @@ async def _settings_response(
         {
             "fields": with_manual(request, locale, planning),
             "integration_fields": with_manual(request, locale, integrations),
-            "errors": form.errors,
+            "errors": form.errors + (idp_form.errors if idp_form else []),
             "check": await check_view(request, locale, context),
+            "idp": await group_idp_view(request, context, idp_form),
         },
         status,
     )
+
+
+@router.post("/groups/{slug}/settings/idp-key", response_class=HTMLResponse)
+async def save_idp_key(
+    request: Request,
+    locale: Locale,
+    slug: str,
+    _: SameOrigin,
+    context: Annotated[
+        AdminContext,
+        Depends(RequirePermission(Permission.IDP_MAPPING_MANAGE, group_param="slug", fresh=True)),
+    ],
+) -> Response:
+    """Set the value the identity provider names the group by (ADR 0049 point 4)."""
+    form = await read_form(request, locale)
+    try:
+        changed = await idp_mapping_service(request).change_group_idp_key(
+            context.principal, slug, form.text("idp_key")
+        )
+    except DomainError as error:
+        raise_refusal(error)
+        form.refusal(error)
+        return await _settings_response(
+            request, locale, context, FormData({}, locale.gettext), 422, form
+        )
+    return redirect_done(f"/admin/groups/{slug}/settings", "saved" if changed else "unchanged")
 
 
 @router.get("/groups/{slug}/settings", response_class=HTMLResponse)
