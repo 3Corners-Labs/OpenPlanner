@@ -1155,16 +1155,16 @@ msgid "admin.field.trial_call_enabled_hint"
 msgstr "Ja: de burger kan vooraf in een echte Webex-meeting uitproberen of camera, microfoon en luidsprekers werken. De meeting is van de Webex-host van deze groep; er komt niemand van het team in. Alleen met een Webex-host."
 
 msgid "admin.field.join_client"
-msgstr "Webex-pagina voor de burger"
+msgstr "Webex-pagina voor de deelnemer"
 
 msgid "admin.field.join_client_hint"
-msgstr "Welke pagina van Webex de burger bij de afspraak en het proefgesprek te zien krijgt."
+msgstr "Welke pagina van Webex de deelnemer bij de afspraak en het proefgesprek te zien krijgt."
 
 msgid "admin.group.join_client_browser"
 msgstr "Direct in de browser"
 
 msgid "admin.group.join_client_choice"
-msgstr "Webex laat de burger kiezen"
+msgstr "Webex laat de deelnemer kiezen"
 
 msgid "admin.field.trial_call_minutes"
 msgstr "Proefgesprek blijft open (minuten)"
@@ -4350,6 +4350,33 @@ msgstr "Meldingen"
 msgid "admin.topbar.tasks.count"
 msgstr "{label}, {count} lopend of mislukt"
 
+msgid "admin.scope.label"
+msgstr "Werkgebied"
+
+msgid "admin.scope.crumbs"
+msgstr "Gekozen werkgebied"
+
+msgid "admin.scope.organisation"
+msgstr "Organisatie"
+
+msgid "admin.scope.group"
+msgstr "Groep"
+
+msgid "admin.scope.all_organisations"
+msgstr "Alle organisaties"
+
+msgid "admin.scope.all_groups"
+msgstr "Alle groepen"
+
+msgid "admin.scope.hint"
+msgstr "Beperkt de groepen, afspraken, wachtrij en wijzigingen op deze pagina tot wat u al mag zien. Taken, status en rechten blijven voor het hele platform."
+
+msgid "admin.scope.apply"
+msgstr "Tonen"
+
+msgid "admin.scope.reset"
+msgstr "Alles tonen"
+
 msgid "admin.nav.help"
 msgstr "Handleiding"
 
@@ -4590,10 +4617,10 @@ msgid "admin.check.webex.host_ok"
 msgstr "Een proefmeeting voor host {host} is gepland zoals een afspraak dat doet, en weer verwijderd."
 
 msgid "admin.check.webex.browser_link_ok"
-msgstr "De directe browserlink werkt: Webex houdt de browseroptie vast, dus de burger krijgt op een computer meteen de webversie, zonder de vraag naar de app."
+msgstr "De directe browserlink werkt: Webex houdt de browseroptie vast, dus de deelnemer krijgt op een computer meteen de webversie, zonder de vraag naar de app."
 
 msgid "admin.check.webex.browser_link_lost"
-msgstr "Webex neemt de browseroptie niet meer mee in de link (antwoord {status}). De burger krijgt dan toch de keuze tussen app en browser. Er breekt niets; zet de Webex-pagina voor de burger desnoods op 'Webex laat de burger kiezen'."
+msgstr "Webex neemt de browseroptie niet meer mee in de link (antwoord {status}). De deelnemer krijgt dan toch de keuze tussen app en browser. Er breekt niets; zet de Webex-pagina voor de deelnemer desnoods op 'Webex laat de deelnemer kiezen'."
 
 msgid "admin.check.webex.browser_link_unreachable"
 msgstr "De directe browserlink kon niet worden gecontroleerd: de Webex-site was niet bereikbaar ({error})."
@@ -4620,7 +4647,7 @@ msgid "admin.check.webex.trial_refused"
 msgstr "Webex weigerde een proefgesprek-meeting voor host {host} ({error}): {reason}. Burgers kunnen dan geen proefgesprek openen; controleer op de Webex-site of deelnemers vóór de host mogen binnenkomen."
 
 msgid "admin.check.webex.trial_lobby"
-msgstr "Webex nam een proefgesprek-meeting voor host {host} aan, maar bewaarde de instellingen niet ({stored}). De burger komt dan in de wachtruimte terecht en niemand haalt hem eruit. Laat de beheerder van de Webex-site toestaan dat deelnemers vóór de host binnenkomen en zonder wachtruimte; tot dan werkt het proefgesprek niet."
+msgstr "Webex nam een proefgesprek-meeting voor host {host} aan, maar bewaarde de instellingen niet ({stored}). De deelnemer komt dan in de wachtruimte terecht en niemand laat de deelnemer binnen. Laat de beheerder van de Webex-site toestaan dat deelnemers vóór de host binnenkomen en zonder wachtruimte; tot dan werkt het proefgesprek niet."
 
 msgid "admin.check.webex.trial_left"
 msgstr "De proefgesprek-meeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."

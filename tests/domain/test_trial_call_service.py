@@ -210,7 +210,7 @@ async def test_a_group_that_keeps_webexs_choice_gets_the_meeting_link_unchanged(
 
 
 @pytest.mark.parametrize("client", list(JoinClient))
-async def test_following_the_trial_link_says_which_page_the_citizen_was_sent_to(
+async def test_following_the_trial_link_says_which_page_the_participant_was_sent_to(
     client: JoinClient,
 ) -> None:
     setup = await Setup(join_client=client).booked()

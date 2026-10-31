@@ -92,3 +92,21 @@ alleen wat uw rol mag openen:
 Op een telefoon blijven de pictogrammen, het getal en uw initialen staan; de woorden staan
 voor schermlezers in de balk. Het getal staat ook in de naam van de snelkoppeling, bijvoorbeeld
 *Taken, 2 lopend of mislukt*. Een snelkoppeling zonder bron voor een getal toont er geen.
+
+## Werkgebied kiezen
+
+Links in de balk staat een knop met een filter-pictogram, op een breed scherm met de keuze erbij
+(*Werkgebied: Alle organisaties › Alle groepen*). Daarin kiest u een organisatie, een groep of
+beide, en **Tonen** beperkt het overzicht tot die keuze: de groepen onderaan, *Afspraken vandaag
+per groep*, *Wachtrij in mijn groepen* en *Recente wijzigingen van de configuratie*. *Taken*,
+*Systeemstatus* en *Mijn rol en bereik* gelden voor het hele platform en veranderen niet.
+**Alles tonen** haalt de keuze weg.
+
+Het filter laat alleen zien wat uw rol al mag zien. U kiest uit de organisaties en groepen
+binnen uw bereik; een andere waarde in het adres wordt genegeerd. Het is een gewoon formulier
+dat niets wijzigt. Boven de keuzelijsten staan de gekozen organisatie en groep als links naar hun
+pagina's (de organisatiepagina alleen voor wie organisaties beheert). De keuze geldt voor deze
+sessie: u ziet haar terug als u later naar het overzicht gaat, en na opnieuw inloggen staat het
+filter weer op alles. Is een keuze actief, dan heeft de knop een gekleurde achtergrond, ook als er
+op een kleiner scherm alleen het pictogram past. Op dit moment werkt het filter op het overzicht;
+de andere lijsten hebben hun eigen filters.
