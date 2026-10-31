@@ -83,8 +83,8 @@ else rather than guessing.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #278 | in PR |
-| 1 | `--list-pull-requests` and `--merge-group` in `scripts/decision_gate.py`, the `merge_group` job in `decision-gate.yml` with `pull-requests: read`, `edited` on `pull_request_target`, tests, ADR 0078's table, CONTRIBUTING.md and the runbook | #278 | in PR |
+| 0 | ADR proposed | #284 | in PR |
+| 1 | `--list-pull-requests` and `--merge-group` in `scripts/decision_gate.py`, the `merge_group` job in `decision-gate.yml` with `pull-requests: read`, `edited` on `pull_request_target`, tests, ADR 0078's table, CONTRIBUTING.md and the runbook | #284 | in PR |
 | 2 | The product owner adds *decision gate* to the required checks of `main` (ADR 0078 step 3; without it neither run stops a merge) | | planned |
 
 ## Consequences
