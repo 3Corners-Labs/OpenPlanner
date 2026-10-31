@@ -73,7 +73,7 @@ from the rows below.
 | 0051 | Dependency currency | BUILT (repository side) | #94; `renovate.json`, `make pins`, `freshness.yml` | Unsure: the Renovate app installed, the required check on `main` (GitHub settings) |
 | 0052 | Releases and versioning | BUILT | #96; `release_plan.py`; v0.3.0 (#113) | – |
 | 0053 | Security events, public entry points | BUILT | #97; `web/security_events.py` | – |
-| 0054 | EUPL-1.2 and CLA | BUILT (code side) | #102, #104; `reuse lint` | Not code: the lawyer's review of the CLA, making the repository public |
+| 0054 | EUPL-1.2 and CLA | BUILT (code side) | #102, #104; `reuse lint`; `publiccode.yml`, validated in CI, version and date set by the release PR | Not code: the lawyer's review of the CLA, making the repository public, listing on developer.overheid.nl |
 | 0055 | Booking form fields | BUILT | #114; migration 0053 | – |
 | 0056 | Citizen confirms by email | PARTIAL | step 1 #115, step 2 #134 (migration 0058) | Step 3 (planner confirms on behalf), step 4 (citizen corrects details) |
 | 0057 | Rebooking assistant | PARTIAL | step 1 #129 (`domain/rebooking.py`) | Steps 2–4: held proposal, message, confirm and expiry, review page, automatic mode, `reschedule_*` settings |
@@ -106,6 +106,7 @@ from the rows below.
 | 0084 | Everything an admin creates can be changed and deleted | PARTIAL | #270 (ADR, step 1 and step 2; #262 and #264 were carried by it): `Permission.ORGANISATION_DELETE`, `Permission.GROUP_DELETE`, `tests/admin/test_create_change_delete.py`); migration 0078, `PlanningService.archive_group`, `AdminService.READ_WHEN_ARCHIVED`, `/admin/groups/{slug}/settings/archive`; step 3 in PR (#278): `domain/group_erase.py`, `Housekeeping` daily erase, setting `group_erase_after_days` | Steps 4–7 (organisation delete, change in place for exception, reminder rule and calendar name, API client delete, threat model) |
 | 0085 | Log destinations in the portal (syslog, Splunk, Elastic) and a trace level | PARTIAL | #263 (landed through #266); step 1 merged (#266): `TRACE` and `tracer` in `app/logging.py`, `api/trace.py`, `jobs/runner.py`, `adapters/http_trace.py`, `adapters/db/engine.py`, `web/templates.py`, `docs/logging.md`, `TRACE_LEVEL_MAX_HOURS`, `SQL_SLOW_MS` | Steps 2–5 (destination model and sender, the four adapters, the admin screen, kill switch and docs) |
 | 0086 | The public address and the reverse proxy: visible, verified end to end, and by the standards | NOT BUILT | #265 | Steps 1–2 (*Address and proxy* on System status, `/api/v1/instance` round-trip probe, link-building test; standards asserted in `check-proxy.sh`, runbook, internet.nl checklist) |
+| 0087 | The public website: static, built from the repository, shipped with every release | NOT BUILT | #271 (ADR and step 1 in PR) | Steps 1–4 (`site/`, `scripts/build_site.py`, the `site` job; Playwright lane; recorded walkthrough; TransIP host work) |
 | 0088 | The decision gate judges the merge group too | PARTIAL | #284; step 1 in PR: `--list-pull-requests` and `--merge-group` in `scripts/decision_gate.py`, the `merge_group` job in `decision-gate.yml`, `tests/scripts/test_decision_gate.py` | Step 2: the product owner makes *decision gate* a required check of `main` (ADR 0078 step 3) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
