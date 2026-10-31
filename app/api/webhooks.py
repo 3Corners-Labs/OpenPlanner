@@ -7,7 +7,7 @@ meetings, tasks and event types, and Webex events seen before (replays), are ack
 ignored, so the platforms do not retry.
 
     POST /webhooks/webex   meetings started/ended, participants joined/left
-    POST /webhooks/wxcc    task:connected, task:ended, task:failed
+    POST /webhooks/wxcc    task:new, task:connected, task:ended, task:failed
 """
 
 import json

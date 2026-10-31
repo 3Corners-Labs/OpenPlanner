@@ -25,7 +25,7 @@ from typing import Any
 import httpx
 
 from app.adapters.diagnostics import CheckResult
-from app.adapters.wxcc import REQUIRED_FIELDS, ROUTING_KEY, WORK_ITEM_FIELDS
+from app.adapters.wxcc import PROBE_KIND, REQUIRED_FIELDS, ROUTING_KEY, WORK_ITEM_FIELDS
 from app.domain.ports import IntegrationError
 
 PROJECT_ID = "5e5c9ad6d61f870d6d778c1b"
@@ -395,6 +395,22 @@ def _flow_results(
                 required=False,
                 code="naming.no_match",
                 value=group.routing_value,
+            )
+        )
+
+    # ADR 0082 point 2: a Case branch on kind == probe ends the group check's probe work item
+    # before an agent sees it; without it OpenPlanner ends the probe itself (a warning).
+    if PROBE_KIND in flow.strings:
+        out.append(result("probe branch", True, code="probe.ok"))
+    else:
+        out.append(
+            result(
+                "probe branch",
+                False,
+                f"no branch for kind '{PROBE_KIND}': the group check ends its probe work item "
+                "itself (End Task, cjp:user), or an agent sees it",
+                required=False,
+                code="probe.missing",
             )
         )
 

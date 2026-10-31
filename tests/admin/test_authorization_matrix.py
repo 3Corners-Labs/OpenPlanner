@@ -203,6 +203,10 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # Integrations and secrets: superuser only.
     "GET /admin/integrations": {"/admin/integrations": statuses(200, 403, 403, 403, 403, 403, 403)},
+    # ADR 0082: the Service App check from Koppelingen; whoever manages integrations.
+    "POST /admin/integrations/service-app-check": {
+        "/admin/integrations/service-app-check": statuses(303, 403, 403, 403, 403, 403, 403)
+    },
     # Organisations: create and edit, superuser only (HANDOVER §6).
     # ADR 0047 step 3: organisation.view opens the organisations in reach; an admin of exactly
     # one organisation is sent straight to it (303). The auditor reads it too.
@@ -952,6 +956,7 @@ WRITABLE_IN_MAINTENANCE = frozenset(
         "POST /admin/maintenance/on",
         "POST /admin/maintenance/off",
         "POST /admin/groups/{slug}/check",
+        "POST /admin/integrations/service-app-check",
     }
 )
 

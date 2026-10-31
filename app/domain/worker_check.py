@@ -12,6 +12,7 @@ the platform checker does. Pure Python: the service feeds it what the database s
     worker.alive            seen within that age, with its version                ok
     worker.version_differs  worker and web run different versions                warn
     worker.no_video_jobs    the group has a host; the worker claims no meeting   fail
+    worker.no_dispatch_jobs the group dispatches; the worker claims no work item fail
     worker.jobs_ok          no failed or overdue jobs of the group                ok
     worker.failed_jobs      failed jobs of the group                              warn
     worker.overdue_jobs     pending jobs past their time by the threshold         warn
@@ -56,6 +57,7 @@ def worker_findings(
     web_version: str,
     has_host: bool,
     overdue_after: timedelta,
+    dispatches: bool = False,
 ) -> list[Finding]:
     """Return the worker and queue findings of one group.
 
@@ -67,6 +69,8 @@ def worker_findings(
         web_version: The version of the process running the check.
         has_host: Whether the group has a Webex host, so meeting jobs are expected.
         overdue_after: The threshold used for ``counts.overdue`` (``job_overdue_minutes``).
+        dispatches: Whether the group sends work items to a contact center, so dispatch jobs
+            are expected (ADR 0082 point 4).
     """
     area = CheckArea.WORKER
     findings: list[Finding] = []
@@ -97,6 +101,8 @@ def worker_findings(
             )
         if has_host and JobType.CREATE_VIDEO_ROOM.value not in heartbeat.job_types:
             findings.append(Finding(area, "worker.no_video_jobs", CheckStatus.FAIL))
+        if dispatches and JobType.DISPATCH_WXCC_TASK.value not in heartbeat.job_types:
+            findings.append(Finding(area, "worker.no_dispatch_jobs", CheckStatus.FAIL))
     if counts.failed:
         findings.append(
             Finding(area, "worker.failed_jobs", CheckStatus.WARN, (("count", str(counts.failed)),))

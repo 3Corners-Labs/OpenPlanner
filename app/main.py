@@ -17,6 +17,8 @@ from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
+from app.adapters.db.probes import ProbeReports
+from app.adapters.db.reports import ReportStore
 from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
@@ -200,6 +202,7 @@ def create_app(
         configure_logging(settings.log_level, envelope=settings.event_envelope)
         warn_loose_secret_files(loose_secret_files(environment()))
         app.state.engine = create_engine(settings.database_url)
+        app.state.http = http  # ADR 0082: the Service App check runs the probes from here
         # ADR 0034: committed audit events also go to stdout for the log platform.
         uow = SqlUnitOfWork(
             app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
@@ -233,7 +236,13 @@ def create_app(
 
         def wire_integrations(current: Settings) -> None:
             wired = integrations or build_integrations(
-                current, app.state.engine, http, clock, app.state.security_log, request_log
+                current,
+                app.state.engine,
+                http,
+                clock,
+                app.state.security_log,
+                request_log,
+                probe_timeout=lambda: timedelta(seconds=live().integration_probe_timeout_seconds),
             )
             app.state.integrations = wired
             app.state.call_service = CallService(
@@ -359,7 +368,11 @@ def create_app(
             uow, clock, app.state.admin_service, agent_pseudonym_key(settings)
         )
         app.state.integration_service = IntegrationService(
-            uow, clock, app.state.admin_service, settings.app_version
+            uow,
+            clock,
+            app.state.admin_service,
+            settings.app_version,
+            probes=ProbeReports(ReportStore(app.state.engine)),
         )
         app.state.meeting_status_service = MeetingStatusService(
             uow,

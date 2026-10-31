@@ -99,6 +99,16 @@ cancelled. **Secondary:** End Task, `POST /v1/tasks/{taskId}/end` without a body
 
 Only the booking reference goes out: no first name, no meeting link.
 
+**Reading a task** (ADR 0082 point 1): `GET /v1/tasks/{taskId}` (`cjp:config_read`). Only
+`status` (mapped to OpenPlanner's task state) and `lastUpdatedTime` are read; the task's
+attributes and `workItemData` are ignored. A `404` is a task WxCC does not know.
+
+**Probe work item** (ADR 0082 point 2): the group check sends the same Create Task v2 request
+with `kind: "probe"`, `bookingReference: "probe-<12 hex>"`, `firstName: "Probe"`, the group's
+name and the probe meeting's link (or `https://openplanner.invalid/probe`). The flow's Case
+on `kind == probe` ends it; otherwise OpenPlanner ends it with End Task after
+`INTEGRATION_PROBE_TIMEOUT_SECONDS`.
+
 ## Webhook addresses
 
 Both platforms call `<WEBHOOK_BASE_URL>/webhooks/webex` and `<WEBHOOK_BASE_URL>/webhooks/wxcc`.
@@ -186,7 +196,10 @@ Verification (before reading anything else):
 2. `X-WebExCC-Timestamp` equals the body's `comciscotimestamp`.
 3. |now − timestamp| ≤ 300 s.
 
-Correlation is on `data.taskId`. `task:connected` carries no agent identity, which is why the
+Correlation is on `data.taskId`. A booking's `task:new` is acknowledged and ignored (the
+dispatch job recorded the creation); the `task:new` and `task:ended` of the group check's probe
+work item are noted for the check (`integration_reports`, row `wxcc_probe`) and never touch a
+booking. `task:connected` carries no agent identity, which is why the
 agent's host role comes from `allowAnyUserToBeCoHost` (ADR 0017). `task:failed` carries
 `reason` (for example `ENTRY_POINT_NOT_FOUND`, `ORG_DIGITAL_CONTACT_LIMIT_EXCEEDED`), shown to
 admins on the booking's timeline.

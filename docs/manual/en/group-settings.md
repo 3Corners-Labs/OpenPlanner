@@ -165,8 +165,10 @@ must keep working when someone leaves.
 
 As soon as you save a new address, OpenPlanner checks the integration right away, just like the
 **Check integration** button at the bottom of the page: a probe meeting is scheduled and removed
-again. The result is shown under **Check integration** after saving. From then on the platform
-checks every group with a host by itself, once a day by default. When something is wrong (no
+again, and for a group with a contact-center mapping a probe work item goes through the flow
+(see *WxCC business address*). The result is shown under **Check integration** after saving.
+From then on the platform checks every group with a host or a contact-center mapping by
+itself, once a day by default. When something is wrong (no
 licence, wrong account, missing rights), the group's audit log shows a system entry
 *Integration checked* with Webex's answer under it; it repeats until it is fixed and reports
 once that all is well again. So you hear about it before a participant gets an appointment without
@@ -176,11 +178,20 @@ The check also looks at the **background jobs (worker)**: the part of OpenPlanne
 creates the video meetings. The probe meeting runs in the admin portal, bookings run in the
 worker. The check reports whether the worker runs and which version, whether it runs the same
 version as the admin portal (if not, an update is half way), whether it was started with the
-Webex settings, and how many jobs of this group failed or wait too long. A job waits too long
+Webex and the WxCC settings, and how many jobs of this group failed or wait too long. A job waits too long
 once it is more than the platform setting *Job overdue after* (default 10 minutes) past its time.
 
 <!-- field: wxcc_business_address -->
 ### WxCC business address
+
+**Check integration** sends a **probe work item** through Webex Contact Center with these
+fields, exactly as a booking does: with kind `probe`, a reference that belongs to no booking
+and the first name "Probe", so without any participant data. It then waits until WxCC reports
+the creation and the end (60 seconds by default). That proves token, rights, asset, flow,
+subscription and webhook in one go. The flow should have a branch for kind `probe` that ends
+the item at once; without it OpenPlanner ends the item itself and shows a warning. When no
+event comes back, the result names what is missing (subscription, webhook or the branch in
+the flow).
 
 The address of the *digital channel asset* in Webex Contact Center that receives this group's
 tasks. Several groups can share an address; the routing value then picks the queue.

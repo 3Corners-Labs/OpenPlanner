@@ -15,8 +15,9 @@ meeting ran here: its heartbeat, version and job types, and the group's failed a
 jobs (``app.domain.worker_check``).
 
 ADR 0065 step 2: the platform also checks on its own, so a wrong host, licence or scope is
-reported before a participant's booking fails. The worker checks every group with a Webex host
-whose latest check is older than ``integration_check_interval_hours`` (``IntegrationWatch``),
+reported before a participant's booking fails. The worker checks every group with a Webex host or
+a contact-center mapping (ADR 0082 point 4) whose latest check is older than
+``integration_check_interval_hours`` (``IntegrationWatch``),
 and the admin portal checks a group right after its host address changed. Those runs go
 through ``check_as_system``: no principal, no admin audit, but a system event
 ``integration.check`` at the group's level whenever ``report_for`` says so: on every failing
@@ -41,6 +42,9 @@ from app.domain.worker_check import worker_findings
 
 CHECK_EVENT = "integration.check"
 """Audit action of a check; the reason is the overall status (by hand) or the failing code."""
+SERVICE_APP_CHECK_EVENT = "integration.service_app_check"
+"""Audit action of the Service App check from *Koppelingen* (ADR 0082 point 3); the reason is
+``passed`` or ``failed``."""
 
 NOT_CONFIGURED = Finding(CheckArea.PLATFORM, "platform.not_configured", CheckStatus.SKIPPED)
 
@@ -90,6 +94,14 @@ def report_for(previous: GroupCheck | None, current: GroupCheck) -> CheckReport 
     if previous is not None and previous.overall is CheckStatus.FAIL:
         return CheckReport(Outcome.SUCCESS, current.overall.value)
     return None
+
+
+def has_chain(group: Group) -> bool:
+    """Whether the platform checks ``group`` on its own: a Webex host or a contact-center mapping.
+
+    A group with neither makes no call to a platform, so there is nothing to prove.
+    """
+    return group.video_enabled or group.dispatch_enabled
 
 
 def check_due(previous: GroupCheck | None, now: datetime, interval: timedelta) -> bool:
@@ -164,14 +176,14 @@ class IntegrationCheckService:
         """Check the group on the platform's own initiative; record a system event when due.
 
         Nothing is checked, and ``None`` returned, without a Service App, for an unknown group
-        or for a group without a Webex host: there is no chain to prove then, and a skipped
-        result would hide the admin's own latest check.
+        or for a group with neither a Webex host nor a contact-center mapping: there is no
+        chain to prove then, and a skipped result would hide the admin's own latest check.
         """
         if self._checker is None:
             return None
         async with self._uow.read() as tx:
             summary = await tx.get_group_summary(slug)
-        if summary is None or not summary.group.video_host_email:
+        if summary is None or not has_chain(summary.group):
             return None
         bind_level(summary.organisation_slug, slug)
         check, previous = await self._check(summary.group, summary.organisation_slug)
@@ -187,7 +199,7 @@ class IntegrationCheckService:
         return check
 
     async def check_due_groups(self, interval: timedelta) -> list[str]:
-        """Check every group with a Webex host whose latest check is older than ``interval``.
+        """Check every group with a chain whose latest check is older than ``interval``.
 
         Returns:
             The slugs of the groups checked, in listing order.
@@ -199,7 +211,7 @@ class IntegrationCheckService:
         async with self._uow.read() as tx:
             for summary in await tx.list_groups(Scope(everything=True)):
                 group = summary.group
-                if not group.video_host_email:
+                if not has_chain(group):
                     continue
                 if check_due(await tx.get_group_check(group.id), now, interval):
                     due.append(group.slug)
@@ -244,6 +256,7 @@ class IntegrationCheckService:
             web_version=self._version,
             has_host=group.video_enabled,
             overdue_after=overdue_after,
+            dispatches=group.dispatch_enabled,
         )
 
     async def _authorize(self, principal: Principal, slug: str) -> str:

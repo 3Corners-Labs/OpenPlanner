@@ -4386,6 +4386,45 @@ msgstr "Lees verder in de handleiding"
 
 #. Webhook registrations and delivery self-test (integrations page).
 
+msgid "admin.integrations.service_app_check"
+msgstr "Service App controleren"
+
+msgid "admin.integrations.service_app_check_lead"
+msgstr "Doet elke soort aanroep die OpenPlanner naar Webex en Webex Contact Center doet, zonder iets te veranderen: een lege taak en een onbekend taak-id worden door WxCC geweigerd. Per aanroep ziet u de HTTP-status en, bij 401 of 403, de scope die waarschijnlijk ontbreekt."
+
+msgid "admin.integrations.service_app_check_button"
+msgstr "Service App controleren"
+
+msgid "admin.integrations.service_app_not_checked"
+msgstr "Nog niet gecontroleerd vanuit het portaal. Op de commandoregel: {command}."
+
+msgid "admin.integrations.service_app_checked_at"
+msgstr "Laatst gecontroleerd op {date}."
+
+msgid "admin.integrations.service_app_passed"
+msgstr "Alle verplichte aanroepen slagen."
+
+msgid "admin.integrations.service_app_failed"
+msgstr "Een verplichte aanroep mislukt: zie de regels hieronder en het runbook (Service App)."
+
+msgid "admin.integrations.col.probe"
+msgstr "Aanroep"
+
+msgid "admin.integrations.col.verdict"
+msgstr "Uitslag"
+
+msgid "admin.integrations.col.hint"
+msgstr "Toelichting"
+
+msgid "admin.integrations.verdict.ok"
+msgstr "OK"
+
+msgid "admin.integrations.verdict.fail"
+msgstr "Mislukt"
+
+msgid "admin.integrations.verdict.warn"
+msgstr "Waarschuwing"
+
 msgid "admin.integrations.registrations"
 msgstr "Registraties bij Webex en WxCC"
 
@@ -4723,6 +4762,30 @@ msgstr "De flow toont een Screen Pop aan de agent."
 
 msgid "admin.check.wxcc.screenpop.missing"
 msgstr "Geen Screen Pop: voeg er een toe met meetingLink, zodat de agent de link direct ziet."
+
+msgid "admin.check.wxcc.probe.ok"
+msgstr "Proef-work item {task} is door de flow aangemaakt en beëindigd ({seconds} s): token, scopes, asset, flow, abonnement en webhook werken."
+
+msgid "admin.check.wxcc.probe.missing"
+msgstr "De flow heeft geen tak voor kind 'probe': een proef-work item wordt door OpenPlanner zelf beëindigd (End Task) of komt bij een medewerker terecht. Voeg in de flow een Case op kind == probe toe die het contact beëindigt."
+
+msgid "admin.check.wxcc.probe.refused"
+msgstr "Het proef-work item is geweigerd ({error}): {reason}"
+
+msgid "admin.check.wxcc.probe.failed"
+msgstr "WxCC meldde proef-work item {task} als mislukt ({seconds} s): de flow of de wachtrij weigert het."
+
+msgid "admin.check.wxcc.probe.no_events"
+msgstr "Proef-work item {task} is aangemaakt, maar binnen {seconds} s kwam geen task:new binnen: het abonnement staat uit of de webhook bereikt OpenPlanner niet. OpenPlanner heeft het item zelf beëindigd."
+
+msgid "admin.check.wxcc.probe.not_ended"
+msgstr "Proef-work item {task} kwam binnen (task:new), maar de flow beëindigde het niet binnen {seconds} s: controleer de tak op kind == probe. OpenPlanner heeft het item zelf beëindigd."
+
+msgid "admin.check.wxcc.probe.ended_here"
+msgstr "Proef-work item {task} kwam binnen (task:new); omdat de flow geen tak voor 'probe' heeft, heeft OpenPlanner het na {seconds} s zelf beëindigd."
+
+msgid "admin.check.wxcc.probe.left"
+msgstr "Proef-work item {task} kon niet worden beëindigd ({error}): beëindig het in Agent Desktop, of voeg de scope cjp:user toe."
 
 msgid "admin.check.webhooks.not_https"
 msgstr "Het webhook-adres {base} is geen https-adres: Webex en Webex Contact Center kunnen niets afleveren."
@@ -6755,6 +6818,9 @@ msgstr "De worker draait versie {worker}, de beheeromgeving versie {web}: een up
 msgid "admin.check.worker.no_video_jobs"
 msgstr "De worker maakt geen videomeetings: hij is gestart zonder de Webex-instellingen. Start de worker opnieuw nadat de Service App is ingesteld."
 
+msgid "admin.check.worker.no_dispatch_jobs"
+msgstr "De worker maakt geen work items: hij is gestart zonder de WxCC-instellingen. Start de worker opnieuw nadat WXCC_API_BASE_URL is ingesteld."
+
 msgid "admin.check.worker.jobs_ok"
 msgstr "Geen mislukte of achterstallige taken in deze groep."
 
@@ -6763,6 +6829,9 @@ msgstr "{count} taken van deze groep zijn mislukt. Open de afspraak in de agenda
 
 msgid "admin.check.worker.overdue_jobs"
 msgstr "{count} taken van deze groep wachten langer dan {minutes} minuten op de worker."
+
+msgid "audit.event.integration_service_app_check"
+msgstr "Service App gecontroleerd"
 
 msgid "audit.event.integration_request"
 msgstr "Verzoek aan Webex of Webex Contact Center"
@@ -6793,6 +6862,9 @@ msgstr "Opnieuw proberen kan niet meer: de afspraak is niet actief, of de meetin
 
 msgid "settings.field.integration_request_retention_days.label"
 msgstr "Verzoeken aan Webex en WxCC bewaren (dagen)"
+
+msgid "settings.field.integration_probe_timeout_seconds.label"
+msgstr "Wachten op de events van het proef-work item (seconden)"
 
 msgid "settings.field.job_overdue_minutes.label"
 msgstr "Taak achterstallig na (minuten)"
