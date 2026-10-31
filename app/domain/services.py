@@ -506,9 +506,13 @@ class BookingService:
         )
 
     async def _group(self, tx: Transaction, slug: str) -> Group:
-        """Return the group or raise ``group_not_found``."""
+        """Return the group or raise ``group_not_found``.
+
+        An archived group (ADR 0084) is not found either: its page answers 404 and the slug
+        tells nothing about what was there.
+        """
         group = await tx.get_group(slug)
-        if group is None:
+        if group is None or group.is_archived:
             raise DomainError(ErrorCode.GROUP_NOT_FOUND)
         return group
 

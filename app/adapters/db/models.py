@@ -220,6 +220,8 @@ class GroupRow(Base):
     form_version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
     # ADR 0049: what the identity provider names the group by, unique in its organisation.
     idp_key: Mapped[str] = mapped_column(String(64), default=_slug_as_idp_key)
+    # ADR 0084: set when the group is archived; NULL while it is in use.
+    archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     __table_args__ = (
         UniqueConstraint("organisation_id", "idp_key", name="uq_groups_organisation_idp_key"),
