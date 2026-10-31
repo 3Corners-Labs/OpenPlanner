@@ -409,7 +409,7 @@ async def matrix(
         )
         for row in matrix_rows()
     ]
-    citizen = [
+    participant = [
         (_(PARTICIPANT_LABELS[action.key]), _(CONDITION_LABELS[action.condition]))
         for action in PARTICIPANT_ACTIONS
     ]
@@ -425,7 +425,7 @@ async def matrix(
             + [c.name(locale.code) for c in custom],
             "custom_count": len(custom),
             "history": [_role_change(request, locale, e, names) for e in await service.history()],
-            "citizen": citizen,
+            "participant": participant,
             "api_scopes": [
                 (f"{_(API_SCOPE_LABELS[scope])} ({scope})", _(LEVEL_LABELS[level]))
                 for scope, level in API_SCOPES.items()

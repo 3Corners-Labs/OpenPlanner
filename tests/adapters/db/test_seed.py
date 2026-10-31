@@ -1,4 +1,4 @@
-"""Closure examples of the demo seed (ADR 0037): fixtures of the citizen pages and e2e."""
+"""Closure examples of the demo seed (ADR 0037): fixtures of the participant pages and e2e."""
 
 from datetime import timedelta
 

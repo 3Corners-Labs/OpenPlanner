@@ -1,8 +1,8 @@
 /**
- * The citizen maintenance page (ADR 0038, MM-3): axe (WCAG 2.2 AA) with and without a contact
+ * The participant maintenance page (ADR 0038, MM-3): axe (WCAG 2.2 AA) with and without a contact
  * block, in Dutch and English, and the admin side of switching it.
  *
- * Maintenance closes every citizen page of the installation, so this spec runs in its own CI
+ * Maintenance closes every participant page of the installation, so this spec runs in its own CI
  * step after the others (MAINTENANCE_E2E=1) and switches maintenance off again at the end.
  * Needs Keycloak and the demo seed, like admin-roles.spec.ts.
  */

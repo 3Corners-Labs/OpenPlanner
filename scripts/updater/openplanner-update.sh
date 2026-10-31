@@ -21,9 +21,9 @@
 # a proxy that does not become healthy rolls the update back like an unhealthy worker. An
 # installation without the proxy sees none of this.
 #
-# Maintenance mode (ADR 0038) keeps citizens and admins from writing what a rollback would
+# Maintenance mode (ADR 0038) keeps participants and admins from writing what a rollback would
 # lose. It is switched on before the backup, so a restored backup has it on as well. An update
-# or restore that ends as `failed` after the switch leaves it on: citizens see the maintenance
+# or restore that ends as `failed` after the switch leaves it on: participants see the maintenance
 # page instead of a half-working system until an operator has looked. A backup that fails
 # changed nothing, so maintenance is switched off again then.
 #

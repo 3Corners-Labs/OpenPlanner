@@ -1,8 +1,8 @@
-{#- The claimed booking's status (ADR 0043, 0072): where the citizen is, whether the video
+{#- The claimed booking's status (ADR 0043, 0072): where the participant is, whether the video
     link is ready, and the actions. Rendered inside queue_claimed.html and on its own for
     static/live-region.js, which swaps it in while ``poll`` is set. -#}
 <div data-live-fragment{% if poll %} data-poll="{{ poll }}" data-poll-seconds="{{ poll_seconds }}"{% endif %}>
-  <p><span class="chip{% if claimed.citizen_tone %} chip--{{ claimed.citizen_tone }}{% endif %}" data-live-status>{{ claimed.citizen }}</span></p>
+  <p><span class="chip{% if claimed.participant_tone %} chip--{{ claimed.participant_tone }}{% endif %}" data-live-status>{{ claimed.participant }}</span></p>
   {% if claimed.booking.video == "failed" %}
   <div class="alert alert--error">
     <p>{{ _("admin.queue.video_failed_explained") }}</p>

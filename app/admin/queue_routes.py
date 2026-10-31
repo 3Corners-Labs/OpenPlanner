@@ -72,7 +72,7 @@ PARTICIPANT_LABELS: dict[ParticipantState, tuple[str, str]] = {
     ParticipantState.IN_CALL: ("admin.queue.citizen.in_call", "success"),
     ParticipantState.ENDED: ("admin.queue.citizen.ended", ""),
 }
-"""Catalogue key and chip tone per citizen state on the claimed booking's page."""
+"""Catalogue key and chip tone per participant state on the claimed booking's page."""
 
 
 @dataclass(frozen=True)
@@ -107,12 +107,12 @@ class ListView:
 
 @dataclass(frozen=True)
 class ClaimedView:
-    """The claimed booking's status fragment: citizen state, video state, poll key."""
+    """The claimed booking's status fragment: participant state, video state, poll key."""
 
     booking: ClaimedBooking
     time: str
-    citizen: str
-    citizen_tone: str
+    participant: str
+    participant_tone: str
     video: str | None
     key: str
     polling: bool
@@ -242,13 +242,13 @@ async def _claimed(
 
 def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) -> ClaimedView:
     """Write the claimed booking out; polling stops once nothing can change any more."""
-    citizen_key, citizen_tone = PARTICIPANT_LABELS[booking.participant]
+    participant_key, participant_tone = PARTICIPANT_LABELS[booking.participant]
     video_key, _tone = VIDEO_LABELS[booking.video]
     return ClaimedView(
         booking=booking,
         time=format_clock(booking.start, tz, locale.code),
-        citizen=locale.gettext(citizen_key),
-        citizen_tone=citizen_tone,
+        participant=locale.gettext(participant_key),
+        participant_tone=participant_tone,
         video=locale.gettext(video_key) if video_key else None,
         key=key(booking.video, booking.participant, booking.join_url is not None),
         polling=booking.video is not VideoState.FAILED

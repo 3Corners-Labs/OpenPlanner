@@ -1,4 +1,4 @@
-"""The organisation text editor (ADR 0074): who may open it, what is stored, what citizens see."""
+"""The organisation text editor (ADR 0074): who may open it, what is stored, what is shown."""
 
 import pytest
 
@@ -32,7 +32,9 @@ async def test_the_editor_opens_in_the_default_locale_and_shows_the_shipped_text
     assert 'aria-current="page"' in page
 
 
-async def test_a_saved_text_shows_on_the_citizen_page_of_every_group_at_once(site: Site) -> None:
+async def test_a_saved_text_shows_on_the_participant_page_of_every_group_at_once(
+    site: Site,
+) -> None:
     await site.login_as(ORG_ADMIN)
     before = (await site.client.get("/g/demo")).text
     assert "Kies een dag en tijd voor een videogesprek." in before
@@ -49,7 +51,7 @@ async def test_a_saved_text_shows_on_the_citizen_page_of_every_group_at_once(sit
     assert "Eigen tekst van deze organisatie." in editor
 
 
-async def test_the_organisation_text_is_escaped_on_the_citizen_page(site: Site) -> None:
+async def test_the_organisation_text_is_escaped_on_the_participant_page(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
     await site.client.post(

@@ -1,6 +1,7 @@
 # 0077. Terminology: "participant", and organisation names for staff functions
 
-Status: accepted (2026-10-31), not built: step 1a is in PR #172, the rest is planned. Requested
+Status: accepted (2026-10-31), partly built: the rename of steps 1a to 2c and the first parts of 2d are
+merged, the rest of 2d is in review, the guard test and the function names are planned. Requested
 by the product owner, who accepted it on 2026-10-31 together with the recommendations of
 Q12 and Q13. Extends ADR 0004 (texts), ADR 0039 (roles) and ADR 0074 (organisation text
 overrides, PR #168). Changes no right: ADR 0014 stays as it is.
@@ -239,17 +240,20 @@ Nothing is open at the time of acceptance. A new question gets a row here, not a
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1a | Column `citizen_change_lead_minutes` → `participant_change_lead_minutes`, migration, audit alias (point 3a) | #172 | in PR #172 |
-| 1b | This ADR and the `CLAUDE.md` wording (point 7) | | planned |
-| 2a | `nl.po` and `en.po` with the tests that assert their texts, `widget/`, `docs/widget.md` (keys unchanged) | | planned |
-| 2b | Admin manual `docs/manual/{nl,en}/` | | planned |
-| 2c | `docs/*.md` except HANDOVER (which gets its one line), and `CONTRIBUTING.md` | | planned |
-| 2d | Code identifiers, comments and the `citizen.*` codes; `e2e/`, `scripts/diagrams/` | | planned |
+| 1a | Column `citizen_change_lead_minutes` → `participant_change_lead_minutes`, migration, audit alias (point 3a) | #172 | merged |
+| 1b | This ADR and the `CLAUDE.md` wording (point 7) | #173 | merged |
+| 2a | `nl.po` and `en.po` with the tests that assert their texts, `widget/`, `docs/widget.md` (keys unchanged) | #175 | merged |
+| 2b | Admin manual `docs/manual/{nl,en}/` | #182 | merged |
+| 2c | `docs/*.md` except HANDOVER (which gets its one line), and `CONTRIBUTING.md` | #181 | merged |
+| 2d-1 | Code: domain layer and the identifiers shared across layers, the `citizen.*` codes | #206 | merged |
+| 2d-2 | Code: api and web layers, `app/api/citizen.py` → `participant.py` | #212 | merged |
+| 2d-3 | Code: admin, adapters, jobs, scripts, e2e and the rest of the tests; the diagram source | #244 | in PR #244 |
+| 2e | Docs that name renamed files and tests; `docs/diagrams` regenerated with `make diagrams` (needs the draw.io app) | | planned |
 | 3 | Guard test `tests/test_terminology.py` | | planned |
 | 4a | The agent term and role names per organisation and group in the portal (points 8, 10 to 13) | | planned |
 | 4b | `{agent}` and `{agents}` in catalogue texts and mails, grammar test (point 9) | | planned |
 
-Steps 2a and 4a wait for the open PRs on the catalogue and for #168; 4b after 2a and 4a; 3 after 2a to 2d.
+Step 4b comes after 4a; step 3 after 2d-3 and 2e. `EventKind.CITIZEN_LEFT` (stored value `citizen_left`) is not renamed: it needs a name of its own, separate from `PARTICIPANT_LEFT`, which is a Webex event.
 
 ## Consequences
 

@@ -18,8 +18,8 @@ export async function expectNoAxeViolations(page: Page): Promise<void> {
  * one server, and an address may hold only a few bookings per group (ADR 0066), so a shared
  * address would make the later browsers' runs fail.
  */
-export function citizenEmail(testInfo: TestInfo): string {
-  return `citizen.${testInfo.project.name}.${testInfo.testId}.${testInfo.retry}@example.org`;
+export function participantEmail(testInfo: TestInfo): string {
+  return `participant.${testInfo.project.name}.${testInfo.testId}.${testInfo.retry}@example.org`;
 }
 
 /** Press Tab until `locator` has focus; fails if it is not reachable with the keyboard. */
