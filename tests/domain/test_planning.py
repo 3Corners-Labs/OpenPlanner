@@ -510,3 +510,63 @@ async def test_an_archived_group_keeps_its_slug_and_leaves_the_list(
     admin = AdminService(uow, FixedClock(NOW))
     assert [s.group.slug for s in await admin.groups(ORG_ADMIN)] == []
     assert [s.group.slug for s in await admin.groups(ORG_ADMIN, archived=True)] == ["demo"]
+
+
+# --- changing an exception in place (ADR 0084 step 5) ----------------------------------------
+
+
+async def test_an_exception_is_changed_in_place_and_audited(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    override_id = await planning.add_override(
+        GROUP_ADMIN, "demo", ScheduleOverride(date(2026, 1, 6), None)
+    )
+    moved = ScheduleOverride(date(2026, 1, 7), window("10:00", "11:00", 1))
+
+    assert await planning.update_override(GROUP_ADMIN, "demo", override_id, moved)
+    assert not await planning.update_override(GROUP_ADMIN, "demo", override_id, moved)
+
+    stored = await planning.override(GROUP_ADMIN, "demo", override_id)
+    assert (stored.id, stored.day, stored.window) == (override_id, moved.day, moved.window)
+    assert [e.detail for e in uow.state.audit] == ["override.add", "override.edit"]
+
+
+async def test_a_changed_exception_may_not_clash_or_move_into_the_past(
+    planning: PlanningService,
+) -> None:
+    first = await planning.add_override(SUPER, "demo", ScheduleOverride(date(2026, 1, 6), None))
+    await planning.add_override(SUPER, "demo", ScheduleOverride(date(2026, 1, 7), None))
+
+    with pytest.raises(DomainError, match="invalid_configuration: day"):
+        await planning.update_override(
+            SUPER, "demo", first, ScheduleOverride(TODAY - timedelta(days=1), None)
+        )
+    with pytest.raises(DomainError, match="schedule_overrides"):
+        await planning.update_override(
+            SUPER, "demo", first, ScheduleOverride(date(2026, 1, 7), None)
+        )
+    # Its own old day is not a clash.
+    assert await planning.update_override(
+        SUPER, "demo", first, ScheduleOverride(date(2026, 1, 6), window("10:00", "11:00", 1))
+    )
+
+
+async def test_an_exception_of_another_group_is_out_of_reach(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    other = await planning.add_override(
+        OUTSIDER, "andere-team", ScheduleOverride(date(2026, 1, 6), None)
+    )
+
+    for attempt in (
+        planning.override(GROUP_ADMIN, "demo", other),
+        planning.update_override(
+            GROUP_ADMIN, "demo", other, ScheduleOverride(date(2026, 1, 8), None)
+        ),
+    ):
+        with pytest.raises(DomainError, match="schedule_item_not_found"):
+            await attempt
+    with pytest.raises(DomainError, match="not_permitted"):
+        await planning.update_override(
+            GROUP_ADMIN, "andere-team", other, ScheduleOverride(date(2026, 1, 8), None)
+        )

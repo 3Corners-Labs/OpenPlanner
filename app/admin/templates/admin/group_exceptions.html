@@ -1,5 +1,4 @@
 {% extends "admin/layout.html" %}
-{% from "admin/_fields.html" import field with context %}
 {% block title %}{{ _("admin.tab.exceptions") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
@@ -22,6 +21,7 @@
         <th scope="row">{{ item.day }}</th>
         <td>{% if item.closed %}<span class="chip chip--warning">{{ _("admin.exceptions.closed") }}</span>{% else %}<span class="chip chip--accent">{{ item.time }}</span> {{ item.capacity }}{% if item.offer %} · {{ item.offer }}{% endif %}{% endif %}</td>
         <td>
+          <a href="/admin/groups/{{ summary.group.slug }}/exceptions/{{ item.id }}" aria-label="{{ _("admin.exceptions.edit_label", day=item.day) }}">{{ _("admin.edit") }}</a>
           <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/exceptions/{{ item.id }}/delete">
             <button type="submit" class="button button--quiet" aria-label="{{ _("admin.exceptions.remove_label", day=item.day) }}">{{ _("admin.remove") }}</button>
           </form>
@@ -39,16 +39,7 @@
   <div class="card__header">
     <h2 id="add-heading">{{ _("admin.exceptions.add") }}</h2>
   </div>
-  <div class="form-grid">
-    {{ field(fields[0]) }}
-    <fieldset class="field choice{% if kind_error %} field--error{% endif %}" id="kind">
-      <legend>{{ _("admin.exceptions.kind") }}</legend>
-      <div class="choice__option"><input type="radio" id="kind-closed" name="kind" value="closed"{% if kind == "closed" %} checked{% endif %}><label for="kind-closed">{{ _("admin.exceptions.kind_closed") }}</label></div>
-      <div class="choice__option"><input type="radio" id="kind-hours" name="kind" value="hours"{% if kind == "hours" %} checked{% endif %}><label for="kind-hours">{{ _("admin.exceptions.kind_hours") }}</label></div>
-      {% if kind_error %}<p class="error-message">{{ kind_error }}</p>{% endif %}
-    </fieldset>
-    {% for f in fields[1:] %}{{ field(f) }}{% endfor %}
-  </div>
+  {% include "admin/_exception_inputs.html" %}
   <div class="form-actions">
     <button type="submit" class="button">{{ _("admin.exceptions.add_button") }}</button>
   </div>

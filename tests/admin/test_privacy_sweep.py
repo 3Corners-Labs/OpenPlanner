@@ -147,6 +147,8 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/hours/{rule_id}": "/admin/groups/demo/hours/{rule}",
     "/admin/groups/{slug}/exceptions": "/admin/groups/demo/exceptions",
     "/admin/groups/{slug}/reminders": "/admin/groups/demo/reminders",
+    "/admin/groups/{slug}/exceptions/{override_id}": "/admin/groups/demo/exceptions/{override}",
+    "/admin/groups/{slug}/reminders/{channel}/{minutes}": "/admin/groups/demo/reminders/email/180",
     "/admin/groups/{slug}/messages": "/admin/groups/demo/messages",
     "/admin/groups/{slug}/messages/{text_locale}": "/admin/groups/demo/messages/nl",
     "/admin/groups/{slug}/holidays": "/admin/groups/demo/holidays",
@@ -228,6 +230,7 @@ class Fixture:
         self.queued_id = 0
         self.on_hold_id = 0
         self.rule_id = 0
+        self.override_id = 0
         self.scenario_id = 0
         self.org_scenario_id = 0
         self.role_id = 0
@@ -241,6 +244,7 @@ class Fixture:
             "{queued}": self.queued_id,
             "{on_hold}": self.on_hold_id,
             "{rule}": self.rule_id,
+            "{override}": self.override_id,
             "{scenario}": self.scenario_id,
             "{org_scenario}": self.org_scenario_id,
             "{role}": self.role_id,
@@ -346,7 +350,7 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     found.on_hold_id = await book(5, CLOSED_DAY_0900)
     planning = PlanningService(uow, site.clock, AdminService(uow, site.clock))
     one_agent = ScheduleOverride(NEXT_WEEK_0900.date(), TimeWindow(time(9), time(10), 1))
-    await planning.add_override(SUPER, "demo", one_agent)
+    found.override_id = await planning.add_override(SUPER, "demo", one_agent)
     async with uow.locked() as tx:
         await tx.save_meeting(found.queued_id, MeetingRef("m-zq", MARKERS["guest_join_url"]))
         trial = TrialCall(MeetingRef("t-zq", MARKERS["trial_join_url"]), site.clock.now())
@@ -358,6 +362,9 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     await site.login_as(GROUP_ADMIN)  # a staff record; the superuser is never listed
     await site.login_as(SUPER)
     found.member_id = await _first_id(site, "/admin/staff", r"/admin/staff/(\d+)")
+    await _post(
+        site, "/admin/groups/demo/reminders", {"channel": "email", "amount": "3", "unit": "hours"}
+    )
     found.rule_id = await _first_id(
         site, "/admin/groups/demo/staffing", r"/admin/groups/demo/staffing/(\d+)"
     )

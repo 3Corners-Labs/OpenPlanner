@@ -56,7 +56,7 @@ CREATABLES: dict[str, Creatable] = {
         delete="/admin/groups/{slug}/staffing/{rule_id}/delete",
     ),
     "/admin/groups/{slug}/exceptions": Creatable(
-        change=Gap("ADR 0084 step 5: change a staffing exception in place"),
+        change="/admin/groups/{slug}/exceptions/{override_id}",
         delete="/admin/groups/{slug}/exceptions/{override_id}/delete",
     ),
     # ADR 0055: answers refer to a field, so it is retired rather than deleted.
@@ -65,11 +65,11 @@ CREATABLES: dict[str, Creatable] = {
         delete="/admin/groups/{slug}/settings/form/{key}/retire",
     ),
     "/admin/groups/{slug}/reminders": Creatable(
-        change=Gap("ADR 0084 step 5: change a reminder rule in place"),
+        change="/admin/groups/{slug}/reminders/{channel}/{minutes}",
         delete="/admin/groups/{slug}/reminders/{channel}/{minutes}/delete",
     ),
     "/admin/holidays": Creatable(
-        change=Gap("ADR 0084 step 5: rename a holiday calendar"),
+        change="/admin/holidays/{calendar}",
         delete="/admin/holidays/{calendar}/delete",
     ),
     "/admin/holidays/{calendar}/days": Creatable(
@@ -146,8 +146,8 @@ def test_a_gap_names_the_decision_that_allows_it() -> None:
     ]
 
     assert all(gap.decision.startswith("ADR ") for gap in gaps)
-    # ADR 0084 steps 5 and 6 close four of these; three are the decision's own exceptions.
-    assert len(gaps) == 7
+    # ADR 0084 step 6 closes one of these; three are the decision's own exceptions.
+    assert len(gaps) == 4
 
 
 def test_the_heuristic_finds_the_known_creators() -> None:

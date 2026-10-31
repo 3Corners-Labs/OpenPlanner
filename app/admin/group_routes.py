@@ -22,6 +22,8 @@ The domain (``PlanningService``) authorises again, validates and audits.
     GET  /admin/groups/{slug}/hours[/{id}]         schedule.manage   301 to /staffing[/{id}]
     GET  /admin/groups/{slug}/exceptions           schedule.manage   staffing exceptions
     POST /admin/groups/{slug}/exceptions           schedule.manage   add an exception
+    GET  /admin/groups/{slug}/exceptions/{id}      schedule.manage   change-exception form
+    POST /admin/groups/{slug}/exceptions/{id}      schedule.manage   change an exception
     POST /admin/groups/{slug}/exceptions/{id}/delete schedule.manage remove an exception
 
 The staffing pages lived at ``/hours`` before ADR 0027; the old GET paths redirect
@@ -1333,6 +1335,20 @@ async def add_exception(
 ) -> Response:
     """Close a date or give it its own hours."""
     form = await read_form(request, locale)
+    override = _read_override(form)
+    if override is not None:
+        try:
+            await planning_service(request).add_override(context.principal, slug, override)
+        except DomainError as error:
+            raise_refusal(error)
+            form.refusal(error)
+        else:
+            return redirect_done(f"/admin/groups/{slug}/exceptions", "added")
+    return await _exceptions_response(request, locale, context, form, 422)
+
+
+def _read_override(form: FormData) -> ScheduleOverride | None:
+    """Parse the exception form; ``None`` (with form errors) when it is incomplete."""
     day = form.day("day")
     kind = form.choice("kind", {"closed", "hours"})
     window = None
@@ -1345,21 +1361,97 @@ async def add_exception(
         offer = _read_offer(form)
         if opens and closes and offer and capacity is not None:
             try:
-                label = form.optional_text("label")
-                window = TimeWindow(opens, closes, capacity, label, Offer(offer))
+                window = TimeWindow(
+                    opens, closes, capacity, form.optional_text("label"), Offer(offer)
+                )
             except DomainError as error:
                 form.refusal(error)
-    if not form.errors and day is not None:
+    if form.errors or day is None:
+        return None
+    return ScheduleOverride(day, window)
+
+
+def _override_values(override: ScheduleOverride) -> dict[str, str]:
+    """Return a stored exception as form values, to pre-fill the change form."""
+    window = override.window
+    values = {"day": override.day.isoformat(), "kind": "closed" if window is None else "hours"}
+    if window is not None:
+        values |= {
+            "opens": window.opens.strftime("%H:%M"),
+            "closes": window.closes.strftime("%H:%M"),
+            "capacity": str(window.capacity),
+            "offer": window.offer.value,
+            "label": window.label or "",
+        }
+    return values
+
+
+def _edit_exception_response(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    override_id: int,
+    form: FormData,
+    status: int,
+) -> HTMLResponse:
+    """Render the change form of one exception (ADR 0084 step 5)."""
+    return group_page(
+        request,
+        locale,
+        context,
+        "admin/group_exception_edit.html",
+        {
+            "override_id": override_id,
+            "fields": _exception_fields(form, locale),
+            "kind": form.text("kind") or "closed",
+            "kind_error": form.error_for("kind"),
+            "errors": form.errors,
+        },
+        status,
+    )
+
+
+@router.get("/groups/{slug}/exceptions/{override_id}", response_class=HTMLResponse)
+async def edit_exception(
+    request: Request, locale: Locale, slug: str, override_id: int, context: ManageGroup
+) -> HTMLResponse:
+    """Show the change form of an exception, pre-filled with its values."""
+    try:
+        override = await planning_service(request).override(context.principal, slug, override_id)
+    except DomainError as error:
+        raise_refusal(error)
+        raise
+    form = FormData(_override_values(override), locale.gettext)
+    return _edit_exception_response(request, locale, context, override_id, form, 200)
+
+
+@router.post("/groups/{slug}/exceptions/{override_id}", response_class=HTMLResponse)
+async def update_exception(
+    request: Request,
+    locale: Locale,
+    slug: str,
+    override_id: int,
+    _: SameOrigin,
+    context: ManageGroup,
+) -> Response:
+    """Change an exception; bookings made on the old day keep their slots."""
+    form = await read_form(request, locale)
+    override = _read_override(form)
+    if override is not None:
         try:
-            await planning_service(request).add_override(
-                context.principal, slug, ScheduleOverride(day, window)
+            changed = await planning_service(request).update_override(
+                context.principal, slug, override_id, override
             )
         except DomainError as error:
             raise_refusal(error)
+            if error.code is ErrorCode.SCHEDULE_ITEM_NOT_FOUND:
+                raise
             form.refusal(error)
         else:
-            return redirect_done(f"/admin/groups/{slug}/exceptions", "added")
-    return await _exceptions_response(request, locale, context, form, 422)
+            return redirect_done(
+                f"/admin/groups/{slug}/exceptions", "saved" if changed else "unchanged"
+            )
+    return _edit_exception_response(request, locale, context, override_id, form, 422)
 
 
 @router.post("/groups/{slug}/exceptions/{override_id}/delete", response_class=HTMLResponse)

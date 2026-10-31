@@ -710,6 +710,12 @@ class Transaction(Protocol):
         """Store an override for the group and return its id."""
         ...
 
+    async def update_schedule_override(
+        self, group_id: int, override_id: int, override: ScheduleOverride
+    ) -> bool:
+        """Replace the group's exception ``override_id`` (ADR 0084 step 5); ``False`` if unknown."""
+        ...
+
     async def delete_schedule_override(self, group_id: int, override_id: int) -> bool:
         """Delete the group's override ``override_id``; ``False`` if it has no such override."""
         ...
@@ -728,6 +734,10 @@ class Transaction(Protocol):
 
     async def add_holiday_calendar(self, calendar: HolidayCalendar) -> HolidayCalendar:
         """Store a new calendar and return it with its id; the slug must be free."""
+        ...
+
+    async def save_holiday_calendar(self, calendar: HolidayCalendar) -> None:
+        """Store the name of an existing calendar; the slug never changes (ADR 0084 step 5)."""
         ...
 
     async def delete_holiday_calendar(self, calendar_id: int) -> None:
@@ -849,6 +859,12 @@ class Transaction(Protocol):
 
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:
         """Return the group's reminder rules."""
+        ...
+
+    async def update_reminder_rule(
+        self, group_id: int, channel: ChannelKind, minutes_before: int, rule: ReminderRule
+    ) -> bool:
+        """Replace the group's rule with this channel and offset (ADR 0084 step 5)."""
         ...
 
     async def add_reminder_rule(self, group_id: int, rule: ReminderRule) -> None:

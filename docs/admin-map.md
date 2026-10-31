@@ -74,9 +74,9 @@ Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 | Overview | `/admin/groups/{slug}` | `group.view` | wide | – |
 | Settings | `/admin/groups/{slug}/settings` | `group.edit` | standard | `/admin/groups/{slug}/settings/form`, `/admin/groups/{slug}/settings/form/{key}`, `/admin/groups/{slug}/settings/archive` |
 | Staffing | `/admin/groups/{slug}/staffing` | `schedule.manage` | wide | `/admin/groups/{slug}/staffing/{rule_id}`, `/admin/groups/{slug}/staffing/{rule_id}/split` |
-| Staffing exceptions | `/admin/groups/{slug}/exceptions` | `schedule.manage` | standard | – |
+| Staffing exceptions | `/admin/groups/{slug}/exceptions` | `schedule.manage` | standard | `/admin/groups/{slug}/exceptions/{override_id}` |
 | Holidays | `/admin/groups/{slug}/holidays` | `schedule.manage` | standard | – |
-| Reminders | `/admin/groups/{slug}/reminders` | `reminders.manage` | standard | – |
+| Reminders | `/admin/groups/{slug}/reminders` | `reminders.manage` | standard | `/admin/groups/{slug}/reminders/{channel}/{minutes}` |
 | Message texts | `/admin/groups/{slug}/messages` | `texts.manage` | standard | `/admin/groups/{slug}/messages/{text_locale}` |
 | Agenda | `/admin/groups/{slug}/agenda` | `bookings.view` | wide | `/admin/groups/{slug}/bookings/{booking_id}`, `/admin/groups/{slug}/agenda/week`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/move`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/rebook`, `/admin/groups/{slug}/agenda/slot-rebook`, `/admin/groups/{slug}/agenda/waiting` |
 | Queue | `/admin/groups/{slug}/queue` | `queue.work` | wide | `/admin/groups/{slug}/queue/{booking_id}` |

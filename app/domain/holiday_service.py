@@ -180,6 +180,25 @@ class HolidayService:
             await self._audit_global(tx, principal, slug, "calendar.add")
         return stored
 
+    async def rename_calendar(self, principal: Principal, slug: str, name: str) -> bool:
+        """Give the calendar a new name; the slug stays (ADR 0084 step 5).
+
+        Returns ``False`` when the name is the same.
+
+        Raises:
+            DomainError: ``not_permitted``, ``holiday_calendar_not_found`` or
+                ``invalid_configuration`` (``name``).
+        """
+        await self._manage(principal)
+        async with self._uow.locked() as tx:
+            calendar = await _calendar(tx, slug)
+            renamed = HolidayCalendar(calendar.id, calendar.slug, name)
+            if renamed == calendar:
+                return False
+            await tx.save_holiday_calendar(renamed)
+            await self._audit_global(tx, principal, slug, "calendar.rename")
+        return True
+
     async def delete_calendar(self, principal: Principal, slug: str) -> None:
         """Delete a calendar no organisation or group uses any more.
 

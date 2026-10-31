@@ -1,0 +1,17 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.exceptions.edit") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/exceptions/{{ override_id }}" novalidate aria-labelledby="edit-heading">
+  <div class="card__header">
+    <h2 id="edit-heading">{{ _("admin.exceptions.edit") }}</h2>
+    <p class="card__lead">{{ _("admin.exceptions.edit_lead") }}</p>
+  </div>
+  {% include "admin/_exception_inputs.html" %}
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") }}</button>
+    <a href="/admin/groups/{{ summary.group.slug }}/exceptions">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}
