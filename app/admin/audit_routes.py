@@ -191,6 +191,8 @@ DETAIL_LABELS: dict[str, str] = {
     "phone_mode": "admin.field.phone_mode",
     "dispatch_lead_minutes": "admin.field.dispatch_lead_minutes",
     "dispatch_kind": "admin.field.dispatch_kind",
+    "participant_change_lead_minutes": "admin.field.citizen_change_lead_minutes",
+    # Events written before ADR 0077 carry the old field name; history is not rewritten.
     "citizen_change_lead_minutes": "admin.field.citizen_change_lead_minutes",
     "planner_change_min_lead_minutes": "admin.field.planner_change_min_lead_minutes",
     "queue_visible_from_minutes": "admin.field.queue_visible_from_minutes",

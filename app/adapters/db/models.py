@@ -201,7 +201,7 @@ class GroupRow(Base):
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
     dispatch_kind: Mapped[str] = mapped_column(String(32), server_default=text("'contact_center'"))
     # ADR 0069: the citizen moves a booking up to this long before the start.
-    citizen_change_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
+    participant_change_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     # ADR 0044: a planner changes bookings up to this long before the start.
     planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     # ADR 0071: a trial call on Webex ahead of the appointment.
@@ -228,7 +228,9 @@ class GroupRow(Base):
         CheckConstraint(
             "dispatch_kind IN ('contact_center', 'openplanner_queue')", name="dispatch_kind"
         ),
-        CheckConstraint("citizen_change_lead_minutes BETWEEN 0 AND 1440", name="citizen_lead"),
+        CheckConstraint(
+            "participant_change_lead_minutes BETWEEN 0 AND 1440", name="participant_lead"
+        ),
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
         CheckConstraint("trial_call_minutes BETWEEN 10 AND 60", name="trial_call_minutes"),
         CheckConstraint("trial_calls_per_booking BETWEEN 1 AND 5", name="trial_calls_per_booking"),
