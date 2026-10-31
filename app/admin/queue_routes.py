@@ -30,7 +30,7 @@ from app.admin.live import Seen, fragment, key
 from app.admin.pages import Locale, SameOrigin
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.own_queue import Participantstate, VideoState
+from app.domain.own_queue import ParticipantState, VideoState
 from app.domain.queue_service import ClaimedBooking, QueueRow, QueueService, QueueView
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock
@@ -66,11 +66,11 @@ VIDEO_LABELS: dict[VideoState, tuple[str | None, str]] = {
 }
 """Catalogue key and chip tone per video state; a ready link needs no chip."""
 
-PARTICIPANT_LABELS: dict[Participantstate, tuple[str, str]] = {
-    Participantstate.NOT_YET: ("admin.queue.participant.not_yet", ""),
-    Participantstate.IN_LOBBY: ("admin.queue.participant.in_lobby", "warning"),
-    Participantstate.IN_CALL: ("admin.queue.participant.in_call", "success"),
-    Participantstate.ENDED: ("admin.queue.participant.ended", ""),
+PARTICIPANT_LABELS: dict[ParticipantState, tuple[str, str]] = {
+    ParticipantState.NOT_YET: ("admin.queue.participant.not_yet", ""),
+    ParticipantState.IN_LOBBY: ("admin.queue.participant.in_lobby", "warning"),
+    ParticipantState.IN_CALL: ("admin.queue.participant.in_call", "success"),
+    ParticipantState.ENDED: ("admin.queue.participant.ended", ""),
 }
 """Catalogue key and chip tone per participant state on the claimed booking's page."""
 
@@ -252,7 +252,7 @@ def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) ->
         video=locale.gettext(video_key) if video_key else None,
         key=key(booking.video, booking.participant, booking.join_url is not None),
         polling=booking.video is not VideoState.FAILED
-        and booking.participant is not Participantstate.ENDED,
+        and booking.participant is not ParticipantState.ENDED,
     )
 
 
