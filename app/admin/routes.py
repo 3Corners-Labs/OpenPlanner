@@ -115,9 +115,9 @@ from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.settings_service import SettingsService
 from app.web.authz_labels import (
     API_SCOPE_LABELS,
-    PARTICIPANT_LABELS,
     CONDITION_LABELS,
     LEVEL_LABELS,
+    PARTICIPANT_LABELS,
     PERMISSION_LABELS,
     ROLE_LABELS,
 )
