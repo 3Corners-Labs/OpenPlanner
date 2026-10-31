@@ -182,6 +182,7 @@ def create_app(
         enabled=settings.rate_limit_enabled,
         bookings=settings.rate_limit_bookings,
         reads=settings.rate_limit_reads,
+        unknown_links=settings.rate_limit_unknown_links,
         agent_tokens=settings.rate_limit_agent_tokens,
         agent_calls=settings.rate_limit_agent_calls,
     )
@@ -208,6 +209,7 @@ def create_app(
             set_rate_limits(
                 bookings=current.rate_limit_bookings,
                 reads=current.rate_limit_reads,
+                unknown_links=current.rate_limit_unknown_links,
                 agent_tokens=current.rate_limit_agent_tokens,
                 agent_calls=current.rate_limit_agent_calls,
             )
