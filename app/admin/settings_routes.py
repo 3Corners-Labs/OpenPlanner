@@ -476,6 +476,7 @@ async def _overview(
             ),
             "done": done_message(request, locale.gettext),
             "max_hours": LOG_LEVEL_MAX_EXPIRY_HOURS,
+            "trace_max_hours": current.trace_level_max_hours,
             "login_form": _login_form(context, current, live, errors, locale),
             "manage": manage,
             "unknown_error": next((m for k, m in errors.items() if k not in BY_KEY), None),

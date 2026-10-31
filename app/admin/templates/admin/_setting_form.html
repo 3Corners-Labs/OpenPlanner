@@ -1,5 +1,5 @@
 {#- The change form of one setting row (ADR 0042 steps 4 and 5): new value, optional expiry, reset. -#}
-{% macro setting_form(row, action, reset_label, max_hours=24) -%}
+{% macro setting_form(row, action, reset_label, max_hours=24, trace_max_hours=4) -%}
 {% if row.error %}<p class="error-message" id="error-{{ row.key }}">{{ row.error }}</p>{% endif %}
 <form method="post" action="{{ action }}" novalidate class="setting-form">
   <label for="value-{{ row.key }}">{{ _("admin.settings.new_value") }}</label>
@@ -14,7 +14,7 @@
   <input id="value-{{ row.key }}" name="value" type="text" value="{{ row.input }}" size="16"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
   {% endif %}
   {% if row.expires %}
-  <label for="hours-{{ row.key }}">{{ _("admin.settings.hours", max=max_hours) }}</label>
+  <label for="hours-{{ row.key }}">{{ _("admin.settings.hours", max=max_hours, trace_max=trace_max_hours) }}</label>
   <input id="hours-{{ row.key }}" name="hours" type="text" inputmode="numeric" value="1" size="3">
   {% endif %}
   <button type="submit" class="button button--small">{{ _("admin.settings.save") }}</button>
