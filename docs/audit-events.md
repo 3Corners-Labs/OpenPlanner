@@ -26,7 +26,7 @@ model, so Elastic, Splunk or an OpenTelemetry collector reads it without mapping
 | `service.version` | `1.4.0` | `APP_VERSION`; empty in development |
 | `installation` | `gemeente-prod` | `INSTALLATION_NAME`; empty when not set |
 | `detail` | `horizon_days,name` | what changed, as machine keys; never values |
-| `message` | `timezone 'Europe/Amsterdam' and timezone offset in '...+00:00' do not match` | the provider's own reason for a failed job (ADR 0065): Webex's `errors[].description` or `message`, email addresses masked, at most 300 characters, only from requests that carry no citizen data; empty for every other event |
+| `message` | `timezone 'Europe/Amsterdam' and timezone offset in '...+00:00' do not match` | the provider's own reason for a failed job (ADR 0065): Webex's `errors[].description` or `message`, email addresses masked, at most 300 characters, only from requests that carry no participant data; empty for every other event |
 
 ## Updates and versions (ADR 0029, 0065)
 
@@ -76,7 +76,7 @@ there is none, `many` once `SECURITY_EVENT_MAX_SOURCES` callers are tracked.
 
 ## What never appears
 
-No personal data of citizens (name, email, phone, note, join links) and no admin display
+No personal data of participants (name, email, phone, note, join links) and no admin display
 names or email addresses: `actor` is a subject identifier, which the organisation can resolve
 in its identity provider. The masking processor of `app/logging.py` still runs over every log
 line as a safety net, and a test asserts that no schema field is a PII field.

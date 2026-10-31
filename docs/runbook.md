@@ -99,8 +99,8 @@ load: check for long-running admin exports or a full volume.
 **Which environment am I in?** `ENVIRONMENT` decides, and it defaults to `prod`, so a forgotten
 setting is the safe one. Production refuses to start with development defaults (missing keys,
 http addresses, `SIMULATOR_ENABLED=true`). Outside production every admin page shows a striped
-bar, "Ontwikkelomgeving" or "Testomgeving" ("not for real appointments of citizens"); in
-production there is no bar. An acceptance environment where real citizens book must run with
+bar, "Ontwikkelomgeving" or "Testomgeving" ("not for real appointments of participants"); in
+production there is no bar. An acceptance environment where real participants book must run with
 `ENVIRONMENT=prod`.
 
 The image refuses to start in production (`ENVIRONMENT` defaults to `prod`) without
@@ -342,7 +342,7 @@ Restart `web` and `worker` after changing it.
 
 ## Admin portal login (PingFederate)
 
-Without `OIDC_DISCOVERY_URL` the admin portal is disabled; citizens' pages work regardless.
+Without `OIDC_DISCOVERY_URL` the admin portal is disabled; participants' pages work regardless.
 In production also set `SESSION_SECRET` (at least 32 random bytes); the image refuses to start
 without it, and with an `http` discovery URL or without `OIDC_CLIENT_SECRET` (ADR 0013).
 
@@ -419,7 +419,7 @@ There is no login bypass, fallback IdP or local account. Diagnose and act from t
    that already have a closure are skipped). `--end` needs an offset; without it the closure
    lasts until it is lifted. Lifting from the host never reinstates appointments: moving,
    reinstating and cancelling wait until someone can log in to the portal (*Noodsluiting*).
-   The notices are shown to citizens and mailed: plain text, no names or other personal data.
+   The notices are shown to participants and mailed: plain text, no names or other personal data.
 
 ## Webex meetings and Webex Contact Center
 
@@ -477,23 +477,23 @@ Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (w
 | Host accounts | one licensed account per group (or shared), entered per group under **Instellingen → Koppelingen** |
 
 Staff who join signed in with the organisation's account become cohost automatically; check
-on a phone that the citizen's browser join works with your site settings (mobile browsers may
+on a phone that the participant's browser join works with your site settings (mobile browsers may
 offer the Webex app).
 
-**Trial call (ADR 0071).** A citizen's trial call is a meeting of the same host on the same site
+**Trial call (ADR 0071).** A participant's trial call is a meeting of the same host on the same site
 that participants may enter before the host (OpenPlanner sets `enabledJoinBeforeHost`,
 `enableConnectAudioBeforeHost` and `allowJoin` on it, not on the appointment's own meeting).
 The site must allow this. **Koppeling controleren** schedules and deletes a trial probe and
 shows `webex.trial_refused` with Webex's reason when it refuses the request, and
 `webex.trial_lobby` with the values it kept when it accepts the request but ignores the options
-(ADR 0075: the citizen would wait in the lobby for nobody; seen on the test site
+(ADR 0075: the participant would wait in the lobby for nobody; seen on the test site
 `rijksvideotest.webex.com`, where Control Hub must allow entry before the host first). In
-both cases citizens cannot use a trial call, and the group's switch can be set to *Nee* until
+both cases participants cannot use a trial call, and the group's switch can be set to *Nee* until
 the site allows it. For a group that opens the Webex web app directly (`join_client`
 *browser*), the check also visits the probe's link once and shows `webex.browser_link_lost`
 when Webex no longer carries `launchApp=true` through its redirect: nothing breaks then,
-citizens get Webex's own page with the app or browser question, and the group can be set to
-*Webex laat de burger kiezen* so that the texts say so. After a Webex or
+participants get Webex's own page with the app or browser question, and the group can be set to
+*Webex laat de deelnemer kiezen* so that the texts say so. After a Webex or
 site change, run the check and then open a trial call yourself from a test booking: it must
 open without the lobby, ask for camera and microphone, and be gone from the host's Webex
 calendar a few minutes after it closes.
@@ -805,7 +805,7 @@ group can:
 1. **Nep-meeting en -taak aanmaken** for a booking without them. This sets stand-in ids
    (`simulated-meeting-<id>`, `simulated-task-<id>`, a join link on `.invalid`) and records
    "meeting created" and "task created" with detail `simulated`. Real ids are never replaced.
-2. Play events in the order of a call: agent accepts the task, agent joins, citizen joins,
+2. Play events in the order of a call: agent accepts the task, agent joins, participant joins,
    participant leaves, meeting started or ended, task not picked up, task ended.
 
 Each event is signed with this installation's `WEBEX_WEBHOOK_SECRET` or
@@ -816,8 +816,8 @@ audited (`simulator.prepare`, `simulator.event`). Without the switch the card is
 the route answers 403.
 
 A quick end-to-end try without Webex: create a group with opening hours and "Direct gesprek
-starten", start a call as a citizen (`/g/<slug>/direct`), open the booking in the agenda,
-create the stand-ins, and play "agent accepts" and "agent joins". The citizen's waiting page
+starten", start a call as a participant (`/g/<slug>/direct`), open the booking in the agenda,
+create the stand-ins, and play "agent accepts" and "agent joins". The participant's waiting page
 then shows the matching status.
 
 ### 11. When the contact center is down: the own queue (ADR 0043)
@@ -831,7 +831,7 @@ OpenPlanner**. From then on:
   theirs;
 - the team's agents sign in to the admin portal (IdP role `OIDC_ROLE_AGENT`, default
   `openplanner-agent`, with the group in the group claim) and open the **Wachtrij** tab;
-- citizens can cancel until the start and move until `citizen_change_lead_minutes` before it
+- participants can cancel until the start and move until `citizen_change_lead_minutes` before it
   (ADR 0069), as with the contact center.
 
 Switch back the same way once the contact center works again. Both changes are in the audit
@@ -882,7 +882,7 @@ when a rule's channel is not configured.
 
 `MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Rotating it invalidates every
 link in mails already sent; bookings are unaffected. Rotate only after an incident, and tell the
-contact center that citizens may call about broken links.
+contact center that participants may call about broken links.
 
 ## Releasing a version (ADR 0052)
 
@@ -1186,12 +1186,12 @@ When a team cannot hold its appointments (outage, illness, closed building):
    *Noodsluiting* in the main menu (organisation admins).
 2. **What happens.** Nothing can be booked inside the closure and direct calls are off. Every
    confirmed appointment inside it is put on hold: reminders and the WxCC task are cancelled and
-   the citizen gets an email with the notice, the closure's contact options, a link to the
+   the participant gets an email with the notice, the closure's contact options, a link to the
    closure page and a link to choose a new time or cancel (ADR 0037 §5; the image is not
    mailed). The group page shows the closure page. Nothing is deleted.
-3. **Keep citizens informed.** Change the notice or the end on the same tab and tick *Stuur de
+3. **Keep participants informed.** Change the notice or the end on the same tab and tick *Stuur de
    nieuwe toelichting…* to mail everyone still on hold.
-4. **Handle appointments.** In *Opgeschorte afspraken*: move one to a free time (the citizen
+4. **Handle appointments.** In *Opgeschorte afspraken*: move one to a free time (the participant
    gets the new time and a new link), confirm it again, or cancel it; or do this for all at
    once.
 5. **Reopen.** *Opheffen*, optionally confirming again every appointment that can still go
@@ -1209,7 +1209,7 @@ organisation that cannot take appointments, use the section above.
 
 - An update or restore: the host updater does it itself (below); nothing to do by hand.
 - Repairing an integration: expired SMTP credentials, a rotated WxCC or SMS key, webhook
-  registrations to renew. Citizens then do not book appointments whose confirmation or work
+  registrations to renew. Participants then do not book appointments whose confirmation or work
   item would not arrive.
 - Investigating an incident with data that must not change underneath.
 - Work on the database itself (restore by hand, moving the volume): use the environment
@@ -1232,8 +1232,8 @@ organisation that cannot take appointments, use the section above.
 
 | Area | During maintenance |
 |---|---|
-| Citizens: book, reschedule, cancel, start a direct call | closed: `503` with `Retry-After` (`MAINTENANCE_RETRY_AFTER_SECONDS`), the maintenance page with the expected end and the team's (or organisation's) contact options |
-| Citizens: view an appointment, join a confirmed call, waiting page | open |
+| Participants: book, reschedule, cancel, start a direct call | closed: `503` with `Retry-After` (`MAINTENANCE_RETRY_AFTER_SECONDS`), the maintenance page with the expected end and the team's (or organisation's) contact options |
+| Participants: view an appointment, join a confirmed call, waiting page | open |
 | Machine API | reads and the token endpoint open; writes `503 {"error": "maintenance"}` |
 | Worker: reminders, work items, meetings, `purge_pii` and the nightly sweep | continue; the worker never pauses |
 | Webhooks from Webex and WxCC | open |
@@ -1246,7 +1246,7 @@ cannot be started or changed during maintenance: end maintenance first if one is
 
 **Updates.** The updater switches maintenance on right before its backup (so the backup has it
 on too) and off after `succeeded` or `rolled_back`. A `failed` update after the backup leaves it
-on: citizens see the maintenance page instead of a half-working system. After fixing it (see
+on: participants see the maintenance page instead of a half-working system. After fixing it (see
 *When the portal shows `failed`* above), switch maintenance off in the portal or with the CLI.
 The updater also switches off maintenance that a superuser had switched on before the update;
 switch it on again if the work is not done.
@@ -1500,8 +1500,8 @@ Bookings keep working: they are stored first, and meetings and work items are jo
 - **Transient failures** (timeouts, 429, 5xx) are retried after 1, 5 and 15 minutes; after
   that the job fails and the timeline shows `integration_error` or `task_failed` with the code.
   The agenda shows the affected bookings.
-- **A work item cannot be created at T−5:** the citizen still has the join link and can wait
-  in the lobby. Pick the booking from the agenda and contact the citizen another way, or
+- **A work item cannot be created at T−5:** the participant still has the join link and can wait
+  in the lobby. Pick the booking from the agenda and contact the participant another way, or
   re-run the job once WxCC is back (set the job's status to `pending` in the `jobs` table).
 - **Direct calls** during an outage show "no agent available" after the group's
   not-picked-up limit and offer to book instead.

@@ -98,7 +98,7 @@ tests/         mirrors app/; fakes for ports live in tests/fakes/.
   URLs or job payloads. The semgrep rules in `.semgrep/` and the masking test catch the obvious
   cases, not all of them.
 - A new or changed admin screen comes with its manual topic in `docs/manual/nl` and
-  `docs/manual/en` (ADR 0033, how-to in `docs/manual/README.md`). Citizen pages explain
+  `docs/manual/en` (ADR 0033, how-to in `docs/manual/README.md`). Participant pages explain
   themselves in the page, through `_()`, and never link to the manual.
 - A new dependency needs a reason in the PR, an active maintainer and a license in
   {MIT, BSD, Apache-2.0, PSF}. Anything else needs an ADR.
