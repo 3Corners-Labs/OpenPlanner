@@ -35,12 +35,12 @@ from app.domain.form_fields import (
     labelled_answers,
 )
 from app.domain.own_queue import (
-    Participantstate,
+    ParticipantState,
     QueueEntry,
     VideoState,
-    participant_state,
     next_up,
     not_claimed_in_time,
+    participant_state,
     summarise,
     video_state,
     visible,
@@ -127,7 +127,7 @@ class ClaimedBooking:
     """Answers to the group's custom fields an agent may see: never PII (ADR 0055)."""
     video: VideoState = VideoState.PENDING
     """Whether the meeting is ready, pending or failed (ADR 0072)."""
-    participant: Participantstate = Participantstate.NOT_YET
+    participant: ParticipantState = ParticipantState.NOT_YET
     """Where the participant is: not yet joined, in the lobby, in the call, or gone."""
 
 

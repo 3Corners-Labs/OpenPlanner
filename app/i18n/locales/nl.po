@@ -6299,7 +6299,7 @@ msgid "admin.org_settings.page_title"
 msgstr "Instellingen van {name}"
 
 msgid "admin.org_settings.page_lead"
-msgstr "Deze waarden gelden voor de groepen, deelnemerpagina's, mails en beheerders van deze organisatie. Een wijziging geldt binnen tien seconden."
+msgstr "Deze waarden gelden voor de groepen, deelnemerspagina's, mails en beheerders van deze organisatie. Een wijziging geldt binnen tien seconden."
 
 msgid "admin.org_settings.settings"
 msgstr "Instellingen"

@@ -289,7 +289,11 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
             "2000",
             '<a href="#participant_change_lead_minutes">Vul een aantal minuten',
         ),
-        ("contact_center", "3", '<a href="#participant_change_lead_minutes">Vul een aantal minuten'),
+        (
+            "contact_center",
+            "3",
+            '<a href="#participant_change_lead_minutes">Vul een aantal minuten',
+        ),
     ],
 )
 async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, error: str) -> None:

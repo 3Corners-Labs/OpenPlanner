@@ -31,13 +31,13 @@ import structlog
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.api.participant import participant_page, templates
 from app.api.contact_form import (
     HONEYPOT_FIELD,
     contact_input,
     load_contact_form,
     read_contact,
 )
+from app.api.participant import participant_page, templates
 from app.api.trace import bind_group_from_path
 from app.domain.booking import BookingKind
 from app.domain.call_service import CallService

@@ -24,8 +24,8 @@ from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
-from tests.support.participant import confirm_newest
 from tests.support.domain import NOW
+from tests.support.participant import confirm_newest
 
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
@@ -253,7 +253,7 @@ async def test_the_page_polls_a_status_fragment_without_reloading(site: Site) ->
 
 
 async def test_a_claim_in_the_own_queue_shows_as_accepted(site: Site) -> None:
-    """ADR 0072: the own queue has no WxCC task; the claim tells the participant an agent is coming."""
+    """ADR 0072: the own queue has no WxCC task; the claim tells the participant someone comes."""
     await _configure(site.database_url, dispatch_kind=DispatchKind.OPENPLANNER_QUEUE)
     wait = (await site.start()).headers["location"]
     searching = (await site.client.get(wait)).text

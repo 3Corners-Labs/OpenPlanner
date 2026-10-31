@@ -7,14 +7,14 @@ from app.domain.authorization import Role
 from app.domain.booking import Booking, BookingKind, BookingStatus, Contact, MeetingRef
 from app.domain.calls import CallState, CallStatus
 from app.domain.own_queue import (
-    Participantstate,
     Claim,
+    ParticipantState,
     QueueEntry,
     QueueSummary,
     VideoState,
-    participant_state,
     next_up,
     not_claimed_in_time,
+    participant_state,
     summarise,
     video_state,
     visible,
@@ -125,10 +125,13 @@ def test_the_video_link_is_ready_pending_or_failed() -> None:
 
 
 def test_where_the_participant_is() -> None:
-    assert participant_state(CallStatus(1)) is Participantstate.NOT_YET
-    assert participant_state(CallStatus(1, participants=1)) is Participantstate.IN_LOBBY
-    assert participant_state(CallStatus(1, participants=2, host_joined=True)) is Participantstate.IN_CALL
-    assert participant_state(CallStatus(1, call=CallState.ENDED)) is Participantstate.ENDED
+    assert participant_state(CallStatus(1)) is ParticipantState.NOT_YET
+    assert participant_state(CallStatus(1, participants=1)) is ParticipantState.IN_LOBBY
+    assert (
+        participant_state(CallStatus(1, participants=2, host_joined=True))
+        is ParticipantState.IN_CALL
+    )
+    assert participant_state(CallStatus(1, call=CallState.ENDED)) is ParticipantState.ENDED
 
 
 def _joined(item: QueueEntry, minutes_ago: int) -> QueueEntry:
