@@ -19,6 +19,7 @@ SHELL_TEMPLATES = [
     ADMIN_TEMPLATES / "_environment.html",
     ADMIN_TEMPLATES / "_maintenance.html",
     ADMIN_TEMPLATES / "_update_banner.html",
+    ADMIN_TEMPLATES / "_scope_filter.html",
     SHARED_TEMPLATES / "_language_switcher.html",
 ]
 """Everything the logged-in frame includes, whatever the page."""
