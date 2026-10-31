@@ -45,9 +45,10 @@ CREATABLES: dict[str, Creatable] = {
         change="/admin/organisations/{org}",
         delete=Gap("ADR 0084 step 4: delete an empty organisation"),
     ),
+    # ADR 0084 step 2: a group is archived, from its settings.
     "/admin/groups": Creatable(
         change="/admin/groups/{slug}/settings",
-        delete=Gap("ADR 0084 step 2: archive a group"),
+        delete="/admin/groups/{slug}/settings/archive",
     ),
     "/admin/groups/{slug}/staffing": Creatable(
         change="/admin/groups/{slug}/staffing/{rule_id}",
@@ -144,8 +145,8 @@ def test_a_gap_names_the_decision_that_allows_it() -> None:
     ]
 
     assert all(gap.decision.startswith("ADR ") for gap in gaps)
-    # ADR 0084 steps 2, 4, 5 and 6 close six of these; three are the decision's own exceptions.
-    assert len(gaps) == 9
+    # ADR 0084 steps 4, 5 and 6 close five of these; three are the decision's own exceptions.
+    assert len(gaps) == 8
 
 
 def test_the_heuristic_finds_the_known_creators() -> None:

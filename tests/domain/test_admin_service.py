@@ -1,10 +1,11 @@
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
 
-from app.domain.admin import AdminService
+from app.domain.admin import READ_WHEN_ARCHIVED, AdminService
 from app.domain.audit import AuditFilter, Outcome, Source
-from app.domain.authorization import Decision, Permission, Principal, Reason, Role
+from app.domain.authorization import MATRIX, Decision, Permission, Principal, Reason, Role
 from app.domain.errors import DomainError
 from app.domain.staff import Membership, StaffFilter
 from tests.fakes.clock import FixedClock
@@ -309,3 +310,29 @@ async def test_the_home_organisation_is_the_one_organisation_an_admin_belongs_to
     assert await service.home_organisation(org_admin) == "demo"
     assert await service.home_organisation(two) is None
     assert await service.home_organisation(superuser) is None
+
+
+# --- archived groups (ADR 0084) -------------------------------------------------------------
+
+
+async def test_an_archived_group_is_read_only(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    uow.state.groups[1] = replace(uow.state.groups[1], archived_at=NOW)
+
+    viewed = await service.authorize(SUPER, Permission.GROUP_VIEW, group_slug="demo")
+    bookings = await service.authorize(SUPER, Permission.BOOKINGS_VIEW, group_slug="demo")
+
+    assert viewed.decision.allowed
+    assert bookings.decision.allowed
+    for permission in (Permission.GROUP_EDIT, Permission.SCHEDULE_MANAGE, Permission.GROUP_DELETE):
+        with pytest.raises(DomainError, match="group_archived"):
+            await service.authorize(SUPER, permission, group_slug="demo")
+    assert uow.state.audit == []
+
+
+def test_what_stays_readable_on_an_archived_group_is_the_compliance_role_and_bookings() -> None:
+    assert READ_WHEN_ARCHIVED == MATRIX[Role.AUDITOR] | {Permission.BOOKINGS_VIEW}
+    assert not any(
+        p.value.endswith((".manage", ".edit", ".create", ".delete")) for p in READ_WHEN_ARCHIVED
+    )

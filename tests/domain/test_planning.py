@@ -446,3 +446,67 @@ def test_rule_ids_are_not_part_of_equality() -> None:
 
 def uow_tz() -> ZoneInfo:
     return ZoneInfo("Europe/Amsterdam")
+
+
+# --- archiving a group (ADR 0084) ------------------------------------------------------------
+
+
+async def test_org_admin_archives_a_group_by_typing_its_name(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    await planning.archive_group(ORG_ADMIN, "demo", " demo ")
+
+    assert uow.state.groups[1].archived_at == NOW
+    assert audit_rows(uow) == [("o-1", "group.delete", Outcome.SUCCESS, "archived", "demo")]
+
+
+async def test_archiving_needs_the_exact_name(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    with pytest.raises(DomainError, match="confirmation_mismatch: confirmation"):
+        await planning.archive_group(ORG_ADMIN, "demo", "Demo-team")
+
+    assert not uow.state.groups[1].is_archived
+    assert audit_rows(uow) == []
+
+
+async def test_archiving_is_refused_while_bookings_lie_ahead(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    _future_booking(uow, BookingStatus.CONFIRMED)
+
+    with pytest.raises(DomainError, match="group_has_future_bookings"):
+        await planning.archive_group(SUPER, "demo", "demo")
+    assert await planning.future_bookings(SUPER, "demo") == 1
+
+    uow.state.bookings[60] = replace(uow.state.bookings[60], status=BookingStatus.CANCELLED)
+    await planning.archive_group(SUPER, "demo", "demo")
+    assert uow.state.groups[1].is_archived
+
+
+async def test_a_group_admin_cannot_archive_and_an_archived_group_refuses_changes(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    with pytest.raises(DomainError, match="not_permitted"):
+        await planning.archive_group(GROUP_ADMIN, "demo", "demo")
+
+    await planning.archive_group(ORG_ADMIN, "demo", "demo")
+
+    with pytest.raises(DomainError, match="group_archived"):
+        await planning.archive_group(ORG_ADMIN, "demo", "demo")
+    with pytest.raises(DomainError, match="group_archived"):
+        await planning.add_rule(GROUP_ADMIN, "demo", _rule())
+
+
+async def test_an_archived_group_keeps_its_slug_and_leaves_the_list(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    await planning.archive_group(ORG_ADMIN, "demo", "demo")
+
+    with pytest.raises(DomainError, match="slug_taken"):
+        await planning.create_group(
+            ORG_ADMIN, NewGroup("demo", "Demo", "demo", "Europe/Amsterdam", 20)
+        )
+    admin = AdminService(uow, FixedClock(NOW))
+    assert [s.group.slug for s in await admin.groups(ORG_ADMIN)] == []
+    assert [s.group.slug for s in await admin.groups(ORG_ADMIN, archived=True)] == ["demo"]

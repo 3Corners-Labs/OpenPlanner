@@ -192,6 +192,39 @@ class PlanningService:
             )
         return changed
 
+    async def archive_group(self, principal: Principal, slug: str, confirmation: str) -> None:
+        """Archive the group (ADR 0084 point 3): no bookings, 404 in public, read-only here.
+
+        ``confirmation`` is the group's name typed back on the confirmation page. The slug
+        stays reserved; the nightly sweep erases the row later (step 3).
+
+        Raises:
+            DomainError: ``not_permitted``, ``group_not_found``, ``group_archived`` (already),
+                ``confirmation_mismatch`` or ``group_has_future_bookings``.
+        """
+        permission = Permission.GROUP_DELETE
+        authorization = require(await self._admin.authorize(principal, permission, group_slug=slug))
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            if group.is_archived:
+                raise DomainError(ErrorCode.GROUP_ARCHIVED)
+            if confirmation.strip().casefold() != group.name.casefold():
+                raise DomainError(ErrorCode.CONFIRMATION_MISMATCH, "confirmation")
+            now = self._clock.now()
+            if await tx.count_future_bookings(group.id, now):
+                raise DomainError(ErrorCode.GROUP_HAS_FUTURE_BOOKINGS)
+            await tx.save_group(replace(group, archived_at=now))
+            await self._audit(
+                tx, principal, permission, _organisation(authorization), slug, "archived"
+            )
+
+    async def future_bookings(self, principal: Principal, slug: str) -> int:
+        """Return how many bookings that hold a place lie ahead, for the archive page."""
+        require(await self._admin.authorize(principal, Permission.GROUP_DELETE, group_slug=slug))
+        async with self._uow.read() as tx:
+            group = await group_by_slug(tx, slug)
+            return await tx.count_future_bookings(group.id, self._clock.now())
+
     # --- opening hours and exceptions --------------------------------------------------------
 
     async def schedule(self, principal: Principal, slug: str) -> Schedule:

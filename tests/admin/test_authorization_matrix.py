@@ -430,6 +430,16 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/settings": statuses(422, 422, 403, 403, 403, 403, 403),
         "/admin/groups/andere-team/settings": statuses(422, 403, 403, 422, 403, 403, 403),
     },
+    # ADR 0084: archiving needs group.delete (superuser, org admin); an empty confirmation is
+    # refused (422).
+    "GET /admin/groups/{slug}/settings/archive": {
+        "/admin/groups/demo/settings/archive": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/settings/archive": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/settings/archive": {
+        "/admin/groups/demo/settings/archive": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/settings/archive": statuses(422, 403, 403, 422, 403, 403, 403),
+    },
     # ADR 0055: the booking form is part of the group's settings (group.edit). An empty add is
     # refused (422); an unknown field sends back to the list (303).
     "GET /admin/groups/{slug}/settings/form": {
