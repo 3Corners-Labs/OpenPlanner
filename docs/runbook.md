@@ -88,7 +88,9 @@ images (`OPENPLANNER_IMAGE` and `OPENPLANNER_PROXY_IMAGE` in `.env.update`).
 | worker container health | `healthy` | heartbeat older than 120 s: worker stuck or database unreachable (`worker.database_unavailable`) |
 
 Logs are JSON on stdout: `docker compose logs -f web worker`. They rotate at 5 files of 20 MB
-per container (see *Logs and disk space*).
+per container (see *Logs and disk space*). Levels, the record and the `TRACE` points are in
+`docs/logging.md`; `settings set LOG_LEVEL TRACE --hours 1` traces every request, job step,
+outgoing call, slow statement and page render for an hour, without personal data.
 
 `database_busy` errors mean a booking waited longer than 5 s for SQLite's write lock. At the
 expected volume (peak 20 bookings/min) this indicates a stuck transaction or a slow disk, not

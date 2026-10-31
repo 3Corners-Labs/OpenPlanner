@@ -116,6 +116,7 @@ make check
   model, runtime flows, security, quality assurance.
 - `docs/manual/` — the admin manual, screen by screen (also shown in the portal).
 - `docs/widget.md` — embedding the calendar on your website, and its styling tokens.
+- `docs/logging.md` — log levels, the record, the trace points and where the lines go.
 - `docs/agent-api.md` — connecting a contact-center bot to the machine API.
 - `docs/install.md` — installing and repairing a host with `scripts/install.sh`.
 - `site/` — the public website, openplanner.nl, built from the repository (ADR 0087).

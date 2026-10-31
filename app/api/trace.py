@@ -5,13 +5,22 @@ Each request gets a fresh trace id, so its log lines and the audit events it wri
 otherwise make its requests share a trace with someone else's and muddle a trace filter. Admin
 routes later bind the organisation and group they act on (``app.admin.authz``); public pages
 under ``/g/{slug}`` bind their group (``bind_group_from_path``).
+
+Each request also leaves one ``http.request`` trace line (ADR 0085 point 9) with its method,
+the route template Starlette matched (``/g/{slug}``, never the raw path: ``/b/{token}``
+carries the management token), the status and the duration; an unmatched path has an empty
+route.
 """
 
+from time import perf_counter
+
 from fastapi import Request
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.routing import Route
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.domain.event_context import bind_level, trace_scope
 from app.domain.scheduling import is_slug
+from app.logging import tracer
 
 
 class TraceMiddleware:
@@ -26,8 +35,27 @@ class TraceMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        started = perf_counter()
+        status = 0
+
+        async def send_traced(message: Message) -> None:
+            nonlocal status
+            if message["type"] == "http.response.start":
+                status = int(message["status"])
+            await send(message)
+
         with trace_scope():
-            await self.app(scope, receive, send)
+            try:
+                await self.app(scope, receive, send_traced)
+            finally:
+                route = scope.get("route")
+                tracer.trace(
+                    "http.request",
+                    method=str(scope.get("method", "")),
+                    route=route.path if isinstance(route, Route) else "",
+                    status=status,
+                    ms=int((perf_counter() - started) * 1000),
+                )
 
 
 async def bind_group_from_path(request: Request) -> None:
