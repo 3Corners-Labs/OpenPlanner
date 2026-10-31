@@ -6091,6 +6091,12 @@ msgstr "Diagnosegebeurtenissen bewaren (dagen)"
 msgid "settings.field.diagnostic_mode_hours.label"
 msgstr "Diagnosemodus stopt na (uren)"
 
+msgid "settings.field.trace_level_max_hours.label"
+msgstr "Logniveau TRACE valt terug na hooguit (uren)"
+
+msgid "settings.field.sql_slow_ms.label"
+msgstr "Traceer een databaseopdracht trager dan (milliseconden)"
+
 msgid "settings.field.security_event_window_minutes.label"
 msgstr "Venster voor beveiligingsgebeurtenissen (minuten)"
 
