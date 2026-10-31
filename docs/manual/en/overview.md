@@ -77,6 +77,13 @@ On a phone the bar keeps only its icons and your initials; your name is in the m
 
 ## The top bar
 
+At the start of the bar, before the mark, the **menu button** (three lines) collapses the side
+menu to its icons or expands it again. Collapsed, every entry keeps its name: it appears when
+you point at the icon or move the keyboard focus to it. On a tablet the menu starts collapsed
+and the button expands it; on a wider screen it starts expanded. The choice holds for this
+session and survives signing in again, like the appearance. On a phone there is no side menu
+and no button: the bar at the bottom has the first entries, *More* the rest.
+
 To the right of the portal's name sit a few shortcuts, from left to right. You only see what
 your role may open:
 

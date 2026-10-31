@@ -79,6 +79,13 @@ het menu.
 
 ## De balk bovenin
 
+Vooraan in de balk, voor het beeldmerk, klapt de **menuknop** (drie streepjes) het zijmenu in
+tot zijn pictogrammen of weer uit. Ingeklapt houdt elk onderdeel zijn naam: die verschijnt als u
+het pictogram aanwijst of er met het toetsenbord de focus op zet. Op een tablet begint het menu
+ingeklapt en klapt de knop het uit; op een breder scherm begint het uitgeklapt. De keuze geldt
+voor deze sessie en blijft ook na opnieuw inloggen, net als de weergave. Op een telefoon is er
+geen zijmenu en geen knop: de balk onderin heeft de eerste onderdelen, *Meer* de rest.
+
 Rechts van de naam van het beheer staan, van links naar rechts, kleine snelkoppelingen. U ziet
 alleen wat uw rol mag openen:
 
