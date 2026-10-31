@@ -56,9 +56,9 @@ MAX_DIRECT_CALLS = MAX_CAPACITY
 
 DEFAULT_DISPATCH_LEAD_MINUTES = 5
 MAX_DISPATCH_LEAD_MINUTES = 60
-DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES = 60
+DEFAULT_PARTICIPANT_CHANGE_LEAD_MINUTES = 60
 """ADR 0069: a citizen can move a booking until this long before the start."""
-MAX_CITIZEN_CHANGE_LEAD_MINUTES = 1440
+MAX_PARTICIPANT_CHANGE_LEAD_MINUTES = 1440
 DEFAULT_TRIAL_CALL_MINUTES = 30
 """ADR 0071: how long a trial call stays open, from the moment the citizen starts it."""
 MIN_TRIAL_CALL_MINUTES = 10
@@ -214,7 +214,7 @@ class Group:
             never dispatched the moment it is made. Used only with
             ``DispatchKind.CONTACT_CENTER``.
         dispatch_kind: Contact center or OpenPlanner's own queue (ADR 0043).
-        citizen_change_lead_minutes: How long before the start the citizen may still move
+        participant_change_lead_minutes: How long before the start the citizen may still move
             the booking (ADR 0069, class D per group); cancelling is possible until the start.
             Never below ``dispatch_lead_minutes``. A booking made later than that cannot be
             moved by the citizen, only cancelled.
@@ -262,7 +262,7 @@ class Group:
     direct_call_max_concurrent: int | None = None
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
     dispatch_kind: DispatchKind = DispatchKind.CONTACT_CENTER
-    citizen_change_lead_minutes: int = DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES
+    participant_change_lead_minutes: int = DEFAULT_PARTICIPANT_CHANGE_LEAD_MINUTES
     planner_change_min_lead_minutes: int = 60
     trial_call_enabled: bool = True
     trial_call_minutes: int = DEFAULT_TRIAL_CALL_MINUTES
@@ -291,9 +291,9 @@ class Group:
             raise _invalid("dispatch_lead_minutes")
         if self.min_notice_minutes < self.dispatch_lead_minutes:
             raise _invalid("min_notice_minutes")
-        change_lead = self.citizen_change_lead_minutes
-        if not self.dispatch_lead_minutes <= change_lead <= MAX_CITIZEN_CHANGE_LEAD_MINUTES:
-            raise _invalid("citizen_change_lead_minutes")
+        change_lead = self.participant_change_lead_minutes
+        if not self.dispatch_lead_minutes <= change_lead <= MAX_PARTICIPANT_CHANGE_LEAD_MINUTES:
+            raise _invalid("participant_change_lead_minutes")
         planner_lead = self.planner_change_min_lead_minutes
         if not self.dispatch_lead_minutes <= planner_lead <= MAX_PLANNER_LEAD_MINUTES:
             raise _invalid("planner_change_min_lead_minutes")
@@ -373,11 +373,11 @@ class Group:
     def change_deadline(self, start: datetime) -> datetime:
         """Return the moment the citizen can no longer move a booking starting at ``start``.
 
-        ``citizen_change_lead_minutes`` before the start, for both dispatch kinds (ADR 0069).
+        ``participant_change_lead_minutes`` before the start, for both dispatch kinds (ADR 0069).
         A booking already dispatched to the contact center is moved with its task ended
         (ADR 0021), so the lead is never shorter than the dispatch lead.
         """
-        return start - timedelta(minutes=self.citizen_change_lead_minutes)
+        return start - timedelta(minutes=self.participant_change_lead_minutes)
 
     def cancel_deadline(self, start: datetime) -> datetime:
         """Return the moment the citizen can no longer cancel: the start itself (ADR 0069).

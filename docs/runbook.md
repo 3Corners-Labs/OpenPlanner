@@ -844,7 +844,7 @@ OpenPlanner**. From then on:
   theirs;
 - the team's agents sign in to the admin portal (IdP role `OIDC_ROLE_AGENT`, default
   `openplanner-agent`, with the group in the group claim) and open the **Wachtrij** tab;
-- participants can cancel until the start and move until `citizen_change_lead_minutes` before it
+- participants can cancel until the start and move until `participant_change_lead_minutes` before it
   (ADR 0069), as with the contact center.
 
 Switch back the same way once the contact center works again. Both changes are in the audit
