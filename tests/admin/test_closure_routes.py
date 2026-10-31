@@ -161,9 +161,9 @@ async def test_cancel_all_bookings_on_hold(site: Site) -> None:
 async def test_org_admin_closes_every_team_of_the_organisation(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     nav = (await site.client.get("/admin/")).text
-    assert 'href="/admin/closures"' in nav
-    listing = (await site.client.get("/admin/closures")).text
-    assert 'href="/admin/organisations/demo/closure"' in listing
+    assert 'href="/admin/closures"' not in nav  # ADR 0047 §4: a tab of the organisation
+    organisation = (await site.client.get("/admin/organisations/demo")).text
+    assert 'href="/admin/organisations/demo/closure"' in organisation
 
     response = await _post(site, "/admin/organisations/demo/closure", UNTIL_SATURDAY)
     assert response.headers["location"] == (

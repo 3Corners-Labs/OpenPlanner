@@ -2,9 +2,9 @@
 
 Een groep heeft altijd een eigen pagina die u vanaf uw website kunt linken. Wilt u de
 afsprakenkalender liever direct in een pagina van uw eigen website tonen, dan kan dat met de
-widget. Dit scherm bepaalt op welke websites dat mag. U opent het via **Insluiten** in het
-menu. Organisatiebeheerders en de superuser kunnen het gebruiken, elk voor hun eigen
-organisaties.
+widget. Dit scherm bepaalt op welke websites dat mag. U opent het via **Organisaties →
+organisatie → Overzicht → Inbedding**. Organisatiebeheerders en de superuser kunnen het
+gebruiken, elk voor hun eigen organisaties.
 
 Twee dingen zijn nodig voordat een groep in de widget verschijnt:
 

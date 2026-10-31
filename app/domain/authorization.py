@@ -80,6 +80,8 @@ class Permission(StrEnum):
     RIGHTS_VIEW = "rights.view"
     MATRIX_VIEW = "matrix.view"
     ORGANISATION_MANAGE = "organisation.manage"
+    ORGANISATION_VIEW = "organisation.view"
+    """ADR 0047 step 3: open an organisation's page and its tabs (read-only on its own)."""
     AUDIT_VIEW = "audit.view"
     AUDIT_EXPORT = "audit.export"
     DIAGNOSTICS_MANAGE = "diagnostics.manage"
@@ -117,6 +119,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.RIGHTS_VIEW: Level.GLOBAL,
     Permission.MATRIX_VIEW: Level.GLOBAL,
     Permission.ORGANISATION_MANAGE: Level.GLOBAL,
+    Permission.ORGANISATION_VIEW: Level.ORGANISATION,
     Permission.HOLIDAYS_MANAGE: Level.GLOBAL,
     Permission.INTEGRATIONS_MANAGE: Level.ORGANISATION,
     Permission.BRANDING_MANAGE: Level.ORGANISATION,
@@ -198,6 +201,7 @@ READ_PERMISSIONS = frozenset(
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,
+        Permission.ORGANISATION_VIEW,
         Permission.GROUP_VIEW,
         Permission.BOOKINGS_VIEW,
         Permission.RETENTION_VIEW,
@@ -237,6 +241,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     | {
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,
+        # ADR 0047 step 3: the own organisations' pages, with the tabs the other rights open.
+        Permission.ORGANISATION_VIEW,
         Permission.HOLIDAYS_ASSIGN,
         Permission.GROUP_CREATE,
         Permission.GROUP_VIEW,
@@ -286,6 +292,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     | {
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,
+        # ADR 0047 step 3: the organisations' pages, read-only (groups, profile).
+        Permission.ORGANISATION_VIEW,
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         # ADR 0046: who has access, for an access review.
