@@ -912,7 +912,12 @@ repository:
 | `OPENAI_API_KEY` | secret | an OpenAI API key | the audit job (`openai/codex-action`); the key stays in the action's proxy and never reaches the review process |
 | `RELEASE_RUNNER` | variable, optional | the label of a self-hosted runner | default `ubuntu-24.04`; see *Self-hosted runner* below |
 
-A real run stops at its first step without `RELEASE_TOKEN`; a dry run needs none of them.
+A real run stops at its first step without `RELEASE_TOKEN`; a dry run needs none of them. A
+personal access token expires: note the date, renew it under the same name before it does
+(a release then fails at its first step, nothing half-done), or replace it with a GitHub App
+token later. The Codex CLI is installed at its newest version on every audit run
+(`codex-version` empty), as on a laptop; it is a tool of the forge, not a dependency of the
+product.
 
 ### Step 1: the release PR (one click)
 
