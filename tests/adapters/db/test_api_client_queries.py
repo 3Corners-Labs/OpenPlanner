@@ -73,7 +73,7 @@ async def test_client_round_trips_with_groups_and_listing_follows_the_scope(
         loaded = await tx.get_api_client(narrowed.client_id)
         everything = await tx.list_api_clients(Scope(everything=True))
         demo_only = await tx.list_api_clients(Scope(organisations=frozenset({"demo"})))
-        groups_only = await tx.list_api_clients(Scope(groups=frozenset({"demo"})))
+        groups_only = await tx.list_api_clients(Scope(groups=frozenset({("demo", "demo")})))
         assert await tx.get_api_client("opc_missing-000000000000") is None
     assert loaded == narrowed
     assert {c.client_id for c in everything} == {narrowed.client_id, other.client_id}

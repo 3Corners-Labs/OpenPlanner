@@ -86,7 +86,7 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 ## Privacy rules
 - PII fields: `first_name, last_name, email, phone, note, form_answers, guest_join_url, host_join_url, trial_join_url`. Only on `Booking`. Nowhere else. Answers to a group's custom form fields (ADR 0055) are read only through `Answers.visible(purpose)`; never read a field's PII tag yourself.
 - `purge_pii` job runs at `slot.end + 24h` or `cancelled_at + 24h`; sets fields to NULL and `pii_purged_at`. A nightly sweep re-checks for stragglers and alerts if any booking older than 48 h still has PII.
-- Outbound payloads to any contact-center provider (Webex Contact Center today, ADR 0032) contain only first name and the host join URL.
+- Outbound payloads to any contact-center provider (Webex Contact Center today, ADR 0032) contain only first name, the host join URL and the routing variables of ADR 0081 (subject and attribute codes from a closed list, never free text or a PII field).
 - Data flow diagram in `docs/dataflow.md` is the input for the DPIA; keep it current.
 
 ## Git and process

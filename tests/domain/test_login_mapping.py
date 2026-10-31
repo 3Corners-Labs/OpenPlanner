@@ -14,10 +14,12 @@ GOOD = {
     "oidc_role_group_admin": "openplanner-group-admin",
     "oidc_role_auditor": "openplanner-auditor",
     "oidc_role_agent": "openplanner-agent",
+    "oidc_entitlement_claim": "openplanner_entitlements",
+    "oidc_entitlement_prefix": "openplanner",
 }
 
 
-def test_the_mapping_has_the_eight_registered_keys() -> None:
+def test_the_mapping_has_the_ten_registered_keys() -> None:
     assert set(LOGIN_KEYS) == set(GOOD)
 
 
@@ -35,6 +37,8 @@ def test_a_valid_mapping_is_returned_trimmed() -> None:
         ("oidc_group_claim", "groups; drop"),
         ("oidc_role_superuser", "a" * 129),
         ("oidc_role_auditor", "openplanner-superuser"),  # two roles with one value
+        ("oidc_entitlement_prefix", "OpenPlanner"),  # ADR 0049: lower case, no case folding
+        ("oidc_entitlement_prefix", "x"),  # too short for the grammar
     ],
 )
 def test_an_invalid_mapping_is_refused_by_key(key: str, value: str) -> None:

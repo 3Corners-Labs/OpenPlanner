@@ -265,7 +265,7 @@ def scope_text(scope: Scope | None, _: BoundGettext) -> str:
             _("admin.rights.scope_organisations", names=", ".join(sorted(scope.organisations)))
         )
     if scope.groups:
-        parts.append(_("admin.rights.scope_groups", names=", ".join(sorted(scope.groups))))
+        parts.append(_("admin.rights.scope_groups", names=", ".join(sorted(scope.group_slugs))))
     return "; ".join(parts)
 
 

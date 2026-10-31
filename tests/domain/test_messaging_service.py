@@ -15,10 +15,11 @@ from app.domain.scheduling import Organisation, PhoneMode
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW, make_group
+from tests.support.principals import principal
 
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
-GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"team"}))
-OTHER_ORG = Principal("o-2", "X", frozenset({Role.ORG_ADMIN}), frozenset({"other"}), frozenset())
+ORG_ADMIN = principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+GROUP_ADMIN = principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"team"}))
+OTHER_ORG = principal("o-2", "X", frozenset({Role.ORG_ADMIN}), frozenset({"other"}), frozenset())
 SMS_RULE = ReminderRule(ChannelKind.SMS, 120)
 
 

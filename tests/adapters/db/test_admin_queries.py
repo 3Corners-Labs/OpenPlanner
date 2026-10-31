@@ -33,9 +33,9 @@ EVERYTHING = Scope(everything=True)
     [
         (EVERYTHING, ["andere-team", "demo"]),
         (Scope(organisations=frozenset({"demo"})), ["demo"]),
-        (Scope(groups=frozenset({"andere-team"})), ["andere-team"]),
+        (Scope(groups=frozenset({("andere", "andere-team")})), ["andere-team"]),
         (
-            Scope(organisations=frozenset({"demo"}), groups=frozenset({"andere-team"})),
+            Scope(organisations=frozenset({"demo"}), groups=frozenset({("andere", "andere-team")})),
             ["andere-team", "demo"],
         ),
         (Scope(organisations=frozenset({"nope"})), []),
@@ -151,7 +151,7 @@ async def test_audit_scope_is_exact_per_level(engine: AsyncEngine) -> None:
             await tx.add_audit_event(event)
 
     async with uow.read() as tx:
-        group_admin = await tx.list_audit_events(Scope(groups=frozenset({"demo"})))
+        group_admin = await tx.list_audit_events(Scope(groups=frozenset({("demo", "demo")})))
         org_admin = await tx.list_audit_events(Scope(organisations=frozenset({"demo"})))
         superuser = await tx.list_audit_events(EVERYTHING)
 

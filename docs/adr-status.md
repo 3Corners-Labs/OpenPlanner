@@ -17,7 +17,7 @@ package; when the two disagree, the code wins.
 | Built? | ADRs |
 |---|---|
 | BUILT | 48 |
-| PARTIAL | 23 |
+| PARTIAL | 24 |
 | NOT BUILT | 5 |
 | POLICY | 3 |
 
@@ -71,7 +71,7 @@ package; when the two disagree, the code wins.
 | 0046 | Staff directory, SCIM | PARTIAL | step 1 #61; migration 0026 | Step 2 (suspend, end sessions, erase, retention, CSV), step 3 (SCIM) |
 | 0047 | Admin information architecture | PARTIAL | steps 1–3 and the groups list of step 5 (#62, #80, #219): `web/navigation.py`, `docs/admin-map.md`, the organisation page with tabs and sub-tabs, `organisation.view`, `/admin/groups` | Step 4 (six group tabs), the readiness checklist, lists for API clients and the audit log, `return` keys, registry `topic` |
 | 0048 | Live update progress | BUILT | #63; migration 0027 | – |
-| 0049 | Role and scope in one claim | NOT BUILT | ADR only (#64) | Everything |
+| 0049 | Role and scope in one claim | PARTIAL | steps 0–3 #179; `domain/entitlements.py`, `domain/login_service.py`, `domain/idp_mapping.py`, migration 0076, `admin/idp_mapping_routes.py`, `OIDC_CLAIM_MODE` | Step 4: mismatch count on System status, memberships by id, `entitlements` as default and removal of `legacy`/`shadow` (E4) |
 | 0050 | Host installer | BUILT | #82; `scripts/install.sh`; extended by #139, #144 | – |
 | 0051 | Dependency currency | BUILT (repository side) | #94; `renovate.json`, `make pins`, `freshness.yml` | Unsure: the Renovate app installed, the required check on `main` (GitHub settings) |
 | 0052 | Releases and versioning | BUILT | #96; `release_plan.py`; v0.3.0 (#113) | – |
@@ -102,6 +102,7 @@ package; when the two disagree, the code wins.
 | 0078 | Build work merges on green; decisions and releases wait for the product owner; audit before a minor release | PARTIAL | steps 0–2 (#177); step 4 (#180): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | Steps 3 and 5: the required check and the label on GitHub, the first audited minor release (prepared by ADR 0079) |
 | 0079 | The release is a workflow: release PR, audit and tag by dispatch | PARTIAL | steps 0–2 (#183): `.github/workflows/release.yml`, `scripts/release_pr.py`, `tests/scripts/test_release_pr.py`, dry run on the PR branch | Step 3: the secrets `RELEASE_TOKEN` and `OPENAI_API_KEY` (product owner); step 4: the first release through the workflow, `v0.4.0`, with the first real audit |
 | 0080 | Page width: two classes, declared in the register, and a week that never wraps | BUILT | `app/web/navigation.py` (`Width`, `Screen.width`, `wide_subpages`), `data-width` in `admin/layout.html`, tokens and `.week-frame` in `admin.css`, `docs/admin-map.md`; `tests/web/test_navigation.py`, `tests/web/test_shell_styles.py`, `tests/admin/test_pages.py` | – (further list screens go wide when a table needs the room, step 2) |
+| 0081 | Subjects and routing attributes next to the group | NOT BUILT | #179; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 
