@@ -11,12 +11,15 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Screen / scherm | Nederlands | English |
 |---|---|---|
 | Overview / overzicht | [Overzicht](nl/overview.md) | [Overview](en/overview.md) |
+| Groups / groepen | [Groepen](nl/groups.md) | [Groups](en/groups.md) |
+| Organisation / organisatie | [Organisatie](nl/organisation.md) | [Organisation](en/organisation.md) |
 | Group settings / groepsinstellingen | [Groepsinstellingen](nl/group-settings.md) | [Group settings](en/group-settings.md) |
 | Branding / huisstijl | [Huisstijl](nl/branding.md) | [Branding](en/branding.md) |
 | Rights matrix / rechtenmatrix | [Rechtenmatrix](nl/rights-matrix.md) | [Rights matrix](en/rights-matrix.md) |
 | Custom roles / eigen rollen | [Eigen rollen](nl/roles.md) | [Custom roles](en/roles.md) |
 | Retention / bewaartermijnen | [Bewaartermijnen](nl/retention.md) | [Retention](en/retention.md) |
 | Staff / medewerkers | [Medewerkers](nl/staff.md) | [Staff](en/staff.md) |
+| Identity provider mapping / koppeling identiteitsprovider (ADR 0049) | [Koppeling identiteitsprovider](nl/idp-mapping.md) | [Identity provider mapping](en/idp-mapping.md) |
 | Audit log / auditlog | [Auditlog](nl/audit.md) | [Audit log](en/audit.md) |
 | Queue / wachtrij (ADR 0043) | [Wachtrij](nl/queue.md) | [Queue](en/queue.md) |
 | Alternative contact options / contactalternatieven | [Contactalternatieven](nl/organisation-contacts.md) | [Alternative contact options](en/organisation-contacts.md) |

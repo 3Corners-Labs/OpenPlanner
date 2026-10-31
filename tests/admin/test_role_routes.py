@@ -13,8 +13,10 @@ import re
 import pytest
 
 from app.domain.authorization import MATRIX, Permission, Principal, Role
+from app.domain.entitlements import LoginClaims
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_authorization_matrix import EXPECTED
+from tests.support.principals import legacy_claims
 
 CLAIM = "openplanner-custom"
 TEMPLATE_ROWS = {
@@ -38,14 +40,14 @@ def role_form(
     return form
 
 
-def holder_like(principal: Principal, claim: str = CLAIM) -> Principal:
-    """A person with no built-in role, the claims of ``principal`` and the custom claim."""
-    return Principal(
+def holder_like(admin: Principal, claim: str = CLAIM) -> LoginClaims:
+    """A login with no built-in role, the scope claims of ``admin`` and the custom claim."""
+    scope = legacy_claims(admin)
+    return LoginClaims(
         "sub-custom",
         "Carla Custom",
-        frozenset(),
-        principal.organisations,
-        principal.groups,
+        organisations=scope.organisations,
+        groups=scope.groups,
         role_claims=frozenset({claim}),
     )
 
@@ -71,7 +73,7 @@ async def test_a_copy_of_a_template_answers_every_route_like_the_template(
 ) -> None:
     row, principal = TEMPLATE_ROWS[template]
     await create_role(site, role_form(template, MATRIX[template]))
-    await site.login_as(holder_like(principal))
+    await site.login_with(holder_like(principal))
 
     wrong = []
     for key, paths in EXPECTED.items():
@@ -87,7 +89,7 @@ async def test_a_narrowed_copy_loses_exactly_what_was_switched_off(site: Site) -
     narrowed = MATRIX[Role.GROUP_ADMIN] - {Permission.BOOKINGS_VIEW, Permission.TEXTS_MANAGE}
     narrowed -= {Permission.BOOKINGS_MANAGE}  # it requires bookings.view (ADR 0044)
     await create_role(site, role_form(Role.GROUP_ADMIN, narrowed))
-    await site.login_as(holder_like(GROUP_ADMIN))
+    await site.login_with(holder_like(GROUP_ADMIN))
 
     assert (await site.client.get("/admin/groups/demo/settings")).status_code == 403
     assert (await site.client.get("/admin/groups/demo/agenda")).status_code == 403
@@ -101,7 +103,7 @@ async def test_a_role_change_works_on_the_next_request_without_logging_in(site: 
     client = site.client
     superuser = dict(client.cookies)
     client.cookies.clear()
-    await site.login_as(holder_like(GROUP_ADMIN))
+    await site.login_with(holder_like(GROUP_ADMIN))
     holder = dict(client.cookies)
 
     def act_as(cookies: dict[str, str]) -> None:
@@ -165,7 +167,7 @@ async def test_an_auditor_copy_cannot_get_personal_data(site: Site) -> None:
     assert "persoonsgegevens" in response.text
 
     await create_role(site, role_form(Role.AUDITOR, MATRIX[Role.AUDITOR]))
-    await site.login_as(holder_like(AUDITOR))
+    await site.login_with(holder_like(AUDITOR))
     assert (await site.client.get("/admin/groups/demo/agenda")).status_code == 403
 
 
@@ -212,7 +214,7 @@ async def test_pages_show_the_role_names_and_the_history(site: Site) -> None:
     overview = await site.client.get("/admin/roles")
     assert "openplanner-custom" in overview.text
 
-    await site.login_as(holder_like(GROUP_ADMIN))
+    await site.login_with(holder_like(GROUP_ADMIN))
     matrix = await site.client.get("/admin/matrix")
     assert matrix.status_code == 200
     assert "Teamleider" in matrix.text  # a column, and the history row
