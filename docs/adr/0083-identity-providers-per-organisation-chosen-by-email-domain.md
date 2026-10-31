@@ -209,7 +209,7 @@ overlap after a key rotation.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; row in `docs/adr-status.md` | | in PR |
+| 0 | ADR proposed; row in `docs/adr-status.md` | #248 | in PR |
 | 1 | Groundwork, no behaviour change: a provider registry behind the `IdentityProvider` port (the platform provider as its only entry); provider key on the pending login and the session; provider-qualified subjects and the `idp:` refusal; provider column on `staff` (migration); the outbound guard as a shared adapter; a second realm in the dev Keycloak | | planned |
 | 2 | Registration: `identity_providers` table (migration), permissions and matrix rows, the *Login* tab on the organisation page, discovery check, `client_secret_basic` and `private_key_jwt` with `/admin/jwks.json` and key rotation, the guided test login, audit events | | planned |
 | 3 | Domains and routing: domain claims, DNS TXT verification and the re-check job, the email-first login page (nl, en), `login_hint`, RFC 9207 check, email-domain check at the callback, scope restriction in `resolve`, the kill switch | | planned |

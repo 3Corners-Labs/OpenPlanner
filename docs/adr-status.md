@@ -105,7 +105,7 @@ package; when the two disagree, the code wins.
 | 0080 | Page width: two classes, declared in the register, and a week that never wraps | BUILT | `app/web/navigation.py` (`Width`, `Screen.width`, `wide_subpages`), `data-width` in `admin/layout.html`, tokens and `.week-frame` in `admin.css`, `docs/admin-map.md`; `tests/web/test_navigation.py`, `tests/web/test_shell_styles.py`, `tests/admin/test_pages.py` | – (further list screens go wide when a table needs the room, step 2) |
 | 0081 | Subjects and routing attributes next to the group | NOT BUILT | #179; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
 | 0082 | Contact-center integration: verification, health, alerts to administrators and a fallback per group | NOT BUILT | #238 | Steps 1–5 (probe work item and `read_task`, health and reconcile, alert model with email and Webex bot, fallback per group, manual topic) |
-| 0083 | Identity providers per organisation, chosen by email domain | NOT BUILT | – | Steps 1–5 (registry and qualified subjects, registration with `private_key_jwt`, verified domains and email-first routing, host tools, docs and e2e) |
+| 0083 | Identity providers per organisation, chosen by email domain | NOT BUILT | #248 | Steps 1–5 (registry and qualified subjects, registration with `private_key_jwt`, verified domains and email-first routing, host tools, docs and e2e) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 
