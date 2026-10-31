@@ -127,7 +127,7 @@ groups exist (data integrity, not a threshold).
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #NNN | in PR |
+| 0 | ADR proposed | #262 | in PR |
 | 1 | Permissions `organisation.delete` and `group.delete` in the matrix, docs and sweep; the guard test of point 8 with today's gaps on its exception list | | planned |
 | 2 | Group archive: migration `archived_at`, domain rule, route, confirmation page, 404 on `/g/{slug}`, lists and navigation, audit events, manual topic (nl/en) | | planned |
 | 3 | Group erase in the nightly sweep, setting `group_erase_after_days`, threat model and data flow updated | | planned |
