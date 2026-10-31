@@ -115,9 +115,9 @@ async def test_keys_are_sealed_published_in_the_window_and_the_current_one_is_op
         await tx.retire_signing_keys("gem-a", keep="kid-2", at=later)
 
     async with uow.read() as tx:
-        listed = await tx.list_signing_keys("gem-a")
-        within = await tx.list_published_keys(later + KEY_OVERLAP - timedelta(seconds=1))
-        after = await tx.list_published_keys(later + KEY_OVERLAP)
+        listed = await tx.get_signing_keys("gem-a")
+        within = await tx.published_signing_keys(later + KEY_OVERLAP - timedelta(seconds=1))
+        after = await tx.published_signing_keys(later + KEY_OVERLAP)
     assert [(k.kid, k.retired_at) for k in listed] == [("kid-2", None), ("kid-1", later)]
     assert sorted(k.kid for k in within) == ["kid-1", "kid-2"]
     assert [k.kid for k in after] == ["kid-2"]

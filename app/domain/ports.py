@@ -1230,7 +1230,7 @@ class Transaction(Protocol):
         """Remove the provider, its secret and its keys; ``False`` if there was none."""
         ...
 
-    async def list_signing_keys(self, provider_key: str) -> list[SigningKey]:
+    async def get_signing_keys(self, provider_key: str) -> list[SigningKey]:
         """Return the provider's key pairs (public side), newest first."""
         ...
 
@@ -1242,7 +1242,7 @@ class Transaction(Protocol):
         """Mark every current key of the provider except ``keep`` as retired at ``at``."""
         ...
 
-    async def list_published_keys(self, now: datetime) -> list[SigningKey]:
+    async def published_signing_keys(self, now: datetime) -> list[SigningKey]:
         """Return the keys of every provider that belong in the JWKS at ``now``."""
         ...
 

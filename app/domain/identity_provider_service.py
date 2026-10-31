@@ -161,14 +161,14 @@ class IdentityProviderService:
         async with self._uow.read() as tx:
             organisation = await organisation_by_slug(tx, slug)
             provider = await _provider_of(tx, slug, key)
-            keys = await tx.list_signing_keys(key)
+            keys = await tx.get_signing_keys(key)
         return ProviderDetail(organisation, provider, keys)
 
     async def published_keys(self) -> dict[str, list[dict[str, str]]]:
         """Return the JWKS of every provider: current keys and those retired within a day."""
         now = self._clock.now()
         async with self._uow.read() as tx:
-            keys = await tx.list_published_keys(now)
+            keys = await tx.published_signing_keys(now)
         return jwks([k for k in keys if k.published(now)])
 
     # --- changing ------------------------------------------------------------------------
@@ -289,7 +289,7 @@ class IdentityProviderService:
             )
             await tx.save_identity_provider(updated, secret)
             if updated.needs_key and not any(
-                k.retired_at is None for k in await tx.list_signing_keys(key)
+                k.retired_at is None for k in await tx.get_signing_keys(key)
             ):
                 await tx.add_signing_key(key, self._keys.generate(), now)
                 changed.append("signing_key")
