@@ -346,5 +346,10 @@ name only).
 
 ## Planned flows
 
+Subjects and routing attributes (ADR 0078, not built): the participant's chosen subject and the
+switched-on attributes (preferred language, channel preference) are stored on the booking as codes
+from a closed list and leave the system only as routing variables in the contact-center task,
+next to the first name and the host join URL; purged with the booking.
+
 To be added per work package: purge sweep and backups (WP8). Each flow lists: data items, source, destination, legal
 basis owner, retention.
