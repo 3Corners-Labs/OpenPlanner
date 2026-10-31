@@ -338,6 +338,8 @@ def build(
         shutil.rmtree(out)
     shutil.copytree(SITE / "static", out / "static")
     shutil.copytree(BRAND, out / "static" / "brand")
+    # Files for the web root itself (.htaccess): the host's configuration, not page content.
+    shutil.copytree(SITE / "root", out, dirs_exist_ok=True)
     written: list[Path] = []
     contents = {locale: load_content(locale) for locale in LOCALES}
     for content in contents.values():

@@ -10,20 +10,24 @@
 #
 # Reads:
 #   SITE_DEPLOY_REMOTE       the repository, user@host:path.git (variable)
-#   SITE_DEPLOY_KEY          the private key of the deploy-only key pair (secret)
+#   SITE_DEPLOY_KEY          the private key of the deploy-only key pair (secret), or
+#   SITE_DEPLOY_KEY_FILE     the path of a key file instead, for a run from a laptop
 #   SITE_DEPLOY_KNOWN_HOSTS  the host's key lines, from ssh-keyscan, checked against the
 #                            fingerprints in docs/runbook.md (variable)
 #   SITE_DEPLOY_DIR          the folder inside the repository that is the web root; empty is
 #                            the repository root (variable, optional)
 #   SITE_DEPLOY_BRANCH       the branch to push when the repository is still empty; otherwise
-#                            the repository's own default branch is used (variable, optional)
+#                            the repository's own default branch is used (variable, optional;
+#                            TransIP deploys the "Git production branch" set in its panel)
+# TransIP AutoGit needs `.autogit.yml` in the repository root; the script writes it from
+# site/deploy/autogit.yml next to the site folder.
 # Without SITE_DEPLOY_REMOTE or SITE_DEPLOY_KEY it prints a notice and exits 0, so a fork, a
 # pull request or a local run builds and never deploys.
 set -euo pipefail
 
 dist="${1:?usage: deploy-site.sh <dist directory> <version label>}"
 label="${2:?usage: deploy-site.sh <dist directory> <version label>}"
-if [ -z "${SITE_DEPLOY_REMOTE:-}" ] || [ -z "${SITE_DEPLOY_KEY:-}" ]; then
+if [ -z "${SITE_DEPLOY_REMOTE:-}" ] || [ -z "${SITE_DEPLOY_KEY:-}${SITE_DEPLOY_KEY_FILE:-}" ]; then
   echo "::notice::no SITE_DEPLOY_REMOTE or SITE_DEPLOY_KEY, the site is built but not deployed"
   exit 0
 fi
@@ -34,12 +38,14 @@ case "$subdir" in
 esac
 [ -f "$dist/index.html" ] || { echo "::error::$dist/index.html missing, nothing to deploy"; exit 1; }
 
+autogit="$(cd "$(dirname "$0")/.." && pwd)/site/deploy/autogit.yml"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 umask 077
-printf '%s\n' "$SITE_DEPLOY_KEY" > "$work/key"
+key="${SITE_DEPLOY_KEY_FILE:-$work/key}"
+[ -n "${SITE_DEPLOY_KEY_FILE:-}" ] || printf '%s\n' "$SITE_DEPLOY_KEY" > "$work/key"
 printf '%s\n' "$SITE_DEPLOY_KNOWN_HOSTS" > "$work/known_hosts"
-export GIT_SSH_COMMAND="ssh -i $work/key -o UserKnownHostsFile=$work/known_hosts -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes -o LogLevel=ERROR"
+export GIT_SSH_COMMAND="ssh -i $key -o UserKnownHostsFile=$work/known_hosts -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes -o LogLevel=ERROR"
 
 git clone --quiet --depth 1 "$SITE_DEPLOY_REMOTE" "$work/repo"
 cd "$work/repo"
@@ -56,6 +62,7 @@ target="${subdir:-.}"
 mkdir -p "$target"
 find "$target" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
 cp -R "$dist/." "$target/"
+[ ! -f "$autogit" ] || cp "$autogit" .autogit.yml
 
 git add --all
 if git diff --cached --quiet; then
