@@ -926,6 +926,9 @@ msgstr "Organisatie bekijken"
 msgid "authz.permission.organisation_manage"
 msgstr "Organisaties beheren"
 
+msgid "authz.permission.organisation_delete"
+msgstr "Organisaties verwijderen"
+
 msgid "authz.permission.audit_view"
 msgstr "Auditlog bekijken"
 
@@ -940,6 +943,9 @@ msgstr "Koppelingen en geheimen beheren"
 
 msgid "authz.permission.group_create"
 msgstr "Groepen aanmaken"
+
+msgid "authz.permission.group_delete"
+msgstr "Groepen archiveren"
 
 msgid "authz.permission.group_view"
 msgstr "Groep bekijken"
