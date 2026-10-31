@@ -1,9 +1,10 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_contact_form.html" import contact_form with context %}
-{% from "admin/_page_header.html" import page_header with context %}
 {% block title %}{{ _("admin.contacts.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
-{{ page_header("/admin/closures", _("admin.closures.title"), _("admin.contacts.title"), _("admin.contacts.title"), _("admin.contacts.lead", name=organisation.name), "/admin/organisations/" ~ organisation.slug ~ "/closure", organisation.name) }}
+{% include "admin/_organisation_header.html" %}
+<h2 class="section-title">{{ _("admin.contacts.title") }}</h2>
+<p>{{ _("admin.contacts.lead", name=organisation.name) }}</p>
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
 {{ contact_form("/admin/organisations/" ~ organisation.slug ~ "/contacts", preview, _("admin.contacts.preview_lead"), heading_fields, rows) }}

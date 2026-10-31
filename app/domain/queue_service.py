@@ -102,7 +102,8 @@ class GroupQueueSummary:
 
     Attributes:
         summary: The group with its organisation.
-        waiting: Participants in the lobby nobody picked up yet.
+        waiting: Participants nobody picked up yet: in the lobby, or direct callers since their
+            request.
         longest_wait: How long the first of them has waited.
         staff_available: Staff who may work this queue and are signed in now.
     """
