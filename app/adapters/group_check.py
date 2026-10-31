@@ -163,7 +163,7 @@ class PlatformChecker:
         except IntegrationError as error:
             params = (("host", host), ("error", error.code), ("reason", error.reason or "-"))
             return [Finding(CheckArea.WEBEX, "webex.trial_refused", CheckStatus.WARN, params)]
-        if probe.ignored:  # accepted, but not kept: the participant would wait in the lobby (ADR 0075)
+        if probe.ignored:  # accepted, not kept: the participant waits in the lobby (ADR 0075)
             stored = ", ".join(f"{key}={_value(value)}" for key, value in probe.ignored.items())
             lobby = (("host", host), ("stored", stored))
             outcome = Finding(CheckArea.WEBEX, "webex.trial_lobby", CheckStatus.WARN, lobby)
