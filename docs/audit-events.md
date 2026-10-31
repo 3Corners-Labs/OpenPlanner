@@ -66,7 +66,7 @@ per kind and caller:
 
 | `event.action` | `reason` | `detail` |
 |---|---|---|
-| `request.rate_limited` | `too_many_requests` | `surface:web` or `surface:agent`, `client:…` |
+| `request.rate_limited` | `too_many_requests` | `surface:web`, `surface:agent` or `surface:links` (unknown management links), `client:…` |
 | `request.rejected` | `honeypot`, `cross_site`, `origin_mismatch` | `client:…` |
 | `admin.login` (actor `anonymous`) | the identity error code, e.g. `invalid_state`, `invalid_token`, `nonce_mismatch` | `client:…` |
 | `token.rejected` | `unknown_token` (machine API), `unknown_management_link` (`/b/…`) | `client:…` |
