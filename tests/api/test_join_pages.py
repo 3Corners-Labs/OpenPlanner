@@ -1,4 +1,4 @@
-"""The participant's join page (ADR 0017): time window, redirect to Webex, recorded on the timeline."""
+"""The participant's join page (ADR 0017): time window, redirect to Webex, timeline entry."""
 
 from dataclasses import replace
 from datetime import datetime, timedelta

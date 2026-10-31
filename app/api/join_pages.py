@@ -12,8 +12,8 @@ shows the time and a button to check again. It never reloads by itself (WCAG 2.2
 from fastapi import APIRouter, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.api.participant import participant_page
 from app.api.labels import slot_label
+from app.api.participant import participant_page
 from app.domain.calls import JOIN_OPENS_BEFORE, EventKind, JoinState, join_link, join_state
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock

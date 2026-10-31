@@ -28,7 +28,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.api.participant import participant_page
 from app.api.contact_form import (
     HONEYPOT_FIELD,
     ContactForm,
@@ -37,6 +36,7 @@ from app.api.contact_form import (
     read_contact,
 )
 from app.api.labels import slot_label
+from app.api.participant import participant_page
 from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
 from app.domain.availability import AvailableSlot
@@ -248,7 +248,9 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
         slot = await _available(service, group, start)
         contact = await load_contact_form(service, group, _clock(request).now())
         context = _book_context(contact, start, slot, locale, contact.errors(error, locale), values)
-        return await participant_page(request, locale, "book.html", group, context, status_for(error))
+        return await participant_page(
+            request, locale, "book.html", group, context, status_for(error)
+        )
     booked = f"/g/{group.slug}/booked?start={slot_value(receipt.booking.start)}"
     return RedirectResponse(booked, status_code=303)
 

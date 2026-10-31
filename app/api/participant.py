@@ -1,7 +1,7 @@
 """Shared plumbing of the participant pages: templates, the organisation's branding, rendering.
 
-Every participant page of a group goes through ``participant_page``, so each shows the logo, name and
-accent colour of the group's organisation (WP3b) and may load the page's own scripts
+Every participant page of a group goes through ``participant_page``, so each shows the logo, name
+and accent colour of the group's organisation (WP3b) and may load the page's own scripts
 (ADR 0020), and shows the organisation's own wording (ADR 0074). The branding reaches the
 browser as ``/o/{slug}/theme.css`` and ``/o/{slug}/logo`` (``brand_assets``);
 ``app.web.branding`` builds the header from the organisation.
