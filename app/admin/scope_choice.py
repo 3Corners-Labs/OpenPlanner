@@ -133,7 +133,7 @@ def filter_view(
     choice: ScopeChoice,
     groups: Sequence[GroupSummary],
     translate: BoundGettext,
-    can_manage_organisations: bool,
+    opens_organisations: bool,
 ) -> ScopeFilterView:
     """Describe the filter form for ``choice`` and the groups the admin may see.
 
@@ -141,7 +141,7 @@ def filter_view(
         choice: The checked choice.
         groups: The admin's groups.
         translate: The page's gettext.
-        can_manage_organisations: Whether the admin may open organisation pages.
+        opens_organisations: Whether the admin may open organisation pages.
     """
     ordered = sorted(
         groups, key=lambda g: (g.organisation_name.casefold(), g.group.name.casefold())
@@ -154,7 +154,7 @@ def filter_view(
     all_groups = translate("admin.scope.all_groups")
     crumbs: list[Crumb] = []
     if choice.organisation is not None:
-        href = f"/admin/organisations/{choice.organisation}" if can_manage_organisations else None
+        href = f"/admin/organisations/{choice.organisation}" if opens_organisations else None
         crumbs.append(Crumb(organisations[choice.organisation], href))
     if choice.group is not None:
         crumbs.append(Crumb(names[choice.group], f"/admin/groups/{choice.group}"))
