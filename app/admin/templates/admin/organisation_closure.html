@@ -2,18 +2,9 @@
 {% from "admin/_closure_forms.html" import scenario_picker, start_form, lift_form with context %}
 {% block title %}{{ _("admin.closures.title") }} · {{ organisation_name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
-<nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
-  <ol>
-    <li><a href="/admin/closures">{{ _("admin.closures.title") }}</a></li>
-    <li><span aria-current="page">{{ organisation_name }}</span></li>
-  </ol>
-</nav>
-<div class="page-header">
-  <div>
-    <h1>{{ _("admin.closures.organisation_title", name=organisation_name) }}</h1>
-    <p class="page-header__lead">{{ _("admin.closures.organisation_lead") }}</p>
-  </div>
-</div>
+{% include "admin/_organisation_header.html" %}
+<h2 class="section-title">{{ _("admin.closures.organisation_title", name=organisation_name) }}</h2>
+<p>{{ _("admin.closures.organisation_lead") }}</p>
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
 <section class="card" aria-labelledby="groups-heading">

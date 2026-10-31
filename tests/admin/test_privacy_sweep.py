@@ -186,6 +186,7 @@ PATHS: dict[str, str] = {
         "/admin/groups/demo/closure/bookings/{on_hold}/move"
     ),
     "/admin/organisations/{org}": "/admin/organisations/demo",
+    "/admin/organisations/{org}/edit": "/admin/organisations/demo/edit",
     "/admin/organisations/{org}/settings": "/admin/organisations/demo/settings",
     "/admin/organisations/{org}/texts/{text_locale}": "/admin/organisations/demo/texts/nl",
     "/admin/organisations/{org}/texts": "/admin/organisations/demo/texts",

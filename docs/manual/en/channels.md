@@ -2,7 +2,7 @@
 
 On this screen the superuser records, per organisation, how messages to citizens leave the
 building: the mail server (SMTP) for email and the SMS gateway for text messages. You open it
-through **Integrations → organisation → Channels**. Passwords and API keys are write-only: the
+through **Organisations → organisation → Channels**. Passwords and API keys are write-only: the
 field is always empty, and an empty field keeps the stored secret (ADR 0022).
 
 ## Email

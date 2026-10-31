@@ -1,7 +1,7 @@
 # Branding
 
 On this screen you set how an organisation's booking pages look: name and logo in the header,
-colours, fonts and the shape of cards and buttons. Open it via **Branding → organisation**.
+colours, fonts and the shape of cards and buttons. Open it via **Organisations → organisation → Branding**.
 Only a superuser can change branding; the portal may ask you to sign in again before saving.
 The admin portal itself keeps one fixed style.
 

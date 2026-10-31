@@ -14,6 +14,11 @@ deduplication, timeline and call status. No tunnel or network is involved.
     meeting_ended    Webex meeting ended
     task_failed      WxCC task:failed          nobody picked the work item up
     task_ended       WxCC task:ended
+    trial_entered    Webex participant joined  the citizen is in the trial call (ADR 0071)
+    trial_left       Webex participant left    the citizen left the trial call
+
+The trial events carry the trial meeting's id, so the webhook matches them on the booking's
+trial call and records them as the trial kinds (ADR 0076), never on the call status.
 """
 
 import uuid
@@ -39,6 +44,8 @@ class SimulatedEvent(StrEnum):
     MEETING_ENDED = "meeting_ended"
     TASK_FAILED = "task_failed"
     TASK_ENDED = "task_ended"
+    TRIAL_ENTERED = "trial_entered"
+    TRIAL_LEFT = "trial_left"
 
 
 WXCC_TYPES = {
@@ -46,6 +53,12 @@ WXCC_TYPES = {
     SimulatedEvent.TASK_FAILED: "task:failed",
     SimulatedEvent.TASK_ENDED: "task:ended",
 }
+
+TRIAL_EVENTS = {
+    SimulatedEvent.TRIAL_ENTERED: SimulatedEvent.GUEST_JOINED,
+    SimulatedEvent.TRIAL_LEFT: SimulatedEvent.PARTICIPANT_LEFT,
+}
+"""What Webex sends for a trial event: the same participant event, on the trial meeting."""
 
 
 class PlayOutcome(StrEnum):
@@ -108,6 +121,7 @@ async def play(
     *,
     meeting_id: str | None,
     task_id: str | None,
+    trial_meeting_id: str | None = None,
     webex_secret: str | None,
     wxcc_secret: str | None,
     now: datetime,
@@ -122,11 +136,14 @@ async def play(
         body = event_body(wxcc_payload(event, task_id, stamp))
         path, headers = "/webhooks/wxcc", sign_wxcc(body, wxcc_secret, stamp)
     else:
-        if meeting_id is None:
+        sent, target = TRIAL_EVENTS.get(event, event), meeting_id
+        if event in TRIAL_EVENTS:
+            target = trial_meeting_id
+        if target is None:
             return Played(event, PlayOutcome.NO_IDS)
         if webex_secret is None:
             return Played(event, PlayOutcome.NO_SECRET)
-        body = event_body(webex_payload(event, meeting_id, now))
+        body = event_body(webex_payload(sent, target, now))
         path, headers = "/webhooks/webex", sign_webex(body, webex_secret)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://simulator") as client:
