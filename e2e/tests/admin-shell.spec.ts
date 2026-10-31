@@ -68,25 +68,32 @@ for (const [name, width] of Object.entries(WIDTHS)) {
         await loginAs(page, 'super');
         const shell = page.locator('.admin-shell');
         const button = page.getByRole('button', { name: 'Menu in- of uitklappen' });
-        const label = adminMenu(page).getByRole('link', { name: 'Huisstijl' }).locator('span');
+        const menu = adminMenu(page);
+        // The rail is 3.75 rem wide, the full menu 15 rem; the label stays in the page either
+        // way (clipped to a pixel on the rail), so the width tells the state, not visibility.
+        const expectRail = async (rail: boolean) => {
+          const box = await menu.boundingBox();
+          expect(box).not.toBeNull();
+          if (rail) expect(box!.width).toBeLessThan(100);
+          else expect(box!.width).toBeGreaterThan(200);
+          await expect(button).toHaveAttribute('aria-expanded', String(!rail));
+        };
         // The tablet starts with the rail, the desktop with the full menu.
         const startsCollapsed = name === 'tablet';
-        await expect(button).toHaveAttribute('aria-expanded', String(!startsCollapsed));
-        await expect(label).toBeVisible({ visible: !startsCollapsed });
+        await expectRail(startsCollapsed);
 
         await tabTo(page, button);
         await page.keyboard.press('Enter');
         await expect(shell).toHaveClass(new RegExp(startsCollapsed ? 'nav-expanded' : 'nav-collapsed'));
-        await expect(button).toHaveAttribute('aria-expanded', String(startsCollapsed));
-        await expect(label).toBeVisible({ visible: startsCollapsed });
+        await expectRail(!startsCollapsed);
         await expectNoAxeViolations(page);
 
         // The choice holds on the next page, and the button turns the menu back.
         await page.goto('/admin/audit');
-        await expect(button).toHaveAttribute('aria-expanded', String(startsCollapsed));
+        await expectRail(!startsCollapsed);
         await button.click();
-        await expect(button).toHaveAttribute('aria-expanded', String(!startsCollapsed));
-        await expect(label).toBeVisible({ visible: !startsCollapsed });
+        await expect(shell).not.toHaveClass(new RegExp(startsCollapsed ? 'nav-expanded' : 'nav-collapsed'));
+        await expectRail(startsCollapsed);
       });
     }
   });
