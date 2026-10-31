@@ -1,6 +1,6 @@
 # 0083. Identity providers per organisation, chosen by email domain
 
-Status: proposed (2026-10-31), requested by the product owner; not built. Amends ADR 0013
+Status: accepted (2026-10-31), requested and approved by the product owner; not built. Amends ADR 0013
 (one identity provider, its issuer the only accepted `iss`), ADR 0042 §8 (the OIDC client is
 class A; a second identity provider was rejected as a fallback) and ADR 0046 (a staff record is
 keyed by the IdP subject). Builds on ADR 0008 (encrypted integration secrets), ADR 0015 (fresh
