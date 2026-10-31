@@ -14,7 +14,30 @@
   {% else %}
   <p class="muted">{{ _("admin.rights.none") }}</p>
   {% endif %}
+  {% if grants %}
+  <h3>{{ _("admin.rights.grants") }}</h3>
+  <ul role="list">{% for grant in grants %}<li><code>{{ grant }}</code></li>{% endfor %}</ul>
+  {% endif %}
 </section>
+{% if refused %}
+<section class="card" aria-labelledby="refused-heading">
+  <h2 id="refused-heading">{{ _("admin.rights.refused") }}</h2>
+  <p class="muted">{{ _("admin.rights.refused_intro") }}</p>
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.rights.refused") }}</caption>
+    <thead>
+      <tr><th scope="col">{{ _("admin.staff.refused_value") }}</th><th scope="col">{{ _("admin.staff.refused_reason") }}</th><th scope="col">{{ _("admin.staff.refused_received") }}</th></tr>
+    </thead>
+    <tbody>
+      {% for value, reason, received in refused %}
+      <tr><td><code>{{ value }}</code></td><td>{{ reason }}</td><td class="nowrap">{{ received }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
 {% if rights %}
 <h2 class="section-title">{{ _("admin.rights.title") }}</h2>
 <div class="table-scroll">

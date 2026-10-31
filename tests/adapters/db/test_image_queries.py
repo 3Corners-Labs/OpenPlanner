@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.admin import AdminService
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.closure import Closure
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.images import ImageFile, ImageText
@@ -16,8 +16,9 @@ from tests.fakes.clock import FixedClock
 from tests.support.closures import NOTICES
 from tests.support.domain import NOW, TEST_TOKEN_KEY
 from tests.support.images import jpeg, png
+from tests.support.principals import principal
 
-ADMIN = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+ADMIN = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 TEXT = ImageText({"nl": "Gesloten deur", "en": "Closed door"})
 
 

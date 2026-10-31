@@ -108,6 +108,9 @@ PHONE_REGIONS = tuple(sorted(phonenumbers.SUPPORTED_REGIONS))
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 """Values of ``LOG_LEVEL``."""
 
+CLAIM_MODES = ("legacy", "shadow", "entitlements")
+"""Values of ``OIDC_CLAIM_MODE`` (ADR 0049 point 13); a test checks them against ``ClaimMode``."""
+
 LOG_LEVEL_MAX_EXPIRY_HOURS = 24
 """A log level set in the portal falls back to the default after at most this long (§6)."""
 
@@ -810,6 +813,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=300,
     ),
     S(
+        "rate_limit_unknown_links",
+        K.RATE,
+        "20/hour",
+        _C,
+        T.RATE_LIMITS,
+        "Unknown management links per IP address.",
+        minimum=5,
+        maximum=100,
+    ),
+    S(
         "rate_limit_agent_tokens",
         K.RATE,
         "10/minute",
@@ -898,6 +911,52 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _C,
         T.LOGIN_MAPPING,
         "Role value of an agent who works a group's own queue (ADR 0043).",
+    ),
+    S(
+        "oidc_entitlement_claim",
+        K.STRING,
+        "openplanner_entitlements",
+        _C,
+        T.LOGIN_MAPPING,
+        "Claim holding the entitlements, one value per role and target (ADR 0049).",
+    ),
+    S(
+        "oidc_entitlement_prefix",
+        K.STRING,
+        "openplanner",
+        _C,
+        T.LOGIN_MAPPING,
+        "Prefix of every entitlement value; separates installations that share one IdP.",
+    ),
+    S(
+        "oidc_claim_mode",
+        K.ENUM,
+        "legacy",
+        _B,
+        T.LOGIN,
+        "Where rights come from: legacy (three claims), shadow (compare), entitlements "
+        "(ADR 0049); moving back to legacy weakens a protection, so env only.",
+        choices=CLAIM_MODES,
+    ),
+    S(
+        "oidc_entitlements_max_values",
+        K.INT,
+        200,
+        _C,
+        T.LOGIN_MAPPING,
+        "Values in the entitlement claim above which the login is refused (ADR 0049).",
+        minimum=20,
+        maximum=1000,
+    ),
+    S(
+        "idp_mapping_refused_window_days",
+        K.INT,
+        30,
+        _C,
+        T.STAFF,
+        "How far back the identity provider mapping page lists refused values (ADR 0049).",
+        minimum=7,
+        maximum=365,
     ),
     S(
         "smtp_host",

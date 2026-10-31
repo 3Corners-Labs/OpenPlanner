@@ -24,6 +24,14 @@ u daarom bij de identiteitsprovider, niet hier.
 Elke wijziging die OpenPlanner bij een login ziet, staat in de auditlog als **Rollen of
 lidmaatschappen gewijzigd**, met wat erbij kwam en wat eraf ging.
 
+## Niet herkende rechten
+
+Stuurt de identiteitsprovider bij een login waarden mee die OpenPlanner niet herkent (een
+typefout in de rol, een onbekende organisatie of groep), dan staan die op de pagina van de
+medewerker onder **Niet herkende rechten**, met de reden en het moment. Het filter **Alleen met
+niet-herkende rechten** vindt deze medewerkers. De juiste waarden staan op **Koppeling
+identiteitsprovider**; geef de afwijking door aan het IdP-team.
+
 ## Filters
 
 - **Organisatie**, **Groep** en **Rol**: alleen medewerkers die daarbij horen.

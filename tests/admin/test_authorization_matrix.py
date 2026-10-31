@@ -116,8 +116,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/settings/admin_session_hours": statuses(422, 403, 403, 403, 403, 403, 403),
     },
     # ADR 0042 step 5: the own organisation's class D settings; org admins and the superuser.
+    # ADR 0047 §4: the old list redirects permanently to the organisation's Settings sub-tab.
     "GET /admin/organisation-settings": {
-        "/admin/organisation-settings": statuses(200, 200, 403, 200, 403, 403, 403),
+        "/admin/organisation-settings": statuses(308, 308, 403, 308, 403, 403, 403),
     },
     "GET /admin/organisations/{org}/settings": {
         "/admin/organisations/demo/settings": statuses(200, 200, 403, 403, 403, 403, 403),
@@ -178,6 +179,17 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
     "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403, 403)},
+    # ADR 0049 point 17: the mapping page is an input for the access review (organisation
+    # level): the superuser, org admins and the auditor; never a group admin or an agent.
+    "GET /admin/idp-mapping": {"/admin/idp-mapping": statuses(200, 200, 403, 200, 200, 403, 403)},
+    "GET /admin/idp-mapping/export.txt": {
+        "/admin/idp-mapping/export.txt": statuses(200, 200, 403, 200, 200, 403, 403)
+    },
+    # ADR 0049 point 4: a group's IdP value, by the org admin of its organisation (an empty
+    # value is outside the grammar, 422); a group admin may not change their own group's.
+    "POST /admin/groups/{slug}/settings/idp-key": {
+        "/admin/groups/demo/settings/idp-key": statuses(422, 422, 403, 403, 403, 403, 403),
+    },
     "GET /admin/staff/{member_id}": {
         "/admin/staff/999": statuses(404, 404, 404, 404, 404, 403, 403)
     },
@@ -192,9 +204,12 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     # Integrations and secrets: superuser only.
     "GET /admin/integrations": {"/admin/integrations": statuses(200, 403, 403, 403, 403, 403, 403)},
     # Organisations: create and edit, superuser only (HANDOVER §6).
+    # ADR 0047 step 3: organisation.view opens the organisations in reach; an admin of exactly
+    # one organisation is sent straight to it (303). The auditor reads it too.
     "GET /admin/organisations": {
-        "/admin/organisations": statuses(200, 403, 403, 403, 403, 403, 403)
+        "/admin/organisations": statuses(200, 303, 403, 303, 303, 403, 403)
     },
+    "GET /admin/groups": {"/admin/groups": statuses(200, 200, 200, 200, 200, 200, 403)},
     "GET /admin/organisations/new": {
         "/admin/organisations/new": statuses(200, 403, 403, 403, 403, 403, 403),
     },
@@ -202,16 +217,23 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/organisations": statuses(422, 403, 403, 403, 403, 403, 403)
     },
     "GET /admin/organisations/{org}": {
-        "/admin/organisations/demo": statuses(200, 403, 403, 403, 403, 403, 403),
-        "/admin/organisations/andere": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo": statuses(200, 200, 403, 403, 200, 403, 403),
+        "/admin/organisations/andere": statuses(200, 403, 403, 200, 403, 403, 403),
         "/admin/organisations/nope": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    # Editing name and language stays with the superuser (organisation.manage is locked).
+    "GET /admin/organisations/{org}/edit": {
+        "/admin/organisations/demo/edit": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/edit": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/nope/edit": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}": {
         "/admin/organisations/demo": statuses(422, 403, 403, 403, 403, 403, 403),
         "/admin/organisations/nope": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     # Branding per organisation: superuser only (HANDOVER §6), also for the own organisation.
-    "GET /admin/branding": {"/admin/branding": statuses(200, 403, 403, 403, 403, 403, 403)},
+    # ADR 0047 §4: the old branding list redirects permanently to the organisations.
+    "GET /admin/branding": {"/admin/branding": statuses(308, 403, 403, 403, 403, 403, 403)},
     "GET /admin/organisations/{org}/branding": {
         "/admin/organisations/demo/branding": statuses(200, 403, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/branding": statuses(200, 403, 403, 403, 403, 403, 403),
@@ -249,7 +271,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # Holiday calendars (ADR 0025): the superuser maintains them; organisation admins choose
     # them for their own organisation; group admins choose for their own groups (below).
-    "GET /admin/holidays": {"/admin/holidays": statuses(200, 200, 403, 200, 403, 403, 403)},
+    # ADR 0047 §4: the shared calendars are the superuser's (Platform → Holiday calendars);
+    # an organisation chooses its calendars on its own Holidays tab.
+    "GET /admin/holidays": {"/admin/holidays": statuses(200, 403, 403, 403, 403, 403, 403)},
     "POST /admin/holidays": {"/admin/holidays": statuses(422, 403, 403, 403, 403, 403, 403)},
     "GET /admin/holidays/{calendar}": {
         "/admin/holidays/nationaal": statuses(200, 403, 403, 403, 403, 403, 403),
@@ -666,7 +690,8 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         ),
     },
     # Emergency closure of a whole organisation: organisation admins and the superuser.
-    "GET /admin/closures": {"/admin/closures": statuses(200, 200, 403, 200, 403, 403, 403)},
+    # ADR 0047 §4: the old closures list redirects permanently to the organisation's tab.
+    "GET /admin/closures": {"/admin/closures": statuses(308, 308, 403, 308, 403, 403, 403)},
     "GET /admin/organisations/{org}/closure": {
         "/admin/organisations/demo/closure": statuses(200, 200, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/closure": statuses(200, 403, 403, 200, 403, 403, 403),
@@ -829,7 +854,8 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     # An empty form removes nothing that is not there, so an allowed POST redirects (303).
     # ADR 0035: the websites allowed to embed the organisation's groups, embedding.manage.
     # An empty form removes nothing that is not there, so an allowed POST redirects (303).
-    "GET /admin/embedding": {"/admin/embedding": statuses(200, 200, 403, 200, 403, 403, 403)},
+    # ADR 0047 §4: the old embedding list redirects permanently to the organisation's sub-tab.
+    "GET /admin/embedding": {"/admin/embedding": statuses(308, 308, 403, 308, 403, 403, 403)},
     "GET /admin/organisations/{org}/embedding": {
         "/admin/organisations/demo/embedding": statuses(200, 200, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/embedding": statuses(200, 403, 403, 200, 403, 403, 403),

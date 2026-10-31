@@ -23,7 +23,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import Field, FormData, done_message, raise_refusal, read_form, redirect_done
 from app.admin.message_routes import PART_LABELS, PURPOSE_LABELS, LocaleTab
-from app.admin.pages import Locale, SameOrigin, page
+from app.admin.pages import Locale, SameOrigin, organisation_header, page
 from app.domain.authorization import Permission
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
@@ -171,6 +171,9 @@ async def _editor(
         context.principal,
         {
             "organisation": view.organisation,
+            "org_header": organisation_header(
+                request, locale, context.principal, view.organisation.name, view.organisation.slug
+            ),
             "text_locale": text_locale,
             "locale_tabs": tabs,
             "sections": _sections(request, text_locale, view.texts, form, locale.gettext),

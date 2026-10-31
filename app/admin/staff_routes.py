@@ -9,8 +9,12 @@ filters are a GET form without JavaScript; unknown or out-of-scope values are ig
 A person's page adds their recent activity from the audit log, within the viewer's audit
 scope. Links use the record's number, never the identity-provider subject.
 
-    GET /admin/staff?organisation=demo&group=team&role=org_admin&dormant=1     staff.view
+    GET /admin/staff?organisation=demo&group=team&role=org_admin&dormant=1&unrecognised=1
+                                                                               staff.view
     GET /admin/staff/{member_id}                                               staff.view
+
+A person's page also lists the entitlement values of their last login that this installation
+did not recognise, with the reason (ADR 0049 point 8), within the viewer's scope.
 """
 
 from dataclasses import dataclass
@@ -23,6 +27,7 @@ from starlette.responses import HTMLResponse
 from app.admin.audit_routes import audit_views
 from app.admin.authz import AdminContext, RequirePermission, admin_service
 from app.admin.forms import Option
+from app.admin.idp_mapping_routes import reason_label
 from app.admin.pages import Locale, admin_moment
 from app.admin.pages import page as _page
 from app.domain.audit import AuditFilter
@@ -49,6 +54,15 @@ class PlaceView:
 
 
 @dataclass(frozen=True)
+class RefusedView:
+    """One entitlement value of the person's last login that gave no right (ADR 0049)."""
+
+    value: str
+    reason: str
+    received: str
+
+
+@dataclass(frozen=True)
 class StaffView:
     """A person as the list and their page show them."""
 
@@ -61,6 +75,7 @@ class StaffView:
     last_seen: str
     last_logout: str
     dormant: bool
+    refused: tuple[RefusedView, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -74,6 +89,7 @@ class StaffFilterView:
     roles: tuple[Option, ...]
     role: str
     dormant: bool
+    unrecognised: bool
     active: bool
 
 
@@ -118,6 +134,14 @@ def _view(
             admin_moment(request, locale, member.last_logout_at) if member.last_logout_at else never
         ),
         dormant=member.is_dormant(now, _dormant_after(request)),
+        refused=tuple(
+            RefusedView(
+                r.value,
+                reason_label(r.reason, locale),
+                admin_moment(request, locale, r.received_at),
+            )
+            for r in member.refused
+        ),
     )
 
 
@@ -128,6 +152,7 @@ def _narrow(
     dormant: str | None,
     in_scope: list[GroupSummary],
     dormant_before: datetime,
+    unrecognised: str | None = None,
 ) -> StaffFilter:
     """Turn the query parameters into a filter; unknown or out-of-scope values are ignored."""
     return StaffFilter(
@@ -137,6 +162,7 @@ def _narrow(
         group=group if group in {g.group.slug for g in in_scope} else None,
         role=Role(role) if role in set(Role) else None,
         dormant_before=dormant_before if dormant == "1" else None,
+        unrecognised=unrecognised == "1",
     )
 
 
@@ -149,13 +175,16 @@ async def staff_list(
     group: str | None = None,
     role: str | None = None,
     dormant: str | None = None,
+    unrecognised: str | None = None,
 ) -> HTMLResponse:
     """List the people who use the portal, within the viewer's scope."""
     _ = locale.gettext
     service = admin_service(request)
     now = request.app.state.clock.now()
     in_scope = await service.groups(context.principal, Permission.STAFF_VIEW)
-    narrow = _narrow(organisation, group, role, dormant, in_scope, now - _dormant_after(request))
+    narrow = _narrow(
+        organisation, group, role, dormant, in_scope, now - _dormant_after(request), unrecognised
+    )
     members = await service.staff(context.principal, narrow)
     names = _names(in_scope)
     filters = StaffFilterView(
@@ -166,6 +195,7 @@ async def staff_list(
         roles=tuple(Option(r.value, _(ROLE_LABELS[r])) for r in Role),
         role=narrow.role.value if narrow.role else "",
         dormant=narrow.dormant_before is not None,
+        unrecognised=narrow.unrecognised,
         active=narrow != StaffFilter(),
     )
     return _page(

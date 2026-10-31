@@ -1,5 +1,6 @@
 {#- The weekly staffing blocks; with add, change, split and remove actions when ``removable`` is set.
     A block without agents carries ``window--unstaffed`` and says "geen medewerkers" in words. -#}
+<div class="week-frame">
 <ul class="week">
   {% for day in week %}
   <li class="day{% if not day.windows %} day--closed{% endif %}">
@@ -34,3 +35,4 @@
   </li>
   {% endfor %}
 </ul>
+</div>

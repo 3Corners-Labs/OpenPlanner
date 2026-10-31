@@ -30,7 +30,7 @@ from starlette.responses import HTMLResponse, Response
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import Field, FormData, done_message, raise_refusal, read_form, redirect_done
 from app.admin.group_routes import ManageGroup, group_page
-from app.admin.pages import Locale, SameOrigin, page
+from app.admin.pages import Locale, SameOrigin, organisation_header, page
 from app.admin.shortfalls import group_shortfalls
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
@@ -127,7 +127,6 @@ async def _overview_response(
         context.principal,
         {
             "calendars": overview.calendars,
-            "organisations": overview.organisations,
             "fields": _calendar_fields(form, locale),
             "errors": form.errors,
             "done": done_message(request, locale.gettext),
@@ -141,9 +140,9 @@ async def _overview_response(
 async def overview(
     request: Request,
     locale: Locale,
-    context: Annotated[AdminContext, Depends(RequirePermission(Permission.HOLIDAYS_ASSIGN))],
+    context: Annotated[AdminContext, Depends(RequirePermission(Permission.HOLIDAYS_MANAGE))],
 ) -> HTMLResponse:
-    """List the calendars and the organisations whose choice the admin may change."""
+    """List the shared calendars (*Platform → Holiday calendars*, ADR 0047 §4)."""
     return await _overview_response(request, locale, context, FormData({}, locale.gettext), 200)
 
 
@@ -347,6 +346,13 @@ async def _organisation_response(
         context.principal,
         {
             "organisation": choice.organisation,
+            "org_header": organisation_header(
+                request,
+                locale,
+                context.principal,
+                choice.organisation.name,
+                choice.organisation.slug,
+            ),
             "options": _options(choice.calendars, chosen),
             "errors": form.errors,
             "done": done_message(request, locale.gettext),

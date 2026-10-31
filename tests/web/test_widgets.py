@@ -22,6 +22,7 @@ from app.web.widgets import (
     widget,
 )
 from tests.admin.conftest import AGENT, AUDITOR, GROUP_ADMIN, SUPER
+from tests.support.principals import principal
 from tests.support.routes import all_routes
 
 REQUIRED_LOCALES = ("nl", "en")
@@ -103,7 +104,7 @@ def test_every_role_has_a_default_layout_of_known_widgets() -> None:
 
 
 def test_the_default_layout_merges_the_roles_in_order() -> None:
-    agent_then_auditor = Principal(
+    agent_then_auditor = principal(
         "x", "X", frozenset({Role.AGENT, Role.AUDITOR}), frozenset({"demo"}), frozenset({"demo"})
     )
 
@@ -115,7 +116,7 @@ def test_the_default_layout_merges_the_roles_in_order() -> None:
 
 
 def test_a_principal_without_a_built_in_role_gets_every_widget() -> None:
-    custom_only = Principal("c", "C", frozenset(), frozenset({"demo"}), frozenset())
+    custom_only = principal("c", "C", frozenset(), frozenset({"demo"}), frozenset())
 
     assert [w.key for w in default_layout(custom_only)] == [w.key for w in WIDGETS]
 

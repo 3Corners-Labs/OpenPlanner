@@ -58,6 +58,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DEV_TOKEN_KEY_PATH` | path | `data/dev-token.key` | Development management-token key file. |
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
 | `DEV_SETTINGS_KEY_PATH` | path | `data/dev-settings.key` | Development settings key file. |
+| `OIDC_CLAIM_MODE` | enum | `legacy` | Where rights come from: legacy (three claims), shadow (compare), entitlements (ADR 0049); moving back to legacy weakens a protection, so env only. |
 
 ## C. Platform (portal, *Advanced settings*; lockable by env)
 
@@ -92,6 +93,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DATABASE_MAX_MB` | int | — | empty or ≥ 100 | `settings.platform.manage` | Database size above which storage is degraded; empty means no limit. |
 | `RATE_LIMIT_BOOKINGS` | rate | `10/hour` | 1–30 per hour | `settings.platform.manage` | Bookings per IP address. |
 | `RATE_LIMIT_READS` | rate | `60/minute` | 10–300 per minute | `settings.platform.manage` | Availability reads per IP address. |
+| `RATE_LIMIT_UNKNOWN_LINKS` | rate | `20/hour` | 5–100 per hour | `settings.platform.manage` | Unknown management links per IP address. |
 | `RATE_LIMIT_AGENT_TOKENS` | rate | `10/minute` | 1–30 per minute | `settings.platform.manage` | Machine API token requests per client. |
 | `RATE_LIMIT_AGENT_CALLS` | rate | `120/minute` | 10–600 per minute | `settings.platform.manage` | Machine API calls per client. |
 | `ADMIN_SESSION_HOURS` | int | `8` | 1–8 | `settings.platform.manage` | Lifetime of an admin session. |
@@ -104,6 +106,10 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `OIDC_ROLE_GROUP_ADMIN` | string | `openplanner-group-admin` | — | `settings.login.manage` | Role value of a group admin. |
 | `OIDC_ROLE_AUDITOR` | string | `openplanner-auditor` | — | `settings.login.manage` | Role value of an auditor (ADR 0039). |
 | `OIDC_ROLE_AGENT` | string | `openplanner-agent` | — | `settings.login.manage` | Role value of an agent who works a group's own queue (ADR 0043). |
+| `OIDC_ENTITLEMENT_CLAIM` | string | `openplanner_entitlements` | — | `settings.login.manage` | Claim holding the entitlements, one value per role and target (ADR 0049). |
+| `OIDC_ENTITLEMENT_PREFIX` | string | `openplanner` | — | `settings.login.manage` | Prefix of every entitlement value; separates installations that share one IdP. |
+| `OIDC_ENTITLEMENTS_MAX_VALUES` | int | `200` | 20–1000 | `settings.login.manage` | Values in the entitlement claim above which the login is refused (ADR 0049). |
+| `IDP_MAPPING_REFUSED_WINDOW_DAYS` | int | `30` | 7–365 | `settings.platform.manage` | How far back the identity provider mapping page lists refused values (ADR 0049). |
 | `SMTP_HOST` | string | — | — | `settings.platform.manage` | Fallback mail server (ADR 0022); empty means no fallback mail. |
 | `SMTP_PORT` | int | `25` | 1–65535 | `settings.platform.manage` | Port of the fallback mail server. |
 | `SMTP_STARTTLS` | bool | `false` | — | `settings.platform.manage` | Upgrade the connection with STARTTLS. |
