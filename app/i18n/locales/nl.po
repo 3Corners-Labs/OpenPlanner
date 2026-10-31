@@ -7995,3 +7995,33 @@ msgstr "Het portaal weigert zolang de organisatie niet leeg is."
 
 msgid "admin.audit.detail.deleted"
 msgstr "verwijderd"
+
+msgid "admin.audit.detail.override_edit"
+msgstr "Afwijkende bezetting gewijzigd"
+
+msgid "admin.exceptions.edit"
+msgstr "Afwijkende bezetting wijzigen"
+
+msgid "admin.exceptions.edit_lead"
+msgstr "Bestaande afspraken blijven staan; de gewijzigde dag geldt voor nieuwe afspraken."
+
+msgid "admin.exceptions.edit_label"
+msgstr "Afwijkende bezetting van {day} wijzigen"
+
+msgid "admin.reminders.edit"
+msgstr "Herinnering wijzigen"
+
+msgid "admin.reminders.edit_lead"
+msgstr "Herinneringen die al voor bestaande afspraken zijn ingepland blijven staan; de gewijzigde regel geldt voor nieuwe afspraken."
+
+msgid "admin.reminders.edit_label"
+msgstr "Herinnering {channel}, {when} wijzigen"
+
+msgid "admin.holidays.rename"
+msgstr "Naam wijzigen"
+
+msgid "admin.holidays.rename_lead"
+msgstr "Het webadres van de kalender blijft hetzelfde; organisaties en groepen die hem gebruiken volgen de nieuwe naam."
+
+msgid "admin.holidays.calendar_name"
+msgstr "Naam van de kalender"

@@ -271,6 +271,19 @@ def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
     }
 
 
+def _override_columns(override: ScheduleOverride) -> dict[str, Any]:
+    """Return the stored columns of an exception; no window means a closed day."""
+    window = override.window
+    return {
+        "day": override.day,
+        "opens": window.opens if window else None,
+        "closes": window.closes if window else None,
+        "capacity": window.capacity if window else None,
+        "label": window.label if window else None,
+        "offer": window.offer.value if window else Offer.SCHEDULED.value,
+    }
+
+
 def _group_columns(group: Group) -> dict[str, Any]:
     """Return the stored columns of a group's settings."""
     return {
@@ -1023,19 +1036,21 @@ class SqlTransaction(
 
     async def add_schedule_override(self, group_id: int, override: ScheduleOverride) -> int:
         """Insert an override (a closed day when it has no window) and return its ID."""
-        window = override.window
-        row = ScheduleOverrideRow(
-            group_id=group_id,
-            day=override.day,
-            opens=window.opens if window else None,
-            closes=window.closes if window else None,
-            capacity=window.capacity if window else None,
-            label=window.label if window else None,
-            offer=window.offer.value if window else Offer.SCHEDULED.value,
-        )
+        row = ScheduleOverrideRow(group_id=group_id, **_override_columns(override))
         self._session.add(row)
         await self._session.flush()
         return row.id
+
+    async def update_schedule_override(
+        self, group_id: int, override_id: int, override: ScheduleOverride
+    ) -> bool:
+        """Replace the group's override; the group condition keeps other groups' out of reach."""
+        result = await self._session.execute(
+            update(ScheduleOverrideRow)
+            .where(ScheduleOverrideRow.id == override_id, ScheduleOverrideRow.group_id == group_id)
+            .values(**_override_columns(override))
+        )
+        return bool(getattr(result, "rowcount", 0))
 
     async def delete_schedule_override(self, group_id: int, override_id: int) -> bool:
         """Delete the group's override; the group condition keeps others out of reach."""
@@ -1066,6 +1081,14 @@ class SqlTransaction(
         self._session.add(row)
         await self._session.flush()
         return _calendar(row)
+
+    async def save_holiday_calendar(self, calendar: HolidayCalendar) -> None:
+        """Store the calendar's name; the slug never changes."""
+        await self._session.execute(
+            update(HolidayCalendarRow)
+            .where(HolidayCalendarRow.id == calendar.id)
+            .values(name=calendar.name)
+        )
 
     async def delete_holiday_calendar(self, calendar_id: int) -> None:
         """Delete the calendar; its holidays go with it (``ON DELETE CASCADE``)."""
@@ -1388,6 +1411,21 @@ class SqlTransaction(
             select(ReminderRuleRow).where(ReminderRuleRow.group_id == group_id)
         )
         return [ReminderRule(ChannelKind(r.channel), r.minutes_before, r.enabled) for r in rows]
+
+    async def update_reminder_rule(
+        self, group_id: int, channel: ChannelKind, minutes_before: int, rule: ReminderRule
+    ) -> bool:
+        """Replace the channel and offset of the group's rule (the unique constraint backs it)."""
+        result = await self._session.execute(
+            update(ReminderRuleRow)
+            .where(
+                ReminderRuleRow.group_id == group_id,
+                ReminderRuleRow.channel == channel.value,
+                ReminderRuleRow.minutes_before == minutes_before,
+            )
+            .values(channel=rule.channel.value, minutes_before=rule.minutes_before)
+        )
+        return bool(getattr(result, "rowcount", 0))
 
     async def add_reminder_rule(self, group_id: int, rule: ReminderRule) -> None:
         """Insert a reminder rule (the unique constraint backs the domain's duplicate check)."""

@@ -6,6 +6,8 @@ confirmation. ``MessagingService`` authorises again, validates and audits.
 
     GET  /admin/groups/{slug}/reminders                             reminders.manage  rules
     POST /admin/groups/{slug}/reminders                             reminders.manage  add
+    GET  /admin/groups/{slug}/reminders/{channel}/{minutes}         reminders.manage  change form
+    POST /admin/groups/{slug}/reminders/{channel}/{minutes}         reminders.manage  change
     POST /admin/groups/{slug}/reminders/{channel}/{minutes}/delete  reminders.manage  remove
     GET  /admin/groups/{slug}/messages                              texts.manage      default locale
     GET  /admin/groups/{slug}/messages/{locale}                     texts.manage      editor
@@ -120,9 +122,14 @@ class ReminderView:
     ready: bool
 
 
+def _largest_unit(minutes: int) -> str:
+    """Return the largest unit (days, hours, minutes) that divides ``minutes`` exactly."""
+    return next(u for u in ("days", "hours", "minutes") if minutes % UNITS[u] == 0)
+
+
 def offset_label(minutes: int, _: BoundGettext) -> str:
     """Return ``24 uur vooraf``-style text in the largest whole unit."""
-    unit = next(u for u in ("days", "hours", "minutes") if minutes % UNITS[u] == 0)
+    unit = _largest_unit(minutes)
     count = minutes // UNITS[unit]
     singular, plural = OFFSET_LABELS[unit]
     return _(singular if count == 1 else plural, count=count)
@@ -211,12 +218,9 @@ async def add_reminder(
 ) -> Response:
     """Add a reminder rule."""
     form = await read_form(request, locale)
-    channel = form.choice("channel", {c.value for c in CHANNEL_LABELS})
-    amount = form.integer("amount")
-    unit = form.choice("unit", set(UNITS))
-    if not form.errors and channel and amount is not None and unit:
+    rule = _read_reminder(form)
+    if rule is not None:
         try:
-            rule = ReminderRule(ChannelKind(channel), amount * UNITS[unit])
             await messaging_service(request).add_reminder(context.principal, slug, rule)
         except DomainError as error:
             raise_refusal(error)
@@ -224,6 +228,115 @@ async def add_reminder(
         else:
             return redirect_done(f"/admin/groups/{slug}/reminders", "added")
     return await _reminders_response(request, locale, context, form, 422)
+
+
+def _read_reminder(form: FormData) -> ReminderRule | None:
+    """Parse the reminder form; ``None`` (with form errors) when it is incomplete."""
+    channel = form.choice("channel", {c.value for c in CHANNEL_LABELS})
+    amount = form.integer("amount")
+    unit = form.choice("unit", set(UNITS))
+    if form.errors or not (channel and amount is not None and unit):
+        return None
+    try:
+        return ReminderRule(ChannelKind(channel), amount * UNITS[unit])
+    except DomainError as error:
+        form.refusal(error)
+        return None
+
+
+def _reminder_values(rule: ReminderRule) -> dict[str, str]:
+    """Return a stored rule as form values, to pre-fill the change form."""
+    unit = _largest_unit(rule.minutes_before)
+    return {
+        "channel": rule.channel.value,
+        "amount": str(rule.minutes_before // UNITS[unit]),
+        "unit": unit,
+    }
+
+
+def _kind(channel: str) -> ChannelKind:
+    """Return the channel of a path segment; an unknown one is a 404."""
+    try:
+        return ChannelKind(channel)
+    except ValueError as exc:
+        raise RejectedRequest(404) from exc
+
+
+def _edit_reminder_response(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    channel: str,
+    minutes: int,
+    form: FormData,
+    status: int,
+) -> HTMLResponse:
+    """Render the change form of one reminder rule (ADR 0084 step 5)."""
+    return group_page(
+        request,
+        locale,
+        context,
+        "admin/group_reminder_edit.html",
+        {
+            "channel": channel,
+            "minutes": minutes,
+            "fields": _reminder_fields(form, locale.gettext),
+            "errors": form.errors,
+        },
+        status,
+    )
+
+
+@router.get("/groups/{slug}/reminders/{channel}/{minutes}", response_class=HTMLResponse)
+async def edit_reminder(
+    request: Request,
+    locale: Locale,
+    slug: str,
+    channel: str,
+    minutes: int,
+    context: ManageReminders,
+) -> HTMLResponse:
+    """Show the change form of a reminder rule, pre-filled with its values."""
+    try:
+        rule = await messaging_service(request).reminder(
+            context.principal, slug, _kind(channel), minutes
+        )
+    except DomainError as error:
+        raise_refusal(error)
+        raise
+    form = FormData(_reminder_values(rule), locale.gettext)
+    return _edit_reminder_response(request, locale, context, channel, minutes, form, 200)
+
+
+@router.post("/groups/{slug}/reminders/{channel}/{minutes}", response_class=HTMLResponse)
+async def update_reminder(
+    request: Request,
+    locale: Locale,
+    slug: str,
+    channel: str,
+    minutes: int,
+    _: SameOrigin,
+    context: ManageReminders,
+) -> Response:
+    """Change a reminder rule; reminders already planned for bookings stay (ADR 0022)."""
+    kind = _kind(channel)
+    form = await read_form(request, locale)
+    rule = _read_reminder(form)
+    if rule is not None:
+        try:
+            changed = await messaging_service(request).update_reminder(
+                context.principal, slug, kind, minutes, rule
+            )
+        except DomainError as error:
+            raise_refusal(error)
+            if error.code is ErrorCode.REMINDER_NOT_FOUND:
+                raise
+            form.refusal(error)
+        else:
+            return redirect_done(
+                f"/admin/groups/{slug}/reminders", "saved" if changed else "unchanged"
+            )
+    return _edit_reminder_response(request, locale, context, channel, minutes, form, 422)
 
 
 @router.post("/groups/{slug}/reminders/{channel}/{minutes}/delete", response_class=HTMLResponse)
@@ -236,10 +349,7 @@ async def remove_reminder(
     context: ManageReminders,
 ) -> Response:
     """Remove a reminder rule."""
-    try:
-        kind = ChannelKind(channel)
-    except ValueError as exc:
-        raise RejectedRequest(404) from exc
+    kind = _kind(channel)
     try:
         await messaging_service(request).remove_reminder(context.principal, slug, kind, minutes)
     except DomainError as error:

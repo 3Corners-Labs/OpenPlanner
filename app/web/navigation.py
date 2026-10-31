@@ -449,6 +449,8 @@ OBJECTS = (
                 f"{_GROUP}/exceptions",
                 Permission.SCHEDULE_MANAGE,
                 "calendar",
+                # ADR 0084 step 5: an exception is changed on its own page.
+                (f"{_GROUP}/exceptions/{{override_id}}",),
             ),
             Screen(
                 "group.holidays",
@@ -463,6 +465,8 @@ OBJECTS = (
                 f"{_GROUP}/reminders",
                 Permission.REMINDERS_MANAGE,
                 "bell",
+                # ADR 0084 step 5: a rule is changed on its own page.
+                (f"{_GROUP}/reminders/{{channel}}/{{minutes}}",),
             ),
             Screen(
                 "group.messages",

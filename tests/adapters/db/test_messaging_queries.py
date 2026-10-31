@@ -161,3 +161,27 @@ async def test_organisation_texts_store_replace_delete_and_list_all(engine: Asyn
         }
         await tx.save_organisation_text(org, "nl", "booked.text", None)
         assert await tx.get_organisation_texts(org) == {("en", "booked.text"): "Second"}
+
+
+async def test_a_reminder_rule_is_changed_in_place(engine: AsyncEngine) -> None:
+    """ADR 0084 step 5: channel and offset are replaced; another group's rule is out of reach."""
+    await seed_demo(engine)
+    uow = SqlUnitOfWork(engine, BOX)
+    _, group_id = await _demo_ids(uow)
+    async with uow.locked() as tx:
+        await tx.add_reminder_rule(group_id, ReminderRule(ChannelKind.EMAIL, 180))
+    async with uow.locked() as tx:
+        assert not await tx.update_reminder_rule(
+            group_id + 99, ChannelKind.EMAIL, 180, ReminderRule(ChannelKind.SMS, 60)
+        )
+        assert await tx.update_reminder_rule(
+            group_id, ChannelKind.EMAIL, 180, ReminderRule(ChannelKind.SMS, 60)
+        )
+        assert not await tx.update_reminder_rule(
+            group_id, ChannelKind.EMAIL, 180, ReminderRule(ChannelKind.SMS, 30)
+        )
+    async with uow.read() as tx:
+        rules = {(r.channel, r.minutes_before) for r in await tx.get_reminder_rules(group_id)}
+
+    assert (ChannelKind.SMS, 60) in rules
+    assert (ChannelKind.EMAIL, 180) not in rules

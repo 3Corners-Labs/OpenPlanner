@@ -98,6 +98,19 @@ async def test_schedule_items_carry_ids_and_stay_within_their_group(engine: Asyn
     ]
 
     async with uow.locked() as tx:
+        moved = ScheduleOverride(date(2026, 1, 8), window("14:00", "16:00", 2))
+        assert not await tx.update_schedule_override(other, closed, moved)  # not this group's
+        assert await tx.update_schedule_override(own, closed, moved)
+        assert await tx.update_schedule_override(
+            own, closed, ScheduleOverride(date(2026, 1, 6), None)
+        )
+    async with uow.read() as tx:
+        _, overrides = await tx.get_schedule_items(own, date(2026, 1, 1))
+    assert [(o.id, o.day, o.window) for o in overrides if o.id == closed] == [
+        (closed, date(2026, 1, 6), None)
+    ]
+
+    async with uow.locked() as tx:
         assert not await tx.delete_schedule_rule(own, other_rule)  # not this group's rule
         assert await tx.delete_schedule_rule(own, rule_id)
         assert not await tx.delete_schedule_override(other, closed)

@@ -228,3 +228,27 @@ async def test_button_labels_contain_their_visible_text(site: Site) -> None:
     }
     for label, visible in buttons:
         assert unescape(visible).strip().lower() in unescape(label).lower(), (label, visible)
+
+
+async def test_superuser_renames_a_calendar_and_its_address_stays(site: Site) -> None:
+    """ADR 0084 step 5: the page has a rename form; a blank name is explained."""
+    await site.login_as(SUPER)
+    assert 'name="calendar_name"' in (await site.client.get(CALENDAR)).text
+
+    blank = await site.client.post(CALENDAR, data={"calendar_name": "  "}, headers=SAME_ORIGIN)
+    renamed = await site.client.post(
+        CALENDAR, data={"calendar_name": "Landelijke feestdagen"}, headers=SAME_ORIGIN
+    )
+    again = await site.client.post(
+        CALENDAR, data={"calendar_name": "Landelijke feestdagen"}, headers=SAME_ORIGIN
+    )
+
+    assert blank.status_code == 422
+    assert 'href="#calendar_name"' in blank.text
+    assert renamed.headers["location"] == f"{CALENDAR}?done=saved"
+    assert again.headers["location"] == f"{CALENDAR}?done=unchanged"
+    assert "Landelijke feestdagen" in (await site.client.get("/admin/holidays")).text
+    assert (await site.client.get(CALENDAR)).status_code == 200
+    assert (
+        await site.client.post("/admin/holidays/nope", data={}, headers=SAME_ORIGIN)
+    ).status_code == 404

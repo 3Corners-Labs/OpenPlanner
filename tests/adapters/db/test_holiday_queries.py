@@ -140,3 +140,18 @@ async def test_a_national_holiday_closes_every_inheriting_group(engine: AsyncEng
     assert before
     assert closed == []
     assert reopened == before
+
+
+async def test_a_calendar_is_renamed_and_keeps_slug_and_dates(engine: AsyncEngine) -> None:
+    """ADR 0084 step 5: only the name is stored; the slug and the dates stay."""
+    await seed_demo(engine)
+    uow = SqlUnitOfWork(engine)
+    national, _ = await _calendars(uow)
+    async with uow.locked() as tx:
+        await tx.save_holiday_calendar(HolidayCalendar(national.id, "ignored", "Landelijk"))
+    async with uow.read() as tx:
+        renamed = await tx.get_holiday_calendar(national.slug)
+        missing = await tx.get_holiday_calendar("ignored")
+
+    assert renamed == HolidayCalendar(national.id, national.slug, "Landelijk")
+    assert missing is None

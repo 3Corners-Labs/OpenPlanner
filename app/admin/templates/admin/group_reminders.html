@@ -26,6 +26,7 @@
         <td>{{ rule.offset }}</td>
         <td>{% if rule.ready %}<span class="chip chip--success">{{ _("admin.channels.ready") }}</span>{% else %}<span class="chip chip--warning">{{ _("admin.channels.not_configured") }}</span>{% endif %}</td>
         <td>
+          <a href="/admin/groups/{{ summary.group.slug }}/reminders/{{ rule.channel }}/{{ rule.minutes_before }}" aria-label="{{ _("admin.reminders.edit_label", channel=rule.channel_label, when=rule.offset) }}">{{ _("admin.edit") }}</a>
           <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/reminders/{{ rule.channel }}/{{ rule.minutes_before }}/delete">
             <button type="submit" class="button button--quiet" aria-label="{{ _("admin.reminders.remove_label", channel=rule.channel_label, when=rule.offset) }}">{{ _("admin.remove") }}</button>
           </form>

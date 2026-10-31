@@ -7983,3 +7983,33 @@ msgstr "The portal refuses while the organisation is not empty."
 
 msgid "admin.audit.detail.deleted"
 msgstr "deleted"
+
+msgid "admin.audit.detail.override_edit"
+msgstr "Staffing exception changed"
+
+msgid "admin.exceptions.edit"
+msgstr "Change staffing exception"
+
+msgid "admin.exceptions.edit_lead"
+msgstr "Existing appointments stay; the changed day applies to new appointments."
+
+msgid "admin.exceptions.edit_label"
+msgstr "Change the staffing exception of {day}"
+
+msgid "admin.reminders.edit"
+msgstr "Change reminder"
+
+msgid "admin.reminders.edit_lead"
+msgstr "Reminders already planned for existing appointments stay; the changed rule applies to new appointments."
+
+msgid "admin.reminders.edit_label"
+msgstr "Change reminder {channel}, {when}"
+
+msgid "admin.holidays.rename"
+msgstr "Change name"
+
+msgid "admin.holidays.rename_lead"
+msgstr "The calendar's web address stays the same; organisations and groups that use it follow the new name."
+
+msgid "admin.holidays.calendar_name"
+msgstr "Name of the calendar"

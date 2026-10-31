@@ -300,6 +300,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/holidays/nationaal": statuses(200, 403, 403, 403, 403, 403, 403),
         "/admin/holidays/nope": statuses(404, 403, 403, 403, 403, 403, 403),
     },
+    # ADR 0084 step 5: renaming is holidays.manage like the rest; an empty name is refused (422).
+    "POST /admin/holidays/{calendar}": {
+        "/admin/holidays/nationaal": statuses(422, 403, 403, 403, 403, 403, 403),
+        "/admin/holidays/nope": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
     "POST /admin/holidays/{calendar}/days": {
         "/admin/holidays/nationaal/days": statuses(422, 403, 403, 403, 403, 403, 403),
     },
@@ -539,6 +544,28 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/andere-team/exceptions": statuses(422, 403, 403, 422, 403, 403, 403),
     },
     # Reminder rules: organisation admins and the superuser, not group admins (HANDOVER §6).
+    # ADR 0084 step 5: a staffing exception and a reminder rule are changed on their own pages,
+    # under the permission of their list.
+    "GET /admin/groups/{slug}/exceptions/{override_id}": {
+        "/admin/groups/demo/exceptions/999999": statuses(404, 404, 404, 403, 403, 403, 403),
+        "/admin/groups/andere-team/exceptions/999999": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/exceptions/{override_id}": {
+        "/admin/groups/demo/exceptions/999999": statuses(422, 422, 422, 403, 403, 403, 403),
+        "/admin/groups/andere-team/exceptions/999999": statuses(422, 403, 403, 422, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/reminders/{channel}/{minutes}": {
+        "/admin/groups/demo/reminders/email/999999": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/reminders/email/999999": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/reminders/{channel}/{minutes}": {
+        "/admin/groups/demo/reminders/email/999999": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/reminders/email/999999": statuses(
+            422, 403, 403, 422, 403, 403, 403
+        ),
+    },
     "GET /admin/groups/{slug}/reminders": {
         "/admin/groups/demo/reminders": statuses(200, 200, 403, 403, 403, 403, 403),
         "/admin/groups/andere-team/reminders": statuses(200, 403, 403, 200, 403, 403, 403),
