@@ -3,7 +3,7 @@
 Als deelnemers geen afspraak kunnen maken, willen ze weten hoe ze de organisatie anders kunnen
 bereiken. Op dit scherm legt u dat één keer vast voor de hele organisatie. Het blok staat op de
 pagina van een noodsluiting en op de onderhoudspagina (ADR 0037 en 0038). U opent het via
-**Sluitingen → organisatie → Contactalternatieven beheren**. Een organisatiebeheerder of
+**Organisaties → organisatie → Contact**. Een organisatiebeheerder of
 superuser kan het wijzigen.
 
 Regel dit vóórdat er iets misgaat. In een noodsituatie is er geen tijd om nummers op te

@@ -233,9 +233,9 @@ een meeting in Webex; met dit getal kan één afspraak er niet onbeperkt aanmake
 <!-- field: join_client -->
 ### Webex-pagina voor de deelnemer
 
-Bepaalt welke pagina van Webex de deelnemer krijgt als hij vanaf onze pagina naar het gesprek gaat,
+Bepaalt welke pagina van Webex de deelnemer krijgt wanneer die vanaf onze pagina naar het gesprek gaat,
 bij de afspraak en bij het proefgesprek. **Direct in de browser** (standaard) opent meteen de
-webversie van Webex: op een computer hoeft de deelnemer niets te installeren en ziet hij de vraag
+webversie van Webex: op een computer hoeft de deelnemer niets te installeren en ziet de vraag
 "app of browser" niet. **Webex laat de deelnemer kiezen** geeft Webex' eigen pagina, met de keuze
 tussen de app en de browser; kies dit als uw deelnemers de Webex-app gebruiken of als uw organisatie
 dat zo wil. Op een telefoon of tablet vraagt Webex in beide gevallen om de Webex-app: een

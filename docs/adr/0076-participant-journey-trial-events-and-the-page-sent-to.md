@@ -3,7 +3,7 @@
 Status: accepted (2026-10-30), requested by the product owner: follow the journey of the
 participant as far as possible, and be able to troubleshoot it. Extends ADR 0010 (timeline),
 ADR 0068 (troubleshooting per booking), ADR 0071 (trial call) and ADR 0075 (the page the
-join link opens). Partly built: step 1 is in PR #171, steps 2 and 3 are planned;
+join link opens). Partly built: step 1 is merged (#171), steps 2 and 3 are planned;
 see *Build status*.
 
 ## Context
@@ -65,7 +65,7 @@ setting and has no bounds of its own.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1 | Trial meeting events matched and recorded (`trial_entered`, `trial_left`), `ignored` outcome, the page named on `join_clicked` and `trial_joined`, texts in nl and en, `docs/webhooks.md` | #171 | in PR |
+| 1 | Trial meeting events matched and recorded (`trial_entered`, `trial_left`), `ignored` outcome, the page named on `join_clicked` and `trial_joined`, texts in nl and en, `docs/webhooks.md` | #171 | merged |
 | 2 | The signal *followed, nobody entered*, as a derived flag on the booking page | | planned |
 | 3 | The merged journey on the booking page, with *problems only* | | planned |
 

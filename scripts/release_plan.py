@@ -85,14 +85,34 @@ def candidate_version(base: str, tags: Sequence[str]) -> str:
     return f"{base}-rc.{max(numbers, default=0) + 1}"
 
 
-def _git(*args: str) -> str:
-    """Return the output of one git command."""
+def git(*args: str) -> str:
+    """Return the output of one git command, run in the current directory.
+
+    Shared with ``scripts/release_pr.py``; both only ever pass fixed arguments.
+    """
     return subprocess.run(  # noqa: S603 - fixed argument list, no shell
         ["git", *args],  # noqa: S607 - git from PATH, as every developer runs it
         check=True,
         capture_output=True,
         text=True,
     ).stdout
+
+
+def last_release() -> str:
+    """Return the tag of the last release reachable from ``HEAD``, for example ``v0.3.0``.
+
+    Release candidates are tags too (ADR 0059); the last *release* is the last tag without
+    ``-rc``.
+    """
+    return git(
+        "describe", "--tags", "--abbrev=0", "--match", "v*.*.*", "--exclude", "v*-rc.*"
+    ).strip()
+
+
+def messages_since(ref: str) -> list[str]:
+    """Return the full commit messages on the first-parent line from ``ref`` to ``HEAD``."""
+    log = git("log", f"{ref}..HEAD", "--format=%B%x00", "--first-parent")
+    return [message.strip() for message in log.split("\0") if message.strip()]
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -102,19 +122,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--candidate", action="store_true", help="print only the X.Y.Z-rc.N a merge becomes"
     )
     args = parser.parse_args(argv)
-    # Release candidates are tags too; the last *release* is the last tag without -rc.
-    last = _git(
-        "describe", "--tags", "--abbrev=0", "--match", "v*.*.*", "--exclude", "v*-rc.*"
-    ).strip()
-    log = _git("log", f"{last}..HEAD", "--format=%B%x00", "--first-parent")
-    messages = [message.strip() for message in log.split("\0") if message.strip()]
+    last = last_release()
+    messages = messages_since(last)
     project = project_version(Path("pyproject.toml"))
     if args.candidate:
         base = candidate_base(last.removeprefix("v"), project, messages)
         if base is None:
             sys.stderr.write("nothing merged since the last release; no candidate\n")
             return 1
-        tags = _git("tag", "--list", f"v{base}-rc.*").split()
+        tags = git("tag", "--list", f"v{base}-rc.*").split()
         sys.stdout.write(candidate_version(base, tags) + "\n")
         return 0
     proposal = next_version(last.removeprefix("v"), messages)

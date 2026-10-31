@@ -16,8 +16,8 @@ package; when the two disagree, the code wins.
 
 | Built? | ADRs |
 |---|---|
-| BUILT | 47 |
-| PARTIAL | 21 |
+| BUILT | 48 |
+| PARTIAL | 23 |
 | NOT BUILT | 5 |
 | POLICY | 3 |
 
@@ -69,7 +69,7 @@ package; when the two disagree, the code wins.
 | 0044 | Planner agenda | BUILT | #81, #92, #98; migrations 0045, 0046 | – |
 | 0045 | Dedicated Webex site, meeting policy | NOT BUILT | none | Everything |
 | 0046 | Staff directory, SCIM | PARTIAL | step 1 #61; migration 0026 | Step 2 (suspend, end sessions, erase, retention, CSV), step 3 (SCIM) |
-| 0047 | Admin information architecture | PARTIAL | steps 1–2 (#62, #80): `web/navigation.py`, `docs/admin-map.md` | Steps 3–6: organisation page with tabs, six group tabs, readiness checklist, `return` keys |
+| 0047 | Admin information architecture | PARTIAL | steps 1–3 and the groups list of step 5 (#62, #80, #219): `web/navigation.py`, `docs/admin-map.md`, the organisation page with tabs and sub-tabs, `organisation.view`, `/admin/groups` | Step 4 (six group tabs), the readiness checklist, lists for API clients and the audit log, `return` keys, registry `topic` |
 | 0048 | Live update progress | BUILT | #63; migration 0027 | – |
 | 0049 | Role and scope in one claim | NOT BUILT | ADR only (#64) | Everything |
 | 0050 | Host installer | BUILT | #82; `scripts/install.sh`; extended by #139, #144 | – |
@@ -97,8 +97,11 @@ package; when the two disagree, the code wins.
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
 | 0073 | Email deliverability: sender domain check, system mail headers | PARTIAL | step 1 #166; no migration | Step 2 (a periodic check in the worker) is decided after step 1 is in use (ADR decision 6) |
 | 0074 | Organisation text overrides | BUILT | #168; migration 0074; `domain/text_overrides.py`, `adapters/db/text_overrides.py`, `admin/organisation_text_routes.py` | Step 2: the global (superuser) layer, `.po` export and import, revision counter (follow-up, listed in the ADR) |
-| 0075 | Browser-direct join link per group | PARTIAL | Steps 1 and 2 (PR #171); migration 0075 | Step 3: confirmation with the Webex app installed, on docker01 |
-| 0076 | Participant journey: trial call events, the page sent to | PARTIAL | Step 1 (PR #171); no migration | Step 2: the signal *followed, nobody entered*; step 3: the merged journey view |
+| 0075 | Browser-direct join link per group | PARTIAL | Steps 1 and 2 (#171); migration 0075 | Step 3: confirmation with the Webex app installed, on docker01 |
+| 0076 | Participant journey: trial call events, the page sent to | PARTIAL | Step 1 (#171); no migration | Step 2: the signal *followed, nobody entered*; step 3: the merged journey view |
+| 0078 | Build work merges on green; decisions and releases wait for the product owner; audit before a minor release | PARTIAL | steps 0–2 (#177); step 4 (#180): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | Steps 3 and 5: the required check and the label on GitHub, the first audited minor release (prepared by ADR 0079) |
+| 0079 | The release is a workflow: release PR, audit and tag by dispatch | PARTIAL | steps 0–2 (#183): `.github/workflows/release.yml`, `scripts/release_pr.py`, `tests/scripts/test_release_pr.py`, dry run on the PR branch | Step 3: the secrets `RELEASE_TOKEN` and `OPENAI_API_KEY` (product owner); step 4: the first release through the workflow, `v0.4.0`, with the first real audit |
+| 0080 | Page width: two classes, declared in the register, and a week that never wraps | BUILT | `app/web/navigation.py` (`Width`, `Screen.width`, `wide_subpages`), `data-width` in `admin/layout.html`, tokens and `.week-frame` in `admin.css`, `docs/admin-map.md`; `tests/web/test_navigation.py`, `tests/web/test_shell_styles.py`, `tests/admin/test_pages.py` | – (further list screens go wide when a table needs the room, step 2) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 
