@@ -13,8 +13,11 @@ from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 from app.logging import (
     MASK,
     PII_FIELDS,
+    TRACE,
+    TRACE_POINTS,
     configure_logging,
     set_log_level,
+    tracer,
     warn_loose_secret_files,
 )
 
@@ -158,3 +161,83 @@ def test_the_level_can_change_while_running_and_masking_stays() -> None:
     assert "shown" in out
     assert "ada@example.org" not in out
     set_log_level("INFO")
+
+
+# ADR 0085 part 2: the TRACE level and the fixed trace points.
+
+
+def _trace_stream(level: str) -> io.StringIO:
+    out = io.StringIO()
+    configure_logging(level, stream=out)
+    return out
+
+
+def test_trace_is_a_level_below_debug() -> None:
+    assert TRACE < logging.DEBUG
+    assert logging.getLevelName(TRACE) == "TRACE"
+    assert logging.getLevelNamesMapping()["TRACE"] == TRACE
+
+
+def test_trace_lines_appear_at_trace_level_only() -> None:
+    try:
+        quiet = _trace_stream("DEBUG")
+        tracer.trace("http.request", method="GET", route="/g/{slug}", status=200, ms=3)
+        assert quiet.getvalue() == ""
+
+        loud = _trace_stream("TRACE")
+        tracer.trace("http.request", method="GET", route="/g/{slug}", status=200, ms=3)
+        record = _records(loud)[0]
+        assert record["message"] == "http.request"
+        assert record["log.level"] == "trace"
+        assert record["route"] == "/g/{slug}"
+        assert record["status"] == 200
+        assert "name" not in record  # the stdlib logger's name does not leak into the line
+    finally:
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+
+def test_every_trace_point_passes_pii_in_its_fields_masked() -> None:
+    try:
+        out = _trace_stream("TRACE")
+        for point, fields in TRACE_POINTS.items():
+            tracer.trace(point, **{field: f"pii-{field}@example.org" for field in fields})
+        output = out.getvalue()
+        assert "example.org" not in output or all(
+            f"pii-{field}@example.org" not in output
+            for fields in TRACE_POINTS.values()
+            for field in fields
+            if field in PII_FIELDS
+        )
+        assert not PII_FIELDS & {field for fields in TRACE_POINTS.values() for field in fields}
+        assert len(_records(out)) == len(TRACE_POINTS)
+    finally:
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+
+def test_a_trace_point_takes_only_its_registered_fields() -> None:
+    with pytest.raises(ValueError, match="unknown trace point"):
+        tracer.trace("sql.text")
+    with pytest.raises(ValueError, match="not a field of"):
+        tracer.trace("http.request", path="/b/secret-token")
+
+
+def test_the_five_trace_points_of_the_adr_are_registered() -> None:
+    assert set(TRACE_POINTS) == {
+        "http.request",
+        "job.run",
+        "job.step",
+        "outbound.request",
+        "sql.slow",
+        "template.render",
+    }
+    assert "path" not in TRACE_POINTS["http.request"]  # the route template, never the raw path
+    assert not {"url", "body", "headers"} & set(TRACE_POINTS["outbound.request"])
+    assert "text" not in TRACE_POINTS["sql.slow"]
+
+
+def test_httpx_request_lines_with_their_urls_are_not_logged(stream: io.StringIO) -> None:
+    logging.getLogger("httpx").info('HTTP Request: GET https://h/x?token=secret-token "200"')
+
+    assert stream.getvalue() == ""
