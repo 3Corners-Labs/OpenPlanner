@@ -34,6 +34,7 @@ from tests.support.domain import (
     window,
     with_team_invite,
 )
+from tests.support.tracing import captured_trace
 
 
 def merge_context(_logger: WrappedLogger, _method: str, event_dict: EventDict) -> EventDict:
@@ -560,3 +561,25 @@ async def test_the_request_to_confirm_goes_only_while_it_is_pending(
     await JobRunner(FakeQueue([request]), uow, FixedClock(NOW), sender, composer).run_due()
 
     assert [m.subject for m in sender.sent] == ["Bevestig uw afspraak met Aangifte"]
+
+
+# ADR 0085 point 9: ``job.run`` and ``job.step`` trace points.
+
+
+async def test_a_message_job_leaves_its_run_and_steps_as_trace_lines(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    queue, sender = FakeQueue([job(bid, JobType.SEND_CONFIRMATION)]), RecordingSender()
+
+    with captured_trace() as lines:
+        await JobRunner(queue, uow, FixedClock(NOW), sender, composer).run_due()
+
+    steps = [line.fields["step"] for line in lines if line.point == "job.step"]
+    assert steps == ["load", "compose", "send"]
+    assert all(line.fields["type"] == "send_confirmation" for line in lines)
+    run = [line for line in lines if line.point == "job.run"]
+    assert len(run) == 1
+    assert run[0].fields["attempt"] == 1
+    assert isinstance(run[0].fields["ms"], int)
+    assert "ada@example.org" not in repr(lines)
