@@ -67,6 +67,7 @@ from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.worker_check import WorkerHeartbeat
+from tests.support.domain import NOW
 
 
 @dataclass
@@ -416,6 +417,33 @@ class InMemoryTransaction:
 
     async def save_group(self, group: Group) -> None:
         self.state.groups[group.id] = group
+
+    async def erasable_groups(self, archived_before: datetime) -> list[Group]:
+        def referenced(group_id: int) -> bool:
+            return (
+                any(s.group_id == group_id for s in self.state.slots.values())
+                or any(b.group_id == group_id for b in self.state.bookings.values())
+                or any(c.group_id == group_id for c in self.state.closures.values())
+                or any(a.group_id == group_id for a in self.state.acceptances.values())
+                or any(
+                    g.slug in c.groups
+                    for c in self.state.api_clients.values()
+                    for g in [self.state.groups[group_id]]
+                )
+            )
+
+        return [
+            g
+            for g in sorted(self.state.groups.values(), key=lambda g: (g.archived_at or NOW, g.id))
+            if g.archived_at is not None
+            and g.archived_at <= archived_before
+            and not referenced(g.id)
+        ]
+
+    async def delete_group(self, group_id: int) -> None:
+        del self.state.groups[group_id]
+        for table in (self.state.rules, self.state.overrides, self.state.reminder_rules):
+            table.pop(group_id, None)
 
     async def count_future_bookings(self, group_id: int, now: datetime) -> int:
         return sum(

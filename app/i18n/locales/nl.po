@@ -5923,9 +5923,6 @@ msgstr "Instelling"
 msgid "admin.settings.value"
 msgstr "Waarde"
 
-msgid "admin.settings.notes"
-msgstr "Opmerkingen"
-
 msgid "admin.settings.locked"
 msgstr "Vastgezet door de beheerder van de server"
 
@@ -6276,12 +6273,6 @@ msgstr "Uiterlijk bevestigen (uren voor de afspraak)"
 
 msgid "settings.field.booking_confirm_window_hours.label"
 msgstr "Bevestigen binnen (uren na het boeken)"
-
-msgid "admin.settings.change"
-msgstr "Wijzigen"
-
-msgid "admin.settings.new_value"
-msgstr "Nieuwe waarde"
 
 msgid "admin.settings.hours"
 msgstr "Terug naar standaard na (uren, hooguit {max}; TRACE hooguit {trace_max})"
@@ -6874,6 +6865,9 @@ msgstr "Opnieuw proberen kan niet meer: de afspraak is niet actief, of de meetin
 
 msgid "settings.field.integration_request_retention_days.label"
 msgstr "Verzoeken aan Webex en WxCC bewaren (dagen)"
+
+msgid "settings.field.group_erase_after_days.label"
+msgstr "Gearchiveerde groep wissen na (dagen)"
 
 msgid "settings.field.integration_probe_timeout_seconds.label"
 msgstr "Wachten op de events van het proef-work item (seconden)"

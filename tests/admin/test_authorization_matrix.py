@@ -115,6 +115,10 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/{key}": {
         "/admin/settings/admin_session_hours": statuses(422, 403, 403, 403, 403, 403, 403),
     },
+    # One Save per topic: an empty form changes nothing and returns to the page.
+    "POST /admin/settings/topic/{topic}": {
+        "/admin/settings/topic/admin_session": statuses(303, 403, 403, 403, 403, 403, 403),
+    },
     # ADR 0042 step 5: the own organisation's class D settings; org admins and the superuser.
     # ADR 0047 §4: the old list redirects permanently to the organisation's Settings sub-tab.
     "GET /admin/organisation-settings": {
@@ -123,6 +127,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/organisations/{org}/settings": {
         "/admin/organisations/demo/settings": statuses(200, 200, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/settings": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/settings": {
+        "/admin/organisations/demo/settings": statuses(303, 303, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/settings/{key}": {
         "/admin/organisations/demo/settings/time_format": statuses(
