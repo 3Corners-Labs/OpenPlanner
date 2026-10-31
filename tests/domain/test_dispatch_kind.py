@@ -63,7 +63,9 @@ def test_change_lead_accepts_the_bounds(minutes: int) -> None:
 
 def test_change_lead_is_never_shorter_than_the_dispatch_lead() -> None:
     with pytest.raises(DomainError) as excinfo:
-        make_group(dispatch_lead_minutes=15, min_notice_minutes=60, participant_change_lead_minutes=10)
+        make_group(
+            dispatch_lead_minutes=15, min_notice_minutes=60, participant_change_lead_minutes=10
+        )
 
     assert excinfo.value.field == "participant_change_lead_minutes"
 
