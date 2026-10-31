@@ -77,7 +77,7 @@ The register (`app/web/navigation.py`), the three sections, the `<details>` prof
 
 | ID | Item | Size | Done when | Status |
 |---|---|---|---|---|
-| PW-1 | Two page widths declared per screen in the register, `data-width` on `<main>`, tokens in `admin.css`, forms capped in wide pages, the week as seven columns or one row per day | M | Register, markup and stylesheet tests; `docs/admin-map.md` shows the width; checked at 375, 768, 1280, 1440 and 1920 px | built |
+| PW-1 | Two page widths declared per screen in the register, `data-width` on `<main>`, tokens in `admin.css`, forms capped in wide pages, the week as seven columns or one row per day | M | Register, markup and stylesheet tests; `docs/admin-map.md` shows the width; checked at 375, 768, 1280, 1440 and 1920 px | built (#215) |
 | PW-2 | Move further list screens (organisations, holidays, closures) to wide once a table on them needs the room | S | One line per screen in the register; admin shell test at 1280 px stays green | open |
 | PW-3 | Playwright check of the wide page at 1920 px (content 96 rem, week in seven columns) in `admin-shell.spec.ts` | S | Runs against the Keycloak login of the existing spec | open |
 
