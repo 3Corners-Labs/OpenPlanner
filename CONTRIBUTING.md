@@ -130,9 +130,11 @@ there.
 
 ## Releases
 
-A merge to `main` is no release. Releases follow ADR 0052: `make release-plan` proposes the
-number, a `chore(release): vX.Y.Z` PR sets it, and a tag on `main` publishes it. A minor or major
-release first gets `make release-audit`: an independent review by a second model, pasted into
-the release PR under `## Release audit` (ADR 0078); CI refuses a `vX.Y.0` tag without it. The
-commands are in `docs/runbook.md`, *Releasing a version*.
+A merge to `main` is no release. Releases follow ADR 0052 and run as the `release` workflow
+(ADR 0079): the dispatch `release-pr` opens the `chore(release): vX.Y.Z` PR (number from
+`scripts/release_plan.py` unless given), the `audit` job puts the independent review of a
+minor or major release into it (ADR 0078; the product owner changes `Verdict: open` to
+`Verdict: pass` after reading), the label `po:approved` lets it merge, and the dispatch `tag`
+sets the tag that publishes it; CI refuses a `vX.Y.0` tag without a passing audit. The steps and
+the laptop fallback are in `docs/runbook.md`, *Releasing a version*.
 `docs/skills.md` lists which Claude Code skills to use in each work package.
