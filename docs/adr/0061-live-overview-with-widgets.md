@@ -50,7 +50,7 @@ The overview (`/admin/`, `dashboard.view`) lists groups as cards. Admins asked f
 | 2b | OV-4: server-rendered SVG charts (bar, line, pie) with text summary and table | #153 | merged |
 | 3 | OV-5: `overview-live.js`, live endpoint, CSP on this page only, "poll flood" abuse case | | planned |
 | 4 | OV-6, OV-7: alerts, banner, pop-ups, level filter; `QUEUE_WAIT_*` settings | | planned |
-| 5 | SH-3: organisation › group filter in the top bar | | planned |
+| 5 | SH-3: organisation › group filter in the top bar (overview; other lists keep their own filters) | #161 | in PR |
 
 ## Consequences
 

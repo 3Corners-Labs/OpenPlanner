@@ -431,7 +431,7 @@ async def test_the_browser_link_is_followed_once_before_the_probe_is_deleted() -
 
     (get,) = _gets(platforms)
     assert str(get.url) == "https://w.example/j?launchApp=true"
-    assert "authorization" not in get.headers  # an anonymous visit, like the citizen's
+    assert "authorization" not in get.headers  # an anonymous visit, like the participant's
     assert [f.code for f in findings if f.area is CheckArea.WEBEX][:2] == [
         "webex.host_ok",
         "webex.browser_link_ok",
@@ -454,7 +454,7 @@ async def test_a_browser_link_webex_no_longer_carries_through_is_a_warning(
     findings = await _checker(platforms).check_group(GROUP, [GROUP])
 
     lost = next(f for f in findings if f.code == "webex.browser_link_lost")
-    assert lost.status is CheckStatus.WARN  # citizens still get Webex's page: nothing breaks
+    assert lost.status is CheckStatus.WARN  # participants still get Webex's page: nothing breaks
     assert ("status", str(status)) in lost.params
     assert "webex.browser_link_ok" not in _codes(findings)
 
