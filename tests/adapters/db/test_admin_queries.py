@@ -53,6 +53,28 @@ async def test_list_groups_respects_the_scope(
     assert [g.group.slug for g in groups] == expected
 
 
+async def test_an_archived_group_moves_to_the_archived_list_and_keeps_its_row(
+    engine: AsyncEngine,
+) -> None:
+    """ADR 0084: ``archived_at`` round-trips, and the default list leaves archived groups out."""
+    await seed_demo(engine)
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        group = await tx.get_group("demo")
+        assert group is not None
+        await tx.save_group(replace(group, archived_at=NOW))
+
+    async with uow.read() as tx:
+        in_use = [s.group.slug for s in await tx.list_groups(EVERYTHING)]
+        archived = await tx.list_groups(EVERYTHING, archived=True)
+        still_there = await tx.get_group("demo")
+
+    assert in_use == ["andere-team"]
+    assert [(s.group.slug, s.group.archived_at) for s in archived] == [("demo", NOW)]
+    assert still_there is not None
+    assert still_there.is_archived
+
+
 async def test_group_summary_carries_the_organisation(engine: AsyncEngine) -> None:
     await seed_demo(engine)
 
