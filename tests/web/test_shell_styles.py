@@ -114,6 +114,9 @@ FIXED_CAPS = frozenset(
         ".brand-preview__logo",
         ".brand-preview__header--logo .brand-preview__logo",
         ".more",
+        # A settings row's field keeps a readable width inside its column (one form per topic).
+        ".admin .setting__value input",
+        ".admin .setting__value select",
     }
 )
 """Components that cap their own width in rem or ch. A page container never does (ADR 0080)."""

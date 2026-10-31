@@ -192,13 +192,13 @@ async def test_the_auditor_sees_no_forms_and_may_not_post(site: Site) -> None:
 
 
 @pytest.mark.usefixtures("lock_session_hours")
-async def test_a_locked_setting_has_no_form(site: Site) -> None:
+async def test_a_locked_setting_has_no_field(site: Site) -> None:
     await site.login_as(SUPER)
 
     page = (await site.client.get("/admin/settings")).text
 
-    assert 'action="/admin/settings/admin_session_hours"' not in page
-    assert 'action="/admin/settings/admin_reauth_minutes"' in page
+    assert 'name="admin_session_hours"' not in page
+    assert 'name="admin_reauth_minutes"' in page
 
 
 # Secrets and taking over from the environment (ADR 0042 step 6).
@@ -440,3 +440,89 @@ async def test_system_status_without_a_check_says_so(site: Site) -> None:
         "chip--success"
         not in text.split("Certificaat van het publieke adres")[1].split("</section>")[0]
     )
+
+
+# One Save per topic: only the values that differ are saved, the first refusal shows at its row.
+
+
+async def test_each_topic_is_one_form_with_one_save(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    page = (await site.client.get("/admin/settings")).text
+
+    assert 'action="/admin/settings/topic/admin_session"' in page
+    assert 'formaction="/admin/settings/' not in page  # nothing stored yet: no reset buttons
+    assert 'name="value"' not in page  # fields carry the setting's key
+    assert 'name="admin_session_hours"' in page
+    assert 'name="product_footer"' in page  # on/off as a choice
+    assert 'value="true"' in page
+
+
+async def test_the_topic_form_saves_only_what_differs(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+
+    response = await site.client.post(
+        "/admin/settings/topic/admin_session",
+        data={
+            "admin_session_hours": "4",
+            "admin_reauth_minutes": str(app.state.settings.admin_reauth_minutes),
+        },
+        headers=SAME_ORIGIN,
+    )
+    page = (await site.client.get("/admin/settings")).text
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin/settings?done=saved#topic-admin_session"
+    assert app.state.settings.admin_session_hours == 4
+    assert 'formaction="/admin/settings/admin_session_hours/reset"' in page
+    assert 'formaction="/admin/settings/admin_reauth_minutes/reset"' not in page
+
+
+async def test_the_topic_form_with_nothing_new_changes_nothing(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+
+    response = await site.client.post(
+        "/admin/settings/topic/admin_session",
+        data={"admin_session_hours": str(app.state.settings.admin_session_hours)},
+        headers=SAME_ORIGIN,
+    )
+
+    assert response.headers["location"] == "/admin/settings?done=unchanged#topic-admin_session"
+
+
+async def test_the_topic_form_stops_at_the_first_refusal(site: Site) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+
+    response = await site.client.post(
+        "/admin/settings/topic/admin_session",
+        data={"admin_session_hours": "99", "admin_reauth_minutes": "5"},
+        headers=SAME_ORIGIN,
+    )
+
+    assert response.status_code == 422
+    assert 'id="error-admin_session_hours"' in response.text
+    assert app.state.settings.admin_session_hours == 8
+
+
+async def test_the_topic_form_sets_a_boolean_and_an_empty_secret_keeps_the_current(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    await site.client.post(
+        "/admin/settings/smtp_password", data={"value": SECRET}, headers=SAME_ORIGIN
+    )
+
+    response = await site.client.post(
+        "/admin/settings/topic/mail",
+        data={"smtp_password": "", "smtp_tls": "true"},
+        headers=SAME_ORIGIN,
+    )
+    await site.client.get("/admin/settings")
+
+    assert response.headers["location"] == "/admin/settings?done=saved#topic-mail"
+    assert app.state.settings.smtp_tls is True
+    assert app.state.settings.smtp_password.get_secret_value() == SECRET
