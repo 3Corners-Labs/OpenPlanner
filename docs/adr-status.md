@@ -17,8 +17,8 @@ package; when the two disagree, the code wins.
 | Built? | ADRs |
 |---|---|
 | BUILT | 48 |
-| PARTIAL | 27 |
-| NOT BUILT | 6 |
+| PARTIAL | 28 |
+| NOT BUILT | 5 |
 | POLICY | 3 |
 
 | ADR | Title | Built? | Evidence | What is missing |
@@ -106,7 +106,7 @@ package; when the two disagree, the code wins.
 | 0081 | Subjects and routing attributes next to the group | NOT BUILT | #179; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
 | 0082 | Contact-center integration: verification, health, alerts to administrators and a fallback per group | PARTIAL | #238; step 1 in PR: `ContactCenterDispatcher.read_task`, `adapters/group_check.py` (probe work item), `adapters/service_app_check.py`, `adapters/db/probes.py`, `worker.no_dispatch_jobs` | Steps 2–5 (health and reconcile, alert model with email and Webex bot, fallback per group, manual topic for the set-up) |
 | 0083 | Identity providers per organisation, chosen by email domain | PARTIAL | #248; step 1 in PR (#250): `domain/identity.py`, `adapters/outbound.py`, provider on the pending login, `dev/keycloak/andere-realm.json` | Steps 2–5 (registration with `private_key_jwt`, verified domains and email-first routing, host tools, docs and e2e) |
-| 0084 | Everything an admin creates can be changed and deleted | NOT BUILT | #262 | Steps 1–7 (permissions `organisation.delete`/`group.delete`, group archive and erase, organisation delete, change in place for exception, reminder rule and calendar name, API client delete, guard test) |
+| 0084 | Everything an admin creates can be changed and deleted | PARTIAL | #262; step 1 in PR (#264): `Permission.ORGANISATION_DELETE`, `Permission.GROUP_DELETE`, `tests/admin/test_create_change_delete.py` | Steps 2–7 (group archive and erase, organisation delete, change in place for exception, reminder rule and calendar name, API client delete, threat model) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 
