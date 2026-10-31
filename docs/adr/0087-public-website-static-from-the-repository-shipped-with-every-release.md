@@ -86,7 +86,8 @@ already has a design language (ADR 0060 mark, ADR 0020 tokens, NL Design System 
 10. **A standard is named only with its evidence and its state.** The section *Quality and
     standards* lists each standard with what it means, a state (`tested in CI`, `built in`,
     `partly`, `planned`) and a link into the repository. What is not done says so: the manual
-    screen-reader audit, the penetration test, `publiccode.yml`, the TLS check of ADR 0086.
+    screen-reader audit, the penetration test, the listing on developer.overheid.nl, the TLS
+    check of ADR 0086.
     A test fails when a repository link on the site points at a file that does not exist.
 11. **Same bar as the product.** The site is checked for keyboard operation, `axe-core` with
    zero violations and Lighthouse accessibility ≥ 95 in both locales, added to the Playwright

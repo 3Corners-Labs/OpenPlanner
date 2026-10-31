@@ -622,10 +622,10 @@
       },
       {
         "name": "Standard for Public Code",
-        "what": "EUPL-1.2, a licence per file through REUSE, decisions public as ADRs. A publiccode.yml for developer.overheid.nl is still open.",
+        "what": "EUPL-1.2, a licence per file through REUSE, decisions public as ADRs, and a publiccode.yml that CI validates and every release updates. The listing on developer.overheid.nl is still open.",
         "status": "partly",
-        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0054-eupl-licence-and-contributor-agreement.md",
-        "link": "ADR 0054"
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/publiccode.yml",
+        "link": "publiccode.yml"
       },
       {
         "name": "Penetration test",
