@@ -250,7 +250,7 @@ Nothing is open at the time of acceptance. A new question gets a row here, not a
 | 2d-3 | Code: admin, adapters, jobs, scripts, e2e and the rest of the tests; the diagram source | #244 | merged |
 | 2e | Docs that name renamed files and tests | #247 | in PR #247 |
 | 2f | `docs/diagrams` regenerated with `make diagrams` (needs the draw.io desktop app) | | planned |
-| 3 | Guard test `tests/test_terminology.py` | | planned |
+| 3 | Guard test `tests/test_terminology.py` | #256 | in PR #256 |
 | 4a | The agent term and role names per organisation and group in the portal (points 8, 10 to 13) | | planned |
 | 4b | `{agent}` and `{agents}` in catalogue texts and mails, grammar test (point 9) | | planned |
 
