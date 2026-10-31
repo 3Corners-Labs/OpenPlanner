@@ -1155,16 +1155,16 @@ msgid "admin.field.trial_call_enabled_hint"
 msgstr "Yes: the participant can try beforehand, in a real Webex meeting, whether camera, microphone and speakers work. The meeting belongs to this group's Webex host; nobody from the team joins. Only with a Webex host."
 
 msgid "admin.field.join_client"
-msgstr "Webex page for the citizen"
+msgstr "Webex page for the participant"
 
 msgid "admin.field.join_client_hint"
-msgstr "Which Webex page the citizen sees for the appointment and the trial call."
+msgstr "Which Webex page the participant sees for the appointment and the trial call."
 
 msgid "admin.group.join_client_browser"
 msgstr "Straight into the browser"
 
 msgid "admin.group.join_client_choice"
-msgstr "Webex lets the citizen choose"
+msgstr "Webex lets the participant choose"
 
 msgid "admin.field.trial_call_minutes"
 msgstr "Trial call stays open (minutes)"
@@ -4590,10 +4590,10 @@ msgid "admin.check.webex.host_ok"
 msgstr "A probe meeting for host {host} was scheduled exactly as a booking does, and deleted again."
 
 msgid "admin.check.webex.browser_link_ok"
-msgstr "The direct browser link works: Webex carries the browser option through, so on a computer the citizen gets the web version at once, without the question about the app."
+msgstr "The direct browser link works: Webex carries the browser option through, so on a computer the participant gets the web version at once, without the question about the app."
 
 msgid "admin.check.webex.browser_link_lost"
-msgstr "Webex no longer carries the browser option through in the link (answer {status}). The citizen then gets the choice between app and browser after all. Nothing breaks; if you like, set the Webex page for the citizen to 'Webex lets the citizen choose'."
+msgstr "Webex no longer carries the browser option through in the link (answer {status}). The participant then gets the choice between app and browser after all. Nothing breaks; if you like, set the Webex page for the participant to 'Webex lets the participant choose'."
 
 msgid "admin.check.webex.browser_link_unreachable"
 msgstr "The direct browser link could not be checked: the Webex site could not be reached ({error})."
@@ -4620,7 +4620,7 @@ msgid "admin.check.webex.trial_refused"
 msgstr "Webex refused a trial-call meeting for host {host} ({error}): {reason}. Participants cannot then open a trial call; check on the Webex site whether participants may join before the host."
 
 msgid "admin.check.webex.trial_lobby"
-msgstr "Webex accepted a trial call meeting for host {host} but did not keep its settings ({stored}). The citizen would then wait in the lobby and nobody lets them in. Ask the administrator of the Webex site to allow participants to join before the host and without a lobby; until then the trial call does not work."
+msgstr "Webex accepted a trial call meeting for host {host} but did not keep its settings ({stored}). The participant would then wait in the lobby and nobody lets them in. Ask the administrator of the Webex site to allow participants to join before the host and without a lobby; until then the trial call does not work."
 
 msgid "admin.check.webex.trial_left"
 msgstr "The trial-call meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
