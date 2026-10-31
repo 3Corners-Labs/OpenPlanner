@@ -7918,7 +7918,6 @@ msgstr "Archived groups: read-only, without a participant page."
 msgid "admin.audit.detail.archived"
 msgstr "archived"
 
-<<<<<<< HEAD
 msgid "admin.done.organisation_deleted"
 msgstr "The organisation has been deleted."
 
@@ -8014,7 +8013,7 @@ msgstr "The calendar's web address stays the same; organisations and groups that
 
 msgid "admin.holidays.calendar_name"
 msgstr "Name of the calendar"
-=======
+
 msgid "admin.tab.login"
 msgstr "Login"
 
@@ -8284,4 +8283,3 @@ msgstr "The test login failed: this provider has no key. Rotate the key to gener
 
 msgid "admin.idp.test_failed.too_many_entitlements"
 msgstr "The test login failed: the token holds more entitlement values than allowed."
->>>>>>> bb2906369313551169dc43f1a8772eb159f53555
