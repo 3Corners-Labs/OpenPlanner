@@ -45,6 +45,7 @@ from app.admin.overview_charts import (
     view_choices,
 )
 from app.admin.pages import Locale, admin_moment, page, role_labels, scope_text, templates
+from app.admin.scope_choice import filter_view, scope_of
 from app.admin.shortfalls import agenda_service, shortfall_view
 from app.admin.update_routes import update_service
 from app.config import Settings
@@ -198,7 +199,12 @@ async def _bookings_today(
 ) -> WidgetView:
     """Bookings today per group: a count per group whose bookings the admin may view."""
     service = admin_service(request)
-    groups = await service.groups(principal, Permission.BOOKINGS_VIEW)
+    choice = (await scope_of(request, principal))[0]
+    groups = [
+        g
+        for g in await service.groups(principal, Permission.BOOKINGS_VIEW)
+        if choice.keeps(g.organisation_slug, g.group.slug)
+    ]
     counts = await agenda_service(request).counts_today(principal)
     rows = [
         GroupCount(
@@ -224,7 +230,10 @@ async def _changes(request: Request, locale: RequestLocale, principal: Principal
     item = _declared("changes")
     narrow = AuditFilter(source=Source.ADMIN, category=Category.AUDIT)
     entries = await admin_service(request).audit_log(principal, narrow, limit=item.default_rows * 4)
-    changes = [e for e in entries if _is_change(e)]
+    choice = (await scope_of(request, principal))[0]
+    changes = [
+        e for e in entries if _is_change(e) and choice.keeps(e.event.organisation, e.event.group)
+    ]
     views = audit_views(request, locale, principal, changes[: item.default_rows])
     rows = [
         Change(v.when, v.actor, v.action, v.target, v.trace_url or "/admin/audit") for v in views
@@ -243,6 +252,7 @@ async def _queue(request: Request, locale: RequestLocale, principal: Principal) 
     item = _declared("queue")
     service: QueueService = request.app.state.queue_service
     lifetime = timedelta(hours=_settings(request).admin_session_hours)
+    choice = (await scope_of(request, principal))[0]
     rows = [
         QueueRow(
             s.summary.group.name,
@@ -253,6 +263,7 @@ async def _queue(request: Request, locale: RequestLocale, principal: Principal) 
             s.staff_available,
         )
         for s in await service.summaries(principal, lifetime)
+        if choice.keeps(s.summary.organisation_slug, s.summary.group.slug)
     ]
     return WidgetView(item, list(rows[: item.default_rows]), len(rows))
 
@@ -495,7 +506,8 @@ async def overview(
     """The overview: the visible widgets as a grid, then the groups in scope with shortfalls."""
     principal = context.principal
     views = await _views(request, locale, principal)
-    groups = await admin_service(request).groups(principal)
+    choice, in_scope = await scope_of(request, principal)
+    groups = [g for g in in_scope if choice.keeps(g.organisation_slug, g.group.slug)]
     summaries = await agenda_service(request).summaries(principal)
     shortfalls = {
         g.group.slug: shortfall_view(summaries[g.group.slug], g.group, locale)
@@ -507,7 +519,17 @@ async def overview(
         locale,
         "admin/dashboard.html",
         principal,
-        {"views": views, "groups": groups, "shortfalls": shortfalls},
+        {
+            "views": views,
+            "groups": groups,
+            "shortfalls": shortfalls,
+            "scope_filter": filter_view(
+                choice,
+                in_scope,
+                locale.gettext,
+                can_function(principal)(Permission.ORGANISATION_MANAGE),
+            ),
+        },
     )
 
 

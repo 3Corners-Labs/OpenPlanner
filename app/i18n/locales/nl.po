@@ -4350,6 +4350,33 @@ msgstr "Meldingen"
 msgid "admin.topbar.tasks.count"
 msgstr "{label}, {count} lopend of mislukt"
 
+msgid "admin.scope.label"
+msgstr "Werkgebied"
+
+msgid "admin.scope.crumbs"
+msgstr "Gekozen werkgebied"
+
+msgid "admin.scope.organisation"
+msgstr "Organisatie"
+
+msgid "admin.scope.group"
+msgstr "Groep"
+
+msgid "admin.scope.all_organisations"
+msgstr "Alle organisaties"
+
+msgid "admin.scope.all_groups"
+msgstr "Alle groepen"
+
+msgid "admin.scope.hint"
+msgstr "Beperkt de groepen, afspraken, wachtrij en wijzigingen op deze pagina tot wat u al mag zien. Taken, status en rechten blijven voor het hele platform."
+
+msgid "admin.scope.apply"
+msgstr "Tonen"
+
+msgid "admin.scope.reset"
+msgstr "Alles tonen"
+
 msgid "admin.nav.help"
 msgstr "Handleiding"
 
