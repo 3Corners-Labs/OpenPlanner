@@ -42,6 +42,19 @@ of our {agents}" rather than "a {agent}": a word may start with a vowel or be a 
 
 The pages of this manual use the shipped words. Your own word replaces them on screen.
 
+## What you call the administrators
+
+An organisation can also give its *organisation admin* and its *group admin* a name of its own,
+for example "Head of planning" and "Team leader". You enter the names in the card *What you call
+the administrators*, per language, on this screen. A name is a label on the screen: it changes
+no right. The superuser and the auditor cannot be renamed, and a custom role keeps the name the
+superuser gave it.
+
+Wherever a name stands next to rights, the rights matrix and *My rights*, the shipped name stays
+visible in brackets, for example "Head of planning (Organisation admin)". The audit log and the
+rights document keep the shipped names. A name may not be the name of another role, in capitals
+or not: "Group admin" is refused as the name of the organisation admin.
+
 ## Changing a text
 
 First choose the language. An organisation can have its own texts for each language. Change the
