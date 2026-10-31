@@ -201,8 +201,8 @@
     "pause": "Pause",
     "scene_label": "Animation of the participant and admin flows",
     "video_title": "Screen recording of the real interface",
-    "video_text": "On every release the pipeline records the booking flow, the portal and the agenda again, so what you see here is what you install.",
-    "video_soon": "Arrives with the next release.",
+    "video_text": "Recorded by the pipeline at release {version} ({date}), against the real application with test data: from a participant booking to the agent who picks up the call.",
+    "video_soon": "From the next release on, the pipeline records the booking flow, the portal and the queue, and the recording appears here. Until then the animation above shows the chain.",
     "art": {
       "direct_btn": "Talk now",
       "direct_wait": "2 waiting · about 3 min",
@@ -270,7 +270,9 @@
       "queue_cc": "Contact center",
       "queue_own": "Own queue",
       "cohost": "cohost"
-    }
+    },
+    "video_captions": "English",
+    "video_help": "No sound; the captions describe what is shown. The steps are also in the tour above as text."
   },
   "how": {
     "title": "How it works",

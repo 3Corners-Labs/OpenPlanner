@@ -975,6 +975,7 @@ clones that repository, replaces the site files with the build, commits `site: <
 |---|---|---|
 | Merge to `main` | `site`, after the candidate job: build with the releases and the roadmap from GitHub, upload the artifact, push | the site on TransIP, with the candidate that merge made on it |
 | Tag `vX.Y.Z` | the same after `publish`, plus `gh release upload` | `site-X.Y.Z.tar.gz` on the release page, and the site on TransIP with the new release on it |
+| Tag `vX.Y.Z` (also) | `tour` (`.github/workflows/tour.yml`): the e2e stack, `e2e/tour/tour.spec.ts`, the captions | `tour.webm`, `tour.jpg`, `tour.nl.vtt`, `tour.en.vtt`, `tour.json` on the release; the `site` job puts the newest one on the page |
 | Pull request, fork | nothing (`main.yml` only) | a local `make site` is the preview |
 
 ### Once: the deploy settings
@@ -987,8 +988,8 @@ In the GitHub environment `website` (*Settings → Environments*), so only the j
 | `SITE_DEPLOY_REMOTE` | variable | `openplannernl@openps.ssh.transip.me:auto.git` |
 | `SITE_DEPLOY_KNOWN_HOSTS` | variable | the output of `ssh-keyscan -t ed25519,rsa openps.ssh.transip.me`, after checking it against the fingerprints below |
 | `SITE_DEPLOY_KEY` | secret | the private key of a deploy-only pair: `ssh-keygen -t ed25519 -C openplanner-site-deploy -f site-deploy -N ""`; the public key `site-deploy.pub` goes on the TransIP package's SSH keys |
-| `SITE_DEPLOY_DIR` | variable, optional | the folder inside the repository that TransIP serves; empty means the repository root |
-| `SITE_DEPLOY_BRANCH` | variable, optional | the branch to create when the repository is still empty (default `main`); a repository with commits keeps its own default branch |
+| `SITE_DEPLOY_DIR` | variable | `www`: TransIP AutoGit serves the `www/` folder of the repository |
+| `SITE_DEPLOY_BRANCH` | variable | `main`: the *Git production branch* in TransIP's panel (AutoGit); a push to another branch is received but not deployed |
 
 Host key fingerprints of `openps.ssh.transip.me` as read on 2026-10-31; compare them with what
 TransIP publishes before trusting them:
@@ -1002,9 +1003,36 @@ Without `SITE_DEPLOY_REMOTE` or `SITE_DEPLOY_KEY` the job builds and uploads the
 prints a notice; it never deploys half. The web root mirrors the build: a page removed from
 `site/` disappears from the host.
 
-Not yet checked from here: whether TransIP serves the repository root or a folder such as
-`www/` (set `SITE_DEPLOY_DIR` then), and which branch it deploys. Look at the repository once
-after the first push and adjust the two variables if needed.
+TransIP AutoGit (panel: *Shared Hosting* → openplanner.nl → *Advanced* → *AutoGit*) deploys the
+production branch on every push: it needs `.autogit.yml` in the repository root, which the
+script writes from `site/deploy/autogit.yml`, and serves `www/`. It keeps the two newest
+releases. First push on 2026-11-01: deployed, `www` pointing at the release. HTTPS for
+openplanner.nl still has to be switched on in the panel (*SSL*, Let's Encrypt for the apex and
+`www`); until then port 443 answers with another domain's certificate and a placeholder page,
+and http redirects there.
+
+### The recorded walkthrough (ADR 0087 step 3)
+
+Every release tag records the walkthrough against the release's own code: a participant books,
+confirms, moves, tries the video and joins; the team signs in, sees groups and staffing, sets
+the own queue, follows the agenda and picks the call up. The simulator stands in for Webex and
+the contact center, pressed in a context that is not recorded; the test-environment bar is
+hidden in the recording, nothing else. The page shows the newest release that carries a
+recording, with the version and date next to it.
+
+Record a release again (after a change to the script, or when a recording failed): GitHub →
+*Actions* → *tour* → *Run workflow*, with the tag. The tag's own code is recorded, so a release
+older than the script cannot be recorded. Locally, against a stack on port 8010 (the e2e recipe
+in `CONTRIBUTING.md`):
+
+```sh
+cd e2e
+BASE_URL=http://127.0.0.1:8010 PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npm run tour
+npm run tour:captions -- local
+```
+
+`TOUR_PACE_MS` sets how long each screen rests (default 1800); a second local run needs another
+participant address (`TOUR_EMAIL`), since an address may hold only a few bookings per group.
 
 ### Rotating the deploy key
 

@@ -201,8 +201,8 @@
     "pause": "Pauzeren",
     "scene_label": "Animatie van de deelnemers- en beheerflow",
     "video_title": "Schermopname van de echte interface",
-    "video_text": "Bij elke release neemt de pipeline de boekingsflow, het portaal en de agenda opnieuw op, zodat wat je hier ziet ook is wat je installeert.",
-    "video_soon": "Komt met de eerstvolgende release.",
+    "video_text": "Opgenomen door de pipeline bij release {version} ({date}), tegen de echte applicatie met testgegevens: van een deelnemer die boekt tot de medewerker die het gesprek oppakt.",
+    "video_soon": "Vanaf de volgende release neemt de pipeline de boekingsflow, het portaal en de wachtrij op en verschijnt de opname hier. Tot die tijd laat de animatie hierboven de keten zien.",
     "art": {
       "direct_btn": "Nu praten",
       "direct_wait": "2 wachtenden · ± 3 min",
@@ -270,7 +270,9 @@
       "queue_cc": "Contact center",
       "queue_own": "Eigen wachtrij",
       "cohost": "cohost"
-    }
+    },
+    "video_captions": "Nederlands",
+    "video_help": "Zonder geluid; de ondertitels beschrijven wat er te zien is. De stappen staan ook als tekst in de tour hierboven."
   },
   "how": {
     "title": "Hoe het werkt",
