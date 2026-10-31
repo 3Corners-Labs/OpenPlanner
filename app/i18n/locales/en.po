@@ -7418,3 +7418,211 @@ msgstr "The DKIM key is empty (revoked). Ask your mail administrator to publish 
 
 msgid "admin.channels.domain_reason.dmarc_policy_none"
 msgstr "DMARC is at p=none: receivers only report, nothing is rejected. Set the policy to quarantine or reject once SPF and DKIM are right."
+
+# ADR 0049: entitlements, the identity provider mapping and refused values.
+msgid "admin.nav.idp_mapping"
+msgstr "Identity provider mapping"
+
+msgid "authz.permission.idp_mapping_view"
+msgstr "View the identity provider mapping"
+
+msgid "authz.permission.idp_mapping_manage"
+msgstr "Change a group's IdP value"
+
+msgid "settings.field.oidc_entitlement_claim.label"
+msgstr "Claim holding the entitlements"
+
+msgid "settings.field.oidc_entitlement_prefix.label"
+msgstr "Prefix of every entitlement value"
+
+msgid "settings.field.oidc_entitlements_max_values.label"
+msgstr "Maximum number of values in the entitlement claim"
+
+msgid "settings.field.idp_mapping_refused_window_days.label"
+msgstr "Show unrecognised values for (days)"
+
+msgid "admin.form.error.idp_key_taken"
+msgstr "This IdP value is already in use. Choose another one."
+
+msgid "admin.login_refused.ambiguous_claims"
+msgstr "Your account holds more than one role for more than one organisation or group, so OpenPlanner cannot tell which role applies where. Ask the IdP team for rights per organisation or group (entitlements) or to split the roles."
+
+msgid "admin.login_refused.too_many_entitlements"
+msgstr "Your account sends more rights than OpenPlanner can handle. Ask the IdP team to send only the rights for OpenPlanner."
+
+msgid "admin.rights_not_recognised.text"
+msgstr "Your account has rights for OpenPlanner that this installation does not recognise. Contact your administrator; your page under Staff shows which values were not recognised."
+
+msgid "admin.audit.detail.grant_add"
+msgstr "right added: {value}"
+
+msgid "admin.audit.detail.grant_remove"
+msgstr "right removed: {value}"
+
+msgid "audit.event.entitlement_refused"
+msgstr "Rights not recognised at login"
+
+msgid "audit.event.entitlement_mismatch"
+msgstr "Entitlement claim differs from the role claims (shadow mode)"
+
+msgid "audit.event.ambiguous_claims"
+msgstr "Login refused: roles ambiguous"
+
+msgid "audit.event.organisation_idp_key_changed"
+msgstr "IdP value of the organisation changed"
+
+msgid "audit.event.group_idp_key_changed"
+msgstr "IdP value of the group changed"
+
+msgid "audit.event.idp_mapping_exported"
+msgstr "Identity provider mapping downloaded"
+
+msgid "admin.idp_mapping.title"
+msgstr "Identity provider mapping"
+
+msgid "admin.idp_mapping.intro"
+msgstr "The identity provider must send these values in the claim {claim}. One value per role per organisation or group. The IdP team grants rights; here you see what it must send and what came in."
+
+msgid "admin.idp_mapping.export"
+msgstr "Download as text"
+
+msgid "admin.idp_mapping.settings"
+msgstr "Settings"
+
+msgid "admin.idp_mapping.mode"
+msgstr "Source of the rights"
+
+msgid "admin.idp_mapping.mode.legacy"
+msgstr "Three claims (roles, organisations, groups)"
+
+msgid "admin.idp_mapping.mode.shadow"
+msgstr "Three claims, entitlement claim compared (shadow mode)"
+
+msgid "admin.idp_mapping.mode.entitlements"
+msgstr "Entitlement claim (one value per role and target)"
+
+msgid "admin.idp_mapping.claim"
+msgstr "Claim"
+
+msgid "admin.idp_mapping.prefix"
+msgstr "Prefix"
+
+msgid "admin.idp_mapping.superuser"
+msgstr "Superuser"
+
+msgid "admin.idp_mapping.idp_key"
+msgstr "IdP value"
+
+msgid "admin.idp_mapping.holders_warning"
+msgstr "Note: {count} staff member(s) currently hold a right with the current value; they lose access until the identity provider sends the new value."
+
+msgid "admin.idp_mapping.values_of"
+msgstr "Values of {name}"
+
+msgid "admin.idp_mapping.role"
+msgstr "Role"
+
+msgid "admin.idp_mapping.value"
+msgstr "Value"
+
+msgid "admin.idp_mapping.holders"
+msgstr "Staff"
+
+msgid "admin.idp_mapping.last_login"
+msgstr "Last login"
+
+msgid "admin.idp_mapping.never"
+msgstr "never"
+
+msgid "admin.idp_mapping.group"
+msgstr "Group"
+
+msgid "admin.idp_mapping.organisations_empty"
+msgstr "There are no organisations within your reach."
+
+msgid "admin.idp_mapping.refused_title"
+msgstr "Unrecognised values"
+
+msgid "admin.idp_mapping.refused_intro"
+msgstr "Values with the prefix that came in at a login in the last {days} days but gave no right. A typo in the identity provider shows up here."
+
+msgid "admin.idp_mapping.refused_empty"
+msgstr "No unrecognised values in this period."
+
+msgid "admin.idp_mapping.reason"
+msgstr "Reason"
+
+msgid "admin.idp_mapping.organisation"
+msgstr "Organisation"
+
+msgid "admin.idp_mapping.people"
+msgstr "People"
+
+msgid "admin.idp_mapping.received"
+msgstr "Last received"
+
+msgid "admin.idp_mapping.no_organisation"
+msgstr "(unknown)"
+
+msgid "admin.idp_mapping.reason.malformed"
+msgstr "does not match the form prefix:role:organisation/group"
+
+msgid "admin.idp_mapping.reason.unknown_role"
+msgstr "unknown role"
+
+msgid "admin.idp_mapping.reason.unknown_organisation"
+msgstr "unknown organisation"
+
+msgid "admin.idp_mapping.reason.unknown_group"
+msgstr "unknown group"
+
+msgid "admin.idp_mapping.reason.group_not_in_organisation"
+msgstr "group does not belong to this organisation"
+
+msgid "admin.idp_mapping.reason.scope_not_allowed"
+msgstr "target does not fit the role's reach"
+
+msgid "admin.organisation.idp_key_hint"
+msgstr "The value the identity provider names this organisation by in a right, for example openplanner:org_admin:gem-a. Lower-case letters, digits and hyphens. A change needs a fresh login."
+
+msgid "admin.group.idp_key.title"
+msgstr "Identity provider mapping"
+
+msgid "admin.group.idp_key.lead"
+msgstr "The value the identity provider names this group by in a right, for example openplanner:group_admin:gem-a/burgerzaken. The full list is on the Identity provider mapping page."
+
+msgid "admin.group.idp_key.hint"
+msgstr "Lower-case letters, digits and hyphens; unique within the organisation. A change needs a fresh login."
+
+msgid "admin.group.idp_key.readonly"
+msgstr "Only an organisation admin or the superuser changes this value."
+
+msgid "admin.staff.unrecognised_only"
+msgstr "Only with unrecognised rights"
+
+msgid "admin.staff.refused"
+msgstr "Rights not recognised"
+
+msgid "admin.staff.refused_intro"
+msgstr "Values that came in at the last login but gave no right. Have the IdP team correct the value; the right values are on Identity provider mapping."
+
+msgid "admin.staff.refused_value"
+msgstr "Value"
+
+msgid "admin.staff.refused_reason"
+msgstr "Reason"
+
+msgid "admin.staff.refused_received"
+msgstr "Received"
+
+msgid "admin.rights.grants"
+msgstr "Rights per organisation or group"
+
+msgid "admin.rights.refused"
+msgstr "Rights not recognised"
+
+msgid "admin.rights.refused_intro"
+msgstr "The identity provider sent these values at your last login, but this installation does not recognise them. Pass them on to the IdP team."
+
+msgid "admin.roles.entitlement_notice"
+msgstr "When the installation uses an entitlement claim (ADR 0049), the identity provider sends one value per organisation or group with this role's key, for example openplanner:custom.3:gem-a. The key and the exact values are on the Identity provider mapping page."

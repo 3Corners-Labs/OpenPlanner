@@ -259,3 +259,11 @@ With **Yes**, the group can also appear as a widget on the organisation's websit
 group's own page. This works only on the websites the organisation allows under
 [Embedding on websites](embedding.md). With **No** (the default), the group can only be booked
 on its own page, even when the widget is on an allowed website.
+
+## Identity provider mapping
+
+The **IdP value** is the name the identity provider uses for this group in a right, for
+example `openplanner:group_admin:gem-a/burgerzaken`. A new group starts with the code of its
+web address as value. Only an organisation admin or the superuser changes the value; the form
+warns how many staff members lose access until the identity provider sends the new value. The
+full list is on **Identity provider mapping**.

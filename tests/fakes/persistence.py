@@ -11,7 +11,7 @@ from app.domain import holidays as holiday_model
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
-from app.domain.authorization import CustomRole, Scope
+from app.domain.authorization import CustomRole, RoleCatalogue, Scope
 from app.domain.booking import (
     Booking,
     BookingKind,
@@ -32,6 +32,7 @@ from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
+from app.domain.entitlements import Directory, GroupRef, OrganisationRef
 from app.domain.form_fields import Answers, FormDefinition, raise_to_pii
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobCounts, JobStatus, JobSummary, PlannedJob
@@ -47,7 +48,14 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
-from app.domain.staff import StaffFilter, StaffMember, visible
+from app.domain.staff import (
+    GrantHolders,
+    Membership,
+    RefusedEntitlement,
+    StaffFilter,
+    StaffMember,
+    visible,
+)
 from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
@@ -220,6 +228,48 @@ class InMemoryTransaction:
         found = [m for m in self.state.staff.values() if visible(m, scope) and narrow.matches(m)]
         return sorted(found, key=lambda m: (m.display_name, m.subject))
 
+    async def get_directory(self) -> Directory:
+        catalogue = RoleCatalogue(tuple(await self.get_custom_roles()))
+        organisations = [
+            OrganisationRef(o.slug, o.idp_key) for o in self.state.organisations.values()
+        ]
+        groups = [
+            GroupRef(g.slug, g.idp_key, self.state.organisation_slugs.get(g.organisation_id, "org"))
+            for g in self.state.groups.values()
+        ]
+        return Directory.of(catalogue, organisations, groups)
+
+    async def list_grant_holders(self, scope: Scope) -> list[GrantHolders]:
+        found: dict[Membership, GrantHolders] = {}
+        for member in self.state.staff.values():
+            for m in member.memberships:
+                if not (scope.everything or m.organisation in scope.organisations):
+                    continue
+                before = found.get(m)
+                found[m] = GrantHolders(
+                    m,
+                    (before.holders if before else 0) + 1,
+                    max(before.last_login_at, member.last_login_at)
+                    if before
+                    else member.last_login_at,
+                )
+        return sorted(found.values(), key=lambda h: h.membership.sort_key)
+
+    async def list_refused_entitlements(
+        self, scope: Scope, since: datetime
+    ) -> list[RefusedEntitlement]:
+        return sorted(
+            (
+                r
+                for member in self.state.staff.values()
+                for r in member.refused
+                if r.received_at >= since
+                and (scope.everything or r.organisation in scope.organisations)
+            ),
+            key=lambda r: (r.received_at, r.value),
+            reverse=True,
+        )
+
     async def get_group(self, slug: str) -> Group | None:
         return next((g for g in self.state.groups.values() if g.slug == slug), None)
 
@@ -285,7 +335,10 @@ class InMemoryTransaction:
     async def save_organisation(self, organisation: Organisation) -> None:
         current = self.state.organisations[organisation.id]
         self.state.organisations[organisation.id] = replace(
-            current, name=organisation.name, default_locale=organisation.default_locale
+            current,
+            name=organisation.name,
+            default_locale=organisation.default_locale,
+            idp_key=organisation.idp_key,
         )
 
     async def save_branding(self, organisation_id: int, branding: Branding) -> None:
@@ -344,7 +397,7 @@ class InMemoryTransaction:
             self.state.group_contact_blocks[group_id] = block
 
     async def add_group(self, group: Group) -> Group:
-        stored = replace(group, id=self._new_id())
+        stored = replace(group, id=self._new_id(), idp_key=group.slug)
         self.state.groups[stored.id] = stored
         return stored
 

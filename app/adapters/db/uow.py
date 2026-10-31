@@ -180,7 +180,9 @@ def _organisation(row: OrganisationRow) -> Organisation:
         HeaderStyle(row.header_style),
         fonts,
     )
-    return Organisation(row.id, row.name, row.slug, row.default_locale, branding)
+    return Organisation(
+        row.id, row.name, row.slug, row.default_locale, branding, row.idp_key or row.slug
+    )
 
 
 def _group(row: GroupRow) -> Group:
@@ -213,6 +215,7 @@ def _group(row: GroupRow) -> Group:
         queue_free_pick_allowed=row.queue_free_pick_allowed,
         max_bookings_per_email=row.max_bookings_per_email,
         calendar_invite_address=row.calendar_invite_address,
+        idp_key=row.idp_key or row.slug,
     )
 
 
@@ -289,6 +292,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
         "max_bookings_per_email": group.max_bookings_per_email,
         "calendar_invite_address": group.calendar_invite_address,
+        "idp_key": group.idp_key,
     }
 
 
@@ -726,6 +730,7 @@ class SqlTransaction(
         row = OrganisationRow(
             name=organisation.name,
             slug=organisation.slug,
+            idp_key=organisation.idp_key,
             default_locale=organisation.default_locale,
         )
         self._session.add(row)
@@ -734,11 +739,15 @@ class SqlTransaction(
         return _organisation(row)
 
     async def save_organisation(self, organisation: Organisation) -> None:
-        """Store name and default locale; slug and branding columns are left alone."""
+        """Store name, default locale and IdP value; slug and branding columns are left alone."""
         await self._session.execute(
             update(OrganisationRow)
             .where(OrganisationRow.id == organisation.id)
-            .values(name=organisation.name, default_locale=organisation.default_locale)
+            .values(
+                name=organisation.name,
+                default_locale=organisation.default_locale,
+                idp_key=organisation.idp_key,
+            )
         )
 
     async def save_branding(self, organisation_id: int, branding: Branding) -> None:
@@ -874,9 +883,11 @@ class SqlTransaction(
             self._session.add(GroupContactsRow(group_id=group_id, body=contacts_json(block)))
 
     async def add_group(self, group: Group) -> Group:
-        """Insert a group and return it with its ID."""
+        """Insert a group and return it with its ID; its IdP value starts as its slug."""
         row = GroupRow(
-            organisation_id=group.organisation_id, slug=group.slug, **_group_columns(group)
+            organisation_id=group.organisation_id,
+            slug=group.slug,
+            **{**_group_columns(group), "idp_key": group.slug},
         )
         self._session.add(row)
         await self._session.flush()

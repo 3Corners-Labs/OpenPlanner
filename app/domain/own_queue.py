@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 
-from app.domain.authorization import Permission, Principal, Target, decide
+from app.domain.authorization import Grant, Permission, Principal, Role, Target, decide
 from app.domain.booking import Booking, BookingKind, Claim
 from app.domain.calls import CallState, CallStatus
 from app.domain.scheduling import Group
@@ -154,13 +154,10 @@ def works_queue(member: StaffMember, group_slug: str, organisation_slug: str) ->
     Decided by the matrix from what the directory recorded at the last login (ADR 0046);
     custom roles are not in the directory, so a member with custom roles only does not count.
     """
-    as_principal = Principal(
-        member.subject,
-        member.display_name,
-        member.roles,
-        frozenset(m.organisation for m in member.memberships if m.group is None),
-        frozenset(m.group for m in member.memberships if m.group is not None),
-    )
+    grants = {Grant(m.role, m.organisation, m.group) for m in member.memberships}
+    if Role.SUPERUSER in member.roles:
+        grants.add(Grant(Role.SUPERUSER.value))
+    as_principal = Principal(member.subject, member.display_name, frozenset(grants))
     target = Target.for_group(group_slug, organisation_slug)
     return decide(as_principal, Permission.QUEUE_WORK, target).allowed
 

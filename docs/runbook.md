@@ -380,6 +380,52 @@ If PingFederate is down, admins cannot log in; booking, reminders and dispatch k
 Rotating `SESSION_SECRET` logs every admin out. Rotating the client secret needs the new value
 in `OIDC_CLIENT_SECRET` and a restart of `web`.
 
+### PingFederate attribute contract: entitlements (ADR 0049)
+
+Next to the three claims above, the portal can take its rights from **one claim with role and
+scope per value** (`OIDC_ENTITLEMENT_CLAIM`, default `openplanner_entitlements`, multi-valued in
+the ID token). Each value is one right:
+
+| Role reach | Value | Example |
+|---|---|---|
+| everything | `<prefix>:superuser` | `openplanner:superuser` |
+| organisations | `<prefix>:<role>:<org>` | `openplanner:org_admin:gem-a` |
+| groups | `<prefix>:<role>:<org>/<group>` | `openplanner:group_admin:gem-a/burgerzaken` |
+
+`<role>` is the role's key (`superuser`, `org_admin`, `group_admin`, `auditor`, `agent` or
+`custom.<id>`); `<org>` and `<group>` are the **IdP values** shown on *Koppeling
+identiteitsprovider* in the portal (they start as the slugs and are changed there, never by a
+rename). The simplest contract is one directory group per value, mapped 1:1 into the claim;
+the portal's page offers the full list as a text download. Values without the prefix are
+ignored, so the claim may be filled from a shared attribute. A value with the prefix that the
+installation does not recognise gives nothing and shows on the person's staff page with the
+reason.
+
+Test a contract without a login: put sample claims in a JSON file (`sub` plus the claims) and run
+
+```sh
+docker compose exec web python -m app.cli oidc-check --claims /tmp/sample-claims.json
+```
+
+It prints the mode, every grant and every refused value with its reason.
+
+**Switching over.** `OIDC_CLAIM_MODE` (environment, restart `web`):
+
+1. `legacy` (default): the three claims decide. A login whose claims are ambiguous (two roles
+   of one reach while that reach's claim names more than one organisation or group) is
+   refused with `ambiguous_claims` and audited: that combination handed out rights nobody gave.
+   Before the first release with this check, look for such admins in PingFederate and either
+   give them entitlements or split their roles.
+2. `shadow`: the three claims still decide; every login also parses the entitlement claim and
+   writes `auth.entitlement_mismatch` to the audit log when the two disagree. Run it for a full
+   working week; no mismatch means PingFederate is right.
+3. `entitlements`: only the entitlement claim decides. Rollback: set `legacy` and restart.
+
+The prefix (`OIDC_ENTITLEMENT_PREFIX`, default `openplanner`) separates installations that
+share one PingFederate: give acceptance `openplanner-acc`, and production values never work
+there. The claim name and the prefix are class C settings with the dry run of §8; the host
+resets them like the other login settings.
+
 ### Nobody can log in (ADR 0042 §8)
 
 There is no login bypass, fallback IdP or local account. Diagnose and act from the host:

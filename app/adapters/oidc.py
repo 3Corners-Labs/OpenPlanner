@@ -2,13 +2,15 @@
 
 Authorization code flow with PKCE (S256), ``state`` and ``nonce``. httpx makes the three calls
 (discovery, token, JWKS); PyJWT verifies the ID token. Only asymmetric algorithms are accepted.
-Which claims carry roles, organisations and groups is configuration (``ClaimMapping``), so the
-same code serves PingFederate in production and Keycloak in development.
+Which claims carry roles, organisations, groups and entitlements is configuration
+(``ClaimMapping``), so the same code serves PingFederate in production and Keycloak in
+development. The adapter only extracts (``LoginClaims``); what a value means is decided by
+``app.domain.entitlements.resolve`` with the directory (ADR 0049 point 3).
 
     start_login ──► authorization_endpoint?…&state&nonce&code_challenge
     finish_login ─► token_endpoint (code + code_verifier, client_secret_basic)
                  ─► verify id_token: signature (JWKS, kid), iss, aud/azp, exp, iat, nonce
-                 ─► claims ──ClaimMapping──► Principal
+                 ─► claims ──ClaimMapping──► LoginClaims
 """
 
 import base64
@@ -25,7 +27,8 @@ import httpx
 import jwt
 import structlog
 
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
+from app.domain.entitlements import LoginClaims
 from app.domain.ports import IdentityError, LoginStart
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 from app.domain.tunable import value_of
@@ -47,12 +50,18 @@ class ClaimMapping:
         organisation_claim: Claim with organisation slugs (for org_admin).
         group_claim: Claim with group slugs (for group_admin).
         role_values: Claim value per role, e.g. ``{"openplanner-superuser": SUPERUSER}``.
+        entitlement_claim: Claim with the entitlement values (ADR 0049).
+        entitlement_prefix: Only values starting with ``<prefix>:`` are kept.
+        max_entitlements: More values in the entitlement claim refuses the login.
     """
 
     role_claim: str
     organisation_claim: str
     group_claim: str
     role_values: Mapping[str, Role]
+    entitlement_claim: str = "openplanner_entitlements"
+    entitlement_prefix: str = "openplanner"
+    max_entitlements: int = 200
 
 
 @dataclass(frozen=True)
@@ -76,7 +85,7 @@ def _values(claim: object) -> frozenset[str]:
     return frozenset()
 
 
-def claim_mapping(values: Mapping[str, str]) -> ClaimMapping:
+def claim_mapping(values: Mapping[str, str], max_entitlements: int = 200) -> ClaimMapping:
     """Return the mapping the login settings describe (``oidc_*`` keys, ADR 0042 §8)."""
     return ClaimMapping(
         role_claim=values["oidc_role_claim"],
@@ -89,36 +98,50 @@ def claim_mapping(values: Mapping[str, str]) -> ClaimMapping:
             values["oidc_role_auditor"]: Role.AUDITOR,
             values["oidc_role_agent"]: Role.AGENT,
         },
+        entitlement_claim=values.get("oidc_entitlement_claim", "openplanner_entitlements"),
+        entitlement_prefix=values.get("oidc_entitlement_prefix", "openplanner"),
+        max_entitlements=max_entitlements,
     )
 
 
-def principal_from_claims(
+def login_claims(
     claims: Mapping[str, Any], mapping: ClaimMapping, *, log_lockout: bool = True
-) -> Principal:
-    """Map verified ID-token claims to a ``Principal``.
+) -> LoginClaims:
+    """Extract what the verified ID-token claims say about the admin.
 
     Values of built-in roles become roles. The other role values are kept as
     ``role_claims`` (custom roles link to them, ADR 0039): only values shaped like a claim
     value, at most ``MAX_ROLE_CLAIMS`` of them in a stable order, so the session stays small.
-    A login that resolves to no built-in role, or to a scoped role without its scope claim, is
-    logged for the operator (``_log_lockout``); custom roles are attached after this, so such a
-    login may still hold one.
+    Of the entitlement claim only the values with the prefix are kept (ADR 0049 point 5). A
+    login that resolves to no role at all is logged for the operator (``_log_lockout``).
+
+    Raises:
+        IdentityError: ``too_many_entitlements`` when the entitlement claim holds more values
+            than ``mapping.max_entitlements`` (ADR 0049 point 6: fail closed).
     """
     seen = _values(claims.get(mapping.role_claim))
     roles = frozenset(mapping.role_values[value] for value in seen if value in mapping.role_values)
     others = sorted(v for v in seen if v not in mapping.role_values and is_claim_value(v))
+    entitlements = _values(claims.get(mapping.entitlement_claim))
+    if len(entitlements) > mapping.max_entitlements:
+        log.warning(
+            "oidc.too_many_entitlements", actor=str(claims["sub"]), values=len(entitlements)
+        )
+        raise IdentityError("too_many_entitlements")
+    head = f"{mapping.entitlement_prefix}:"
     name = claims.get("name") or claims.get("preferred_username") or claims["sub"]
-    principal = Principal(
+    found = LoginClaims(
         subject=str(claims["sub"]),
         display_name=str(name)[:200],
         roles=roles,
         organisations=_values(claims.get(mapping.organisation_claim)),
         groups=_values(claims.get(mapping.group_claim)),
         role_claims=frozenset(others[:MAX_ROLE_CLAIMS]),
+        entitlements=frozenset(v for v in entitlements if v.startswith(head)),
     )
     if log_lockout:  # a dry run's verdict is audited, not logged as a lockout
-        _log_lockout(claims, mapping, principal, len(seen))
-    return principal
+        _log_lockout(claims, mapping, found, len(seen))
+    return found
 
 
 MAX_LOGGED_CLAIMS = 50
@@ -131,21 +154,22 @@ def _claim_names(claims: Mapping[str, Any]) -> list[str]:
 
 
 def _log_lockout(
-    claims: Mapping[str, Any], mapping: ClaimMapping, principal: Principal, seen: int
+    claims: Mapping[str, Any], mapping: ClaimMapping, principal: LoginClaims, seen: int
 ) -> None:
     """Log why a login grants nothing (ADR 0042 §8 rule 4), so the operator can fix it.
 
     The log names the configured claim that was missing and the *names* of the claims that
     were present, and counts the role values that matched nothing. Claim values (names,
-    addresses, role and organisation values) are never logged.
+    addresses, role, organisation and entitlement values) are never logged.
     """
-    if not principal.roles:
+    if not principal.roles and not principal.entitlements:
         missing = None if mapping.role_claim in claims else mapping.role_claim
         log.warning(
             "oidc.no_role",
             actor=principal.subject,
             missing_claim=missing,
             role_values_seen=seen,
+            entitlements_seen=len(_values(claims.get(mapping.entitlement_claim))),
             claims_present=_claim_names(claims),
         )
         return
@@ -211,14 +235,15 @@ class OidcIdentityProvider:
 
     async def finish_login(
         self, *, code: str, redirect_uri: str, code_verifier: str, nonce: str
-    ) -> Principal:
-        """Exchange the code, verify the ID token and return the admin it describes.
+    ) -> LoginClaims:
+        """Exchange the code, verify the ID token and return what it says about the admin.
 
         Raises:
-            IdentityError: ``token_exchange_failed``, ``invalid_token`` or ``nonce_mismatch``.
+            IdentityError: ``token_exchange_failed``, ``invalid_token``, ``nonce_mismatch``
+                or ``too_many_entitlements``.
         """
         claims = await self._claims(code, redirect_uri, code_verifier, nonce)
-        return principal_from_claims(claims, value_of(self._config.mapping))
+        return login_claims(claims, value_of(self._config.mapping))
 
     async def finish_trial_login(
         self,
@@ -228,15 +253,17 @@ class OidcIdentityProvider:
         code_verifier: str,
         nonce: str,
         trial: Mapping[str, str],
-    ) -> tuple[Principal, Principal]:
-        """Return the admin under the current mapping and under the ``trial`` one (§8).
+    ) -> tuple[LoginClaims, LoginClaims]:
+        """Return the claims under the current mapping and under the ``trial`` one (§8).
 
         Raises:
             IdentityError: As ``finish_login``.
         """
         claims = await self._claims(code, redirect_uri, code_verifier, nonce)
-        current = principal_from_claims(claims, value_of(self._config.mapping))
-        return current, principal_from_claims(claims, claim_mapping(trial), log_lockout=False)
+        mapping = value_of(self._config.mapping)
+        current = login_claims(claims, mapping)
+        tried = claim_mapping(trial, mapping.max_entitlements)
+        return current, login_claims(claims, tried, log_lockout=False)
 
     async def _claims(
         self, code: str, redirect_uri: str, code_verifier: str, nonce: str

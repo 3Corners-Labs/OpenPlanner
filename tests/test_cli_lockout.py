@@ -12,6 +12,7 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.models import AuditEventRow, ClosureNoticeRow, ClosureRow
 from app.cli import CLI_ACTOR, _closure_lift, _closure_start, _oidc_check, main
 from app.config import Settings
+from app.domain.authorization import Grant
 from tests.adapters.db.conftest import seed_group
 from tests.adapters.test_oidc_check import _transport
 from tests.support.database import migrated_database
@@ -119,8 +120,8 @@ async def test_the_domain_rules_are_the_portals(configured: Settings) -> None:
 
 def test_the_cli_actor_is_no_login() -> None:
     assert CLI_ACTOR.subject == "system:cli"
-    assert CLI_ACTOR.organisations == frozenset()
-    assert CLI_ACTOR.groups == frozenset()
+    assert CLI_ACTOR.grants == frozenset({Grant("superuser")})
+    assert CLI_ACTOR.custom_roles == frozenset()
 
 
 @pytest.mark.parametrize(

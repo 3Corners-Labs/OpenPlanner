@@ -29,6 +29,30 @@
     <a href="/admin/groups/{{ summary.group.slug }}">{{ _("admin.cancel") }}</a>
   </div>
 </form>
+<section class="card" id="idp-key" aria-labelledby="idp-key-heading">
+  <div class="card__header">
+    <h2 id="idp-key-heading">{{ _("admin.group.idp_key.title") }}</h2>
+    <p class="card__lead">{{ _("admin.group.idp_key.lead") }}</p>
+  </div>
+  {% if idp.can_manage %}
+  <form method="post" action="/admin/groups/{{ summary.group.slug }}/settings/idp-key" novalidate>
+    <div class="form-grid">
+      <div class="field{% if idp.error %} field--error{% endif %}">
+        <label for="idp_key">{{ _("admin.idp_mapping.idp_key") }}</label>
+        <input id="idp_key" name="idp_key" type="text" value="{{ idp.value }}" required maxlength="63" pattern="{{ idp.pattern }}" autocapitalize="none" spellcheck="false" aria-describedby="idp_key-hint{% if idp.error %} idp_key-error{% endif %}"{% if idp.error %} aria-invalid="true"{% endif %}>
+        <p class="hint" id="idp_key-hint">{{ _("admin.group.idp_key.hint") }}{% if idp.holders %} {{ _("admin.idp_mapping.holders_warning", count=idp.holders) }}{% endif %}</p>
+        {% if idp.error %}<p class="field__error" id="idp_key-error">{{ idp.error }}</p>{% endif %}
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.save") }}</button>
+    </div>
+  </form>
+  {% else %}
+  <p>{{ _("admin.idp_mapping.idp_key") }}: <code>{{ idp.value }}</code></p>
+  <p class="muted">{{ _("admin.group.idp_key.readonly") }}</p>
+  {% endif %}
+</section>
 <section class="card" id="booking-form" aria-labelledby="booking-form-heading">
   <div class="card__header">
     <h2 id="booking-form-heading">{{ _("admin.form_fields.title") }}</h2>

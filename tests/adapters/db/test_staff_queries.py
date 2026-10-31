@@ -12,7 +12,9 @@ from app.domain.authorization import Role, Scope
 from app.domain.staff import Membership, StaffFilter, StaffMember, visible
 from tests.support.domain import NOW
 
-DEMO, DEMO_TEAM, OTHER = Membership("demo"), Membership("demo", "team"), Membership("andere")
+DEMO = Membership("org_admin", "demo")
+DEMO_TEAM = Membership("group_admin", "demo", "team")
+OTHER = Membership("org_admin", "andere")
 
 PEOPLE = (
     StaffMember(
@@ -46,7 +48,7 @@ SCOPES = (
     Scope(everything=True),
     Scope(organisations=frozenset({"demo"})),
     Scope(organisations=frozenset({"andere"})),
-    Scope(groups=frozenset({"team"})),
+    Scope(groups=frozenset({("demo", "team")})),
     Scope(),
 )
 

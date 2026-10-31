@@ -11,6 +11,7 @@ from app.domain.authorization import Principal
 from app.domain.privacy import PII_FIELDS
 from app.web.protection import booking_limit
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.principals import principal
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
 
@@ -285,7 +286,7 @@ async def test_a_mapping_that_keeps_the_superuser_is_saved_after_a_fresh_login(
 async def test_a_mapping_that_would_lock_out_is_not_saved(site: Site) -> None:
     await site.login_as(SUPER)
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    nobody = Principal("sub-super", "Sanne Super", frozenset(), frozenset(), frozenset())
+    nobody = principal("sub-super", "Sanne Super", frozenset(), frozenset(), frozenset())
 
     location = await _try(site, nobody)
 

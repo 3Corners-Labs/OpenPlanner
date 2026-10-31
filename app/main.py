@@ -63,11 +63,14 @@ from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
+from app.domain.entitlements import ClaimMode
 from app.domain.event_context import set_service
 from app.domain.form_service import FormService
 from app.domain.holiday_service import HolidayService
+from app.domain.idp_mapping import IdpMappingService, MappingSettings
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
+from app.domain.login_service import ClaimSettings, LoginService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.meeting_status_service import MeetingStatusService
 from app.domain.messaging_service import MessagingService
@@ -131,7 +134,9 @@ def oidc_provider(
         client_id=settings.oidc_client_id,
         client_secret=secret,
         scopes=settings.oidc_scopes,
-        mapping=lambda: claim_mapping(current().login_values),
+        mapping=lambda: claim_mapping(
+            current().login_values, current().oidc_entitlements_max_values
+        ),
     )
     return OidcIdentityProvider(config, http)
 
@@ -282,6 +287,25 @@ def create_app(
             confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
         )
         app.state.admin_service = AdminService(uow, clock)
+        # ADR 0049: claims become grants per request; the mode is class B, the prefix C.
+        app.state.login_service = LoginService(
+            uow,
+            app.state.admin_service,
+            lambda: ClaimSettings(
+                ClaimMode(settings.oidc_claim_mode), live().oidc_entitlement_prefix
+            ),
+        )
+        app.state.idp_mapping_service = IdpMappingService(
+            uow,
+            clock,
+            app.state.admin_service,
+            lambda: MappingSettings(
+                ClaimMode(settings.oidc_claim_mode),
+                live().oidc_entitlement_claim,
+                live().oidc_entitlement_prefix,
+                live().idp_mapping_refused_window_days,
+            ),
+        )
         app.state.form_service = FormService(
             uow, clock, app.state.admin_service, lambda: live().booking_form_max_custom_fields
         )

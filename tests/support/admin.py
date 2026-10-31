@@ -5,17 +5,18 @@ else's), so every test can check both sides of the matrix.
 """
 
 from app.domain.audit import Outcome
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.scheduling import Organisation
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import make_group
+from tests.support.principals import principal
 
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
-GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
-OUTSIDER = Principal("x-1", "X", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
-AUDITOR = Principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
-OTHER_TEAM = Principal(
+SUPER = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+ORG_ADMIN = principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+GROUP_ADMIN = principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
+OUTSIDER = principal("x-1", "X", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
+AUDITOR = principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
+OTHER_TEAM = principal(
     "g-2", "G2", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"andere-team"})
 )
 

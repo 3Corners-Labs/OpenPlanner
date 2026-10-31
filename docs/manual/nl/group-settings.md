@@ -269,3 +269,12 @@ Met **Ja** kan de groep ook als widget op de website van de organisatie staan, n
 pagina van de groep. Dat werkt alleen op de websites die de organisatie heeft toegestaan onder
 [Insluiten op websites](embedding.md). Met **Nee** (de standaard) is de groep alleen via haar
 eigen pagina te boeken, ook als de widget op een toegestane website staat.
+
+## Koppeling identiteitsprovider
+
+De **IdP-waarde** is de naam waarmee de identiteitsprovider deze groep noemt in een recht,
+bijvoorbeeld `openplanner:group_admin:gem-a/burgerzaken`. Een nieuwe groep begint met de code
+van het webadres als waarde. Alleen een organisatiebeheerder of de superuser wijzigt de
+waarde; het formulier waarschuwt hoeveel medewerkers toegang verliezen tot de
+identiteitsprovider de nieuwe waarde stuurt. De volledige lijst staat op **Koppeling
+identiteitsprovider**.
