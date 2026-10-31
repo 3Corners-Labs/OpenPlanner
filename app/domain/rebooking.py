@@ -71,8 +71,8 @@ def may_take(group: Group, start: datetime, now: datetime) -> bool:
     """Return whether a planner may still put a booking into the slot at ``start``.
 
     The slot must lie beyond the planner lead and the dispatch lead, as for any planner change,
-    and beyond the group's change deadline (the participant's change lead, ADR 0069), so the participant
-    can still confirm or change the proposal.
+    and beyond the group's change deadline (the participant's change lead, ADR 0069), so the
+    participant can still confirm or change the proposal.
     """
     lead = max(group.planner_lead, group.dispatch_lead)
     return now < start - lead and now < group.change_deadline(start)
