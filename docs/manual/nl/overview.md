@@ -23,7 +23,8 @@ tijden.
 
 - **Wachtrij in mijn groepen**: per groep met een eigen wachtrij in uw bereik hoeveel deelnemers
   er wachten, hoe lang de langste wacht al duurt en hoeveel medewerkers die de wachtrij mogen
-  bedienen nu zijn aangemeld. De groepsnaam opent de wachtrij. Alleen aantallen en minuten,
+  bedienen nu zijn aangemeld. Een deelnemer met een afspraak telt mee zodra die in de lobby
+  staat; een directe oproep telt vanaf de aanvraag, ook als de link nog niet is geopend. De groepsnaam opent de wachtrij. Alleen aantallen en minuten,
   nooit namen. Kleuren bij een te lange wachttijd volgen met de wachttijdgrenzen.
 - **Lopende taken**: de achtergrondtaken die nu bezig zijn en de taken die na de laatste
   poging zijn mislukt, met soort, status en tijdstip. Nooit de inhoud van een taak of de
