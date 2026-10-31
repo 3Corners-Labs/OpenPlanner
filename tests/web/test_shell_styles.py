@@ -176,3 +176,19 @@ def test_the_week_markup_sits_in_its_frame() -> None:
 
     assert '<div class="week-frame">' in template
     assert template.index("week-frame") < template.index('class="week"')
+
+
+def test_the_icon_rail_is_written_once_and_switches_on_the_menu_width() -> None:
+    """The rail serves the tablet's default and the admin's choice from the menu button (#208).
+
+    A container query on the menu's own width carries the rail rules, so neither the tablet
+    media query nor the collapsed state repeats them; those two only set the width.
+    """
+    sheet = CSS_COMMENT.sub("", (STATIC / "admin.css").read_text())
+
+    assert ".admin-nav {\n  container-type: inline-size;" in sheet
+    assert sheet.count("@container (max-width: 6rem)") == 1
+    assert sheet.count(".admin-nav a:is(:hover, :focus-visible) > span") == 1
+    assert sheet.count("--adm-nav-width: 3.75rem") == 2
+    for state in ("collapse", "expand"):
+        assert f".admin-nav-toggle__button--{state}" in sheet
