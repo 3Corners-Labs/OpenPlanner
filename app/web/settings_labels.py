@@ -34,6 +34,8 @@ SETTING_LABELS: dict[str, str] = {
     "security_event_retention_days": "settings.field.security_event_retention_days.label",
     "diagnostic_event_retention_days": "settings.field.diagnostic_event_retention_days.label",
     "diagnostic_mode_hours": "settings.field.diagnostic_mode_hours.label",
+    "trace_level_max_hours": "settings.field.trace_level_max_hours.label",
+    "sql_slow_ms": "settings.field.sql_slow_ms.label",
     "security_event_window_minutes": "settings.field.security_event_window_minutes.label",
     "security_event_max_sources": "settings.field.security_event_max_sources.label",
     "audit_export_max_rows": "settings.field.audit_export_max_rows.label",
