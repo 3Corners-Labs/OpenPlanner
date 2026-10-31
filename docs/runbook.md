@@ -918,7 +918,19 @@ On a branch `release/v0.3.0` (or ask Claude Code: "make the release PR for v0.3.
 1. `pyproject.toml`: `version = "0.3.0"`, then `uv lock` (only the `openplanner` line changes).
 2. `CHANGELOG.md`: rename `## Unreleased` to `## 0.3.0 (2026-11-02)` and put a fresh empty
    `## Unreleased` above it.
-3. Commit `chore(release): v0.3.0`, open the PR, merge it (squash) when CI is green.
+3. Commit `chore(release): v0.3.0` and open the PR.
+4. For a minor or major release (`vX.Y.0`), run the audit on the release branch (ADR 0078):
+
+   ```sh
+   make release-audit
+   ```
+
+   It runs the Codex CLI (`codex`, a second model, read-only) over everything since the last
+   release. Paste the findings into the PR under `## Release audit`: P1 findings are fixed
+   first, P2 findings become issues, and the section ends with `Verdict: pass`. `main.yml`
+   refuses a `vX.Y.0` tag whose release PR has no such section. A patch release skips this.
+5. A release PR is a decision: it merges (squash) once CI is green and the product owner has
+   set the label `po:approved`.
 
 ### Step 3: the tag
 

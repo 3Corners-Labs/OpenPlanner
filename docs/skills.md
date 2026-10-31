@@ -15,6 +15,7 @@ green CI, and never through a skill (ADR 0012).
 | Bug or failing test | `/investigate` | Find the root cause before fixing |
 | Before the PR | `security-review` (repo), then `/review` | Five review questions and abuse cases; then a pre-landing diff review |
 | End | `/context-save` | Hand over to the next session |
+| Release of a minor or major version | `/codex review` via `make release-audit` | Independent review of everything since the last release by a second model, pasted into the release PR (ADR 0078) |
 
 ## Per work package
 
