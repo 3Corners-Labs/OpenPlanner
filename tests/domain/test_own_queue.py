@@ -193,10 +193,10 @@ def _member(roles: frozenset[Role], *memberships: Membership) -> StaffMember:
 
 
 def test_works_queue_follows_the_matrix_for_the_members_memberships() -> None:
-    agent = _member(frozenset({Role.AGENT}), Membership("demo", "team"))
-    elsewhere = _member(frozenset({Role.AGENT}), Membership("demo", "other"))
-    org_admin = _member(frozenset({Role.ORG_ADMIN}), Membership("demo"))
-    auditor = _member(frozenset({Role.AUDITOR}), Membership("demo"))
+    agent = _member(frozenset({Role.AGENT}), Membership("agent", "demo", "team"))
+    elsewhere = _member(frozenset({Role.AGENT}), Membership("agent", "demo", "other"))
+    org_admin = _member(frozenset({Role.ORG_ADMIN}), Membership("org_admin", "demo"))
+    auditor = _member(frozenset({Role.AUDITOR}), Membership("auditor", "demo"))
 
     assert works_queue(agent, "team", "demo")
     assert not works_queue(elsewhere, "team", "demo")

@@ -1,12 +1,13 @@
 """The admin session: who is logged in, and the OIDC login in progress (ADR 0013).
 
-Stored in Starlette's signed session cookie (``op_admin``, path ``/admin``). Holds the
-principal's subject, display name, roles, organisations and groups, the other role claim
-values (custom roles link to them, ADR 0039; the roles themselves are looked up per request),
-the login time, when activity was last written to the staff record (ADR 0046), the chosen
-theme, the alert preferences and the scope filter. The absolute lifetime is enforced here; the
-cookie's own expiry slides with every response. The theme, the preferences and the filter live
-here so that they need no cookie of their own.
+Stored in Starlette's signed session cookie (``op_admin``, path ``/admin``). Holds what the
+ID token said (``LoginClaims``: subject, display name, the legacy roles, organisations and
+groups, the other role claim values and the recognised entitlement values of ADR 0049), the
+login time, when activity was last written to the staff record (ADR 0046), the chosen theme,
+the menu width, the alert preferences and the scope filter. The grants themselves are resolved
+from those claims on every request (``app.domain.login_service``), never stored. The absolute
+lifetime is enforced here; the cookie's own expiry slides with every response. The theme, the
+menu width, the preferences and the filter live here so that they need no cookie of their own.
 """
 
 from dataclasses import dataclass
@@ -15,7 +16,8 @@ from typing import Any
 
 from fastapi import Request
 
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
+from app.domain.entitlements import MAX_SESSION_GRANTS, LoginClaims
 from app.domain.ports import LoginStart
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 
@@ -25,12 +27,20 @@ _SEEN_AT = "seen_at"
 _OIDC = "oidc"
 _TRIAL = "login_trial"
 _THEME = "theme"
+_NAV = "nav"
 _ALERT_BANNER = "alert_banner"
 _ALERT_POPUPS = "alert_popups"
 _SCOPE = "scope"
 
 THEMES = ("system", "light", "dark")
 """The portal's colour themes; ``system`` follows the device setting and is the default."""
+
+NAV_CHOICES = ("collapsed", "expanded")
+"""How wide the admin wants the side navigation: the icon rail or the full menu.
+
+Without a choice the width decides (the rail on a tablet, the full menu on a desktop); the
+choice overrides it on both, as the admin shell design does.
+"""
 
 ALERT_POPUPS = ("all", "warnings", "outages", "off")
 """Which alerts may pop up (ADR 0061 §7): all, warnings and outages, outages only, none."""
@@ -102,41 +112,46 @@ def pop_login_start(request: Request) -> dict[str, str] | None:
     return value if isinstance(value, dict) else None
 
 
-def start_session(request: Request, principal: Principal, now: datetime) -> None:
-    """Replace the whole session with a fresh one for ``principal`` (no session fixation).
+def start_session(request: Request, claims: LoginClaims, now: datetime) -> None:
+    """Replace the whole session with a fresh one for ``claims`` (no session fixation).
 
-    Only the theme and the alert preferences carry over, so a fresh login (ADR 0015) keeps the
-    admin's choices.
+    Only the theme, the menu width and the alert preferences carry over, so a fresh login
+    (ADR 0015) keeps the admin's choices. ``claims.entitlements`` should hold the recognised
+    values only (the login service sees to that), so the cookie stays within its 4 kB.
     """
     theme = session_theme(request)
+    nav = session_nav(request)
     prefs = session_alert_prefs(request)
     request.session.clear()
     if theme != THEMES[0]:
         request.session[_THEME] = theme
+    if nav is not None:
+        request.session[_NAV] = nav
     if prefs != AlertPrefs(True, DEFAULT_ALERT_POPUPS):
         request.session[_ALERT_BANNER] = prefs.banner
         request.session[_ALERT_POPUPS] = prefs.popups
     request.session[_PRINCIPAL] = {
-        "subject": principal.subject,
-        "name": principal.display_name,
-        "roles": sorted(principal.roles),
-        "organisations": sorted(principal.organisations),
-        "groups": sorted(principal.groups),
-        "claims": sorted(principal.role_claims),
+        "subject": claims.subject,
+        "name": claims.display_name,
+        "roles": sorted(claims.roles),
+        "organisations": sorted(claims.organisations),
+        "groups": sorted(claims.groups),
+        "claims": sorted(claims.role_claims),
+        "entitlements": sorted(claims.entitlements)[:MAX_SESSION_GRANTS],
     }
     request.session[_LOGIN_AT] = now.isoformat()
     request.session[_SEEN_AT] = now.isoformat()
 
 
-def current_principal(request: Request, now: datetime, lifetime: timedelta) -> Principal | None:
-    """Return the logged-in principal, or ``None`` (not logged in, expired or tampered)."""
+def current_login(request: Request, now: datetime, lifetime: timedelta) -> LoginClaims | None:
+    """Return the logged-in admin's claims, or ``None`` (not logged in, expired or tampered)."""
     data: Any = request.session.get(_PRINCIPAL)
     login_at: Any = request.session.get(_LOGIN_AT)
     if not isinstance(data, dict) or not isinstance(login_at, str):
         return None
     try:
         started = datetime.fromisoformat(login_at)
-        principal = Principal(
+        claims = LoginClaims(
             subject=str(data["subject"]),
             display_name=str(data["name"]),
             roles=frozenset(Role(r) for r in data["roles"]),
@@ -145,6 +160,9 @@ def current_principal(request: Request, now: datetime, lifetime: timedelta) -> P
             role_claims=frozenset(
                 str(c) for c in data.get("claims", [])[:MAX_ROLE_CLAIMS] if is_claim_value(str(c))
             ),
+            entitlements=frozenset(
+                str(e) for e in data.get("entitlements", [])[:MAX_SESSION_GRANTS]
+            ),
         )
     except (KeyError, TypeError, ValueError):
         request.session.clear()
@@ -152,7 +170,7 @@ def current_principal(request: Request, now: datetime, lifetime: timedelta) -> P
     if now - started > lifetime:
         request.session.clear()
         return None
-    return principal
+    return claims
 
 
 def login_age(request: Request, now: datetime) -> timedelta | None:
@@ -198,6 +216,19 @@ def choose_theme(request: Request, theme: str | None) -> str:
     if theme in THEMES:
         request.session[_THEME] = theme
     return session_theme(request)
+
+
+def session_nav(request: Request) -> str | None:
+    """Return the menu width chosen in this session (one of ``NAV_CHOICES``), or ``None``."""
+    value: Any = request.session.get(_NAV)
+    return value if value in NAV_CHOICES else None
+
+
+def choose_nav(request: Request, nav: str | None) -> str | None:
+    """Remember ``nav`` for this session if it is a known choice; return the session's choice."""
+    if nav in NAV_CHOICES:
+        request.session[_NAV] = nav
+    return session_nav(request)
 
 
 def session_alert_prefs(request: Request) -> AlertPrefs:

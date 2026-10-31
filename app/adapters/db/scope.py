@@ -6,7 +6,7 @@ Every scoped listing of the database adapter (``uow`` and its query mixins) filt
 
 from typing import Any
 
-from sqlalchemy import ColumnElement, false, or_, true
+from sqlalchemy import ColumnElement, and_, false, or_, true
 from sqlalchemy.sql.elements import SQLCoreOperations
 
 from app.domain.authorization import Scope
@@ -27,5 +27,9 @@ def scope_filter(
     if scope.organisations:
         conditions.append(organisation_slug.in_(sorted(scope.organisations)))
     if scope.groups and group_slug is not None:
-        conditions.append(group_slug.in_(sorted(scope.groups)))
+        # ADR 0049 point 11: a group only together with its organisation.
+        conditions += [
+            and_(organisation_slug == organisation, group_slug == group)
+            for organisation, group in sorted(scope.groups)
+        ]
     return or_(*conditions) if conditions else false()

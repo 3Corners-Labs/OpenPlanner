@@ -26,6 +26,7 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.RIGHTS_VIEW: "authz.permission.rights_view",
     Permission.MATRIX_VIEW: "authz.permission.matrix_view",
     Permission.ORGANISATION_MANAGE: "authz.permission.organisation_manage",
+    Permission.ORGANISATION_VIEW: "authz.permission.organisation_view",
     Permission.AUDIT_VIEW: "authz.permission.audit_view",
     Permission.AUDIT_EXPORT: "authz.permission.audit_export",
     Permission.DIAGNOSTICS_MANAGE: "authz.permission.diagnostics_manage",
@@ -56,6 +57,8 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.SETTINGS_LOGIN_MANAGE: "authz.permission.settings_login_manage",
     Permission.SETTINGS_ORGANISATION_MANAGE: "authz.permission.settings_organisation_manage",
     Permission.TEXTS_ORGANISATION_MANAGE: "authz.permission.texts_organisation_manage",
+    Permission.IDP_MAPPING_VIEW: "authz.permission.idp_mapping_view",
+    Permission.IDP_MAPPING_MANAGE: "authz.permission.idp_mapping_manage",
 }
 
 API_SCOPE_LABELS: dict[ApiScope, str] = {

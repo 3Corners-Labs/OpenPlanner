@@ -73,6 +73,8 @@ class ErrorCode(StrEnum):
     SETTING_NOT_LOCKED = "setting_not_locked"
     NOTHING_TO_RETRY = "nothing_to_retry"
     LOGIN_LOCKOUT = "login_lockout"
+    LOGIN_REFUSED = "login_refused"
+    IDP_KEY_TAKEN = "idp_key_taken"
     TLS_CERTIFICATE_UNREADABLE = "tls_certificate_unreadable"
     TLS_KEY_MISMATCH = "tls_key_mismatch"
     TLS_NAME_MISMATCH = "tls_name_mismatch"

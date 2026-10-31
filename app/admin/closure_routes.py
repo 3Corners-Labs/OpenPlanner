@@ -34,10 +34,10 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, Response
+from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin import forms
-from app.admin.authz import AdminContext, RequirePermission
+from app.admin.authz import AdminContext, RequirePermission, admin_service
 from app.admin.forms import (
     Field,
     FormData,
@@ -49,7 +49,14 @@ from app.admin.forms import (
 )
 from app.admin.group_routes import group_page
 from app.admin.image_forms import decorative, image_fields
-from app.admin.pages import Locale, SameOrigin, page, with_manual
+from app.admin.pages import (
+    Locale,
+    SameOrigin,
+    organisation_header,
+    organisation_redirect,
+    page,
+    with_manual,
+)
 from app.domain.authorization import Permission
 from app.domain.booking import Booking
 from app.domain.closure import (
@@ -606,19 +613,12 @@ class GroupStateView:
     suspended: int
 
 
-@router.get("/closures", response_class=HTMLResponse)
+@router.get("/closures")
 async def organisations(
-    request: Request,
-    locale: Locale,
-    context: Annotated[
-        AdminContext, Depends(RequirePermission(Permission.ORGANISATION_CLOSURE, fresh=True))
-    ],
-) -> HTMLResponse:
-    """List the organisations the admin may close as a whole."""
-    found = await closure_service(request).organisations(context.principal)
-    return page(
-        request, locale, "admin/closure_list.html", context.principal, {"organisations": found}
-    )
+    context: Annotated[AdminContext, Depends(RequirePermission(Permission.ORGANISATION_CLOSURE))],
+) -> RedirectResponse:
+    """Send the old closures list to the organisation's Closure tab (ADR 0047 §4)."""
+    return organisation_redirect(context.principal, Permission.ORGANISATION_CLOSURE, "closure")
 
 
 async def _organisation_response(
@@ -646,7 +646,7 @@ async def _organisation_response(
         )
         for s in states
     ]
-    name = states[0].summary.organisation_name if states else org
+    name = await admin_service(request).organisation_name(org)
     first = states[0].summary.group if states else None
     fields = _closure_fields(form, locale, first, None, choice.chosen) if first else []
     contacts = await contact_service(request).view(context.principal, org)
@@ -658,6 +658,7 @@ async def _organisation_response(
         {
             "organisation_slug": org,
             "organisation_name": name,
+            "org_header": organisation_header(request, locale, context.principal, name, org),
             "groups": groups,
             "any_closed": any(g.closure for g in groups),
             "contact_count": len(contacts.block.options) if contacts.block else 0,

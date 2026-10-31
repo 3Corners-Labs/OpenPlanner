@@ -11,14 +11,15 @@ from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.closures import confirmed_booking
 from tests.support.domain import NOW, make_group
+from tests.support.principals import principal
 
-GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
-OTHER_ADMIN = Principal(
-    "x-1", "X", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"elders"})
+GROUP_ADMIN = principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
+ORG_ADMIN = principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+OTHER_ADMIN = principal(
+    "x-1", "X", frozenset({Role.GROUP_ADMIN}), frozenset(), [("andere", "elders")]
 )
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-NO_ROLE = Principal("n-1", "N", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
+SUPER = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+NO_ROLE = principal("n-1", "N", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
 
 
 @pytest.fixture
@@ -135,12 +136,12 @@ def _contexts(uow: InMemoryUnitOfWork) -> list[tuple[str, str, str | None, str |
 async def test_login_is_recorded_per_organisation_and_group_in_scope(
     service: AdminService, uow: InMemoryUnitOfWork
 ) -> None:
-    both = Principal(
+    both = principal(
         "b-1",
         "Bea Beide",
         frozenset({Role.ORG_ADMIN, Role.GROUP_ADMIN}),
         frozenset({"andere"}),
-        frozenset({"demo", "unknown-group"}),
+        frozenset({"demo"}),
     )
 
     await service.record_login(both)
@@ -159,7 +160,7 @@ async def test_auditor_login_is_recorded_in_their_organisation(
     service: AdminService, uow: InMemoryUnitOfWork
 ) -> None:
     # ADR 0039: the organisation admins and auditors of "demo" can see who checked the log.
-    auditor = Principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
+    auditor = principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
 
     await service.record_login(auditor)
 
@@ -200,9 +201,7 @@ async def test_org_admin_sees_logins_of_admins_in_their_organisation(
 
 async def test_audit_log_shows_the_latest_known_name(service: AdminService) -> None:
     await service.record_login(GROUP_ADMIN)
-    renamed = Principal(
-        "g-1", "Gina Groep", GROUP_ADMIN.roles, GROUP_ADMIN.organisations, GROUP_ADMIN.groups
-    )
+    renamed = Principal("g-1", "Gina Groep", GROUP_ADMIN.grants)
     await service.record_login(renamed)
     await service.record("unknown-subject", "group.edit", Outcome.SUCCESS, "", "demo", "demo")
 
@@ -241,17 +240,17 @@ async def test_a_login_records_the_staff_member_and_what_changed(
     # ADR 0046: just in time from the claims; a move to another group is audited there.
     await service.record_login(GROUP_ADMIN)
     uow.state.audit.clear()
-    moved = Principal("g-1", "G", GROUP_ADMIN.roles, frozenset(), frozenset({"andere-team"}))
+    moved = principal("g-1", "G", GROUP_ADMIN.roles, frozenset(), frozenset({"andere-team"}))
 
     await service.record_login(moved)
 
     member = uow.state.staff["g-1"]
-    assert member.memberships == {Membership("andere", "andere-team")}
+    assert member.memberships == {Membership("group_admin", "andere", "andere-team")}
     assert member.first_seen_at == member.last_login_at == member.last_seen_at == NOW
     changes = [(e.organisation, e.group, e.detail) for e in uow.state.audit[1:]]
     assert changes == [
-        ("andere", "andere-team", "group.add:andere-team"),
-        ("demo", "demo", "group.remove:demo"),
+        ("andere", "andere-team", "grant.add:group_admin:andere/andere-team"),
+        ("demo", "demo", "grant.remove:group_admin:demo/demo"),
     ]
 
 
@@ -271,9 +270,9 @@ async def test_seen_and_logout_are_noted(
 
 
 async def test_staff_are_listed_within_the_viewers_scope(service: AdminService) -> None:
-    for principal in (GROUP_ADMIN, ORG_ADMIN, OTHER_ADMIN, SUPER):
-        await service.record_login(principal)
-    elsewhere = Principal(
+    for admin in (GROUP_ADMIN, ORG_ADMIN, OTHER_ADMIN, SUPER):
+        await service.record_login(admin)
+    elsewhere = principal(
         "e-1", "E", frozenset({Role.ORG_ADMIN}), frozenset({"demo", "andere"}), frozenset()
     )
     await service.record_login(elsewhere)
@@ -303,9 +302,9 @@ async def test_a_person_outside_the_scope_is_not_found(service: AdminService) ->
 async def test_the_home_organisation_is_the_one_organisation_an_admin_belongs_to() -> None:
     uow = InMemoryUnitOfWork()
     service = AdminService(uow, FixedClock())
-    org_admin = Principal("o", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
-    two = Principal("t", "T", frozenset({Role.ORG_ADMIN}), frozenset({"demo", "b"}), frozenset())
-    superuser = Principal("s", "S", frozenset({Role.SUPERUSER}), frozenset({"demo"}), frozenset())
+    org_admin = principal("o", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+    two = principal("t", "T", frozenset({Role.ORG_ADMIN}), frozenset({"demo", "b"}), frozenset())
+    superuser = principal("s", "S", frozenset({Role.SUPERUSER}), frozenset({"demo"}), frozenset())
 
     assert await service.home_organisation(org_admin) == "demo"
     assert await service.home_organisation(two) is None

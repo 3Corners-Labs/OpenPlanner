@@ -527,7 +527,7 @@ async def overview(
                 choice,
                 in_scope,
                 locale.gettext,
-                can_function(principal)(Permission.ORGANISATION_MANAGE),
+                can_function(principal)(Permission.ORGANISATION_VIEW),
             ),
         },
     )
