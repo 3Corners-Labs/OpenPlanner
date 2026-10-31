@@ -571,6 +571,9 @@ msgstr "Beheermenu"
 msgid "admin.nav.more"
 msgstr "Meer"
 
+msgid "admin.nav.toggle"
+msgstr "Menu in- of uitklappen"
+
 msgid "admin.nav.section.monitor"
 msgstr "Bewaken"
 
