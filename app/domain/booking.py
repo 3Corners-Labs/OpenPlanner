@@ -317,7 +317,7 @@ class Booking:
         )
 
     def confirm(self, now: datetime) -> "Booking":
-        """Return the booking confirmed by the participant (or a planner on their behalf) at ``now``.
+        """Return the booking confirmed by the participant (or by a planner for them) at ``now``.
 
         Raises:
             DomainError: ``booking_not_pending`` if it does not await confirmation.

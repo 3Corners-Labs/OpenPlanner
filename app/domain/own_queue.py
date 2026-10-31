@@ -34,7 +34,7 @@ from app.domain.scheduling import Group
 from app.domain.staff import StaffMember
 
 __all__ = [
-    "Participantstate",
+    "ParticipantState",
     "Claim",
     "QueueEntry",
     "QueueSummary",
@@ -61,7 +61,7 @@ class VideoState(StrEnum):
     """The provider refused; the reason is on the booking's timeline (ADR 0065)."""
 
 
-class Participantstate(StrEnum):
+class ParticipantState(StrEnum):
     """Where the participant is, as the Webex webhooks report it (ADR 0010)."""
 
     NOT_YET = "not_yet"
@@ -80,15 +80,15 @@ def video_state(booking: Booking, status: CallStatus) -> VideoState:
     return VideoState.PENDING
 
 
-def participant_state(status: CallStatus) -> Participantstate:
+def participant_state(status: CallStatus) -> ParticipantState:
     """Return where the participant of a booking with ``status`` is."""
     if status.call is CallState.ENDED:
-        return Participantstate.ENDED
+        return ParticipantState.ENDED
     if status.host_joined:
-        return Participantstate.IN_CALL
+        return ParticipantState.IN_CALL
     if status.participants > 0:
-        return Participantstate.IN_LOBBY
-    return Participantstate.NOT_YET
+        return ParticipantState.IN_LOBBY
+    return ParticipantState.NOT_YET
 
 
 @dataclass(frozen=True)
