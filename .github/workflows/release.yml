@@ -46,6 +46,11 @@ on:
 permissions:
   contents: read
 
+# bash with pipefail: a failing script before `| tee` fails its step.
+defaults:
+  run:
+    shell: bash
+
 # One release at a time: two dispatches never race for the same number or tag.
 concurrency:
   group: release
