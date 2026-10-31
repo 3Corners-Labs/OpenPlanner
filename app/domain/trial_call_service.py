@@ -139,7 +139,8 @@ class TrialCallService:
     def _view(self, booking: Booking, group: Group) -> TrialView:
         """Return the page's view of ``booking`` now."""
         state = trial_state(booking, group, self._clock.now())
-        if self._video is None and state in (TrialState.AVAILABLE, TrialState.ACTIVE):
+        # Only opening a new trial call needs Webex; one that is already open keeps its way in.
+        if self._video is None and state is TrialState.AVAILABLE:
             state = TrialState.OFF
         expires = booking.trial.expires_at if booking.trial and state is TrialState.ACTIVE else None
         left = max(0, group.trial_calls_per_booking - booking.trial_count)
