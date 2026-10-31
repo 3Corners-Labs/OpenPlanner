@@ -5917,9 +5917,6 @@ msgstr "Instelling"
 msgid "admin.settings.value"
 msgstr "Waarde"
 
-msgid "admin.settings.notes"
-msgstr "Opmerkingen"
-
 msgid "admin.settings.locked"
 msgstr "Vastgezet door de beheerder van de server"
 
@@ -6264,12 +6261,6 @@ msgstr "Uiterlijk bevestigen (uren voor de afspraak)"
 
 msgid "settings.field.booking_confirm_window_hours.label"
 msgstr "Bevestigen binnen (uren na het boeken)"
-
-msgid "admin.settings.change"
-msgstr "Wijzigen"
-
-msgid "admin.settings.new_value"
-msgstr "Nieuwe waarde"
 
 msgid "admin.settings.hours"
 msgstr "Terug naar standaard na (uren, hooguit {max})"

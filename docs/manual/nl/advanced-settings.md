@@ -120,15 +120,18 @@ de updatecontrole en de Webex Service App met het WxCC-adres. De webhookgeheimen
 zelf maakt) en de inlogkoppeling volgen in een latere versie. Na een gewijzigde Webex-waarde
 worden videogesprekken en werkitems binnen ongeveer tien seconden opnieuw gekoppeld. Zet bij een nieuwe Service App de client-ID, het client secret en het refresh token tegelijk.
 
-- Vul onder **Wijzigen** de nieuwe waarde in en kies **Opslaan**. Het portaal accepteert alleen
+- Elk onderwerp is één formulier met één knop **Opslaan** onderaan. Vul bij de instellingen die
+  u wilt wijzigen de nieuwe waarde in (aan of uit kiest u uit een lijst) en kies **Opslaan**;
+  alleen de waarden die afwijken van de huidige worden opgeslagen. Het portaal accepteert alleen
   waarden binnen zijn grenzen, bijvoorbeeld 1 tot 30 afspraken per uur per adres. Een waarde
-  daarbuiten wordt bij de regel geweigerd, met de reden.
+  daarbuiten wordt bij de regel geweigerd, met de reden; de waarden erboven in hetzelfde
+  formulier zijn dan al opgeslagen, die eronder nog niet.
 - Sommige instellingen hangen van elkaar af: kritieke opslag moet onder weinig opslag blijven, en
   de herinnering om opnieuw te boeken moet vóór het vervallen komen. Een waarde die een andere
   instelling tegenspreekt, wordt geweigerd.
 - **Standaardwaarde gebruiken** haalt de hier ingestelde waarde weg; dan geldt weer de
   standaardwaarde (of de waarde van de server).
-- Een instelling die **vastgezet is door de beheerder van de server** heeft geen formulier:
+- Een instelling die **vastgezet is door de beheerder van de server** heeft geen veld:
   wijzig die in de omgeving van de server, of vraag het de beheerder. **Beheer dit voortaan hier**
   neemt de waarde van de server over in het portaal; vraag de beheerder daarna de variabele die
   bij de regel staat weg te halen en te herstarten. Tot dan geldt de waarde van de server nog.
