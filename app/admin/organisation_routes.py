@@ -14,6 +14,8 @@ a confirmation. ``OrganisationService`` authorises again, validates and audits.
     GET  /admin/organisations/{org}/edit  organisation.manage   edit form
     POST /admin/organisations/{org}       organisation.manage   save name, default language and
                                                                 the IdP value (ADR 0049 point 4)
+    GET  /admin/organisations/{org}/delete organisation.delete  confirmation page (ADR 0084)
+    POST /admin/organisations/{org}/delete organisation.delete  delete an empty organisation
 """
 
 from typing import Annotated
@@ -35,7 +37,12 @@ from app.admin.pages import Locale, SameOrigin, organisation_header, page
 from app.domain.authorization import Permission, scope_for
 from app.domain.entitlements import IDP_KEY_PATTERN
 from app.domain.errors import DomainError
-from app.domain.organisations import NewOrganisation, OrganisationService, OrganisationSettings
+from app.domain.organisations import (
+    NewOrganisation,
+    Occupancy,
+    OrganisationService,
+    OrganisationSettings,
+)
 from app.domain.scheduling import Organisation
 from app.web.locale import RequestLocale
 
@@ -56,6 +63,13 @@ Manage = Annotated[
     AdminContext, Depends(RequirePermission(Permission.ORGANISATION_MANAGE, fresh=True))
 ]
 """Forms and changes: only after a recent login (ADR 0015)."""
+Delete = Annotated[
+    AdminContext, Depends(RequirePermission(Permission.ORGANISATION_DELETE, fresh=True))
+]
+"""Deleting (ADR 0084 point 4): the superuser's own right, after a recent login."""
+
+CONFIRMATION_FIELD = "confirmation"
+"""The input on the delete page: the organisation's name, typed back (ADR 0084 point 5)."""
 
 
 def organisation_service(request: Request) -> OrganisationService:
@@ -182,7 +196,11 @@ async def organisations(request: Request, locale: Locale, context: View) -> Resp
         locale,
         "admin/organisations.html",
         context.principal,
-        {"organisations": found, "language_names": names},
+        {
+            "organisations": found,
+            "language_names": names,
+            "done": done_message(request, locale.gettext),
+        },
     )
 
 
@@ -262,3 +280,70 @@ async def save_organisation(
         holders = await service.holders_of(context.principal, org)
         return _form_page(request, locale, context, form, current, 422, holders)
     return redirect_done(f"{LIST_URL}/{org}", "saved" if changed else "unchanged")
+
+
+# --- delete (ADR 0084 point 4) --------------------------------------------------------------
+
+
+def _delete_page(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    current: Organisation,
+    occupancy: Occupancy,
+    form: FormData,
+    status: int,
+) -> HTMLResponse:
+    """Render the confirmation page with what still keeps the organisation, if anything."""
+    confirmation = Field(
+        CONFIRMATION_FIELD,
+        locale.gettext("admin.organisation.delete.confirmation"),
+        hint=locale.gettext("admin.organisation.delete.confirmation_hint", name=current.name),
+        error=form.error_for(CONFIRMATION_FIELD),
+        attributes={"maxlength": "200", "autocomplete": "off"},
+    )
+    response = page(
+        request,
+        locale,
+        "admin/organisation_delete.html",
+        context.principal,
+        {
+            "organisation": current,
+            "org_header": organisation_header(
+                request, locale, context.principal, current.name, current.slug
+            ),
+            "occupancy": occupancy,
+            "confirmation": confirmation,
+            "errors": form.errors,
+        },
+    )
+    response.status_code = status
+    return response
+
+
+@router.get("/organisations/{org}/delete", response_class=HTMLResponse)
+async def delete_form(request: Request, locale: Locale, org: str, context: Delete) -> HTMLResponse:
+    """Show what deleting removes, what still keeps the organisation, and ask for its name."""
+    service = organisation_service(request)
+    current = await service.get(context.principal, org)
+    occupancy = await service.occupancy(context.principal, org)
+    form = FormData({}, locale.gettext)
+    return _delete_page(request, locale, context, current, occupancy, form, 200)
+
+
+@router.post("/organisations/{org}/delete", response_class=HTMLResponse)
+async def delete_organisation(
+    request: Request, locale: Locale, org: str, _: SameOrigin, context: Delete
+) -> Response:
+    """Delete the organisation when the name matches and nothing is left; then to the list."""
+    service = organisation_service(request)
+    current = await service.get(context.principal, org)
+    form = await read_form(request, locale)
+    try:
+        await service.delete(context.principal, org, form.text(CONFIRMATION_FIELD))
+    except DomainError as error:
+        raise_refusal(error)
+        form.refusal(error)
+        occupancy = await service.occupancy(context.principal, org)
+        return _delete_page(request, locale, context, current, occupancy, form, 422)
+    return redirect_done(LIST_URL, "organisation_deleted")

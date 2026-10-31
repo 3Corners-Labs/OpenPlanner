@@ -29,6 +29,23 @@ from app.domain.scheduling import RESERVED_SLUGS, Organisation
 
 _PERMISSION = Permission.ORGANISATION_MANAGE
 IDP_KEY_CHANGED = "organisation.idp_key_changed"
+DELETED = "deleted"
+"""Detail of the ``organisation.delete`` audit event (ADR 0084 point 4)."""
+
+
+@dataclass(frozen=True)
+class Occupancy:
+    """What still keeps an organisation from being deleted (ADR 0084 point 4)."""
+
+    groups: int
+    api_clients: int
+
+    @property
+    def empty(self) -> bool:
+        """Whether nothing is left that refers to the organisation."""
+        return not (self.groups or self.api_clients)
+
+
 """ADR 0049 point 4: the superuser changed the value the IdP names the organisation by."""
 
 
@@ -162,6 +179,44 @@ class OrganisationService:
                         IDP_KEY_CHANGED,
                     )
         return changed
+
+    async def occupancy(self, principal: Principal, slug: str) -> Occupancy:
+        """Return what still keeps the organisation, for the delete page (ADR 0084).
+
+        Raises:
+            DomainError: ``not_permitted`` or ``organisation_not_found``.
+        """
+        require(await self._admin.authorize(principal, Permission.ORGANISATION_DELETE))
+        async with self._uow.read() as tx:
+            current = await organisation_by_slug(tx, slug)
+            return Occupancy(
+                await tx.count_groups(current.id), await tx.count_api_clients(current.id)
+            )
+
+    async def delete(self, principal: Principal, slug: str, confirmation: str) -> None:
+        """Erase an empty organisation (ADR 0084 point 4).
+
+        ``confirmation`` is the organisation's name typed back. Branding, channels and their
+        secrets, embedding, contacts, texts, settings, scenarios and identity providers go
+        with the row by the schema's cascades; groups and API clients keep it.
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found``,
+                ``confirmation_mismatch``, ``organisation_has_groups`` or
+                ``organisation_has_api_clients``.
+        """
+        permission = Permission.ORGANISATION_DELETE
+        require(await self._admin.authorize(principal, permission))
+        async with self._uow.locked() as tx:
+            current = await organisation_by_slug(tx, slug)
+            if confirmation.strip().casefold() != current.name.casefold():
+                raise DomainError(ErrorCode.CONFIRMATION_MISMATCH, "confirmation")
+            if await tx.count_groups(current.id):
+                raise DomainError(ErrorCode.ORGANISATION_HAS_GROUPS)
+            if await tx.count_api_clients(current.id):
+                raise DomainError(ErrorCode.ORGANISATION_HAS_API_CLIENTS)
+            await record_change(tx, self._clock.now(), principal, permission, slug, None, DELETED)
+            await tx.delete_organisation(current.id)
 
     async def holders_of(self, principal: Principal, slug: str) -> int:
         """Return how many people last held a grant on the organisation (ADR 0049 point 4).

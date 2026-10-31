@@ -55,7 +55,7 @@ Side navigation: *Organisations*. A row *Tab › Sub-tab* is a sub-tab of that t
 
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|
-| Overview | `/admin/organisations/{org}` | `organisation.view` | wide | `/admin/organisations/{org}/edit` |
+| Overview | `/admin/organisations/{org}` | `organisation.view` | wide | `/admin/organisations/{org}/edit`, `/admin/organisations/{org}/delete` |
 | Overview › Settings | `/admin/organisations/{org}/settings` | `settings.organisation.manage` | standard | – |
 | Overview › Texts | `/admin/organisations/{org}/texts` | `texts.organisation.manage` | standard | `/admin/organisations/{org}/texts/{text_locale}` |
 | Overview › Embedding | `/admin/organisations/{org}/embedding` | `embedding.manage` | standard | – |

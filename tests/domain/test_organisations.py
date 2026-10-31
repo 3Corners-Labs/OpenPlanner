@@ -5,6 +5,7 @@ from dataclasses import replace
 import pytest
 
 from app.domain.admin import AdminService
+from app.domain.api_clients import ApiClient
 from app.domain.audit import Outcome
 from app.domain.authorization import Role
 from app.domain.branding import Branding
@@ -13,7 +14,7 @@ from app.domain.organisations import NewOrganisation, OrganisationService, Organ
 from app.domain.scheduling import Organisation
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.domain import NOW
+from tests.support.domain import NOW, make_group
 from tests.support.principals import principal
 
 SUPER = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
@@ -191,3 +192,53 @@ def test_service_needs_at_least_one_locale(uow: InMemoryUnitOfWork) -> None:
     clock = FixedClock(NOW)
     with pytest.raises(ValueError, match="locale"):
         OrganisationService(uow, clock, AdminService(uow, clock), ())
+
+
+# --- deleting (ADR 0084 point 4) -------------------------------------------------------------
+
+
+async def test_superuser_deletes_an_empty_organisation_by_typing_its_name(
+    service: OrganisationService, uow: InMemoryUnitOfWork
+) -> None:
+    await service.delete(SUPER, "demo", " demo-GEMEENTE ")
+
+    assert uow.state.organisations == {}
+    assert 1 not in uow.state.organisation_slugs
+    event = uow.state.audit[-1]
+    assert (event.actor, event.action, event.outcome, event.organisation, event.detail) == (
+        "s-1",
+        "organisation.delete",
+        Outcome.SUCCESS,
+        "demo",
+        "deleted",
+    )
+
+
+async def test_deleting_needs_the_exact_name_and_the_superuser(
+    service: OrganisationService, uow: InMemoryUnitOfWork
+) -> None:
+    with pytest.raises(DomainError, match="confirmation_mismatch: confirmation"):
+        await service.delete(SUPER, "demo", "Demo")
+    with pytest.raises(DomainError, match="not_permitted"):
+        await service.delete(ORG_ADMIN, "demo", "Demo-gemeente")
+
+    assert 1 in uow.state.organisations
+
+
+async def test_an_organisation_with_groups_or_api_clients_stays(
+    service: OrganisationService, uow: InMemoryUnitOfWork
+) -> None:
+    uow.state.groups[1] = make_group(id=1, organisation_id=1, slug="demo", archived_at=NOW)
+
+    with pytest.raises(DomainError, match="organisation_has_groups"):
+        await service.delete(SUPER, "demo", "Demo-gemeente")
+    assert (await service.occupancy(SUPER, "demo")).groups == 1
+
+    del uow.state.groups[1]
+    uow.state.api_clients["bot"] = ApiClient(
+        1, "bot", "Bot", "demo", frozenset(), frozenset(), (), True, "h", NOW, NOW
+    )
+    with pytest.raises(DomainError, match="organisation_has_api_clients"):
+        await service.delete(SUPER, "demo", "Demo-gemeente")
+    assert (await service.occupancy(SUPER, "demo")).api_clients == 1
+    assert 1 in uow.state.organisations

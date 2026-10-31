@@ -39,6 +39,7 @@ from app.adapters.db.images import ImageQueries, page_image
 from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
     ApiClientGroupRow,
+    ApiClientRow,
     AuditEventRow,
     BookingEventRow,
     BookingRow,
@@ -750,6 +751,28 @@ class SqlTransaction(
         await self._session.flush()
         await self._session.refresh(row)
         return _organisation(row)
+
+    async def count_groups(self, organisation_id: int) -> int:
+        """Return how many groups the organisation has, archived ones included."""
+        count = await self._session.scalar(
+            select(func.count(GroupRow.id)).where(GroupRow.organisation_id == organisation_id)
+        )
+        return int(count or 0)
+
+    async def count_api_clients(self, organisation_id: int) -> int:
+        """Return how many API clients belong to the organisation."""
+        count = await self._session.scalar(
+            select(func.count(ApiClientRow.id)).where(
+                ApiClientRow.organisation_id == organisation_id
+            )
+        )
+        return int(count or 0)
+
+    async def delete_organisation(self, organisation_id: int) -> None:
+        """Erase the organisation's row; the schema's cascades take the rest."""
+        await self._session.execute(
+            delete(OrganisationRow).where(OrganisationRow.id == organisation_id)
+        )
 
     async def save_organisation(self, organisation: Organisation) -> None:
         """Store name, default locale and IdP value; slug and branding columns are left alone."""
