@@ -27,7 +27,7 @@ async def test_a_booking_past_its_purge_moment_needs_attention(site: Site) -> No
     assert '<h1 id="page-title">Bewaartermijnen</h1>' in text
     assert "Afspraken met persoonsgegevens over de bewaartermijn: 1." in text
     assert '<span class="chip chip--danger">Actie nodig</span>' in text
-    # Counts only: nothing of the citizen reaches the page, not even for the auditor.
+    # Counts only: nothing of the participant reaches the page, not even for the auditor.
     for pii in ("Ada", "ada@example.org", "06 1234 5678"):
         assert pii not in text
     assert 'href="/admin/retention"' in text

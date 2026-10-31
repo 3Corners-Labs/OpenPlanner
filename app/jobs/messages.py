@@ -1,4 +1,4 @@
-"""Compose the citizen's messages from editable text blocks (ADR 0009, ADR 0022).
+"""Compose the participant's messages from editable text blocks (ADR 0009, ADR 0022).
 
 Every email uses one fixed layout (HTML plus plain text); an SMS is one text block. Text
 comes from the group's own texts first, then the i18n chain (organisation override,
@@ -109,7 +109,7 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
     JobType.SEND_REINSTATEMENT: MessageKind(
         "message.reinstatement.subject", "message.reinstatement.intro", True, False
     ),
-    # ADR 0044: a planner asked the citizen to choose a new time; the old time is removed
+    # ADR 0044: a planner asked the participant to choose a new time; the old time is removed
     # from their calendar with the request, and the request lapses at ``rebook_by``.
     JobType.SEND_REBOOK_REQUEST: MessageKind(
         "message.rebook_request.subject",
@@ -234,7 +234,7 @@ class MessageComposer:
         await self._translator.refresh()
 
     def manage_url(self, booking: Booking) -> str:
-        """Return the citizen's management link for ``booking``."""
+        """Return the participant's management link for ``booking``."""
         return f"{self._base_url}/b/{derive_token(self._token_key, booking.token_salt)}"
 
     def compose(
@@ -351,7 +351,7 @@ class MessageComposer:
             else None,
         }
         attachments: tuple[Attachment, ...] = ()
-        if not on_hold and kind.calendar:  # on hold: leave the citizen's calendar alone
+        if not on_hold and kind.calendar:  # on hold: leave the participant's calendar alone
             attachments = (self._calendar(kind, booking, group, now, manage_url, _),)
         return OutboundMessage(
             channel=ChannelKind.EMAIL,
@@ -368,7 +368,7 @@ class MessageComposer:
         """Return the calendar invite to an own-queue team, or its withdrawal (ADR 0043).
 
         Sent to ``group.calendar_invite_address`` in the organisation's ``locale``, in the same
-        fixed layout as the citizen's mail. It carries the first name (the invite only), the
+        fixed layout as the participant's mail. It carries the first name (the invite only), the
         booking reference, the time and a link to the group's queue: never the meeting link,
         which an agent gets by claiming, nor any other personal data.
 

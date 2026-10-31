@@ -41,7 +41,7 @@ def _image_src(page: str) -> str:
     return match.group(1)
 
 
-async def test_group_admin_adds_an_image_that_citizens_see_without_metadata(site: Site) -> None:
+async def test_group_admin_adds_an_image_that_participants_see_without_metadata(site: Site) -> None:
     await _closed(site)
 
     response = await _upload(site, jpeg())

@@ -224,7 +224,7 @@ class AuthorizedClient:
         """Send the request and return the response if its status is in ``ok``.
 
         ``explain`` logs Webex's error message on a refusal; pass it only for requests that
-        carry no citizen data, since Webex may echo submitted values.
+        carry no participant data, since Webex may echo submitted values.
 
         Raises:
             IntegrationError: ``unauthorized``, ``rejected`` (4xx; not retryable),
@@ -285,7 +285,7 @@ def http_failure(response: httpx.Response, *, explain: bool = False) -> Integrat
 
     Shared by every HTTP adapter (Webex Meetings, WxCC, Webex Connect SMS, GitHub releases).
     The log line carries the status and the ``trackingId``, if any; with ``explain``
-    (requests without citizen data only) also Webex's reason with email addresses masked,
+    (requests without participant data only) also Webex's reason with email addresses masked,
     which the error then carries to the timeline and the system event (ADR 0065). Never the
     rest of the body.
     """

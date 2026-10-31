@@ -178,7 +178,7 @@ async def test_the_queue_widget_has_an_empty_state_without_an_own_queue(site: Si
     assert "Geen eigen wachtrij in uw bereik." in text
 
 
-async def test_the_queue_widget_counts_the_waiting_citizen_and_the_agent_signed_in(
+async def test_the_queue_widget_counts_the_waiting_participant_and_the_agent_signed_in(
     site: Site,
 ) -> None:
     booking_id = await own_queue(site)

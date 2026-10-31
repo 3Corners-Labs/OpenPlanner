@@ -158,7 +158,7 @@ PARTICIPANTS = {
             "state": "joined",
             "joinedTime": "2026-01-05T08:00:40Z",
         },
-        {  # the citizen, in the call
+        {  # the participant, in the call
             "id": "p-2",
             "host": False,
             "coHost": False,

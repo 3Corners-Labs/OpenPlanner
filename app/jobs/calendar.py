@@ -1,6 +1,6 @@
 """Minimal iCalendar (RFC 5545) entries for confirmation, change, reminder and cancellation.
 
-No personal data goes into the citizen's event: summary, team and the management link only.
+No personal data goes into the participant's event: summary, team and the management link only.
 The invite to an own-queue team (ADR 0043) is a ``REQUEST`` (RFC 5546) with the team's address
 as organizer and attendee, so the event lands in the team's calendar without answers; its
 ``CANCEL`` withdraws it. The ``SEQUENCE`` rises with each change.

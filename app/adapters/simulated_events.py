@@ -8,14 +8,14 @@ deduplication, timeline and call status. No tunnel or network is involved.
 
     task_connected   WxCC task:connected       an agent accepted the work item
     host_joined      Webex participant joined  the agent (host) is in the meeting
-    guest_joined     Webex participant joined  the citizen is in the meeting
+    guest_joined     Webex participant joined  the participant is in the meeting
     participant_left Webex participant left
     meeting_started  Webex meeting started
     meeting_ended    Webex meeting ended
     task_failed      WxCC task:failed          nobody picked the work item up
     task_ended       WxCC task:ended
-    trial_entered    Webex participant joined  the citizen is in the trial call (ADR 0071)
-    trial_left       Webex participant left    the citizen left the trial call
+    trial_entered    Webex participant joined  the participant is in the trial call (ADR 0071)
+    trial_left       Webex participant left    the participant left the trial call
 
 The trial events carry the trial meeting's id, so the webhook matches them on the booking's
 trial call and records them as the trial kinds (ADR 0076), never on the call status.

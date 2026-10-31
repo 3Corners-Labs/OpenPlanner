@@ -147,7 +147,7 @@ async def test_a_failed_video_link_is_said_on_the_row_and_after_the_claim(site: 
     assert _poll_url(claimed) is None  # nothing will change any more
 
 
-async def test_the_claimed_page_follows_the_citizen(site: Site) -> None:
+async def test_the_claimed_page_follows_the_participant(site: Site) -> None:
     booking_id = await _own_queue(site)
     await site.login_as(AGENT)
     picked = await site.client.post(f"{QUEUE}/next", headers=SAME_ORIGIN)

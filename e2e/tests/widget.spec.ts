@@ -6,7 +6,7 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { citizenEmail, expectNoAxeViolations, tabTo } from '../helpers';
+import { participantEmail, expectNoAxeViolations, tabTo } from '../helpers';
 
 const HOST = process.env.WIDGET_HOST_URL ?? 'http://localhost:8001/';
 
@@ -59,7 +59,7 @@ test('book through the widget with the keyboard only', async ({ page }, info) =>
   await page.keyboard.press('Enter');
   await expect(widget.getByLabel('E-mailadres')).toBeFocused();
   await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.type(citizenEmail(info));
+  await page.keyboard.type(participantEmail(info));
   await tabTo(page, widget.getByRole('button', { name: 'Afspraak maken' }));
   await page.keyboard.press('Enter');
 

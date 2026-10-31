@@ -21,7 +21,7 @@ INTRO = (
     "en de besluiten. De bewerkbare bron van de platen is openplanner-architectuur.drawio."
 )
 LEGEND_TEXT = (
-    "Kleuren: groen = burgerkanaal, blauw = kern (domein), oranje = beheer, paars = platform, "
+    "Kleuren: groen = deelnemerskanaal, blauw = kern (domein), oranje = beheer, paars = platform, "
     "grijs = extern. Gestippeld = ontworpen, nog niet gebouwd."
 )
 
@@ -29,7 +29,7 @@ LEGEND_TEXT = (
 class Family(StrEnum):
     """The colour family of a block; the same on every plate and in the register."""
 
-    CITIZEN = "citizen"
+    PARTICIPANT = "participant"
     CORE = "core"
     ADMIN = "admin"
     PLATFORM = "platform"
@@ -38,7 +38,7 @@ class Family(StrEnum):
 
 
 FAMILY_NAMES = {
-    Family.CITIZEN: "Burgerkanaal",
+    Family.PARTICIPANT: "Deelnemerskanaal",
     Family.CORE: "Kern (domein)",
     Family.ADMIN: "Beheer",
     Family.PLATFORM: "Platform",
@@ -58,7 +58,7 @@ PLATES = (
     Plate(
         "Hoofdlijn: bouwblokken en omgeving",
         "Zeventien bouwblokken in vier families. Links wie de dienst gebruikt, rechts de systemen "
-        "waar OpenPlanner mee praat. Burgers loggen nooit in; alleen beheerders via de identity "
+        "waar OpenPlanner mee praat. Deelnemers loggen nooit in; alleen beheerders via de identity "
         "provider. Persoonsgegevens staan alleen op Booking.",
     ),
     Plate(
@@ -92,18 +92,18 @@ class Block:
 BLOCKS = (
     Block(
         "B1",
-        Family.CITIZEN,
-        "Burgerportaal",
+        Family.PARTICIPANT,
+        "Deelnemersportaal",
         "groepspagina /g/slug, maandkalender, beheerpagina /b/token, join-pagina",
         "Groepspagina /g/{slug}, maandkalender als progressive enhancement, beheerpagina "
         "/b/{token} voor verzetten en annuleren, join-pagina. Werkt zonder JavaScript en zonder "
         "muis.",
-        "api/booking_pages · citizen · slot_picker · join_pages · web/static/calendar.js",
+        "api/booking_pages · participant · slot_picker · join_pages · web/static/calendar.js",
         "0020",
     ),
     Block(
         "B2",
-        Family.CITIZEN,
+        Family.PARTICIPANT,
         "Widget",
         "Web Component, dezelfde tokens",
         "Dezelfde boekflow als Web Component in Shadow DOM, gestyled via --booking-*-tokens en "
@@ -114,7 +114,7 @@ BLOCKS = (
     ),
     Block(
         "B3",
-        Family.CITIZEN,
+        Family.PARTICIPANT,
         "Direct videobellen",
         "nu bellen, plafond per groep, plek in de rij",
         "'Nu bellen' per groep: meeting en work item direct, plafond op open gesprekken, plek in "
@@ -272,7 +272,7 @@ BLOCKS = (
 LOGGING_BOX = ("Logging &amp; health", "structlog JSON, PII-masker, /healthz")
 
 ACTORS = (
-    ("Burger", "boekt, wijzigt, belt in", True),
+    ("Deelnemer", "boekt, wijzigt, belt in", True),
     ("Website organisatie", "beslisboom, linkt naar /g/slug", True),
     ("Beheerder", "groep, organisatie, superuser", True),
     ("Contactcenter-bot", "WxCC AI Agent, vraagt vrije tijden", True),
@@ -290,7 +290,7 @@ EXTERNALS = (
 )
 
 PLATE1_FOOTNOTE = (
-    "Burgers loggen nooit in; alleen beheerders via de IdP. Persoonsgegevens staan alleen op "
+    "Deelnemers loggen nooit in; alleen beheerders via de IdP. Persoonsgegevens staan alleen op "
     "<b>Booking</b>; naar WxCC gaan alleen voornaam en host-link."
 )
 
@@ -325,9 +325,14 @@ LAYERS = (
         "Ingangen",
         "api · admin · jobs · cli",
         (
-            C(Family.CITIZEN, "B1", "Burgerpagina's", "api/booking_pages · citizen · slot_picker"),
-            C(Family.CITIZEN, "B1 B7", "Join-pagina", "api/join_pages"),
-            C(Family.CITIZEN, "B3", "Direct bellen", "api/direct_pages"),
+            C(
+                Family.PARTICIPANT,
+                "B1",
+                "Deelnemerspagina's",
+                "api/booking_pages · participant · slot_picker",
+            ),
+            C(Family.PARTICIPANT, "B1 B7", "Join-pagina", "api/join_pages"),
+            C(Family.PARTICIPANT, "B3", "Direct bellen", "api/direct_pages"),
             C(Family.CORE, "B7", "Webhooks in", "api/webhooks"),
             C(Family.ADMIN, "B11", "Machine-API", "api/agent/ (token, RequireScope)"),
             C(Family.ADMIN, "B9 B10", "Beheerportaal", "admin/*_routes · authz · session"),
@@ -471,7 +476,7 @@ LANES = (
         "SMTP, STARTTLS / TLS<br>login uit kanaalinstelling",
         "Mailprovider",
         "per organisatie; dev: Mailpit",
-        "mail aan burger: voornaam, datum, team, beheerlink, .ics",
+        "mail aan deelnemer: voornaam, datum, team, beheerlink, .ics",
         "alleen foutcode (unreachable, tls_failed, auth_failed …)",
     ),
     Lane(

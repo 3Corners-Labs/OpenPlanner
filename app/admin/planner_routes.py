@@ -2,7 +2,7 @@
 
 Every route needs ``bookings.manage`` on the group with a fresh login (ADR 0015); the domain
 decides again (``PlannerService``). Each form names the booking by reference and first name
-only, as the agenda does. The citizen is always told; the reason is chosen from a fixed list,
+only, as the agenda does. The participant is always told; the reason is chosen from a fixed list,
 never typed. After a change the planner lands back on the day in the agenda.
 
     GET  /admin/groups/{slug}/agenda/bookings/{booking_id}/move     bookings.manage
@@ -63,7 +63,7 @@ REASON_LABELS: dict[ChangeReason, str] = {
     ChangeReason.TECHNICAL: "admin.planner.reason_technical",
     ChangeReason.UNFORESEEN: "admin.planner.reason_unforeseen",
 }
-"""What the planner sees per reason (the citizen gets ``message.reason.<code>``)."""
+"""What the planner sees per reason (the participant gets ``message.reason.<code>``)."""
 
 ManageBookings = Annotated[
     AdminContext,
@@ -192,7 +192,7 @@ async def move(
     _: SameOrigin,
     context: ManageBookings,
 ) -> Response:
-    """Move a booking; the citizen gets the change message with the new time."""
+    """Move a booking; the participant gets the change message with the new time."""
     form = await read_form(request, locale)
     start = parse_start(form.text("start"))
     if start is None:
@@ -313,7 +313,7 @@ async def cancel(
     _: SameOrigin,
     context: ManageBookings,
 ) -> Response:
-    """Cancel a booking; the citizen gets the cancellation message with the reason."""
+    """Cancel a booking; the participant gets the cancellation message with the reason."""
     return await _reason_post(request, locale, context, booking_id, CANCEL)
 
 
@@ -324,7 +324,7 @@ async def cancel(
 async def rebook_form(
     request: Request, locale: Locale, slug: str, booking_id: int, context: ManageBookings
 ) -> HTMLResponse:
-    """Ask for the reason before asking the citizen to choose a new time."""
+    """Ask for the reason before asking the participant to choose a new time."""
     booking = await _changeable(request, context, booking_id)
     form = FormData({}, locale.gettext)
     return _reason_response(request, locale, context, booking, form, REBOOK)
@@ -339,7 +339,7 @@ async def rebook(
     _: SameOrigin,
     context: ManageBookings,
 ) -> Response:
-    """Ask the citizen to choose a new time; the place is freed at once."""
+    """Ask the participant to choose a new time; the place is freed at once."""
     return await _reason_post(request, locale, context, booking_id, REBOOK)
 
 
@@ -395,7 +395,7 @@ async def slot_rebook_form(
 async def slot_rebook(
     request: Request, locale: Locale, slug: str, _: SameOrigin, context: ManageBookings
 ) -> Response:
-    """Ask the citizens of exactly the confirmed bookings to choose a new time."""
+    """Ask the participants of exactly the confirmed bookings to choose a new time."""
     form = await read_form(request, locale)
     moment = parse_start(form.text("start"))
     ids = _confirmed_ids(form.text("ids"))
