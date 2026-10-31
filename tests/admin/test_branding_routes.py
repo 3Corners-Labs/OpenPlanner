@@ -16,14 +16,15 @@ async def _save(site: Site, **data: str) -> httpx.Response:
     return await site.client.post(PAGE, data=data, headers=SAME_ORIGIN)
 
 
-async def test_superuser_finds_the_organisations_in_the_menu(site: Site) -> None:
+async def test_superuser_reaches_branding_from_the_organisation_page(site: Site) -> None:
     await site.login_as(SUPER)
     overview = (await site.client.get("/admin/")).text
-    listing = (await site.client.get("/admin/branding")).text
+    organisation = (await site.client.get("/admin/organisations/demo")).text
 
-    assert 'href="/admin/branding"' in overview
-    assert f'href="{PAGE}"' in listing
-    assert 'href="/admin/organisations/andere/branding"' in listing
+    # ADR 0047 §4: no branding entry in the menu; the tab on the organisation's page.
+    assert 'href="/admin/branding"' not in overview
+    assert f'href="{PAGE}"' in organisation
+    assert (await site.client.get("/admin/branding")).status_code == 308
 
 
 async def test_name_and_colour_are_saved_shown_and_audited(site: Site) -> None:

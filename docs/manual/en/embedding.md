@@ -2,8 +2,9 @@
 
 A group always has its own page, which you can link to from your website. If you would rather
 show the booking calendar right inside a page of your own website, you can use the widget.
-This screen decides on which websites that is allowed. You open it with **Embedding** in the
-menu. Organisation admins and the superuser can use it, each for their own organisations.
+This screen decides on which websites that is allowed. You open it with **Organisations →
+organisation → Overview → Embedding**. Organisation admins and the superuser can use it, each
+for their own organisations.
 
 Two things are needed before a group appears in the widget:
 

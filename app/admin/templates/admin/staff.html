@@ -22,6 +22,10 @@
       <input type="checkbox" id="staff-dormant" name="dormant" value="1"{% if filters.dormant %} checked{% endif %}>
       <label for="staff-dormant">{{ _("admin.staff.dormant_only", days=dormant_days) }}</label>
     </div>
+    <div class="choice__option">
+      <input type="checkbox" id="staff-unrecognised" name="unrecognised" value="1"{% if filters.unrecognised %} checked{% endif %}>
+      <label for="staff-unrecognised">{{ _("admin.staff.unrecognised_only") }}</label>
+    </div>
     <button type="submit" class="button button--secondary">{{ _("admin.staff.apply") }}</button>
     {% if filters.active %}<a href="/admin/staff">{{ _("admin.staff.clear") }}</a>{% endif %}
   </div>

@@ -8,12 +8,19 @@ Roles come from the identity provider (ADR 0013). Each permission applies at one
     GROUP         something of one group (settings, opening hours, texts, bookings, the
                   audit log of its events)
 
-A role grants a permission within its reach (``REACH``):
+A principal holds *grants* (ADR 0049): each one pairs a role with the one target it was given
+for, so a role from one organisation never reaches another. A role grants a permission within
+its reach (``REACH``):
 
-    superuser    everything: every organisation and group (a scope, not a bypass)
-    org_admin    organisations: those in the principal's organisation claim, and their groups
+    superuser    everything: every organisation and group (a scope, not a bypass); no target
+    org_admin    organisations: the organisation of the grant, and its groups
     auditor      organisations, read-only and without personal data (ADR 0039)
-    group_admin  groups: those in the principal's group claim
+    group_admin  groups: the one group of the grant, in its organisation
+
+``decide`` looks at one grant at a time: a permission is allowed on a target when a single
+grant both holds it (through its role) and covers the target. There is no step that combines
+a role of one grant with the scope of another. ``scope_for`` is the union of the covering
+grants. How grants are made from the identity provider's claims is ``app.domain.entitlements``.
 
 Some permissions are locked to the superuser (``LOCKED_PERMISSIONS``); some show citizens'
 personal data (``PII_PERMISSIONS``); some depend on others (``REQUIRES``). The matrix page and
@@ -21,12 +28,11 @@ the documentation mark all three.
 
 Custom roles (ADR 0039) are data: the superuser copies a template (``TEMPLATES``) and switches
 delegable permissions on or off. ``validate_role`` keeps every definition inside the bounds;
-the database adapter stores it; a ``RoleCatalogue`` attaches the custom roles a principal
-holds through their role claim values, once per request. ``decide`` and ``scope_for`` read
-each role's reach, never a role's name, and clip a custom role to its bounds again::
+the database adapter stores it; a ``RoleCatalogue`` attaches the custom roles a principal's
+grants name (by key), once per request. ``decide`` and ``scope_for`` read each role's reach,
+never a role's name, and clip a custom role to its bounds again::
 
-    role claim ──ClaimMapping──► built-in roles
-               └─ other values ─► RoleCatalogue.holding ─► custom roles (template, permissions)
+    grants (role key, organisation, group) ──RoleCatalogue.holding──► custom roles attached
                                                              └─ granted = permissions ∩ delegable
 
 ``decide`` answers one question for routes; ``scope_for`` turns the same rules into a
@@ -80,6 +86,8 @@ class Permission(StrEnum):
     RIGHTS_VIEW = "rights.view"
     MATRIX_VIEW = "matrix.view"
     ORGANISATION_MANAGE = "organisation.manage"
+    ORGANISATION_VIEW = "organisation.view"
+    """ADR 0047 step 3: open an organisation's page and its tabs (read-only on its own)."""
     AUDIT_VIEW = "audit.view"
     AUDIT_EXPORT = "audit.export"
     DIAGNOSTICS_MANAGE = "diagnostics.manage"
@@ -110,6 +118,8 @@ class Permission(StrEnum):
     SETTINGS_LOGIN_MANAGE = "settings.login.manage"
     SETTINGS_ORGANISATION_MANAGE = "settings.organisation.manage"
     TEXTS_ORGANISATION_MANAGE = "texts.organisation.manage"
+    IDP_MAPPING_VIEW = "idp_mapping.view"
+    IDP_MAPPING_MANAGE = "idp_mapping.manage"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -117,6 +127,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.RIGHTS_VIEW: Level.GLOBAL,
     Permission.MATRIX_VIEW: Level.GLOBAL,
     Permission.ORGANISATION_MANAGE: Level.GLOBAL,
+    Permission.ORGANISATION_VIEW: Level.ORGANISATION,
     Permission.HOLIDAYS_MANAGE: Level.GLOBAL,
     Permission.INTEGRATIONS_MANAGE: Level.ORGANISATION,
     Permission.BRANDING_MANAGE: Level.ORGANISATION,
@@ -162,6 +173,10 @@ LEVELS: dict[Permission, Level] = {
     Permission.SETTINGS_ORGANISATION_MANAGE: Level.ORGANISATION,
     # ADR 0004, 0009: the organisation's own wording of citizen pages and messages.
     Permission.TEXTS_ORGANISATION_MANAGE: Level.ORGANISATION,
+    # ADR 0049 point 17: the entitlement values the IdP must send, per organisation.
+    Permission.IDP_MAPPING_VIEW: Level.ORGANISATION,
+    # ADR 0049 point 4: the IdP value of a group; not for a group admin.
+    Permission.IDP_MAPPING_MANAGE: Level.ORGANISATION,
 }
 
 LOCKED_PERMISSIONS = frozenset(
@@ -198,11 +213,13 @@ READ_PERMISSIONS = frozenset(
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,
+        Permission.ORGANISATION_VIEW,
         Permission.GROUP_VIEW,
         Permission.BOOKINGS_VIEW,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,
         Permission.SETTINGS_PLATFORM_VIEW,
+        Permission.IDP_MAPPING_VIEW,
     }
 )
 """ADR 0039: permissions that only show; everything else changes something."""
@@ -218,6 +235,8 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
     # ADR 0044: a planner changes bookings they can see in the group's agenda.
     Permission.BOOKINGS_MANAGE: frozenset({Permission.BOOKINGS_VIEW, Permission.GROUP_VIEW}),
     Permission.ORGANISATION_CLOSURE: frozenset({Permission.CLOSURE_MANAGE}),
+    # ADR 0049: changing a group's IdP value presumes seeing the mapping.
+    Permission.IDP_MAPPING_MANAGE: frozenset({Permission.IDP_MAPPING_VIEW}),
 }
 """ADR 0039: permissions a permission depends on; a custom role must hold them too."""
 
@@ -237,6 +256,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     | {
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,
+        # ADR 0047 step 3: the own organisations' pages, with the tabs the other rights open.
+        Permission.ORGANISATION_VIEW,
         Permission.HOLIDAYS_ASSIGN,
         Permission.GROUP_CREATE,
         Permission.GROUP_VIEW,
@@ -262,6 +283,9 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.SETTINGS_ORGANISATION_MANAGE,
         # ADR 0004: the organisation's own wording of citizen pages and messages.
         Permission.TEXTS_ORGANISATION_MANAGE,
+        # ADR 0049: the entitlement values of the own organisations, and the groups' IdP values.
+        Permission.IDP_MAPPING_VIEW,
+        Permission.IDP_MAPPING_MANAGE,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: EVERY_ADMIN
@@ -286,12 +310,16 @@ MATRIX: dict[Role, frozenset[Permission]] = {
     | {
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,
+        # ADR 0047 step 3: the organisations' pages, read-only (groups, profile).
+        Permission.ORGANISATION_VIEW,
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         # ADR 0046: who has access, for an access review.
         Permission.STAFF_VIEW,
         # ADR 0042 §5: how the installation is configured, without secret values.
         Permission.SETTINGS_PLATFORM_VIEW,
+        # ADR 0049 point 17: the mapping is an input for the access review.
+        Permission.IDP_MAPPING_VIEW,
     },
     # ADR 0043: picks up bookings in the own queue of its groups; sees first names only.
     Role.AGENT: EVERY_ADMIN | {Permission.GROUP_VIEW, Permission.QUEUE_WORK},
@@ -487,27 +515,55 @@ class Decision:
 
 
 @dataclass(frozen=True)
+class Grant:
+    """One entitlement: a role on exactly one target (ADR 0049).
+
+    Attributes:
+        role: The role's key: a built-in ``Role`` value or ``custom.<id>``.
+        organisation: Organisation slug; ``None`` only for a role that reaches everything.
+        group: Group slug, for a role that reaches groups; ``None`` otherwise.
+    """
+
+    role: str
+    organisation: str | None = None
+    group: str | None = None
+
+    @property
+    def key(self) -> str:
+        """A stable, readable form for audit details: ``org_admin:demo``, ``superuser``."""
+        if self.organisation is None:
+            return self.role
+        place = f"{self.organisation}/{self.group}" if self.group else self.organisation
+        return f"{self.role}:{place}"
+
+
+@dataclass(frozen=True)
 class Principal:
-    """A logged-in admin as the identity provider describes them.
+    """A logged-in admin: who they are and what they were granted.
 
     Attributes:
         subject: Stable identifier from the identity provider; used in logs and audit.
         display_name: For the page header only; never logged.
-        roles: Built-in roles from the role claim.
-        organisations: Organisation slugs from the organisation claim (organisation reach).
-        groups: Group slugs from the group claim (group reach).
-        role_claims: The other values of the role claim; custom roles are linked to these.
-        custom_roles: The custom roles those values grant, attached per request by a
+        grants: One per role and target (ADR 0049); resolved per request from the session's
+            claims, so a renamed or deleted organisation or group takes effect at once.
+        custom_roles: The custom roles the grants name, attached per request by a
             ``RoleCatalogue`` (never stored in the session).
     """
 
     subject: str
     display_name: str = field(repr=False)
-    roles: frozenset[Role]
-    organisations: frozenset[str]
-    groups: frozenset[str]
-    role_claims: frozenset[str] = frozenset()
+    grants: frozenset[Grant] = frozenset()
     custom_roles: frozenset[CustomRole] = frozenset()
+
+    @property
+    def roles(self) -> frozenset[Role]:
+        """The built-in roles among the grants (for labels and default layouts)."""
+        names = {r.value for r in Role}
+        return frozenset(Role(g.role) for g in self.grants if g.role in names)
+
+    def grants_of(self, role: str) -> frozenset[Grant]:
+        """Return the grants of one role key."""
+        return frozenset(g for g in self.grants if g.role == role)
 
 
 @dataclass(frozen=True)
@@ -517,19 +573,30 @@ class RoleCatalogue:
     custom: tuple[CustomRole, ...] = ()
 
     def holding(self, principal: Principal) -> Principal:
-        """Return ``principal`` with exactly the custom roles its role claim values grant."""
-        held = frozenset(r for r in self.custom if r.claim_value in principal.role_claims)
-        return replace(principal, custom_roles=held)
+        """Return ``principal`` with exactly the custom roles its grants name by key."""
+        keys = {g.role for g in principal.grants}
+        return replace(principal, custom_roles=frozenset(r for r in self.custom if r.key in keys))
+
+    def by_claim_value(self, values: Iterable[str]) -> frozenset[CustomRole]:
+        """Return the custom roles the legacy role claim ``values`` grant (ADR 0039 point 6)."""
+        wanted = set(values)
+        return frozenset(r for r in self.custom if r.claim_value in wanted)
+
+    def reach_by_key(self) -> dict[str, Reach]:
+        """Return the reach of every role key: built-in roles, then the custom ones."""
+        found: dict[str, Reach] = {role.value: REACH[role] for role in Role}
+        found.update({r.key: r.reach for r in self.custom})
+        return found
 
 
 def holds_a_role(principal: Principal) -> bool:
-    """Return whether the principal holds any built-in or custom role."""
-    return bool(principal.roles or principal.custom_roles)
+    """Return whether the principal holds a grant of a known role (built-in or attached)."""
+    return bool(_grants(principal))
 
 
 def role_keys(principal: Principal) -> list[str]:
-    """Return the principal's roles as stable keys (built-in values, then ``custom.<id>``)."""
-    return sorted(principal.roles) + sorted(r.key for r in principal.custom_roles)
+    """Return the principal's distinct role keys, sorted (built-in values and ``custom.<id>``)."""
+    return sorted({g.role for g in principal.grants})
 
 
 @dataclass(frozen=True)
@@ -576,39 +643,90 @@ class Target:
 
 @dataclass(frozen=True)
 class Scope:
-    """Which organisations and groups a listing may show; applied in SQL by the adapter."""
+    """Which organisations and groups a listing may show; applied in SQL by the adapter.
+
+    Attributes:
+        everything: The superuser's scope.
+        organisations: Organisation slugs (with every group of each).
+        groups: ``(organisation slug, group slug)`` pairs (ADR 0049 point 11): a group is
+            only in scope together with its organisation, so a slug reused elsewhere never
+            matches.
+    """
 
     everything: bool = False
     organisations: frozenset[str] = frozenset()
-    groups: frozenset[str] = frozenset()
+    groups: frozenset[tuple[str, str]] = frozenset()
 
     @property
     def is_empty(self) -> bool:
         """Whether the scope matches nothing."""
         return not (self.everything or self.organisations or self.groups)
 
+    @property
+    def group_slugs(self) -> frozenset[str]:
+        """The group slugs of the pairs, for labels."""
+        return frozenset(group for _, group in self.groups)
+
     def contains(self, organisation: str | None, group: str | None) -> bool:
         """Return whether a group (with its organisation) falls inside the scope."""
         return (
             self.everything
             or (organisation is not None and organisation in self.organisations)
-            or (group is not None and group in self.groups)
+            or (
+                organisation is not None
+                and group is not None
+                and (organisation, group) in self.groups
+            )
         )
 
 
-def _grants(principal: Principal) -> list[tuple[frozenset[Permission], Reach]]:
-    """Return the permissions and reach of every role the principal holds."""
-    grants = [(MATRIX[role], REACH[role]) for role in principal.roles]
-    return grants + [(role.granted, role.reach) for role in principal.custom_roles]
+_BUILT_IN = {role.value: role for role in Role}
+
+
+def _role_of(principal: Principal, key: str) -> tuple[frozenset[Permission], Reach] | None:
+    """Return the permissions and reach of role ``key``, or ``None`` for an unknown key."""
+    role = _BUILT_IN.get(key)
+    if role is not None:
+        return MATRIX[role], REACH[role]
+    for custom in principal.custom_roles:
+        if custom.key == key:
+            return custom.granted, custom.reach
+    return None
+
+
+def _grants(principal: Principal) -> list[tuple[frozenset[Permission], Reach, Grant]]:
+    """Return every grant with its role's permissions and reach; unknown roles grant nothing."""
+    found = []
+    for grant in sorted(principal.grants, key=lambda g: g.key):
+        role = _role_of(principal, grant.role)
+        if role is not None:
+            found.append((role[0], role[1], grant))
+    return found
 
 
 def reaches(principal: Principal, permission: Permission | None = None) -> set[Reach]:
     """Return the reach of the principal's roles (only those granting ``permission``, if given)."""
     return {
         reach
-        for permissions, reach in _grants(principal)
+        for permissions, reach, _ in _grants(principal)
         if permission is None or permission in permissions
     }
+
+
+def _covers(reach: Reach, grant: Grant, target: Target) -> Reason | None:
+    """Return why one grant covers ``target``, or ``None`` when it does not (ADR 0049 point 10)."""
+    if reach is Reach.EVERYTHING:
+        return Reason.SUPERUSER
+    if target.level is Level.GLOBAL:
+        return Reason.ROLE
+    if reach is Reach.ORGANISATIONS:
+        return Reason.ORGANISATION if grant.organisation == target.organisation else None
+    if target.level is Level.GROUP and (grant.organisation, grant.group) == (
+        target.organisation,
+        target.group,
+    ):
+        return Reason.GROUP
+    return None
 
 
 def decide(principal: Principal, permission: Permission, target: Target) -> Decision:
@@ -621,17 +739,17 @@ def decide(principal: Principal, permission: Permission, target: Target) -> Deci
         raise ValueError(f"{permission} needs a {LEVELS[permission]} level target")
     if not holds_a_role(principal):
         return Decision(False, Reason.NO_ROLE)
-    reach = reaches(principal, permission)
-    if not reach:
+    holding = [
+        (reach, grant)
+        for permissions, reach, grant in _grants(principal)
+        if permission in permissions
+    ]
+    if not holding:
         return Decision(False, Reason.NOT_PERMITTED)
-    if Reach.EVERYTHING in reach:
-        return Decision(True, Reason.SUPERUSER)
-    if target.level is Level.GLOBAL:
-        return Decision(True, Reason.ROLE)
-    if Reach.ORGANISATIONS in reach and target.organisation in principal.organisations:
-        return Decision(True, Reason.ORGANISATION)
-    if target.level is Level.GROUP and Reach.GROUPS in reach and target.group in principal.groups:
-        return Decision(True, Reason.GROUP)
+    reasons = {_covers(reach, grant, target) for reach, grant in holding} - {None}
+    for reason in (Reason.SUPERUSER, Reason.ROLE, Reason.ORGANISATION, Reason.GROUP):
+        if reason in reasons:
+            return Decision(True, reason)
     return Decision(False, Reason.OUT_OF_SCOPE)
 
 
@@ -681,11 +799,21 @@ def scope_for(principal: Principal, permission: Permission) -> Scope:
     level = LEVELS[permission]
     if level is Level.GLOBAL:
         raise ValueError(f"{permission} is a global permission and has no scope")
-    reach = reaches(principal, permission)
-    if Reach.EVERYTHING in reach:
+    holding = [
+        (reach, grant)
+        for permissions, reach, grant in _grants(principal)
+        if permission in permissions
+    ]
+    if any(reach is Reach.EVERYTHING for reach, _ in holding):
         return Scope(everything=True)
-    organisations = principal.organisations if Reach.ORGANISATIONS in reach else frozenset()
-    groups = principal.groups if Reach.GROUPS in reach and level is Level.GROUP else frozenset()
+    organisations = frozenset(
+        g.organisation for reach, g in holding if reach is Reach.ORGANISATIONS and g.organisation
+    )
+    groups = frozenset(
+        (g.organisation, g.group)
+        for reach, g in holding
+        if reach is Reach.GROUPS and level is Level.GROUP and g.organisation and g.group
+    )
     return Scope(organisations=organisations, groups=groups)
 
 

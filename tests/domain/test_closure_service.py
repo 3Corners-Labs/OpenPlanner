@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.domain.audit import Outcome
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.booking import BookingStatus
 from app.domain.closure import RETENTION_AFTER_CLOSURE
 from app.domain.closure_service import ClosureInput, ClosureService
@@ -26,11 +26,12 @@ from tests.support.domain import (
     book_pending,
     with_team_invite,
 )
+from tests.support.principals import principal
 
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
-GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
-OTHER_TEAM = Principal(
+SUPER = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+ORG_ADMIN = principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+GROUP_ADMIN = principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
+OTHER_TEAM = principal(
     "g-2", "G2", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"andere-team"})
 )
 NEXT_MONDAY = SLOT_0900 + timedelta(days=7)

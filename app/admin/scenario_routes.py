@@ -43,7 +43,7 @@ from app.admin.contact_routes import block_form_values, block_refusal, read_bloc
 from app.admin.forms import Field, FormData, raise_refusal, read_form, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.image_forms import decorative, image_fields, image_refusal, read_image_form
-from app.admin.pages import Locale, SameOrigin, page, with_manual
+from app.admin.pages import Locale, SameOrigin, organisation_header, page, with_manual
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scenario_service import ScenarioInput
@@ -134,6 +134,9 @@ async def _render(
         return group_page(request, locale, context, template, values, status)
     found = await contact_service(request).view(context.principal, owner.organisation or "")
     values["organisation_name"] = found.organisation.name
+    values["org_header"] = organisation_header(
+        request, locale, context.principal, found.organisation.name, found.organisation.slug
+    )
     values["done"] = forms.done_message(request, locale.gettext)
     response = page(request, locale, template, context.principal, values)
     response.status_code = status

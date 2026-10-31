@@ -1,9 +1,10 @@
 """The staff directory: who uses the admin portal, with what roles and where (ADR 0046).
 
 The identity provider decides who someone is and what they may do (ADR 0013). The portal
-records what it saw at each login, just in time: the roles, and the organisations and groups
-those roles reach (``Membership``). That record feeds the staff overview and is never a
-source of rights; the session still carries the claims.
+records what it saw at each login, just in time: one ``Membership`` per grant (a role on an
+organisation or a group, ADR 0049 point 12), and the entitlement values it could not use
+(``RefusedEntitlement``, ADR 0049 point 8). That record feeds the staff overview and is never
+a source of rights; the session still carries the claims.
 
     login ──► memberships_of(principal) ──► StaffMember ──► changes(old, new) ──► audit events
 
@@ -28,28 +29,66 @@ CHANGED_EVENT = "staff.membership_changed"
 
 ROLE_ADDED = "role.add"
 ROLE_REMOVED = "role.remove"
-ORGANISATION_ADDED = "organisation.add"
-ORGANISATION_REMOVED = "organisation.remove"
-GROUP_ADDED = "group.add"
-GROUP_REMOVED = "group.remove"
+GRANT_ADDED = "grant.add"
+GRANT_REMOVED = "grant.remove"
 
 
 @dataclass(frozen=True)
 class Membership:
-    """One organisation, or one group with its organisation, that a person's roles reach.
+    """One grant as the directory records it: a role on an organisation or on a group.
 
     Attributes:
+        role: The role's key (``org_admin``, ``custom.3``).
         organisation: Slug of the organisation.
-        group: Slug of the group; ``None`` for a membership of the organisation itself.
+        group: Slug of the group; ``None`` for a grant on the organisation itself.
     """
 
+    role: str
     organisation: str
     group: str | None = None
 
     @property
-    def sort_key(self) -> tuple[str, str]:
-        """Organisation first, its own membership before its groups."""
-        return (self.organisation, self.group or "")
+    def sort_key(self) -> tuple[str, str, str]:
+        """Organisation first, its own grants before those of its groups, then the role."""
+        return (self.organisation, self.group or "", self.role)
+
+    @property
+    def key(self) -> str:
+        """The grant's audit key: ``org_admin:demo``, ``group_admin:demo/team``."""
+        place = f"{self.organisation}/{self.group}" if self.group else self.organisation
+        return f"{self.role}:{place}"
+
+
+@dataclass(frozen=True)
+class RefusedEntitlement:
+    """An entitlement value received at login that gave no right (ADR 0049 point 8).
+
+    Attributes:
+        value: The value (prefix, role key, IdP values; never personal data).
+        reason: A ``RefusalReason`` code.
+        organisation: Slug of the organisation it names, when known; who may see it.
+        received_at: When it was last received (UTC).
+    """
+
+    value: str
+    reason: str
+    organisation: str | None
+    received_at: datetime
+
+
+@dataclass(frozen=True)
+class GrantHolders:
+    """How many people the directory last saw holding one grant (ADR 0049 point 17).
+
+    Attributes:
+        membership: The grant.
+        holders: How many staff records carry it.
+        last_login_at: The latest login among them (UTC).
+    """
+
+    membership: Membership
+    holders: int
+    last_login_at: datetime
 
 
 @dataclass(frozen=True)
@@ -59,8 +98,9 @@ class StaffMember:
     Attributes:
         subject: Subject identifier from the identity provider.
         display_name: Name from the identity provider; never logged.
-        roles: Roles from the last login.
-        memberships: Organisations and groups those roles reach.
+        roles: Built-in roles from the last login (for the superuser rule and the filter).
+        memberships: One per grant of the last login.
+        refused: Entitlement values of the last login that were refused.
         first_seen_at: First login (UTC).
         last_login_at: Latest login (UTC).
         last_seen_at: Latest request, written at most once per interval (UTC).
@@ -80,6 +120,7 @@ class StaffMember:
     last_logout_at: datetime | None = None
     recorded: bool = True
     id: int | None = None
+    refused: tuple[RefusedEntitlement, ...] = ()
 
     @property
     def organisations(self) -> list[str]:
@@ -107,11 +148,20 @@ class StaffMember:
         return not logged_out and now - self.last_seen_at <= lifetime
 
     def within(self, scope: Scope) -> "StaffMember":
-        """Return the member with only the memberships ``scope`` covers."""
+        """Return the member with only the memberships and refusals ``scope`` covers.
+
+        A refused value shows to a viewer whose scope holds the organisation it names; one
+        naming no known organisation shows to the superuser only (ADR 0049, A14).
+        """
         if scope.everything:
             return self
         kept = frozenset(m for m in self.memberships if _covers(scope, m))
-        return replace(self, memberships=kept)
+        refused = tuple(
+            r
+            for r in self.refused
+            if r.organisation is not None and r.organisation in scope.organisations
+        )
+        return replace(self, memberships=kept, refused=refused)
 
 
 @dataclass(frozen=True)
@@ -124,6 +174,7 @@ class StaffFilter:
         role: Only people holding this role.
         dormant_before: Only people whose last login is before this moment.
         id: Only the person with this id (the detail page).
+        unrecognised: Only people whose last login carried a refused entitlement value.
     """
 
     organisation: str | None = None
@@ -131,6 +182,7 @@ class StaffFilter:
     role: Role | None = None
     dormant_before: datetime | None = None
     id: int | None = None
+    unrecognised: bool = False
 
     def matches(self, member: StaffMember) -> bool:
         """Return whether ``member`` passes (the SQL adapter applies the same rules)."""
@@ -140,6 +192,7 @@ class StaffFilter:
             and (self.role is None or self.role in member.roles)
             and (self.dormant_before is None or member.last_login_at < self.dormant_before)
             and (self.id is None or member.id == self.id)
+            and (not self.unrecognised or bool(member.refused))
         )
 
 
@@ -171,14 +224,10 @@ def _role_changes(old: StaffMember, new: StaffMember) -> list[str]:
 
 
 def _membership_changes(added: set[Membership], removed: set[Membership]) -> list[str]:
-    """Detail keys of the memberships added and removed, sorted."""
+    """Detail keys of the grants added and removed, sorted (``grant.add:org_admin:demo``)."""
     keys: list[str] = []
-    for members, org_key, group_key in (
-        (added, ORGANISATION_ADDED, GROUP_ADDED),
-        (removed, ORGANISATION_REMOVED, GROUP_REMOVED),
-    ):
-        for m in sorted(members, key=lambda m: m.sort_key):
-            keys.append(f"{group_key}:{m.group}" if m.group else f"{org_key}:{m.organisation}")
+    for members, key in ((added, GRANT_ADDED), (removed, GRANT_REMOVED)):
+        keys += [f"{key}:{m.key}" for m in sorted(members, key=lambda m: m.sort_key)]
     return keys
 
 
@@ -189,7 +238,7 @@ def change_events(old: StaffMember | None, new: StaffMember) -> list[AuditEvent]
     concerned see it in their own log (ADR 0031). Each event's detail holds the role changes
     and only the membership changes of its own organisation, never those elsewhere. Without
     memberships the event is global (only the superuser sees it). Detail keys are codes and
-    slugs (``role.add:org_admin``, ``group.remove:demo``), never names.
+    slugs (``role.add:org_admin``, ``grant.remove:group_admin:demo/team``), never names.
     """
     if old is not None and not old.recorded:
         return []

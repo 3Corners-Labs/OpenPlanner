@@ -53,6 +53,8 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.ROLE_INVALID: "admin.form.error.role_invalid",
     ErrorCode.ROLE_CHANGED: "admin.form.error.role_changed",
     ErrorCode.CLAIM_VALUE_TAKEN: "admin.form.error.claim_value_taken",
+    ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
+    ErrorCode.LOGIN_REFUSED: "admin.login_failed.text",
     ErrorCode.MAINTENANCE: "error.maintenance",
     ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
     ErrorCode.QUEUE_NOT_ENABLED: "error.not_found.text",

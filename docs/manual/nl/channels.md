@@ -2,7 +2,7 @@
 
 Op dit scherm legt de superuser per organisatie vast hoe berichten aan burgers de deur uit
 gaan: de mailserver (SMTP) voor e-mail en de sms-gateway voor sms. U opent het via
-**Integraties → organisatie → Kanalen**. Wachtwoorden en API-sleutels zijn alleen te schrijven:
+**Organisaties → organisatie → Kanalen**. Wachtwoorden en API-sleutels zijn alleen te schrijven:
 het veld is altijd leeg, en een leeg veld laat het opgeslagen geheim staan (ADR 0022).
 
 ## E-mail

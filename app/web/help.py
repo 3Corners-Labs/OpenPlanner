@@ -55,6 +55,18 @@ class HelpTopic:
 
 TOPICS = (
     HelpTopic("overview", ("/admin/",), Permission.DASHBOARD_VIEW),
+    # ADR 0047 steps 3 and 5: the groups list and the organisation's own page.
+    HelpTopic("groups", ("/admin/groups",), Permission.GROUP_VIEW),
+    HelpTopic(
+        "organisation",
+        (
+            "/admin/organisations",
+            "/admin/organisations/{org}",
+            "/admin/organisations/new",
+            "/admin/organisations/{org}/edit",
+        ),
+        Permission.ORGANISATION_VIEW,
+    ),
     HelpTopic("group-settings", ("/admin/groups/{slug}/settings",), Permission.GROUP_EDIT),
     HelpTopic("branding", ("/admin/organisations/{org}/branding",), Permission.BRANDING_MANAGE),
     HelpTopic("rights-matrix", ("/admin/matrix",), Permission.MATRIX_VIEW),
@@ -65,10 +77,11 @@ TOPICS = (
     ),
     HelpTopic("retention", ("/admin/retention",), Permission.RETENTION_VIEW),
     HelpTopic("staff", ("/admin/staff", "/admin/staff/{member_id}"), Permission.STAFF_VIEW),
+    HelpTopic("idp-mapping", ("/admin/idp-mapping",), Permission.IDP_MAPPING_VIEW),
     HelpTopic("audit", ("/admin/audit",), Permission.AUDIT_VIEW),
     HelpTopic(
         "embedding",
-        ("/admin/embedding", "/admin/organisations/{org}/embedding"),
+        ("/admin/organisations/{org}/embedding",),
         Permission.EMBEDDING_MANAGE,
     ),
     HelpTopic(
@@ -120,7 +133,7 @@ TOPICS = (
     HelpTopic("data-fields", (), Permission.SETTINGS_PLATFORM_VIEW),
     HelpTopic(
         "organisation-settings",
-        ("/admin/organisation-settings", "/admin/organisations/{org}/settings"),
+        ("/admin/organisations/{org}/settings",),
         Permission.SETTINGS_ORGANISATION_MANAGE,
     ),
     HelpTopic(

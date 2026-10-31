@@ -23,7 +23,8 @@ tijden.
 
 - **Wachtrij in mijn groepen**: per groep met een eigen wachtrij in uw bereik hoeveel burgers
   er wachten, hoe lang de langste wacht al duurt en hoeveel medewerkers die de wachtrij mogen
-  bedienen nu zijn aangemeld. De groepsnaam opent de wachtrij. Alleen aantallen en minuten,
+  bedienen nu zijn aangemeld. Een deelnemer met een afspraak telt mee zodra die in de lobby
+  staat; een directe oproep telt vanaf de aanvraag, ook als de link nog niet is geopend. De groepsnaam opent de wachtrij. Alleen aantallen en minuten,
   nooit namen. Kleuren bij een te lange wachttijd volgen met de wachttijdgrenzen.
 - **Lopende taken**: de achtergrondtaken die nu bezig zijn en de taken die na de laatste
   poging zijn mislukt, met soort, status en tijdstip. Nooit de inhoud van een taak of de
@@ -78,6 +79,13 @@ het menu.
 
 ## De balk bovenin
 
+Vooraan in de balk, voor het beeldmerk, klapt de **menuknop** (drie streepjes) het zijmenu in
+tot zijn pictogrammen of weer uit. Ingeklapt houdt elk onderdeel zijn naam: die verschijnt als u
+het pictogram aanwijst of er met het toetsenbord de focus op zet. Op een tablet begint het menu
+ingeklapt en klapt de knop het uit; op een breder scherm begint het uitgeklapt. De keuze geldt
+voor deze sessie en blijft ook na opnieuw inloggen, net als de weergave. Op een telefoon is er
+geen zijmenu en geen knop: de balk onderin heeft de eerste onderdelen, *Meer* de rest.
+
 Rechts van de naam van het beheer staan, van links naar rechts, kleine snelkoppelingen. U ziet
 alleen wat uw rol mag openen:
 
@@ -105,7 +113,7 @@ per groep*, *Wachtrij in mijn groepen* en *Recente wijzigingen van de configurat
 Het filter laat alleen zien wat uw rol al mag zien. U kiest uit de organisaties en groepen
 binnen uw bereik; een andere waarde in het adres wordt genegeerd. Het is een gewoon formulier
 dat niets wijzigt. Boven de keuzelijsten staan de gekozen organisatie en groep als links naar hun
-pagina's (de organisatiepagina alleen voor wie organisaties beheert). De keuze geldt voor deze
+pagina's (de organisatiepagina alleen voor wie die mag openen). De keuze geldt voor deze
 sessie: u ziet haar terug als u later naar het overzicht gaat, en na opnieuw inloggen staat het
 filter weer op alles. Is een keuze actief, dan heeft de knop een gekleurde achtergrond, ook als er
 op een kleiner scherm alleen het pictogram past. Op dit moment werkt het filter op het overzicht;

@@ -9,9 +9,10 @@ Templates receive ``can(permission, group=None)`` to show only the actions the m
 hiding is a convenience, the server always decides again.
 
 The principal is resolved once per request by ``load_principal`` (a dependency of every admin
-router): the session cookie gives the built-in roles and the other role claim values, the
-role catalogue adds the custom roles those values grant now (ADR 0039), so a changed or
-deleted custom role takes effect on the next request without a new login.
+router): the session cookie gives the login's claims, the ``LoginService`` resolves them with
+the directory and the role catalogue into grants (ADR 0049), so a renamed or deleted
+organisation or group, or a changed custom role, takes effect on the next request without a
+new login.
 
 During maintenance (ADR 0038) every request that is not a GET also passes
 ``decide_in_maintenance``: only the permissions in ``MAINTENANCE_WRITABLE`` and routes declared
@@ -26,7 +27,7 @@ from datetime import timedelta
 import structlog
 from fastapi import Request
 
-from app.admin.session import activity_due, current_principal, login_age
+from app.admin.session import activity_due, current_login, login_age
 from app.domain.admin import AdminService, Authorization
 from app.domain.authorization import (
     LEVELS,
@@ -38,7 +39,9 @@ from app.domain.authorization import (
     decide_in_maintenance,
     scope_for,
 )
+from app.domain.entitlements import LoginClaims
 from app.domain.event_context import bind_level
+from app.domain.login_service import LoginService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import Clock
 from app.domain.roles import RoleService
@@ -104,24 +107,31 @@ def role_service(request: Request) -> RoleService:
     return service
 
 
+def login_service(request: Request) -> LoginService:
+    """Return the application's login service (claims to grants, ADR 0049)."""
+    service: LoginService = request.app.state.login_service
+    return service
+
+
 def maintenance_service(request: Request) -> MaintenanceService:
     """Return the application's maintenance service."""
     service: MaintenanceService = request.app.state.maintenance_service
     return service
 
 
-def _cookie_principal(request: Request) -> Principal | None:
-    """Return the principal stored in the session, honouring the absolute lifetime."""
+def _cookie_claims(request: Request) -> LoginClaims | None:
+    """Return the login's claims stored in the session, honouring the absolute lifetime."""
     clock: Clock = request.app.state.clock
     hours: int = request.app.state.settings.admin_session_hours
-    return current_principal(request, clock.now(), timedelta(hours=hours))
+    return current_login(request, clock.now(), timedelta(hours=hours))
 
 
 async def load_principal(request: Request) -> None:
-    """Resolve the logged-in principal with its custom roles once, for the whole request."""
-    principal = _cookie_principal(request)
-    if principal is not None:
-        principal = await role_service(request).attach(principal)
+    """Resolve the logged-in principal with its grants once, for the whole request."""
+    claims = _cookie_claims(request)
+    principal = None
+    if claims is not None:
+        principal = await login_service(request).principal_for(claims)
         # ADR 0042 step 5: the admin's own organisation's time format and zone apply.
         live = getattr(request.app.state, "live_settings", None)
         home = await admin_service(request).home_organisation(principal)
@@ -132,13 +142,14 @@ async def load_principal(request: Request) -> None:
 def session_principal(request: Request) -> Principal | None:
     """Return the logged-in principal of ``request``, honouring the absolute lifetime.
 
-    Outside an admin router (where ``load_principal`` did not run) custom roles are left out,
-    so the principal can only hold less.
+    Outside an admin router (where ``load_principal`` did not run) the grants are left out:
+    the principal is known by name and holds nothing, so it can only hold less.
     """
     loaded: Principal | None | bool = getattr(request.state, "admin_principal", False)
     if loaded is not False:
         return loaded if isinstance(loaded, Principal) else None
-    return _cookie_principal(request)
+    claims = _cookie_claims(request)
+    return Principal(claims.subject, claims.display_name) if claims is not None else None
 
 
 async def _note_activity(request: Request, principal: Principal) -> None:

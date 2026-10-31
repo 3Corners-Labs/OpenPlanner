@@ -16,15 +16,16 @@ async def _save(site: Site, origins: str) -> httpx.Response:
     return await site.client.post(PAGE, data={"origins": origins}, headers=SAME_ORIGIN)
 
 
-async def test_the_menu_links_to_the_overview_with_the_own_organisation(site: Site) -> None:
+async def test_the_organisation_page_links_to_the_embedding_sub_tab(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    dashboard = (await site.client.get("/admin/")).text
-    overview = (await site.client.get("/admin/embedding")).text
+    organisation = (await site.client.get("/admin/organisations/demo")).text
+    old = await site.client.get("/admin/embedding")
 
-    assert 'href="/admin/embedding"' in dashboard
-    assert f'href="{PAGE}"' in overview
-    assert "/admin/organisations/andere/embedding" not in overview
+    assert f'href="{PAGE}"' in organisation
+    assert "/admin/organisations/andere/embedding" not in organisation
+    # ADR 0047 §4: the old list sends an admin of one organisation straight to its sub-tab.
+    assert (old.status_code, old.headers["location"]) == (308, PAGE)
 
 
 async def test_origins_are_saved_normalised_and_audited_with_counts(site: Site) -> None:
