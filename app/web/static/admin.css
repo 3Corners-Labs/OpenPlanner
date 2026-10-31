@@ -574,7 +574,12 @@ html {
   max-width: var(--adm-width-wide);
 }
 
-/* A form is filled in, not scanned: in a wide page it keeps the reading width. */
+/* A form card takes the page's width (the public stylesheet caps a main's form to the
+   participant's text width); in a wide page it keeps the reading width, filled in, not scanned. */
+.admin-main > form.card {
+  max-width: none;
+}
+
 .admin-main[data-width="wide"] > form.card {
   max-width: var(--adm-width-standard);
 }
@@ -2627,7 +2632,7 @@ fieldset.card {
   white-space: pre-wrap;
 }
 
-/* --- Advanced settings: one small form per changeable setting (ADR 0042 step 4) ---------- */
+/* --- Settings (ADR 0042 steps 4 and 5): one form per topic, rows in a list ---------------- */
 .admin .setting-form {
   display: flex;
   flex-wrap: wrap;
@@ -2638,4 +2643,110 @@ fieldset.card {
 
 .admin .setting-form label {
   font-size: 0.9rem;
+}
+
+/* Name, value or field, source: three columns the rows share through a subgrid, so every row
+   lines up whatever it holds. Below the phone width each row stacks. */
+.settings-list {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.1fr) minmax(0, 1.5fr) minmax(10rem, 1fr);
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius);
+  background: var(--adm-surface);
+  box-shadow: var(--adm-shadow);
+}
+
+.settings-list__head,
+.setting {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  gap: 0.5rem 1.5rem;
+  padding: 0.85rem 1rem;
+}
+
+.settings-list__head {
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+  border-radius: var(--adm-radius) var(--adm-radius) 0 0;
+  background: var(--adm-surface-muted);
+  color: var(--adm-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.setting {
+  align-items: start;
+  border-top: 1px solid var(--adm-border);
+}
+
+.setting:target {
+  background: var(--adm-row-hover);
+}
+
+.setting__name label,
+.setting__name > span {
+  display: block;
+  margin: 0;
+  font-weight: 600;
+}
+
+.setting__name code {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--adm-text-muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.admin .setting__value input,
+.admin .setting__value select {
+  max-width: 24rem;
+}
+
+.setting__current {
+  display: block;
+  padding-top: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.setting__pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.setting__state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.setting__source {
+  font-weight: 600;
+}
+
+@media (max-width: 47.99rem) {
+  .settings-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-list__head {
+    display: none;
+  }
+
+  .setting {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .setting__state {
+    padding-top: 0;
+  }
 }
