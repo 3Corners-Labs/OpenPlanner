@@ -64,7 +64,7 @@ PAGE_LABELS: dict[str, str] = {
     "confirm.not_me": "admin.org_texts.page.confirm_not_me",
     "manage.pending.text": "admin.org_texts.page.manage_pending_text",
 }
-"""The field label of each citizen-page text."""
+"""The field label of each participant-page text."""
 
 
 @dataclass(frozen=True)

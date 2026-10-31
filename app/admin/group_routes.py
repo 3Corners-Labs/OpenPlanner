@@ -371,7 +371,7 @@ class ExceptionView:
 
 @dataclass(frozen=True)
 class PreviewView:
-    """One day of the preview of citizens' slots."""
+    """One day of the preview of participants' slots."""
 
     day: str
     summary: str

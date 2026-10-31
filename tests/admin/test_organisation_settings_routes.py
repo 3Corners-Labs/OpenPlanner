@@ -19,7 +19,9 @@ async def test_an_org_admin_lists_and_opens_their_own_organisation(site: Site) -
     assert "Standaardwaarde" in page  # nothing set yet: the platform default
 
 
-async def test_a_value_for_the_organisation_applies_to_its_admin_and_citizens(site: Site) -> None:
+async def test_a_value_for_the_organisation_applies_to_its_admin_and_participants(
+    site: Site,
+) -> None:
     await site.login_as(ORG_ADMIN)
 
     response = await site.client.post(

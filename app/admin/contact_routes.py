@@ -1,7 +1,7 @@
 """Admin routes for contact blocks: organisation default and group override (ADR 0037 §2).
 
 Every route depends on one ``RequirePermission``, ``fresh`` like every closure page: what
-citizens read in an emergency is prepared here. The change is a POST form with the Fetch
+participants read in an emergency is prepared here. The change is a POST form with the Fetch
 Metadata check, answered with a redirect and a confirmation. ``ContactService`` authorises
 again, validates and audits.
 

@@ -430,7 +430,7 @@ def _bookings_data(rows: list[object]) -> list[Datum]:
 
 
 def _queue_data(rows: list[object]) -> list[Datum]:
-    """The queue widget's chart data: citizens waiting per group."""
+    """The queue widget's chart data: participants waiting per group."""
     return [Datum(r.name, r.waiting) for r in rows if isinstance(r, QueueRow)]
 
 

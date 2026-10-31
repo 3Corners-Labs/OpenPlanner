@@ -129,7 +129,7 @@ async def test_a_calendar_in_use_cannot_be_deleted(site: Site) -> None:
     assert "nog gekozen door een organisatie of groep" in response.text
 
 
-async def test_an_inherited_holiday_closes_the_citizen_calendar(site: Site) -> None:
+async def test_an_inherited_holiday_closes_the_participant_calendar(site: Site) -> None:
     before = (await site.client.get("/g/demo")).text
     await _fill_and_assign(site)
     after = (await site.client.get("/g/demo")).text
@@ -146,14 +146,14 @@ async def test_group_admin_keeps_a_holiday_open_and_closes_it_again(site: Site) 
 
     page = (await site.client.get(GROUP)).text
     opened = await site.client.post(f"{GROUP}/2026-01-01/open", headers=SAME_ORIGIN)
-    citizen = (await site.client.get("/g/demo")).text
+    participant = (await site.client.get("/g/demo")).text
     after = (await site.client.get(GROUP)).text
     closed = await site.client.post(f"{GROUP}/2026-01-01/close", headers=SAME_ORIGIN)
 
     assert "Nieuwjaarsdag" in page
     assert "Nu: Nationale feestdagen" in page  # what the group inherits
     assert opened.headers["location"] == f"{GROUP}?done=saved"
-    assert "Eerst mogelijk:</strong> donderdag 1 januari" in citizen
+    assert "Eerst mogelijk:</strong> donderdag 1 januari" in participant
     assert "Gewoon open" in after
     assert closed.status_code == 303
     assert "Eerst mogelijk:</strong> vrijdag 2 januari" in (await site.client.get("/g/demo")).text

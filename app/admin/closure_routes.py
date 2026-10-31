@@ -1,7 +1,7 @@
 """Admin routes for emergency closures (ADR 0024).
 
 Every route depends on exactly one ``RequirePermission``, always ``fresh``: closing a team is
-a change with impact on citizens. Changes are POST forms with the Fetch Metadata check,
+a change with impact on participants. Changes are POST forms with the Fetch Metadata check,
 answered with a redirect and a confirmation (post/redirect/get). ``ClosureService``
 authorises again, validates and audits.
 
@@ -479,7 +479,7 @@ async def reinstate_all(
 async def cancel_all(
     request: Request, locale: Locale, slug: str, _: SameOrigin, context: ManageClosure
 ) -> Response:
-    """Cancel every booking on hold; each citizen gets the cancellation mail."""
+    """Cancel every booking on hold; each participant gets the cancellation mail."""
     try:
         outcome = await closure_service(request).cancel_all(context.principal, slug)
     except DomainError as error:
@@ -579,7 +579,7 @@ async def move_one(
     _: SameOrigin,
     context: ManageClosure,
 ) -> Response:
-    """Move one booking on hold; the citizen gets the change mail with a new link."""
+    """Move one booking on hold; the participant gets the change mail with a new link."""
     form = await read_form(request, locale)
     start = parse_start(form.text("start"))
     if start is None:

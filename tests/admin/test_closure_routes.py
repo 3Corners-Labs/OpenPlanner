@@ -1,4 +1,4 @@
-"""Emergency closure screens (ADR 0024): closing, informing citizens and handling bookings.
+"""Emergency closure screens (ADR 0024): closing, informing participants and handling bookings.
 
 Calendar: "now" is Thursday 1 January 2026 08:00 UTC; the demo group is open on weekdays
 09:00-12:00 and 13:00-17:00 Amsterdam time, two places per slot.
@@ -15,7 +15,7 @@ from tests.support.citizen import confirm_newest
 CLOSURE = "/admin/groups/demo/closure"
 FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam
 MONDAY_0900 = "2026-01-05T08:00:00+00:00"
-CITIZEN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
+PARTICIPANT = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 NOTICES = {
     "notice_nl": "Door een stroomstoring zijn wij gesloten.\nWe excuseren ons <b>hiervoor</b>.",
     "notice_en": "We are closed because of a power cut.",
@@ -24,7 +24,7 @@ UNTIL_SATURDAY = {"ends_at": "2026-01-03", "ends_at_time": "00:00", **NOTICES}
 
 
 async def _book(site: Site, start: str = FRIDAY_0900) -> str:
-    """Book as a citizen and return the management path ``/b/{token}``."""
+    """Book as a participant and return the management path ``/b/{token}``."""
     response = await site.client.post(
         "/g/demo/book",
         data={
@@ -34,7 +34,7 @@ async def _book(site: Site, start: str = FRIDAY_0900) -> str:
             "email": "ada@example.org",
             "phone": "",
         },
-        headers=CITIZEN,
+        headers=PARTICIPANT,
     )
     assert response.status_code == 303
     return f"/b/{await confirm_newest(site.client)}"
@@ -54,7 +54,7 @@ async def _close(site: Site) -> str:
     return manage
 
 
-async def test_group_admin_closes_the_team_and_citizens_see_why(site: Site) -> None:
+async def test_group_admin_closes_the_team_and_participants_see_why(site: Site) -> None:
     manage = await _close(site)
 
     page = (await site.client.get(f"{CLOSURE}?done=closure_started&count=1")).text
@@ -90,7 +90,7 @@ async def test_closed_team_cannot_be_booked(site: Site) -> None:
             "last_name": "Berg",
             "email": "bo@example.org",
         },
-        headers=CITIZEN,
+        headers=PARTICIPANT,
     )
 
     assert response.status_code == 409

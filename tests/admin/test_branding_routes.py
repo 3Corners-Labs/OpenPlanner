@@ -38,8 +38,8 @@ async def test_name_and_colour_are_saved_shown_and_audited(site: Site) -> None:
     assert 'value="#154273"' in page
     saved = Branding("Gemeente Demo", "#154273")
     assert f'href="/o/demo/theme.css?v={saved.theme_digest}"' in page  # preview: saved theme
-    citizen = (await site.client.get("/g/demo")).text
-    assert "<span>Gemeente Demo</span>" in citizen
+    participant = (await site.client.get("/g/demo")).text
+    assert "<span>Gemeente Demo</span>" in participant
     assert ("sub-super", "branding.manage", "success", "") in [
         (a, b, str(c), d) for a, b, c, d in await audit_events(site)
     ]
