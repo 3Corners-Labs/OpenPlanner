@@ -5,8 +5,10 @@ from dataclasses import replace
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.adapters.db.models import ScheduleRuleRow, SlotRow
 from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import (
@@ -20,6 +22,7 @@ from app.domain.audit import (
     Source,
 )
 from app.domain.authorization import Scope
+from app.domain.booking import Slot
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.ports import Transaction
 from app.domain.staff import StaffMember
@@ -361,3 +364,45 @@ async def test_events_are_pruned_per_category(engine: AsyncEngine) -> None:
 
     assert removed == 1
     assert [e.event for e in left] == [kept]
+
+
+async def test_an_archived_group_is_erasable_once_nothing_refers_to_it(
+    engine: AsyncEngine,
+) -> None:
+    """ADR 0084 step 3: the RESTRICT tables keep the group; the cascades take the rest."""
+    await seed_demo(engine)
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        group = await tx.get_group("demo")
+        assert group is not None
+        await tx.save_group(replace(group, archived_at=NOW))
+        start = NOW + timedelta(days=1)
+        slot = await tx.add_slot(Slot(None, group.id, start, start + timedelta(minutes=30), 1))
+
+    async with uow.read() as tx:
+        blocked = await tx.erasable_groups(NOW)
+        too_early = await tx.erasable_groups(NOW - timedelta(seconds=1))
+
+    async with engine.begin() as connection:
+        await connection.execute(delete(SlotRow).where(SlotRow.id == slot.id))
+    async with uow.read() as tx:
+        due = [g.slug for g in await tx.erasable_groups(NOW)]
+
+    async with uow.locked() as tx:
+        await tx.delete_group(group.id)
+    async with uow.read() as tx:
+        gone = await tx.get_group("demo")
+        others = [s.group.slug for s in await tx.list_groups(EVERYTHING)]
+    async with engine.connect() as connection:
+        rules = (
+            await connection.execute(
+                select(ScheduleRuleRow.id).where(ScheduleRuleRow.group_id == group.id)
+            )
+        ).all()
+
+    assert blocked == []
+    assert too_early == []
+    assert due == ["demo"]
+    assert gone is None
+    assert others == ["andere-team"]
+    assert rules == []
