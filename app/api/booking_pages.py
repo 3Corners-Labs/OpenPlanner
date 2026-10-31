@@ -28,7 +28,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.api.participant import participant_page
 from app.api.contact_form import (
     HONEYPOT_FIELD,
     ContactForm,
@@ -37,6 +36,7 @@ from app.api.contact_form import (
     read_contact,
 )
 from app.api.labels import slot_label
+from app.api.participant import participant_page
 from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
 from app.domain.availability import AvailableSlot
