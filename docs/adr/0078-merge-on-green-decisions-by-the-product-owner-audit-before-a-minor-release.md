@@ -126,7 +126,7 @@ is a decision that needs the label.
 | 3 | The product owner adds `decision gate` to the required checks of `main` and the label `po:approved` exists; Claude Code enables auto-merge on the pull requests it opens from then on | | planned |
 | 4 | Issues per open *Build status* row on the merge of an ADR, and the weekly drift report (point 6): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | #180 | in PR |
 | 5 | First minor release under this ADR (`v0.4.0`) with its audit section | | planned; prepared by ADR 0079 (#183): the `audit` job of `release.yml` runs the review and writes the section, the product owner sets the verdict |
-| 6 | The gate runs in the merge queue and judges every pull request in the group by its own commit (ADR 0088); the skipped `merge_group` job let #266 carry ADR 0085 onto `main` on 2026-10-31 | #278 | in PR |
+| 6 | The gate runs in the merge queue and judges every pull request in the group by its own commit (ADR 0088); the skipped `merge_group` job let #266 carry ADR 0085 onto `main` on 2026-10-31 | #284 | in PR |
 
 ## Consequences
 
