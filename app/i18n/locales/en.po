@@ -926,6 +926,9 @@ msgstr "View an organisation"
 msgid "authz.permission.organisation_manage"
 msgstr "Manage organisations"
 
+msgid "authz.permission.organisation_delete"
+msgstr "Delete organisations"
+
 msgid "authz.permission.audit_view"
 msgstr "View audit log"
 
@@ -940,6 +943,9 @@ msgstr "Manage integrations and secrets"
 
 msgid "authz.permission.group_create"
 msgstr "Create groups"
+
+msgid "authz.permission.group_delete"
+msgstr "Archive groups"
 
 msgid "authz.permission.group_view"
 msgstr "View group"
@@ -7848,3 +7854,72 @@ msgstr "Only a name on the screen: the rights do not change. Next to the rights,
 
 msgid "admin.form.error.role_display_name"
 msgstr "Enter a name of {min} to {max} characters, without braces, that is not the name of another role."
+
+msgid "admin.done.archived"
+msgstr "The group has been archived. Its participant page is gone; the portal shows the group read-only under the Archived filter."
+
+msgid "admin.form.error.group_archived"
+msgstr "This group is archived and can no longer be changed."
+
+msgid "admin.form.error.confirmation_mismatch"
+msgstr "Type the name exactly as it is shown above."
+
+msgid "admin.group.archive.title"
+msgstr "Archive group"
+
+msgid "admin.group.archive.settings_lead"
+msgstr "An archived group takes no more appointments and leaves the portal. Its web address stays reserved."
+
+msgid "admin.group.archive.open"
+msgstr "Archive group…"
+
+msgid "admin.group.archive.lead"
+msgstr "Archiving cannot be undone in the portal. Read what happens, then type the group's name."
+
+msgid "admin.group.archive.what_happens"
+msgstr "What happens"
+
+msgid "admin.group.archive.effect_public"
+msgstr "The page /g/{slug} and the widget answer “not found” at once; new appointments are no longer possible."
+
+msgid "admin.group.archive.effect_portal"
+msgstr "The group leaves the overview, the lists and the menus. The filter “Archived groups only” still shows it, read-only."
+
+msgid "admin.group.archive.effect_slug"
+msgstr "The web address stays reserved: a new group cannot take it."
+
+msgid "admin.group.archive.effect_data"
+msgstr "Past appointments stay until the usual clean-up period; after that the portal erases the group by itself. The log keeps the web address."
+
+msgid "admin.group.archive.bookings_ahead"
+msgstr "{count} appointments still lie ahead. Archiving is possible once they have taken place, were moved or were cancelled."
+
+msgid "admin.group.archive.close_first"
+msgstr "Close the group first (emergency closure)."
+
+msgid "admin.group.archive.confirm_heading"
+msgstr "Confirm"
+
+msgid "admin.group.archive.confirmation"
+msgstr "Name of the group"
+
+msgid "admin.group.archive.confirmation_hint"
+msgstr "Type “{name}” to confirm."
+
+msgid "admin.group.archive.button"
+msgstr "Archive group"
+
+msgid "admin.group.archive.blocked_hint"
+msgstr "The portal refuses while appointments lie ahead."
+
+msgid "admin.group.archived_notice"
+msgstr "This group is archived. You can still read, not change."
+
+msgid "admin.groups.archived_only"
+msgstr "Archived groups only"
+
+msgid "admin.groups.archived_lead"
+msgstr "Archived groups: read-only, without a participant page."
+
+msgid "admin.audit.detail.archived"
+msgstr "archived"

@@ -9,14 +9,14 @@ and a value outside them is ignored and never echoed (``docs/threat-model.md``).
     GET /admin/groups   group.view   the groups in the admin's scope
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
-from app.admin.forms import Option
+from app.admin.forms import Option, done_message
 from app.admin.pages import Locale, page
 from app.admin.shortfalls import ShortfallView, agenda_service, shortfall_view
 from app.domain.agenda_service import ShortfallSummary
@@ -57,11 +57,13 @@ class GroupFilterView:
     query: str
     organisation: str
     organisations: list[Option]
+    archived: bool = False
+    """ADR 0084: the archived groups instead of the ones in use."""
 
     @property
     def active(self) -> bool:
         """Whether anything narrows the list."""
-        return bool(self.query or self.organisation)
+        return bool(self.query or self.organisation or self.archived)
 
 
 def narrow(
@@ -95,12 +97,14 @@ async def groups(
 ) -> HTMLResponse:
     """List the groups in the admin's scope, narrowed by the filter form."""
     principal = context.principal
-    found = await admin_service(request).groups(principal)
+    archived = request.query_params.get(ARCHIVED_PARAM) == "1"
+    found = await admin_service(request).groups(principal, archived=archived)
     rows, filters = narrow(
         found,
         request.query_params.get(QUERY_PARAM, ""),
         request.query_params.get(ORGANISATION_PARAM, ""),
     )
+    filters = replace(filters, archived=archived)
     summaries = await agenda_service(request).summaries(principal)
     opens_organisations = can_function(principal)(Permission.ORGANISATION_VIEW)
     return page(
@@ -114,6 +118,7 @@ async def groups(
             ],
             "filters": filters,
             "total": len(found),
+            "done": done_message(request, locale.gettext),
         },
     )
 
@@ -136,3 +141,7 @@ def _row(
         chip,
         f"/g/{group.slug}",
     )
+
+
+ARCHIVED_PARAM = "archived"
+"""``?archived=1`` lists the archived groups (ADR 0084), read-only."""

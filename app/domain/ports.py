@@ -455,8 +455,11 @@ class Transaction(Protocol):
     test enforces this for new methods.
     """
 
-    async def list_groups(self, scope: Scope) -> list[GroupSummary]:
-        """Return the groups inside ``scope``, ordered by organisation and name."""
+    async def list_groups(self, scope: Scope, *, archived: bool = False) -> list[GroupSummary]:
+        """Return the groups inside ``scope``, ordered by organisation and name.
+
+        ``archived`` lists the archived groups instead of the ones in use (ADR 0084).
+        """
         ...
 
     async def save_group_check(self, check: GroupCheck) -> None:
