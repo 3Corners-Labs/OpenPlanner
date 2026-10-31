@@ -104,7 +104,7 @@ package; when the two disagree, the code wins.
 | 0079 | The release is a workflow: release PR, audit and tag by dispatch | PARTIAL | steps 0–2 (#183): `.github/workflows/release.yml`, `scripts/release_pr.py`, `tests/scripts/test_release_pr.py`, dry run on the PR branch | Step 3: the secrets `RELEASE_TOKEN` and `OPENAI_API_KEY` (product owner); step 4: the first release through the workflow, `v0.4.0`, with the first real audit |
 | 0080 | Page width: two classes, declared in the register, and a week that never wraps | BUILT | `app/web/navigation.py` (`Width`, `Screen.width`, `wide_subpages`), `data-width` in `admin/layout.html`, tokens and `.week-frame` in `admin.css`, `docs/admin-map.md`; `tests/web/test_navigation.py`, `tests/web/test_shell_styles.py`, `tests/admin/test_pages.py` | – (further list screens go wide when a table needs the room, step 2) |
 | 0081 | Subjects and routing attributes next to the group | NOT BUILT | #179; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
-| 0082 | Contact-center integration: verification, health, alerts to administrators and a fallback per group | NOT BUILT | ADR only | Steps 1–5 (probe work item and `read_task`, health and reconcile, alert model with email and Webex bot, fallback per group, manual topic) |
+| 0082 | Contact-center integration: verification, health, alerts to administrators and a fallback per group | NOT BUILT | #238 | Steps 1–5 (probe work item and `read_task`, health and reconcile, alert model with email and Webex bot, fallback per group, manual topic) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 

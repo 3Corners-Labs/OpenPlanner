@@ -221,7 +221,7 @@ bot's single scope `spark:messages_write`.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; row in `docs/adr-status.md` | | planned |
+| 0 | ADR proposed; row in `docs/adr-status.md` | #238 | in PR |
 | 1 | Verification: `read_task` on the port and the WxCC adapter; probe work item and probe-branch rule in the group check and `wxcc-config-check`; Service App probes on *Koppelingen*; `worker.no_dispatch_jobs`; automatic check for every mapped group | | planned |
 | 2 | Health: last inbound event per platform, WxCC event dedupe, reconcile job, health state with its events, *System status* and *Koppelingen* | | planned |
 | 3 | Alerts: the alert model, banner and pop-ups of ADR 0061 OV-6/OV-7 (updates that ADR's table); `AlertSender` with the email and Webex-bot adapters; targets and test alert on *Koppelingen*; repeat and dedupe | | planned |
