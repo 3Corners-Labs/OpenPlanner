@@ -25,11 +25,13 @@ from app.domain.calls import EventKind
 MAX_SKEW = timedelta(seconds=300)
 
 WXCC_EVENTS: dict[str, EventKind] = {
+    "task:new": EventKind.TASK_CREATED,
     "task:connected": EventKind.TASK_CONNECTED,
     "task:ended": EventKind.TASK_ENDED,
     "task:failed": EventKind.TASK_FAILED,
 }
-"""WxCC event types OpenPlanner acts on; ``task:new`` is already recorded at dispatch."""
+"""WxCC event types OpenPlanner acts on. A booking's ``task:new`` is already recorded at
+dispatch and ignored by the domain; the group check's probe work item needs it (ADR 0082)."""
 
 
 @dataclass(frozen=True)

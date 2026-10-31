@@ -158,6 +158,23 @@ class TaskState(StrEnum):
 
 
 @dataclass(frozen=True)
+class TaskSnapshot:
+    """What the contact center says about a work item when asked (ADR 0082 point 1).
+
+    Attributes:
+        state: The task's state as OpenPlanner knows it; ``NONE`` when the platform does not
+            know the task (or no longer does).
+        status: The platform's own status word, lower case, for a finding or event; empty
+            when unknown. Never the task's attributes or data.
+        changed_at: When the platform last changed the task, if it says.
+    """
+
+    state: TaskState
+    status: str = ""
+    changed_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class BookingEvent:
     """One entry of a booking's timeline; ``detail`` is a reason code, never personal data.
 

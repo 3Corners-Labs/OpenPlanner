@@ -11,19 +11,27 @@ For one group it walks the chain a call depends on and turns every link into a `
               0071): a warning when the site refuses it, and one when it accepts the request
               but stores other values, since the participant would then wait in the lobby for nobody
     wxcc      region ─► channel ─► asset ─► schema ─► entry point ─► flow ─► queue ─► Screen Pop
-              (``wxcc_config``, the same rules as ``wxcc-config-check``)
+              (``wxcc_config``, the same rules as ``wxcc-config-check``); then a probe work
+              item (ADR 0082): created on the group's channel and business address with kind
+              ``probe``, exactly as a booking's would be, and watched on the webhook until
+              its ``task:new`` and ``task:ended`` arrive (``ProbeRegistry``), which proves the
+              token, the scopes, the asset, the flow, the subscription and the webhook path
+              in one go. The flow's ``probe`` branch ends it; without that branch OpenPlanner
+              ends it itself (End Task) and warns
     webhooks  WEBHOOK_BASE_URL is https; this host's Webex webhooks and the WxCC subscription
               exist and are current (``registrations``); a signed test event is delivered and a
               wrongly signed one refused (``webhook_selftest``)
 
-Besides the probe meetings nothing is created or deleted at the platforms, and the self-test
-events belong to no booking. A platform that refuses or cannot be reached becomes a finding;
-the checker never raises for it. Findings carry names, ids, status codes and Webex's masked
-reason only: no secrets, tokens or citizen data.
+Besides the probe meetings and the probe work item nothing is created or deleted at the
+platforms, and the self-test events belong to no booking. A platform that refuses or cannot
+be reached becomes a finding; the checker never raises for it. Findings carry names, ids,
+status codes and Webex's masked reason only: no secrets, tokens or citizen data.
 """
 
+import asyncio
 import time
-from collections.abc import Sequence
+import uuid
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from urllib.parse import parse_qsl, urlsplit
@@ -35,10 +43,18 @@ from app.adapters.registrations import Expected, Listing, list_registrations
 from app.adapters.webex_auth import AuthorizedClient, WebexTokens
 from app.adapters.webex_meetings import WebexMeetings
 from app.adapters.webhook_selftest import self_test
+from app.adapters.wxcc import PROBE_KIND
 from app.adapters.wxcc_config import GroupRouting, check_group, fetch_config, region_check
-from app.domain.calls import BROWSER_LINK_PARAMS, MeetingRequest, join_link
+from app.domain.calls import BROWSER_LINK_PARAMS, EventKind, MeetingRequest, WorkItem, join_link
 from app.domain.checks import CheckArea, CheckStatus, Finding
-from app.domain.ports import Clock, IntegrationError, RequestLog, RequestRecord
+from app.domain.ports import (
+    Clock,
+    ContactCenterDispatcher,
+    IntegrationError,
+    ProbeRegistry,
+    RequestLog,
+    RequestRecord,
+)
 from app.domain.scheduling import Group, JoinClient
 
 PROBE_TITLE = "OpenPlanner controle"
@@ -47,6 +63,17 @@ PROBE_AHEAD = timedelta(days=1)
 """The probe is scheduled this far ahead, at the same clock time, so it is never 'now'."""
 PROBE_LENGTH = timedelta(minutes=30)
 """Length of the probe meeting: the usual slot."""
+PROBE_FIRST_NAME = "Probe"
+"""The first name on the probe work item: no participant, so no personal data (ADR 0082)."""
+PROBE_LINK = "https://openplanner.invalid/probe"
+"""Meeting link of the probe work item when no probe meeting could be scheduled."""
+PROBE_POLL = 1.0
+"""Seconds between looks at the probe registry while waiting for the webhook: the wait's
+resolution, not a tunable; the wait itself is ``integration_probe_timeout_seconds``."""
+PROBE_TIMEOUT = timedelta(seconds=60)
+"""Default wait for the probe's events (``integration_probe_timeout_seconds``)."""
+
+Sleep = Callable[[float], Awaitable[None]]
 
 
 @dataclass(frozen=True)
@@ -92,6 +119,11 @@ class PlatformChecker:
         config: Platform addresses, webhook base and secrets.
         clock: Current time, for the signed test events.
         request_log: Where the probe meeting's requests are reported (ADR 0068).
+        dispatcher: Creates and ends the probe work item (ADR 0082); ``None`` without WxCC.
+        probes: Where the probe's webhook events arrive; ``None`` skips the probe work item.
+        probe_timeout: How long to wait for the probe's events
+            (``integration_probe_timeout_seconds``).
+        sleep: Waits between looks at the registry (tests pass one that does not wait).
     """
 
     def __init__(
@@ -101,6 +133,11 @@ class PlatformChecker:
         config: CheckerConfig,
         clock: Clock,
         request_log: RequestLog | None = None,
+        *,
+        dispatcher: ContactCenterDispatcher | None = None,
+        probes: ProbeRegistry | None = None,
+        probe_timeout: Callable[[], timedelta] = lambda: PROBE_TIMEOUT,
+        sleep: Sleep = asyncio.sleep,
     ) -> None:
         """Store the collaborators."""
         self._http = http
@@ -109,20 +146,28 @@ class PlatformChecker:
         self._config = config
         self._clock = clock
         self._request_log = request_log
+        self._dispatcher = dispatcher
+        self._probes = probes
+        self._probe_timeout = probe_timeout
+        self._sleep = sleep
 
     async def check_group(self, group: Group, peers: Sequence[Group]) -> list[Finding]:
         """Return the findings for ``group``, in the order of the chain."""
+        webex, link = await self._webex(group)
         return [
-            *await self._webex(group),
-            *await self._wxcc(group, peers),
+            *webex,
+            *await self._wxcc(group, peers, link),
             *await self._webhooks(group),
         ]
 
-    async def _webex(self, group: Group) -> list[Finding]:
-        """Schedule a probe meeting for the group's host as a booking would, then delete it."""
+    async def _webex(self, group: Group) -> tuple[list[Finding], str | None]:
+        """Schedule a probe meeting for the group's host as a booking would, then delete it.
+
+        Returns the findings and the probe meeting's link, which the probe work item carries.
+        """
         host = group.video_host_email
         if not host:
-            return [Finding(CheckArea.WEBEX, "webex.no_host", CheckStatus.WARN)]
+            return [Finding(CheckArea.WEBEX, "webex.no_host", CheckStatus.WARN)], None
         meetings = WebexMeetings(self._client, self._config.webex_base_url, self._clock)
         start = self._clock.now().replace(second=0, microsecond=0) + PROBE_AHEAD
         request = MeetingRequest(PROBE_TITLE, start, start + PROBE_LENGTH, group.timezone, host)
@@ -138,13 +183,13 @@ class PlatformChecker:
             else:
                 code = "webex.unreachable"
             params = (("host", host), ("error", error.code), ("reason", error.reason or "-"))
-            return [Finding(CheckArea.WEBEX, code, CheckStatus.FAIL, params)]
+            return [Finding(CheckArea.WEBEX, code, CheckStatus.FAIL, params)], None
         findings = [Finding(CheckArea.WEBEX, "webex.host_ok", CheckStatus.OK, (("host", host),))]
         findings += await self._browser_link(group, probe.link)
         findings += await self._delete_probe(meetings, probe.id, host, "webex.probe_left")
         if group.trial_call_enabled:
             findings += await self._trial_probe(meetings, group, host, start)
-        return findings
+        return findings, probe.link
 
     async def _trial_probe(
         self, meetings: WebexMeetings, group: Group, host: str, start: datetime
@@ -222,8 +267,8 @@ class PlatformChecker:
             return [Finding(CheckArea.WEBEX, code, CheckStatus.WARN, params)]
         return []
 
-    async def _wxcc(self, group: Group, peers: Sequence[Group]) -> list[Finding]:
-        """Walk the WxCC routing chain of the group's work items."""
+    async def _wxcc(self, group: Group, peers: Sequence[Group], link: str | None) -> list[Finding]:
+        """Walk the WxCC routing chain of the group's work items, then send a probe through it."""
         base = self._config.wxcc_base_url
         if not base:
             return [Finding(CheckArea.WXCC, "wxcc.not_configured", CheckStatus.SKIPPED)]
@@ -255,6 +300,67 @@ class PlatformChecker:
                     (("error", error.code),),
                 )
             ]
+        branch = any(f.code == "wxcc.probe.ok" for f in findings)
+        return findings + await self._probe_task(group, link, branch)
+
+    async def _probe_task(self, group: Group, link: str | None, branch: bool) -> list[Finding]:
+        """Create a probe work item as a booking's would be and wait for its events (ADR 0082).
+
+        ``branch`` says whether the flow has the Case on ``probe`` that ends it. The probe
+        carries no participant data: a fixed first name, a reference that is no booking's,
+        and the probe meeting's link (already deleted) or a placeholder.
+        """
+        if self._dispatcher is None or self._probes is None:
+            return []
+        if not group.wxcc_channel or not group.wxcc_business_address:  # pragma: no cover
+            return []
+        now = self._clock.now()
+        item = WorkItem(
+            reference=f"probe-{uuid.uuid4().hex[:12]}",
+            first_name=PROBE_FIRST_NAME,
+            start_label=now.astimezone(group.tz).strftime("%Y-%m-%d %H:%M"),
+            group_name=group.name,
+            meeting_link=link or PROBE_LINK,
+            kind=PROBE_KIND,
+            business_address=group.wxcc_business_address,
+            channel=group.wxcc_channel,
+            routing_value=group.routing_value,
+        )
+        area = CheckArea.WXCC
+        try:
+            task_id = await self._dispatcher.create_task(item)
+        except IntegrationError as error:
+            params = (("error", error.code), ("reason", error.reason or "-"))
+            return [Finding(area, "wxcc.probe.refused", CheckStatus.FAIL, params)]
+        await self._probes.open(task_id, now)
+        timeout = self._probe_timeout()
+        started = time.monotonic()
+        seen: tuple[EventKind, ...] = ()
+        while True:
+            seen = await self._probes.events(task_id)
+            if EventKind.TASK_ENDED in seen or EventKind.TASK_FAILED in seen:
+                break
+            if time.monotonic() - started >= timeout.total_seconds():
+                break
+            await self._sleep(PROBE_POLL)
+        seconds = str(int(time.monotonic() - started))
+        task = (("task", task_id), ("seconds", seconds))
+        if EventKind.TASK_ENDED in seen:
+            return [Finding(area, "wxcc.probe.ok", CheckStatus.OK, task)]
+        if EventKind.TASK_FAILED in seen:
+            return [Finding(area, "wxcc.probe.failed", CheckStatus.FAIL, task)]
+        findings = []
+        if EventKind.TASK_CREATED not in seen:
+            findings.append(Finding(area, "wxcc.probe.no_events", CheckStatus.FAIL, task))
+        elif branch:
+            findings.append(Finding(area, "wxcc.probe.not_ended", CheckStatus.FAIL, task))
+        else:
+            findings.append(Finding(area, "wxcc.probe.ended_here", CheckStatus.WARN, task))
+        try:
+            await self._dispatcher.end_task(task_id)
+        except IntegrationError as error:
+            params = (("task", task_id), ("error", error.code))
+            findings.append(Finding(area, "wxcc.probe.left", CheckStatus.WARN, params))
         return findings
 
     async def _webhooks(self, group: Group) -> list[Finding]:

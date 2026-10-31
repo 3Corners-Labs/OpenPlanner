@@ -91,7 +91,10 @@ Jobs, slots, schedules and audit events carry no personal data of citizens. A fa
 job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
 the group name and the host's address (masked), never a citizen's data; the system event of the
 automatic group check (ADR 0065 step 2) carries the same masked reason of the probe meeting,
-which belongs to no booking. A request event (`integration.request`, ADR 0068) records each
+which belongs to no booking. The probe work item of a group check (ADR 0082) leaves for WxCC
+with a fixed first name ("Probe"), a reference that is no booking's and the probe meeting's
+link: no participant data; its `task:new` and `task:ended` are kept as event kinds in
+`integration_reports` (row `wxcc_probe`), replaced by the next check. A request event (`integration.request`, ADR 0068) records each
 call to Webex and WxCC made for a booking as method, path without its query string, status,
 duration, the platform's tracking id and the version: never a body, a query or a header, so
 neither the host's address (a query parameter of `DELETE /meetings`) nor a citizen's first name

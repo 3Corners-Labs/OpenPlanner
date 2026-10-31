@@ -75,7 +75,7 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
-from app.adapters.diagnostics import CheckResult, format_report, passed, probes, run_checks
+from app.adapters.diagnostics import CheckResult, format_report, passed, run_checks
 from app.adapters.integrations import build_integrations, secret_box
 from app.adapters.oidc import claim_mapping, login_claims
 from app.adapters.oidc_check import OidcTarget, check_oidc
@@ -88,6 +88,7 @@ from app.adapters.registrations import (
     listing_to_report,
 )
 from app.adapters.releases import update_service
+from app.adapters.service_app_check import service_app_check
 from app.adapters.settings_report import (
     combination_problem,
     describe,
@@ -247,11 +248,9 @@ async def _wxcc_check(
     async with _service_app(settings, transport) as (http, tokens):
         if tokens is None:  # pragma: no cover - video_configured implies tokens
             return "Webex is not configured; nothing to check.\n", False
-        checks = probes(settings.webex_api_base_url, settings.wxcc_api_base_url)
-        results = await run_checks(http, tokens, checks, SystemClock())
-        if settings.wxcc_api_base_url and results[0].ok:
-            token = await tokens.access_token()
-            results.append((await region_check(http, token, settings.wxcc_api_base_url))[0])
+        results = await service_app_check(
+            http, tokens, settings.webex_api_base_url, settings.wxcc_api_base_url, SystemClock()
+        )
     report = format_report(results)
     if not settings.wxcc_api_base_url:
         report += "WXCC_API_BASE_URL is not set: WxCC was not checked.\n"

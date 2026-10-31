@@ -1,6 +1,6 @@
 # 0082. Contact-center integration: verification, health, alerts to administrators and a fallback per group
 
-Status: proposed (2026-10-31), requested by the product owner; not built. Extends ADR 0018
+Status: proposed (2026-10-31), requested by the product owner; partly built (step 1 in PR). Extends ADR 0018
 (work items), ADR 0021 (ending a work item), ADR 0043 (own queue), ADR 0061 (alerts on the
 overview, OV-6 and OV-7), ADR 0065 and ADR 0068 (group check, request events). Written on the
 neutral port of ADR 0032, which stays as it is.
@@ -61,9 +61,10 @@ a choice of the group, never a surprise for its team.
    `integration_probe_timeout_seconds` for `task:new` and `task:ended` on the webhook. That
    proves the token, the scopes, the asset, the flow, the subscription and the webhook path in
    one go. The flow ends a probe itself: the configuration check gets a rule **probe branch**
-   (FAIL when the flow has no Case on `kind == probe` that ends the contact). When the branch
-   is missing, OpenPlanner ends the probe itself (End Task, ADR 0021) and reports a warning;
-   when `task:new` arrives but `task:ended` does not, the check fails with `probe_not_ended`.
+   (a warning when the flow has no Case on `kind == probe` that ends the contact: OpenPlanner
+   then ends the probe itself with End Task, ADR 0021, and reports that as a warning too, so a
+   tenant without the branch keeps a passing check). When the flow has the branch and
+   `task:new` arrives but `task:ended` does not, the check fails with `probe_not_ended`.
    The probe is recorded as request events at the group's level, without a booking, like the
    probe meeting. A probe is never shown in the own queue, the agenda or the overview.
 3. **The Service App probes move into the portal.** The probes of `wxcc-check` (token
@@ -222,7 +223,7 @@ bot's single scope `spark:messages_write`.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed; row in `docs/adr-status.md` | #238 | in PR |
-| 1 | Verification: `read_task` on the port and the WxCC adapter; probe work item and probe-branch rule in the group check and `wxcc-config-check`; Service App probes on *Koppelingen*; `worker.no_dispatch_jobs`; automatic check for every mapped group | | planned |
+| 1 | Verification: `read_task` on the port and the WxCC adapter; probe work item and probe-branch rule in the group check and `wxcc-config-check`; Service App probes on *Koppelingen*; `worker.no_dispatch_jobs`; automatic check for every mapped group | #245 | in PR |
 | 2 | Health: last inbound event per platform, WxCC event dedupe, reconcile job, health state with its events, *System status* and *Koppelingen* | | planned |
 | 3 | Alerts: the alert model, banner and pop-ups of ADR 0061 OV-6/OV-7 (updates that ADR's table); `AlertSender` with the email and Webex-bot adapters; targets and test alert on *Koppelingen*; repeat and dedupe | | planned |
 | 4 | Fallback per group: setting, per-booking and per-group activation, queue flag and banners, space messages, return to the contact center | | planned |
