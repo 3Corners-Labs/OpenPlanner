@@ -17,7 +17,7 @@ Suggested order: logo and icons (small, visible at once), shell to ADR 0047 (unb
 |---|---|---|---|---|
 | LG-1 | Brand files in `app/web/static/brand/` (`mark.svg`, `mark-mono.svg`, `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`); token `--op-brand-slot` light and dark in `admin.css` | S | SVGs without scripts or external references (test); `REUSE.toml` annotated; `reuse lint` green | built (#135) |
 | LG-2 | Admin top bar shows the mark instead of the "OP" span in `layout.html` (`admin-brand__mark`); favicon linked from `base.html` | S | axe zero violations; product name stays as text; both themes screenshotted in the PR | built (#135) |
-| LG-3 | Citizen footer "Appointments via OpenPlanner" uses the mark when the organisation keeps it on (ADR 0041) | S | Email plain-text part unchanged; logo has a text alternative in the HTML part | built (#135) |
+| LG-3 | Participant footer "Appointments via OpenPlanner" uses the mark when the organisation keeps it on (ADR 0041) | S | Email plain-text part unchanged; logo has a text alternative in the HTML part | built (#135) |
 | LG-4 | Optional motion: `static/brand-motion.js` for sign-in and booking confirmed, CSS-only loader | M | No motion under `prefers-reduced-motion`; static mark without script; CSP change limited to the pages that load it | open |
 
 ## 2. Icons
@@ -70,7 +70,7 @@ The register (`app/web/navigation.py`), the three sections, the `<details>` prof
 
 | ID | Item | Size | Done when | Status |
 |---|---|---|---|---|
-| BR-1 | Branding tab on the organisation page (ADR 0047 §3) with live contrast check (≥ 4.5:1 against white, save blocked below), preview of a citizen page, "Appointments via OpenPlanner" toggle | M | Server repeats the contrast check; SVG upload sanitised or refused; abuse case "script in uploaded SVG" with a test | open |
+| BR-1 | Branding tab on the organisation page (ADR 0047 §3) with live contrast check (≥ 4.5:1 against white, save blocked below), preview of a participant page, "Appointments via OpenPlanner" toggle | M | Server repeats the contrast check; SVG upload sanitised or refused; abuse case "script in uploaded SVG" with a test | open |
 | BR-2 | Organisation logo shown next to the organisation in lists and the filter | S | Image served from our origin with the correct content type; no inline SVG from uploads | open |
 
 ## 8. Page width — ADR 0080

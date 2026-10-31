@@ -40,7 +40,7 @@ stores the tokens encrypted (ADR 0008). Scopes:
 }
 ```
 
-The title never contains the citizen's name. OpenPlanner keeps `id` (as `video_room_id`) and
+The title never contains the participant's name. OpenPlanner keeps `id` (as `video_room_id`) and
 `webLink` (as `guest_join_url` and `host_join_url`; one link, the role follows the signed-in
 account). Cancelling deletes the meeting: `DELETE /v1/meetings/{id}?hostEmail=…`.
 

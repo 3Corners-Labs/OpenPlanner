@@ -20,7 +20,7 @@ It identifies nobody and is strictly functional, so no consent banner is needed.
 ## Outgoing email (WP3, ADR 0022)
 
 ```
-worker ──SMTP──> mail provider of the organisation (admin portal; else SMTP_HOST) ──> citizen
+worker ──SMTP──> mail provider of the organisation (admin portal; else SMTP_HOST) ──> participant
    reads booking at send time: first name, email, date, time, team, management link
    request to confirm a new booking and its reminder (ADR 0056): email, date, time, team
    and the confirm link only; no name, join link or calendar file (the address is not
@@ -35,7 +35,7 @@ no full name. In development Mailpit (`--profile dev`) catches all mail locally.
 ## SMS reminders (ADR 0022, 0028)
 
 ```
-worker ──HTTPS──> SMS API of the organisation's provider ──> mobile network ──> citizen
+worker ──HTTPS──> SMS API of the organisation's provider ──> mobile network ──> participant
    body: phone number (E.164), text with first name, date, time, team, management link
 ```
 
@@ -56,7 +56,7 @@ provider (ADR 0028) adds a processor: add its row to the table above in the same
 ## Channel settings and message texts (ADR 0022)
 
 SMTP and SMS settings per organisation are organisation data; their password and SMS API key
-are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data. Organisation texts (ADR 0074, table `organisation_texts`) are the same kind of plain text, shown to every citizen of the organisation's groups on pages and in messages; they never hold personal data and leave the system only inside those messages.
+are sealed with AES-256-GCM (ADR 0008). Group texts are text blocks without personal data. Organisation texts (ADR 0074, table `organisation_texts`) are the same kind of plain text, shown to every participant of the organisation's groups on pages and in messages; they never hold personal data and leave the system only inside those messages.
 Neither leaves the system except as part of the messages above.
 
 ```
@@ -84,17 +84,17 @@ filter matches on it. The list and the rule are constants, not settings.
 | Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
 | Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
-| Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the citizen, host URL to WxCC |
+| Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the participant, host URL to WxCC |
 | Management token | `bookings.management_token_hash` (SHA-256 only) | generated | kept (not personal data once the booking is purged) | token itself only in the confirmation mail |
 
-Jobs, slots, schedules and audit events carry no personal data of citizens. A failed meeting
+Jobs, slots, schedules and audit events carry no personal data of participants. A failed meeting
 job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
-the group name and the host's address (masked), never a citizen's data; the system event of the
+the group name and the host's address (masked), never a participant's data; the system event of the
 automatic group check (ADR 0065 step 2) carries the same masked reason of the probe meeting,
 which belongs to no booking. A request event (`integration.request`, ADR 0068) records each
 call to Webex and WxCC made for a booking as method, path without its query string, status,
 duration, the platform's tracking id and the version: never a body, a query or a header, so
-neither the host's address (a query parameter of `DELETE /meetings`) nor a citizen's first name
+neither the host's address (a query parameter of `DELETE /meetings`) nor a participant's first name
 (the work item body) reaches it. Request events are kept `INTEGRATION_REQUEST_RETENTION_DAYS`
 (default 30). The definitions of
 custom fields (`group_form_fields`: keys, labels, options) are the organisation's questions,
@@ -106,20 +106,20 @@ the data above until it is moved, reinstated or cancelled (then the rules above 
 and at most until 30 days after the closure ends (`purge_pii` planned at the closure's end +
 30 days; none while the closure is open-ended). Decided by the product owner on 2026-10-25; to
 be confirmed in the DPIA (O7). The closure notice is admin text without personal data
-(`closure_notices`); it goes to the citizen by mail and on the public group page.
+(`closure_notices`); it goes to the participant by mail and on the public group page.
 
 **Alternative contact options (ADR 0037).** Phone numbers, email addresses, links and addresses
 of the organisation (`organisation_contacts`), entered by an organisation admin, or of one team
 (`group_contacts`), entered by its group admin, and shown publicly on closure and maintenance
 pages, on the page of a booking on hold (CL-2) and in the suspension and update mails (CL-5). A closure keeps a copy of the block that applied when it started (`closures.contacts`)
-and an optional heading per locale (`closure_notices.heading`). Organisation data, not personal data of citizens;
+and an optional heading per locale (`closure_notices.heading`). Organisation data, not personal data of participants;
 the admin page asks for general numbers and addresses only. No purge job; kept until changed.
 
-**Embedded booking (ADR 0035).** With `<gov-booking>` on a host website, the citizen's
+**Embedded booking (ADR 0035).** With `<gov-booking>` on a host website, the participant's
 browser calls `/api/v1/widget/{org}/{group}/` directly: first and last name, email, (optional) phone
 and the answers to the group's custom fields go
 from the browser to OpenPlanner over TLS, never through the host's servers. The host site
-does see that a citizen opened its page with the widget, and which group the tag names; it
+does see that a participant opened its page with the widget, and which group the tag names; it
 cannot read what is typed into the shadow root's form through our API, and the answer to a
 booking holds no personal data and no management token (the link goes by email only). The
 same personal data rules apply as for the standalone page.
@@ -135,7 +135,7 @@ Organisation data; no purge job.
 (`closure_scenarios`): an admin-facing name, notices and headings, optionally a contact block
 and an image (`closure_images`, stripped as above). Admin-only until a closure starts from it;
 then the closure gets its own copy, so deleting or editing the scenario never changes what
-citizens were told. Organisation data; no personal data of citizens; no purge job.
+participants were told. Organisation data; no personal data of participants; no purge job.
 
 **Allowed origins for embedding (ADR 0035).** The websites on which an organisation's groups
 may appear as a widget (`organisation_origins`, such as `https://www.gemeente.nl`), entered by
@@ -163,16 +163,16 @@ web ──SQL──> staff, staff_memberships (sub, display name, roles, organis
 | IdP values of organisations and groups | `organisations.idp_key`, `groups.idp_key` | superuser and org admins in the portal | as the organisation or group; changes audited with old and new value | no (they are what PingFederate sends) |
 | Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
 | System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
-| Audit events on the log platform (ADR 0034) | one JSON line per audit, system and security event on stdout, shipped by the host to the organisation's log platform (SIEM) | web, worker | the organisation's log policy | no citizen data; **admin subjects** (personal data of employees): the log platform is a recipient |
+| Audit events on the log platform (ADR 0034) | one JSON line per audit, system and security event on stdout, shipped by the host to the organisation's log platform (SIEM) | web, worker | the organisation's log policy | no participant data; **admin subjects** (personal data of employees): the log platform is a recipient |
 | Caller pseudonym in security events (ADR 0053) | `audit_events.detail` as `client:<16 hex>`, and on the log platform | web (from the request's IP address; the address itself is never stored) | as the security event (`SECURITY_EVENT_RETENTION_DAYS`; the organisation's log policy on the platform) | pseudonymised personal data of the caller: HMAC-SHA256 under a key derived from `MANAGEMENT_TOKEN_KEY`, IPv6 by /64; only reversible by trying a known address on the host (`python -m app.cli client-pseudonym`) |
-| Audit log export (ADR 0040) | CSV download of the audit log in the admin's scope: ids, codes, admin subjects | web → admin's browser | the organisation's policy; every export is an audit event | no citizen data; admin subjects |
+| Audit log export (ADR 0040) | CSV download of the audit log in the admin's scope: ids, codes, admin subjects | web → admin's browser | the organisation's policy; every export is an audit event | no participant data; admin subjects |
 | Diagnostic mode (ADR 0040) | `diagnostic_modes`: organisation and group slug, end time, superuser's subject; debug events in `audit_events` (category `diagnostic`: job type, attempt, duration) | web (superuser), worker | mode: until it ends; debug events `DIAGNOSTIC_EVENT_RETENTION_DAYS` (7) | no |
 | Event schema fields (ADR 0040) | `audit_events.event_id`, `level`, `category`, `trace_id`, `service`; the same trace id on stdout | web, worker | as the event they belong to | no: random ids and codes |
 
 System events hold no personal data: no names, addresses, message text or join links, only codes
 and the booking id. Each admin sees them at their own level only (group admin: their groups;
 organisation admin and auditor: their organisation and its groups; superuser: everything).
-The auditor role (ADR 0039) is read-only and holds no permission that shows citizens' data; it
+The auditor role (ADR 0039) is read-only and holds no permission that shows participants' data; it
 does see admin names in the audit log, which is the accountability it exists for.
 
 Custom roles (ADR 0039 step 3) live in `roles`: template, names, the role claim value and the
@@ -184,7 +184,7 @@ with codes only and shown on the matrix page with the actor's display name.
 The retention overview (`/admin/retention`, ADR 0039) reads `bookings` only to count, per group,
 how many still hold personal data, how many are past their purge moment and how many purges
 failed, and when the last purge ran. It selects no personal data column and no booking id, so it
-is no new processing of citizens' data; it is the control that the purge (CLAUDE.md privacy
+is no new processing of participants' data; it is the control that the purge (CLAUDE.md privacy
 rules) works.
 
 Admin names are personal data of employees, processed for accountability (who did what in the
@@ -203,17 +203,17 @@ operator CLI <──HTTPS── WxCC configuration (wxcc-config-check): channel,
 operator CLI <──HTTPS── Webex webhooks (ownedBy=org), WxCC subscriptions (webhooks-list/-reset): ids, events, hostEmail filters, status, secret set or not, target without query → integration_reports
 operator CLI ──DELETE──> Webex webhooks, WxCC subscriptions (webhooks-reset --yes): ids of stale registrations only
 operator CLI ──signed test events (unknown ids)──> WEBHOOK_BASE_URL/webhooks/* (webhooks-health) → outcome codes in integration_reports
-citizen ──GET /b/{token}/join/go──> OpenPlanner ──303──> Webex web app (no data added to the link)
-citizen ──POST /b/{token}/test──> OpenPlanner ──meeting (group name, times)──> Webex ──id, link──> OpenPlanner (ADR 0071)
-citizen ──GET /b/{token}/test/go──> OpenPlanner ──303──> the trial meeting in the Webex web app
+participant ──GET /b/{token}/join/go──> OpenPlanner ──303──> Webex web app (no data added to the link)
+participant ──POST /b/{token}/test──> OpenPlanner ──meeting (group name, times)──> Webex ──id, link──> OpenPlanner (ADR 0071)
+participant ──GET /b/{token}/test/go──> OpenPlanner ──303──> the trial meeting in the Webex web app
 Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task events → booking_events, call_status
 web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex (ADR 0010, when an admin opens or polls the agenda and a status is older than MEETING_STATUS_REFRESH_SECONDS): meeting id and the group's host address out; state and participant list back, reduced in the adapter to state, count, host flag, first join and last leave → call_status. Participant names, addresses and IPs are processed in memory only, never stored or logged
 ```
 
 | Data item | Where | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| Meeting join link | `bookings.guest_join_url`, `host_join_url` | Webex | purged with the contact (PII field) | in the citizen's link (via OpenPlanner) and to WxCC (`meetingLink`) |
-| Trial call link | `bookings.trial_join_url` (with `trial_room_id`, `trial_expires_at`, `trial_count`) | Webex, when the citizen opens a trial call (ADR 0071) | link: purged with the contact (PII field); the meeting is deleted at Webex minutes after it closes | to the citizen only (via OpenPlanner's redirect); no WxCC task |
+| Meeting join link | `bookings.guest_join_url`, `host_join_url` | Webex | purged with the contact (PII field) | in the participant's link (via OpenPlanner) and to WxCC (`meetingLink`) |
+| Trial call link | `bookings.trial_join_url` (with `trial_room_id`, `trial_expires_at`, `trial_count`) | Webex, when the participant opens a trial call (ADR 0071) | link: purged with the contact (PII field); the meeting is deleted at Webex minutes after it closes | to the participant only (via OpenPlanner's redirect); no WxCC task |
 | First name | `bookings.first_name` | booking form | as the contact | to WxCC (`firstName`, `origin.name`) |
 | Meeting and task ids, timeline, call status | `bookings.video_room_id`, `wxcc_task_id`, `booking_events`, `call_status` | Webex, WxCC | kept for statistics (no personal data) | no |
 | Participant names/emails in webhook payloads | processed in memory only; webhooks filtered on the groups' host accounts, so other meetings of the organisation are not delivered | Webex | not stored, not logged | no |
@@ -278,7 +278,7 @@ superuser ──POST calendar name/slug, holiday date/name, year──> web ─�
 organisation admin ──POST ticked calendars──> web ──SQL──> organisation_holiday_calendars
 group admin ──POST source, own calendars, kept-open date──> web ──SQL──> groups.holiday_source,
                                                                  group_holiday_calendars, group_holiday_open_days
-citizen ──GET /g/{slug}──> web (holidays are closed days: no times, no holiday data shown)
+participant ──GET /g/{slug}──> web (holidays are closed days: no times, no holiday data shown)
 ```
 
 Holiday calendars are configuration, not personal data; nothing leaves the system. Changes are
@@ -299,7 +299,7 @@ host updater ──docker exec python -m app.cli (claim, progress, report)──
              ──backup-db──> data/backups/request-<id>.db (copy of the whole database: PII)
 ```
 
-Nothing about citizens leaves the system: the release lookup sends no data. The database
+Nothing about participants leaves the system: the release lookup sends no data. The database
 backups the updater takes before every change contain the PII of `bookings`; they stay in the
 data volume with mode 600 and are deleted after 24 hours (`backup-db --prune` on every updater
 run). A backup that is put back is minutes old: purge jobs that ran after it are still pending
@@ -312,7 +312,7 @@ superuser ──POST /admin/maintenance/on|off (reason code, expected end)──
 host (CLI, updater) ──docker exec python -m app.cli maintenance──> web ──SQL──> maintenance_state, audit_events
 operator ──MAINTENANCE_MODE (environment)──> web (no database read)
 admin ──POST (any change) during maintenance──> web ──refused──> audit_events (permission, target slugs)
-citizen ──GET/POST /g/{slug}…, /b/{token}/cancel|reschedule──> web ──503 maintenance page (no write)
+participant ──GET/POST /g/{slug}…, /b/{token}/cancel|reschedule──> web ──503 maintenance page (no write)
 bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error": "maintenance"} (no write)
 ```
 
@@ -341,7 +341,7 @@ web ──portal-certs volume──> proxy: privkey.pem, fullchain.pem, serial
 **The database holds certificates but no private keys** (DPIA input): the key of an own
 certificate is made on the host or imported straight into the `portal-certs` volume, which the
 database backup leaves out on purpose; it is never in a log, an audit event, an error message or
-a page. It concerns the organisation's server identity, not a citizen. The CA learns the domain name and the operator's e-mail address; no citizen data
+a page. It concerns the organisation's server identity, not a participant. The CA learns the domain name and the operator's e-mail address; no participant data
 leaves through this flow. The proxy keeps no access log, so booking paths with management tokens are not
 written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
 name only).

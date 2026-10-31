@@ -12,9 +12,20 @@ and adapters) plus a building-block register is in `docs/diagrams/`: draw.io, PN
 Word, generated from `scripts/diagrams/content.py` with `make diagrams`. Update that content in
 the same PR as a change it shows.
 
+### Terms
+
+One word per role (ADR 0077). Code, docs and texts use these; earlier ADRs and `docs/HANDOVER.md` say "citizen" or "burger" for the participant.
+
+| Term (en / nl) | Meaning |
+|---|---|
+| Participant / deelnemer | The person who books, receives the mails and joins the call. Never logs in. |
+| Agent / medewerker | The person who takes the video call. Organisations may show another word, such as "behandelaar" (ADR 0077, point 8, not built yet). Not the planner, who is a separate role. |
+| Host | The Webex host of the meeting (Webex's word). |
+| Appointment / afspraak | The booking of a participant in a time slot. |
+
 ## 1. Purpose and scope
 
-Citizens book a video call with a team of a government contact center (a *group*, one
+Participants book a video call with a team of a government contact center (a *group*, one
 Webex Contact Center queue). The service offers free time slots, takes the booking, sends
 confirmation and reminders, hands the call to the queue just before the start, and deletes
 personal data 24 hours after the appointment.
@@ -36,7 +47,7 @@ scheduling (the WxCC queue assigns agents), and the video call itself (Webex).
 
 ```mermaid
 flowchart LR
-    citizen([Citizen])
+    participant([Participant])
     website[Organisation website<br/>decision tree]
     admin([Group / organisation admin])
     agent([Contact center agent])
@@ -54,16 +65,16 @@ flowchart LR
     whatsapp[WhatsApp]
 
     website -- links to /g/slug --> service
-    citizen -- books, changes, cancels --> service
-    service -- confirmation, reminders --> smtp --> citizen
+    participant -- books, changes, cancels --> service
+    service -- confirmation, reminders --> smtp --> participant
     admin -. manages groups, texts, settings .-> service
     service -- work item with meeting link at T-5 or now --> wxcc
     wxcc -- offers work item --> agent
     service -- creates meeting, webhooks back --> video
-    citizen -- joins in the browser --> video
+    participant -- joins in the browser --> video
     agent -- joins as cohost, Webex app --> video
     admin -. login .-> idp
-    service -- SMS reminders --> sms --> citizen
+    service -- SMS reminders --> sms --> participant
     service -. roadmap .-> whatsapp
     bot -- free times, OAuth client credentials --> service
 
@@ -79,7 +90,7 @@ flowchart LR
 | Identity provider | in | Admin login with roles | HANDOVER B8, O3 |
 | SMS provider (Webex Connect) | out | SMS reminders, per organisation and provider | ADR 0022, 0028 |
 | WhatsApp | out | Reminders | ADR 0009 (roadmap) |
-| Contact-center bot (WxCC AI Agent) | in | Free times through `/api/agent/v1`; changes through the citizen's confirmation (next step) | ADR 0023 |
+| Contact-center bot (WxCC AI Agent) | in | Free times through `/api/agent/v1`; changes through the participant's confirmation (next step) | ADR 0023 |
 
 ## 4. Containers and deployment
 
@@ -253,7 +264,7 @@ same commit and rollback behaviour as the SQL one.
 | Own queue: visible bookings, next up, claims, release, agent pseudonym (ADR 0043) | `app/domain/own_queue.py`, `app/domain/queue_service.py`, `app/admin/queue_routes.py`, `app/keys.py` |
 | Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029); live steps (ADR 0048) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/web/static/update-progress.js`, `app/cli.py`, `scripts/updater/` |
 | Installing and repairing a host: packages, settings files, pinned release, host updater (ADR 0050) | `scripts/install.sh`, `docs/install.md` |
-| Maintenance mode: switch, cache, refusals in `RequirePermission`, disabled buttons, citizen and machine-API rules, alert (ADR 0038) | `app/domain/maintenance.py`, `app/domain/maintenance_service.py`, `app/adapters/db/maintenance_state.py`, `app/admin/maintenance_routes.py`, `app/admin/frozen_forms.py`, `app/api/maintenance.py`, `app/cli.py`, `scripts/updater/` |
+| Maintenance mode: switch, cache, refusals in `RequirePermission`, disabled buttons, participant and machine-API rules, alert (ADR 0038) | `app/domain/maintenance.py`, `app/domain/maintenance_service.py`, `app/adapters/db/maintenance_state.py`, `app/admin/maintenance_routes.py`, `app/admin/frozen_forms.py`, `app/api/maintenance.py`, `app/cli.py`, `scripts/updater/` |
 | Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Operator commands: `webhooks-list`, `webhooks-reset`, `webhooks-health`; stored results | `app/cli.py`, `app/adapters/registrations.py`, `app/adapters/webhook_selftest.py`, `app/adapters/db/reports.py` |
@@ -262,7 +273,7 @@ same commit and rollback behaviour as the SQL one.
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda per slot with agents and shortfalls, day and week view (ADR 0044) | `app/domain/agenda.py`, `app/domain/agenda_service.py`, `app/admin/agenda_routes.py`, `app/admin/shortfalls.py` |
 | A planner's changes: move, cancel with a fixed reason, accept a shortfall (ADR 0044) | `app/domain/planner_service.py`, `app/admin/planner_routes.py` |
-| Cancelling on the citizen's behalf, shared by closure and planner; the planner's limits; asking to rebook and its lapse (ADR 0044) | `app/domain/booking_changes.py`, `app/jobs/runner.py` (`lapse_rebook`) |
+| Cancelling on the participant's behalf, shared by closure and planner; the planner's limits; asking to rebook and its lapse (ADR 0044) | `app/domain/booking_changes.py`, `app/jobs/runner.py` (`lapse_rebook`) |
 | Rebooking assistant: which bookings of a short slot move and which slot each is proposed, same time on the nearest day first (ADR 0057) | `app/domain/rebooking.py` |
 | Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
@@ -278,7 +289,7 @@ same commit and rollback behaviour as the SQL one.
 | Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |
 | Transactions, write lock | `app/adapters/db/uow.py`, `app/adapters/db/engine.py` |
 | Job queue | `app/adapters/db/jobs.py` |
-| Citizen pages | `app/api/booking_pages.py`, `app/api/citizen.py`, `app/api/templates/` |
+| Participant pages | `app/api/booking_pages.py`, `app/api/citizen.py`, `app/api/templates/` |
 | Slot picker: month calendar and times (ADR 0020) | `app/api/slot_picker.py`, `app/web/static/calendar.js` |
 | Organisations (superuser) | `app/domain/organisations.py`, `app/admin/organisation_routes.py` |
 | Branding per organisation (O5, ADR 0041) | `app/domain/branding.py`, `app/domain/theme.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
@@ -411,12 +422,12 @@ Rules that matter for the rest of the system:
   none) and may keep single holidays open. On a date the group's own override wins, then a
   holiday closes the day, then the weekly rules apply (`app/domain/holidays.py`).
 - **The dispatch lead** (`dispatch_lead_minutes`, default 5) sets when the WxCC task is
-  created. The minimum notice can never be shorter than it. The citizen can cancel until the
+  created. The minimum notice can never be shorter than it. The participant can cancel until the
   start and move until `participant_change_lead_minutes` (default 60, ADR 0069).
 - **Dispatch kind per group** (ADR 0043): `contact_center` (the WxCC task above) or
   `openplanner_queue`, where agents sign in and claim bookings in the group's own queue
   (`app/domain/own_queue.py`, `queue_service.py`). An own-queue group sends no task; both
-  kinds share the citizen's change rule (`Group.change_deadline`, `Group.cancel_deadline`).
+  kinds share the participant's change rule (`Group.change_deadline`, `Group.cancel_deadline`).
 - **All times are stored in UTC.** They are converted to the group's time zone only when
   rendering and parsing.
 
@@ -427,7 +438,7 @@ Rules that matter for the rest of the system:
 ```mermaid
 sequenceDiagram
     autonumber
-    actor C as Citizen
+    actor C as Participant
     participant W as web (booking_pages)
     participant S as BookingService
     participant DB as SQLite
@@ -528,12 +539,12 @@ nothing if the booking is no longer confirmed, its start changed, or its data wa
 Cancelling or moving a booking replaces its pending jobs in the same transaction, including
 deleting its meeting.
 
-### A call: meeting, work item, agent and citizen
+### A call: meeting, work item, agent and participant
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor C as Citizen
+    actor C as Participant
     participant O as OpenPlanner
     participant W as Webex Meetings
     participant X as WxCC
@@ -552,7 +563,7 @@ sequenceDiagram
     O-->>C: 303 to the Webex link
     C->>W: join in the browser, waits in the lobby
     W-->>O: webhooks: started, host joined, guest joined (signed)
-    A->>W: admit citizen
+    A->>W: admit participant
     W-->>O: webhook: meeting ended
 ```
 
@@ -570,7 +581,7 @@ flowchart LR
     status -->|admin POST| authz["RequirePermission:<br/>matrix, then<br/>decide_in_maintenance"]
     authz -->|"integrations, updates, switch,<br/>'Koppeling controleren'<br/>(superuser only)"| allowed["change"]
     authz -->|anything else| refused["503 'alleen lezen'<br/>audit maintenance.refused"]
-    status -->|citizen form or write| page["503 + Retry-After<br/>maintenance page, contact block"]
+    status -->|participant form or write| page["503 + Retry-After<br/>maintenance page, contact block"]
     status -->|machine-API write| api["503 {error: maintenance}"]
     status -.->|never asked| open["webhooks, join pages, health,<br/>worker jobs incl. purge_pii"]
 ```
@@ -722,11 +733,11 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0017 | Video calls through the Webex Meetings API (cohost for staff, lobby for guests) |
 | 0018 | Dispatch to WxCC as work items (Create Task API v2) |
 | 0019 | Direct video call ("now") per group |
-| 0020 | Citizen calendar as progressive enhancement; branding through tokens |
+| 0020 | Participant calendar as progressive enhancement; branding through tokens |
 | 0021 | Ending the work item of a cancelled booking |
 | 0022 | Message channels per organisation, SMS through Webex Connect, editable texts |
 | 0023 | Machine API for contact-center bots: OAuth client credentials, off by default, no personal data |
-| 0024 | Emergency closure: appointments on hold, citizens informed, no deletion |
+| 0024 | Emergency closure: appointments on hold, participants informed, no deletion |
 | 0025 | Reusable holiday calendars with overrides per organisation and group |
 | 0026 | Cap on open direct calls per group; queue feedback from our own data |
 | 0027 | Staffing blocks with an agent count, including zero, instead of opening hours |
@@ -748,8 +759,8 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0044 | Planner: group agenda with shortfalls; move, ask to rebook, cancel or accept per booking (`bookings.manage`) |
 | 0048 | Live progress of updates: the host updater reports each step, the updates page polls a fragment |
 | 0050 | One host installer that installs, repairs and re-checks a host; one layout under `/home/<user>/openplanner` |
-| 0056 | A citizen confirms a new booking by email link; it holds its place until `confirm_by`, then lapses |
-| 0057 | Rebooking assistant: propose a new time for the excess of a short slot, held until the citizen confirms |
+| 0056 | A participant confirms a new booking by email link; it holds its place until `confirm_by`, then lapses |
+| 0057 | Rebooking assistant: propose a new time for the excess of a short slot, held until the participant confirms |
 | 0042 | Settings layers: code default, admin portal, environment lock |
 | 0045 | Dedicated Webex site and an enforced meeting policy |
 | 0046 | Staff directory: just-in-time records from OIDC, optional SCIM 2.0 provisioning |
@@ -771,11 +782,11 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0066 | Bookings per email address |
 | 0067 | Version management in the portal: channel, chosen version, history |
 | 0068 | Troubleshooting per booking: requests, versions, retries and the worker in the group check |
-| 0069 | The citizen cancels until the start and moves until a lead per group |
+| 0069 | The participant cancels until the start and moves until a lead per group |
 | 0070 | The certificate source of the bundled proxy, managed by the superuser in the portal |
 | 0071 | A trial call on Webex ahead of the appointment |
-| 0072 | Direct calls per staffing block, live status for citizen and agent, visible failures |
-| 0074 | Organisation text overrides: allow-listed citizen-page and message texts per organisation and locale |
+| 0072 | Direct calls per staffing block, live status for participant and agent, visible failures |
+| 0074 | Organisation text overrides: allow-listed participant-page and message texts per organisation and locale |
 
 What is built of each decision is not kept here: it is in `docs/adr-status.md` (checked against the code) and in the *Build status* of the ADR itself.
 
@@ -786,8 +797,8 @@ What is built of each decision is not kept here: it is in `docs/adr-status.md` (
 | WP1 | Skeleton, CI, containers, logging, health | done |
 | i18n core | Language module, home page | done |
 | WP2 | Domain, persistence, write lock | done |
-| WP3 (slice 1) | Citizen pages, mail, worker, demo | done |
-| WP3b | Citizen pages: month calendar grid, modern layout, branding (O5) | done |
+| WP3 (slice 1) | Participant pages, mail, worker, demo | done |
+| WP3b | Participant pages: month calendar grid, modern layout, branding (O5) | done |
 | WP3c | Embeddable widget (Web Component, same tokens; ADR 0035, backlog EM-1 to EM-5) | done |
 | WP4 | SMS reminders, message editors | done (ADR 0022) |
 | WP5 | Webex Meetings, join page, live status (O1: Meetings API) | done |
@@ -813,7 +824,7 @@ What is built of each decision is not kept here: it is in `docs/adr-status.md` (
 | ADR 0039 | Rights: (1) auditor role, reach, matrix page text; (2) retention overview; (3) custom roles within bounds | done |
 | ADR 0040 | Logging and storage: step 1 rotation, reclaim and disk watch; steps 2–4 schema and levels, filters and CSV export, diagnostic mode and retention | done (parts 1–4) |
 | O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
-| O11 step 2 | Change requests by phone number, confirmed by the citizen by email/SMS (ADR 0023) | planned |
+| O11 step 2 | Change requests by phone number, confirmed by the participant by email/SMS (ADR 0023) | planned |
 
 Every other decision since ADR 0035 (settings layers, own queue, planner, staff directory, installer, releases and release candidates, TLS, the overview, troubleshooting and more) has its state in `docs/adr-status.md`; this table keeps the work packages only.
 

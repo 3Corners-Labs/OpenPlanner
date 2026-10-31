@@ -3,6 +3,7 @@
 Datum: 22 oktober 2026
 Status: ontwerp vastgesteld; de bouw loopt. Per besluit staat in `docs/adr-status.md` wat gebouwd is (gecontroleerd tegen de code op 30 oktober 2026)
 Doel van dit document: alles wat een ontwikkelaar (of Claude Code) nodig heeft om zonder deze gespreksgeschiedenis te starten.
+Terminologie: dit document spreekt van "burger"; in de software heet die persoon sinds ADR 0077 "deelnemer" (Engels: participant). De tekst hieronder blijft ongewijzigd.
 
 ---
 

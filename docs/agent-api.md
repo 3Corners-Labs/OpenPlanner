@@ -99,7 +99,7 @@ Every refusal is `{"error": "<code>"}`; it never repeats input.
 ## 6. What comes next
 
 Changing and cancelling (ADR 0023, next step): the bot sends the caller's phone number and
-the wanted change; OpenPlanner sends the citizen an email or SMS to confirm, and only that
+the wanted change; OpenPlanner sends the participant an email or SMS to confirm, and only that
 confirmation changes the booking. The bot gets the same answer whether or not the number has
 a booking, so the API cannot reveal who has an appointment.
 
