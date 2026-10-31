@@ -123,7 +123,7 @@ is a decision that needs the label.
 | 1 | `scripts/decision_gate.py` with its test and the `decision gate` job in `ci.yml`; `tests/test_numbering.py`; CLAUDE.md, CONTRIBUTING.md, the PR template, `docs/skills.md` and `docs/adr-status.md` updated | #177 | in PR |
 | 2 | `make release-audit` (Codex CLI over the diff since the last release) and the `## Release audit` check on a `vX.Y.0` tag in `main.yml`; runbook step | #177 | in PR |
 | 3 | The product owner adds `decision gate` to the required checks of `main` and the label `po:approved` exists; Claude Code enables auto-merge on the pull requests it opens from then on | | planned |
-| 4 | Issues per open *Build status* row on the merge of an ADR, and the weekly drift report (point 6) | | planned |
+| 4 | Issues per open *Build status* row on the merge of an ADR, and the weekly drift report (point 6): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | #180 | in PR |
 | 5 | First minor release under this ADR (`v0.4.0`) with its audit section | | planned |
 
 ## Consequences

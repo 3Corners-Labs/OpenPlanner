@@ -21,7 +21,7 @@ from app.domain.security_log import (
 )
 from app.web.errors import ERROR_KEYS, status_for
 from app.web.locale import resolve_locale
-from app.web.protection import RejectedRequest
+from app.web.protection import RejectedRequest, count_unknown_link
 from app.web.security_events import report
 from app.web.templates import create_templates, render
 
@@ -57,6 +57,19 @@ def _page(request: Request, status: int, title_key: str, message_key: str) -> Re
     return response
 
 
+async def _too_many_unknown_links(request: Request) -> Response:
+    """Answer 429 to a caller who tried too many links that match no booking (ADR 0011)."""
+    await report(request, RATE_LIMITED, TOO_MANY_REQUESTS, detail="surface:links")
+    return _rate_limited_response(request)
+
+
+def _rate_limited_response(request: Request) -> Response:
+    """The rate-limit page with a ``Retry-After`` hint."""
+    response = _page(request, 429, "error.title", "error.rate_limited")
+    response.headers["retry-after"] = "60"
+    return response
+
+
 async def domain_error_page(request: Request, exc: Exception) -> Response:
     """Render a domain error that a route did not handle itself."""
     if not isinstance(exc, DomainError):  # pragma: no cover - registered for DomainError only
@@ -64,6 +77,8 @@ async def domain_error_page(request: Request, exc: Exception) -> Response:
     if exc.code is ErrorCode.BOOKING_NOT_FOUND and request.url.path.startswith(
         MANAGEMENT_LINK_PREFIX
     ):
+        if count_unknown_link(request):
+            return await _too_many_unknown_links(request)
         await report(request, TOKEN_REJECTED, UNKNOWN_MANAGEMENT_LINK)
     if exc.code in _NOT_FOUND:
         return _page(request, 404, "error.not_found.title", "error.not_found.text")
@@ -95,9 +110,7 @@ async def validation_error_page(request: Request, exc: Exception) -> Response:
 async def rate_limited_page(request: Request, exc: Exception) -> Response:
     """Render the rate-limit page with a ``Retry-After`` hint."""
     await report(request, RATE_LIMITED, TOO_MANY_REQUESTS, detail="surface:web")
-    response = _page(request, 429, "error.title", "error.rate_limited")
-    response.headers["retry-after"] = "60"
-    return response
+    return _rate_limited_response(request)
 
 
 def register_error_pages(app: FastAPI) -> None:

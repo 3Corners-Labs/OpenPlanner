@@ -120,6 +120,7 @@ Build work merges as soon as every check is green (enable auto-merge when you op
 decision (an ADR, CLAUDE.md, the authorisation matrix, the workflows, a release PR) shows a red
 *decision gate* until the product owner sets the label `po:approved` (ADR 0078). The PR template asks the seven review questions from `CLAUDE.md`; answer all of them.
 New ADRs start from `docs/adr/template.md`, including its *Settings* section (ADR 0042). A new ADR also gets its *Build status* table and its row in `docs/adr-status.md`; the PR that builds a step of an ADR updates both (ADR 0059).
+Every open row of a *Build status* table has an issue `ADR NNNN step S: …` (label `adr:NNNN`, kept by `scripts/adr_issues.py`); a build PR sets its row to `in PR #N` and closes the issue with `Closes #N` in its description, and a weekly report issue `ADR drift <date>` lists what no longer agrees (ADR 0078).
 Run the `security-review` skill (`.claude/skills/security-review/`) before opening the PR.
 
 `main` merges through a merge queue (squash): the queue builds `main` with the queued pull

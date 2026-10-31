@@ -74,6 +74,7 @@ def test_security_floors_of_section_7() -> None:
         "admin_reauth_minutes": (5, 60),
         "rate_limit_bookings": (1, 30),
         "rate_limit_reads": (10, 300),
+        "rate_limit_unknown_links": (5, 100),
         "rate_limit_agent_tokens": (1, 30),
         "rate_limit_agent_calls": (10, 600),
         "system_event_retention_days": (30, 3650),
