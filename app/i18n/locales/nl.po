@@ -3953,6 +3953,9 @@ msgstr "op de webpagina's"
 msgid "admin.audit.detail.surface_agent"
 msgstr "op de machine-API"
 
+msgid "admin.audit.detail.surface_links"
+msgstr "bij onbekende beheerlinks"
+
 msgid "admin.audit.detail.client"
 msgstr "afzender {value}"
 
@@ -6093,6 +6096,9 @@ msgstr "Afspraken per IP-adres"
 
 msgid "settings.field.rate_limit_reads.label"
 msgstr "Beschikbaarheid opvragen per IP-adres"
+
+msgid "settings.field.rate_limit_unknown_links.label"
+msgstr "Onbekende beheerlinks per IP-adres"
 
 msgid "settings.field.rate_limit_agent_tokens.label"
 msgstr "Tokenaanvragen machine-API per client"

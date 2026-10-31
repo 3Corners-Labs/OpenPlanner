@@ -132,13 +132,16 @@ code. Switching a protection off is not a class C action.
 | `admin_reauth_minutes` | 60 | 5–60 | — |
 | `rate_limit_bookings` | 10/hour | 1–30 per hour | `RATE_LIMIT_ENABLED` (off switch) |
 | `rate_limit_reads` | 60/minute | 10–300 per minute | idem |
+| `rate_limit_unknown_links` | 20/hour | 5–100 per hour | idem |
 | `rate_limit_agent_tokens` | 10/minute | 1–30 per minute | `AGENT_API_ENABLED` (routes exist) |
 | `rate_limit_agent_calls` | 120/minute | 10–600 per minute | idem |
 | `system_event_retention_days` | 90 | 30–3650 | — |
 | `log_level` | INFO | any, with expiry ≤ 24 h | — |
 
 The CLAUDE.md security baseline (10 bookings/IP/hour, 60 reads/IP/minute) becomes the
-default. The ceilings exist for real cases, such as many citizens behind one municipal NAT
+default. `rate_limit_unknown_links` (added with the bound on unknown management links,
+ADR 0053 point 7) counts only links that match no booking, so the ceiling of 100 per hour
+costs a shared address nothing it uses in normal life. The ceilings exist for real cases, such as many citizens behind one municipal NAT
 address.
 
 ### 8. Login settings: changeable, but never a lockout
