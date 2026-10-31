@@ -4,9 +4,12 @@ For one group it walks the chain a call depends on and turns every link into a `
 
     webex     a probe meeting is scheduled for the host exactly as a booking would schedule
               one (same adapter, same body: licence, scope, host, time zone and options in one
-              go) and deleted at once (ADR 0065); a refusal carries Webex's reason. Then a
-              second probe with the trial call's options (entry before the host, ADR 0071),
-              a warning when the site refuses it
+              go) and deleted at once (ADR 0065); a refusal carries Webex's reason. For a group
+              that opens the web app (ADR 0075) the probe's link is visited once, anonymously,
+              before it is deleted: Webex must carry ``launchApp=true`` through its redirect.
+              Then a second probe with the trial call's options (entry before the host, ADR
+              0071): a warning when the site refuses it, and one when it accepts the request
+              but stores other values, since the citizen would then wait in the lobby for nobody
     wxcc      region ─► channel ─► asset ─► schema ─► entry point ─► flow ─► queue ─► Screen Pop
               (``wxcc_config``, the same rules as ``wxcc-config-check``)
     webhooks  WEBHOOK_BASE_URL is https; this host's Webex webhooks and the WxCC subscription
@@ -19,9 +22,11 @@ the checker never raises for it. Findings carry names, ids, status codes and Web
 reason only: no secrets, tokens or citizen data.
 """
 
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
+from urllib.parse import parse_qsl, urlsplit
 
 import httpx
 
@@ -31,10 +36,10 @@ from app.adapters.webex_auth import AuthorizedClient, WebexTokens
 from app.adapters.webex_meetings import WebexMeetings
 from app.adapters.webhook_selftest import self_test
 from app.adapters.wxcc_config import GroupRouting, check_group, fetch_config, region_check
-from app.domain.calls import MeetingRequest
+from app.domain.calls import BROWSER_LINK_PARAMS, MeetingRequest, join_link
 from app.domain.checks import CheckArea, CheckStatus, Finding
-from app.domain.ports import Clock, IntegrationError, RequestLog
-from app.domain.scheduling import Group
+from app.domain.ports import Clock, IntegrationError, RequestLog, RequestRecord
+from app.domain.scheduling import Group, JoinClient
 
 PROBE_TITLE = "OpenPlanner controle"
 """Title of the probe meeting; the host may see it for a second in the Webex calendar."""
@@ -60,6 +65,17 @@ def _status(result: CheckResult) -> CheckStatus:
     if result.ok:
         return CheckStatus.OK
     return CheckStatus.FAIL if result.required else CheckStatus.WARN
+
+
+def _value(value: object) -> str:
+    """Return ``value`` as Webex writes it in JSON (``true``, ``false``, a word)."""
+    return str(value).lower() if isinstance(value, bool) else str(value)
+
+
+def _browser_finding(code: str, params: tuple[tuple[str, str], ...] = ()) -> Finding:
+    """Return the finding for the browser link: a warning unless it works."""
+    status = CheckStatus.OK if code.endswith("_ok") else CheckStatus.WARN
+    return Finding(CheckArea.WEBEX, code, status, params)
 
 
 def _finding(area: CheckArea, result: CheckResult) -> Finding:
@@ -92,6 +108,7 @@ class PlatformChecker:
         self._client = AuthorizedClient(http, tokens, request_log)
         self._config = config
         self._clock = clock
+        self._request_log = request_log
 
     async def check_group(self, group: Group, peers: Sequence[Group]) -> list[Finding]:
         """Return the findings for ``group``, in the order of the chain."""
@@ -123,6 +140,7 @@ class PlatformChecker:
             params = (("host", host), ("error", error.code), ("reason", error.reason or "-"))
             return [Finding(CheckArea.WEBEX, code, CheckStatus.FAIL, params)]
         findings = [Finding(CheckArea.WEBEX, "webex.host_ok", CheckStatus.OK, (("host", host),))]
+        findings += await self._browser_link(group, probe.link)
         findings += await self._delete_probe(meetings, probe.id, host, "webex.probe_left")
         if group.trial_call_enabled:
             findings += await self._trial_probe(meetings, group, host, start)
@@ -141,12 +159,57 @@ class PlatformChecker:
             join_before_host=True,
         )
         try:
-            probe = await meetings.create_meeting(request)
+            probe = await meetings.probe_meeting(request)
         except IntegrationError as error:
             params = (("host", host), ("error", error.code), ("reason", error.reason or "-"))
             return [Finding(CheckArea.WEBEX, "webex.trial_refused", CheckStatus.WARN, params)]
-        ok = Finding(CheckArea.WEBEX, "webex.trial_ok", CheckStatus.OK, (("host", host),))
-        return [ok, *await self._delete_probe(meetings, probe.id, host, "webex.trial_left")]
+        if probe.ignored:  # accepted, but not kept: the citizen would wait in the lobby (ADR 0075)
+            stored = ", ".join(f"{key}={_value(value)}" for key, value in probe.ignored.items())
+            lobby = (("host", host), ("stored", stored))
+            outcome = Finding(CheckArea.WEBEX, "webex.trial_lobby", CheckStatus.WARN, lobby)
+        else:
+            outcome = Finding(CheckArea.WEBEX, "webex.trial_ok", CheckStatus.OK, (("host", host),))
+        return [
+            outcome,
+            *await self._delete_probe(meetings, probe.ref.id, host, "webex.trial_left"),
+        ]
+
+    async def _browser_link(self, group: Group, link: str | None) -> list[Finding]:
+        """Visit the probe's browser link once and see whether Webex still carries the parameter.
+
+        Only for a group that opens the web app (ADR 0075). The visit is anonymous, follows no
+        redirect and sends nothing of a citizen: Webex answers the short link with a redirect to
+        its join page, and that redirect must still contain ``launchApp=true``. A warning, never
+        a failure: without the parameter the citizen gets Webex's own choice page.
+        """
+        if group.join_client is not JoinClient.BROWSER:
+            return []
+        url = join_link(link, JoinClient.BROWSER)
+        if url is None:  # not an https link: never visited
+            return [_browser_finding("webex.browser_link_lost", (("status", "-"),))]
+        started = time.monotonic()
+        try:
+            response = await self._http.get(url, follow_redirects=False)
+        except httpx.HTTPError as error:
+            await self._record(url, 0, "unreachable", started)
+            name = type(error).__name__
+            return [_browser_finding("webex.browser_link_unreachable", (("error", name),))]
+        await self._record(url, response.status_code, "", started)
+        kept = set(BROWSER_LINK_PARAMS) <= set(
+            parse_qsl(urlsplit(response.headers.get("location", "")).query)
+        )
+        if 300 <= response.status_code < 400 and kept:
+            return [_browser_finding("webex.browser_link_ok")]
+        return [
+            _browser_finding("webex.browser_link_lost", (("status", str(response.status_code)),))
+        ]
+
+    async def _record(self, url: str, status: int, error: str, started: float) -> None:
+        """Report the visit to the request log without its query (ADR 0068)."""
+        if self._request_log is not None:
+            path = urlsplit(url).path
+            millis = int((time.monotonic() - started) * 1000)
+            await self._request_log.record(RequestRecord("GET", path, status, error, "", millis))
 
     async def _delete_probe(
         self, meetings: WebexMeetings, meeting_id: str, host: str, code: str
