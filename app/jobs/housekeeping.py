@@ -6,6 +6,7 @@ Called once per worker loop, after the due jobs:
                      ─► changed? ─► system event storage.check (superuser's audit log)
     critical ─► brake: every diagnostic mode ends, so no debug events are written (part 4)
     hourly ─► PRAGMA incremental_vacuum ─► pages back to the file system
+    daily ─► erase the archived groups nothing refers to any more (ADR 0084 step 3)
 
 The stdout log does not depend on the database: when the disk is full, writing the system
 event may fail, and monitoring must still see the problem. Housekeeping never stops the loop;
@@ -39,6 +40,9 @@ REMIND_EVERY = timedelta(hours=1)
 RECLAIM_EVERY = timedelta(hours=1)
 """How often freed database pages are returned to the file system."""
 
+ERASE_EVERY = timedelta(days=1)
+"""How often archived groups are swept (ADR 0084 step 3); the delay itself is a setting."""
+
 
 class Housekeeping:
     """Storage watch and page reclaim for the worker loop.
@@ -50,6 +54,8 @@ class Housekeeping:
         limits: Storage grade boundaries.
         measure: Returns the current usage, or ``None`` when unknown (tests pass a fake).
         brake: Ends diagnostic mode, with the reason; called every loop at grade critical.
+        erase: Erases the archived groups that qualify and returns the count; called once per
+            ``ERASE_EVERY``.
     """
 
     def __init__(
@@ -60,9 +66,12 @@ class Housekeeping:
         limits: StorageLimits | Callable[[], StorageLimits],
         measure: Callable[[], StorageUsage | None],
         brake: Callable[[str], Awaitable[int]] | None = None,
+        erase: Callable[[], Awaitable[int]] | None = None,
     ) -> None:
-        """Store the collaborators; nothing has been logged or reclaimed yet."""
+        """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
         self._brake = brake
+        self._erase = erase
+        self._erased_at: datetime | None = None
         self._engine = engine
         self._clock = clock
         self._limits = limits
@@ -80,15 +89,32 @@ class Housekeeping:
         limits: StorageLimits | Callable[[], StorageLimits],
         database_url: str,
         brake: Callable[[str], Awaitable[int]] | None = None,
+        erase: Callable[[], Awaitable[int]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
-        return cls(engine, uow, clock, limits, lambda: measure_storage(database_url), brake)
+        return cls(engine, uow, clock, limits, lambda: measure_storage(database_url), brake, erase)
 
     async def run(self) -> None:
-        """Watch the storage, then reclaim pages when due."""
+        """Watch the storage, then reclaim pages and erase archived groups when due."""
         now = self._clock.now()
         await self._watch_storage(now)
         await self._reclaim(now)
+        await self._erase_groups(now)
+
+    async def _erase_groups(self, now: datetime) -> None:
+        """Erase the archived groups that qualify, at most once per ``ERASE_EVERY``."""
+        if self._erase is None:
+            return
+        if self._erased_at is not None and now - self._erased_at < ERASE_EVERY:
+            return
+        self._erased_at = now
+        try:
+            erased = await self._erase()
+        except Exception as exc:  # never stop the loop over housekeeping
+            log.warning("group.erase_failed", error=type(exc).__name__)
+        else:
+            if erased:
+                log.info("group.erase_done", groups=erased)
 
     async def _watch_storage(self, now: datetime) -> None:
         """Log a degraded grade and record a change; failures are only logged."""

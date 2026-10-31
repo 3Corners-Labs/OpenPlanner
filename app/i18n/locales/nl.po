@@ -6875,6 +6875,9 @@ msgstr "Opnieuw proberen kan niet meer: de afspraak is niet actief, of de meetin
 msgid "settings.field.integration_request_retention_days.label"
 msgstr "Verzoeken aan Webex en WxCC bewaren (dagen)"
 
+msgid "settings.field.group_erase_after_days.label"
+msgstr "Gearchiveerde groep wissen na (dagen)"
+
 msgid "settings.field.integration_probe_timeout_seconds.label"
 msgstr "Wachten op de events van het proef-work item (seconden)"
 

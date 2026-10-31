@@ -165,3 +165,56 @@ async def test_a_failing_brake_never_stops_housekeeping(engine: AsyncEngine) -> 
         await housekeeping.run()
 
     assert "diagnostics.brake_failed" in [e["event"] for e in logs]
+
+
+# --- archived groups (ADR 0084 step 3) --------------------------------------------------------
+
+
+class Eraser:
+    """Counts how often housekeeping asked it to erase; fails on demand."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+        self.fail = False
+
+    async def __call__(self) -> int:
+        self.calls += 1
+        if self.fail:
+            raise RuntimeError("database locked")
+        return 2
+
+
+async def test_archived_groups_are_swept_once_a_day(engine: AsyncEngine) -> None:
+    setup = Setup(engine)
+    eraser = Eraser()
+    setup.housekeeping = Housekeeping(
+        engine, setup.uow, setup.clock, StorageLimits(), setup.disk, erase=eraser
+    )
+
+    with capture_logs() as logs:
+        await setup.housekeeping.run()
+        setup.clock.advance(timedelta(hours=23))
+        await setup.housekeeping.run()
+        setup.clock.advance(timedelta(hours=1))
+        await setup.housekeeping.run()
+
+    assert eraser.calls == 2
+    assert [e["event"] for e in logs if e["event"].startswith("group.")] == [
+        "group.erase_done",
+        "group.erase_done",
+    ]
+
+
+async def test_a_failing_erase_never_stops_housekeeping(engine: AsyncEngine) -> None:
+    setup = Setup(engine)
+    eraser = Eraser()
+    eraser.fail = True
+    setup.housekeeping = Housekeeping(
+        engine, setup.uow, setup.clock, StorageLimits(), setup.disk, erase=eraser
+    )
+
+    with capture_logs() as logs:
+        await setup.housekeeping.run()
+
+    assert [e["event"] for e in logs if e["event"].startswith("group.")] == ["group.erase_failed"]
+    assert eraser.calls == 1

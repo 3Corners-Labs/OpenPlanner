@@ -70,6 +70,22 @@ The platform's fallback mail server, the update check's read token and the Webex
 `setting:<key>` in `integration_credentials`, and are never shown, logged or audited by value;
 they leave the system only to the mail server and to GitHub respectively.
 
+## Archived groups (ADR 0084)
+
+```
+org admin ──POST /admin/groups/{slug}/settings/archive (name typed back)──> web
+web ──SQL──> groups.archived_at = now; audit group.delete, detail archived (slug, actor)
+participant ──GET /g/{slug}──> web ──> 404 (same page as an unknown slug)
+worker (daily) ──SQL──> groups archived ≥ group_erase_after_days ago with no booking, slot,
+                         closure, acceptance or API client ──> system event group.erased ──>
+                         DELETE groups (cascade: staffing, exceptions, reminders, texts,
+                         form fields, holidays, settings)
+```
+
+Archiving moves no personal data: the bookings of the group keep their own `purge_pii` jobs
+and leave on their own schedule, and the row is erased only after the last of them is gone.
+The audit log keeps the slug as text; nothing of a participant is in it.
+
 ## Stored personal data (WP2 schema)
 
 The fields below are the fixed list of `app/domain/privacy.py` (ADR 0063): personal data is
