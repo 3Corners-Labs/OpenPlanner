@@ -9,12 +9,12 @@ from dataclasses import dataclass
 
 from app.domain.authorization import (
     API_SCOPES,
-    CITIZEN_ACTIONS,
     HELD_BACK,
     LEVELS,
     LOCKED_PERMISSIONS,
     MAINTENANCE_WRITABLE,
     MATRIX,
+    PARTICIPANT_ACTIONS,
     PII_PERMISSIONS,
     REACH,
     REQUIRES,
@@ -27,9 +27,9 @@ from app.domain.authorization import (
 from app.i18n import Translator
 from app.web.authz_labels import (
     API_SCOPE_LABELS,
-    CITIZEN_LABELS,
     CONDITION_LABELS,
     LEVEL_LABELS,
+    PARTICIPANT_LABELS,
     PERMISSION_LABELS,
     ROLE_LABELS,
 )
@@ -135,9 +135,9 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
         "| Action | Condition |",
         "|---|---|",
     ]
-    for action in CITIZEN_ACTIONS:
+    for action in PARTICIPANT_ACTIONS:
         lines.append(
-            f"| {_(CITIZEN_LABELS[action.key])} (`{action.key}`) "
+            f"| {_(PARTICIPANT_LABELS[action.key])} (`{action.key}`) "
             f"| {_(CONDITION_LABELS[action.condition])} |"
         )
     lines += [

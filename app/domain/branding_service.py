@@ -1,11 +1,11 @@
-"""Branding use cases: show an organisation's branding to citizens, let admins change it.
+"""Branding use cases: show an organisation's branding to participants, let admins change it.
 
 Changing branding needs ``branding.manage`` on the organisation (superuser only, HANDOVER §6).
 Every change asks ``AdminService.authorize`` first and is audited in the same transaction,
 with the names of what changed, never the values. Colours are checked for contrast across
 tokens before anything is stored (ADR 0041).
 
-    public / for_group / logo / font      citizens, no authorisation (branding is public)
+    public / for_group / logo / font      participants, no authorisation (branding is public)
     update / apply_theme_file             branding.manage, organisation level
     set_logo / remove_logo                branding.manage, organisation level
     set_font / remove_font                branding.manage, organisation level

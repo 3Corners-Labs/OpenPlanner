@@ -24,8 +24,8 @@ from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
-from tests.support.citizen import confirm_newest
 from tests.support.domain import NOW
+from tests.support.participant import confirm_newest
 
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}

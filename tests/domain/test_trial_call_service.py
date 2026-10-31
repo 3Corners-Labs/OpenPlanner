@@ -57,7 +57,7 @@ async def setup() -> Setup:
     return await Setup().booked()
 
 
-async def test_opening_schedules_a_meeting_the_citizen_can_enter_alone(setup: Setup) -> None:
+async def test_opening_schedules_a_meeting_the_participant_can_enter_alone(setup: Setup) -> None:
     view = await setup.service.open(setup.token)
 
     assert view.state is TrialState.ACTIVE

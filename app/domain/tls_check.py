@@ -6,7 +6,7 @@
 A finding other than ``ok`` becomes a system event ``tls.certificate`` the first time it is
 seen and again every repeat period while it lasts; the return to ``ok`` is recorded once. The
 events carry codes only: the finding, the issuer's name and the days left, never anything about
-a citizen. ``CertificateStatus`` reads the stored check for *System status* and the CLI.
+a participant. ``CertificateStatus`` reads the stored check for *System status* and the CLI.
 """
 
 from collections.abc import Callable
@@ -48,7 +48,7 @@ class TlsWatch:
         clock: Current time.
         probe: Performs the TLS handshake.
         system_log: Where the events go (global: only the superuser sees them).
-        public_base_url: The address citizens use; an ``http`` one has nothing to check.
+        public_base_url: The address participants use; an ``http`` one has nothing to check.
         interval: How often the certificate is probed.
         warn_within: Days left below which the finding is ``expiring``.
         repeat: How often a lasting finding is reported again.

@@ -25,7 +25,7 @@ def test_only_contact_center_groups_send_work_items() -> None:
 
 
 @pytest.mark.parametrize("kind", list(DispatchKind))
-def test_citizen_moves_until_the_change_lead_for_both_kinds(kind: DispatchKind) -> None:
+def test_participant_moves_until_the_change_lead_for_both_kinds(kind: DispatchKind) -> None:
     start = datetime(2026, 11, 2, 9, 30, tzinfo=UTC)
     group = make_group(dispatch_kind=kind, citizen_change_lead_minutes=90)
 
@@ -33,7 +33,7 @@ def test_citizen_moves_until_the_change_lead_for_both_kinds(kind: DispatchKind) 
 
 
 @pytest.mark.parametrize("kind", list(DispatchKind))
-def test_citizen_cancels_until_the_start_for_both_kinds(kind: DispatchKind) -> None:
+def test_participant_cancels_until_the_start_for_both_kinds(kind: DispatchKind) -> None:
     start = datetime(2026, 11, 2, 9, 30, tzinfo=UTC)
 
     assert make_group(dispatch_kind=kind).cancel_deadline(start) == start

@@ -16,7 +16,7 @@ again.
 
 A booking whose slot the staffing no longer covers (a block removed or shortened) needs an
 agent that is not there: that slot gets 0 agents. Slots of an old time grid are counted on
-their own; overlap between grids is left to the citizen's availability (``availability``).
+their own; overlap between grids is left to the participant's availability (``availability``).
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -94,7 +94,7 @@ def agents_for(
     """Return the agents on duty for all of ``start``–``end`` on ``day``.
 
     The slot must lie inside one run of touching staffed blocks; it then gets the lowest
-    count among the blocks it covers, as in the citizen's availability. Otherwise 0.
+    count among the blocks it covers, as in the participant's availability. Otherwise 0.
     """
     tz = group.tz
     local_start = start.astimezone(tz).replace(tzinfo=None)

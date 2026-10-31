@@ -1,11 +1,11 @@
-"""A citizen stops waiting for a direct call (ADR 0019 point 4, ADR 0021).
+"""A participant stops waiting for a direct call (ADR 0019 point 4, ADR 0021).
 
 Leaving cancels the direct booking, which frees its place under the group's cap (ADR 0026), and
 ends the work item through the same ``end_wxcc_task`` job as any cancellation. Nothing else is
-sent: the citizen did it themselves and the waiting page says what happened, so no cancellation
+sent: the participant did it themselves and the waiting page says what happened, so no cancellation
 mail. If an agent already took the call (a connected task, a claim in the own queue, or the
 host in the meeting) the meeting is *not* deleted: the agent is not cut off mid-sentence, and
-the meeting runs out by itself. The citizen's link stops working because the booking is
+the meeting runs out by itself. The participant's link stops working because the booking is
 cancelled.
 
 Pure Python, no I/O; ``BookingService.leave_direct`` stores the result in its locked transaction.
@@ -19,9 +19,9 @@ from app.domain.calls import BookingEvent, CallStatus, EventKind, TaskState
 from app.domain.job_plan import JobType, PlannedJob, plan_for_cancellation
 
 DETAIL_WAITING = "waiting"
-"""Timeline detail of a citizen who left before an agent came."""
+"""Timeline detail of a participant who left before an agent came."""
 DETAIL_AGENT = "agent"
-"""Timeline detail of a citizen who left after an agent accepted or joined."""
+"""Timeline detail of a participant who left after an agent accepted or joined."""
 
 
 @dataclass(frozen=True)
@@ -41,7 +41,7 @@ class DirectLeft:
 
 @dataclass(frozen=True)
 class LeavePlan:
-    """What to store when a citizen leaves: the cancelled booking, its jobs and the event."""
+    """What to store when a participant leaves: the cancelled booking, its jobs and the event."""
 
     booking: Booking
     jobs: list[PlannedJob]

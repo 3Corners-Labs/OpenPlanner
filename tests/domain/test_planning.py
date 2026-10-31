@@ -415,7 +415,7 @@ async def test_viewing_the_schedule_needs_access_to_the_group(planning: Planning
         await planning.schedule(SUPER, "nope")
 
 
-async def test_preview_shows_the_slots_citizens_will_see(planning: PlanningService) -> None:
+async def test_preview_shows_the_slots_participants_will_see(planning: PlanningService) -> None:
     await planning.add_rule(
         SUPER, "demo", _rule(weekday=0, opens="09:00", closes="10:00", capacity=3)
     )

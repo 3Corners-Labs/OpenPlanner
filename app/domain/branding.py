@@ -1,6 +1,6 @@
 """Branding of an organisation: name, accent, logo, theme, header style and fonts (O5).
 
-Citizen pages show the organisation's logo and name and use its accent colour for links,
+Participant pages show the organisation's logo and name and use its accent colour for links,
 buttons and the selected day. The accent is used for white text on the accent and for accent
 text on white, so one rule covers both: at least 4.5:1 contrast with white (WCAG 1.4.3).
 The colour reaches the browser only through a generated stylesheet of CSS custom properties;
@@ -78,7 +78,7 @@ class LogoRef:
 
 @dataclass(frozen=True)
 class Branding:
-    """How citizen pages of an organisation look.
+    """How participant pages of an organisation look.
 
     Attributes:
         display_name: Name in the page header; the organisation's name when ``None``.

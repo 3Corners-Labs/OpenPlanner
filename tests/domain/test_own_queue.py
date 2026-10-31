@@ -7,14 +7,14 @@ from app.domain.authorization import Role
 from app.domain.booking import Booking, BookingKind, BookingStatus, Contact, MeetingRef
 from app.domain.calls import CallState, CallStatus
 from app.domain.own_queue import (
-    CitizenState,
     Claim,
+    ParticipantState,
     QueueEntry,
     QueueSummary,
     VideoState,
-    citizen_state,
     next_up,
     not_claimed_in_time,
+    participant_state,
     summarise,
     video_state,
     visible,
@@ -68,7 +68,7 @@ def test_shows_bookings_from_the_visible_window_until_they_end_in_start_order() 
     assert ids(visible(entries, GROUP, NOW)) == [3, 2]
 
 
-def test_next_is_the_citizen_in_the_lobby_before_the_earliest_start() -> None:
+def test_next_is_the_participant_in_the_lobby_before_the_earliest_start() -> None:
     entries = [entry(1, -10), entry(2, -5, lobby=True), entry(3, -20, claimed=True)]
 
     nxt = next_up(entries)
@@ -87,7 +87,7 @@ def test_nothing_is_next_when_everything_is_claimed() -> None:
     assert next_up([entry(1, 0, claimed=True)]) is None
 
 
-def test_a_host_in_the_meeting_is_not_a_waiting_citizen() -> None:
+def test_a_host_in_the_meeting_is_not_a_waiting_participant() -> None:
     waiting = entry(1, 0, lobby=True)
     joined = replace(waiting, status=replace(waiting.status, host_joined=True, participants=2))
 
@@ -122,20 +122,23 @@ def test_the_video_link_is_ready_pending_or_failed() -> None:
     assert entry(1, 0).video is VideoState.PENDING
 
 
-def test_where_the_citizen_is() -> None:
-    assert citizen_state(CallStatus(1)) is CitizenState.NOT_YET
-    assert citizen_state(CallStatus(1, participants=1)) is CitizenState.IN_LOBBY
-    assert citizen_state(CallStatus(1, participants=2, host_joined=True)) is CitizenState.IN_CALL
-    assert citizen_state(CallStatus(1, call=CallState.ENDED)) is CitizenState.ENDED
+def test_where_the_participant_is() -> None:
+    assert participant_state(CallStatus(1)) is ParticipantState.NOT_YET
+    assert participant_state(CallStatus(1, participants=1)) is ParticipantState.IN_LOBBY
+    assert (
+        participant_state(CallStatus(1, participants=2, host_joined=True))
+        is ParticipantState.IN_CALL
+    )
+    assert participant_state(CallStatus(1, call=CallState.ENDED)) is ParticipantState.ENDED
 
 
 def _joined(item: QueueEntry, minutes_ago: int) -> QueueEntry:
-    """Return ``item`` with the citizen's presence last changed ``minutes_ago``."""
+    """Return ``item`` with the participant's presence last changed ``minutes_ago``."""
     at = NOW - timedelta(minutes=minutes_ago)
     return replace(item, status=replace(item.status, updated_at=at))
 
 
-def test_summarise_counts_waiting_citizens_and_the_longest_wait() -> None:
+def test_summarise_counts_waiting_participants_and_the_longest_wait() -> None:
     since_start = entry(1, -8, lobby=True)  # joined at an unknown moment: waits since its start
     early = _joined(entry(2, 5, lobby=True), 3)  # joined before the start: waits since joining
     claimed = entry(3, -20, lobby=True, claimed=True)

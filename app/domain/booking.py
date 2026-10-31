@@ -1,9 +1,9 @@
-"""Bookings and the citizen's contact details.
+"""Bookings and the participant's contact details.
 
 ``Contact`` holds the only personal data in the system (CLAUDE.md privacy rules). Its fields
 are excluded from ``repr`` so they cannot end up in logs or tracebacks by accident.
 
-    pending_confirmation ──confirm()──► confirmed      (citizen clicks, ADR 0056)
+    pending_confirmation ──confirm()──► confirmed      (participant clicks, ADR 0056)
              ├──expire()──► cancelled                  (not confirmed in time)
              └──cancel()──► cancelled
 
@@ -63,7 +63,7 @@ def _clean_phone(raw: str | None, mode: PhoneMode, region: str) -> str | None:
 
 @dataclass(frozen=True)
 class Contact:
-    """Validated contact details of a citizen. Build it with ``Contact.create``.
+    """Validated contact details of a participant. Build it with ``Contact.create``.
 
     ``answers`` are the answers to the group's custom form fields (ADR 0055); they are personal
     data like the rest and are purged with it.
@@ -118,7 +118,7 @@ class MeetingRef:
     """The video meeting of a booking: the provider's id and its join link.
 
     The link is personal data while the booking lives (CLAUDE.md privacy rules: it gives access
-    to the citizen's call), so it is excluded from ``repr`` and purged with the contact.
+    to the participant's call), so it is excluded from ``repr`` and purged with the contact.
     """
 
     id: str
@@ -159,9 +159,9 @@ class BookingStatus(StrEnum):
     NO_SHOW = "no_show"
     SUSPENDED = "suspended"
     AWAITING_REBOOK = "awaiting_rebook"
-    """A planner asked the citizen to choose a new time (ADR 0044); the place is freed."""
+    """A planner asked the participant to choose a new time (ADR 0044); the place is freed."""
     PENDING_CONFIRMATION = "pending_confirmation"
-    """The citizen has not confirmed by email link yet (ADR 0056); the place is held."""
+    """The participant has not confirmed by email link yet (ADR 0056); the place is held."""
 
 
 @dataclass(frozen=True)
@@ -196,7 +196,7 @@ class Claim:
     Attributes:
         claimed_at: When the agent claimed it (UTC).
         claimed_by: Pseudonym of the agent (``tokens.agent_pseudonym``), never a name or
-            email address. Removed with the citizen's data by ``purge_pii``.
+            email address. Removed with the participant's data by ``purge_pii``.
     """
 
     claimed_at: datetime
@@ -205,11 +205,11 @@ class Claim:
 
 @dataclass(frozen=True)
 class Booking:
-    """One citizen's appointment in a slot.
+    """One participant's appointment in a slot.
 
     ``contact`` is ``None`` after the personal data has been purged. ``confirm_by`` is set on a
     booking that had to be confirmed by email link (ADR 0056), ``confirmed_at`` once it was:
-    the moment the citizen's email address was verified.
+    the moment the participant's email address was verified.
     """
 
     id: int | None
@@ -255,12 +255,12 @@ class Booking:
 
     @property
     def awaits_rebook(self) -> bool:
-        """Whether a planner asked the citizen to choose a new time (ADR 0044)."""
+        """Whether a planner asked the participant to choose a new time (ADR 0044)."""
         return self.status is BookingStatus.AWAITING_REBOOK
 
     @property
     def awaits_confirmation(self) -> bool:
-        """Whether the citizen still has to confirm the booking by email link (ADR 0056)."""
+        """Whether the participant still has to confirm the booking by email link (ADR 0056)."""
         return self.status is BookingStatus.PENDING_CONFIRMATION
 
     @property
@@ -279,10 +279,10 @@ class Booking:
 
     @property
     def on_hold(self) -> bool:
-        """Whether the booking does not go ahead at its time until the citizen or staff act.
+        """Whether the booking does not go ahead at its time until the participant or staff act.
 
-        Suspended by a closure (ADR 0024) or awaiting a new time from the citizen (ADR 0044):
-        either way there is no change deadline, and the citizen can choose a new time or
+        Suspended by a closure (ADR 0024) or awaiting a new time from the participant (ADR 0044):
+        either way there is no change deadline, and the participant can choose a new time or
         cancel.
         """
         return self.is_suspended or self.awaits_rebook
@@ -317,7 +317,7 @@ class Booking:
         )
 
     def confirm(self, now: datetime) -> "Booking":
-        """Return the booking confirmed by the citizen (or a planner on their behalf) at ``now``.
+        """Return the booking confirmed by the participant (or by a planner for them) at ``now``.
 
         Raises:
             DomainError: ``booking_not_pending`` if it does not await confirmation.
@@ -340,10 +340,10 @@ class Booking:
         return replace(self, status=BookingStatus.CANCELLED, cancelled_at=self.confirm_by or now)
 
     def request_rebook(self, reason: ChangeReason, by: datetime) -> "Booking":
-        """Return the booking awaiting a new time from the citizen until ``by`` (ADR 0044).
+        """Return the booking awaiting a new time from the participant until ``by`` (ADR 0044).
 
         Its place in the slot is freed at once; the booking keeps its contact details, so the
-        citizen can choose a new time without entering them again.
+        participant can choose a new time without entering them again.
 
         Raises:
             DomainError: ``booking_not_active`` if it is not confirmed.

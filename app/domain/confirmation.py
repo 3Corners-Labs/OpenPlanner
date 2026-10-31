@@ -1,8 +1,8 @@
-"""When a citizen must confirm a booking by email link, and when to remind them (ADR 0056).
+"""When a participant must confirm a booking by email link, and when to remind them (ADR 0056).
 
-A citizen's booking starts as ``pending_confirmation``. It has to be confirmed by the earlier
+A participant's booking starts as ``pending_confirmation``. It has to be confirmed by the earlier
 of ``window`` after booking and ``cutoff`` before the start. When that lies less than
-``min_lead`` ahead (the appointment is soon), the citizen may still confirm until the change
+``min_lead`` ahead (the appointment is soon), the participant may still confirm until the change
 deadline (start − dispatch lead), without a reminder. Reminders are spread evenly over the
 window; one that would fall within ``min_lead`` of the deadline is dropped.
 """

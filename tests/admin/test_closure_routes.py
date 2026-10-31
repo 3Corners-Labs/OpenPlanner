@@ -10,7 +10,7 @@ import httpx
 
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
 from tests.admin.test_admin_flow import audit_events
-from tests.support.citizen import confirm_newest
+from tests.support.participant import confirm_newest
 
 CLOSURE = "/admin/groups/demo/closure"
 FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam

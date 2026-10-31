@@ -64,7 +64,7 @@ class ClosureInput:
     Attributes:
         starts_at: First closed start time (UTC); ``None`` or a past moment means now.
         ends_at: First start time that is open again (UTC); ``None`` until further notice.
-        notices: The explanation for citizens per locale (``NOTICE_LOCALES`` required).
+        notices: The explanation for participants per locale (``NOTICE_LOCALES`` required).
         headings: Optional heading per locale; empty means the page's default heading.
         scenario_id: The prepared scenario the closure starts from, if any (ADR 0037 §4).
     """
@@ -139,7 +139,7 @@ class ClosureService:
         uow: Opens database transactions.
         clock: Current time.
         admin: Authorises every operation and audits refusals.
-        bookings: Moves a booking to a new slot with the citizen's own rules.
+        bookings: Moves a booking to a new slot with the participant's own rules.
     """
 
     def __init__(
@@ -318,7 +318,7 @@ class ClosureService:
         return outcome
 
     async def cancel(self, principal: Principal, slug: str, booking_id: int) -> None:
-        """Cancel a suspended booking; the citizen gets the cancellation mail.
+        """Cancel a suspended booking; the participant gets the cancellation mail.
 
         Raises:
             DomainError: ``not_permitted``, ``booking_not_found`` or ``booking_not_active``.
@@ -348,7 +348,7 @@ class ClosureService:
     async def move(
         self, principal: Principal, slug: str, booking_id: int, new_start: datetime
     ) -> Booking:
-        """Move a suspended booking to a free slot; the citizen gets the change mail.
+        """Move a suspended booking to a free slot; the participant gets the change mail.
 
         Raises:
             DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active`` or

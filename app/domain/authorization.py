@@ -15,7 +15,7 @@ A role grants a permission within its reach (``REACH``):
     auditor      organisations, read-only and without personal data (ADR 0039)
     group_admin  groups: those in the principal's group claim
 
-Some permissions are locked to the superuser (``LOCKED_PERMISSIONS``); some show citizens'
+Some permissions are locked to the superuser (``LOCKED_PERMISSIONS``); some show participants'
 personal data (``PII_PERMISSIONS``); some depend on others (``REQUIRES``). The matrix page and
 the documentation mark all three.
 
@@ -33,8 +33,8 @@ each role's reach, never a role's name, and clip a custom role to its bounds aga
 ``Scope`` that the database adapter applies to listings. Both are derived from ``MATRIX``,
 so what a list shows is exactly what a route allows.
 
-Citizens never log in. Their rights depend on holding a management link and on the change
-deadline; ``CITIZEN_ACTIONS`` documents them next to the admin matrix.
+Participants never log in. Their rights depend on holding a management link and on the change
+deadline; ``PARTICIPANT_ACTIONS`` documents them next to the admin matrix.
 
 Machines (contact-center bots, ADR 0023) never get a role either. An API client holds OAuth
 scopes (``API_SCOPES``) within one organisation, optionally narrowed to some of its groups;
@@ -160,7 +160,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.SETTINGS_LOGIN_MANAGE: Level.GLOBAL,
     # ADR 0042 §5: the settings of one organisation (class D).
     Permission.SETTINGS_ORGANISATION_MANAGE: Level.ORGANISATION,
-    # ADR 0004, 0009: the organisation's own wording of citizen pages and messages.
+    # ADR 0004, 0009: the organisation's own wording of participant pages and messages.
     Permission.TEXTS_ORGANISATION_MANAGE: Level.ORGANISATION,
 }
 
@@ -183,7 +183,7 @@ LOCKED_PERMISSIONS = frozenset(
 PII_PERMISSIONS = frozenset(
     {Permission.BOOKINGS_VIEW, Permission.BOOKINGS_MANAGE, Permission.QUEUE_WORK}
 )
-"""ADR 0039: permissions that show citizens' personal data; never held by the auditor."""
+"""ADR 0039: permissions that show participants' personal data; never held by the auditor."""
 
 MAINTENANCE_WRITABLE = frozenset(
     {Permission.INTEGRATIONS_MANAGE, Permission.SYSTEM_UPDATE, Permission.SYSTEM_MAINTENANCE}
@@ -260,7 +260,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.QUEUE_WORK,
         # ADR 0042 §5: the settings of the own organisation (class D).
         Permission.SETTINGS_ORGANISATION_MANAGE,
-        # ADR 0004: the organisation's own wording of citizen pages and messages.
+        # ADR 0004: the organisation's own wording of participant pages and messages.
         Permission.TEXTS_ORGANISATION_MANAGE,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
@@ -435,21 +435,21 @@ class CustomRole:
 
 
 @dataclass(frozen=True)
-class CitizenAction:
-    """Something a citizen can do without logging in, and the condition for it."""
+class ParticipantAction:
+    """Something a participant can do without logging in, and the condition for it."""
 
     key: str
     condition: str
 
 
-CITIZEN_ACTIONS: tuple[CitizenAction, ...] = (
-    CitizenAction("citizen.availability_view", "public"),
-    CitizenAction("citizen.book", "public"),
-    CitizenAction("citizen.booking_view", "management_link"),
-    CitizenAction("citizen.booking_change", "management_link_before_deadline"),
-    CitizenAction("citizen.booking_cancel", "management_link_before_deadline"),
+PARTICIPANT_ACTIONS: tuple[ParticipantAction, ...] = (
+    ParticipantAction("participant.availability_view", "public"),
+    ParticipantAction("participant.book", "public"),
+    ParticipantAction("participant.booking_view", "management_link"),
+    ParticipantAction("participant.booking_change", "management_link_before_deadline"),
+    ParticipantAction("participant.booking_cancel", "management_link_before_deadline"),
     # ADR 0024: a booking on hold can be moved or cancelled until it is resolved.
-    CitizenAction("citizen.suspended_booking_change", "management_link_while_suspended"),
+    ParticipantAction("participant.suspended_booking_change", "management_link_while_suspended"),
 )
 
 

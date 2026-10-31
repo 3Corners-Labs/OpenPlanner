@@ -1,6 +1,6 @@
 """Design tokens an organisation may change, their validation and the theme file (ADR 0041).
 
-Citizen pages are styled by ``--booking-*`` custom properties (``site.css``). An organisation
+Participant pages are styled by ``--booking-*`` custom properties (``site.css``). An organisation
 overrides a fixed allow-list of them; every value is checked against its token's type and
 bounds here, so the generated ``theme.css`` can only ever contain values this module accepted.
 Colours are checked for contrast across tokens when branding is saved (``contrast_failure``).

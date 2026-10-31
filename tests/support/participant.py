@@ -1,6 +1,6 @@
-"""The citizen's side of the booking pages in HTTP tests: the emailed link and confirming it.
+"""The participant's side of the booking pages in HTTP tests: the emailed link and confirming it.
 
-Since ADR 0056 the management token reaches the citizen by email only; the booking page
+Since ADR 0056 the management token reaches the participant by email only; the booking page
 redirects to "check your email". Tests read the newest booking's salt from the database and
 derive the token as the mail composer does, then confirm with the page's POST.
 """

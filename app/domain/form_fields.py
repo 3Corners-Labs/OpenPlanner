@@ -1,4 +1,4 @@
-"""Booking form fields an administrator adds per group, and the citizen's answers (ADR 0055).
+"""Booking form fields an administrator adds per group, and the participant's answers (ADR 0055).
 
 A field has one type from a closed catalogue; each type has its own validator, so no
 administrator writes a regular expression. Every field carries a classification that defaults
@@ -210,7 +210,7 @@ class FieldDefinition:
     ``minimum``/``maximum`` bound a ``number`` (the value) or a ``date`` (days relative to the
     day of booking, negative is in the past). ``options`` are the keys of a ``choice``.
     ``labels``, ``hints`` and ``option_labels`` hold the administrator's text per locale; the
-    citizen sees the request locale, else Dutch. A retired field takes no new answers but keeps
+    participant sees the request locale, else Dutch. A retired field takes no new answers but keeps
     its labels for the answers already given.
     """
 

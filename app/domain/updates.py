@@ -12,7 +12,7 @@ restored to the version it replaced for ``RESTORE_WINDOW``.
 While running, the updater reports each step it starts (ADR 0048), so the portal can show
 where it is: ``PLANS`` lists the steps per action; rolling back may follow any of them.
 
-Everything here is about the installation, not about citizens: no personal data.
+Everything here is about the installation, not about participants: no personal data.
 """
 
 import re

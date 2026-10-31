@@ -1,4 +1,4 @@
-"""Management tokens for the citizen's change/cancel link (``/b/{token}``), ADR 0011.
+"""Management tokens for the participant's change/cancel link (``/b/{token}``), ADR 0011.
 
 Per booking a random salt (32 bytes, URL-safe) is stored. The token is derived from it with
 HMAC-SHA256 under a server key that lives only in the environment, so every message can

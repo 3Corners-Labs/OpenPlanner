@@ -94,7 +94,7 @@ class Attachment:
 
 @dataclass(frozen=True)
 class OutboundMessage:
-    """A message to one citizen. Contains personal data: keep it in memory only."""
+    """A message to one participant. Contains personal data: keep it in memory only."""
 
     channel: ChannelKind
     recipient: str = field(repr=False)
@@ -156,7 +156,7 @@ class IntegrationError(Exception):
     The code is a short machine key (``unauthorized``, ``rate_limited``, ``server_error``,
     ``rejected``); it never contains response bodies, which could hold personal data.
     ``reason`` is the provider's own explanation (ADR 0065): set only by adapters for requests
-    that carry no citizen data, with addresses masked and cut at ``REASON_LIMIT``; it is kept
+    that carry no participant data, with addresses masked and cut at ``REASON_LIMIT``; it is kept
     with the failure on the timeline and the system event, so admins read it on the page.
     """
 

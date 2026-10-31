@@ -13,7 +13,7 @@ certificate signing request (the default path), or imported straight into it nex
 chain (a migration). The database holds the chain and the leaf's public key, so a restore on
 another host shows *key missing* until a new request is made or the key imported again.
 Every refusal carries a code, never a byte of an upload. The worker's check
-(``app.domain.tls_check``) stays the only report of what citizens see; this module only says
+(``app.domain.tls_check``) stays the only report of what participants see; this module only says
 what was uploaded and whether this host can serve it.
 """
 
