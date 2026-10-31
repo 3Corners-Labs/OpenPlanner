@@ -105,14 +105,21 @@ CLOCK_STYLES = ("24h", "12h", "locale")
 PHONE_REGIONS = tuple(sorted(phonenumbers.SUPPORTED_REGIONS))
 """Values of ``PHONE_DEFAULT_REGION``: the regions ``phonenumbers`` knows (ADR 0055)."""
 
-LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+LOG_LEVELS = ("TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 """Values of ``LOG_LEVEL``."""
 
 CLAIM_MODES = ("legacy", "shadow", "entitlements")
 """Values of ``OIDC_CLAIM_MODE`` (ADR 0049 point 13); a test checks them against ``ClaimMode``."""
 
 LOG_LEVEL_MAX_EXPIRY_HOURS = 24
-"""A log level set in the portal falls back to the default after at most this long (§6)."""
+"""A log level set in the portal falls back to the default after at most this long (§6).
+``TRACE`` falls back after at most ``TRACE_LEVEL_MAX_HOURS`` (ADR 0085 point 8)."""
+
+TRACE_LEVEL = "TRACE"
+"""The level with the shorter cap."""
+
+TRACE_LEVEL_MAX_HOURS = "trace_level_max_hours"
+"""Key of that cap."""
 
 _RATE = re.compile(r"^\s*(\d+)\s*(?:/|per)\s*(second|minute|hour|day)s?\s*$")
 
@@ -524,8 +531,29 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "INFO",
         _C,
         T.OPERATIONS,
-        "Log level; set in the portal it expires after at most 24 hours.",
+        "Log level; set in the portal it expires after at most 24 hours (TRACE: after at most "
+        "TRACE_LEVEL_MAX_HOURS).",
         choices=LOG_LEVELS,
+    ),
+    S(
+        "trace_level_max_hours",
+        K.INT,
+        4,
+        _C,
+        T.OPERATIONS,
+        "Hours after which LOG_LEVEL=TRACE set in the portal falls back (ADR 0085).",
+        minimum=1,
+        maximum=24,
+    ),
+    S(
+        "sql_slow_ms",
+        K.INT,
+        200,
+        _C,
+        T.OPERATIONS,
+        "A statement slower than this many milliseconds leaves a sql.slow trace line (ADR 0085).",
+        minimum=10,
+        maximum=10_000,
     ),
     S(
         "worker_poll_seconds",

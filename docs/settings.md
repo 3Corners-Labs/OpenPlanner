@@ -64,7 +64,9 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 
 | Variable | Kind | Default | Portal bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `LOG_LEVEL` | enum | `INFO` | DEBUG, INFO, WARNING, ERROR, CRITICAL | `settings.platform.manage` | Log level; set in the portal it expires after at most 24 hours. |
+| `LOG_LEVEL` | enum | `INFO` | TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL | `settings.platform.manage` | Log level; set in the portal it expires after at most 24 hours (TRACE: after at most TRACE_LEVEL_MAX_HOURS). |
+| `TRACE_LEVEL_MAX_HOURS` | int | `4` | 1–24 | `settings.platform.manage` | Hours after which LOG_LEVEL=TRACE set in the portal falls back (ADR 0085). |
+| `SQL_SLOW_MS` | int | `200` | 10–10000 | `settings.platform.manage` | A statement slower than this many milliseconds leaves a sql.slow trace line (ADR 0085). |
 | `WORKER_POLL_SECONDS` | float | `30.0` | 5–300 | `settings.platform.manage` | Interval of the worker loop. |
 | `MAINTENANCE_CACHE_SECONDS` | float | `5.0` | 0–5 | `settings.platform.manage` | How long the web process trusts its last read of the maintenance switch (ADR 0038). |
 | `MAINTENANCE_RETRY_AFTER_SECONDS` | int | `300` | 30–3600 | `settings.platform.manage` | Retry-After of the 503 that participants and the machine API get during maintenance (ADR 0038). |

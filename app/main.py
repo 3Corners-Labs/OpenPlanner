@@ -16,7 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
-from app.adapters.db.engine import create_engine
+from app.adapters.db.engine import create_engine, set_slow_query_ms
 from app.adapters.db.identity_providers import ProviderCredentialStore
 from app.adapters.db.probes import ProbeReports
 from app.adapters.db.reports import ReportStore
@@ -24,6 +24,7 @@ from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.discovery import GuardedDiscoveryFetcher
 from app.adapters.event_sink import StdoutEventSink
+from app.adapters.http_trace import traced_transport
 from app.adapters.idp_registry import OrganisationProviders
 from app.adapters.integrations import (
     Integrations,
@@ -204,7 +205,7 @@ def create_app(
     settings = settings or Settings()
     clock = clock or SystemClock()
     token_key = management_token_key(settings)
-    http = httpx.AsyncClient(timeout=10.0)
+    http = httpx.AsyncClient(timeout=10.0, transport=traced_transport(None))
     configure_clock(settings.time_format)
     configure_rate_limits(
         enabled=settings.rate_limit_enabled,
@@ -243,6 +244,7 @@ def create_app(
                 agent_calls=current.rate_limit_agent_calls,
             )
             set_log_level(current.log_level)
+            set_slow_query_ms(current.sql_slow_ms)
             configure_clock(current.time_format)
             # ADR 0042 step 6: the release repository and its token can change in the portal.
             app.state.update_service = update_service(current, uow, clock, http, lookup=False)

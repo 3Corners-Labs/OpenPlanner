@@ -25,7 +25,7 @@ from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
 from app.domain.system_log import EventRetention
 from app.i18n.dates import ClockStyle
 
-LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+LogLevel = Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 AGENT_API_PREFIX = "/api/agent/v1"
 """Where the machine API for contact-center bots is mounted (ADR 0023)."""
@@ -212,6 +212,10 @@ class Settings(BaseSettings):
     security_event_retention_days: int = Field(default=365, ge=30, le=3650)
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)
+    # ADR 0085 (class C): TRACE set in the portal falls back sooner than the other levels, and
+    # a statement slower than this many milliseconds leaves a ``sql.slow`` trace line.
+    trace_level_max_hours: int = Field(default=4, ge=1, le=24)
+    sql_slow_ms: int = Field(default=200, ge=10, le=10_000)
 
     # ADR 0044: how many days ahead the shortfall summary (group page, dashboard) looks.
     # Class D organisation (ADR 0042, settings registry).
