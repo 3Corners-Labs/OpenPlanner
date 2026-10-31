@@ -325,7 +325,12 @@ LAYERS = (
         "Ingangen",
         "api · admin · jobs · cli",
         (
-            C(Family.PARTICIPANT, "B1", "Deelnemerpagina's", "api/booking_pages · participant · slot_picker"),
+            C(
+                Family.PARTICIPANT,
+                "B1",
+                "Deelnemerpagina's",
+                "api/booking_pages · participant · slot_picker",
+            ),
             C(Family.PARTICIPANT, "B1 B7", "Join-pagina", "api/join_pages"),
             C(Family.PARTICIPANT, "B3", "Direct bellen", "api/direct_pages"),
             C(Family.CORE, "B7", "Webhooks in", "api/webhooks"),
