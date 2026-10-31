@@ -81,7 +81,15 @@ from app.admin.authz import (
 from app.admin.forms import safe_next
 from app.admin.idp_mapping_routes import reason_label
 from app.admin.integration_views import check_view
-from app.admin.pages import Locale, SameOrigin, admin_moment, role_labels, scope_text, templates
+from app.admin.pages import (
+    Locale,
+    SameOrigin,
+    admin_moment,
+    role_labels,
+    role_name,
+    scope_text,
+    templates,
+)
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
 from app.admin.session import (
@@ -121,7 +129,6 @@ from app.web.authz_labels import (
     LEVEL_LABELS,
     PARTICIPANT_LABELS,
     PERMISSION_LABELS,
-    ROLE_LABELS,
 )
 from app.web.authz_report import matrix_rows
 from app.web.locale import RequestLocale, resolve_locale
@@ -312,7 +319,7 @@ async def rights(
         (_(PERMISSION_LABELS[permission]), scope_text(scope, _))
         for permission, scope in permissions_for(principal)
     ]
-    roles = role_labels(principal, locale)
+    roles = role_labels(principal, locale, with_standard=True)
     grants = sorted(g.key for g in principal.grants)
     refused = [
         (r.value, reason_label(r.reason, locale), admin_moment(request, locale, r.received_at))
@@ -432,7 +439,7 @@ async def matrix(
         context.principal,
         {
             "rows": rows,
-            "role_columns": [_(ROLE_LABELS[r]) for r in Role]
+            "role_columns": [role_name(r, locale, with_standard=True) for r in Role]
             + [c.name(locale.code) for c in custom],
             "custom_count": len(custom),
             "history": [_role_change(request, locale, e, names) for e in await service.history()],

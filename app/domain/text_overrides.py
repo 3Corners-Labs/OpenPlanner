@@ -10,6 +10,7 @@ may not import ``app.i18n``; ``tests/i18n`` checks that each page text's allow-l
 placeholders of the shipped nl and en texts.
 """
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -21,6 +22,7 @@ from app.domain.message_texts import (
     MESSAGE_BLOCKS,
     check_text,
 )
+from app.domain.role_names import ROLE_NAME_KEYS, clean_role_name
 
 
 class Area(StrEnum):
@@ -29,6 +31,7 @@ class Area(StrEnum):
     MESSAGES = "messages"
     PAGES = "pages"
     TERMS = "terms"
+    ROLES = "roles"
 
 
 @dataclass(frozen=True)
@@ -81,6 +84,12 @@ TERM_TEXTS: tuple[EditableText, ...] = tuple(
 """The words of the agent term (ADR 0077): singular first, then plural. The same keys hold a
 group's own words in ``group_texts``."""
 
+ROLE_TEXTS: tuple[EditableText, ...] = tuple(
+    EditableText(key, Area.ROLES, frozenset(), MAX_TERM_LENGTH, single_line=True)
+    for key in ROLE_NAME_KEYS
+)
+"""The names an organisation gives its organisation admin and group admin (ADR 0077)."""
+
 EDITABLE_TEXTS: tuple[EditableText, ...] = (
     *(
         EditableText(b.key, Area.MESSAGES, b.placeholders, b.max_length, b.single_line)
@@ -88,6 +97,7 @@ EDITABLE_TEXTS: tuple[EditableText, ...] = (
     ),
     *PAGE_TEXTS,
     *TERM_TEXTS,
+    *ROLE_TEXTS,
 )
 """Every editable text; the message blocks come first, as in the group editor, and the words
 of the agent term last."""
@@ -98,8 +108,10 @@ OrganisationTexts = dict[tuple[str, str], str]
 """An organisation's own texts by ``(locale, key)``."""
 
 
-def clean_override(key: str, text: str) -> str:
+def clean_override(key: str, text: str, taken: Collection[str] = ()) -> str:
     """Return the trimmed ``text`` for ``key`` if an organisation may store it.
+
+    ``taken`` holds the names a role name may not equal (the other roles, ADR 0077).
 
     Raises:
         DomainError: ``invalid_configuration`` with field ``key`` for a key that is not on the
@@ -110,4 +122,6 @@ def clean_override(key: str, text: str) -> str:
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "key")
     if spec.area is Area.TERMS:
         return clean_term(key, text)
+    if spec.area is Area.ROLES:
+        return clean_role_name(key, text, taken)
     return check_text(key, text, spec.placeholders, spec.max_length, single_line=spec.single_line)

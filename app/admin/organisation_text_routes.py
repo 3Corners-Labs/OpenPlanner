@@ -67,6 +67,12 @@ PAGE_LABELS: dict[str, str] = {
 }
 """The field label of each participant-page text."""
 
+ROLE_LABELS_OF_FIELDS: dict[str, str] = {
+    "authz.role.org_admin": "admin.org_texts.role.org_admin",
+    "authz.role.group_admin": "admin.org_texts.role.group_admin",
+}
+"""The field label of each role name."""
+
 TERM_LABELS: dict[str, str] = {
     "term.agent": "admin.org_texts.term.singular",
     "term.agents": "admin.org_texts.term.plural",
@@ -105,6 +111,8 @@ def _label(spec: EditableText, _: BoundGettext) -> str:
         return _(PAGE_LABELS[spec.key])
     if spec.area is Area.TERMS:
         return _(TERM_LABELS[spec.key])
+    if spec.area is Area.ROLES:
+        return _(ROLE_LABELS_OF_FIELDS[spec.key])
     block = BLOCKS_BY_KEY[spec.key]
     return _(
         "admin.messages.part_sms" if block.channel is ChannelKind.SMS else PART_LABELS[block.part]
@@ -117,6 +125,8 @@ def _section_title(spec: EditableText, _: BoundGettext) -> tuple[str, str]:
         return "pages", _("admin.org_texts.section_pages")
     if spec.area is Area.TERMS:
         return "terms", _("admin.org_texts.section_terms")
+    if spec.area is Area.ROLES:
+        return "roles", _("admin.org_texts.section_roles")
     purpose = BLOCKS_BY_KEY[spec.key].purpose
     return purpose, _(PURPOSE_LABELS[purpose])
 
@@ -124,6 +134,8 @@ def _section_title(spec: EditableText, _: BoundGettext) -> tuple[str, str]:
 def _hint(spec: EditableText, custom: bool, _: BoundGettext) -> str:
     """Return whether the organisation changed the text and which placeholders it may use."""
     state = _("admin.org_texts.custom") if custom else _("admin.messages.default")
+    if spec.area is Area.ROLES:
+        return f"{state} {_('admin.org_texts.role.hint')}"
     if spec.area is Area.TERMS:
         return f"{state} {_('admin.org_texts.term.use')}" if spec.key == TERM_SINGULAR else state
     if not spec.placeholders:
@@ -247,6 +259,10 @@ async def save_texts(
         if spec.area is Area.TERMS:
             message = locale.gettext(
                 "admin.form.error.agent_term", min=MIN_TERM_LENGTH, max=MAX_TERM_LENGTH
+            )
+        if spec.area is Area.ROLES:
+            message = locale.gettext(
+                "admin.form.error.role_display_name", min=MIN_TERM_LENGTH, max=MAX_TERM_LENGTH
             )
         form.errors.append(FormError(spec.key, message))
         return await _editor(request, locale, context, org, code, form, 422)

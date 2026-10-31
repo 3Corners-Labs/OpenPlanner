@@ -1,7 +1,7 @@
 # 0077. Terminology: "participant", and organisation names for staff functions
 
-Status: accepted (2026-10-31), partly built: the rename and the guard test are merged and the agent
-term (steps 4a-1 and 4b) is in review; the diagrams and the names of two roles are planned. Requested
+Status: accepted (2026-10-31), partly built: the rename, the guard test and the agent term are merged,
+the names of two roles are in review, and the diagrams are planned. Requested
 by the product owner, who accepted it on 2026-10-31 together with the recommendations of
 Q12 and Q13. Extends ADR 0004 (texts), ADR 0039 (roles) and ADR 0074 (organisation text
 overrides, PR #168). Changes no right: ADR 0014 stays as it is.
@@ -251,9 +251,9 @@ Nothing is open at the time of acceptance. A new question gets a row here, not a
 | 2e | Docs that name renamed files and tests | #247 | merged |
 | 2f | `docs/diagrams` regenerated with `make diagrams` (needs the draw.io desktop app) | | planned |
 | 3 | Guard test `tests/test_terminology.py` | #256 | merged |
-| 4a-1 | The agent term per organisation and group: words, editors, scope of the portal, mails and pages (points 8, 9, 11, 12, 13) | #257 | in PR #257 |
-| 4a-2 | Display names of `org_admin` and `group_admin` per organisation (points 10, 11, 13) | | planned |
-| 4b | `{agent}` and `{agents}` in catalogue texts and mails, grammar test (point 9) | #257 | in PR #257 |
+| 4a-1 | The agent term per organisation and group: words, editors, scope of the portal, mails and pages (points 8, 9, 11, 12, 13) | #257 | merged |
+| 4a-2 | Display names of `org_admin` and `group_admin` per organisation (points 10, 11, 13) | #259 | in PR #259 |
+| 4b | `{agent}` and `{agents}` in catalogue texts and mails, grammar test (point 9) | #257 | merged |
 
 Step 4b comes after 4a; step 3 after 2e. `EventKind.CITIZEN_LEFT` (stored value `citizen_left`) is not renamed: it needs a name of its own, separate from `PARTICIPANT_LEFT`, which is a Webex event.
 
