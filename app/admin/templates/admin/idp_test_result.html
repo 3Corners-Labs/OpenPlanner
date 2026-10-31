@@ -1,0 +1,38 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.idp.test_result.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="page-header__lead"><a href="{{ back_url }}">{{ _("admin.idp.title") }}</a> · <code>{{ key }}</code></p>
+    <h1 id="page-title">{{ _("admin.idp.test_result.title") }}</h1>
+  </div>
+</div>
+<div class="alert alert--success" role="status"><p>{{ _("admin.idp.test_result.succeeded") }}</p></div>
+<section class="card" aria-labelledby="token-heading">
+  <h2 id="token-heading">{{ _("admin.idp.test_result.token") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("admin.idp.test_result.claims") }}</dt><dd>{% for name in report.claim_names %}<code>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</dd></div>
+    <div><dt>{{ _("admin.idp.test_result.email_verified") }}</dt><dd>{% if report.email_verified is true %}<span class="chip chip--success">{{ _("admin.idp.test_result.yes") }}</span>{% elif report.email_verified is false %}<span class="chip chip--danger">{{ _("admin.idp.test_result.no") }}</span>{% else %}<span class="chip chip--warning">{{ _("admin.idp.test_result.absent") }}</span>{% endif %}</dd></div>
+    <div><dt>{{ _("admin.idp.test_result.email_domain") }}</dt><dd>{% if report.email_domain %}<code>{{ report.email_domain }}</code>{% else %}<span class="chip chip--warning">{{ _("admin.idp.test_result.absent") }}</span>{% endif %}</dd></div>
+    <div><dt>{{ _("admin.idp.test_result.entitlements") }}</dt><dd>{{ report.claims.entitlements|length }}</dd></div>
+  </dl>
+  <p class="hint">{{ _("admin.idp.test_result.hint") }}</p>
+</section>
+<section class="card" aria-labelledby="grants-heading">
+  <h2 id="grants-heading">{{ _("admin.idp.test_result.grants") }}</h2>
+  {% if grants %}
+  <ul>
+    {% for grant in grants %}<li>{{ grant.role }}{% if grant.target %} · <code>{{ grant.target }}</code>{% endif %}</li>{% endfor %}
+  </ul>
+  {% else %}
+  <p>{{ _("admin.idp.test_result.no_grants") }}</p>
+  {% endif %}
+  {% if refused %}
+  <h3>{{ _("admin.idp.test_result.refused") }}</h3>
+  <ul>
+    {% for value, reason in refused %}<li><code>{{ value }}</code> · {{ reason }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</section>
+<div class="form-actions"><a class="button" href="{{ back_url }}">{{ _("admin.idp.test_result.back") }}</a></div>
+{% endblock %}
