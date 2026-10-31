@@ -2,7 +2,8 @@
 
 Status: accepted (2026-10-30), requested by the product owner. Amends CLAUDE.md
 ("Code style and quality gates", *Per PR*) and point 2 of ADR 0012. Keeps ADR 0006 and
-ADR 0051 as they are. Partly built; see `docs/adr-status.md` for what is built.
+ADR 0051 as they are. Partly built; see `docs/adr-status.md` for what is built. Point 5
+(who adds a pull request to the queue) is amended by ADR 0078: auto-merge does.
 
 ## Context
 
