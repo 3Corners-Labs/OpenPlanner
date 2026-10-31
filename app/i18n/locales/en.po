@@ -917,6 +917,9 @@ msgstr "View own rights"
 msgid "authz.permission.matrix_view"
 msgstr "View rights matrix"
 
+msgid "authz.permission.organisation_view"
+msgstr "View an organisation"
+
 msgid "authz.permission.organisation_manage"
 msgstr "Manage organisations"
 
@@ -2176,9 +2179,6 @@ msgstr "The booking was cancelled and the task was marked as cancelled through t
 msgid "authz.permission.branding_manage"
 msgstr "Manage an organisation's branding"
 
-msgid "admin.nav.branding"
-msgstr "Branding"
-
 msgid "admin.done.logo_saved"
 msgstr "The logo has been saved."
 
@@ -2199,15 +2199,6 @@ msgstr "Logo removed"
 
 msgid "admin.branding.title"
 msgstr "Branding"
-
-msgid "admin.branding.lead"
-msgstr "Logo, name, colours, fonts and header of an organisation's booking pages."
-
-msgid "admin.branding.organisations"
-msgstr "Organisations"
-
-msgid "admin.branding.none"
-msgstr "You do not manage the branding of any organisation."
 
 msgid "admin.branding.page_lead"
 msgstr "This is how participants see this organisation's booking pages. The admin portal itself keeps one fixed style."
@@ -2544,9 +2535,6 @@ msgstr "with the management link, while the appointment is on hold"
 msgid "admin.tab.closure"
 msgstr "Emergency closure"
 
-msgid "admin.nav.closures"
-msgstr "Emergency closure"
-
 msgid "admin.done.closure_started"
 msgstr "The emergency closure is in place. Appointments on hold: {count}. The citizens receive an email."
 
@@ -2771,15 +2759,6 @@ msgstr "Back to the emergency closure"
 
 msgid "admin.closures.title"
 msgstr "Emergency closure"
-
-msgid "admin.closures.lead"
-msgstr "Close every team of an organisation at once, for example during an outage or when a building is closed."
-
-msgid "admin.closures.organisations"
-msgstr "Organisations"
-
-msgid "admin.closures.none"
-msgstr "You cannot close an organisation as a whole."
 
 msgid "admin.closures.organisation_title"
 msgstr "Emergency closure {name}"
@@ -3153,12 +3132,6 @@ msgstr "All organisations"
 msgid "admin.organisations.none"
 msgstr "There are no organisations yet."
 
-msgid "admin.organisations.branding"
-msgstr "Branding"
-
-msgid "admin.organisations.branding_of"
-msgstr "Branding of {name}"
-
 msgid "admin.new_organisation.title"
 msgstr "New organisation"
 
@@ -3465,7 +3438,7 @@ msgid "agent_docs.spec_link"
 msgstr "OpenAPI spec (JSON)"
 
 msgid "admin.nav.holidays"
-msgstr "Holidays"
+msgstr "Holiday calendars"
 
 msgid "admin.tab.holidays"
 msgstr "Holidays"
@@ -3502,12 +3475,6 @@ msgstr "Create calendar"
 
 msgid "admin.holidays.slug_hint"
 msgstr "Short name for the address bar, for example national. Cannot be changed later."
-
-msgid "admin.holidays.organisations"
-msgstr "Choice per organisation"
-
-msgid "admin.holidays.organisations_lead"
-msgstr "Groups follow the calendars of their organisation unless a group chooses otherwise."
 
 msgid "admin.holidays.holiday_name"
 msgstr "Name"
@@ -4830,9 +4797,6 @@ msgstr "View retention"
 msgid "authz.permission.embedding_manage"
 msgstr "Manage embedding on websites"
 
-msgid "admin.nav.embedding"
-msgstr "Embedding"
-
 msgid "authz.permission.queue_work"
 msgstr "Pick up appointments in the own queue"
 
@@ -5731,21 +5695,6 @@ msgstr "No activity within your organisations or groups."
 msgid "admin.embedding.title"
 msgstr "Embedding on websites"
 
-msgid "admin.embedding.lead"
-msgstr "On which websites an organisation's groups may appear as a widget."
-
-msgid "admin.embedding.organisations"
-msgstr "Organisations"
-
-msgid "admin.embedding.col.origins"
-msgstr "Allowed websites"
-
-msgid "admin.embedding.col.groups"
-msgstr "Groups embedded"
-
-msgid "admin.embedding.none"
-msgstr "There are no organisations you may manage."
-
 msgid "admin.embedding.org_lead"
 msgstr "The websites on which the groups of {name} may appear as a widget. A group appears only once it switches embedding on in its own settings."
 
@@ -6240,21 +6189,6 @@ msgstr "This value contradicts another setting (for example critical storage not
 
 msgid "admin.form.error.setting_expiry"
 msgstr "Enter the hours after which the log level falls back: 1 to 24."
-
-msgid "admin.nav.organisation_settings"
-msgstr "Organisation settings"
-
-msgid "admin.org_settings.title"
-msgstr "Organisation settings"
-
-msgid "admin.org_settings.lead"
-msgstr "Time format, time zone and periods per organisation. Without a value of its own, the platform value applies."
-
-msgid "admin.org_settings.organisations"
-msgstr "Organisations"
-
-msgid "admin.org_settings.none"
-msgstr "There are no organisations whose settings you can change."
 
 msgid "admin.org_settings.page_title"
 msgstr "Settings of {name}"
@@ -7281,15 +7215,6 @@ msgstr "Empty a field to restore the default text. Texts are plain text: markup 
 msgid "admin.org_texts.section_pages"
 msgstr "Pages for citizens"
 
-msgid "admin.org_texts.link_title"
-msgstr "Texts for citizens"
-
-msgid "admin.org_texts.link_lead"
-msgstr "Change the texts on the group pages and in emails and text messages for the whole organisation."
-
-msgid "admin.org_texts.link_button"
-msgstr "Change texts"
-
 msgid "admin.org_texts.page.group_intro"
 msgstr "Introduction on the group's page"
 
@@ -7460,3 +7385,99 @@ msgstr "The DKIM key is empty (revoked). Ask your mail administrator to publish 
 
 msgid "admin.channels.domain_reason.dmarc_policy_none"
 msgstr "DMARC is at p=none: receivers only report, nothing is rejected. Set the policy to quarantine or reject once SPF and DKIM are right."
+
+msgid "admin.nav.groups"
+msgstr "Groups"
+
+msgid "admin.nav.object.organisation"
+msgstr "Organisation"
+
+msgid "admin.tab.texts"
+msgstr "Texts"
+
+msgid "admin.tab.embedding"
+msgstr "Embedding"
+
+msgid "admin.tab.branding"
+msgstr "Branding"
+
+msgid "admin.tab.channels"
+msgstr "Channels"
+
+msgid "admin.tab.contact"
+msgstr "Contact"
+
+msgid "admin.organisation.sections"
+msgstr "Sections of the organisation"
+
+msgid "admin.organisation.subsections"
+msgstr "Sections of this tab"
+
+msgid "admin.organisation.groups"
+msgstr "Groups"
+
+msgid "admin.organisation.groups_lead"
+msgstr "This organisation's groups you have rights on. A group opens on its own page."
+
+msgid "admin.organisation.no_groups"
+msgstr "This organisation has no groups you have rights on yet."
+
+msgid "admin.organisation.all_groups"
+msgstr "These groups in the Groups list"
+
+msgid "admin.organisation.profile"
+msgstr "Profile"
+
+msgid "admin.organisation.edit"
+msgstr "Change name and language"
+
+msgid "admin.organisations.groups"
+msgstr "Groups"
+
+msgid "admin.organisations.groups_of"
+msgstr "Groups of {name}"
+
+msgid "admin.groups.title"
+msgstr "Groups"
+
+msgid "admin.groups.lead"
+msgstr "Every group you have rights on, with its organisation. A group opens on its own page."
+
+msgid "admin.groups.filter"
+msgstr "Filter"
+
+msgid "admin.groups.search"
+msgstr "Search by name"
+
+msgid "admin.groups.organisation"
+msgstr "Organisation"
+
+msgid "admin.groups.apply"
+msgstr "Filter"
+
+msgid "admin.groups.clear"
+msgstr "Clear filters"
+
+msgid "admin.groups.count"
+msgstr "Number of groups: {count}"
+
+msgid "admin.groups.of_total"
+msgstr "Of {total} groups in all."
+
+msgid "admin.groups.none"
+msgstr "No groups found."
+
+msgid "admin.groups.duration"
+msgstr "Duration"
+
+msgid "admin.groups.shortfalls"
+msgstr "Shortfalls"
+
+msgid "admin.groups.no_shortfall"
+msgstr "None"
+
+msgid "admin.groups.public_page"
+msgstr "Public page"
+
+msgid "admin.groups.search_active"
+msgstr "A search is active. Clear the filters to see everything again."

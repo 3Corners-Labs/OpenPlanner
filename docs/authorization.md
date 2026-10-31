@@ -32,6 +32,7 @@ stays open to every role as usual.
 | View system status and advanced settings (`settings.platform.view`) | Portal | – | yes | – | – | yes | – |
 | Change platform settings (`settings.platform.manage`) | Portal | locked | yes | – | – | – | – |
 | Change the login mapping (claims and roles) (`settings.login.manage`) | Portal | locked | yes | – | – | – | – |
+| View an organisation (`organisation.view`) | Organisation | – | yes | yes | – | yes | – |
 | Manage integrations and secrets (`integrations.manage`) | Organisation | locked, maintenance | yes | – | – | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | – | yes | – | – | – | – |
 | Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | – | yes | yes | – | – | – |
@@ -66,9 +67,9 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 
 | Template | Reach | Delegable permissions |
 |---|---|---|
-| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `queue.work`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
+| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.edit`, `group.view`, `holidays.assign`, `matrix.view`, `organisation.closure`, `organisation.view`, `queue.work`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
 | Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `queue.work`, `reminders.manage`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
-| Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `matrix.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
+| Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `matrix.view`, `organisation.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
 
 ## Citizens
 

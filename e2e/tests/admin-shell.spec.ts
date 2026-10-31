@@ -36,24 +36,24 @@ for (const [name, width] of Object.entries(WIDTHS)) {
       if (name === 'phone') {
         // The first entries sit in the bottom bar; the rest wait behind More.
         await expect(menu.getByRole('link', { name: 'Auditlog' })).toBeVisible();
-        const branding = menu.getByRole('link', { name: 'Huisstijl' });
-        await expect(branding).toBeHidden();
+        const staff = menu.getByRole('link', { name: 'Medewerkers' });
+        await expect(staff).toBeHidden();
         const more = menu.locator('details.admin-bottombar__more > summary');
         await tabTo(page, more);
         await page.keyboard.press('Enter');
-        await expect(branding).toBeVisible();
+        await expect(staff).toBeVisible();
         await expectNoAxeViolations(page);
-        await tabTo(page, branding);
+        await tabTo(page, staff);
       } else {
-        const branding = menu.getByRole('link', { name: 'Huisstijl' });
-        await tabTo(page, branding);
+        const staff = menu.getByRole('link', { name: 'Medewerkers' });
+        await tabTo(page, staff);
         // The rail hides the label visually until the entry has focus (its accessible name
         // stays); the desktop menu shows it at all times.
-        await expect(branding.locator('span')).toBeVisible();
+        await expect(staff.locator('span')).toBeVisible();
       }
       await page.keyboard.press('Enter');
-      await expect(page).toHaveURL(/\/admin\/branding$/);
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Huisstijl');
+      await expect(page).toHaveURL(/\/admin\/staff$/);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Medewerkers');
       // The current entry is marked where it shows: in the menu, or on More when it holds it.
       const current = name === 'phone'
         ? menu.locator('details.admin-bottombar__more:has(a[aria-current="page"]) > summary')

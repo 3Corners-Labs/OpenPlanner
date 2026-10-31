@@ -27,7 +27,7 @@ from app.admin import forms
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import done_message, raise_refusal, read_form, redirect_done
 from app.admin.group_routes import group_page
-from app.admin.pages import Locale, SameOrigin, page
+from app.admin.pages import Locale, SameOrigin, organisation_header, page
 from app.domain.authorization import Permission
 from app.domain.contacts import (
     CONTACT_LOCALES,
@@ -249,6 +249,9 @@ async def _form_page(
         context.principal,
         {
             "organisation": found.organisation,
+            "org_header": organisation_header(
+                request, locale, context.principal, found.organisation.name, found.organisation.slug
+            ),
             "preview": contact_view(found.block, locale),
             "done": done_message(request, locale.gettext),
             **block_form_values(found.block, form, locale),

@@ -115,17 +115,56 @@ async def test_a_sub_page_marks_its_entry_and_tab_as_current(site: Site) -> None
 
     page = (await site.client.get(rule.group(1))).text
 
-    assert _current_links(page) == ["/admin/", "/admin/groups/demo/staffing"]
+    assert _current_links(page) == ["/admin/groups", "/admin/groups/demo/staffing"]
 
 
-async def test_an_organisation_page_marks_its_own_entry(site: Site) -> None:
+async def test_an_organisation_page_marks_its_entry_its_tab_and_its_sub_tab(site: Site) -> None:
     await site.login_as(SUPER)
 
     branding = (await site.client.get("/admin/organisations/demo/branding")).text
     channels = (await site.client.get("/admin/organisations/demo/channels")).text
+    settings = (await site.client.get("/admin/organisations/demo/settings")).text
+    overview = (await site.client.get("/admin/organisations/demo")).text
 
-    assert _current_links(branding) == ["/admin/branding"]
-    assert _current_links(channels) == ["/admin/integrations"]
+    assert _current_links(branding) == [
+        "/admin/organisations",
+        "/admin/organisations/demo/branding",
+    ]
+    assert _current_links(channels) == [
+        "/admin/organisations",
+        "/admin/organisations/demo/channels",
+    ]
+    # ADR 0047 §3: a sub-tab keeps its tab current and marks itself in the second row.
+    assert _current_links(settings) == [
+        "/admin/organisations",
+        "/admin/organisations/demo",
+        "/admin/organisations/demo/settings",
+    ]
+    assert 'class="tabs tabs--sub"' in settings
+    assert 'class="tabs tabs--sub"' in overview
+    assert 'class="tabs tabs--sub"' not in branding
+
+
+async def test_a_group_page_shows_the_path_groups_organisation_group(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    page = (await site.client.get("/admin/groups/demo")).text
+    crumbs = page.split('<nav class="breadcrumbs"', 1)[1].split("</nav>", 1)[0]
+
+    assert _hrefs(crumbs) == ["/admin/groups", "/admin/organisations/demo"]
+    assert (
+        crumbs.index("Groepen") < crumbs.index("Demo-gemeente") < crumbs.index("Demo: videogesprek")
+    )
+
+
+async def test_a_group_admin_sees_the_organisation_in_the_path_without_a_link(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    page = (await site.client.get("/admin/groups/demo")).text
+    crumbs = page.split('<nav class="breadcrumbs"', 1)[1].split("</nav>", 1)[0]
+
+    assert _hrefs(crumbs) == ["/admin/groups"]
+    assert "Demo-gemeente" in crumbs
 
 
 def _panel(page: str) -> str:
