@@ -247,7 +247,7 @@ Nothing is open at the time of acceptance. A new question gets a row here, not a
 | 2c | `docs/*.md` except HANDOVER (which gets its one line), and `CONTRIBUTING.md` | #181 | merged |
 | 2d-1 | Code: domain layer and the identifiers shared across layers, the `citizen.*` codes | #206 | merged |
 | 2d-2 | Code: api and web layers, `app/api/citizen.py` → `participant.py` | #212 | merged |
-| 2d-3 | Code: admin, adapters, jobs, scripts, e2e and the rest of the tests; the diagram source | | planned |
+| 2d-3 | Code: admin, adapters, jobs, scripts, e2e and the rest of the tests; the diagram source | #244 | in PR #244 |
 | 2e | Docs that name renamed files and tests; `docs/diagrams` regenerated with `make diagrams` (needs the draw.io app) | | planned |
 | 3 | Guard test `tests/test_terminology.py` | | planned |
 | 4a | The agent term and role names per organisation and group in the portal (points 8, 10 to 13) | | planned |
