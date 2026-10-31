@@ -1035,7 +1035,8 @@ A patch release has no audit job.
 2. Edit the PR description and change the last line of the section from `Verdict: open` to
    `Verdict: pass`. This is a human act on purpose; `main.yml` refuses the tag until it is done.
 3. Set the label `po:approved`. The PR is a decision (ADR 0078): with the label and green CI
-   the merge queue squash-merges it.
+   the merge queue squash-merges it. The gate checks the label again in the queue (ADR 0088),
+   so removing the label before the merge sends the PR back.
 
 ### Step 3: the tag (one click)
 

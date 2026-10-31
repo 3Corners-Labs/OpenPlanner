@@ -3,19 +3,26 @@ name: decision gate
 # ADR 0078: build work merges on green; a decision (an ADR outside its Build status table,
 # CLAUDE.md, the authorisation matrix, the workflows, the gates themselves, a release PR) waits
 # for the product owner's label `po:approved`. The check runs `scripts/decision_gate.py` from
-# `main`, not from the pull request: `pull_request_target` takes the workflow and the checkout
+# the base, not from the pull request: `pull_request_target` takes the workflow and the checkout
 # from the base, and the pull request's commits are only fetched as git objects to diff them.
-# Nothing from the pull request is executed here, and the job holds no secrets.
+# Nothing from the pull request is executed here, and the job holds no secret beyond the
+# read-only `GITHUB_TOKEN` it needs to read labels.
 #
-# `merge_group` is listed so the required check reports (as skipped, which counts as passed)
-# in the merge queue, where there is no pull request and no label.
+# ADR 0088: the gate runs again in the merge queue. A skipped required check counts as passed,
+# and the check on the pull request can be stale (the base branch changed, or the pull request
+# was stacked on another branch that was closed) by the time auto-merge queues it; on
+# 2026-10-31 an ADR reached `main` that way (#266). On `merge_group` the job checks out the
+# group's base (`main`), judges every pull request in the group by its own commit on the queue
+# branch, and reads each pull request's labels through the API. A commit that names no pull
+# request, or a pull request whose labels cannot be read, fails the check.
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
   merge_group:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: decision-gate-${{ github.event.pull_request.number || github.ref }}
@@ -24,22 +31,34 @@ concurrency:
 jobs:
   gate:
     name: decision gate
-    if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    env:
+      BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+      HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           fetch-depth: 0
-      - name: fetch the pull request's commits (objects only, nothing is checked out or run)
-        env:
-          HEAD: ${{ github.event.pull_request.head.sha }}
+      - name: fetch the judged commits (objects only, nothing is checked out or run)
         run: git fetch --no-tags origin "$HEAD"
-      - name: build work or decision?
+      - name: build work or decision? (the pull request)
+        if: github.event_name == 'pull_request_target'
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
           TITLE: ${{ github.event.pull_request.title }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --title "$TITLE" --labels "$LABELS"
+      - name: build work or decision? (every pull request in the merge group)
+        if: github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          numbers=$(python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --list-pull-requests)
+          pulls=()
+          for number in $numbers; do
+            labels=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${number}" --jq '[.labels[].name] | join(",")')
+            pulls+=(--pull "${number}=${labels}")
+          done
+          python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --merge-group "${pulls[@]}"
