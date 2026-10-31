@@ -133,6 +133,31 @@
       ]
     },
     {
+      "name": "groups list",
+      "path": "/admin/groups",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "organisation page",
+      "path": "/admin/organisations/demo",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "organisation page as org admin",
+      "path": "/admin/organisations/demo",
+      "user": "orgadmin",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
       "name": "advanced settings",
       "path": "/admin/settings",
       "user": "super",

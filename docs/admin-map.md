@@ -12,7 +12,7 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|
-| Overview | `/admin/` | `dashboard.view` | wide | `/admin/groups/new` |
+| Overview | `/admin/` | `dashboard.view` | wide | – |
 | Audit log | `/admin/audit` | `audit.view` | wide | – |
 | Retention | `/admin/retention` | `retention.view` | standard | – |
 
@@ -20,12 +20,8 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|
-| Organisations | `/admin/organisations` | `organisation.manage` | standard | `/admin/organisations/new`, `/admin/organisations/{org}`, `/admin/organisations/{org}/contacts` |
-| Branding | `/admin/branding` | `branding.manage` | standard | `/admin/organisations/{org}/branding` |
-| Embedding | `/admin/embedding` | `embedding.manage` | standard | `/admin/organisations/{org}/embedding` |
-| Organisation settings | `/admin/organisation-settings` | `settings.organisation.manage` | standard | `/admin/organisations/{org}/settings`, `/admin/organisations/{org}/texts`, `/admin/organisations/{org}/texts/{text_locale}` |
-| Holidays | `/admin/holidays` | `holidays.assign` | standard | `/admin/holidays/{calendar}`, `/admin/organisations/{org}/holidays` |
-| Emergency closure | `/admin/closures` | `organisation.closure` | standard | `/admin/organisations/{org}/closure`, `/admin/organisations/{org}/closure/scenarios`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts` |
+| Groups | `/admin/groups` | `group.view` | wide | `/admin/groups/new` |
+| Organisations | `/admin/organisations` | `organisation.view` | wide | `/admin/organisations/new` |
 | Staff | `/admin/staff` | `staff.view` | wide | `/admin/staff/{member_id}` |
 | Identity provider mapping | `/admin/idp-mapping` | `idp_mapping.view` | standard | – |
 | My rights | `/admin/rights` | `rights.view` | standard | – |
@@ -35,8 +31,9 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|
-| Integrations | `/admin/integrations` | `integrations.manage` | standard | `/admin/organisations/{org}/channels` |
+| Integrations | `/admin/integrations` | `integrations.manage` | standard | – |
 | API clients | `/admin/api` | `api_clients.manage` | standard | `/admin/api/clients/new`, `/admin/api/clients/{client_id}` |
+| Holiday calendars | `/admin/holidays` | `holidays.manage` | standard | `/admin/holidays/{calendar}` |
 | Updates | `/admin/updates` | `system.update` | standard | – |
 | Maintenance | `/admin/maintenance` | `system.maintenance` | standard | – |
 | Advanced settings | `/admin/settings` | `settings.platform.view` | standard | – |
@@ -52,9 +49,25 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 
 ## Object pages
 
+### Organisation (`/admin/organisations/{org}`)
+
+Side navigation: *Organisations*. A row *Tab › Sub-tab* is a sub-tab of that tab.
+
+| Entry | Path | Permission | Width | Also the home of |
+|---|---|---|---|---|
+| Overview | `/admin/organisations/{org}` | `organisation.view` | wide | `/admin/organisations/{org}/edit` |
+| Overview › Settings | `/admin/organisations/{org}/settings` | `settings.organisation.manage` | standard | – |
+| Overview › Texts | `/admin/organisations/{org}/texts` | `texts.organisation.manage` | standard | `/admin/organisations/{org}/texts/{text_locale}` |
+| Overview › Embedding | `/admin/organisations/{org}/embedding` | `embedding.manage` | standard | – |
+| Branding | `/admin/organisations/{org}/branding` | `branding.manage` | standard | – |
+| Channels | `/admin/organisations/{org}/channels` | `integrations.manage` | standard | – |
+| Contact | `/admin/organisations/{org}/contacts` | `organisation.closure` | standard | – |
+| Holidays | `/admin/organisations/{org}/holidays` | `holidays.assign` | standard | – |
+| Emergency closure | `/admin/organisations/{org}/closure` | `organisation.closure` | standard | `/admin/organisations/{org}/closure/scenarios`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts` |
+
 ### Group (`/admin/groups/{slug}`)
 
-Side navigation: *Overview*.
+Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|

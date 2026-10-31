@@ -2,7 +2,8 @@
  * Branding per organisation (WP3b) through the real identity provider: only the superuser may
  * change it (HANDOVER §6); the form saves with the keyboard, refuses a light colour with a
  * linked error, and passes axe (WCAG 2.2 AA). "Accentkleur" is matched exactly: "Tekst op accentkleur"
- * (ADR 0041) contains it.
+ * (ADR 0041) contains it. Branding is a tab of the organisation's page (ADR 0047 step 3), reached
+ * from Beheren > Organisaties; it has no menu entry of its own.
  *
  * The three browsers run in parallel against one database: each uses its own colour on the
  * "andere" organisation, so the citizen specs on "demo" are not affected.
@@ -14,7 +15,7 @@ import { adminMenu, expectForbidden, loginAs, requireKeycloak } from '../keycloa
 
 requireKeycloak();
 
-const PAGE = '/admin/organisations/andere/branding';
+const ORGANISATION_TABS = 'Onderdelen van de organisatie';
 const COLOURS: Record<string, string> = {
   chromium: '#154273',
   firefox: '#7a1f5c',
@@ -22,10 +23,18 @@ const COLOURS: Record<string, string> = {
 };
 
 test('the superuser changes the branding with the keyboard', async ({ page }, testInfo) => {
-  await loginAs(page, 'super', '/admin/branding');
-  await expect(adminMenu(page).getByRole('link', { name: 'Huisstijl' })).toBeVisible();
+  await loginAs(page, 'super', '/admin/organisations');
+  await expect(adminMenu(page).getByRole('link', { name: 'Organisaties' })).toBeVisible();
+  await expect(adminMenu(page).getByRole('link', { name: 'Huisstijl' })).toHaveCount(0);
   await expectNoAxeViolations(page);
-  await page.getByRole('link', { name: 'Andere gemeente' }).click();
+  await page.getByRole('link', { name: 'Andere gemeente', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Andere gemeente');
+  await expectNoAxeViolations(page);
+  await page
+    .getByRole('navigation', { name: ORGANISATION_TABS })
+    .getByRole('link', { name: 'Huisstijl' })
+    .click();
+  await expect(page).toHaveURL(/\/admin\/organisations\/andere\/branding$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Andere gemeente');
   await expectNoAxeViolations(page);
 
@@ -47,7 +56,13 @@ test('the superuser changes the branding with the keyboard', async ({ page }, te
 });
 
 test('an organisation admin cannot change branding', async ({ page }) => {
-  await loginAs(page, 'orgadmin');
+  await loginAs(page, 'orgadmin', '/admin/organisations');
+  // An admin of one organisation lands on it; the Huisstijl tab is not offered.
+  await expect(page).toHaveURL(/\/admin\/organisations\/demo$/);
+  await expect(page.getByRole('navigation', { name: ORGANISATION_TABS })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: ORGANISATION_TABS }).getByRole('link', { name: 'Huisstijl' }),
+  ).toHaveCount(0);
   await expect(adminMenu(page).getByRole('link', { name: 'Huisstijl' })).toHaveCount(0);
   await expectForbidden(page, '/admin/organisations/demo/branding');
 });

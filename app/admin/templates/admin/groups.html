@@ -1,0 +1,68 @@
+{#- The groups list (ADR 0047 §4): GET filter form, count, table with a link to each group's page; never an edit form. -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
+{% from "admin/_filters.html" import filter_select with context %}
+{% block title %}{{ _("admin.groups.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.groups.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.groups.lead") }}</p>
+  </div>
+  {% if can("group.create") %}
+  <div class="page-header__actions">
+    <a class="button" href="/admin/groups/new">{{ icon("plus") }}<span>{{ _("admin.new_group.title") }}</span></a>
+  </div>
+  {% endif %}
+</div>
+<form class="card" method="get" action="/admin/groups" aria-labelledby="filter-heading">
+  <h2 id="filter-heading" class="visually-hidden">{{ _("admin.groups.filter") }}</h2>
+  <div class="inline-forms">
+    <div class="field">
+      <label for="groups-query">{{ _("admin.groups.search") }}</label>
+      <input type="search" id="groups-query" name="q" maxlength="100"{% if filters.query %} aria-describedby="groups-query-active"{% endif %}>
+      {% if filters.query %}<p class="hint" id="groups-query-active">{{ _("admin.groups.search_active") }}</p>{% endif %}
+    </div>
+    {% if filters.organisations | length > 1 %}
+    {{ filter_select("groups-organisation", "org", _("admin.groups.organisation"), filters.organisations, filters.organisation) }}
+    {% endif %}
+    <button type="submit" class="button button--secondary">{{ icon("filter") }}<span>{{ _("admin.groups.apply") }}</span></button>
+    {% if filters.active %}<a href="/admin/groups">{{ _("admin.groups.clear") }}</a>{% endif %}
+  </div>
+</form>
+<section class="card" aria-labelledby="groups-heading">
+  <div class="card__header">
+    <h2 id="groups-heading">{{ _("admin.groups.count", count=rows | length) }}</h2>
+    {% if filters.active %}<p class="card__lead">{{ _("admin.groups.of_total", total=total) }}</p>{% endif %}
+  </div>
+  {% if rows %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.groups.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.field.name") }}</th>
+        <th scope="col">{{ _("admin.groups.organisation") }}</th>
+        <th scope="col">{{ _("admin.groups.duration") }}</th>
+        <th scope="col">{{ _("admin.groups.shortfalls") }}</th>
+        <th scope="col">{{ _("admin.groups.public_page") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <th scope="row"><a href="{{ row.href }}">{{ row.name }}</a></th>
+        <td>{% if row.organisation_href %}<a href="{{ row.organisation_href }}">{{ row.organisation_name }}</a>{% else %}{{ row.organisation_name }}{% endif %}</td>
+        <td>{{ _("admin.group.minutes", minutes=row.minutes) }}</td>
+        <td>{% if row.shortfall %}<a class="chip chip--danger" href="{{ row.shortfall.first_href }}">{{ icon("alert") }}{{ _("admin.shortfall.chip", count=row.shortfall.count) }}</a>{% else %}{{ _("admin.groups.no_shortfall") }}{% endif %}</td>
+        <td><a class="link-with-icon" href="{{ row.public_href }}">{{ icon("external") }}<span>{{ row.public_href }}</span></a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.groups.none") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

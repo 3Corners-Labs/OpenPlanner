@@ -298,7 +298,7 @@ async def test_the_superuser_sets_the_organisations_idp_value_on_its_page(site: 
     await site.login_as(SUPER)
     form = {"name": "Demo-gemeente", "default_locale": "nl"}
 
-    page = (await site.client.get("/admin/organisations/demo")).text
+    page = (await site.client.get("/admin/organisations/demo/edit")).text
     saved = await site.client.post(
         "/admin/organisations/demo", data={**form, "idp_key": "gem-demo"}, headers=SAME_ORIGIN
     )

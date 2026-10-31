@@ -32,7 +32,7 @@ from starlette.responses import HTMLResponse, Response
 from app.admin import forms
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import Field, FormData, moment_label
-from app.admin.pages import Locale, SameOrigin
+from app.admin.pages import Locale, SameOrigin, organisation_header
 from app.admin.pages import page as _page
 from app.domain.authorization import Permission
 from app.domain.channel_service import ChannelOverview, ChannelSettingsService
@@ -370,6 +370,13 @@ async def _form_page(
         context.principal,
         {
             "organisation": overview.organisation,
+            "org_header": organisation_header(
+                request,
+                locale,
+                context.principal,
+                overview.organisation.name,
+                overview.organisation.slug,
+            ),
             "email_fields": _smtp_fields(email, stored_email, _),
             "sms_fields": _sms_fields(sms, stored_sms, _),
             "email_status": _status(stored_email, locale, tz),

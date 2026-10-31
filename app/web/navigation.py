@@ -1,10 +1,10 @@
 """The navigation register of the admin portal: where every screen lives (ADR 0047).
 
 One declaration of the portal's structure: sections of the side navigation with their entries,
-the top bar, and object pages with their tabs. Every admin page route belongs to exactly one
-entry or tab, as its main path or as a sub-page (a detail or edit page). The side navigation,
-the object tabs and ``docs/admin-map.md`` (``python -m app.cli admin-map``) are rendered from
-it, and a test fails when an admin page has no home here.
+the top bar, and object pages with their tabs and sub-tabs. Every admin page route belongs to
+exactly one entry, tab or sub-tab, as its main path or as a sub-page (a detail or edit page).
+The side navigation, the object tabs and ``docs/admin-map.md`` (``python -m app.cli
+admin-map``) are rendered from it, and a test fails when an admin page has no home here.
 
 The register decides *where* a screen lives, never *who* may open it: visibility comes only
 from the authorisation matrix (ADR 0014), through each screen's permission.
@@ -47,7 +47,7 @@ class Width(StrEnum):
 
 @dataclass(frozen=True)
 class Screen:
-    """One side-navigation entry, top-bar link or tab.
+    """One side-navigation entry, top-bar link, tab or sub-tab.
 
     Attributes:
         key: Stable identifier, ``section.name`` for entries, ``object.name`` for tabs.
@@ -65,6 +65,8 @@ class Screen:
             that is read or filled in, so it keeps the standard width unless it is listed in
             ``wide_subpages``.
         wide_subpages: The sub-pages that are data views too (for example the week agenda).
+        subtabs: For a tab: related screens shown as a second row under it (ADR 0047 §3).
+            The tab's own page is the first item of that row.
     """
 
     key: str
@@ -77,6 +79,7 @@ class Screen:
     widget: str = ""
     width: Width = Width.STANDARD
     wide_subpages: tuple[str, ...] = ()
+    subtabs: tuple["Screen", ...] = ()
 
     @property
     def routes(self) -> tuple[str, ...]:
@@ -95,7 +98,7 @@ class Section:
 
 @dataclass(frozen=True)
 class ObjectPage:
-    """The pages of one object (a group, later an organisation), shown as tabs.
+    """The pages of one object (a group or an organisation), shown as tabs.
 
     Attributes:
         key: Stable identifier of the object kind.
@@ -114,10 +117,18 @@ class ObjectPage:
 
 @dataclass(frozen=True)
 class Home:
-    """Where a route lives: the side-navigation entry, the tab on an object page, the width."""
+    """Where a route lives: the side-navigation entry, the tab and sub-tab, and the width.
+
+    Attributes:
+        entry: Key of the side-navigation entry.
+        tab: Key of the tab, on an object page.
+        subtab: Key of the sub-tab, when the route lives in a tab's second row.
+        width: The page width of the route (ADR 0080).
+    """
 
     entry: str
     tab: str | None
+    subtab: str | None = None
     width: Width = Width.STANDARD
 
 
@@ -132,7 +143,6 @@ SECTIONS = (
                 "/admin/",
                 Permission.DASHBOARD_VIEW,
                 "dashboard",
-                ("/admin/groups/new",),
                 width=Width.WIDE,
             ),
             Screen(
@@ -156,68 +166,25 @@ SECTIONS = (
         "manage",
         "admin.nav.section.manage",
         (
+            # ADR 0047 §2 and step 5: the groups as a list; the group's pages live under it.
+            Screen(
+                "manage.groups",
+                "admin.nav.groups",
+                "/admin/groups",
+                Permission.GROUP_VIEW,
+                "users",
+                ("/admin/groups/new",),
+                width=Width.WIDE,
+            ),
+            # ADR 0047 step 3: the organisation as an object page; its tabs are in OBJECTS.
             Screen(
                 "manage.organisations",
                 "admin.nav.organisations",
                 "/admin/organisations",
-                Permission.ORGANISATION_MANAGE,
+                Permission.ORGANISATION_VIEW,
                 "organisation",
-                (
-                    "/admin/organisations/new",
-                    "/admin/organisations/{org}",
-                    "/admin/organisations/{org}/contacts",
-                ),
-            ),
-            Screen(
-                "manage.branding",
-                "admin.nav.branding",
-                "/admin/branding",
-                Permission.BRANDING_MANAGE,
-                "palette",
-                ("/admin/organisations/{org}/branding",),
-            ),
-            Screen(
-                "manage.embedding",
-                "admin.nav.embedding",
-                "/admin/embedding",
-                Permission.EMBEDDING_MANAGE,
-                "code",
-                ("/admin/organisations/{org}/embedding",),
-            ),
-            # ADR 0042 step 5: the class D settings of the own organisations.
-            Screen(
-                "manage.organisation_settings",
-                "admin.nav.organisation_settings",
-                "/admin/organisation-settings",
-                Permission.SETTINGS_ORGANISATION_MANAGE,
-                "sliders",
-                (
-                    "/admin/organisations/{org}/settings",
-                    # ADR 0074: the organisation's own wording of citizen pages and messages.
-                    "/admin/organisations/{org}/texts",
-                    "/admin/organisations/{org}/texts/{text_locale}",
-                ),
-            ),
-            Screen(
-                "manage.holidays",
-                "admin.nav.holidays",
-                "/admin/holidays",
-                Permission.HOLIDAYS_ASSIGN,
-                "holiday",
-                ("/admin/holidays/{calendar}", "/admin/organisations/{org}/holidays"),
-            ),
-            Screen(
-                "manage.closures",
-                "admin.nav.closures",
-                "/admin/closures",
-                Permission.ORGANISATION_CLOSURE,
-                "alert",
-                (
-                    "/admin/organisations/{org}/closure",
-                    "/admin/organisations/{org}/closure/scenarios",
-                    "/admin/organisations/{org}/closure/scenarios/{scenario_id}",
-                    "/admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts",
-                ),
+                ("/admin/organisations/new",),
+                width=Width.WIDE,
             ),
             Screen(
                 "manage.staff",
@@ -265,7 +232,6 @@ SECTIONS = (
                 "/admin/integrations",
                 Permission.INTEGRATIONS_MANAGE,
                 "settings",
-                ("/admin/organisations/{org}/channels",),
             ),
             Screen(
                 "platform.api",
@@ -274,6 +240,16 @@ SECTIONS = (
                 Permission.API_CLIENTS_MANAGE,
                 "key",
                 ("/admin/api/clients/new", "/admin/api/clients/{client_id}"),
+            ),
+            # ADR 0047 §4: the shared calendars stay under Platform; an organisation chooses
+            # its calendars on its own Holidays tab.
+            Screen(
+                "platform.holidays",
+                "admin.nav.holidays",
+                "/admin/holidays",
+                Permission.HOLIDAYS_MANAGE,
+                "holiday",
+                ("/admin/holidays/{calendar}",),
             ),
             Screen(
                 "platform.updates",
@@ -343,13 +319,97 @@ TOP_BAR = (
 """Links in the top bar before the profile: three shortcuts, then the manual."""
 
 _GROUP = "/admin/groups/{slug}"
+_ORGANISATION = "/admin/organisations/{org}"
 
 OBJECTS = (
+    ObjectPage(
+        "organisation",
+        "admin.nav.object.organisation",
+        _ORGANISATION,
+        "manage.organisations",
+        (
+            # The overview: the organisation's groups and profile. Its second row holds the
+            # organisation-wide settings of ADR 0042 step 5, ADR 0074 and ADR 0035.
+            Screen(
+                "organisation.overview",
+                "admin.tab.overview",
+                _ORGANISATION,
+                Permission.ORGANISATION_VIEW,
+                "dashboard",
+                (f"{_ORGANISATION}/edit",),
+                width=Width.WIDE,
+                subtabs=(
+                    Screen(
+                        "organisation.settings",
+                        "admin.tab.settings",
+                        f"{_ORGANISATION}/settings",
+                        Permission.SETTINGS_ORGANISATION_MANAGE,
+                        "sliders",
+                    ),
+                    Screen(
+                        "organisation.texts",
+                        "admin.tab.texts",
+                        f"{_ORGANISATION}/texts",
+                        Permission.TEXTS_ORGANISATION_MANAGE,
+                        "mail",
+                        (f"{_ORGANISATION}/texts/{{text_locale}}",),
+                    ),
+                    Screen(
+                        "organisation.embedding",
+                        "admin.tab.embedding",
+                        f"{_ORGANISATION}/embedding",
+                        Permission.EMBEDDING_MANAGE,
+                        "code",
+                    ),
+                ),
+            ),
+            Screen(
+                "organisation.branding",
+                "admin.tab.branding",
+                f"{_ORGANISATION}/branding",
+                Permission.BRANDING_MANAGE,
+                "palette",
+            ),
+            Screen(
+                "organisation.channels",
+                "admin.tab.channels",
+                f"{_ORGANISATION}/channels",
+                Permission.INTEGRATIONS_MANAGE,
+                "mail",
+            ),
+            Screen(
+                "organisation.contact",
+                "admin.tab.contact",
+                f"{_ORGANISATION}/contacts",
+                Permission.ORGANISATION_CLOSURE,
+                "people",
+            ),
+            Screen(
+                "organisation.holidays",
+                "admin.tab.holidays",
+                f"{_ORGANISATION}/holidays",
+                Permission.HOLIDAYS_ASSIGN,
+                "holiday",
+            ),
+            Screen(
+                "organisation.closure",
+                "admin.tab.closure",
+                f"{_ORGANISATION}/closure",
+                Permission.ORGANISATION_CLOSURE,
+                "alert",
+                (
+                    f"{_ORGANISATION}/closure/scenarios",
+                    f"{_ORGANISATION}/closure/scenarios/{{scenario_id}}",
+                    f"{_ORGANISATION}/closure/scenarios/{{scenario_id}}/contacts",
+                ),
+            ),
+        ),
+    ),
     ObjectPage(
         "group",
         "admin.nav.object.group",
         _GROUP,
-        "monitor.overview",
+        "manage.groups",
         (
             Screen(
                 "group.overview",
@@ -463,19 +523,31 @@ def screens() -> Iterator[tuple[str, Screen]]:
     for obj in OBJECTS:
         for tab in obj.tabs:
             yield obj.entry, tab
+            for subtab in tab.subtabs:
+                yield obj.entry, subtab
+
+
+def _home(entry: str, tab: str | None, subtab: str | None, screen: Screen, path: str) -> Home:
+    """Return the home of ``path`` of ``screen``; wide only for its own page or a listed one."""
+    wide = (path == screen.path and screen.width is Width.WIDE) or path in screen.wide_subpages
+    return Home(entry, tab, subtab, Width.WIDE if wide else Width.STANDARD)
 
 
 def _homes() -> dict[str, Home]:
     """Return the home of every route template the register names."""
     homes: dict[str, Home] = {}
-    tab_keys = {tab.key for obj in OBJECTS for tab in obj.tabs}
-    for entry, screen in screens():
-        tab = screen.key if screen.key in tab_keys else None
-        for path in screen.routes:
-            wide = (path == screen.path and screen.width is Width.WIDE) or (
-                path in screen.wide_subpages
-            )
-            homes[path] = Home(entry, tab, Width.WIDE if wide else Width.STANDARD)
+    for section in SECTIONS:
+        for entry in section.entries:
+            homes.update({path: _home(entry.key, None, None, entry, path) for path in entry.routes})
+    for link in TOP_BAR:
+        homes.update({path: _home(link.key, None, None, link, path) for path in link.routes})
+    for obj in OBJECTS:
+        for tab in obj.tabs:
+            homes.update({path: _home(obj.entry, tab.key, None, tab, path) for path in tab.routes})
+            for sub in tab.subtabs:
+                homes.update(
+                    {path: _home(obj.entry, tab.key, sub.key, sub, path) for path in sub.routes}
+                )
     return homes
 
 
@@ -493,19 +565,24 @@ def object_page(key: str) -> ObjectPage:
 
 
 def _rows(translator: Translator, locale: str, items: tuple[Screen, ...]) -> list[str]:
-    """Return Markdown table rows for ``items``."""
-    return [
-        f"| {translator.gettext(locale, s.label_key)} | `{s.path}` | `{s.permission.value}` | "
-        + ("–" if s.target else s.width.value)
-        + " | "
-        + (
-            f"shortcut to `{s.target}`"
-            if s.target
-            else ", ".join(f"`{p}`" for p in s.subpages) or "–"
-        )
-        + " |"
-        for s in items
-    ]
+    """Return Markdown table rows for ``items``, each tab followed by its sub-tabs."""
+    rows: list[str] = []
+    for s in items:
+        rows.append(_row(translator, locale, s, translator.gettext(locale, s.label_key)))
+        for sub in s.subtabs:
+            tab_name = translator.gettext(locale, s.label_key)
+            label = f"{tab_name} › {translator.gettext(locale, sub.label_key)}"
+            rows.append(_row(translator, locale, sub, label))
+    return rows
+
+
+def _row(translator: Translator, locale: str, s: Screen, label: str) -> str:
+    """Return one Markdown table row for ``s`` under ``label``, with its page width."""
+    homes = (
+        f"shortcut to `{s.target}`" if s.target else ", ".join(f"`{p}`" for p in s.subpages) or "–"
+    )
+    width = "–" if s.target else s.width.value
+    return f"| {label} | `{s.path}` | `{s.permission.value}` | {width} | {homes} |"
 
 
 def render_markdown(translator: Translator, locale: str = "en") -> str:
@@ -538,7 +615,7 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
             "",
             f"### {name} (`{obj.path}`)",
             "",
-            f"Side navigation: *{under}*.",
+            f"Side navigation: *{under}*. A row *Tab › Sub-tab* is a sub-tab of that tab.",
             "",
             *header,
             *_rows(translator, locale, obj.tabs),
