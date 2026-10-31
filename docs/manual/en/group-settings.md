@@ -227,12 +227,12 @@ meeting in Webex; this number stops one appointment from creating them without e
 Decides which Webex page the citizen gets when they go from our page to the call, for the
 appointment and for the trial call. **Straight into the browser** (the default) opens the Webex
 web app at once: on a computer the citizen has nothing to install and does not see the "app or
-browser" question. **Webex lets the participant choose** gives Webex's own page, with the choice
+browser" question. **Webex lets the citizen choose** gives Webex's own page, with the choice
 between the app and the browser; pick it if your citizens use the Webex app or your organisation
 prefers it. On a phone or tablet Webex asks for the Webex app in both cases: there is no web
 version there. The texts in the confirmation, on the call page and on the trial call page follow
 this choice. Webex can change this behaviour itself; if the citizen does see the choice between
-app and browser anyway, set it to **Webex lets the participant choose**.
+app and browser anyway, set it to **Webex lets the citizen choose**.
 
 <!-- field: offer -->
 ### Offer per block
