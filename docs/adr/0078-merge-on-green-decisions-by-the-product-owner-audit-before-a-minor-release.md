@@ -124,7 +124,7 @@ is a decision that needs the label.
 | 2 | `make release-audit` (Codex CLI over the diff since the last release) and the `## Release audit` check on a `vX.Y.0` tag in `main.yml`; runbook step | #177 | in PR |
 | 3 | The product owner adds `decision gate` to the required checks of `main` and the label `po:approved` exists; Claude Code enables auto-merge on the pull requests it opens from then on | | planned |
 | 4 | Issues per open *Build status* row on the merge of an ADR, and the weekly drift report (point 6) | | planned |
-| 5 | First minor release under this ADR (`v0.4.0`) with its audit section | | planned; prepared by ADR 0079 (#179): the `audit` job of `release.yml` runs the review and writes the section, the product owner sets the verdict |
+| 5 | First minor release under this ADR (`v0.4.0`) with its audit section | | planned; prepared by ADR 0079 (#183): the `audit` job of `release.yml` runs the review and writes the section, the product owner sets the verdict |
 
 ## Consequences
 
