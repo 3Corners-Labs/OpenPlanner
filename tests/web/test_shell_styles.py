@@ -85,3 +85,13 @@ def test_the_profile_summary_has_no_marker_or_chevron() -> None:
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_a_chosen_theme_sets_the_colour_scheme(theme: str) -> None:
     assert f"color-scheme: {theme}" in _rule(f'body.admin[data-theme="{theme}"]')
+
+
+def test_the_side_navigation_stays_in_view_under_the_top_bar() -> None:
+    """The menu is sticky with its own scroll (admin shell design, #209)."""
+    nav = _rule(".admin-nav")
+
+    assert "position: sticky" in nav
+    assert "top: 3.5rem" in nav
+    assert "height: calc(100vh - 3.5rem)" in nav
+    assert "overflow-y: auto" in nav
