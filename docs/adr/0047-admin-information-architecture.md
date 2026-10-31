@@ -285,9 +285,9 @@ The readiness checklist (§5) uses existing data and adds no thresholds.
 |---|---|---|---|
 | 1 | This ADR, review question 7 | #60 | merged |
 | 2 | Register and shell, `admin-map` | #62, #80 | merged |
-| 3 | Organisation page: six tabs, sub-tabs, `organisation.view`, the menu entries *Branding*, *Embedding*, *Organisation settings* and *Emergency closure* removed, 308 redirects of the old lists, *Holiday calendars* under Platform | this PR | built |
+| 3 | Organisation page: six tabs, sub-tabs, `organisation.view`, the menu entries *Branding*, *Embedding*, *Organisation settings* and *Emergency closure* removed, 308 redirects of the old lists, *Holiday calendars* under Platform | #219 | in PR #219 |
 | 4 | Group page: six tabs with sub-tabs, contact into *Messages*, the check into *Settings* | | planned (the group still has ten tabs) |
-| 5 | Lists: *Groups* with search and organisation filter, path *Groups › organisation › group* | this PR | built |
+| 5 | Lists: *Groups* with search and organisation filter, path *Groups › organisation › group* | #219 | in PR #219 |
 | 5 | Lists: readiness checklist, active closures as a filter, lists for API clients and the audit log | | planned |
 | 6 | ADR 0042 registry `topic` and the settings test | | planned |
 
