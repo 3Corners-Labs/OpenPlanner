@@ -129,9 +129,11 @@
   <div class="wrap">
     <h2 id="tour-title">{{ c.tour.title }}</h2>
     <p class="lead">{{ c.tour.lead }}</p>
+    {%- set a = c.tour.art %}
     <div class="tour" data-tour>
       <div class="tour__scene" role="img" aria-label="{{ c.tour.scene_label }}">
-        <div class="scene scene--book" data-scene="0">
+        {#- Participant track #}
+        <div class="scene" data-scene="book">
           <div class="mini">
             <div class="mini__bar"><i></i><i></i><i></i></div>
             <div class="mini__cal">
@@ -142,41 +144,115 @@
             <span class="cursor"></span>
           </div>
         </div>
-        <div class="scene scene--meeting" data-scene="1">
-          <div class="card card--webex">
-            <span class="card__dot"></span>
-            <b class="card__line card__line--w"></b>
-            <b class="card__line"></b>
-            <div class="card__pill"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Webex Meetings</div>
-            <div class="ics"><b></b><b></b>.ics</div>
+        <div class="scene" data-scene="direct">
+          <div class="mini mini--direct">
+            <div class="mini__bar"><i></i><i></i><i></i></div>
+            <b class="mini__line mini__line--w"></b><b class="mini__line"></b>
+            <div class="direct__btn"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg>{{ a.direct_btn }}</div>
+            <div class="direct__wait">{{ a.direct_wait }}</div>
+            <span class="cursor cursor--direct"></span>
           </div>
         </div>
-        <div class="scene scene--queue" data-scene="2">
+        <div class="scene" data-scene="mail">
+          <div class="mail">
+            <div class="mail__head"><span class="mail__dot"></span><b class="mail__from"></b></div>
+            <div class="mail__subject">{{ a.mail_subject }}</div>
+            <b class="mini__line mini__line--w"></b><b class="mini__line"></b><b class="mini__line mini__line--s"></b>
+            <div class="mail__row"><span class="mail__btn">{{ a.mail_btn }}</span><span class="ics ics--inline">.ics</span></div>
+          </div>
+        </div>
+        <div class="scene" data-scene="manage">
+          <div class="mini mini--manage">
+            <div class="mini__bar"><i></i><i></i><i></i></div>
+            <div class="manage__summary"><b class="mini__line mini__line--w"></b></div>
+            <div class="manage__btns"><span class="manage__btn manage__btn--primary">{{ a.manage_move }}</span><span class="manage__btn">{{ a.manage_cancel }}</span></div>
+            <div class="mini__times mini__times--manage"><b></b><b class="pick"></b><b></b><b></b></div>
+            <span class="cursor cursor--manage"></span>
+          </div>
+        </div>
+        <div class="scene" data-scene="trial">
+          <div class="trial">
+            <div class="trial__tile"><span class="trial__cam"></span><span class="trial__label">{{ a.trial_cam }}</span><span class="trial__ok"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span></div>
+            <div class="trial__tile"><span class="trial__mic"></span><span class="trial__label">{{ a.trial_mic }}</span><span class="trial__ok"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span></div>
+            <div class="card__pill trial__pill"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>{{ a.trial_ok }}</div>
+          </div>
+        </div>
+        <div class="scene" data-scene="join">
+          <div class="call call--join">
+            <div class="call__tile call__tile--wide"><span class="join__btn">{{ a.join_btn }}</span></div>
+            <div class="call__tile call__tile--p"><span class="avatar avatar--p"></span><span class="label">{{ a.lobby }}</span></div>
+            <div class="call__tile call__tile--agent"><span class="avatar"></span><span class="label">{{ a.cohost }}</span></div>
+          </div>
+        </div>
+        {#- Team and admin track #}
+        <div class="scene" data-scene="orgs">
+          <div class="portal">
+            <div class="portal__side"><i></i><i></i><i></i><i></i></div>
+            <div class="portal__main">
+              {%- for org in a.orgs %}
+              <div class="portal__row"><img src="{{ base }}static/brand/mark-mono.svg" alt="" width="14" height="14"><span>{{ org }}</span></div>
+              {%- endfor %}
+              <div class="portal__roles">{% for role in a.roles %}<span class="chip">{{ role }}</span>{% endfor %}</div>
+            </div>
+          </div>
+        </div>
+        <div class="scene" data-scene="groups">
+          <div class="groups">
+            {%- for g in a.groups %}
+            <div class="group"><span class="tag">{{ a.skill }}</span><strong>{{ g[0] }}</strong><span class="group__meta">{{ g[1] }}</span><b class="mini__line"></b></div>
+            {%- endfor %}
+          </div>
+        </div>
+        <div class="scene" data-scene="staffing">
+          <div class="week">
+            {%- for day in a.days %}
+            <div class="week__day"><span class="week__name">{{ day }}</span><b class="block block--{{ loop.index }}"></b><b class="block block--b{{ loop.index }}"></b></div>
+            {%- endfor %}
+          </div>
+        </div>
+        <div class="scene" data-scene="agenda">
+          <div class="agenda">
+            {%- for row in a.agenda %}
+            <div class="agenda__row agenda__row--{{ loop.index }}"><span class="agenda__time">{{ row[0] }}</span><b class="mini__line"></b><span class="pill pill--{{ loop.index }}">{{ row[1] }}</span></div>
+            {%- endfor %}
+          </div>
+        </div>
+        <div class="scene" data-scene="queue">
           <div class="queue">
+            <div class="queue__kinds"><span class="queue__kind is-on">{{ a.queue_cc }}</span><span class="queue__kind">{{ a.queue_own }}</span></div>
             <div class="queue__head">Webex Contact Center</div>
             <div class="queue__item"></div>
             <div class="queue__item"></div>
             <div class="queue__item queue__item--new"><span class="badge">T−5</span></div>
           </div>
         </div>
-        <div class="scene scene--agent" data-scene="3">
+        <div class="scene" data-scene="agent">
           <div class="call">
-            <div class="call__tile call__tile--agent"><span class="avatar"></span><span class="label">cohost</span></div>
+            <div class="call__tile call__tile--agent"><span class="avatar"></span><span class="label">{{ a.cohost }}</span></div>
             <div class="call__tile"><span class="avatar avatar--p"></span><span class="label">Sam</span></div>
             <div class="call__bar"><span class="purge"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>24 h</span></div>
           </div>
         </div>
       </div>
-      <ol class="tour__steps" data-tour-steps>
-        {%- for step in c.tour.steps %}
-        <li class="tour__step" data-tour-step="{{ loop.index0 }}">
-          <button type="button" class="tour__pick" aria-pressed="{{ 'true' if loop.first else 'false' }}" data-tour-go="{{ loop.index0 }}">
-            <span class="tour__num">{{ loop.index }}</span>
-            <span class="tour__text"><strong>{{ step.title }}</strong><span>{{ step.text }}</span></span>
-          </button>
-        </li>
+      <div class="tour__tracks" data-tour-steps>
+        {%- set n = namespace(i=0) %}
+        {%- for track in c.tour.tracks %}
+        <section class="tour__track" aria-labelledby="track-{{ track.key }}">
+          <h3 id="track-{{ track.key }}" class="tour__track-title">{{ track.title }}</h3>
+          <ol class="tour__steps">
+            {%- for step in track.steps %}
+            <li class="tour__step">
+              <button type="button" class="tour__pick" aria-pressed="{{ 'true' if n.i == 0 else 'false' }}" data-tour-go="{{ n.i }}">
+                <span class="tour__num">{{ loop.index }}</span>
+                <span class="tour__text"><strong>{{ step.title }}</strong><span>{{ step.text }}</span></span>
+              </button>
+            </li>
+            {%- set n.i = n.i + 1 %}
+            {%- endfor %}
+          </ol>
+        </section>
         {%- endfor %}
-      </ol>
+      </div>
       <div class="tour__controls">
         <button type="button" class="btn btn--small" data-tour-toggle aria-pressed="false" hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-pause" data-tour-icon/></svg><span data-tour-label>{{ c.tour.pause }}</span>
@@ -262,6 +338,38 @@
   </div>
 </section>
 
+<section class="section" id="standards" aria-labelledby="standards-title">
+  <div class="wrap">
+    <h2 id="standards-title">{{ c.standards.title }}</h2>
+    <p class="lead">{{ c.standards.lead }}</p>
+    <div class="table-scroll">
+      <table class="standards">
+        <thead><tr><th scope="col">{{ c.standards.col_standard }}</th><th scope="col">{{ c.standards.col_what }}</th><th scope="col">{{ c.standards.col_status }}</th><th scope="col">{{ c.standards.col_proof }}</th></tr></thead>
+        <tbody>
+          {%- for row in c.standards['items'] %}
+          <tr>
+            <th scope="row">{{ row.name }}</th>
+            <td>{{ row.what }}</td>
+            <td><span class="status status--{{ row.status }}"><span class="status__dot" aria-hidden="true"></span>{{ c.standards.status[row.status] }}</span></td>
+            <td><a href="{{ row.href }}">{{ row.link }}</a></td>
+          </tr>
+          {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="twocol">
+      <div>
+        <h3>{{ c.standards.code_title }}</h3>
+        <ul class="ticks">{% for line in c.standards.code %}<li>{{ line }}</li>{% endfor %}</ul>
+      </div>
+      <div>
+        <h3>{{ c.standards.update_title }}</h3>
+        <ul class="ticks">{% for line in c.standards['update'] %}<li>{{ line }}</li>{% endfor %}</ul>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="section" id="open-source" aria-labelledby="os-title">
   <div class="wrap">
     <h2 id="os-title">{{ c.opensource.title }}</h2>
@@ -276,6 +384,29 @@
       <a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/CONTRIBUTING.md">{{ c.opensource.cta_contribute }}</a>
       <a class="btn btn--ghost" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/SECURITY.md">{{ c.opensource.cta_security }}</a>
     </p>
+  </div>
+</section>
+
+<section class="section" id="roadmap" aria-labelledby="roadmap-title">
+  <div class="wrap">
+    <h2 id="roadmap-title">{{ c.roadmap.title }}</h2>
+    <p class="lead">{{ c.roadmap.lead }}</p>
+    {%- if roadmap %}
+    {%- set total = roadmap | sum(attribute='open_steps') %}
+    <p class="small">{{ c.roadmap.total.replace("{n}", total | string).replace("{m}", roadmap | length | string) }}</p>
+    <ul class="roadmap-list">
+      {%- for item in roadmap %}
+      <li>
+        <a class="roadmap-list__adr" href="{{ item.adr_url }}">ADR {{ item.number }}</a>
+        <span class="roadmap-list__title">{{ item.title }}</span>
+        <a class="roadmap-list__steps" href="{{ item.issues_url }}">{{ c.roadmap.step if item.open_steps == 1 else c.roadmap.steps.replace("{n}", item.open_steps | string) }}</a>
+      </li>
+      {%- endfor %}
+    </ul>
+    {%- else %}
+    <p class="notice">{{ c.roadmap.no_data }}</p>
+    {%- endif %}
+    <p class="actions"><a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen+label%3Aadr%3A">{{ c.roadmap.all }}</a></p>
   </div>
 </section>
 
@@ -312,7 +443,7 @@
       <a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/releases">{{ c.releases.all }}</a>
       <a class="btn btn--ghost" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md">{{ c.releases.install }}</a>
     </p>
-    {%- if commit %}<p class="small">{{ c.releases.built.replace("{commit}", commit[:12]) }}</p>{%- endif %}
+    <p class="small">{{ c.releases.fresh }}{% if commit %} {{ c.releases.built.replace("{commit}", commit[:12]) }}{% endif %}</p>
   </div>
 </section>
 
