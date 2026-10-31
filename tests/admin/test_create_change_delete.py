@@ -87,6 +87,11 @@ CREATABLES: dict[str, Creatable] = {
         change="/admin/api/clients/{client_id}",
         delete=Gap("ADR 0084 step 6: delete a disabled API client"),
     ),
+    # ADR 0083 step 2: an organisation's identity provider, changed and removed on its page.
+    "/admin/organisations/{org}/login": Creatable(
+        change="/admin/organisations/{org}/login/{idp_key}",
+        delete="/admin/organisations/{org}/login/{idp_key}/delete",
+    ),
     "/admin/organisations/{org}/closure/scenarios": Creatable(
         change="/admin/organisations/{org}/closure/scenarios/{scenario_id}",
         delete="/admin/organisations/{org}/closure/scenarios/{scenario_id}/delete",
