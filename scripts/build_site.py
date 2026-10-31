@@ -14,6 +14,7 @@ Run ``make site`` (output in ``site/dist/``), or::
 
 import argparse
 import json
+import re
 import shutil
 import sys
 from dataclasses import dataclass, field
@@ -26,6 +27,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 BRAND = ROOT / "app" / "web" / "static" / "brand"
+ADR_DIR = ROOT / "docs" / "adr"
 LOCALES = ("nl", "en")
 ORIGIN = "https://openplanner.nl"
 REPOSITORY = "https://github.com/3Corners-Labs/OpenPlanner"
@@ -73,10 +75,73 @@ def parse_releases(raw: list[dict[str, Any]]) -> Releases:
         and item.get("published_at")
         and str(item["html_url"]).startswith(REPOSITORY + "/releases/")
     ]
-    releases.sort(key=lambda r: r.date, reverse=True)
+    releases = list({r.tag: r for r in releases}.values())
+    releases.sort(key=lambda r: (r.date, r.tag), reverse=True)
     latest = next((r for r in releases if not r.prerelease), None)
     candidate = next((r for r in releases if r.prerelease), None)
     return Releases(latest=latest, candidate=candidate, recent=releases[:RECENT])
+
+
+@dataclass(frozen=True)
+class RoadmapItem:
+    """One decision with open build steps, from the issues labelled ``adr:NNNN`` (ADR 0078)."""
+
+    number: str
+    title: str
+    adr_url: str
+    issues_url: str
+    open_steps: int
+
+
+_ADR_LABEL = re.compile(r"^adr:(\d{4})$")
+
+
+def adr_titles(adr_dir: Path) -> dict[str, tuple[str, str]]:
+    """Map each ADR number to its title and file name, read from ``docs/adr/NNNN-*.md``."""
+    titles: dict[str, tuple[str, str]] = {}
+    for path in sorted(adr_dir.glob("[0-9][0-9][0-9][0-9]-*.md")):
+        first = path.read_text(encoding="utf-8").split("\n", 1)[0]
+        title = re.sub(r"^#\s*\d{4}\.\s*", "", first).strip()
+        titles[path.name[:4]] = (title, path.name)
+    return titles
+
+
+def parse_roadmap(raw: list[dict[str, Any]], adr_dir: Path) -> list[RoadmapItem]:
+    """Group the open ADR step issues by decision, newest decision first.
+
+    Args:
+        raw: The array ``GET /repos/{owner}/{repo}/issues?state=open`` returns. Pull requests
+            and issues without an ``adr:NNNN`` label (such as ``adr:drift``) are left out.
+        adr_dir: Where the ADR files are, for the titles.
+
+    Returns:
+        One item per decision with at least one open step.
+    """
+    counts: dict[str, int] = {}
+    for issue in raw:
+        if "pull_request" in issue or issue.get("state", "open") != "open":
+            continue
+        for label in issue.get("labels", []):
+            match = _ADR_LABEL.match(str(label.get("name", "")))
+            if match:
+                counts[match.group(1)] = counts.get(match.group(1), 0) + 1
+                break
+    titles = adr_titles(adr_dir)
+    items = []
+    for number in sorted(counts, reverse=True):
+        title, file = titles.get(number, (f"ADR {number}", ""))
+        items.append(
+            RoadmapItem(
+                number=number,
+                title=title,
+                adr_url=f"{REPOSITORY}/blob/main/docs/adr/{file}"
+                if file
+                else f"{REPOSITORY}/tree/main/docs/adr",
+                issues_url=f"{REPOSITORY}/issues?q=is%3Aissue+is%3Aopen+label%3Aadr%3A{number}",
+                open_steps=counts[number],
+            )
+        )
+    return items
 
 
 def load_content(locale: str) -> dict[str, Any]:
@@ -126,7 +191,11 @@ def structured_data(content: dict[str, Any], releases: Releases | None) -> list[
     return [software, faq]
 
 
-def llms_text(contents: dict[str, dict[str, Any]], releases: Releases | None) -> str:
+def llms_text(
+    contents: dict[str, dict[str, Any]],
+    releases: Releases | None,
+    roadmap: list[RoadmapItem] | None = None,
+) -> str:
     """``llms.txt``: the site in Markdown for AI tools, with the links that carry the facts.
 
     The format (llmstxt.org) is a title, a blockquote summary, sections of links. English
@@ -153,6 +222,21 @@ def llms_text(contents: dict[str, dict[str, Any]], releases: Releases | None) ->
     ]
     lines += ["", "## Enterprise", ""]
     lines += [f"- {item['title']}: {item['text']}" for item in en["enterprise"]["items"]]
+    status = en["standards"]["status"]
+    lines += ["", "## Standards", ""]
+    lines += [
+        f"- {item['name']} ({status[item['status']]}): {item['what']} "
+        f"[{item['link']}]({item['href']})"
+        for item in en["standards"]["items"]
+    ]
+    lines += ["", "## Automatic updates", ""]
+    lines += [f"- {line}" for line in en["standards"]["update"]]
+    if roadmap:
+        lines += ["", "## Roadmap (decided, not built yet)", ""]
+        lines += [
+            f"- ADR {item.number} {item.title}: {item.open_steps} open steps ({item.issues_url})"
+            for item in roadmap
+        ]
     if releases and releases.latest:
         lines += [
             "",
@@ -213,12 +297,18 @@ Sitemap: {ORIGIN}/sitemap.xml
 
 
 def build(
-    out: Path, releases: Releases | None, commit: str, tour_video: bool, base: str = "/"
+    out: Path,
+    releases: Releases | None,
+    commit: str,
+    tour_video: bool,
+    base: str = "/",
+    roadmap: list[RoadmapItem] | None = None,
 ) -> list[Path]:
     """Render every locale into ``out`` and copy the static files. Returns the files written.
 
     ``base`` is the root the assets are linked from: ``/`` on the web server; a relative
-    root for a preview served from a sub-path.
+    root for a preview served from a sub-path. ``releases`` and ``roadmap`` are ``None`` in a
+    local build without GitHub data; the page then links to GitHub instead.
     """
     env = Environment(
         loader=FileSystemLoader(SITE / "templates"),
@@ -246,6 +336,7 @@ def build(
             template.render(
                 c=content,
                 releases=releases,
+                roadmap=roadmap,
                 commit=commit,
                 base=page_base,
                 tour_video=tour_video,
@@ -258,7 +349,7 @@ def build(
     for name, text in (
         ("sitemap.xml", sitemap(built)),
         ("robots.txt", ROBOTS),
-        ("llms.txt", llms_text(contents, releases)),
+        ("llms.txt", llms_text(contents, releases, roadmap)),
     ):
         (out / name).write_text(text, encoding="utf-8")
         written.append(out / name)
@@ -266,11 +357,14 @@ def build(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command line: ``--out``, ``--releases`` (GitHub JSON), ``--commit``, ``--tour-video``."""
+    """Command line: ``--out``, ``--releases`` and ``--issues`` (GitHub JSON), ``--commit``."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=SITE / "dist")
     parser.add_argument(
         "--releases", type=Path, help="JSON from GET /repos/{owner}/{repo}/releases"
+    )
+    parser.add_argument(
+        "--issues", type=Path, help="JSON from GET /repos/{owner}/{repo}/issues?state=open"
     )
     parser.add_argument("--commit", default="", help="the commit the site is built from")
     parser.add_argument(
@@ -284,7 +378,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.releases:
         with args.releases.open(encoding="utf-8") as handle:
             releases = parse_releases(json.load(handle))
-    written = build(args.out, releases, args.commit, args.tour_video, args.base)
+    roadmap = None
+    if args.issues:
+        with args.issues.open(encoding="utf-8") as handle:
+            roadmap = parse_roadmap(json.load(handle), ADR_DIR)
+    written = build(args.out, releases, args.commit, args.tour_video, args.base, roadmap)
     sys.stdout.write(f"built {len(written)} files into {args.out}\n")
     return 0
 

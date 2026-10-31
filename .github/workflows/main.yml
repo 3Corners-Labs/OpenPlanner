@@ -193,16 +193,20 @@ jobs:
   # are set, so a fork or a pull request never deploys.
   site:
     name: public website (build, attach, deploy)
-    # On a tag it waits for `publish`, whose first step refuses a tag that is not on main or
-    # that was made by hand (ADR 0052, ADR 0059): such a tag then deploys nothing. On a merge
-    # to main `publish` is skipped and the site goes out on its own.
-    needs: [publish]
-    if: ${{ !cancelled() && (github.ref_type == 'branch' || needs.publish.result == 'success') }}
+    # On a merge to main it waits for `candidate`, so the release candidate that merge made is
+    # on the page. On a tag it waits for `publish`, whose first step refuses a tag that is not
+    # on main or that was made by hand (ADR 0052, ADR 0059): such a tag then deploys nothing.
+    needs: [candidate, publish]
+    if: >-
+      ${{ !cancelled() && (
+        (github.ref_type == 'branch' && needs.candidate.result == 'success') ||
+        (github.ref_type == 'tag' && needs.publish.result == 'success')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: website
     permissions:
       contents: write   # the site tarball on the release
+      issues: read      # the roadmap
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -210,15 +214,23 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
       - run: uv sync --locked
-      - name: the releases, for the page
+      # The newest hundred releases are mostly candidates; the latest stable release is asked
+      # for on its own so it is on the page however many candidates came after it. The open
+      # issues labelled adr:NNNN are the roadmap (ADR 0078).
+      - name: the releases and the roadmap, for the page
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api "repos/$GITHUB_REPOSITORY/releases?per_page=20" > "$RUNNER_TEMP/releases.json"
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/all.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > "$RUNNER_TEMP/latest.json" || echo '{}' > "$RUNNER_TEMP/latest.json"
+          jq -s '.[0] + (if .[1].tag_name then [.[1]] else [] end)' "$RUNNER_TEMP/all.json" "$RUNNER_TEMP/latest.json" > "$RUNNER_TEMP/releases.json"
+          gh api "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" --paginate --slurp | jq 'add' > "$RUNNER_TEMP/issues.json"
       - name: build
         run: |
           video=""
           [ -f site/static/media/tour.webm ] && video="--tour-video"
-          uv run python -m scripts.build_site --out site/dist --releases "$RUNNER_TEMP/releases.json" --commit "$GITHUB_SHA" $video
+          uv run python -m scripts.build_site --out site/dist --releases "$RUNNER_TEMP/releases.json" \
+            --issues "$RUNNER_TEMP/issues.json" --commit "$GITHUB_SHA" $video
           tar -C site/dist -czf "site-${GITHUB_REF_NAME#v}.tar.gz" .
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:

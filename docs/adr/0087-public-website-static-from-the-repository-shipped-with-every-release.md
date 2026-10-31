@@ -40,9 +40,11 @@ already has a design language (ADR 0060 mark, ADR 0020 tokens, NL Design System 
    external `src`, on `document.cookie` or on web storage in the site's script. The server
    keeps its own access log; that is the host's concern, not the site's.
 4. **Release data is baked at build time, never fetched by the visitor's browser.** The
-   workflow reads the releases with `gh api` and hands the JSON to the build; the site shows
-   the latest release, the latest release candidate and the last five entries with their
-   dates and links to GitHub. A call to `api.github.com` from the visitor's browser would hand
+   workflow reads the newest hundred releases and, separately, `releases/latest` (so the last
+   stable release is found however many candidates came after it) with `gh api` and hands the
+   JSON to the build; the site shows the latest release, the latest release candidate and the
+   last five entries with their dates and links to GitHub. On a merge to `main` the job waits
+   for the candidate job, so the candidate that merge made is on the page. A call to `api.github.com` from the visitor's browser would hand
    their IP address to GitHub, which point 3 forbids. Without release data (a local build) the
    section links to the releases page.
 5. **The release train publishes it.** `main.yml` gets a job `site`: on every merge to `main`
@@ -62,7 +64,7 @@ already has a design language (ADR 0060 mark, ADR 0020 tokens, NL Design System 
    Webex meeting is made, the work item lands in the contact center queue, the agent joins.
    Step 3 adds a recorded walkthrough of the real interface: the Playwright lane records the
    booking flow and the admin agenda against the seeded demo at release time and the site job
-   embeds it as `tour.webm` with a poster image and captions (`<track kind="captions">`). Both
+   embeds it as `tour.webm` with a poster image and captions, covering the participant's flow, the admin portal and the agent's queue, (`<track kind="captions">`). Both
    never autoplay when `prefers-reduced-motion: reduce` is set, have a visible play and pause
    control, and the static poster is always the fallback (WCAG 2.2.2, 2.3.1).
 8. **The integrations are named, with Webex Meetings as the heart.** The site has an
@@ -74,7 +76,17 @@ already has a design language (ADR 0060 mark, ADR 0020 tokens, NL Design System 
    and the machine API for contact-center bots (ADR 0023). Every claim links to the ADR or the
    document that backs it; the site states what is built, not what is planned, unless marked
    "on the roadmap" (the Build status tables are the source).
-9. **Same bar as the product.** The site is checked for keyboard operation, `axe-core` with
+9. **The roadmap is the open ADR steps on GitHub.** Every open row of a *Build status* table
+   is an issue labelled `adr:NNNN` (ADR 0078). The build groups the open issues by decision,
+   takes each title from `docs/adr/`, and links to the decision and to its open issues. No
+   hand-written roadmap: closing an issue by merging the step takes it off the site at the
+   next build.
+10. **A standard is named only with its evidence and its state.** The section *Quality and
+    standards* lists each standard with what it means, a state (`tested in CI`, `built in`,
+    `partly`, `planned`) and a link into the repository. What is not done says so: the manual
+    screen-reader audit, the penetration test, `publiccode.yml`, the TLS check of ADR 0086.
+    A test fails when a repository link on the site points at a file that does not exist.
+11. **Same bar as the product.** The site is checked for keyboard operation, `axe-core` with
    zero violations and Lighthouse accessibility ≥ 95 in both locales, added to the Playwright
    lane as step 2; `e2e/pages.json` gains the site's pages served from `site/dist/` by a static
    server. Until then the structural test of point 2 guards `lang`, `alt`, headings, labels
@@ -97,7 +109,7 @@ accessibility targets of point 9.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #271 | in PR |
-| 1 | `site/` (content nl/en, templates, stylesheet, script, animated tour, interactive demo, integrations), `scripts/build_site.py`, `make site`, structural test, the `site` job with artifact and rsync deploy | #271 | in PR |
+| 1 | `site/` (content nl/en, templates, stylesheet, script, animated tour in two tracks of six scenes, interactive demo, integrations, standards, roadmap from the ADR issues), `scripts/build_site.py`, `make site`, structural test, the `site` job with artifact and rsync deploy | #271 | in PR |
 | 2 | The site's pages in the Playwright lane (keyboard, axe, Lighthouse) | | planned |
 | 3 | Recorded walkthrough of the real interface at release time (`tour.webm`, poster, captions) | | planned |
 | 4 | TransIP: deploy key, environment `website`, DNS for `openplanner.nl` and `www`, HTTPS and the response headers (HSTS, CSP, Referrer-Policy) on the web server (host work) | | planned |

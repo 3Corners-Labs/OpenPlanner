@@ -9,12 +9,14 @@ import pytest
 
 from scripts.build_site import (
     LOCALES,
+    ROOT,
     SITE,
     Releases,
     build,
     llms_text,
     load_content,
     parse_releases,
+    parse_roadmap,
 )
 
 RAW_RELEASES = [
@@ -206,3 +208,77 @@ def test_content_files_are_valid_json_with_trailing_newline() -> None:
         text = (SITE / "content" / f"{locale}.json").read_text(encoding="utf-8")
         json.loads(text)
         assert text.endswith("}\n")
+
+
+def test_the_latest_stable_release_is_found_behind_a_hundred_candidates() -> None:
+    url = "https://github.com/3Corners-Labs/OpenPlanner/releases/tag/"
+    candidates = [
+        {
+            "tag_name": f"v0.4.0-rc.{n}",
+            "published_at": f"2026-10-31T{n % 24:02d}:00:00Z",
+            "html_url": url + f"v0.4.0-rc.{n}",
+            "prerelease": True,
+        }
+        for n in range(100)
+    ]
+    latest = {
+        "tag_name": "v0.3.0",
+        "published_at": "2026-10-30T11:19:10Z",
+        "html_url": url + "v0.3.0",
+        "prerelease": False,
+    }
+    # The workflow appends releases/latest; a duplicate of a listed release counts once.
+    releases = parse_releases([*candidates, latest, latest])
+    assert releases.latest is not None
+    assert releases.latest.tag == "v0.3.0"
+    assert sum(r.tag == "v0.3.0" for r in releases.recent) <= 1
+
+
+def test_roadmap_groups_open_adr_steps_and_skips_the_rest(tmp_path: Path) -> None:
+    (tmp_path / "0085-log-destinations.md").write_text(
+        "# 0085. Log destinations in the portal\n\nbody"
+    )
+    issue = "https://github.com/3Corners-Labs/OpenPlanner/issues/"
+    raw = [
+        {"number": 1, "html_url": issue + "1", "labels": [{"name": "adr:0085"}], "state": "open"},
+        {"number": 2, "html_url": issue + "2", "labels": [{"name": "adr:0085"}], "state": "open"},
+        {"number": 3, "html_url": issue + "3", "labels": [{"name": "adr:0090"}], "state": "open"},
+        {"number": 4, "html_url": issue + "4", "labels": [{"name": "adr:drift"}], "state": "open"},
+        {"number": 5, "html_url": issue + "5", "labels": [{"name": "bug"}], "state": "open"},
+        {
+            "number": 6,
+            "html_url": issue + "6",
+            "labels": [{"name": "adr:0085"}],
+            "pull_request": {},
+        },
+    ]
+    roadmap = parse_roadmap(raw, tmp_path)
+    assert [(item.number, item.open_steps) for item in roadmap] == [("0090", 1), ("0085", 2)]
+    assert roadmap[1].title == "Log destinations in the portal"
+    assert roadmap[1].adr_url.endswith("/docs/adr/0085-log-destinations.md")
+    assert roadmap[0].title == "ADR 0090"
+    assert "label%3Aadr%3A0085" in roadmap[1].issues_url
+
+
+def test_roadmap_is_on_the_page_and_in_llms_txt(tmp_path: Path) -> None:
+    (tmp_path / "adr").mkdir()
+    (tmp_path / "adr" / "0085-x.md").write_text("# 0085. Log destinations\n")
+    roadmap = parse_roadmap([{"labels": [{"name": "adr:0085"}], "state": "open"}], tmp_path / "adr")
+    out = tmp_path / "out"
+    build(out, None, "", tour_video=False, roadmap=roadmap)
+    assert "Log destinations" in (out / "index.html").read_text(encoding="utf-8")
+    assert "ADR 0085 Log destinations: 1 open steps" in (out / "llms.txt").read_text()
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_every_repository_link_on_the_site_exists(locale: str) -> None:
+    text = json.dumps(load_content(locale))
+    paths = set(re.findall(r"OpenPlanner/(?:blob|tree)/main/([^\"#?]+)", text))
+    missing = sorted(path for path in paths if not (ROOT / path).exists())
+    assert missing == []
+
+
+def test_every_standard_has_a_known_status() -> None:
+    for locale in LOCALES:
+        standards = load_content(locale)["standards"]
+        assert {item["status"] for item in standards["items"]} <= set(standards["status"])
