@@ -12,7 +12,7 @@ SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "deploy-site.sh"
 
 
 def _deploy(
-    dist: Path, env: dict[str, str], label: str = "v1 abc"
+    dist: Path | str, env: dict[str, str], label: str = "v1 abc", cwd: Path | None = None
 ) -> subprocess.CompletedProcess[str]:
     base = {k: v for k, v in os.environ.items() if not k.startswith("SITE_DEPLOY_")}
     return subprocess.run(  # noqa: S603 - fixed argv, no shell
@@ -21,6 +21,7 @@ def _deploy(
         capture_output=True,
         text=True,
         check=False,
+        cwd=cwd,
     )
 
 
@@ -107,3 +108,9 @@ def test_an_empty_build_is_never_pushed(tmp_path: Path, remote: Path) -> None:
     result = _deploy(tmp_path / "empty", _env(remote))
     assert result.returncode == 1
     assert "index.html missing" in result.stdout
+
+
+def test_a_relative_build_path_works(git: Git, dist: Path, remote: Path) -> None:
+    result = _deploy("dist", _env(remote), cwd=dist.parent)
+    assert result.returncode == 0, result.stderr
+    assert "index.html" in _files(git, remote)

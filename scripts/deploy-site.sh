@@ -37,6 +37,7 @@ case "$subdir" in
   *..*|/*) echo "::error::SITE_DEPLOY_DIR must be a relative folder without '..' (got '$subdir')"; exit 1 ;;
 esac
 [ -f "$dist/index.html" ] || { echo "::error::$dist/index.html missing, nothing to deploy"; exit 1; }
+dist="$(cd "$dist" && pwd)"   # the script changes directory below
 
 autogit="$(cd "$(dirname "$0")/.." && pwd)/site/deploy/autogit.yml"
 work="$(mktemp -d)"
