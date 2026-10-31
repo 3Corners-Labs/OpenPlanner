@@ -1,6 +1,6 @@
 # 0084. Everything an admin creates can be changed and deleted
 
-Status: proposed (2026-10-31), requested by the product owner. Extends ADR 0014 (one
+Status: accepted (2026-10-31, product owner), step 1 in PR, steps 2–7 not built. Requested by the product owner. Extends ADR 0014 (one
 authorisation matrix), ADR 0024 (emergency closure), ADR 0047 (admin structure) and ADR 0025
 (holiday calendars).
 
@@ -128,7 +128,7 @@ groups exist (data integrity, not a threshold).
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #262 | in PR |
-| 1 | Permissions `organisation.delete` and `group.delete` in the matrix, docs and sweep; the guard test of point 8 with today's gaps on its exception list | | planned |
+| 1 | Permissions `organisation.delete` and `group.delete` in the matrix, docs and sweep; the guard test of point 8 with today's gaps on its exception list | #264 | in PR |
 | 2 | Group archive: migration `archived_at`, domain rule, route, confirmation page, 404 on `/g/{slug}`, lists and navigation, audit events, manual topic (nl/en) | | planned |
 | 3 | Group erase in the nightly sweep, setting `group_erase_after_days`, threat model and data flow updated | | planned |
 | 4 | Organisation delete: domain rule, route, confirmation page, cascades checked up and down in the migration test, manual topic | | planned |
