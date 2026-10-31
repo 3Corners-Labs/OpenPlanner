@@ -13,6 +13,7 @@ from app.domain.authorization import (
     EVERY_ADMIN,
     MATRIX,
     CustomRole,
+    Grant,
     Permission,
     Principal,
     Role,
@@ -37,10 +38,11 @@ from app.domain.roles import (
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.domain import NOW
+from tests.support.principals import principal
 
 NOBODY: frozenset[str] = frozenset()
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), NOBODY, NOBODY)
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), NOBODY)
+SUPER = principal("s-1", "S", frozenset({Role.SUPERUSER}), NOBODY, NOBODY)
+ORG_ADMIN = principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), NOBODY)
 RESERVED = ("openplanner-superuser", "openplanner-org-admin")
 
 
@@ -241,14 +243,7 @@ async def test_a_change_takes_effect_on_the_next_request_and_delete_leaves_no_ro
     service: RoleService, uow: InMemoryUnitOfWork
 ) -> None:
     role = await service.create(SUPER, draft())
-    session = Principal(
-        "t-1",
-        "T",
-        frozenset(),
-        NOBODY,
-        frozenset({"demo"}),
-        role_claims=frozenset({"openplanner-teamlead"}),
-    )
+    session = Principal("t-1", "T", frozenset({Grant(role.key, "demo", "demo")}))
     own_group = Target.for_group("demo", "demo")
 
     assert decide(await service.attach(session), Permission.GROUP_EDIT, own_group).allowed

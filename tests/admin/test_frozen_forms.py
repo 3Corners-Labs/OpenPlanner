@@ -78,6 +78,7 @@ async def test_an_organisation_admin_sees_every_change_disabled(site: Site) -> N
     assert dict(forms(page)) == {
         "/admin/logout": False,
         "/admin/groups/demo/settings": True,
+        "/admin/groups/demo/settings/idp-key": True,
         "/admin/groups/demo/check": True,
     }
 

@@ -46,6 +46,7 @@ from app.admin import (
     group_routes,
     help_routes,
     holiday_routes,
+    idp_mapping_routes,
     maintenance_routes,
     message_routes,
     organisation_routes,
@@ -72,10 +73,12 @@ from app.admin.authz import (
     RequirePermission,
     admin_service,
     load_principal,
+    login_service,
     role_service,
     session_principal,
 )
 from app.admin.forms import safe_next
+from app.admin.idp_mapping_routes import reason_label
 from app.admin.integration_views import check_view
 from app.admin.pages import Locale, SameOrigin, admin_moment, role_labels, scope_text, templates
 from app.admin.pages import message as _message
@@ -100,7 +103,13 @@ from app.domain.authorization import (
     permissions_for,
     role_keys,
 )
+from app.domain.entitlements import LoginClaims
 from app.domain.errors import DomainError
+from app.domain.login_service import (
+    AMBIGUOUS_CLAIMS,
+    TOO_MANY_ENTITLEMENTS,
+    LoginRefusedError,
+)
 from app.domain.ports import Clock, IdentityError, IdentityProvider
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.settings_service import SettingsService
@@ -120,6 +129,12 @@ from app.web.templates import render
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 log = structlog.get_logger()
+
+LOGIN_REFUSED_TEXTS: dict[str, str] = {
+    AMBIGUOUS_CLAIMS: "admin.login_refused.ambiguous_claims",
+    TOO_MANY_ENTITLEMENTS: "admin.login_refused.too_many_entitlements",
+}
+"""What the error page says per refusal reason of the login service (ADR 0049)."""
 
 PUBLIC_ADMIN_PATHS = frozenset(
     {"/admin/login", "/admin/callback", "/admin/logout", "/admin/logged-out"}
@@ -175,7 +190,6 @@ async def callback(
 ) -> Response:
     """Complete the login: check state, verify the token, start a fresh session."""
     provider = _identity_provider(request)
-    service = admin_service(request)
     pending = pop_login_start(request)
     trial = pop_login_trial(
         request,
@@ -191,17 +205,17 @@ async def callback(
     ):
         await report(request, LOGIN_EVENT, "invalid_state", actor=ANONYMOUS)
         return _message(request, locale, 400, "admin.login_failed.title", "admin.login_failed.text")
-    tried: Principal | None = None
+    tried: LoginClaims | None = None
     try:
         if trial is None:
-            principal = await provider.finish_login(
+            claims = await provider.finish_login(
                 code=code,
                 redirect_uri=_callback_url(request),
                 code_verifier=pending["verifier"],
                 nonce=pending["nonce"],
             )
         else:
-            principal, tried = await provider.finish_trial_login(
+            claims, tried = await provider.finish_trial_login(
                 code=code,
                 redirect_uri=_callback_url(request),
                 code_verifier=pending["verifier"],
@@ -211,12 +225,21 @@ async def callback(
     except IdentityError as error:
         await report(request, LOGIN_EVENT, error.code, actor=ANONYMOUS)
         return _message(request, locale, 401, "admin.login_failed.title", "admin.login_failed.text")
-    principal = await role_service(request).attach(principal)
-    start_session(request, principal, _clock(request).now())
-    await service.record_login(principal)
+    logins = login_service(request)
+    try:
+        outcome = await logins.complete_login(claims)
+    except LoginRefusedError as refused:
+        # ADR 0049 points 6 and 14: audited by the service; the page names the reason.
+        await report(request, LOGIN_EVENT, refused.reason, actor=claims.subject)
+        text = LOGIN_REFUSED_TEXTS.get(refused.reason, "admin.login_failed.text")
+        return _message(request, locale, 403, "admin.login_failed.title", text)
+    principal = outcome.principal
+    start_session(request, outcome.session_claims, _clock(request).now())
     log.info("admin.login", actor=principal.subject, roles=role_keys(principal))
     if trial is not None and tried is not None:
-        return await _finish_login_trial(request, principal, trial, tried)
+        prefix = trial[1].get("oidc_entitlement_prefix", "")
+        tried_principal = (await logins.preview(tried, prefix)).principal
+        return await _finish_login_trial(request, principal, trial, tried_principal)
     return RedirectResponse(safe_next(pending.get("next")), status_code=303)
 
 
@@ -271,7 +294,7 @@ async def rights(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.RIGHTS_VIEW))],
 ) -> HTMLResponse:
-    """Show the admin's own permissions and where they apply."""
+    """Show the admin's own grants, permissions and where they apply, and refused values."""
     _ = locale.gettext
     principal = context.principal
     rows = [
@@ -279,7 +302,18 @@ async def rights(
         for permission, scope in permissions_for(principal)
     ]
     roles = role_labels(principal, locale)
-    return _page(request, locale, "admin/rights.html", principal, {"rights": rows, "roles": roles})
+    grants = sorted(g.key for g in principal.grants)
+    refused = [
+        (r.value, reason_label(r.reason, locale), admin_moment(request, locale, r.received_at))
+        for r in await admin_service(request).own_refusals(principal)
+    ]
+    return _page(
+        request,
+        locale,
+        "admin/rights.html",
+        principal,
+        {"rights": rows, "roles": roles, "grants": grants, "refused": refused},
+    )
 
 
 @dataclass(frozen=True)
@@ -478,9 +512,10 @@ def register_admin(app: FastAPI) -> None:
         locale = resolve_locale(request)
         principal = session_principal(request)
         if principal is not None and not permissions_for(principal):
-            return _message(
-                request, locale, 403, "admin.forbidden.title", "admin.no_role.text", back_link=False
-            )
+            # ADR 0049 point 8: values were sent but none recognised; name no value.
+            refused = await admin_service(request).own_refusals(principal)
+            text = "admin.rights_not_recognised.text" if refused else "admin.no_role.text"
+            return _message(request, locale, 403, "admin.forbidden.title", text, back_link=False)
         return _message(request, locale, 403, "admin.forbidden.title", "admin.forbidden.text")
 
     async def maintenance_refused(request: Request, exc: Exception) -> Response:
@@ -529,6 +564,7 @@ def register_admin(app: FastAPI) -> None:
         check_routes.router,
         branding_routes.router,
         holiday_routes.router,
+        idp_mapping_routes.router,
         channel_routes.router,
         message_routes.router,
         organisation_routes.router,

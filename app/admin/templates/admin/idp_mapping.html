@@ -1,0 +1,83 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.idp_mapping.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("admin.idp_mapping.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.idp_mapping.intro", claim=settings.claim) }}</p>
+  </div>
+  <div class="page-header__actions">
+    <a class="button button--ghost" href="/admin/idp-mapping/export.txt">{{ _("admin.idp_mapping.export") }}</a>
+  </div>
+</div>
+<section class="card" aria-labelledby="mapping-settings-heading">
+  <h2 id="mapping-settings-heading">{{ _("admin.idp_mapping.settings") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("admin.idp_mapping.mode") }}</dt><dd>{{ mode_label }}</dd></div>
+    <div><dt>{{ _("admin.idp_mapping.claim") }}</dt><dd><code>{{ settings.claim }}</code></dd></div>
+    <div><dt>{{ _("admin.idp_mapping.prefix") }}</dt><dd><code>{{ settings.prefix }}</code></dd></div>
+    {% if superuser_value %}
+    <div><dt>{{ _("admin.idp_mapping.superuser") }}</dt><dd><code>{{ superuser_value }}</code></dd></div>
+    {% endif %}
+  </dl>
+</section>
+{% for organisation in organisations %}
+<section class="card" aria-labelledby="org-{{ organisation.slug }}-heading">
+  <h2 id="org-{{ organisation.slug }}-heading">{{ organisation.name }} <span class="muted">({{ organisation.slug }})</span></h2>
+  <p>{{ _("admin.idp_mapping.idp_key") }}: <code>{{ organisation.idp_key }}</code></p>
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.idp_mapping.values_of", name=organisation.name) }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.idp_mapping.role") }}</th>
+        <th scope="col">{{ _("admin.idp_mapping.value") }}</th>
+        <th scope="col">{{ _("admin.idp_mapping.holders") }}</th>
+        <th scope="col">{{ _("admin.idp_mapping.last_login") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in organisation.lines %}
+      <tr><td>{{ line.role }}</td><td><code>{{ line.value }}</code></td><td>{{ line.holders }}</td><td class="nowrap">{{ line.last_login }}</td></tr>
+      {% endfor %}
+      {% for group in organisation.groups %}
+      <tr><th scope="row" colspan="4">{{ _("admin.idp_mapping.group") }} {{ group.name }} <span class="muted">({{ group.slug }})</span> · {{ _("admin.idp_mapping.idp_key") }}: <code>{{ group.idp_key }}</code></th></tr>
+      {% for line in group.lines %}
+      <tr><td>{{ line.role }}</td><td><code>{{ line.value }}</code></td><td>{{ line.holders }}</td><td class="nowrap">{{ line.last_login }}</td></tr>
+      {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% else %}
+<p class="empty-state">{{ _("admin.idp_mapping.organisations_empty") }}</p>
+{% endfor %}
+<section class="card" aria-labelledby="refused-heading">
+  <h2 id="refused-heading">{{ _("admin.idp_mapping.refused_title") }}</h2>
+  <p class="muted">{{ _("admin.idp_mapping.refused_intro", days=settings.window_days) }}</p>
+  {% if refused %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.idp_mapping.refused_title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.idp_mapping.value") }}</th>
+        <th scope="col">{{ _("admin.idp_mapping.reason") }}</th>
+        <th scope="col">{{ _("admin.idp_mapping.organisation") }}</th>
+        <th scope="col">{{ _("admin.idp_mapping.people") }}</th>
+        <th scope="col">{{ _("admin.idp_mapping.received") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in refused %}
+      <tr><td><code>{{ r.value }}</code></td><td>{{ r.reason }}</td><td>{{ r.organisation }}</td><td>{{ r.people }}</td><td class="nowrap">{{ r.received }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.idp_mapping.refused_empty") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

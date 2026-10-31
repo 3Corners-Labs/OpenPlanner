@@ -36,7 +36,7 @@
       {{ error_text("claim_value") }}
     </div>
   </div>
-  <div class="alert alert--info"><p>{{ _("admin.roles.claim_notice") }}</p></div>
+  <div class="alert alert--info"><p>{{ _("admin.roles.claim_notice") }}</p><p>{{ _("admin.roles.entitlement_notice") }}</p></div>
   <fieldset class="field choice{% if error_for('permissions') %} field--error{% endif %}" id="permissions" aria-describedby="{{ described('permissions') }}">
     <legend>{{ _("admin.roles.permissions") }}</legend>
     <p class="hint" id="permissions-hint">{% if read_only %}{{ _("admin.roles.permissions_hint_read_only") }}{% else %}{{ _("admin.roles.permissions_hint") }}{% endif %}</p>

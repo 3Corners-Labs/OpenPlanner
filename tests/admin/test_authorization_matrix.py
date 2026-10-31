@@ -179,6 +179,17 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
     "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403, 403)},
+    # ADR 0049 point 17: the mapping page is an input for the access review (organisation
+    # level): the superuser, org admins and the auditor; never a group admin or an agent.
+    "GET /admin/idp-mapping": {"/admin/idp-mapping": statuses(200, 200, 403, 200, 200, 403, 403)},
+    "GET /admin/idp-mapping/export.txt": {
+        "/admin/idp-mapping/export.txt": statuses(200, 200, 403, 200, 200, 403, 403)
+    },
+    # ADR 0049 point 4: a group's IdP value, by the org admin of its organisation (an empty
+    # value is outside the grammar, 422); a group admin may not change their own group's.
+    "POST /admin/groups/{slug}/settings/idp-key": {
+        "/admin/groups/demo/settings/idp-key": statuses(422, 422, 403, 403, 403, 403, 403),
+    },
     "GET /admin/staff/{member_id}": {
         "/admin/staff/999": statuses(404, 404, 404, 404, 404, 403, 403)
     },

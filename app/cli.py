@@ -77,6 +77,7 @@ from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.diagnostics import CheckResult, format_report, passed, probes, run_checks
 from app.adapters.integrations import build_integrations, secret_box
+from app.adapters.oidc import claim_mapping, login_claims
 from app.adapters.oidc_check import OidcTarget, check_oidc
 from app.adapters.registrations import (
     Expected,
@@ -101,14 +102,15 @@ from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks,
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.config import Settings, environment
 from app.domain.admin import AdminService
-from app.domain.authorization import Principal, Role, Scope
+from app.domain.authorization import Grant, Principal, Role, RoleCatalogue, Scope
 from app.domain.client_pseudonym import UNKNOWN_CLIENT, ClientPseudonyms
 from app.domain.closure_service import ClosureInput, ClosureService, GroupOutcome
+from app.domain.entitlements import ClaimMode, resolve
 from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
-from app.domain.ports import CertificateProbe, IntegrationError
+from app.domain.ports import CertificateProbe, IdentityError, IntegrationError
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.domain.settings_registry import lookup
@@ -601,9 +603,7 @@ def _token_expiry(health: TokenHealth) -> list[CheckResult]:
 CLI_ACTOR = Principal(
     subject="system:cli",
     display_name="host CLI",
-    roles=frozenset({Role.SUPERUSER}),
-    organisations=frozenset(),
-    groups=frozenset(),
+    grants=frozenset({Grant(Role.SUPERUSER.value)}),
 )
 """Who the host commands act as: access to the host is the authorisation (ADR 0042 §10).
 
@@ -620,8 +620,11 @@ CLAIM_SETTINGS = (
     "oidc_role_group_admin",
     "oidc_role_auditor",
     "oidc_role_agent",
+    "oidc_entitlement_claim",
+    "oidc_entitlement_prefix",
+    "oidc_claim_mode",
 )
-"""The claim mapping ``oidc-check`` prints: claim names and role values, never secrets."""
+"""The claim mapping ``oidc-check`` prints: claim names, role values and the mode, never secrets."""
 
 
 async def _oidc_check(
@@ -648,6 +651,52 @@ async def _oidc_check(
         for name in CLAIM_SETTINGS
     )
     return format_report(results) + "\nClaim mapping (value, source):\n" + mapping, passed(results)
+
+
+def _read_claims(path: Path) -> object:
+    """Return the sample claims of ``path`` as data, or the reason it is unusable."""
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError) as exc:
+        return f"cannot read {path}: {type(exc).__name__}"
+
+
+async def _oidc_claims(settings: Settings, sample: object) -> tuple[str, bool]:
+    """Resolve ``sample`` claims without a login (ADR 0049 point 16).
+
+    Prints the mode, every grant and every refused value with its reason, so the IdP team can
+    test an attribute contract before anyone logs in. Reads the directory from the database;
+    the sample is data and is never logged.
+    """
+    if isinstance(sample, str):
+        return f"{sample}\n", False
+    if not isinstance(sample, dict) or "sub" not in sample:
+        return 'the claims file must be a JSON object with at least "sub"\n', False
+    mapping = claim_mapping(settings.login_values, settings.oidc_entitlements_max_values)
+    try:
+        claims = login_claims(sample, mapping, log_lockout=False)
+    except IdentityError as exc:
+        return f"refused: {exc.code}\n", False
+    engine = create_engine(settings.database_url)
+    try:
+        uow = SqlUnitOfWork(engine, secret_box(settings))
+        async with uow.read() as tx:
+            directory = await tx.get_directory()
+            catalogue = RoleCatalogue(tuple(await tx.get_custom_roles()))
+    finally:
+        await engine.dispose()
+    mode = ClaimMode(settings.oidc_claim_mode)
+    outcome = resolve(claims, mode, settings.oidc_entitlement_prefix, directory, catalogue)
+    lines = [f"mode: {mode.value}", f"subject: {claims.subject}"]
+    if outcome.ambiguous:
+        lines.append("refused: ambiguous_claims (two roles of one reach over several targets)")
+    lines += [f"grant: {g.key}" for g in sorted(outcome.principal.grants, key=lambda g: g.key)]
+    lines += [f"refused value: {r.value} ({r.reason.value})" for r in outcome.refused]
+    if outcome.mismatch:
+        lines.append(f"shadow mismatch: {outcome.mismatch}")
+    if not outcome.principal.grants:
+        lines.append("no grant: this login would hold no role")
+    return "\n".join(lines) + "\n", bool(outcome.principal.grants) and not outcome.ambiguous
 
 
 @asynccontextmanager
@@ -887,7 +936,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         "client-pseudonym", help="pseudonym of an IP address in security events (ADR 0053)"
     )
     pseudonym_cmd.add_argument("address")
-    commands.add_parser("oidc-check", help="check the login configuration (no login started)")
+    oidc_cmd = commands.add_parser(
+        "oidc-check", help="check the login configuration (no login started)"
+    )
+    oidc_cmd.add_argument(
+        "--claims",
+        help="a JSON file with sample ID-token claims: print the grants and refused values "
+        "they resolve to under the current mode and directory (ADR 0049 point 16)",
+    )
     tls_cmd = commands.add_parser("tls-check", help="the certificate of the public address")
     tls_cmd.add_argument("--host", help="probe another server instead (stored nowhere)")
     tls_cmd.add_argument("--port", type=int, help="its port (default 443)")
@@ -919,6 +975,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stdout.write(f"{pseudonym}\n")
         return 0 if pseudonym != UNKNOWN_CLIENT else 1
     if args.command == "oidc-check":
+        if args.claims:
+            sample = _read_claims(Path(args.claims))
+            return _write(asyncio.run(_oidc_claims(Settings(), sample)))
         return _write(asyncio.run(_oidc_check(Settings())))
     if args.command == "tls-check":
         return _write(asyncio.run(_tls_check(Settings(), args.host, args.port)))
