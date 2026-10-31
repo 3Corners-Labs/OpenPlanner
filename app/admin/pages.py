@@ -27,7 +27,7 @@ from app.i18n import BoundGettext
 from app.web.authz_labels import ROLE_LABELS
 from app.web.help import HelpTopic, shipped_manual, topic_for_path
 from app.web.locale import RequestLocale, request_locale
-from app.web.navigation import BOTTOM_BAR_ENTRIES, SECTIONS, Home, Screen, home_of
+from app.web.navigation import BOTTOM_BAR_ENTRIES, SECTIONS, Home, Screen, Width, home_of
 from app.web.organisation_settings import settings_for
 from app.web.protection import require_same_origin
 from app.web.templates import create_templates, kept_query, render
@@ -218,6 +218,8 @@ def page(
         {
             **context,
             "principal": principal,
+            # The page width from the register (ADR 0080); ``admin.css`` keys on it.
+            "content_width": (home.width if home else Width.STANDARD).value,
             "nav": nav,
             "top_links": top_links(request, locale.gettext, can, on_overview, home, help_topic),
             "bottom_bar": bar,
