@@ -571,6 +571,9 @@ msgstr "Administration menu"
 msgid "admin.nav.more"
 msgstr "More"
 
+msgid "admin.nav.toggle"
+msgstr "Collapse or expand menu"
+
 msgid "admin.nav.section.monitor"
 msgstr "Monitor"
 
