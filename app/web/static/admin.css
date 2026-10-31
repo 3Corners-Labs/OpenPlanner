@@ -557,17 +557,47 @@ html {
   margin-top: 2rem;
 }
 
-/* --- Tablet (768–1023 px): the side navigation collapses to an icon rail (SH-1). Labels stay in
-   the page for screen readers and appear as a tooltip on hover and keyboard focus. ------------ */
-@media (min-width: 48rem) and (max-width: 63.99rem) {
-  .admin-shell {
+/* --- The icon rail (SH-1): the side navigation at 3.75 rem shows icons only. Labels stay in
+   the page for screen readers and appear as a tooltip on hover and keyboard focus. The rail is
+   the tablet's default (768–1023 px) and the admin's choice anywhere from the top bar's menu
+   button (admin shell design); either way it is the menu's own width that switches these rules
+   on, so they are written once. --------------------------------------------------------- */
+.admin-nav {
+  container-type: inline-size;
+  /* The tooltips reach over the page; the menu paints above its ordinary content. */
+  z-index: 10;
+}
+
+@media (min-width: 48rem) {
+  .admin-shell--nav-collapsed {
     --adm-nav-width: 3.75rem;
   }
 
-  .admin-nav {
+  .admin-shell--nav-collapsed .admin-nav {
+    padding: 0.75rem 0.5rem 2rem;
+  }
+}
+
+@media (min-width: 48rem) and (max-width: 63.99rem) {
+  .admin-shell:not(.admin-shell--nav-expanded) {
+    --adm-nav-width: 3.75rem;
+  }
+
+  .admin-shell:not(.admin-shell--nav-expanded) .admin-nav {
     padding: 0.75rem 0.5rem 2rem;
   }
 
+  .admin-topbar {
+    padding: 0 1rem;
+  }
+
+  .admin-main {
+    padding: 0 1.5rem 3rem;
+    --adm-main-pad: 1.5rem;
+  }
+}
+
+@container (max-width: 6rem) {
   .admin-nav__section + .admin-nav__section {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
@@ -610,14 +640,53 @@ html {
     translate: 0 -50%;
     pointer-events: none;
   }
+}
 
-  .admin-topbar {
-    padding: 0 1rem;
+/* --- The menu button (admin shell design): one form with a button per direction; only the
+   one that applies shows, by the menu's state at this width. A phone has no rail. --------- */
+.admin-nav-toggle {
+  display: none;
+  flex: none;
+  margin: 0;
+}
+
+.admin-nav-toggle__button {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--adm-radius-s);
+  background: transparent;
+  color: var(--adm-text-muted);
+  cursor: pointer;
+}
+
+.admin-nav-toggle__button:hover {
+  border-color: var(--adm-border);
+  background: var(--adm-surface-muted);
+  color: var(--adm-text);
+}
+
+@media (min-width: 48rem) {
+  .admin-nav-toggle {
+    display: flex;
   }
+}
 
-  .admin-main {
-    padding: 0 1.5rem 3rem;
-    --adm-main-pad: 1.5rem;
+@media (min-width: 48rem) and (max-width: 63.99rem) {
+  .admin-shell:not(.admin-shell--nav-expanded) .admin-nav-toggle__button--expand,
+  .admin-shell--nav-expanded .admin-nav-toggle__button--collapse {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 64rem) {
+  .admin-shell:not(.admin-shell--nav-collapsed) .admin-nav-toggle__button--collapse,
+  .admin-shell--nav-collapsed .admin-nav-toggle__button--expand {
+    display: inline-flex;
   }
 }
 

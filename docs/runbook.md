@@ -851,8 +851,15 @@ group can:
 1. **Nep-meeting en -taak aanmaken** for a booking without them. This sets stand-in ids
    (`simulated-meeting-<id>`, `simulated-task-<id>`, a join link on `.invalid`) and records
    "meeting created" and "task created" with detail `simulated`. Real ids are never replaced.
+   A booking that may open a trial call right now (ADR 0071: the group has a video host and
+   the trial call on, the appointment has not started, the limit is not reached) also gets an
+   open stand-in trial call (`simulated-trial-<id>`) for the group's trial call minutes,
+   recorded as "trial call opened" with detail `simulated`; the participant's trial page then
+   offers the way in. A real or still open trial call is left as it is.
 2. Play events in the order of a call: agent accepts the task, agent joins, citizen joins,
-   participant leaves, meeting started or ended, task not picked up, task ended.
+   participant leaves, meeting started or ended, task not picked up, task ended; and for the
+   trial call, participant enters and leaves it (recorded as the trial kinds of ADR 0076, never
+   on the appointment's call status).
 
 Each event is signed with this installation's `WEBEX_WEBHOOK_SECRET` or
 `WXCC_WEBHOOK_SECRET` and posted in-process to `/webhooks/webex` or `/webhooks/wxcc`. It takes
@@ -865,6 +872,12 @@ A quick end-to-end try without Webex: create a group with opening hours and "Dir
 starten", start a call as a citizen (`/g/<slug>/direct`), open the booking in the agenda,
 create the stand-ins, and play "agent accepts" and "agent joins". The citizen's waiting page
 then shows the matching status.
+
+The participant's whole journey (trial call, join link, the call, and what the admin sees of
+it) runs this way in CI: `e2e/tests/video-journey.spec.ts`, on the bookings that
+`seed-closures` adds to the team "Demo: reis van de deelnemer". What it cannot cover is
+Webex itself: entering the meeting, the lobby and the Webex app on the tester's computer
+(ADR 0075 step 3) stay a check by a person against the real Webex site.
 
 ### 11. When the contact center is down: the own queue (ADR 0043)
 

@@ -1,15 +1,18 @@
 """SimulationService: stand-in platform ids so the simulator can play events (not prod)."""
 
 from dataclasses import replace
+from datetime import timedelta
 
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.booking import MeetingRef
+from app.domain.booking import MeetingRef, TrialCall
 from app.domain.calls import EventKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
+from app.domain.scheduling import Group
 from app.domain.simulation import SIMULATED_LINK, SimulationService
+from app.domain.trial_call import TrialState, trial_state
 from tests.domain.test_integration import _booking
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -98,3 +101,55 @@ async def test_each_played_event_is_audited(uow: InMemoryUnitOfWork) -> None:
 
     event = uow.state.audit[-1]
     assert (event.action, event.reason, event.group) == ("simulator.event", "host_joined", "demo")
+
+
+def _with_video_host(uow: InMemoryUnitOfWork) -> Group:
+    """Give the demo group a video host, so it offers video and the trial call (ADR 0071)."""
+    group = replace(uow.state.groups[1], video_host_email="host@example.nl")
+    uow.state.groups[1] = group
+    return group
+
+
+async def test_prepare_opens_a_stand_in_trial_call_where_the_group_offers_one(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    group = _with_video_host(uow)
+
+    ids = await _service(uow).prepare(ORG_ADMIN, "demo", 123)
+
+    booking = uow.state.bookings[123]
+    expected = TrialCall(
+        MeetingRef("simulated-trial-123", SIMULATED_LINK),
+        NOW + timedelta(minutes=group.trial_call_minutes),
+    )
+    assert ids.trial_meeting_id == "simulated-trial-123"
+    assert booking.trial == expected
+    assert booking.trial_count == 1  # it counts, as a real one would
+    assert trial_state(booking, group, NOW) is TrialState.ACTIVE
+    assert uow.state.booking_events[123][-1].kind is EventKind.TRIAL_CREATED
+    assert uow.state.booking_events[123][-1].detail == "simulated"
+
+
+async def test_without_a_trial_call_on_offer_prepare_opens_none(uow: InMemoryUnitOfWork) -> None:
+    ids = await _service(uow).prepare(ORG_ADMIN, "demo", 123)  # no video host: no trial call
+
+    assert ids.trial_meeting_id is None
+    assert uow.state.bookings[123].trial is None
+    kinds = [e.kind for e in uow.state.booking_events[123]]
+    assert EventKind.TRIAL_CREATED not in kinds
+
+
+async def test_an_open_trial_call_is_never_replaced(uow: InMemoryUnitOfWork) -> None:
+    _with_video_host(uow)
+    real = TrialCall(
+        MeetingRef("real-trial", "https://site.webex.com/j.php?MTID=t1"),
+        NOW + timedelta(minutes=20),
+    )
+    uow.state.bookings[123] = replace(_booking(), trial=real, trial_count=1)
+
+    ids = await _service(uow).prepare(ORG_ADMIN, "demo", 123)
+
+    assert ids.trial_meeting_id == "real-trial"
+    assert uow.state.bookings[123].trial == real
+    assert uow.state.bookings[123].trial_count == 1
+    assert (await _service(uow).ids(ORG_ADMIN, "demo", 123)).trial_meeting_id == "real-trial"
