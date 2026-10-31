@@ -62,7 +62,9 @@ def test_wxcc_events_map_to_call_events() -> None:
     assert (connected.target_id, connected.kind) == ("task-1", EventKind.TASK_CONNECTED)
     assert failed is not None
     assert (failed.kind, failed.detail) == (EventKind.TASK_FAILED, "ENTRY_POINT_NOT_FOUND")
-    assert parse_wxcc(json.loads(wxcc_body("task:new"))) is None
+    created = parse_wxcc(json.loads(wxcc_body("task:new")))
+    assert created is not None
+    assert created.kind is EventKind.TASK_CREATED  # ADR 0082: the probe work item needs it
     assert parse_wxcc({"type": "task:ended", "data": {}}) is None
 
 

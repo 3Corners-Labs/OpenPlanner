@@ -27,7 +27,7 @@ from app.domain.calls import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobSummary
-from app.domain.ports import REASON_LIMIT, Clock, Transaction, UnitOfWork
+from app.domain.ports import REASON_LIMIT, Clock, ProbeRegistry, Transaction, UnitOfWork
 from app.domain.request_log import REQUEST_EVENT
 
 WEBHOOK_MEMORY = timedelta(days=30)
@@ -48,7 +48,11 @@ class EventOutcome(StrEnum):
     DUPLICATE = "duplicate"
     """The same event was recorded before (replay or redelivery)."""
     IGNORED = "ignored"
-    """An event of a known trial meeting that the timeline does not show (its start and end)."""
+    """An event of a known trial meeting that the timeline does not show (its start and end),
+    or a task's ``task:new``, which the dispatch job already recorded."""
+    PROBE = "probe"
+    """An event of the group check's probe work item (ADR 0082): noted for the check, never
+    on a booking."""
 
 
 @dataclass(frozen=True)
@@ -74,16 +78,24 @@ class IntegrationService:
         clock: Current time.
         admin: Authorises admin views (``bookings.view``) and audits refusals.
         version: ``APP_VERSION`` of this process, stamped on every timeline event (ADR 0068).
+        probes: Where the group check's probe work item waits for its events (ADR 0082);
+            ``None`` when no contact center is configured.
     """
 
     def __init__(
-        self, uow: UnitOfWork, clock: Clock, admin: AdminService, version: str = ""
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        admin: AdminService,
+        version: str = "",
+        probes: ProbeRegistry | None = None,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
         self._version = version
+        self._probes = probes
 
     async def record(
         self,
@@ -142,13 +154,23 @@ class IntegrationService:
     async def record_task_event(
         self, task_id: str, kind: EventKind, at: datetime, detail: str = ""
     ) -> EventOutcome:
-        """Record a work item event; ``UNKNOWN`` for tasks OpenPlanner does not know."""
+        """Record a work item event; ``UNKNOWN`` for tasks OpenPlanner does not know.
+
+        A ``task:new`` of a booking's task is ``IGNORED``: the dispatch job recorded the
+        creation when it got the id. An unknown task may be the group check's probe (ADR
+        0082): its event is noted for the check and the outcome is ``PROBE``.
+        """
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_task(task_id)
-            if booking is None or booking.id is None:
-                return EventOutcome.UNKNOWN
-            await self._record(tx, booking.id, kind, at, detail)
-        return EventOutcome.RECORDED
+            if booking is not None and booking.id is not None:
+                if kind is EventKind.TASK_CREATED:
+                    return EventOutcome.IGNORED
+                await self._record(tx, booking.id, kind, at, detail)
+                return EventOutcome.RECORDED
+        # Outside the write lock: the registry writes in a transaction of its own.
+        if self._probes is not None and await self._probes.note(task_id, kind, at):
+            return EventOutcome.PROBE
+        return EventOutcome.UNKNOWN
 
     async def status(self, booking_id: int) -> CallStatus:
         """Return a booking's call status (the citizen's waiting page; no admin data)."""

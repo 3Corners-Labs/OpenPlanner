@@ -6,7 +6,9 @@ video meetings and work items; bookings keep working. Without a settings key the
 """
 
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import timedelta
 
 import httpx
 import structlog
@@ -14,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.credentials import CredentialStore
+from app.adapters.db.probes import ProbeReports
+from app.adapters.db.reports import ReportStore
 from app.adapters.group_check import CheckerConfig, PlatformChecker
 from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTokens
 from app.adapters.webex_meetings import WebexMeetings
@@ -78,11 +82,13 @@ def build_integrations(
     clock: Clock,
     security: SecurityLog | None = None,
     request_log: RequestLog | None = None,
+    probe_timeout: Callable[[], timedelta] | None = None,
 ) -> Integrations:
     """Return the adapters the settings allow.
 
     ``security`` records failing token refreshes; ``request_log`` receives every request the
-    adapters make (ADR 0068).
+    adapters make (ADR 0068); ``probe_timeout`` is how long the group check waits for its
+    probe work item's events (ADR 0082; the settings' value when not given).
     """
     client_id, secret, refresh = (
         settings.webex_client_id,
@@ -119,5 +125,9 @@ def build_integrations(
         ),
         clock,
         request_log,
+        dispatcher=dispatcher,
+        probes=ProbeReports(ReportStore(engine)) if dispatcher else None,
+        probe_timeout=probe_timeout
+        or (lambda: timedelta(seconds=settings.integration_probe_timeout_seconds)),
     )
     return Integrations(tokens, video, dispatcher, checker)

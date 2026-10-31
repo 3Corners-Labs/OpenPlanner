@@ -387,6 +387,9 @@ class Settings(BaseSettings):
     # Class C: the worker checks every group with a Webex host whose latest integration check
     # is older than this many hours, and records a system event on failure (ADR 0065 step 2).
     integration_check_interval_hours: int = Field(default=24, ge=1, le=168)
+    # Class C: how long the group check waits for the webhook events of its probe work item
+    # (ADR 0082 point 2).
+    integration_probe_timeout_seconds: int = Field(default=60, ge=10, le=300)
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":

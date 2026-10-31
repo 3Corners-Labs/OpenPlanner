@@ -113,7 +113,15 @@ async def run_worker(
 
     def build_runner(current: Settings) -> tuple[Integrations, JobRunner, IntegrationWatch]:
         wired = integrations or build_integrations(
-            current, engine, http, clock, security, request_log
+            current,
+            engine,
+            http,
+            clock,
+            security,
+            request_log,
+            probe_timeout=lambda: timedelta(
+                seconds=live.settings.integration_probe_timeout_seconds
+            ),
         )
         # ADR 0065 step 2: the automatic group check, with the checker of this wiring.
         watch = IntegrationWatch(

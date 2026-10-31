@@ -624,10 +624,21 @@ REGISTRY: tuple[SettingSpec, ...] = (
         24,
         _C,
         T.OPERATIONS,
-        "The worker checks every group with a Webex host this often and reports a broken "
-        "chain as a system event (ADR 0065).",
+        "The worker checks every group with a Webex host or a contact-center mapping this "
+        "often and reports a broken chain as a system event (ADR 0065, 0082).",
         minimum=1,
         maximum=168,
+    ),
+    S(
+        "integration_probe_timeout_seconds",
+        K.INT,
+        60,
+        _C,
+        T.OPERATIONS,
+        "How long a group check waits for the task:new and task:ended events of its probe "
+        "work item before it reports the webhook path broken (ADR 0082).",
+        minimum=10,
+        maximum=300,
     ),
     S(
         "job_overdue_minutes",
