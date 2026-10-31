@@ -43,6 +43,20 @@ het woord, en `{Agent}` of `{Agents}` waar het woord een zin of een label begint
 De pagina's van deze handleiding gebruiken de standaardwoorden. Uw eigen woord vervangt ze op het
 scherm.
 
+## Hoe u de beheerders noemt
+
+Een organisatie kan ook haar *organisatiebeheerder* en haar *groepsbeheerder* een eigen naam
+geven, bijvoorbeeld "Hoofd planning" en "Teamleider". U vult de namen in bij de kaart *Hoe u de
+beheerders noemt*, per taal, op dit scherm. Een naam is een label op het scherm: hij wijzigt geen
+rechten. De superuser en de auditor kunt u niet hernoemen, en een eigen rol houdt de naam die de
+superuser gaf.
+
+Overal waar een naam naast rechten staat, in de rechtenmatrix en bij *Mijn rechten*, blijft de
+standaardnaam tussen haakjes zichtbaar, bijvoorbeeld "Hoofd planning (Organisatiebeheerder)".
+Het auditlogboek en het rechtendocument houden de standaardnamen. Een naam mag niet de naam van
+een andere rol zijn, met of zonder hoofdletters: "Groepsbeheerder" wordt geweigerd als naam van de
+organisatiebeheerder.
+
 ## Een tekst wijzigen
 
 Kies eerst de taal. Een organisatie kan voor elke taal eigen teksten hebben. Pas de tekst aan en

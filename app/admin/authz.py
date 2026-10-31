@@ -97,6 +97,24 @@ class AdminContext:
         return self.authorization.group
 
 
+async def _scope_to_organisation(
+    service: AdminService,
+    principal: Principal,
+    authorization: Authorization,
+    locale: RequestLocale,
+) -> None:
+    """Show the words of the request's organisation on a route that has no group (ADR 0077).
+
+    The organisation is the one in the route, else the only organisation of the person; a
+    superuser or an admin of several organisations gets the shipped words.
+    """
+    slug = authorization.target.organisation or await service.home_organisation(principal)
+    if slug is not None:
+        organisation_id = await service.organisation_id(slug)
+        if organisation_id is not None:
+            locale.gettext.scope_to(organisation_id, None)
+
+
 def admin_service(request: Request) -> AdminService:
     """Return the application's admin service."""
     service: AdminService = request.app.state.admin_service
@@ -270,6 +288,8 @@ class RequirePermission:
             )
         if not authorization.decision.allowed:
             raise AccessDenied
+        if authorization.group is None:
+            await _scope_to_organisation(service, principal, authorization, locale)
         if request.method not in READ_METHODS:
             await self._check_maintenance(request, principal, authorization.target)
         return AdminContext(principal, authorization)
