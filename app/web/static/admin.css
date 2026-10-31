@@ -43,7 +43,10 @@
   );
   --adm-shadow-popover: 0 8px 24px rgb(0 0 0 / 18%), 0 2px 6px rgb(0 0 0 / 12%);
   --adm-nav-width: 15rem;
-  --adm-content-width: 72rem;
+  /* Page widths beside the side navigation (ADR 0080). Which screen gets which is decided in
+     app/web/navigation.py and arrives as <main data-width>; nothing else sets a page width. */
+  --adm-width-standard: 72rem;
+  --adm-width-wide: 96rem;
 
   /* The organisation's citizen colours as the page defines them (site.css or its theme file),
      kept so the branding preview shows them even in the dark portal. */
@@ -546,10 +549,21 @@ html {
 .admin-main {
   grid-area: main;
   width: 100%;
-  max-width: var(--adm-content-width);
+  max-width: var(--adm-width-standard);
   margin: 0;
   padding: 0 2rem 4rem;
   --adm-main-pad: 2rem;
+}
+
+/* Data views (ADR 0080) use the room they get, up to the wide cap, left-aligned at the
+   navigation so the content does not jump when the navigation collapses. */
+.admin-main[data-width="wide"] {
+  max-width: var(--adm-width-wide);
+}
+
+/* A form is filled in, not scanned: in a wide page it keeps the reading width. */
+.admin-main[data-width="wide"] > form.card {
+  max-width: var(--adm-width-standard);
 }
 
 /* Pages without a header band keep their distance to the top bar. */
@@ -1935,13 +1949,53 @@ fieldset.card {
 }
 
 /* --- Week schedule -------------------------------------------------------------------------- */
+/* The week is seven columns or one row per day, never six and one (ADR 0080). The frame measures
+   the room the schedule really gets, so it holds on every width of the navigation and the page. */
+.week-frame {
+  container-type: inline-size;
+}
+
 .week {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8.75rem, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Seven columns of at least 8.75 rem need 66 rem. */
+@container (min-width: 66rem) {
+  .week {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+/* Under that, a day is a row: the name beside its blocks, which flow side by side. */
+@container (min-width: 32rem) and (max-width: 65.99rem) {
+  .day {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    column-gap: 0.75rem;
+    align-items: start;
+  }
+
+  .day h3 {
+    grid-row: 1 / span 2;
+    margin: 0;
+  }
+
+  .day > :not(h3) {
+    grid-column: 2;
+  }
+
+  .day .windows {
+    flex-flow: row wrap;
+  }
+
+  .day .window {
+    flex: 0 1 12rem;
+  }
 }
 
 .day {
@@ -2371,7 +2425,7 @@ fieldset.card {
 }
 
 .manual {
-  max-width: var(--adm-content-width);
+  max-width: var(--adm-width-standard);
 }
 
 .manual h2 {
