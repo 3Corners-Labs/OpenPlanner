@@ -77,8 +77,11 @@ jobs:
           echo "::error::dispatch the release on ${{ github.event.repository.default_branch }}, not on $REF (or tick dry_run)"
           exit 1
       - name: a real run needs RELEASE_TOKEN
-        if: ${{ !inputs.dry_run && secrets.RELEASE_TOKEN == '' }}
+        if: ${{ !inputs.dry_run }}
+        env:
+          TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
+          [ -n "$TOKEN" ] && exit 0
           echo "::error::the secret RELEASE_TOKEN is missing; a PR opened with GITHUB_TOKEN gets no CI (docs/runbook.md, Releasing a version)"
           exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -161,9 +164,10 @@ jobs:
     permissions:
       contents: read
       pull-requests: write   # the findings go into the release PR's body
-    env:
-      CODEX_HOME: ${{ runner.temp }}/codex-home   # the action's proxy config; the script reads the same
     steps:
+      # One Codex home for the action (it writes the proxy config there) and for the script.
+      - name: CODEX_HOME for the action and the script
+        run: echo "CODEX_HOME=$RUNNER_TEMP/codex-home" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release-pr.outputs.branch }}
@@ -219,8 +223,11 @@ jobs:
           echo "::error::dispatch the tag on ${{ github.event.repository.default_branch }}, not on $REF (or tick dry_run)"
           exit 1
       - name: a real run needs RELEASE_TOKEN
-        if: ${{ !inputs.dry_run && secrets.RELEASE_TOKEN == '' }}
+        if: ${{ !inputs.dry_run }}
+        env:
+          TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
+          [ -n "$TOKEN" ] && exit 0
           echo "::error::the secret RELEASE_TOKEN is missing; a tag pushed with GITHUB_TOKEN starts no build"
           exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
