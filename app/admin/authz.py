@@ -23,9 +23,10 @@ During maintenance (ADR 0038) every request that is not a GET also passes
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Annotated
 
 import structlog
-from fastapi import Request
+from fastapi import Depends, Request
 
 from app.admin.session import activity_due, current_login, login_age
 from app.domain.admin import AdminService, Authorization
@@ -46,6 +47,7 @@ from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import Clock
 from app.domain.roles import RoleService
 from app.domain.scheduling import GroupSummary
+from app.web.locale import RequestLocale, request_locale
 from app.web.organisation_settings import follow
 
 log = structlog.get_logger()
@@ -221,8 +223,13 @@ class RequirePermission:
         self.fresh = fresh
         self.maintenance_safe = maintenance_safe
 
-    async def __call__(self, request: Request) -> AdminContext:
+    async def __call__(
+        self, request: Request, locale: Annotated[RequestLocale, Depends(request_locale)]
+    ) -> AdminContext:
         """Resolve the principal and decide.
+
+        On a group route the request's ``_()`` is scoped to the group, so the page shows the
+        group's own word for the agent (ADR 0077); ``locale`` is the object the route receives.
 
         Raises:
             LoginRequired: Without a valid session.
@@ -257,6 +264,10 @@ class RequirePermission:
         )
         # ADR 0040: the rest of the request's log lines carry the target it acts on.
         bind_level(authorization.target.organisation, authorization.target.group)
+        if authorization.group is not None:
+            locale.gettext.scope_to(
+                authorization.group.group.organisation_id, authorization.group.group.id
+            )
         if not authorization.decision.allowed:
             raise AccessDenied
         if request.method not in READ_METHODS:

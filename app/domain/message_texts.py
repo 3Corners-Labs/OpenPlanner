@@ -22,6 +22,10 @@ MAX_BODY_LENGTH = 2000
 MAX_SMS_LENGTH = 320
 """Before the placeholders are filled; leaves room for the link within three SMS segments."""
 
+EVERYWHERE_PLACEHOLDERS = frozenset({"agent", "agents", "Agent", "Agents"})
+"""Placeholders every text may use besides its own: the agent term, which the translator fills
+from the words in effect for the organisation and group (ADR 0077)."""
+
 EMAIL_PLACEHOLDERS = frozenset({"date", "time", "group_name"})
 SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name", "manage_url"})
 CANCELLATION_SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name", "reason"})
@@ -32,7 +36,7 @@ LAPSED_SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name"}
 """A cancelled booking has nothing left to manage; a planner's reason may be added (ADR 0044)."""
 
 _TOKEN = re.compile(r"\{\{|\}\}|\{([^{}]*)\}?|\}")
-_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
+_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 _NEWLINE = re.compile(r"[\r\n]")
 
@@ -191,8 +195,8 @@ def check_text(
     """Return the trimmed ``text`` of block ``key`` if it may be stored.
 
     Rules: not blank, within ``max_length``, no control characters, no line breaks when
-    ``single_line``, and only placeholders from ``placeholders``. One home for the rules of
-    group texts and organisation texts (ADR 0004 §8, ADR 0009).
+    ``single_line``, and only placeholders from ``placeholders`` or the agent term. One home for
+    the rules of group texts and organisation texts (ADR 0004 §8, ADR 0009).
 
     Raises:
         DomainError: ``invalid_configuration`` with the block key as field.
@@ -205,7 +209,7 @@ def check_text(
         or _CONTROL_CHARS.search(cleaned)
         or (single_line and _NEWLINE.search(cleaned))
         or names is None
-        or not names <= placeholders
+        or not names <= placeholders | EVERYWHERE_PLACEHOLDERS
     ):
         raise _invalid(key)
     return cleaned

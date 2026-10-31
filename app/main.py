@@ -427,7 +427,11 @@ def create_app(
             on_change=text_overrides.invalidate,
         )
         app.state.messaging_service = MessagingService(
-            uow, clock, app.state.admin_service, app.state.translator.locales
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.translator.locales,
+            on_change=text_overrides.invalidate,
         )
         app.state.organisation_service = OrganisationService(
             uow, clock, app.state.admin_service, app.state.translator.locales

@@ -21,6 +21,28 @@ Een tekst die u hier aanpast geldt voor alle groepen van de organisatie. De volg
 
 Andere teksten, zoals knoppen, formulierlabels en foutmeldingen, kunt u niet aanpassen.
 
+## Hoe u de medewerker noemt
+
+OpenPlanner noemt de persoon die het videogesprek aanneemt een *medewerker* ("agent" in de
+Engelse teksten). Uw organisatie kan voor haar eigen groepen een ander woord kiezen, zoals
+"behandelaar" of "adviseur". Onderaan dit scherm, in de kaart *Hoe u de medewerker noemt*, vult
+u dat woord in het enkelvoud en in het meervoud in, per taal. Beide wijzigen samen: het
+formulier weigert een enkelvoud zonder meervoud.
+
+Het woord staat daarna overal waar de standaardteksten over deze persoon spreken: in de mails
+en sms'jes, op de pagina's voor deelnemers en op de schermen van uw groepen (openingstijden,
+wachtrij, agenda). Het woord is alleen een label. Het wijzigt geen rechten, en het
+auditlogboek en de rechtenmatrix houden hun eigen namen.
+
+Een groep kan een eigen woord gebruiken, bijvoorbeeld als één team "adviseurs" zegt: de
+groepsbeheerder stelt dat in bij [de berichtteksten van de groep](group-settings.md); het gaat
+voor het woord van de organisatie. In een eigen tekst schrijft u `{agent}` of `{agents}` voor
+het woord, en `{Agent}` of `{Agents}` waar het woord een zin of een label begint. Schrijf
+"uw {agent}" of "een {agent}" en niet "de {agent}": een woord kan een *het*-woord zijn.
+
+De pagina's van deze handleiding gebruiken de standaardwoorden. Uw eigen woord vervangt ze op het
+scherm.
+
 ## Een tekst wijzigen
 
 Kies eerst de taal. Een organisatie kan voor elke taal eigen teksten hebben. Pas de tekst aan en

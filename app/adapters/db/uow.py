@@ -79,6 +79,7 @@ from app.adapters.db.scope import scope_filter
 from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
 from app.domain.agenda import ShortfallAcceptance
+from app.domain.agent_term import TERM_KEYS
 from app.domain.audit import (
     PROBLEMS,
     AuditEntry,
@@ -1469,6 +1470,13 @@ class SqlTransaction(
         """Return every organisation's texts by ``(organisation id, locale, key)``."""
         rows = await self._session.scalars(select(OrganisationTextRow))
         return {(row.organisation_id, row.locale, row.key): row.text for row in rows}
+
+    async def get_all_group_terms(self) -> dict[tuple[int, str, str], str]:
+        """Return every group's own agent term words by ``(group id, locale, key)``."""
+        rows = await self._session.scalars(
+            select(GroupTextRow).where(GroupTextRow.key.in_(TERM_KEYS))
+        )
+        return {(row.group_id, row.locale, row.key): row.text for row in rows}
 
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime

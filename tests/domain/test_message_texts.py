@@ -32,11 +32,17 @@ def test_every_purpose_has_an_email_subject_and_intro() -> None:
         ("{date", None),
         ("date}", None),
         ("{}", None),
-        ("{Date}", None),
+        ("{Date}", frozenset({"Date"})),  # a capital is a name; the allow-list decides
+        ("{1x}", None),
     ],
 )
 def test_used_placeholders(text: str, names: frozenset[str] | None) -> None:
     assert used_placeholders(text) == names
+
+
+def test_a_capitalised_placeholder_is_refused_unless_the_block_allows_it() -> None:
+    with pytest.raises(DomainError):
+        clean_text("message.reminder.intro", "Op {Date}")
 
 
 def test_clean_text_trims_and_normalises_line_breaks() -> None:

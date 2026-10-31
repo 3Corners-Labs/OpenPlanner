@@ -40,7 +40,7 @@ async def participant_page(
         templates,
         request,
         name,
-        locale.for_organisation(group.organisation_id),
+        locale.for_scope(group.organisation_id, group.id),
         {**context, "group": group, "brand": brand_view(organisation)},
         scripts=True,
     )
