@@ -965,55 +965,67 @@ when a rule's channel is not configured.
 
 The website is static: `site/` in the repository, built by `scripts/build_site.py` and
 published by the job `site` of `main.yml` on every merge to `main` and on every release tag.
-It is hosted on a web server at TransIP, apart from the application; the application never
-reads from it and it never calls the application.
+It is hosted on a TransIP web hosting package, apart from the application; the application
+never reads from it and it never calls the application. TransIP deploys what is pushed to the
+package's git repository, so the deploy is a `git push` (`scripts/deploy-site.sh`): the job
+clones that repository, replaces the site files with the build, commits `site: <tag or branch>
+<commit>` and pushes. The repository keeps every deployed version.
 
 | Event | What runs | Result |
 |---|---|---|
-| Merge to `main` | `site`: build with the releases from GitHub, upload the artifact, rsync | the site on the web server, with the newest release candidate on it |
-| Tag `vX.Y.Z` | the same, plus `gh release upload` | `site-X.Y.Z.tar.gz` on the release page, and the site on the web server with the new release on it |
+| Merge to `main` | `site`, after the candidate job: build with the releases and the roadmap from GitHub, upload the artifact, push | the site on TransIP, with the candidate that merge made on it |
+| Tag `vX.Y.Z` | the same after `publish`, plus `gh release upload` | `site-X.Y.Z.tar.gz` on the release page, and the site on TransIP with the new release on it |
 | Pull request, fork | nothing (`main.yml` only) | a local `make site` is the preview |
 
-### Once: the deploy secrets
+### Once: the deploy settings
 
-Set by a repository admin in the GitHub environment `website` (*Settings → Environments*),
-so only the job `site` on `main` can read them:
+In the GitHub environment `website` (*Settings → Environments*), so only the job `site` on
+`main` can read them:
 
-| Name | What |
-|---|---|
-| `SITE_DEPLOY_HOST` | the SSH host of the TransIP web server |
-| `SITE_DEPLOY_USER` | the SSH user; give it write access to the site directory only |
-| `SITE_DEPLOY_PATH` | the absolute directory the web server serves for `openplanner.nl` |
-| `SITE_DEPLOY_KEY` | the private key of a deploy-only key pair (`ssh-keygen -t ed25519 -C openplanner-site-deploy`); the public key goes in the user's `authorized_keys` on the server |
-| `SITE_DEPLOY_KNOWN_HOSTS` | the server's host key line (`ssh-keyscan -t ed25519 <host>`), so the job refuses a different server |
+| Name | Kind | Value |
+|---|---|---|
+| `SITE_DEPLOY_REMOTE` | variable | `openplannernl@openps.ssh.transip.me:auto.git` |
+| `SITE_DEPLOY_KNOWN_HOSTS` | variable | the output of `ssh-keyscan -t ed25519,rsa openps.ssh.transip.me`, after checking it against the fingerprints below |
+| `SITE_DEPLOY_KEY` | secret | the private key of a deploy-only pair: `ssh-keygen -t ed25519 -C openplanner-site-deploy -f site-deploy -N ""`; the public key `site-deploy.pub` goes on the TransIP package's SSH keys |
+| `SITE_DEPLOY_DIR` | variable, optional | the folder inside the repository that TransIP serves; empty means the repository root |
+| `SITE_DEPLOY_BRANCH` | variable, optional | the branch to create when the repository is still empty (default `main`); a repository with commits keeps its own default branch |
 
-Without `SITE_DEPLOY_HOST` the job builds and uploads the artifact and prints a notice; it
-never deploys half. The deploy is `rsync --delete`: the server mirrors the build, so a page
-removed from `site/` disappears from the server.
+Host key fingerprints of `openps.ssh.transip.me` as read on 2026-10-31; compare them with what
+TransIP publishes before trusting them:
+
+```text
+256  SHA256:0dGaYR9rj5YLPxqCTQgehcNaIjH+oIBkFPN6bBpZp24 (ED25519)
+3072 SHA256:j0TdSEUGqyqnH+qe8BPxA+1482UvW4bLrPOfFVRsvik (RSA)
+```
+
+Without `SITE_DEPLOY_REMOTE` or `SITE_DEPLOY_KEY` the job builds and uploads the artifact and
+prints a notice; it never deploys half. The web root mirrors the build: a page removed from
+`site/` disappears from the host.
+
+Not yet checked from here: whether TransIP serves the repository root or a folder such as
+`www/` (set `SITE_DEPLOY_DIR` then), and which branch it deploys. Look at the repository once
+after the first push and adjust the two variables if needed.
 
 ### Rotating the deploy key
 
-Make a new key pair, put the new public key in `authorized_keys`, replace `SITE_DEPLOY_KEY`,
+Make a new key pair, add the new public key on the TransIP package, replace `SITE_DEPLOY_KEY`,
 re-run the last `main.yml` run (the job `site` is idempotent), then remove the old public key
-from the server. Nothing else holds the key.
+from TransIP. Nothing else holds the key.
 
-### When the deploy fails
+### Rolling back
 
-The build is in the run's artifact `site` (fourteen days). Download it and copy it by hand:
-
-```sh
-tar -xzf site-*.tar.gz -C /tmp/site
-rsync -az --delete /tmp/site/ <user>@<host>:<path>/
-```
+Revert the last commit in the TransIP repository and push it, or re-run the `site` job of an
+earlier `main.yml` run. The build of every run is also its artifact `site` (fourteen days) and
+every release carries `site-X.Y.Z.tar.gz`.
 
 ### The web server
 
-Serve `SITE_DEPLOY_PATH` as the document root of `openplanner.nl` and `www.openplanner.nl`
-(redirect `www` to the apex), HTTPS only with HSTS, and these headers, which the page also sets
-as meta tags where it can: `Content-Security-Policy: default-src 'self'; img-src 'self' data:;
-media-src 'self'; frame-ancestors 'none'`, `Referrer-Policy: no-referrer`,
-`X-Content-Type-Options: nosniff`. The site sets no cookie; the server's access log is the
-host's concern and is not shipped anywhere by us.
+Serve `openplanner.nl` and `www.openplanner.nl` (redirect `www` to the apex) over HTTPS only,
+with HSTS, and these headers, which the page also sets as meta tags where it can:
+`Content-Security-Policy: default-src 'self'; img-src 'self' data:; media-src 'self';
+frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`.
+On TransIP web hosting these go in an `.htaccess` in the web root (step 4 of ADR 0087). The site
+sets no cookie; the host's access log is TransIP's and is not shipped anywhere by us.
 
 ## Management token key
 
