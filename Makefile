@@ -1,4 +1,4 @@
-.PHONY: setup fast check matrix pins fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation release-plan e2e proxy-check diagrams up down
+.PHONY: setup fast check matrix pins fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation release-plan release-audit e2e proxy-check diagrams up down
 
 UV := uv run
 
@@ -101,6 +101,12 @@ mutation:
 release-plan:
 	@git fetch --quiet --tags origin
 	$(UV) python -m scripts.release_plan
+
+# ADR 0078: before the release PR of a minor or major version merges, a second model reviews
+# everything since the last release (the Codex CLI in a read-only sandbox, as /codex does).
+# Paste the findings into the release PR under "## Release audit", ending with "Verdict: pass".
+release-audit: ## Independent review of everything since the last release (needs codex)
+	scripts/release-audit.sh
 
 # TLS proxy (ADR 0030) against Let's Encrypt's test CA; needs docker.
 proxy-check:
