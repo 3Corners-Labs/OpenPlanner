@@ -8,9 +8,10 @@ from dataclasses import replace
 from datetime import UTC, date, datetime, time
 from typing import Any
 
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.scheduling import DispatchKind, Group, Offer, TimeWindow
 from app.domain.services import BookingReceipt, BookingService, ContactInput
+from tests.support.principals import principal
 
 NOW = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
 MONDAY = date(2026, 1, 5)
@@ -20,8 +21,8 @@ TUESDAY_0900 = datetime(2026, 1, 6, 8, 0, tzinfo=UTC)
 ADA = ContactInput(
     first_name="Ada", last_name="Lovelace", email="ada@example.org", phone="06 1234 5678"
 )
-DEMO_SUPERUSER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-DEMO_ORG_ADMIN = Principal(
+DEMO_SUPERUSER = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+DEMO_ORG_ADMIN = principal(
     "o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset()
 )
 """Admins for domain tests: the superuser and an organisation admin of ``demo``."""

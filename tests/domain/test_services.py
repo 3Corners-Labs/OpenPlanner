@@ -484,7 +484,7 @@ async def test_dispatch_job_follows_the_groups_dispatch_lead(uow: InMemoryUnitOf
         slug="aangifte",
         dispatch_lead_minutes=15,
         min_notice_minutes=60,
-        citizen_change_lead_minutes=15,
+        participant_change_lead_minutes=15,
     )
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     at_lead = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=15)), TEST_TOKEN_KEY)

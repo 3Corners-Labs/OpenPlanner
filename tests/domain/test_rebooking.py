@@ -113,10 +113,10 @@ def test_a_slot_within_the_planner_lead_is_no_candidate() -> None:
 @pytest.mark.parametrize("kind", list(DispatchKind))
 def test_a_slot_within_the_participants_change_lead_is_no_candidate(kind: DispatchKind) -> None:
     """ADR 0069: the participant's change lead applies to both kinds; a day ahead is far enough."""
-    group = make_group(dispatch_kind=kind, citizen_change_lead_minutes=180)
+    group = make_group(dispatch_kind=kind, participant_change_lead_minutes=180)
     two_hours_before = FRI_0900 - timedelta(hours=2)
 
-    assert may_take(replace(group, citizen_change_lead_minutes=60), FRI_0900, two_hours_before)
+    assert may_take(replace(group, participant_change_lead_minutes=60), FRI_0900, two_hours_before)
     assert not may_take(group, FRI_0900, two_hours_before)
     assert may_take(group, FRI_0900, FRI_0900 - timedelta(days=1))
 

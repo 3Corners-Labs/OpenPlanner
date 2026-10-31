@@ -215,13 +215,16 @@ async def test_the_summary_names_the_scope_and_links_to_its_pages(site: Site) ->
     assert '<a href="/admin/organisations/demo">Demo-gemeente</a>' in panel
 
 
-async def test_an_org_admin_gets_no_link_to_the_organisation_page(site: Site) -> None:
+async def test_who_may_open_the_organisation_page_gets_a_link_to_it(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
+    org_admin = _panel((await site.client.get("/admin/?lang=en&scope=1&org=demo")).text)
+    await site.login_as(GROUP_ADMIN)
+    group_admin = _panel((await site.client.get("/admin/?lang=en&scope=1&group=demo")).text)
 
-    panel = _panel((await site.client.get("/admin/?lang=en&scope=1&org=demo")).text)
-
-    assert "Demo-gemeente" in panel
-    assert 'href="/admin/organisations/demo"' not in panel
+    # ADR 0047 step 3: organisation.view opens the page, so the filter links to it.
+    assert '<a href="/admin/organisations/demo">Demo-gemeente</a>' in org_admin
+    assert "Demo-gemeente" in group_admin
+    assert 'href="/admin/organisations/demo"' not in group_admin
 
 
 async def test_a_narrowed_view_is_marked_and_everything_is_not(site: Site) -> None:

@@ -3,7 +3,8 @@
  * on every admin page in pages.json at 375, 768 and 1280 px, and the menu usable with the
  * keyboard alone at each width. On tablet the side navigation is an icon rail whose label shows
  * on focus; on phone the bottom bar carries the first entries and the rest open from *More*, a
- * <details> without script.
+ * <details> without script. On tablet and desktop the top bar's menu button collapses the menu
+ * to the rail or expands it, a form without script that holds for the session (#208).
  *
  * Needs Keycloak and the demo seed, like admin-roles.spec.ts.
  */
@@ -36,24 +37,24 @@ for (const [name, width] of Object.entries(WIDTHS)) {
       if (name === 'phone') {
         // The first entries sit in the bottom bar; the rest wait behind More.
         await expect(menu.getByRole('link', { name: 'Auditlog' })).toBeVisible();
-        const branding = menu.getByRole('link', { name: 'Huisstijl' });
-        await expect(branding).toBeHidden();
+        const staff = menu.getByRole('link', { name: 'Medewerkers' });
+        await expect(staff).toBeHidden();
         const more = menu.locator('details.admin-bottombar__more > summary');
         await tabTo(page, more);
         await page.keyboard.press('Enter');
-        await expect(branding).toBeVisible();
+        await expect(staff).toBeVisible();
         await expectNoAxeViolations(page);
-        await tabTo(page, branding);
+        await tabTo(page, staff);
       } else {
-        const branding = menu.getByRole('link', { name: 'Huisstijl' });
-        await tabTo(page, branding);
+        const staff = menu.getByRole('link', { name: 'Medewerkers' });
+        await tabTo(page, staff);
         // The rail hides the label visually until the entry has focus (its accessible name
         // stays); the desktop menu shows it at all times.
-        await expect(branding.locator('span')).toBeVisible();
+        await expect(staff.locator('span')).toBeVisible();
       }
       await page.keyboard.press('Enter');
-      await expect(page).toHaveURL(/\/admin\/branding$/);
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Huisstijl');
+      await expect(page).toHaveURL(/\/admin\/staff$/);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Medewerkers');
       // The current entry is marked where it shows: in the menu, or on More when it holds it.
       const current = name === 'phone'
         ? menu.locator('details.admin-bottombar__more:has(a[aria-current="page"]) > summary')
@@ -61,5 +62,60 @@ for (const [name, width] of Object.entries(WIDTHS)) {
       await expect(current).toBeVisible();
       await expectNoAxeViolations(page);
     });
+
+    if (name !== 'phone') {
+      test('the menu stays in view while a long page scrolls', async ({ page }) => {
+        await loginAs(page, 'super', '/admin/audit');
+        const menu = adminMenu(page);
+        const bar = page.locator('.admin-topbar');
+        // Make the page long enough to scroll, whatever the audit log holds.
+        await page.evaluate(() => {
+          document.querySelector('main')!.style.minHeight = '400vh';
+        });
+        await page.evaluate(() => window.scrollTo(0, 2000));
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
+        // The top bar sticks to the top of the window and the menu right under it, whatever
+        // sat above them before the scroll (the environment banner).
+        const barBox = await bar.boundingBox();
+        const menuBox = await menu.boundingBox();
+        expect(barBox).not.toBeNull();
+        expect(menuBox).not.toBeNull();
+        expect(barBox!.y).toBe(0);
+        expect(menuBox!.y).toBeCloseTo(barBox!.y + barBox!.height, 0);
+        await expect(menu.getByRole('link', { name: 'Overzicht' })).toBeInViewport();
+      });
+
+      test('the menu button collapses or expands the menu for the session', async ({ page }) => {
+        await loginAs(page, 'super');
+        const shell = page.locator('.admin-shell');
+        const button = page.getByRole('button', { name: 'Menu in- of uitklappen' });
+        const menu = adminMenu(page);
+        // The rail is 3.75 rem wide, the full menu 15 rem; the label stays in the page either
+        // way (clipped to a pixel on the rail), so the width tells the state, not visibility.
+        const expectRail = async (rail: boolean) => {
+          const box = await menu.boundingBox();
+          expect(box).not.toBeNull();
+          if (rail) expect(box!.width).toBeLessThan(100);
+          else expect(box!.width).toBeGreaterThan(200);
+          await expect(button).toHaveAttribute('aria-expanded', String(!rail));
+        };
+        // The tablet starts with the rail, the desktop with the full menu.
+        const startsCollapsed = name === 'tablet';
+        await expectRail(startsCollapsed);
+
+        await tabTo(page, button);
+        await page.keyboard.press('Enter');
+        await expect(shell).toHaveClass(new RegExp(startsCollapsed ? 'nav-expanded' : 'nav-collapsed'));
+        await expectRail(!startsCollapsed);
+        await expectNoAxeViolations(page);
+
+        // The choice holds on the next page, and the button turns the menu back.
+        await page.goto('/admin/audit');
+        await expectRail(!startsCollapsed);
+        await button.click();
+        await expect(shell).not.toHaveClass(new RegExp(startsCollapsed ? 'nav-expanded' : 'nav-collapsed'));
+        await expectRail(startsCollapsed);
+      });
+    }
   });
 }

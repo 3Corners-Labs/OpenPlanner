@@ -12,7 +12,10 @@ for development and CI only.
 
 ``seed_closure_examples`` adds what the closure pages need (ADR 0037): a team that is closed
 now (with an image, CL-3), a team with a planned closure (without one) and a booking on hold.
-Development and test only; the e2e pages of CL-2 are these.
+It also adds, per e2e browser, the two confirmed bookings of the participant's journey
+(trial call, join link and the call, ADR 0071, 0075, 0076) in a team with a video host, so
+the journey spec can play the call with the simulator. Development and test only; the e2e
+pages of CL-2 are these.
 
 Used by ``python -m app.cli seed-demo`` and by tests. Idempotent: existing groups are left
 untouched.
@@ -53,7 +56,16 @@ DEMO_CALENDAR_SLUG = "nationaal"
 DEMO_WIDGET_HOST = "http://localhost:8001"
 CLOSED_GROUP_SLUG = "demo-gesloten"
 PLANNED_GROUP_SLUG = "demo-gepland"
+JOURNEY_GROUP_SLUG = "demo-reis"
+JOURNEY_HOST = "proefhost@example.org"
+"""Video host of the journey team: a made-up address, so the team offers video and the trial
+call without a Webex Service App; the simulator stands in for Webex."""
+BROWSERS = ("chromium", "firefox", "webkit")
+"""The e2e browsers (``e2e/playwright.config.ts``); each runs the journey on its own bookings."""
 PENDING_TIMES = (time(11), time(11, 30), time(13), time(13, 30))
+JOURNEY_CALL_IN = timedelta(minutes=10)
+"""The journey's call starts this long after seeding: its join page is open at once (it opens
+15 minutes before the start) and stays open until half an hour after the end."""
 """Local times of the example bookings awaiting confirmation: one for the page checks and one
 per browser of the e2e keyboard flow, each in its own slot."""
 FIRST_WEEKEND_DAY = 5
@@ -92,6 +104,25 @@ EXAMPLE_CITIZEN = Contact.create(
 
 
 @dataclass(frozen=True)
+class JourneyExample:
+    """The participant's journey for one e2e browser: two confirmed bookings in the journey team.
+
+    Attributes:
+        trial_page: The trial call page of a booking tomorrow or later, so the trial call is
+            available for the whole run.
+        trial_booking: The admin booking page of that booking (simulator, timeline).
+        call_page: The join page of a booking that starts in ``JOURNEY_CALL_IN``, so the join
+            page is open for the whole run.
+        call_booking: The admin booking page of that booking.
+    """
+
+    trial_page: str
+    trial_booking: str
+    call_page: str
+    call_booking: str
+
+
+@dataclass(frozen=True)
 class ClosureExamples:
     """Paths of the example closure pages, for the e2e page list.
 
@@ -107,6 +138,7 @@ class ClosureExamples:
         pending_flow_webkit: The same for WebKit.
         trial_page: The trial call page of that booking. It shows the page's "not available
             for this appointment" state; its other states are covered by the API tests.
+        journeys: The participant's journey per e2e browser (``BROWSERS``), new each run.
     """
 
     closed_group: str
@@ -117,6 +149,7 @@ class ClosureExamples:
     pending_flow_firefox: str
     pending_flow_webkit: str
     trial_page: str
+    journeys: dict[str, JourneyExample]
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -194,6 +227,14 @@ async def seed_closure_examples(
     planned = await _seed_group(
         engine, DEMO_SLUG, "Demo-gemeente", PLANNED_GROUP_SLUG, "Demo: sluiting gepland"
     )
+    await _seed_group(
+        engine,
+        DEMO_SLUG,
+        "Demo-gemeente",
+        JOURNEY_GROUP_SLUG,
+        "Demo: reis van de deelnemer",
+        video_host=JOURNEY_HOST,
+    )
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
         closed_group = await _group(tx, CLOSED_GROUP_SLUG)
@@ -210,6 +251,10 @@ async def seed_closure_examples(
         token = await _suspended_booking(tx, closed_group, closure, now, token_key)
         demo = await _group(tx, DEMO_SLUG)
         pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
+        journey_group = await _group(tx, JOURNEY_GROUP_SLUG)
+        journeys = {
+            browser: await _journey(tx, journey_group, now, token_key) for browser in BROWSERS
+        }
     return ClosureExamples(
         closed_group=f"/g/{CLOSED_GROUP_SLUG}",
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
@@ -219,6 +264,7 @@ async def seed_closure_examples(
         pending_flow_firefox=f"/b/{pending[2]}/confirm",
         pending_flow_webkit=f"/b/{pending[3]}/confirm",
         trial_page=f"/b/{token}/test",
+        journeys=journeys,
     )
 
 
@@ -245,6 +291,81 @@ def _local(group: Group, now: datetime, days: int, at: time) -> datetime:
     return datetime.combine(day, at, tzinfo=group.tz).astimezone(UTC)
 
 
+def _next_weekday(group: Group, now: datetime, at: time) -> datetime:
+    """Return ``at`` on the next weekday (tomorrow at the earliest) in the group's time zone."""
+    days = 1
+    while (now + timedelta(days=days)).astimezone(group.tz).weekday() >= FIRST_WEEKEND_DAY:
+        days += 1
+    return _local(group, now, days, at)
+
+
+async def _slot(tx: Transaction, group: Group, start: datetime, end: datetime) -> int:
+    """Return the id of the group's slot at ``start``, creating it when there is none."""
+    slot = await tx.get_slot(group.id, start) or await tx.add_slot(
+        Slot(None, group.id, start, end, DEMO_CAPACITY)
+    )
+    if slot.id is None:
+        raise ValueError("the slot must be stored")
+    return slot.id
+
+
+async def _store_booking(
+    tx: Transaction,
+    group: Group,
+    start: datetime,
+    now: datetime,
+    token_key: bytes,
+    *,
+    status: BookingStatus,
+    confirm_by: datetime | None = None,
+) -> tuple[str, Booking]:
+    """Store an example booking of the made-up citizen at ``start``; return its token and it.
+
+    Each booking gets its own address, so repeated seeds stay under the address limit
+    (ADR 0066) when an e2e flow moves or rebooks one.
+    """
+    end = start + timedelta(minutes=group.slot_minutes)
+    salt = new_token_salt()
+    token = derive_token(token_key, salt)
+    booking = await tx.add_booking(
+        Booking(
+            id=None,
+            group_id=group.id,
+            slot_id=await _slot(tx, group, start, end),
+            start=start,
+            end=end,
+            status=status,
+            contact=replace(EXAMPLE_CITIZEN, email=f"voorbeeld-{salt[:8].lower()}@example.org"),
+            locale="nl",
+            token_hash=hash_token(token),
+            created_at=now,
+            token_salt=salt,
+            confirm_by=confirm_by,
+        )
+    )
+    return token, booking
+
+
+async def _journey(
+    tx: Transaction, group: Group, now: datetime, token_key: bytes
+) -> JourneyExample:
+    """Store the journey's two confirmed bookings and return their pages."""
+    confirmed = BookingStatus.CONFIRMED
+    trial_token, trial = await _store_booking(
+        tx, group, _next_weekday(group, now, time(15)), now, token_key, status=confirmed
+    )
+    call_token, call = await _store_booking(
+        tx, group, now + JOURNEY_CALL_IN, now, token_key, status=confirmed
+    )
+    admin = f"/admin/groups/{group.slug}/bookings"
+    return JourneyExample(
+        trial_page=f"/b/{trial_token}/test",
+        trial_booking=f"{admin}/{trial.id}",
+        call_page=f"/b/{call_token}/join",
+        call_booking=f"{admin}/{call.id}",
+    )
+
+
 async def _group(tx: Transaction, slug: str) -> Group:
     """Return the seeded group ``slug``."""
     group = await tx.get_group(slug)
@@ -266,29 +387,11 @@ async def _suspended_booking(
     tx: Transaction, group: Group, closure: Closure, now: datetime, token_key: bytes
 ) -> str:
     """Store a booking on hold by ``closure`` next week and return its management token."""
+    if closure.id is None:
+        raise ValueError("the closure must be stored")
     start = _local(group, now, 7, time(10))
-    end = start + timedelta(minutes=group.slot_minutes)
-    slot = await tx.get_slot(group.id, start) or await tx.add_slot(
-        Slot(None, group.id, start, end, DEMO_CAPACITY)
-    )
-    if slot.id is None or closure.id is None:
-        raise ValueError("the slot and the closure must be stored")
-    salt = new_token_salt()
-    token = derive_token(token_key, salt)
-    booking = await tx.add_booking(
-        Booking(
-            id=None,
-            group_id=group.id,
-            slot_id=slot.id,
-            start=start,
-            end=end,
-            status=BookingStatus.CONFIRMED,
-            contact=EXAMPLE_CITIZEN,
-            locale="nl",
-            token_hash=hash_token(token),
-            created_at=now,
-            token_salt=salt,
-        )
+    token, booking = await _store_booking(
+        tx, group, start, now, token_key, status=BookingStatus.CONFIRMED
     )
     await tx.save_booking(booking.suspend(closure.id))
     return token
@@ -301,35 +404,14 @@ async def _pending_booking(
 
     It lies on the next weekday at ``at`` and has a day to be confirmed.
     """
-    days = 1
-    while (now + timedelta(days=days)).astimezone(group.tz).weekday() >= FIRST_WEEKEND_DAY:
-        days += 1
-    start = _local(group, now, days, at)
-    end = start + timedelta(minutes=group.slot_minutes)
-    slot = await tx.get_slot(group.id, start) or await tx.add_slot(
-        Slot(None, group.id, start, end, DEMO_CAPACITY)
-    )
-    if slot.id is None:
-        raise ValueError("the slot must be stored")
-    salt = new_token_salt()
-    token = derive_token(token_key, salt)
-    await tx.add_booking(
-        Booking(
-            id=None,
-            group_id=group.id,
-            slot_id=slot.id,
-            start=start,
-            end=end,
-            status=BookingStatus.PENDING_CONFIRMATION,
-            # Its own address each run, so repeated seeds stay under the address limit
-            # (ADR 0059) when the e2e flow moves the confirmed one.
-            contact=replace(EXAMPLE_CITIZEN, email=f"wacht-{salt[:8].lower()}@example.org"),
-            locale="nl",
-            token_hash=hash_token(token),
-            created_at=now,
-            token_salt=salt,
-            confirm_by=now + timedelta(days=1),
-        )
+    token, _ = await _store_booking(
+        tx,
+        group,
+        _next_weekday(group, now, at),
+        now,
+        token_key,
+        status=BookingStatus.PENDING_CONFIRMATION,
+        confirm_by=now + timedelta(days=1),
     )
     return token
 
@@ -342,11 +424,13 @@ async def _seed_group(
     name: str,
     *,
     embed: bool = False,
+    video_host: str | None = None,
 ) -> bool:
     """Create a group open on weekdays, and its organisation if needed; skip if the group exists.
 
     With ``embed`` the group is switched on for the widget and the organisation allows
-    ``DEMO_WIDGET_HOST`` (ADR 0035).
+    ``DEMO_WIDGET_HOST`` (ADR 0035). With ``video_host`` the group offers video and the trial
+    call on that host's behalf (ADR 0017, 0071).
     """
     async with AsyncSession(engine) as session, session.begin():
         existing = await session.scalar(select(GroupRow.id).where(GroupRow.slug == slug))
@@ -371,6 +455,7 @@ async def _seed_group(
             phone_mode="optional",
             dispatch_lead_minutes=5,
             embedding_enabled=embed,
+            video_host_email=video_host,
         )
         session.add(group)
         if embed:

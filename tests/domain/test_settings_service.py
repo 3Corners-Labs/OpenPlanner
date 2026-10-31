@@ -7,16 +7,17 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import Organisation
 from app.domain.settings_registry import BY_KEY
 from app.domain.settings_service import CLI_ACTOR, SettingsService, editable, parse
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.principals import principal
 
-SUPER = Principal("sub-super", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-AUDITOR = Principal("sub-aud", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
+SUPER = principal("sub-super", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+AUDITOR = principal("sub-aud", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
 
 
 def _service(
@@ -247,7 +248,7 @@ async def test_the_cli_changes_and_resets_as_the_host_actor(
 
 # Organisation values (ADR 0042 step 5).
 
-ORG = Principal("sub-org", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+ORG = principal("sub-org", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
 
 
 def _organisations(uow: InMemoryUnitOfWork) -> None:
@@ -469,6 +470,8 @@ MAPPING = {
     "oidc_role_group_admin": "op-group",
     "oidc_role_auditor": "op-audit",
     "oidc_role_agent": "op-agent",
+    "oidc_entitlement_claim": "op_entitlements",
+    "oidc_entitlement_prefix": "op-acc",
 }
 
 
@@ -489,7 +492,7 @@ async def test_a_mapping_that_keeps_the_superuser_is_saved_and_audited(
 async def test_a_mapping_that_would_lock_the_superuser_out_is_refused(
     uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    no_roles = Principal("sub-super", "S", frozenset(), frozenset(), frozenset())
+    no_roles = principal("sub-super", "S", frozenset(), frozenset(), frozenset())
 
     with pytest.raises(DomainError) as caught:
         await _service(uow, clock).change_login_mapping(SUPER, MAPPING, trial=no_roles)
@@ -502,7 +505,7 @@ async def test_a_mapping_that_would_lock_the_superuser_out_is_refused(
 async def test_a_dry_run_of_another_person_does_not_count(
     uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    other = Principal("sub-other", "O", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+    other = principal("sub-other", "O", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 
     with pytest.raises(DomainError) as caught:
         await _service(uow, clock).change_login_mapping(SUPER, MAPPING, trial=other)

@@ -10,7 +10,7 @@ rest of a definition (names, the role claim value) and the use cases around it:
     every admin (matrix.view)
         catalogue() · history()       role definitions and who changed them are not secret
     every request
-        attach(principal) ─► the custom roles its role claim values grant (no authorisation)
+        attach(principal) ─► the custom roles its grants name by key (no authorisation)
 
 Every change writes one global ``admin`` audit event in the same transaction: the role key as
 reason, the new version and the permission codes added and removed as detail. Names and claim
@@ -54,6 +54,7 @@ HISTORY_LIMIT = 50
 """Changes shown on the matrix page; the audit log keeps the rest."""
 
 _CLAIM_VALUE = re.compile(CLAIM_VALUE_PATTERN)
+_BUILT_IN = frozenset(role.value for role in Role)
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 _MANAGE = Permission.ROLES_MANAGE
 
@@ -185,12 +186,12 @@ class RoleService:
         self._reserved = frozenset(value.casefold() for value in reserved_claims)
 
     async def attach(self, principal: Principal) -> Principal:
-        """Return ``principal`` with the custom roles its role claim values grant now.
+        """Return ``principal`` with the custom roles its grants name now.
 
-        Called for every admin request, so a change takes effect without a new login. No
-        database read when the session holds no role claim value other than built-in ones.
+        A change takes effect without a new login. No database read when every grant names
+        a built-in role.
         """
-        if not principal.role_claims:
+        if all(g.role in _BUILT_IN for g in principal.grants):
             return principal
         return (await self.catalogue()).holding(principal)
 

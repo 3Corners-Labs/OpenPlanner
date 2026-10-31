@@ -380,6 +380,52 @@ If PingFederate is down, admins cannot log in; booking, reminders and dispatch k
 Rotating `SESSION_SECRET` logs every admin out. Rotating the client secret needs the new value
 in `OIDC_CLIENT_SECRET` and a restart of `web`.
 
+### PingFederate attribute contract: entitlements (ADR 0049)
+
+Next to the three claims above, the portal can take its rights from **one claim with role and
+scope per value** (`OIDC_ENTITLEMENT_CLAIM`, default `openplanner_entitlements`, multi-valued in
+the ID token). Each value is one right:
+
+| Role reach | Value | Example |
+|---|---|---|
+| everything | `<prefix>:superuser` | `openplanner:superuser` |
+| organisations | `<prefix>:<role>:<org>` | `openplanner:org_admin:gem-a` |
+| groups | `<prefix>:<role>:<org>/<group>` | `openplanner:group_admin:gem-a/burgerzaken` |
+
+`<role>` is the role's key (`superuser`, `org_admin`, `group_admin`, `auditor`, `agent` or
+`custom.<id>`); `<org>` and `<group>` are the **IdP values** shown on *Koppeling
+identiteitsprovider* in the portal (they start as the slugs and are changed there, never by a
+rename). The simplest contract is one directory group per value, mapped 1:1 into the claim;
+the portal's page offers the full list as a text download. Values without the prefix are
+ignored, so the claim may be filled from a shared attribute. A value with the prefix that the
+installation does not recognise gives nothing and shows on the person's staff page with the
+reason.
+
+Test a contract without a login: put sample claims in a JSON file (`sub` plus the claims) and run
+
+```sh
+docker compose exec web python -m app.cli oidc-check --claims /tmp/sample-claims.json
+```
+
+It prints the mode, every grant and every refused value with its reason.
+
+**Switching over.** `OIDC_CLAIM_MODE` (environment, restart `web`):
+
+1. `legacy` (default): the three claims decide. A login whose claims are ambiguous (two roles
+   of one reach while that reach's claim names more than one organisation or group) is
+   refused with `ambiguous_claims` and audited: that combination handed out rights nobody gave.
+   Before the first release with this check, look for such admins in PingFederate and either
+   give them entitlements or split their roles.
+2. `shadow`: the three claims still decide; every login also parses the entitlement claim and
+   writes `auth.entitlement_mismatch` to the audit log when the two disagree. Run it for a full
+   working week; no mismatch means PingFederate is right.
+3. `entitlements`: only the entitlement claim decides. Rollback: set `legacy` and restart.
+
+The prefix (`OIDC_ENTITLEMENT_PREFIX`, default `openplanner`) separates installations that
+share one PingFederate: give acceptance `openplanner-acc`, and production values never work
+there. The claim name and the prefix are class C settings with the dry run of §8; the host
+resets them like the other login settings.
+
 ### Nobody can log in (ADR 0042 §8)
 
 There is no login bypass, fallback IdP or local account. Diagnose and act from the host:
@@ -805,8 +851,15 @@ group can:
 1. **Nep-meeting en -taak aanmaken** for a booking without them. This sets stand-in ids
    (`simulated-meeting-<id>`, `simulated-task-<id>`, a join link on `.invalid`) and records
    "meeting created" and "task created" with detail `simulated`. Real ids are never replaced.
+   A booking that may open a trial call right now (ADR 0071: the group has a video host and
+   the trial call on, the appointment has not started, the limit is not reached) also gets an
+   open stand-in trial call (`simulated-trial-<id>`) for the group's trial call minutes,
+   recorded as "trial call opened" with detail `simulated`; the participant's trial page then
+   offers the way in. A real or still open trial call is left as it is.
 2. Play events in the order of a call: agent accepts the task, agent joins, citizen joins,
-   participant leaves, meeting started or ended, task not picked up, task ended.
+   participant leaves, meeting started or ended, task not picked up, task ended; and for the
+   trial call, participant enters and leaves it (recorded as the trial kinds of ADR 0076, never
+   on the appointment's call status).
 
 Each event is signed with this installation's `WEBEX_WEBHOOK_SECRET` or
 `WXCC_WEBHOOK_SECRET` and posted in-process to `/webhooks/webex` or `/webhooks/wxcc`. It takes
@@ -820,6 +873,12 @@ starten", start a call as a citizen (`/g/<slug>/direct`), open the booking in th
 create the stand-ins, and play "agent accepts" and "agent joins". The citizen's waiting page
 then shows the matching status.
 
+The participant's whole journey (trial call, join link, the call, and what the admin sees of
+it) runs this way in CI: `e2e/tests/video-journey.spec.ts`, on the bookings that
+`seed-closures` adds to the team "Demo: reis van de deelnemer". What it cannot cover is
+Webex itself: entering the meeting, the lobby and the Webex app on the tester's computer
+(ADR 0075 step 3) stay a check by a person against the real Webex site.
+
 ### 11. When the contact center is down: the own queue (ADR 0043)
 
 When Webex Connect or Webex Contact Center cannot take tasks, a group admin with
@@ -831,7 +890,7 @@ OpenPlanner**. From then on:
   theirs;
 - the team's agents sign in to the admin portal (IdP role `OIDC_ROLE_AGENT`, default
   `openplanner-agent`, with the group in the group claim) and open the **Wachtrij** tab;
-- citizens can cancel until the start and move until `citizen_change_lead_minutes` before it
+- citizens can cancel until the start and move until `participant_change_lead_minutes` before it
   (ADR 0069), as with the contact center.
 
 Switch back the same way once the contact center works again. Both changes are in the audit

@@ -30,13 +30,14 @@ from app.domain.authorization import (
     role_keys,
     scope_for,
 )
+from tests.support.principals import principal
 
-SUPER = Principal("s", "Super", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-ORG = Principal("o", "Org", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
-GROUP = Principal("g", "Group", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
-AUDITOR = Principal("a", "Auditor", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
-NOBODY = Principal("n", "Nobody", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
-MIXED = Principal(
+SUPER = principal("s", "Super", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+ORG = principal("o", "Org", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+GROUP = principal("g", "Group", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
+AUDITOR = principal("a", "Auditor", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
+NOBODY = principal("n", "Nobody", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
+MIXED = principal(
     "m",
     "Mixed",
     frozenset({Role.ORG_ADMIN, Role.GROUP_ADMIN}),
@@ -44,7 +45,7 @@ MIXED = Principal(
     frozenset({"demo"}),
 )
 
-EVERY_ROLE = Principal(
+EVERY_ROLE = principal(
     "e",
     "Every role",
     frozenset(Role),
@@ -67,6 +68,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,  # ADR 0040
+        Permission.ORGANISATION_VIEW,  # ADR 0047 step 3: the own organisations' pages
         Permission.HOLIDAYS_ASSIGN,  # ADR 0025
         Permission.GROUP_CREATE,
         Permission.GROUP_VIEW,
@@ -84,6 +86,8 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.QUEUE_WORK,  # ADR 0043
         Permission.SETTINGS_ORGANISATION_MANAGE,  # ADR 0042: the own organisation's settings
         Permission.TEXTS_ORGANISATION_MANAGE,  # ADR 0004: the organisation's own wording
+        Permission.IDP_MAPPING_VIEW,  # ADR 0049
+        Permission.IDP_MAPPING_MANAGE,  # ADR 0049
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -114,10 +118,12 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,  # ADR 0040: the same log as a file
+        Permission.ORGANISATION_VIEW,  # ADR 0047 step 3: the organisations' pages, read-only
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042: system status, read-only
+        Permission.IDP_MAPPING_VIEW,  # ADR 0049
     }
 
 
@@ -128,10 +134,12 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,
+        Permission.ORGANISATION_VIEW,  # ADR 0047 step 3: the organisation's page, read-only
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042
+        Permission.IDP_MAPPING_VIEW,  # ADR 0049
     }
 
     assert not MATRIX[Role.AUDITOR] & PII_PERMISSIONS
@@ -300,7 +308,7 @@ def test_target_level_must_match_the_permission() -> None:
 def test_scope_for_group_permissions() -> None:
     assert scope_for(SUPER, Permission.GROUP_VIEW) == Scope(everything=True)
     assert scope_for(ORG, Permission.GROUP_VIEW) == Scope(organisations=frozenset({"demo"}))
-    assert scope_for(GROUP, Permission.GROUP_VIEW) == Scope(groups=frozenset({"demo"}))
+    assert scope_for(GROUP, Permission.GROUP_VIEW) == Scope(groups=frozenset({("demo", "demo")}))
     assert scope_for(GROUP, Permission.GROUP_EDIT).is_empty
     assert scope_for(NOBODY, Permission.GROUP_VIEW).is_empty
 
@@ -308,7 +316,7 @@ def test_scope_for_group_permissions() -> None:
 def test_audit_scope_is_exactly_the_own_level() -> None:
     # ADR 0031: a group admin's log holds its groups only, never the organisation's own
     # events; an organisation admin's log holds no global events.
-    assert scope_for(GROUP, Permission.AUDIT_VIEW) == Scope(groups=frozenset({"demo"}))
+    assert scope_for(GROUP, Permission.AUDIT_VIEW) == Scope(groups=frozenset({("demo", "demo")}))
     assert not scope_for(GROUP, Permission.AUDIT_VIEW).contains("demo", None)
     assert scope_for(ORG, Permission.AUDIT_VIEW).contains("demo", None)
     assert not scope_for(ORG, Permission.AUDIT_VIEW).contains(None, None)
@@ -329,7 +337,7 @@ def test_retention_scope_is_the_organisation() -> None:
 def test_staff_scope_is_the_organisation_or_the_groups() -> None:
     # ADR 0046: a group admin sees the staff of their own groups.
     assert scope_for(ORG, Permission.STAFF_VIEW) == Scope(organisations=frozenset({"demo"}))
-    assert scope_for(GROUP, Permission.STAFF_VIEW) == Scope(groups=frozenset({"demo"}))
+    assert scope_for(GROUP, Permission.STAFF_VIEW) == Scope(groups=frozenset({("demo", "demo")}))
     assert scope_for(SUPER, Permission.STAFF_VIEW) == Scope(everything=True)
 
 
@@ -339,11 +347,12 @@ def test_scope_for_rejects_global_permissions() -> None:
 
 
 def test_scope_contains() -> None:
-    scope = Scope(organisations=frozenset({"demo"}), groups=frozenset({"x"}))
+    scope = Scope(organisations=frozenset({"demo"}), groups=frozenset({("andere", "x")}))
 
     assert scope.contains("demo", "anything")
     assert scope.contains("andere", "x")
     assert not scope.contains("andere", "y")
+    assert not scope.contains("elders", "x")  # ADR 0049: a group only with its organisation
     assert Scope(everything=True).contains("a", "b")
     assert not Scope().contains("a", "b")
 
@@ -386,7 +395,7 @@ def test_holding_every_role_decides_and_lists_like_the_superuser(permission: Per
 def test_permissions_for_lists_rights_with_their_scope() -> None:
     rights = dict(permissions_for(GROUP))
 
-    assert rights[Permission.SCHEDULE_MANAGE] == Scope(groups=frozenset({"demo"}))
+    assert rights[Permission.SCHEDULE_MANAGE] == Scope(groups=frozenset({("demo", "demo")}))
     assert rights[Permission.DASHBOARD_VIEW] is None  # global: no scope
     assert Permission.GROUP_EDIT not in rights
     assert permissions_for(NOBODY) == []

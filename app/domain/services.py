@@ -17,7 +17,7 @@ organisation's ``ConfirmPolicy``. A booking that is moved or rescheduled keeps t
 confirmation it had (the address was already verified), so it is placed confirmed.
 
 A participant can move a booking until its change deadline (``Group.change_deadline``: the group's
-``citizen_change_lead_minutes`` before the start, 60 by default) and cancel it until its start
+``participant_change_lead_minutes`` before the start, 60 by default) and cancel it until its start
 (``Group.cancel_deadline``, ADR 0069); after that, reschedule and cancel raise
 ``booking_locked``. A booking suspended by an emergency closure (ADR 0024) has no deadline:
 the participant can move or cancel it until it is resolved. No slot inside a closure is offered
