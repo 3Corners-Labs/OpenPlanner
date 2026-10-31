@@ -918,7 +918,19 @@ On a branch `release/v0.3.0` (or ask Claude Code: "make the release PR for v0.3.
 1. `pyproject.toml`: `version = "0.3.0"`, then `uv lock` (only the `openplanner` line changes).
 2. `CHANGELOG.md`: rename `## Unreleased` to `## 0.3.0 (2026-11-02)` and put a fresh empty
    `## Unreleased` above it.
-3. Commit `chore(release): v0.3.0`, open the PR, merge it (squash) when CI is green.
+3. Commit `chore(release): v0.3.0` and open the PR.
+4. For a minor or major release (`vX.Y.0`), run the audit on the release branch (ADR 0078):
+
+   ```sh
+   make release-audit
+   ```
+
+   It runs the Codex CLI (`codex`, a second model, read-only) over everything since the last
+   release. Paste the findings into the PR under `## Release audit`: P1 findings are fixed
+   first, P2 findings become issues, and the section ends with `Verdict: pass`. `main.yml`
+   refuses a `vX.Y.0` tag whose release PR has no such section. A patch release skips this.
+5. A release PR is a decision: it merges (squash) once CI is green and the product owner has
+   set the label `po:approved`.
 
 ### Step 3: the tag
 
@@ -1326,7 +1338,7 @@ caller by pseudonym (`client:<16 hex>`), never by IP address:
 
 | Entry | Means | What to do |
 |---|---|---|
-| *Te veel verzoeken*, `too_many_requests` (`surface:web` or `surface:agent`) | one caller went over a rate limit | many from one caller: a scanner or bot, block it at the proxy or firewall; from `many` callers: a distributed attack |
+| *Te veel verzoeken*, `too_many_requests` (`surface:web`, `surface:agent` or `surface:links`) | one caller went over a rate limit | many from one caller: a scanner or bot, block it at the proxy or firewall; from `many` callers: a distributed attack |
 | *Verzoek geweigerd*, `honeypot` | a bot filled in the hidden field of the booking form | nothing for one; a stream: consider Turnstile (feature flag) |
 | *Verzoek geweigerd*, `cross_site` / `origin_mismatch` | a form post from another site (CSRF attempt), or a proxy that rewrites `Origin` | check the proxy if it comes from all callers |
 | *Inloggen*, outcome denied, `invalid_state` / `invalid_token` / `nonce_mismatch` | a failed admin login | one: an expired login tab; many from one caller: an attack on the login |
