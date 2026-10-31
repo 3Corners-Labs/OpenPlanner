@@ -381,3 +381,30 @@ async def test_alert_preferences_survive_a_fresh_login_but_not_a_logout(site: Si
 
     assert _alerts(after_login) == (False, "off")
     assert _alerts(after_logout) == (True, "warnings")
+
+
+def _main_width(page: str) -> str:
+    """Return the ``data-width`` of the ``<main>`` element of ``page``."""
+    found = re.search(r'<main id="content"[^>]*data-width="([^"]+)"', page)
+    assert found, "the page has no data-width on <main>"
+    return found.group(1)
+
+
+async def test_a_data_view_page_is_wide_and_a_reading_page_is_standard(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    overview = (await site.client.get("/admin/")).text
+    audit = (await site.client.get("/admin/audit")).text
+    retention = (await site.client.get("/admin/retention")).text
+
+    assert _main_width(overview) == "wide"
+    assert _main_width(audit) == "wide"
+    assert _main_width(retention) == "standard"
+
+
+async def test_a_message_page_keeps_the_standard_width(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    page = (await site.client.get("/admin/help/no-such-topic")).text
+
+    assert _main_width(page) == "standard"

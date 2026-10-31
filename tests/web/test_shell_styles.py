@@ -85,3 +85,94 @@ def test_the_profile_summary_has_no_marker_or_chevron() -> None:
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_a_chosen_theme_sets_the_colour_scheme(theme: str) -> None:
     assert f"color-scheme: {theme}" in _rule(f'body.admin[data-theme="{theme}"]')
+
+
+# --- Page width framework (ADR 0080) --------------------------------------------------------
+
+RULE = re.compile(r"([^{}]+)\{([^{}]*)\}")
+"""An innermost CSS rule (also inside an at-rule): selector and declarations."""
+
+FIXED_CAPS = frozenset(
+    {
+        ".admin-scope summary",
+        ".admin-scope__panel",
+        ".admin-profile__panel",
+        ".card--message",
+        ".timeline__hint",
+        ".admin-public__header",
+        ".admin-public__card",
+        ".brand-preview__logo",
+        ".brand-preview__header--logo .brand-preview__logo",
+        ".more",
+    }
+)
+"""Components that cap their own width in rem or ch. A page container never does (ADR 0080)."""
+
+NOT_A_CAP = {"none", "100%"}
+
+
+def _rules() -> list[tuple[str, str]]:
+    """Return every (selector, declarations) pair of ``admin.css``, comments removed."""
+    sheet = CSS_COMMENT.sub("", (STATIC / "admin.css").read_text())
+    return [(" ".join(sel.split()), body) for sel, body in RULE.findall(sheet)]
+
+
+def _token(name: str) -> str:
+    """Return the value of the custom property ``name`` in the first ``:root``-like block."""
+    found = re.search(rf"{re.escape(name)}:\s*([^;]+);", (STATIC / "admin.css").read_text())
+    assert found, f"no token {name}"
+    return found.group(1).strip()
+
+
+def test_the_two_page_widths_are_tokens_and_wide_is_wider() -> None:
+    standard = float(_token("--adm-width-standard").removesuffix("rem"))
+    wide = float(_token("--adm-width-wide").removesuffix("rem"))
+
+    assert standard < wide
+
+
+def test_the_page_container_takes_its_width_from_the_tokens() -> None:
+    assert "max-width: var(--adm-width-standard)" in _rule(".admin-main")
+    assert "max-width: var(--adm-width-wide)" in _rule('.admin-main[data-width="wide"]')
+    assert "--adm-content-width" not in (STATIC / "admin.css").read_text()
+
+
+def test_a_form_in_a_wide_page_keeps_the_reading_width() -> None:
+    capped = _rule('.admin-main[data-width="wide"] > form.card')
+
+    assert "max-width: var(--adm-width-standard)" in capped
+
+
+def test_only_known_components_cap_their_own_width() -> None:
+    caps = {
+        sel
+        for sel, body in _rules()
+        for value in re.findall(r"(?<![-\w])max-width:\s*([^;]+);", body)
+        if value.strip() not in NOT_A_CAP and "var(--adm-width" not in value
+        for sel in sel.split(", ")
+        if not sel.startswith(".admin-bottombar")
+    }
+
+    assert caps - FIXED_CAPS == set(), (
+        "a new width cap: a page container takes --adm-width-standard or --adm-width-wide "
+        "(declared in app/web/navigation.py, ADR 0080); a component may be added to FIXED_CAPS"
+    )
+
+
+# --- The weekly schedule is seven columns or one (ADR 0080) -----------------------------------
+
+
+def test_the_week_never_wraps_into_six_and_one() -> None:
+    week = _rule(".week")
+
+    assert "auto-fit" not in week
+    assert "auto-fill" not in week
+    assert "container-type: inline-size" in _rule(".week-frame")
+    assert "repeat(7, minmax(0, 1fr))" in CSS_COMMENT.sub("", (STATIC / "admin.css").read_text())
+
+
+def test_the_week_markup_sits_in_its_frame() -> None:
+    template = (ADMIN_TEMPLATES / "_week.html").read_text()
+
+    assert '<div class="week-frame">' in template
+    assert template.index("week-frame") < template.index('class="week"')
