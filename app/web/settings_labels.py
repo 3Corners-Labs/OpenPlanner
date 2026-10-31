@@ -43,6 +43,7 @@ SETTING_LABELS: dict[str, str] = {
     "database_max_mb": "settings.field.database_max_mb.label",
     "rate_limit_bookings": "settings.field.rate_limit_bookings.label",
     "rate_limit_reads": "settings.field.rate_limit_reads.label",
+    "rate_limit_unknown_links": "settings.field.rate_limit_unknown_links.label",
     "rate_limit_agent_tokens": "settings.field.rate_limit_agent_tokens.label",
     "rate_limit_agent_calls": "settings.field.rate_limit_agent_calls.label",
     "admin_session_hours": "settings.field.admin_session_hours.label",
