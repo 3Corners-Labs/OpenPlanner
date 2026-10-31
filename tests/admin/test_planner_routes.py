@@ -127,7 +127,7 @@ async def test_a_planner_cancels_with_a_fixed_reason(site: Site) -> None:
     response = await _post(site, path, {"reason": "technical"})
 
     assert '<option value="technical">Technische storing</option>' in form
-    assert "De burger krijgt hiervan altijd bericht" in form
+    assert "De deelnemer krijgt hiervan altijd bericht" in form
     assert invalid.status_code == 422
     assert response.status_code == 303
     assert await _status(site, booking_id) == (BookingStatus.CANCELLED, ChangeReason.TECHNICAL)
@@ -224,7 +224,7 @@ async def test_a_planner_asks_a_citizen_to_choose_a_new_time(site: Site) -> None
     assert f'href="{path}"' in agenda
     assert "De plek in dit tijdslot komt meteen vrij" in form
     assert response.status_code == 303
-    assert "Burgers gevraagd een nieuwe tijd te kiezen: 1" in after
+    assert "Deelnemers gevraagd een nieuwe tijd te kiezen: 1" in after
     assert "Wacht op nieuwe tijd</span>" in after
     assert f"OP-{booking_id:06d} · Ada" in waiting
     assert "vrijdag 16 januari 2026, 09:00" in waiting  # lapses 14 days after the start
@@ -251,7 +251,7 @@ async def test_a_short_slot_is_asked_to_rebook_after_a_confirmation(site: Site) 
         {"start": FRIDAY_0900.isoformat(), "ids": str(newest), "reason": "technical"},
     )
 
-    assert "Burgers om een nieuwe tijd vragen" in agenda
+    assert "Deelnemers om een nieuwe tijd vragen" in agenda
     assert confirm.status_code == 200
     assert f"OP-{newest:06d} · Ada" in confirm.text
     assert "Om een nieuwe tijd vragen (1)" in confirm.text

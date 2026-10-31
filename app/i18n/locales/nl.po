@@ -783,7 +783,7 @@ msgid "admin.matrix.title"
 msgstr "Rechtenmatrix"
 
 msgid "admin.matrix.intro"
-msgstr "Overzicht van wat elke rol mag, per organisatie en per groep. Rechten met het kenmerk Alleen superuser liggen vast. Rechten met het kenmerk Persoonsgegevens tonen gegevens van burgers. Alleen de superuser kan rollen aanpassen; elke wijziging wordt vastgelegd en staat onderaan deze pagina. Welke rol iemand heeft, regelt uw organisatie in de identity provider."
+msgstr "Overzicht van wat elke rol mag, per organisatie en per groep. Rechten met het kenmerk Alleen superuser liggen vast. Rechten met het kenmerk Persoonsgegevens tonen gegevens van deelnemers. Alleen de superuser kan rollen aanpassen; elke wijziging wordt vastgelegd en staat onderaan deze pagina. Welke rol iemand heeft, regelt uw organisatie in de identity provider."
 
 msgid "admin.matrix.level"
 msgstr "Niveau"
@@ -1137,16 +1137,16 @@ msgid "admin.field.queue_free_pick_allowed_hint"
 msgstr "Nee: medewerkers pakken altijd de volgende op. Ja: ze kunnen ook een andere afspraak uit de lijst oppakken."
 
 msgid "admin.field.citizen_change_lead_minutes"
-msgstr "Verplaatsen door de burger tot (minuten vooraf)"
+msgstr "Verplaatsen door de deelnemer tot (minuten vooraf)"
 
 msgid "admin.field.citizen_change_lead_minutes_hint"
-msgstr "Tot hoeveel minuten voor de start de burger de afspraak nog kan verplaatsen. Annuleren kan altijd tot de start. Niet korter dan Doorzetten naar de wachtrij, hoogstens 1440. Standaard 60."
+msgstr "Tot hoeveel minuten voor de start de deelnemer de afspraak nog kan verplaatsen. Annuleren kan altijd tot de start. Niet korter dan Doorzetten naar de wachtrij, hoogstens 1440. Standaard 60."
 
 msgid "admin.field.trial_call_enabled"
-msgstr "Proefgesprek voor de burger"
+msgstr "Proefgesprek voor de deelnemer"
 
 msgid "admin.field.trial_call_enabled_hint"
-msgstr "Ja: de burger kan vooraf in een echte Webex-meeting uitproberen of camera, microfoon en luidsprekers werken. De meeting is van de Webex-host van deze groep; er komt niemand van het team in. Alleen met een Webex-host."
+msgstr "Ja: de deelnemer kan vooraf in een echte Webex-meeting uitproberen of camera, microfoon en luidsprekers werken. De meeting is van de Webex-host van deze groep; er komt niemand van het team in. Alleen met een Webex-host."
 
 msgid "admin.field.trial_call_minutes"
 msgstr "Proefgesprek blijft open (minuten)"
@@ -1167,10 +1167,10 @@ msgid "admin.form.error.trial_calls_per_booking"
 msgstr "Vul een aantal in van 1 tot 5."
 
 msgid "call.event.trial_created"
-msgstr "Proefgesprek geopend door de burger"
+msgstr "Proefgesprek geopend door de deelnemer"
 
 msgid "call.event.trial_joined"
-msgstr "Burger ging het proefgesprek in"
+msgstr "Deelnemer ging het proefgesprek in"
 
 msgid "call.event.trial_failed"
 msgstr "Proefgesprek openen mislukt"
@@ -1965,7 +1965,7 @@ msgid "admin.planner.accept_shortfall_hint"
 msgstr "Alleen nodig als het gekozen tijdslot daardoor een tekort krijgt."
 
 msgid "admin.planner.citizen_told"
-msgstr "De burger krijgt hiervan altijd bericht per e-mail, en per sms als er een telefoonnummer is."
+msgstr "De deelnemer krijgt hiervan altijd bericht per e-mail, en per sms als er een telefoonnummer is."
 
 msgid "admin.planner.back"
 msgstr "Terug naar de agenda"
@@ -1974,7 +1974,7 @@ msgid "admin.planner.cancel_title"
 msgstr "Afspraak {reference} annuleren"
 
 msgid "admin.planner.cancel_lead"
-msgstr "{first_name}, {when}. Kies de reden die de burger in het bericht leest."
+msgstr "{first_name}, {when}. Kies de reden die de deelnemer in het bericht leest."
 
 msgid "admin.planner.reason"
 msgstr "Reden"
@@ -2004,7 +2004,7 @@ msgid "admin.agenda.rebook"
 msgstr "Om nieuwe tijd vragen"
 
 msgid "admin.agenda.slot_rebook"
-msgstr "Burgers om een nieuwe tijd vragen"
+msgstr "Deelnemers om een nieuwe tijd vragen"
 
 msgid "admin.agenda.waiting_list"
 msgstr "Wacht op nieuwe tijd"
@@ -2013,10 +2013,10 @@ msgid "admin.planner.rebook_title"
 msgstr "Om een nieuwe tijd vragen voor {reference}"
 
 msgid "admin.planner.rebook_lead"
-msgstr "{first_name}, {when}. De burger kiest zelf een nieuwe tijd."
+msgstr "{first_name}, {when}. De deelnemer kiest zelf een nieuwe tijd."
 
 msgid "admin.planner.rebook_explain"
-msgstr "De plek in dit tijdslot komt meteen vrij. De burger krijgt een bericht met de reden en een link om een nieuwe tijd te kiezen, en {reminder} dagen voor het verlopen een herinnering. Kiest de burger binnen {days} dagen na de oorspronkelijke tijd niets, dan vervalt de afspraak."
+msgstr "De plek in dit tijdslot komt meteen vrij. De deelnemer krijgt een bericht met de reden en een link om een nieuwe tijd te kiezen, en {reminder} dagen voor het verlopen een herinnering. Kiest de deelnemer binnen {days} dagen na de oorspronkelijke tijd niets, dan vervalt de afspraak."
 
 msgid "admin.planner.rebook_button"
 msgstr "Om een nieuwe tijd vragen"
@@ -2037,7 +2037,7 @@ msgid "admin.planner.waiting_title"
 msgstr "Wacht op nieuwe tijd"
 
 msgid "admin.planner.waiting_lead"
-msgstr "Afspraken waarvoor de burger is gevraagd een nieuwe tijd te kiezen. U kunt ze zelf verplaatsen of annuleren."
+msgstr "Afspraken waarvoor de deelnemer is gevraagd een nieuwe tijd te kiezen. U kunt ze zelf verplaatsen of annuleren."
 
 msgid "admin.planner.waiting_booking"
 msgstr "Afspraak"
@@ -2052,7 +2052,7 @@ msgid "admin.planner.waiting_empty"
 msgstr "Er wachten geen afspraken op een nieuwe tijd."
 
 msgid "admin.done.rebook_requested"
-msgstr "Burgers gevraagd een nieuwe tijd te kiezen: {count}. De plekken zijn vrijgekomen."
+msgstr "Deelnemers gevraagd een nieuwe tijd te kiezen: {count}. De plekken zijn vrijgekomen."
 
 msgid "admin.form.error.slot_changed"
 msgstr "Dit tijdslot is intussen veranderd. Controleer de lijst en bevestig opnieuw."
@@ -2136,7 +2136,7 @@ msgid "call.event.task_marked_cancelled"
 msgstr "Taak als geannuleerd gemarkeerd"
 
 msgid "call.event.citizen_left"
-msgstr "Burger stopte met wachten"
+msgstr "Deelnemer stopte met wachten"
 
 msgid "admin.booking.end_not_possible"
 msgstr "De afspraak is geannuleerd en de taak is via de v2-API als geannuleerd gemarkeerd (Soort: cancelled; zie de tijdlijn), maar WxCC liet OpenPlanner de taak niet beëindigen. Beëindig de taak in Agent Desktop als die nog openstaat."
@@ -2518,7 +2518,7 @@ msgid "admin.nav.closures"
 msgstr "Noodsluiting"
 
 msgid "admin.done.closure_started"
-msgstr "De noodsluiting is ingesteld. Opgeschorte afspraken: {count}. De burgers krijgen een e-mail."
+msgstr "De noodsluiting is ingesteld. Opgeschorte afspraken: {count}. De deelnemers krijgen een e-mail."
 
 msgid "admin.done.closure_updated"
 msgstr "De noodsluiting is bijgewerkt. E-mails met de update: {count}."
@@ -2527,13 +2527,13 @@ msgid "admin.done.closure_lifted"
 msgstr "De noodsluiting is opgeheven. Weer bevestigde afspraken: {count}."
 
 msgid "admin.done.reinstated"
-msgstr "Weer bevestigde afspraken: {count}. De burgers krijgen bericht."
+msgstr "Weer bevestigde afspraken: {count}. De deelnemers krijgen bericht."
 
 msgid "admin.done.cancelled"
-msgstr "Geannuleerde afspraken: {count}. De burgers krijgen bericht."
+msgstr "Geannuleerde afspraken: {count}. De deelnemers krijgen bericht."
 
 msgid "admin.done.moved"
-msgstr "De afspraak is verzet. De burger krijgt een e-mail met de nieuwe tijd."
+msgstr "De afspraak is verzet. De deelnemer krijgt een e-mail met de nieuwe tijd."
 
 msgid "admin.done.organisation_closed"
 msgstr "Teams gesloten: {count}. Teams die al gesloten waren, zijn ongewijzigd."
@@ -2593,7 +2593,7 @@ msgid "admin.audit.detail.planner_cancel"
 msgstr "afspraak geannuleerd door een planner"
 
 msgid "admin.audit.detail.planner_rebook"
-msgstr "burger gevraagd een nieuwe tijd te kiezen"
+msgstr "deelnemer gevraagd een nieuwe tijd te kiezen"
 
 msgid "admin.audit.detail.bulk"
 msgstr "voor een heel tijdslot"
@@ -2629,10 +2629,10 @@ msgid "admin.closure.ends_at_hint"
 msgstr "Leeg laten voor tot nader bericht. Tijd van het team."
 
 msgid "admin.closure.notice_nl"
-msgstr "Toelichting voor burgers (Nederlands)"
+msgstr "Toelichting voor deelnemers (Nederlands)"
 
 msgid "admin.closure.notice_en"
-msgstr "Toelichting voor burgers (Engels)"
+msgstr "Toelichting voor deelnemers (Engels)"
 
 msgid "admin.closure.notice_hint"
 msgstr "Getoond op de afspraakpagina en in de e-mail. Gewone tekst, hooguit {limit} tekens; geen persoonsgegevens."
@@ -2641,7 +2641,7 @@ msgid "admin.closure.current"
 msgstr "Huidige noodsluiting"
 
 msgid "admin.closure.current_lead"
-msgstr "Zo zien burgers de melding op de afspraakpagina."
+msgstr "Zo zien deelnemers de melding op de afspraakpagina."
 
 msgid "admin.closure.update"
 msgstr "Noodsluiting aanpassen"
@@ -2650,7 +2650,7 @@ msgid "admin.closure.update_lead"
 msgstr "Verleng of verkort de sluiting en werk de toelichting bij. Afspraken die door een later einde in de sluiting vallen, worden opgeschort."
 
 msgid "admin.closure.notify"
-msgstr "Stuur de nieuwe toelichting per e-mail naar alle burgers met een opgeschorte afspraak ({count})"
+msgstr "Stuur de nieuwe toelichting per e-mail naar alle deelnemers met een opgeschorte afspraak ({count})"
 
 msgid "admin.closure.update_button"
 msgstr "Opslaan"
@@ -2662,7 +2662,7 @@ msgid "admin.closure.lift_lead"
 msgstr "Het team is direct weer te boeken. Opgeschorte afspraken blijven staan tot ze verzet, bevestigd of geannuleerd zijn."
 
 msgid "admin.closure.lift_reinstate"
-msgstr "Afspraken die nog kunnen doorgaan weer bevestigen (de burger krijgt bericht)"
+msgstr "Afspraken die nog kunnen doorgaan weer bevestigen (de deelnemer krijgt bericht)"
 
 msgid "admin.closure.lift_button"
 msgstr "Opheffen"
@@ -2671,7 +2671,7 @@ msgid "admin.closure.start"
 msgstr "Team noodsluiten"
 
 msgid "admin.closure.start_lead"
-msgstr "Er staan {count} bevestigde afspraken gepland. Afspraken in de sluiting worden opgeschort, niet verwijderd: de burger krijgt een e-mail met uw toelichting en kan zelf een nieuwe tijd kiezen."
+msgstr "Er staan {count} bevestigde afspraken gepland. Afspraken in de sluiting worden opgeschort, niet verwijderd: de deelnemer krijgt een e-mail met uw toelichting en kan zelf een nieuwe tijd kiezen."
 
 msgid "admin.closure.start_button"
 msgstr "Team sluiten"
@@ -2722,7 +2722,7 @@ msgid "admin.closure.move_title"
 msgstr "Afspraak {reference} verzetten"
 
 msgid "admin.closure.move_lead"
-msgstr "Oorspronkelijke tijd: {when}. De burger krijgt een e-mail met de nieuwe tijd en een nieuwe beheerlink."
+msgstr "Oorspronkelijke tijd: {when}. De deelnemer krijgt een e-mail met de nieuwe tijd en een nieuwe beheerlink."
 
 msgid "admin.closure.move_start"
 msgstr "Nieuwe tijd"
@@ -2773,7 +2773,7 @@ msgid "admin.closures.start"
 msgstr "Alle teams noodsluiten"
 
 msgid "admin.closures.start_lead"
-msgstr "Afspraken in de sluiting worden opgeschort, niet verwijderd; elke burger krijgt een e-mail met uw toelichting. Tijden gelden in de tijdzone van de teams."
+msgstr "Afspraken in de sluiting worden opgeschort, niet verwijderd; elke deelnemer krijgt een e-mail met uw toelichting. Tijden gelden in de tijdzone van de teams."
 
 msgid "admin.closures.start_button"
 msgstr "Alle teams sluiten"
@@ -2800,7 +2800,7 @@ msgid "admin.channels.title"
 msgstr "Berichtkanalen"
 
 msgid "admin.channels.lead"
-msgstr "Via welke mailserver en welke sms-dienst burgers berichten van deze organisatie krijgen."
+msgstr "Via welke mailserver en welke sms-dienst deelnemers berichten van deze organisatie krijgen."
 
 msgid "admin.integrations.channels_lead"
 msgstr "Mailserver en sms-dienst per organisatie. Kies een organisatie om ze in te stellen."
@@ -2875,7 +2875,7 @@ msgid "admin.channels.sender_address"
 msgstr "Afzenderadres"
 
 msgid "admin.channels.sender_address_hint"
-msgstr "Het adres dat burgers zien en waarop zij kunnen antwoorden."
+msgstr "Het adres dat deelnemers zien en waarop zij kunnen antwoorden."
 
 msgid "admin.channels.sender_name"
 msgstr "Afzendernaam"
@@ -2980,7 +2980,7 @@ msgid "admin.reminders.title"
 msgstr "Herinneringen"
 
 msgid "admin.reminders.lead"
-msgstr "Wanneer en hoe burgers aan hun afspraak worden herinnerd. Wijzigingen gelden voor nieuwe boekingen; geplande herinneringen van bestaande boekingen blijven staan."
+msgstr "Wanneer en hoe deelnemers aan hun afspraak worden herinnerd. Wijzigingen gelden voor nieuwe boekingen; geplande herinneringen van bestaande boekingen blijven staan."
 
 msgid "admin.reminders.none"
 msgstr "Er zijn geen herinneringen ingesteld."
@@ -3031,7 +3031,7 @@ msgid "admin.reminders.add"
 msgstr "Herinnering toevoegen"
 
 msgid "admin.reminders.add_lead"
-msgstr "Een sms gaat alleen naar burgers die een telefoonnummer hebben opgegeven."
+msgstr "Een sms gaat alleen naar deelnemers die een telefoonnummer hebben opgegeven."
 
 msgid "admin.reminders.no_phone"
 msgstr "Het boekingsformulier van deze groep vraagt geen telefoonnummer, dus sms is niet mogelijk."
@@ -3061,7 +3061,7 @@ msgid "admin.messages.title"
 msgstr "Berichtteksten"
 
 msgid "admin.messages.lead"
-msgstr "De teksten van de berichten aan burgers. Opmaak, links en de agenda-bijlage blijven vast; u past alleen de tekst aan."
+msgstr "De teksten van de berichten aan deelnemers. Opmaak, links en de agenda-bijlage blijven vast; u past alleen de tekst aan."
 
 msgid "admin.messages.languages"
 msgstr "Taal van de teksten"
@@ -3531,7 +3531,7 @@ msgid "admin.holidays.upcoming"
 msgstr "Komende feestdagen"
 
 msgid "admin.holidays.upcoming_lead"
-msgstr "De feestdagen van het komende jaar uit de kalenders die voor deze groep gelden. Op een gesloten dag kunnen burgers geen afspraak maken."
+msgstr "De feestdagen van het komende jaar uit de kalenders die voor deze groep gelden. Op een gesloten dag kunnen deelnemers geen afspraak maken."
 
 msgid "admin.holidays.state"
 msgstr "Deze groep"
@@ -4578,7 +4578,7 @@ msgid "admin.check.webex.trial_ok"
 msgstr "Een proefgesprek-meeting voor host {host} (deelnemers mogen vóór de host binnen) is gepland en weer verwijderd."
 
 msgid "admin.check.webex.trial_refused"
-msgstr "Webex weigerde een proefgesprek-meeting voor host {host} ({error}): {reason}. Burgers kunnen dan geen proefgesprek openen; controleer op de Webex-site of deelnemers vóór de host mogen binnenkomen."
+msgstr "Webex weigerde een proefgesprek-meeting voor host {host} ({error}): {reason}. Deelnemers kunnen dan geen proefgesprek openen; controleer op de Webex-site of deelnemers vóór de host mogen binnenkomen."
 
 msgid "admin.check.webex.trial_left"
 msgstr "De proefgesprek-meeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
@@ -4733,7 +4733,7 @@ msgid "admin.simulator.event.host_joined"
 msgstr "Agent komt binnen"
 
 msgid "admin.simulator.event.guest_joined"
-msgstr "Burger komt binnen"
+msgstr "Deelnemer komt binnen"
 
 msgid "admin.simulator.event.participant_left"
 msgstr "Deelnemer vertrekt"
@@ -4777,7 +4777,7 @@ msgid "admin.environment.test"
 msgstr "Testomgeving"
 
 msgid "admin.environment.text"
-msgstr "Niet voor echte afspraken van burgers."
+msgstr "Niet voor echte afspraken van deelnemers."
 
 msgid "admin.environment.simulator"
 msgstr "Simulator staat aan"
@@ -4801,7 +4801,7 @@ msgid "admin.retention.title"
 msgstr "Bewaartermijnen"
 
 msgid "admin.retention.intro"
-msgstr "Controle of persoonsgegevens van burgers op tijd worden verwijderd, per groep. U ziet hier alleen aantallen en tijden, nooit gegevens van burgers."
+msgstr "Controle of persoonsgegevens van deelnemers op tijd worden verwijderd, per groep. U ziet hier alleen aantallen en tijden, nooit gegevens van deelnemers."
 
 msgid "admin.retention.in_order"
 msgstr "In orde: er zijn geen persoonsgegevens over hun bewaartermijn en geen mislukte verwijderingen."
@@ -4873,7 +4873,7 @@ msgid "admin.contacts.title"
 msgstr "Contactalternatieven"
 
 msgid "admin.contacts.lead"
-msgstr "Hoe burgers {name} kunnen bereiken als ze geen afspraak kunnen maken. Dit blok staat op de pagina van een noodsluiting en op de onderhoudspagina."
+msgstr "Hoe deelnemers {name} kunnen bereiken als ze geen afspraak kunnen maken. Dit blok staat op de pagina van een noodsluiting en op de onderhoudspagina."
 
 msgid "admin.contacts.manage"
 msgstr "Contactalternatieven beheren"
@@ -4885,10 +4885,10 @@ msgid "admin.contacts.preview"
 msgstr "Voorbeeld"
 
 msgid "admin.contacts.preview_lead"
-msgstr "Zo zien burgers het blok, zoals nu opgeslagen."
+msgstr "Zo zien deelnemers het blok, zoals nu opgeslagen."
 
 msgid "admin.contacts.empty"
-msgstr "Nog geen contactalternatieven ingesteld. Burgers zien dan alleen de tekst van de sluiting."
+msgstr "Nog geen contactalternatieven ingesteld. Deelnemers zien dan alleen de tekst van de sluiting."
 
 msgid "admin.contacts.form"
 msgstr "Contactmogelijkheden"
@@ -4998,7 +4998,7 @@ msgid "admin.group_contacts.back"
 msgstr "Terug naar de sluiting van dit team"
 
 msgid "admin.group_contacts.preview_lead"
-msgstr "Zo zien burgers het blok dat nu voor dit team geldt: het eigen blok of anders de standaard van de organisatie."
+msgstr "Zo zien deelnemers het blok dat nu voor dit team geldt: het eigen blok of anders de standaard van de organisatie."
 
 msgid "admin.group_contacts.summary_own"
 msgstr "Eigen blok met {count} contactmogelijkheden."
@@ -5088,7 +5088,7 @@ msgid "admin.roles.permissions_hint"
 msgstr "Alleen de rechten die deze rol mag krijgen staan hier. Een recht dat een ander recht nodig heeft, zegt dat erbij."
 
 msgid "admin.roles.permissions_hint_read_only"
-msgstr "Een kopie van Compliance en privacy kan alleen lezen en ziet nooit persoonsgegevens van burgers."
+msgstr "Een kopie van Compliance en privacy kan alleen lezen en ziet nooit persoonsgegevens van deelnemers."
 
 msgid "admin.roles.requires"
 msgstr "Heeft nodig: {permissions}"
@@ -5205,7 +5205,7 @@ msgid "admin.closure.image"
 msgstr "Afbeelding"
 
 msgid "admin.closure.image_lead"
-msgstr "Eén afbeelding op de sluitingspagina, onder de melding, zoals een pictogram voor ‘gesloten’ of ‘storing’. Zet nooit informatie alleen in de afbeelding: burgers die hem niet zien, lezen alleen de tekst."
+msgstr "Eén afbeelding op de sluitingspagina, onder de melding, zoals een pictogram voor ‘gesloten’ of ‘storing’. Zet nooit informatie alleen in de afbeelding: deelnemers die hem niet zien, lezen alleen de tekst."
 
 msgid "admin.closure.image_current"
 msgstr "Zo staat de afbeelding nu op de sluitingspagina."
@@ -5292,7 +5292,7 @@ msgid "admin.scenarios.name"
 msgstr "Naam"
 
 msgid "admin.scenarios.name_hint"
-msgstr "Voor beheerders, bijvoorbeeld ‘Storing’ of ‘Staking’; burgers zien deze naam niet. Hoogstens {limit} tekens."
+msgstr "Voor beheerders, bijvoorbeeld ‘Storing’ of ‘Staking’; deelnemers zien deze naam niet. Hoogstens {limit} tekens."
 
 msgid "admin.scenarios.own_group"
 msgstr "Scenario's van dit team"
@@ -5367,7 +5367,7 @@ msgid "admin.scenarios.back_to_scenario"
 msgstr "Terug naar het scenario"
 
 msgid "admin.scenarios.contacts_preview_lead"
-msgstr "Zo zien burgers het blok van dit scenario. Leeg: bij het sluiten geldt het blok van het team of de organisatie."
+msgstr "Zo zien deelnemers het blok van dit scenario. Leeg: bij het sluiten geldt het blok van het team of de organisatie."
 
 msgid "admin.form.error.scenario_name"
 msgstr "Geef het scenario een naam van hoogstens 80 tekens op één regel."
@@ -5454,7 +5454,7 @@ msgid "admin.maintenance.title"
 msgstr "Onderhoudsmodus"
 
 msgid "admin.maintenance.lead"
-msgstr "Zet de hele installatie op alleen lezen terwijl u aan het platform werkt. Burgers kunnen dan geen afspraken maken of wijzigen; afspraken die al vaststaan gaan gewoon door."
+msgstr "Zet de hele installatie op alleen lezen terwijl u aan het platform werkt. Deelnemers kunnen dan geen afspraken maken of wijzigen; afspraken die al vaststaan gaan gewoon door."
 
 msgid "admin.maintenance.state"
 msgstr "Status"
@@ -5508,7 +5508,7 @@ msgid "admin.maintenance.off_heading"
 msgstr "Onderhoudsmodus uitzetten"
 
 msgid "admin.maintenance.off_lead"
-msgstr "Burgers en beheerders kunnen daarna weer alles wat ze gewend zijn."
+msgstr "Deelnemers en beheerders kunnen daarna weer alles wat ze gewend zijn."
 
 msgid "admin.maintenance.off_lead_environment"
 msgstr "Uitzetten haalt alleen de schakelaar in het portaal weg; de onderhoudsmodus blijft aan zolang de server hem aanzet."
@@ -6218,7 +6218,7 @@ msgid "admin.org_settings.page_title"
 msgstr "Instellingen van {name}"
 
 msgid "admin.org_settings.page_lead"
-msgstr "Deze waarden gelden voor de groepen, burgerpagina's, mails en beheerders van deze organisatie. Een wijziging geldt binnen tien seconden."
+msgstr "Deze waarden gelden voor de groepen, deelnemerspagina's, mails en beheerders van deze organisatie. Een wijziging geldt binnen tien seconden."
 
 msgid "admin.org_settings.settings"
 msgstr "Instellingen"
@@ -6869,7 +6869,7 @@ msgid "admin.settings.data_fields.title"
 msgstr "Gegevensvelden"
 
 msgid "admin.settings.data_fields.intro"
-msgstr "Welke velden van een afspraak persoonsgegevens van de burger zijn, en hoe gevoelig ze zijn."
+msgstr "Welke velden van een afspraak persoonsgegevens van de deelnemer zijn, en hoe gevoelig ze zijn."
 
 msgid "admin.settings.data_fields.rule"
 msgstr "Persoonsgegevens staan alleen bij de afspraak. Ze worden alleen getoond op de afspraakpagina en in de wachtrij, aan rollen die afspraken mogen bekijken of de wachtrij bedienen; de agenda toont alleen de voornaam. Ze staan nooit op het overzicht, in lijsten, in het auditlog of de export daarvan, in een zoekresultaat of in een melding, en zoeken of filteren werkt er nooit op."
@@ -6890,10 +6890,10 @@ msgid "admin.settings.data_fields.stored_on"
 msgstr "Opgeslagen bij"
 
 msgid "admin.settings.data_fields.direct"
-msgstr "Direct: identificeert de burger op zichzelf"
+msgstr "Direct: identificeert de deelnemer op zichzelf"
 
 msgid "admin.settings.data_fields.sensitive"
-msgstr "Gevoelig: wat de burger ons vertelde, of een koppeling naar het gesprek"
+msgstr "Gevoelig: wat de deelnemer ons vertelde, of een koppeling naar het gesprek"
 
 msgid "admin.settings.data_fields.field.first_name"
 msgstr "Voornaam"
@@ -6914,7 +6914,7 @@ msgid "admin.settings.data_fields.field.form_answers"
 msgstr "Antwoorden op de eigen vragen van het team"
 
 msgid "admin.settings.data_fields.field.guest_join_url"
-msgstr "Deelnamekoppeling van de burger"
+msgstr "Deelnamekoppeling van de deelnemer"
 
 msgid "admin.settings.data_fields.field.host_join_url"
 msgstr "Deelnamekoppeling van de medewerker"
@@ -7231,10 +7231,10 @@ msgstr "De server kan de sleutel niet wegschrijven naar het volume van de proxy.
 # ADR 0074: the organisation's own texts for citizens.
 
 msgid "admin.org_texts.title"
-msgstr "Teksten voor burgers"
+msgstr "Teksten voor deelnemers"
 
 msgid "admin.org_texts.lead"
-msgstr "Hier past u de teksten aan die burgers van {name} zien op de pagina's van de groepen en in mails en sms'jes. Opmaak, links en de agenda-bijlage blijven vast; u past alleen de tekst aan."
+msgstr "Hier past u de teksten aan die deelnemers van {name} zien op de pagina's van de groepen en in mails en sms'jes. Opmaak, links en de agenda-bijlage blijven vast; u past alleen de tekst aan."
 
 msgid "admin.org_texts.languages_heading"
 msgstr "Taal van de teksten"
@@ -7249,10 +7249,10 @@ msgid "admin.org_texts.save_hint"
 msgstr "Maak een veld leeg om de standaardtekst terug te zetten. Teksten zijn gewone tekst: opmaak of code wordt als tekst getoond."
 
 msgid "admin.org_texts.section_pages"
-msgstr "Pagina's voor burgers"
+msgstr "Pagina's voor deelnemers"
 
 msgid "admin.org_texts.link_title"
-msgstr "Teksten voor burgers"
+msgstr "Teksten voor deelnemers"
 
 msgid "admin.org_texts.link_lead"
 msgstr "Pas de teksten op de pagina's van de groepen en in de mails en sms'jes aan voor de hele organisatie."
@@ -7333,7 +7333,7 @@ msgid "admin.channels.reply_to_address"
 msgstr "Antwoordadres"
 
 msgid "admin.channels.reply_to_address_hint"
-msgstr "Waar een antwoord van een burger naartoe gaat (Reply-To). Leeg: een antwoord gaat naar het afzenderadres."
+msgstr "Waar een antwoord van een deelnemer naartoe gaat (Reply-To). Leeg: een antwoord gaat naar het afzenderadres."
 
 msgid "admin.channels.dkim_selector"
 msgstr "DKIM-selector"
