@@ -22,8 +22,10 @@ The overview never shows citizens' personal data: only counts, group names and t
 
 - **Queue across my groups**: for each group with an own queue within your reach, how many
   citizens wait, how long the longest wait has been and how many staff who may work the queue
-  are signed in now. The group name opens the queue. Counts and minutes only, never names.
-  Colours for a wait that is too long follow with the wait thresholds.
+  are signed in now. A participant with an appointment counts once they are in the lobby; a
+  direct call counts from the request, even before the link is opened. The group name opens
+  the queue. Counts and minutes only, never names. Colours for a wait that is too long follow
+  with the wait thresholds.
 - **Running tasks**: the background jobs that are running now and the jobs that failed after
   their last attempt, with type, state and time. Never the content of a job or the booking it
   belongs to. If something here says *Failed*, something is stuck: tell the installation's
@@ -74,6 +76,13 @@ works without JavaScript. From top to bottom:
 On a phone the bar keeps only its icons and your initials; your name is in the menu.
 
 ## The top bar
+
+At the start of the bar, before the mark, the **menu button** (three lines) collapses the side
+menu to its icons or expands it again. Collapsed, every entry keeps its name: it appears when
+you point at the icon or move the keyboard focus to it. On a tablet the menu starts collapsed
+and the button expands it; on a wider screen it starts expanded. The choice holds for this
+session and survives signing in again, like the appearance. On a phone there is no side menu
+and no button: the bar at the bottom has the first entries, *More* the rest.
 
 To the right of the portal's name sit a few shortcuts, from left to right. You only see what
 your role may open:

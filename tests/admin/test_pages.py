@@ -242,6 +242,82 @@ async def test_the_theme_survives_a_fresh_login_but_not_a_logout(site: Site) -> 
     assert _theme(after_logout) == "system"
 
 
+def _menu_width(page: str) -> str | None:
+    """Return the menu width the shell declares (``collapsed`` or ``expanded``), if any."""
+    found = re.search(r'<div class="admin-shell admin-shell--nav-([a-z]+)">', page)
+    return found.group(1) if found else None
+
+
+def _menu_buttons(page: str) -> list[tuple[str, str]]:
+    """Return (value, aria-expanded) of the top bar's menu buttons, then ("next", where to)."""
+    form_tag = '<form class="admin-nav-toggle" method="get" action="/admin/preferences">'
+    parts = page.split(form_tag, 1)
+    if len(parts) == 1:
+        return []
+    form = parts[1].split("</form>", 1)[0]
+    back = re.search(r'name="next" value="([^"]*)"', form).group(1)  # type: ignore[union-attr]
+    buttons = re.findall(
+        r'name="nav" value="([a-z]+)" class="admin-nav-toggle__button [\w-]+" '
+        r'aria-label="Menu in- of uitklappen" aria-expanded="(true|false)"',
+        form,
+    )
+    return [*buttons, ("next", back)]
+
+
+async def test_the_menu_button_offers_both_directions_until_the_admin_chooses(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    page = (await site.client.get("/admin/audit?from=2026-10-01")).text
+
+    assert _menu_width(page) is None
+    assert _menu_buttons(page) == [
+        ("collapsed", "true"),
+        ("expanded", "false"),
+        ("next", "/admin/audit?from=2026-10-01"),
+    ]
+
+
+async def test_a_chosen_menu_width_redirects_back_and_stays_for_the_session(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    chosen = await site.client.get("/admin/preferences?next=/admin/audit&nav=collapsed")
+    back = await site.client.get(chosen.headers["location"])
+    later = (await site.client.get("/admin/")).text
+    await site.client.get("/admin/preferences?next=/admin/&nav=expanded")
+    expanded = (await site.client.get("/admin/")).text
+
+    assert (chosen.status_code, chosen.headers["location"]) == (303, "/admin/audit")
+    assert _menu_width(back.text) == "collapsed"
+    assert _menu_width(later) == "collapsed"
+    assert _menu_width(expanded) == "expanded"
+
+
+async def test_an_unknown_menu_width_is_ignored_and_never_reflected(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    await site.client.get("/admin/preferences?nav=collapsed")
+
+    chosen = await site.client.get("/admin/preferences?nav=%22%3E%3Cx&next=/admin/")
+    page = (await site.client.get("/admin/")).text
+
+    assert chosen.status_code == 303
+    assert _menu_width(page) == "collapsed"
+    assert "%3Cx" not in page
+
+
+async def test_the_menu_width_survives_a_fresh_login_but_not_a_logout(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    await site.client.get("/admin/preferences?nav=collapsed")
+
+    await site.login_as(GROUP_ADMIN)
+    after_login = (await site.client.get("/admin/")).text
+    await site.client.post("/admin/logout", headers=SAME_ORIGIN)
+    await site.login_as(GROUP_ADMIN)
+    after_logout = (await site.client.get("/admin/")).text
+
+    assert _menu_width(after_login) == "collapsed"
+    assert _menu_width(after_logout) is None
+
+
 async def test_the_choices_are_buttons_and_the_current_one_is_primary(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
     await site.client.get("/admin/preferences?theme=dark")
@@ -311,6 +387,7 @@ async def test_my_rights_and_the_preferences_are_offered_only_to_who_may_use_the
     assert "<fieldset" not in page
     assert 'id="theme-label"' not in page
     assert 'href="/admin/rights"' not in page
+    assert _menu_buttons(page) == []
     assert _choices(page, "language-label")
 
 
@@ -381,3 +458,30 @@ async def test_alert_preferences_survive_a_fresh_login_but_not_a_logout(site: Si
 
     assert _alerts(after_login) == (False, "off")
     assert _alerts(after_logout) == (True, "warnings")
+
+
+def _main_width(page: str) -> str:
+    """Return the ``data-width`` of the ``<main>`` element of ``page``."""
+    found = re.search(r'<main id="content"[^>]*data-width="([^"]+)"', page)
+    assert found, "the page has no data-width on <main>"
+    return found.group(1)
+
+
+async def test_a_data_view_page_is_wide_and_a_reading_page_is_standard(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    overview = (await site.client.get("/admin/")).text
+    audit = (await site.client.get("/admin/audit")).text
+    retention = (await site.client.get("/admin/retention")).text
+
+    assert _main_width(overview) == "wide"
+    assert _main_width(audit) == "wide"
+    assert _main_width(retention) == "standard"
+
+
+async def test_a_message_page_keeps_the_standard_width(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    page = (await site.client.get("/admin/help/no-such-topic")).text
+
+    assert _main_width(page) == "standard"

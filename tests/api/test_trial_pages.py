@@ -210,3 +210,28 @@ async def test_the_trial_page_follows_the_groups_join_client(
     assert "Deelnemen via deze browser" not in browser
     assert "Deelnemen via deze browser" in choice
     assert go.headers["location"] == "https://site.webex.com/m/1"
+
+
+async def test_without_webex_a_new_trial_call_cannot_open_but_an_open_one_keeps_its_way_in(
+    site: Site, demo_settings: Settings
+) -> None:
+    await site.open()  # opened while Webex was there
+    async with app_client(
+        demo_settings, FixedClock(NOW), Integrations(None, None, FakeDispatcher())
+    ) as client:
+        page = await client.get(f"/b/{site.token}/test")
+        way_in = await client.get(f"/b/{site.token}/test/go")
+
+    assert "Naar het proefgesprek" in page.text
+    assert way_in.status_code == 303
+    assert way_in.headers["location"].startswith("https://site.webex.com/m/")
+
+    await _configure(demo_settings.database_url, trial_calls_per_booking=1)
+    async with app_client(
+        demo_settings,
+        FixedClock(NOW + timedelta(hours=1)),
+        Integrations(None, None, FakeDispatcher()),
+    ) as client:
+        later = await client.get(f"/b/{site.token}/test")
+
+    assert "Proefgesprek openen" not in later.text  # nothing new can be opened without Webex

@@ -1,4 +1,4 @@
-{#- Logged-in portal: top bar (help, profile with theme, language and alert choices) and the navigation from the register (ADR 0047) through the matrix: side navigation in sections (an icon rail on tablet), and on phone a bottom bar with the first entries and the rest behind *More* (SH-1). Which one shows is CSS only. -#}
+{#- Logged-in portal: top bar (menu button, help, profile with theme, language and alert choices) and the navigation from the register (ADR 0047) through the matrix: side navigation in sections (an icon rail on tablet, or wherever the admin collapsed it from the menu button), and on phone a bottom bar with the first entries and the rest behind *More* (SH-1). Which one shows is CSS only. -#}
 {% extends "admin/_shell.html" %}
 {% from "admin/_icons.html" import icon %}
 {% macro nav_entry(item) -%}
@@ -28,8 +28,16 @@
 {% block page %}
 {% include "admin/_environment.html" %}
 {% include "admin/_maintenance.html" %}
-<div class="admin-shell{% if not nav %} admin-shell--no-nav{% endif %}">
+<div class="admin-shell{% if not nav %} admin-shell--no-nav{% elif nav_choice %} admin-shell--nav-{{ nav_choice }}{% endif %}">
   <header class="admin-topbar">
+    {#- The menu button of the admin shell design: two submit buttons, one per direction; the stylesheet shows the one that applies to the menu as it is at this width (the rail on a tablet, the full menu on a desktop, unless the admin chose). On a phone the bottom bar has no rail, so neither shows. -#}
+    {% if nav and can("dashboard.view") %}
+    <form class="admin-nav-toggle" method="get" action="/admin/preferences">
+      <input type="hidden" name="next" value="{{ back }}">
+      <button type="submit" name="nav" value="collapsed" class="admin-nav-toggle__button admin-nav-toggle__button--collapse" aria-label="{{ _("admin.nav.toggle") }}" aria-expanded="true">{{ icon("menu") }}</button>
+      <button type="submit" name="nav" value="expanded" class="admin-nav-toggle__button admin-nav-toggle__button--expand" aria-label="{{ _("admin.nav.toggle") }}" aria-expanded="false">{{ icon("menu") }}</button>
+    </form>
+    {% endif %}
     {#- Without a menu (no role) the overview would only loop back to the refusal. -#}
     {% if nav %}<a class="admin-brand" href="/admin/">{% else %}<span class="admin-brand">{% endif %}<img class="admin-brand__mark" src="{{ static_url('brand/mark.svg') }}" alt="" width="26" height="26"><span>{{ _("admin.title") }}</span>{% if nav %}</a>{% else %}</span>{% endif %}
     {% if scope_filter is defined %}{% include "admin/_scope_filter.html" %}{% endif %}
@@ -105,7 +113,7 @@
     </ul>
   </nav>
   {% endif %}
-  <main id="content" tabindex="-1" class="admin-main">
+  <main id="content" tabindex="-1" class="admin-main" data-width="{{ content_width | default('standard') }}">
     {% if update_banner %}{% include "admin/_update_banner.html" %}{% endif %}
     {% block content %}{% endblock %}
   </main>
