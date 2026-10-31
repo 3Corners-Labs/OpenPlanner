@@ -61,9 +61,10 @@ a choice of the group, never a surprise for its team.
    `integration_probe_timeout_seconds` for `task:new` and `task:ended` on the webhook. That
    proves the token, the scopes, the asset, the flow, the subscription and the webhook path in
    one go. The flow ends a probe itself: the configuration check gets a rule **probe branch**
-   (FAIL when the flow has no Case on `kind == probe` that ends the contact). When the branch
-   is missing, OpenPlanner ends the probe itself (End Task, ADR 0021) and reports a warning;
-   when `task:new` arrives but `task:ended` does not, the check fails with `probe_not_ended`.
+   (a warning when the flow has no Case on `kind == probe` that ends the contact: OpenPlanner
+   then ends the probe itself with End Task, ADR 0021, and reports that as a warning too, so a
+   tenant without the branch keeps a passing check). When the flow has the branch and
+   `task:new` arrives but `task:ended` does not, the check fails with `probe_not_ended`.
    The probe is recorded as request events at the group's level, without a booking, like the
    probe meeting. A probe is never shown in the own queue, the agenda or the overview.
 3. **The Service App probes move into the portal.** The probes of `wxcc-check` (token
