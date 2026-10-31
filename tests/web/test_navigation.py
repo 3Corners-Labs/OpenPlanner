@@ -121,6 +121,7 @@ def test_the_organisation_is_an_object_page_with_six_tabs() -> None:
         "organisation.settings",
         "organisation.texts",
         "organisation.embedding",
+        "organisation.login",
     ]
 
 

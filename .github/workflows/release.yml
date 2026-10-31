@@ -4,7 +4,7 @@ name: release
 # product owner, and the click is the recorded instruction of ADR 0012 and ADR 0052 point 3.
 #
 #   step = release-pr   the release PR `chore(release): vX.Y.Z` (branch, pyproject.toml, uv.lock,
-#                       CHANGELOG.md, the PR template filled in, auto-merge). For a minor or
+#                       publiccode.yml, CHANGELOG.md, the PR template filled in, auto-merge). For a minor or
 #                       major version (vX.Y.0) the `audit` job then runs the independent review
 #                       of ADR 0078 and writes it into the PR body, ending with `Verdict: open`.
 #                       The product owner reads it, changes the verdict to `pass` and sets the
@@ -98,7 +98,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: python3 -m scripts.release_pr plan --version "$VERSION" | tee -a "$GITHUB_OUTPUT"
-      - name: pyproject.toml, uv.lock, CHANGELOG.md and the PR body
+      - name: pyproject.toml, uv.lock, publiccode.yml, CHANGELOG.md and the PR body
         env:
           VERSION: ${{ steps.plan.outputs.version }}
         run: python3 -m scripts.release_pr prepare --version "$VERSION" --body "$RUNNER_TEMP/body.md" --actor "$GITHUB_ACTOR"

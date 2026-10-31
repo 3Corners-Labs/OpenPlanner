@@ -124,6 +124,8 @@ class Permission(StrEnum):
     TEXTS_ORGANISATION_MANAGE = "texts.organisation.manage"
     IDP_MAPPING_VIEW = "idp_mapping.view"
     IDP_MAPPING_MANAGE = "idp_mapping.manage"
+    IDENTITY_PROVIDERS_VIEW = "identity_providers.view"
+    IDENTITY_PROVIDERS_MANAGE = "identity_providers.manage"
 
 
 LEVELS: dict[Permission, Level] = {
@@ -185,6 +187,9 @@ LEVELS: dict[Permission, Level] = {
     Permission.IDP_MAPPING_VIEW: Level.ORGANISATION,
     # ADR 0049 point 4: the IdP value of a group; not for a group admin.
     Permission.IDP_MAPPING_MANAGE: Level.ORGANISATION,
+    # ADR 0083 point 4: the status of the own organisation's providers; registering is global.
+    Permission.IDENTITY_PROVIDERS_VIEW: Level.ORGANISATION,
+    Permission.IDENTITY_PROVIDERS_MANAGE: Level.GLOBAL,
 }
 
 LOCKED_PERMISSIONS = frozenset(
@@ -200,6 +205,7 @@ LOCKED_PERMISSIONS = frozenset(
         Permission.DIAGNOSTICS_MANAGE,
         Permission.SETTINGS_PLATFORM_MANAGE,
         Permission.SETTINGS_LOGIN_MANAGE,
+        Permission.IDENTITY_PROVIDERS_MANAGE,
     }
 )
 """ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
@@ -229,6 +235,7 @@ READ_PERMISSIONS = frozenset(
         Permission.STAFF_VIEW,
         Permission.SETTINGS_PLATFORM_VIEW,
         Permission.IDP_MAPPING_VIEW,
+        Permission.IDENTITY_PROVIDERS_VIEW,
     }
 )
 """ADR 0039: permissions that only show; everything else changes something."""
@@ -297,6 +304,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         # ADR 0049: the entitlement values of the own organisations, and the groups' IdP values.
         Permission.IDP_MAPPING_VIEW,
         Permission.IDP_MAPPING_MANAGE,
+        # ADR 0083 point 4: the status of the own organisation's identity providers.
+        Permission.IDENTITY_PROVIDERS_VIEW,
     },
     # HANDOVER §6: own groups: rules, overrides, mail texts, view bookings.
     Role.GROUP_ADMIN: EVERY_ADMIN
@@ -331,6 +340,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.SETTINGS_PLATFORM_VIEW,
         # ADR 0049 point 17: the mapping is an input for the access review.
         Permission.IDP_MAPPING_VIEW,
+        # ADR 0083 point 4: which providers an organisation trusts, for the access review.
+        Permission.IDENTITY_PROVIDERS_VIEW,
     },
     # ADR 0043: picks up bookings in the own queue of its groups; sees first names only.
     Role.AGENT: EVERY_ADMIN | {Permission.GROUP_VIEW, Permission.QUEUE_WORK},

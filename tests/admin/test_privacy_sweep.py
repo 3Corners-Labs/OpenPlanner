@@ -42,6 +42,8 @@ from app.domain.staff import StaffFilter
 from app.domain.updates import Release, ReleaseCheck, Version
 from app.web.widgets import OVERVIEW_PATH, WIDGETS
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.admin.test_idp_routes import NEW_PROVIDER, organisation_claims
+from tests.fakes.identity import FakeIdentityProvider
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.routes import all_routes
 
@@ -216,6 +218,10 @@ PATHS: dict[str, str] = {
     "/admin/help/{topic}": "/admin/help/advanced-settings",
     "/admin/holidays/{calendar}": "/admin/holidays/nationaal",
     "/admin/api/clients/{client_id}": "/admin/api/clients/{client}",
+    # ADR 0083 step 2: the organisation's identity providers.
+    "/admin/organisations/{org}/login": "/admin/organisations/demo/login",
+    "/admin/organisations/{org}/login/new": "/admin/organisations/demo/login/new",
+    "/admin/organisations/{org}/login/{idp_key}": "/admin/organisations/demo/login/gem-a",
 }
 """Concrete path per parametrised admin GET route; the placeholders in braces are filled
 from ``Fixture``."""
@@ -384,6 +390,19 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     client_id = re.search(r"opc_[A-Za-z0-9_-]+", secret_page.text)
     assert client_id is not None
     found.client_id = client_id.group(0)
+    # ADR 0083 step 2: a registered provider, and its guided test login (the interstitial
+    # and the result page are reached through a POST and the callback only).
+    registered = await _post(site, "/admin/organisations/demo/login", NEW_PROVIDER)
+    assert registered.status_code == 303, registered.text
+    adapter = FakeIdentityProvider()
+    adapter.next_claims = organisation_claims(frozenset({"openplanner:org_admin:demo"}))
+    site.providers.adapters["gem-a"] = adapter
+    interstitial = await _post(site, "/admin/organisations/demo/login/gem-a/test", {})
+    assert interstitial.status_code == 200, interstitial.text
+    verdict = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+    assert verdict.status_code == 200, verdict.text
+    for page in (interstitial, verdict):
+        assert not _leaks(page.text, set()), "test login pages"
 
     site.clock.advance(TODAY_0900 - site.clock.now() - timedelta(minutes=5))
     await site.login_as(SUPER)  # the session of yesterday has expired

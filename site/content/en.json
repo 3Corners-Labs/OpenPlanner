@@ -1,0 +1,756 @@
+{
+  "lang": "en",
+  "path": "/en/",
+  "other": {
+    "lang": "nl",
+    "path": "/",
+    "label": "Nederlands",
+    "aria": "Schakel naar Nederlands"
+  },
+  "meta": {
+    "title": "OpenPlanner – video appointments with your team, booked in seconds",
+    "description": "OpenPlanner is the open-source scheduler for video calls on Webex. Participants pick a free time on a page in your branding, the call lands in Webex Contact Center, and personal data is gone 24 hours after the call."
+  },
+  "skip": "Skip to content",
+  "nav": [
+    {
+      "href": "#tour",
+      "label": "Tour"
+    },
+    {
+      "href": "#features",
+      "label": "Features"
+    },
+    {
+      "href": "#integrations",
+      "label": "Integrations"
+    },
+    {
+      "href": "#enterprise",
+      "label": "Enterprise"
+    },
+    {
+      "href": "#standards",
+      "label": "Standards"
+    },
+    {
+      "href": "#open-source",
+      "label": "Open source"
+    },
+    {
+      "href": "#roadmap",
+      "label": "Roadmap"
+    },
+    {
+      "href": "#releases",
+      "label": "Releases"
+    }
+  ],
+  "nav_github": "GitHub",
+  "hero": {
+    "eyebrow": "Open source · EUPL-1.2 · WCAG 2.2 AA",
+    "title_a": "Video appointments with your team,",
+    "title_b": "booked in seconds.",
+    "lead": "OpenPlanner is the scheduler for video calls on Webex. A participant picks a free time on a page in your branding, gets a confirmation with a calendar invite and joins from the browser. No account, no app, no login. Your team receives the call at the right moment in Webex Contact Center, and personal data is gone 24 hours after the call.",
+    "cta_demo": "Try the demo",
+    "cta_install": "Install",
+    "cta_source": "View the source",
+    "facts": [
+      {
+        "value": "0",
+        "label": "cookies on this site and on the booking page"
+      },
+      {
+        "value": "24 h",
+        "label": "after the call, personal data is purged"
+      },
+      {
+        "value": "2",
+        "label": "containers and one SQLite file, nothing more"
+      }
+    ]
+  },
+  "demo": {
+    "title": "What booking feels like for a participant",
+    "lead": "A real appointment page, without the real appointment. Everything works by keyboard. Nothing is stored or sent.",
+    "nojs": "This interactive demo needs JavaScript. The real booking flow is in the demo installation from the README.",
+    "step_day": "1. Pick a day",
+    "step_time": "2. Pick a time",
+    "step_form": "3. Your details",
+    "step_done": "Booked",
+    "today": "today",
+    "free": "{n} free",
+    "full": "full",
+    "back": "Back",
+    "first_name": "First name",
+    "last_name": "Last name",
+    "email": "Email address",
+    "submit": "Confirm appointment",
+    "done_title": "Your appointment is set",
+    "done_text": "You receive a confirmation with a calendar invite and a personal link to move or cancel. A few minutes before the start, the call lands with the team.",
+    "done_meeting": "Webex meeting created",
+    "done_task": "Work item scheduled for T−5",
+    "done_purge": "Data purged 24 h after the call",
+    "restart": "Start over",
+    "announce_day": "Day chosen: {day}. Pick a time.",
+    "announce_time": "Time chosen: {time}. Fill in your details.",
+    "announce_done": "Appointment confirmed for {day} at {time}.",
+    "weekdays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "months": [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December"
+    ],
+    "closed": "closed"
+  },
+  "tour": {
+    "title": "From click to call, and everything behind it",
+    "lead": "Two tracks through the product: what the participant experiences, from picking a time to the call, and what the team and the administrators hold, from the organisation to the agent who picks up.",
+    "tracks": [
+      {
+        "key": "participant",
+        "title": "The participant",
+        "steps": [
+          {
+            "key": "book",
+            "title": "Picking a time",
+            "text": "Month calendar, free times of the day, a short form with three fields and the group's own questions. On your domain, in your branding."
+          },
+          {
+            "key": "direct",
+            "title": "Or talk now",
+            "text": "When the group is open, the participant can call right away. A cap on the number waiting and honest queue feedback keep it tidy."
+          },
+          {
+            "key": "mail",
+            "title": "Confirmation by email",
+            "text": "Confirmation with a calendar invite (.ics), the personal management link and the reminder later. By SMS if the group wants it. SPF, DKIM and DMARC checked."
+          },
+          {
+            "key": "manage",
+            "title": "Move or cancel",
+            "text": "Through the personal link, without an account. Cancel until the start, move until an hour before; known details are filled in already."
+          },
+          {
+            "key": "trial",
+            "title": "Test the video first",
+            "text": "A real trial call on Webex: camera, microphone and sound checked before it matters, with the result visible in the team's agenda."
+          },
+          {
+            "key": "join",
+            "title": "Starting the call",
+            "text": "Join from the browser, no app or account. Every appointment is its own Webex meeting; the participant waits in the lobby until the agent is there."
+          }
+        ]
+      },
+      {
+        "key": "team",
+        "title": "The team and the administrators",
+        "steps": [
+          {
+            "key": "orgs",
+            "title": "One installation, several organisations",
+            "text": "Each organisation with its own groups, branding, texts, channels and identity provider. Roles from the IdP: superuser, organisation admin, group admin, planner, agent, auditor."
+          },
+          {
+            "key": "groups",
+            "title": "Groups as skills",
+            "text": "A group is a skill: a subject, a team, a queue, its own opening hours and form. The participant never picks a person; the call goes to the first free agent."
+          },
+          {
+            "key": "staffing",
+            "title": "Staffing per block",
+            "text": "Blocks per day with the number of agents, holidays, exceptions and an emergency closure in one action. Capacity decides what the participant gets to see."
+          },
+          {
+            "key": "agenda",
+            "title": "Agenda and planner, live",
+            "text": "Every call with its status: planned, trial call done, in the call, finished. The planner moves or cancels on the participant's behalf and sees the reason of every failure."
+          },
+          {
+            "key": "queue",
+            "title": "The work item at T−5",
+            "text": "Five minutes before the start the call lands as a work item in Webex Contact Center, or in OpenPlanner's own queue. Chosen per group, and switched when the contact center is down."
+          },
+          {
+            "key": "agent",
+            "title": "The agent picks up",
+            "text": "With the agent role, the agent takes the call from the queue, sees only a first name and a subject, and joins the meeting as cohost. 24 hours after the call the data is gone."
+          }
+        ]
+      }
+    ],
+    "play": "Play",
+    "pause": "Pause",
+    "scene_label": "Animation of the participant and admin flows",
+    "video_title": "Screen recording of the real interface",
+    "video_text": "On every release the pipeline records the booking flow, the portal and the agenda again, so what you see here is what you install.",
+    "video_soon": "Arrives with the next release.",
+    "art": {
+      "direct_btn": "Talk now",
+      "direct_wait": "2 waiting · about 3 min",
+      "mail_subject": "Your appointment is set",
+      "mail_btn": "Move or cancel",
+      "manage_move": "Move",
+      "manage_cancel": "Cancel",
+      "trial_cam": "camera",
+      "trial_mic": "microphone",
+      "trial_ok": "trial call passed",
+      "join_btn": "Join from the browser",
+      "lobby": "lobby",
+      "orgs": [
+        "Organisation A",
+        "Organisation B",
+        "Organisation C"
+      ],
+      "roles": [
+        "superuser",
+        "org admin",
+        "group",
+        "agent",
+        "auditor"
+      ],
+      "groups": [
+        [
+          "Intake",
+          "4 agents"
+        ],
+        [
+          "Advice",
+          "6 agents"
+        ],
+        [
+          "Support",
+          "3 agents"
+        ]
+      ],
+      "skill": "skill",
+      "days": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ],
+      "agenda": [
+        [
+          "09:00",
+          "planned"
+        ],
+        [
+          "09:30",
+          "trial ok"
+        ],
+        [
+          "10:00",
+          "live"
+        ],
+        [
+          "10:30",
+          "done"
+        ]
+      ],
+      "queue_cc": "Contact center",
+      "queue_own": "Own queue",
+      "cohost": "cohost"
+    }
+  },
+  "how": {
+    "title": "How it works",
+    "steps": [
+      {
+        "title": "You set up a group",
+        "text": "A team is a group: opening hours, staffing per block, holidays, exceptions, texts and branding. All in the admin portal, no code."
+      },
+      {
+        "title": "Your website links to the page",
+        "text": "Every group has its own page on your domain. Or you place the calendar as a Web Component right inside your own site."
+      },
+      {
+        "title": "The call arrives by itself",
+        "text": "As a work item in Webex Contact Center, or in OpenPlanner's own queue where staff with the agent role pick up the call themselves. Chosen per group."
+      }
+    ]
+  },
+  "features": {
+    "title": "Everything a call needs, nothing that distracts",
+    "lead": "Built for teams that serve many people by video: customer service, advisory desks, intake, helpdesks.",
+    "items": [
+      {
+        "icon": "calendar",
+        "title": "Booking without friction",
+        "text": "Month calendar, free times, three fields. Move or cancel through a personal link. Works without JavaScript and fully by keyboard."
+      },
+      {
+        "icon": "video",
+        "title": "Webex built in",
+        "text": "Every appointment gets its own Webex meeting. The participant joins from the browser, no app or account; your team joins as cohost."
+      },
+      {
+        "icon": "queue",
+        "title": "Lands where your team works",
+        "text": "The call goes to the queue in Webex Contact Center as a work item. The first free agent picks up. Nobody has to watch a calendar."
+      },
+      {
+        "icon": "bolt",
+        "title": "Talk now",
+        "text": "A group that is open can offer a direct call, with a cap on the number waiting and honest queue feedback."
+      },
+      {
+        "icon": "grid",
+        "title": "Multitenant with real roles",
+        "text": "One installation, several organisations, each with its own groups, branding, texts and identity provider. Roles and scope come from your IdP; one authorisation matrix decides what everyone sees and does."
+      },
+      {
+        "icon": "queue",
+        "title": "Groups as skills",
+        "text": "A group is a skill with a subject, a team and a queue. The participant never picks a person; the first free agent picks up. One agent can be in several groups."
+      },
+      {
+        "icon": "shield",
+        "title": "Privacy by design",
+        "text": "Personal data lives only on the booking and is gone 24 hours after the call. Never in logs, URLs, jobs or error messages."
+      },
+      {
+        "icon": "brush",
+        "title": "Your brand, your words",
+        "text": "Colours, logo and font per organisation. Every text editable in the portal. Dutch and English out of the box, more locales possible."
+      },
+      {
+        "icon": "message",
+        "title": "Messages that arrive",
+        "text": "Confirmation, change, reminder and cancellation by email (with .ics) and SMS. SPF, DKIM and DMARC are checked for you."
+      },
+      {
+        "icon": "grid",
+        "title": "Agenda and planner",
+        "text": "Admins follow every call live, plan staffing per block and close a group in one action when needed, after which participants pick a new time themselves."
+      }
+    ]
+  },
+  "integrations": {
+    "title": "Webex Meetings is the heart. Everything else connects to it.",
+    "lead": "OpenPlanner is not a video platform and not a contact center. It is the scheduler that ties together the Webex products you already have, and keeps every other system behind a clean adapter.",
+    "center": "OpenPlanner",
+    "items": [
+      {
+        "key": "meetings",
+        "name": "Webex Meetings",
+        "tag": "the heart",
+        "text": "Every appointment is a real Webex meeting through the Meetings API. Browser-direct join, a trial call beforehand, live meeting status in the agenda.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0017-video-through-webex-meetings-api.md",
+        "link": "ADR 0017"
+      },
+      {
+        "key": "wxcc",
+        "name": "Webex Contact Center",
+        "tag": "dispatch",
+        "text": "Five minutes before the start the call becomes a work item in the team's queue, carrying only a first name, the join link and routing attributes. Webex Contact Center is the first integration; the layer behind it is provider-neutral, and a group can also work without a contact center through OpenPlanner's own queue.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0018-wxcc-work-items.md",
+        "link": "ADR 0018"
+      },
+      {
+        "key": "messaging",
+        "name": "Webex Messaging",
+        "tag": "alerts",
+        "text": "A bot tells administrators in Webex when the integration falters, a queue fills up or a check fails. Never personal data, always a link to the portal.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0082-contact-center-verification-health-alerts-and-fallback.md",
+        "link": "ADR 0082"
+      },
+      {
+        "key": "idp",
+        "name": "Your identity provider",
+        "tag": "OIDC",
+        "text": "Administrators sign in through your own IdP (PingFederate, Keycloak, Entra ID, any OIDC provider), per organisation, with roles from the claims.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0083-identity-providers-per-organisation-chosen-by-email-domain.md",
+        "link": "ADR 0083"
+      },
+      {
+        "key": "mail",
+        "name": "Email and SMS",
+        "tag": "channels",
+        "text": "SMTP and a provider-neutral SMS gateway per organisation. Texts per channel and per group editable in the portal.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0022-message-channels-reminders-and-texts.md",
+        "link": "ADR 0022"
+      },
+      {
+        "key": "bot",
+        "name": "AI agents and bots",
+        "tag": "machine API",
+        "text": "A contact-center bot (such as the Webex AI Agent) asks for free times and books on the participant's behalf through an API with scopes and per-client keys.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/agent-api.md",
+        "link": "docs/agent-api.md"
+      }
+    ],
+    "roadmap_title": "On the roadmap",
+    "roadmap": "Other contact-center platforms on the same adapter layer (ADR 0032), the calendar invite as a third dispatch kind (ADR 0043), changes through the bot API (ADR 0023) and staff through SCIM (ADR 0046)."
+  },
+  "enterprise": {
+    "title": "Why we call OpenPlanner enterprise-ready",
+    "lead": "Not because of a list of ticks, but because of how it is built: a core without a framework, every external service behind a port, and rules the pipeline enforces instead of a reviewer.",
+    "arch_title": "Architecture and building blocks",
+    "arch_caption": "The arrows point one way. On every pull request import-linter refuses an import that breaks these layers.",
+    "layers": [
+      {
+        "name": "Channels",
+        "items": [
+          "Participant pages and widget",
+          "Admin portal",
+          "Machine API for bots",
+          "Worker for scheduled jobs"
+        ]
+      },
+      {
+        "name": "Shared building blocks",
+        "items": [
+          "Authorisation matrix",
+          "Translations nl and en",
+          "Settings register",
+          "Audit log and events"
+        ]
+      },
+      {
+        "name": "Domain",
+        "items": [
+          "Booking and capacity",
+          "Groups and staffing",
+          "Rights and scope",
+          "Privacy rules"
+        ],
+        "note": "Pure Python, no framework, ≥ 90% test coverage"
+      }
+    ],
+    "ports_title": "Ports and adapters",
+    "ports": [
+      {
+        "port": "VideoProvider",
+        "adapters": "Webex Meetings"
+      },
+      {
+        "port": "ContactCenterDispatcher",
+        "adapters": "Webex Contact Center, own queue"
+      },
+      {
+        "port": "MessageSender",
+        "adapters": "SMTP, SMS gateway"
+      },
+      {
+        "port": "IdentityProvider",
+        "adapters": "OIDC: PingFederate, Keycloak, Entra ID"
+      },
+      {
+        "port": "EventSink",
+        "adapters": "syslog, Splunk, Elastic"
+      },
+      {
+        "port": "Transaction",
+        "adapters": "SQLite"
+      }
+    ],
+    "pillars": [
+      {
+        "title": "One core, replaceable edges",
+        "text": "Another contact center or video platform is a new adapter behind an existing port. The domain, the screens and the texts do not change."
+      },
+      {
+        "title": "Enforced, not agreed",
+        "text": "Layers, types, rights and privacy rules are checked on every pull request. What does not hold never reaches main."
+      },
+      {
+        "title": "One source per subject",
+        "text": "Rights, settings and the portal's structure each live in one place; their documentation is generated from the code."
+      },
+      {
+        "title": "Recorded decision by decision",
+        "text": "More than eighty ADRs with context, choice, settings and build status. An architect reads why things are the way they are, and what does not run yet."
+      }
+    ],
+    "scale_title": "Scalable, honestly",
+    "scale": [
+      {
+        "state": "now",
+        "title": "Now: one host, well above the design target",
+        "text": "Proxy, web and worker on one VM with SQLite in WAL mode. Readers do not block each other, a booking is a few rows under a write lock, several workers share the job queue. One installation serves many organisations. Scaling is vertical first: more CPU, memory and a faster disk."
+      },
+      {
+        "state": "now",
+        "title": "A recorded limit",
+        "text": "The design target is about 80 bookings per working day. ADR 0036 records when we go further: above 2,000 bookings per working day, at a p95 above one second, with a stricter availability requirement, or when a client requires managed Postgres."
+      },
+      {
+        "state": "designed",
+        "title": "After that: designed, not built yet",
+        "text": "Postgres with row locks, several web instances behind the proxy, workers on any host and shared storage for rate limits. All database access already sits behind one port in one adapter module, so the domain, the routes and the screens stay the same."
+      }
+    ],
+    "scale_state": {
+      "now": "runs today",
+      "designed": "designed"
+    },
+    "scale_link": {
+      "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0036-scaling-envelope-and-path-beyond-one-vm.md",
+      "label": "ADR 0036: scaling envelope and the path beyond one VM"
+    },
+    "arch_link": {
+      "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/architecture.md",
+      "label": "Architecture with diagrams"
+    },
+    "security_title": "Security and operations",
+    "items": [
+      {
+        "title": "One authorisation matrix",
+        "text": "Role × permission × level in one place. Every admin route declares one permission, every query filters by scope, every denial is in the audit log. No exception for superusers."
+      },
+      {
+        "title": "Multitenant, separated per organisation",
+        "text": "Every query filters by the role's scope; an organisation admin never sees another organisation, a group admin never another group. The same matrix drives the menu, the buttons and the API."
+      },
+      {
+        "title": "Single sign-on, no detour",
+        "text": "OIDC with PKCE, state and nonce, asymmetric algorithms only, eight-hour session. No local accounts, no break-glass login, on purpose."
+      },
+      {
+        "title": "An audit log you can forward",
+        "text": "Logins, changes and denials as structured events, to syslog, Splunk or Elastic. Without personal data."
+      },
+      {
+        "title": "Signed releases",
+        "text": "Images signed keyless with cosign, an SBOM (CycloneDX) on every release, CVE scans with trivy and grype, hashes in the lockfile. The installation verifies the signature."
+      },
+      {
+        "title": "A strict pipeline",
+        "text": "mypy strict, ruff, bandit, semgrep, gitleaks, mutation testing, schemathesis, OWASP ZAP, Playwright with axe-core and Lighthouse. Everything blocks the merge."
+      },
+      {
+        "title": "Light to run",
+        "text": "Two containers, one SQLite file, HTTPS with automatic certificates or your own proxy. Updates and release channel from the portal. The backup is one file."
+      },
+      {
+        "title": "Accessible, provably",
+        "text": "WCAG 2.2 AA on every public page, in every language, tested again on every pull request. No time limits, no CAPTCHA puzzles."
+      },
+      {
+        "title": "Configurable, not hard-coded",
+        "text": "Every threshold, limit and period is a setting with a class, a default and bounds. What is a protection cannot be switched off from the portal."
+      }
+    ]
+  },
+  "opensource": {
+    "title": "Open source, open decisions",
+    "lead": "OpenPlanner is published under the EUPL-1.2, the open-source licence of the European Commission. Not only the code is open: every design decision sits in the repository as an ADR, with what has been built of it.",
+    "points": [
+      {
+        "title": "EUPL-1.2",
+        "text": "Use, change and distribute it, commercially too. Compatible with GPL, AGPL and most European procurement rules."
+      },
+      {
+        "title": "Architecture Decision Records",
+        "text": "More than eighty decisions, each with context, choice, settings and build status. You read why things are the way they are, and what does not run yet."
+      },
+      {
+        "title": "Security up front",
+        "text": "A threat model per flow, an abuse case per endpoint, each with a test. Responsible disclosure through SECURITY.md."
+      },
+      {
+        "title": "Contributions welcome",
+        "text": "Issues, discussions and pull requests on GitHub. A CLA keeps the licence clean. Every PR answers the same seven review questions."
+      }
+    ],
+    "cta_github": "View on GitHub",
+    "cta_contribute": "Contribute",
+    "cta_security": "Report a vulnerability"
+  },
+  "releases": {
+    "title": "Releases",
+    "lead": "Every merge to main becomes a release candidate on the rc channel. A release is a signed image, an SBOM and this website, in one train.",
+    "latest": "Latest release",
+    "candidate": "Latest release candidate",
+    "none": "No release on this channel yet.",
+    "all": "All releases on GitHub",
+    "install": "Installation guide",
+    "prerelease": "release candidate",
+    "built": "This page was built from commit {commit}.",
+    "no_data": "The release list is read from GitHub on every build; this local build has none.",
+    "fresh": "On every merge to main and on every release this page is rebuilt with the releases of that moment. Your browser never talks to GitHub, which keeps this site free of third parties."
+  },
+  "cta": {
+    "title": "Put it on a test server this afternoon",
+    "text": "One install script, a Let's Encrypt certificate and a demo group. Or start locally with docker compose and walk the portal as every role.",
+    "primary": "Read the installation guide",
+    "secondary": "Quick start in the README"
+  },
+  "footer": {
+    "tagline": "Video appointments with your team, booked in seconds, privacy by default.",
+    "nocookies": "This website sets no cookies, uses no trackers and loads nothing from third parties.",
+    "license": "Source code under EUPL-1.2. Made by 3Corners and the OpenPlanner contributors.",
+    "links": [
+      {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner",
+        "label": "GitHub"
+      },
+      {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md",
+        "label": "Install"
+      },
+      {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/tree/main/docs/adr",
+        "label": "ADRs"
+      },
+      {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/SECURITY.md",
+        "label": "Security"
+      },
+      {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/CONTRIBUTING.md",
+        "label": "Contribute"
+      },
+      {
+        "href": "https://3corners.nl",
+        "label": "3Corners"
+      }
+    ]
+  },
+  "standards": {
+    "title": "Quality and standards, provably",
+    "lead": "What we claim is in the code, in a test or in the pipeline. For each standard you see how far it is and where the evidence is.",
+    "col_standard": "Standard",
+    "col_what": "What it means",
+    "col_status": "Status",
+    "col_proof": "Evidence",
+    "status": {
+      "ci": "tested in CI",
+      "built": "built in",
+      "partly": "partly",
+      "planned": "planned"
+    },
+    "code_title": "Coding standards",
+    "code": [
+      "Python 3.12 with full type checking (mypy strict) and ruff for style and common mistakes.",
+      "A layered architecture, enforced with import-linter: the domain knows no framework.",
+      "Every module and function with a Google-style docstring, readable by documentation tools.",
+      "Test coverage ≥ 90% on the domain and translations, mutation score ≥ 80%, abuse cases as tests.",
+      "Conventional Commits, one ADR per decision with its build status, and every PR answers seven review questions.",
+      "bandit, semgrep, gitleaks, pip-audit and a licence check on every pull request."
+    ],
+    "update_title": "Automatic updates",
+    "update": [
+      "The superuser picks the channel in the portal: stable, or release candidate for a test environment.",
+      "Install a new version with one click in the portal, or let the installation do it by itself.",
+      "The host verifies the signature of every image before the update; an unsigned image does not run.",
+      "Renovate keeps dependencies current weekly, security updates at once; a PR older than 14 days raises an alert.",
+      "Database migrations run automatically and can always be rolled back."
+    ],
+    "items": [
+      {
+        "name": "WCAG 2.2 AA (EN 301 549)",
+        "what": "Keyboard flow, axe-core with zero violations and Lighthouse ≥ 95 on every public page, in every language, on every pull request. Manual audit with NVDA and VoiceOver before go-live.",
+        "status": "ci",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/e2e/pages.json",
+        "link": "e2e/pages.json"
+      },
+      {
+        "name": "NL Design System",
+        "what": "Colours, type and spacing of the participant pages come from NL Design System tokens; organisations adjust them within those tokens.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/widget.md",
+        "link": "docs/widget.md"
+      },
+      {
+        "name": "HTTPS, HSTS and NCSC TLS guidelines",
+        "what": "HTTPS with HSTS (Forum Standaardisatie comply-or-explain list), TLS 1.2 and 1.3 per the NCSC guidelines. A check in CI and internet.nl in the go-live checklist are planned.",
+        "status": "partly",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0086-public-address-and-reverse-proxy-visible-verified-and-by-the-standards.md",
+        "link": "ADR 0086"
+      },
+      {
+        "name": "SPF, DKIM and DMARC",
+        "what": "Comply-or-explain standards for email. The portal checks each organisation's sender domain and shows what is missing.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0073-email-deliverability-sender-domain-check-and-system-mail-headers.md",
+        "link": "ADR 0073"
+      },
+      {
+        "name": "OpenID Connect",
+        "what": "Administrators sign in through their own identity provider: PKCE, state and nonce, asymmetric algorithms only. Tested against Keycloak, PingFederate in production.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0013-admin-login-with-oidc.md",
+        "link": "ADR 0013"
+      },
+      {
+        "name": "OpenAPI 3",
+        "what": "The API specification is generated from the code, compared on every pull request and attacked with schemathesis.",
+        "status": "ci",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/api.md",
+        "link": "docs/api.md"
+      },
+      {
+        "name": "GDPR and privacy by design",
+        "what": "Personal data only on the booking, purged 24 hours after the call, never in logs. The data-flow diagram is the input for the organisation's DPIA.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/dataflow.md",
+        "link": "docs/dataflow.md"
+      },
+      {
+        "name": "Building blocks for the BIO",
+        "what": "An audit log of every change and denial, security events on attacks, an auditor role and export to your log platform. The BIO itself remains the organisation's responsibility.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0053-security-events-for-attacks-on-public-entry-points.md",
+        "link": "ADR 0053"
+      },
+      {
+        "name": "security.txt (RFC 9116)",
+        "what": "A fixed reporting point for vulnerabilities on every installation, with SECURITY.md in the repository.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/SECURITY.md",
+        "link": "SECURITY.md"
+      },
+      {
+        "name": "Software supply chain",
+        "what": "Every image signed keyless with cosign, a CycloneDX SBOM with every release, CVE scans with trivy and grype, dependencies pinned with hashes.",
+        "status": "ci",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0006-ci-tooling-and-image-signing.md",
+        "link": "ADR 0006"
+      },
+      {
+        "name": "Standard for Public Code",
+        "what": "EUPL-1.2, a licence per file through REUSE, decisions public as ADRs, and a publiccode.yml that CI validates and every release updates. The listing on developer.overheid.nl is still open.",
+        "status": "partly",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/publiccode.yml",
+        "link": "publiccode.yml"
+      },
+      {
+        "name": "Penetration test",
+        "what": "An external penetration test before go-live and yearly after. Until then: OWASP ZAP on every merge and abuse cases as tests.",
+        "status": "planned",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/threat-model.md",
+        "link": "docs/threat-model.md"
+      }
+    ]
+  },
+  "roadmap": {
+    "title": "Roadmap",
+    "lead": "Straight from GitHub: every open step of a decision is an issue. What is listed here is decided but not built yet.",
+    "steps": "{n} open steps",
+    "step": "1 open step",
+    "all": "All open steps on GitHub",
+    "no_data": "The roadmap is read from the GitHub issues on every build; this local build has none.",
+    "total": "{n} open steps in {m} decisions"
+  }
+}

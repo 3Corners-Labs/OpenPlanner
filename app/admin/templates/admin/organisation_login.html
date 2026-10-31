@@ -1,0 +1,46 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.idp.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+<h2 class="section-title" id="page-title">{{ _("admin.idp.title") }}</h2>
+<p>{{ _("admin.idp.lead") }}</p>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+<section class="card" aria-labelledby="providers-heading">
+  <h2 id="providers-heading">{{ _("admin.idp.providers") }}</h2>
+  {% if providers %}
+  <div class="table-scroll" role="region" aria-labelledby="providers-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.idp.providers") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.idp.name") }}</th>
+        <th scope="col">{{ _("admin.idp.key") }}</th>
+        <th scope="col">{{ _("admin.idp.client_auth") }}</th>
+        <th scope="col">{{ _("admin.idp.status") }}</th>
+        <th scope="col">{{ _("admin.idp.checked") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for view in providers %}
+      <tr>
+        <th scope="row"><a href="/admin/organisations/{{ organisation.slug }}/login/{{ view.provider.key }}">{{ view.provider.name }}</a></th>
+        <td><code>{{ view.provider.key }}</code></td>
+        <td>{{ view.auth_label }}</td>
+        <td>{% if view.provider.enabled %}<span class="chip chip--success">{{ _("admin.idp.on") }}</span>{% else %}<span class="chip">{{ _("admin.idp.off") }}</span>{% endif %}</td>
+        <td>{{ view.checked or _("admin.idp.never") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>{{ _("admin.idp.none") }}</p>
+  {% endif %}
+  <p class="hint">{{ _("admin.idp.limit", limit=limit) }}</p>
+  {% if can("identity_providers.manage") %}
+  <div class="form-actions">
+    {% if room %}<a class="button" href="/admin/organisations/{{ organisation.slug }}/login/new">{{ _("admin.idp.add") }}</a>{% else %}<p class="hint">{{ _("admin.idp.limit_reached") }}</p>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

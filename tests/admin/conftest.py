@@ -17,6 +17,7 @@ from app.main import create_app
 from tests.fakes.clock import FixedClock
 from tests.fakes.dns import FakeTxtResolver
 from tests.fakes.identity import FakeIdentityProvider
+from tests.fakes.identity_providers import FakeDiscoveryFetcher, FakeSigningKeys
 from tests.fakes.integrations import FakeVideo
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
@@ -43,6 +44,20 @@ NO_ROLE = principal("sub-none", "Nina None", frozenset(), frozenset({"demo"}), f
 SAME_ORIGIN = {"sec-fetch-site": "same-origin"}
 
 
+class FakeOrganisationProviders:
+    """The registry of organisation provider adapters (ADR 0083): one fake per key."""
+
+    def __init__(self) -> None:
+        self.adapters: dict[str, FakeIdentityProvider] = {}
+        self.invalidated: list[str] = []
+
+    async def provider(self, key: str) -> FakeIdentityProvider | None:
+        return self.adapters.get(key)
+
+    def invalidate(self, key: str) -> None:
+        self.invalidated.append(key)
+
+
 class Site:
     """The app, its fake identity provider, clock and DNS resolver (ADR 0073)."""
 
@@ -52,11 +67,17 @@ class Site:
         idp: FakeIdentityProvider,
         clock: FixedClock,
         dns: FakeTxtResolver | None = None,
+        discovery: FakeDiscoveryFetcher | None = None,
+        providers: FakeOrganisationProviders | None = None,
     ):
         self.client = client
         self.idp = idp
         self.clock = clock
         self.dns = dns or FakeTxtResolver()
+        self.discovery = discovery or FakeDiscoveryFetcher()
+        """The discovery documents the registration check sees (ADR 0083 step 2)."""
+        self.providers = providers or FakeOrganisationProviders()
+        """The adapters of the registered organisation providers, for the test login."""
 
     async def login_as(self, principal: Principal) -> httpx.Response:
         """Log in as ``principal`` through the legacy claims that resolve to it."""
@@ -84,12 +105,16 @@ async def _running_site(
     await seed_demo(engine)
     await engine.dispose()
     idp, clock, dns = FakeIdentityProvider(), FixedClock(NOW), FakeTxtResolver()
+    discovery, providers = FakeDiscoveryFetcher(), FakeOrganisationProviders()
     app = create_app(
         settings.model_copy(update={"database_url": admin_db}),
         clock,
         idp,
         integrations=integrations,
         mail_domain_resolver=dns,
+        discovery_fetcher=discovery,
+        signing_keys=FakeSigningKeys(),
+        organisation_providers=providers,  # type: ignore[arg-type]
     )
     async with (
         app.router.lifespan_context(app),
@@ -97,7 +122,7 @@ async def _running_site(
             transport=httpx.ASGITransport(app=app), base_url="http://testserver"
         ) as client,
     ):
-        yield Site(client, idp, clock, dns)
+        yield Site(client, idp, clock, dns, discovery, providers)
 
 
 @pytest.fixture
