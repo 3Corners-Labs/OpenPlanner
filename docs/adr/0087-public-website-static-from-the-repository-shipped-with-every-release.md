@@ -64,11 +64,16 @@ already has a design language (ADR 0060 mark, ADR 0020 tokens, NL Design System 
 7. **The moving impression comes from the product itself.** Step 1 ships an animated tour as
    an HTML and CSS scene in the product's design language: the participant picks a time, the
    Webex meeting is made, the work item lands in the contact center queue, the agent joins.
-   Step 3 adds a recorded walkthrough of the real interface: the Playwright lane records the
-   booking flow and the admin agenda against the seeded demo at release time and the site job
-   embeds it as `tour.webm` with a poster image and captions, covering the participant's flow, the admin portal and the agent's queue, (`<track kind="captions">`). Both
-   never autoplay when `prefers-reduced-motion: reduce` is set, have a visible play and pause
-   control, and the static poster is always the fallback (WCAG 2.2.2, 2.3.1).
+   Step 3 adds a recorded walkthrough of the real interface: at every release tag a Playwright
+   spec plays one story against the release's own code with the seeded demo (the participant
+   books, confirms, moves, tries the video and joins; the team signs in, sees groups and
+   staffing, sets the own queue, follows the agenda and picks the call up). The simulator stands
+   in for Webex and the contact center in a context that is not recorded; the recording hides
+   the test-environment bar and nothing else. The release carries `tour.webm`, a poster and
+   captions in nl and en (`<track kind="captions">`); the site shows the newest recording with
+   its version and date, and says so plainly while there is none. The animation never plays
+   when `prefers-reduced-motion: reduce` is set and the video never autoplays; both have a
+   visible play and pause control, and the static poster is the fallback (WCAG 2.2.2, 2.3.1).
 8. **The integrations are named, with Webex Meetings as the heart.** The site has an
    integrations section that draws the product in the middle and the systems around it:
    Webex Meetings (every appointment is a meeting; the participant joins from the browser),
@@ -115,7 +120,7 @@ accessibility targets of point 9.
 | 0 | ADR proposed | #271 | in PR |
 | 1 | `site/` (content nl/en, templates, stylesheet, script, animated tour in two tracks of six scenes, interactive demo, integrations, standards, roadmap from the ADR issues), `scripts/build_site.py`, `make site`, structural test, the `site` job with artifact and a git-push deploy to TransIP | #271 | in PR |
 | 2 | The site's pages in the Playwright lane (keyboard, axe, Lighthouse) | | planned |
-| 3 | Recorded walkthrough of the real interface at release time (`tour.webm`, poster, captions) | | planned |
+| 3 | Recorded walkthrough of the real interface at release time (`e2e/tour/`, `.github/workflows/tour.yml`, `.github/actions/e2e-stack`, `tour.webm`, poster, captions nl/en, the newest recording on the page) | | planned |
 | 4 | TransIP: deploy key on the package, environment `website` with the remote, DNS for `openplanner.nl` and `www`, HTTPS and the response headers (HSTS, CSP, Referrer-Policy) in `.htaccess` (host work) | | planned |
 
 ## Consequences

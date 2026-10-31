@@ -1,0 +1,19 @@
+{
+  "$comment": "The chapters of the recorded walkthrough (ADR 0087 step 3). tour.spec.ts marks the start of each chapter in the video; captions.mjs turns the marks and these texts into tour.nl.vtt and tour.en.vtt. The order is the order of the spec.",
+  "chapters": [
+    {"key": "book", "nl": "De deelnemer kiest een dag en een tijd in de kalender van de groep.", "en": "The participant picks a day and a time in the group's calendar."},
+    {"key": "form", "nl": "Drie velden en de vragen van de groep. Geen account, geen app.", "en": "Three fields and the group's own questions. No account, no app."},
+    {"key": "check_email", "nl": "De deelnemer bevestigt via de link in de e-mail.", "en": "The participant confirms through the link in the email."},
+    {"key": "confirmed", "nl": "Bevestigd. Met dezelfde link verzet of annuleert de deelnemer de afspraak.", "en": "Confirmed. The same link moves or cancels the appointment."},
+    {"key": "move", "nl": "Verzetten: een nieuwe tijd kiezen en bevestigen.", "en": "Moving: pick a new time and confirm it."},
+    {"key": "trial", "nl": "Voor het gesprek test de deelnemer camera en microfoon in een proefgesprek.", "en": "Before the call the participant tests camera and microphone in a trial call."},
+    {"key": "join", "nl": "Op het moment zelf: deelnemen vanuit de browser.", "en": "On the day: joining from the browser."},
+    {"key": "login", "nl": "Beheerders loggen in via de eigen identity provider.", "en": "Administrators sign in through their own identity provider."},
+    {"key": "groups", "nl": "Elke groep is een skill met een eigen team, tijden en wachtrij.", "en": "Every group is a skill with its own team, hours and queue."},
+    {"key": "staffing", "nl": "Bezetting per blok bepaalt welke tijden de deelnemer ziet.", "en": "Staffing per block decides which times the participant sees."},
+    {"key": "dispatch", "nl": "Per groep: een taak in het contact center of de eigen wachtrij.", "en": "Per group: a task in the contact center or the own queue."},
+    {"key": "agenda", "nl": "De agenda toont elk gesprek met zijn status, live.", "en": "The agenda shows every call with its status, live."},
+    {"key": "queue", "nl": "De medewerker pakt het gesprek op uit de wachtrij.", "en": "The agent picks up the call from the queue."},
+    {"key": "claimed", "nl": "En stapt in het gesprek. 24 uur later zijn de persoonsgegevens gewist.", "en": "And joins the call. 24 hours later the personal data is gone."}
+  ]
+}
