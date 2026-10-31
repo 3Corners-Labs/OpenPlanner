@@ -1,4 +1,4 @@
-"""The organisation text editor (ADR 0074): who may open it, what is stored, what participants see."""
+"""The organisation text editor (ADR 0074): who may open it, what is stored, what is shown."""
 
 import pytest
 
