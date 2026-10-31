@@ -311,3 +311,24 @@ De naam waarmee de identiteitsprovider deze groep noemt in een recht, bijvoorbee
 koppeltekens; uniek binnen de organisatie. Een nieuwe groep begint met de code van het
 webadres. Wijzigt u de waarde, dan verliezen de medewerkers met een recht op de oude waarde hun
 toegang tot de identiteitsprovider de nieuwe stuurt; het formulier telt hoeveel dat er zijn.
+
+## Groep archiveren
+
+Onderaan de instellingen staat **Groep archiveren…**, alleen voor wie groepen mag archiveren
+(organisatiebeheerder of superuser; het recht `group.delete` staat los van het wijzigen van
+instellingen). De bevestigingspagina zegt wat er gebeurt en vraagt u de naam van de groep over
+te typen; zonder recente login vraagt het portaal eerst opnieuw om in te loggen.
+
+Na het archiveren:
+
+- geven de pagina `/g/<webadres>` en de widget meteen "niet gevonden"; nieuwe afspraken zijn niet
+  meer mogelijk;
+- verdwijnt de groep uit het overzicht, de lijsten en de menu's. Onder **Groepen** toont het
+  filter *Alleen gearchiveerde groepen* hem nog, alleen-lezen: elke wijziging wordt geweigerd;
+- blijft het webadres gereserveerd, zodat een nieuwe groep het niet kan overnemen;
+- blijven afspraken uit het verleden tot de gewone opruimtermijn; daarna wist het portaal de
+  groep vanzelf. Het logboek houdt het webadres.
+
+Archiveren kan niet zolang er afspraken in de toekomst staan. Sluit de groep dan eerst
+(**Sluiting**), laat deelnemers verzetten of annuleren, of annuleer de afspraken vanuit het
+sluitingsscherm, en archiveer daarna. Archiveren is niet ongedaan te maken in het portaal.

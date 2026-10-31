@@ -141,6 +141,7 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/settings": "/admin/groups/demo/settings",
     "/admin/groups/{slug}/settings/form": "/admin/groups/demo/settings/form",
     "/admin/groups/{slug}/settings/form/{key}": "/admin/groups/demo/settings/form/onderwerp",
+    "/admin/groups/{slug}/settings/archive": "/admin/groups/demo/settings/archive",
     "/admin/groups/{slug}/staffing": "/admin/groups/demo/staffing",
     "/admin/groups/{slug}/staffing/{rule_id}": "/admin/groups/demo/staffing/{rule}",
     "/admin/groups/{slug}/staffing/{rule_id}/split": "/admin/groups/demo/staffing/{rule}/split",

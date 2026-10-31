@@ -86,6 +86,8 @@ class Permission(StrEnum):
     RIGHTS_VIEW = "rights.view"
     MATRIX_VIEW = "matrix.view"
     ORGANISATION_MANAGE = "organisation.manage"
+    ORGANISATION_DELETE = "organisation.delete"
+    """ADR 0084: delete an empty organisation; apart from managing it, superuser only."""
     ORGANISATION_VIEW = "organisation.view"
     """ADR 0047 step 3: open an organisation's page and its tabs (read-only on its own)."""
     AUDIT_VIEW = "audit.view"
@@ -96,6 +98,8 @@ class Permission(StrEnum):
     HOLIDAYS_MANAGE = "holidays.manage"
     HOLIDAYS_ASSIGN = "holidays.assign"
     GROUP_CREATE = "group.create"
+    GROUP_DELETE = "group.delete"
+    """ADR 0084: archive a group; apart from editing it, so daily work cannot remove one."""
     GROUP_VIEW = "group.view"
     GROUP_EDIT = "group.edit"
     SCHEDULE_MANAGE = "schedule.manage"
@@ -129,12 +133,16 @@ LEVELS: dict[Permission, Level] = {
     Permission.RIGHTS_VIEW: Level.GLOBAL,
     Permission.MATRIX_VIEW: Level.GLOBAL,
     Permission.ORGANISATION_MANAGE: Level.GLOBAL,
+    # ADR 0084: deleting is its own right, next to managing; the superuser's alone.
+    Permission.ORGANISATION_DELETE: Level.GLOBAL,
     Permission.ORGANISATION_VIEW: Level.ORGANISATION,
     Permission.HOLIDAYS_MANAGE: Level.GLOBAL,
     Permission.INTEGRATIONS_MANAGE: Level.ORGANISATION,
     Permission.BRANDING_MANAGE: Level.ORGANISATION,
     Permission.HOLIDAYS_ASSIGN: Level.ORGANISATION,
     Permission.GROUP_CREATE: Level.ORGANISATION,
+    # ADR 0084: archiving a group is decided at the organisation, like creating one.
+    Permission.GROUP_DELETE: Level.ORGANISATION,
     Permission.AUDIT_VIEW: Level.GROUP,  # ADR 0031: one log, exact per level
     # ADR 0040: the same log as a CSV file, for compliance work outside the portal.
     Permission.AUDIT_EXPORT: Level.GROUP,
@@ -187,6 +195,7 @@ LEVELS: dict[Permission, Level] = {
 LOCKED_PERMISSIONS = frozenset(
     {
         Permission.ORGANISATION_MANAGE,
+        Permission.ORGANISATION_DELETE,
         Permission.HOLIDAYS_MANAGE,
         Permission.INTEGRATIONS_MANAGE,
         Permission.API_CLIENTS_MANAGE,
@@ -267,6 +276,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.ORGANISATION_VIEW,
         Permission.HOLIDAYS_ASSIGN,
         Permission.GROUP_CREATE,
+        # ADR 0084: what the organisation admin creates, they can archive.
+        Permission.GROUP_DELETE,
         Permission.GROUP_VIEW,
         Permission.GROUP_EDIT,
         Permission.SCHEDULE_MANAGE,

@@ -179,6 +179,8 @@ DETAIL_LABELS: dict[str, str] = {
     # ADR 0068: a meeting or work item job planned again from the booking page.
     "retry.create_video_room": "admin.audit.detail.retry_create_video_room",
     "retry.dispatch_wxcc_task": "admin.audit.detail.retry_dispatch_wxcc_task",
+    # ADR 0084: the group was archived (action group.delete).
+    "archived": "admin.audit.detail.archived",
     "rule.add": "admin.audit.detail.rule_add",
     "rule.edit": "admin.audit.detail.rule_edit",
     "rule.remove": "admin.audit.detail.rule_remove",

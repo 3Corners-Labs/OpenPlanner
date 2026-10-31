@@ -15,6 +15,7 @@
   </div>
   {% endif %}
 </div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 <form class="card" method="get" action="/admin/groups" aria-labelledby="filter-heading">
   <h2 id="filter-heading" class="visually-hidden">{{ _("admin.groups.filter") }}</h2>
   <div class="inline-forms">
@@ -26,6 +27,10 @@
     {% if filters.organisations | length > 1 %}
     {{ filter_select("groups-organisation", "org", _("admin.groups.organisation"), filters.organisations, filters.organisation) }}
     {% endif %}
+    <div class="choice__option">
+      <input type="checkbox" id="groups-archived" name="archived" value="1"{% if filters.archived %} checked{% endif %}>
+      <label for="groups-archived">{{ _("admin.groups.archived_only") }}</label>
+    </div>
     <button type="submit" class="button button--secondary">{{ icon("filter") }}<span>{{ _("admin.groups.apply") }}</span></button>
     {% if filters.active %}<a href="/admin/groups">{{ _("admin.groups.clear") }}</a>{% endif %}
   </div>
@@ -33,7 +38,7 @@
 <section class="card" aria-labelledby="groups-heading">
   <div class="card__header">
     <h2 id="groups-heading">{{ _("admin.groups.count", count=rows | length) }}</h2>
-    {% if filters.active %}<p class="card__lead">{{ _("admin.groups.of_total", total=total) }}</p>{% endif %}
+    {% if filters.archived %}<p class="card__lead">{{ _("admin.groups.archived_lead") }}</p>{% elif filters.active %}<p class="card__lead">{{ _("admin.groups.of_total", total=total) }}</p>{% endif %}
   </div>
   {% if rows %}
   <div class="table-scroll">

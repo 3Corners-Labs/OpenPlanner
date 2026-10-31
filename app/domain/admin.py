@@ -31,12 +31,14 @@ from app.domain.audit_export import (
 )
 from app.domain.authorization import (
     LEVELS,
+    MATRIX,
     Decision,
     Level,
     Permission,
     Principal,
     Reach,
     Reason,
+    Role,
     Scope,
     Target,
     decide,
@@ -73,6 +75,11 @@ AMBIGUOUS_CLAIMS_EVENT = "auth.ambiguous_claims"
 """ADR 0049 point 14: a login refused because its legacy claims were ambiguous."""
 
 
+READ_WHEN_ARCHIVED: frozenset[Permission] = MATRIX[Role.AUDITOR] | {Permission.BOOKINGS_VIEW}
+"""ADR 0084 point 3: what stays possible on an archived group: the read-only permissions of
+the compliance role, and the bookings (the past ones, until the purge job has removed them)."""
+
+
 @dataclass(frozen=True)
 class Authorization:
     """The outcome of ``AdminService.authorize``: decision, target and the group, if any."""
@@ -105,8 +112,13 @@ class AdminService:
     ) -> Authorization:
         """Decide whether ``principal`` may use ``permission``; audit every denial.
 
+        An archived group (ADR 0084) is read-only: every permission outside
+        ``READ_WHEN_ARCHIVED`` is refused on it, whatever the matrix says, so no use case
+        needs its own check.
+
         Raises:
-            DomainError: ``group_not_found`` for an unknown group.
+            DomainError: ``group_not_found`` for an unknown group, ``group_archived`` for a
+                change to an archived group.
             ValueError: If the target needed by the permission's level is missing.
         """
         level = LEVELS[permission]
@@ -116,6 +128,8 @@ class AdminService:
                 group = await tx.get_group_summary(group_slug)
             if group is None:
                 raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+            if group.group.is_archived and permission not in READ_WHEN_ARCHIVED:
+                raise DomainError(ErrorCode.GROUP_ARCHIVED)
         if level is Level.GROUP:
             if group is None:
                 raise ValueError(f"{permission} needs a group")
@@ -300,11 +314,18 @@ class AdminService:
         return member.refused if member else ()
 
     async def groups(
-        self, principal: Principal, permission: Permission = Permission.GROUP_VIEW
+        self,
+        principal: Principal,
+        permission: Permission = Permission.GROUP_VIEW,
+        *,
+        archived: bool = False,
     ) -> list[GroupSummary]:
-        """Return the groups ``principal`` may use ``permission`` on (database-side scope)."""
+        """Return the groups ``principal`` may use ``permission`` on (database-side scope).
+
+        The groups in use, or with ``archived`` the archived ones (ADR 0084).
+        """
         async with self._uow.read() as tx:
-            return await tx.list_groups(scope_for(principal, permission))
+            return await tx.list_groups(scope_for(principal, permission), archived=archived)
 
     async def organisation_name(self, slug: str) -> str:
         """Return the name of organisation ``slug`` for a page header, or the slug if unknown.
