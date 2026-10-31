@@ -1,0 +1,32 @@
+{#- Header of every organisation page (ADR 0047 step 3): breadcrumbs, name, the tabs the matrix allows and the current tab's second row. Expects ``org_header`` (ObjectHeader). -#}
+{% from "admin/_icons.html" import icon %}
+<nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
+  <ol>
+    <li><a href="/admin/organisations">{{ _("admin.nav.organisations") }}</a></li>
+    <li><span aria-current="page">{{ org_header.name }}</span></li>
+  </ol>
+</nav>
+<div class="page-header">
+  <div>
+    <h1>{{ org_header.name }}</h1>
+    <p class="page-header__lead">{{ _("admin.nav.object.organisation") }} · {{ org_header.slug }}</p>
+  </div>
+</div>
+{% if org_header.tabs|length > 1 %}
+<nav class="tabs" aria-label="{{ _("admin.organisation.sections") }}">
+  <ul>
+    {% for tab in org_header.tabs %}
+    <li><a href="{{ tab.href }}"{% if tab.current %} aria-current="page"{% endif %}>{{ icon(tab.icon) }}<span>{{ tab.label }}</span></a></li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+{% if org_header.subtabs %}
+<nav class="tabs tabs--sub" aria-label="{{ _("admin.organisation.subsections") }}">
+  <ul>
+    {% for tab in org_header.subtabs %}
+    <li><a href="{{ tab.href }}"{% if tab.current %} aria-current="page"{% endif %}><span>{{ tab.label }}</span></a></li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}

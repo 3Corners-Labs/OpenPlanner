@@ -297,6 +297,16 @@ class AdminService:
         async with self._uow.read() as tx:
             return await tx.list_groups(scope_for(principal, permission))
 
+    async def organisation_name(self, slug: str) -> str:
+        """Return the name of organisation ``slug`` for a page header, or the slug if unknown.
+
+        The route that calls this has already authorised the organisation (ADR 0014); the
+        name is what the admin sees in the header and breadcrumbs (ADR 0047 step 3).
+        """
+        async with self._uow.read() as tx:
+            found = await tx.get_organisation(slug)
+        return found.name if found else slug
+
     async def active_jobs(self, limit: int) -> ActiveJobs:
         """Return the running and failed background jobs for the overview (ADR 0061 §2).
 

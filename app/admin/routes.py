@@ -42,6 +42,7 @@ from app.admin import (
     contact_routes,
     embedding_routes,
     form_routes,
+    group_list_routes,
     group_routes,
     help_routes,
     holiday_routes,
@@ -548,6 +549,7 @@ def register_admin(app: FastAPI) -> None:
     for module_router in (
         router,
         overview_routes.router,
+        group_list_routes.router,
         audit_routes.router,
         retention_routes.router,
         settings_routes.router,

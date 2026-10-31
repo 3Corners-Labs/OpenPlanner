@@ -111,7 +111,7 @@ the choice.
 The filter only shows what your role may already see. You choose from the organisations and groups
 within your reach; any other value in the address is ignored. It is an ordinary form that changes
 nothing. Above the lists the chosen organisation and group are links to their pages (the
-organisation page only for those who manage organisations). The choice holds for this session: you
+organisation page only for those who may open it). The choice holds for this session: you
 see it again when you return to the overview, and after signing in again the filter is back on
 everything. While a choice is active the button has a coloured background, also when only the icon
 fits on a smaller screen. For now the filter works on the overview; the other lists have their own

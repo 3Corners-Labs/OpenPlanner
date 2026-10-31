@@ -68,6 +68,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,  # ADR 0040
+        Permission.ORGANISATION_VIEW,  # ADR 0047 step 3: the own organisations' pages
         Permission.HOLIDAYS_ASSIGN,  # ADR 0025
         Permission.GROUP_CREATE,
         Permission.GROUP_VIEW,
@@ -117,6 +118,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,  # ADR 0040: the same log as a file
+        Permission.ORGANISATION_VIEW,  # ADR 0047 step 3: the organisations' pages, read-only
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
@@ -132,6 +134,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.MATRIX_VIEW,
         Permission.AUDIT_VIEW,
         Permission.AUDIT_EXPORT,
+        Permission.ORGANISATION_VIEW,  # ADR 0047 step 3: the organisation's page, read-only
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046

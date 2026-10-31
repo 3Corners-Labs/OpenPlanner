@@ -1,7 +1,7 @@
 # Organisatie-instellingen
 
 Een organisatie kan haar eigen tijdnotatie, tijdzone en termijnen instellen. U opent het scherm
-via **Organisatie-instellingen** in het menu en kiest de organisatie. Organisatiebeheerders
+via **Organisaties → organisatie → Overzicht → Instellingen**. Organisatiebeheerders
 wijzigen de instellingen van hun eigen organisaties; de superuser kan die van elke organisatie
 wijzigen.
 
