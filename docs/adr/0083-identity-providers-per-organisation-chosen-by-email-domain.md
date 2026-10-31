@@ -210,7 +210,7 @@ overlap after a key rotation.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed; row in `docs/adr-status.md` | #248 | in PR |
-| 1 | Groundwork, no behaviour change: provider-qualified subjects and the `idp:` refusal (`app/domain/identity.py`, the OIDC adapter); the provider key on the pending login, checked at the callback (the platform provider is the only entry until step 2); the provider of a staff record follows from its qualified subject (`provider_of`), so `staff` needs no new column; the outbound guard (`app/adapters/outbound.py`); the dev realm `andere` | #PR | in PR |
+| 1 | Groundwork, no behaviour change: provider-qualified subjects and the `idp:` refusal (`app/domain/identity.py`, the OIDC adapter); the provider key on the pending login, checked at the callback (the platform provider is the only entry until step 2); the provider of a staff record follows from its qualified subject (`provider_of`), so `staff` needs no new column; the outbound guard (`app/adapters/outbound.py`); the dev realm `andere` | #250 | in PR |
 | 2 | Registration: `identity_providers` table (migration), permissions and matrix rows, the *Login* tab on the organisation page, discovery check, `client_secret_basic` and `private_key_jwt` with `/admin/jwks.json` and key rotation, the guided test login, audit events | | planned |
 | 3 | Domains and routing: domain claims, DNS TXT verification and the re-check job, the email-first login page (nl, en), `login_hint`, RFC 9207 check, email-domain check at the callback, scope restriction in `resolve`, the kill switch | | planned |
 | 4 | Operations: `oidc-check --idp`, `idp disable`, staff directory filter, system events and the status on *System status*, logout and fresh login per provider | | planned |
