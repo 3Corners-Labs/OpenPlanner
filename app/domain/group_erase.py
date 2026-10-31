@@ -11,14 +11,10 @@ is a system event ``group.erased`` at the group's level, written before the row 
 from collections.abc import Callable
 from datetime import timedelta
 
-import structlog
-
 from app.domain.audit import Outcome
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.system_log import SystemLog
 from app.domain.tunable import value_of
-
-log = structlog.get_logger()
 
 ERASED = "group.erased"
 """The system event written for every erased group."""
@@ -52,5 +48,4 @@ class GroupEraser:
             await self._events.record(ERASED, Outcome.SUCCESS, group_slug=group.slug)
             async with self._uow.locked() as tx:
                 await tx.delete_group(group.id)
-            log.info("group.erased", group=group.slug)
         return len(due)
