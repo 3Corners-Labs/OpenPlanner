@@ -1014,7 +1014,8 @@ The job `release PR` then:
 
 1. computes the number (`scripts/release_pr.py plan`) from the commits since the last release
    tag, the same as `make release-plan`;
-2. sets `version = "X.Y.Z"` in `pyproject.toml` and `uv.lock`, renames `## Unreleased` in
+2. sets `version = "X.Y.Z"` in `pyproject.toml` and `uv.lock`, `softwareVersion` and
+   `releaseDate` in `publiccode.yml` (ADR 0054), renames `## Unreleased` in
    `CHANGELOG.md` to `## X.Y.Z (date)` with a fresh empty `## Unreleased` above it;
 3. pushes `release/vX.Y.Z`, opens the PR `chore(release): vX.Y.Z` with the PR template filled
    in (the dispatcher's login is in it: that is the recorded instruction) and enables
