@@ -31,6 +31,8 @@ from app.domain.scheduling import Organisation
 from app.domain.settings_registry import (
     BY_KEY,
     LOG_LEVEL_MAX_EXPIRY_HOURS,
+    TRACE_LEVEL,
+    TRACE_LEVEL_MAX_HOURS,
     Kind,
     SettingClass,
     SettingSpec,
@@ -404,6 +406,10 @@ class SettingsService:
             return
         async with self._uow.locked() as tx:
             stored = await tx.platform_settings()
+            if value == TRACE_LEVEL and expires is not None:
+                cap = self._trace_cap(stored)
+                if expires > now + timedelta(hours=cap):
+                    raise DomainError(ErrorCode.SETTING_EXPIRY, key)
             if self._combination({**stored, key: value}):
                 raise DomainError(ErrorCode.SETTING_COMBINATION, key)
             old = stored.get(key, spec.default)
@@ -496,9 +502,20 @@ class SettingsService:
             await tx.bump_settings_version()
             await _audit(tx, now, actor, f"adopt:{key}:{_text(value)}")
 
+    def _trace_cap(self, stored: Mapping[str, object]) -> int:
+        """The hours ``TRACE`` may stay on (ADR 0085 point 8): environment, portal, default."""
+        value = self._environment_value(TRACE_LEVEL_MAX_HOURS) or stored.get(TRACE_LEVEL_MAX_HOURS)
+        return (
+            int(str(value))
+            if value is not None
+            else int(str(BY_KEY[TRACE_LEVEL_MAX_HOURS].default))
+        )
+
     @staticmethod
     def _expiry(spec: SettingSpec, hours: int | None, now: datetime) -> datetime | None:
         """Return when the value lapses: only ``LOG_LEVEL``, after 1 to 24 hours.
+
+        ``TRACE`` has a shorter cap, checked in ``_change`` once the stored settings are read.
 
         Raises:
             DomainError: ``setting_expiry``.

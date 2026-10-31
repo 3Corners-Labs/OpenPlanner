@@ -8,6 +8,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 from urllib.parse import urlencode
 
 from fastapi import Request
@@ -15,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 from starlette.responses import HTMLResponse
 
+from app.logging import tracer
 from app.web.locale import LANG_PARAM, RequestLocale
 from app.web.static_assets import ASSETS
 
@@ -188,6 +190,7 @@ def render(
     and ``product_footer`` in addition to ``context``. ``scripts=True`` allows the page's own
     scripts (``SCRIPT_CSP``).
     """
+    started = perf_counter()
     response = templates.TemplateResponse(
         request,
         name,
@@ -200,6 +203,7 @@ def render(
             "product_footer": product_footer_of(request),
         },
     )
+    tracer.trace("template.render", template=name, ms=int((perf_counter() - started) * 1000))
     response.headers["content-security-policy"] = SCRIPT_CSP if scripts else HTML_CSP
     response.headers["cache-control"] = "no-store"
     locale.apply_to(request, response)
