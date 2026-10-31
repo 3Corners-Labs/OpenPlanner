@@ -5917,9 +5917,6 @@ msgstr "Setting"
 msgid "admin.settings.value"
 msgstr "Value"
 
-msgid "admin.settings.notes"
-msgstr "Notes"
-
 msgid "admin.settings.locked"
 msgstr "Locked by the server operator"
 
@@ -6264,12 +6261,6 @@ msgstr "Confirm at the latest (hours before the appointment)"
 
 msgid "settings.field.booking_confirm_window_hours.label"
 msgstr "Confirm within (hours after booking)"
-
-msgid "admin.settings.change"
-msgstr "Change"
-
-msgid "admin.settings.new_value"
-msgstr "New value"
 
 msgid "admin.settings.hours"
 msgstr "Back to the default after (hours, at most {max})"
