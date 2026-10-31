@@ -571,6 +571,9 @@ msgstr "Beheermenu"
 msgid "admin.nav.more"
 msgstr "Meer"
 
+msgid "admin.nav.toggle"
+msgstr "Menu in- of uitklappen"
+
 msgid "admin.nav.section.monitor"
 msgstr "Bewaken"
 
@@ -4793,7 +4796,7 @@ msgid "admin.simulator.lead"
 msgstr "Speel na wat Webex en Webex Contact Center zouden melden, zonder agent of tunnel. Elk event gaat ondertekend door het echte webhook-endpoint en komt op de tijdlijn. Deze kaart bestaat niet in productie."
 
 msgid "admin.simulator.prepare_lead"
-msgstr "Deze boeking heeft nog geen meeting of work item. Geef haar eerst nep-id's, dan kunnen de events haar vinden."
+msgstr "Deze boeking heeft nog geen meeting of work item. Geef haar eerst nep-id's, dan kunnen de events haar vinden. Biedt de groep een proefgesprek aan, dan krijgt de boeking ook een open nep-proefgesprek."
 
 msgid "admin.simulator.prepare"
 msgstr "Nep-meeting en -taak aanmaken"
@@ -4822,11 +4825,17 @@ msgstr "Taak niet opgepakt"
 msgid "admin.simulator.event.task_ended"
 msgstr "Taak beëindigd"
 
+msgid "admin.simulator.event.trial_entered"
+msgstr "Deelnemer komt het proefgesprek binnen"
+
+msgid "admin.simulator.event.trial_left"
+msgstr "Deelnemer verlaat het proefgesprek"
+
 msgid "admin.done.simulated"
 msgstr "Het event is afgeleverd en staat op de tijdlijn."
 
 msgid "admin.done.simulated_prepared"
-msgstr "De boeking heeft nu een nep-meeting en een nep-taak."
+msgstr "De boeking heeft nu een nep-meeting en een nep-taak, en een open nep-proefgesprek als de groep er een aanbiedt."
 
 msgid "admin.done.simulator_no_ids"
 msgstr "Deze boeking heeft daarvoor geen meeting of taak. Maak eerst een nep-meeting en -taak aan."
