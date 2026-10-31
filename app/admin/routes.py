@@ -106,6 +106,7 @@ from app.domain.authorization import (
 )
 from app.domain.entitlements import LoginClaims
 from app.domain.errors import DomainError
+from app.domain.identity import PLATFORM
 from app.domain.login_service import (
     AMBIGUOUS_CLAIMS,
     TOO_MANY_ENTITLEMENTS,
@@ -149,6 +150,15 @@ def _identity_provider(request: Request) -> IdentityProvider | None:
     return provider
 
 
+def _provider_for(request: Request, key: str) -> IdentityProvider | None:
+    """Return the provider a pending login started at, or ``None`` if it is not known.
+
+    Only the platform provider exists until organisation providers are registered (ADR 0083
+    step 2); a login naming any other key is refused like a forged ``state``.
+    """
+    return _identity_provider(request) if key == PLATFORM else None
+
+
 def _clock(request: Request) -> Clock:
     """Return the application's clock."""
     clock: Clock = request.app.state.clock
@@ -190,8 +200,8 @@ async def callback(
     request: Request, locale: Locale, code: str | None = None, state: str | None = None
 ) -> Response:
     """Complete the login: check state, verify the token, start a fresh session."""
-    provider = _identity_provider(request)
     pending = pop_login_start(request)
+    provider = _provider_for(request, pending.get("provider", PLATFORM)) if pending else None
     trial = pop_login_trial(
         request,
         _clock(request).now(),

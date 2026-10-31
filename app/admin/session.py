@@ -18,6 +18,7 @@ from fastapi import Request
 
 from app.domain.authorization import Role
 from app.domain.entitlements import MAX_SESSION_GRANTS, LoginClaims
+from app.domain.identity import PLATFORM
 from app.domain.ports import LoginStart
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 
@@ -62,13 +63,20 @@ class AlertPrefs:
     popups: str
 
 
-def save_login_start(request: Request, start: LoginStart, next_url: str) -> None:
-    """Remember the secrets of a login in progress and where to go afterwards."""
+def save_login_start(
+    request: Request, start: LoginStart, next_url: str, provider: str = PLATFORM
+) -> None:
+    """Remember the secrets of a login in progress, its provider and where to go afterwards.
+
+    The callback completes the login only at ``provider`` (ADR 0083 point 14), so the answer
+    of one provider can never finish a login started at another.
+    """
     request.session[_OIDC] = {
         "state": start.state,
         "nonce": start.nonce,
         "verifier": start.code_verifier,
         "next": next_url,
+        "provider": provider,
     }
 
 

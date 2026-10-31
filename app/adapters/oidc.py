@@ -29,6 +29,7 @@ import structlog
 
 from app.domain.authorization import Role
 from app.domain.entitlements import LoginClaims
+from app.domain.identity import PLATFORM, SubjectRefusedError, qualify
 from app.domain.ports import IdentityError, LoginStart
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 from app.domain.tunable import value_of
@@ -66,7 +67,11 @@ class ClaimMapping:
 
 @dataclass(frozen=True)
 class OidcConfig:
-    """Client registration at the identity provider."""
+    """Client registration at the identity provider.
+
+    ``provider_key`` is empty for the platform provider of the environment and the
+    organisation provider's key otherwise; it qualifies every subject (ADR 0083 point 16).
+    """
 
     discovery_url: str
     client_id: str
@@ -74,6 +79,7 @@ class OidcConfig:
     scopes: str
     mapping: ClaimMapping | Callable[[], ClaimMapping]
     leeway_seconds: int = 60
+    provider_key: str = PLATFORM
 
 
 def _values(claim: object) -> frozenset[str]:
@@ -105,7 +111,11 @@ def claim_mapping(values: Mapping[str, str], max_entitlements: int = 200) -> Cla
 
 
 def login_claims(
-    claims: Mapping[str, Any], mapping: ClaimMapping, *, log_lockout: bool = True
+    claims: Mapping[str, Any],
+    mapping: ClaimMapping,
+    *,
+    log_lockout: bool = True,
+    provider: str = PLATFORM,
 ) -> LoginClaims:
     """Extract what the verified ID-token claims say about the admin.
 
@@ -114,24 +124,30 @@ def login_claims(
     value, at most ``MAX_ROLE_CLAIMS`` of them in a stable order, so the session stays small.
     Of the entitlement claim only the values with the prefix are kept (ADR 0049 point 5). A
     login that resolves to no role at all is logged for the operator (``_log_lockout``).
+    The subject is qualified with ``provider`` (ADR 0083 point 16).
 
     Raises:
         IdentityError: ``too_many_entitlements`` when the entitlement claim holds more values
-            than ``mapping.max_entitlements`` (ADR 0049 point 6: fail closed).
+            than ``mapping.max_entitlements`` (ADR 0049 point 6: fail closed);
+            ``reserved_subject``, ``subject_too_long`` or ``empty_subject`` when the ``sub``
+            cannot become an identity.
     """
+    try:
+        subject = qualify(provider, str(claims["sub"]))
+    except SubjectRefusedError as refused:
+        log.warning("oidc.subject_refused", reason=refused.reason)
+        raise IdentityError(refused.reason) from refused
     seen = _values(claims.get(mapping.role_claim))
     roles = frozenset(mapping.role_values[value] for value in seen if value in mapping.role_values)
     others = sorted(v for v in seen if v not in mapping.role_values and is_claim_value(v))
     entitlements = _values(claims.get(mapping.entitlement_claim))
     if len(entitlements) > mapping.max_entitlements:
-        log.warning(
-            "oidc.too_many_entitlements", actor=str(claims["sub"]), values=len(entitlements)
-        )
+        log.warning("oidc.too_many_entitlements", actor=subject, values=len(entitlements))
         raise IdentityError("too_many_entitlements")
     head = f"{mapping.entitlement_prefix}:"
     name = claims.get("name") or claims.get("preferred_username") or claims["sub"]
     found = LoginClaims(
-        subject=str(claims["sub"]),
+        subject=subject,
         display_name=str(name)[:200],
         roles=roles,
         organisations=_values(claims.get(mapping.organisation_claim)),
@@ -243,7 +259,9 @@ class OidcIdentityProvider:
                 or ``too_many_entitlements``.
         """
         claims = await self._claims(code, redirect_uri, code_verifier, nonce)
-        return login_claims(claims, value_of(self._config.mapping))
+        return login_claims(
+            claims, value_of(self._config.mapping), provider=self._config.provider_key
+        )
 
     async def finish_trial_login(
         self,
@@ -261,9 +279,10 @@ class OidcIdentityProvider:
         """
         claims = await self._claims(code, redirect_uri, code_verifier, nonce)
         mapping = value_of(self._config.mapping)
-        current = login_claims(claims, mapping)
+        provider = self._config.provider_key
+        current = login_claims(claims, mapping, provider=provider)
         tried = claim_mapping(trial, mapping.max_entitlements)
-        return current, login_claims(claims, tried, log_lockout=False)
+        return current, login_claims(claims, tried, log_lockout=False, provider=provider)
 
     async def _claims(
         self, code: str, redirect_uri: str, code_verifier: str, nonce: str
