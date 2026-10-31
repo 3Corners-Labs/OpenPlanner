@@ -1055,6 +1055,34 @@ Release on the day the fix is merged (ADR 0052 §6): run the same steps; `make r
 gives a PATCH when only fixes are waiting, otherwise a MINOR that also carries the features on
 `main`. Keep the release notes free of exploit details until installations have updated.
 
+## Build steps as issues and the ADR drift report (ADR 0078)
+
+Every ADR from 0059 on ends with a *Build status* table. The workflow `adr drift`
+(`.github/workflows/adr-drift.yml`) turns it into work on GitHub, after every merge to `main`
+that touches an ADR and on Tuesday mornings:
+
+- Every row that is `planned` or `follow-up` has one open issue `ADR NNNN step S: <what>`
+  with the label `adr:NNNN`. The pull request that builds the step sets the row to `in PR #N`
+  and closes the issue with `Closes #N`; a row that moved to `merged`, `built` or `live`
+  closes it as well. The table is the source of truth: a closed issue for a row that is still
+  open is reopened, so change the row, not the issue. Issues without an `adr:` label are
+  never touched.
+- One issue `ADR drift <date>` lists what no longer agrees: a row of `docs/adr-status.md`
+  whose category contradicts the ADR's table, rows that say `in PR #N` for a pull request
+  that is merged or closed, and `adr:` issues whose row is gone. It is updated in place and
+  closed when there is nothing to report.
+
+To see what a run would do without writing anything, or to run it by hand:
+
+```sh
+uv run python -m scripts.adr_issues --dry-run
+uv run python -m scripts.adr_issues --report
+```
+
+The workflow has `issues: write` and nothing else it can change; the logic is in
+`scripts/adr_issues.py` (tests in `tests/scripts/test_adr_issues.py`), so another forge
+only needs to call it.
+
 ## Updates from the admin portal (ADR 0029)
 
 With `UPDATE_REPOSITORY=<owner>/<repo>` the worker looks up the latest GitHub release once an
@@ -1338,7 +1366,7 @@ caller by pseudonym (`client:<16 hex>`), never by IP address:
 
 | Entry | Means | What to do |
 |---|---|---|
-| *Te veel verzoeken*, `too_many_requests` (`surface:web` or `surface:agent`) | one caller went over a rate limit | many from one caller: a scanner or bot, block it at the proxy or firewall; from `many` callers: a distributed attack |
+| *Te veel verzoeken*, `too_many_requests` (`surface:web`, `surface:agent` or `surface:links`) | one caller went over a rate limit | many from one caller: a scanner or bot, block it at the proxy or firewall; from `many` callers: a distributed attack |
 | *Verzoek geweigerd*, `honeypot` | a bot filled in the hidden field of the booking form | nothing for one; a stream: consider Turnstile (feature flag) |
 | *Verzoek geweigerd*, `cross_site` / `origin_mismatch` | a form post from another site (CSRF attempt), or a proxy that rewrites `Origin` | check the proxy if it comes from all callers |
 | *Inloggen*, outcome denied, `invalid_state` / `invalid_token` / `nonce_mismatch` | a failed admin login | one: an expired login tab; many from one caller: an attack on the login |
