@@ -17,8 +17,8 @@ package; when the two disagree, the code wins.
 | Built? | ADRs |
 |---|---|
 | BUILT | 48 |
-| PARTIAL | 26 |
-| NOT BUILT | 6 |
+| PARTIAL | 27 |
+| NOT BUILT | 5 |
 | POLICY | 3 |
 
 | ADR | Title | Built? | Evidence | What is missing |
@@ -99,13 +99,13 @@ package; when the two disagree, the code wins.
 | 0074 | Organisation text overrides | BUILT | #168; migration 0074; `domain/text_overrides.py`, `adapters/db/text_overrides.py`, `admin/organisation_text_routes.py` | Step 2: the global (superuser) layer, `.po` export and import, revision counter (follow-up, listed in the ADR) |
 | 0075 | Browser-direct join link per group | PARTIAL | Steps 1 and 2 (#171); migration 0075 | Step 3: confirmation with the Webex app installed, on docker01 |
 | 0076 | Participant journey: trial call events, the page sent to | PARTIAL | Step 1 (#171); no migration | Step 2: the signal *followed, nobody entered*; step 3: the merged journey view |
-| 0077 | Terminology: participant, and organisation names for staff functions | PARTIAL | steps 1a to 2d (#172, #173, #175, #181, #182, #206, #212, #244); 2e in #247; migration 0077 | 2f (diagrams, needs the draw.io app), the guard test, function names per organisation and group |
+| 0077 | Terminology: participant, and organisation names for staff functions | PARTIAL | steps 1a to 2c (#172, #173, #175, #181, #182) and 2d-1, 2d-2 (#206, #212); migration 0077 | 2d-3 (admin, adapters, jobs, scripts, e2e), 2e (docs that name renamed files, diagrams), the guard test, function names per organisation and group |
 | 0078 | Build work merges on green; decisions and releases wait for the product owner; audit before a minor release | PARTIAL | steps 0–2 (#177); step 4 (#180): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | Steps 3 and 5: the required check and the label on GitHub, the first audited minor release (prepared by ADR 0079) |
 | 0079 | The release is a workflow: release PR, audit and tag by dispatch | PARTIAL | steps 0–2 (#183): `.github/workflows/release.yml`, `scripts/release_pr.py`, `tests/scripts/test_release_pr.py`, dry run on the PR branch | Step 3: the secrets `RELEASE_TOKEN` and `OPENAI_API_KEY` (product owner); step 4: the first release through the workflow, `v0.4.0`, with the first real audit |
 | 0080 | Page width: two classes, declared in the register, and a week that never wraps | BUILT | `app/web/navigation.py` (`Width`, `Screen.width`, `wide_subpages`), `data-width` in `admin/layout.html`, tokens and `.week-frame` in `admin.css`, `docs/admin-map.md`; `tests/web/test_navigation.py`, `tests/web/test_shell_styles.py`, `tests/admin/test_pages.py` | – (further list screens go wide when a table needs the room, step 2) |
 | 0081 | Subjects and routing attributes next to the group | NOT BUILT | #179; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
 | 0082 | Contact-center integration: verification, health, alerts to administrators and a fallback per group | PARTIAL | #238; step 1 in PR: `ContactCenterDispatcher.read_task`, `adapters/group_check.py` (probe work item), `adapters/service_app_check.py`, `adapters/db/probes.py`, `worker.no_dispatch_jobs` | Steps 2–5 (health and reconcile, alert model with email and Webex bot, fallback per group, manual topic for the set-up) |
-| 0083 | Identity providers per organisation, chosen by email domain | NOT BUILT | #248 | Steps 1–5 (registry and qualified subjects, registration with `private_key_jwt`, verified domains and email-first routing, host tools, docs and e2e) |
+| 0083 | Identity providers per organisation, chosen by email domain | PARTIAL | #248; step 1 in PR (#250): `domain/identity.py`, `adapters/outbound.py`, provider on the pending login, `dev/keycloak/andere-realm.json` | Steps 2–5 (registration with `private_key_jwt`, verified domains and email-first routing, host tools, docs and e2e) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 
