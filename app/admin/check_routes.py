@@ -1,12 +1,16 @@
 """The "Koppeling controleren" button of a group (verify button for its integration chain).
 
     POST /admin/groups/{slug}/check   group.edit (fresh)   run the check, then back to settings
+    POST /admin/integrations/service-app-check   integrations.manage (fresh)
+                                      the probes of ``wxcc-check``, then back to Koppelingen
 
-The check reads Webex and WxCC and sends signed test events to our own webhook endpoints; it
-changes nothing at the platforms. The latest result is shown on the group's settings page
-(``check_view``). Platforms can be slow, so the button is limited per address.
+The group check reads Webex and WxCC, creates a probe meeting and a probe work item (ADR
+0065, 0082) and sends signed test events to our own webhook endpoints; the latest result is
+shown on the group's settings page (``check_view``). The Service App check (ADR 0082 point
+3) makes every kind of call OpenPlanner makes, harmlessly, and stores its verdicts for the
+integrations page. Platforms can be slow, so both buttons are limited per address.
 
-It writes nothing but its own report, so it is the one ``maintenance_safe`` route: during
+Both write nothing but their own report, so they are ``maintenance_safe``: during
 maintenance the superuser can still check a repaired integration (ADR 0038).
 """
 
@@ -16,15 +20,20 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import Response
 
+from app.adapters.db.reports import ReportStore
+from app.adapters.integrations import Integrations
+from app.adapters.service_app_check import service_app_check, store_service_app_check
 from app.adapters.webhook_selftest import Outcome
-from app.admin.authz import AdminContext, RequirePermission
+from app.admin.authz import AdminContext, RequirePermission, admin_service
 from app.admin.forms import raise_refusal, redirect_done
 from app.admin.integration_views import OUTCOME_LABELS
 from app.admin.pages import SameOrigin, admin_moment
+from app.domain.audit import Outcome as AuditOutcome
 from app.domain.authorization import Permission
 from app.domain.checks import Finding, GroupCheck
 from app.domain.errors import DomainError
-from app.domain.integration_check import IntegrationCheckService
+from app.domain.integration_check import SERVICE_APP_CHECK_EVENT, IntegrationCheckService
+from app.domain.ports import Clock
 from app.i18n import BoundGettext
 from app.web.check_labels import AREA_LABELS, FINDING_LABELS, STATUS_LABELS, UNKNOWN_FINDING
 from app.web.locale import RequestLocale
@@ -39,6 +48,10 @@ Edit = Annotated[
             Permission.GROUP_EDIT, group_param="slug", fresh=True, maintenance_safe=True
         )
     ),
+]
+Manage = Annotated[
+    AdminContext,
+    Depends(RequirePermission(Permission.INTEGRATIONS_MANAGE, fresh=True, maintenance_safe=True)),
 ]
 
 
@@ -129,3 +142,27 @@ async def run_check(request: Request, slug: str, _: SameOrigin, context: Edit) -
         raise_refusal(error)
         raise
     return redirect_done(f"/admin/groups/{slug}/settings", "checked", anchor="check")
+
+
+@router.post("/integrations/service-app-check")
+@limiter.limit(check_limit)
+async def run_service_app_check(request: Request, _: SameOrigin, context: Manage) -> Response:
+    """Run the probes of ``wxcc-check`` with the Service App's tokens and keep the verdicts."""
+    settings = request.app.state.settings
+    wired: Integrations = request.app.state.integrations
+    clock: Clock = request.app.state.clock
+    wxcc = settings.wxcc_api_base_url if wired.dispatcher is not None else None
+    results = await service_app_check(
+        request.app.state.http, wired.tokens, settings.webex_api_base_url, wxcc, clock
+    )
+    await store_service_app_check(
+        ReportStore(request.app.state.engine), results, wxcc is not None, clock.now()
+    )
+    ok = all(r.ok or not r.required for r in results)
+    await admin_service(request).record(
+        context.principal.subject,
+        SERVICE_APP_CHECK_EVENT,
+        AuditOutcome.SUCCESS if ok else AuditOutcome.FAILURE,
+        "passed" if ok else "failed",
+    )
+    return redirect_done("/admin/integrations", "checked", anchor="service-app")

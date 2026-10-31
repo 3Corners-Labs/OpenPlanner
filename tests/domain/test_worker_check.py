@@ -129,3 +129,25 @@ def test_failed_and_overdue_jobs_are_warnings_with_their_counts() -> None:
 )
 def test_the_heartbeat_row_is_written_once_a_minute(ago: timedelta | None, due: bool) -> None:
     assert heartbeat_due(None if ago is None else NOW - ago, NOW) is due
+
+
+def test_a_worker_without_the_wxcc_settings_fails_for_a_group_that_dispatches() -> None:
+    no_dispatch = WorkerHeartbeat(NOW, "1.0.0", VIDEO)
+    both = WorkerHeartbeat(NOW, "1.0.0", (*VIDEO, JobType.DISPATCH_WXCC_TASK.value))
+
+    def codes(heartbeat: WorkerHeartbeat, dispatches: bool) -> list[tuple[str, CheckStatus]]:
+        findings = worker_findings(
+            heartbeat,
+            NONE,
+            now=NOW,
+            max_age=MAX_AGE,
+            web_version="1.0.0",
+            has_host=True,
+            overdue_after=OVERDUE,
+            dispatches=dispatches,
+        )
+        return [(f.code, f.status) for f in findings]
+
+    assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) in codes(no_dispatch, True)
+    assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) not in codes(no_dispatch, False)
+    assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) not in codes(both, True)

@@ -12,7 +12,7 @@ from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.main import create_app
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, Site
+from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_admin_flow import audit_events
 from tests.admin.test_group_routes import SETTINGS_FORM
 from tests.fakes.clock import FixedClock
@@ -184,3 +184,36 @@ async def test_a_crashing_check_never_blocks_the_save(
     page = (await site.client.get(SETTINGS)).text
     assert 'value="host@example.nl"' in page
     assert "Deze groep is nog niet gecontroleerd." in page
+
+
+# --- ADR 0082 point 3: the Service App check on Koppelingen ----------------------------------
+
+
+async def test_the_service_app_check_runs_from_koppelingen_and_keeps_its_verdicts(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+    before = (await site.client.get("/admin/integrations")).text
+    assert 'action="/admin/integrations/service-app-check"' in before
+    assert "Nog niet gecontroleerd vanuit het portaal" in before
+
+    response = await site.client.post("/admin/integrations/service-app-check", headers=SAME_ORIGIN)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin/integrations?done=checked#service-app"
+    page = (await site.client.get(response.headers["location"])).text
+    assert "Laatst gecontroleerd op" in page
+    assert "Een verplichte aanroep mislukt" in page  # no Service App in this site
+    assert "<code>token refresh</code>" in page
+    assert "Webex is not configured" in page
+    assert ("sub-super", "integration.service_app_check", "failure", "failed") in [
+        (a, b, str(c), d) for a, b, c, d in await audit_events(site)
+    ]
+
+
+async def test_the_service_app_check_needs_the_integrations_permission(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    response = await site.client.post("/admin/integrations/service-app-check", headers=SAME_ORIGIN)
+
+    assert response.status_code == 403
