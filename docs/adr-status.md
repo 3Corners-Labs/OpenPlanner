@@ -103,7 +103,7 @@ from the rows below.
 | 0081 | Subjects and routing attributes next to the group | NOT BUILT | #179; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
 | 0082 | Contact-center integration: verification, health, alerts to administrators and a fallback per group | PARTIAL | #238; step 1 in PR: `ContactCenterDispatcher.read_task`, `adapters/group_check.py` (probe work item), `adapters/service_app_check.py`, `adapters/db/probes.py`, `worker.no_dispatch_jobs` | Steps 2–5 (health and reconcile, alert model with email and Webex bot, fallback per group, manual topic for the set-up) |
 | 0083 | Identity providers per organisation, chosen by email domain | PARTIAL | #248; step 1 in PR (#250): `domain/identity.py`, `adapters/outbound.py`, provider on the pending login, `dev/keycloak/andere-realm.json` | Steps 2–5 (registration with `private_key_jwt`, verified domains and email-first routing, host tools, docs and e2e) |
-| 0087 | The public website: static, built from the repository, shipped with every release | NOT BUILT | ADR in PR | Steps 1–4 (`site/`, `scripts/build_site.py`, the `site` job; Playwright lane; recorded walkthrough; TransIP host work) |
+| 0087 | The public website: static, built from the repository, shipped with every release | NOT BUILT | #271 (ADR and step 1 in PR) | Steps 1–4 (`site/`, `scripts/build_site.py`, the `site` job; Playwright lane; recorded walkthrough; TransIP host work) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 

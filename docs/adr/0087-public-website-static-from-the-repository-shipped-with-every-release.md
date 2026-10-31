@@ -96,8 +96,8 @@ accessibility targets of point 9.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | | planned |
-| 1 | `site/` (content nl/en, templates, stylesheet, script, animated tour, interactive demo, integrations), `scripts/build_site.py`, `make site`, structural test, the `site` job with artifact and rsync deploy | | planned |
+| 0 | ADR proposed | #271 | in PR |
+| 1 | `site/` (content nl/en, templates, stylesheet, script, animated tour, interactive demo, integrations), `scripts/build_site.py`, `make site`, structural test, the `site` job with artifact and rsync deploy | #271 | in PR |
 | 2 | The site's pages in the Playwright lane (keyboard, axe, Lighthouse) | | planned |
 | 3 | Recorded walkthrough of the real interface at release time (`tour.webm`, poster, captions) | | planned |
 | 4 | TransIP: deploy key, environment `website`, DNS for `openplanner.nl` and `www`, HTTPS and the response headers (HSTS, CSP, Referrer-Policy) on the web server (host work) | | planned |
