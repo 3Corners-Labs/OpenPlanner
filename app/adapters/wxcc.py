@@ -9,17 +9,46 @@ A cancelled booking's task is first marked with a Task Messages v2 append
 (``cjp:task_write``) that sets ``kind`` to ``cancelled`` with only the booking reference, so
 the agent sees it without the first name or the meeting link; then End Task v1 (``cjp:user``;
 there is no v2 End Task) is tried as a secondary step (ADR 0021).
+
+``read_task`` (ADR 0082 point 1) asks ``GET /v1/tasks/{taskId}`` (``cjp:config_read``) and
+keeps only the task's status word and the time of its last change; the answer's attributes
+and ``workItemData`` are never read. A 404 is a task WxCC does not know (``TaskState.NONE``).
 """
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
 from app.adapters.webex_auth import AuthorizedClient
-from app.domain.calls import WorkItem
+from app.domain.calls import TaskSnapshot, TaskState, WorkItem
 from app.domain.ports import Clock, IntegrationError
 
 ROUTING_KEY = "openplannerGroup"
+
+PROBE_KIND = "probe"
+"""``kind`` of the group check's probe work item (ADR 0082 point 2); the flow's Case branch on
+it ends the probe before an agent sees it. Fixed on purpose: the flow and OpenPlanner agree."""
+
+TASK_STATES: dict[str, TaskState] = {
+    "new": TaskState.QUEUED,
+    "created": TaskState.QUEUED,
+    "queued": TaskState.QUEUED,
+    "parked": TaskState.QUEUED,
+    "offered": TaskState.QUEUED,
+    "connected": TaskState.CONNECTED,
+    "active": TaskState.CONNECTED,
+    "hold": TaskState.CONNECTED,
+    "consult": TaskState.CONNECTED,
+    "wrapup": TaskState.ENDED,
+    "ended": TaskState.ENDED,
+    "completed": TaskState.ENDED,
+    "closed": TaskState.ENDED,
+    "abandoned": TaskState.ENDED,
+    "failed": TaskState.FAILED,
+}
+"""WxCC's status words, lower case, to OpenPlanner's task states; an unknown word is
+``TaskState.NONE`` with the word kept in ``TaskSnapshot.status``."""
 
 WORK_ITEM_FIELDS = (
     "bookingReference",
@@ -117,6 +146,32 @@ class WxccTasks:
             ok=(200, 202),
         )
 
+    async def read_task(self, task_id: str) -> TaskSnapshot:
+        """Return the task's state (``GET /v1/tasks/{taskId}``); ``NONE`` for a 404."""
+        url = f"{self._base}/v1/tasks/{quote(task_id, safe='')}"
+        try:
+            response = await self._client.request("GET", url, ok=(200,))
+        except IntegrationError as error:
+            if error.code == "rejected_404":
+                return TaskSnapshot(TaskState.NONE)
+            raise
+        return task_snapshot(response.json())
+
     def _task_url(self, version: str, task_id: str, action: str) -> str:
         """Return a task action URL; the id is escaped so it cannot change the path."""
         return f"{self._base}/{version}/tasks/{quote(task_id, safe='')}/{action}"
+
+
+def task_snapshot(payload: object) -> TaskSnapshot:
+    """Reduce a task answer to its status word and last change; nothing else is read."""
+    data = payload.get("data", payload) if isinstance(payload, dict) else {}
+    if not isinstance(data, dict):
+        return TaskSnapshot(TaskState.NONE)
+    status = str(data.get("status") or "").strip().lower()[:32]
+    changed = data.get("lastUpdatedTime") or data.get("endedTime") or data.get("createdTime")
+    changed_at = (
+        datetime.fromtimestamp(changed / 1000, tz=UTC)
+        if isinstance(changed, int | float) and changed > 0
+        else None
+    )
+    return TaskSnapshot(TASK_STATES.get(status, TaskState.NONE), status, changed_at)

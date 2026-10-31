@@ -75,7 +75,7 @@ from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
 from app.domain.idp_mapping import EXPORTED_EVENT, GROUP_IDP_KEY_CHANGED
-from app.domain.integration_check import CHECK_EVENT
+from app.domain.integration_check import CHECK_EVENT, SERVICE_APP_CHECK_EVENT
 from app.domain.maintenance import OVERDUE_EVENT, MaintenanceReason
 from app.domain.organisations import IDP_KEY_CHANGED as ORGANISATION_IDP_KEY_CHANGED
 from app.domain.planner_service import ALERT_ACTION
@@ -158,6 +158,8 @@ EVENT_LABELS: dict[str, str] = {
     OVERDUE_EVENT: "audit.event.maintenance_overdue",
     # ADR 0065: "Koppeling controleren", by hand or by the worker (at the group).
     CHECK_EVENT: "audit.event.integration_check",
+    # ADR 0082: the Service App check from Koppelingen (global).
+    SERVICE_APP_CHECK_EVENT: "audit.event.integration_service_app_check",
     # ADR 0068: every request to Webex and WxCC for a booking.
     REQUEST_EVENT: "audit.event.integration_request",
     # Security events (ADR 0034): global, deduplicated per window.

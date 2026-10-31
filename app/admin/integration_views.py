@@ -7,11 +7,12 @@ command line (runbook, section 6): the page offers no destructive action.
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.adapters.db.reports import StoredReport
 from app.adapters.registrations import Reason, State, listing_from_report
+from app.adapters.service_app_check import results_from_report
 from app.adapters.webhook_selftest import Outcome, deliveries_from_report
 
 STATE_LABELS: dict[State, tuple[str, str]] = {
@@ -78,8 +79,19 @@ class DeliveryRow:
 
 
 @dataclass(frozen=True)
+class ProbeRow:
+    """One probe of the Service App check as the page shows it (ADR 0082 point 3)."""
+
+    name: str
+    status: str
+    verdict: str
+    tone: str
+    hint: str
+
+
+@dataclass(frozen=True)
 class CheckView:
-    """The last listing and delivery test; ``None`` times mean no check ran yet."""
+    """The last listing, delivery test and Service App check; ``None`` times mean no run yet."""
 
     listed_at: str | None
     listed_base: str
@@ -89,6 +101,23 @@ class CheckView:
     tested_at: str | None
     tested_base: str
     deliveries: list[DeliveryRow]
+    service_app_at: str | None = None
+    service_app_passed: bool = False
+    probes: list[ProbeRow] = field(default_factory=list)
+
+
+def _probe_rows(report: StoredReport | None, _: Callable[..., str]) -> list[ProbeRow]:
+    """Turn the stored Service App check into rows; a secondary probe that fails warns."""
+    rows = []
+    for result in results_from_report(report.body) if report else []:
+        if result.ok:
+            verdict, tone = "admin.integrations.verdict.ok", "success"
+        elif result.required:
+            verdict, tone = "admin.integrations.verdict.fail", "danger"
+        else:
+            verdict, tone = "admin.integrations.verdict.warn", "warning"
+        rows.append(ProbeRow(result.name, str(result.status or "–"), _(verdict), tone, result.hint))
+    return rows
 
 
 def check_view(
@@ -96,6 +125,7 @@ def check_view(
     tested: StoredReport | None,
     _: Callable[..., str],
     moment: Callable[[datetime], str],
+    service_app: StoredReport | None = None,
 ) -> CheckView:
     """Build the view from the stored reports with ``_`` (gettext) and ``moment`` (dates)."""
     listing = listing_from_report(listed.body) if listed else None
@@ -139,4 +169,7 @@ def check_view(
             )
             for d in deliveries
         ],
+        service_app_at=moment(service_app.checked_at) if service_app else None,
+        service_app_passed=bool(service_app and service_app.body.get("passed")),
+        probes=_probe_rows(service_app, _),
     )

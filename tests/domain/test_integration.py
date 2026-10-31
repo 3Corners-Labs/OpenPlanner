@@ -23,6 +23,7 @@ from app.domain.job_plan import JobStatus, JobType, PlannedJob
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.scheduling import PhoneMode
 from tests.fakes.clock import FixedClock
+from tests.fakes.integrations import FakeProbes
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW, SLOT_0900, make_group
 from tests.support.principals import principal
@@ -463,3 +464,29 @@ async def test_the_appointments_own_meeting_still_counts_the_participant(
 
     assert _kinds(trial_uow) == [EventKind.GUEST_JOINED]
     assert trial_uow.state.call_status[123].participants == 1
+
+
+# --- the group check's probe work item (ADR 0082) -------------------------------------------
+
+
+async def test_a_bookings_task_new_is_ignored_and_a_probes_events_are_noted(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    clock = FixedClock(NOW)
+    probes = FakeProbes()
+    await probes.open("probe-task", NOW)
+    service = IntegrationService(uow, clock, AdminService(uow, clock), probes=probes)
+
+    ignored = await service.record_task_event("task-1", EventKind.TASK_CREATED, NOW)
+    noted = await service.record_task_event("probe-task", EventKind.TASK_CREATED, NOW)
+    ended = await service.record_task_event("probe-task", EventKind.TASK_ENDED, NOW)
+    unknown = await service.record_task_event("someone-else", EventKind.TASK_ENDED, NOW)
+
+    assert (ignored, noted, ended, unknown) == (
+        EventOutcome.IGNORED,
+        EventOutcome.PROBE,
+        EventOutcome.PROBE,
+        EventOutcome.UNKNOWN,
+    )
+    assert uow.state.booking_events.get(123, []) == []  # nothing on the booking's timeline
+    assert await probes.events("probe-task") == (EventKind.TASK_CREATED, EventKind.TASK_ENDED)

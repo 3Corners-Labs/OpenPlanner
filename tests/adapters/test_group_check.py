@@ -7,7 +7,7 @@ import hashlib
 import hmac
 import json
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -18,11 +18,14 @@ from app.adapters.diagnostics import CheckResult
 from app.adapters.group_check import CheckerConfig, PlatformChecker
 from app.adapters.webex_auth import ServiceAppConfig, WebexTokens
 from app.adapters.webhook_registration import WEBEX_EVENTS
+from app.adapters.wxcc_config import parse_flow
+from app.domain.calls import EventKind
 from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import JoinClient
-from tests.adapters.test_wxcc_config import _config
+from tests.adapters.test_wxcc_config import FLOW_DOC, _config
 from tests.fakes.clock import FixedClock
+from tests.fakes.integrations import FakeDispatcher, FakeProbes
 from tests.fakes.tokens import MemoryTokenStore
 from tests.support.domain import make_group
 
@@ -571,3 +574,158 @@ async def test_the_trial_probe_is_still_deleted_when_the_options_were_ignored() 
 
     deletes = [r for r in platforms.requests if r.method == "DELETE"]
     assert len(deletes) == 2  # the booking probe and the trial probe
+
+
+# --- the probe work item (ADR 0082) ---------------------------------------------------------
+
+
+async def _no_sleep(seconds: float) -> None:
+    """The checker's wait between looks: the fake registry hands out events per look."""
+
+
+def _probing(
+    platforms: Platforms,
+    probes: FakeProbes,
+    dispatcher: FakeDispatcher | None = None,
+    timeout: timedelta = timedelta(seconds=30),
+) -> tuple[PlatformChecker, FakeDispatcher]:
+    http = httpx.AsyncClient(transport=httpx.MockTransport(platforms))
+    clock = FixedClock(NOW)
+    tokens = WebexTokens(ServiceAppConfig("c", "s", "r"), http, MemoryTokenStore(), clock)
+    dispatcher = dispatcher or FakeDispatcher()
+    checker = PlatformChecker(
+        http,
+        tokens,
+        CONFIG,
+        clock,
+        dispatcher=dispatcher,
+        probes=probes,
+        probe_timeout=lambda: timeout,
+        sleep=_no_sleep,
+    )
+    return checker, dispatcher
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_the_probe_work_item_is_a_bookings_work_item_without_a_participant() -> None:
+    probes = FakeProbes([EventKind.TASK_CREATED, EventKind.TASK_ENDED])
+    checker, dispatcher = _probing(Platforms(), probes)
+
+    findings = await checker.check_group(GROUP, [GROUP])
+    codes = _codes(findings)
+
+    assert codes["wxcc.probe.ok"] is CheckStatus.OK
+    assert probes.opened == ["task-1"]
+    [item] = dispatcher.items
+    assert item.kind == "probe"
+    assert item.first_name == "Probe"
+    assert item.reference.startswith("probe-")
+    assert item.meeting_link == "https://w.example/j"  # the probe meeting's link
+    assert (item.business_address, item.channel, item.routing_value) == (
+        GROUP.wxcc_business_address,
+        GROUP.wxcc_channel,
+        "aangifte",
+    )
+    assert item.group_name == GROUP.name
+    assert dispatcher.ended == []  # the flow ended it; nothing left to clean up
+    ok = next(f for f in findings if f.code == "wxcc.probe.ok")
+    assert ("task", "task-1") in ok.params
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_probe_that_gets_no_events_fails_and_is_ended_by_openplanner() -> None:
+    checker, dispatcher = _probing(Platforms(), FakeProbes(), timeout=timedelta(0))
+
+    codes = _codes(await checker.check_group(GROUP, [GROUP]))
+
+    assert codes["wxcc.probe.no_events"] is CheckStatus.FAIL
+    assert dispatcher.ended == ["task-1"]
+    assert "wxcc.probe.left" not in codes
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_probe_that_arrives_but_is_not_ended_warns_without_the_branch() -> None:
+    """The recorded flow has no Case on ``probe``: OpenPlanner ends the probe and warns."""
+    probes = FakeProbes([EventKind.TASK_CREATED])
+    checker, dispatcher = _probing(Platforms(), probes, timeout=timedelta(0))
+
+    codes = _codes(await checker.check_group(GROUP, [GROUP]))
+
+    assert codes["wxcc.probe.missing"] is CheckStatus.WARN
+    assert codes["wxcc.probe.ended_here"] is CheckStatus.WARN
+    assert dispatcher.ended == ["task-1"]
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_probe_that_arrives_but_is_not_ended_fails_when_the_flow_has_the_branch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    flow = parse_flow(
+        {
+            **FLOW_DOC,
+            "nodes": [*FLOW_DOC["nodes"], {"name": "Case", "properties": {"value": "probe"}}],
+        }
+    )
+
+    async def fetch(*_: object) -> object:
+        return _config(flow=flow)
+
+    monkeypatch.setattr(group_check, "fetch_config", fetch)
+    probes = FakeProbes([EventKind.TASK_CREATED])
+    checker, dispatcher = _probing(Platforms(), probes, timeout=timedelta(0))
+
+    codes = _codes(await checker.check_group(GROUP, [GROUP]))
+
+    assert codes["wxcc.probe.ok"] is CheckStatus.OK  # the branch rule
+    assert codes["wxcc.probe.not_ended"] is CheckStatus.FAIL
+    assert dispatcher.ended == ["task-1"]
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_probe_wxcc_reports_as_failed_is_a_failure() -> None:
+    probes = FakeProbes([EventKind.TASK_CREATED, EventKind.TASK_FAILED])
+    checker, dispatcher = _probing(Platforms(), probes)
+
+    codes = _codes(await checker.check_group(GROUP, [GROUP]))
+
+    assert codes["wxcc.probe.failed"] is CheckStatus.FAIL
+    assert dispatcher.ended == []
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_refused_probe_and_a_probe_that_cannot_be_ended_are_named() -> None:
+    refused = FakeDispatcher()
+    refused.error = IntegrationError("rejected_400", retryable=False, reason="INVALID_CONTENT")
+    checker, _ = _probing(Platforms(), FakeProbes(), refused)
+    left = FakeDispatcher()
+    left.end_error = IntegrationError("rejected_403", retryable=False)
+    checker_left, _ = _probing(Platforms(), FakeProbes(), left, timeout=timedelta(0))
+
+    refusal = _codes(await checker.check_group(GROUP, [GROUP]))
+    not_ended = {f.code: f for f in await checker_left.check_group(GROUP, [GROUP])}
+
+    assert refusal["wxcc.probe.refused"] is CheckStatus.FAIL
+    assert "wxcc.probe.no_events" not in refusal
+    assert not_ended["wxcc.probe.left"].status is CheckStatus.WARN
+    assert ("error", "rejected_403") in not_ended["wxcc.probe.left"].params
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_without_a_dispatcher_or_registry_no_probe_work_item_is_created() -> None:
+    codes = _codes(await _checker(Platforms()).check_group(GROUP, [GROUP]))
+
+    assert not any(
+        code.startswith("wxcc.probe.") and code != "wxcc.probe.missing" for code in codes
+    )
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_probe_without_a_probe_meeting_carries_a_placeholder_link() -> None:
+    platforms = Platforms()
+    platforms.host_status = 404
+    probes = FakeProbes([EventKind.TASK_CREATED, EventKind.TASK_ENDED])
+    checker, dispatcher = _probing(platforms, probes)
+
+    await checker.check_group(GROUP, [GROUP])
+
+    assert dispatcher.items[0].meeting_link == "https://openplanner.invalid/probe"
