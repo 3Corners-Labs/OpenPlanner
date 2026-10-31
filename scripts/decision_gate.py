@@ -1,8 +1,11 @@
 """Tell build work from a decision, so that only decisions wait for the product owner (ADR 0078).
 
-``.github/workflows/decision-gate.yml`` runs this on every pull request as the required check
-*decision gate*, from ``main``'s copy of this file (``pull_request_target``), so a pull request
-cannot change the gate that judges it. A pull request is a *decision* when it touches an ADR
+``.github/workflows/decision-gate.yml`` runs this as the required check *decision gate* twice:
+on every pull request, from ``main``'s copy of this file (``pull_request_target``), so a pull
+request cannot change the gate that judges it; and again in the merge queue (``merge_group``,
+ADR 0088), where it judges every pull request in the group by its own commit on the queue
+branch, so that a decision cannot reach ``main`` through a stale or skipped check on the pull
+request. A pull request is a *decision* when it touches an ADR
 outside its *Build status* table and its Status line (a new or removed ADR always counts),
 ``CLAUDE.md``, ``SECURITY.md``, the authorisation matrix, anything under ``.github/`` or
 ``.semgrep/``, the ``Makefile`` (what CI runs), the gates themselves (this script and the
@@ -13,6 +16,14 @@ knows what they are approving.
 
 The list of decision paths is fixed on purpose and lives here: changing it is itself a
 decision (ADR 0078, *Settings*).
+
+In the merge queue every first-parent commit between the group's base (``main``) and its head
+is one pull request's squash commit, whose subject ends in ``(#N)``, or its merge commit,
+whose subject starts with ``Merge pull request #N``. ``--list-pull-requests`` prints those
+numbers so the workflow can ask the API for each pull request's labels; ``--merge-group`` then
+judges each commit against its parent with the labels given as ``--pull N=label,label``. A
+commit that names no pull request, or a pull request whose labels were not given, fails the
+check: the gate fails closed.
 """
 
 import argparse
@@ -42,6 +53,9 @@ DECISION_DIRECTORIES = (".github/", ".semgrep/")
 
 ADR_DIRECTORY = "docs/adr/"
 RELEASE_TITLE = "chore(release):"
+
+_PULL_REQUEST = re.compile(r"\(#(\d+)\)$|^Merge pull request #(\d+) ")
+"""The pull request number in a squash commit's subject or a merge commit's subject."""
 
 _STATUS = re.compile(r"^Status:.*?(?:\n\n|\Z)", re.M | re.S)
 _BUILD_STATUS = re.compile(r"^## Build status\n.*?(?=^## |\Z)", re.M | re.S)
@@ -101,6 +115,28 @@ def reasons(paths: Iterable[str], title: str, texts: Texts) -> list[str]:
     return found
 
 
+def pull_request_number(subject: str) -> int | None:
+    """Return the pull request a commit on the merge queue branch merges, or ``None``.
+
+    Args:
+        subject: The commit's subject line.
+
+    Returns:
+        The number from ``... (#N)`` (a squash commit) or ``Merge pull request #N ...`` (a
+        merge commit); ``None`` when the subject names no pull request.
+    """
+    found = _PULL_REQUEST.search(subject.strip())
+    if found is None:
+        return None
+    return int(found.group(1) or found.group(2))
+
+
+def parse_pull(argument: str) -> tuple[int, set[str]]:
+    """Parse one ``--pull N=label,label`` argument into the number and its labels."""
+    number, _, labels = argument.partition("=")
+    return int(number), {label.strip() for label in labels.split(",") if label.strip()}
+
+
 def _git(*args: str) -> str:
     """Run git with fixed arguments and return its output."""
     return subprocess.run(  # noqa: S603 - fixed argument list, no shell
@@ -119,20 +155,10 @@ def _show(revision: str, path: str) -> str | None:
         return None
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Print what makes the pull request a decision and exit 1 when it lacks the label."""
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--base", required=True, help="the base commit of the pull request")
-    parser.add_argument("--head", required=True, help="the head commit of the pull request")
-    parser.add_argument("--title", default="", help="the pull request's title")
-    parser.add_argument("--labels", default="", help="the pull request's labels, comma-separated")
-    args = parser.parse_args(argv)
-
-    base = _git("merge-base", args.base, args.head).strip()
-    paths = _git("diff", "--name-only", base, args.head).split()
-    found = reasons(paths, args.title, lambda path: (_show(base, path), _show(args.head, path)))
-    labels = {label.strip() for label in args.labels.split(",")}
-
+def _judge(base: str, head: str, title: str, labels: set[str]) -> int:
+    """Print what makes one change a decision and return 1 when it lacks the label."""
+    paths = _git("diff", "--name-only", base, head).split()
+    found = reasons(paths, title, lambda path: (_show(base, path), _show(head, path)))
     if not found:
         print("build work: merges on green (ADR 0078)")
         return 0
@@ -144,6 +170,86 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     print(f"::error::a decision waits for the product owner: the label {LABEL} is missing")
     return 1
+
+
+def _queue_commits(base: str, head: str) -> list[tuple[str, str, int | None]]:
+    """Return the merge queue's commits between ``base`` and ``head``, oldest first.
+
+    Each item is the commit, its subject and the pull request it merges (``None`` when the
+    subject names none).
+    """
+    start = _git("merge-base", base, head).strip()
+    commits = _git("rev-list", "--first-parent", "--reverse", f"{start}..{head}").split()
+    found = []
+    for commit in commits:
+        subject = _git("log", "-1", "--format=%s", commit).strip()
+        found.append((commit, subject, pull_request_number(subject)))
+    return found
+
+
+def _list_pull_requests(base: str, head: str) -> int:
+    """Print the pull requests in the merge group, one per line; 1 when a commit names none."""
+    status = 0
+    for commit, subject, number in _queue_commits(base, head):
+        if number is None:
+            print(f"::error::commit {commit[:12]} names no pull request: {subject}")
+            status = 1
+        else:
+            print(number)
+    return status
+
+
+def _judge_merge_group(base: str, head: str, pulls: dict[int, set[str]]) -> int:
+    """Judge every pull request in the merge group by its own commit; 1 when one fails."""
+    status = 0
+    for commit, subject, number in _queue_commits(base, head):
+        print(f"{commit[:12]} {subject}")
+        if number is None:
+            print("::error::the commit names no pull request, so its labels cannot be read")
+            status = 1
+            continue
+        if number not in pulls:
+            print(f"::error::the labels of pull request #{number} were not given")
+            status = 1
+            continue
+        status = max(status, _judge(f"{commit}^", commit, subject, pulls[number]))
+    return status
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Print what makes the pull request a decision and exit 1 when it lacks the label."""
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--base", required=True, help="the base commit of the pull request")
+    parser.add_argument("--head", required=True, help="the head commit of the pull request")
+    parser.add_argument("--title", default="", help="the pull request's title")
+    parser.add_argument("--labels", default="", help="the pull request's labels, comma-separated")
+    parser.add_argument(
+        "--list-pull-requests",
+        action="store_true",
+        help="print the pull requests merged by the commits between base and head, one per line",
+    )
+    parser.add_argument(
+        "--merge-group",
+        action="store_true",
+        help="judge every pull request between base and head by its own commit (merge queue)",
+    )
+    parser.add_argument(
+        "--pull",
+        action="append",
+        default=[],
+        metavar="N=LABEL,LABEL",
+        help="a pull request in the merge group with its labels (with --merge-group)",
+    )
+    args = parser.parse_args(argv)
+
+    if args.list_pull_requests:
+        return _list_pull_requests(args.base, args.head)
+    if args.merge_group:
+        return _judge_merge_group(args.base, args.head, dict(map(parse_pull, args.pull)))
+
+    base = _git("merge-base", args.base, args.head).strip()
+    labels = {label.strip() for label in args.labels.split(",")}
+    return _judge(base, args.head, args.title, labels)
 
 
 if __name__ == "__main__":
