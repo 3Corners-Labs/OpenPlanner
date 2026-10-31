@@ -1,0 +1,37 @@
+{#- The scope filter of the top bar (SH-3, ADR 0061 §9): a GET form that narrows the overview to one organisation or group; never an edit form. Expects ``scope_filter`` (ScopeFilterView). -#}
+{% from "admin/_icons.html" import icon %}
+<details class="admin-scope{% if scope_filter.crumbs %} admin-scope--active{% endif %}">
+  <summary>{{ icon("filter") }}<span class="admin-topbar__label">{{ _("admin.scope.label") }}: {{ scope_filter.summary }}</span></summary>
+  <div class="admin-scope__panel">
+    {% if scope_filter.crumbs %}
+    <nav aria-label="{{ _("admin.scope.crumbs") }}">
+      <ol class="admin-scope__crumbs">
+        {% for crumb in scope_filter.crumbs %}<li>{% if crumb.href %}<a href="{{ crumb.href }}">{{ crumb.label }}</a>{% else %}{{ crumb.label }}{% endif %}</li>
+        {% endfor %}
+      </ol>
+    </nav>
+    {% endif %}
+    <form method="get">
+      <input type="hidden" name="scope" value="1">
+      <div class="field">
+        <label for="scope-org">{{ _("admin.scope.organisation") }}</label>
+        <select id="scope-org" name="org">
+          {% for option in scope_filter.organisations %}<option value="{{ option.value }}"{% if option.value == scope_filter.organisation %} selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="scope-group">{{ _("admin.scope.group") }}</label>
+        <select id="scope-group" name="group">
+          {% for option in scope_filter.groups %}<option value="{{ option.value }}"{% if option.value == scope_filter.group %} selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <p class="admin-scope__hint">{{ _("admin.scope.hint") }}</p>
+      <div class="admin-scope__actions">
+        <button type="submit" class="button button--small">{{ _("admin.scope.apply") }}</button>
+        <a class="button button--small button--secondary" href="?scope=1">{{ _("admin.scope.reset") }}</a>
+      </div>
+    </form>
+  </div>
+</details>
