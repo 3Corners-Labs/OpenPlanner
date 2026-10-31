@@ -569,6 +569,9 @@ def main(argv: Sequence[str] | None = None, root: Path = ROOT, run: Runner = run
         "--post", action="store_true", help="with --report: keep it as the issue 'ADR drift <date>'"
     )
     parser.add_argument(
+        "--counts", action="store_true", help="print how many ADRs are in each category and stop"
+    )
+    parser.add_argument(
         "--dry-run", action="store_true", help="say what would change; write nothing"
     )
     parser.add_argument(
@@ -578,6 +581,16 @@ def main(argv: Sequence[str] | None = None, root: Path = ROOT, run: Runner = run
         help="the report's date",
     )
     args = parser.parse_args(argv)
+
+    if args.counts:
+        try:
+            overview = parse_overview((root / "docs" / "adr-status.md").read_text())
+        except ParseError as error:
+            print(f"::error::{error}")
+            return 2
+        for category in CATEGORIES:
+            print(f"{category}: {sum(1 for found in overview.values() if found == category)}")
+        return 0
 
     gh = GitHub(run)
     try:
