@@ -16,7 +16,7 @@ package; when the two disagree, the code wins.
 
 | Built? | ADRs |
 |---|---|
-| BUILT | 47 |
+| BUILT | 48 |
 | PARTIAL | 24 |
 | NOT BUILT | 5 |
 | POLICY | 3 |
@@ -101,7 +101,8 @@ package; when the two disagree, the code wins.
 | 0076 | Participant journey: trial call events, the page sent to | PARTIAL | Step 1 (#171); no migration | Step 2: the signal *followed, nobody entered*; step 3: the merged journey view |
 | 0078 | Build work merges on green; decisions and releases wait for the product owner; audit before a minor release | PARTIAL | steps 0–2 (#177); step 4 (#180): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | Steps 3 and 5: the required check and the label on GitHub, the first audited minor release (prepared by ADR 0079) |
 | 0079 | The release is a workflow: release PR, audit and tag by dispatch | PARTIAL | steps 0–2 (#183): `.github/workflows/release.yml`, `scripts/release_pr.py`, `tests/scripts/test_release_pr.py`, dry run on the PR branch | Step 3: the secrets `RELEASE_TOKEN` and `OPENAI_API_KEY` (product owner); step 4: the first release through the workflow, `v0.4.0`, with the first real audit |
-| 0080 | Subjects and routing attributes next to the group | NOT BUILT | #179; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
+| 0080 | Page width: two classes, declared in the register, and a week that never wraps | BUILT | `app/web/navigation.py` (`Width`, `Screen.width`, `wide_subpages`), `data-width` in `admin/layout.html`, tokens and `.week-frame` in `admin.css`, `docs/admin-map.md`; `tests/web/test_navigation.py`, `tests/web/test_shell_styles.py`, `tests/admin/test_pages.py` | – (further list screens go wide when a table needs the room, step 2) |
+| 0081 | Subjects and routing attributes next to the group | NOT BUILT | #179; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 

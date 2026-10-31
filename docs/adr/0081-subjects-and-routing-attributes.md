@@ -1,4 +1,4 @@
-# 0080. Subjects and routing attributes next to the group
+# 0081. Subjects and routing attributes next to the group
 
 Status: accepted (2026-10-31), requested by the product owner; not built. Extends ADR 0032
 (provider-neutral contact center) and ADR 0043 (own queue); amends the privacy rule on outbound
