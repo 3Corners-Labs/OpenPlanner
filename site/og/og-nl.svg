@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#ffffff"/>
+  <rect x="0" y="0" width="14" height="630" fill="#01689b"/>
+  <g transform="translate(80 80) scale(2.6)">
+    <g fill="#01689b"><rect x="2" y="2" width="5.5" height="5.5" rx="1.4"/><rect x="9.25" y="2" width="5.5" height="5.5" rx="1.4"/><rect x="16.5" y="2" width="5.5" height="5.5" rx="1.4"/><rect x="2" y="9.25" width="5.5" height="5.5" rx="1.4"/><rect x="9.25" y="9.25" width="5.5" height="5.5" rx="1.4"/><rect x="2" y="16.5" width="5.5" height="5.5" rx="1.4"/><rect x="9.25" y="16.5" width="5.5" height="5.5" rx="1.4"/><rect x="16.5" y="16.5" width="5.5" height="5.5" rx="1.4"/></g>
+    <path d="M22.45 11.68V10.4A1.6 1.6 0 0 0 20.85 8.8H17.65A1.6 1.6 0 0 0 16.05 10.4V13.6A1.6 1.6 0 0 0 17.65 15.2H18.93L20.23 13.9H17.35V10.1H21.15V12.98Z" fill="#ee7f01"/>
+  </g>
+  <text x="170" y="128" font-family="Helvetica, Arial, sans-serif" font-size="46" fill="#1b1b1b">Open<tspan font-weight="700">Planner</tspan></text>
+  <text x="80" y="300" font-family="Helvetica, Arial, sans-serif" font-size="60" font-weight="700" fill="#1b1b1b">Video-afspraken met je team,</text>
+  <text x="80" y="375" font-family="Helvetica, Arial, sans-serif" font-size="60" font-weight="700" fill="#01689b">in seconden geboekt.</text>
+  <text x="80" y="470" font-family="Helvetica, Arial, sans-serif" font-size="28" fill="#4f5a63">Open source · Webex · privacy standaard · WCAG 2.2 AA</text>
+  <text x="80" y="560" font-family="Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#ee7f01">openplanner.nl</text>
+</svg>
