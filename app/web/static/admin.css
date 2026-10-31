@@ -485,6 +485,15 @@ html {
    sections, so the section, heading and link rules apply to both. */
 .admin-nav {
   grid-area: nav;
+  /* Stays in view under the top bar while the page scrolls (admin shell design, #209); a menu
+     taller than the window scrolls on its own, with room above a focused entry. */
+  position: sticky;
+  top: 3.5rem;
+  align-self: start;
+  height: calc(100vh - 3.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 1rem 0;
   padding: 1rem 0.75rem 2rem;
   border-right: 1px solid var(--adm-border);
   background: var(--adm-surface);
