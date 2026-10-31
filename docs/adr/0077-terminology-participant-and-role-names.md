@@ -26,7 +26,7 @@ The state on `main` at 2026-10-30, counted with a case-insensitive search for `b
 | `tests/`, `e2e/`, `scripts/` | 167, 33, 22 | tests assert literal Dutch texts |
 | `migrations/` | 25 | merged, never edited (CLAUDE.md) |
 | `widget/`, `CLAUDE.md`, `CONTRIBUTING.md` | 1, 2, 1 | |
-| `docs/HANDOVER.md` | 3 | Guard test `tests/test_terminology.py` | #256 | merged |
+| `docs/HANDOVER.md` | 3 | Dutch stakeholder document |
 
 "Participant" is already the word for the same person where the Webex integration needs one
 (`EventKind.PARTICIPANT_LEFT`, the Webex resource `meetingParticipants`, "Deelnemer kwam
@@ -255,7 +255,7 @@ Nothing is open at the time of acceptance. A new question gets a row here, not a
 | 4a-2 | Display names of `org_admin` and `group_admin` per organisation (points 10, 11, 13) | | planned |
 | 4b | `{agent}` and `{agents}` in catalogue texts and mails, grammar test (point 9) | #257 | in PR #257 |
 
-Step 4a-2 follows 4a-1. `EventKind.CITIZEN_LEFT` (stored value `citizen_left`) is not renamed: it needs a name of its own, separate from `PARTICIPANT_LEFT`, which is a Webex event.
+Step 4b comes after 4a; step 3 after 2e. `EventKind.CITIZEN_LEFT` (stored value `citizen_left`) is not renamed: it needs a name of its own, separate from `PARTICIPANT_LEFT`, which is a Webex event.
 
 ## Consequences
 
