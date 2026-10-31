@@ -1,7 +1,7 @@
 # 0077. Terminology: "participant", and organisation names for staff functions
 
-Status: accepted (2026-10-31), partly built: the rename of steps 1a to 2d is merged, the references in the docs
-are in review, the diagrams, the guard test and the function names are planned. Requested
+Status: accepted (2026-10-31), partly built: the rename and the guard test are merged and the agent
+term (steps 4a-1 and 4b) is in review; the diagrams and the names of two roles are planned. Requested
 by the product owner, who accepted it on 2026-10-31 together with the recommendations of
 Q12 and Q13. Extends ADR 0004 (texts), ADR 0039 (roles) and ADR 0074 (organisation text
 overrides, PR #168). Changes no right: ADR 0014 stays as it is.
@@ -26,7 +26,7 @@ The state on `main` at 2026-10-30, counted with a case-insensitive search for `b
 | `tests/`, `e2e/`, `scripts/` | 167, 33, 22 | tests assert literal Dutch texts |
 | `migrations/` | 25 | merged, never edited (CLAUDE.md) |
 | `widget/`, `CLAUDE.md`, `CONTRIBUTING.md` | 1, 2, 1 | |
-| `docs/HANDOVER.md` | 3 | Dutch stakeholder document |
+| `docs/HANDOVER.md` | 3 | Guard test `tests/test_terminology.py` | #256 | merged |
 
 "Participant" is already the word for the same person where the Webex integration needs one
 (`EventKind.PARTICIPANT_LEFT`, the Webex resource `meetingParticipants`, "Deelnemer kwam
@@ -248,13 +248,14 @@ Nothing is open at the time of acceptance. A new question gets a row here, not a
 | 2d-1 | Code: domain layer and the identifiers shared across layers, the `citizen.*` codes | #206 | merged |
 | 2d-2 | Code: api and web layers, `app/api/citizen.py` → `participant.py` | #212 | merged |
 | 2d-3 | Code: admin, adapters, jobs, scripts, e2e and the rest of the tests; the diagram source | #244 | merged |
-| 2e | Docs that name renamed files and tests | #247 | in PR #247 |
+| 2e | Docs that name renamed files and tests | #247 | merged |
 | 2f | `docs/diagrams` regenerated with `make diagrams` (needs the draw.io desktop app) | | planned |
-| 3 | Guard test `tests/test_terminology.py` | #256 | in PR #256 |
-| 4a | The agent term and role names per organisation and group in the portal (points 8, 10 to 13) | | planned |
-| 4b | `{agent}` and `{agents}` in catalogue texts and mails, grammar test (point 9) | | planned |
+| 3 | Guard test `tests/test_terminology.py` | #256 | merged |
+| 4a-1 | The agent term per organisation and group: words, editors, scope of the portal, mails and pages (points 8, 9, 11, 12, 13) | #257 | in PR #257 |
+| 4a-2 | Display names of `org_admin` and `group_admin` per organisation (points 10, 11, 13) | | planned |
+| 4b | `{agent}` and `{agents}` in catalogue texts and mails, grammar test (point 9) | #257 | in PR #257 |
 
-Step 4b comes after 4a; step 3 after 2e. `EventKind.CITIZEN_LEFT` (stored value `citizen_left`) is not renamed: it needs a name of its own, separate from `PARTICIPANT_LEFT`, which is a Webex event.
+Step 4a-2 follows 4a-1. `EventKind.CITIZEN_LEFT` (stored value `citizen_left`) is not renamed: it needs a name of its own, separate from `PARTICIPANT_LEFT`, which is a Webex event.
 
 ## Consequences
 
