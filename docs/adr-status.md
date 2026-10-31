@@ -14,12 +14,9 @@ carries its own *Build status* table, updated by the PR that builds a step, and 
 line says what is built. This table is the overview and is refreshed at the end of a work
 package; when the two disagree, the code wins.
 
-| Built? | ADRs |
-|---|---|
-| BUILT | 48 |
-| PARTIAL | 23 |
-| NOT BUILT | 5 |
-| POLICY | 3 |
+The number of ADRs per category is not kept here: every pull request that touched a row
+changed the same lines and conflicted. `uv run python -m scripts.adr_issues --counts` prints it
+from the rows below.
 
 | ADR | Title | Built? | Evidence | What is missing |
 |---|---|---|---|---|
