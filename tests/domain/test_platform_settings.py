@@ -69,7 +69,7 @@ def test_a_deployment_setting_is_never_locked_nor_taken_from_the_portal() -> Non
         (HOURS, "4"),  # a string where a number belongs
         (HOURS, True),  # a bool is not an int here
         (HOURS, None),  # not optional
-        (LEVEL, "TRACE"),  # not one of the choices
+        (LEVEL, "VERBOSE"),  # not one of the choices
         (RATE, "10/minute"),  # another period than the default's
         (RATE, "31/hour"),
         (SECRET, "hunter2"),  # secrets live sealed in integration_credentials (step 6)
