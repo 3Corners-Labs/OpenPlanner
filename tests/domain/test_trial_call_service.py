@@ -1,17 +1,18 @@
 """Opening, joining and deleting a trial call (ADR 0071)."""
 
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.booking import BookingStatus
+from app.domain.booking import BookingStatus, MeetingRef
 from app.domain.calls import EventKind
 from app.domain.errors import DomainError
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
-from app.domain.scheduling import ScheduleRule
+from app.domain.scheduling import JoinClient, ScheduleRule
 from app.domain.services import BookingService
 from app.domain.trial_call import TrialState
 from app.domain.trial_call_service import TrialCallService
@@ -94,7 +95,7 @@ async def test_opening_again_reuses_the_open_trial_call(setup: Setup) -> None:
 async def test_the_link_is_followed_only_while_the_trial_call_is_open(setup: Setup) -> None:
     await setup.service.open(setup.token)
 
-    assert await setup.service.join_link(setup.token) == "https://site.webex.com/m/1"
+    assert await setup.service.join_link(setup.token) == "https://site.webex.com/m/1?launchApp=true"
     setup.clock.advance(timedelta(minutes=31))
     assert await setup.service.join_link(setup.token) is None
     assert setup.events() == [EventKind.TRIAL_CREATED, EventKind.TRIAL_JOINED]
@@ -199,3 +200,41 @@ async def test_cancelling_plans_the_removal_of_the_trial_meeting(setup: Setup) -
 
     assert cancelled.status is BookingStatus.CANCELLED
     assert JobType.DELETE_TRIAL_CALL in setup.jobs()
+
+
+async def test_a_group_that_keeps_webexs_choice_gets_the_meeting_link_unchanged() -> None:
+    setup = await Setup(join_client=JoinClient.CHOICE).booked()
+    await setup.service.open(setup.token)
+
+    assert await setup.service.join_link(setup.token) == "https://site.webex.com/m/1"
+
+
+@pytest.mark.parametrize("client", list(JoinClient))
+async def test_following_the_trial_link_says_which_page_the_participant_was_sent_to(
+    client: JoinClient,
+) -> None:
+    setup = await Setup(join_client=client).booked()
+    await setup.service.open(setup.token)
+
+    await setup.service.join_link(setup.token)
+
+    joined = [
+        e
+        for e in setup.uow.state.booking_events[setup.booking_id]
+        if e.kind is EventKind.TRIAL_JOINED
+    ]
+    assert [e.detail for e in joined] == [client.value]
+
+
+@pytest.mark.parametrize(
+    "link", ["http://evil.example/m", "javascript:alert(1)", "", "//evil.example/m"]
+)
+async def test_a_trial_link_that_is_not_https_is_never_followed(setup: Setup, link: str) -> None:
+    await setup.service.open(setup.token)
+    booking = setup.uow.state.bookings[setup.booking_id]
+    assert booking.trial is not None
+    trial = replace(booking.trial, meeting=MeetingRef(booking.trial.meeting.id, link))
+    setup.uow.state.bookings[setup.booking_id] = replace(booking, trial=trial)
+
+    assert await setup.service.join_link(setup.token) is None
+    assert EventKind.TRIAL_JOINED not in setup.events()  # nothing was followed

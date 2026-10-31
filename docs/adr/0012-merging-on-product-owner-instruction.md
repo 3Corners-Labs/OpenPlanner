@@ -1,7 +1,9 @@
 # 0012. Claude Code merges only on explicit instruction of the product owner
 
 Status: accepted (2026-10-23). Supersedes the last sentence of HANDOVER B16 and the merge rule
-in CLAUDE.md ("Claude Code opens PRs and never merges them").
+in CLAUDE.md ("Claude Code opens PRs and never merges them"). Amended by ADR 0058 (point 2:
+through the merge queue) and ADR 0078 (point 1: build work merges on green without an
+instruction; a decision waits for the label `po:approved`).
 
 ## Context
 

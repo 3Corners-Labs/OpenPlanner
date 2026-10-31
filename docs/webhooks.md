@@ -155,6 +155,14 @@ are kept 30 days and only for OpenPlanner's own meetings. The payload's meeting 
 (`<meetingId>_I_<…>`); it is matched on the series id. Participant names and emails are never
 stored: only counts, whether a host/cohost joined, and times (ADR 0010).
 
+**The trial call's meeting (ADR 0071, 0076).** A booking's trial call is a meeting of its own
+with the same host, so its events arrive on the same webhooks. They are matched on the booking's
+open trial meeting and recorded as `trial_entered` (someone joined; detail `host` when a host or
+cohost did, which nobody from the team should be) and `trial_left`, never as participants of the
+appointment: the appointment's call status stays untouched. The trial meeting's `started` and
+`ended` are ignored, since our own jobs open and delete it. Once the trial meeting is deleted it
+no longer matches, so a late event of it is ignored like any unknown meeting.
+
 **Polling fallback (ADR 0010).** A webhook can be lost, so a status older than
 `MEETING_STATUS_REFRESH_SECONDS` (default 30 s) is read from the Meetings API when an admin
 opens or polls the group's agenda: `GET /meetings/{id}?hostEmail=…` for the `state`, and once

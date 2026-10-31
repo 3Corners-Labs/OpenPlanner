@@ -813,6 +813,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=300,
     ),
     S(
+        "rate_limit_unknown_links",
+        K.RATE,
+        "20/hour",
+        _C,
+        T.RATE_LIMITS,
+        "Unknown management links per IP address.",
+        minimum=5,
+        maximum=100,
+    ),
+    S(
         "rate_limit_agent_tokens",
         K.RATE,
         "10/minute",

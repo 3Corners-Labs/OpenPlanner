@@ -74,6 +74,7 @@ from app.domain.scheduling import (
     MIN_TRIAL_CALL_MINUTES,
     DispatchKind,
     GroupSummary,
+    JoinClient,
     Offer,
     PhoneMode,
     ScheduleOverride,
@@ -95,6 +96,11 @@ from app.web.navigation import object_page
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 log = structlog.get_logger()
+
+JOIN_CLIENT_LABELS: dict[JoinClient, str] = {
+    JoinClient.BROWSER: "admin.group.join_client_browser",
+    JoinClient.CHOICE: "admin.group.join_client_choice",
+}
 
 DISPATCH_LABELS: dict[DispatchKind, str] = {
     DispatchKind.CONTACT_CENTER: "admin.group.dispatch_contact_center",
@@ -543,6 +549,9 @@ def _settings_fields(
     phone_options = tuple(Option(mode.value, _(PHONE_LABELS[mode])) for mode in PhoneMode)
     yes_no = (Option("yes", _("admin.yes")), Option("no", _("admin.no")))
     dispatch_options = tuple(Option(kind.value, _(DISPATCH_LABELS[kind])) for kind in DispatchKind)
+    join_client_options = tuple(
+        Option(client.value, _(JOIN_CLIENT_LABELS[client])) for client in JoinClient
+    )
     planning = [
         Field(
             "name",
@@ -637,6 +646,15 @@ def _settings_fields(
             "trial_calls_per_booking",
             current.trial_calls_per_booking,
             {"min": "1", "max": str(MAX_TRIAL_CALLS_PER_BOOKING)},
+        ),
+        Field(
+            "join_client",
+            _("admin.field.join_client"),
+            "select",
+            value("join_client", current.join_client.value),
+            hint=_("admin.field.join_client_hint"),
+            error=form.error_for("join_client"),
+            options=join_client_options,
         ),
         number("not_picked_up_minutes", current.not_picked_up_minutes, {"min": "1", "max": "120"}),
         number(
@@ -755,8 +773,9 @@ async def save_settings(
     dispatch = form.choice("dispatch_kind", {kind.value for kind in DispatchKind})
     embedding = form.choice("embedding_enabled", {"yes", "no"})
     trial = form.choice("trial_call_enabled", {"yes", "no"})
+    join_client = form.choice("join_client", {client.value for client in JoinClient})
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
-    if not form.errors and None not in (phone, dispatch, embedding, free_pick, trial):
+    if not form.errors and None not in (phone, dispatch, embedding, free_pick, trial, join_client):
         new = GroupSettings(
             name=form.text("name"),
             timezone=form.text("timezone"),
@@ -771,6 +790,7 @@ async def save_settings(
             direct_call_max_concurrent=cap,
             embedding_enabled=embedding == "yes",
             trial_call_enabled=trial == "yes",
+            join_client=JoinClient(str(join_client)),
             **{name: value for name, value in numbers.items() if value is not None},
         )
         try:

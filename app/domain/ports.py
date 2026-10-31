@@ -729,6 +729,10 @@ class Transaction(Protocol):
         """Return the booking whose meeting has ``meeting_id``."""
         ...
 
+    async def get_booking_by_trial_meeting(self, meeting_id: str) -> Booking | None:
+        """Return the booking whose open trial call (ADR 0071) is the meeting ``meeting_id``."""
+        ...
+
     async def get_booking_by_task(self, task_id: str) -> Booking | None:
         """Return the booking whose WxCC task has ``task_id``."""
         ...
