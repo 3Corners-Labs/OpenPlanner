@@ -1000,7 +1000,7 @@ class InMemoryTransaction:
             self.state.private_keys.pop(stored.kid, None)
         return self.state.identity_providers.pop(key, None) is not None
 
-    async def list_signing_keys(self, provider_key: str) -> list[SigningKey]:
+    async def get_signing_keys(self, provider_key: str) -> list[SigningKey]:
         keys = self.state.signing_keys.get(provider_key, [])
         return sorted(keys, key=lambda k: (k.created_at, k.kid), reverse=True)
 
@@ -1016,7 +1016,7 @@ class InMemoryTransaction:
             for k in self.state.signing_keys.get(provider_key, [])
         ]
 
-    async def list_published_keys(self, now: datetime) -> list[SigningKey]:
+    async def published_signing_keys(self, now: datetime) -> list[SigningKey]:
         return [
             k
             for keys in self.state.signing_keys.values()

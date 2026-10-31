@@ -145,7 +145,7 @@ class IdentityProviderQueries:
         await self._session.flush()
         return True
 
-    async def list_signing_keys(self, provider_key: str) -> list[SigningKey]:
+    async def get_signing_keys(self, provider_key: str) -> list[SigningKey]:
         """Return the provider's keys, newest first."""
         rows = (
             await self._session.scalars(
@@ -193,7 +193,7 @@ class IdentityProviderQueries:
             .values(retired_at=at)
         )
 
-    async def list_published_keys(self, now: datetime) -> list[SigningKey]:
+    async def published_signing_keys(self, now: datetime) -> list[SigningKey]:
         """Return the keys of every provider still inside the publication window."""
         rows = (
             await self._session.execute(
