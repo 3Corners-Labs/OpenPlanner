@@ -403,8 +403,116 @@
     "roadmap": "Other contact-center platforms on the same adapter layer (ADR 0032), the calendar invite as a third dispatch kind (ADR 0043), changes through the bot API (ADR 0023) and staff through SCIM (ADR 0046)."
   },
   "enterprise": {
-    "title": "Enterprise-ready from the first commit",
-    "lead": "Built for organisations with strict requirements on security, privacy and accessibility. You see that in every line of the pipeline.",
+    "title": "Why we call OpenPlanner enterprise-ready",
+    "lead": "Not because of a list of ticks, but because of how it is built: a core without a framework, every external service behind a port, and rules the pipeline enforces instead of a reviewer.",
+    "arch_title": "Architecture and building blocks",
+    "arch_caption": "The arrows point one way. On every pull request import-linter refuses an import that breaks these layers.",
+    "layers": [
+      {
+        "name": "Channels",
+        "items": [
+          "Participant pages and widget",
+          "Admin portal",
+          "Machine API for bots",
+          "Worker for scheduled jobs"
+        ]
+      },
+      {
+        "name": "Shared building blocks",
+        "items": [
+          "Authorisation matrix",
+          "Translations nl and en",
+          "Settings register",
+          "Audit log and events"
+        ]
+      },
+      {
+        "name": "Domain",
+        "items": [
+          "Booking and capacity",
+          "Groups and staffing",
+          "Rights and scope",
+          "Privacy rules"
+        ],
+        "note": "Pure Python, no framework, ≥ 90% test coverage"
+      }
+    ],
+    "ports_title": "Ports and adapters",
+    "ports": [
+      {
+        "port": "VideoProvider",
+        "adapters": "Webex Meetings"
+      },
+      {
+        "port": "ContactCenterDispatcher",
+        "adapters": "Webex Contact Center, own queue"
+      },
+      {
+        "port": "MessageSender",
+        "adapters": "SMTP, SMS gateway"
+      },
+      {
+        "port": "IdentityProvider",
+        "adapters": "OIDC: PingFederate, Keycloak, Entra ID"
+      },
+      {
+        "port": "EventSink",
+        "adapters": "syslog, Splunk, Elastic"
+      },
+      {
+        "port": "Transaction",
+        "adapters": "SQLite"
+      }
+    ],
+    "pillars": [
+      {
+        "title": "One core, replaceable edges",
+        "text": "Another contact center or video platform is a new adapter behind an existing port. The domain, the screens and the texts do not change."
+      },
+      {
+        "title": "Enforced, not agreed",
+        "text": "Layers, types, rights and privacy rules are checked on every pull request. What does not hold never reaches main."
+      },
+      {
+        "title": "One source per subject",
+        "text": "Rights, settings and the portal's structure each live in one place; their documentation is generated from the code."
+      },
+      {
+        "title": "Recorded decision by decision",
+        "text": "More than eighty ADRs with context, choice, settings and build status. An architect reads why things are the way they are, and what does not run yet."
+      }
+    ],
+    "scale_title": "Scalable, honestly",
+    "scale": [
+      {
+        "state": "now",
+        "title": "Now: one host, well above the design target",
+        "text": "Proxy, web and worker on one VM with SQLite in WAL mode. Readers do not block each other, a booking is a few rows under a write lock, several workers share the job queue. One installation serves many organisations. Scaling is vertical first: more CPU, memory and a faster disk."
+      },
+      {
+        "state": "now",
+        "title": "A recorded limit",
+        "text": "The design target is about 80 bookings per working day. ADR 0036 records when we go further: above 2,000 bookings per working day, at a p95 above one second, with a stricter availability requirement, or when a client requires managed Postgres."
+      },
+      {
+        "state": "designed",
+        "title": "After that: designed, not built yet",
+        "text": "Postgres with row locks, several web instances behind the proxy, workers on any host and shared storage for rate limits. All database access already sits behind one port in one adapter module, so the domain, the routes and the screens stay the same."
+      }
+    ],
+    "scale_state": {
+      "now": "runs today",
+      "designed": "designed"
+    },
+    "scale_link": {
+      "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0036-scaling-envelope-and-path-beyond-one-vm.md",
+      "label": "ADR 0036: scaling envelope and the path beyond one VM"
+    },
+    "arch_link": {
+      "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/architecture.md",
+      "label": "Architecture with diagrams"
+    },
+    "security_title": "Security and operations",
     "items": [
       {
         "title": "One authorisation matrix",

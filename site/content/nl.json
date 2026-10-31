@@ -403,8 +403,116 @@
     "roadmap": "Andere contact-centerplatforms op dezelfde adapterlaag (ADR 0032), de agenda-uitnodiging als derde dispatchvorm (ADR 0043), wijzigen via de bot-API (ADR 0023) en medewerkers via SCIM (ADR 0046)."
   },
   "enterprise": {
-    "title": "Enterprise-klaar, vanaf de eerste commit",
-    "lead": "Gebouwd voor organisaties met strenge eisen aan beveiliging, privacy en toegankelijkheid. Dat zie je terug in elke regel van de pipeline.",
+    "title": "Waarom we OpenPlanner enterprise-klaar noemen",
+    "lead": "Niet door een lijst vinkjes, maar door de opbouw: een kern zonder framework, elke externe dienst achter een poort, en regels die de pipeline afdwingt in plaats van een reviewer.",
+    "arch_title": "Architectuur en bouwblokken",
+    "arch_caption": "De pijlen lopen één kant op. import-linter weigert bij elke pull request een import die deze lagen doorbreekt.",
+    "layers": [
+      {
+        "name": "Kanalen",
+        "items": [
+          "Deelnemerspagina's en widget",
+          "Beheerportaal",
+          "Machine-API voor bots",
+          "Worker voor geplande taken"
+        ]
+      },
+      {
+        "name": "Gedeelde bouwblokken",
+        "items": [
+          "Autorisatiematrix",
+          "Vertalingen nl en en",
+          "Instellingenregister",
+          "Auditlog en events"
+        ]
+      },
+      {
+        "name": "Domein",
+        "items": [
+          "Boeken en capaciteit",
+          "Groepen en bezetting",
+          "Rechten en scope",
+          "Privacyregels"
+        ],
+        "note": "Pure Python, geen framework, ≥ 90% testdekking"
+      }
+    ],
+    "ports_title": "Poorten en adapters",
+    "ports": [
+      {
+        "port": "VideoProvider",
+        "adapters": "Webex Meetings"
+      },
+      {
+        "port": "ContactCenterDispatcher",
+        "adapters": "Webex Contact Center, eigen wachtrij"
+      },
+      {
+        "port": "MessageSender",
+        "adapters": "SMTP, sms-gateway"
+      },
+      {
+        "port": "IdentityProvider",
+        "adapters": "OIDC: PingFederate, Keycloak, Entra ID"
+      },
+      {
+        "port": "EventSink",
+        "adapters": "syslog, Splunk, Elastic"
+      },
+      {
+        "port": "Transaction",
+        "adapters": "SQLite"
+      }
+    ],
+    "pillars": [
+      {
+        "title": "Eén kern, vervangbare randen",
+        "text": "Een ander contact center of videoplatform is een nieuwe adapter achter een bestaande poort. Domein, schermen en teksten veranderen niet."
+      },
+      {
+        "title": "Afgedwongen, niet afgesproken",
+        "text": "Lagen, typen, rechten en privacyregels worden bij elke pull request gecontroleerd. Wat niet klopt, komt niet op main."
+      },
+      {
+        "title": "Eén bron per onderwerp",
+        "text": "Rechten, instellingen en de structuur van het portaal staan elk op één plek; de documentatie daarvan wordt uit de code gegenereerd."
+      },
+      {
+        "title": "Besluit voor besluit vastgelegd",
+        "text": "Meer dan tachtig ADR's met context, keuze, instellingen en bouwstatus. Een architect leest waarom iets zo is, en wat nog niet draait."
+      }
+    ],
+    "scale_title": "Schaalbaar, eerlijk gezegd",
+    "scale": [
+      {
+        "state": "now",
+        "title": "Nu: één host, ruim boven de ontwerpdoelstelling",
+        "text": "Proxy, web en worker op één VM met SQLite in WAL-modus. Lezers blokkeren elkaar niet, een boeking is een paar rijen onder een schrijfslot, meerdere workers delen de takenwachtrij. Eén installatie bedient vele organisaties. Opschalen gaat eerst verticaal: meer CPU, geheugen en snellere schijf."
+      },
+      {
+        "state": "now",
+        "title": "Vastgelegde grens",
+        "text": "De ontwerpdoelstelling is zo'n 80 boekingen per werkdag. ADR 0036 legt vast wanneer we verder gaan: boven 2.000 boekingen per werkdag, bij een p95 boven 1 seconde, bij een strengere beschikbaarheidseis of als een klant beheerde Postgres eist."
+      },
+      {
+        "state": "designed",
+        "title": "Daarna: ontworpen, nog niet gebouwd",
+        "text": "Postgres met rijvergrendeling, meerdere webinstanties achter de proxy, workers op elke host en een gedeelde opslag voor rate limits. Alle databasetoegang zit al achter één poort in één adaptermodule, dus domein, routes en schermen blijven gelijk."
+      }
+    ],
+    "scale_state": {
+      "now": "draait nu",
+      "designed": "ontworpen"
+    },
+    "scale_link": {
+      "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0036-scaling-envelope-and-path-beyond-one-vm.md",
+      "label": "ADR 0036: schaalgrenzen en het pad voorbij één VM"
+    },
+    "arch_link": {
+      "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/architecture.md",
+      "label": "Architectuur met diagrammen"
+    },
+    "security_title": "Beveiliging en beheer",
     "items": [
       {
         "title": "Eén autorisatiematrix",

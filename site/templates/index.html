@@ -323,12 +323,56 @@
 </section>
 
 <section class="section section--dark" id="enterprise" aria-labelledby="enterprise-title">
+  {%- set e = c.enterprise %}
   <div class="wrap">
-    <h2 id="enterprise-title">{{ c.enterprise.title }}</h2>
-    <p class="lead">{{ c.enterprise.lead }}</p>
+    <h2 id="enterprise-title">{{ e.title }}</h2>
+    <p class="lead">{{ e.lead }}</p>
+
+    <h3 class="sub">{{ e.arch_title }}</h3>
+    <figure class="arch">
+      <div class="arch__layers">
+        {%- for layer in e.layers %}
+        <section class="arch__layer arch__layer--{{ loop.index }}" aria-label="{{ layer.name }}">
+          <h4>{{ layer.name }}</h4>
+          <ul>{% for item in layer['items'] %}<li>{{ item }}</li>{% endfor %}</ul>
+          {%- if layer.get('note') %}<p class="arch__note">{{ layer['note'] }}</p>{% endif %}
+        </section>
+        {%- if not loop.last %}<span class="arch__arrow" aria-hidden="true"></span>{% endif %}
+        {%- endfor %}
+      </div>
+      <div class="arch__ports">
+        <h4>{{ e.ports_title }}</h4>
+        <ul>
+          {%- for p in e.ports %}
+          <li><code>{{ p.port }}</code><span aria-hidden="true" class="arch__plug"></span><span>{{ p.adapters }}</span></li>
+          {%- endfor %}
+        </ul>
+      </div>
+      <figcaption>{{ e.arch_caption }} <a href="{{ e.arch_link.href }}">{{ e.arch_link.label }}</a></figcaption>
+    </figure>
+
+    <ul class="pillars">
+      {%- for pillar in e.pillars %}
+      <li class="reveal"><h4>{{ pillar.title }}</h4><p>{{ pillar.text }}</p></li>
+      {%- endfor %}
+    </ul>
+
+    <h3 class="sub">{{ e.scale_title }}</h3>
+    <ol class="scale">
+      {%- for step in e.scale %}
+      <li class="scale__step scale__step--{{ step.state }}">
+        <span class="scale__state">{{ e.scale_state[step.state] }}</span>
+        <h4>{{ step.title }}</h4>
+        <p>{{ step.text }}</p>
+      </li>
+      {%- endfor %}
+    </ol>
+    <p class="small"><a href="{{ e.scale_link.href }}">{{ e.scale_link.label }}</a></p>
+
+    <h3 class="sub">{{ e.security_title }}</h3>
     <ul class="grid2">
-      {%- for e in c.enterprise['items'] %}
-      <li class="reveal"><h3>{{ e.title }}</h3><p>{{ e.text }}</p></li>
+      {%- for item in e['items'] %}
+      <li class="reveal"><h4>{{ item.title }}</h4><p>{{ item.text }}</p></li>
       {%- endfor %}
     </ul>
   </div>
