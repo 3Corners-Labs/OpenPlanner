@@ -3,7 +3,8 @@
 Status: proposed (2026-10-31), requested by the product owner. Amends ADR 0012 (point 1:
 who asks for a merge), ADR 0058 (point 5: who adds a pull request to the queue) and ADR 0052
 (point 3: a release of a new minor or major version gets an audit first). Keeps ADR 0059
-(release candidates on every merge) as it is. Partly built; see *Build status*.
+(release candidates on every merge) as it is. Amended by ADR 0088 (point 3: the gate judges
+the merge group too). Partly built; see *Build status*.
 
 ## Context
 
@@ -125,6 +126,7 @@ is a decision that needs the label.
 | 3 | The product owner adds `decision gate` to the required checks of `main` and the label `po:approved` exists; Claude Code enables auto-merge on the pull requests it opens from then on | | planned |
 | 4 | Issues per open *Build status* row on the merge of an ADR, and the weekly drift report (point 6): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | #180 | in PR |
 | 5 | First minor release under this ADR (`v0.4.0`) with its audit section | | planned; prepared by ADR 0079 (#183): the `audit` job of `release.yml` runs the review and writes the section, the product owner sets the verdict |
+| 6 | The gate runs in the merge queue and judges every pull request in the group by its own commit (ADR 0088); the skipped `merge_group` job let #266 carry ADR 0085 onto `main` on 2026-10-31 | #278 | in PR |
 
 ## Consequences
 
