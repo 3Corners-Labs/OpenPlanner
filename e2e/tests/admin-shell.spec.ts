@@ -61,5 +61,22 @@ for (const [name, width] of Object.entries(WIDTHS)) {
       await expect(current).toBeVisible();
       await expectNoAxeViolations(page);
     });
+
+    if (name !== 'phone') {
+      test('the menu stays in view while a long page scrolls', async ({ page }) => {
+        await loginAs(page, 'super', '/admin/audit');
+        const menu = adminMenu(page);
+        const before = await menu.boundingBox();
+        // Make the page long enough to scroll, whatever the audit log holds.
+        await page.evaluate(() => {
+          document.querySelector('main')!.style.minHeight = '400vh';
+        });
+        await page.mouse.wheel(0, 2000);
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
+        const after = await menu.boundingBox();
+        expect(after?.y).toBe(before?.y);
+        await expect(menu.getByRole('link', { name: 'Overzicht' })).toBeInViewport();
+      });
+    }
   });
 }
