@@ -300,3 +300,24 @@ The name the identity provider uses for this group in a right, for example `burg
 within the organisation. A new group starts with the code of its web address. When you change
 the value, staff with a right on the old value lose access until the identity provider sends
 the new one; the form counts how many that are.
+
+## Archiving a group
+
+At the bottom of the settings sits **Archive group…**, only for those who may archive groups
+(organisation admin or superuser; the right `group.delete` is separate from changing settings).
+The confirmation page says what happens and asks you to type the group's name; without a recent
+login the portal first asks you to log in again.
+
+After archiving:
+
+- the page `/g/<web address>` and the widget answer "not found" at once; new appointments are
+  no longer possible;
+- the group leaves the overview, the lists and the menus. Under **Groups** the filter *Archived
+  groups only* still shows it, read-only: every change is refused;
+- the web address stays reserved, so a new group cannot take it;
+- past appointments stay until the usual clean-up period; after that the portal erases the
+  group by itself. The log keeps the web address.
+
+Archiving is not possible while appointments lie ahead. Close the group first (**Closure**), let
+participants move or cancel, or cancel the appointments from the closure screen, and archive
+afterwards. Archiving cannot be undone in the portal.
