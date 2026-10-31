@@ -22,8 +22,10 @@ The overview never shows participants' personal data: only counts, group names a
 
 - **Queue across my groups**: for each group with an own queue within your reach, how many
   participants wait, how long the longest wait has been and how many staff who may work the queue
-  are signed in now. The group name opens the queue. Counts and minutes only, never names.
-  Colours for a wait that is too long follow with the wait thresholds.
+  are signed in now. A participant with an appointment counts once they are in the lobby; a
+  direct call counts from the request, even before the link is opened. The group name opens
+  the queue. Counts and minutes only, never names. Colours for a wait that is too long follow
+  with the wait thresholds.
 - **Running tasks**: the background jobs that are running now and the jobs that failed after
   their last attempt, with type, state and time. Never the content of a job or the booking it
   belongs to. If something here says *Failed*, something is stuck: tell the installation's

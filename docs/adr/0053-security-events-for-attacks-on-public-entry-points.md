@@ -34,7 +34,7 @@ the log platform would put personal data of citizens in a place CLAUDE.md forbid
 
    | `event.action` | `reason` | Where |
    |---|---|---|
-   | `request.rate_limited` | `too_many_requests` | HTML 429 handler; machine API 429 handler (detail `surface:web` or `surface:agent`) |
+   | `request.rate_limited` | `too_many_requests` | HTML 429 handler; machine API 429 handler (detail `surface:web` or `surface:agent`); the unknown-link bound of point 7 (detail `surface:links`) |
    | `request.rejected` | `honeypot` | booking and direct-call forms |
    | `request.rejected` | `cross_site`, `origin_mismatch` | `require_same_origin` |
    | `admin.login` | the identity error code (`invalid_state`, `invalid_token`, `nonce_mismatch`, …) | `/admin/callback` |
@@ -68,11 +68,27 @@ the log platform would put personal data of citizens in a place CLAUDE.md forbid
 6. **No request content.** Detail holds machine keys (`surface:web`, `client:…`,
    `suppressed:n`). Never a path, header, form value, token or address.
 
+7. **Unknown management links are bounded per address (added 2026-10-30).** slowapi buckets
+   per request path, so every `/b/{token}/...` path had a counter of its own and any number of
+   different guessed tokens from one address went unlimited (guessing itself stays infeasible,
+   ADR 0011; the cost was unbounded lookups and one limiter key per path). Setting
+   `key_style="endpoint"` would instead make all citizens behind one address share the status
+   poll and booking budgets, so it is not used. Instead the 404 handler for
+   `booking_not_found` under `/b/` counts the answer in one bucket per client address, the same
+   for every `/b/{token}` route (`count_unknown_link` in `app/web/protection.py`, on the
+   slowapi limiter, so `RATE_LIMIT_ENABLED` is its off switch). Within the bound the answer is
+   the 404 and the `token.rejected` event above; over it the caller gets the rate-limit page
+   (429, `Retry-After`) and one `request.rate_limited` event with detail `surface:links` per
+   caller and window (point 4). Requests with a valid link are never counted. The lookup of a
+   guess still runs; the bound limits what an address learns and writes, not the cost of a
+   single lookup, which stays one indexed hash comparison.
+
 ## Settings
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
 | `SECURITY_EVENT_MAX_SOURCES` | C platform | 1000 | 10–100000 | `settings.platform.manage` (settings registry, ADR 0042) | windows kept per process (point 4) |
+| `RATE_LIMIT_UNKNOWN_LINKS` | C platform | 20/hour | 5–100 per hour | `settings.platform.manage` | unknown management links per address (point 7); `RATE_LIMIT_ENABLED` stays the off switch |
 
 `SECURITY_EVENT_WINDOW_MINUTES` (ADR 0034) now also applies to the new events.
 

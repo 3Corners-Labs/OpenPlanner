@@ -6,13 +6,15 @@ Forms carry no CSRF token. The primary signal is Fetch Metadata: browsers send
 (``RejectedRequest``) and becomes a security event (ADR 0053).
 
 Rate limits use slowapi, keyed by client IP (behind a proxy, uvicorn's ``--proxy-headers``
-supplies the real address).
+supplies the real address). slowapi buckets per request path, so links that match no booking
+get a bound of their own, one bucket per address whatever the path (``count_unknown_link``).
 """
 
 from dataclasses import dataclass
 
 import structlog
 from fastapi import Request
+from limits import parse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -67,6 +69,7 @@ class RateLimits:
 
     bookings: str = "10/hour"
     reads: str = "60/minute"
+    unknown_links: str = "20/hour"
     assets: str = "600/minute"
     checks: str = "6/minute"
     agent_tokens: str = "10/minute"
@@ -82,6 +85,7 @@ def configure_rate_limits(
     enabled: bool,
     bookings: str,
     reads: str,
+    unknown_links: str = "20/hour",
     agent_tokens: str = "10/minute",
     agent_calls: str = "120/minute",
 ) -> None:
@@ -89,18 +93,22 @@ def configure_rate_limits(
     limiter.enabled = enabled
     LIMITS.bookings = bookings
     LIMITS.reads = reads
+    LIMITS.unknown_links = unknown_links
     LIMITS.agent_tokens = agent_tokens
     LIMITS.agent_calls = agent_calls
     limiter.reset()
 
 
-def set_rate_limits(*, bookings: str, reads: str, agent_tokens: str, agent_calls: str) -> None:
+def set_rate_limits(
+    *, bookings: str, reads: str, unknown_links: str, agent_tokens: str, agent_calls: str
+) -> None:
     """Apply changed limits to the next request, keeping the counters (ADR 0042 §6).
 
     The switch ``RATE_LIMIT_ENABLED`` is deployment-only and stays as it was.
     """
     LIMITS.bookings = bookings
     LIMITS.reads = reads
+    LIMITS.unknown_links = unknown_links
     LIMITS.agent_tokens = agent_tokens
     LIMITS.agent_calls = agent_calls
 
@@ -113,6 +121,30 @@ def booking_limit() -> str:
 def read_limit() -> str:
     """Limit for availability pages."""
     return LIMITS.reads
+
+
+def unknown_link_limit() -> str:
+    """Limit for management links that match no booking, per IP address, over all paths."""
+    return LIMITS.unknown_links
+
+
+def count_unknown_link(request: Request) -> bool:
+    """Count a management link that matched no booking against its caller's bound.
+
+    Only answers that already are a 404 are counted, so citizens with a valid link never use
+    the bound up. The bucket is keyed by address alone, not by path, so guessing different
+    tokens on one or many ``/b/{token}`` routes draws on the same budget (ADR 0011).
+
+    Args:
+        request: The request whose link matched nothing.
+
+    Returns:
+        Whether the caller is now over the bound; always ``False`` while rate limits are off.
+    """
+    if not limiter.enabled:
+        return False
+    item = parse(unknown_link_limit())
+    return not limiter.limiter.hit(item, "unknown-management-link", get_remote_address(request))
 
 
 def asset_limit() -> str:
