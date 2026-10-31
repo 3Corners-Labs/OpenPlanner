@@ -289,7 +289,7 @@ same commit and rollback behaviour as the SQL one.
 | Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |
 | Transactions, write lock | `app/adapters/db/uow.py`, `app/adapters/db/engine.py` |
 | Job queue | `app/adapters/db/jobs.py` |
-| Participant pages | `app/api/booking_pages.py`, `app/api/citizen.py`, `app/api/templates/` |
+| Participant pages | `app/api/booking_pages.py`, `app/api/participant.py`, `app/api/templates/` |
 | Slot picker: month calendar and times (ADR 0020) | `app/api/slot_picker.py`, `app/web/static/calendar.js` |
 | Organisations (superuser) | `app/domain/organisations.py`, `app/admin/organisation_routes.py` |
 | Branding per organisation (O5, ADR 0041) | `app/domain/branding.py`, `app/domain/theme.py`, `app/domain/branding_service.py`, `app/web/branding.py`, `app/api/brand_assets.py`, `app/admin/branding_routes.py` |
