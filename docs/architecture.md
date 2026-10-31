@@ -106,7 +106,7 @@ flowchart TB
     web <--> volume
     worker <--> volume
     worker -- SMTP --> smtp
-    worker -- hourly release check --> github
+    worker -- release check (interval setting) --> github
     worker -. "certificate probe, https :443" .-> proxy
     web -- "own certificate (ADR 0070)" --> certs -. "watcher, caddy reload" .-> proxy
     updater -- "app.cli: claim, progress, report, backup" --> web
@@ -142,7 +142,8 @@ flowchart TB
   every release and release candidate. A host pulls, verifies and pins both by digest
   (`.env.update`) and never builds Caddy; `docker compose` builds the proxy locally only in
   development and in `scripts/check-proxy.sh`. Hosting and backups: open point O7.
-- **Updates** (ADR 0029): the worker checks the latest release hourly; a superuser requests an
+- **Updates** (ADR 0029): the worker checks the latest release every `update_check_minutes`
+  (default 60) or at once after "Check now" (ADR 0067 point 7); a superuser requests an
   update or a restore in the portal; the host updater (outside the containers, with the Docker
   socket) verifies the signatures of both images, backs up, switches the pinned digests and
   rolls back on its own when the new version (web, worker or proxy) does not become healthy.
@@ -288,6 +289,7 @@ same commit and rollback behaviour as the SQL one.
 | Channel settings per organisation (SMTP, SMS; ADR 0022) | `app/domain/channel_settings.py`, `app/domain/channel_service.py`, `app/admin/channel_routes.py` |
 | Reminder rules and group texts (ADR 0022) | `app/domain/messaging_service.py`, `app/domain/message_texts.py`, `app/admin/message_routes.py` |
 | Senders per organisation, SMS adapters per provider (ADR 0028) | `app/adapters/senders.py`, `app/adapters/sms.py`, `app/adapters/webex_connect_sms.py`, `app/adapters/smtp.py` |
+| Sender domain check: SPF, DKIM, DMARC verdicts (ADR 0073) | `app/domain/mail_domain.py`, `app/adapters/mail_dns.py` |
 | Job execution | `app/jobs/runner.py`, `app/jobs/worker.py` |
 | Settings: registry, portal values with env lock, live reload, Advanced settings (ADR 0042) | `app/domain/settings_registry.py`, `app/domain/platform_settings.py`, `app/adapters/settings_report.py`, `app/adapters/live_settings.py`, `app/adapters/db/platform_settings.py`, `app/admin/settings_routes.py` |
 
@@ -773,6 +775,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0070 | The certificate source of the bundled proxy, managed by the superuser in the portal |
 | 0071 | A trial call on Webex ahead of the appointment |
 | 0072 | Direct calls per staffing block, live status for citizen and agent, visible failures |
+| 0074 | Organisation text overrides: allow-listed citizen-page and message texts per organisation and locale |
 
 What is built of each decision is not kept here: it is in `docs/adr-status.md` (checked against the code) and in the *Build status* of the ADR itself.
 
@@ -800,7 +803,7 @@ What is built of each decision is not kept here: it is in `docs/adr-status.md` (
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
 | ADR 0033 | Manual and context-sensitive help: 20 topics in Dutch and English; 28 admin routes still without a topic | in progress |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
-| WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides | partly done |
+| WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides (ADR 0074); global overrides and `.po` import/export | partly done |
 | WP8 | Purge sweep and alerting, audit retention | planned |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 | ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | done (AU-3, the client's security review, is open) |

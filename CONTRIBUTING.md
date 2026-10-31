@@ -117,7 +117,7 @@ CI runs `reuse lint`.
 
 Short-lived branch, Conventional Commit title, squash merge after one human approval and green
 CI. The PR template asks the seven review questions from `CLAUDE.md`; answer all of them.
-New ADRs start from `docs/adr/template.md`, including its *Settings* section (ADR 0042).
+New ADRs start from `docs/adr/template.md`, including its *Settings* section (ADR 0042). A new ADR also gets its *Build status* table and its row in `docs/adr-status.md`; the PR that builds a step of an ADR updates both (ADR 0059).
 Run the `security-review` skill (`.claude/skills/security-review/`) before opening the PR.
 
 `main` merges through a merge queue (squash): the queue builds `main` with the queued pull

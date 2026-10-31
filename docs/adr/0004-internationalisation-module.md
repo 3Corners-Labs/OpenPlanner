@@ -1,6 +1,6 @@
 # 0004. Internationalisation as a self-contained module
 
-Status: accepted (2026-10-23). Supersedes the `*_nl` / `*_en` columns in HANDOVER §3.
+Status: accepted (2026-10-23). Supersedes the `*_nl` / `*_en` columns in HANDOVER §3. Partly built, checked on 2026-10-31: the module, catalogues, negotiation and organisation overrides (ADR 0074) run; the global override layer and `.po` export and import are not built (`docs/adr-status.md`).
 
 ## Context
 
@@ -103,6 +103,15 @@ attribute (3.1.2). Switching language keeps entered form data (3.3.7).
 Each process caches catalogues and overrides. A revision counter in the database is bumped on
 every change and checked at most every 5 seconds, so web and worker converge within 5 seconds
 without a restart.
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | Core, `nl`/`en` catalogues, negotiation, switcher (§1–§6) | #1, #19, #85 | built |
+| 2 | Group texts (`group_texts`, §7 last bullet) | #29 | built |
+| 3 | Organisation overrides: store, cached source, editor (§4 step 1, §7 org_admin, §9) | #168 | merged |
+| 4 | Global (superuser) overrides, enable locales, `.po` export and import, revision counter (§4 step 2, §7) | | follow-up |
 
 ## Consequences
 

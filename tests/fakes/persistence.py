@@ -50,7 +50,7 @@ from app.domain.scheduling import (
 from app.domain.staff import StaffFilter, StaffMember, visible
 from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
-from app.domain.updates import ReleaseCheck, RunningVersion, UpdateRequest
+from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -93,8 +93,10 @@ class State:
     channel_settings: dict[tuple[int, ChannelKind], ChannelSettings] = field(default_factory=dict)
     channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
     group_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
+    organisation_texts: dict[int, dict[tuple[str, str], str]] = field(default_factory=dict)
     release_check: ReleaseCheck | None = None
     running_versions: list[RunningVersion] = field(default_factory=list)
+    release_listing: list[ListedRelease] = field(default_factory=list)
     certificate_check: CertificateCheck | None = None
     own_certificate: OwnCertificate | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
@@ -588,6 +590,25 @@ class InMemoryTransaction:
         else:
             texts[(locale, key)] = text
 
+    async def get_organisation_texts(self, organisation_id: int) -> dict[tuple[str, str], str]:
+        return dict(self.state.organisation_texts.get(organisation_id, {}))
+
+    async def save_organisation_text(
+        self, organisation_id: int, locale: str, key: str, text: str | None
+    ) -> None:
+        texts = self.state.organisation_texts.setdefault(organisation_id, {})
+        if text is None:
+            texts.pop((locale, key), None)
+        else:
+            texts[(locale, key)] = text
+
+    async def get_all_organisation_texts(self) -> dict[tuple[int, str, str], str]:
+        return {
+            (org, locale, key): text
+            for org, texts in self.state.organisation_texts.items()
+            for (locale, key), text in texts.items()
+        }
+
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[SlotUsage]:
@@ -889,6 +910,12 @@ class InMemoryTransaction:
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
         self.state.release_check = check
+
+    async def get_release_listing(self) -> list[ListedRelease]:
+        return sorted(self.state.release_listing, key=lambda item: item.version, reverse=True)
+
+    async def save_release_listing(self, listing: Sequence[ListedRelease]) -> None:
+        self.state.release_listing = list(listing)
 
     async def get_running_versions(self, limit: int = 2) -> list[RunningVersion]:
         return list(reversed(self.state.running_versions))[:limit]

@@ -1040,6 +1040,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "The worker requests a newer version itself as soon as the check finds one "
         "(ADR 0059, 0065); not usable in production.",
     ),
+    S(
+        "update_check_minutes",
+        K.INT,
+        60,
+        _C,
+        T.UPDATES,
+        'Minutes between two release checks by the worker (ADR 0067); "Check now" on the '
+        "updates page asks for one ahead of time.",
+        minimum=5,
+        maximum=1440,
+    ),
     # D. Organisation: the value per organisation; the superuser's or the environment's value
     # is the default for organisations without one.
     S(
@@ -1108,6 +1119,18 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "waiting page (ADR 0072).",
         minimum=5,
         maximum=60,
+    ),
+    S(
+        "meeting_status_refresh_seconds",
+        K.INT,
+        30,
+        _C,
+        T.PLANNER,
+        "Seconds a meeting status on the agenda may be old before the video provider is asked "
+        "(webhooks come first), and between two refreshes of the agenda's status columns "
+        "(ADR 0010).",
+        minimum=10,
+        maximum=300,
     ),
     S(
         "planner_rebook_days",

@@ -11,13 +11,13 @@ from datetime import timedelta
 import httpx
 import structlog
 from fastapi import Depends, FastAPI
-from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
+from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import (
@@ -27,6 +27,7 @@ from app.adapters.integrations import (
     webex_fingerprint,
 )
 from app.adapters.live_settings import LiveSettings, keep_current
+from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.oidc import OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
@@ -68,12 +69,14 @@ from app.domain.holiday_service import HolidayService
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
 from app.domain.maintenance_service import MaintenanceService
+from app.domain.meeting_status_service import MeetingStatusService
 from app.domain.messaging_service import MessagingService
+from app.domain.organisation_text_service import OrganisationTextService
 from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.platform_settings import PlatformSettingsStore
-from app.domain.ports import CertificateProbe, Clock, IdentityProvider
+from app.domain.ports import CertificateProbe, Clock, IdentityProvider, MailDomainResolver
 from app.domain.queue_service import QueueService
 from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
@@ -100,7 +103,7 @@ from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
 from app.web.organisation_settings import ClockScopeMiddleware
 from app.web.protection import configure_rate_limits, limiter, set_rate_limits
-from app.web.templates import STATIC_DIR
+from app.web.static_assets import ASSETS, VersionedStaticFiles
 
 
 def _public_host(public_base_url: str) -> str | None:
@@ -149,6 +152,7 @@ def create_app(
     identity_provider: IdentityProvider | None = None,
     integrations: Integrations | None = None,
     certificate_probe: CertificateProbe | None = None,
+    mail_domain_resolver: MailDomainResolver | None = None,
 ) -> FastAPI:
     """Build the application.
 
@@ -161,6 +165,8 @@ def create_app(
             configure, or none.
         certificate_probe: Explicit TLS probe for *Check now* (tests); defaults to a real
             handshake.
+        mail_domain_resolver: Explicit DNS lookup for the sender domain check (tests);
+            defaults to the host's resolver (ADR 0073).
 
     Returns:
         The FastAPI app with translator, booking service, rate limits and error pages. Its
@@ -329,6 +335,14 @@ def create_app(
         app.state.integration_service = IntegrationService(
             uow, clock, app.state.admin_service, settings.app_version
         )
+        app.state.meeting_status_service = MeetingStatusService(
+            uow,
+            clock,
+            app.state.integration_service,
+            lambda: app.state.integrations.video,
+            lambda: timedelta(seconds=live().meeting_status_refresh_seconds),
+            settings.app_version,
+        )
         app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
@@ -355,8 +369,23 @@ def create_app(
         )
         # Test emails go through exactly the senders the worker uses (ADR 0022).
         senders = ConfiguredSenders(uow, http, lambda: fallback_mail(live()))
+        # The sender domain check looks up the fallback sender's domain when an organisation
+        # has no SMTP settings of its own (ADR 0073).
         app.state.channel_service = ChannelSettingsService(
-            uow, clock, app.state.admin_service, senders
+            uow,
+            clock,
+            app.state.admin_service,
+            senders,
+            mail_domain_resolver or DnsTxtResolver(),
+            lambda: live().mail_from if live().smtp_host else None,
+        )
+        text_overrides.attach(uow)
+        app.state.organisation_text_service = OrganisationTextService(
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.translator.locales,
+            on_change=text_overrides.invalidate,
         )
         app.state.messaging_service = MessagingService(
             uow, clock, app.state.admin_service, app.state.translator.locales
@@ -440,8 +469,10 @@ def create_app(
     app.state.identity_provider = identity_provider or oidc_provider(
         settings, http, lambda: app.state.settings
     )
-    # Admin-edited overrides are wired in here once the database adapter exists (WP7).
-    app.state.translator = Translator(load_catalogues())
+    # ADR 0074: the organisations' own texts; the source reads the database once the lifespan
+    # has opened it (until then, and in tools without one, the shipped texts apply).
+    text_overrides = CachedTextOverrides()
+    app.state.translator = Translator(load_catalogues(), text_overrides)
     # Admin session (ADR 0013): only sent to /admin, signed, HttpOnly, SameSite=Lax.
     app.add_middleware(
         SessionMiddleware,
@@ -478,5 +509,5 @@ def create_app(
         app.include_router(public_router, dependencies=gate)
     if agent_api is not None:
         app.mount(AGENT_API_PREFIX, agent_api)
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.mount("/static", VersionedStaticFiles(ASSETS), name="static")
     return app

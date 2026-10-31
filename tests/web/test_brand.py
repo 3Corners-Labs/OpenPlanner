@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.config import Settings
-from app.web.templates import STATIC_DIR
+from app.web.static_assets import ASSETS, STATIC_DIR
 from tests.admin.conftest import (
     AGENT,
     AUDITOR,
@@ -35,12 +35,13 @@ SVGS = sorted(BRAND.glob("*.svg"))
 PNGS = sorted(BRAND.glob("*.png"))
 EVENT_HANDLER = re.compile(r"\son[a-z]+\s*=", re.IGNORECASE)
 FAVICON_LINKS = (
-    '<link rel="icon" href="/static/brand/favicon.svg" type="image/svg+xml">',
-    '<link rel="icon" href="/static/brand/favicon-32.png" type="image/png" sizes="32x32">',
-    '<link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">',
+    f'<link rel="icon" href="{ASSETS.url("brand/favicon.svg")}" type="image/svg+xml">',
+    f'<link rel="icon" href="{ASSETS.url("brand/favicon-32.png")}" type="image/png" sizes="32x32">',
+    f'<link rel="apple-touch-icon" href="{ASSETS.url("brand/apple-touch-icon.png")}">',
 )
 MARK = (
-    '<img class="product-footer__mark" src="/static/brand/mark.svg" alt="" width="20" height="20">'
+    f'<img class="product-footer__mark" src="{ASSETS.url("brand/mark.svg")}" alt="" '
+    'width="20" height="20">'
 )
 
 
@@ -112,7 +113,7 @@ async def test_the_footer_follows_the_organisations_setting(site: Site) -> None:
     page = (await site.client.get("/g/demo")).text
 
     assert '<footer class="site-footer">' not in page
-    assert "/static/brand/mark.svg" not in page
+    assert ASSETS.url("brand/mark.svg") not in page
     for link in FAVICON_LINKS:  # the favicon is product identity, never a setting
         assert link in page
 
@@ -149,8 +150,8 @@ async def test_the_admin_top_bar_shows_the_mark_for_every_role(site: Site, role:
         assert link in page
     top_bar = page.split('<header class="admin-topbar">', 1)[1].split("</header>", 1)[0]
     assert (
-        '<img class="admin-brand__mark" src="/static/brand/mark.svg" alt="" width="26" height="26">'
-        in top_bar
+        f'<img class="admin-brand__mark" src="{ASSETS.url("brand/mark.svg")}" alt="" '
+        'width="26" height="26">' in top_bar
     )
     assert "<span>Administration</span>" in top_bar  # the product name stays text
     assert ">OP<" not in top_bar
@@ -160,7 +161,8 @@ async def test_the_admin_top_bar_shows_the_mark_for_every_role(site: Site, role:
 async def test_the_portal_has_no_citizen_footer_in_any_theme(site: Site) -> None:
     await site.login_as(ROLE_PRINCIPALS["superuser"])
     for theme in ("light", "dark"):
-        page = (await site.client.get(f"/admin/?theme={theme}")).text
+        await site.client.get(f"/admin/preferences?theme={theme}")
+        page = (await site.client.get("/admin/")).text
         assert f'data-theme="{theme}"' in page
         assert '<footer class="site-footer">' not in page
-        assert "/static/brand/mark.svg" in page
+        assert ASSETS.url("brand/mark.svg") in page

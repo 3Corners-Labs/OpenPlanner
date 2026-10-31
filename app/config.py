@@ -222,6 +222,9 @@ class Settings(BaseSettings):
     # ADR 0072 (announced in ADR 0043): how often the own queue, a claimed booking and the
     # citizen's waiting page ask the server for a change. Class C platform.
     queue_refresh_seconds: int = Field(default=10, ge=5, le=60)
+    # ADR 0010: how old a meeting status may be before the agenda asks the video provider, and
+    # how often the agenda's live region asks the server. Class C platform.
+    meeting_status_refresh_seconds: int = Field(default=30, ge=10, le=300)
     # ADR 0044: a planner's request to choose a new time lapses this many days after the
     # original start, with one reminder this many days before. Class D organisation (ADR 0042,
     # settings registry).
@@ -343,6 +346,10 @@ class Settings(BaseSettings):
     # Neither is allowed in production, from the environment or from the portal.
     update_channel: Literal["release", "rc"] = "release"
     update_auto_apply: bool = False
+    # Class C: minutes between two release checks by the worker; "Check now" on the updates
+    # page asks for one ahead of time. GitHub allows 60 anonymous calls per hour per address,
+    # so the portal floor is 5 minutes.
+    update_check_minutes: int = Field(default=60, ge=1, le=1440)
 
     # Maintenance mode (ADR 0038). MAINTENANCE_MODE (class B, deployment: needed while the
     # database is unavailable or being restored) switches it on from the environment; the

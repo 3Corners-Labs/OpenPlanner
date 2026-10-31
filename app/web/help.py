@@ -113,6 +113,8 @@ TOPICS = (
         Permission.BOOKINGS_VIEW,
     ),
     HelpTopic("maintenance", ("/admin/maintenance",), Permission.SYSTEM_MAINTENANCE),
+    # ADR 0073: the channels of an organisation, with the sender domain check.
+    HelpTopic("channels", ("/admin/organisations/{org}/channels",), Permission.INTEGRATIONS_MANAGE),
     HelpTopic("advanced-settings", ("/admin/settings",), Permission.SETTINGS_PLATFORM_VIEW),
     # ADR 0063: the Data fields card on Advanced settings; no route of its own.
     HelpTopic("data-fields", (), Permission.SETTINGS_PLATFORM_VIEW),
@@ -120,6 +122,11 @@ TOPICS = (
         "organisation-settings",
         ("/admin/organisation-settings", "/admin/organisations/{org}/settings"),
         Permission.SETTINGS_ORGANISATION_MANAGE,
+    ),
+    HelpTopic(
+        "organisation-texts",
+        ("/admin/organisations/{org}/texts", "/admin/organisations/{org}/texts/{text_locale}"),
+        Permission.TEXTS_ORGANISATION_MANAGE,
     ),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""

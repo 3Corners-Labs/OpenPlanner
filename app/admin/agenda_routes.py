@@ -4,13 +4,19 @@ The day view lists every slot of the day with its agent count from the effective
 its number of confirmed bookings and, below it, the bookings (first name and call status, see
 ``call_routes.agenda_row``). The week view is a table of slot times (rows) by days (columns)
 with the same counts; each cell links to its slot in the day view. A shortfall (more bookings
-than agents) is written out with an icon, never shown by colour alone. No JavaScript.
+than agents) is written out with an icon, never shown by colour alone. The week view needs no
+JavaScript. The day view's table refreshes itself (ADR 0010, 0072): ``static/live-region.js``
+polls ``agenda/live`` every ``MEETING_STATUS_REFRESH_SECONDS`` and swaps the table in when
+something changed; without the script the page shows its status as loaded and offers a
+"Refresh" link. Each load and each poll refreshes a status older than that window from the
+video provider (``MeetingStatusService``), so a missed webhook is corrected within a window.
 
 With ``bookings.manage`` (ADR 0044) the day view links each booking a planner may still
 change to its move and cancel forms (``planner_routes``) and offers "leave as is" on a slot
 with an open shortfall.
 
     GET /admin/groups/{slug}/agenda?day=YYYY-MM-DD          bookings.view
+    GET /admin/groups/{slug}/agenda/live?day=…&seen=KEY     bookings.view  (fragment, 204 if same)
     GET /admin/groups/{slug}/agenda/week?week=YYYY-MM-DD    bookings.view
 """
 
@@ -18,21 +24,27 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Request
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, Response
 
-from app.admin.authz import can_function
-from app.admin.call_routes import AgendaRow, ViewBookings, agenda_row, integration_service
+from app.admin.authz import AdminContext, can_function
+from app.admin.call_routes import AgendaRow, ViewBookings, agenda_row
 from app.admin.group_routes import group_page
+from app.admin.live import Seen, fragment, key
 from app.admin.pages import Locale
 from app.admin.shortfalls import agenda_service
 from app.domain.agenda import AgendaSlot
 from app.domain.authorization import Permission
 from app.domain.booking import BookingKind
 from app.domain.booking_changes import planner_may_change
+from app.domain.calls import CallState
+from app.domain.meeting_status_service import MeetingStatusService
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock, format_day, format_day_short
+from app.web.locale import RequestLocale
+from app.web.organisation_settings import settings_for
+from app.web.templates import FragmentResponse
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -106,11 +118,20 @@ def _chosen(raw: str | None, today: date) -> date:
     return chosen if abs(chosen - today) <= REACH else today
 
 
-@router.get("/groups/{slug}/agenda", response_class=HTMLResponse)
-async def agenda(
-    request: Request, locale: Locale, slug: str, context: ViewBookings, day: str | None = None
-) -> HTMLResponse:
-    """Show the group's slots of one day with agents, bookings and their call status."""
+def _meeting_status(request: Request) -> MeetingStatusService:
+    """Return the service that refreshes stale meeting statuses from the video provider."""
+    service: MeetingStatusService = request.app.state.meeting_status_service
+    return service
+
+
+async def _day(
+    request: Request, locale: RequestLocale, context: AdminContext, slug: str, day: str | None
+) -> tuple[dict[str, object], str]:
+    """Load one day of the agenda; return what its table renders and the key of that table.
+
+    The key changes whenever a slot or row would look different, so the poller is only sent
+    a new table when something changed. Past days do not poll: nothing on them changes.
+    """
     _, code = locale.gettext, locale.code
     group = context.group.group
     clock: Clock = request.app.state.clock
@@ -118,16 +139,18 @@ async def agenda(
     today = now.astimezone(group.tz).date()
     chosen = _chosen(day, today)
     (agenda_day,) = await agenda_service(request).days(context.principal, slug, chosen, 1)
-    overview = await integration_service(request).day_overview(context.principal, slug, chosen)
+    overview = await _meeting_status(request).day_overview(context.principal, slug, chosen)
     manage = can_function(context.principal)(Permission.BOOKINGS_MANAGE, context.group)
     slots = {
         s.start: _slot_view(s, group, code, _, manage=manage, now=now) for s in agenda_day.slots
     }
     direct: list[AgendaRow] = []
     changeable: set[int] = set()
+    running = 0
     for item in overview:
         row = agenda_row(item, group, now, _, code)
         booking = item.booking
+        running += booking.is_active and item.status.call is CallState.IN_PROGRESS
         if manage and planner_may_change(booking, group, now):
             changeable.add(row.id)
         if booking.kind is BookingKind.DIRECT:
@@ -143,23 +166,54 @@ async def agenda(
                 closed=False,
             )
         slots[booking.start].rows.append(row)
-    return group_page(
-        request,
-        locale,
-        context,
-        "admin/group_agenda.html",
+    ordered = [slots[start] for start in sorted(slots)]
+    shown = key(ordered, direct, sorted(changeable))
+    unpicked = sum(r.not_picked_up for s in ordered for r in s.rows) + sum(
+        r.not_picked_up for r in direct
+    )
+    return (
         {
             "day_label": format_day(chosen, code),
             "previous_day": (chosen - timedelta(days=1)).isoformat(),
             "next_day": (chosen + timedelta(days=1)).isoformat(),
             "today": today.isoformat(),
+            "this_day": chosen.isoformat(),
             "week_href": f"/admin/groups/{slug}/agenda/week?week={chosen.isoformat()}",
-            "slots": [slots[start] for start in sorted(slots)],
+            "slots": ordered,
             "direct": direct,
             "changeable": changeable,
             "manage": manage,
+            "announcement": _("admin.agenda.live_status", running=running, unpicked=unpicked),
+            "poll": f"/admin/groups/{slug}/agenda/live?day={chosen.isoformat()}&seen={shown}"
+            if chosen >= today
+            else None,
+            "poll_seconds": settings_for(request).meeting_status_refresh_seconds,
         },
+        shown,
     )
+
+
+@router.get("/groups/{slug}/agenda", response_class=HTMLResponse)
+async def agenda(
+    request: Request, locale: Locale, slug: str, context: ViewBookings, day: str | None = None
+) -> HTMLResponse:
+    """Show the group's slots of one day with agents, bookings and their call status."""
+    page, _shown = await _day(request, locale, context, slug, day)
+    return group_page(request, locale, context, "admin/group_agenda.html", page, scripts=True)
+
+
+@router.get("/groups/{slug}/agenda/live", response_class=FragmentResponse)
+async def agenda_live(
+    request: Request,
+    locale: Locale,
+    slug: str,
+    context: ViewBookings,
+    day: str | None = None,
+    seen: Seen = "",
+) -> Response:
+    """Return the day's table for the page's poller; 204 while ``seen`` is current."""
+    page, shown = await _day(request, locale, context, slug, day)
+    return fragment(request, locale, context, "admin/_agenda_table.html", seen, shown, page)
 
 
 @dataclass(frozen=True)

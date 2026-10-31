@@ -6,6 +6,7 @@ from app.domain.admin import AdminService
 from app.domain.authorization import Principal, Role, Scope
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
+from app.web.static_assets import ASSETS
 from tests.admin.conftest import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
 from tests.support.queue import own_queue as _own_queue
 from tests.support.queue import site_uow as _uow
@@ -116,7 +117,7 @@ async def test_the_list_refreshes_through_a_fragment(site: Site) -> None:
     unchanged = await site.client.get(url)
     changed = await site.client.get(f"{QUEUE}/live?seen=something-else")
 
-    assert '<script src="/static/live-region.js" defer></script>' in page
+    assert f'<script src="{ASSETS.url("live-region.js")}" defer></script>' in page
     assert 'data-poll-seconds="10"' in page
     assert "http-equiv" not in page
     assert unchanged.status_code == 204

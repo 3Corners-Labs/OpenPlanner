@@ -9,7 +9,8 @@ The settings here are the non-secret part. The secret (SMTP password, SMS API ke
 alongside on save, stored encrypted by the adapter (ADR 0008), never read back into the
 domain and never shown again: the domain only learns *whether* one is set.
 
-    SmtpSettings   host, port, security, username, sender                secret: password (optional)
+    SmtpSettings   host, port, security, username, sender,              secret: password (optional)
+                   reply address and DKIM selector (ADR 0073)
     SmsSettings    provider, API base URL, sender ID, country code      secret: API key (required)
 """
 
@@ -88,6 +89,10 @@ class SmtpSettings:
         username: Login name; ``None`` when the server accepts mail without login.
         sender_address: The ``From`` address citizens see and can reply to.
         sender_name: Display name in ``From``; ``None`` shows the address only.
+        reply_to_address: Where a reply goes (``Reply-To``); ``None`` sends no such header
+            (ADR 0073).
+        dkim_selector: The selector the relay signs with (``<selector>._domainkey``), for
+            the sender domain check only; ``None`` leaves DKIM unchecked (ADR 0073).
 
     Raises:
         DomainError: ``invalid_configuration`` naming the offending field.
@@ -99,6 +104,8 @@ class SmtpSettings:
     username: str | None
     sender_address: str
     sender_name: str | None = None
+    reply_to_address: str | None = None
+    dkim_selector: str | None = None
 
     def __post_init__(self) -> None:
         """Validate every field."""
@@ -115,6 +122,10 @@ class SmtpSettings:
         _check_text(self.sender_name, "sender_name", MAX_SENDER_NAME_LENGTH)
         if self.sender_name is not None and not self.sender_name.strip():
             raise _invalid("sender_name")
+        if self.reply_to_address is not None:
+            _check_email(self.reply_to_address, "reply_to_address")
+        if self.dkim_selector is not None and not _HOST.fullmatch(self.dkim_selector):
+            raise _invalid("dkim_selector")  # one or more DNS labels, like a host name
 
     @property
     def channel(self) -> ChannelKind:
