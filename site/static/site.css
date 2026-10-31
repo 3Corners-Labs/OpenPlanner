@@ -299,7 +299,7 @@ ul, ol { padding: 0; margin: 0; }
 /* Enterprise: dark, two columns, numbered rules */
 .grid2 { list-style: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem 3rem; margin-top: 2rem; }
 .grid2 li { padding-top: 1rem; border-top: 1px solid #2c3741; }
-.grid2 h3 { color: #fff; } .grid2 p { color: #b7c2cc; margin: 0; }
+.grid2 h3, .grid2 h4 { color: #fff; margin: 0 0 .4rem; font-size: 1.05rem; } .grid2 p { color: #b7c2cc; margin: 0; }
 @media (max-width: 48rem) { .grid2 { grid-template-columns: 1fr; } }
 
 /* Releases */
@@ -472,3 +472,40 @@ ul, ol { padding: 0; margin: 0; }
 .roadmap-list__steps { font-size: .8rem; font-weight: 700; white-space: nowrap; color: var(--slot-text); }
 @media (max-width: 56rem) { .roadmap-list { grid-template-columns: 1fr; } }
 @media (max-width: 30rem) { .roadmap-list li { grid-template-columns: 1fr auto; } .roadmap-list__title { grid-column: 1 / -1; grid-row: 2; } }
+
+/* Enterprise: architecture plate, pillars, scaling steps (on the dark band) */
+.section--dark .small { color: #b7c2cc; }
+.sub { font-size: 1.25rem; margin: 3rem 0 1rem; color: #fff; }
+.arch { margin: 0; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 1.25rem; }
+.arch figcaption { grid-column: 1 / -1; font-size: .9rem; color: #b7c2cc; }
+.arch__layers { display: grid; gap: .4rem; }
+.arch__layer { border: 1px solid #2c3741; border-radius: var(--radius); padding: .9rem 1rem; background: #1a1e23; }
+.arch__layer h4, .arch__ports h4 { margin: 0 0 .55rem; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: #9fb0bf; }
+.arch__layer ul { list-style: none; display: flex; flex-wrap: wrap; gap: .4rem; }
+.arch__layer li { padding: .3rem .65rem; border-radius: var(--radius-s); background: #252a31; color: #e8ebef; font-size: .9rem; }
+.arch__layer--3 { border-color: #6cb4ee; }
+.arch__layer--3 li { background: #15324a; }
+.arch__note { margin: .6rem 0 0; font-size: .82rem; color: #9ccdf5; }
+.arch__arrow { justify-self: center; width: 2px; height: 1.1rem; background: #6cb4ee; position: relative; }
+.arch__arrow::after { content: ""; position: absolute; left: -5px; bottom: -2px; border: 6px solid transparent; border-top-color: #6cb4ee; border-bottom: 0; }
+.arch__ports { border: 1px solid #2c3741; border-radius: var(--radius); padding: .9rem 1rem; background: #1a1e23; }
+.arch__ports ul { list-style: none; display: grid; gap: .5rem; }
+.arch__ports li { display: grid; grid-template-columns: minmax(0, auto) 1.2rem minmax(0, 1fr); align-items: center; gap: .5rem; font-size: .88rem; color: #e8ebef; }
+.arch__ports code { font-family: var(--mono); font-size: .8rem; color: #9ccdf5; overflow-wrap: anywhere; }
+.arch__plug { height: 2px; background: #f39a3a; position: relative; }
+.arch__plug::after { content: ""; position: absolute; right: -2px; top: -3px; width: 8px; height: 8px; border-radius: 2px; background: #f39a3a; }
+@media (max-width: 56rem) { .arch { grid-template-columns: 1fr; } }
+.pillars { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.25rem 2rem; margin-top: 2rem; }
+.pillars li { padding-top: .9rem; border-top: 2px solid #6cb4ee; }
+.pillars h4 { margin: 0 0 .4rem; color: #fff; font-size: 1rem; }
+.pillars p { margin: 0; color: #b7c2cc; font-size: .95rem; }
+@media (max-width: 64rem) { .pillars { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 36rem) { .pillars { grid-template-columns: 1fr; } }
+.scale { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.scale__step { padding: 1rem 1.1rem; border-radius: var(--radius); background: #1a1e23; border: 1px solid #2c3741; }
+.scale__step--designed { border-style: dashed; border-color: #f39a3a; background: transparent; }
+.scale__step h4 { margin: .5rem 0 .4rem; color: #fff; font-size: 1rem; }
+.scale__step p { margin: 0; color: #b7c2cc; font-size: .93rem; }
+.scale__state { display: inline-block; font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: .15rem .55rem; border-radius: 999px; background: #14301d; color: #74d08e; }
+.scale__step--designed .scale__state { background: #33270e; color: #f2b84b; }
+@media (max-width: 56rem) { .scale { grid-template-columns: 1fr; } }
