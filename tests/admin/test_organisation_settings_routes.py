@@ -67,3 +67,30 @@ async def test_the_superuser_sets_the_platform_default_on_advanced_settings(site
     assert response.status_code == 303
     await site.client.get("/admin/settings")
     assert app.state.settings.shortfall_horizon_days == 21
+
+
+async def test_one_save_sets_every_changed_value_of_the_organisation(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    page = (await site.client.get(URL)).text
+    response = await site.client.post(
+        URL, data={"time_format": "12h", "admin_timezone": "Europe/Amsterdam"}, headers=SAME_ORIGIN
+    )
+    after = (await site.client.get(URL)).text
+
+    assert f'action="{URL}"' in page
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{URL}?done=saved"
+    assert f'formaction="{URL}/time_format/reset"' in after
+    assert f'formaction="{URL}/admin_timezone/reset"' not in after  # unchanged: not stored
+
+
+async def test_one_save_refuses_at_the_row_and_keeps_the_rest(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    response = await site.client.post(
+        URL, data={"admin_timezone": "Mars/Olympus", "time_format": "12h"}, headers=SAME_ORIGIN
+    )
+
+    assert response.status_code == 422
+    assert 'id="error-admin_timezone"' in response.text

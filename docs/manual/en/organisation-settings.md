@@ -28,7 +28,8 @@ sets on **Advanced settings**. The **Source** column says which one applies:
 
 ## Changing a setting
 
-Enter the new value and choose **Save**; it applies within about ten seconds. **Use the
+Enter the new values and choose **Save** at the bottom; only the values that differ from
+the current ones are saved, and they apply within about ten seconds. **Use the
 platform value** removes the organisation's value. You need a recent login to change a
 setting. Every change is recorded in the audit log with the old and the new value.
 

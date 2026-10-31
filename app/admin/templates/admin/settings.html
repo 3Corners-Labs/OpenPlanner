@@ -1,5 +1,5 @@
 {% extends "admin/layout.html" %}
-{% from "admin/_setting_form.html" import setting_form with context %}
+{% from "admin/_setting_form.html" import setting_row, setting_head with context %}
 {% block title %}{{ _("admin.settings.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -191,47 +191,25 @@
 </form>
 {% endif %}
 {% for section in sections %}
-<section class="card" aria-labelledby="topic-{{ section.key }}">
+{#- With the manage permission each topic is one form with one Save; Reset and Take over post
+    through formaction. Without it the topic is a read-only section. -#}
+{% if manage %}
+<form method="post" action="/admin/settings/topic/{{ section.key }}" novalidate class="card settings-group" aria-labelledby="topic-{{ section.key }}">
+{% else %}
+<section class="card settings-group" aria-labelledby="topic-{{ section.key }}">
+{% endif %}
   <h2 id="topic-{{ section.key }}">{{ section.heading }}</h2>
-  <div class="table-scroll" role="region" aria-labelledby="topic-{{ section.key }}" tabindex="0">
-  <table class="data-table">
-    <caption class="visually-hidden">{{ section.heading }}</caption>
-    <thead>
-      <tr>
-        <th scope="col">{{ _("admin.settings.setting") }}</th>
-        <th scope="col">{{ _("admin.settings.value") }}</th>
-        <th scope="col">{{ _("admin.settings.source") }}</th>
-        <th scope="col">{{ _("admin.settings.notes") }}</th>
-        {% if manage %}<th scope="col">{{ _("admin.settings.change") }}</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in section.rows %}
-      <tr id="setting-{{ row.key }}">
-        <th scope="row">{{ row.label }}<br><code class="muted">{{ row.variable }}</code></th>
-        <td>{{ row.value }}</td>
-        <td>{{ row.source }}</td>
-        <td>
-          {% if row.locked %}<p>{{ _("admin.settings.locked") }}: <code>{{ row.variable }}</code></p>{% endif %}
-          {% if row.outside_bounds %}<p><span class="chip chip--warning">{{ _("admin.settings.outside_bounds") }}</span></p>{% endif %}
-          {% if row.portal_ignored %}<p><span class="chip chip--warning">{{ _("admin.settings.portal_ignored") }}</span></p>{% endif %}
-        </td>
-        {% if manage %}
-        <td>
-          {% if row.editable %}{{ setting_form(row, "/admin/settings/" ~ row.key, _("admin.settings.reset"), max_hours, trace_max_hours) }}{% elif row.error %}<p class="error-message" id="error-{{ row.key }}">{{ row.error }}</p>{% endif %}
-          {% if row.adoptable %}
-          <form method="post" action="/admin/settings/{{ row.key }}/adopt" class="setting-form">
-            <button type="submit" class="button button--secondary button--small">{{ _("admin.settings.adopt") }}</button>
-          </form>
-          {% endif %}
-          {% if row.adopted %}<p>{{ _("admin.settings.adopted_note") }} <code>{{ row.variable }}</code></p>{% endif %}
-        </td>
-        {% endif %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="settings-list">
+    {{ setting_head() }}
+    {% for row in section.rows %}
+    {{ setting_row(row, "/admin/settings/" ~ row.key, _("admin.settings.reset"), max_hours, trace_max_hours) }}
+    {% endfor %}
   </div>
-</section>
+  {% if manage and section.rows | selectattr("editable") | list %}
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.settings.save") }}</button>
+  </div>
+  {% endif %}
+{% if manage %}</form>{% else %}</section>{% endif %}
 {% endfor %}
 {% endblock %}

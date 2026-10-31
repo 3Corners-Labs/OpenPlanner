@@ -41,6 +41,7 @@ from app.config import Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
+from app.domain.group_erase import GroupEraser
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService, IntegrationWatch
 from app.domain.maintenance_service import MaintenanceWatch
@@ -172,6 +173,7 @@ async def run_worker(
         AdminService(uow, clock),
         lambda: timedelta(hours=live.settings.diagnostic_mode_hours),
     )
+    eraser = GroupEraser(uow, clock, lambda: timedelta(days=live.settings.group_erase_after_days))
     housekeeping = Housekeeping.for_database(
         engine,
         uow,
@@ -179,6 +181,7 @@ async def run_worker(
         lambda: storage_limits(live.settings),
         settings.database_url,
         diagnostics.brake,
+        eraser.run,
     )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(
