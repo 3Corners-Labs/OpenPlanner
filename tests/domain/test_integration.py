@@ -5,7 +5,7 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import AuditEvent, Outcome, Source
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.booking import Booking, BookingStatus, Contact, MeetingRef, TrialCall
 from app.domain.calls import (
     CallState,
@@ -25,6 +25,7 @@ from app.domain.scheduling import PhoneMode
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW, SLOT_0900, make_group
+from tests.support.principals import principal
 
 GROUP = make_group(
     id=1,
@@ -42,8 +43,8 @@ ADA = Contact.create(
     phone=None,
     phone_mode=PhoneMode.OPTIONAL,
 )
-GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
-OUTSIDER = Principal("x-1", "X", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
+GROUP_ADMIN = principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
+OUTSIDER = principal("x-1", "X", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
 
 
 def _booking(**changes: object) -> Booking:

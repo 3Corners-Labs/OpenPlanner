@@ -6,16 +6,17 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import Category, Level, Source
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.diagnostics import BRAKE_EVENT, DiagnosticLog, DiagnosticsService
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import Organisation
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW, make_group
+from tests.support.principals import principal
 
-SUPER = Principal("super-1", "Sam", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-ORG_ADMIN = Principal(
+SUPER = principal("super-1", "Sam", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+ORG_ADMIN = principal(
     "org-1", "Olga", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset()
 )
 HOURS = timedelta(hours=24)

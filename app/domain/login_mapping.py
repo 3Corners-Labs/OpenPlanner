@@ -1,18 +1,28 @@
 """The OIDC login mapping as settings: which claims and values make an admin (ADR 0042 §8).
 
-Eight class C settings, all under ``settings.login.manage``: the claims that carry roles,
-organisations and groups, and the role value of each built-in role. A new mapping is saved only
-after a dry run on the superuser's own fresh login (``SettingsService.change_login_mapping``);
-this module checks the values before that run.
+Ten class C settings, all under ``settings.login.manage``: the claims that carry roles,
+organisations and groups, the role value of each built-in role, and the entitlement claim and
+prefix of ADR 0049. A new mapping is saved only after a dry run on the superuser's own fresh
+login (``SettingsService.change_login_mapping``); this module checks the values before that
+run.
 """
 
 import re
 from collections.abc import Mapping
 
+from app.domain.entitlements import is_prefix
 from app.domain.errors import DomainError, ErrorCode
 
-CLAIM_KEYS = ("oidc_role_claim", "oidc_organisation_claim", "oidc_group_claim")
+CLAIM_KEYS = (
+    "oidc_role_claim",
+    "oidc_organisation_claim",
+    "oidc_group_claim",
+    "oidc_entitlement_claim",
+)
 """The settings that name a claim of the ID token."""
+
+PREFIX_KEY = "oidc_entitlement_prefix"
+"""The entitlement prefix (ADR 0049 point 1); its grammar is stricter than a claim name's."""
 
 ROLE_KEYS = (
     "oidc_role_superuser",
@@ -23,7 +33,7 @@ ROLE_KEYS = (
 )
 """The settings that hold the role claim's value for each built-in role."""
 
-LOGIN_KEYS = CLAIM_KEYS + ROLE_KEYS
+LOGIN_KEYS = CLAIM_KEYS + ROLE_KEYS + (PREFIX_KEY,)
 """Every setting of the login mapping, in form order."""
 
 _TOKEN = re.compile(r"[A-Za-z0-9_.:/@-]{1,128}")
@@ -31,16 +41,17 @@ _TOKEN = re.compile(r"[A-Za-z0-9_.:/@-]{1,128}")
 
 
 def validate_mapping(values: Mapping[str, str]) -> dict[str, str]:
-    """Return the eight values trimmed, or refuse the first one that is not usable.
+    """Return the ten values trimmed, or refuse the first one that is not usable.
 
     Raises:
         DomainError: ``setting_invalid`` with the key as field: a value missing, not a plain
-            token, or a role value used for two roles (one login would then hold both).
+            token, a prefix outside its grammar, or a role value used for two roles (one login
+            would then hold both).
     """
     found: dict[str, str] = {}
     for key in LOGIN_KEYS:
         value = str(values.get(key, "")).strip()
-        if not _TOKEN.fullmatch(value):
+        if not _TOKEN.fullmatch(value) or (key == PREFIX_KEY and not is_prefix(value)):
             raise DomainError(ErrorCode.SETTING_INVALID, key)
         found[key] = value
     seen: set[str] = set()

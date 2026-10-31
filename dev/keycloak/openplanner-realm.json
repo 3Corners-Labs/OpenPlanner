@@ -88,6 +88,21 @@
             "userinfo.token.claim": "false",
             "aggregate.attrs": "false"
           }
+        },
+        {
+          "name": "openplanner_entitlements",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "entitlements",
+            "claim.name": "openplanner_entitlements",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false",
+            "aggregate.attrs": "false"
+          }
         }
       ]
     }
@@ -113,6 +128,9 @@
         ],
         "groups": [
           "demo"
+        ],
+        "entitlements": [
+          "openplanner:superuser"
         ]
       },
       "credentials": [
@@ -136,6 +154,9 @@
         ],
         "organisations": [
           "demo"
+        ],
+        "entitlements": [
+          "openplanner:org_admin:demo"
         ]
       },
       "credentials": [
@@ -159,6 +180,9 @@
         ],
         "groups": [
           "demo"
+        ],
+        "entitlements": [
+          "openplanner:group_admin:demo/demo"
         ]
       },
       "credentials": [
@@ -182,6 +206,9 @@
         ],
         "groups": [
           "demo"
+        ],
+        "entitlements": [
+          "openplanner:agent:demo/demo"
         ]
       },
       "credentials": [
@@ -205,6 +232,9 @@
         ],
         "organisations": [
           "demo"
+        ],
+        "entitlements": [
+          "openplanner:auditor:demo"
         ]
       },
       "credentials": [
@@ -228,6 +258,9 @@
         ],
         "organisations": [
           "andere"
+        ],
+        "entitlements": [
+          "openplanner:org_admin:andere"
         ]
       },
       "credentials": [
@@ -246,7 +279,64 @@
       "lastName": "Zonderrol",
       "email": "norole@openplanner.test",
       "attributes": {
-        "roles": []
+        "roles": [],
+        "entitlements": []
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "mixed",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Mira",
+      "lastName": "Mixed",
+      "email": "mixed@openplanner.test",
+      "attributes": {
+        "roles": [
+          "openplanner-org-admin",
+          "openplanner-auditor"
+        ],
+        "organisations": [
+          "demo",
+          "andere"
+        ],
+        "entitlements": [
+          "openplanner:org_admin:demo",
+          "openplanner:auditor:andere"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "refused",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Rik",
+      "lastName": "Refused",
+      "email": "refused@openplanner.test",
+      "attributes": {
+        "roles": [
+          "openplanner-org-admin"
+        ],
+        "organisations": [
+          "demo"
+        ],
+        "entitlements": [
+          "openplanner:org_admin:demo",
+          "openplanner:org-admin:demo"
+        ]
       },
       "credentials": [
         {
