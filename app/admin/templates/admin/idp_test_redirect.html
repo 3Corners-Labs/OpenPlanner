@@ -1,0 +1,8 @@
+{% extends "admin/_public.html" %}
+{% block title %}{{ _("admin.idp.testing.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block admin_head %}<meta http-equiv="refresh" content="0;url={{ login_url }}">{% endblock %}
+{% block content %}
+<h1>{{ _("admin.idp.testing.title") }}</h1>
+<p>{{ _("admin.idp.testing.text", name=name) }}</p>
+<p><a class="button" href="{{ login_url }}">{{ _("admin.idp.testing.continue") }}</a></p>
+{% endblock %}

@@ -17,11 +17,14 @@ from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine
+from app.adapters.db.identity_providers import ProviderCredentialStore
 from app.adapters.db.probes import ProbeReports
 from app.adapters.db.reports import ReportStore
 from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.discovery import GuardedDiscoveryFetcher
 from app.adapters.event_sink import StdoutEventSink
+from app.adapters.idp_registry import OrganisationProviders
 from app.adapters.integrations import (
     Integrations,
     build_integrations,
@@ -30,9 +33,10 @@ from app.adapters.integrations import (
 )
 from app.adapters.live_settings import LiveSettings, keep_current
 from app.adapters.mail_dns import DnsTxtResolver
-from app.adapters.oidc import OidcConfig, OidcIdentityProvider, claim_mapping
+from app.adapters.oidc import Guard, OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
+from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.tls_probe import SslCertificateProbe
 from app.admin.routes import register_admin
 from app.api import (
@@ -69,6 +73,7 @@ from app.domain.entitlements import ClaimMode
 from app.domain.event_context import set_service
 from app.domain.form_service import FormService
 from app.domain.holiday_service import HolidayService
+from app.domain.identity_provider_service import IdentityProviderService
 from app.domain.idp_mapping import IdpMappingService, MappingSettings
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
@@ -81,7 +86,14 @@ from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.platform_settings import PlatformSettingsStore
-from app.domain.ports import CertificateProbe, Clock, IdentityProvider, MailDomainResolver
+from app.domain.ports import (
+    CertificateProbe,
+    Clock,
+    DiscoveryFetcher,
+    IdentityProvider,
+    MailDomainResolver,
+    SigningKeys,
+)
 from app.domain.queue_service import QueueService
 from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
@@ -161,6 +173,9 @@ def create_app(
     integrations: Integrations | None = None,
     certificate_probe: CertificateProbe | None = None,
     mail_domain_resolver: MailDomainResolver | None = None,
+    discovery_fetcher: DiscoveryFetcher | None = None,
+    signing_keys: SigningKeys | None = None,
+    organisation_providers: OrganisationProviders | None = None,
 ) -> FastAPI:
     """Build the application.
 
@@ -175,6 +190,11 @@ def create_app(
             handshake.
         mail_domain_resolver: Explicit DNS lookup for the sender domain check (tests);
             defaults to the host's resolver (ADR 0073).
+        discovery_fetcher: Explicit fetcher of discovery documents (tests); defaults to a
+            guarded fetch (ADR 0083 point 8).
+        signing_keys: Explicit key generator (tests); defaults to EC P-256 pairs.
+        organisation_providers: Explicit registry of organisation provider adapters (tests);
+            defaults to one built from the database.
 
     Returns:
         The FastAPI app with translator, booking service, rate limits and error pages. Its
@@ -306,6 +326,25 @@ def create_app(
             lambda: ClaimSettings(
                 ClaimMode(settings.oidc_claim_mode), live().oidc_entitlement_prefix
             ),
+        )
+        # ADR 0083 step 2: organisation identity providers, their adapters and registration.
+        lab = settings.environment != "prod"
+        providers = organisation_providers or OrganisationProviders(
+            ProviderCredentialStore(app.state.engine, secret_box(settings)),
+            http,
+            guard=Guard(allow_private=lab),
+            max_entitlements=lambda: live().oidc_entitlements_max_values,
+        )
+        app.state.organisation_providers = providers
+        app.state.identity_provider_service = IdentityProviderService(
+            uow,
+            clock,
+            app.state.admin_service,
+            discovery_fetcher or GuardedDiscoveryFetcher(http, allow_private=lab),
+            signing_keys or EcSigningKeys(),
+            limit=lambda: live().idp_max_per_organisation,
+            platform_discovery_url=lambda: settings.oidc_discovery_url,
+            on_change=providers.invalidate,
         )
         app.state.idp_mapping_service = IdpMappingService(
             uow,
