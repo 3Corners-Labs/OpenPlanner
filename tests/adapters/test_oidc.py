@@ -17,12 +17,15 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 from app.adapters.oidc import (
     ClaimMapping,
+    Guard,
     OidcConfig,
     OidcIdentityProvider,
     claim_mapping,
     login_claims,
 )
+from app.adapters.signing_keys import EcSigningKeys
 from app.domain.authorization import Role
+from app.domain.identity_providers import ClientAuth
 from app.domain.ports import IdentityError
 from app.domain.settings_registry import lookup
 
@@ -605,3 +608,108 @@ def test_the_organisation_dev_realm_holds_a_user_per_abuse_case() -> None:
     assert not users["buitendomein"]["email"].endswith("@andere.test")
     assert users["onbevestigd"]["emailVerified"] is False
     assert users["beheer"]["attributes"]["entitlements"] == ["openplanner:org_admin:andere"]
+
+
+# --- organisation providers: private_key_jwt and the outbound guard (ADR 0083 step 2) ---------
+
+
+def _organisation_config(**overrides: Any) -> OidcConfig:
+    """The registration of an organisation provider, as the registry builds it."""
+    values: dict[str, Any] = {
+        "discovery_url": f"{ISSUER}/.well-known/openid-configuration",
+        "client_id": CLIENT,
+        "client_secret": "",
+        "scopes": "openid profile email",
+        "mapping": MAPPING,
+        "provider_key": "gem-a",
+        "client_auth": ClientAuth.PRIVATE_KEY_JWT,
+        "guard": Guard(resolve=lambda host, port: ["8.8.8.8"]),
+    }
+    values.update(overrides)
+    return OidcConfig(**values)
+
+
+async def test_private_key_jwt_sends_a_signed_assertion_the_published_key_verifies(
+    provider: FakeProvider,
+) -> None:
+    generated = EcSigningKeys().generate()
+    config = _organisation_config(signing_key=(generated.kid, generated.private_pem))
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        _, claims = await login(OidcIdentityProvider(config, http), provider)
+
+    assert claims.subject == "idp:gem-a:user-1"
+    assert provider.received["authorization"] is None
+    assert provider.received["client_id"] == CLIENT
+    assert provider.received["client_assertion_type"].endswith(":jwt-bearer")
+    assertion = provider.received["client_assertion"]
+    assert jwt.get_unverified_header(assertion)["kid"] == generated.kid
+    public = jwt.PyJWK.from_dict({**generated.public_jwk, "kid": generated.kid}).key
+    body = jwt.decode(assertion, public, algorithms=["ES256"], audience=f"{ISSUER}/token")
+    assert (body["iss"], body["sub"]) == (CLIENT, CLIENT)
+    assert body["exp"] - body["iat"] == 60
+    assert body["jti"]
+
+
+async def test_a_provider_without_a_key_cannot_exchange_the_code(provider: FakeProvider) -> None:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        oidc = OidcIdentityProvider(_organisation_config(), http)
+        start = await oidc.start_login(REDIRECT)
+        provider.nonce = start.nonce
+        with pytest.raises(IdentityError) as failed:
+            await oidc.finish_login(
+                code="abc",
+                redirect_uri=REDIRECT,
+                code_verifier=start.code_verifier,
+                nonce=start.nonce,
+            )
+
+    assert failed.value.code == "no_signing_key"
+    assert provider.received == {}
+
+
+async def test_b8_a_registered_providers_addresses_go_through_the_guard(
+    provider: FakeProvider,
+) -> None:
+    config = _organisation_config(guard=Guard(resolve=lambda host, port: ["10.0.0.5"]))
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        with pytest.raises(IdentityError) as refused:
+            await OidcIdentityProvider(config, http).start_login(REDIRECT)
+
+    assert refused.value.code == "discovery_failed"
+    assert provider.jwks_calls == 0
+
+
+async def test_a_test_login_reports_claim_names_the_verified_flag_and_the_domain(
+    provider: FakeProvider,
+) -> None:
+    generated = EcSigningKeys().generate()
+    config = _organisation_config(signing_key=(generated.kid, generated.private_pem))
+    provider.claims = {"email": "Ada@Gem-A.Example", "email_verified": True}
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        oidc = OidcIdentityProvider(config, http)
+        start = await oidc.start_login(REDIRECT)
+        provider.nonce = start.nonce
+        report = await oidc.finish_test_login(
+            code="abc", redirect_uri=REDIRECT, code_verifier=start.code_verifier, nonce=start.nonce
+        )
+
+    assert report.claims.subject == "idp:gem-a:user-1"
+    assert "email" in report.claim_names
+    assert "Ada@Gem-A.Example" not in repr(report)
+    assert (report.email_verified, report.email_domain) == (True, "gem-a.example")
+
+
+async def test_a_test_login_without_email_claims_reports_them_absent(
+    provider: FakeProvider,
+) -> None:
+    generated = EcSigningKeys().generate()
+    config = _organisation_config(signing_key=(generated.kid, generated.private_pem))
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        oidc = OidcIdentityProvider(config, http)
+        start = await oidc.start_login(REDIRECT)
+        provider.nonce = start.nonce
+        report = await oidc.finish_test_login(
+            code="abc", redirect_uri=REDIRECT, code_verifier=start.code_verifier, nonce=start.nonce
+        )
+
+    assert (report.email_verified, report.email_domain) == (None, None)

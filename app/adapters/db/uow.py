@@ -35,6 +35,7 @@ from app.adapters.db.certificate import CertificateQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, answers_json
+from app.adapters.db.identity_providers import IdentityProviderQueries
 from app.adapters.db.images import ImageQueries, page_image
 from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
@@ -403,6 +404,7 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 
 class SqlTransaction(
     ApiClientQueries,
+    IdentityProviderQueries,
     UpdateQueries,
     RetentionQueries,
     StaffQueries,
@@ -423,7 +425,8 @@ class SqlTransaction(
     the maintenance switch from ``MaintenanceQueries`` (ADR 0038), custom roles from
     ``RoleQueries`` (ADR 0039), closure images and scenarios from ``ImageQueries`` and
     ``ScenarioQueries`` (ADR 0037), portal settings from ``PlatformSettingsQueries``
-    (ADR 0042), the certificate check from ``CertificateQueries`` (ADR 0064).
+    (ADR 0042), the certificate check from ``CertificateQueries`` (ADR 0064), the organisation
+    identity providers from ``IdentityProviderQueries`` (ADR 0083).
 
     Args:
         session: The open session.

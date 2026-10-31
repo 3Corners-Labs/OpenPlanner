@@ -89,6 +89,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.TEXTS_ORGANISATION_MANAGE,  # ADR 0004: the organisation's own wording
         Permission.IDP_MAPPING_VIEW,  # ADR 0049
         Permission.IDP_MAPPING_MANAGE,  # ADR 0049
+        Permission.IDENTITY_PROVIDERS_VIEW,  # ADR 0083
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -125,6 +126,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042: system status, read-only
         Permission.IDP_MAPPING_VIEW,  # ADR 0049
+        Permission.IDENTITY_PROVIDERS_VIEW,  # ADR 0083
     }
 
 
@@ -141,6 +143,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042
         Permission.IDP_MAPPING_VIEW,  # ADR 0049
+        Permission.IDENTITY_PROVIDERS_VIEW,  # ADR 0083
     }
 
     assert not MATRIX[Role.AUDITOR] & PII_PERMISSIONS
@@ -160,6 +163,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.DIAGNOSTICS_MANAGE,  # ADR 0040: product owner, 2026-10-29
         Permission.SETTINGS_PLATFORM_MANAGE,  # ADR 0042 §5
         Permission.SETTINGS_LOGIN_MANAGE,  # ADR 0042 §5: never grantable to another role
+        Permission.IDENTITY_PROVIDERS_MANAGE,  # ADR 0083 point 4
     } == LOCKED_PERMISSIONS
     for permission in LOCKED_PERMISSIONS:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]

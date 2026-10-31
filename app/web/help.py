@@ -98,6 +98,16 @@ TOPICS = (
         ("/admin/organisations/{org}/contacts",),
         Permission.ORGANISATION_CLOSURE,
     ),
+    # ADR 0083: the organisation's own identity providers (the *Login* sub-tab).
+    HelpTopic(
+        "organisation-login",
+        (
+            "/admin/organisations/{org}/login",
+            "/admin/organisations/{org}/login/new",
+            "/admin/organisations/{org}/login/{idp_key}",
+        ),
+        Permission.IDENTITY_PROVIDERS_VIEW,
+    ),
     HelpTopic(
         "group-contacts", ("/admin/groups/{slug}/closure/contacts",), Permission.CLOSURE_MANAGE
     ),
