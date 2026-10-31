@@ -884,11 +884,12 @@ when a rule's channel is not configured.
 link in mails already sent; bookings are unaffected. Rotate only after an incident, and tell the
 contact center that citizens may call about broken links.
 
-## Releasing a version (ADR 0052)
+## Releasing a version (ADR 0052, ADR 0079)
 
 A merge to `main` is **not** a release. An installation only sees a new version after a tag
-`vX.Y.Z` on `main` has gone through `main.yml`. You do two things by hand (a release PR, then a
-tag); everything after the tag is automatic and visible in the Actions tab.
+`vX.Y.Z` on `main` has gone through `main.yml`. The product owner does two clicks in the
+workflow *release* (GitHub → *Actions* → *release* → *Run workflow*) and reads one section;
+everything else is automatic and visible in the Actions tab and in the release PR.
 
 ### What happens where
 
@@ -896,55 +897,98 @@ tag); everything after the tag is automatic and visible in the Actions tab.
 |---|---|---|---|
 | PR | `ci.yml` | checks only | no |
 | Merge to `main` | `main.yml`: ZAP, then build, sign, tag `vX.Y.Z-rc.N`, pre-release (ADR 0059); mutation runs alongside | application and proxy images `:X.Y.Z-rc.N`, `:main` and `:sha-<commit>` (the application with `APP_VERSION=X.Y.Z-rc.N` and `APP_COMMIT`); pre-release page with both SBOMs | only on the `rc` channel (below) |
+| Dispatch *release* with `step = release-pr` | `release.yml`: the release PR, and for `vX.Y.0` the audit job | PR `chore(release): vX.Y.Z` with auto-merge; `## Release audit` with `Verdict: open` | no |
+| Dispatch *release* with `step = tag` | `release.yml`: the checks of ADR 0052 point 4, the annotated tag | tag `vX.Y.Z` on the merged release commit | not yet |
 | Tag `vX.Y.Z` pushed | `main.yml`: tag check, ZAP, mutation, build, sign, SBOM, GitHub release | application image `:X.Y.Z` with `APP_VERSION` and `APP_COMMIT`, proxy image `:X.Y.Z` (ADR 0064 step 2); release page with `sbom.cdx.json` and `sbom-proxy.cdx.json` | yes, within an hour |
 
-### Step 1: decide the number
+### Once: the secrets the workflow needs
 
-On an up-to-date `main` in your own checkout (not a worktree of another branch):
+Set by a repository admin under *Settings → Secrets and variables → Actions*, never in the
+repository:
 
-```sh
-git switch main && git pull
-make release-plan
-```
+| Name | Kind | What | Why |
+|---|---|---|---|
+| `RELEASE_TOKEN` | secret | a fine-grained personal access token on this repository with *Contents: read and write* and *Pull requests: read and write* (or a GitHub App token later) | a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow: the release PR would get no CI and the tag no build |
+| `OPENAI_API_KEY` | secret | an OpenAI API key | the audit job (`openai/codex-action`); the key stays in the action's proxy and never reaches the review process |
+| `RELEASE_RUNNER` | variable, optional | the label of a self-hosted runner | default `ubuntu-24.04`; see *Self-hosted runner* below |
 
-It prints the last release, every commit since then and the next version by the rules of
-ADR 0052 (breaking → MAJOR, from 1.0; `feat` → MINOR; anything else → PATCH). It changes
-nothing. Write the number down, for example `0.3.0`.
+A real run stops at its first step without `RELEASE_TOKEN`; a dry run needs none of them. A
+personal access token expires: note the date, renew it under the same name before it does
+(a release then fails at its first step, nothing half-done), or replace it with a GitHub App
+token later. The Codex CLI is installed at its newest version on every audit run
+(`codex-version` empty), as on a laptop; it is a tool of the forge, not a dependency of the
+product.
 
-### Step 2: the release PR
+### Step 1: the release PR (one click)
 
-On a branch `release/v0.3.0` (or ask Claude Code: "make the release PR for v0.3.0"):
+*Run workflow* on `main` with `step = release-pr`. Leave `version` empty for the number the
+rules of ADR 0052 give (breaking → MAJOR, from 1.0; `feat` → MINOR; anything else → PATCH),
+or type a higher one, for example `1.0.0` for the first production release. Tick `dry_run`
+to see the result first: the run's summary shows the diff and the PR body, and nothing is
+opened.
 
-1. `pyproject.toml`: `version = "0.3.0"`, then `uv lock` (only the `openplanner` line changes).
-2. `CHANGELOG.md`: rename `## Unreleased` to `## 0.3.0 (2026-11-02)` and put a fresh empty
-   `## Unreleased` above it.
-3. Commit `chore(release): v0.3.0` and open the PR.
-4. For a minor or major release (`vX.Y.0`), run the audit on the release branch (ADR 0078):
+The job `release PR` then:
 
-   ```sh
-   make release-audit
-   ```
+1. computes the number (`scripts/release_pr.py plan`) from the commits since the last release
+   tag, the same as `make release-plan`;
+2. sets `version = "X.Y.Z"` in `pyproject.toml` and `uv.lock`, renames `## Unreleased` in
+   `CHANGELOG.md` to `## X.Y.Z (date)` with a fresh empty `## Unreleased` above it;
+3. pushes `release/vX.Y.Z`, opens the PR `chore(release): vX.Y.Z` with the PR template filled
+   in (the dispatcher's login is in it: that is the recorded instruction) and enables
+   auto-merge.
 
-   It runs the Codex CLI (`codex`, a second model, read-only) over everything since the last
-   release. Paste the findings into the PR under `## Release audit`: P1 findings are fixed
-   first, P2 findings become issues, and the section ends with `Verdict: pass`. `main.yml`
-   refuses a `vX.Y.0` tag whose release PR has no such section. A patch release skips this.
-5. A release PR is a decision: it merges (squash) once CI is green and the product owner has
-   set the label `po:approved`.
+For a minor or major release (`vX.Y.0`) the job `release audit` runs next (ADR 0078): the
+Codex CLI, a second model, reviews everything since the last release in a read-only sandbox
+(`scripts/release-audit.sh`, the same command as `make release-audit`) and writes the
+findings into the PR under `## Release audit`, ending with `Verdict: open`. It takes some
+minutes and costs one API call (roughly 5 to 20 US dollars for a diff the size of `v0.4.0`).
+A patch release has no audit job.
 
-### Step 3: the tag
+### Step 2: read, decide, label (the product owner)
 
-On `main`, after the release PR is merged:
+1. Open the release PR. Read `## Release audit`: P1 findings are fixed before the release
+   (in their own PRs; then re-run the *release audit* job from the Actions tab, it replaces the
+   section), P2 findings become issues.
+2. Edit the PR description and change the last line of the section from `Verdict: open` to
+   `Verdict: pass`. This is a human act on purpose; `main.yml` refuses the tag until it is done.
+3. Set the label `po:approved`. The PR is a decision (ADR 0078): with the label and green CI
+   the merge queue squash-merges it.
 
-```sh
-git switch main && git pull
-git log -1 --oneline        # must be "chore(release): v0.3.0 (#NN)"
-git tag -a v0.3.0 -m "v0.3.0: tagged on the instruction of <name> on <date>"
-git push origin v0.3.0
-```
+### Step 3: the tag (one click)
+
+*Run workflow* on `main` with `step = tag` and `version = X.Y.Z`. The job:
+
+1. finds the merged `chore(release): vX.Y.Z (#NN)` on `main`, checks that `pyproject.toml` at
+   that commit says `X.Y.Z` and that the tag does not exist yet;
+2. for `vX.Y.0`, checks that the release PR's `## Release audit` ends with `Verdict: pass`
+   (`scripts/check-release-audit.sh`, the same check `main.yml` repeats);
+3. sets the annotated tag `vX.Y.Z` on that commit with the message
+   `vX.Y.Z: tagged on the instruction of <your login> on <date>` and pushes it; `main.yml`
+   takes over.
 
 Do **not** use "Draft a new release" on GitHub: `main.yml` creates the release itself after
 the image is signed, and a hand-made release would make that step fail.
+
+### Laptop fallback
+
+When the forge cannot run the workflow, the same scripts work in a checkout on `main`:
+`python -m scripts.release_pr plan`, `python -m scripts.release_pr prepare --version X.Y.Z
+--body body.md` (then branch, commit `chore(release): vX.Y.Z`, `gh pr create --body-file
+body.md`, `gh pr merge --auto --squash`), `make release-audit` with the findings pasted under
+`## Release audit`, and after the merge `python -m scripts.release_pr tag-check --version X.Y.Z`
+followed by `git tag -a vX.Y.Z <commit> -m "<message it printed>"` and `git push origin vX.Y.Z`.
+
+### Self-hosted runner
+
+Set the repository variable `RELEASE_RUNNER` to the runner's label. The runner needs git,
+Python 3.11 or newer, the `gh` CLI and network access to the forge. The audit job additionally
+needs what `openai/codex-action` needs on Linux: passwordless `sudo`, `/usr/bin/setpriv`,
+`/usr/bin/setfacl` (package `acl`) and unprivileged user namespaces (`kernel.unprivileged_userns_clone=1`,
+AppArmor not restricting them); the action drops `sudo` irreversibly and removes the runner's
+access to root-owned sockets under `/run`, so give the audit job an ephemeral runner that is
+replaced after every job. On an internal forge (Forgejo or Gitea Actions) the YAML runs as is
+with its `vars` and `secrets`; the four `gh` calls (list and open the PR, auto-merge, edit the
+body) are the places to swap for that forge's CLI.
 
 ### Step 4: watch it go out
 
