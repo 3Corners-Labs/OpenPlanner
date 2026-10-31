@@ -150,9 +150,12 @@ Admin: `GET /admin/branding`, `GET/POST /admin/organisations/{org}/branding`,
 
 ## Flow: organisation management
 
-Admin: `GET /admin/organisations`, `GET /admin/organisations/new`, `POST /admin/organisations`,
-`GET/POST /admin/organisations/{org}`. Inputs from outside: name, slug and default language
-(form fields), `org` (path).
+Admin: `GET /admin/organisations` (a list, or a redirect to the one organisation in reach),
+`GET /admin/organisations/new`, `POST /admin/organisations`, `GET /admin/organisations/{org}` (the
+organisation's page with its groups and tabs, ADR 0047 step 3), `GET /admin/organisations/{org}/edit`
+and `POST /admin/organisations/{org}`. The old per-organisation lists `/admin/branding`,
+`/admin/embedding`, `/admin/organisation-settings` and `/admin/closures` answer with a permanent
+redirect. Inputs from outside: name, slug and default language (form fields), `org` (path).
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -161,6 +164,19 @@ Admin: `GET /admin/organisations`, `GET /admin/organisations/new`, `POST /admin/
 | Tampering | Control characters or unknown languages in stored settings | Name and slug validated in the domain (shared with groups); the default language must have a catalogue | `tests/domain/test_organisations.py::test_invalid_input_is_refused_with_its_field` |
 | Repudiation | Who created or renamed an organisation | Audit event `organisation.manage` with `create` or the field names (never values) | `test_superuser_creates_an_organisation_and_it_is_audited`, `test_update_changes_name_and_locale_and_names_the_fields` |
 | Tampering (CSRF) | A third-party site creates an organisation in a superuser's browser | Fetch Metadata check on every POST | `tests/admin/test_organisation_routes.py::test_cross_site_posts_are_refused` |
+| Information disclosure / elevation | Opening the page of an organisation outside one's reach, or listing organisations of others, through the new read permission | `organisation.view` is an organisation-level permission: `RequirePermission(..., organisation_param="org")` decides on the path slug and the list is read with the database-side scope; a denial is audited; the tabs show only what the matrix grants, and the edit form and the create form stay behind `organisation.manage` | `tests/admin/test_authorization_matrix.py`, `tests/admin/test_organisation_routes.py::test_other_roles_cannot_open_an_organisation_outside_their_reach`, `tests/domain/test_organisations.py::test_an_organisation_outside_the_scope_cannot_be_opened_and_the_denial_is_audited` |
+| Spoofing (open redirect) / elevation | The old list paths (`/admin/branding`, `/embedding`, `/organisation-settings`, `/closures`) are used to send an admin elsewhere, or to reach an organisation the admin has no right on | The redirects declare the same permission as the tab they lead to and build the location from the admin's own scope only: the one organisation in reach, else the organisations list; nothing is read from the request | `tests/admin/test_organisation_routes.py::test_the_old_lists_redirect_permanently_into_the_organisation`, `tests/admin/test_authorization_matrix.py` |
+
+## Flow: groups list (ADR 0047 step 5)
+
+Admin: `GET /admin/groups`, a list with a GET filter form. Inputs from outside: `q` (search text) and
+`org` (organisation slug) as query parameters. It never holds an edit form and shows no personal data.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure | The organisation filter or the search reveals groups or organisations outside the admin's scope | The rows are read with the database-side scope of `group.view`; `org` counts only when it is the organisation of one of those rows, any other value is dropped and never echoed; `q` only narrows what is already listed | `tests/admin/test_group_list_routes.py::test_a_filter_value_outside_the_scope_is_ignored_and_never_echoed`, `test_the_list_shows_only_the_groups_the_role_may_view` |
+| Tampering (XSS), information disclosure | A crafted search text, or a personal-data value typed into it, is reflected into the page | The text is cut to 100 characters, used for matching only and never rendered again: the page says only that a search is active | `tests/admin/test_group_list_routes.py::test_a_long_search_text_is_cut_and_escaped`, `test_search_and_organisation_filter_narrow_the_list`, `tests/admin/test_privacy_sweep.py::test_a_pii_value_in_any_query_parameter_finds_nothing_and_is_not_reflected` |
+| Information disclosure | The list leaks personal data of participants | It shows names, organisation, slot length and the shortfall count only; the privacy sweep renders every admin list with marker values | `tests/admin/test_privacy_sweep.py` |
 
 ## Flow: outgoing email (WP3, worker)
 
