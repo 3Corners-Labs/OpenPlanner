@@ -362,6 +362,20 @@ OBJECTS = (
                         Permission.EMBEDDING_MANAGE,
                         "code",
                     ),
+                    # ADR 0083 step 2: the organisation's own identity providers. A sub-tab
+                    # of the overview, like the other organisation-wide settings, so the
+                    # organisation page keeps its six tabs (ADR 0047 §7).
+                    Screen(
+                        "organisation.login",
+                        "admin.tab.login",
+                        f"{_ORGANISATION}/login",
+                        Permission.IDENTITY_PROVIDERS_VIEW,
+                        "key",
+                        (
+                            f"{_ORGANISATION}/login/new",
+                            f"{_ORGANISATION}/login/{{idp_key}}",
+                        ),
+                    ),
                 ),
             ),
             Screen(

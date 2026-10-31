@@ -48,6 +48,7 @@ from app.admin import (
     help_routes,
     holiday_routes,
     idp_mapping_routes,
+    idp_routes,
     maintenance_routes,
     message_routes,
     organisation_routes,
@@ -80,6 +81,7 @@ from app.admin.authz import (
 )
 from app.admin.forms import safe_next
 from app.admin.idp_mapping_routes import reason_label
+from app.admin.idp_routes import JWKS_PATH
 from app.admin.integration_views import check_view
 from app.admin.pages import (
     Locale,
@@ -96,6 +98,7 @@ from app.admin.session import (
     end_session,
     has_login_trial,
     pop_login_start,
+    pop_login_test,
     pop_login_trial,
     save_login_start,
     start_session,
@@ -112,7 +115,7 @@ from app.domain.authorization import (
     permissions_for,
     role_keys,
 )
-from app.domain.entitlements import LoginClaims
+from app.domain.entitlements import ClaimMode, LoginClaims, resolve
 from app.domain.errors import DomainError
 from app.domain.identity import PLATFORM
 from app.domain.login_service import (
@@ -146,9 +149,10 @@ LOGIN_REFUSED_TEXTS: dict[str, str] = {
 """What the error page says per refusal reason of the login service (ADR 0049)."""
 
 PUBLIC_ADMIN_PATHS = frozenset(
-    {"/admin/login", "/admin/callback", "/admin/logout", "/admin/logged-out"}
+    {"/admin/login", "/admin/callback", "/admin/logout", "/admin/logged-out", JWKS_PATH}
 )
-"""The only admin paths without a ``RequirePermission``: the login flow itself."""
+"""The only admin paths without a ``RequirePermission``: the login flow itself, and the
+public key set of the organisation providers (ADR 0083 point 6)."""
 
 
 def _identity_provider(request: Request) -> IdentityProvider | None:
@@ -157,13 +161,21 @@ def _identity_provider(request: Request) -> IdentityProvider | None:
     return provider
 
 
-def _provider_for(request: Request, key: str) -> IdentityProvider | None:
+async def _provider_for(
+    request: Request, key: str, test: tuple[str, str, str] | None
+) -> IdentityProvider | None:
     """Return the provider a pending login started at, or ``None`` if it is not known.
 
-    Only the platform provider exists until organisation providers are registered (ADR 0083
-    step 2); a login naming any other key is refused like a forged ``state``.
+    The platform provider completes logins; an organisation provider (ADR 0083 step 2) only
+    completes the guided test login that started at it, until step 3 routes logins. Any
+    other key is refused like a forged ``state``.
     """
-    return _identity_provider(request) if key == PLATFORM else None
+    if key == PLATFORM:
+        return _identity_provider(request)
+    if test is None or test[2] != key:
+        return None
+    found: IdentityProvider | None = await request.app.state.organisation_providers.provider(key)
+    return found
 
 
 def _clock(request: Request) -> Clock:
@@ -208,12 +220,12 @@ async def callback(
 ) -> Response:
     """Complete the login: check state, verify the token, start a fresh session."""
     pending = pop_login_start(request)
-    provider = _provider_for(request, pending.get("provider", PLATFORM)) if pending else None
-    trial = pop_login_trial(
-        request,
-        _clock(request).now(),
-        timedelta(minutes=request.app.state.settings.admin_reauth_minutes),
-    )
+    now = _clock(request).now()
+    max_age = timedelta(minutes=request.app.state.settings.admin_reauth_minutes)
+    test = pop_login_test(request, now, max_age)
+    key = pending.get("provider", PLATFORM) if pending else PLATFORM
+    provider = await _provider_for(request, key, test)
+    trial = pop_login_trial(request, now, max_age)
     if (
         provider is None
         or pending is None
@@ -223,6 +235,8 @@ async def callback(
     ):
         await report(request, LOGIN_EVENT, "invalid_state", actor=ANONYMOUS)
         return _message(request, locale, 400, "admin.login_failed.title", "admin.login_failed.text")
+    if test is not None and key != PLATFORM:
+        return await _finish_test_login(request, locale, provider, pending, test, code)
     tried: LoginClaims | None = None
     try:
         if trial is None:
@@ -259,6 +273,52 @@ async def callback(
         tried_principal = (await logins.preview(tried, prefix)).principal
         return await _finish_login_trial(request, principal, trial, tried_principal)
     return RedirectResponse(safe_next(pending.get("next")), status_code=303)
+
+
+async def _finish_test_login(
+    request: Request,
+    locale: Locale,
+    provider: IdentityProvider,
+    pending: dict[str, str],
+    test: tuple[str, str, str],
+    code: str,
+) -> Response:
+    """Show what a guided test login brought back, without a session (ADR 0083 point 9).
+
+    The test belongs to the superuser who started it: it is completed only in that admin's
+    own session, and audited as ``idp.test_login`` with the outcome.
+    """
+    subject, organisation, key = test
+    principal = session_principal(request)
+    if principal is None or principal.subject != subject:
+        await report(request, LOGIN_EVENT, "test_login_mismatch", actor=ANONYMOUS)
+        return _message(request, locale, 403, "admin.login_failed.title", "admin.login_failed.text")
+    providers = idp_routes.service(request)
+    back = f"/admin/organisations/{organisation}/login/{key}"
+    try:
+        found = await provider.finish_test_login(
+            code=code,
+            redirect_uri=_callback_url(request),
+            code_verifier=pending["verifier"],
+            nonce=pending["nonce"],
+        )
+    except IdentityError as error:
+        await providers.record_test_login(principal, organisation, key, reason=error.code)
+        return RedirectResponse(f"{back}?test_failed={error.code}", status_code=303)
+    # ADR 0083 point 2: an organisation provider resolves in entitlements mode only.
+    detail = await providers.provider(principal, organisation, key)
+    directory, catalogue = await login_service(request).directory()
+    resolution = resolve(
+        found.claims,
+        ClaimMode.ENTITLEMENTS,
+        detail.provider.entitlement_prefix,
+        directory,
+        catalogue,
+    )
+    await providers.record_test_login(principal, organisation, key)
+    return idp_routes.test_result_page(
+        request, locale, principal, organisation, key, found, resolution
+    )
 
 
 async def _finish_login_trial(
@@ -584,6 +644,7 @@ def register_admin(app: FastAPI) -> None:
         branding_routes.router,
         holiday_routes.router,
         idp_mapping_routes.router,
+        idp_routes.router,
         channel_routes.router,
         message_routes.router,
         organisation_routes.router,

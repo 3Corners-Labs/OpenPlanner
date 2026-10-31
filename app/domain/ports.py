@@ -47,6 +47,7 @@ from app.domain.embedding import AllowedOrigins
 from app.domain.entitlements import Directory, LoginClaims
 from app.domain.form_fields import FormDefinition
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
+from app.domain.identity_providers import GeneratedKey, OrganisationProvider, SigningKey
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobCounts, JobSummary, JobType, PlannedJob
 from app.domain.maintenance import MaintenanceState
@@ -147,6 +148,48 @@ class IdentityError(Exception):
         """Store the code; it is also the message."""
         super().__init__(code)
         self.code = code
+
+
+@dataclass(frozen=True)
+class LoginTestReport:
+    """What a guided test login through an organisation provider showed (ADR 0083 point 9).
+
+    Only names and verdicts: the claim names that arrived, whether ``email_verified`` was
+    true, the domain of the ``email`` claim (never the address), and the claims as the login
+    would read them. The superuser sees it; no session is started from it.
+
+    Attributes:
+        claims: The claims as ``finish_login`` would return them.
+        claim_names: The names of the claims in the ID token, sorted and bounded.
+        email_verified: The ``email_verified`` claim, ``None`` when absent.
+        email_domain: The part after ``@`` of the ``email`` claim, ``None`` when absent.
+    """
+
+    claims: LoginClaims
+    claim_names: tuple[str, ...]
+    email_verified: bool | None
+    email_domain: str | None
+
+
+class DiscoveryFetcher(Protocol):
+    """Fetches a provider's discovery document through the outbound guard (ADR 0083 point 8)."""
+
+    async def fetch(self, url: str) -> Mapping[str, object]:
+        """Return the JSON document at ``url``.
+
+        Raises:
+            IdentityError: ``discovery_failed`` when it cannot be fetched or is no JSON object,
+                or the guard's reason (``not_https``, ``not_public``, ``redirect``, …).
+        """
+        ...
+
+
+class SigningKeys(Protocol):
+    """Generates the key pair a provider signs its client assertions with (point 6)."""
+
+    def generate(self) -> GeneratedKey:
+        """Return a fresh EC P-256 key pair with a unique key id."""
+        ...
 
 
 REASON_LIMIT = 300
@@ -434,6 +477,16 @@ class IdentityProvider(Protocol):
 
         Returns what the current mapping and the proposed one make of the ID token; the
         token itself is never returned or stored.
+
+        Raises:
+            IdentityError: If the exchange or any token check fails.
+        """
+        ...
+
+    async def finish_test_login(
+        self, *, code: str, redirect_uri: str, code_verifier: str, nonce: str
+    ) -> LoginTestReport:
+        """Like ``finish_login``, and also report which claims arrived (ADR 0083 point 9).
 
         Raises:
             IdentityError: If the exchange or any token check fails.
@@ -1184,6 +1237,56 @@ class Transaction(Protocol):
 
     async def add_running_version(self, running: RunningVersion) -> RunningVersion:
         """Record a version seen at start-up."""
+        ...
+
+    async def list_identity_providers(self, scope: Scope) -> list[OrganisationProvider]:
+        """Return the organisation providers of the organisations inside ``scope`` (ADR 0083).
+
+        Providers belong to an organisation, so only the organisation part of the scope (or
+        ``everything``) matches them. Ordered by organisation and key.
+        """
+        ...
+
+    async def get_identity_provider(self, key: str) -> OrganisationProvider | None:
+        """Return the provider with ``key`` (unique on the installation)."""
+        ...
+
+    async def add_identity_provider(
+        self, provider: OrganisationProvider, secret: str | None
+    ) -> OrganisationProvider:
+        """Store a new provider and return it with its id.
+
+        ``secret`` is sealed by the adapter (ADR 0008) and never read back into the domain.
+
+        Raises:
+            LookupError: The organisation does not exist.
+        """
+        ...
+
+    async def save_identity_provider(
+        self, provider: OrganisationProvider, secret: str | None
+    ) -> None:
+        """Store the changes of an existing provider; ``secret=None`` keeps the stored one."""
+        ...
+
+    async def delete_identity_provider(self, key: str) -> bool:
+        """Remove the provider, its secret and its keys; ``False`` if there was none."""
+        ...
+
+    async def get_signing_keys(self, provider_key: str) -> list[SigningKey]:
+        """Return the provider's key pairs (public side), newest first."""
+        ...
+
+    async def add_signing_key(self, provider_key: str, key: GeneratedKey, now: datetime) -> None:
+        """Store a generated key pair; the private part is sealed by the adapter."""
+        ...
+
+    async def retire_signing_keys(self, provider_key: str, *, keep: str, at: datetime) -> None:
+        """Mark every current key of the provider except ``keep`` as retired at ``at``."""
+        ...
+
+    async def published_signing_keys(self, now: datetime) -> list[SigningKey]:
+        """Return the keys of every provider that belong in the JWKS at ``now``."""
         ...
 
     async def get_update_requests(self, limit: int = 20) -> list[UpdateRequest]:

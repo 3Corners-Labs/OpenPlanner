@@ -114,6 +114,49 @@ def pop_login_trial(
     return str(value.get("subject", "")), values
 
 
+_TEST = "login_test"
+
+
+def save_login_test(
+    request: Request, subject: str, organisation: str, provider: str, now: datetime
+) -> None:
+    """Remember that the superuser started a guided test login (ADR 0083 point 9).
+
+    The callback shows the report to the admin who started it and starts no session; the
+    test belongs to ``subject`` and to ``provider``, so a login that comes back for another
+    provider or in another admin's session is refused.
+    """
+    request.session[_TEST] = {
+        "subject": subject,
+        "organisation": organisation,
+        "provider": provider,
+        "at": now.isoformat(),
+    }
+
+
+def pop_login_test(
+    request: Request, now: datetime, max_age: timedelta
+) -> tuple[str, str, str] | None:
+    """Return and forget the pending test login: subject, organisation and provider key.
+
+    A test older than ``max_age`` (the re-login limit) is dropped, like a login trial.
+    """
+    value = request.session.pop(_TEST, None)
+    if not isinstance(value, dict):
+        return None
+    try:
+        made = datetime.fromisoformat(str(value.get("at", "")))
+    except ValueError:
+        return None
+    if made.tzinfo is None or now - made > max_age:
+        return None
+    return (
+        str(value.get("subject", "")),
+        str(value.get("organisation", "")),
+        str(value.get("provider", "")),
+    )
+
+
 def pop_login_start(request: Request) -> dict[str, str] | None:
     """Return and forget the login in progress (each one can be completed once)."""
     value = request.session.pop(_OIDC, None)
