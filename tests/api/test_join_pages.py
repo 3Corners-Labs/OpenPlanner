@@ -131,7 +131,7 @@ async def test_a_group_that_keeps_webexs_choice_gets_the_stored_link(
     assert go.headers["location"] == LINK
 
 
-async def test_the_page_tells_what_the_citizen_will_see_per_client(
+async def test_the_page_tells_what_the_participant_will_see_per_client(
     booked: tuple[str, int, Settings],
 ) -> None:
     token, booking_id, settings = booked
@@ -177,7 +177,7 @@ async def test_unknown_token_is_a_404(demo_settings: Settings) -> None:
 
 
 @pytest.mark.parametrize("client", list(JoinClient))
-async def test_the_click_says_which_page_the_citizen_was_sent_to(
+async def test_the_click_says_which_page_the_participant_was_sent_to(
     booked: tuple[str, int, Settings], client: JoinClient
 ) -> None:
     """Without it "I saw the app question" cannot be told from a link that lost its parameter."""
