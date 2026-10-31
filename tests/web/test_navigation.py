@@ -15,6 +15,7 @@ from app.web.navigation import (
     SECTIONS,
     TOP_BAR,
     Screen,
+    Width,
     home_of,
     render_markdown,
     screens,
@@ -145,3 +146,46 @@ def test_a_shortcut_to_a_widget_names_an_available_widget() -> None:
             assert item is not None, link.key
             assert item.available, link.key
             assert link.path.endswith(f"#widget-{link.widget}")
+
+
+def test_a_screen_is_standard_width_unless_it_declares_wide() -> None:
+    screen = Screen("x.y", "k", "/admin/x", next(iter(screens()))[1].permission, "dashboard")
+
+    assert screen.width is Width.STANDARD
+    assert screen.wide_subpages == ()
+
+
+def test_home_of_reports_the_page_width_of_a_route() -> None:
+    assert home_of("/admin/").width is Width.WIDE  # type: ignore[union-attr]
+    assert home_of("/admin/audit").width is Width.WIDE  # type: ignore[union-attr]
+    assert home_of("/admin/retention").width is Width.STANDARD  # type: ignore[union-attr]
+    assert home_of("/admin/groups/{slug}").width is Width.WIDE  # type: ignore[union-attr]
+    assert home_of("/admin/groups/{slug}/agenda/week").width is Width.WIDE  # type: ignore[union-attr]
+
+
+def test_a_sub_page_is_standard_width_unless_the_screen_lists_it() -> None:
+    # A detail or edit page is read or filled in, so it keeps the reading width.
+    assert home_of("/admin/groups/{slug}/bookings/{booking_id}").width is Width.STANDARD  # type: ignore[union-attr]
+    assert home_of("/admin/groups/{slug}/staffing/{rule_id}").width is Width.STANDARD  # type: ignore[union-attr]
+    assert home_of("/admin/groups/{slug}/settings").width is Width.STANDARD  # type: ignore[union-attr]
+
+
+def test_a_wide_sub_page_is_a_sub_page_of_its_own_screen() -> None:
+    for _, screen in screens():
+        assert set(screen.wide_subpages) <= set(screen.subpages), screen.key
+
+
+def test_a_shortcut_declares_no_width() -> None:
+    # It owns no route, so a width on it would never apply.
+    for link in TOP_BAR:
+        if link.target:
+            assert link.width is Width.STANDARD
+            assert link.wide_subpages == ()
+
+
+def test_the_admin_map_shows_the_width_of_every_screen() -> None:
+    text = render_markdown(Translator(load_catalogues()), "en")
+
+    assert "| Width |" in text
+    assert "| wide |" in text
+    assert "| standard |" in text
