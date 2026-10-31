@@ -6,7 +6,7 @@ import pytest
 from app.domain.admin import AdminService
 from app.domain.audit import AuditEvent, Outcome, Source
 from app.domain.authorization import Role
-from app.domain.booking import Booking, BookingStatus, Contact, MeetingRef
+from app.domain.booking import Booking, BookingStatus, Contact, MeetingRef, TrialCall
 from app.domain.calls import (
     CallState,
     EventKind,
@@ -367,3 +367,99 @@ async def test_the_timeline_carries_versions_jobs_and_the_bookings_requests(
         (JobType.SEND_REMINDER, JobStatus.PENDING)
     ]
     assert timeline.requests == [mine]
+
+
+# --- the trial call's own meeting (ADR 0071): its Webex events reach the timeline --------
+
+
+TRIAL_ROOM = "trial-1"
+
+
+@pytest.fixture
+def trial_uow(uow: InMemoryUnitOfWork) -> InMemoryUnitOfWork:
+    """The booking with an open trial call next to its own meeting."""
+    booking = uow.state.bookings[123]
+    trial = TrialCall(
+        MeetingRef(TRIAL_ROOM, "https://site.webex.com/t"), NOW + timedelta(minutes=30)
+    )
+    uow.state.bookings[123] = replace(booking, trial=trial)
+    return uow
+
+
+def _kinds(uow: InMemoryUnitOfWork) -> list[EventKind]:
+    return [e.kind for e in uow.state.booking_events.get(123, [])]
+
+
+async def test_a_guest_entering_the_trial_call_is_on_the_timeline_not_in_the_call_status(
+    service: IntegrationService, trial_uow: InMemoryUnitOfWork
+) -> None:
+    outcome = await service.record_meeting_event(TRIAL_ROOM, EventKind.GUEST_JOINED, NOW)
+
+    assert outcome is EventOutcome.RECORDED
+    assert _kinds(trial_uow) == [EventKind.TRIAL_ENTERED]
+    status = trial_uow.state.call_status[123]
+    assert (status.participants, status.host_joined, status.call) == (0, False, CallState.NONE)
+
+
+async def test_someone_leaving_the_trial_call_is_on_the_timeline(
+    service: IntegrationService, trial_uow: InMemoryUnitOfWork
+) -> None:
+    await service.record_meeting_event(TRIAL_ROOM, EventKind.GUEST_JOINED, NOW)
+    await service.record_meeting_event(TRIAL_ROOM, EventKind.PARTICIPANT_LEFT, NOW)
+
+    assert _kinds(trial_uow) == [EventKind.TRIAL_ENTERED, EventKind.TRIAL_LEFT]
+    assert trial_uow.state.call_status[123].participants == 0
+
+
+async def test_a_host_in_the_trial_call_is_noted_because_nobody_from_the_team_should_be_there(
+    service: IntegrationService, trial_uow: InMemoryUnitOfWork
+) -> None:
+    await service.record_meeting_event(TRIAL_ROOM, EventKind.HOST_JOINED, NOW)
+
+    (event,) = trial_uow.state.booking_events[123]
+    assert (event.kind, event.detail) == (EventKind.TRIAL_ENTERED, "host")
+    assert trial_uow.state.call_status[123].host_joined is False  # the appointment is not started
+
+
+async def test_the_trial_meetings_start_and_end_are_ignored(
+    service: IntegrationService, trial_uow: InMemoryUnitOfWork
+) -> None:
+    started = await service.record_meeting_event(TRIAL_ROOM, EventKind.MEETING_STARTED, NOW)
+    ended = await service.record_meeting_event(TRIAL_ROOM, EventKind.MEETING_ENDED, NOW)
+
+    assert (started, ended) == (EventOutcome.IGNORED, EventOutcome.IGNORED)
+    assert _kinds(trial_uow) == []
+    assert 123 not in trial_uow.state.call_status  # the appointment's call is untouched
+
+
+async def test_an_instance_id_and_a_replay_of_a_trial_event_count_once(
+    service: IntegrationService, trial_uow: InMemoryUnitOfWork
+) -> None:
+    joined = EventKind.GUEST_JOINED
+
+    first = await service.record_meeting_event(f"{TRIAL_ROOM}_I_9", joined, NOW, event_key="t1")
+    replay = await service.record_meeting_event(TRIAL_ROOM, joined, NOW, event_key="t1")
+
+    assert (first, replay) == (EventOutcome.RECORDED, EventOutcome.DUPLICATE)
+    assert _kinds(trial_uow) == [EventKind.TRIAL_ENTERED]
+
+
+async def test_a_closed_trial_call_no_longer_matches(
+    service: IntegrationService, trial_uow: InMemoryUnitOfWork
+) -> None:
+    booking = trial_uow.state.bookings[123]
+    trial_uow.state.bookings[123] = replace(booking, trial=None)
+
+    outcome = await service.record_meeting_event(TRIAL_ROOM, EventKind.GUEST_JOINED, NOW)
+
+    assert outcome is EventOutcome.UNKNOWN
+    assert _kinds(trial_uow) == []
+
+
+async def test_the_appointments_own_meeting_still_counts_the_participant(
+    service: IntegrationService, trial_uow: InMemoryUnitOfWork
+) -> None:
+    await service.record_meeting_event("meeting-1", EventKind.GUEST_JOINED, NOW)
+
+    assert _kinds(trial_uow) == [EventKind.GUEST_JOINED]
+    assert trial_uow.state.call_status[123].participants == 1

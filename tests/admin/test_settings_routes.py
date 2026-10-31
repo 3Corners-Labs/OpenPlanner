@@ -9,7 +9,7 @@ from app.adapters.db.models import PlatformSettingRow, SettingsVersionRow
 from app.admin.settings_routes import _FIELD_LABELS
 from app.domain.authorization import Principal
 from app.domain.privacy import PII_FIELDS
-from app.web.protection import booking_limit
+from app.web.protection import booking_limit, unknown_link_limit
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.principals import principal
 
@@ -163,6 +163,20 @@ async def test_rate_limits_follow_a_change_without_a_restart(site: Site) -> None
     await site.client.get("/admin/settings")
 
     assert booking_limit() == "5/hour"
+
+
+async def test_the_unknown_link_bound_follows_a_change_and_keeps_its_bounds(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    await site.client.post(
+        "/admin/settings/rate_limit_unknown_links", data={"value": "30/hour"}, headers=SAME_ORIGIN
+    )
+    await site.client.post(
+        "/admin/settings/rate_limit_unknown_links", data={"value": "500/hour"}, headers=SAME_ORIGIN
+    )
+    await site.client.get("/admin/settings")
+
+    assert unknown_link_limit() == "30/hour"
 
 
 async def test_the_auditor_sees_no_forms_and_may_not_post(site: Site) -> None:

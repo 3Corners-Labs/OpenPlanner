@@ -132,6 +132,15 @@ class DispatchKind(StrEnum):
     """OpenPlanner's own queue: agents sign in and pick up a booking."""
 
 
+class JoinClient(StrEnum):
+    """Which Webex page a participant's join link opens (ADR 0075, per group)."""
+
+    BROWSER = "browser"
+    """The Webex web app straight away; on a computer there is no app to choose or install."""
+    CHOICE = "choice"
+    """Webex's own page, which offers the app or the browser (the stored link, unchanged)."""
+
+
 class Offer(StrEnum):
     """What a staffing block offers citizens (ADR 0072): slots, direct calls, or both."""
 
@@ -224,6 +233,9 @@ class Group:
         trial_call_minutes: How long one trial call stays open, 10 to 60 minutes.
         trial_calls_per_booking: How many trial calls one booking may open, 1 to 5, so the page
             cannot be used to create Webex meetings without end.
+        join_client: Which Webex page the participant's link to the appointment and the trial call
+            opens (ADR 0075): the web app straight away (the default) or Webex's own choice
+            between app and browser.
         embedding_enabled: Whether the group may appear in the widget on the websites its
             organisation allows (ADR 0035); off until the group switches it on.
         queue_visible_from_minutes: Own queue: how long before its start a booking appears.
@@ -264,6 +276,7 @@ class Group:
     trial_call_enabled: bool = True
     trial_call_minutes: int = DEFAULT_TRIAL_CALL_MINUTES
     trial_calls_per_booking: int = DEFAULT_TRIAL_CALLS_PER_BOOKING
+    join_client: JoinClient = JoinClient.BROWSER
     embedding_enabled: bool = False
     queue_visible_from_minutes: int = DEFAULT_QUEUE_VISIBLE_FROM_MINUTES
     queue_free_pick_allowed: bool = False

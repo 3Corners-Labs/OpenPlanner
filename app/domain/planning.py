@@ -29,6 +29,7 @@ from app.domain.scheduling import (
     RESERVED_SLUGS,
     DispatchKind,
     Group,
+    JoinClient,
     Organisation,
     PhoneMode,
     ScheduleOverride,
@@ -72,6 +73,7 @@ class GroupSettings:
     trial_call_enabled: bool
     trial_call_minutes: int
     trial_calls_per_booking: int
+    join_client: JoinClient
     queue_visible_from_minutes: int
     queue_free_pick_allowed: bool
     max_bookings_per_email: int

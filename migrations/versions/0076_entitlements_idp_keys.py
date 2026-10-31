@@ -9,7 +9,7 @@ shows it truthfully. ``staff_refused_entitlements`` keeps the values of a person
 that gave no right, with their reason code. No personal data in any of it.
 
 Revision ID: 0076
-Revises: 0074
+Revises: 0075
 Create Date: 2026-10-31 12:00:00.000000
 """
 
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0076"
-down_revision: str | None = "0074"
+down_revision: str | None = "0075"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

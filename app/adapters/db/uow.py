@@ -138,6 +138,7 @@ from app.domain.scheduling import (
     DispatchKind,
     Group,
     GroupSummary,
+    JoinClient,
     Offer,
     Organisation,
     PhoneMode,
@@ -210,6 +211,7 @@ def _group(row: GroupRow) -> Group:
         trial_call_enabled=row.trial_call_enabled,
         trial_call_minutes=row.trial_call_minutes,
         trial_calls_per_booking=row.trial_calls_per_booking,
+        join_client=JoinClient(row.join_client),
         embedding_enabled=row.embedding_enabled,
         queue_visible_from_minutes=row.queue_visible_from_minutes,
         queue_free_pick_allowed=row.queue_free_pick_allowed,
@@ -287,6 +289,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "trial_call_enabled": group.trial_call_enabled,
         "trial_call_minutes": group.trial_call_minutes,
         "trial_calls_per_booking": group.trial_calls_per_booking,
+        "join_client": group.join_client.value,
         "embedding_enabled": group.embedding_enabled,
         "queue_visible_from_minutes": group.queue_visible_from_minutes,
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
@@ -1149,6 +1152,10 @@ class SqlTransaction(
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
         """Return the booking whose meeting has ``meeting_id``."""
         return await self._booking_where(BookingRow.video_room_id == meeting_id)
+
+    async def get_booking_by_trial_meeting(self, meeting_id: str) -> Booking | None:
+        """Return the booking whose open trial call (ADR 0071) is the meeting ``meeting_id``."""
+        return await self._booking_where(BookingRow.trial_room_id == meeting_id)
 
     async def claim_booking(self, booking_id: int, claim: Claim) -> bool:
         """Record ``claim`` if the booking is confirmed and unclaimed (one conditional UPDATE)."""

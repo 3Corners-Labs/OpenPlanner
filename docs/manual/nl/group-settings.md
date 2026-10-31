@@ -230,6 +230,19 @@ Webex-meeting verwijderd; de burger kan een nieuw proefgesprek openen.
 Hoe vaak één afspraak een proefgesprek mag openen, van 1 tot 5. Standaard 3. Elk proefgesprek is
 een meeting in Webex; met dit getal kan één afspraak er niet onbeperkt aanmaken.
 
+<!-- field: join_client -->
+### Webex-pagina voor de deelnemer
+
+Bepaalt welke pagina van Webex de deelnemer krijgt wanneer die vanaf onze pagina naar het gesprek gaat,
+bij de afspraak en bij het proefgesprek. **Direct in de browser** (standaard) opent meteen de
+webversie van Webex: op een computer hoeft de deelnemer niets te installeren en ziet de vraag
+"app of browser" niet. **Webex laat de deelnemer kiezen** geeft Webex' eigen pagina, met de keuze
+tussen de app en de browser; kies dit als uw deelnemers de Webex-app gebruiken of als uw organisatie
+dat zo wil. Op een telefoon of tablet vraagt Webex in beide gevallen om de Webex-app: een
+webversie is daar niet beschikbaar. De teksten in de bevestiging, op de pagina voor het gesprek
+en op de proefgesprekpagina volgen deze keuze. Webex kan dit gedrag zelf wijzigen; ziet de
+deelnemer toch de keuze tussen app en browser, zet het dan op **Webex laat de deelnemer kiezen**.
+
 <!-- field: offer -->
 ### Aanbod per tijdblok
 

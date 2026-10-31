@@ -6,8 +6,8 @@ groups, the other role claim values and the recognised entitlement values of ADR
 login time, when activity was last written to the staff record (ADR 0046), the chosen theme
 and the alert preferences. The grants themselves are resolved from those claims on every
 request (``app.domain.login_service``), never stored. The absolute lifetime is enforced here;
-the cookie's own expiry slides with every response. The theme and the preferences live here so
-that they need no cookie of their own.
+the cookie's own expiry slides with every response. The theme, the preferences and the filter
+live here so that they need no cookie of their own.
 """
 
 from dataclasses import dataclass
@@ -29,6 +29,7 @@ _TRIAL = "login_trial"
 _THEME = "theme"
 _ALERT_BANNER = "alert_banner"
 _ALERT_POPUPS = "alert_popups"
+_SCOPE = "scope"
 
 THEMES = ("system", "light", "dark")
 """The portal's colour themes; ``system`` follows the device setting and is the default."""
@@ -229,3 +230,27 @@ def choose_alert_prefs(
         if popups in ALERT_POPUPS:
             request.session[_ALERT_POPUPS] = popups
     return session_alert_prefs(request)
+
+
+def session_scope(request: Request) -> tuple[str | None, str | None]:
+    """Return the organisation and group slug the admin chose in the scope filter, or ``None``.
+
+    The values are only what the admin last submitted; the caller checks them against the
+    admin's own scope on every request (``app.admin.scope_choice``) and never trusts them.
+    """
+    value: Any = request.session.get(_SCOPE)
+    if not isinstance(value, list) or len(value) != 2:
+        return None, None
+    organisation, group = value
+    return (
+        organisation if isinstance(organisation, str) else None,
+        group if isinstance(group, str) else None,
+    )
+
+
+def remember_scope(request: Request, organisation: str | None, group: str | None) -> None:
+    """Keep the (already checked) scope choice for this session; both ``None`` forgets it."""
+    if organisation is None and group is None:
+        request.session.pop(_SCOPE, None)
+    else:
+        request.session[_SCOPE] = [organisation, group]

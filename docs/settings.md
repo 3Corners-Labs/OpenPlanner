@@ -93,6 +93,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DATABASE_MAX_MB` | int | — | empty or ≥ 100 | `settings.platform.manage` | Database size above which storage is degraded; empty means no limit. |
 | `RATE_LIMIT_BOOKINGS` | rate | `10/hour` | 1–30 per hour | `settings.platform.manage` | Bookings per IP address. |
 | `RATE_LIMIT_READS` | rate | `60/minute` | 10–300 per minute | `settings.platform.manage` | Availability reads per IP address. |
+| `RATE_LIMIT_UNKNOWN_LINKS` | rate | `20/hour` | 5–100 per hour | `settings.platform.manage` | Unknown management links per IP address. |
 | `RATE_LIMIT_AGENT_TOKENS` | rate | `10/minute` | 1–30 per minute | `settings.platform.manage` | Machine API token requests per client. |
 | `RATE_LIMIT_AGENT_CALLS` | rate | `120/minute` | 10–600 per minute | `settings.platform.manage` | Machine API calls per client. |
 | `ADMIN_SESSION_HOURS` | int | `8` | 1–8 | `settings.platform.manage` | Lifetime of an admin session. |
