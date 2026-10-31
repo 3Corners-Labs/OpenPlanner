@@ -35,6 +35,12 @@ from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
 from app.domain.entitlements import Directory, GroupRef, OrganisationRef
 from app.domain.form_fields import Answers, FormDefinition, raise_to_pii
+from app.domain.identity_providers import (
+    KEY_OVERLAP,
+    GeneratedKey,
+    OrganisationProvider,
+    SigningKey,
+)
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobCounts, JobStatus, JobSummary, PlannedJob
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
@@ -99,6 +105,10 @@ class State:
     scenario_images: dict[int, ImageFile] = field(default_factory=dict)
     api_settings: ApiSettings = field(default_factory=ApiSettings)
     api_clients: dict[str, ApiClient] = field(default_factory=dict)
+    identity_providers: dict[str, OrganisationProvider] = field(default_factory=dict)
+    provider_secrets: dict[str, str] = field(default_factory=dict)
+    signing_keys: dict[str, list[SigningKey]] = field(default_factory=dict)
+    private_keys: dict[str, str] = field(default_factory=dict)
     access_tokens: dict[str, AccessToken] = field(default_factory=dict)
     channel_settings: dict[tuple[int, ChannelKind], ChannelSettings] = field(default_factory=dict)
     channel_secrets: dict[tuple[int, ChannelKind], str] = field(default_factory=dict)
@@ -984,6 +994,65 @@ class InMemoryTransaction:
 
     async def save_api_client(self, client: ApiClient) -> None:
         self.state.api_clients[client.client_id] = client
+
+    async def list_identity_providers(self, scope: Scope) -> list[OrganisationProvider]:
+        found = [
+            p
+            for p in self.state.identity_providers.values()
+            if scope.contains(p.organisation, None)
+        ]
+        return sorted(found, key=lambda p: (p.organisation, p.key))
+
+    async def get_identity_provider(self, key: str) -> OrganisationProvider | None:
+        return self.state.identity_providers.get(key)
+
+    async def add_identity_provider(
+        self, provider: OrganisationProvider, secret: str | None
+    ) -> OrganisationProvider:
+        if await self.get_organisation(provider.organisation) is None:
+            raise LookupError("unknown organisation")
+        stored = replace(provider, id=self._new_id())
+        self.state.identity_providers[provider.key] = stored
+        if secret is not None:
+            self.state.provider_secrets[provider.key] = secret
+        return stored
+
+    async def save_identity_provider(
+        self, provider: OrganisationProvider, secret: str | None
+    ) -> None:
+        self.state.identity_providers[provider.key] = provider
+        if secret is not None:
+            self.state.provider_secrets[provider.key] = secret
+
+    async def delete_identity_provider(self, key: str) -> bool:
+        self.state.provider_secrets.pop(key, None)
+        for stored in self.state.signing_keys.pop(key, []):
+            self.state.private_keys.pop(stored.kid, None)
+        return self.state.identity_providers.pop(key, None) is not None
+
+    async def get_signing_keys(self, provider_key: str) -> list[SigningKey]:
+        keys = self.state.signing_keys.get(provider_key, [])
+        return sorted(keys, key=lambda k: (k.created_at, k.kid), reverse=True)
+
+    async def add_signing_key(self, provider_key: str, key: GeneratedKey, now: datetime) -> None:
+        self.state.signing_keys.setdefault(provider_key, []).append(
+            SigningKey(provider_key, key.kid, dict(key.public_jwk), now)
+        )
+        self.state.private_keys[key.kid] = key.private_pem
+
+    async def retire_signing_keys(self, provider_key: str, *, keep: str, at: datetime) -> None:
+        self.state.signing_keys[provider_key] = [
+            replace(k, retired_at=at) if k.kid != keep and k.retired_at is None else k
+            for k in self.state.signing_keys.get(provider_key, [])
+        ]
+
+    async def published_signing_keys(self, now: datetime) -> list[SigningKey]:
+        return [
+            k
+            for keys in self.state.signing_keys.values()
+            for k in keys
+            if k.retired_at is None or now - k.retired_at < KEY_OVERLAP
+        ]
 
     async def add_access_token(self, token: AccessToken) -> None:
         self.state.access_tokens[token.token_hash] = token

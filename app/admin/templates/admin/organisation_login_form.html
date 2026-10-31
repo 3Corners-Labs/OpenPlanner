@@ -1,0 +1,63 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import form_body with context %}
+{% block title %}{% if view %}{{ view.provider.name }}{% else %}{{ _("admin.idp.add") }}{% endif %} · {{ _("admin.idp.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+<h2 class="section-title" id="page-title">{% if view %}{{ view.provider.name }}{% else %}{{ _("admin.idp.add") }}{% endif %}</h2>
+<p class="page-header__lead"><a href="/admin/organisations/{{ organisation.slug }}/login">{{ _("admin.idp.title") }}</a>{% if view %} · <code>{{ view.provider.key }}</code>{% endif %}</p>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if test_failed %}<div class="alert alert--error" role="alert"><p>{{ test_failed }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+{% if view %}
+<section class="card" aria-labelledby="state-heading">
+  <h2 id="state-heading">{{ _("admin.idp.state") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("admin.idp.status") }}</dt><dd>{% if view.provider.enabled %}<span class="chip chip--success">{{ _("admin.idp.on") }}</span>{% else %}<span class="chip">{{ _("admin.idp.off") }}</span>{% endif %}</dd></div>
+    <div><dt>{{ _("admin.idp.issuer") }}</dt><dd><code>{{ view.provider.issuer }}</code></dd></div>
+    <div><dt>{{ _("admin.idp.checked") }}</dt><dd>{{ view.checked or _("admin.idp.never") }}</dd></div>
+    <div><dt>{{ _("admin.idp.updated") }}</dt><dd>{{ view.updated }}</dd></div>
+    <div><dt>{{ _("admin.idp.callback_url") }}</dt><dd><code>{{ callback_url }}</code></dd></div>
+    {% if view.provider.needs_key %}
+    <div><dt>{{ _("admin.idp.jwks_url") }}</dt><dd><code>{{ jwks_url }}</code></dd></div>
+    <div><dt>{{ _("admin.idp.current_key") }}</dt><dd>{% if current_key %}<code>{{ current_key.kid }}</code>{% else %}{{ _("admin.idp.no_key") }}{% endif %}</dd></div>
+    {% if retired_keys %}<div><dt>{{ _("admin.idp.retired_keys") }}</dt><dd>{% for k in retired_keys %}<code>{{ k.kid }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</dd></div>{% endif %}
+    {% else %}
+    <div><dt>{{ _("admin.idp.client_secret") }}</dt><dd>{% if view.provider.secret_set %}{{ _("admin.idp.secret_set") }}{% else %}{{ _("admin.idp.secret_missing") }}{% endif %}</dd></div>
+    {% endif %}
+  </dl>
+  {% if can("identity_providers.manage") %}
+  <div class="inline-forms">
+    <form method="post" action="/admin/organisations/{{ organisation.slug }}/login/{{ view.provider.key }}/test">
+      <button type="submit" class="button button--secondary">{{ _("admin.idp.test") }}</button>
+    </form>
+    <form method="post" action="/admin/organisations/{{ organisation.slug }}/login/{{ view.provider.key }}/enable">
+      {% if view.provider.enabled %}
+      <button type="submit" class="button button--danger">{{ _("admin.idp.disable") }}</button>
+      {% else %}
+      <input type="hidden" name="enabled" value="on">
+      <button type="submit" class="button">{{ _("admin.idp.enable") }}</button>
+      {% endif %}
+    </form>
+    {% if view.provider.needs_key %}
+    <form method="post" action="/admin/organisations/{{ organisation.slug }}/login/{{ view.provider.key }}/rotate-key">
+      <button type="submit" class="button button--secondary">{{ _("admin.idp.rotate_key") }}</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/admin/organisations/{{ organisation.slug }}/login/{{ view.provider.key }}/delete">
+      <button type="submit" class="button button--danger">{{ _("admin.idp.delete") }}</button>
+    </form>
+  </div>
+  <p class="hint">{{ _("admin.idp.actions_hint") }}</p>
+  {% endif %}
+</section>
+{% endif %}
+{% if can("identity_providers.manage") %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/login{% if view %}/{{ view.provider.key }}{% endif %}" novalidate aria-labelledby="registration-heading">
+  <div class="card__header">
+    <h2 id="registration-heading">{{ _("admin.idp.registration") }}</h2>
+    <p class="card__lead">{{ _("admin.idp.registration_lead") }}</p>
+  </div>
+  {{ form_body(fields, _("admin.save") if view else _("admin.idp.create"), "/admin/organisations/" ~ organisation.slug ~ "/login") }}
+</form>
+{% endif %}
+{% endblock %}

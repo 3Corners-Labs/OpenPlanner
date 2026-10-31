@@ -312,6 +312,9 @@ class Settings(BaseSettings):
     oidc_entitlements_max_values: int = Field(default=200, ge=20, le=1000)
     # ADR 0049 point 17: how far back the mapping page lists refused values.
     idp_mapping_refused_window_days: int = Field(default=30, ge=7, le=365)
+    # ADR 0083: organisation identity providers per organisation (two: a migration from one
+    # IdP to the next without a gap).
+    idp_max_per_organisation: int = Field(default=2, ge=1, le=5)
 
     # Integration secrets at rest (ADR 0008): AES-256-GCM under a key derived from this value.
     settings_encryption_key: SecretStr | None = None

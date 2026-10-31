@@ -10,6 +10,8 @@ the display name of admins, from the identity provider (ADR 0046).
     api_settings (one row); organisations 1──* api_clients 1──* api_access_tokens
                                                  └──* api_client_groups *──1 groups (ADR 0023)
     organisations 1──* channel_settings (SMTP and SMS per organisation, secret encrypted)
+    organisations 1──* identity_providers 1──* identity_provider_keys (ADR 0083; the secret and
+                                               the private key encrypted)
     integration_reports (last webhook listing and delivery test; no secrets)
     staff 1──* staff_memberships (admins as last seen at login, ADR 0046; the name is joined
                                   into the audit log)
@@ -80,6 +82,8 @@ __all__ = [
     "GroupRow",
     "HolidayCalendarRow",
     "HolidayRow",
+    "IdentityProviderKeyRow",
+    "IdentityProviderRow",
     "JobRow",
     "OrganisationHolidayCalendarRow",
     "OrganisationLogoRow",
@@ -871,6 +875,62 @@ class ApiSettingsRow(Base):
     updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class IdentityProviderRow(Base):
+    """An organisation's identity provider (ADR 0083 step 2).
+
+    The client secret of ``client_secret_basic`` is sealed with AES-256-GCM under
+    ``idp:<key>:secret`` (ADR 0008); every other column is public configuration.
+    """
+
+    __tablename__ = "identity_providers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), index=True
+    )
+    key: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str] = mapped_column(String(80))
+    discovery_url: Mapped[str] = mapped_column(String(500))
+    issuer: Mapped[str] = mapped_column(String(500))
+    client_id: Mapped[str] = mapped_column(String(255))
+    client_auth: Mapped[str] = mapped_column(String(32))
+    scopes: Mapped[str] = mapped_column(String(200))
+    entitlement_claim: Mapped[str] = mapped_column(String(64))
+    entitlement_prefix: Mapped[str] = mapped_column(String(32))
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    secret_nonce: Mapped[bytes | None] = mapped_column(LargeBinary)
+    secret_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        CheckConstraint(
+            "client_auth IN ('private_key_jwt', 'client_secret_basic')", name="client_auth"
+        ),
+    )
+
+
+class IdentityProviderKeyRow(Base):
+    """A signing key pair of a provider (``private_key_jwt``, ADR 0083 point 6).
+
+    The public JWK is published at ``/admin/jwks.json``; the private key is sealed under
+    ``idp:<key>:key:<kid>`` and never leaves the server.
+    """
+
+    __tablename__ = "identity_provider_keys"
+
+    kid: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider_id: Mapped[int] = mapped_column(
+        ForeignKey("identity_providers.id", ondelete="CASCADE"), index=True
+    )
+    public_jwk: Mapped[str] = mapped_column(Text)
+    key_nonce: Mapped[bytes] = mapped_column(LargeBinary)
+    key_ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    retired_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class ApiClientRow(Base):

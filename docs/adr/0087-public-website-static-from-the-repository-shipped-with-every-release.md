@@ -1,6 +1,6 @@
 # 0087. The public website: static, built from the repository, shipped with every release
 
-Status: proposed (2026-10-31), requested by the product owner. Not built; see *Build status*.
+Status: accepted (2026-10-31, `po:approved` on #271 and #285), requested by the product owner. Partly built: step 1 is on `main` (#285) and live on TransIP (first deploy 2026-11-01, HTTPS still off); see *Build status*.
 
 ## Context
 
@@ -117,8 +117,8 @@ accessibility targets of point 9.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #271 | in PR |
-| 1 | `site/` (content nl/en, templates, stylesheet, script, animated tour in two tracks of six scenes, interactive demo, integrations, standards, roadmap from the ADR issues), `scripts/build_site.py`, `make site`, structural test, the `site` job with artifact and a git-push deploy to TransIP | #271 | in PR |
+| 0 | ADR proposed | #271, #285 | merged |
+| 1 | `site/` (content nl/en, templates, stylesheet, script, animated tour in two tracks of six scenes, interactive demo, integrations, standards, roadmap from the ADR issues), `scripts/build_site.py`, `make site`, structural test, the `site` job with artifact and a git-push deploy to TransIP | #271, #285 | merged |
 | 2 | The site's pages in the Playwright lane (keyboard, axe, Lighthouse) | | planned |
 | 3 | Recorded walkthrough of the real interface at release time (`e2e/tour/`, `.github/workflows/tour.yml`, `.github/actions/e2e-stack`, `tour.webm`, poster, captions nl/en, the newest recording on the page) | #289 | in PR |
 | 4 | TransIP: deploy key on the package, environment `website` with the remote, DNS for `openplanner.nl` and `www`, HTTPS and the response headers (HSTS, CSP, Referrer-Policy) in `.htaccess` (host work) | | planned |

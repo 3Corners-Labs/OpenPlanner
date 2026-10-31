@@ -163,7 +163,7 @@ class Subject(StrEnum):
 
 SUBJECT_ACTIONS: Mapping[Subject, frozenset[str]] = {
     Subject.UPDATES: frozenset({"system.update", "system.version"}),
-    Subject.LOGIN: frozenset({"admin.login", "admin.logout", "admin.session"}),
+    Subject.LOGIN: frozenset({"admin.login", "admin.logout", "admin.session", "idp."}),
     Subject.SETTINGS: frozenset({"settings."}),
     Subject.RIGHTS: frozenset({"roles.", "role.", "rights.", "matrix.", "staff."}),
     Subject.BOOKINGS: frozenset({"bookings.", "booking.", "job.", "queue.", "schedule."}),
