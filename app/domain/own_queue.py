@@ -10,7 +10,9 @@ lobby first, then the earliest start.
 
 "In the lobby" means the citizen joined the meeting (Webex webhook, ADR 0010) and no host
 has. The lobby wait itself is not stored, so among waiting citizens the earliest start goes
-first, which is nearly always the one waiting longest.
+first, which is nearly always the one waiting longest. A direct call (ADR 0019) is the request
+to talk now, so its citizen waits from its start, whether or not they opened the link yet;
+a scheduled appointment's citizen waits from the lobby join.
 
 Every row also says whether the video link is ready, still being prepared or failed, and the
 claimed booking where the citizen is (ADR 0072): an agent never waits for a link that will
@@ -119,12 +121,26 @@ class QueueEntry:
         return video_state(self.booking, self.status)
 
     @property
-    def waiting_since(self) -> datetime:
-        """When the waiting citizen's presence last changed: their join, nearly always.
+    def waiting(self) -> bool:
+        """Whether the citizen waits for an agent nobody picked up yet.
 
-        The lobby join itself is not stored (module docstring); the status's last change is
-        the join for a citizen alone in the lobby. Without one, the booking's start.
+        A scheduled citizen waits once in the lobby; a direct caller from the request itself,
+        until an agent claims the call or joins the meeting.
         """
+        if self.claimed or self.status.host_joined:
+            return False
+        return self.in_lobby or (self.is_direct and self.status.call is not CallState.ENDED)
+
+    @property
+    def waiting_since(self) -> datetime:
+        """When the citizen started waiting.
+
+        A direct call waits from its start, which is the request (ADR 0019). For a scheduled
+        appointment the lobby join itself is not stored (module docstring); the status's last
+        change is the join for a citizen alone in the lobby. Without one, the booking's start.
+        """
+        if self.is_direct:
+            return self.booking.start
         return self.status.updated_at or self.booking.start
 
 
@@ -133,7 +149,8 @@ class QueueSummary:
     """One group's queue at a glance: who waits and for how long at most.
 
     Attributes:
-        waiting: Citizens in the lobby nobody picked up yet.
+        waiting: Citizens nobody picked up yet: in the lobby, or direct callers since their
+            request (``QueueEntry.waiting``).
         longest_wait: How long the first of them has waited; zero when nobody waits.
     """
 
@@ -142,8 +159,8 @@ class QueueSummary:
 
 
 def summarise(entries: Iterable[QueueEntry], now: datetime) -> QueueSummary:
-    """Return how many entries wait unclaimed in the lobby and the longest wait among them."""
-    waiting = [e for e in entries if e.in_lobby and not e.claimed]
+    """Return how many entries wait for an agent and the longest wait among them."""
+    waiting = [e for e in entries if e.waiting]
     waits = [max(now - e.waiting_since, NO_WAIT) for e in waiting]
     return QueueSummary(len(waiting), max(waits, default=NO_WAIT))
 

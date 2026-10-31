@@ -10,11 +10,11 @@ URL = "/admin/organisations/demo/settings"
 async def test_an_org_admin_lists_and_opens_their_own_organisation(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    listed = (await site.client.get("/admin/organisation-settings")).text
+    organisation = (await site.client.get("/admin/organisations/demo")).text
     page = (await site.client.get(URL)).text
 
-    assert 'href="/admin/organisations/demo/settings"' in listed
-    assert "Andere" not in listed.split('id="page-title"')[1]
+    assert 'href="/admin/organisations/demo/settings"' in organisation
+    assert "Andere" not in page.split('id="page-title"')[1]
     assert "Tijdnotatie" in page
     assert "Standaardwaarde" in page  # nothing set yet: the platform default
 

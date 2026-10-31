@@ -4,9 +4,9 @@ Stored in Starlette's signed session cookie (``op_admin``, path ``/admin``). Hol
 principal's subject, display name, roles, organisations and groups, the other role claim
 values (custom roles link to them, ADR 0039; the roles themselves are looked up per request),
 the login time, when activity was last written to the staff record (ADR 0046), the chosen
-theme and the alert preferences. The absolute lifetime is enforced here; the cookie's own expiry
-slides with every response. The theme and the preferences live here so that they need no cookie
-of their own.
+theme, the menu width, the alert preferences and the scope filter. The absolute lifetime is
+enforced here; the cookie's own expiry slides with every response. The theme, the menu width,
+the preferences and the filter live here so that they need no cookie of their own.
 """
 
 from dataclasses import dataclass
@@ -25,11 +25,20 @@ _SEEN_AT = "seen_at"
 _OIDC = "oidc"
 _TRIAL = "login_trial"
 _THEME = "theme"
+_NAV = "nav"
 _ALERT_BANNER = "alert_banner"
 _ALERT_POPUPS = "alert_popups"
+_SCOPE = "scope"
 
 THEMES = ("system", "light", "dark")
 """The portal's colour themes; ``system`` follows the device setting and is the default."""
+
+NAV_CHOICES = ("collapsed", "expanded")
+"""How wide the admin wants the side navigation: the icon rail or the full menu.
+
+Without a choice the width decides (the rail on a tablet, the full menu on a desktop); the
+choice overrides it on both, as the admin shell design does.
+"""
 
 ALERT_POPUPS = ("all", "warnings", "outages", "off")
 """Which alerts may pop up (ADR 0061 §7): all, warnings and outages, outages only, none."""
@@ -104,14 +113,17 @@ def pop_login_start(request: Request) -> dict[str, str] | None:
 def start_session(request: Request, principal: Principal, now: datetime) -> None:
     """Replace the whole session with a fresh one for ``principal`` (no session fixation).
 
-    Only the theme and the alert preferences carry over, so a fresh login (ADR 0015) keeps the
-    admin's choices.
+    Only the theme, the menu width and the alert preferences carry over, so a fresh login
+    (ADR 0015) keeps the admin's choices.
     """
     theme = session_theme(request)
+    nav = session_nav(request)
     prefs = session_alert_prefs(request)
     request.session.clear()
     if theme != THEMES[0]:
         request.session[_THEME] = theme
+    if nav is not None:
+        request.session[_NAV] = nav
     if prefs != AlertPrefs(True, DEFAULT_ALERT_POPUPS):
         request.session[_ALERT_BANNER] = prefs.banner
         request.session[_ALERT_POPUPS] = prefs.popups
@@ -199,6 +211,19 @@ def choose_theme(request: Request, theme: str | None) -> str:
     return session_theme(request)
 
 
+def session_nav(request: Request) -> str | None:
+    """Return the menu width chosen in this session (one of ``NAV_CHOICES``), or ``None``."""
+    value: Any = request.session.get(_NAV)
+    return value if value in NAV_CHOICES else None
+
+
+def choose_nav(request: Request, nav: str | None) -> str | None:
+    """Remember ``nav`` for this session if it is a known choice; return the session's choice."""
+    if nav in NAV_CHOICES:
+        request.session[_NAV] = nav
+    return session_nav(request)
+
+
 def session_alert_prefs(request: Request) -> AlertPrefs:
     """Return the alert preferences of this session: the banner on and ``warnings`` by default."""
     banner: Any = request.session.get(_ALERT_BANNER)
@@ -222,3 +247,27 @@ def choose_alert_prefs(
         if popups in ALERT_POPUPS:
             request.session[_ALERT_POPUPS] = popups
     return session_alert_prefs(request)
+
+
+def session_scope(request: Request) -> tuple[str | None, str | None]:
+    """Return the organisation and group slug the admin chose in the scope filter, or ``None``.
+
+    The values are only what the admin last submitted; the caller checks them against the
+    admin's own scope on every request (``app.admin.scope_choice``) and never trusts them.
+    """
+    value: Any = request.session.get(_SCOPE)
+    if not isinstance(value, list) or len(value) != 2:
+        return None, None
+    organisation, group = value
+    return (
+        organisation if isinstance(organisation, str) else None,
+        group if isinstance(group, str) else None,
+    )
+
+
+def remember_scope(request: Request, organisation: str | None, group: str | None) -> None:
+    """Keep the (already checked) scope choice for this session; both ``None`` forgets it."""
+    if organisation is None and group is None:
+        request.session.pop(_SCOPE, None)
+    else:
+        request.session[_SCOPE] = [organisation, group]

@@ -571,6 +571,9 @@ msgstr "Administration menu"
 msgid "admin.nav.more"
 msgstr "More"
 
+msgid "admin.nav.toggle"
+msgstr "Collapse or expand menu"
+
 msgid "admin.nav.section.monitor"
 msgstr "Monitor"
 
@@ -917,6 +920,9 @@ msgstr "View own rights"
 msgid "authz.permission.matrix_view"
 msgstr "View rights matrix"
 
+msgid "authz.permission.organisation_view"
+msgstr "View an organisation"
+
 msgid "authz.permission.organisation_manage"
 msgstr "Manage organisations"
 
@@ -1155,16 +1161,16 @@ msgid "admin.field.trial_call_enabled_hint"
 msgstr "Yes: the participant can try beforehand, in a real Webex meeting, whether camera, microphone and speakers work. The meeting belongs to this group's Webex host; nobody from the team joins. Only with a Webex host."
 
 msgid "admin.field.join_client"
-msgstr "Webex page for the citizen"
+msgstr "Webex page for the participant"
 
 msgid "admin.field.join_client_hint"
-msgstr "Which Webex page the citizen sees for the appointment and the trial call."
+msgstr "Which Webex page the participant sees for the appointment and the trial call."
 
 msgid "admin.group.join_client_browser"
 msgstr "Straight into the browser"
 
 msgid "admin.group.join_client_choice"
-msgstr "Webex lets the citizen choose"
+msgstr "Webex lets the participant choose"
 
 msgid "admin.field.trial_call_minutes"
 msgstr "Trial call stays open (minutes)"
@@ -2176,9 +2182,6 @@ msgstr "The booking was cancelled and the task was marked as cancelled through t
 msgid "authz.permission.branding_manage"
 msgstr "Manage an organisation's branding"
 
-msgid "admin.nav.branding"
-msgstr "Branding"
-
 msgid "admin.done.logo_saved"
 msgstr "The logo has been saved."
 
@@ -2199,15 +2202,6 @@ msgstr "Logo removed"
 
 msgid "admin.branding.title"
 msgstr "Branding"
-
-msgid "admin.branding.lead"
-msgstr "Logo, name, colours, fonts and header of an organisation's booking pages."
-
-msgid "admin.branding.organisations"
-msgstr "Organisations"
-
-msgid "admin.branding.none"
-msgstr "You do not manage the branding of any organisation."
 
 msgid "admin.branding.page_lead"
 msgstr "This is how participants see this organisation's booking pages. The admin portal itself keeps one fixed style."
@@ -2544,9 +2538,6 @@ msgstr "with the management link, while the appointment is on hold"
 msgid "admin.tab.closure"
 msgstr "Emergency closure"
 
-msgid "admin.nav.closures"
-msgstr "Emergency closure"
-
 msgid "admin.done.closure_started"
 msgstr "The emergency closure is in place. Appointments on hold: {count}. The participants receive an email."
 
@@ -2771,15 +2762,6 @@ msgstr "Back to the emergency closure"
 
 msgid "admin.closures.title"
 msgstr "Emergency closure"
-
-msgid "admin.closures.lead"
-msgstr "Close every team of an organisation at once, for example during an outage or when a building is closed."
-
-msgid "admin.closures.organisations"
-msgstr "Organisations"
-
-msgid "admin.closures.none"
-msgstr "You cannot close an organisation as a whole."
 
 msgid "admin.closures.organisation_title"
 msgstr "Emergency closure {name}"
@@ -3153,12 +3135,6 @@ msgstr "All organisations"
 msgid "admin.organisations.none"
 msgstr "There are no organisations yet."
 
-msgid "admin.organisations.branding"
-msgstr "Branding"
-
-msgid "admin.organisations.branding_of"
-msgstr "Branding of {name}"
-
 msgid "admin.new_organisation.title"
 msgstr "New organisation"
 
@@ -3465,7 +3441,7 @@ msgid "agent_docs.spec_link"
 msgstr "OpenAPI spec (JSON)"
 
 msgid "admin.nav.holidays"
-msgstr "Holidays"
+msgstr "Holiday calendars"
 
 msgid "admin.tab.holidays"
 msgstr "Holidays"
@@ -3502,12 +3478,6 @@ msgstr "Create calendar"
 
 msgid "admin.holidays.slug_hint"
 msgstr "Short name for the address bar, for example national. Cannot be changed later."
-
-msgid "admin.holidays.organisations"
-msgstr "Choice per organisation"
-
-msgid "admin.holidays.organisations_lead"
-msgstr "Groups follow the calendars of their organisation unless a group chooses otherwise."
 
 msgid "admin.holidays.holiday_name"
 msgstr "Name"
@@ -3953,6 +3923,9 @@ msgstr "on the web pages"
 msgid "admin.audit.detail.surface_agent"
 msgstr "on the machine API"
 
+msgid "admin.audit.detail.surface_links"
+msgstr "on unknown management links"
+
 msgid "admin.audit.detail.client"
 msgstr "caller {value}"
 
@@ -4350,6 +4323,33 @@ msgstr "Alerts"
 msgid "admin.topbar.tasks.count"
 msgstr "{label}, {count} running or failed"
 
+msgid "admin.scope.label"
+msgstr "Scope"
+
+msgid "admin.scope.crumbs"
+msgstr "Chosen scope"
+
+msgid "admin.scope.organisation"
+msgstr "Organisation"
+
+msgid "admin.scope.group"
+msgstr "Group"
+
+msgid "admin.scope.all_organisations"
+msgstr "All organisations"
+
+msgid "admin.scope.all_groups"
+msgstr "All groups"
+
+msgid "admin.scope.hint"
+msgstr "Narrows the groups, bookings, queue and changes on this page to what you may already see. Tasks, status and rights stay platform-wide."
+
+msgid "admin.scope.apply"
+msgstr "Show"
+
+msgid "admin.scope.reset"
+msgstr "Show everything"
+
 msgid "admin.nav.help"
 msgstr "Manual"
 
@@ -4590,10 +4590,10 @@ msgid "admin.check.webex.host_ok"
 msgstr "A probe meeting for host {host} was scheduled exactly as a booking does, and deleted again."
 
 msgid "admin.check.webex.browser_link_ok"
-msgstr "The direct browser link works: Webex carries the browser option through, so on a computer the citizen gets the web version at once, without the question about the app."
+msgstr "The direct browser link works: Webex carries the browser option through, so on a computer the participant gets the web version at once, without the question about the app."
 
 msgid "admin.check.webex.browser_link_lost"
-msgstr "Webex no longer carries the browser option through in the link (answer {status}). The citizen then gets the choice between app and browser after all. Nothing breaks; if you like, set the Webex page for the citizen to 'Webex lets the citizen choose'."
+msgstr "Webex no longer carries the browser option through in the link (answer {status}). The participant then gets the choice between app and browser after all. Nothing breaks; if you like, set the Webex page for the participant to 'Webex lets the participant choose'."
 
 msgid "admin.check.webex.browser_link_unreachable"
 msgstr "The direct browser link could not be checked: the Webex site could not be reached ({error})."
@@ -4620,7 +4620,7 @@ msgid "admin.check.webex.trial_refused"
 msgstr "Webex refused a trial-call meeting for host {host} ({error}): {reason}. Participants cannot then open a trial call; check on the Webex site whether participants may join before the host."
 
 msgid "admin.check.webex.trial_lobby"
-msgstr "Webex accepted a trial call meeting for host {host} but did not keep its settings ({stored}). The citizen would then wait in the lobby and nobody lets them in. Ask the administrator of the Webex site to allow participants to join before the host and without a lobby; until then the trial call does not work."
+msgstr "Webex accepted a trial call meeting for host {host} but did not keep its settings ({stored}). The participant would then wait in the lobby and nobody lets them in. Ask the administrator of the Webex site to allow participants to join before the host and without a lobby; until then the trial call does not work."
 
 msgid "admin.check.webex.trial_left"
 msgstr "The trial-call meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
@@ -4763,7 +4763,7 @@ msgid "admin.simulator.lead"
 msgstr "Play what Webex and Webex Contact Center would report, without an agent or a tunnel. Each event goes signed through the real webhook endpoint and lands on the timeline. This card does not exist in production."
 
 msgid "admin.simulator.prepare_lead"
-msgstr "This booking has no meeting or work item yet. Give it stand-in ids first, so the events can find it."
+msgstr "This booking has no meeting or work item yet. Give it stand-in ids first, so the events can find it. If the group offers a trial call, the booking also gets an open stand-in trial call."
 
 msgid "admin.simulator.prepare"
 msgstr "Create stand-in meeting and task"
@@ -4792,11 +4792,17 @@ msgstr "Task not picked up"
 msgid "admin.simulator.event.task_ended"
 msgstr "Task ended"
 
+msgid "admin.simulator.event.trial_entered"
+msgstr "Participant enters the trial call"
+
+msgid "admin.simulator.event.trial_left"
+msgstr "Participant leaves the trial call"
+
 msgid "admin.done.simulated"
 msgstr "The event was delivered and is on the timeline."
 
 msgid "admin.done.simulated_prepared"
-msgstr "The booking now has a stand-in meeting and task."
+msgstr "The booking now has a stand-in meeting and task, and an open stand-in trial call if the group offers one."
 
 msgid "admin.done.simulator_no_ids"
 msgstr "This booking has no meeting or task for that. Create a stand-in meeting and task first."
@@ -4829,9 +4835,6 @@ msgstr "View retention"
 
 msgid "authz.permission.embedding_manage"
 msgstr "Manage embedding on websites"
-
-msgid "admin.nav.embedding"
-msgstr "Embedding"
 
 msgid "authz.permission.queue_work"
 msgstr "Pick up appointments in the own queue"
@@ -5731,21 +5734,6 @@ msgstr "No activity within your organisations or groups."
 msgid "admin.embedding.title"
 msgstr "Embedding on websites"
 
-msgid "admin.embedding.lead"
-msgstr "On which websites an organisation's groups may appear as a widget."
-
-msgid "admin.embedding.organisations"
-msgstr "Organisations"
-
-msgid "admin.embedding.col.origins"
-msgstr "Allowed websites"
-
-msgid "admin.embedding.col.groups"
-msgstr "Groups embedded"
-
-msgid "admin.embedding.none"
-msgstr "There are no organisations you may manage."
-
 msgid "admin.embedding.org_lead"
 msgstr "The websites on which the groups of {name} may appear as a widget. A group appears only once it switches embedding on in its own settings."
 
@@ -6067,6 +6055,9 @@ msgstr "Bookings per IP address"
 msgid "settings.field.rate_limit_reads.label"
 msgstr "Availability reads per IP address"
 
+msgid "settings.field.rate_limit_unknown_links.label"
+msgstr "Unknown management links per IP address"
+
 msgid "settings.field.rate_limit_agent_tokens.label"
 msgstr "Machine API token requests per client"
 
@@ -6240,21 +6231,6 @@ msgstr "This value contradicts another setting (for example critical storage not
 
 msgid "admin.form.error.setting_expiry"
 msgstr "Enter the hours after which the log level falls back: 1 to 24."
-
-msgid "admin.nav.organisation_settings"
-msgstr "Organisation settings"
-
-msgid "admin.org_settings.title"
-msgstr "Organisation settings"
-
-msgid "admin.org_settings.lead"
-msgstr "Time format, time zone and periods per organisation. Without a value of its own, the platform value applies."
-
-msgid "admin.org_settings.organisations"
-msgstr "Organisations"
-
-msgid "admin.org_settings.none"
-msgstr "There are no organisations whose settings you can change."
 
 msgid "admin.org_settings.page_title"
 msgstr "Settings of {name}"
@@ -7281,15 +7257,6 @@ msgstr "Empty a field to restore the default text. Texts are plain text: markup 
 msgid "admin.org_texts.section_pages"
 msgstr "Pages for participants"
 
-msgid "admin.org_texts.link_title"
-msgstr "Texts for participants"
-
-msgid "admin.org_texts.link_lead"
-msgstr "Change the texts on the group pages and in emails and text messages for the whole organisation."
-
-msgid "admin.org_texts.link_button"
-msgstr "Change texts"
-
 msgid "admin.org_texts.page.group_intro"
 msgstr "Introduction on the group's page"
 
@@ -7460,3 +7427,99 @@ msgstr "The DKIM key is empty (revoked). Ask your mail administrator to publish 
 
 msgid "admin.channels.domain_reason.dmarc_policy_none"
 msgstr "DMARC is at p=none: receivers only report, nothing is rejected. Set the policy to quarantine or reject once SPF and DKIM are right."
+
+msgid "admin.nav.groups"
+msgstr "Groups"
+
+msgid "admin.nav.object.organisation"
+msgstr "Organisation"
+
+msgid "admin.tab.texts"
+msgstr "Texts"
+
+msgid "admin.tab.embedding"
+msgstr "Embedding"
+
+msgid "admin.tab.branding"
+msgstr "Branding"
+
+msgid "admin.tab.channels"
+msgstr "Channels"
+
+msgid "admin.tab.contact"
+msgstr "Contact"
+
+msgid "admin.organisation.sections"
+msgstr "Sections of the organisation"
+
+msgid "admin.organisation.subsections"
+msgstr "Sections of this tab"
+
+msgid "admin.organisation.groups"
+msgstr "Groups"
+
+msgid "admin.organisation.groups_lead"
+msgstr "This organisation's groups you have rights on. A group opens on its own page."
+
+msgid "admin.organisation.no_groups"
+msgstr "This organisation has no groups you have rights on yet."
+
+msgid "admin.organisation.all_groups"
+msgstr "These groups in the Groups list"
+
+msgid "admin.organisation.profile"
+msgstr "Profile"
+
+msgid "admin.organisation.edit"
+msgstr "Change name and language"
+
+msgid "admin.organisations.groups"
+msgstr "Groups"
+
+msgid "admin.organisations.groups_of"
+msgstr "Groups of {name}"
+
+msgid "admin.groups.title"
+msgstr "Groups"
+
+msgid "admin.groups.lead"
+msgstr "Every group you have rights on, with its organisation. A group opens on its own page."
+
+msgid "admin.groups.filter"
+msgstr "Filter"
+
+msgid "admin.groups.search"
+msgstr "Search by name"
+
+msgid "admin.groups.organisation"
+msgstr "Organisation"
+
+msgid "admin.groups.apply"
+msgstr "Filter"
+
+msgid "admin.groups.clear"
+msgstr "Clear filters"
+
+msgid "admin.groups.count"
+msgstr "Number of groups: {count}"
+
+msgid "admin.groups.of_total"
+msgstr "Of {total} groups in all."
+
+msgid "admin.groups.none"
+msgstr "No groups found."
+
+msgid "admin.groups.duration"
+msgstr "Duration"
+
+msgid "admin.groups.shortfalls"
+msgstr "Shortfalls"
+
+msgid "admin.groups.no_shortfall"
+msgstr "None"
+
+msgid "admin.groups.public_page"
+msgstr "Public page"
+
+msgid "admin.groups.search_active"
+msgstr "A search is active. Clear the filters to see everything again."

@@ -32,7 +32,7 @@ The register (`app/web/navigation.py`), the three sections, the `<details>` prof
 
 | ID | Item | Size | Done when | Status |
 |---|---|---|---|---|
-| SH-1 | Collapsed icon rail on tablet and a bottom bar with *More* on phone, CSS only (`<details>` for *More*); entries still from the register | M | Keyboard-only pass; axe zero violations at 375, 768 and 1280 px; `docs/admin-map.md` unchanged | built (#147) |
+| SH-1 | Collapsed icon rail on tablet and a bottom bar with *More* on phone, CSS only (`<details>` for *More*); entries still from the register | M | Keyboard-only pass; axe zero violations at 375, 768 and 1280 px; `docs/admin-map.md` unchanged | built (#147); the design's menu button that collapses or expands it on any width: #208 |
 | SH-2 | Top bar end: status, tasks and alerts links before help, language and profile, each with a count where it applies; profile gains *My rights* and alert preferences | M | No role switcher anywhere (test greps templates); counts rendered server-side; links carry `aria-label` with the count | open |
 | SH-3 | Organisation › group filter in the top bar for overview and lists: GET form, only objects in the user's scope, links to the object page | S | Abuse case "filter value outside scope" with a test; never an edit form | open |
 
@@ -73,7 +73,15 @@ The register (`app/web/navigation.py`), the three sections, the `<details>` prof
 | BR-1 | Branding tab on the organisation page (ADR 0047 §3) with live contrast check (≥ 4.5:1 against white, save blocked below), preview of a citizen page, "Appointments via OpenPlanner" toggle | M | Server repeats the contrast check; SVG upload sanitised or refused; abuse case "script in uploaded SVG" with a test | open |
 | BR-2 | Organisation logo shown next to the organisation in lists and the filter | S | Image served from our origin with the correct content type; no inline SVG from uploads | open |
 
-## 8. Release — ADR 0052
+## 8. Page width — ADR 0080
+
+| ID | Item | Size | Done when | Status |
+|---|---|---|---|---|
+| PW-1 | Two page widths declared per screen in the register, `data-width` on `<main>`, tokens in `admin.css`, forms capped in wide pages, the week as seven columns or one row per day | M | Register, markup and stylesheet tests; `docs/admin-map.md` shows the width; checked at 375, 768, 1280, 1440 and 1920 px | built (#215) |
+| PW-2 | Move further list screens (organisations, holidays, closures) to wide once a table on them needs the room | S | One line per screen in the register; admin shell test at 1280 px stays green | open |
+| PW-3 | Playwright check of the wide page at 1920 px (content 96 rem, week in seven columns) in `admin-shell.spec.ts` | S | Runs against the Keycloak login of the existing spec | open |
+
+## 9. Release — ADR 0052
 
 | ID | Item | Size | Done when | Status |
 |---|---|---|---|---|

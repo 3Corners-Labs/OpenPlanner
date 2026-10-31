@@ -27,17 +27,36 @@ export interface AdminPageUnderTest extends PageUnderTest {
 const file = new URL('./pages.json', import.meta.url);
 const fixtureFile = new URL('./fixtures.json', import.meta.url);
 
+/** The participant's journey of one browser (ADR 0071, 0075, 0076): two seeded bookings. */
+export interface JourneyExample {
+  /** The trial call page of a booking tomorrow or later. */
+  trial_page: string;
+  /** The admin booking page of that booking. */
+  trial_booking: string;
+  /** The join page of a booking that starts in ten minutes. */
+  call_page: string;
+  /** The admin booking page of that booking. */
+  call_booking: string;
+}
+
+const SEED_COMMAND = 'run python -m app.cli seed-closures > e2e/fixtures.json';
+
+function fixtures(): Record<string, unknown> {
+  return existsSync(fixtureFile) ? (JSON.parse(readFileSync(fixtureFile, 'utf8')) as Record<string, unknown>) : {};
+}
+
 /** Return the seeded example `name` from fixtures.json; fails with the command that writes it. */
 export function fixture(name: string): string {
-  const fixtures = existsSync(fixtureFile)
-    ? (JSON.parse(readFileSync(fixtureFile, 'utf8')) as Record<string, string>)
-    : {};
-  const value = fixtures[name];
-  if (value === undefined) {
-    throw new Error(
-      `fixture "${name}" missing: run python -m app.cli seed-closures > e2e/fixtures.json`,
-    );
-  }
+  const value = fixtures()[name];
+  if (typeof value !== 'string') throw new Error(`fixture "${name}" missing: ${SEED_COMMAND}`);
+  return value;
+}
+
+/** Return the seeded journey of the browser `project` (chromium, firefox or webkit). */
+export function journey(project: string): JourneyExample {
+  const journeys = fixtures().journeys as Record<string, JourneyExample> | undefined;
+  const value = journeys?.[project];
+  if (value === undefined) throw new Error(`journey of "${project}" missing: ${SEED_COMMAND}`);
   return value;
 }
 
