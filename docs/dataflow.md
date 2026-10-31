@@ -348,7 +348,7 @@ name only).
 
 ## Planned flows
 
-Subjects and routing attributes (ADR 0079, not built): the participant's chosen subject and the
+Subjects and routing attributes (ADR 0080, not built): the participant's chosen subject and the
 switched-on attributes (preferred language, channel preference) are stored on the booking as codes
 from a closed list and leave the system only as routing variables in the contact-center task,
 next to the first name and the host join URL; purged with the booking.
