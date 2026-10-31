@@ -30,7 +30,7 @@ MANAGEMENT_LINK_PREFIX = "/b/"
 MACHINE_PREFIXES = ("/api/", "/webhooks/")
 """Paths whose callers are programs: they keep FastAPI's JSON validation answer, which the
 OpenAPI spec documents (``HTTPValidationError``)."""
-"""Path prefix of the participant's management link; a 404 under it is a link that matches nothing."""
+"""Path prefix of the participant's management link; a 404 under it matches no link."""
 
 _NOT_FOUND = {
     ErrorCode.GROUP_NOT_FOUND,

@@ -1,7 +1,7 @@
 """An organisation's branding as pages show it: header, theme stylesheet, logo and fonts.
 
-Shared by the participant pages (``app.api.participant``), the branding assets (``app.api.brand_assets``)
-and the admin preview (``app.admin.branding_routes``). The theme, logo and font URLs carry a
+Shared by the participant pages (``app.api.participant``), the branding assets
+(``app.api.brand_assets``) and the admin preview (``app.admin.branding_routes``). The theme, logo and font URLs carry a
 version that changes with the content, so browsers may cache them.
 
 ``theme_css`` writes only values ``app.domain.theme`` validated, inside fixed CSS of our own

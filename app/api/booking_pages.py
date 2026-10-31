@@ -248,7 +248,9 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
         slot = await _available(service, group, start)
         contact = await load_contact_form(service, group, _clock(request).now())
         context = _book_context(contact, start, slot, locale, contact.errors(error, locale), values)
-        return await participant_page(request, locale, "book.html", group, context, status_for(error))
+        return await participant_page(
+            request, locale, "book.html", group, context, status_for(error)
+        )
     booked = f"/g/{group.slug}/booked?start={slot_value(receipt.booking.start)}"
     return RedirectResponse(booked, status_code=303)
 
