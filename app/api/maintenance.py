@@ -1,7 +1,7 @@
-"""Citizen pages and machine-API writes during maintenance (ADR 0038 §2, MM-3).
+"""Participant pages and machine-API writes during maintenance (ADR 0038 §2, MM-3).
 
 A fixed list of rules, keyed by route template, decides what closes while maintenance is on.
-``app.main`` installs ``citizen_gate`` on every citizen router and ``machine_gate`` on the
+``app.main`` installs ``participant_gate`` on every participant router and ``machine_gate`` on the
 machine API, and a test checks that every public route is either closed or explicitly open, so
 no route can forget it.
 
@@ -12,7 +12,7 @@ no route can forget it.
               waiting and join pages, health, brand assets, webhooks (they record what
               happens in running calls); confirming by email link and the "check your
               email" page (ADR 0056): the worker lets unconfirmed bookings lapse during
-              maintenance too, so the citizen must be able to confirm
+              maintenance too, so the participant must be able to confirm
     widget    the group, availability and booking routes of the embedded widget (ADR 0035)
               ─► 503 ``{"error": "maintenance"}`` + Retry-After, readable by the host page;
               its texts, its script and the CORS preflight stay open
@@ -31,7 +31,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI, Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
 
-from app.api.citizen import citizen_page, templates
+from app.api.participant import participant_page, templates
 from app.domain.errors import DomainError
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.scheduling import Group
@@ -43,7 +43,7 @@ from app.web.organisation_settings import settings_for
 from app.web.templates import render
 
 GROUP_ROUTES = frozenset({"/g/{slug}", "/g/{slug}/book", "/g/{slug}/direct"})
-"""Citizen routes of a group that show the maintenance page instead of a form or a write."""
+"""Participant routes of a group that show the maintenance page instead of a form or a write."""
 
 BOOKING_ROUTES = frozenset(
     {
@@ -54,7 +54,7 @@ BOOKING_ROUTES = frozenset(
         "/b/{token}/wait/leave",
     }
 )
-"""Citizen routes under a management link that close (both the form and the write). The trial
+"""Participant routes under a management link that close (both the form and the write). The trial
 call (ADR 0071) schedules a meeting at Webex, which is a write, so its page closes too, and
 stopping a direct call (ADR 0019 point 4) cancels a booking like ``/cancel`` does."""
 
@@ -99,7 +99,7 @@ READS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 class MaintenanceClosed(Exception):  # noqa: N818 - control flow, rendered as the 503 page
-    """A citizen route is closed for maintenance.
+    """A participant route is closed for maintenance.
 
     Args:
         slug: The group of the page, when the route names one.
@@ -130,8 +130,8 @@ def _route_path(request: Request) -> str:
     return str(getattr(request.scope.get("route"), "path", ""))
 
 
-async def citizen_gate(request: Request) -> None:
-    """Router dependency: close the citizen routes of the rules while maintenance is on.
+async def participant_gate(request: Request) -> None:
+    """Router dependency: close the participant routes of the rules while maintenance is on.
 
     Raises:
         MaintenanceClosed: For a route in ``GROUP_ROUTES`` or ``BOOKING_ROUTES``.
@@ -198,7 +198,7 @@ async def maintenance_page(request: Request, slug: str | None) -> HTMLResponse:
     else:
         block = await contact_service(request).public_for_group(group)
         context["contacts"] = contact_view(block, locale)
-        response = await citizen_page(request, locale, "maintenance.html", group, context, 503)
+        response = await participant_page(request, locale, "maintenance.html", group, context, 503)
     response.headers.update(retry_after(request))
     return response
 

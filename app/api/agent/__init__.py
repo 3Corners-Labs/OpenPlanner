@@ -1,6 +1,6 @@
 """The machine API for contact-center bots, mounted at ``/api/agent/v1`` (ADR 0023).
 
-A FastAPI sub-application with its own OpenAPI spec and JSON errors, so the citizen pages and
+A FastAPI sub-application with its own OpenAPI spec and JSON errors, so the participant pages and
 the public API are not affected. It exists only when ``AGENT_API_ENABLED`` is set; the
 superuser's switch in the admin portal then decides whether it answers.
 

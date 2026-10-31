@@ -1,6 +1,6 @@
-"""Citizen pages and the machine API during maintenance (ADR 0038 §2, MM-3).
+"""Participant pages and the machine API during maintenance (ADR 0038 §2, MM-3).
 
-Abuse cases from docs/threat-model.md: a citizen POST slipping past the rules (every public
+Abuse cases from docs/threat-model.md: a participant POST slipping past the rules (every public
 route is either closed or explicitly open), and a machine-API write.
 """
 
@@ -19,7 +19,7 @@ from app.api.maintenance import (
     GROUP_ROUTES,
     OPEN_ROUTES,
     WIDGET_ROUTES,
-    citizen_gate,
+    participant_gate,
     machine_gate,
     register_machine_maintenance,
 )
@@ -81,7 +81,7 @@ CLOSED = [
 
 
 @pytest.mark.parametrize(("method", "path"), CLOSED)
-async def test_citizen_forms_and_writes_answer_503_with_retry_after(
+async def test_participant_forms_and_writes_answer_503_with_retry_after(
     site: Site, method: str, path: str
 ) -> None:
     await site.switch_on()
@@ -188,17 +188,17 @@ def test_every_public_route_is_closed_or_explicitly_open(demo_settings: Settings
 
 
 def _routes_with_gate(routes: list[object], gated: bool = False) -> list[tuple[APIRoute, bool]]:
-    """Every route with whether ``citizen_gate`` guards it (on the route or its include)."""
+    """Every route with whether ``participant_gate`` guards it (on the route or its include)."""
     found: list[tuple[APIRoute, bool]] = []
     for route in routes:
         if isinstance(route, APIRoute):
-            own = any(d.dependency is citizen_gate for d in route.dependencies)
+            own = any(d.dependency is participant_gate for d in route.dependencies)
             found.append((route, gated or own))
         context = getattr(route, "include_context", None)
         inner = getattr(route, "original_router", None)
         if inner is not None:
             included = context is not None and any(
-                d.dependency is citizen_gate for d in context.dependencies
+                d.dependency is participant_gate for d in context.dependencies
             )
             found.extend(_routes_with_gate(inner.routes, gated or included))
     return found

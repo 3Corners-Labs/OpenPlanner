@@ -1,4 +1,4 @@
-"""The contact block as citizens read it, and its shared template partial (ADR 0037)."""
+"""The contact block as participants read it, and its shared template partial (ADR 0037)."""
 
 import pytest
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape

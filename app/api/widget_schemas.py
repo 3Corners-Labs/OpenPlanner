@@ -66,7 +66,7 @@ class WidgetField(BaseModel):
 
 
 class WidgetClosure(BaseModel):
-    """An emergency closure citizens must see (ADR 0024/0037); no booking while active."""
+    """An emergency closure participants must see (ADR 0024/0037); no booking while active."""
 
     title: str
     period: str
@@ -115,7 +115,7 @@ class WidgetMonth(BaseModel):
     next: str | None = Field(description="`YYYY-MM` of the next month, if bookable.")
     weekdays: list[WidgetWeekday]
     weeks: list[list[WidgetDay | None]]
-    horizon: str = Field(description="How far ahead citizens can book, as a sentence.")
+    horizon: str = Field(description="How far ahead participants can book, as a sentence.")
     has_later: bool
 
 
@@ -151,7 +151,7 @@ class WidgetAvailability(BaseModel):
 
 
 class WidgetBookingRequest(BaseModel):
-    """What the citizen enters; ``website`` is the honeypot and must stay empty."""
+    """What the participant enters; ``website`` is the honeypot and must stay empty."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -190,7 +190,7 @@ class WidgetBookingRequest(BaseModel):
 
 
 class WidgetBooking(BaseModel):
-    """The booking as made; it awaits confirmation by the link in the citizen's email."""
+    """The booking as made; it awaits confirmation by the link in the participant's email."""
 
     status: Literal["booked"]
     start: str

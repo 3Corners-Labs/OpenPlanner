@@ -1,4 +1,4 @@
-"""Closure wording shared by citizen and admin pages: the banner as people read it (ADR 0024).
+"""Closure wording shared by participant and admin pages: the banner as people read it (ADR 0024).
 
 The same view feeds the full closure page of ADR 0037 §5: heading, period, notice, image and
 the copy of the contact options taken when the closure started.

@@ -1,4 +1,4 @@
-"""The citizen's join page (ADR 0017): time window, redirect to Webex, recorded on the timeline."""
+"""The participant's join page (ADR 0017): time window, redirect to Webex, timeline entry."""
 
 from dataclasses import replace
 from datetime import datetime, timedelta
@@ -99,7 +99,7 @@ async def test_page_waits_until_fifteen_minutes_before(booked: tuple[str, int, S
     assert await _events(settings.database_url, booking_id) == []
 
 
-async def test_open_page_sends_the_citizen_to_webex(booked: tuple[str, int, Settings]) -> None:
+async def test_open_page_sends_the_participant_to_webex(booked: tuple[str, int, Settings]) -> None:
     token, booking_id, settings = booked
     await _wire(settings.database_url, booking_id)
 

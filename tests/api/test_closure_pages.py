@@ -1,4 +1,4 @@
-"""What citizens see of an emergency closure (ADR 0037 §5, CL-2).
+"""What participants see of an emergency closure (ADR 0037 §5, CL-2).
 
 The seeded examples: ``demo-gesloten`` closed since yesterday until further notice, with a
 heading and three contact options and a booking on hold next week; ``demo-gepland`` closed in

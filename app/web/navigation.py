@@ -165,7 +165,7 @@ SECTIONS = (
                 "sliders",
                 (
                     "/admin/organisations/{org}/settings",
-                    # ADR 0074: the organisation's own wording of citizen pages and messages.
+                    # ADR 0074: the organisation's own wording of participant pages and messages.
                     "/admin/organisations/{org}/texts",
                     "/admin/organisations/{org}/texts/{text_locale}",
                 ),

@@ -166,7 +166,7 @@ class Settings(BaseSettings):
     # ``24h`` (default), ``12h`` or ``locale`` (per language). Dates always follow the locale.
     time_format: ClockStyle = ClockStyle.H24
     # ADR 0060 §6 (class D): "Appointments via OpenPlanner" with the product mark at the foot of
-    # the booking pages and in the HTML part of the citizen's emails.
+    # the booking pages and in the HTML part of the participant's emails.
     product_footer: bool = True
 
     # Worker loop: poll interval and the heartbeat file its container healthcheck reads.
@@ -220,7 +220,7 @@ class Settings(BaseSettings):
     # blocks). Class C platform (ADR 0042, settings registry).
     planner_changes_alert_per_hour: int = Field(default=50, ge=5, le=1000)
     # ADR 0072 (announced in ADR 0043): how often the own queue, a claimed booking and the
-    # citizen's waiting page ask the server for a change. Class C platform.
+    # participant's waiting page ask the server for a change. Class C platform.
     queue_refresh_seconds: int = Field(default=10, ge=5, le=60)
     # ADR 0010: how old a meeting status may be before the agenda asks the video provider, and
     # how often the agenda's live region asks the server. Class C platform.
@@ -234,7 +234,7 @@ class Settings(BaseSettings):
     # country of phone numbers typed without a country code (class D organisation).
     booking_form_max_custom_fields: int = Field(default=5, ge=0, le=15)
     phone_default_region: str = Field(default="NL", pattern=r"^[A-Z]{2}$")
-    # ADR 0056: a citizen confirms a booking by email link within the earlier of this many
+    # ADR 0056: a participant confirms a booking by email link within the earlier of this many
     # hours after booking and this many hours before the start, with this many reminders.
     # Class D organisation (ADR 0042, settings registry).
     booking_confirm_window_hours: int = Field(default=24, ge=1, le=72)
@@ -358,7 +358,7 @@ class Settings(BaseSettings):
     # Class C (platform, ADR 0042): how long the web process trusts its last read of the
     # maintenance switch; ADR 0038 sets 5 seconds as the upper bound.
     maintenance_cache_seconds: float = Field(default=5.0, ge=0, le=5)
-    # Class C: the Retry-After of citizen pages and machine-API writes refused during
+    # Class C: the Retry-After of participant pages and machine-API writes refused during
     # maintenance (seconds); maintenance has no automatic end, so this is a polite guess.
     maintenance_retry_after_seconds: int = Field(default=300, ge=30, le=3600)
     # Class C: maintenance on longer than this many hours is reported as a system event by the

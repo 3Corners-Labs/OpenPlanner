@@ -1,6 +1,6 @@
-"""The citizen's way into the video call (ADR 0017): ``/b/{token}/join``.
+"""The participant's way into the video call (ADR 0017): ``/b/{token}/join``.
 
-The email links here, not to Webex: the link never expires, nothing about the citizen is sent
+The email links here, not to Webex: the link never expires, nothing about the participant is sent
 to Webex for it, and opening and clicking are recorded on the booking's timeline. The page
 opens 15 minutes before the start; before that (and while the meeting is being prepared) it
 shows the time and a button to check again. It never reloads by itself (WCAG 2.2.1).
@@ -12,7 +12,7 @@ shows the time and a button to check again. It never reloads by itself (WCAG 2.2
 from fastapi import APIRouter, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.api.citizen import citizen_page
+from app.api.participant import participant_page
 from app.api.labels import slot_label
 from app.domain.calls import JOIN_OPENS_BEFORE, EventKind, JoinState, join_link, join_state
 from app.domain.integration import IntegrationService
@@ -56,13 +56,13 @@ async def join_page(request: Request, token: str) -> HTMLResponse:
         "slot_label": slot_label(booking.start, booking.end, group, locale),
         "opens_at": format_clock(booking.start - JOIN_OPENS_BEFORE, group.tz, locale.code),
     }
-    return await citizen_page(request, locale, "join.html", group, context)
+    return await participant_page(request, locale, "join.html", group, context)
 
 
 @router.get("/b/{token}/join/go")
 @limiter.limit(read_limit)
 async def join_go(request: Request, token: str) -> Response:
-    """Send the citizen to the meeting, or back to the status page when it is not open."""
+    """Send the participant to the meeting, or back to the status page when it is not open."""
     bookings, integration, clock = _services(request)
     details = await bookings.find(token)
     follow(request, details.group.organisation_id)

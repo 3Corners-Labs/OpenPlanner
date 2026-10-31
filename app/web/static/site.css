@@ -1,5 +1,5 @@
 /*
- * Citizen pages (and the shared base of every page). All design decisions are --booking-*
+ * Participant pages (and the shared base of every page). All design decisions are --booking-*
  * custom properties, the same tokens the embeddable widget will read (docs/widget.md). An
  * organisation's branding (/o/{slug}/theme.css) overrides an allow-list of them (ADR 0041):
  * colours, fonts, font size, line height, corners, width and shadow; the domain checks the

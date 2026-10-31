@@ -1,4 +1,4 @@
-"""The citizen's trial call on Webex (ADR 0071): page, opening, the way in, and its limits."""
+"""The participant's trial call on Webex (ADR 0071): page, opening, the way in, and its limits."""
 
 from collections.abc import AsyncIterator
 from dataclasses import replace
@@ -40,7 +40,7 @@ class Site:
         self.token = ""
 
     async def booked(self, *, confirm: bool = True) -> "Site":
-        """Book, then confirm by the emailed link (ADR 0056), as a citizen does."""
+        """Book, then confirm by the emailed link (ADR 0056), as a participant does."""
         await self.client.post(
             "/g/demo/book", data={"start": FRIDAY_0900, **ADA}, headers=SAME_ORIGIN
         )
@@ -112,7 +112,7 @@ async def test_opening_needs_a_same_origin_post(site: Site) -> None:
     assert site.video.created == []
 
 
-async def test_the_limit_is_told_to_the_citizen(site: Site) -> None:
+async def test_the_limit_is_told_to_the_participant(site: Site) -> None:
     for _ in range(3):
         await site.open()
         site.clock.advance(timedelta(minutes=31))
