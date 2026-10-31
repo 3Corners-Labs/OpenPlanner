@@ -20,7 +20,7 @@ from starlette.responses import HTMLResponse
 from app.admin.authz import can_function, return_path, session_principal
 from app.admin.forms import Field, moment_label
 from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
-from app.admin.session import THEMES, session_alert_prefs, session_theme
+from app.admin.session import THEMES, session_alert_prefs, session_nav, session_theme
 from app.admin.top_bar import top_links
 from app.domain.authorization import Principal, Role, Scope
 from app.i18n import BoundGettext
@@ -226,6 +226,8 @@ def page(
             "role_labels": role_labels(principal, locale),
             "theme": theme,
             "themes": theme_options(locale, theme),
+            # The menu width the admin chose from the top bar's menu button, if any.
+            "nav_choice": session_nav(request),
             "alert_prefs": session_alert_prefs(request),
             # Where the preference forms of the profile menu return to (``preference_routes``).
             "back": back_href(request),
