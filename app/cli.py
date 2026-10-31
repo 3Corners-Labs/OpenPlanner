@@ -955,7 +955,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     set_cmd = settings_actions.add_parser("set", help="change a class C setting (audited)")
     set_cmd.add_argument("key", help="variable name, e.g. ADMIN_SESSION_HOURS")
     set_cmd.add_argument("value", help="the new value, within the portal bounds")
-    set_cmd.add_argument("--hours", type=int, help="expiry of LOG_LEVEL (1-24 hours)")
+    set_cmd.add_argument(
+        "--hours",
+        type=int,
+        help="expiry of LOG_LEVEL (1-24 hours; TRACE at most TRACE_LEVEL_MAX_HOURS)",
+    )
     reset_cmd = settings_actions.add_parser("reset", help="remove portal values (audited)")
     target = reset_cmd.add_mutually_exclusive_group(required=True)
     target.add_argument("key", nargs="?", help="variable name")

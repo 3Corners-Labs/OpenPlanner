@@ -6097,6 +6097,12 @@ msgstr "Keep diagnostic events (days)"
 msgid "settings.field.diagnostic_mode_hours.label"
 msgstr "Diagnostic mode ends after (hours)"
 
+msgid "settings.field.trace_level_max_hours.label"
+msgstr "Log level TRACE falls back after at most (hours)"
+
+msgid "settings.field.sql_slow_ms.label"
+msgstr "Trace a database statement slower than (milliseconds)"
+
 msgid "settings.field.security_event_window_minutes.label"
 msgstr "Security event window (minutes)"
 
@@ -6278,7 +6284,7 @@ msgid "admin.settings.new_value"
 msgstr "New value"
 
 msgid "admin.settings.hours"
-msgstr "Back to the default after (hours, at most {max})"
+msgstr "Back to the default after (hours, at most {max}; TRACE at most {trace_max})"
 
 msgid "admin.settings.save"
 msgstr "Save"

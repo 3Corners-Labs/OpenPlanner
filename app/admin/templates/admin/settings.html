@@ -218,7 +218,7 @@
         </td>
         {% if manage %}
         <td>
-          {% if row.editable %}{{ setting_form(row, "/admin/settings/" ~ row.key, _("admin.settings.reset"), max_hours) }}{% elif row.error %}<p class="error-message" id="error-{{ row.key }}">{{ row.error }}</p>{% endif %}
+          {% if row.editable %}{{ setting_form(row, "/admin/settings/" ~ row.key, _("admin.settings.reset"), max_hours, trace_max_hours) }}{% elif row.error %}<p class="error-message" id="error-{{ row.key }}">{{ row.error }}</p>{% endif %}
           {% if row.adoptable %}
           <form method="post" action="/admin/settings/{{ row.key }}/adopt" class="setting-form">
             <button type="submit" class="button button--secondary button--small">{{ _("admin.settings.adopt") }}</button>
