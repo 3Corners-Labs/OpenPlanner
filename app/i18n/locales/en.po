@@ -571,6 +571,9 @@ msgstr "Administration menu"
 msgid "admin.nav.more"
 msgstr "More"
 
+msgid "admin.nav.toggle"
+msgstr "Collapse or expand menu"
+
 msgid "admin.nav.section.monitor"
 msgstr "Monitor"
 
@@ -4760,7 +4763,7 @@ msgid "admin.simulator.lead"
 msgstr "Play what Webex and Webex Contact Center would report, without an agent or a tunnel. Each event goes signed through the real webhook endpoint and lands on the timeline. This card does not exist in production."
 
 msgid "admin.simulator.prepare_lead"
-msgstr "This booking has no meeting or work item yet. Give it stand-in ids first, so the events can find it."
+msgstr "This booking has no meeting or work item yet. Give it stand-in ids first, so the events can find it. If the group offers a trial call, the booking also gets an open stand-in trial call."
 
 msgid "admin.simulator.prepare"
 msgstr "Create stand-in meeting and task"
@@ -4789,11 +4792,17 @@ msgstr "Task not picked up"
 msgid "admin.simulator.event.task_ended"
 msgstr "Task ended"
 
+msgid "admin.simulator.event.trial_entered"
+msgstr "Participant enters the trial call"
+
+msgid "admin.simulator.event.trial_left"
+msgstr "Participant leaves the trial call"
+
 msgid "admin.done.simulated"
 msgstr "The event was delivered and is on the timeline."
 
 msgid "admin.done.simulated_prepared"
-msgstr "The booking now has a stand-in meeting and task."
+msgstr "The booking now has a stand-in meeting and task, and an open stand-in trial call if the group offers one."
 
 msgid "admin.done.simulator_no_ids"
 msgstr "This booking has no meeting or task for that. Create a stand-in meeting and task first."

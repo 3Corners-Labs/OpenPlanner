@@ -12,6 +12,7 @@ from the authorisation matrix (ADR 0014), through each screen's permission.
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+from enum import StrEnum
 
 from app.domain.authorization import Permission
 from app.i18n import Translator
@@ -30,6 +31,20 @@ width of a phone screen and the target size, and it never changes which screens 
 """
 
 
+class Width(StrEnum):
+    """How wide a page may grow beside the side navigation (ADR 0080).
+
+    The value is what ``<main data-width>`` carries and what ``admin.css`` keys on, so the one
+    place that decides a page's width is the register; a template or a stylesheet never does.
+    """
+
+    STANDARD = "standard"
+    """Reading width, for forms, settings, details and text. The default."""
+
+    WIDE = "wide"
+    """Data views (overviews, lists, schedules, the agenda) that use the room they get."""
+
+
 @dataclass(frozen=True)
 class Screen:
     """One side-navigation entry, top-bar link, tab or sub-tab.
@@ -46,6 +61,10 @@ class Screen:
             a query or a fragment); the rule "one home per screen" (ADR 0047) stays whole.
         widget: For a shortcut to an overview widget: that widget's key. The link shows only
             while the widget is on the admin's overview, so it never leads nowhere.
+        width: The page width of ``path`` itself (ADR 0080). A sub-page is a detail or edit page
+            that is read or filled in, so it keeps the standard width unless it is listed in
+            ``wide_subpages``.
+        wide_subpages: The sub-pages that are data views too (for example the week agenda).
         subtabs: For a tab: related screens shown as a second row under it (ADR 0047 §3).
             The tab's own page is the first item of that row.
     """
@@ -58,6 +77,8 @@ class Screen:
     subpages: tuple[str, ...] = ()
     target: str = ""
     widget: str = ""
+    width: Width = Width.STANDARD
+    wide_subpages: tuple[str, ...] = ()
     subtabs: tuple["Screen", ...] = ()
 
     @property
@@ -96,17 +117,19 @@ class ObjectPage:
 
 @dataclass(frozen=True)
 class Home:
-    """Where a route lives: the side-navigation entry and, on an object page, the tab.
+    """Where a route lives: the side-navigation entry, the tab and sub-tab, and the width.
 
     Attributes:
         entry: Key of the side-navigation entry.
         tab: Key of the tab, on an object page.
         subtab: Key of the sub-tab, when the route lives in a tab's second row.
+        width: The page width of the route (ADR 0080).
     """
 
     entry: str
     tab: str | None
     subtab: str | None = None
+    width: Width = Width.STANDARD
 
 
 SECTIONS = (
@@ -120,9 +143,15 @@ SECTIONS = (
                 "/admin/",
                 Permission.DASHBOARD_VIEW,
                 "dashboard",
+                width=Width.WIDE,
             ),
             Screen(
-                "monitor.audit", "admin.nav.audit", "/admin/audit", Permission.AUDIT_VIEW, "audit"
+                "monitor.audit",
+                "admin.nav.audit",
+                "/admin/audit",
+                Permission.AUDIT_VIEW,
+                "audit",
+                width=Width.WIDE,
             ),
             Screen(
                 "monitor.retention",
@@ -145,6 +174,7 @@ SECTIONS = (
                 Permission.GROUP_VIEW,
                 "users",
                 ("/admin/groups/new",),
+                width=Width.WIDE,
             ),
             # ADR 0047 step 3: the organisation as an object page; its tabs are in OBJECTS.
             Screen(
@@ -154,6 +184,7 @@ SECTIONS = (
                 Permission.ORGANISATION_VIEW,
                 "organisation",
                 ("/admin/organisations/new",),
+                width=Width.WIDE,
             ),
             Screen(
                 "manage.staff",
@@ -162,6 +193,7 @@ SECTIONS = (
                 Permission.STAFF_VIEW,
                 "people",
                 ("/admin/staff/{member_id}",),
+                width=Width.WIDE,
             ),
             Screen(
                 "manage.rights",
@@ -178,6 +210,7 @@ SECTIONS = (
                 "matrix",
                 # The role editor opens from the matrix (ADR 0039 step 3).
                 ("/admin/roles", "/admin/roles/new", "/admin/roles/{role_id}"),
+                width=Width.WIDE,
             ),
         ),
     ),
@@ -296,6 +329,7 @@ OBJECTS = (
                 Permission.ORGANISATION_VIEW,
                 "dashboard",
                 (f"{_ORGANISATION}/edit",),
+                width=Width.WIDE,
                 subtabs=(
                     Screen(
                         "organisation.settings",
@@ -370,7 +404,12 @@ OBJECTS = (
         "manage.groups",
         (
             Screen(
-                "group.overview", "admin.tab.overview", _GROUP, Permission.GROUP_VIEW, "dashboard"
+                "group.overview",
+                "admin.tab.overview",
+                _GROUP,
+                Permission.GROUP_VIEW,
+                "dashboard",
+                width=Width.WIDE,
             ),
             Screen(
                 "group.settings",
@@ -388,6 +427,7 @@ OBJECTS = (
                 Permission.SCHEDULE_MANAGE,
                 "clock",
                 (f"{_GROUP}/staffing/{{rule_id}}", f"{_GROUP}/staffing/{{rule_id}}/split"),
+                width=Width.WIDE,
             ),
             Screen(
                 "group.exceptions",
@@ -433,6 +473,8 @@ OBJECTS = (
                     f"{_GROUP}/agenda/slot-rebook",
                     f"{_GROUP}/agenda/waiting",
                 ),
+                width=Width.WIDE,
+                wide_subpages=(f"{_GROUP}/agenda/week",),
             ),
             Screen(
                 "group.queue",
@@ -441,6 +483,7 @@ OBJECTS = (
                 Permission.QUEUE_WORK,
                 "queue",
                 (f"{_GROUP}/queue/{{booking_id}}",),
+                width=Width.WIDE,
             ),
             Screen(
                 "group.closure",
@@ -476,19 +519,27 @@ def screens() -> Iterator[tuple[str, Screen]]:
                 yield obj.entry, subtab
 
 
+def _home(entry: str, tab: str | None, subtab: str | None, screen: Screen, path: str) -> Home:
+    """Return the home of ``path`` of ``screen``; wide only for its own page or a listed one."""
+    wide = (path == screen.path and screen.width is Width.WIDE) or path in screen.wide_subpages
+    return Home(entry, tab, subtab, Width.WIDE if wide else Width.STANDARD)
+
+
 def _homes() -> dict[str, Home]:
     """Return the home of every route template the register names."""
     homes: dict[str, Home] = {}
     for section in SECTIONS:
         for entry in section.entries:
-            homes.update({path: Home(entry.key, None) for path in entry.routes})
+            homes.update({path: _home(entry.key, None, None, entry, path) for path in entry.routes})
     for link in TOP_BAR:
-        homes.update({path: Home(link.key, None) for path in link.routes})
+        homes.update({path: _home(link.key, None, None, link, path) for path in link.routes})
     for obj in OBJECTS:
         for tab in obj.tabs:
-            homes.update({path: Home(obj.entry, tab.key) for path in tab.routes})
-            for subtab in tab.subtabs:
-                homes.update({path: Home(obj.entry, tab.key, subtab.key) for path in subtab.routes})
+            homes.update({path: _home(obj.entry, tab.key, None, tab, path) for path in tab.routes})
+            for sub in tab.subtabs:
+                homes.update(
+                    {path: _home(obj.entry, tab.key, sub.key, sub, path) for path in sub.routes}
+                )
     return homes
 
 
@@ -518,22 +569,28 @@ def _rows(translator: Translator, locale: str, items: tuple[Screen, ...]) -> lis
 
 
 def _row(translator: Translator, locale: str, s: Screen, label: str) -> str:
-    """Return one Markdown table row for ``s`` under ``label``."""
+    """Return one Markdown table row for ``s`` under ``label``, with its page width."""
     homes = (
         f"shortcut to `{s.target}`" if s.target else ", ".join(f"`{p}`" for p in s.subpages) or "–"
     )
-    return f"| {label} | `{s.path}` | `{s.permission.value}` | {homes} |"
+    width = "–" if s.target else s.width.value
+    return f"| {label} | `{s.path}` | `{s.permission.value}` | {width} | {homes} |"
 
 
 def render_markdown(translator: Translator, locale: str = "en") -> str:
     """Return ``docs/admin-map.md``: the side navigation, the top bar and the object pages."""
-    header = ["| Entry | Path | Permission | Also the home of |", "|---|---|---|---|"]
+    header = [
+        "| Entry | Path | Permission | Width | Also the home of |",
+        "|---|---|---|---|---|",
+    ]
     lines = [
         "# Admin structure",
         "",
         "Generated by `python -m app.cli admin-map` from `app/web/navigation.py` (ADR 0047). Do",
         "not edit by hand: a test fails when this file differs from the code. Which entries an",
-        "admin sees follows from the authorisation matrix (`docs/authorization.md`).",
+        "admin sees follows from the authorisation matrix (`docs/authorization.md`). Width is the",
+        "page width beside the side navigation (ADR 0080): `wide` for data views, `standard` for",
+        "forms and reading; a sub-page is `standard` unless the register lists it as wide.",
         "",
         "## Side navigation",
     ]
