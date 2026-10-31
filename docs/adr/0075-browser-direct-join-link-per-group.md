@@ -113,8 +113,8 @@ probe meeting's title, lead and length stay as in the group check today.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1 | `join_client` on `groups` (migration 0075, reversible), `JoinClient`, `join_link()`, both redirects, group form and manual topic, texts per client in nl and en | #171 | merged |
-| 2 | Group check: `webex.browser_link_*` and `webex.trial_lobby`, i18n of the findings | #171 | merged |
+| 1 | `join_client` on `groups` (migration 0075, reversible), `JoinClient`, `join_link()`, both redirects, group form and manual topic, texts per client in nl and en | #171 | merged (rc.39 on docker01 with migration 0075; the redirect itself is not yet clicked through there) |
+| 2 | Group check: `webex.browser_link_*` and `webex.trial_lobby`, i18n of the findings | #171 | live (rc.39 on docker01, checked 2026-10-31: `browser_link_ok` and `trial_lobby` against the real Webex, no probe left behind) |
 | 3 | Confirm on docker01 with the Webex app installed on the tester's computer that `browser` opens the web app and `choice` the Webex page; record in this table | | planned |
 
 ## Consequences
