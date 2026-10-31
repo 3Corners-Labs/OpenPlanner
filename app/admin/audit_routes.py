@@ -247,6 +247,7 @@ DETAIL_LABELS: dict[str, str] = {
     "source:wxcc": "admin.audit.detail.source_wxcc",
     "surface:web": "admin.audit.detail.surface_web",
     "surface:agent": "admin.audit.detail.surface_agent",
+    "surface:links": "admin.audit.detail.surface_links",
     "diagnostics.on": "admin.audit.detail.diagnostics_on",
     "diagnostics.off": "admin.audit.detail.diagnostics_off",
 }
