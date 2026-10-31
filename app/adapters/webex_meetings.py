@@ -14,6 +14,7 @@ carries whole seconds, and a start that has passed (a direct call, or its retry 
 becomes the moment of the request. The booking keeps its own start.
 """
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -42,6 +43,25 @@ TRIAL_OPTIONS: dict[str, Any] = {
 
 Everything else, the site, the host, the chat and file settings, is the booking's own, so the
 citizen tries the call they will have."""
+
+
+@dataclass(frozen=True)
+class ProbeMeeting:
+    """A meeting the group check scheduled, with what the site stored of the trial options.
+
+    Attributes:
+        ref: The meeting's id and link, as a booking's meeting has them.
+        stored: Webex's value for every key of ``TRIAL_OPTIONS`` its answer carried. A key the
+            answer leaves out is absent here: no answer is not a refusal.
+    """
+
+    ref: MeetingRef
+    stored: dict[str, Any]
+
+    @property
+    def ignored(self) -> dict[str, Any]:
+        """The trial options the site stored differently from what was asked (ADR 0075)."""
+        return {k: v for k, v in self.stored.items() if v != TRIAL_OPTIONS[k]}
 
 
 MEETING_STATES: dict[str, CallState] = {
@@ -74,6 +94,14 @@ class WebexMeetings:
 
     async def create_meeting(self, request: MeetingRequest) -> MeetingRef:
         """Schedule the meeting on behalf of the group's host and return its id and link."""
+        return (await self.probe_meeting(request)).ref
+
+    async def probe_meeting(self, request: MeetingRequest) -> ProbeMeeting:
+        """Schedule the meeting like ``create_meeting`` and also return what the site stored.
+
+        The group check uses it: Webex accepts the trial call's options on a site that does not
+        honour them and answers with the values it kept (ADR 0075).
+        """
         body = meeting_body(request, self._clock.now())
         response = await self._client.request(
             "POST", f"{self._base}/meetings", json=body, explain=True
@@ -81,7 +109,8 @@ class WebexMeetings:
         data = response.json()
         if not isinstance(data.get("id"), str) or not isinstance(data.get("webLink"), str):
             raise IntegrationError("unexpected_response", retryable=False)
-        return MeetingRef(data["id"], data["webLink"])
+        stored = {key: data[key] for key in TRIAL_OPTIONS if key in data}
+        return ProbeMeeting(MeetingRef(data["id"], data["webLink"]), stored)
 
     async def delete_meeting(self, meeting_id: str, host_email: str) -> None:
         """Delete the meeting; one that no longer exists counts as deleted."""

@@ -484,8 +484,16 @@ offer the Webex app).
 that participants may enter before the host (OpenPlanner sets `enabledJoinBeforeHost`,
 `enableConnectAudioBeforeHost` and `allowJoin` on it, not on the appointment's own meeting).
 The site must allow this. **Koppeling controleren** schedules and deletes a trial probe and
-shows `webex.trial_refused` with Webex's reason when it does not; citizens then cannot open a
-trial call, and the group's switch can be set to *Nee* until the site allows it. After a Webex or
+shows `webex.trial_refused` with Webex's reason when it refuses the request, and
+`webex.trial_lobby` with the values it kept when it accepts the request but ignores the options
+(ADR 0075: the citizen would wait in the lobby for nobody; seen on the test site
+`rijksvideotest.webex.com`, where Control Hub must allow entry before the host first). In
+both cases citizens cannot use a trial call, and the group's switch can be set to *Nee* until
+the site allows it. For a group that opens the Webex web app directly (`join_client`
+*browser*), the check also visits the probe's link once and shows `webex.browser_link_lost`
+when Webex no longer carries `launchApp=true` through its redirect: nothing breaks then,
+citizens get Webex's own page with the app or browser question, and the group can be set to
+*Webex laat de burger kiezen* so that the texts say so. After a Webex or
 site change, run the check and then open a trial call yourself from a test booking: it must
 open without the lobby, ask for camera and microphone, and be gone from the host's Webex
 calendar a few minutes after it closes.
@@ -1094,6 +1102,23 @@ locally built proxy: remove the `OPENPLANNER_PROXY_IMAGE` line then.)
 
 Backups hold personal data: they stay in the data volume (mode 600) and every updater run
 deletes those older than 24 hours (`backup-db --prune`). Never copy them off the host.
+
+### The browser shows old styling after an update (versioned static files)
+
+Every stylesheet, script and image under `/static` is linked with the hash of its content
+(`/static/admin.css?v=3f9a1c07b2de`), and the response for exactly that URL is cached for a
+year (`immutable`). A new release changes the hash of every file it changes, so the next page
+load asks for the new URL. Nothing needs clearing on the host or in the browser.
+
+If a page still looks old, its HTML came from a cache: check that the address in the browser is
+the portal's own (not an old tab) and that a proxy in front does not cache pages. Pages are sent
+with `Cache-Control: no-store`. To see what the host serves:
+
+```bash
+curl -sI "https://<host>/static/admin.css?v=0" | grep -i -e cache-control -e etag
+```
+
+An unknown or old `v` always answers with the current file and `Cache-Control: no-cache`.
 
 ## Rollback
 

@@ -66,9 +66,9 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     # The profile menu in the top bar has a select of its own; the form is in the main part.
     form = page.split('<main id="content"', 1)[1]
     assert '<option value="Europe/Amsterdam" selected>' in form
-    # time zone, dispatch kind, free pick, phone mode, trial call, embedding (the direct
-    # call is offered per staffing block since ADR 0072)
-    assert form.count(" selected>") == 6
+    # time zone, dispatch kind, free pick, phone mode, trial call, Webex page (ADR 0075),
+    # embedding (the direct call is offered per staffing block since ADR 0072)
+    assert form.count(" selected>") == 7
 
 
 async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
@@ -199,6 +199,7 @@ SETTINGS_FORM = {
     "dispatch_kind": "contact_center",
     "citizen_change_lead_minutes": "60",
     "trial_call_enabled": "yes",
+    "join_client": "browser",
     "trial_call_minutes": "30",
     "trial_calls_per_booking": "3",
     "planner_change_min_lead_minutes": "60",
@@ -250,6 +251,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "dispatch_kind": "openplanner_queue",
         "citizen_change_lead_minutes": "120",
         "trial_call_enabled": "yes",
+        "join_client": "browser",
         "trial_call_minutes": "30",
         "trial_calls_per_booking": "3",
         "queue_visible_from_minutes": "15",
@@ -302,6 +304,7 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, 
         "dispatch_kind": kind,
         "citizen_change_lead_minutes": minutes,
         "trial_call_enabled": "yes",
+        "join_client": "browser",
         "trial_call_minutes": "30",
         "trial_calls_per_booking": "3",
         "queue_visible_from_minutes": "15",
@@ -335,6 +338,7 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "dispatch_kind": "contact_center",
             "citizen_change_lead_minutes": "60",
             "trial_call_enabled": "yes",
+            "join_client": "browser",
             "trial_call_minutes": "30",
             "trial_calls_per_booking": "3",
             "planner_change_min_lead_minutes": "60",
@@ -644,6 +648,7 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "dispatch_kind": "contact_center",
             "citizen_change_lead_minutes": "60",
             "trial_call_enabled": "yes",
+            "join_client": "browser",
             "trial_call_minutes": "30",
             "trial_calls_per_booking": "3",
             "planner_change_min_lead_minutes": "60",
@@ -684,6 +689,7 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "dispatch_kind": "contact_center",
         "citizen_change_lead_minutes": "60",
         "trial_call_enabled": "yes",
+        "join_client": "browser",
         "trial_call_minutes": "30",
         "trial_calls_per_booking": "3",
         "planner_change_min_lead_minutes": "60",
@@ -830,3 +836,25 @@ async def test_the_trial_call_switch_and_limits_are_saved(site: Site) -> None:
     assert 'name="trial_call_minutes" type="number" value="45"' in after
     assert 'name="trial_calls_per_booking" type="number" value="5"' in after
     assert '<option value="no" selected' in after
+
+
+async def test_the_join_client_is_saved_and_shown(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    default = (await site.client.get(f"{GROUP}/settings")).text
+    saved = await _post(site, f"{GROUP}/settings", {**SETTINGS_FORM, "join_client": "choice"})
+    after = (await site.client.get(f"{GROUP}/settings")).text
+
+    assert '<option value="browser" selected' in default
+    assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
+    assert '<option value="choice" selected' in after
+
+
+async def test_an_unknown_join_client_is_refused_and_nothing_changes(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    refused = await _post(site, f"{GROUP}/settings", {**SETTINGS_FORM, "join_client": "app"})
+    after = (await site.client.get(f"{GROUP}/settings")).text
+
+    assert refused.status_code == 422
+    assert '<option value="browser" selected' in after

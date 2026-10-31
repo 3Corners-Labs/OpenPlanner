@@ -20,6 +20,7 @@ from app.adapters.webex_auth import ServiceAppConfig, WebexTokens
 from app.adapters.webhook_registration import WEBEX_EVENTS
 from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.domain.ports import IntegrationError
+from app.domain.scheduling import JoinClient
 from tests.adapters.test_wxcc_config import _config
 from tests.fakes.clock import FixedClock
 from tests.fakes.tokens import MemoryTokenStore
@@ -94,6 +95,12 @@ class Platforms:
         self.host_status = 200
         self.delete_status = 204
         self.trial_status = 200
+        self.trial_stored: dict[str, Any] = {}
+        """Options Webex's answer to the trial probe carries (an empty answer says nothing)."""
+        self.web_link = "https://w.example/j"
+        self.browser_status = 302
+        self.browser_keeps_parameter = True
+        self.browser_unreachable = False
         self.reason = "Host host@example.nl is not a valid user."
         self.hooks = _hooks()
         self.subscriptions = _subscriptions()
@@ -111,7 +118,14 @@ class Platforms:
             if status != 200:
                 refusal = {"message": "Refused.", "errors": [{"description": self.reason}]}
                 return httpx.Response(status, json=refusal)
-            return httpx.Response(200, json={"id": "probe-1", "webLink": "https://w.example/j"})
+            stored = self.trial_stored if trial else {}
+            return httpx.Response(200, json={"id": "probe-1", "webLink": self.web_link, **stored})
+        if url.startswith("https://w.example/j") and request.method == "GET":
+            if self.browser_unreachable:
+                raise httpx.ConnectError("no route", request=request)
+            kept = "&launchApp=true" if self.browser_keeps_parameter else ""
+            where = f"https://w.example/wbxmjs/joinservice/meeting/probe-1?MTID=m1{kept}"
+            return httpx.Response(self.browser_status, headers={"location": where})
         if url.startswith(f"{WEBEX}/meetings/probe-1") and request.method == "DELETE":
             return httpx.Response(self.delete_status)
         if url.startswith(f"{WEBEX}/webhooks"):
@@ -225,10 +239,13 @@ async def test_a_probe_that_cannot_be_deleted_is_a_warning_naming_it() -> None:
 
     findings = await _checker(platforms).check_group(GROUP, [GROUP])
 
-    assert findings[0].code == "webex.host_ok"
-    assert findings[1].code == "webex.probe_left"
-    assert findings[1].status is CheckStatus.WARN
-    assert ("meeting", "probe-1") in findings[1].params
+    assert [f.code for f in findings[:3]] == [
+        "webex.host_ok",
+        "webex.browser_link_ok",
+        "webex.probe_left",
+    ]
+    assert findings[2].status is CheckStatus.WARN
+    assert ("meeting", "probe-1") in findings[2].params
 
 
 @pytest.mark.parametrize(
@@ -340,7 +357,7 @@ async def test_a_trial_call_probe_follows_the_booking_probe_with_entry_before_th
     findings = await _checker(platforms).check_group(GROUP, [GROUP])
 
     webex = [f for f in findings if f.area is CheckArea.WEBEX]
-    assert [f.code for f in webex] == ["webex.host_ok", "webex.trial_ok"]
+    assert [f.code for f in webex] == ["webex.host_ok", "webex.browser_link_ok", "webex.trial_ok"]
     bodies = [
         json.loads(r.content)
         for r in platforms.requests
@@ -359,9 +376,13 @@ async def test_a_site_that_refuses_entry_before_the_host_is_a_warning_with_the_r
     findings = await _checker(platforms).check_group(GROUP, [GROUP])
 
     webex = [f for f in findings if f.area is CheckArea.WEBEX]
-    assert [f.code for f in webex] == ["webex.host_ok", "webex.trial_refused"]
-    assert webex[1].status is CheckStatus.WARN  # the appointment's own meeting still works
-    assert ("reason", "Host *** is not a valid user.") in webex[1].params  # addresses masked
+    assert [f.code for f in webex] == [
+        "webex.host_ok",
+        "webex.browser_link_ok",
+        "webex.trial_refused",
+    ]
+    assert webex[2].status is CheckStatus.WARN  # the appointment's own meeting still works
+    assert ("reason", "Host *** is not a valid user.") in webex[2].params  # addresses masked
 
 
 @pytest.mark.usefixtures("wxcc_ok")
@@ -371,7 +392,10 @@ async def test_no_trial_probe_when_the_group_has_no_trial_call() -> None:
 
     findings = await _checker(platforms).check_group(group, [group])
 
-    assert [f.code for f in findings if f.area is CheckArea.WEBEX] == ["webex.host_ok"]
+    assert [f.code for f in findings if f.area is CheckArea.WEBEX] == [
+        "webex.host_ok",
+        "webex.browser_link_ok",
+    ]
     assert (
         sum(1 for r in platforms.requests if r.method == "POST" and r.url.path == "/v1/meetings")
         == 1
@@ -386,4 +410,164 @@ async def test_a_trial_probe_that_cannot_be_deleted_is_a_warning_naming_it() -> 
     findings = await _checker(platforms).check_group(GROUP, [GROUP])
 
     codes = [f.code for f in findings if f.area is CheckArea.WEBEX]
-    assert codes == ["webex.host_ok", "webex.probe_left", "webex.trial_ok", "webex.trial_left"]
+    assert codes == [
+        "webex.host_ok",
+        "webex.browser_link_ok",
+        "webex.probe_left",
+        "webex.trial_ok",
+        "webex.trial_left",
+    ]
+
+
+def _gets(platforms: Platforms) -> list[httpx.Request]:
+    return [r for r in platforms.requests if r.method == "GET" and r.url.host == "w.example"]
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_the_browser_link_is_followed_once_before_the_probe_is_deleted() -> None:
+    platforms = Platforms()
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    (get,) = _gets(platforms)
+    assert str(get.url) == "https://w.example/j?launchApp=true"
+    assert "authorization" not in get.headers  # an anonymous visit, like the citizen's
+    assert [f.code for f in findings if f.area is CheckArea.WEBEX][:2] == [
+        "webex.host_ok",
+        "webex.browser_link_ok",
+    ]
+    order = [
+        r.method for r in platforms.requests if r.url.host in ("w.example", "webexapis.example")
+    ]
+    assert order.index("GET") < order.index("DELETE")
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+@pytest.mark.parametrize(("status", "keeps"), [(302, False), (200, True), (404, True)])
+async def test_a_browser_link_webex_no_longer_carries_through_is_a_warning(
+    status: int, keeps: bool
+) -> None:
+    platforms = Platforms()
+    platforms.browser_status = status
+    platforms.browser_keeps_parameter = keeps
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    lost = next(f for f in findings if f.code == "webex.browser_link_lost")
+    assert lost.status is CheckStatus.WARN  # citizens still get Webex's page: nothing breaks
+    assert ("status", str(status)) in lost.params
+    assert "webex.browser_link_ok" not in _codes(findings)
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_an_unreachable_join_page_is_told_apart_from_a_lost_parameter() -> None:
+    platforms = Platforms()
+    platforms.browser_unreachable = True
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    unreachable = next(f for f in findings if f.code == "webex.browser_link_unreachable")
+    assert unreachable.status is CheckStatus.WARN
+    assert ("error", "ConnectError") in unreachable.params
+    assert "webex.browser_link_lost" not in _codes(findings)
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_group_that_keeps_webexs_choice_is_not_asked_about_the_browser_link() -> None:
+    platforms = Platforms()
+    group = replace(GROUP, join_client=JoinClient.CHOICE)
+
+    findings = await _checker(platforms).check_group(group, [group])
+
+    assert not _gets(platforms)
+    assert not [f for f in findings if f.code.startswith("webex.browser_link")]
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_probe_link_that_is_not_https_is_never_visited() -> None:
+    platforms = Platforms()
+    platforms.web_link = "http://w.example/j"
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    assert not _gets(platforms)
+    assert _codes(findings)["webex.browser_link_lost"] is CheckStatus.WARN
+
+
+LOBBY = {
+    "enabledJoinBeforeHost": False,
+    "enableConnectAudioBeforeHost": False,
+    "unlockedMeetingJoinSecurity": "allowJoinWithLobby",
+}
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_site_that_ignores_the_trial_options_is_a_warning_naming_what_it_stored() -> None:
+    platforms = Platforms()
+    platforms.trial_stored = LOBBY
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    webex = [f for f in findings if f.area is CheckArea.WEBEX]
+    assert [f.code for f in webex] == [
+        "webex.host_ok",
+        "webex.browser_link_ok",
+        "webex.trial_lobby",
+    ]
+    lobby = webex[2]
+    assert lobby.status is CheckStatus.WARN
+    assert dict(lobby.params)["stored"] == (
+        "enabledJoinBeforeHost=false, enableConnectAudioBeforeHost=false, "
+        "unlockedMeetingJoinSecurity=allowJoinWithLobby"
+    )
+    assert "webex.trial_ok" not in _codes(findings)  # created is not the same as let in
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_one_ignored_trial_option_is_enough_for_the_warning() -> None:
+    platforms = Platforms()
+    platforms.trial_stored = {
+        **LOBBY,
+        "enabledJoinBeforeHost": True,
+        "enableConnectAudioBeforeHost": True,
+    }
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    lobby = next(f for f in findings if f.code == "webex.trial_lobby")
+    assert dict(lobby.params)["stored"] == "unlockedMeetingJoinSecurity=allowJoinWithLobby"
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_site_that_keeps_the_trial_options_is_ok() -> None:
+    platforms = Platforms()
+    platforms.trial_stored = {
+        "enabledJoinBeforeHost": True,
+        "enableConnectAudioBeforeHost": True,
+        "unlockedMeetingJoinSecurity": "allowJoin",
+    }
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    assert _codes(findings)["webex.trial_ok"] is CheckStatus.OK
+    assert "webex.trial_lobby" not in _codes(findings)
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_an_answer_without_the_options_is_not_taken_for_a_refusal() -> None:
+    platforms = Platforms()  # the default answer carries no options at all
+
+    findings = await _checker(platforms).check_group(GROUP, [GROUP])
+
+    assert _codes(findings)["webex.trial_ok"] is CheckStatus.OK
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_the_trial_probe_is_still_deleted_when_the_options_were_ignored() -> None:
+    platforms = Platforms()
+    platforms.trial_stored = LOBBY
+
+    await _checker(platforms).check_group(GROUP, [GROUP])
+
+    deletes = [r for r in platforms.requests if r.method == "DELETE"]
+    assert len(deletes) == 2  # the booking probe and the trial probe

@@ -18,10 +18,18 @@ host joined, and times. Pure Python, no I/O; ``app.domain.integration`` records 
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from enum import StrEnum
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.domain.booking import Booking
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.scheduling import Group
+from app.domain.scheduling import Group, JoinClient
+
+BROWSER_LINK_PARAMS: tuple[tuple[str, str], ...] = (("launchApp", "true"),)
+"""What Webex's own *join from this browser* button adds to the meeting link (ADR 0075).
+
+With it Webex's join page skips the choice between its app and the browser and opens the web
+app's prepare-to-join screen. A constant, not a setting: it is Webex's mechanism, and the group
+check tells us when Webex stops carrying it through."""
 
 
 class EventKind(StrEnum):
@@ -33,10 +41,19 @@ class EventKind(StrEnum):
     MEETING_DELETED = "meeting_deleted"
     JOIN_PAGE_OPENED = "join_page_opened"
     JOIN_CLICKED = "join_clicked"
+    """The citizen pressed the button on the join page (detail: the page they were sent to,
+    ``browser`` or ``choice``, ADR 0075)."""
     TRIAL_CREATED = "trial_created"
     """The citizen opened a trial call on Webex (ADR 0071)."""
     TRIAL_JOINED = "trial_joined"
-    """The citizen followed the link into the trial call."""
+    """The citizen followed the link into the trial call (detail: the page they were sent to,
+    ``browser`` or ``choice``, ADR 0075)."""
+    TRIAL_ENTERED = "trial_entered"
+    """Webex reports that someone joined the trial meeting (detail ``host`` when a host did,
+    which nobody from the team should). A click that is never followed by this means the
+    guest did not get in, for example because they wait in the lobby."""
+    TRIAL_LEFT = "trial_left"
+    """Webex reports that someone left the trial meeting."""
     TRIAL_FAILED = "trial_failed"
     """The trial meeting could not be created (detail: the code, e.g. ``rejected_400``)."""
     TRIAL_DELETED = "trial_deleted"
@@ -56,6 +73,36 @@ class EventKind(StrEnum):
     PARTICIPANT_LEFT = "participant_left"
     MEETING_ENDED = "meeting_ended"
     INTEGRATION_ERROR = "integration_error"
+
+
+def join_link(link: str | None, client: JoinClient) -> str | None:
+    """Return the link to send the citizen to for ``client``, or ``None`` when there is none.
+
+    The stored link comes from Webex and is personal data, so it is never altered in storage;
+    this builds the redirect target. A link that is not ``https`` is refused, so a poisoned
+    value can never become a redirect. ``JoinClient.BROWSER`` sets the parameters of
+    ``BROWSER_LINK_PARAMS`` (replacing a value that says the opposite) and keeps every other
+    part of the link; applying it twice gives the same link.
+    """
+    if not link or not link.startswith("https://"):
+        return None
+    if client is JoinClient.CHOICE:
+        return link
+    parts = urlsplit(link)
+    names = {name for name, _ in BROWSER_LINK_PARAMS}
+    query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k not in names]
+    query.extend(BROWSER_LINK_PARAMS)
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+TRIAL_MEETING_EVENTS: dict[EventKind, EventKind] = {
+    EventKind.GUEST_JOINED: EventKind.TRIAL_ENTERED,
+    EventKind.HOST_JOINED: EventKind.TRIAL_ENTERED,
+    EventKind.PARTICIPANT_LEFT: EventKind.TRIAL_LEFT,
+}
+"""How an event of a trial meeting (ADR 0071) is recorded: as its own kinds, so the
+appointment's call status (participants, host joined) never counts the trial. The meeting's
+start and end are left out: our own jobs open and delete it."""
 
 
 class JoinState(StrEnum):

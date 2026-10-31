@@ -56,7 +56,7 @@ already existed, but there was no SMS adapter, no screen for reminder rules and 
 | Step | What | PR | State |
 |---|---|---|---|
 | 1 | Channel settings, SMS through Webex Connect, reminder rules, group texts | #19, #29 | built |
-| 2 | Organisation-wide text editor (the last Consequences point) | #168 | in PR |
+| 2 | Organisation-wide text editor (the last Consequences point) | #168 | merged |
 
 ## Consequences
 
