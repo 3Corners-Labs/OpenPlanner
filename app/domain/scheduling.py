@@ -249,6 +249,9 @@ class Group:
             iCalendar invite per booking (ADR 0043 point 9); ``None`` sends none.
         idp_key: The value the identity provider names the group by in an entitlement
             (ADR 0049 point 4); the slug until the organisation admin sets it.
+        archived_at: When the group was archived (ADR 0084 point 3), or ``None`` while it is
+            in use. An archived group takes no bookings, answers 404 on its public page, is
+            read-only in the portal and keeps its slug until the nightly sweep erases it.
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -283,6 +286,12 @@ class Group:
     max_bookings_per_email: int = DEFAULT_MAX_BOOKINGS_PER_EMAIL
     calendar_invite_address: str | None = None
     idp_key: str = ""
+    archived_at: datetime | None = None
+
+    @property
+    def is_archived(self) -> bool:
+        """Return whether the group is archived (ADR 0084)."""
+        return self.archived_at is not None
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""

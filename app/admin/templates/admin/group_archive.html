@@ -1,0 +1,34 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.group.archive.title") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="archive-heading">
+  <div class="card__header">
+    <h2 id="archive-heading">{{ _("admin.group.archive.title") }}</h2>
+    <p class="card__lead">{{ _("admin.group.archive.lead") }}</p>
+  </div>
+  <h3>{{ _("admin.group.archive.what_happens") }}</h3>
+  <ul>
+    <li>{{ _("admin.group.archive.effect_public", slug=summary.group.slug) }}</li>
+    <li>{{ _("admin.group.archive.effect_portal") }}</li>
+    <li>{{ _("admin.group.archive.effect_slug") }}</li>
+    <li>{{ _("admin.group.archive.effect_data") }}</li>
+  </ul>
+  {% if bookings_ahead %}
+  <div class="alert alert--info" role="status"><p>{{ _("admin.group.archive.bookings_ahead", count=bookings_ahead) }} <a href="/admin/groups/{{ summary.group.slug }}/closure">{{ _("admin.group.archive.close_first") }}</a></p></div>
+  {% endif %}
+</section>
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/archive" novalidate aria-labelledby="confirm-heading">
+  <h2 id="confirm-heading">{{ _("admin.group.archive.confirm_heading") }}</h2>
+  <div class="form-grid">
+    {{ field(confirmation) }}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button button--danger"{% if bookings_ahead %} aria-describedby="archive-blocked"{% endif %}>{{ _("admin.group.archive.button") }}</button>
+    <a href="/admin/groups/{{ summary.group.slug }}/settings">{{ _("admin.cancel") }}</a>
+    {% if bookings_ahead %}<p class="hint" id="archive-blocked">{{ _("admin.group.archive.blocked_hint") }}</p>{% endif %}
+  </div>
+</form>
+{% endblock %}

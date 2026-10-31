@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -519,6 +520,16 @@ async def test_get_group(service: BookingService) -> None:
     assert (await service.get_group("aangifte")).id == 1
     with pytest.raises(DomainError, match="group_not_found"):
         await service.get_group("nope")
+
+
+async def test_an_archived_group_is_not_found_in_public(
+    service: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    """ADR 0084: the public page and the API answer 404 for an archived group."""
+    uow.state.groups[1] = replace(uow.state.groups[1], archived_at=NOW)
+
+    with pytest.raises(DomainError, match="group_not_found"):
+        await service.get_group("aangifte")
 
 
 def test_token_key_must_be_long_enough(uow: InMemoryUnitOfWork) -> None:

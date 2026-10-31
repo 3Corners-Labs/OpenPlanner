@@ -81,4 +81,13 @@
     <p class="hint">{{ _("admin.check.after_save") }}</p>
   </form>
 </section>
+{% if can("group.delete", summary) %}
+<section class="card" id="archive" aria-labelledby="archive-heading">
+  <div class="card__header">
+    <h2 id="archive-heading">{{ _("admin.group.archive.title") }}</h2>
+    <p class="card__lead">{{ _("admin.group.archive.settings_lead") }}</p>
+  </div>
+  <p><a class="button button--secondary" href="/admin/groups/{{ summary.group.slug }}/settings/archive">{{ _("admin.group.archive.open") }}</a></p>
+</section>
+{% endif %}
 {% endblock %}
