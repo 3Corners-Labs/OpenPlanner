@@ -19,8 +19,8 @@ from app.api.maintenance import (
     GROUP_ROUTES,
     OPEN_ROUTES,
     WIDGET_ROUTES,
-    participant_gate,
     machine_gate,
+    participant_gate,
     register_machine_maintenance,
 )
 from app.config import Settings

@@ -15,8 +15,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.api.participant import participant_page
 from app.api.labels import slot_label
+from app.api.participant import participant_page
 from app.domain.trial_call_service import TrialCallService, TrialView
 from app.i18n.dates import format_clock
 from app.web.locale import RequestLocale, request_locale
