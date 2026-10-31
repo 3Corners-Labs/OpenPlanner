@@ -17,7 +17,7 @@ package; when the two disagree, the code wins.
 | Built? | ADRs |
 |---|---|
 | BUILT | 47 |
-| PARTIAL | 21 |
+| PARTIAL | 23 |
 | NOT BUILT | 5 |
 | POLICY | 3 |
 
@@ -97,8 +97,10 @@ package; when the two disagree, the code wins.
 | 0072 | Direct calls per block, live status | PARTIAL | #155 (step 1); migration 0064 | Step 2: the updates page on `live-region.js` (a follow-up listed in the ADR) |
 | 0073 | Email deliverability: sender domain check, system mail headers | PARTIAL | step 1 #166; no migration | Step 2 (a periodic check in the worker) is decided after step 1 is in use (ADR decision 6) |
 | 0074 | Organisation text overrides | BUILT | #168; migration 0074; `domain/text_overrides.py`, `adapters/db/text_overrides.py`, `admin/organisation_text_routes.py` | Step 2: the global (superuser) layer, `.po` export and import, revision counter (follow-up, listed in the ADR) |
-| 0075 | Browser-direct join link per group | PARTIAL | Steps 1 and 2 (PR #171); migration 0075 | Step 3: confirmation with the Webex app installed, on docker01 |
-| 0076 | Participant journey: trial call events, the page sent to | PARTIAL | Step 1 (PR #171); no migration | Step 2: the signal *followed, nobody entered*; step 3: the merged journey view |
+| 0075 | Browser-direct join link per group | PARTIAL | Steps 1 and 2 (#171); migration 0075 | Step 3: confirmation with the Webex app installed, on docker01 |
+| 0076 | Participant journey: trial call events, the page sent to | PARTIAL | Step 1 (#171); no migration | Step 2: the signal *followed, nobody entered*; step 3: the merged journey view |
+| 0078 | Build work merges on green; decisions and releases wait for the product owner; audit before a minor release | PARTIAL | steps 0–2 (#177); step 4 (#180): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | Steps 3 and 5: the required check and the label on GitHub, the first audited minor release (prepared by ADR 0079) |
+| 0079 | The release is a workflow: release PR, audit and tag by dispatch | PARTIAL | steps 0–2 (#183): `.github/workflows/release.yml`, `scripts/release_pr.py`, `tests/scripts/test_release_pr.py`, dry run on the PR branch | Step 3: the secrets `RELEASE_TOKEN` and `OPENAI_API_KEY` (product owner); step 4: the first release through the workflow, `v0.4.0`, with the first real audit |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 
