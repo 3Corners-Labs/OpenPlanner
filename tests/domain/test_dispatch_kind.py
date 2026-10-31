@@ -16,7 +16,7 @@ def test_existing_groups_keep_the_contact_center() -> None:
     group = make_group()
 
     assert group.dispatch_kind is DispatchKind.CONTACT_CENTER
-    assert group.citizen_change_lead_minutes == 60
+    assert group.participant_change_lead_minutes == 60
 
 
 def test_only_contact_center_groups_send_work_items() -> None:
@@ -27,7 +27,7 @@ def test_only_contact_center_groups_send_work_items() -> None:
 @pytest.mark.parametrize("kind", list(DispatchKind))
 def test_citizen_moves_until_the_change_lead_for_both_kinds(kind: DispatchKind) -> None:
     start = datetime(2026, 11, 2, 9, 30, tzinfo=UTC)
-    group = make_group(dispatch_kind=kind, citizen_change_lead_minutes=90)
+    group = make_group(dispatch_kind=kind, participant_change_lead_minutes=90)
 
     assert group.change_deadline(start) == start - timedelta(minutes=90)
 
@@ -51,21 +51,23 @@ def test_a_monday_booking_is_not_locked_since_friday() -> None:
 @pytest.mark.parametrize("minutes", [-1, 1441])
 def test_change_lead_is_bounded(minutes: int) -> None:
     with pytest.raises(DomainError) as excinfo:
-        make_group(citizen_change_lead_minutes=minutes)
+        make_group(participant_change_lead_minutes=minutes)
 
-    assert excinfo.value.field == "citizen_change_lead_minutes"
+    assert excinfo.value.field == "participant_change_lead_minutes"
 
 
 @pytest.mark.parametrize("minutes", [0, 1440])
 def test_change_lead_accepts_the_bounds(minutes: int) -> None:
-    make_group(citizen_change_lead_minutes=minutes, dispatch_lead_minutes=0)
+    make_group(participant_change_lead_minutes=minutes, dispatch_lead_minutes=0)
 
 
 def test_change_lead_is_never_shorter_than_the_dispatch_lead() -> None:
     with pytest.raises(DomainError) as excinfo:
-        make_group(dispatch_lead_minutes=15, min_notice_minutes=60, citizen_change_lead_minutes=10)
+        make_group(
+            dispatch_lead_minutes=15, min_notice_minutes=60, participant_change_lead_minutes=10
+        )
 
-    assert excinfo.value.field == "citizen_change_lead_minutes"
+    assert excinfo.value.field == "participant_change_lead_minutes"
 
 
 def test_only_an_own_queue_group_with_an_address_sends_the_team_invite() -> None:

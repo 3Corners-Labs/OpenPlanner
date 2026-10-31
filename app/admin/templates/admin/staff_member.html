@@ -18,6 +18,25 @@
   </dl>
   <p class="muted">{{ _("admin.staff.source") }}</p>
 </section>
+{% if person.refused %}
+<section class="card" aria-labelledby="refused-heading">
+  <h2 id="refused-heading">{{ _("admin.staff.refused") }}</h2>
+  <p class="muted">{{ _("admin.staff.refused_intro") }}</p>
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.staff.refused") }}</caption>
+    <thead>
+      <tr><th scope="col">{{ _("admin.staff.refused_value") }}</th><th scope="col">{{ _("admin.staff.refused_reason") }}</th><th scope="col">{{ _("admin.staff.refused_received") }}</th></tr>
+    </thead>
+    <tbody>
+      {% for r in person.refused %}
+      <tr><td><code>{{ r.value }}</code></td><td>{{ r.reason }}</td><td class="nowrap">{{ r.received }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
 <section class="card" aria-labelledby="times-heading">
   <h2 id="times-heading">{{ _("admin.staff.times") }}</h2>
   <dl class="facts">

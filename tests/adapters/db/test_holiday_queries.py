@@ -9,14 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.admin import AdminService
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.holiday_service import HolidayService
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.support.domain import MONDAY, NOW, TEST_TOKEN_KEY
+from tests.support.principals import principal
 
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+SUPER = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 
 
 async def _calendars(uow: SqlUnitOfWork) -> tuple[HolidayCalendar, HolidayCalendar]:

@@ -9,10 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.adapters.db.models import StaffRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Role, Scope
-from app.domain.staff import Membership, StaffFilter, StaffMember, visible
+from app.domain.staff import Membership, RefusedEntitlement, StaffFilter, StaffMember, visible
 from tests.support.domain import NOW
 
-DEMO, DEMO_TEAM, OTHER = Membership("demo"), Membership("demo", "team"), Membership("andere")
+DEMO = Membership("org_admin", "demo")
+DEMO_TEAM = Membership("group_admin", "demo", "team")
+OTHER = Membership("org_admin", "andere")
 
 PEOPLE = (
     StaffMember(
@@ -46,7 +48,7 @@ SCOPES = (
     Scope(everything=True),
     Scope(organisations=frozenset({"demo"})),
     Scope(organisations=frozenset({"andere"})),
-    Scope(groups=frozenset({"team"})),
+    Scope(groups=frozenset({("demo", "team")})),
     Scope(),
 )
 
@@ -116,6 +118,60 @@ async def test_seen_and_logout_are_recorded_for_known_subjects_only(engine: Asyn
     assert olaf is not None
     assert (olaf.last_seen_at, olaf.last_logout_at) == (later, later)
     assert unknown is None
+
+
+async def test_refusals_round_trip_and_feed_the_filter_and_the_mapping(engine: AsyncEngine) -> None:
+    # ADR 0049 points 8 and 17.
+    uow = await _people(engine)
+    refused = (
+        RefusedEntitlement("openplanner:org_admin:gem-x", "unknown_organisation", None, NOW),
+        RefusedEntitlement("openplanner:agent:demo/nope", "unknown_group", "demo", NOW),
+    )
+    async with uow.locked() as tx:
+        await tx.save_staff(replace(PEOPLE[0], refused=refused))
+    async with uow.read() as tx:
+        olaf = await tx.get_staff("sub-org")
+        flagged = await tx.list_staff(Scope(everything=True), StaffFilter(unrecognised=True))
+        for_demo = await tx.list_refused_entitlements(
+            Scope(organisations=frozenset({"demo"})), NOW - timedelta(days=1)
+        )
+        for_all = await tx.list_refused_entitlements(
+            Scope(everything=True), NOW - timedelta(days=1)
+        )
+        stale = await tx.list_refused_entitlements(Scope(everything=True), NOW + timedelta(days=1))
+        holders = await tx.list_grant_holders(Scope(organisations=frozenset({"demo"})))
+        directory = await tx.get_directory()
+
+    assert olaf is not None
+    assert olaf.refused == tuple(sorted(refused, key=lambda r: r.value))
+    assert [m.subject for m in flagged] == ["sub-org"]
+    assert [r.value for r in for_demo] == ["openplanner:agent:demo/nope"]
+    assert len(for_all) == 2
+    assert stale == []
+    assert [(h.membership, h.holders) for h in holders] == [
+        (DEMO, 2),
+        (DEMO_TEAM, 2),
+    ]
+    assert directory.organisations == ()
+    assert directory.groups == ()
+    assert directory.roles["org_admin"].value == "organisations"
+
+
+async def test_the_directory_carries_the_idp_values_of_organisations_and_groups(
+    engine: AsyncEngine,
+) -> None:
+    from app.adapters.db.seed import seed_demo
+
+    await seed_demo(engine)
+    async with SqlUnitOfWork(engine).read() as tx:
+        directory = await tx.get_directory()
+
+    assert directory.organisation_by_idp_key("demo") is not None
+    assert directory.organisation_by_idp_key("demo").slug == "demo"  # type: ignore[union-attr]
+    demo = directory.group_by_slug("demo")
+    assert demo is not None
+    assert (demo.idp_key, demo.organisation) == ("demo", "demo")
+    assert directory.groups_by_idp_key("andere-team")[0].organisation == "andere"
 
 
 async def test_a_carried_over_profile_is_not_recorded_yet(engine: AsyncEngine) -> None:

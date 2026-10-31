@@ -21,6 +21,8 @@ from app.domain.authorization import (
     REQUIRES,
     TEMPLATES,
     CustomRole,
+    Decision,
+    Grant,
     Level,
     Permission,
     Principal,
@@ -65,18 +67,17 @@ def custom(template: Role, permissions: frozenset[Permission], role_id: int = 1)
     )
 
 
+def grant_of(role: CustomRole, organisation: str = "demo", group: str = "demo") -> Grant:
+    """The grant of ``role`` on the organisation, or on the group for a group-reach role."""
+    if role.reach is Reach.ORGANISATIONS:
+        return Grant(role.key, organisation)
+    return Grant(role.key, organisation, group)
+
+
 def holder(role: CustomRole) -> Principal:
-    """A principal holding only ``role``, in organisation demo and group demo."""
-    base = Principal("c", "Carla Custom", frozenset(), frozenset({"demo"}), frozenset({"demo"}))
+    """A principal holding only ``role``, in organisation demo (and group demo)."""
     return RoleCatalogue((role,)).holding(
-        Principal(
-            base.subject,
-            base.display_name,
-            base.roles,
-            base.organisations,
-            base.groups,
-            role_claims=frozenset({role.claim_value}),
-        )
+        Principal("c", "Carla Custom", frozenset({grant_of(role)}))
     )
 
 
@@ -251,7 +252,9 @@ def test_decide_never_allows_more_than_the_definition(
 def test_a_copy_of_the_template_decides_exactly_like_the_template(template: Role) -> None:
     role = custom(template, MATRIX[template])
     copy = holder(role)
-    original = Principal("t", "T", frozenset({template}), copy.organisations, copy.groups)
+    original = Principal(
+        "t", "T", frozenset(Grant(template.value, g.organisation, g.group) for g in copy.grants)
+    )
     for permission in Permission:
         for target in TARGETS[LEVELS[permission]]:
             assert (
@@ -274,50 +277,47 @@ def test_group_reach_uses_the_group_claim_and_organisation_reach_the_organisatio
     view = EVERY_ADMIN | {Permission.GROUP_VIEW}
     group_role = holder(custom(Role.GROUP_ADMIN, view))
     org_role = holder(custom(Role.ORG_ADMIN, view))
-    assert scope_for(group_role, Permission.GROUP_VIEW) == Scope(groups=frozenset({"demo"}))
+    assert scope_for(group_role, Permission.GROUP_VIEW) == Scope(
+        groups=frozenset({("demo", "demo")})
+    )
     assert scope_for(org_role, Permission.GROUP_VIEW) == Scope(organisations=frozenset({"demo"}))
 
 
 # Linking to the identity provider.
 
 
-def test_a_role_is_held_only_through_its_claim_value() -> None:
+def test_a_role_is_held_only_through_a_grant_naming_its_key() -> None:
     role = custom(Role.GROUP_ADMIN, MATRIX[Role.GROUP_ADMIN])
     catalogue = RoleCatalogue((role,))
-    none = Principal("x", "X", frozenset(), frozenset(), frozenset({"demo"}))
-    other = Principal(
-        "x", "X", frozenset(), frozenset(), frozenset({"demo"}), role_claims=frozenset({"nope"})
-    )
+    none = Principal("x", "X")
+    other = Principal("x", "X", frozenset({Grant("custom.99", "demo", "demo")}))
     assert catalogue.holding(none).custom_roles == frozenset()
     assert catalogue.holding(other).custom_roles == frozenset()
-    assert not holds_a_role(catalogue.holding(other))
+    assert not holds_a_role(none)
+    # A grant naming an unknown role key gives nothing: no role, not even the basics.
     assert decide(catalogue.holding(other), Permission.DASHBOARD_VIEW, Target.everything()) == (
-        decide(none, Permission.DASHBOARD_VIEW, Target.everything())
+        Decision(False, Reason.NO_ROLE)
     )
+    assert permissions_for(catalogue.holding(other)) == []
     assert holder(role).custom_roles == frozenset({role})
     assert holds_a_role(holder(role))
 
 
 def test_a_deleted_role_leaves_its_holders_without_a_role() -> None:
     role = custom(Role.ORG_ADMIN, MATRIX[Role.ORG_ADMIN])
-    principal = RoleCatalogue(()).holding(holder(role))
-    assert decide(principal, Permission.DASHBOARD_VIEW, Target.everything()).reason is (
-        Reason.NO_ROLE
-    )
-    assert permissions_for(principal) == []
+    carla = RoleCatalogue(()).holding(holder(role))
+    assert decide(carla, Permission.DASHBOARD_VIEW, Target.everything()).reason is (Reason.NO_ROLE)
+    assert permissions_for(carla) == []
 
 
 def test_role_keys_name_built_in_and_custom_roles() -> None:
     role = custom(Role.ORG_ADMIN, MATRIX[Role.ORG_ADMIN], role_id=7)
-    principal = holder(role)
+    carla = holder(role)
     mixed = Principal(
-        principal.subject,
-        principal.display_name,
-        frozenset({Role.AUDITOR}),
-        principal.organisations,
-        principal.groups,
-        role_claims=principal.role_claims,
-        custom_roles=principal.custom_roles,
+        carla.subject,
+        carla.display_name,
+        carla.grants | {Grant(Role.AUDITOR.value, "demo")},
+        carla.custom_roles,
     )
     assert role.key == "custom.7"
     assert role_keys(mixed) == ["auditor", "custom.7"]
@@ -341,38 +341,27 @@ def test_two_custom_roles_add_up_within_their_own_reach() -> None:
     group_edit = custom(
         Role.GROUP_ADMIN, EVERY_ADMIN | {Permission.GROUP_VIEW, Permission.GROUP_EDIT}, 2
     )
-    principal = RoleCatalogue((org_view, group_edit)).holding(
+    carla = RoleCatalogue((org_view, group_edit)).holding(
         Principal(
             "c",
             "C",
-            frozenset(),
-            frozenset({"andere"}),
-            frozenset({"demo"}),
-            role_claims=frozenset({org_view.claim_value, group_edit.claim_value}),
+            frozenset({Grant(org_view.key, "andere"), Grant(group_edit.key, "demo", "demo")}),
         )
     )
-    assert decide(principal, Permission.GROUP_VIEW, OTHER_GROUP).allowed
-    assert decide(principal, Permission.GROUP_EDIT, OWN_GROUP).allowed
-    assert not decide(principal, Permission.GROUP_EDIT, OTHER_GROUP).allowed
+    assert decide(carla, Permission.GROUP_VIEW, OTHER_GROUP).allowed
+    assert decide(carla, Permission.GROUP_EDIT, OWN_GROUP).allowed
+    assert not decide(carla, Permission.GROUP_EDIT, OTHER_GROUP).allowed
 
 
 def test_principal_repr_hides_the_display_name() -> None:
-    principal = holder(custom(Role.ORG_ADMIN, MATRIX[Role.ORG_ADMIN]))
-    assert "Carla" not in repr(principal)
+    carla = holder(custom(Role.ORG_ADMIN, MATRIX[Role.ORG_ADMIN]))
+    assert "Carla" not in repr(carla)
 
 
 def test_combinations_of_templates_never_reach_everything() -> None:
     for first, second in itertools.combinations(TEMPLATES, 2):
-        principal = RoleCatalogue(
-            (custom(first, MATRIX[first], 1), custom(second, MATRIX[second], 2))
-        ).holding(
-            Principal(
-                "c",
-                "C",
-                frozenset(),
-                frozenset(),
-                frozenset(),
-                role_claims=frozenset({"openplanner-custom-1", "openplanner-custom-2"}),
-            )
+        one, two = custom(first, MATRIX[first], 1), custom(second, MATRIX[second], 2)
+        carla = RoleCatalogue((one, two)).holding(
+            Principal("c", "C", frozenset({grant_of(one), grant_of(two)}))
         )
-        assert not scope_for(principal, Permission.GROUP_VIEW).everything
+        assert not scope_for(carla, Permission.GROUP_VIEW).everything

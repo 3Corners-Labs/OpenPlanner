@@ -32,7 +32,7 @@ The register (`app/web/navigation.py`), the three sections, the `<details>` prof
 
 | ID | Item | Size | Done when | Status |
 |---|---|---|---|---|
-| SH-1 | Collapsed icon rail on tablet and a bottom bar with *More* on phone, CSS only (`<details>` for *More*); entries still from the register | M | Keyboard-only pass; axe zero violations at 375, 768 and 1280 px; `docs/admin-map.md` unchanged | built (#147); the design's menu button that collapses or expands it on any width: #208 |
+| SH-1 | Collapsed icon rail on tablet and a bottom bar with *More* on phone, CSS only (`<details>` for *More*); entries still from the register | M | Keyboard-only pass; axe zero violations at 375, 768 and 1280 px; `docs/admin-map.md` unchanged | built (#147); the design's menu button that collapses or expands it on any width: #217; the design's sticky menu with its own scroll: #209 |
 | SH-2 | Top bar end: status, tasks and alerts links before help, language and profile, each with a count where it applies; profile gains *My rights* and alert preferences | M | No role switcher anywhere (test greps templates); counts rendered server-side; links carry `aria-label` with the count | open |
 | SH-3 | Organisation › group filter in the top bar for overview and lists: GET form, only objects in the user's scope, links to the object page | S | Abuse case "filter value outside scope" with a test; never an edit form | open |
 

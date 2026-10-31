@@ -108,6 +108,7 @@ DONE_MESSAGES: dict[str, str] = {
 FIELD_MESSAGES: dict[str, str] = {
     "name": "admin.form.error.name",
     "slug": "admin.form.error.slug",
+    "idp_key": "admin.form.error.idp_key",
     "organisation": "admin.form.error.organisation",
     "default_locale": "admin.form.error.default_locale",
     "timezone": "admin.form.error.timezone",
@@ -116,7 +117,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "horizon_days": "admin.form.error.horizon_days",
     "dispatch_lead_minutes": "admin.form.error.dispatch_lead_minutes",
     "dispatch_kind": "admin.form.error.choice",
-    "citizen_change_lead_minutes": "admin.form.error.citizen_change_lead_minutes",
+    "participant_change_lead_minutes": "admin.form.error.citizen_change_lead_minutes",
     "planner_change_min_lead_minutes": "admin.form.error.planner_change_min_lead_minutes",
     "queue_visible_from_minutes": "admin.form.error.queue_visible_from_minutes",
     "queue_free_pick_allowed": "admin.form.error.choice",
@@ -211,6 +212,7 @@ FIELD_TARGET: dict[str, str] = {
 
 CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
+    ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
     ErrorCode.ORGANISATION_NOT_FOUND: "admin.form.error.organisation",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
     ErrorCode.DATABASE_BUSY: "error.database_busy",

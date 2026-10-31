@@ -6,7 +6,7 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.branding import Branding
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.organisations import NewOrganisation, OrganisationService, OrganisationSettings
@@ -14,12 +14,13 @@ from app.domain.scheduling import Organisation
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW
+from tests.support.principals import principal
 
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
-OTHER_ADMIN = Principal("o-2", "P", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
-AUDITOR = Principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
-GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
+SUPER = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+ORG_ADMIN = principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+OTHER_ADMIN = principal("o-2", "P", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
+AUDITOR = principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
+GROUP_ADMIN = principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
 LOCALES = ("nl", "en")
 
 

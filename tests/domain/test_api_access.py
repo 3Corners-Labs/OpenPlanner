@@ -22,19 +22,20 @@ from app.domain.api_clients import (
     credential_hash,
 )
 from app.domain.audit import Outcome
-from app.domain.authorization import ApiScope, Principal, Role
+from app.domain.authorization import ApiScope, Role
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import Organisation
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW, make_group
+from tests.support.principals import principal
 
 READ = ApiScope.AVAILABILITY_READ
 WXCC_EGRESS = "198.51.100.0/24"
 INSIDE, OUTSIDE = "198.51.100.7", "203.0.113.9"
 NOBODY: frozenset[str] = frozenset()
-SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), NOBODY, NOBODY)
-ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), NOBODY)
+SUPER = principal("s-1", "S", frozenset({Role.SUPERUSER}), NOBODY, NOBODY)
+ORG_ADMIN = principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), NOBODY)
 ORGANISATIONS = (Organisation(1, "Demo-gemeente", "demo"), Organisation(2, "Andere", "andere"))
 
 
