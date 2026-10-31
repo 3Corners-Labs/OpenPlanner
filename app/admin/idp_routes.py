@@ -87,8 +87,8 @@ AUTH_LABELS: dict[ClientAuth, str] = {
 
 TEST_FAILURES: dict[str, str] = {
     "discovery_failed": "admin.idp.test_failed.discovery_failed",
-    "token_exchange_failed": "admin.idp.test_failed.token_exchange_failed",
-    "invalid_token": "admin.idp.test_failed.invalid_token",
+    "token_exchange_failed": "admin.idp.test_failed.token_exchange_failed",  # noqa: S105  # nosec B105
+    "invalid_token": "admin.idp.test_failed.invalid_token",  # noqa: S105  # nosec B105
     "nonce_mismatch": "admin.idp.test_failed.invalid_token",
     "no_signing_key": "admin.idp.test_failed.no_signing_key",
     "too_many_entitlements": "admin.idp.test_failed.too_many_entitlements",

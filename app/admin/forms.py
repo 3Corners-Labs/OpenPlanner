@@ -211,7 +211,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "discovery_url": "admin.form.error.discovery_url",
     "client_id": "admin.form.error.integration_text",
     "client_auth": "admin.form.error.choice",
-    "client_secret": "admin.form.error.client_secret",
+    "client_secret": "admin.form.error.client_secret",  # noqa: S105  # nosec B105 - a key
     "entitlement_claim": "admin.form.error.entitlement_claim",
     "entitlement_prefix": "admin.form.error.entitlement_prefix",
 }
