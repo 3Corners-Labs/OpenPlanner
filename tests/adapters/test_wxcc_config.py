@@ -316,3 +316,21 @@ def test_report_lines_carry_the_group() -> None:
     report = format_report(check_groups([GROUP], _config()))
 
     assert "[aangifte] channel" in report
+
+
+def test_the_probe_branch_is_advice_until_the_flow_ends_probes_itself() -> None:
+    without = _by_name(check_groups([GROUP], _config()))
+    with_branch = parse_flow(
+        {
+            **FLOW_DOC,
+            "nodes": [
+                *FLOW_DOC["nodes"],
+                {"name": "Case", "properties": {"activityName": "case", "value": "probe"}},
+            ],
+        }
+    )
+
+    assert not without["probe branch"].ok
+    assert not without["probe branch"].required  # ADR 0082: OpenPlanner ends the probe itself
+    assert without["probe branch"].code == "probe.missing"
+    assert _by_name(check_groups([GROUP], _config(flow=with_branch)))["probe branch"].ok

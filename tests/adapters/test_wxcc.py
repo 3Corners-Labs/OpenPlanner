@@ -2,12 +2,19 @@
 
 import json
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 import httpx
 import pytest
 
-from app.adapters.wxcc import WORK_ITEM_FIELDS, WxccTasks, cancellation_body, task_body
-from app.domain.calls import WorkItem
+from app.adapters.wxcc import (
+    WORK_ITEM_FIELDS,
+    WxccTasks,
+    cancellation_body,
+    task_body,
+    task_snapshot,
+)
+from app.domain.calls import TaskSnapshot, TaskState, WorkItem
 from app.domain.ports import IntegrationError
 from tests.fakes.clock import FixedClock
 from tests.fakes.tokens import authorized_client
@@ -155,3 +162,50 @@ async def test_mark_cancelled_appends_a_task_message() -> None:
     assert seen[0].url.path == "/v2/tasks/141897a0/messages"
     message = json.loads(seen[0].content)["channelParams"]["message"]
     assert message["workItemData"] == {"bookingReference": "OP-000123", "kind": "cancelled"}
+
+
+async def test_read_task_keeps_only_state_status_and_last_change() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "id": "task-1",
+                    "status": "Connected",
+                    "lastUpdatedTime": 1767600600000,
+                    "owner": {"name": "Agent Name", "email": "agent@example.nl"},
+                    "workItemData": {"firstName": "Ada"},
+                }
+            },
+        )
+
+    snapshot = await _tasks(handler).read_task("task-1")
+
+    assert seen[0].method == "GET"
+    assert seen[0].url.path == "/v1/tasks/task-1"
+    assert snapshot == TaskSnapshot(
+        TaskState.CONNECTED, "connected", datetime(2026, 1, 5, 8, 10, tzinfo=UTC)
+    )
+
+
+@pytest.mark.parametrize(
+    ("status", "state"),
+    [("new", TaskState.QUEUED), ("ended", TaskState.ENDED), ("weird", TaskState.NONE)],
+)
+def test_wxcc_status_words_map_to_task_states(status: str, state: TaskState) -> None:
+    snapshot = task_snapshot({"data": {"status": status}})
+
+    assert (snapshot.state, snapshot.status, snapshot.changed_at) == (state, status, None)
+
+
+async def test_a_task_wxcc_does_not_know_is_none_and_other_refusals_raise() -> None:
+    unknown = _tasks(lambda request: httpx.Response(404, json={"error": "not found"}))
+    refused = _tasks(lambda request: httpx.Response(403, json={"error": "forbidden"}))
+
+    assert (await unknown.read_task("gone")).state is TaskState.NONE
+    with pytest.raises(IntegrationError) as error:
+        await refused.read_task("task-1")
+    assert error.value.code == "rejected_403"

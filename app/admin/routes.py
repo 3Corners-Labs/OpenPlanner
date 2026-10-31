@@ -29,6 +29,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.integrations import Integrations
+from app.adapters.service_app_check import SERVICE_APP_REPORT
 from app.admin import (
     agenda_routes,
     api_routes,
@@ -491,6 +492,7 @@ async def integrations(
         await reports.get(HEALTH_REPORT),
         locale.gettext,
         lambda at: admin_moment(request, locale, at),
+        await reports.get(SERVICE_APP_REPORT),
     )
     return _page(
         request,

@@ -60,6 +60,11 @@ No body, query string or header. Kept `INTEGRATION_REQUEST_RETENTION_DAYS` (defa
 and work item jobs with nothing to do are `skipped` with reason `already_done`, `no_video`,
 `own_queue` or `no_dispatch`.
 
+ADR 0082 adds `integration.service_app_check` (category `admin`, global): the Service App check
+from *Koppelingen*, outcome `success` or `failure`, reason `passed` or `failed`; the verdicts
+are in `integration_reports`, not in the event. The probe work item of a group check is
+recorded as `integration.request` events at the group's level, like the probe meeting.
+
 ADR 0053 adds the attempts on public entry points, all with outcome `denied` and a caller
 pseudonym `client:<16 hex>` in `detail` (also on `webhook.rejected`); the window then counts
 per kind and caller:
