@@ -3,7 +3,7 @@
 This file is read by Claude Code at the start of every session. It states how we work, not what we build; the what is in `docs/HANDOVER.md` and `docs/adr/`.
 
 ## Project in one line
-Lightweight group-booking service for a government contact center: embeddable widget, admin UI with IdP roles, Webex video links, Webex Contact Center task dispatch via Webex Connect, strict PII retention.
+Lightweight group-booking platform: organisations offer sessions to groups of participants, who book on a standalone page or an embeddable widget and join by video. Admin UI with IdP roles, Webex video links, Webex Contact Center task dispatch via Webex Connect, strict PII retention. The first client is a government contact center.
 
 ## Language
 - Code, identifiers, comments, commit messages, ADRs, README: **English**.
@@ -78,7 +78,7 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 - CSP, HSTS, `X-Frame-Options` (admin), CORS allow-list from settings. Widget endpoints allow only configured origins.
 - Calls to WxCC use OAuth tokens of a service app (ADR 0007). Every inbound webhook from WxCC is verified (signature or token, per WxCC's mechanism); reject if |now − ts| > 300 s.
 - Bootstrap secrets (settings encryption key, management token key, OIDC client secret, session secret) via env/secret store only; `.env.example` has placeholders. Integration secrets (SMTP, WxCC, messaging) are entered in the admin UI, stored AES-256-GCM encrypted, write-only, audited (ADR 0008). `gitleaks` blocks commits.
-- OIDC (admin portal only; citizens never log in; PingFederate in production, Keycloak in development, ADR 0013): `httpx` + `PyJWT`, PKCE, `state` and `nonce` checked, only asymmetric algorithms, session cookie `Secure; HttpOnly; SameSite=Lax`, 8 h lifetime. No login bypass or role switcher, ever.
+- OIDC (admin portal only; participants never log in; PingFederate in production, Keycloak in development, ADR 0013): `httpx` + `PyJWT`, PKCE, `state` and `nonce` checked, only asymmetric algorithms, session cookie `Secure; HttpOnly; SameSite=Lax`, 8 h lifetime. No login bypass or role switcher, ever.
 - Dependencies: only packages that are actively maintained **and** the de-facto standard in their field, with a license in {MIT, BSD, Apache-2.0, PSF}. AGPL/GPL packages need an ADR. Record the review in `docs/dependencies.md`.
 - Threat model lives in `docs/threat-model.md` (STRIDE per flow) together with an abuse-case list per public endpoint (slot exhaustion by bots, token guessing, rescheduling into another group's slot, PII through error messages). Every abuse case has a test. Update both when a flow changes.
 - External penetration test before go-live and yearly; `SECURITY.md` and `/.well-known/security.txt` describe responsible disclosure.
@@ -124,7 +124,7 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 - `docs/api.md` — generated from OpenAPI; `docs/webhooks.md` — payloads to/from Webex Connect.
 - `docs/widget.md` — how a website embeds the widget, CSP requirements, attributes.
 - `docs/agent-api.md` — how a contact-center bot connects to the machine API (ADR 0023).
-- `docs/manual/{nl,en}/` — admin manual, one topic per screen, shown in the portal and behind each field's (i) (ADR 0033). A PR that adds or changes an admin screen updates its topic; citizens get help in the page itself, never a link out.
+- `docs/manual/{nl,en}/` — admin manual, one topic per screen, shown in the portal and behind each field's (i) (ADR 0033). A PR that adds or changes an admin screen updates its topic; participants get help in the page itself, never a link out.
 
 ## How to work in this repo (for Claude Code)
 - Read `docs/HANDOVER.md` §3 (domain) and §5 (flows) before touching domain code.
