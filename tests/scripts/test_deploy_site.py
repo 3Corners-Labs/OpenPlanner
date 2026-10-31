@@ -114,3 +114,13 @@ def test_a_relative_build_path_works(git: Git, dist: Path, remote: Path) -> None
     result = _deploy("dist", _env(remote), cwd=dist.parent)
     assert result.returncode == 0, result.stderr
     assert "index.html" in _files(git, remote)
+
+
+def test_the_named_branch_is_pushed_even_when_the_repository_has_another(
+    git: Git, dist: Path, remote: Path
+) -> None:
+    assert _deploy(dist, _env(remote, SITE_DEPLOY_BRANCH="master")).returncode == 0
+    result = _deploy(dist, _env(remote, SITE_DEPLOY_BRANCH="main"), label="to main")
+    assert result.returncode == 0, result.stderr
+    assert "index.html" in _files(git, remote, "main")
+    assert "site: to main" in git("--git-dir", str(remote), "log", "-1", "--format=%s", "main")
