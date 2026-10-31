@@ -151,7 +151,7 @@ oldest on a full queue (a request is never blocked by logging).
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #NNN | in PR |
+| 0 | ADR proposed | #263 | in PR |
 | 1 | `TRACE` level, `trace()` helper, the five trace points, `TRACE_LEVEL_MAX_HOURS`, `SQL_SLOW_MS`, `docs/logging.md` | | planned |
 | 2 | Domain: `LogDestination` Protocol, destination model and validation, queue and sender with drop and backoff, counters, system event; `logging.manage` and `logging.view` in the matrix; migration | | planned |
 | 3 | Adapters: `syslog` (TLS, TCP, UDP), `splunk_hec`, `elastic`, `http`; contract tests against recorded fixtures and a local receiver in the test suite | | planned |
