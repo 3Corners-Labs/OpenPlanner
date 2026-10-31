@@ -12,6 +12,17 @@ and adapters) plus a building-block register is in `docs/diagrams/`: draw.io, PN
 Word, generated from `scripts/diagrams/content.py` with `make diagrams`. Update that content in
 the same PR as a change it shows.
 
+### Terms
+
+One word per role (ADR 0077). Code, docs and texts use these; earlier ADRs and `docs/HANDOVER.md` say "participant" or "deelnemer" for the participant.
+
+| Term (en / nl) | Meaning |
+|---|---|
+| Participant / deelnemer | The person who books, receives the mails and joins the call. Never logs in. |
+| Agent / medewerker | The person who takes the video call. Organisations may show another word, such as "behandelaar" (ADR 0077, point 8, not built yet). Not the planner, who is a separate role. |
+| Host | The Webex host of the meeting (Webex's word). |
+| Appointment / afspraak | The booking of a participant in a time slot. |
+
 ## 1. Purpose and scope
 
 Participants book a video call with a team of a contact center (a *group*, one
