@@ -6272,7 +6272,7 @@ msgid "admin.settings.new_value"
 msgstr "Nieuwe waarde"
 
 msgid "admin.settings.hours"
-msgstr "Terug naar standaard na (uren, hooguit {max})"
+msgstr "Terug naar standaard na (uren, hooguit {max}; TRACE hooguit {trace_max})"
 
 msgid "admin.settings.save"
 msgstr "Opslaan"

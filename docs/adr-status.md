@@ -17,8 +17,8 @@ package; when the two disagree, the code wins.
 | Built? | ADRs |
 |---|---|
 | BUILT | 48 |
-| PARTIAL | 27 |
-| NOT BUILT | 6 |
+| PARTIAL | 28 |
+| NOT BUILT | 5 |
 | POLICY | 3 |
 
 | ADR | Title | Built? | Evidence | What is missing |
@@ -106,7 +106,7 @@ package; when the two disagree, the code wins.
 | 0081 | Subjects and routing attributes next to the group | NOT BUILT | #179; privacy rule in CLAUDE.md | Steps 1–4 (subjects, attribute catalogue, routing mapping, block binding) |
 | 0082 | Contact-center integration: verification, health, alerts to administrators and a fallback per group | PARTIAL | #238; step 1 in PR: `ContactCenterDispatcher.read_task`, `adapters/group_check.py` (probe work item), `adapters/service_app_check.py`, `adapters/db/probes.py`, `worker.no_dispatch_jobs` | Steps 2–5 (health and reconcile, alert model with email and Webex bot, fallback per group, manual topic for the set-up) |
 | 0083 | Identity providers per organisation, chosen by email domain | PARTIAL | #248; step 1 in PR (#250): `domain/identity.py`, `adapters/outbound.py`, provider on the pending login, `dev/keycloak/andere-realm.json` | Steps 2–5 (registration with `private_key_jwt`, verified domains and email-first routing, host tools, docs and e2e) |
-| 0085 | Log destinations in the portal (syslog, Splunk, Elastic) and a trace level | NOT BUILT | #263 | Steps 1–5 (`TRACE` level and trace points, destination model and sender, the four adapters, the admin screen, kill switch and docs) |
+| 0085 | Log destinations in the portal (syslog, Splunk, Elastic) and a trace level | PARTIAL | #263; step 1 in PR: `TRACE` and `tracer` in `app/logging.py`, `api/trace.py`, `jobs/runner.py`, `adapters/http_trace.py`, `adapters/db/engine.py`, `web/templates.py`, `docs/logging.md`, `TRACE_LEVEL_MAX_HOURS`, `SQL_SLOW_MS` | Steps 2–5 (destination model and sender, the four adapters, the admin screen, kill switch and docs) |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 

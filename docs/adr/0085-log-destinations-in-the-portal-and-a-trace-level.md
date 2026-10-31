@@ -1,6 +1,6 @@
 # 0085. Log destinations in the portal (syslog, Splunk, Elastic) and a trace level
 
-Status: proposed (2026-10-31), requested by the product owner; not built. Amends ADR 0034
+Status: accepted (2026-10-31) by the product owner; partly built: step 1 (the `TRACE` level and the trace points) is in PR, steps 2–5 are planned. Amends ADR 0034
 point 4 (shipping is the host's job only) and extends ADR 0040 (levels) and ADR 0042 (`LOG_LEVEL`
 with expiry). ADR 0008 (encrypted integration secrets) and ADR 0047 (one home per screen)
 apply.

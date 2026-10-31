@@ -6272,7 +6272,7 @@ msgid "admin.settings.new_value"
 msgstr "New value"
 
 msgid "admin.settings.hours"
-msgstr "Back to the default after (hours, at most {max})"
+msgstr "Back to the default after (hours, at most {max}; TRACE at most {trace_max})"
 
 msgid "admin.settings.save"
 msgstr "Save"

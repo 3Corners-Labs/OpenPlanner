@@ -27,6 +27,7 @@ its own retention period.
 
 from collections.abc import Awaitable, Callable, Collection
 from datetime import datetime, timedelta
+from time import perf_counter
 from typing import Protocol
 
 import structlog
@@ -57,6 +58,7 @@ from app.i18n import DEFAULT_LOCALE
 from app.i18n.dates import clock_scope, use_clock
 from app.jobs.calls import CALL_JOBS, STALE, CallJobs
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
+from app.logging import tracer
 from app.web.call_labels import agent_start_label
 
 log = structlog.get_logger()
@@ -178,7 +180,14 @@ class JobRunner:
             with trace_scope():
                 await self._bind(job)
                 started = self._clock.now()
+                ticks = perf_counter()
                 await self._handle(job, now)
+                tracer.trace(
+                    "job.run",
+                    type=job.type.value,
+                    attempt=job.attempts,
+                    ms=int((perf_counter() - ticks) * 1000),
+                )
                 await self._debug(job, self._clock.now() - started)
         return len(jobs)
 
@@ -249,6 +258,7 @@ class JobRunner:
             log.info("job.lapsed", job_id=job.id, booking_id=job.booking_id)
             return None
         channel = job.channel or ChannelKind.EMAIL
+        step = perf_counter()
         async with self._uow.read() as tx:
             booking = await tx.get_booking(job.booking_id)
             group = await tx.get_group_by_id(booking.group_id) if booking else None
@@ -263,6 +273,7 @@ class JobRunner:
                 if group and job.type in TEAM_INVITES
                 else None
             )
+        step = self._step(job, "load", step)
         contact = booking.contact if booking else None
         if (
             booking is None
@@ -302,9 +313,18 @@ class JobRunner:
                     product_footer=self._product_footer is None
                     or self._product_footer(group.organisation_id),
                 )
+        step = self._step(job, "compose", step)
         await sender.send(message)
+        self._step(job, "send", step)
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)
         return None
+
+    @staticmethod
+    def _step(job: ClaimedJob, name: str, since: float) -> float:
+        """Trace one step of a message job (ADR 0085); return the start of the next."""
+        now = perf_counter()
+        tracer.trace("job.step", type=job.type.value, step=name, ms=int((now - since) * 1000))
+        return now
 
     async def _handle_failure(
         self,
