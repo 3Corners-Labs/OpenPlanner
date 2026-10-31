@@ -199,6 +199,24 @@ def test_the_icon_rail_is_written_once_and_switches_on_the_menu_width() -> None:
     assert ".admin-nav {\n  container-type: inline-size;" in sheet
     assert sheet.count("@container (max-width: 6rem)") == 1
     assert sheet.count(".admin-nav a:is(:hover, :focus-visible) > span") == 1
-    assert sheet.count("--adm-nav-width: 3.75rem") == 2
+    assert sheet.count("--adm-nav-width: var(--adm-rail-width)") == 2
     for state in ("collapse", "expand"):
         assert f".admin-nav-toggle__button--{state}" in sheet
+
+
+def test_the_menu_button_and_the_mark_form_one_cluster_on_the_left() -> None:
+    """The product mark sits next to the menu button, not in the middle of the bar (ADR 0047).
+
+    The bar no longer spreads its children; the end block pushes itself right, and the button's
+    form is as wide as the rail and starts at the window's edge, so it stands above the icons.
+    """
+    bar = _rule(".admin-topbar")
+    toggle = _rule(".admin-nav-toggle")
+
+    assert "justify-content" not in bar
+    assert "margin-left: auto" in _rule(".admin-topbar__end")
+    assert "margin-right: auto" not in _rule(".admin-scope")
+    assert "width: var(--adm-rail-width)" in toggle
+    assert "margin: 0 0 0 calc(-1 * var(--adm-topbar-pad))" in toggle
+    assert "justify-content: center" in toggle
+    assert _token("--adm-rail-width") == "3.75rem"
