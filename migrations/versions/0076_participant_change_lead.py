@@ -4,11 +4,11 @@
 constraint ``citizen_lead`` becomes ``participant_lead``; values are kept. The downgrade renames
 both back. Audit events already written keep the old field name in their detail.
 
-Revises 0074 (organisation texts). Open PRs also claim numbers, so recheck the head
+Revises 0075 (join client). Open PRs also claim numbers, so recheck the head
 before merging.
 
-Revision ID: 0075
-Revises: 0073
+Revision ID: 0076
+Revises: 0075
 Create Date: 2026-10-31 09:00:00.000000
 """
 
@@ -16,8 +16,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0075"
-down_revision: str | None = "0074"
+revision: str = "0076"
+down_revision: str | None = "0075"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
