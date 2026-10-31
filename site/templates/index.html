@@ -54,7 +54,7 @@
 <header class="top">
   <div class="wrap top__row">
     <a class="brand" href="{{ c.path }}">
-      <img class="brand__mark" src="{{ base }}static/brand/mark.svg" alt="" width="28" height="28">
+      <span class="brand__mark">{{ mark }}</span>
       <span class="brand__name">Open<b>Planner</b></span>
     </a>
     <nav class="top__nav" aria-label="{{ c.nav_github }}">
@@ -86,11 +86,7 @@
       </p>
     </div>
     <div class="hero__art" aria-hidden="true">
-      <div class="bigmark">
-        {%- for i in range(9) %}
-        <span class="bigmark__tile{% if i == 5 %} bigmark__tile--open{% endif %}"></span>
-        {%- endfor %}
-      </div>
+      <div class="bigmark">{{ mark }}</div>
     </div>
   </div>
   <div class="wrap">
@@ -307,7 +303,7 @@
         <path d="M150 150 L50 50 M150 150 L150 50 M150 150 L250 50 M150 150 L50 250 M150 150 L150 250 M150 150 L250 250"/>
       </svg>
       <div class="hub__center">
-        <img src="{{ base }}static/brand/mark.svg" alt="" width="56" height="56">
+        <span class="hub__mark">{{ mark }}</span>
         <strong>{{ c.integrations.center }}</strong>
       </div>
       {%- for it in c.integrations['items'] %}
@@ -463,7 +459,7 @@
 <footer class="foot">
   <div class="wrap foot__grid">
     <div>
-      <a class="brand" href="{{ c.path }}"><img class="brand__mark" src="{{ base }}static/brand/mark.svg" alt="" width="28" height="28"><span class="brand__name">Open<b>Planner</b></span></a>
+      <a class="brand" href="{{ c.path }}"><span class="brand__mark">{{ mark }}</span><span class="brand__name">Open<b>Planner</b></span></a>
       <p>{{ c.footer.tagline }}</p>
     </div>
     <ul class="foot__links">

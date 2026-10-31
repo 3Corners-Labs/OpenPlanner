@@ -282,3 +282,12 @@ def test_every_standard_has_a_known_status() -> None:
     for locale in LOCALES:
         standards = load_content(locale)["standards"]
         assert {item["status"] for item in standards["items"]} <= set(standards["status"])
+
+
+def test_the_site_shows_the_applications_own_mark(dist: Path) -> None:
+    mark = (ROOT / "app" / "web" / "static" / "brand" / "mark.svg").read_text(encoding="utf-8")
+    slot = re.search(r'<path d="([^"]+)"', mark)
+    assert slot is not None
+    html = (dist / "index.html").read_text(encoding="utf-8")
+    # Header, hero, integration hub and footer: the same drawing as the admin portal.
+    assert html.count(slot.group(1)) == 4

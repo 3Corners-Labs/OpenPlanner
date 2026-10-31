@@ -4,22 +4,27 @@
 
 :root {
   color-scheme: light dark;
+  /* The admin portal's tokens (app/web/static/admin.css), so the site and the product match. */
   --accent: light-dark(#01689b, #6cb4ee);
-  --accent-strong: light-dark(#154273, #9ccdf5);
-  --accent-subtle: light-dark(#e5f0f9, #10283a);
-  --slot: light-dark(#ee7f01, #f39a3a);
-  --slot-subtle: light-dark(#fff1e2, #3a2510);
-  --page: light-dark(#ffffff, #0f1419);
-  --tint: light-dark(#f3f5f7, #161c23);
-  --surface: light-dark(#ffffff, #1b232c);
-  --dark: #0f1419;
-  --dark-surface: #1b232c;
-  --text: light-dark(#1b1b1b, #e9eef3);
-  --muted: light-dark(#4f5a63, #a3b0bb);
-  --border: light-dark(#d6dde3, #2c3741);
-  --focus: light-dark(#ffb81c, #ffd166);
-  --on-accent: #ffffff;
-  --ok: light-dark(#1e7b3c, #6fd08c);
+  --accent-strong: light-dark(#004f78, #a5d2f5);
+  --accent-subtle: light-dark(#e5f0f6, #15324a);
+  --on-accent: light-dark(#ffffff, #0b1a26);
+  --slot: light-dark(#d46e00, #f39a3a);          /* --op-brand-slot: graphics only */
+  --slot-text: light-dark(#8a5300, #f2b84b);     /* --adm-warning: orange that passes 4.5:1 */
+  --slot-subtle: light-dark(#fdf3e1, #33270e);
+  --mark-tile: light-dark(#01689b, #6cb4ee);     /* ADR 0060 §3 */
+  --mark-slot: light-dark(#ee7f01, #f39a3a);
+  --page: light-dark(#ffffff, #111418);
+  --tint: light-dark(#f5f6f8, #1a1e23);
+  --surface: light-dark(#ffffff, #1a1e23);
+  --dark: #111418;
+  --dark-surface: #252a31;
+  --text: light-dark(#1b1f24, #e8ebef);
+  --muted: light-dark(#545d68, #aab3be);
+  --border: light-dark(#dde1e6, #343b44);
+  --focus: light-dark(#1b1f24, #ffffff);
+  --focus-halo: #ffbf47;
+  --ok: light-dark(#26703a, #74d08e);
   --radius: 10px;
   --radius-s: 6px;
   --wrap: 72rem;
@@ -47,7 +52,7 @@ h3 { font-size: 1.15rem; }
 p { margin: 0 0 1em; }
 a { color: var(--accent); text-underline-offset: .15em; }
 a:hover { color: var(--accent-strong); }
-:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 5px var(--focus-halo); border-radius: 3px; }
 img, svg { display: block; max-width: 100%; }
 button { font: inherit; color: inherit; }
 ul, ol { padding: 0; margin: 0; }
@@ -62,7 +67,7 @@ ul, ol { padding: 0; margin: 0; }
 .lead { font-size: clamp(1.1rem, 1.6vw, 1.3rem); color: var(--muted); max-width: 46rem; }
 .eyebrow { font-size: .85rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin-bottom: 1rem; }
 .accent { color: var(--accent); }
-.tag { display: inline-block; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--slot); margin: 0 0 .4rem; }
+.tag { display: inline-block; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--slot-text); margin: 0 0 .4rem; }
 .small { font-size: .85rem; color: var(--muted); }
 .notice { padding: 1rem 1.25rem; border-left: 4px solid var(--slot); background: var(--slot-subtle); border-radius: var(--radius-s); }
 
@@ -112,15 +117,21 @@ ul, ol { padding: 0; margin: 0; }
 .hero__copy .lead { max-width: 40rem; }
 @media (max-width: 56rem) { .hero__grid { grid-template-columns: 1fr; } .hero__art { order: -1; max-width: 14rem; } }
 
-/* The mark, large: nine tiles, the open slot moves and settles (ADR 0060 §7). */
-.bigmark { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8%; aspect-ratio: 1; width: min(100%, 22rem); margin-inline: auto; }
-.bigmark__tile { display: block; background: var(--accent); border-radius: 18%; transform-origin: center; animation: tile-in .7s var(--ease) both; }
-.bigmark__tile:nth-child(2) { animation-delay: .05s } .bigmark__tile:nth-child(3) { animation-delay: .1s }
-.bigmark__tile:nth-child(4) { animation-delay: .15s } .bigmark__tile:nth-child(5) { animation-delay: .2s }
-.bigmark__tile:nth-child(7) { animation-delay: .3s } .bigmark__tile:nth-child(8) { animation-delay: .35s } .bigmark__tile:nth-child(9) { animation-delay: .4s }
-.bigmark__tile--open { background: transparent; border: clamp(6px, 1.2vw, 12px) solid var(--slot); border-radius: 18% 18% 0 18%; transform: scale(1.1); animation: slot-in 1.4s var(--ease) .6s both; }
+/* The mark: the application's own mark.svg, inline (ADR 0060). Tiles and the open slot take
+   the brand tokens; the open slot slides in and settles (ADR 0060 §7), never with reduced motion. */
+.mark { display: block; width: 100%; height: auto; overflow: visible; }
+.mark g { fill: var(--mark-tile); }
+.mark path { fill: var(--mark-slot); }
+.brand__mark { display: block; width: 28px; height: 28px; }
+.hub__mark { display: block; width: 56px; height: 56px; }
+.bigmark { width: min(100%, 22rem); margin-inline: auto; }
+.bigmark .mark rect { transform-box: fill-box; transform-origin: center; animation: tile-in .7s var(--ease) both; }
+.bigmark .mark rect:nth-child(2) { animation-delay: .05s } .bigmark .mark rect:nth-child(3) { animation-delay: .1s }
+.bigmark .mark rect:nth-child(4) { animation-delay: .15s } .bigmark .mark rect:nth-child(5) { animation-delay: .2s }
+.bigmark .mark rect:nth-child(6) { animation-delay: .3s } .bigmark .mark rect:nth-child(7) { animation-delay: .35s } .bigmark .mark rect:nth-child(8) { animation-delay: .4s }
+.bigmark .mark path { transform-box: fill-box; animation: slot-in 1.4s var(--ease) .6s both; }
 @keyframes tile-in { from { transform: scale(.6); } to { transform: none; } }
-@keyframes slot-in { 0% { opacity: 0; transform: translate(-120%, 0) scale(1.1); } 60% { opacity: 1; transform: translate(6%, 0) scale(1.1); } 100% { transform: scale(1.1); } }
+@keyframes slot-in { 0% { opacity: 0; transform: translateX(-260%); } 60% { opacity: 1; transform: translateX(8%); } 100% { transform: none; } }
 
 .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin: clamp(2.5rem, 6vw, 4rem) 0 0; padding-top: 2rem; border-top: 1px solid var(--border); }
 .fact__value { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; letter-spacing: -0.02em; color: var(--accent); margin: 0; }
@@ -422,7 +433,7 @@ ul, ol { padding: 0; margin: 0; }
 .agenda__time { font-family: var(--mono); font-weight: 700; }
 .pill { font-size: .68rem; font-weight: 700; padding: .15rem .5rem; border-radius: 999px; background: var(--tint); color: var(--muted); }
 .pill--2 { background: var(--accent-subtle); color: var(--accent-strong); }
-.pill--3 { background: var(--slot-subtle); color: var(--slot); }
+.pill--3 { background: var(--slot-subtle); color: var(--slot-text); }
 .pill--4 { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
 .is-active .agenda__row--3 { animation: pulse 1.2s var(--ease) .8s 2; }
 
@@ -443,7 +454,7 @@ ul, ol { padding: 0; margin: 0; }
 .status__dot { width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
 .status--ci { color: var(--ok); }
 .status--built { color: var(--accent); }
-.status--partly { color: var(--slot); }
+.status--partly { color: var(--slot-text); }
 .status--planned { color: var(--muted); }
 .status--planned .status__dot { background: transparent; border: 2px solid currentColor; }
 .status--partly .status__dot { background: linear-gradient(90deg, currentColor 50%, transparent 50%); border: 1px solid currentColor; }
@@ -458,6 +469,6 @@ ul, ol { padding: 0; margin: 0; }
 .roadmap-list li { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; gap: .75rem; align-items: baseline; padding: .6rem 0; border-top: 1px solid var(--border); }
 .roadmap-list__adr { font-family: var(--mono); font-weight: 700; font-size: .9rem; text-decoration: none; }
 .roadmap-list__title { min-width: 0; }
-.roadmap-list__steps { font-size: .8rem; font-weight: 700; white-space: nowrap; color: var(--slot); }
+.roadmap-list__steps { font-size: .8rem; font-weight: 700; white-space: nowrap; color: var(--slot-text); }
 @media (max-width: 56rem) { .roadmap-list { grid-template-columns: 1fr; } }
 @media (max-width: 30rem) { .roadmap-list li { grid-template-columns: 1fr auto; } .roadmap-list__title { grid-column: 1 / -1; grid-row: 2; } }

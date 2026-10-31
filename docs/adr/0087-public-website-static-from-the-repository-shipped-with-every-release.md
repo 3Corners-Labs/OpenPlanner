@@ -9,7 +9,8 @@ visitor in two minutes what it is, what it does, which Webex products it connect
 get it. The product owner wants a modern public website at `openplanner.nl`: the story, the
 functions, the key features, enterprise readiness, the open-source licence and the community,
 with dynamic interaction, a moving impression of the user interface, and the current release
-on it. It is hosted on a web server at TransIP, apart from the application, and it is driven
+on it. It is hosted on a TransIP web hosting package, apart from the application, which deploys
+what is pushed to its git repository (`openplannernl@openps.ssh.transip.me:auto.git`). It is driven
 from Git: the repository is the source, GitHub Actions builds and publishes it, and a release
 updates it.
 
@@ -48,17 +49,18 @@ already has a design language (ADR 0060 mark, ADR 0020 tokens, NL Design System 
    their IP address to GitHub, which point 3 forbids. Without release data (a local build) the
    section links to the releases page.
 5. **The release train publishes it.** `main.yml` gets a job `site`: on every merge to `main`
-   and on every release tag it builds the site, attaches `site-<version>.tar.gz` to the
-   release the tag made (so every release carries the website that described it), and deploys
-   to the web server by `rsync` over SSH when the deployment secrets are set. Without them the
-   job only builds and uploads the artifact, so a fork and a pull request never deploy. The
-   candidate job does not deploy: a release candidate changes the application, not the site.
-6. **The deployment target is a secret of the forge, not a setting of the application.** The
-   host, user, path, private key and known-hosts line live as repository secrets
-   (`SITE_DEPLOY_HOST`, `SITE_DEPLOY_USER`, `SITE_DEPLOY_PATH`, `SITE_DEPLOY_KEY`,
-   `SITE_DEPLOY_KNOWN_HOSTS`), in a GitHub environment `website` so the key is used only by
-   this job on `main`. The key is a deploy-only key on the TransIP account with access to the
-   site's directory and nothing else; `docs/runbook.md` says how to rotate it.
+   (after the candidate job) and on every release tag (after `publish`) it builds the site,
+   attaches `site-<version>.tar.gz` to the release the tag made (so every release carries the
+   website that described it), and deploys by a `git push` to the web host's repository:
+   clone, replace the site files with the build, commit `site: <ref> <commit>`, push. The
+   host's repository holds every deployed version, so a rollback is a revert. Without the
+   remote and the key the job only builds and uploads the artifact, so a fork and a pull
+   request never deploy. The candidate job itself does not deploy.
+6. **The deployment target lives in the forge, not in the application.** The remote, the
+   host's key lines and the optional folder and branch are variables, the private key a
+   secret, all in a GitHub environment `website` so only this job on `main` reads them. The
+   key is a deploy-only key on the TransIP package; `docs/runbook.md` says how to rotate it
+   and lists the host key fingerprints to check.
 7. **The moving impression comes from the product itself.** Step 1 ships an animated tour as
    an HTML and CSS scene in the product's design language: the participant picks a time, the
    Webex meeting is made, the work item lands in the contact center queue, the agent joins.
@@ -98,7 +100,8 @@ None in the application: the website is outside it (point 6).
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `SITE_DEPLOY_HOST`, `_USER`, `_PATH`, `_KEY`, `_KNOWN_HOSTS` | B deployment (forge secrets) | unset (build only) | – | repository admin | Environment `website`; unset means no deploy |
+| `SITE_DEPLOY_REMOTE`, `SITE_DEPLOY_KNOWN_HOSTS`, `SITE_DEPLOY_DIR`, `SITE_DEPLOY_BRANCH` | B deployment (forge variables) | unset (build only); dir empty; branch `main` for an empty repository | dir relative, no `..` | repository admin | Environment `website` |
+| `SITE_DEPLOY_KEY` | B deployment (forge secret) | unset (build only) | – | repository admin | Deploy-only key on the TransIP package |
 
 **Fixed on purpose:** no cookies, no third-party requests, the CSP of point 3 (privacy by
 design, not a tunable), the two locales `nl` and `en` (a third is a content PR), and the
@@ -109,20 +112,19 @@ accessibility targets of point 9.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #271 | in PR |
-| 1 | `site/` (content nl/en, templates, stylesheet, script, animated tour in two tracks of six scenes, interactive demo, integrations, standards, roadmap from the ADR issues), `scripts/build_site.py`, `make site`, structural test, the `site` job with artifact and rsync deploy | #271 | in PR |
+| 1 | `site/` (content nl/en, templates, stylesheet, script, animated tour in two tracks of six scenes, interactive demo, integrations, standards, roadmap from the ADR issues), `scripts/build_site.py`, `make site`, structural test, the `site` job with artifact and a git-push deploy to TransIP | #271 | in PR |
 | 2 | The site's pages in the Playwright lane (keyboard, axe, Lighthouse) | | planned |
 | 3 | Recorded walkthrough of the real interface at release time (`tour.webm`, poster, captions) | | planned |
-| 4 | TransIP: deploy key, environment `website`, DNS for `openplanner.nl` and `www`, HTTPS and the response headers (HSTS, CSP, Referrer-Policy) on the web server (host work) | | planned |
+| 4 | TransIP: deploy key on the package, environment `website` with the remote, DNS for `openplanner.nl` and `www`, HTTPS and the response headers (HSTS, CSP, Referrer-Policy) in `.htaccess` (host work) | | planned |
 
 ## Consequences
 
 - A new top-level directory `site/` and a build script; no dependency (Jinja2 and httpx are
   in the lock already; the build uses Jinja2 only).
-- `main.yml` gains the job `site` with `contents: write` for the release asset; the deploy step
-  runs in the environment `website`.
+- `main.yml` gains the job `site` with `contents: write` for the release asset and
+  `issues: read` for the roadmap; the deploy step runs in the environment `website`.
 - `docs/runbook.md` gains a section on the website: where it is hosted, how it is deployed,
-  how to rotate the deploy key, what to do when the deploy fails (the artifact of the run can
-  be uploaded by hand with `rsync`).
+  how to rotate the deploy key, how to roll back (a revert in the host's repository).
 - `README.md` links to the website. `docs/architecture.md` does not change: the site is not
   part of the running system and reads nothing from it.
 - Threat model: the site is static and takes no input, so no new abuse case; the deploy key

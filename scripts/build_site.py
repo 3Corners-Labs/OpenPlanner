@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+from markupsafe import Markup
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
@@ -142,6 +143,20 @@ def parse_roadmap(raw: list[dict[str, Any]], adr_dir: Path) -> list[RoadmapItem]
             )
         )
     return items
+
+
+def brand_mark() -> Markup:
+    """The application's mark (ADR 0060), inline so CSS can colour and animate its parts.
+
+    The file is the product's own and has no script or external reference (ADR 0060 §5);
+    the fixed fills are left in place and the site's stylesheet overrides them by token.
+    """
+    svg = (BRAND / "mark.svg").read_text(encoding="utf-8").strip()
+    if "<script" in svg or "href=" in svg:
+        msg = "mark.svg must stay a plain drawing (ADR 0060 §5)"
+        raise ValueError(msg)
+    tagged = svg.replace("<svg ", '<svg class="mark" aria-hidden="true" focusable="false" ', 1)
+    return Markup(tagged)  # noqa: S704 - the product's own file, checked above
 
 
 def load_content(locale: str) -> dict[str, Any]:
@@ -337,6 +352,7 @@ def build(
                 c=content,
                 releases=releases,
                 roadmap=roadmap,
+                mark=brand_mark(),
                 commit=commit,
                 base=page_base,
                 tour_video=tour_video,

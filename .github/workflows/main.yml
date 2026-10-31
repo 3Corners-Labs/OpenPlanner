@@ -188,9 +188,10 @@ jobs:
         run: gh release create "$GITHUB_REF_NAME" sbom.cdx.json sbom-proxy.cdx.json --verify-tag --generate-notes
 
   # ADR 0087: the public website, openplanner.nl. Built from site/ on every merge to main and
-  # on every release tag, with the releases baked in; the tarball goes on the release the tag
-  # made; the deploy by rsync over SSH runs only where the secrets of the environment `website`
-  # are set, so a fork or a pull request never deploys.
+  # on every release tag, with the releases and the roadmap baked in; the tarball goes on the
+  # release the tag made; the deploy is a git push to the web host's repository and runs only
+  # where the environment `website` holds the remote and the key, so a fork or a pull request
+  # never deploys.
   site:
     name: public website (build, attach, deploy)
     # On a merge to main it waits for `candidate`, so the release candidate that merge made is
@@ -242,14 +243,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" site-*.tar.gz --clobber
-      - name: deploy to the web server (rsync over SSH; skipped without the secrets)
+      - name: deploy to the web host (git push; skipped without the remote and the key)
         env:
-          SITE_DEPLOY_HOST: ${{ secrets.SITE_DEPLOY_HOST }}
-          SITE_DEPLOY_USER: ${{ secrets.SITE_DEPLOY_USER }}
-          SITE_DEPLOY_PATH: ${{ secrets.SITE_DEPLOY_PATH }}
+          SITE_DEPLOY_REMOTE: ${{ vars.SITE_DEPLOY_REMOTE }}
+          SITE_DEPLOY_KNOWN_HOSTS: ${{ vars.SITE_DEPLOY_KNOWN_HOSTS }}
+          SITE_DEPLOY_DIR: ${{ vars.SITE_DEPLOY_DIR }}
+          SITE_DEPLOY_BRANCH: ${{ vars.SITE_DEPLOY_BRANCH }}
           SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
-          SITE_DEPLOY_KNOWN_HOSTS: ${{ secrets.SITE_DEPLOY_KNOWN_HOSTS }}
-        run: scripts/deploy-site.sh site/dist
+        run: scripts/deploy-site.sh site/dist "${GITHUB_REF_NAME} ${GITHUB_SHA::12}"
 
   # ADR 0051: same gate as in ci.yml, for the jobs that run only on main.
   deprecations:
