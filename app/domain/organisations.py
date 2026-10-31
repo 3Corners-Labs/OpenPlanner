@@ -1,12 +1,16 @@
-"""Organisation use cases for the superuser: list, create and edit client organisations.
+"""Organisation use cases: list and open client organisations, create and edit them.
 
-``organisation.manage`` is a global permission held only by the superuser (HANDOVER §6,
+``organisation.view`` (ADR 0047 step 3) opens an organisation's page within the admin's
+reach: the superuser sees every organisation, an organisation admin and the auditor their
+own. ``organisation.manage`` is a global permission held only by the superuser (HANDOVER §6,
 ADR 0014). Every operation asks ``AdminService.authorize`` first; every change runs in one
 locked transaction and is audited with what changed (field names, never values).
 
-    organisations / get  organisation.manage   every organisation
-    create       organisation.manage   name, slug (fixed from then on), default locale
-    update       organisation.manage   name and default locale; slug and branding stay
+    organisations  organisation.view     the organisations in the admin's scope
+    view           organisation.view     one organisation in the admin's scope
+    get            organisation.manage   one organisation, for the edit form
+    create         organisation.manage   name, slug (fixed from then on), default locale
+    update         organisation.manage   name and default locale; slug and branding stay
 
 Deleting an organisation is not offered: it would remove groups and bookings whose personal
 data has its own retention rules (CLAUDE.md, privacy rules).
@@ -16,7 +20,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, fields, replace
 
 from app.domain.admin import AdminService, record_change, require
-from app.domain.authorization import Permission, Principal, Scope
+from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import RESERVED_SLUGS, Organisation
@@ -66,17 +70,31 @@ class OrganisationService:
         self._locales = frozenset(locales)
 
     async def organisations(self, principal: Principal) -> list[Organisation]:
-        """Return every organisation, by slug.
+        """Return the organisations ``principal`` may open, by slug (database-side scope).
 
         Raises:
-            DomainError: ``not_permitted``.
+            DomainError: ``not_permitted`` when the admin may open none.
         """
-        await self._authorize(principal)
+        require(await self._admin.authorize_anywhere(principal, Permission.ORGANISATION_VIEW))
         async with self._uow.read() as tx:
-            return await tx.list_organisations(Scope(everything=True))
+            return await tx.list_organisations(scope_for(principal, Permission.ORGANISATION_VIEW))
+
+    async def view(self, principal: Principal, slug: str) -> Organisation:
+        """Return the organisation with ``slug`` if ``principal`` may open its page.
+
+        Raises:
+            DomainError: ``not_permitted`` or ``organisation_not_found``.
+        """
+        require(
+            await self._admin.authorize(
+                principal, Permission.ORGANISATION_VIEW, organisation_slug=slug
+            )
+        )
+        async with self._uow.read() as tx:
+            return await organisation_by_slug(tx, slug)
 
     async def get(self, principal: Principal, slug: str) -> Organisation:
-        """Return the organisation with ``slug``.
+        """Return the organisation with ``slug`` for the superuser's edit form.
 
         Raises:
             DomainError: ``not_permitted`` or ``organisation_not_found``.

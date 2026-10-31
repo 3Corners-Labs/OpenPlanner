@@ -14,8 +14,10 @@ from app.web.navigation import (
     OBJECTS,
     SECTIONS,
     TOP_BAR,
+    Home,
     Screen,
     home_of,
+    object_page,
     render_markdown,
     screens,
 )
@@ -89,19 +91,67 @@ def test_tabs_live_under_their_object() -> None:
     for obj in OBJECTS:
         for tab in obj.tabs:
             assert all(path.startswith(obj.path) for path in tab.routes), tab.key
+            for subtab in tab.subtabs:
+                assert all(path.startswith(obj.path) for path in subtab.routes), subtab.key
+
+
+def test_only_tabs_have_sub_tabs() -> None:
+    tabs = {tab.key for obj in OBJECTS for tab in obj.tabs}
+
+    for entry, screen in screens():
+        if screen.key not in tabs:
+            assert screen.subtabs == (), screen.key
+        assert entry
+
+
+def test_the_organisation_is_an_object_page_with_six_tabs() -> None:
+    organisation = object_page("organisation")
+
+    assert organisation.entry == "manage.organisations"
+    assert [tab.key for tab in organisation.tabs] == [
+        "organisation.overview",
+        "organisation.branding",
+        "organisation.channels",
+        "organisation.contact",
+        "organisation.holidays",
+        "organisation.closure",
+    ]
+    assert [sub.key for sub in organisation.tabs[0].subtabs] == [
+        "organisation.settings",
+        "organisation.texts",
+        "organisation.embedding",
+    ]
+
+
+def test_groups_and_organisations_are_entries_of_manage() -> None:
+    manage = next(section for section in SECTIONS if section.key == "manage")
+
+    assert [entry.key for entry in manage.entries][:2] == ["manage.groups", "manage.organisations"]
+    assert object_page("group").entry == "manage.groups"
+    # ADR 0047 §4: the per-organisation lists left the menu; the calendars went to Platform.
+    keys = {entry.key for section in SECTIONS for entry in section.entries}
+    assert keys.isdisjoint(
+        {"manage.branding", "manage.embedding", "manage.organisation_settings", "manage.closures"}
+    )
+    assert "platform.holidays" in keys
 
 
 def test_home_of_finds_entries_tabs_and_sub_pages() -> None:
     overview = home_of("/admin/")
     staffing_rule = home_of("/admin/groups/{slug}/staffing/{rule_id}")
+    texts = home_of("/admin/organisations/{org}/texts/{text_locale}")
+    edit = home_of("/admin/organisations/{org}/edit")
     help_topic = home_of("/admin/help/{topic}")
 
     assert overview is not None
     assert overview.entry == "monitor.overview"
     assert overview.tab is None
     assert staffing_rule is not None
-    assert staffing_rule.entry == "monitor.overview"
+    assert staffing_rule.entry == "manage.groups"
     assert staffing_rule.tab == "group.staffing"
+    assert staffing_rule.subtab is None
+    assert texts == Home("manage.organisations", "organisation.overview", "organisation.texts")
+    assert edit == Home("manage.organisations", "organisation.overview", None)
     assert help_topic is not None
     assert help_topic.entry == "top.help"
     assert home_of("/admin/does-not-exist") is None

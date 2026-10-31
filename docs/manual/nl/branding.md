@@ -2,7 +2,7 @@
 
 Op dit scherm bepaalt u hoe de afspraakpagina's van een organisatie eruitzien: naam en logo in
 de kop, kleuren, lettertypen en de vorm van kaarten en knoppen. U opent het via
-**Huisstijl → organisatie**. Alleen een superuser kan de huisstijl wijzigen; voor het opslaan
+**Organisaties → organisatie → Huisstijl**. Alleen een superuser kan de huisstijl wijzigen; voor het opslaan
 vraagt het portaal soms opnieuw om in te loggen. Het beheerportaal zelf houdt één vaste stijl.
 
 Bovenaan ziet u een voorbeeld zoals de huisstijl nu is opgeslagen. Een wijziging geldt direct

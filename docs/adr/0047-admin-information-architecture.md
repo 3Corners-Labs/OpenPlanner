@@ -3,7 +3,10 @@
 Status: accepted (2026-10-28), requested by the product owner. Builds on ADR 0014 and 0039
 (authorisation matrix, adjustable roles), ADR 0016 (HTMX only where needed), ADR 0033
 (context-sensitive help and manual) and ADR 0042 (settings registry). Leaves the portal's logo
-open (see *Open points*). Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
+open (see *Open points*). Partly built, checked on 2026-10-31: the register, the shell, the
+organisation page with its tabs, the groups list and the redirects of the old lists are built
+(*Build status* below); the six group tabs and the readiness checklist are not. See
+`docs/adr-status.md` for what is built.
 
 ## Context
 
@@ -63,6 +66,16 @@ cross-object view:
 |---|---|
 | **Bewaken / Monitor** | Overview (status and to-dos), Audit log, Retention |
 | **Beheren / Manage** | Groups, Organisations, Staff (ADR 0046), Access (rights + matrix as tabs) |
+
+*Groups* and *Organisations* are lists of objects. *Groups* opens the groups the admin may view,
+with search and an organisation filter; *Organisations* opens the organisation's page, and an
+admin who may open exactly one organisation lands on it directly. Reading an organisation's
+page needs the new permission `organisation.view` (organisation level: the superuser, the
+organisation admin and the auditor for their own organisations); creating and editing stay
+with `organisation.manage` of the superuser. A group's page shows the path
+*Groups › organisation › group*, and an organisation's page *Organisations › organisation*.
+The organisation's per-organisation lists in the menu (*Branding*, *Embedding*, *Organisation
+settings*, *Emergency closure*) are gone; their old paths redirect (§4).
 | **Platform / Platform** | Connections (Webex, WxCC, webhooks), API clients, Holiday calendars, Advanced settings (ADR 0042), System and updates |
 
 Help, the language switch and the profile (name, roles, log out) move to the top bar. The
@@ -77,7 +90,10 @@ organisation directly instead of a list of one.
 An object page has a page header (breadcrumbs, name, status chips, primary action) and at most
 **six** top-level tabs. Related screens become **sub-tabs** of one tab.
 
-**Organisation:**
+**Organisation** (built as the first of the object pages; the first tab is called *Overview*
+and holds the organisation's groups and profile, with the class D settings, the texts of
+ADR 0074 and the embedding of ADR 0035 as its **sub-tabs** *Settings*, *Texts* and
+*Embedding*, so the object stays at six tabs):
 
 | Tab | Holds (today's screen) |
 |---|---|
@@ -262,6 +278,18 @@ The readiness checklist (§5) uses existing data and adds no thresholds.
 5. **Overview and lists.** The readiness checklist, active closures, and the list pattern
    (search, count, table) for groups, organisations, API clients and the audit log.
 6. **ADR 0042 registry `topic`** and the settings test, when the registry lands.
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | This ADR, review question 7 | #60 | merged |
+| 2 | Register and shell, `admin-map` | #62, #80 | merged |
+| 3 | Organisation page: six tabs, sub-tabs, `organisation.view`, the menu entries *Branding*, *Embedding*, *Organisation settings* and *Emergency closure* removed, 308 redirects of the old lists, *Holiday calendars* under Platform | this PR | built |
+| 4 | Group page: six tabs with sub-tabs, contact into *Messages*, the check into *Settings* | | planned (the group still has ten tabs) |
+| 5 | Lists: *Groups* with search and organisation filter, path *Groups › organisation › group* | this PR | built |
+| 5 | Lists: readiness checklist, active closures as a filter, lists for API clients and the audit log | | planned |
+| 6 | ADR 0042 registry `topic` and the settings test | | planned |
 
 ## Open points
 

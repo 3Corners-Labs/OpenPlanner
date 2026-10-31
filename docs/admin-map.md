@@ -10,7 +10,7 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 
 | Entry | Path | Permission | Also the home of |
 |---|---|---|---|
-| Overview | `/admin/` | `dashboard.view` | `/admin/groups/new` |
+| Overview | `/admin/` | `dashboard.view` | – |
 | Audit log | `/admin/audit` | `audit.view` | – |
 | Retention | `/admin/retention` | `retention.view` | – |
 
@@ -18,12 +18,8 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 
 | Entry | Path | Permission | Also the home of |
 |---|---|---|---|
-| Organisations | `/admin/organisations` | `organisation.manage` | `/admin/organisations/new`, `/admin/organisations/{org}`, `/admin/organisations/{org}/contacts` |
-| Branding | `/admin/branding` | `branding.manage` | `/admin/organisations/{org}/branding` |
-| Embedding | `/admin/embedding` | `embedding.manage` | `/admin/organisations/{org}/embedding` |
-| Organisation settings | `/admin/organisation-settings` | `settings.organisation.manage` | `/admin/organisations/{org}/settings`, `/admin/organisations/{org}/texts`, `/admin/organisations/{org}/texts/{text_locale}` |
-| Holidays | `/admin/holidays` | `holidays.assign` | `/admin/holidays/{calendar}`, `/admin/organisations/{org}/holidays` |
-| Emergency closure | `/admin/closures` | `organisation.closure` | `/admin/organisations/{org}/closure`, `/admin/organisations/{org}/closure/scenarios`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts` |
+| Groups | `/admin/groups` | `group.view` | `/admin/groups/new` |
+| Organisations | `/admin/organisations` | `organisation.view` | `/admin/organisations/new` |
 | Staff | `/admin/staff` | `staff.view` | `/admin/staff/{member_id}` |
 | My rights | `/admin/rights` | `rights.view` | – |
 | Rights matrix | `/admin/matrix` | `matrix.view` | `/admin/roles`, `/admin/roles/new`, `/admin/roles/{role_id}` |
@@ -32,8 +28,9 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 
 | Entry | Path | Permission | Also the home of |
 |---|---|---|---|
-| Integrations | `/admin/integrations` | `integrations.manage` | `/admin/organisations/{org}/channels` |
+| Integrations | `/admin/integrations` | `integrations.manage` | – |
 | API clients | `/admin/api` | `api_clients.manage` | `/admin/api/clients/new`, `/admin/api/clients/{client_id}` |
+| Holiday calendars | `/admin/holidays` | `holidays.manage` | `/admin/holidays/{calendar}` |
 | Updates | `/admin/updates` | `system.update` | – |
 | Maintenance | `/admin/maintenance` | `system.maintenance` | – |
 | Advanced settings | `/admin/settings` | `settings.platform.view` | – |
@@ -49,9 +46,25 @@ admin sees follows from the authorisation matrix (`docs/authorization.md`).
 
 ## Object pages
 
+### Organisation (`/admin/organisations/{org}`)
+
+Side navigation: *Organisations*. A row *Tab › Sub-tab* is a sub-tab of that tab.
+
+| Entry | Path | Permission | Also the home of |
+|---|---|---|---|
+| Overview | `/admin/organisations/{org}` | `organisation.view` | `/admin/organisations/{org}/edit` |
+| Overview › Settings | `/admin/organisations/{org}/settings` | `settings.organisation.manage` | – |
+| Overview › Texts | `/admin/organisations/{org}/texts` | `texts.organisation.manage` | `/admin/organisations/{org}/texts/{text_locale}` |
+| Overview › Embedding | `/admin/organisations/{org}/embedding` | `embedding.manage` | – |
+| Branding | `/admin/organisations/{org}/branding` | `branding.manage` | – |
+| Channels | `/admin/organisations/{org}/channels` | `integrations.manage` | – |
+| Contact | `/admin/organisations/{org}/contacts` | `organisation.closure` | – |
+| Holidays | `/admin/organisations/{org}/holidays` | `holidays.assign` | – |
+| Emergency closure | `/admin/organisations/{org}/closure` | `organisation.closure` | `/admin/organisations/{org}/closure/scenarios`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts` |
+
 ### Group (`/admin/groups/{slug}`)
 
-Side navigation: *Overview*.
+Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 
 | Entry | Path | Permission | Also the home of |
 |---|---|---|---|

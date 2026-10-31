@@ -6,7 +6,7 @@ go through ``message``. Route modules (``routes`` for login, overview and report
 ``group_routes`` for groups and planning) import from here.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -15,19 +15,27 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, Request
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, RedirectResponse
 
 from app.admin.authz import can_function, return_path, session_principal
 from app.admin.forms import Field, moment_label
 from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
 from app.admin.session import THEMES, session_alert_prefs, session_theme
 from app.admin.top_bar import top_links
-from app.domain.authorization import Principal, Role, Scope
+from app.domain.authorization import Permission, Principal, Role, Scope, scope_for
 from app.i18n import BoundGettext
 from app.web.authz_labels import ROLE_LABELS
 from app.web.help import HelpTopic, shipped_manual, topic_for_path
 from app.web.locale import RequestLocale, request_locale
-from app.web.navigation import BOTTOM_BAR_ENTRIES, SECTIONS, Home, Screen, home_of
+from app.web.navigation import (
+    BOTTOM_BAR_ENTRIES,
+    SECTIONS,
+    Home,
+    ObjectPage,
+    Screen,
+    home_of,
+    object_page,
+)
 from app.web.organisation_settings import settings_for
 from app.web.protection import require_same_origin
 from app.web.templates import create_templates, kept_query, render
@@ -56,6 +64,94 @@ class SectionView:
     key: str
     label: str
     entries: list[NavView]
+
+
+@dataclass(frozen=True)
+class ObjectHeader:
+    """The header of an organisation page (ADR 0047 step 3).
+
+    Attributes:
+        name: The organisation's name, for the heading and the breadcrumbs.
+        slug: Its slug, for links.
+        tabs: The visible tabs, the current one marked.
+        subtabs: The second row of the current tab (its own page first), or empty.
+    """
+
+    name: str
+    slug: str
+    tabs: list[NavView]
+    subtabs: list[NavView]
+
+
+ORGANISATIONS_PATH = "/admin/organisations"
+"""The organisations list, where old per-organisation lists redirect to (ADR 0047 §4)."""
+
+
+def object_tabs(
+    locale: RequestLocale,
+    obj: ObjectPage,
+    slug: str,
+    can: Callable[[Permission], bool],
+    home: Home | None,
+) -> tuple[list[NavView], list[NavView]]:
+    """Return the visible tabs of ``obj`` for the object ``slug``, and the current tab's row.
+
+    A tab or sub-tab shows only if the matrix grants its permission (``can``). The second row
+    holds the current tab's own page followed by its visible sub-tabs, and is empty when the
+    current tab has no visible sub-tab.
+    """
+    placeholder = obj.path.rsplit("/", 1)[-1]
+
+    def view(screen: Screen, current: bool) -> NavView:
+        return NavView(
+            locale.gettext(screen.label_key),
+            screen.path.replace(placeholder, slug),
+            current,
+            screen.icon,
+        )
+
+    tabs = [
+        view(tab, home is not None and home.tab == tab.key)
+        for tab in obj.tabs
+        if can(tab.permission)
+    ]
+    current = next((tab for tab in obj.tabs if home is not None and home.tab == tab.key), None)
+    if current is None or not can(current.permission):
+        return tabs, []
+    row = [
+        view(sub, home is not None and home.subtab == sub.key)
+        for sub in current.subtabs
+        if can(sub.permission)
+    ]
+    if not row:
+        return tabs, []
+    return tabs, [view(current, home is not None and home.subtab is None), *row]
+
+
+def organisation_header(
+    request: Request, locale: RequestLocale, principal: Principal, name: str, slug: str
+) -> ObjectHeader:
+    """Return the header of organisation ``slug``'s pages, with the tabs the matrix allows."""
+    tabs, subtabs = object_tabs(
+        locale, object_page("organisation"), slug, can_function(principal), current_home(request)
+    )
+    return ObjectHeader(name, slug, tabs, subtabs)
+
+
+def organisation_redirect(
+    principal: Principal, permission: Permission, tab: str
+) -> RedirectResponse:
+    """Send an old per-organisation list to its new home, permanently (ADR 0047 §4).
+
+    An admin whose scope for ``permission`` is exactly one organisation lands on that
+    organisation's ``tab``; everyone else on the organisations list. The location is built
+    from the authorised scope only, never from the request.
+    """
+    scope = scope_for(principal, permission)
+    if not scope.everything and len(scope.organisations) == 1:
+        (slug,) = scope.organisations
+        return RedirectResponse(f"{ORGANISATIONS_PATH}/{slug}/{tab}", status_code=308)
+    return RedirectResponse(ORGANISATIONS_PATH, status_code=308)
 
 
 THEME_LABELS = {

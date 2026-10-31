@@ -1,0 +1,52 @@
+{#- The overview tab of an organisation (ADR 0047 step 3): its groups, then its profile. -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
+{% block title %}{{ org_header.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+<section class="card" aria-labelledby="groups-heading">
+  <div class="card__header">
+    <h2 id="groups-heading">{{ _("admin.organisation.groups") }}</h2>
+    {% if can("group.create") %}<a class="button button--secondary button--small" href="/admin/groups/new">{{ icon("plus") }}<span>{{ _("admin.new_group.title") }}</span></a>{% endif %}
+  </div>
+  <p class="card__lead">{{ _("admin.organisation.groups_lead") }}</p>
+  {% if groups %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.organisation.groups") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.field.name") }}</th>
+        <th scope="col">{{ _("admin.groups.duration") }}</th>
+        <th scope="col">{{ _("admin.groups.public_page") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for summary in groups %}
+      <tr>
+        <th scope="row"><a href="/admin/groups/{{ summary.group.slug }}">{{ summary.group.name }}</a></th>
+        <td>{{ _("admin.group.minutes", minutes=summary.group.slot_minutes) }}</td>
+        <td><a class="link-with-icon" href="/g/{{ summary.group.slug }}">{{ icon("external") }}<span>/g/{{ summary.group.slug }}</span></a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p><a href="/admin/groups?org={{ org_header.slug }}">{{ _("admin.organisation.all_groups") }}</a></p>
+  {% else %}
+  <p class="empty-state">{{ _("admin.organisation.no_groups") }}</p>
+  {% endif %}
+</section>
+<section class="card" aria-labelledby="profile-heading">
+  <div class="card__header">
+    <h2 id="profile-heading">{{ _("admin.organisation.profile") }}</h2>
+    {% if can("organisation.manage") %}<a href="/admin/organisations/{{ org_header.slug }}/edit">{{ _("admin.organisation.edit") }}</a>{% endif %}
+  </div>
+  <dl class="facts">
+    <div><dt>{{ _("admin.field.name") }}</dt><dd>{{ organisation.name }}</dd></div>
+    <div><dt>{{ _("admin.organisation.slug") }}</dt><dd>{{ organisation.slug }}</dd></div>
+    <div><dt>{{ _("admin.field.default_locale") }}</dt><dd>{{ language_name }}</dd></div>
+  </dl>
+</section>
+{% endblock %}
