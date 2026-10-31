@@ -6854,6 +6854,9 @@ msgstr "Trying again is no longer possible: the booking is not active, or the me
 msgid "settings.field.integration_request_retention_days.label"
 msgstr "Keep requests to Webex and WxCC (days)"
 
+msgid "settings.field.group_erase_after_days.label"
+msgstr "Erase an archived group after (days)"
+
 msgid "settings.field.integration_probe_timeout_seconds.label"
 msgstr "Wait for the probe work item's events (seconds)"
 
