@@ -58,7 +58,9 @@ Further targets: `make migrations` (Alembic up/down/up on a fresh database), `ma
 plus scan), `make mutation` (mutmut on `app/domain`, score ≥ 80%), `make e2e` (Playwright,
 axe-core and Lighthouse against a running app; pages listed in `e2e/pages.json`; the closure
 pages need `docker compose exec web python -m app.cli seed-closures > e2e/fixtures.json` first,
-which writes the link of the example booking on hold). Where the
+which writes the link of the example booking on hold and the bookings of the participant's
+journey; that journey spec also needs `SIMULATOR_ENABLED=true` and the two webhook secrets in
+`.env`, as CI sets them). Where the
 Playwright browser download is blocked, use an installed Chrome:
 `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npx playwright test --project=chromium` and
 `CHROME_PATH=/path/to/chrome npm run lighthouse`. CI additionally runs gitleaks, hadolint, trivy, schemathesis, SBOM + grype, and on
@@ -120,6 +122,7 @@ Build work merges as soon as every check is green (enable auto-merge when you op
 decision (an ADR, CLAUDE.md, the authorisation matrix, the workflows, a release PR) shows a red
 *decision gate* until the product owner sets the label `po:approved` (ADR 0078). The PR template asks the seven review questions from `CLAUDE.md`; answer all of them.
 New ADRs start from `docs/adr/template.md`, including its *Settings* section (ADR 0042). A new ADR also gets its *Build status* table and its row in `docs/adr-status.md`; the PR that builds a step of an ADR updates both (ADR 0059).
+Every open row of a *Build status* table has an issue `ADR NNNN step S: …` (label `adr:NNNN`, kept by `scripts/adr_issues.py`); a build PR sets its row to `in PR #N` and closes the issue with `Closes #N` in its description, and a weekly report issue `ADR drift <date>` lists what no longer agrees (ADR 0078).
 Run the `security-review` skill (`.claude/skills/security-review/`) before opening the PR.
 
 `main` merges through a merge queue (squash): the queue builds `main` with the queued pull
@@ -130,9 +133,11 @@ there.
 
 ## Releases
 
-A merge to `main` is no release. Releases follow ADR 0052: `make release-plan` proposes the
-number, a `chore(release): vX.Y.Z` PR sets it, and a tag on `main` publishes it. A minor or major
-release first gets `make release-audit`: an independent review by a second model, pasted into
-the release PR under `## Release audit` (ADR 0078); CI refuses a `vX.Y.0` tag without it. The
-commands are in `docs/runbook.md`, *Releasing a version*.
+A merge to `main` is no release. Releases follow ADR 0052 and run as the `release` workflow
+(ADR 0079): the dispatch `release-pr` opens the `chore(release): vX.Y.Z` PR (number from
+`scripts/release_plan.py` unless given), the `audit` job puts the independent review of a
+minor or major release into it (ADR 0078; the product owner changes `Verdict: open` to
+`Verdict: pass` after reading), the label `po:approved` lets it merge, and the dispatch `tag`
+sets the tag that publishes it; CI refuses a `vX.Y.0` tag without a passing audit. The steps and
+the laptop fallback are in `docs/runbook.md`, *Releasing a version*.
 `docs/skills.md` lists which Claude Code skills to use in each work package.
