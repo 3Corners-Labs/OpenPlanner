@@ -1,7 +1,7 @@
 {#- One setting row inside a topic's form (ADR 0042 steps 4 and 5): name, value or field, source
     and notes. The form around the rows carries the topic's one Save button; Reset and Take over
     post to their own route through formaction, so a row needs no form of its own. -#}
-{% macro setting_row(row, action, reset_label, max_hours=24) -%}
+{% macro setting_row(row, action, reset_label, max_hours=24, trace_max_hours=4) -%}
 <div class="setting{% if row.error %} setting--error{% endif %}" id="setting-{{ row.key }}">
   <div class="setting__name">
     {% if row.editable %}<label for="value-{{ row.key }}">{{ row.label }}</label>{% else %}<span>{{ row.label }}</span>{% endif %}
@@ -27,7 +27,7 @@
     {% endif %}
     {% if row.expires %}
     <div class="setting__pair">
-      <label for="hours-{{ row.key }}" class="field__sublabel">{{ _("admin.settings.hours", max=max_hours) }}</label>
+      <label for="hours-{{ row.key }}" class="field__sublabel">{{ _("admin.settings.hours", max=max_hours, trace_max=trace_max_hours) }}</label>
       <input id="hours-{{ row.key }}" name="hours" type="text" inputmode="numeric" value="1" class="input--clock">
     </div>
     {% endif %}

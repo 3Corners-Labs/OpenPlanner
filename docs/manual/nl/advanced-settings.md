@@ -139,8 +139,10 @@ worden videogesprekken en werkitems binnen ongeveer tien seconden opnieuw gekopp
   updatecontrole) kunt u alleen schrijven: het scherm zegt alleen of er een is ingesteld. Laat het
   veld leeg om de huidige te houden; **Standaardwaarde gebruiken** haalt hem weg. Ze worden
   versleuteld opgeslagen en vragen de `SETTINGS_ENCRYPTION_KEY` van de server.
-- Het **logniveau** valt altijd vanzelf terug naar de standaard, na hooguit 24 uur. Vul in na
-  hoeveel uur. Persoonsgegevens blijven op elk niveau gemaskeerd in het log.
+- Het **logniveau** valt altijd vanzelf terug naar de standaard, na hooguit 24 uur; het niveau
+  TRACE na hooguit de uren van *TRACE_LEVEL_MAX_HOURS* (standaard 4). Vul in na hoeveel uur.
+  Persoonsgegevens blijven op elk niveau gemaskeerd in het log; TRACE-regels dragen alleen de
+  vaste velden van `docs/logging.md`.
 
 Voor een wijziging moet u kort geleden zijn ingelogd. Elke wijziging staat in het auditlog met
 de oude en de nieuwe waarde; een geweigerde wijziging ook.

@@ -202,7 +202,7 @@
   <div class="settings-list">
     {{ setting_head() }}
     {% for row in section.rows %}
-    {{ setting_row(row, "/admin/settings/" ~ row.key, _("admin.settings.reset"), max_hours) }}
+    {{ setting_row(row, "/admin/settings/" ~ row.key, _("admin.settings.reset"), max_hours, trace_max_hours) }}
     {% endfor %}
   </div>
   {% if manage and section.rows | selectattr("editable") | list %}
