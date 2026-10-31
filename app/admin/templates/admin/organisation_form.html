@@ -1,8 +1,13 @@
-{#- New organisation (organisation is none) or the settings of an existing one. -#}
+{#- New organisation (organisation is none), or the edit form of an existing one under its header (ADR 0047 step 3). -#}
 {% extends "admin/layout.html" %}
 {% from "admin/_fields.html" import field with context %}
 {% block title %}{{ heading }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
+{% if organisation %}
+{% include "admin/_organisation_header.html" %}
+<h2 class="section-title">{{ _("admin.organisation.edit") }}</h2>
+<p>{{ _("admin.organisation.lead") }}</p>
+{% else %}
 <nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
   <ol>
     <li><a href="/admin/organisations">{{ _("admin.organisations.title") }}</a></li>
@@ -12,14 +17,10 @@
 <div class="page-header">
   <div>
     <h1>{{ heading }}</h1>
-    <p class="page-header__lead">{% if organisation %}{{ _("admin.organisation.lead") }}{% else %}{{ _("admin.new_organisation.lead") }}{% endif %}</p>
+    <p class="page-header__lead">{{ _("admin.new_organisation.lead") }}</p>
   </div>
-  {% if organisation %}
-  <div class="page-header__actions">
-    <a class="button button--ghost" href="/admin/organisations/{{ organisation.slug }}/branding">{{ _("admin.organisations.branding") }}</a>
-  </div>
-  {% endif %}
 </div>
+{% endif %}
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
 <form class="card" method="post" action="/admin/organisations{% if organisation %}/{{ organisation.slug }}{% endif %}" novalidate>
@@ -35,7 +36,7 @@
   </div>
   <div class="form-actions">
     <button type="submit" class="button">{% if organisation %}{{ _("admin.save") }}{% else %}{{ _("admin.new_organisation.create") }}{% endif %}</button>
-    <a href="/admin/organisations">{{ _("admin.cancel") }}</a>
+    <a href="/admin/organisations{% if organisation %}/{{ organisation.slug }}{% endif %}">{{ _("admin.cancel") }}</a>
   </div>
 </form>
 {% endblock %}

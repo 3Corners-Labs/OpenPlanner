@@ -231,17 +231,17 @@ Hoe vaak één afspraak een proefgesprek mag openen, van 1 tot 5. Standaard 3. E
 een meeting in Webex; met dit getal kan één afspraak er niet onbeperkt aanmaken.
 
 <!-- field: join_client -->
-### Webex-pagina voor de burger
+### Webex-pagina voor de deelnemer
 
-Bepaalt welke pagina van Webex de burger krijgt als hij vanaf onze pagina naar het gesprek gaat,
+Bepaalt welke pagina van Webex de deelnemer krijgt wanneer die vanaf onze pagina naar het gesprek gaat,
 bij de afspraak en bij het proefgesprek. **Direct in de browser** (standaard) opent meteen de
-webversie van Webex: op een computer hoeft de burger niets te installeren en ziet hij de vraag
-"app of browser" niet. **Webex laat de burger kiezen** geeft Webex' eigen pagina, met de keuze
-tussen de app en de browser; kies dit als uw burgers de Webex-app gebruiken of als uw organisatie
+webversie van Webex: op een computer hoeft de deelnemer niets te installeren en ziet de vraag
+"app of browser" niet. **Webex laat de deelnemer kiezen** geeft Webex' eigen pagina, met de keuze
+tussen de app en de browser; kies dit als uw deelnemers de Webex-app gebruiken of als uw organisatie
 dat zo wil. Op een telefoon of tablet vraagt Webex in beide gevallen om de Webex-app: een
 webversie is daar niet beschikbaar. De teksten in de bevestiging, op de pagina voor het gesprek
 en op de proefgesprekpagina volgen deze keuze. Webex kan dit gedrag zelf wijzigen; ziet de
-burger toch de keuze tussen app en browser, zet het dan op **Webex laat de burger kiezen**.
+deelnemer toch de keuze tussen app en browser, zet het dan op **Webex laat de deelnemer kiezen**.
 
 <!-- field: offer -->
 ### Aanbod per tijdblok
@@ -282,3 +282,21 @@ Met **Ja** kan de groep ook als widget op de website van de organisatie staan, n
 pagina van de groep. Dat werkt alleen op de websites die de organisatie heeft toegestaan onder
 [Insluiten op websites](embedding.md). Met **Nee** (de standaard) is de groep alleen via haar
 eigen pagina te boeken, ook als de widget op een toegestane website staat.
+
+## Koppeling identiteitsprovider
+
+De **IdP-waarde** is de naam waarmee de identiteitsprovider deze groep noemt in een recht,
+bijvoorbeeld `openplanner:group_admin:gem-a/burgerzaken`. Een nieuwe groep begint met de code
+van het webadres als waarde. Alleen een organisatiebeheerder of de superuser wijzigt de
+waarde; het formulier waarschuwt hoeveel medewerkers toegang verliezen tot de
+identiteitsprovider de nieuwe waarde stuurt. De volledige lijst staat op **Koppeling
+identiteitsprovider**.
+
+<!-- field: idp_key -->
+### IdP-waarde
+
+De naam waarmee de identiteitsprovider deze groep noemt in een recht, bijvoorbeeld
+`burgerzaken` in `openplanner:group_admin:gem-a/burgerzaken`. Kleine letters, cijfers en
+koppeltekens; uniek binnen de organisatie. Een nieuwe groep begint met de code van het
+webadres. Wijzigt u de waarde, dan verliezen de medewerkers met een recht op de oude waarde hun
+toegang tot de identiteitsprovider de nieuwe stuurt; het formulier telt hoeveel dat er zijn.

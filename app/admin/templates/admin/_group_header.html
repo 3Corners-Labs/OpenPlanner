@@ -2,14 +2,15 @@
 {% from "admin/_icons.html" import icon %}
 <nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
   <ol>
-    <li><a href="/admin/">{{ _("admin.nav.dashboard") }}</a></li>
+    <li><a href="/admin/groups">{{ _("admin.nav.groups") }}</a></li>
+    <li>{% if can("organisation.view") %}<a href="/admin/organisations/{{ summary.organisation_slug }}">{{ summary.organisation_name }}</a>{% else %}<span>{{ summary.organisation_name }}</span>{% endif %}</li>
     <li><span aria-current="page">{{ summary.group.name }}</span></li>
   </ol>
 </nav>
 <div class="page-header">
   <div>
     <h1>{{ summary.group.name }}</h1>
-    <p class="page-header__lead">{{ summary.organisation_name }}</p>
+    <p class="page-header__lead">{{ _("admin.nav.object.group") }} · {{ summary.organisation_name }}</p>
   </div>
   <div class="page-header__actions">
     <a class="button button--secondary" href="/g/{{ summary.group.slug }}">{{ icon("external") }}<span>{{ _("admin.group.open_public_page") }}</span></a>

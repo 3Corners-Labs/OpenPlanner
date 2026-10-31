@@ -133,7 +133,7 @@ class DispatchKind(StrEnum):
 
 
 class JoinClient(StrEnum):
-    """Which Webex page a citizen's join link opens (ADR 0075, per group)."""
+    """Which Webex page a participant's join link opens (ADR 0075, per group)."""
 
     BROWSER = "browser"
     """The Webex web app straight away; on a computer there is no app to choose or install."""
@@ -173,8 +173,9 @@ class PhoneMode(StrEnum):
 class Organisation:
     """A client organisation; owns groups, branding and integration settings.
 
-    The slug never changes once created: admin URLs and the organisation claim of the
-    identity provider (ADR 0013) refer to it.
+    The slug never changes once created: admin URLs refer to it. The identity provider
+    names the organisation by ``idp_key`` (ADR 0049 point 4), which starts as the slug and
+    is set by the superuser from then on.
     """
 
     id: int
@@ -182,10 +183,16 @@ class Organisation:
     slug: str
     default_locale: str = "nl"
     branding: Branding = Branding()
+    idp_key: str = ""
 
     def __post_init__(self) -> None:
-        """Validate name and slug; the locale is checked against the catalogues by the service."""
+        """Validate name and slug; the locale is checked against the catalogues by the service.
+
+        An empty ``idp_key`` is the slug (what a new organisation starts with).
+        """
         check_name_and_slug(self.name, self.slug)
+        if not self.idp_key:
+            object.__setattr__(self, "idp_key", self.slug)
 
 
 @dataclass(frozen=True)
@@ -226,7 +233,7 @@ class Group:
         trial_call_minutes: How long one trial call stays open, 10 to 60 minutes.
         trial_calls_per_booking: How many trial calls one booking may open, 1 to 5, so the page
             cannot be used to create Webex meetings without end.
-        join_client: Which Webex page the citizen's link to the appointment and the trial call
+        join_client: Which Webex page the participant's link to the appointment and the trial call
             opens (ADR 0075): the web app straight away (the default) or Webex's own choice
             between app and browser.
         embedding_enabled: Whether the group may appear in the widget on the websites its
@@ -240,6 +247,8 @@ class Group:
             always refused.
         calendar_invite_address: Own queue: the team's shared mailbox or list that gets an
             iCalendar invite per booking (ADR 0043 point 9); ``None`` sends none.
+        idp_key: The value the identity provider names the group by in an entitlement
+            (ADR 0049 point 4); the slug until the organisation admin sets it.
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -273,10 +282,13 @@ class Group:
     queue_free_pick_allowed: bool = False
     max_bookings_per_email: int = DEFAULT_MAX_BOOKINGS_PER_EMAIL
     calendar_invite_address: str | None = None
+    idp_key: str = ""
 
     def __post_init__(self) -> None:
         """Validate every field; see the class docstring."""
         check_name_and_slug(self.name, self.slug)
+        if not self.idp_key:
+            object.__setattr__(self, "idp_key", self.slug)
         try:
             ZoneInfo(self.timezone)
         except (ZoneInfoNotFoundError, ValueError) as exc:

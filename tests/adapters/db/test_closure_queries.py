@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.admin import AdminService
-from app.domain.authorization import Principal, Role, Scope
+from app.domain.authorization import Role, Scope
 from app.domain.booking import BookingStatus
 from app.domain.closure import Closure
 from app.domain.closure_service import ClosureInput, ClosureService
@@ -18,8 +18,9 @@ from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.closures import NOTICES
 from tests.support.domain import MONDAY, NOW, SLOT_0900, TEST_TOKEN_KEY, book
+from tests.support.principals import principal
 
-ADMIN = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+ADMIN = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 UNTIL = SLOT_0900 + timedelta(days=1)
 
 
@@ -82,7 +83,9 @@ async def test_suspended_booking_keeps_its_place_and_data(engine: AsyncEngine) -
         group = await tx.get_group("aangifte")
         assert group is not None
         on_hold = await tx.list_suspended_bookings(Scope(everything=True), group.id)
-        elsewhere = await tx.list_suspended_bookings(Scope(groups=frozenset({"x"})), group.id)
+        elsewhere = await tx.list_suspended_bookings(
+            Scope(groups=frozenset({("org-aangifte", "x")})), group.id
+        )
         confirmed = await tx.find_confirmed_bookings(group.id, NOW, None)
         future = await tx.count_future_bookings(group.id, NOW)
 

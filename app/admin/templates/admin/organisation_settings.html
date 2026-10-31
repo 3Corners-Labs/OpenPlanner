@@ -2,19 +2,9 @@
 {% from "admin/_setting_form.html" import setting_form with context %}
 {% block title %}{{ _("admin.org_settings.page_title", name=organisation.name) }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <div>
-    <h1 id="page-title">{{ _("admin.org_settings.page_title", name=organisation.name) }}</h1>
-    <p class="page-header__lead">{{ _("admin.org_settings.page_lead") }}</p>
-  </div>
-</div>
-<section class="card" aria-labelledby="texts-link-heading">
-  <div class="card__header">
-    <h2 id="texts-link-heading">{{ _("admin.org_texts.link_title") }}</h2>
-    <p class="card__lead">{{ _("admin.org_texts.link_lead") }}</p>
-  </div>
-  <p><a class="button button--secondary" href="/admin/organisations/{{ organisation.slug }}/texts">{{ _("admin.org_texts.link_button") }}</a></p>
-</section>
+{% include "admin/_organisation_header.html" %}
+<h2 class="section-title" id="page-title">{{ _("admin.org_settings.page_title", name=organisation.name) }}</h2>
+<p>{{ _("admin.org_settings.page_lead") }}</p>
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% if unknown_error %}<div class="alert alert--error" role="alert"><p>{{ unknown_error }}</p></div>{% endif %}
 <section class="card" aria-labelledby="settings-heading">

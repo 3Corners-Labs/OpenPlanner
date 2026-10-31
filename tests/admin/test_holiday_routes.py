@@ -35,17 +35,25 @@ async def _fill_and_assign(site: Site) -> None:
     assert chosen.headers["location"] == "/admin/organisations/demo/holidays?done=saved"
 
 
-async def test_menu_shows_holidays_to_superuser_and_org_admin(site: Site) -> None:
+async def test_calendars_are_the_superusers_and_an_organisation_chooses_on_its_tab(
+    site: Site,
+) -> None:
     await site.login_as(ORG_ADMIN)
     overview = (await site.client.get("/admin/")).text
-    listing = (await site.client.get("/admin/holidays")).text
+    organisation = (await site.client.get("/admin/organisations/demo")).text
 
-    assert 'href="/admin/holidays"' in overview
+    # ADR 0047 §4: the calendars sit under Platform; the organisation picks on its own tab.
+    assert 'href="/admin/holidays"' not in overview
+    assert (await site.client.get("/admin/holidays")).status_code == 403
+    assert 'href="/admin/organisations/demo/holidays"' in organisation
+
+    await site.login_as(SUPER)
+    listing = (await site.client.get("/admin/holidays")).text
+    assert 'href="/admin/holidays"' in (await site.client.get("/admin/")).text
     assert "Nationale feestdagen" in listing
-    assert f'href="{CALENDAR}"' not in listing  # only the superuser maintains calendars
-    assert 'action="/admin/holidays"' not in listing
-    assert 'href="/admin/organisations/demo/holidays"' in listing
-    assert 'href="/admin/organisations/andere/holidays"' not in listing
+    assert f'href="{CALENDAR}"' in listing
+    assert 'action="/admin/holidays"' in listing
+    assert "/admin/organisations/demo/holidays" not in listing
 
 
 async def test_superuser_generates_the_dutch_holidays_once(site: Site) -> None:

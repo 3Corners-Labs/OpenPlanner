@@ -380,6 +380,52 @@ If PingFederate is down, admins cannot log in; booking, reminders and dispatch k
 Rotating `SESSION_SECRET` logs every admin out. Rotating the client secret needs the new value
 in `OIDC_CLIENT_SECRET` and a restart of `web`.
 
+### PingFederate attribute contract: entitlements (ADR 0049)
+
+Next to the three claims above, the portal can take its rights from **one claim with role and
+scope per value** (`OIDC_ENTITLEMENT_CLAIM`, default `openplanner_entitlements`, multi-valued in
+the ID token). Each value is one right:
+
+| Role reach | Value | Example |
+|---|---|---|
+| everything | `<prefix>:superuser` | `openplanner:superuser` |
+| organisations | `<prefix>:<role>:<org>` | `openplanner:org_admin:gem-a` |
+| groups | `<prefix>:<role>:<org>/<group>` | `openplanner:group_admin:gem-a/burgerzaken` |
+
+`<role>` is the role's key (`superuser`, `org_admin`, `group_admin`, `auditor`, `agent` or
+`custom.<id>`); `<org>` and `<group>` are the **IdP values** shown on *Koppeling
+identiteitsprovider* in the portal (they start as the slugs and are changed there, never by a
+rename). The simplest contract is one directory group per value, mapped 1:1 into the claim;
+the portal's page offers the full list as a text download. Values without the prefix are
+ignored, so the claim may be filled from a shared attribute. A value with the prefix that the
+installation does not recognise gives nothing and shows on the person's staff page with the
+reason.
+
+Test a contract without a login: put sample claims in a JSON file (`sub` plus the claims) and run
+
+```sh
+docker compose exec web python -m app.cli oidc-check --claims /tmp/sample-claims.json
+```
+
+It prints the mode, every grant and every refused value with its reason.
+
+**Switching over.** `OIDC_CLAIM_MODE` (environment, restart `web`):
+
+1. `legacy` (default): the three claims decide. A login whose claims are ambiguous (two roles
+   of one reach while that reach's claim names more than one organisation or group) is
+   refused with `ambiguous_claims` and audited: that combination handed out rights nobody gave.
+   Before the first release with this check, look for such admins in PingFederate and either
+   give them entitlements or split their roles.
+2. `shadow`: the three claims still decide; every login also parses the entitlement claim and
+   writes `auth.entitlement_mismatch` to the audit log when the two disagree. Run it for a full
+   working week; no mismatch means PingFederate is right.
+3. `entitlements`: only the entitlement claim decides. Rollback: set `legacy` and restart.
+
+The prefix (`OIDC_ENTITLEMENT_PREFIX`, default `openplanner`) separates installations that
+share one PingFederate: give acceptance `openplanner-acc`, and production values never work
+there. The claim name and the prefix are class C settings with the dry run of §8; the host
+resets them like the other login settings.
+
 ### Nobody can log in (ADR 0042 §8)
 
 There is no login bypass, fallback IdP or local account. Diagnose and act from the host:
@@ -486,14 +532,14 @@ that participants may enter before the host (OpenPlanner sets `enabledJoinBefore
 The site must allow this. **Koppeling controleren** schedules and deletes a trial probe and
 shows `webex.trial_refused` with Webex's reason when it refuses the request, and
 `webex.trial_lobby` with the values it kept when it accepts the request but ignores the options
-(ADR 0075: the citizen would wait in the lobby for nobody; seen on the test site
+(ADR 0075: the participant would wait in the lobby for nobody; seen on the test site
 `rijksvideotest.webex.com`, where Control Hub must allow entry before the host first). In
-both cases citizens cannot use a trial call, and the group's switch can be set to *Nee* until
+both cases participants cannot use a trial call, and the group's switch can be set to *Nee* until
 the site allows it. For a group that opens the Webex web app directly (`join_client`
 *browser*), the check also visits the probe's link once and shows `webex.browser_link_lost`
 when Webex no longer carries `launchApp=true` through its redirect: nothing breaks then,
-citizens get Webex's own page with the app or browser question, and the group can be set to
-*Webex laat de burger kiezen* so that the texts say so. After a Webex or
+participants get Webex's own page with the app or browser question, and the group can be set to
+*Webex laat de deelnemer kiezen* so that the texts say so. After a Webex or
 site change, run the check and then open a trial call yourself from a test booking: it must
 open without the lobby, ask for camera and microphone, and be gone from the host's Webex
 calendar a few minutes after it closes.
@@ -805,8 +851,15 @@ group can:
 1. **Nep-meeting en -taak aanmaken** for a booking without them. This sets stand-in ids
    (`simulated-meeting-<id>`, `simulated-task-<id>`, a join link on `.invalid`) and records
    "meeting created" and "task created" with detail `simulated`. Real ids are never replaced.
+   A booking that may open a trial call right now (ADR 0071: the group has a video host and
+   the trial call on, the appointment has not started, the limit is not reached) also gets an
+   open stand-in trial call (`simulated-trial-<id>`) for the group's trial call minutes,
+   recorded as "trial call opened" with detail `simulated`; the participant's trial page then
+   offers the way in. A real or still open trial call is left as it is.
 2. Play events in the order of a call: agent accepts the task, agent joins, citizen joins,
-   participant leaves, meeting started or ended, task not picked up, task ended.
+   participant leaves, meeting started or ended, task not picked up, task ended; and for the
+   trial call, participant enters and leaves it (recorded as the trial kinds of ADR 0076, never
+   on the appointment's call status).
 
 Each event is signed with this installation's `WEBEX_WEBHOOK_SECRET` or
 `WXCC_WEBHOOK_SECRET` and posted in-process to `/webhooks/webex` or `/webhooks/wxcc`. It takes
@@ -819,6 +872,12 @@ A quick end-to-end try without Webex: create a group with opening hours and "Dir
 starten", start a call as a citizen (`/g/<slug>/direct`), open the booking in the agenda,
 create the stand-ins, and play "agent accepts" and "agent joins". The citizen's waiting page
 then shows the matching status.
+
+The participant's whole journey (trial call, join link, the call, and what the admin sees of
+it) runs this way in CI: `e2e/tests/video-journey.spec.ts`, on the bookings that
+`seed-closures` adds to the team "Demo: reis van de deelnemer". What it cannot cover is
+Webex itself: entering the meeting, the lobby and the Webex app on the tester's computer
+(ADR 0075 step 3) stay a check by a person against the real Webex site.
 
 ### 11. When the contact center is down: the own queue (ADR 0043)
 
@@ -884,11 +943,12 @@ when a rule's channel is not configured.
 link in mails already sent; bookings are unaffected. Rotate only after an incident, and tell the
 contact center that citizens may call about broken links.
 
-## Releasing a version (ADR 0052)
+## Releasing a version (ADR 0052, ADR 0079)
 
 A merge to `main` is **not** a release. An installation only sees a new version after a tag
-`vX.Y.Z` on `main` has gone through `main.yml`. You do two things by hand (a release PR, then a
-tag); everything after the tag is automatic and visible in the Actions tab.
+`vX.Y.Z` on `main` has gone through `main.yml`. The product owner does two clicks in the
+workflow *release* (GitHub → *Actions* → *release* → *Run workflow*) and reads one section;
+everything else is automatic and visible in the Actions tab and in the release PR.
 
 ### What happens where
 
@@ -896,43 +956,98 @@ tag); everything after the tag is automatic and visible in the Actions tab.
 |---|---|---|---|
 | PR | `ci.yml` | checks only | no |
 | Merge to `main` | `main.yml`: ZAP, then build, sign, tag `vX.Y.Z-rc.N`, pre-release (ADR 0059); mutation runs alongside | application and proxy images `:X.Y.Z-rc.N`, `:main` and `:sha-<commit>` (the application with `APP_VERSION=X.Y.Z-rc.N` and `APP_COMMIT`); pre-release page with both SBOMs | only on the `rc` channel (below) |
+| Dispatch *release* with `step = release-pr` | `release.yml`: the release PR, and for `vX.Y.0` the audit job | PR `chore(release): vX.Y.Z` with auto-merge; `## Release audit` with `Verdict: open` | no |
+| Dispatch *release* with `step = tag` | `release.yml`: the checks of ADR 0052 point 4, the annotated tag | tag `vX.Y.Z` on the merged release commit | not yet |
 | Tag `vX.Y.Z` pushed | `main.yml`: tag check, ZAP, mutation, build, sign, SBOM, GitHub release | application image `:X.Y.Z` with `APP_VERSION` and `APP_COMMIT`, proxy image `:X.Y.Z` (ADR 0064 step 2); release page with `sbom.cdx.json` and `sbom-proxy.cdx.json` | yes, within an hour |
 
-### Step 1: decide the number
+### Once: the secrets the workflow needs
 
-On an up-to-date `main` in your own checkout (not a worktree of another branch):
+Set by a repository admin under *Settings → Secrets and variables → Actions*, never in the
+repository:
 
-```sh
-git switch main && git pull
-make release-plan
-```
+| Name | Kind | What | Why |
+|---|---|---|---|
+| `RELEASE_TOKEN` | secret | a fine-grained personal access token on this repository with *Contents: read and write* and *Pull requests: read and write* (or a GitHub App token later) | a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow: the release PR would get no CI and the tag no build |
+| `OPENAI_API_KEY` | secret | an OpenAI API key | the audit job (`openai/codex-action`); the key stays in the action's proxy and never reaches the review process |
+| `RELEASE_RUNNER` | variable, optional | the label of a self-hosted runner | default `ubuntu-24.04`; see *Self-hosted runner* below |
 
-It prints the last release, every commit since then and the next version by the rules of
-ADR 0052 (breaking → MAJOR, from 1.0; `feat` → MINOR; anything else → PATCH). It changes
-nothing. Write the number down, for example `0.3.0`.
+A real run stops at its first step without `RELEASE_TOKEN`; a dry run needs none of them. A
+personal access token expires: note the date, renew it under the same name before it does
+(a release then fails at its first step, nothing half-done), or replace it with a GitHub App
+token later. The Codex CLI is installed at its newest version on every audit run
+(`codex-version` empty), as on a laptop; it is a tool of the forge, not a dependency of the
+product.
 
-### Step 2: the release PR
+### Step 1: the release PR (one click)
 
-On a branch `release/v0.3.0` (or ask Claude Code: "make the release PR for v0.3.0"):
+*Run workflow* on `main` with `step = release-pr`. Leave `version` empty for the number the
+rules of ADR 0052 give (breaking → MAJOR, from 1.0; `feat` → MINOR; anything else → PATCH),
+or type a higher one, for example `1.0.0` for the first production release. Tick `dry_run`
+to see the result first: the run's summary shows the diff and the PR body, and nothing is
+opened.
 
-1. `pyproject.toml`: `version = "0.3.0"`, then `uv lock` (only the `openplanner` line changes).
-2. `CHANGELOG.md`: rename `## Unreleased` to `## 0.3.0 (2026-11-02)` and put a fresh empty
-   `## Unreleased` above it.
-3. Commit `chore(release): v0.3.0`, open the PR, merge it (squash) when CI is green.
+The job `release PR` then:
 
-### Step 3: the tag
+1. computes the number (`scripts/release_pr.py plan`) from the commits since the last release
+   tag, the same as `make release-plan`;
+2. sets `version = "X.Y.Z"` in `pyproject.toml` and `uv.lock`, renames `## Unreleased` in
+   `CHANGELOG.md` to `## X.Y.Z (date)` with a fresh empty `## Unreleased` above it;
+3. pushes `release/vX.Y.Z`, opens the PR `chore(release): vX.Y.Z` with the PR template filled
+   in (the dispatcher's login is in it: that is the recorded instruction) and enables
+   auto-merge.
 
-On `main`, after the release PR is merged:
+For a minor or major release (`vX.Y.0`) the job `release audit` runs next (ADR 0078): the
+Codex CLI, a second model, reviews everything since the last release in a read-only sandbox
+(`scripts/release-audit.sh`, the same command as `make release-audit`) and writes the
+findings into the PR under `## Release audit`, ending with `Verdict: open`. It takes some
+minutes and costs one API call (roughly 5 to 20 US dollars for a diff the size of `v0.4.0`).
+A patch release has no audit job.
 
-```sh
-git switch main && git pull
-git log -1 --oneline        # must be "chore(release): v0.3.0 (#NN)"
-git tag -a v0.3.0 -m "v0.3.0: tagged on the instruction of <name> on <date>"
-git push origin v0.3.0
-```
+### Step 2: read, decide, label (the product owner)
+
+1. Open the release PR. Read `## Release audit`: P1 findings are fixed before the release
+   (in their own PRs; then re-run the *release audit* job from the Actions tab, it replaces the
+   section), P2 findings become issues.
+2. Edit the PR description and change the last line of the section from `Verdict: open` to
+   `Verdict: pass`. This is a human act on purpose; `main.yml` refuses the tag until it is done.
+3. Set the label `po:approved`. The PR is a decision (ADR 0078): with the label and green CI
+   the merge queue squash-merges it.
+
+### Step 3: the tag (one click)
+
+*Run workflow* on `main` with `step = tag` and `version = X.Y.Z`. The job:
+
+1. finds the merged `chore(release): vX.Y.Z (#NN)` on `main`, checks that `pyproject.toml` at
+   that commit says `X.Y.Z` and that the tag does not exist yet;
+2. for `vX.Y.0`, checks that the release PR's `## Release audit` ends with `Verdict: pass`
+   (`scripts/check-release-audit.sh`, the same check `main.yml` repeats);
+3. sets the annotated tag `vX.Y.Z` on that commit with the message
+   `vX.Y.Z: tagged on the instruction of <your login> on <date>` and pushes it; `main.yml`
+   takes over.
 
 Do **not** use "Draft a new release" on GitHub: `main.yml` creates the release itself after
 the image is signed, and a hand-made release would make that step fail.
+
+### Laptop fallback
+
+When the forge cannot run the workflow, the same scripts work in a checkout on `main`:
+`python -m scripts.release_pr plan`, `python -m scripts.release_pr prepare --version X.Y.Z
+--body body.md` (then branch, commit `chore(release): vX.Y.Z`, `gh pr create --body-file
+body.md`, `gh pr merge --auto --squash`), `make release-audit` with the findings pasted under
+`## Release audit`, and after the merge `python -m scripts.release_pr tag-check --version X.Y.Z`
+followed by `git tag -a vX.Y.Z <commit> -m "<message it printed>"` and `git push origin vX.Y.Z`.
+
+### Self-hosted runner
+
+Set the repository variable `RELEASE_RUNNER` to the runner's label. The runner needs git,
+Python 3.11 or newer, the `gh` CLI and network access to the forge. The audit job additionally
+needs what `openai/codex-action` needs on Linux: passwordless `sudo`, `/usr/bin/setpriv`,
+`/usr/bin/setfacl` (package `acl`) and unprivileged user namespaces (`kernel.unprivileged_userns_clone=1`,
+AppArmor not restricting them); the action drops `sudo` irreversibly and removes the runner's
+access to root-owned sockets under `/run`, so give the audit job an ephemeral runner that is
+replaced after every job. On an internal forge (Forgejo or Gitea Actions) the YAML runs as is
+with its `vars` and `secrets`; the four `gh` calls (list and open the PR, auto-merge, edit the
+body) are the places to swap for that forge's CLI.
 
 ### Step 4: watch it go out
 
@@ -1042,6 +1157,34 @@ wait for a superuser's click again, then `docker compose --env-file .env.update 
 Release on the day the fix is merged (ADR 0052 §6): run the same steps; `make release-plan`
 gives a PATCH when only fixes are waiting, otherwise a MINOR that also carries the features on
 `main`. Keep the release notes free of exploit details until installations have updated.
+
+## Build steps as issues and the ADR drift report (ADR 0078)
+
+Every ADR from 0059 on ends with a *Build status* table. The workflow `adr drift`
+(`.github/workflows/adr-drift.yml`) turns it into work on GitHub, after every merge to `main`
+that touches an ADR and on Tuesday mornings:
+
+- Every row that is `planned` or `follow-up` has one open issue `ADR NNNN step S: <what>`
+  with the label `adr:NNNN`. The pull request that builds the step sets the row to `in PR #N`
+  and closes the issue with `Closes #N`; a row that moved to `merged`, `built` or `live`
+  closes it as well. The table is the source of truth: a closed issue for a row that is still
+  open is reopened, so change the row, not the issue. Issues without an `adr:` label are
+  never touched.
+- One issue `ADR drift <date>` lists what no longer agrees: a row of `docs/adr-status.md`
+  whose category contradicts the ADR's table, rows that say `in PR #N` for a pull request
+  that is merged or closed, and `adr:` issues whose row is gone. It is updated in place and
+  closed when there is nothing to report.
+
+To see what a run would do without writing anything, or to run it by hand:
+
+```sh
+uv run python -m scripts.adr_issues --dry-run
+uv run python -m scripts.adr_issues --report
+```
+
+The workflow has `issues: write` and nothing else it can change; the logic is in
+`scripts/adr_issues.py` (tests in `tests/scripts/test_adr_issues.py`), so another forge
+only needs to call it.
 
 ## Updates from the admin portal (ADR 0029)
 
@@ -1326,7 +1469,7 @@ caller by pseudonym (`client:<16 hex>`), never by IP address:
 
 | Entry | Means | What to do |
 |---|---|---|
-| *Te veel verzoeken*, `too_many_requests` (`surface:web` or `surface:agent`) | one caller went over a rate limit | many from one caller: a scanner or bot, block it at the proxy or firewall; from `many` callers: a distributed attack |
+| *Te veel verzoeken*, `too_many_requests` (`surface:web`, `surface:agent` or `surface:links`) | one caller went over a rate limit | many from one caller: a scanner or bot, block it at the proxy or firewall; from `many` callers: a distributed attack |
 | *Verzoek geweigerd*, `honeypot` | a bot filled in the hidden field of the booking form | nothing for one; a stream: consider Turnstile (feature flag) |
 | *Verzoek geweigerd*, `cross_site` / `origin_mismatch` | a form post from another site (CSRF attempt), or a proxy that rewrites `Origin` | check the proxy if it comes from all callers |
 | *Inloggen*, outcome denied, `invalid_state` / `invalid_token` / `nonce_mismatch` | a failed admin login | one: an expired login tab; many from one caller: an attack on the login |

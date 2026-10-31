@@ -14,12 +14,12 @@ superuser sets on *Advanced settings*. The environment lock binds only the platf
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, Response
+from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.live_settings import LiveSettings
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
-from app.admin.pages import Locale, SameOrigin
+from app.admin.pages import Locale, SameOrigin, organisation_header, organisation_redirect
 from app.admin.pages import page as _page
 from app.admin.settings_routes import SettingRow, _input, _value
 from app.domain.authorization import Permission
@@ -57,16 +57,11 @@ def _url(org: str) -> str:
     return f"/admin/organisations/{org}/settings"
 
 
-@router.get("/organisation-settings", response_class=HTMLResponse)
-async def organisations(request: Request, locale: Locale, context: List) -> HTMLResponse:
-    """List the organisations whose settings the admin may change."""
-    found = await _service(request).organisations(context.principal)
-    return _page(
-        request,
-        locale,
-        "admin/organisation_settings_list.html",
-        context.principal,
-        {"organisations": found},
+@router.get("/organisation-settings")
+async def organisations(context: List) -> RedirectResponse:
+    """Send the old settings list to the organisation's Settings sub-tab (ADR 0047 §4)."""
+    return organisation_redirect(
+        context.principal, Permission.SETTINGS_ORGANISATION_MANAGE, "settings"
     )
 
 
@@ -151,6 +146,9 @@ async def _overview(
         context.principal,
         {
             "organisation": organisation,
+            "org_header": organisation_header(
+                request, locale, context.principal, organisation.name, organisation.slug
+            ),
             "rows": rows,
             "done": done_message(request, locale.gettext),
             "unknown_error": next((m for k, m in errors.items() if k not in BY_KEY), None),

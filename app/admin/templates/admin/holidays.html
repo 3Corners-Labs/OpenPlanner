@@ -34,19 +34,4 @@
   {{ form_body(fields, _("admin.holidays.new_button")) }}
 </form>
 {% endif %}
-<section class="card" aria-labelledby="organisations-heading">
-  <div class="card__header">
-    <h2 id="organisations-heading">{{ _("admin.holidays.organisations") }}</h2>
-    <p class="card__lead">{{ _("admin.holidays.organisations_lead") }}</p>
-  </div>
-  {% if organisations %}
-  <ul class="link-list">
-    {% for organisation in organisations %}
-    <li><a href="/admin/organisations/{{ organisation.slug }}/holidays">{{ organisation.name }}</a></li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="empty-state">{{ _("admin.branding.none") }}</p>
-  {% endif %}
-</section>
 {% endblock %}

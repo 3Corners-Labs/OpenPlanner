@@ -9,8 +9,9 @@ from app.adapters.db.models import PlatformSettingRow, SettingsVersionRow
 from app.admin.settings_routes import _FIELD_LABELS
 from app.domain.authorization import Principal
 from app.domain.privacy import PII_FIELDS
-from app.web.protection import booking_limit
+from app.web.protection import booking_limit, unknown_link_limit
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.principals import principal
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
 
@@ -164,6 +165,20 @@ async def test_rate_limits_follow_a_change_without_a_restart(site: Site) -> None
     assert booking_limit() == "5/hour"
 
 
+async def test_the_unknown_link_bound_follows_a_change_and_keeps_its_bounds(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    await site.client.post(
+        "/admin/settings/rate_limit_unknown_links", data={"value": "30/hour"}, headers=SAME_ORIGIN
+    )
+    await site.client.post(
+        "/admin/settings/rate_limit_unknown_links", data={"value": "500/hour"}, headers=SAME_ORIGIN
+    )
+    await site.client.get("/admin/settings")
+
+    assert unknown_link_limit() == "30/hour"
+
+
 async def test_the_auditor_sees_no_forms_and_may_not_post(site: Site) -> None:
     await site.login_as(AUDITOR)
 
@@ -251,6 +266,8 @@ LOGIN_FORM = {
     "oidc_role_group_admin": "op-group",
     "oidc_role_auditor": "op-audit",
     "oidc_role_agent": "op-agent",
+    "oidc_entitlement_claim": "op_entitlements",
+    "oidc_entitlement_prefix": "op-acc",
 }
 
 
@@ -285,7 +302,7 @@ async def test_a_mapping_that_keeps_the_superuser_is_saved_after_a_fresh_login(
 async def test_a_mapping_that_would_lock_out_is_not_saved(site: Site) -> None:
     await site.login_as(SUPER)
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    nobody = Principal("sub-super", "Sanne Super", frozenset(), frozenset(), frozenset())
+    nobody = principal("sub-super", "Sanne Super", frozenset(), frozenset(), frozenset())
 
     location = await _try(site, nobody)
 

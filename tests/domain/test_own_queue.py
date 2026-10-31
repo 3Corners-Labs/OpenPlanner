@@ -34,6 +34,7 @@ def entry(
     lobby: bool = False,
     claimed: bool = False,
     status: BookingStatus = BookingStatus.CONFIRMED,
+    kind: BookingKind = BookingKind.SCHEDULED,
 ) -> QueueEntry:
     start = NOW + timedelta(minutes=minutes_from_now)
     booking = Booking(
@@ -43,6 +44,7 @@ def entry(
         start=start,
         end=start + timedelta(minutes=30),
         status=status,
+        kind=kind,
         contact=Contact("Ada", "Lovelace", "ada@example.org", None),
         locale="nl",
         token_hash="h",
@@ -135,6 +137,11 @@ def _joined(item: QueueEntry, minutes_ago: int) -> QueueEntry:
     return replace(item, status=replace(item.status, updated_at=at))
 
 
+def _in_call(item: QueueEntry) -> QueueEntry:
+    """Return ``item`` with the host and the citizen in the meeting."""
+    return replace(item, status=replace(item.status, host_joined=True, participants=2))
+
+
 def test_summarise_counts_waiting_citizens_and_the_longest_wait() -> None:
     since_start = entry(1, -8, lobby=True)  # joined at an unknown moment: waits since its start
     early = _joined(entry(2, 5, lobby=True), 3)  # joined before the start: waits since joining
@@ -144,6 +151,25 @@ def test_summarise_counts_waiting_citizens_and_the_longest_wait() -> None:
     summary = summarise([since_start, early, claimed, upcoming], NOW)
 
     assert summary == QueueSummary(waiting=2, longest_wait=timedelta(minutes=8))
+
+
+def test_a_direct_call_waits_from_its_request_before_the_lobby() -> None:
+    """A direct call is the request itself: it waits from its start, joined or not."""
+    requested = entry(1, -3, kind=BookingKind.DIRECT)  # link not yet opened
+    # Joined two minutes ago, but waits since the request six minutes ago.
+    joined = _joined(entry(2, -6, lobby=True, kind=BookingKind.DIRECT), 2)
+    picked_up = entry(3, -9, kind=BookingKind.DIRECT, claimed=True)
+    in_call = _in_call(entry(4, -12, kind=BookingKind.DIRECT))
+
+    summary = summarise([requested, joined, picked_up, in_call], NOW)
+
+    assert summary == QueueSummary(waiting=2, longest_wait=timedelta(minutes=6))
+    assert [e.waiting for e in (requested, joined, picked_up, in_call)] == [
+        True,
+        True,
+        False,
+        False,
+    ]
 
 
 def test_summarise_an_empty_or_idle_queue() -> None:
@@ -164,10 +190,10 @@ def _member(roles: frozenset[Role], *memberships: Membership) -> StaffMember:
 
 
 def test_works_queue_follows_the_matrix_for_the_members_memberships() -> None:
-    agent = _member(frozenset({Role.AGENT}), Membership("demo", "team"))
-    elsewhere = _member(frozenset({Role.AGENT}), Membership("demo", "other"))
-    org_admin = _member(frozenset({Role.ORG_ADMIN}), Membership("demo"))
-    auditor = _member(frozenset({Role.AUDITOR}), Membership("demo"))
+    agent = _member(frozenset({Role.AGENT}), Membership("agent", "demo", "team"))
+    elsewhere = _member(frozenset({Role.AGENT}), Membership("agent", "demo", "other"))
+    org_admin = _member(frozenset({Role.ORG_ADMIN}), Membership("org_admin", "demo"))
+    auditor = _member(frozenset({Role.AUDITOR}), Membership("auditor", "demo"))
 
     assert works_queue(agent, "team", "demo")
     assert not works_queue(elsewhere, "team", "demo")

@@ -49,6 +49,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.engine.default import DefaultExecutionContext
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.adapters.db.base import Base
@@ -91,9 +92,16 @@ __all__ = [
     "ScheduleRuleRow",
     "SlotRow",
     "StaffMembershipRow",
+    "StaffRefusalRow",
     "StaffRow",
     "UpdateRequestRow",
 ]
+
+
+def _slug_as_idp_key(context: DefaultExecutionContext) -> str:
+    """The IdP value of a new organisation or group starts as its slug (ADR 0049 point 4)."""
+    parameters: dict[str, object] = context.get_current_parameters()  # type: ignore[no-untyped-call]
+    return str(parameters["slug"])
 
 
 class OrganisationRow(Base):
@@ -104,6 +112,8 @@ class OrganisationRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str] = mapped_column(String(64), unique=True)
+    # ADR 0049: what the identity provider names the organisation by; the slug at creation.
+    idp_key: Mapped[str] = mapped_column(String(64), unique=True, default=_slug_as_idp_key)
     default_locale: Mapped[str] = mapped_column(String(16), server_default=text("'nl'"))
     display_name: Mapped[str | None] = mapped_column(String(200))
     accent_color: Mapped[str] = mapped_column(String(7), server_default=text("'#01689B'"))
@@ -198,7 +208,7 @@ class GroupRow(Base):
     trial_call_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
     trial_call_minutes: Mapped[int] = mapped_column(Integer, server_default=text("30"))
     trial_calls_per_booking: Mapped[int] = mapped_column(Integer, server_default=text("3"))
-    # ADR 0075: which Webex page the citizen's join link opens.
+    # ADR 0075: which Webex page the participant's join link opens.
     join_client: Mapped[str] = mapped_column(String(16), server_default=text("'browser'"))
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     queue_visible_from_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))
@@ -208,8 +218,11 @@ class GroupRow(Base):
     calendar_invite_address: Mapped[str | None] = mapped_column(String(254))
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
     form_version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+    # ADR 0049: what the identity provider names the group by, unique in its organisation.
+    idp_key: Mapped[str] = mapped_column(String(64), default=_slug_as_idp_key)
 
     __table_args__ = (
+        UniqueConstraint("organisation_id", "idp_key", name="uq_groups_organisation_idp_key"),
         CheckConstraint("phone_mode IN ('hidden', 'optional', 'required')", name="phone_mode"),
         CheckConstraint("dispatch_lead_minutes BETWEEN 0 AND 60", name="dispatch_lead"),
         CheckConstraint(
@@ -715,12 +728,13 @@ class StaffRow(Base):
 
 
 class StaffMembershipRow(Base):
-    """An organisation, or a group with its organisation, that an admin's roles reach."""
+    """One grant of an admin as last seen: a role on an organisation or a group (ADR 0049)."""
 
     __tablename__ = "staff_memberships"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     staff_id: Mapped[int] = mapped_column(ForeignKey("staff.id", ondelete="CASCADE"))
+    role_key: Mapped[str] = mapped_column(String(40), server_default=text("''"))
     organisation: Mapped[str] = mapped_column(String(64))
     group: Mapped[str | None] = mapped_column(String(64))
 
@@ -728,6 +742,28 @@ class StaffMembershipRow(Base):
         Index("ix_staff_memberships_staff_id", "staff_id"),
         Index("ix_staff_memberships_organisation", "organisation"),
         Index("ix_staff_memberships_group", "group"),
+    )
+
+
+class StaffRefusalRow(Base):
+    """An entitlement value of an admin's last login that gave no right (ADR 0049 point 8).
+
+    Holds the value (prefix, role key, IdP values), the reason code and the organisation it
+    names, when known; never personal data.
+    """
+
+    __tablename__ = "staff_refused_entitlements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    staff_id: Mapped[int] = mapped_column(ForeignKey("staff.id", ondelete="CASCADE"))
+    value: Mapped[str] = mapped_column(String(200))
+    reason: Mapped[str] = mapped_column(String(40))
+    organisation: Mapped[str | None] = mapped_column(String(64))
+    received_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        Index("ix_staff_refused_entitlements_staff_id", "staff_id"),
+        Index("ix_staff_refused_entitlements_organisation", "organisation"),
     )
 
 

@@ -1,0 +1,43 @@
+name: adr drift
+
+# ADR 0078 point 6: an accepted decision becomes trackable work. Every open row of a Build
+# status table (`planned`, `follow-up`) is an issue `ADR NNNN step S: …` labelled `adr:NNNN`;
+# a row that moved to merged, built or live closes it. Then one report of what no longer
+# agrees (the overview, rows that say `in PR` for a merged pull request, issues without a
+# row) is kept as the single open issue `ADR drift <date>`, closed when there is nothing.
+# Runs after every merge to `main` that touches an ADR, and weekly on Tuesday after the
+# Renovate freshness check. The logic is `scripts/adr_issues.py`; this file only calls it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/adr/**"
+      - "docs/adr-status.md"
+  schedule:
+    - cron: "0 8 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read   # `gh pr view`: is the pull request of a row `in PR #N` still open?
+
+concurrency:
+  group: adr-drift
+  cancel-in-progress: false
+
+jobs:
+  issues:
+    name: issues per open build step, drift report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: one open issue per open build step
+        run: python3 -m scripts.adr_issues
+      - name: the drift report as the one open issue "ADR drift <date>"
+        run: python3 -m scripts.adr_issues --report --post

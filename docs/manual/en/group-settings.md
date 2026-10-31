@@ -222,17 +222,17 @@ How often one appointment may open a trial call, from 1 to 5. Default 3. Each tr
 meeting in Webex; this number stops one appointment from creating them without end.
 
 <!-- field: join_client -->
-### Webex page for the citizen
+### Webex page for the participant
 
-Decides which Webex page the citizen gets when they go from our page to the call, for the
+Decides which Webex page the participant gets when they go from our page to the call, for the
 appointment and for the trial call. **Straight into the browser** (the default) opens the Webex
-web app at once: on a computer the citizen has nothing to install and does not see the "app or
-browser" question. **Webex lets the citizen choose** gives Webex's own page, with the choice
-between the app and the browser; pick it if your citizens use the Webex app or your organisation
+web app at once: on a computer the participant has nothing to install and does not see the "app or
+browser" question. **Webex lets the participant choose** gives Webex's own page, with the choice
+between the app and the browser; pick it if your participants use the Webex app or your organisation
 prefers it. On a phone or tablet Webex asks for the Webex app in both cases: there is no web
 version there. The texts in the confirmation, on the call page and on the trial call page follow
-this choice. Webex can change this behaviour itself; if the citizen does see the choice between
-app and browser anyway, set it to **Webex lets the citizen choose**.
+this choice. Webex can change this behaviour itself; if the participant does see the choice between
+app and browser anyway, set it to **Webex lets the participant choose**.
 
 <!-- field: offer -->
 ### Offer per block
@@ -272,3 +272,20 @@ With **Yes**, the group can also appear as a widget on the organisation's websit
 group's own page. This works only on the websites the organisation allows under
 [Embedding on websites](embedding.md). With **No** (the default), the group can only be booked
 on its own page, even when the widget is on an allowed website.
+
+## Identity provider mapping
+
+The **IdP value** is the name the identity provider uses for this group in a right, for
+example `openplanner:group_admin:gem-a/burgerzaken`. A new group starts with the code of its
+web address as value. Only an organisation admin or the superuser changes the value; the form
+warns how many staff members lose access until the identity provider sends the new value. The
+full list is on **Identity provider mapping**.
+
+<!-- field: idp_key -->
+### IdP value
+
+The name the identity provider uses for this group in a right, for example `burgerzaken` in
+`openplanner:group_admin:gem-a/burgerzaken`. Lower-case letters, digits and hyphens; unique
+within the organisation. A new group starts with the code of its web address. When you change
+the value, staff with a right on the old value lose access until the identity provider sends
+the new one; the form counts how many that are.

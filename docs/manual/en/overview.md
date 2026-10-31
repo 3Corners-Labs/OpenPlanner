@@ -22,8 +22,10 @@ The overview never shows citizens' personal data: only counts, group names and t
 
 - **Queue across my groups**: for each group with an own queue within your reach, how many
   citizens wait, how long the longest wait has been and how many staff who may work the queue
-  are signed in now. The group name opens the queue. Counts and minutes only, never names.
-  Colours for a wait that is too long follow with the wait thresholds.
+  are signed in now. A participant with an appointment counts once they are in the lobby; a
+  direct call counts from the request, even before the link is opened. The group name opens
+  the queue. Counts and minutes only, never names. Colours for a wait that is too long follow
+  with the wait thresholds.
 - **Running tasks**: the background jobs that are running now and the jobs that failed after
   their last attempt, with type, state and time. Never the content of a job or the booking it
   belongs to. If something here says *Failed*, something is stuck: tell the installation's
@@ -75,6 +77,13 @@ On a phone the bar keeps only its icons and your initials; your name is in the m
 
 ## The top bar
 
+At the start of the bar, before the mark, the **menu button** (three lines) collapses the side
+menu to its icons or expands it again. Collapsed, every entry keeps its name: it appears when
+you point at the icon or move the keyboard focus to it. On a tablet the menu starts collapsed
+and the button expands it; on a wider screen it starts expanded. The choice holds for this
+session and survives signing in again, like the appearance. On a phone there is no side menu
+and no button: the bar at the bottom has the first entries, *More* the rest.
+
 To the right of the portal's name sit a few shortcuts, from left to right. You only see what
 your role may open:
 
@@ -89,3 +98,21 @@ your role may open:
 On a phone the icons, the number and your initials stay; the words stay in the bar for screen
 readers. The number is also part of the shortcut's name, for example *Tasks, 2 running or
 failed*. A shortcut without a source for a number shows none.
+
+## Choosing a scope
+
+At the left of the top bar is a button with a filter icon, and on a wide screen your choice next to
+it (*Scope: All organisations › All groups*). In it you choose an organisation, a group or both,
+and **Show** narrows the overview to that choice: the groups at the bottom, *Bookings today per
+group*, *Queue across my groups* and *Recent configuration changes*. *Running tasks*, *System
+status* and *My role and reach* are platform-wide and do not change. **Show everything** removes
+the choice.
+
+The filter only shows what your role may already see. You choose from the organisations and groups
+within your reach; any other value in the address is ignored. It is an ordinary form that changes
+nothing. Above the lists the chosen organisation and group are links to their pages (the
+organisation page only for those who may open it). The choice holds for this session: you
+see it again when you return to the overview, and after signing in again the filter is back on
+everything. While a choice is active the button has a coloured background, also when only the icon
+fits on a smaller screen. For now the filter works on the overview; the other lists have their own
+filters.
