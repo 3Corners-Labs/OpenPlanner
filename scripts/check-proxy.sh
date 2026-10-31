@@ -47,11 +47,24 @@ issuer() { # issuer: the issuer line of the served certificate
   curl -skv $resolve -o /dev/null https://booking.test:18443/healthz 2>&1 | grep 'issuer:' || true
 }
 
+oversized_post() { # oversized_post: the status of a 100 kB form post, 413 when the proxy refuses it
+  # The proxy answers 413 once it has read more than its limit (64 kB). The app does not read
+  # the body of a post to /g/x and answers 405 at once, so when that answer reaches the proxy
+  # before the proxy has read the limit, the client sees the 405: a race, not a missing limit.
+  # Without the limit every attempt would see 405, so one 413 in ten attempts proves it.
+  status=""
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    # shellcheck disable=SC2086
+    status="$(head -c 100000 /dev/zero | curl -sk $resolve -o /dev/null -w '%{http_code}' -X POST --data-binary @- https://booking.test:18443/g/x)"
+    [ "$status" = "413" ] && break
+  done
+  printf '%s' "$status"
+}
+
 edge_checks() { # redirect, body limit, non-root: the same in every pass
   redirect="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -H 'Host: booking.test' 'http://127.0.0.1:18080/g/x?a=1')"
   [ "$redirect" = "308 https://booking.test/g/x?a=1" ] || fail "port 80 does not redirect ($redirect)"
-  # shellcheck disable=SC2086
-  status="$(head -c 100000 /dev/zero | curl -sk $resolve -o /dev/null -w '%{http_code}' -X POST --data-binary @- https://booking.test:18443/g/x)"
+  status="$(oversized_post)"
   [ "$status" = "413" ] || fail "oversized form body not refused ($status)"
   [ "$(compose exec -T proxy id -u)" != "0" ] || fail "proxy runs as root"
 }
