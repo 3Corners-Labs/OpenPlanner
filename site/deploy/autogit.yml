@@ -1,0 +1,24 @@
+# TransIP AutoGit (ADR 0087): deployed on every push to the production branch. The site is
+# static and already built, so every hook does nothing; TransIP keeps the two newest releases.
+# Written to the root of the host's repository by scripts/deploy-site.sh.
+hooks:
+  setup_before: |
+    exit 0
+  setup_after: |
+    exit 0
+  install_before: |
+    exit 0
+  install_after: |
+    exit 0
+  sharedsymlink_before: |
+    exit 0
+  sharedsymlink_after: |
+    exit 0
+  symlink_before: |
+    exit 0
+  symlink_after: |
+    exit 0
+  cleanup_before: |
+    exit 0
+  cleanup_after: |
+    exit 0

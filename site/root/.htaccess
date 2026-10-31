@@ -1,0 +1,23 @@
+# openplanner.nl on Apache (TransIP web hosting), ADR 0087. Response headers the page cannot set
+# itself. HSTS and the redirect to HTTPS are added once the certificate for openplanner.nl is in
+# place (ADR 0087 step 4); sending them before would lock visitors out.
+DirectoryIndex index.html
+Options -Indexes
+AddType text/markdown .md
+AddType text/plain .txt
+<IfModule mod_headers.c>
+  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+  Header always unset Set-Cookie
+</IfModule>
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 5 minutes"
+  ExpiresByType text/css "access plus 1 hour"
+  ExpiresByType application/javascript "access plus 1 hour"
+  ExpiresByType image/png "access plus 1 week"
+  ExpiresByType image/svg+xml "access plus 1 week"
+</IfModule>

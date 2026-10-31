@@ -53,6 +53,15 @@ def _env(remote: Path, **extra: str) -> dict[str, str]:
     }
 
 
+def test_a_key_file_works_instead_of_the_key(
+    git: Git, dist: Path, remote: Path, tmp_path: Path
+) -> None:
+    env = _env(remote, SITE_DEPLOY_KEY="", SITE_DEPLOY_KEY_FILE=str(tmp_path / "laptop-key"))
+    result = _deploy(dist, env)
+    assert result.returncode == 0, result.stderr
+    assert "index.html" in _files(git, remote)
+
+
 def test_without_remote_or_key_it_builds_and_does_not_deploy(dist: Path) -> None:
     result = _deploy(dist, {})
     assert result.returncode == 0
@@ -64,7 +73,7 @@ def test_first_push_fills_an_empty_repository_and_a_second_changes_nothing(
 ) -> None:
     first = _deploy(dist, _env(remote))
     assert first.returncode == 0, first.stderr
-    assert _files(git, remote) == ["index.html", "static/site.css"]
+    assert _files(git, remote) == [".autogit.yml", "index.html", "static/site.css"]
     assert "site: v1 abc" in git("--git-dir", str(remote), "log", "-1", "--format=%s", "main")
     again = _deploy(dist, _env(remote), label="v2 def")
     assert again.returncode == 0, again.stderr
@@ -75,7 +84,7 @@ def test_a_removed_page_disappears_from_the_host(git: Git, dist: Path, remote: P
     assert _deploy(dist, _env(remote)).returncode == 0
     (dist / "static" / "site.css").unlink()
     assert _deploy(dist, _env(remote), label="v2").returncode == 0
-    assert _files(git, remote) == ["index.html"]
+    assert _files(git, remote) == [".autogit.yml", "index.html"]
 
 
 def test_the_site_can_live_in_a_folder_of_the_repository(
@@ -83,7 +92,7 @@ def test_the_site_can_live_in_a_folder_of_the_repository(
 ) -> None:
     result = _deploy(dist, _env(remote, SITE_DEPLOY_DIR="www"))
     assert result.returncode == 0, result.stderr
-    assert _files(git, remote) == ["www/index.html", "www/static/site.css"]
+    assert _files(git, remote) == [".autogit.yml", "www/index.html", "www/static/site.css"]
 
 
 @pytest.mark.parametrize("folder", ["../outside", "/var/www", "www/../.."])

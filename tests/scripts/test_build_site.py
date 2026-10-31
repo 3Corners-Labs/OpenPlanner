@@ -291,3 +291,11 @@ def test_the_site_shows_the_applications_own_mark(dist: Path) -> None:
     html = (dist / "index.html").read_text(encoding="utf-8")
     # Header, hero, integration hub and footer: the same drawing as the admin portal.
     assert html.count(slot.group(1)) == 4
+
+
+def test_the_web_root_gets_its_server_configuration(dist: Path) -> None:
+    htaccess = (dist / ".htaccess").read_text()
+    assert "Content-Security-Policy" in htaccess
+    assert "Strict-Transport-Security" not in htaccess, (
+        "HSTS only once HTTPS works (ADR 0087 step 4)"
+    )
