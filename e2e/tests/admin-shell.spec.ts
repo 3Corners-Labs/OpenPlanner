@@ -64,6 +64,27 @@ for (const [name, width] of Object.entries(WIDTHS)) {
     });
 
     if (name !== 'phone') {
+      test('the menu stays in view while a long page scrolls', async ({ page }) => {
+        await loginAs(page, 'super', '/admin/audit');
+        const menu = adminMenu(page);
+        const bar = page.locator('.admin-topbar');
+        // Make the page long enough to scroll, whatever the audit log holds.
+        await page.evaluate(() => {
+          document.querySelector('main')!.style.minHeight = '400vh';
+        });
+        await page.evaluate(() => window.scrollTo(0, 2000));
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
+        // The top bar sticks to the top of the window and the menu right under it, whatever
+        // sat above them before the scroll (the environment banner).
+        const barBox = await bar.boundingBox();
+        const menuBox = await menu.boundingBox();
+        expect(barBox).not.toBeNull();
+        expect(menuBox).not.toBeNull();
+        expect(barBox!.y).toBe(0);
+        expect(menuBox!.y).toBeCloseTo(barBox!.y + barBox!.height, 0);
+        await expect(menu.getByRole('link', { name: 'Overzicht' })).toBeInViewport();
+      });
+
       test('the menu button collapses or expands the menu for the session', async ({ page }) => {
         await loginAs(page, 'super');
         const shell = page.locator('.admin-shell');

@@ -190,8 +190,8 @@ async def test_the_trial_call_can_be_played_and_leaves_the_call_status_alone(
         assert response.headers["location"] == f"{page}?done=simulated#simulator", event
 
     html = (await site.client.get(page)).text
-    assert "Proefgesprek geopend door de burger" in html
-    assert "Burger ging het proefgesprek in" in html
+    assert "Proefgesprek geopend door de deelnemer" in html
+    assert "Deelnemer ging het proefgesprek in" in html
     assert "Deelnemer kwam het proefgesprek binnen" in html
     assert "Deelnemer verliet het proefgesprek" in html
     assert "<div><dt>Deelnemers</dt><dd>0</dd></div>" in html  # the trial call never counts

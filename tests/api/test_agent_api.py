@@ -16,14 +16,15 @@ from app.config import Settings
 from app.domain.api_access import ApiAccessService
 from app.domain.api_clients import ClientDraft, IssuedSecret
 from app.domain.audit import Outcome
-from app.domain.authorization import Principal, Role
+from app.domain.authorization import Role
 from app.domain.services import BookingService
 from app.main import create_app
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
+from tests.support.principals import principal
 from tests.support.routes import all_routes
 
-SUPER = Principal("sub-super", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
+SUPER = principal("sub-super", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 BASE = "/api/agent/v1"
 FORM = {"content-type": "application/x-www-form-urlencoded"}
 OPEN_ROUTES = {"/oauth/token", "/openapi.json", "/docs"}

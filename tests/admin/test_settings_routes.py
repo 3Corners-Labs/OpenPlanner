@@ -11,6 +11,7 @@ from app.domain.authorization import Principal
 from app.domain.privacy import PII_FIELDS
 from app.web.protection import booking_limit, unknown_link_limit
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.principals import principal
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
 
@@ -265,6 +266,8 @@ LOGIN_FORM = {
     "oidc_role_group_admin": "op-group",
     "oidc_role_auditor": "op-audit",
     "oidc_role_agent": "op-agent",
+    "oidc_entitlement_claim": "op_entitlements",
+    "oidc_entitlement_prefix": "op-acc",
 }
 
 
@@ -299,7 +302,7 @@ async def test_a_mapping_that_keeps_the_superuser_is_saved_after_a_fresh_login(
 async def test_a_mapping_that_would_lock_out_is_not_saved(site: Site) -> None:
     await site.login_as(SUPER)
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    nobody = Principal("sub-super", "Sanne Super", frozenset(), frozenset(), frozenset())
+    nobody = principal("sub-super", "Sanne Super", frozenset(), frozenset(), frozenset())
 
     location = await _try(site, nobody)
 
@@ -382,8 +385,8 @@ async def test_the_data_fields_card_is_read_only_and_links_to_the_manual(site: S
     assert '<h2 id="data-fields-heading">Gegevensvelden</h2>' in text
     for field in PII_FIELDS:
         assert f'<code class="muted">{field}</code>' in text
-    assert text.count("Direct: identificeert de burger op zichzelf") == 4
-    assert text.count("Gevoelig: wat de burger ons vertelde") == 5
+    assert text.count("Direct: identificeert de deelnemer op zichzelf") == 4
+    assert text.count("Gevoelig: wat de deelnemer ons vertelde") == 5
     assert "ligt vast in de software" in text
     assert 'href="/admin/help/data-fields"' in text
     card = text.split('id="data-fields"')[1].split("</section>")[0]

@@ -3,16 +3,17 @@
 import re
 
 from app.domain.admin import AdminService
-from app.domain.authorization import Principal, Role, Scope
+from app.domain.authorization import Role, Scope
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
 from app.web.static_assets import ASSETS
 from tests.admin.conftest import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
+from tests.support.principals import principal
 from tests.support.queue import own_queue as _own_queue
 from tests.support.queue import site_uow as _uow
 
 QUEUE = "/admin/groups/demo/queue"
-COLLEAGUE = Principal(
+COLLEAGUE = principal(
     "sub-colleague", "Cas Collega", frozenset({Role.AGENT}), frozenset(), frozenset({"demo"})
 )
 

@@ -15,7 +15,7 @@ from typing import Protocol
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
-from app.domain.authorization import CustomRole, Principal, Scope
+from app.domain.authorization import CustomRole, Scope
 from app.domain.booking import (
     Booking,
     BookingStatus,
@@ -42,6 +42,7 @@ from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
+from app.domain.entitlements import Directory, LoginClaims
 from app.domain.form_fields import FormDefinition
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.images import ImageFile, ImageText
@@ -57,7 +58,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
-from app.domain.staff import StaffFilter, StaffMember
+from app.domain.staff import GrantHolders, RefusedEntitlement, StaffFilter, StaffMember
 from app.domain.tasks import ActiveJobs
 from app.domain.tls import CertificateCheck, ProbeResult
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
@@ -375,8 +376,11 @@ class IdentityProvider(Protocol):
 
     async def finish_login(
         self, *, code: str, redirect_uri: str, code_verifier: str, nonce: str
-    ) -> Principal:
-        """Exchange the code, verify the ID token and return the admin it describes.
+    ) -> LoginClaims:
+        """Exchange the code, verify the ID token and return what it says about the admin.
+
+        The claims are extracted, not interpreted: ``app.domain.entitlements.resolve`` turns
+        them into a ``Principal`` with the directory (ADR 0049).
 
         Raises:
             IdentityError: If the exchange or any token check fails.
@@ -391,11 +395,11 @@ class IdentityProvider(Protocol):
         code_verifier: str,
         nonce: str,
         trial: Mapping[str, str],
-    ) -> tuple[Principal, Principal]:
-        """Like ``finish_login``, and also map the same claims with the ``trial`` mapping.
+    ) -> tuple[LoginClaims, LoginClaims]:
+        """Like ``finish_login``, and also extract the same claims with the ``trial`` mapping.
 
-        Returns the admin under the current mapping and under the proposed one; the claims
-        themselves are never returned or stored.
+        Returns what the current mapping and the proposed one make of the ID token; the
+        token itself is never returned or stored.
 
         Raises:
             IdentityError: If the exchange or any token check fails.
@@ -493,8 +497,25 @@ class Transaction(Protocol):
     async def list_staff(self, scope: Scope, narrow: StaffFilter) -> list[StaffMember]:
         """Return the staff ``scope`` may see (``app.domain.staff.visible``), by name.
 
-        ``narrow`` only ever narrows further. Each member carries all memberships; the
-        caller hides those outside the scope.
+        ``narrow`` only ever narrows further. Each member carries all memberships and
+        refusals; the caller hides those outside the scope.
+        """
+        ...
+
+    async def get_directory(self) -> Directory:
+        """Return the role keys, organisations and groups a claim value can name (ADR 0049)."""
+        ...
+
+    async def list_grant_holders(self, scope: Scope) -> list[GrantHolders]:
+        """Return, per grant on an organisation in ``scope``, how many people last held it."""
+        ...
+
+    async def list_refused_entitlements(
+        self, scope: Scope, since: datetime
+    ) -> list[RefusedEntitlement]:
+        """Return the refused values received since ``since``, newest first.
+
+        Only those naming an organisation in ``scope``; every one for the superuser's scope.
         """
         ...
 

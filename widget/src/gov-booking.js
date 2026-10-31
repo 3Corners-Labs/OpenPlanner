@@ -123,7 +123,7 @@ class GovBooking extends HTMLElement {
   }
 
   unavailable(error) {
-    // Maintenance (ADR 0038) ends by itself: say so, and let the citizen try again.
+    // Maintenance (ADR 0038) ends by itself: say so, and let the participant try again.
     const code = error instanceof ApiError ? error.code : null;
     const text = this.t(code === 'maintenance' ? 'widget.maintenance' : 'widget.unavailable');
     const content = h('div', { class: 'notice', part: 'notice' }, h('p', {}, text));
