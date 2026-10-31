@@ -477,3 +477,19 @@ def test_the_script_runs_gh_from_the_path(
 
     assert log.read_text().splitlines()[0].startswith("label list --json name")
     assert "would create: ADR 0099 step 2" in capsys.readouterr().out
+
+
+def test_counts_prints_the_adrs_per_category_and_calls_no_one(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = FakeGh()
+
+    assert main(["--counts"], root=repo, run=fake) == 0
+
+    assert capsys.readouterr().out.splitlines() == [
+        "BUILT: 1",
+        "PARTIAL: 1",
+        "NOT BUILT: 1",
+        "POLICY: 0",
+    ]
+    assert fake.calls == []

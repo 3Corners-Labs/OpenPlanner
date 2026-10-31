@@ -48,12 +48,6 @@ def parse_rows(text: str) -> list[Row]:
     return [Row(*m.groups()) for line in text.splitlines() if (m := ROW.match(line.strip()))]
 
 
-def parse_summary(text: str) -> dict[str, int]:
-    """Return the counts of the small summary table at the top."""
-    found = re.findall(r"^\| (BUILT|PARTIAL|NOT BUILT|POLICY) \| (\d+) \|$", text, re.M)
-    return {name: int(count) for name, count in found}
-
-
 def status_paragraph(adr: Path) -> str:
     """Return the ADR's Status line with its continuation, lower case, on one line."""
     found = re.search(r"^Status:\s*(.*?)(?:\n\n|\Z)", adr.read_text(), re.M | re.S)
@@ -121,10 +115,9 @@ def test_every_adr_is_listed_once_and_nothing_else() -> None:
     assert [n for n, c in Counter(numbers).items() if c > 1] == [], "an ADR is listed twice"
 
 
-def test_the_summary_counts_the_rows() -> None:
-    counted = Counter(row.category for row in ROWS)
-
-    assert parse_summary(TEXT) == {name: counted[name] for name in CATEGORIES if counted[name]}
+def test_the_overview_keeps_no_counts_of_its_own() -> None:
+    """A hand-kept count table made every pull request that touched a row conflict."""
+    assert not re.search(r"^\| (BUILT|PARTIAL|NOT BUILT|POLICY) \| \d+ \|$", TEXT, re.M)
 
 
 def test_the_overview_says_when_it_was_checked() -> None:
