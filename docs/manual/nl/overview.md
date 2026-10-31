@@ -62,10 +62,11 @@ later (ADR 0062). Op een tablet staan maximaal twee widgets naast elkaar, op een
 Rechtsboven opent uw naam of uw initialen het profielmenu. Het staat op elke pagina van het
 beheer en werkt zonder JavaScript. Van boven naar beneden:
 
-- **Uw rollen** en waar ze vandaan komen. De rol komt uit uw organisatie-account en is hier niet
-  te wijzigen; **Mijn rechten bekijken** opent de pagina met wat uw rol toestaat en waar.
-- **Weergave**: Systeem (volgt uw apparaat), Licht of Donker. De keuze geldt voor deze sessie en
-  blijft ook na opnieuw inloggen; uitloggen zet haar terug op Systeem.
+- **Uw naam en rol**, en waar de rol vandaan komt: uit uw organisatie-account, dus hier niet te
+  wijzigen. **Mijn rechten bekijken** opent de pagina met wat uw rol toestaat en waar.
+- **Weergave**: Systeem (volgt uw apparaat), Licht of Donker. De keuze brengt u terug naar de
+  pagina waar u was, geldt voor deze sessie en blijft ook na opnieuw inloggen; uitloggen zet haar
+  terug op Systeem.
 - **Kies een taal**: Nederlands of English. De keuze onthoudt de browser.
 - **Meldingen**: of de balk bij storingen getoond wordt en welke meldingen als pop-up verschijnen
   (alle, waarschuwingen en storingen, alleen storingen, geen). **Opslaan** bewaart de keuze voor

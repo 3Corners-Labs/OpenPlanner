@@ -60,10 +60,11 @@ at most two widgets sit side by side, on a phone one.
 At the top right, your name or initials open the profile menu. It is on every admin page and
 works without JavaScript. From top to bottom:
 
-- **Your roles** and where they come from. Your role comes from your organisation account and
-  cannot be changed here; **View my rights** opens the page with what your role allows and where.
-- **Appearance**: System (follows your device), Light or Dark. The choice holds for this session
-  and survives signing in again; signing out puts it back to System.
+- **Your name and role**, and where the role comes from: your organisation account, so it cannot
+  be changed here. **View my rights** opens the page with what your role allows and where.
+- **Appearance**: System (follows your device), Light or Dark. The choice brings you back to the
+  page you were on, holds for this session and survives signing in again; signing out puts it
+  back to System.
 - **Choose a language**: Nederlands or English. The browser remembers the choice.
 - **Alerts**: whether the bar for outages shows and which alerts pop up (all, warnings and
   outages, outages only, none). **Save** keeps the choice for this session. The alerts themselves

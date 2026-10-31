@@ -2,7 +2,8 @@
 
 A message keeps its fixed, accessible layout; admins change only text blocks. A group text
 replaces the catalogue text of one block in one locale; removing it brings the default back.
-Lookup when a message is composed: group text → organisation override → catalogue.
+Lookup when a message is composed: group text → organisation override → catalogue (the
+organisation's texts are ``app.domain.text_overrides``).
 
 Placeholders are ``{name}`` from the block's allow-list only; a text may leave some out, but
 never use another one. The rule is checked here, so no stored text can ask the composer for a
@@ -184,30 +185,45 @@ def used_placeholders(text: str) -> frozenset[str] | None:
     return frozenset(names)
 
 
-def clean_text(key: str, text: str) -> str:
-    """Return the trimmed text for block ``key`` if it may be stored.
+def check_text(
+    key: str, text: str, placeholders: frozenset[str], max_length: int, *, single_line: bool
+) -> str:
+    """Return the trimmed ``text`` of block ``key`` if it may be stored.
 
-    Rules: a known block, not blank, within the block's length, no control characters, no
-    line breaks in single-line blocks, and only placeholders from the block's allow-list.
+    Rules: not blank, within ``max_length``, no control characters, no line breaks when
+    ``single_line``, and only placeholders from ``placeholders``. One home for the rules of
+    group texts and organisation texts (ADR 0004 §8, ADR 0009).
 
     Raises:
         DomainError: ``invalid_configuration`` with the block key as field.
     """
-    block = BLOCKS_BY_KEY.get(key)
-    if block is None:
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "key")
     cleaned = text.strip().replace("\r\n", "\n")
     names = used_placeholders(cleaned)
     if (
         not cleaned
-        or len(cleaned) > block.max_length
+        or len(cleaned) > max_length
         or _CONTROL_CHARS.search(cleaned)
-        or (block.single_line and _NEWLINE.search(cleaned))
+        or (single_line and _NEWLINE.search(cleaned))
         or names is None
-        or not names <= block.placeholders
+        or not names <= placeholders
     ):
         raise _invalid(key)
     return cleaned
+
+
+def clean_text(key: str, text: str) -> str:
+    """Return the trimmed text for message block ``key`` if it may be stored.
+
+    Raises:
+        DomainError: ``invalid_configuration`` with the block key as field, or ``key`` for a
+            key that is no block.
+    """
+    block = BLOCKS_BY_KEY.get(key)
+    if block is None:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "key")
+    return check_text(
+        key, text, block.placeholders, block.max_length, single_line=block.single_line
+    )
 
 
 GroupTexts = dict[tuple[str, str], str]

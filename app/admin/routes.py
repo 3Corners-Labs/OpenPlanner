@@ -49,8 +49,10 @@ from app.admin import (
     message_routes,
     organisation_routes,
     organisation_settings_routes,
+    organisation_text_routes,
     overview_routes,
     planner_routes,
+    preference_routes,
     queue_routes,
     retention_routes,
     role_routes,
@@ -528,6 +530,7 @@ def register_admin(app: FastAPI) -> None:
         channel_routes.router,
         message_routes.router,
         organisation_routes.router,
+        organisation_text_routes.router,
         closure_routes.router,
         closure_image_routes.router,
         scenario_routes.router,
@@ -539,5 +542,6 @@ def register_admin(app: FastAPI) -> None:
         update_routes.router,
         maintenance_routes.router,
         help_routes.router,
+        preference_routes.router,
     ):
         app.include_router(module_router, dependencies=banner)

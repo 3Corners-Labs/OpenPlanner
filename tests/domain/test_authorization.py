@@ -27,6 +27,7 @@ from app.domain.authorization import (
     decide_client,
     decide_in_maintenance,
     permissions_for,
+    role_keys,
     scope_for,
 )
 
@@ -42,6 +43,15 @@ MIXED = Principal(
     frozenset({"andere"}),
     frozenset({"demo"}),
 )
+
+EVERY_ROLE = Principal(
+    "e",
+    "Every role",
+    frozenset(Role),
+    frozenset({"demo"}),
+    frozenset({"demo"}),
+)
+"""The dev realm's ``super``: the superuser reach wins, the other roles add nothing."""
 
 OWN_GROUP = Target.for_group("demo", "demo")
 OTHER_GROUP = Target.for_group("toeslagen", "andere")
@@ -73,6 +83,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.EMBEDDING_MANAGE,  # ADR 0035
         Permission.QUEUE_WORK,  # ADR 0043
         Permission.SETTINGS_ORGANISATION_MANAGE,  # ADR 0042: the own organisation's settings
+        Permission.TEXTS_ORGANISATION_MANAGE,  # ADR 0004: the organisation's own wording
     }
     assert MATRIX[Role.GROUP_ADMIN] == {
         Permission.DASHBOARD_VIEW,
@@ -256,6 +267,19 @@ def test_every_permission_has_a_level() -> None:
             OWN_ORG,
             Decision(False, Reason.NOT_PERMITTED),
         ),
+        (ORG, Permission.TEXTS_ORGANISATION_MANAGE, OWN_ORG, Decision(True, Reason.ORGANISATION)),
+        (
+            ORG,
+            Permission.TEXTS_ORGANISATION_MANAGE,
+            OTHER_ORG,
+            Decision(False, Reason.OUT_OF_SCOPE),
+        ),
+        (
+            GROUP,
+            Permission.TEXTS_ORGANISATION_MANAGE,
+            OWN_ORG,
+            Decision(False, Reason.NOT_PERMITTED),
+        ),
         # Roles combine: org admin elsewhere, group admin here.
         (MIXED, Permission.SCHEDULE_MANAGE, OWN_GROUP, Decision(True, Reason.GROUP)),
         (MIXED, Permission.GROUP_EDIT, OWN_GROUP, Decision(False, Reason.OUT_OF_SCOPE)),
@@ -324,7 +348,7 @@ def test_scope_contains() -> None:
     assert not Scope().contains("a", "b")
 
 
-PRINCIPALS = [SUPER, ORG, GROUP, AUDITOR, NOBODY, MIXED]
+PRINCIPALS = [SUPER, ORG, GROUP, AUDITOR, NOBODY, MIXED, EVERY_ROLE]
 GROUP_TARGETS = [OWN_GROUP, OTHER_GROUP, Target.for_group("losse", "demo")]
 GROUP_PERMISSIONS = [p for p in Permission if LEVELS[p] is Level.GROUP]
 
@@ -341,6 +365,22 @@ def test_database_scope_and_decision_never_disagree(
     visible = scope_for(principal, permission).contains(target.organisation, target.group)
 
     assert allowed == visible
+
+
+@pytest.mark.parametrize("permission", list(Permission))
+def test_holding_every_role_decides_and_lists_like_the_superuser(permission: Permission) -> None:
+    level = LEVELS[permission]
+    target = {
+        Level.GLOBAL: Target.everything(),
+        Level.ORGANISATION: OTHER_ORG,
+        Level.GROUP: OTHER_GROUP,
+    }[level]
+
+    assert decide(EVERY_ROLE, permission, target) == decide(SUPER, permission, target)
+    assert decide(EVERY_ROLE, permission, target).reason is Reason.SUPERUSER
+    if level is not Level.GLOBAL:
+        assert scope_for(EVERY_ROLE, permission) == Scope(everything=True)
+    assert role_keys(EVERY_ROLE) == sorted(Role)
 
 
 def test_permissions_for_lists_rights_with_their_scope() -> None:

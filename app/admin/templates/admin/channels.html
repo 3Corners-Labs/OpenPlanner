@@ -28,6 +28,30 @@
   </div>
   {{ form_body(test_fields, _("admin.channels.test_send")) }}
 </form>
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/channels/email/domain" aria-labelledby="domain-heading">
+  <div class="card__header">
+    <h2 id="domain-heading">{{ _("admin.channels.domain_heading") }}{% if domain_report %} <span class="chip{% if domain_report.tone %} chip--{{ domain_report.tone }}{% endif %}">{{ domain_report.finding }}</span>{% endif %}</h2>
+    <p class="card__lead">{{ _("admin.channels.domain_lead") }}</p>
+  </div>
+  {% if domain_report %}
+  <p>{{ _("admin.channels.domain_result", domain=domain_report.domain) }}</p>
+  <div class="table-scroll" role="region" aria-labelledby="domain-heading" tabindex="0">
+  <table class="data-table">
+    <thead><tr><th scope="col">{{ _("admin.channels.domain_column_record") }}</th><th scope="col">{{ _("admin.channels.domain_column_verdict") }}</th><th scope="col">{{ _("admin.channels.domain_column_explanation") }}</th></tr></thead>
+    <tbody>
+    {% for row in domain_report.rows %}
+      <tr><th scope="row">{{ row.record }}</th><td><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %}">{{ row.verdict }}</span></td><td>{{ row.explanation }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="hint">{{ _("admin.channels.domain_hint") }}</p>
+  {% endif %}
+  {% if domain_error %}<p class="error-message" id="domain_check-error">{{ domain_error }}</p>{% endif %}
+  <div class="form-actions">
+    <button type="submit" class="button button--secondary" id="domain_check"{% if domain_error %} aria-describedby="domain_check-error"{% endif %}>{{ _("admin.channels.domain_check") }}</button>
+  </div>
+</form>
 {% endif %}
 <form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/channels/sms" novalidate aria-labelledby="sms-heading">
   <div class="card__header">

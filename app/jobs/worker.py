@@ -23,6 +23,7 @@ from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.maintenance import storage_limits
+from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
 from app.adapters.integrations import (
@@ -137,7 +138,7 @@ async def run_worker(
                 clock,
                 ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
                 MessageComposer(
-                    Translator(load_catalogues()),
+                    Translator(load_catalogues(), CachedTextOverrides(uow)),
                     management_token_key(settings),
                     settings.public_base_url,
                 ),
@@ -200,7 +201,9 @@ async def run_worker(
         while not stop.is_set():
             if await is_reachable(engine):
                 if await live.refresh():  # the release repository or token may have changed
-                    updates = update_service(live.settings, uow, clock, http)
+                    updates = update_service(
+                        live.settings, uow, clock, http, live=lambda: live.settings
+                    )
                     if webex_fingerprint(live.settings) != wired_with:  # ADR 0042 step 6b
                         wired, runner, watch = build_runner(live.settings)
                         wired_with = webex_fingerprint(live.settings)

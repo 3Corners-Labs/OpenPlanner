@@ -1,6 +1,6 @@
 # 0009. Notification channels, reminder rules and message templates
 
-Status: accepted (2026-10-23)
+Status: accepted (2026-10-23). Built; the organisation override layer came with ADR 0074 (#168, merged; checked on 2026-10-31, `docs/adr-status.md`).
 
 ## Context
 
@@ -31,6 +31,14 @@ columns.
    Placeholders are `{name}` only, from a fixed allow-list per purpose (for example
    `{first_name}`, `{date}`, `{time}`, `{group_name}`, `{join_url}`, `{manage_url}`). Admins
    never edit Jinja or HTML, which rules out server-side template injection.
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | Channels, reminder rules, fixed layouts with text blocks | #2, #19 | built |
+| 2 | Group texts and the editor (point 4) | #29 | built |
+| 3 | Organisation override layer of the text blocks (point 4) | #168 | merged |
 
 ## Consequences
 

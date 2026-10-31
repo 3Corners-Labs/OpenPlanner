@@ -1095,6 +1095,23 @@ locally built proxy: remove the `OPENPLANNER_PROXY_IMAGE` line then.)
 Backups hold personal data: they stay in the data volume (mode 600) and every updater run
 deletes those older than 24 hours (`backup-db --prune`). Never copy them off the host.
 
+### The browser shows old styling after an update (versioned static files)
+
+Every stylesheet, script and image under `/static` is linked with the hash of its content
+(`/static/admin.css?v=3f9a1c07b2de`), and the response for exactly that URL is cached for a
+year (`immutable`). A new release changes the hash of every file it changes, so the next page
+load asks for the new URL. Nothing needs clearing on the host or in the browser.
+
+If a page still looks old, its HTML came from a cache: check that the address in the browser is
+the portal's own (not an old tab) and that a proxy in front does not cache pages. Pages are sent
+with `Cache-Control: no-store`. To see what the host serves:
+
+```bash
+curl -sI "https://<host>/static/admin.css?v=0" | grep -i -e cache-control -e etag
+```
+
+An unknown or old `v` always answers with the current file and `Cache-Control: no-cache`.
+
 ## Rollback
 
 Prefer "Restore previous version" in the portal (above) within 24 hours of an update. By hand:

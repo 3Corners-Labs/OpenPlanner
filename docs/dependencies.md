@@ -27,6 +27,7 @@ Checked on 2026-10-23 against PyPI release history and GitHub activity (tzdata: 
 | cryptography | AES-256-GCM for integration secrets at rest (ADR 0008); also used by PyJWT | Apache-2.0/BSD-3 | very active (PyCA) | De facto Python crypto library; direct dependency since WP5/6 |
 | itsdangerous | Signed session cookie (Starlette `SessionMiddleware`) | BSD-3 | maintained (Pallets), feature-complete | Starlette's own choice |
 | tzdata | IANA time-zone database for `zoneinfo` (summer/winter time rules) | Apache-2.0 | active (CPython core devs, follows every IANA release) | PEP 615's official fallback; pinned in `uv.lock` and the only source in the image (`PYTHONTZPATH=""`), so DST rules change only through a reviewed Renovate PR |
+| dnspython | TXT lookups for the sender domain check (SPF, DKIM, DMARC; ADR 0073) | ISC (**exception by ADR 0073**; functionally BSD-2-Clause) | very active (release 2026-10) | De facto Python DNS library; the standard library has no TXT lookup. Listed in `scripts/check-licenses.sh` `IGNORED` |
 | markdown-it-py (+ mdurl) | Renders the manual in the portal, raw HTML off (ADR 0033) | MIT | active (executablebooks; release 2026) | De facto CommonMark parser for Python; already in the lock through development tools |
 | phonenumbers | Parses and validates phone numbers, stores them as E.164 (ADR 0055) | Apache-2.0 | very active (follows every libphonenumber release, several a month) | Python port of Google's libphonenumber, the de-facto standard; pure Python, ships type stubs. Checked 2026-10-29 |
 | certifi | CA bundle (via httpx) | MPL-2.0 | active | Exception: ADR 0003 |
@@ -68,6 +69,16 @@ gitleaks (MIT), semgrep (LGPL-2.1, CI container) likewise.
 
 @playwright/test, @axe-core/playwright (MPL-2.0, required by CLAUDE.md), lighthouse,
 chrome-launcher: all active (ADR 0006).
+
+`e2e/package.json` overrides `glob` (14.0.3) and `minimatch` (11.0.3) since 2026-10-31. `npm audit`
+(CI job *lockfile, audit, licenses*) began to fail on two moderate advisories,
+GHSA-3g3m-2fjr-6pw4 (glob) and GHSA-g3hv-75wg-m249 (minimatch), reached through
+lighthouse 13.6.0, @sentry/node and @sentry/bundler-plugins; only the patched majors fix them, and
+`npm audit fix` would downgrade lighthouse. Both packages are by the same maintainer and
+BlueOak-1.0.0/ISC, like before; the new transitive `@isaacs/nonrecursive-glob-match` and
+`path-scurry` 3 are BlueOak-1.0.0 too. They run in CI only, and only to upload source maps in a
+code path lighthouse does not use here. Remove the overrides when lighthouse ships with patched
+dependencies (Renovate's weekly lock file maintenance will show it).
 
 ## Widget build (npm, CI and image build only)
 

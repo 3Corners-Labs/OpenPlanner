@@ -1,9 +1,10 @@
 """Updates started from the admin portal (ADR 0029): versions, the release check and requests.
 
-The worker checks the latest release at most once per ``CHECK_INTERVAL``. A superuser turns
-an available release into a request; the host updater claims it, carries it out and reports
-the outcome. A successful update can be restored to the version it replaced for
-``RESTORE_WINDOW``.
+The worker checks the latest release once per check interval (the setting
+``update_check_minutes``, default ``CHECK_INTERVAL``), or at its next poll when a superuser
+asked for a check ("Check now"). A superuser turns an available release into a request; the
+host updater claims it, carries it out and reports the outcome. A successful update can be
+restored to the version it replaced for ``RESTORE_WINDOW``.
 
     requested ──claim──► running ──report──► succeeded | rolled_back | failed
         └──cancel──► cancelled
@@ -24,7 +25,7 @@ from functools import total_ordering
 from app.domain.errors import DomainError, ErrorCode
 
 CHECK_INTERVAL = timedelta(minutes=60)
-"""How often the worker asks for the latest release."""
+"""Default of ``update_check_minutes``: how often the worker asks for the latest release."""
 
 RESTORE_WINDOW = timedelta(hours=24)
 """How long after a successful update the previous version can be restored."""
@@ -43,6 +44,9 @@ VERSION_ACTION = "system.version"
 
 HOST_ACTOR = "host"
 """Audit actor of a version change nobody requested in the portal: installer or by hand."""
+
+NOTES_CHARS = 4000
+"""How much of a release's notes is kept, as plain text (ADR 0067 point 3)."""
 
 HISTORY_ACTIONS = frozenset({"system.update", VERSION_ACTION})
 """The audit actions the updates page shows as its history (ADR 0067 point 5)."""
@@ -153,6 +157,61 @@ class Release:
 
 
 @dataclass(frozen=True)
+class ListedRelease:
+    """A release or candidate in the repository's listing (ADR 0067 point 3).
+
+    Attributes:
+        version: The version, from the tag.
+        url: Its release page on GitHub.
+        published_at: When it was published; ``None`` when unknown.
+        notes: The generated notes as plain text (PR titles and numbers), at most
+            ``NOTES_CHARS``; empty when there are none.
+
+    Raises:
+        DomainError: ``invalid_configuration`` for ``url`` when it is not a GitHub https page.
+    """
+
+    version: Version
+    url: str
+    published_at: datetime | None = None
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        """Refuse a release page that is not on GitHub and cut the notes."""
+        if not self.url.startswith(_RELEASE_PAGE) or len(self.url) > 300:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "url")
+        if len(self.notes) > NOTES_CHARS:
+            object.__setattr__(self, "notes", self.notes[:NOTES_CHARS])
+
+    @property
+    def release(self) -> Release:
+        """The same release as the banner and the check know it."""
+        return Release(self.version, self.url)
+
+
+def on_channel(listing: Sequence[ListedRelease], channel: UpdateChannel) -> list[ListedRelease]:
+    """Return the listed releases the channel offers, newest version first."""
+    allowed = [
+        item
+        for item in listing
+        if channel is UpdateChannel.CANDIDATE or not item.version.is_candidate
+    ]
+    return sorted(allowed, key=lambda item: item.version, reverse=True)
+
+
+def offered(
+    current: Version | None, listing: Sequence[ListedRelease], channel: UpdateChannel
+) -> list[ListedRelease]:
+    """Return the listed versions newer than ``current`` on ``channel``, newest first.
+
+    A build that is no release (``current`` is ``None``) is offered nothing.
+    """
+    if current is None:
+        return []
+    return [item for item in on_channel(listing, channel) if item.version > current]
+
+
+@dataclass(frozen=True)
 class RunningVersion:
     """A version this installation ran, as the web process saw it at start-up (ADR 0067).
 
@@ -202,11 +261,14 @@ class ReleaseCheck:
         checked_at: When the worker asked.
         latest: The latest release, kept from an earlier check when this one failed.
         error: The failure code of this check (``unauthorized``, ``server_error``, …), if any.
+        requested_at: When a superuser asked for a check ahead of the interval ("Check
+            now"); the worker's next check clears it.
     """
 
     checked_at: datetime
     latest: Release | None
     error: str = ""
+    requested_at: datetime | None = None
 
 
 class UpdateAction(StrEnum):
@@ -301,9 +363,17 @@ class UpdateRequest:
         return self.status in (UpdateStatus.REQUESTED, UpdateStatus.RUNNING)
 
 
-def check_due(last: ReleaseCheck | None, now: datetime) -> bool:
-    """Return whether the worker should ask for the latest release now."""
-    return last is None or now >= last.checked_at + CHECK_INTERVAL
+def check_due(
+    last: ReleaseCheck | None, now: datetime, interval: timedelta = CHECK_INTERVAL
+) -> bool:
+    """Return whether the worker should ask for the latest release now.
+
+    It should on the first run, once ``interval`` has passed since the last check, and at
+    once when a superuser asked for a check.
+    """
+    if last is None or last.requested_at is not None:
+        return True
+    return now >= last.checked_at + interval
 
 
 def available_update(
