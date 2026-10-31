@@ -131,7 +131,7 @@ groups exist (data integrity, not a threshold).
 | 1 | Permissions `organisation.delete` and `group.delete` in the matrix, docs and sweep; the guard test of point 8 with today's gaps on its exception list | #264, carried into `main` by #270 | merged |
 | 2 | Group archive: migration `archived_at`, domain rule, route, confirmation page, 404 on `/g/{slug}`, lists and navigation, audit events, manual topic (nl/en) | #270 | merged |
 | 3 | Group erase in the nightly sweep, setting `group_erase_after_days`, threat model and data flow updated | #278 | in PR |
-| 4 | Organisation delete: domain rule, route, confirmation page, cascades checked up and down in the migration test, manual topic | #PR4 | in PR |
+| 4 | Organisation delete: domain rule, route, confirmation page, cascades checked up and down in the migration test, manual topic | #287 | in PR |
 | 5 | Change in place: staffing exception, reminder rule, holiday calendar rename | | planned |
 | 6 | API client delete after disable | | planned |
 | 7 | Guard test loses its exception list entries one by one as steps land; `docs/threat-model.md` abuse case "delete another organisation's group" with its matrix test | | planned |
