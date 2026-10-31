@@ -133,6 +133,7 @@ jobs:
       contents: write   # attach the SBOM to a release
       packages: write   # push to ghcr.io
       id-token: write   # keyless cosign signature via GitHub OIDC
+      pull-requests: read   # the release audit check reads the release PR (ADR 0078)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -149,6 +150,12 @@ jobs:
           project="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
           [ "v$project" = "$GITHUB_REF_NAME" ] \
             || { echo "::error::tag $GITHUB_REF_NAME but pyproject.toml says $project"; exit 1; }
+      # ADR 0078: a minor or major release (vX.Y.0) carries an independent audit of everything
+      # since the last release in its release PR; without it nothing is built or published.
+      - name: a minor or major release carries its audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/check-release-audit.sh
       - id: image
         run: |
           echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
