@@ -24,6 +24,14 @@ provider, not here.
 Every change OpenPlanner notices at a login is in the audit log as **Roles or memberships
 changed**, with what was added and what was removed.
 
+## Rights not recognised
+
+When the identity provider sends values at a login that OpenPlanner does not recognise (a typo
+in the role, an unknown organisation or group), they are on the person's page under **Rights
+not recognised**, with the reason and the moment. The filter **Only with unrecognised rights**
+finds these people. The right values are on **Identity provider mapping**; pass the difference
+on to the IdP team.
+
 ## Filters
 
 - **Organisation**, **Group** and **Role**: only staff who belong to it.

@@ -26,7 +26,7 @@ async def test_organisations_are_listed_within_the_scope(engine: AsyncEngine) ->
     async with uow.read() as tx:
         everything = await tx.list_organisations(EVERYTHING)
         demo = await tx.list_organisations(Scope(organisations=frozenset({"demo"})))
-        by_group = await tx.list_organisations(Scope(groups=frozenset({"demo"})))
+        by_group = await tx.list_organisations(Scope(groups=frozenset({("demo", "demo")})))
         found = await tx.get_organisation("andere")
         missing = await tx.get_organisation("nope")
 

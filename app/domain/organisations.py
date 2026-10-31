@@ -1,12 +1,16 @@
-"""Organisation use cases for the superuser: list, create and edit client organisations.
+"""Organisation use cases: list and open client organisations, create and edit them.
 
-``organisation.manage`` is a global permission held only by the superuser (HANDOVER §6,
+``organisation.view`` (ADR 0047 step 3) opens an organisation's page within the admin's
+reach: the superuser sees every organisation, an organisation admin and the auditor their
+own. ``organisation.manage`` is a global permission held only by the superuser (HANDOVER §6,
 ADR 0014). Every operation asks ``AdminService.authorize`` first; every change runs in one
 locked transaction and is audited with what changed (field names, never values).
 
-    organisations / get  organisation.manage   every organisation
-    create       organisation.manage   name, slug (fixed from then on), default locale
-    update       organisation.manage   name and default locale; slug and branding stay
+    organisations  organisation.view     the organisations in the admin's scope
+    view           organisation.view     one organisation in the admin's scope
+    get            organisation.manage   one organisation, for the edit form
+    create         organisation.manage   name, slug (fixed from then on), default locale
+    update         organisation.manage   name and default locale; slug and branding stay
 
 Deleting an organisation is not offered: it would remove groups and bookings whose personal
 data has its own retention rules (CLAUDE.md, privacy rules).
@@ -16,12 +20,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass, fields, replace
 
 from app.domain.admin import AdminService, record_change, require
-from app.domain.authorization import Permission, Principal, Scope
+from app.domain.audit import AuditEvent, Outcome
+from app.domain.authorization import Permission, Principal, Scope, scope_for
+from app.domain.entitlements import is_idp_key
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import RESERVED_SLUGS, Organisation
 
 _PERMISSION = Permission.ORGANISATION_MANAGE
+IDP_KEY_CHANGED = "organisation.idp_key_changed"
+"""ADR 0049 point 4: the superuser changed the value the IdP names the organisation by."""
 
 
 @dataclass(frozen=True)
@@ -35,10 +43,15 @@ class NewOrganisation:
 
 @dataclass(frozen=True)
 class OrganisationSettings:
-    """The editable settings of an organisation (its slug never changes)."""
+    """The editable settings of an organisation (its slug never changes).
+
+    ``idp_key`` is the value the identity provider names the organisation by (ADR 0049
+    point 4); ``None`` leaves it as it is.
+    """
 
     name: str
     default_locale: str
+    idp_key: str | None = None
 
 
 class OrganisationService:
@@ -66,17 +79,31 @@ class OrganisationService:
         self._locales = frozenset(locales)
 
     async def organisations(self, principal: Principal) -> list[Organisation]:
-        """Return every organisation, by slug.
+        """Return the organisations ``principal`` may open, by slug (database-side scope).
 
         Raises:
-            DomainError: ``not_permitted``.
+            DomainError: ``not_permitted`` when the admin may open none.
         """
-        await self._authorize(principal)
+        require(await self._admin.authorize_anywhere(principal, Permission.ORGANISATION_VIEW))
         async with self._uow.read() as tx:
-            return await tx.list_organisations(Scope(everything=True))
+            return await tx.list_organisations(scope_for(principal, Permission.ORGANISATION_VIEW))
+
+    async def view(self, principal: Principal, slug: str) -> Organisation:
+        """Return the organisation with ``slug`` if ``principal`` may open its page.
+
+        Raises:
+            DomainError: ``not_permitted`` or ``organisation_not_found``.
+        """
+        require(
+            await self._admin.authorize(
+                principal, Permission.ORGANISATION_VIEW, organisation_slug=slug
+            )
+        )
+        async with self._uow.read() as tx:
+            return await organisation_by_slug(tx, slug)
 
     async def get(self, principal: Principal, slug: str) -> Organisation:
-        """Return the organisation with ``slug``.
+        """Return the organisation with ``slug`` for the superuser's edit form.
 
         Raises:
             DomainError: ``not_permitted`` or ``organisation_not_found``.
@@ -114,18 +141,55 @@ class OrganisationService:
         self._locale(settings.default_locale)
         async with self._uow.locked() as tx:
             current = await organisation_by_slug(tx, slug)
-            updated = replace(
-                current, **{f.name: getattr(settings, f.name) for f in fields(settings)}
-            )
-            changed = sorted(
-                f.name
+            values = {
+                f.name: getattr(settings, f.name)
                 for f in fields(settings)
-                if getattr(current, f.name) != getattr(updated, f.name)
-            )
+                if getattr(settings, f.name) is not None
+            }
+            updated = replace(current, **values)
+            changed = sorted(name for name in values if getattr(current, name) != values[name])
+            if "idp_key" in changed:
+                await self._check_idp_key(tx, updated)
             if changed:
                 await tx.save_organisation(updated)
                 await self._audit(tx, principal, slug, ",".join(changed))
+                if "idp_key" in changed:
+                    await self._audit(
+                        tx,
+                        principal,
+                        slug,
+                        f"{current.idp_key}->{updated.idp_key}",
+                        IDP_KEY_CHANGED,
+                    )
         return changed
+
+    async def holders_of(self, principal: Principal, slug: str) -> int:
+        """Return how many people last held a grant on the organisation (ADR 0049 point 4).
+
+        Shown with the IdP value field: they lose access until the IdP sends the new value.
+
+        Raises:
+            DomainError: ``not_permitted`` or ``organisation_not_found``.
+        """
+        await self._authorize(principal)
+        async with self._uow.read() as tx:
+            await organisation_by_slug(tx, slug)
+            holders = await tx.list_grant_holders(Scope(organisations=frozenset({slug})))
+        return sum(h.holders for h in holders)
+
+    @staticmethod
+    async def _check_idp_key(tx: Transaction, updated: Organisation) -> None:
+        """Refuse an IdP value outside the grammar or already used by another organisation.
+
+        Raises:
+            DomainError: ``invalid_configuration`` or ``idp_key_taken`` for ``idp_key``.
+        """
+        if not is_idp_key(updated.idp_key):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "idp_key")
+        directory = await tx.get_directory()
+        other = directory.organisation_by_idp_key(updated.idp_key)
+        if other is not None and other.slug != updated.slug:
+            raise DomainError(ErrorCode.IDP_KEY_TAKEN, "idp_key")
 
     def _locale(self, locale: str) -> str:
         """Return ``locale`` if it has a catalogue.
@@ -141,9 +205,30 @@ class OrganisationService:
         """Raise ``not_permitted`` unless the matrix grants ``organisation.manage``."""
         require(await self._admin.authorize(principal, _PERMISSION))
 
-    async def _audit(self, tx: Transaction, principal: Principal, slug: str, detail: str) -> None:
-        """Record a change of organisation ``slug``."""
-        await record_change(tx, self._clock.now(), principal, _PERMISSION, slug, None, detail)
+    async def _audit(
+        self,
+        tx: Transaction,
+        principal: Principal,
+        slug: str,
+        detail: str,
+        action: str | None = None,
+    ) -> None:
+        """Record a change of organisation ``slug`` (``action`` names a specific event)."""
+        if action is None:
+            await record_change(tx, self._clock.now(), principal, _PERMISSION, slug, None, detail)
+            return
+        await tx.add_audit_event(
+            AuditEvent(
+                self._clock.now(),
+                principal.subject,
+                action,
+                Outcome.SUCCESS,
+                "",
+                slug,
+                None,
+                detail,
+            )
+        )
 
 
 async def organisation_by_slug(tx: Transaction, slug: str) -> Organisation:

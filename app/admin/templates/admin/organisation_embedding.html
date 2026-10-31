@@ -1,6 +1,5 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_fields.html" import field with context %}
-{% from "admin/_page_header.html" import page_header with context %}
 {% block title %}{{ _("admin.embedding.title") }} · {{ organisation.name }} – {{ _("admin.title") }}<section class="card" aria-labelledby="code-heading">
   <div class="card__header">
     <h2 id="code-heading">{{ _("admin.embedding.code") }}</h2>
@@ -17,7 +16,9 @@
 </section>
 {% endblock %}
 {% block content %}
-{{ page_header("/admin/embedding", _("admin.embedding.title"), organisation.name, _("admin.embedding.title"), _("admin.embedding.org_lead", name=organisation.name)) }}
+{% include "admin/_organisation_header.html" %}
+<h2 class="section-title">{{ _("admin.embedding.title") }}</h2>
+<p>{{ _("admin.embedding.org_lead", name=organisation.name) }}</p>
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
 <form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/embedding" novalidate>
