@@ -63,7 +63,10 @@ All kept current by Renovate (ADR 0051): GitHub Actions pinned by SHA, tool vers
 in `make pins` and as the hosted Renovate app; it is never installed in the project or the
 image. jscpd (MIT), shellcheck (GPL-3.0, run as a separate binary through `shellcheck-py` (MIT) and
 `uvx`, never linked),
-gitleaks (MIT), semgrep (LGPL-2.1, CI container) likewise.
+gitleaks (MIT), semgrep (LGPL-2.1, CI container) likewise. publiccode-parser
+(`publiccodeyml/libpubliccode`, EUPL-1.2, CI container) validates `publiccode.yml` (ADR 0054); it
+is the standard's reference parser (`italia/publiccode-parser-go`, actively maintained by
+Developers Italia) and is never part of the project or the image.
 
 ## Browser tests (npm, CI only)
 

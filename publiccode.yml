@@ -1,0 +1,148 @@
+# publiccode.yml: metadata for public-sector software catalogues such as developer.overheid.nl
+# (Standaard voor Publieke Code; ADR 0054). Spec: https://github.com/publiccodeyml/publiccode.yml
+# Version "0" follows the newest 0.x spec, as the official validator advises; CI checks this
+# file with that validator.
+# softwareVersion and releaseDate are set by the release workflow (scripts/release_pr.py); a
+# test checks that softwareVersion equals the version in pyproject.toml.
+publiccodeYmlVersion: "0"
+
+name: OpenPlanner
+url: "https://github.com/3Corners-Labs/OpenPlanner"
+landingURL: "https://openplanner.nl"
+softwareVersion: "0.3.0"
+releaseDate: "2026-10-30"
+logo: app/web/static/brand/mark.svg
+roadmap: "https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen+label%3Aadr%3A"
+
+platforms:
+  - web
+
+categories:
+  - appointment-scheduling
+  - call-center-management
+  - customer-service-and-support
+  - video-conferencing
+
+developmentStatus: beta
+softwareType: standalone/web
+
+organisation:
+  uri: "https://3corners.nl"
+  name: 3Corners Internetworking Services BV
+
+intendedAudience:
+  countries:
+    - NL
+
+supports:
+  - id: alias:gdpr
+  - id: "https://www.w3.org/TR/WCAG22/"
+  - id: "https://openid.net/specs/openid-connect-core-1_0.html"
+  - id: "https://spec.openapis.org/oas/v3.1.0"
+  - id: "https://www.rfc-editor.org/rfc/rfc9116"
+
+description:
+  nl:
+    localisedName: OpenPlanner
+    shortDescription: >-
+      Video-afspraken met je team, in seconden geboekt: afspraakplanner voor Webex met
+      contact-centerkoppeling en privacy standaard.
+    longDescription: |
+      OpenPlanner is een open-source planner voor videogesprekken via Webex. Een deelnemer
+      kiest een vrij moment op een pagina in de huisstijl van de organisatie, krijgt een
+      bevestiging met agenda-uitnodiging en belt vanuit de browser: geen account, geen app,
+      geen login. Het team krijgt het gesprek op het juiste moment als werkitem in Webex
+      Contact Center, of in de eigen wachtrij van OpenPlanner.
+
+      Eén installatie bedient meerdere organisaties, elk met eigen groepen, huisstijl, teksten,
+      kanalen en identity provider. Beheerders loggen in via OpenID Connect; één
+      autorisatiematrix bepaalt wat elke rol ziet en doet, en elke wijziging staat in het
+      auditlog. Persoonsgegevens staan alleen op de boeking en zijn 24 uur na het gesprek
+      gewist; ze komen nooit in logs, URL's of foutmeldingen.
+
+      OpenPlanner draait als twee containers met één SQLite-bestand, met getekende images,
+      een SBOM bij elke release en updates vanuit het beheerportaal. Elke publieke pagina is
+      getest op WCAG 2.2 AA. Elk ontwerpbesluit staat als ADR in de repository, met wat ervan
+      gebouwd is.
+    documentation: "https://github.com/3Corners-Labs/OpenPlanner/tree/main/docs"
+    apiDocumentation: "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/api.md"
+    features:
+      - Afspraak boeken, verzetten en annuleren zonder account
+      - Direct videobellen wanneer het team open is, met wachtrijplafond
+      - Elke afspraak een eigen Webex-meeting, deelnemen vanuit de browser
+      - Proefgesprek vooraf om camera en microfoon te testen
+      - Werkitem in Webex Contact Center vijf minuten voor de start, of een eigen wachtrij
+      - Bevestiging, herinnering en wijziging per e-mail (met .ics) en sms
+      - Meerdere organisaties met eigen huisstijl, teksten en identity provider
+      - Groepen als skills met bezetting per blok, feestdagen en noodsluiting
+      - Rollen uit de eigen identity provider en één autorisatiematrix
+      - Auditlog en beveiligingsevents, door te sturen naar syslog, Splunk of Elastic
+      - Persoonsgegevens gewist 24 uur na het gesprek
+      - Kalender insluitbaar als Web Component op de eigen website
+      - Machine-API voor contact-centerbots
+      - Updates en releasekanaal vanuit het beheerportaal
+  en:
+    localisedName: OpenPlanner
+    shortDescription: >-
+      Video appointments with your team, booked in seconds: a scheduler for Webex with a
+      contact-center integration and privacy by default.
+    longDescription: |
+      OpenPlanner is an open-source scheduler for video calls on Webex. A participant picks a
+      free time on a page in the organisation's branding, gets a confirmation with a calendar
+      invite and joins from the browser: no account, no app, no login. The team receives the
+      call at the right moment as a work item in Webex Contact Center, or in OpenPlanner's own
+      queue.
+
+      One installation serves several organisations, each with its own groups, branding,
+      texts, channels and identity provider. Administrators sign in through OpenID Connect;
+      one authorisation matrix decides what every role sees and does, and every change is in
+      the audit log. Personal data lives only on the booking and is purged 24 hours after the
+      call; it never reaches logs, URLs or error messages.
+
+      OpenPlanner runs as two containers with one SQLite file, with signed images, an SBOM on
+      every release and updates from the admin portal. Every public page is tested against
+      WCAG 2.2 AA. Every design decision is an ADR in the repository, with what has been built
+      of it.
+    documentation: "https://github.com/3Corners-Labs/OpenPlanner/tree/main/docs"
+    apiDocumentation: "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/api.md"
+    features:
+      - Book, move and cancel an appointment without an account
+      - Video call right away when the team is open, with a queue cap
+      - Every appointment its own Webex meeting, joined from the browser
+      - Trial call beforehand to test camera and microphone
+      - Work item in Webex Contact Center five minutes before the start, or an own queue
+      - Confirmation, reminder and change by email (with .ics) and SMS
+      - Several organisations with their own branding, texts and identity provider
+      - Groups as skills with staffing per block, holidays and emergency closure
+      - Roles from your own identity provider and one authorisation matrix
+      - Audit log and security events, forwarded to syslog, Splunk or Elastic
+      - Personal data purged 24 hours after the call
+      - Calendar embeddable as a Web Component on your own website
+      - Machine API for contact-center bots
+      - Updates and release channel from the admin portal
+
+legal:
+  license: EUPL-1.2
+  mainCopyrightOwner: 3Corners Internetworking Services BV and the OpenPlanner contributors
+
+maintenance:
+  type: contract
+  contractors:
+    - name: 3Corners Internetworking Services BV
+      until: "2027-12-31"
+      website: "https://3corners.nl"
+
+localisation:
+  localisationReady: true
+  availableLanguages:
+    - nl
+    - en
+
+dependsOn:
+  proprietary:
+    - name: Webex Meetings
+      optional: false
+    - name: Webex Contact Center
+      optional: true
+    - name: Webex Messaging
+      optional: true

@@ -73,7 +73,7 @@ from the rows below.
 | 0051 | Dependency currency | BUILT (repository side) | #94; `renovate.json`, `make pins`, `freshness.yml` | Unsure: the Renovate app installed, the required check on `main` (GitHub settings) |
 | 0052 | Releases and versioning | BUILT | #96; `release_plan.py`; v0.3.0 (#113) | – |
 | 0053 | Security events, public entry points | BUILT | #97; `web/security_events.py` | – |
-| 0054 | EUPL-1.2 and CLA | BUILT (code side) | #102, #104; `reuse lint` | Not code: the lawyer's review of the CLA, making the repository public |
+| 0054 | EUPL-1.2 and CLA | BUILT (code side) | #102, #104; `reuse lint`; `publiccode.yml`, validated in CI, version and date set by the release PR | Not code: the lawyer's review of the CLA, making the repository public, listing on developer.overheid.nl |
 | 0055 | Booking form fields | BUILT | #114; migration 0053 | – |
 | 0056 | Citizen confirms by email | PARTIAL | step 1 #115, step 2 #134 (migration 0058) | Step 3 (planner confirms on behalf), step 4 (citizen corrects details) |
 | 0057 | Rebooking assistant | PARTIAL | step 1 #129 (`domain/rebooking.py`) | Steps 2–4: held proposal, message, confirm and expiry, review page, automatic mode, `reschedule_*` settings |
