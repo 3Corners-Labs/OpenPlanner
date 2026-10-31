@@ -132,7 +132,7 @@ groups exist (data integrity, not a threshold).
 | 2 | Group archive: migration `archived_at`, domain rule, route, confirmation page, 404 on `/g/{slug}`, lists and navigation, audit events, manual topic (nl/en) | #270 | merged |
 | 3 | Group erase in the nightly sweep, setting `group_erase_after_days`, threat model and data flow updated | #278 | in PR |
 | 4 | Organisation delete: domain rule, route, confirmation page, cascades checked up and down in the migration test, manual topic | #287 | in PR |
-| 5 | Change in place: staffing exception, reminder rule, holiday calendar rename. A changed reminder rule applies to new bookings; reminders already planned stay (ADR 0022 point 5), so point 6's "moves its pending jobs" is not built | #PR5 | in PR |
+| 5 | Change in place: staffing exception, reminder rule, holiday calendar rename. A changed reminder rule applies to new bookings; reminders already planned stay (ADR 0022 point 5), so point 6's "moves its pending jobs" is not built | #288 | in PR |
 | 6 | API client delete after disable | | planned |
 | 7 | Guard test loses its exception list entries one by one as steps land; `docs/threat-model.md` abuse case "delete another organisation's group" with its matrix test | | planned |
 
