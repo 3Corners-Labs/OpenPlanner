@@ -1,7 +1,8 @@
 /**
  * Holiday calendars (ADR 0025) through the real identity provider: the superuser fills the
- * national calendar with the keyboard and lets an organisation follow it; an organisation admin
- * may choose calendars but not maintain them. Every page passes axe (WCAG 2.2 AA).
+ * national calendar with the keyboard (Platform > Holiday calendars) and lets an organisation
+ * follow it on the organisation's Holidays tab; an organisation admin may choose calendars on
+ * that tab but not maintain them (ADR 0047 step 3). Every page passes axe (WCAG 2.2 AA).
  *
  * The three browsers run in parallel against one database: filling a year skips dates that
  * exist and every browser ticks the same calendar, so the runs do not disturb each other.
@@ -17,7 +18,7 @@ requireKeycloak();
 
 test('the superuser fills a calendar and an organisation follows it', async ({ page }) => {
   await loginAs(page, 'super', '/admin/holidays');
-  await expect(adminMenu(page).getByRole('link', { name: 'Feestdagen' })).toBeVisible();
+  await expect(adminMenu(page).getByRole('link', { name: 'Feestdagkalenders' })).toBeVisible();
   await expectNoAxeViolations(page);
 
   await page.getByRole('link', { name: 'Nationale feestdagen' }).click();
@@ -44,9 +45,18 @@ test('the superuser fills a calendar and an organisation follows it', async ({ p
 });
 
 test('an organisation admin chooses calendars but cannot maintain them', async ({ page }) => {
-  await loginAs(page, 'orgadmin', '/admin/holidays');
-  await expect(adminMenu(page).getByRole('link', { name: 'Feestdagen' })).toBeVisible();
+  await loginAs(page, 'orgadmin', '/admin/organisations');
+  await expect(page).toHaveURL(/\/admin\/organisations\/demo$/);
+  // The calendars are the superuser's: no menu entry, and the page itself is refused.
+  await expect(adminMenu(page).getByRole('link', { name: 'Feestdagkalenders' })).toHaveCount(0);
+  await page
+    .getByRole('navigation', { name: 'Onderdelen van de organisatie' })
+    .getByRole('link', { name: 'Feestdagen' })
+    .click();
+  await expect(page).toHaveURL(/\/admin\/organisations\/demo\/holidays$/);
+  await expect(page.getByRole('checkbox', { name: 'Nationale feestdagen' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Nationale feestdagen' })).toHaveCount(0);
   await expectNoAxeViolations(page);
+  await expectForbidden(page, '/admin/holidays');
   await expectForbidden(page, '/admin/holidays/nationaal');
 });
