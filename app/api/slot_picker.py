@@ -1,4 +1,4 @@
-"""The slot picker of the citizen pages: a month calendar plus the times of one day (ADR 0020).
+"""The slot picker of the participant pages: a month calendar plus the times of one day (ADR 0020).
 
 Without JavaScript it is a table of links (``?day=`` shows that day's times, ``?month=``
 another month) and a form of time buttons. ``static/calendar.js`` turns the table into an ARIA
@@ -47,13 +47,13 @@ WEEKDAY_VALUES = frozenset("0123456")
 
 @dataclass(frozen=True)
 class SlotFilter:
-    """Which slots fit the citizen ("Wanneer past het u?").
+    """Which slots fit the participant ("Wanneer past het u?").
 
     Attributes:
         days: Weekdays that fit (0 = Monday); empty means every day.
         start_hour: A slot fits from this full hour on (local time).
         end_hour: A slot fits if it ends by this full hour (local time).
-        invalid_range: The citizen chose an end at or before the start; ``end_hour`` is
+        invalid_range: The participant chose an end at or before the start; ``end_hour`` is
             then dropped and the form explains why.
     """
 
@@ -376,7 +376,7 @@ async def picker(
         month: Requested month (``YYYY-MM``), from the month navigation.
         day: Requested day (``YYYY-MM-DD``), from a day link.
         exclude: A start time not to offer (the booking that is being moved).
-        slot_filter: Which slots fit the citizen; all of them when ``None``.
+        slot_filter: Which slots fit the participant; all of them when ``None``.
     """
     slot_filter = slot_filter or SlotFilter()
     today = local_day(now, group.tz)

@@ -1,4 +1,4 @@
-"""The contact block as people read it, shared by citizen and admin pages (ADR 0037 §2).
+"""The contact block as people read it, shared by participant and admin pages (ADR 0037 §2).
 
 ``contact_view`` (``block_view`` outside a request, for mails) turns a ``ContactBlock`` into
 what ``_contact_block.html`` renders in the reader's language: a heading (the admin's, or a

@@ -1,4 +1,4 @@
-"""Branding on citizen pages (WP3b, ADR 0041): theme stylesheet, logo, fonts and header."""
+"""Branding on participant pages (WP3b, ADR 0041): theme stylesheet, logo, fonts and header."""
 
 from collections.abc import AsyncIterator
 
@@ -113,7 +113,7 @@ async def test_default_branding_uses_the_organisation_name(site: httpx.AsyncClie
     assert "#01689B" in theme.text
 
 
-async def test_branding_reaches_every_citizen_page(
+async def test_branding_reaches_every_participant_page(
     site: httpx.AsyncClient, demo_settings: Settings
 ) -> None:
     logo = Logo.from_upload(PNG)
@@ -158,7 +158,7 @@ async def test_fonts_are_served_as_woff2_and_404_otherwise(
     assert (await site.get("/o/nope/font/text")).status_code == 404
 
 
-async def test_citizen_pages_allow_fonts_from_our_origin_only(site: httpx.AsyncClient) -> None:
+async def test_participant_pages_allow_fonts_from_our_origin_only(site: httpx.AsyncClient) -> None:
     csp = (await site.get("/g/demo")).headers["content-security-policy"]
     assert "font-src 'self';" in csp
 

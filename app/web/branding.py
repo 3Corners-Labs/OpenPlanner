@@ -1,8 +1,8 @@
 """An organisation's branding as pages show it: header, theme stylesheet, logo and fonts.
 
-Shared by the citizen pages (``app.api.citizen``), the branding assets (``app.api.brand_assets``)
-and the admin preview (``app.admin.branding_routes``). The theme, logo and font URLs carry a
-version that changes with the content, so browsers may cache them.
+Shared by the participant pages (``app.api.participant``), the branding assets
+(``app.api.brand_assets``) and the admin preview (``app.admin.branding_routes``). The theme,
+logo and font URLs carry a version that changes with the content, so browsers may cache them.
 
 ``theme_css`` writes only values ``app.domain.theme`` validated, inside fixed CSS of our own
 (ADR 0041): no text an organisation typed reaches the stylesheet unchecked.
@@ -70,7 +70,7 @@ def theme_css(organisation: Organisation) -> str:
     """Return the stylesheet that applies ``organisation``'s branding to ``site.css``.
 
     Colour tokens other than the accent sit in ``@media not (prefers-contrast: more)``, so a
-    citizen who asks for more contrast gets the defaults of ``site.css`` (ADR 0041 §4).
+    participant who asks for more contrast gets the defaults of ``site.css`` (ADR 0041 §4).
     """
     branding = organisation.branding
     theme = branding.theme

@@ -11,7 +11,7 @@ organisations of their claim and those organisations' groups; group admin in the
 groups of their claim. The auditor reads only and never sees personal data (ADR 0039).
 
 Bounds (ADR 0039): *locked* permissions belong to the superuser only; *personal data*
-permissions show citizens' data and are never held by the auditor.
+permissions show participants' data and are never held by the auditor.
 
 Maintenance (ADR 0038): while maintenance mode is on, every change is refused except
 for the permissions marked *maintenance*, and those only for the superuser. Reading
@@ -73,9 +73,9 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 | Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `queue.work`, `reminders.manage`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
 | Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `idp_mapping.view`, `matrix.view`, `organisation.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
 
-## Citizens
+## Participants
 
-Citizens never log in. Their rights depend on the management link from their
+Participants never log in. Their rights depend on the management link from their
 confirmation email and on the change deadline (the group's dispatch lead).
 
 | Action | Condition |

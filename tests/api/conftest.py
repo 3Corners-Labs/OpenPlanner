@@ -1,4 +1,4 @@
-"""Fixtures of the citizen-page tests: a migrated database with the demo group."""
+"""Fixtures of the participant-page tests: a migrated database with the demo group."""
 
 from pathlib import Path
 

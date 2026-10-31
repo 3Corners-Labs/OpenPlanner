@@ -79,7 +79,7 @@ async def test_the_favicons_are_served(site: Site) -> None:
         assert response.headers["content-type"].startswith(media_type), name
 
 
-async def test_a_citizen_page_links_the_favicons_and_shows_the_footer(site: Site) -> None:
+async def test_a_participant_page_links_the_favicons_and_shows_the_footer(site: Site) -> None:
     page = (await site.client.get("/g/demo?lang=en")).text
 
     for link in FAVICON_LINKS:
@@ -106,7 +106,7 @@ async def test_the_footer_follows_the_organisations_setting(site: Site) -> None:
         headers={"sec-fetch-site": "same-origin"},
     )
     assert response.status_code == 303
-    # The settings screen refreshes the live values at once; citizen pages pick them up within
+    # The settings screen refreshes the live values at once; participant pages pick them up within
     # the worker's reload interval (ADR 0042 step 5).
     await site.client.get("/admin/organisations/demo/settings")
 
@@ -155,10 +155,10 @@ async def test_the_admin_top_bar_shows_the_mark_for_every_role(site: Site, role:
     )
     assert "<span>Administration</span>" in top_bar  # the product name stays text
     assert ">OP<" not in top_bar
-    assert '<footer class="site-footer">' not in page  # the citizen footer is not the portal's
+    assert '<footer class="site-footer">' not in page  # the participant footer is not the portal's
 
 
-async def test_the_portal_has_no_citizen_footer_in_any_theme(site: Site) -> None:
+async def test_the_portal_has_no_participant_footer_in_any_theme(site: Site) -> None:
     await site.login_as(ROLE_PRINCIPALS["superuser"])
     for theme in ("light", "dark"):
         await site.client.get(f"/admin/preferences?theme={theme}")

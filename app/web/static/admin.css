@@ -1,6 +1,6 @@
 /*
  * Admin portal design (loaded after site.css, only on /admin pages). One fixed, calm look for
- * every organisation: organisation branding (O5) applies to the citizen pages, not here.
+ * every organisation: organisation branding (O5) applies to the participant pages, not here.
  * All colours are tokens; text contrast is at least 4.5:1 (WCAG 2.2 AA), focus is always
  * visible, targets are at least 24x24 px. No JavaScript: layout and states are pure CSS.
  */
@@ -50,7 +50,7 @@
   --adm-width-standard: 72rem;
   --adm-width-wide: 96rem;
 
-  /* The organisation's citizen colours as the page defines them (site.css or its theme file),
+  /* The organisation's participant colours as the page defines them (site.css or its theme file),
      kept so the branding preview shows them even in the dark portal. */
   --adm-org-page: var(--booking-color-page);
   --adm-org-background: var(--booking-color-background);
@@ -104,7 +104,7 @@ body.admin[data-theme="dark"] {
   color-scheme: dark;
 }
 
-/* The preview shows the citizen page, which is always light. */
+/* The preview shows the participant page, which is always light. */
 .admin .brand-preview {
   color-scheme: light;
 }
@@ -2193,7 +2193,7 @@ fieldset.card {
   color: var(--adm-text-muted);
 }
 
-/* --- Preview of the citizen's slots ---------------------------------------------------------- */
+/* --- Preview of the participant's slots ---------------------------------------------------------- */
 .preview-days {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
@@ -2567,7 +2567,7 @@ fieldset.card {
   font-weight: 600;
 }
 
-/* Contact block: the same markup as on citizen pages (ADR 0037), here as preview. */
+/* Contact block: the same markup as on participant pages (ADR 0037), here as preview. */
 .contact-block__list {
   display: grid;
   gap: 0.75rem;

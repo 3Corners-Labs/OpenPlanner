@@ -1,9 +1,9 @@
-"""The citizen's contact form, shared by booking, direct calls and the widget (HANDOVER B15).
+"""The participant's contact form, shared by booking, direct calls and the widget (HANDOVER B15).
 
 First and last name, email, (per group) phone, and the group's custom fields (ADR 0055).
 Custom inputs are named ``q_<key>`` so they never collide with the system fields or the
 honeypot. A hidden honeypot field catches simple bots, which becomes a security event
-(ADR 0053). Values are capped and re-filled into the citizen's own form on errors, never
+(ADR 0053). Values are capped and re-filled into the participant's own form on errors, never
 echoed elsewhere.
 """
 
@@ -157,7 +157,7 @@ def _day(today: date, days: int | None) -> str | None:
 
 
 def _with(view: FieldView, value: str, error: str | None) -> FieldView:
-    """Return ``view`` with the citizen's value and the error of its field."""
+    """Return ``view`` with the participant's value and the error of its field."""
     return FieldView(
         view.name,
         view.type,

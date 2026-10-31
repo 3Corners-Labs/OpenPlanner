@@ -1,4 +1,4 @@
-"""End-to-end tests of the citizen pages against a migrated database with the demo group.
+"""End-to-end tests of the participant pages against a migrated database with the demo group.
 
 Calendar: "now" is Thursday 1 January 2026 08:00 UTC; the demo group is open on weekdays
 09:00-12:00 and 13:00-17:00 Amsterdam time, two places per slot.
@@ -162,7 +162,7 @@ async def test_booking_form_for_an_unavailable_slot_goes_back(
 async def test_full_booking_flow(site: httpx.AsyncClient) -> None:
     response = await book(site)
 
-    # ADR 0056: the browser never gets the token; the citizen confirms by the emailed link.
+    # ADR 0056: the browser never gets the token; the participant confirms by the emailed link.
     assert response.status_code == 303
     assert response.headers["location"] == f"/g/demo/booked?start={FRIDAY_0900}"
     check = await site.get(response.headers["location"])

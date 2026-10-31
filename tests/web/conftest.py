@@ -1,4 +1,4 @@
-"""The admin site's fixtures, for the pages shared by the portal and the citizen pages."""
+"""The admin site's fixtures, for the pages shared by the portal and the participant pages."""
 
 from tests.admin.conftest import admin_db, site  # noqa: F401 - re-exported fixtures
 

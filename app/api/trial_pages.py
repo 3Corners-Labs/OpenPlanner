@@ -1,6 +1,6 @@
-"""The citizen's trial call on Webex (ADR 0071): ``/b/{token}/test``.
+"""The participant's trial call on Webex (ADR 0071): ``/b/{token}/test``.
 
-Citizens, often first-timers, can try camera, microphone, speakers and browser in a real Webex
+Participants, often first-timers, can try camera, microphone, speakers and browser in a real Webex
 meeting on the group's site, well before the appointment. The page offers a button that opens
 the meeting; the meeting stays open for a few minutes and nobody from the team is waiting in
 it. Like the join page it never reloads by itself (WCAG 2.2.1).
@@ -15,8 +15,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.api.citizen import citizen_page
 from app.api.labels import slot_label
+from app.api.participant import participant_page
 from app.domain.trial_call_service import TrialCallService, TrialView
 from app.i18n.dates import format_clock
 from app.web.locale import RequestLocale, request_locale
@@ -57,7 +57,7 @@ async def trial_page(request: Request, token: str, locale: Locale) -> HTMLRespon
     """Show what the trial call is and the button that opens it."""
     view = await _service(request).view(token)
     follow(request, view.group.organisation_id)
-    return await citizen_page(
+    return await participant_page(
         request, locale, "trial.html", view.group, _context(view, token, locale)
     )
 
@@ -69,7 +69,7 @@ async def open_trial(request: Request, token: str, locale: Locale, _: SameOrigin
     view = await _service(request).open(token)
     follow(request, view.group.organisation_id)
     if view.failed:
-        return await citizen_page(
+        return await participant_page(
             request, locale, "trial.html", view.group, _context(view, token, locale), 503
         )
     return RedirectResponse(f"/b/{token}/test", status_code=303)
@@ -78,6 +78,6 @@ async def open_trial(request: Request, token: str, locale: Locale, _: SameOrigin
 @router.get("/b/{token}/test/go")
 @limiter.limit(read_limit)
 async def trial_go(request: Request, token: str) -> Response:
-    """Send the citizen into the open trial meeting, or back to the page when there is none."""
+    """Send the participant into the open trial meeting, or back to the page when there is none."""
     link = await _service(request).join_link(token)
     return RedirectResponse(link or f"/b/{token}/test", status_code=303)

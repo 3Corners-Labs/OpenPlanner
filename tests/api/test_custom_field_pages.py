@@ -1,4 +1,4 @@
-"""Custom form fields on the citizen pages and in the widget API (ADR 0055).
+"""Custom form fields on the participant pages and in the widget API (ADR 0055).
 
 The demo group gets three fields: a required short text (PII), a choice that is not PII and
 an optional checkbox. Calendar as in ``test_booking_pages``.
