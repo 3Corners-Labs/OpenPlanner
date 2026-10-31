@@ -2,8 +2,8 @@
 
 Status: accepted (2026-10-30), requested by the product owner after the question whether a
 guest can be given the browser option only. Extends ADR 0017 (video through the Webex Meetings
-API) and ADR 0071 (trial call); settings per ADR 0042. Partly built: steps 1 and 2 are in
-PR #171, step 3 is planned; see *Build status*.
+API) and ADR 0071 (trial call); settings per ADR 0042. Partly built: steps 1 and 2 are merged
+(#171), step 3 is planned; see *Build status*.
 
 ## Context
 
@@ -113,8 +113,8 @@ probe meeting's title, lead and length stay as in the group check today.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1 | `join_client` on `groups` (migration 0075, reversible), `JoinClient`, `join_link()`, both redirects, group form and manual topic, texts per client in nl and en | #171 | in PR |
-| 2 | Group check: `webex.browser_link_*` and `webex.trial_lobby`, i18n of the findings | #171 | in PR |
+| 1 | `join_client` on `groups` (migration 0075, reversible), `JoinClient`, `join_link()`, both redirects, group form and manual topic, texts per client in nl and en | #171 | merged |
+| 2 | Group check: `webex.browser_link_*` and `webex.trial_lobby`, i18n of the findings | #171 | merged |
 | 3 | Confirm on docker01 with the Webex app installed on the tester's computer that `browser` opens the web app and `choice` the Webex page; record in this table | | planned |
 
 ## Consequences

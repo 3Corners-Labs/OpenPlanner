@@ -4620,7 +4620,7 @@ msgid "admin.check.webex.trial_refused"
 msgstr "Webex weigerde een proefgesprek-meeting voor host {host} ({error}): {reason}. Deelnemers kunnen dan geen proefgesprek openen; controleer op de Webex-site of deelnemers vóór de host mogen binnenkomen."
 
 msgid "admin.check.webex.trial_lobby"
-msgstr "Webex nam een proefgesprek-meeting voor host {host} aan, maar bewaarde de instellingen niet ({stored}). De deelnemer komt dan in de wachtruimte terecht en niemand haalt hem eruit. Laat de beheerder van de Webex-site toestaan dat deelnemers vóór de host binnenkomen en zonder wachtruimte; tot dan werkt het proefgesprek niet."
+msgstr "Webex nam een proefgesprek-meeting voor host {host} aan, maar bewaarde de instellingen niet ({stored}). De deelnemer komt dan in de wachtruimte terecht en niemand laat de deelnemer binnen. Laat de beheerder van de Webex-site toestaan dat deelnemers vóór de host binnenkomen en zonder wachtruimte; tot dan werkt het proefgesprek niet."
 
 msgid "admin.check.webex.trial_left"
 msgstr "De proefgesprek-meeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
