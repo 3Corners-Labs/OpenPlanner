@@ -15,7 +15,7 @@ meeting ran here: its heartbeat, version and job types, and the group's failed a
 jobs (``app.domain.worker_check``).
 
 ADR 0065 step 2: the platform also checks on its own, so a wrong host, licence or scope is
-reported before a citizen's booking fails. The worker checks every group with a Webex host or
+reported before a participant's booking fails. The worker checks every group with a Webex host or
 a contact-center mapping (ADR 0082 point 4) whose latest check is older than
 ``integration_check_interval_hours`` (``IntegrationWatch``),
 and the admin portal checks a group right after its host address changed. Those runs go

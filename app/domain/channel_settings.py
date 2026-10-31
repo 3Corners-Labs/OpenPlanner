@@ -87,7 +87,7 @@ class SmtpSettings:
         security: STARTTLS, implicit TLS or none (only for a relay on a trusted network,
             and never with a login).
         username: Login name; ``None`` when the server accepts mail without login.
-        sender_address: The ``From`` address citizens see and can reply to.
+        sender_address: The ``From`` address participants see and can reply to.
         sender_name: Display name in ``From``; ``None`` shows the address only.
         reply_to_address: Where a reply goes (``Reply-To``); ``None`` sends no such header
             (ADR 0073).

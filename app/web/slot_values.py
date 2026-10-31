@@ -1,4 +1,4 @@
-"""Slot values in forms: an appointment start as submitted by a citizen or an admin."""
+"""Slot values in forms: an appointment start as submitted by a participant or an admin."""
 
 from datetime import datetime
 

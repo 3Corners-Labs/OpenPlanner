@@ -1,7 +1,7 @@
 """ORM tables. Importing this module registers every table on ``Base.metadata``.
 
 Rows are persistence shapes only; ``app.adapters.db.uow`` maps them to domain objects.
-PII columns of citizens exist only on ``bookings`` (CLAUDE.md privacy rules). ``staff`` holds
+PII columns of participants exist only on ``bookings`` (CLAUDE.md privacy rules). ``staff`` holds
 the display name of admins, from the identity provider (ADR 0046).
 
     audit_events (no foreign keys: events outlive what they describe)
@@ -200,8 +200,8 @@ class GroupRow(Base):
     direct_call_max_concurrent: Mapped[int | None] = mapped_column(Integer)
     dispatch_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("5"))
     dispatch_kind: Mapped[str] = mapped_column(String(32), server_default=text("'contact_center'"))
-    # ADR 0069: the citizen moves a booking up to this long before the start.
-    citizen_change_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
+    # ADR 0069: the participant moves a booking up to this long before the start.
+    participant_change_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     # ADR 0044: a planner changes bookings up to this long before the start.
     planner_change_min_lead_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     # ADR 0071: a trial call on Webex ahead of the appointment.
@@ -228,7 +228,9 @@ class GroupRow(Base):
         CheckConstraint(
             "dispatch_kind IN ('contact_center', 'openplanner_queue')", name="dispatch_kind"
         ),
-        CheckConstraint("citizen_change_lead_minutes BETWEEN 0 AND 1440", name="citizen_lead"),
+        CheckConstraint(
+            "participant_change_lead_minutes BETWEEN 0 AND 1440", name="participant_lead"
+        ),
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
         CheckConstraint("trial_call_minutes BETWEEN 10 AND 60", name="trial_call_minutes"),
         CheckConstraint("trial_calls_per_booking BETWEEN 1 AND 5", name="trial_calls_per_booking"),
@@ -400,7 +402,7 @@ class GroupHolidayOpenDayRow(Base):
 
 
 class ReminderRuleRow(Base):
-    """When and through which channel a group reminds citizens."""
+    """When and through which channel a group reminds participants."""
 
     __tablename__ = "reminder_rules"
 
@@ -471,7 +473,7 @@ class SlotRow(Base):
 
 
 class BookingRow(Base):
-    """A citizen's appointment. The only table with personal data (nullable for the purge)."""
+    """A participant's appointment. The only table with personal data (nullable for the purge)."""
 
     __tablename__ = "bookings"
 
@@ -509,7 +511,7 @@ class BookingRow(Base):
     rebook_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
     claimed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     claimed_by: Mapped[str | None] = mapped_column(String(64))
-    # ADR 0056: the deadline to confirm by email link, and when the citizen did.
+    # ADR 0056: the deadline to confirm by email link, and when the participant did.
     confirm_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
     confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     # ADR 0055: answers to the group's custom fields as JSON; PII, purged as a whole.
@@ -642,7 +644,7 @@ class JobRow(Base):
 class AuditEventRow(Base):
     """An audited admin action (ADR 0014) or system event (ADR 0031).
 
-    Never holds personal data of citizens; ``booking_id`` is a plain id without a foreign key,
+    Never holds personal data of participants; ``booking_id`` is a plain id without a foreign key,
     so an event outlives what it describes.
     """
 
@@ -657,7 +659,7 @@ class AuditEventRow(Base):
     organisation: Mapped[str | None] = mapped_column(String(64))
     group: Mapped[str | None] = mapped_column(String(64))
     detail: Mapped[str] = mapped_column(String(255), server_default=text("''"))
-    # The provider's reason for a failed job (ADR 0065): masked, capped, no citizen data.
+    # The provider's reason for a failed job (ADR 0065): masked, capped, no participant data.
     message: Mapped[str] = mapped_column(String(300), server_default=text("''"))
     source: Mapped[str] = mapped_column(String(16), server_default=text("'admin'"))
     booking_id: Mapped[int | None] = mapped_column(Integer)

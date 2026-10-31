@@ -30,7 +30,7 @@ MANAGEMENT_LINK_PREFIX = "/b/"
 MACHINE_PREFIXES = ("/api/", "/webhooks/")
 """Paths whose callers are programs: they keep FastAPI's JSON validation answer, which the
 OpenAPI spec documents (``HTTPValidationError``)."""
-"""Path prefix of the citizen's management link; a 404 under it is a link that matches nothing."""
+"""Path prefix of the participant's management link; a 404 under it matches no link."""
 
 _NOT_FOUND = {
     ErrorCode.GROUP_NOT_FOUND,
@@ -97,7 +97,7 @@ async def validation_error_page(request: Request, exc: Exception) -> Response:
     """Render a page's malformed query or path parameter as the generic error page.
 
     FastAPI's default answer repeats the submitted value in JSON; a page never echoes what
-    was typed into its address (ADR 0063 §3), so admin and citizen pages get the error page
+    was typed into its address (ADR 0063 §3), so admin and participant pages get the error page
     with a catalogue text only. Machine paths keep the documented JSON answer.
     """
     if not isinstance(exc, RequestValidationError):  # pragma: no cover - registered for it only

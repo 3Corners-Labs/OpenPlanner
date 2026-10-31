@@ -2,7 +2,7 @@
 
 A mixin of ``SqlTransaction``, so these queries run in the caller's transaction like every
 other one. They select counts, statuses and times only, never a personal data column or a
-booking id, so nothing they return can identify a citizen. Which booking is overdue is
+booking id, so nothing they return can identify a participant. Which booking is overdue is
 decided in ``app.domain.retention``; the SQL only narrows the candidates.
 """
 

@@ -27,7 +27,7 @@ from scripts.diagrams.content import (
 )
 
 COLOURS = {
-    Family.CITIZEN: ("#0f7a6e", "#e3f3f0"),
+    Family.PARTICIPANT: ("#0f7a6e", "#e3f3f0"),
     Family.CORE: ("#154273", "#e4ecf5"),
     Family.ADMIN: ("#9a5b00", "#fbefdc"),
     Family.PLATFORM: ("#5b4b8a", "#ece8f6"),
@@ -175,7 +175,7 @@ def plate_overview() -> Page:
         f"fontSize=14;{FONT}",
     )
     zones = {
-        Family.CITIZEN: (300, 190, 300, 440),
+        Family.PARTICIPANT: (300, 190, 300, 440),
         Family.CORE: (620, 190, 400, 440),
         Family.ADMIN: (1040, 190, 250, 440),
         Family.PLATFORM: (300, 650, 990, 170),
@@ -195,7 +195,7 @@ def plate_overview() -> Page:
     by_family: dict[Family, list[Block]] = {}
     for block in BLOCKS:
         by_family.setdefault(block.family, []).append(block)
-    for i, block in enumerate(by_family[Family.CITIZEN]):
+    for i, block in enumerate(by_family[Family.PARTICIPANT]):
         _block(page, 315, 225 + i * 100, 270, 85, block)
     core = by_family[Family.CORE]
     for i, block in enumerate(core[:-1]):

@@ -19,7 +19,7 @@ MAX_REMINDER_MINUTES = 30 * 24 * 60
 
 
 class ChannelKind(StrEnum):
-    """Ways to reach a citizen."""
+    """Ways to reach a participant."""
 
     EMAIL = "email"
     SMS = "sms"

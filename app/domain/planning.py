@@ -68,7 +68,7 @@ class GroupSettings:
     phone_mode: PhoneMode
     dispatch_lead_minutes: int
     dispatch_kind: DispatchKind
-    citizen_change_lead_minutes: int
+    participant_change_lead_minutes: int
     planner_change_min_lead_minutes: int
     trial_call_enabled: bool
     trial_call_minutes: int
@@ -102,7 +102,7 @@ class Schedule:
 
 @dataclass(frozen=True)
 class PreviewDay:
-    """The slots citizens are offered on one day (before bookings and notice)."""
+    """The slots participants are offered on one day (before bookings and notice)."""
 
     day: date
     slots: list[SlotTime]

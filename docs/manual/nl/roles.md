@@ -54,7 +54,7 @@ Sommige rechten hebben een ander recht nodig; dat staat erbij. Wie de planning m
 moet bijvoorbeeld ook de groep mogen bekijken. Het overzicht, **Mijn rechten** en de
 rechtenmatrix horen bij elke beheerder. Het portaal zegt bij **Opslaan** wat er ontbreekt.
 
-Een recht met het kenmerk **Persoonsgegevens** toont gegevens van burgers. Een kopie van
+Een recht met het kenmerk **Persoonsgegevens** toont gegevens van deelnemers. Een kopie van
 Compliance en privacy kan dat recht nooit krijgen.
 
 ## Wijzigen en verwijderen

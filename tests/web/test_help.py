@@ -167,12 +167,12 @@ def test_every_manual_file_is_a_topic_and_listed_in_the_readme() -> None:
             assert f"({code}/{slug}.md)" in readme
 
 
-def test_the_manual_never_links_citizens_away() -> None:
-    """Help is for the portal; citizen templates do not link to the manual or GitHub."""
-    citizen_templates = Path(__file__).parents[2] / "app" / "api" / "templates"
+def test_the_manual_never_links_participants_away() -> None:
+    """Help is for the portal; participant templates do not link to the manual or GitHub."""
+    participant_templates = Path(__file__).parents[2] / "app" / "api" / "templates"
     linked = [
         path.name
-        for path in citizen_templates.rglob("*.html")
+        for path in participant_templates.rglob("*.html")
         if re.search(r"github\.com|/admin/help|docs/manual", path.read_text(encoding="utf-8"))
     ]
 

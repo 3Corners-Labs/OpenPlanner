@@ -131,7 +131,7 @@ def unknown_link_limit() -> str:
 def count_unknown_link(request: Request) -> bool:
     """Count a management link that matched no booking against its caller's bound.
 
-    Only answers that already are a 404 are counted, so citizens with a valid link never use
+    Only answers that already are a 404 are counted, so participants with a valid link never use
     the bound up. The bucket is keyed by address alone, not by path, so guessing different
     tokens on one or many ``/b/{token}`` routes draws on the same budget (ADR 0011).
 

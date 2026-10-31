@@ -2,7 +2,7 @@
 
 Meetings are scheduled by the Service App on behalf of the group's licensed host. Every
 signed-in user of the organisation becomes cohost on joining (the agent); guests wait in the
-lobby. Webex sends no invitations: OpenPlanner mails the citizen itself. The request carries
+lobby. Webex sends no invitations: OpenPlanner mails the participant itself. The request carries
 the group's name and times only (``app.domain.calls.meeting_request``). Start and end are
 sent in the group's time zone: Webex refuses a ``timezone`` whose offset differs from the one
 in the times (ADR 0065), so UTC times next to ``Europe/Amsterdam`` would never schedule.
@@ -39,10 +39,10 @@ TRIAL_OPTIONS: dict[str, Any] = {
     "enableConnectAudioBeforeHost": True,
     "unlockedMeetingJoinSecurity": "allowJoin",
 }
-"""What a trial call (ADR 0071) changes: the citizen enters alone, without waiting in the lobby.
+"""What a trial call (ADR 0071) changes: the participant enters alone, without waiting in the lobby.
 
 Everything else, the site, the host, the chat and file settings, is the booking's own, so the
-citizen tries the call they will have."""
+participant tries the call they will have."""
 
 
 @dataclass(frozen=True)

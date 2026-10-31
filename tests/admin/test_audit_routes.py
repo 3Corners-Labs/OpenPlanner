@@ -395,3 +395,13 @@ async def test_the_subject_filter_selects_the_updates_and_nothing_else(logged: S
     for marker in ("global_marker", "org_marker", "smtp_unreachable", "other_marker"):
         assert marker not in page  # none of the seeded events is about updates
     assert 'href="/admin/audit/export.csv?subject=updates"' in page
+
+
+def test_events_from_before_the_rename_still_name_the_participant_change_lead() -> None:
+    """ADR 0077: history keeps the old field name, and both names get the same label."""
+    from app.admin.audit_routes import DETAIL_LABELS
+
+    assert (
+        DETAIL_LABELS["citizen_change_lead_minutes"]
+        == DETAIL_LABELS["participant_change_lead_minutes"]
+    )

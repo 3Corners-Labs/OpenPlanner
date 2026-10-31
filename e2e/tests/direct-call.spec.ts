@@ -1,11 +1,11 @@
 /**
  * Direct video call (ADR 0019) end to end, without Webex: the org admin creates a group that is
- * open around the clock with blocks that offer direct calls (ADR 0072); a citizen starts a call
+ * open around the clock with blocks that offer direct calls (ADR 0072); a participant starts a call
  * and lands on the waiting page; the org admin sees it in the agenda. axe (WCAG 2.2 AA) on every
  * page.
  *
  * Without a Webex Service App the meeting and work item are skipped, so the waiting page keeps
- * "looking for an agent" without a join button: the citizen-facing flow is what is tested here.
+ * "looking for an agent" without a join button: the participant-facing flow is what is tested here.
  * Each browser creates its own group, so the parallel browsers do not collide.
  *
  * A staffing block cannot end at 24:00, so "around the clock" leaves 23:55–00:00 closed. The
@@ -42,7 +42,7 @@ async function addAllDayHours(page: Page): Promise<void> {
   }
 }
 
-test('a citizen starts a call right away and the admin sees it', async ({ page, browser }, testInfo) => {
+test('a participant starts a call right away and the admin sees it', async ({ page, browser }, testInfo) => {
   const slug = `e2e-direct-${testInfo.project.name}-${Date.now().toString(36)}`;
   const tabs = page.getByRole('navigation', { name: 'Onderdelen van de groep' });
 
@@ -58,23 +58,23 @@ test('a citizen starts a call right away and the admin sees it', async ({ page, 
   await expect(page.locator('.window__offer', { hasText: 'Afspraken en direct gesprek' })).toHaveCount(WEEKDAYS.length);
   await expectNoAxeViolations(page);
 
-  // Citizen (no admin session): group page offers the direct call.
-  const citizenContext = await browser.newContext({ locale: 'nl-NL' });
-  const citizen = await citizenContext.newPage();
-  await citizen.goto(`/g/${slug}`);
-  await expect(citizen.getByRole('heading', { name: 'Liever meteen?' })).toBeVisible();
-  await expectNoAxeViolations(citizen);
-  await citizen.getByRole('link', { name: 'Nu een gesprek starten' }).click();
-  await expect(citizen.getByRole('heading', { level: 1 })).toHaveText('Nu een videogesprek starten');
-  await expectNoAxeViolations(citizen);
-  await citizen.getByLabel('Voornaam').fill('Ada');
-  await citizen.getByLabel('Achternaam').fill('Lovelace');
-  await citizen.getByLabel('E-mailadres').fill('ada@example.org');
-  await citizen.getByRole('button', { name: 'Gesprek starten' }).press('Enter');
-  await expect(citizen).toHaveURL(/\/b\/[A-Za-z0-9_-]+\/wait$/);
-  await expect(citizen.getByRole('status')).toContainText('We zoeken een medewerker');
-  await expectNoAxeViolations(citizen);
-  await citizenContext.close();
+  // Participant (no admin session): group page offers the direct call.
+  const participantContext = await browser.newContext({ locale: 'nl-NL' });
+  const participant = await participantContext.newPage();
+  await participant.goto(`/g/${slug}`);
+  await expect(participant.getByRole('heading', { name: 'Liever meteen?' })).toBeVisible();
+  await expectNoAxeViolations(participant);
+  await participant.getByRole('link', { name: 'Nu een gesprek starten' }).click();
+  await expect(participant.getByRole('heading', { level: 1 })).toHaveText('Nu een videogesprek starten');
+  await expectNoAxeViolations(participant);
+  await participant.getByLabel('Voornaam').fill('Ada');
+  await participant.getByLabel('Achternaam').fill('Lovelace');
+  await participant.getByLabel('E-mailadres').fill('ada@example.org');
+  await participant.getByRole('button', { name: 'Gesprek starten' }).press('Enter');
+  await expect(participant).toHaveURL(/\/b\/[A-Za-z0-9_-]+\/wait$/);
+  await expect(participant.getByRole('status')).toContainText('We zoeken een medewerker');
+  await expectNoAxeViolations(participant);
+  await participantContext.close();
 
   // Admin: the direct call is in today's agenda.
   await page.goto(`/admin/groups/${slug}/agenda`);

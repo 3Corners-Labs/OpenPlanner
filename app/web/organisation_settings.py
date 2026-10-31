@@ -3,7 +3,7 @@
 An organisation can set its own class D values: the time format, the admin portal's time
 zone, and the staff, shortfall and rebook periods. A request follows one organisation:
 
-    citizen page of a group (/g/{slug}...)   the group's organisation (router dependency)
+    participant page of a group (/g/{slug}...)   the group's organisation (router dependency)
     management link (/b/{token}...)          the booking's group's organisation (after lookup)
     admin portal                             the admin's own organisation if exactly one;
                                              the superuser and multi-organisation admins
@@ -61,7 +61,7 @@ def settings_for(request: Request) -> Settings:
 async def follow_group_from_path(request: Request) -> None:
     """Router dependency: follow the organisation of the path's group, if it exists.
 
-    The group is ``{slug}`` on citizen pages and ``{group}`` in the widget API. An unknown or
+    The group is ``{slug}`` on participant pages and ``{group}`` in the widget API. An unknown or
     malformed slug follows nothing; the route answers it as it always did.
     """
     slug = request.path_params.get("slug") or request.path_params.get("group")

@@ -55,7 +55,7 @@ class ClosureScenario:
         id: Database id; ``None`` before it is stored.
         organisation_id: The organisation the scenario belongs to.
         group_id: The group of a group scenario; ``None`` for an organisation scenario.
-        name: What admins call it ("Storing", "Staking"); never shown to citizens.
+        name: What admins call it ("Storing", "Staking"); never shown to participants.
         notices: The notice per locale (``NOTICE_LOCALES`` required).
         headings: Optional heading per locale.
         contacts: The scenario's own contact block; ``None`` takes the group's at the start.

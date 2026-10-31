@@ -20,7 +20,7 @@ from tests.support.domain import (
     SLOT_0930,
     TEST_TOKEN_KEY,
     book,
-    citizen,
+    participant,
     window,
 )
 
@@ -53,7 +53,7 @@ async def test_the_week_shows_agents_and_bookings_per_slot(
     agenda: AgendaService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     await book(bookings, SLOT_0900, "demo")
-    await book(bookings, SLOT_0900, "demo", citizen(2))
+    await book(bookings, SLOT_0900, "demo", participant(2))
     _lower_staffing(uow, 1)
 
     days = await agenda.days(GROUP_ADMIN, "demo", MONDAY, 7)
@@ -152,8 +152,8 @@ async def test_counts_today_counts_confirmed_bookings_per_group_in_scope(
 ) -> None:
     """ADR 0061: the overview widget shows counts only, for the groups one may view."""
     await book(bookings, SLOT_0900, "demo")
-    await book(bookings, SLOT_0930, "demo", citizen(2))
-    receipt = await book(bookings, SLOT_0900, "demo", citizen(3))
+    await book(bookings, SLOT_0930, "demo", participant(2))
+    receipt = await book(bookings, SLOT_0900, "demo", participant(3))
     await bookings.cancel(receipt.management_token)
 
     assert await agenda.counts_today(SUPER) == {"demo": 0, "demo-twee": 0, "andere-team": 0}

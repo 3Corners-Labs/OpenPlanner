@@ -5,7 +5,7 @@ You open it with **Audit log** in the menu. You only see your own level: a group
 own groups, an organisation admin and the Compliance and privacy role also their own
 organisation, the superuser everything.
 
-The log never contains citizens' data: no names, email addresses or phone numbers.
+The log never contains participants' data: no names, email addresses or phone numbers.
 
 ## What a row shows
 

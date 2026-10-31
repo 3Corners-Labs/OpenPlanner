@@ -5,7 +5,7 @@
     GET /api/agent/v1/groups/{slug}/availability    availability:read on that group
 
 Every route depends on exactly one ``RequireScope`` and is rate-limited per client.
-Change requests (reschedule, cancel, confirmed by the citizen) follow in the next step.
+Change requests (reschedule, cancel, confirmed by the participant) follow in the next step.
 """
 
 from datetime import date
@@ -103,7 +103,7 @@ async def availability(
     """Return the free times between two local dates (at most 62 days).
 
     Scope `availability:read` on the group. The bot offers these to the caller; booking and
-    changing go through the citizen's own confirmation (next step).
+    changing go through the participant's own confirmation (next step).
     """
     if context.group is None:  # pragma: no cover - RequireScope with a group returns it
         raise ApiProblem("invalid_request")

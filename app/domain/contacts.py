@@ -1,6 +1,6 @@
 """Alternative ways to reach an organisation: the contact block (ADR 0037 §1–2).
 
-A ``ContactBlock`` tells citizens how else to reach the organisation when they cannot book: on
+A ``ContactBlock`` tells participants how else to reach the organisation when they cannot book: on
 the page of an emergency closure (ADR 0037) and on the maintenance page (ADR 0038). It holds
 up to ``MAX_OPTIONS`` structured ``ContactOption``s, never free HTML (ADR 0009):
 
@@ -11,7 +11,7 @@ up to ``MAX_OPTIONS`` structured ``ContactOption``s, never free HTML (ADR 0009):
     address  one to four lines                  rendered as an address block
 
 Every option may have a label and opening hours per locale. Contact options are organisation
-data shown publicly, not personal data of citizens; the admin page says that numbers and
+data shown publicly, not personal data of participants; the admin page says that numbers and
 addresses must be functional ones. Refusals name the offending part (``phone``, ``url``,
 ``label`` ...), and ``numbered_option`` prefixes the form row (``contact_3_url``).
 """

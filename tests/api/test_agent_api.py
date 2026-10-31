@@ -347,7 +347,7 @@ def test_every_route_declares_one_scope_except_token_and_docs(agent: Agent) -> N
 
 
 async def test_booking_service_is_shared(agent: Agent) -> None:
-    # The API reads availability through the citizens' service: same rules, same window.
+    # The API reads availability through the participants' service: same rules, same window.
     mounted = next(r for r in agent.app.routes if getattr(r, "path", None) == BASE)
     assert isinstance(mounted.app.state.booking_service, BookingService)  # type: ignore[attr-defined]
     assert mounted.app.state.booking_service is agent.app.state.booking_service  # type: ignore[attr-defined]

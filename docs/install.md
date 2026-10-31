@@ -47,7 +47,7 @@ Caddy.
 
 | `--mode` | `ENVIRONMENT` | Services | For |
 |---|---|---|---|
-| `production` | `prod` | web, worker, HTTPS proxy (Let's Encrypt) | real citizens; public DNS name, ports 80 and 443 |
+| `production` | `prod` | web, worker, HTTPS proxy (Let's Encrypt) | real participants; public DNS name, ports 80 and 443 |
 | `test` | `test` | web, worker, HTTPS proxy (Let's Encrypt) | acceptance on its own public DNS name; `--no-tls` behind your own proxy |
 | `lab` | `test` | web, worker, Keycloak, Mailpit; HTTPS proxy with `--tls-domain` | internal demo and integration tests (as on docker01) |
 

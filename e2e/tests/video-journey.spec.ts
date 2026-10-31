@@ -47,36 +47,36 @@ async function destinationOf(page: Page, link: Locator): Promise<string | undefi
 
 test('the participant tries the connection, joins the call, and the admin follows it', async ({ page, browser }, testInfo) => {
   const paths = journey(testInfo.project.name);
-  const citizenContext = await browser.newContext({ locale: 'nl-NL' });
-  const citizen = await citizenContext.newPage();
+  const participantContext = await browser.newContext({ locale: 'nl-NL' });
+  const participant = await participantContext.newPage();
 
   // No Webex here, so the participant cannot open a trial call yet (opening one is covered by
   // the API tests with a fake Webex): the page says so and offers no way in.
-  await citizen.goto(paths.trial_page);
-  await expect(citizen.getByRole('heading', { level: 1 })).toHaveText('Proefgesprek');
-  await expect(citizen.getByText('Voor deze afspraak is geen proefgesprek beschikbaar.')).toBeVisible();
-  await expect(citizen.getByRole('link', { name: 'Naar het proefgesprek' })).toHaveCount(0);
-  await expectNoAxeViolations(citizen);
+  await participant.goto(paths.trial_page);
+  await expect(participant.getByRole('heading', { level: 1 })).toHaveText('Proefgesprek');
+  await expect(participant.getByText('Voor deze afspraak is geen proefgesprek beschikbaar.')).toBeVisible();
+  await expect(participant.getByRole('link', { name: 'Naar het proefgesprek' })).toHaveCount(0);
+  await expectNoAxeViolations(participant);
 
   // The admin gives the booking a stand-in meeting, task and open trial call.
   await loginAs(page, 'orgadmin', paths.trial_booking);
   await expect(page.getByRole('heading', { name: 'Simulator (alleen in test)' })).toBeVisible();
   await expectNoAxeViolations(page);
   await play(page, PREPARE, /nep-proefgesprek/);
-  await expect(timeline(page, 'Proefgesprek geopend door de burger')).toHaveCount(1);
+  await expect(timeline(page, 'Proefgesprek geopend door de deelnemer')).toHaveCount(1);
 
   // The participant now has the way in, straight into Webex's web app (ADR 0075).
-  await citizen.reload();
-  await expect(citizen.getByRole('status')).toContainText('Uw proefgesprek staat open tot');
-  const wayIn = citizen.getByRole('link', { name: 'Naar het proefgesprek' });
-  await expectNoAxeViolations(citizen);
-  expect(await destinationOf(citizen, wayIn)).toBe(SIMULATED_MEETING);
+  await participant.reload();
+  await expect(participant.getByRole('status')).toContainText('Uw proefgesprek staat open tot');
+  const wayIn = participant.getByRole('link', { name: 'Naar het proefgesprek' });
+  await expectNoAxeViolations(participant);
+  expect(await destinationOf(participant, wayIn)).toBe(SIMULATED_MEETING);
 
   // Webex reports the participant in and out of the trial meeting. The timeline shows the
   // journey; the appointment's own call status stays untouched (ADR 0076).
   await play(page, 'Deelnemer komt het proefgesprek binnen', /afgeleverd/);
   await play(page, 'Deelnemer verlaat het proefgesprek', /afgeleverd/);
-  await expect(timeline(page, 'Burger ging het proefgesprek in')).toContainText('browser');
+  await expect(timeline(page, 'Deelnemer ging het proefgesprek in')).toContainText('browser');
   await expect(timeline(page, 'Deelnemer kwam het proefgesprek binnen')).toHaveCount(1);
   await expect(timeline(page, 'Deelnemer verliet het proefgesprek')).toHaveCount(1);
   await expect(fact(page, 'Deelnemers')).toHaveText('0');
@@ -84,21 +84,21 @@ test('the participant tries the connection, joins the call, and the admin follow
   await expectNoAxeViolations(page);
 
   // The call: the join page is open, but the meeting is not there yet.
-  await citizen.goto(paths.call_page);
-  await expect(citizen.getByRole('heading', { level: 1 })).toHaveText('Uw videogesprek');
-  await expect(citizen.getByRole('status')).toContainText('wordt klaargezet');
-  await expectNoAxeViolations(citizen);
+  await participant.goto(paths.call_page);
+  await expect(participant.getByRole('heading', { level: 1 })).toHaveText('Uw videogesprek');
+  await expect(participant.getByRole('status')).toContainText('wordt klaargezet');
+  await expectNoAxeViolations(participant);
 
   await page.goto(paths.call_booking);
   await play(page, PREPARE, /nep-meeting/);
 
-  await citizen.reload();
-  const joinLink = citizen.getByRole('link', { name: 'Deelnemen aan het videogesprek' });
-  await expectNoAxeViolations(citizen);
-  expect(await destinationOf(citizen, joinLink)).toBe(SIMULATED_MEETING);
+  await participant.reload();
+  const joinLink = participant.getByRole('link', { name: 'Deelnemen aan het videogesprek' });
+  await expectNoAxeViolations(participant);
+  expect(await destinationOf(participant, joinLink)).toBe(SIMULATED_MEETING);
 
   // The call as the contact center and Webex would report it.
-  for (const name of ['Agent neemt taak aan', 'Agent komt binnen', 'Burger komt binnen', 'Meeting beëindigd']) {
+  for (const name of ['Agent neemt taak aan', 'Agent komt binnen', 'Deelnemer komt binnen', 'Meeting beëindigd']) {
     await play(page, name, /afgeleverd/);
   }
   await expect(timeline(page, 'Deelnemer klikte op deelnemen')).toContainText('browser');
@@ -114,5 +114,5 @@ test('the participant tries the connection, joins the call, and the admin follow
   await expect(row).toContainText('Ja');
   await expectNoAxeViolations(page);
 
-  await citizenContext.close();
+  await participantContext.close();
 });

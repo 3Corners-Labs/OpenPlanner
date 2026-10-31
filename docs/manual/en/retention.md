@@ -1,6 +1,6 @@
 # Retention
 
-This screen shows, per group, whether citizens' personal data is removed on time. You open it
+This screen shows, per group, whether participants' personal data is removed on time. You open it
 with **Retention** in the menu. Organisation admins, the Compliance and privacy role and the
 superuser can view it, each for their own organisations.
 

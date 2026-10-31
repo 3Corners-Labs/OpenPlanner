@@ -2,23 +2,23 @@
 
 A group with ``DispatchKind.OPENPLANNER_QUEUE`` sends no task to a contact center. Its agents
 sign in and claim a booking; the claim, not a routing engine, decides who takes it. The
-citizen always gets the first free agent: "pick up next" takes the citizen waiting in the
+participant always gets the first free agent: "pick up next" takes the participant waiting in the
 lobby first, then the earliest start.
 
     visible ─ confirmed, start ≤ now + queue_visible_from_minutes, end > now
     next_up ─ unclaimed; in the lobby first, then by start, then by booking id
 
-"In the lobby" means the citizen joined the meeting (Webex webhook, ADR 0010) and no host
-has. The lobby wait itself is not stored, so among waiting citizens the earliest start goes
+"In the lobby" means the participant joined the meeting (Webex webhook, ADR 0010) and no host
+has. The lobby wait itself is not stored, so among waiting participants the earliest start goes
 first, which is nearly always the one waiting longest. A direct call (ADR 0019) is the request
-to talk now, so its citizen waits from its start, whether or not they opened the link yet;
-a scheduled appointment's citizen waits from the lobby join.
+to talk now, so its participant waits from its start, whether or not they opened the link yet;
+a scheduled appointment's participant waits from the lobby join.
 
 Every row also says whether the video link is ready, still being prepared or failed, and the
-claimed booking where the citizen is (ADR 0072): an agent never waits for a link that will
+claimed booking where the participant is (ADR 0072): an agent never waits for a link that will
 not come.
 ``summarise`` and ``works_queue`` feed the overview's *Queue across own groups* widget (ADR
-0061 §2): how many citizens wait per group, for how long at most, and how many staff who may
+0061 §2): how many participants wait per group, for how long at most, and how many staff who may
 work the queue are signed in.
 
 Pure Python, no I/O; ``QueueService`` loads the bookings and claims in a locked transaction.
@@ -36,12 +36,12 @@ from app.domain.scheduling import Group
 from app.domain.staff import StaffMember
 
 __all__ = [
-    "CitizenState",
+    "ParticipantState",
     "Claim",
     "QueueEntry",
     "QueueSummary",
     "VideoState",
-    "citizen_state",
+    "participant_state",
     "next_up",
     "not_claimed_in_time",
     "summarise",
@@ -63,8 +63,8 @@ class VideoState(StrEnum):
     """The provider refused; the reason is on the booking's timeline (ADR 0065)."""
 
 
-class CitizenState(StrEnum):
-    """Where the citizen is, as the Webex webhooks report it (ADR 0010)."""
+class ParticipantState(StrEnum):
+    """Where the participant is, as the Webex webhooks report it (ADR 0010)."""
 
     NOT_YET = "not_yet"
     IN_LOBBY = "in_lobby"
@@ -82,15 +82,15 @@ def video_state(booking: Booking, status: CallStatus) -> VideoState:
     return VideoState.PENDING
 
 
-def citizen_state(status: CallStatus) -> CitizenState:
-    """Return where the citizen of a booking with ``status`` is."""
+def participant_state(status: CallStatus) -> ParticipantState:
+    """Return where the participant of a booking with ``status`` is."""
     if status.call is CallState.ENDED:
-        return CitizenState.ENDED
+        return ParticipantState.ENDED
     if status.host_joined:
-        return CitizenState.IN_CALL
+        return ParticipantState.IN_CALL
     if status.participants > 0:
-        return CitizenState.IN_LOBBY
-    return CitizenState.NOT_YET
+        return ParticipantState.IN_LOBBY
+    return ParticipantState.NOT_YET
 
 
 @dataclass(frozen=True)
@@ -102,7 +102,7 @@ class QueueEntry:
 
     @property
     def in_lobby(self) -> bool:
-        """Whether the citizen has joined and waits for an agent."""
+        """Whether the participant has joined and waits for an agent."""
         return self.status.participants > 0 and not self.status.host_joined
 
     @property
@@ -122,9 +122,9 @@ class QueueEntry:
 
     @property
     def waiting(self) -> bool:
-        """Whether the citizen waits for an agent nobody picked up yet.
+        """Whether the participant waits for an agent nobody picked up yet.
 
-        A scheduled citizen waits once in the lobby; a direct caller from the request itself,
+        A scheduled participant waits once in the lobby; a direct caller from the request itself,
         until an agent claims the call or joins the meeting.
         """
         if self.claimed or self.status.host_joined:
@@ -133,11 +133,11 @@ class QueueEntry:
 
     @property
     def waiting_since(self) -> datetime:
-        """When the citizen started waiting.
+        """When the participant started waiting.
 
         A direct call waits from its start, which is the request (ADR 0019). For a scheduled
         appointment the lobby join itself is not stored (module docstring); the status's last
-        change is the join for a citizen alone in the lobby. Without one, the booking's start.
+        change is the join for a participant alone in the lobby. Without one, the booking's start.
         """
         if self.is_direct:
             return self.booking.start
@@ -149,7 +149,7 @@ class QueueSummary:
     """One group's queue at a glance: who waits and for how long at most.
 
     Attributes:
-        waiting: Citizens nobody picked up yet: in the lobby, or direct callers since their
+        waiting: Participants nobody picked up yet: in the lobby, or direct callers since their
             request (``QueueEntry.waiting``).
         longest_wait: How long the first of them has waited; zero when nobody waits.
     """

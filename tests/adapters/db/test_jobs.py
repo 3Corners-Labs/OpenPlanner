@@ -111,4 +111,4 @@ async def test_active_jobs_lists_running_then_failed_jobs_with_their_count(
     assert first_only.total == 2
     assert not any(
         hasattr(j, "booking_id") for j in active.jobs
-    )  # no payload, no link to a citizen
+    )  # no payload, no link to a participant

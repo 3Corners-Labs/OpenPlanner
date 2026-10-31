@@ -1,6 +1,6 @@
 # Contactalternatieven
 
-Als burgers geen afspraak kunnen maken, willen ze weten hoe ze de organisatie anders kunnen
+Als deelnemers geen afspraak kunnen maken, willen ze weten hoe ze de organisatie anders kunnen
 bereiken. Op dit scherm legt u dat één keer vast voor de hele organisatie. Het blok staat op de
 pagina van een noodsluiting en op de onderhoudspagina (ADR 0037 en 0038). U opent het via
 **Organisaties → organisatie → Contact**. Een organisatiebeheerder of
@@ -15,18 +15,18 @@ Een team met een eigen loket of nummer kan een eigen blok krijgen (scherm **Cont
 van een team**). Dat blok geldt dan in plaats van dit blok. Een sluiting neemt bij de start een
 kopie van het blok dat dan geldt; latere wijzigingen veranderen een lopende sluiting niet.
 
-## Wat burgers zien
+## Wat deelnemers zien
 
 Een kop (standaard "Andere manieren om ons te bereiken") met daaronder de contactmogelijkheden
 in uw volgorde. Telefoonnummers en e-mailadressen zijn links die op een telefoon direct bellen
 of mailen. Het voorbeeld bovenaan het scherm laat zien hoe het blok nu is opgeslagen.
 
-Burgers zien het blok op drie plekken, altijd als de kopie die bij de sluiting hoort:
+Deelnemers zien het blok op drie plekken, altijd als de kopie die bij de sluiting hoort:
 
 - **Tijdens een sluiting** staat op de pagina van het team geen kalender, maar de
   sluitingspagina: de kop van de sluiting, de periode, de tekst en daaronder dit blok.
 - **Voor een geplande sluiting** blijft de kalender staan. De melding erboven linkt naar de
-  sluitingspagina, zodat burgers al zien hoe zij u tijdens de sluiting kunnen bereiken.
+  sluitingspagina, zodat deelnemers al zien hoe zij u tijdens de sluiting kunnen bereiken.
 - **Bij een opgeschorte afspraak** staat het blok op de pagina van die afspraak, boven de
   knoppen om een nieuwe tijd te kiezen of te annuleren.
 

@@ -220,7 +220,7 @@ def test_without_explain_only_the_tracking_id_is_logged_and_the_error_has_no_rea
 
     assert (logs[0]["reason"], logs[0]["tracking_id"]) == ("", "ROUTER_456")
     assert "Ada" not in str(logs)
-    assert error.reason == ""  # citizen data may be echoed: never kept
+    assert error.reason == ""  # participant data may be echoed: never kept
 
 
 def test_a_refusal_without_a_json_body_still_logs_the_status() -> None:

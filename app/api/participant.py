@@ -1,7 +1,7 @@
-"""Shared plumbing of the citizen pages: templates, the organisation's branding, rendering.
+"""Shared plumbing of the participant pages: templates, the organisation's branding, rendering.
 
-Every citizen page of a group goes through ``citizen_page``, so each shows the logo, name and
-accent colour of the group's organisation (WP3b) and may load the page's own scripts
+Every participant page of a group goes through ``participant_page``, so each shows the logo, name
+and accent colour of the group's organisation (WP3b) and may load the page's own scripts
 (ADR 0020), and shows the organisation's own wording (ADR 0074). The branding reaches the
 browser as ``/o/{slug}/theme.css`` and ``/o/{slug}/logo`` (``brand_assets``);
 ``app.web.branding`` builds the header from the organisation.
@@ -20,7 +20,7 @@ from app.web.templates import create_templates, render
 templates = create_templates([Path(__file__).parent / "templates"])
 
 
-async def citizen_page(
+async def participant_page(
     request: Request,
     locale: RequestLocale,
     name: str,
@@ -28,10 +28,10 @@ async def citizen_page(
     context: dict[str, object],
     status: int = 200,
 ) -> HTMLResponse:
-    """Render a citizen page of ``group`` in its organisation's branding and wording.
+    """Render a participant page of ``group`` in its organisation's branding and wording.
 
     The organisation's own texts (``app.domain.text_overrides``) replace the shipped ones; a
-    template's ``_()`` is bound to the group's organisation here, the one place all citizen
+    template's ``_()`` is bound to the group's organisation here, the one place all participant
     pages pass.
     """
     await locale.translator.refresh()

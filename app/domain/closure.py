@@ -1,11 +1,11 @@
-"""Emergency closure of a group: no bookings, appointments on hold, citizens informed (ADR 0024).
+"""Emergency closure of a group: no bookings, appointments on hold, participants told (ADR 0024).
 
 A ``Closure`` covers the start times ``starts_at <= start < ends_at`` of one group; without
-``ends_at`` it lasts until it is lifted. While it is visible (now before its end) the citizen
+``ends_at`` it lasts until it is lifted. While it is visible (now before its end) the participant
 page shows its notice, and from its start no slot inside it is offered or booked.
 
 Confirmed bookings inside the closure are suspended, not cancelled: they keep their personal
-data and their place, the citizen gets the notice with a link to choose a new time, and an
+data and their place, the participant gets the notice with a link to choose a new time, and an
 admin can move, reinstate or cancel them. The personal data of a booking that is still
 suspended is purged ``RETENTION_AFTER_CLOSURE`` after the closure ends (decided by the product
 owner on 2026-10-25), instead of 24 hours after the slot.
@@ -15,7 +15,7 @@ owner on 2026-10-25), instead of 24 hours after the slot.
     ended               (end <= now)              no banner; suspended bookings remain
 
 Besides the notice a closure may carry a heading per locale and its own copy of a contact block
-(ADR 0037 §2): the block that applied when it started, so what citizens were mailed stays what
+(ADR 0037 §2): the block that applied when it started, so what participants were mailed stays what
 the closure shows when an organisation or group later edits its block. It may also carry one
 image with its text alternative (ADR 0037 §3), public only while the closure is visible.
 """
@@ -99,7 +99,7 @@ class Closure:
         group_id: The closed group.
         starts_at: First start time that is closed (UTC).
         ends_at: First start time that is open again (UTC); ``None`` until lifted.
-        notices: The explanation for citizens per locale (at least ``NOTICE_LOCALES``). Plain
+        notices: The explanation for participants per locale (at least ``NOTICE_LOCALES``). Plain
             text written by an admin; it never contains personal data.
         created_at: When an admin announced it.
         headings: Optional heading per locale; empty means the page's default heading.
@@ -144,7 +144,7 @@ class Closure:
         return self.covers(now)
 
     def is_visible(self, now: datetime) -> bool:
-        """Return whether citizens see the notice at ``now`` (active or upcoming)."""
+        """Return whether participants see the notice at ``now`` (active or upcoming)."""
         return self.ends_at is None or now < self.ends_at
 
     def notice(self, locale: str) -> str:

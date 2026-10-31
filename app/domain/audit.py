@@ -3,7 +3,7 @@
 Written for every login, every denied authorisation decision and every change (ADR 0014),
 and, as system events, for what the platform did on its own: every message, meeting, work
 item and purge job with its result (ADR 0031). An event never contains personal data of
-citizens; the actor is the subject identifier from the identity provider, or ``system``. The
+participants; the actor is the subject identifier from the identity provider, or ``system``. The
 admin's display name lives once in their ``StaffMember`` record (ADR 0046) and is joined in
 when the log is read, so events stay immutable and a name is stored in one place only.
 
@@ -103,7 +103,7 @@ class AuditEvent:
         detail: What changed, as machine keys (changed field names, ``rule.add``); never
             values, so no personal data.
         message: The provider's own words on a failure (ADR 0065): Webex's reason with
-            addresses masked, at most 300 characters, only for requests without citizen data.
+            addresses masked, at most 300 characters, only for requests without participant data.
             Empty for every other event.
         source: Admin action or system event.
         booking_id: The booking a system event is about, if any (an id, not personal data).

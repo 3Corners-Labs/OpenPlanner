@@ -9,12 +9,12 @@ from dataclasses import dataclass
 
 from app.domain.authorization import (
     API_SCOPES,
-    CITIZEN_ACTIONS,
     HELD_BACK,
     LEVELS,
     LOCKED_PERMISSIONS,
     MAINTENANCE_WRITABLE,
     MATRIX,
+    PARTICIPANT_ACTIONS,
     PII_PERMISSIONS,
     REACH,
     REQUIRES,
@@ -27,9 +27,9 @@ from app.domain.authorization import (
 from app.i18n import Translator
 from app.web.authz_labels import (
     API_SCOPE_LABELS,
-    CITIZEN_LABELS,
     CONDITION_LABELS,
     LEVEL_LABELS,
+    PARTICIPANT_LABELS,
     PERMISSION_LABELS,
     ROLE_LABELS,
 )
@@ -63,7 +63,7 @@ def matrix_rows() -> list[MatrixRow]:
 
 
 def render_markdown(translator: Translator, locale: str = "en") -> str:
-    """Return ``docs/authorization.md``: the admin matrix, citizen actions and API scopes."""
+    """Return ``docs/authorization.md``: the admin matrix, participant actions and API scopes."""
     _ = translator.bind(locale)
     roles = list(Role)
     lines = [
@@ -80,7 +80,7 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
         "groups of their claim. The auditor reads only and never sees personal data (ADR 0039).",
         "",
         "Bounds (ADR 0039): *locked* permissions belong to the superuser only; *personal data*",
-        "permissions show citizens' data and are never held by the auditor.",
+        "permissions show participants' data and are never held by the auditor.",
         "",
         "Maintenance (ADR 0038): while maintenance mode is on, every change is refused except",
         "for the permissions marked *maintenance*, and those only for the superuser. Reading",
@@ -127,17 +127,17 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
         lines.append(f"| {_(ROLE_LABELS[template])} | {REACH[template]} | {offered} |")
     lines += [
         "",
-        "## Citizens",
+        "## Participants",
         "",
-        "Citizens never log in. Their rights depend on the management link from their",
+        "Participants never log in. Their rights depend on the management link from their",
         "confirmation email and on the change deadline (the group's dispatch lead).",
         "",
         "| Action | Condition |",
         "|---|---|",
     ]
-    for action in CITIZEN_ACTIONS:
+    for action in PARTICIPANT_ACTIONS:
         lines.append(
-            f"| {_(CITIZEN_LABELS[action.key])} (`{action.key}`) "
+            f"| {_(PARTICIPANT_LABELS[action.key])} (`{action.key}`) "
             f"| {_(CONDITION_LABELS[action.condition])} |"
         )
     lines += [

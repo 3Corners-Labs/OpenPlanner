@@ -1,12 +1,12 @@
-"""Direct video calls for citizens (ADR 0019): ``/g/{slug}/direct`` and the waiting page.
+"""Direct video calls for participants (ADR 0019): ``/g/{slug}/direct`` and the waiting page.
 
 Starting a call creates a booking of kind direct, then the meeting and the work item right
-away so the citizen does not wait for the worker; if Webex or WxCC is slow or down, the
+away so the participant does not wait for the worker; if Webex or WxCC is slow or down, the
 worker's jobs take over (they are idempotent). The waiting page says honestly when no agent
 is available and when the meeting could not be set up (``direct_queue.wait_state``, ADR
 0072). It never reloads by itself (no time limits, WCAG 2.2.1): ``static/live-region.js``
 polls a status fragment and swaps it in, and without the script a button refreshes the page;
-the citizen can wait in the Webex lobby meanwhile. When the group's cap of open direct calls
+the participant can wait in the Webex lobby meanwhile. When the group's cap of open direct calls
 is reached the form says all agents are busy; the form and the waiting page show the place
 in line and the usual wait from OpenPlanner's own data (ADR 0026).
 
@@ -31,13 +31,13 @@ import structlog
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.api.citizen import citizen_page, templates
 from app.api.contact_form import (
     HONEYPOT_FIELD,
     contact_input,
     load_contact_form,
     read_contact,
 )
+from app.api.participant import participant_page, templates
 from app.api.trace import bind_group_from_path
 from app.domain.booking import BookingKind
 from app.domain.call_service import CallService
@@ -67,7 +67,7 @@ Seen = Annotated[str, Query(max_length=64)]
 """The key of the status the page shows; the fragment answers 204 while it is current."""
 
 POLLING = frozenset({WaitState.SEARCHING, WaitState.ACCEPTED})
-"""States that can still change into something the citizen must see at once."""
+"""States that can still change into something the participant must see at once."""
 OVER = frozenset({WaitState.UNAVAILABLE, WaitState.FAILED})
 """States in which the page offers to schedule an appointment instead."""
 WAIT_TEXT: dict[WaitState, str] = {
@@ -80,7 +80,7 @@ WAIT_TEXT: dict[WaitState, str] = {
 }
 """The one sentence per state: shown in the notice and announced in the page's status region."""
 LEFT_TEXT = {"left": "wait.left.waiting", "left_agent": "wait.left.agent"}
-"""What the page says right after the citizen stopped waiting; the query word picks it."""
+"""What the page says right after the participant stopped waiting; the query word picks it."""
 LEAVABLE = frozenset({WaitState.SEARCHING, WaitState.ACCEPTED, WaitState.IN_CALL})
 """States in which the page offers to stop waiting; the others are over or already ended."""
 LeftStatus = Annotated[Literal["left", "left_agent"] | None, Query()]
@@ -153,7 +153,7 @@ async def _form_page(
         "honeypot": HONEYPOT_FIELD,
     }
     status = status_for(error) if error else 200
-    return await citizen_page(request, locale, "direct.html", group, context, status)
+    return await participant_page(request, locale, "direct.html", group, context, status)
 
 
 @router.get("/g/{slug}/direct", response_class=HTMLResponse)
@@ -237,7 +237,7 @@ async def wait_page(
     if view is None:
         return RedirectResponse(f"/b/{token}", status_code=303)
     context = view.context(request, locale)
-    return await citizen_page(request, locale, "wait.html", view.group, context)
+    return await participant_page(request, locale, "wait.html", view.group, context)
 
 
 @router.get("/b/{token}/wait/status", response_class=HTMLResponse)
@@ -255,7 +255,7 @@ async def wait_status(request: Request, token: str, locale: Locale, seen: Seen =
 @router.get("/b/{token}/wait/leave", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def leave_page(request: Request, token: str, locale: Locale) -> Response:
-    """Ask whether the citizen wants to stop waiting, and say what that does."""
+    """Ask whether the participant wants to stop waiting, and say what that does."""
     view = await _wait_view(request, token)
     if view is None:
         return RedirectResponse(f"/b/{token}", status_code=303)
@@ -266,7 +266,7 @@ async def leave_page(request: Request, token: str, locale: Locale) -> Response:
         "token": token,
         "agent": view.state in (WaitState.ACCEPTED, WaitState.IN_CALL),
     }
-    return await citizen_page(request, locale, "wait_leave.html", view.group, context)
+    return await participant_page(request, locale, "wait_leave.html", view.group, context)
 
 
 @router.post("/b/{token}/wait/leave", response_class=HTMLResponse)

@@ -142,7 +142,7 @@ async def _seed_demo(settings: Settings) -> str:
 async def _seed_closures(settings: Settings) -> tuple[str, bool]:
     """Seed the demo and its closure examples; report their paths as JSON (ADR 0037).
 
-    Refused in production: the examples include a booking of a made-up citizen.
+    Refused in production: the examples include a booking of a made-up participant.
     """
     if settings.environment == "prod":
         return "seed-closures adds a made-up booking; it runs only outside production\n", False

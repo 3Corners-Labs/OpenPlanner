@@ -14,7 +14,7 @@ from app.domain.services import BookingService
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_agenda_routes import FRIDAY
 from tests.admin.test_call_routes import FRIDAY_0900
-from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed, citizen
+from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed, participant
 
 FRIDAY_0930 = datetime(2026, 1, 2, 8, 30, tzinfo=UTC)
 AGENDA = "/admin/groups/demo/agenda"
@@ -25,8 +25,8 @@ def _uow(site: Site) -> SqlUnitOfWork:
     return SqlUnitOfWork(app.state.engine)
 
 
-_CITIZENS = itertools.count(1)
-"""Each booking of ``_book`` is another citizen, so the address limit (ADR 0066) stays out."""
+_PARTICIPANTS = itertools.count(1)
+"""Each booking of ``_book`` is another participant, so the address limit (ADR 0066) stays out."""
 
 
 async def _book(site: Site, start: datetime = FRIDAY_0900) -> int:
@@ -34,7 +34,7 @@ async def _book(site: Site, start: datetime = FRIDAY_0900) -> int:
         BookingService(_uow(site), site.clock, TEST_TOKEN_KEY),
         group_slug="demo",
         start=start,
-        contact=citizen(next(_CITIZENS)),
+        contact=participant(next(_PARTICIPANTS)),
         locale="nl",
     )
     return receipt.booking.id or 0
@@ -127,7 +127,7 @@ async def test_a_planner_cancels_with_a_fixed_reason(site: Site) -> None:
     response = await _post(site, path, {"reason": "technical"})
 
     assert '<option value="technical">Technische storing</option>' in form
-    assert "De burger krijgt hiervan altijd bericht" in form
+    assert "De deelnemer krijgt hiervan altijd bericht" in form
     assert invalid.status_code == 422
     assert response.status_code == 303
     assert await _status(site, booking_id) == (BookingStatus.CANCELLED, ChangeReason.TECHNICAL)
@@ -210,7 +210,7 @@ async def test_an_accept_in_local_time_lands_on_the_same_slot(site: Site) -> Non
 # --- ask to rebook ------------------------------------------------------------------------
 
 
-async def test_a_planner_asks_a_citizen_to_choose_a_new_time(site: Site) -> None:
+async def test_a_planner_asks_a_participant_to_choose_a_new_time(site: Site) -> None:
     booking_id = await _book(site)
     await site.login_as(GROUP_ADMIN)
     path = f"{AGENDA}/bookings/{booking_id}/rebook"
@@ -224,7 +224,7 @@ async def test_a_planner_asks_a_citizen_to_choose_a_new_time(site: Site) -> None
     assert f'href="{path}"' in agenda
     assert "De plek in dit tijdslot komt meteen vrij" in form
     assert response.status_code == 303
-    assert "Burgers gevraagd een nieuwe tijd te kiezen: 1" in after
+    assert "Deelnemers gevraagd een nieuwe tijd te kiezen: 1" in after
     assert "Wacht op nieuwe tijd</span>" in after
     assert f"OP-{booking_id:06d} · Ada" in waiting
     assert "vrijdag 16 januari 2026, 09:00" in waiting  # lapses 14 days after the start
@@ -251,7 +251,7 @@ async def test_a_short_slot_is_asked_to_rebook_after_a_confirmation(site: Site) 
         {"start": FRIDAY_0900.isoformat(), "ids": str(newest), "reason": "technical"},
     )
 
-    assert "Burgers om een nieuwe tijd vragen" in agenda
+    assert "Deelnemers om een nieuwe tijd vragen" in agenda
     assert confirm.status_code == 200
     assert f"OP-{newest:06d} · Ada" in confirm.text
     assert "Om een nieuwe tijd vragen (1)" in confirm.text

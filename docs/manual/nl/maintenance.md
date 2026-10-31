@@ -10,7 +10,7 @@ tijdelijk geen afspraken laten aannemen, gebruik dan een noodsluiting.
 
 ## Wat er gebeurt als de onderhoudsmodus aan staat
 
-- **Burgers** kunnen geen afspraak maken, verzetten of annuleren en geen direct gesprek
+- **Deelnemers** kunnen geen afspraak maken, verzetten of annuleren en geen direct gesprek
   starten. Ze zien een melding dat er onderhoud is, met de verwachte eindtijd als u die hebt
   ingevuld en de contactalternatieven van het team (of van de organisatie) als die er zijn.
   Een afspraak bekijken en deelnemen aan een gesprek dat al vaststaat, kan wel. Een kalender
@@ -36,7 +36,7 @@ staat op dit scherm en in de auditlog.
 <!-- field: expected_end -->
 ### Verwacht klaar
 
-Wanneer u verwacht klaar te zijn, in de tijdzone van het beheerportaal. Burgers zien dit
+Wanneer u verwacht klaar te zijn, in de tijdzone van het beheerportaal. Deelnemers zien dit
 tijdstip op de onderhoudspagina. Het is alleen informatie: de onderhoudsmodus gaat niet
 vanzelf uit. Laat beide velden leeg als u het niet weet.
 
@@ -45,7 +45,7 @@ einde aan. Het tijdstip waarop de onderhoudsmodus aanging, blijft dan hetzelfde.
 
 ## De onderhoudsmodus uitzetten
 
-Kies **Onderhoudsmodus uitzetten** zodra u klaar bent. Burgers en beheerders kunnen daarna
+Kies **Onderhoudsmodus uitzetten** zodra u klaar bent. Deelnemers en beheerders kunnen daarna
 direct weer alles wat ze gewend zijn.
 
 Staat de onderhoudsmodus aan **via de server**, dan heeft de beheerder van de server hem
@@ -56,7 +56,7 @@ krijgt. Die kunt u hier niet uitzetten; vraag de beheerder van de server.
 
 Een update of herstel vanuit het scherm **Updates** zet de onderhoudsmodus zelf aan voordat
 de reservekopie wordt gemaakt, en weer uit als de update gelukt of teruggedraaid is. Mislukt
-een update helemaal, dan blijft de onderhoudsmodus aan, zodat burgers geen half werkend
+een update helemaal, dan blijft de onderhoudsmodus aan, zodat deelnemers geen half werkend
 systeem zien. Zet hem dan pas uit als alles weer werkt.
 
 Had u de onderhoudsmodus zelf al aangezet voordat de update begon, dan staat hij na een

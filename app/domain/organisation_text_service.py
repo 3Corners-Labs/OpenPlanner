@@ -1,4 +1,4 @@
-"""Organisation texts: an organisation's own wording of citizen pages and messages (ADR 0004).
+"""Organisation texts: an organisation's own wording of participant pages and messages (ADR 0004).
 
 An organisation admin (``texts.organisation.manage``, own organisations; the superuser for every
 one) replaces the shipped text of an allow-listed key (``app.domain.text_overrides``) in one

@@ -1,4 +1,4 @@
-"""Citizen booking pages: choose a slot, book, view, cancel and reschedule (HANDOVER §5).
+"""Participant booking pages: choose a slot, book, view, cancel and reschedule (HANDOVER §5).
 
 Server-rendered and usable without JavaScript. Every response goes through
 ``app.web.templates.render``; every write is a same-origin, rate-limited POST.
@@ -9,7 +9,7 @@ Server-rendered and usable without JavaScript. Every response goes through
     GET  /g/{slug}/closure/image   that closure's image (ADR 0037 §3), else 404
     GET  /g/{slug}/book?start=     contact form for one slot
     POST /g/{slug}/book            book ─► 303 /g/{slug}/booked?start= (ADR 0056: the token
-                                   goes to the citizen by email only, never to the browser)
+                                   goes to the participant by email only, never to the browser)
     GET  /g/{slug}/booked?start=   "check your email to confirm"
     GET  /b/{token}/confirm        the appointment and one button; a GET never confirms, mail
                                    scanners open links in advance (ADR 0056 §8)
@@ -28,7 +28,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.api.citizen import citizen_page
 from app.api.contact_form import (
     HONEYPOT_FIELD,
     ContactForm,
@@ -37,6 +36,7 @@ from app.api.contact_form import (
     read_contact,
 )
 from app.api.labels import slot_label
+from app.api.participant import participant_page
 from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
 from app.domain.availability import AvailableSlot
@@ -134,7 +134,7 @@ async def group_page(
     closure = await service.closure_notice(group)
     banner = closure_view(closure, group, locale, now) if closure else None
     if banner and banner.active:
-        return await citizen_page(request, locale, "closure.html", group, {"closure": banner})
+        return await participant_page(request, locale, "closure.html", group, {"closure": banner})
     view = await picker(
         service,
         group,
@@ -157,7 +157,7 @@ async def group_page(
         "closure": banner,
         "closure_page": f"/g/{group.slug}/closure",
     }
-    return await citizen_page(request, locale, "group.html", group, context)
+    return await participant_page(request, locale, "group.html", group, context)
 
 
 @router.get("/g/{slug}/closure", response_class=HTMLResponse)
@@ -170,7 +170,7 @@ async def closure_page(request: Request, slug: str, locale: Locale) -> Response:
     if closure is None:
         return RedirectResponse(f"/g/{group.slug}", status_code=303)
     banner = closure_view(closure, group, locale, _clock(request).now())
-    return await citizen_page(request, locale, "closure.html", group, {"closure": banner})
+    return await participant_page(request, locale, "closure.html", group, {"closure": banner})
 
 
 @router.get("/g/{slug}/closure/image")
@@ -223,7 +223,7 @@ async def booking_form(
         return RedirectResponse(f"/g/{group.slug}?status=unavailable", status_code=303)
     contact = await load_contact_form(service, group, _clock(request).now())
     context = _book_context(contact, parsed, slot, locale, [], {})
-    return await citizen_page(request, locale, "book.html", group, context)
+    return await participant_page(request, locale, "book.html", group, context)
 
 
 @router.post("/g/{slug}/book", response_class=HTMLResponse)
@@ -248,7 +248,9 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
         slot = await _available(service, group, start)
         contact = await load_contact_form(service, group, _clock(request).now())
         context = _book_context(contact, start, slot, locale, contact.errors(error, locale), values)
-        return await citizen_page(request, locale, "book.html", group, context, status_for(error))
+        return await participant_page(
+            request, locale, "book.html", group, context, status_for(error)
+        )
     booked = f"/g/{group.slug}/booked?start={slot_value(receipt.booking.start)}"
     return RedirectResponse(booked, status_code=303)
 
@@ -258,7 +260,7 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
 async def booked_page(
     request: Request, slug: str, locale: Locale, start: str | None = None
 ) -> Response:
-    """Ask the citizen to confirm by the link in their email (ADR 0056).
+    """Ask the participant to confirm by the link in their email (ADR 0056).
 
     The page knows no booking: ``start`` only repeats the chosen time, and is left out when
     it does not parse.
@@ -270,7 +272,7 @@ async def booked_page(
         "group": group,
         "slot_label": slot_label(parsed, parsed + length, group, locale) if parsed else None,
     }
-    return await citizen_page(request, locale, "booked.html", group, context)
+    return await participant_page(request, locale, "booked.html", group, context)
 
 
 def _moment(moment: datetime | None, group: Group, locale: RequestLocale) -> str | None:
@@ -321,7 +323,7 @@ async def manage_page(
     details = await _service(request).find(token)
     follow(request, details.group.organisation_id)
     context = {**_manage_context(details, locale, status, _clock(request).now()), "token": token}
-    return await citizen_page(request, locale, "manage.html", details.group, context)
+    return await participant_page(request, locale, "manage.html", details.group, context)
 
 
 @router.get("/b/{token}/cancel", response_class=HTMLResponse)
@@ -333,7 +335,7 @@ async def cancel_page(request: Request, token: str, locale: Locale) -> Response:
     if not details.cancellable:
         return RedirectResponse(f"/b/{token}", status_code=303)
     context = {**_manage_context(details, locale, None, _clock(request).now()), "token": token}
-    return await citizen_page(request, locale, "cancel.html", details.group, context)
+    return await participant_page(request, locale, "cancel.html", details.group, context)
 
 
 @router.get("/b/{token}/confirm", response_class=HTMLResponse)
@@ -345,7 +347,7 @@ async def confirm_page(request: Request, token: str, locale: Locale) -> Response
     if not details.booking.awaits_confirmation:
         return RedirectResponse(f"/b/{token}", status_code=303)
     context = {**_manage_context(details, locale, None, _clock(request).now()), "token": token}
-    return await citizen_page(request, locale, "confirm.html", details.group, context)
+    return await participant_page(request, locale, "confirm.html", details.group, context)
 
 
 @router.post("/b/{token}/confirm", response_class=HTMLResponse)
@@ -410,7 +412,7 @@ async def _reschedule_response(
             slot_filter=parse_filter(request.query_params.multi_items()),
         )
         name = "reschedule.html"
-    return await citizen_page(request, locale, name, group, context, status_code)
+    return await participant_page(request, locale, name, group, context, status_code)
 
 
 @router.get("/b/{token}/reschedule", response_class=HTMLResponse)

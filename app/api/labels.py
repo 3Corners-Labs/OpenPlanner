@@ -1,4 +1,4 @@
-"""Labels shared by the citizen pages: the appointment as people read it."""
+"""Labels shared by the participant pages: the appointment as people read it."""
 
 from datetime import datetime
 

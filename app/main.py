@@ -48,7 +48,7 @@ from app.api import (
     widget_script,
 )
 from app.api.agent import create_agent_api
-from app.api.maintenance import citizen_gate, register_maintenance
+from app.api.maintenance import participant_gate, register_maintenance
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_files
@@ -355,7 +355,7 @@ def create_app(
             source=lambda: live().tls_certificate_source,
         )
         app.state.certificate_sync = asyncio.create_task(app.state.certificate_source.sync())
-        # ADR 0038: read on every admin change (and citizen write), cached for a few seconds.
+        # ADR 0038: read on every admin change (and participant write), cached for a few seconds.
         app.state.maintenance_service = MaintenanceService(
             uow,
             clock,
@@ -531,7 +531,7 @@ def create_app(
     register_admin(app)
     # ADR 0038: the fixed maintenance rules of app.api.maintenance guard every public router.
     register_maintenance(app)
-    gate = [Depends(citizen_gate)]
+    gate = [Depends(participant_gate)]
     for public_router in (
         health.router,
         pages.router,

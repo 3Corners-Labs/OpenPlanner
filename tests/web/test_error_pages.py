@@ -19,7 +19,7 @@ async def test_a_malformed_query_parameter_on_a_page_is_not_echoed(site: Site) -
     assert "Dit verzoek kon niet worden verwerkt." in response.text
 
 
-async def test_a_citizen_page_gets_the_same_error_page(site: Site) -> None:
+async def test_a_participant_page_gets_the_same_error_page(site: Site) -> None:
     response = await site.client.get("/g/demo/book", params={"start": "zqmail7x"})
 
     assert response.status_code < 500

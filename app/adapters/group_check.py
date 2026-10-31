@@ -25,7 +25,7 @@ For one group it walks the chain a call depends on and turns every link into a `
 Besides the probe meetings and the probe work item nothing is created or deleted at the
 platforms, and the self-test events belong to no booking. A platform that refuses or cannot
 be reached becomes a finding; the checker never raises for it. Findings carry names, ids,
-status codes and Webex's masked reason only: no secrets, tokens or citizen data.
+status codes and Webex's masked reason only: no secrets, tokens or participant data.
 """
 
 import asyncio
@@ -194,7 +194,7 @@ class PlatformChecker:
     async def _trial_probe(
         self, meetings: WebexMeetings, group: Group, host: str, start: datetime
     ) -> list[Finding]:
-        """Schedule a trial-call probe, the meeting a citizen's trial call is (ADR 0071).
+        """Schedule a trial-call probe, the meeting a participant's trial call is (ADR 0071).
 
         Webex may refuse entry before the host on a site; that is a warning, since the booking's
         own meeting works without it.

@@ -75,7 +75,7 @@ def picked_up(booking_id: int, wait_minutes: int) -> DirectCall:
         (call(1, task=TaskState.CONNECTED, call=CallState.ENDED), QueuePhase.DONE),
         (call(1, task=TaskState.NONE, call=CallState.FAILED), QueuePhase.DONE),  # no meeting
         (call(1, active=False), QueuePhase.DONE),  # cancelled booking
-        # The meeting itself decides (ADR 0019 point 4): the citizen left or the task ended, but
+        # The meeting itself decides (ADR 0019 point 4): the participant left or the task ended, but
         # the agent is still in the meeting, so the place stays taken until it ends.
         (call(1, active=False, host_joined=True), QueuePhase.CONNECTED),
         (call(1, task=TaskState.ENDED, host_joined=True), QueuePhase.CONNECTED),
@@ -153,7 +153,7 @@ def test_seconds_round_up_to_a_whole_minute() -> None:
     assert typical_wait(quick) == 1
 
 
-# --- the citizen's waiting page (ADR 0072) ---------------------------------------------------
+# --- the participant's waiting page (ADR 0072) ---------------------------------------------------
 
 
 def _direct_booking(*, claimed: bool = False, active: bool = True) -> Booking:

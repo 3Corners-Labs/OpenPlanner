@@ -18,7 +18,7 @@ lijst van instellingen, die het portaal controleert.
 <!-- field: display_name -->
 ### Naam in de kop
 
-De naam die burgers bovenaan elke pagina zien. Laat het veld leeg om de naam van de
+De naam die deelnemers bovenaan elke pagina zien. Laat het veld leeg om de naam van de
 organisatie te tonen.
 
 <!-- field: header_style -->
@@ -53,7 +53,7 @@ contrast. Alleen de accentkleur blijft dan staan.
 <!-- field: font_size -->
 ### Tekstgrootte
 
-In pixels, van 16 tot 20. Kleiner dan de standaard van de browser kan niet; burgers die hun
+In pixels, van 16 tot 20. Kleiner dan de standaard van de browser kan niet; deelnemers die hun
 browser groter zetten, krijgen de tekst ook groter.
 
 <!-- field: radius -->
@@ -79,7 +79,7 @@ WOFF2, hoogstens 250 kB per bestand. Zonder vet lettertype maakt de browser de g
 zelf vetter; zonder lettertype voor koppen gebruiken de koppen het tekstlettertype.
 
 De lettertypen worden vanaf deze dienst geladen, nooit van een andere website zoals Google
-Fonts, zodat de computer van een burger geen contact zoekt met andere partijen. Zorg dat de
+Fonts, zodat de computer van een deelnemer geen contact zoekt met andere partijen. Zorg dat de
 licentie van het lettertype het gebruik op een eigen server toestaat.
 
 ## Themabestand

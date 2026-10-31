@@ -173,7 +173,7 @@ class IntegrationService:
         return EventOutcome.UNKNOWN
 
     async def status(self, booking_id: int) -> CallStatus:
-        """Return a booking's call status (the citizen's waiting page; no admin data)."""
+        """Return a booking's call status (the participant's waiting page; no admin data)."""
         async with self._uow.read() as tx:
             return await tx.get_call_status(booking_id) or new_status(booking_id)
 

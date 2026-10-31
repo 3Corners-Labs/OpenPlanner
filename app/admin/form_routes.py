@@ -1,4 +1,4 @@
-"""Admin routes for a group's booking form: the custom fields citizens fill in (ADR 0055).
+"""Admin routes for a group's booking form: the custom fields participants fill in (ADR 0055).
 
 The screen lives under the group's *Settings* tab (ADR 0047: group → Settings → Booking form).
 Every route depends on one ``RequirePermission(group.edit)``, ``fresh`` like the rest of the

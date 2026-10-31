@@ -1,4 +1,4 @@
-"""Direct calls for citizens (ADR 0019): start, waiting page, honest when no agent comes."""
+"""Direct calls for participants (ADR 0019): start, waiting page, honest when no agent comes."""
 
 import re
 from collections.abc import AsyncIterator
@@ -24,8 +24,8 @@ from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
-from tests.support.citizen import confirm_newest
 from tests.support.domain import NOW
+from tests.support.participant import confirm_newest
 
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
@@ -134,7 +134,7 @@ async def test_starting_creates_meeting_and_work_item_at_once(site: Site) -> Non
     assert "We zoeken een medewerker" in page
     assert "http-equiv" not in page  # no automatic reload (WCAG 2.2.1)
     assert "Status verversen" in page
-    assert "/join/go" in page  # the citizen can wait in the lobby right away
+    assert "/join/go" in page  # the participant can wait in the lobby right away
 
 
 async def test_waiting_page_follows_the_task(site: Site) -> None:
@@ -253,7 +253,7 @@ async def test_the_page_polls_a_status_fragment_without_reloading(site: Site) ->
 
 
 async def test_a_claim_in_the_own_queue_shows_as_accepted(site: Site) -> None:
-    """ADR 0072: the own queue has no WxCC task; the claim tells the citizen an agent is coming."""
+    """ADR 0072: the own queue has no WxCC task; the claim tells the participant someone comes."""
     await _configure(site.database_url, dispatch_kind=DispatchKind.OPENPLANNER_QUEUE)
     wait = (await site.start()).headers["location"]
     searching = (await site.client.get(wait)).text
@@ -321,7 +321,7 @@ async def _events(site: Site, booking_id: int) -> list[EventKind]:
 
 
 def _leave_url(wait: str) -> str:
-    """Return the page that asks the citizen to confirm leaving, from the waiting page's URL."""
+    """Return the page that asks the participant to confirm leaving, from the waiting page's URL."""
     return f"{wait}/leave"
 
 
@@ -365,7 +365,7 @@ async def test_leaving_a_waiting_call_ends_the_work_item_and_says_so(site: Site)
     assert "Stoppen met wachten" not in page
 
 
-async def test_leaving_frees_the_place_for_the_next_citizen(site: Site) -> None:
+async def test_leaving_frees_the_place_for_the_next_participant(site: Site) -> None:
     await _configure(site.database_url, direct_call_max_concurrent=1)
     wait = (await site.start()).headers["location"]
     assert (await site.start()).status_code == 409
@@ -458,7 +458,7 @@ async def test_a_wrong_token_leaves_nothing_and_says_nothing(site: Site) -> None
 
 
 async def test_someone_elses_token_cannot_end_my_call(site: Site) -> None:
-    """Abuse case: guessing or altering a token never reaches another citizen's call."""
+    """Abuse case: guessing or altering a token never reaches another participant's call."""
     await _configure(site.database_url, direct_call_max_concurrent=None)
     mine = (await site.start()).headers["location"]
     my_id = await site.latest_booking_id()

@@ -4,7 +4,7 @@ A ``Finding`` is one link of a group's integration chain: the Webex host, the Wx
 (channel, asset, schema, entry point, flow, queue, Screen Pop), the webhooks or the worker
 that runs the group's jobs (ADR 0068). It carries a
 stable code and the names the text needs; the admin portal turns the code into a translated
-sentence. Findings never hold secrets or personal data of citizens.
+sentence. Findings never hold secrets or personal data of participants.
 """
 
 from dataclasses import dataclass

@@ -38,12 +38,12 @@ Elk recht geldt op één niveau:
 
 - **Alleen superuser**: dit recht ligt vast. Het raakt meer dan één organisatie of gaat over
   geheimen, zoals wachtwoorden van koppelingen. Geen andere rol kan het krijgen.
-- **Persoonsgegevens**: met dit recht ziet u gegevens van burgers, zoals naam en e-mailadres.
+- **Persoonsgegevens**: met dit recht ziet u gegevens van deelnemers, zoals naam en e-mailadres.
   De rol Compliance en privacy krijgt dit recht nooit.
 
 ## Deelnemers en koppelingen
 
-Onder de matrix staat wat burgers kunnen zonder in te loggen: met de link uit hun
+Onder de matrix staat wat deelnemers kunnen zonder in te loggen: met de link uit hun
 bevestigingsmail kunnen ze hun afspraak bekijken, en tot de wijzigingstermijn verzetten of
 annuleren. Daaronder staan de rechten van gekoppelde systemen, zoals een bot van het
 contactcenter. Die rechten kent de superuser per koppeling toe.

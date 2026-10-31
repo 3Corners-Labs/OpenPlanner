@@ -459,9 +459,9 @@ def _read_booking(raw: bytes) -> WidgetBookingRequest:
 )
 @limiter.limit(booking_limit)
 async def book(request: Request, org: str, group: str, locale: Locale) -> JSONResponse:
-    """Book a slot for the citizen. Needs an allowed ``Origin``.
+    """Book a slot for the participant. Needs an allowed ``Origin``.
 
-    The answer says the appointment awaits confirmation by the link in the citizen's email
+    The answer says the appointment awaits confirmation by the link in the participant's email
     (ADR 0056); that link, like the management link, never goes to the host page.
     """
     found = _group(request)

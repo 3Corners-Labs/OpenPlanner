@@ -10,7 +10,7 @@ with keys of what changed (``calendar.add``, ``holiday.open``), never names or d
     group_holidays / set_group_calendars / keep_open / close_again
                                   schedule.manage  group          group admins too
 
-``effective_schedule`` is what the citizen side uses: the group's rules and exceptions with
+``effective_schedule`` is what the participant side uses: the group's rules and exceptions with
 its holidays added as closed days (``holidays.with_holidays``).
 """
 

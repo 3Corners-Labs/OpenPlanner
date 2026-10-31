@@ -93,8 +93,8 @@ EXAMPLE_CONTACTS = ContactBlock(
         ContactOption.create(ContactKind.ADDRESS, "Stadhuis\nAmstel 1\n1011 PN Amsterdam"),
     )
 )
-# A made-up citizen: the booking on hold exists only in development and test databases.
-EXAMPLE_CITIZEN = Contact.create(
+# A made-up participant: the booking on hold exists only in development and test databases.
+EXAMPLE_PARTICIPANT = Contact.create(
     first_name="Voorbeeld",
     last_name="Inwoner",
     email="inwoner@example.org",
@@ -319,7 +319,7 @@ async def _store_booking(
     status: BookingStatus,
     confirm_by: datetime | None = None,
 ) -> tuple[str, Booking]:
-    """Store an example booking of the made-up citizen at ``start``; return its token and it.
+    """Store an example booking of the made-up participant at ``start``; return its token and it.
 
     Each booking gets its own address, so repeated seeds stay under the address limit
     (ADR 0066) when an e2e flow moves or rebooks one.
@@ -335,7 +335,7 @@ async def _store_booking(
             start=start,
             end=end,
             status=status,
-            contact=replace(EXAMPLE_CITIZEN, email=f"voorbeeld-{salt[:8].lower()}@example.org"),
+            contact=replace(EXAMPLE_PARTICIPANT, email=f"voorbeeld-{salt[:8].lower()}@example.org"),
             locale="nl",
             token_hash=hash_token(token),
             created_at=now,

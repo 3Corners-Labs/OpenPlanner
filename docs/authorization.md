@@ -11,7 +11,7 @@ organisations of their claim and those organisations' groups; group admin in the
 groups of their claim. The auditor reads only and never sees personal data (ADR 0039).
 
 Bounds (ADR 0039): *locked* permissions belong to the superuser only; *personal data*
-permissions show citizens' data and are never held by the auditor.
+permissions show participants' data and are never held by the auditor.
 
 Maintenance (ADR 0038): while maintenance mode is on, every change is refused except
 for the permissions marked *maintenance*, and those only for the superuser. Reading
@@ -73,19 +73,19 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 | Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `queue.work`, `reminders.manage`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
 | Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `idp_mapping.view`, `matrix.view`, `organisation.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
 
-## Citizens
+## Participants
 
-Citizens never log in. Their rights depend on the management link from their
+Participants never log in. Their rights depend on the management link from their
 confirmation email and on the change deadline (the group's dispatch lead).
 
 | Action | Condition |
 |---|---|
-| View available times (`citizen.availability_view`) | Anyone |
-| Book an appointment (`citizen.book`) | Anyone |
-| View own appointment (`citizen.booking_view`) | With the management link from the confirmation |
-| Move own appointment (`citizen.booking_change`) | With the management link, until the task goes to the queue |
-| Cancel own appointment (`citizen.booking_cancel`) | With the management link, until the task goes to the queue |
-| Move or cancel an appointment on hold (`citizen.suspended_booking_change`) | with the management link, while the appointment is on hold |
+| View available times (`participant.availability_view`) | Anyone |
+| Book an appointment (`participant.book`) | Anyone |
+| View own appointment (`participant.booking_view`) | With the management link from the confirmation |
+| Move own appointment (`participant.booking_change`) | With the management link, until the task goes to the queue |
+| Cancel own appointment (`participant.booking_cancel`) | With the management link, until the task goes to the queue |
+| Move or cancel an appointment on hold (`participant.suspended_booking_change`) | with the management link, while the appointment is on hold |
 
 ## Machines (API clients)
 

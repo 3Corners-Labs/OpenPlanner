@@ -1,6 +1,6 @@
 # Channels
 
-On this screen the superuser records, per organisation, how messages to citizens leave the
+On this screen the superuser records, per organisation, how messages to participants leave the
 building: the mail server (SMTP) for email and the SMS gateway for text messages. You open it
 through **Organisations → organisation → Channels**. Passwords and API keys are write-only: the
 field is always empty, and an empty field keeps the stored secret (ADR 0022).
@@ -11,9 +11,9 @@ Enter the organisation's mail server: host, port, security (STARTTLS on 587, TLS
 when the server asks for it, a user name with password. A login without STARTTLS or TLS is
 refused: the password would travel readable over the line.
 
-The **sender address** is what citizens see in their inbox. Use an address in the
+The **sender address** is what participants see in their inbox. Use an address in the
 organisation's own domain, for example `appointments@city.example`, with a **sender name**
-such as "City of Demo, appointments". The **reply address** is where a citizen's reply ends
+such as "City of Demo, appointments". The **reply address** is where a participant's reply ends
 up; leave it empty when the sender address itself is staffed. The **DKIM selector** is only
 needed for the check below; ask your mail administrator for it.
 
@@ -23,7 +23,7 @@ server, if the server operator has configured one.
 ## Test email
 
 A test email goes through exactly the server the system uses for this organisation. When it
-succeeds, the server accepts the mail; that says nothing yet about the citizen's inbox. When it
+succeeds, the server accepts the mail; that says nothing yet about the participant's inbox. When it
 fails, the page says why, in its own words and without the server's answer.
 
 ## Sender domain
@@ -67,7 +67,7 @@ reports.
 
 ## SMS
 
-Choose the provider, enter the API host and the API key, and the sender citizens see: a name of
+Choose the provider, enter the API host and the API key, and the sender participants see: a name of
 at most eleven characters or a registered number. The country code applies to numbers entered
 without one.
 

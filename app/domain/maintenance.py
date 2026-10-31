@@ -1,7 +1,7 @@
 """Maintenance mode of the whole installation (ADR 0038): the state and its rules.
 
 Maintenance is a technical state of the platform, not a business decision about a group (that
-is an emergency closure, ADR 0024). While it is on, data is frozen: citizens cannot book and
+is an emergency closure, ADR 0024). While it is on, data is frozen: participants cannot book and
 admins can change only what ``authorization.MAINTENANCE_WRITABLE`` allows. Integrations,
 webhooks, confirmed appointments and the privacy jobs keep running.
 
@@ -14,7 +14,7 @@ It is on when either says so:
 There is no automatic end: the expected end is information only (ADR 0038 §6). Maintenance
 that stays on longer than the alert threshold is reported as a system event.
 
-Nothing here is about citizens: no personal data.
+Nothing here is about participants: no personal data.
 """
 
 from dataclasses import dataclass

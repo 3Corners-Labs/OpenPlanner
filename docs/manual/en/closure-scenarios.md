@@ -27,7 +27,7 @@ the closure page will look.
 ### Name
 
 How admins recognise the scenario, for instance "Outage", "Strike" or "Building closed". At
-most 80 characters. Citizens never see this name.
+most 80 characters. Participants never see this name.
 
 ### Contact options
 
@@ -51,7 +51,7 @@ text if needed, enter the start and end, and close the team.
 
 At the moment of closing the closure takes a **copy** of the scenario: the text from the form,
 the contact options and the image. If you later change or delete the scenario, the running
-closure keeps showing what citizens received by email.
+closure keeps showing what participants received by email.
 
 When you close the whole organisation, you can only pick an organisation scenario. Each team
 gets its own copy and can adjust it separately afterwards.

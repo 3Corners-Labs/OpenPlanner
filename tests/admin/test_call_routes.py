@@ -312,7 +312,7 @@ async def _with_meeting(site: Site, booking_id: int, meeting_id: str) -> None:
 
 
 async def test_the_meeting_id_is_on_the_agenda_and_the_booking_page(site: Site) -> None:
-    """A planner can quote the meeting id to Webex support, also after the citizen left."""
+    """A planner can quote the meeting id to Webex support, also after the participant left."""
     booking_id = await _book(site, "demo")
     await _with_meeting(site, booking_id, "meeting-abc123")
     await site.login_as(GROUP_ADMIN)

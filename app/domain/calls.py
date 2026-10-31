@@ -44,7 +44,7 @@ class EventKind(StrEnum):
     """The participant pressed the button on the join page (detail: the page they were sent to,
     ``browser`` or ``choice``, ADR 0075)."""
     TRIAL_CREATED = "trial_created"
-    """The citizen opened a trial call on Webex (ADR 0071)."""
+    """The participant opened a trial call on Webex (ADR 0071)."""
     TRIAL_JOINED = "trial_joined"
     """The participant followed the link into the trial call (detail: the page they were sent to,
     ``browser`` or ``choice``, ADR 0075)."""
@@ -66,7 +66,7 @@ class EventKind(StrEnum):
     """WxCC refused to end the task (detail: the code, e.g. ``rejected_403``)."""
     TASK_MARKED_CANCELLED = "task_marked_cancelled"
     CITIZEN_LEFT = "citizen_left"
-    """The citizen stopped waiting for a direct call (detail: ``waiting`` or ``agent``)."""
+    """The participant stopped waiting for a direct call (detail: ``waiting`` or ``agent``)."""
     MEETING_STARTED = "meeting_started"
     HOST_JOINED = "host_joined"
     GUEST_JOINED = "guest_joined"
@@ -106,7 +106,7 @@ start and end are left out: our own jobs open and delete it."""
 
 
 class JoinState(StrEnum):
-    """Whether the citizen's join page can send them to the meeting now."""
+    """Whether the participant's join page can send them to the meeting now."""
 
     TOO_EARLY = "too_early"
     OPEN = "open"
@@ -179,7 +179,7 @@ class BookingEvent:
     """One entry of a booking's timeline; ``detail`` is a reason code, never personal data.
 
     ``message`` is the provider's own reason for a failure (ADR 0065): masked, capped, and
-    only from requests without citizen data; empty for every other event. ``version`` is the
+    only from requests without participant data; empty for every other event. ``version`` is the
     ``APP_VERSION`` of the process that wrote the event (ADR 0068); empty in development and
     for events written before it was recorded.
     """
@@ -314,7 +314,7 @@ class BookingOverview:
 
 @dataclass(frozen=True)
 class MeetingRequest:
-    """What the video provider needs to schedule a booking's meeting (no citizen data)."""
+    """What the video provider needs to schedule a booking's meeting (no participant data)."""
 
     title: str
     start: datetime
@@ -322,7 +322,7 @@ class MeetingRequest:
     timezone: str
     host_email: str
     join_before_host: bool = False
-    """A trial call (ADR 0071): the citizen can enter alone, without the lobby."""
+    """A trial call (ADR 0071): the participant can enter alone, without the lobby."""
 
 
 @dataclass(frozen=True)

@@ -385,8 +385,8 @@ async def test_the_data_fields_card_is_read_only_and_links_to_the_manual(site: S
     assert '<h2 id="data-fields-heading">Gegevensvelden</h2>' in text
     for field in PII_FIELDS:
         assert f'<code class="muted">{field}</code>' in text
-    assert text.count("Direct: identificeert de burger op zichzelf") == 4
-    assert text.count("Gevoelig: wat de burger ons vertelde") == 5
+    assert text.count("Direct: identificeert de deelnemer op zichzelf") == 4
+    assert text.count("Gevoelig: wat de deelnemer ons vertelde") == 5
     assert "ligt vast in de software" in text
     assert 'href="/admin/help/data-fields"' in text
     card = text.split('id="data-fields"')[1].split("</section>")[0]

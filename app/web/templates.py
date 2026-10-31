@@ -51,7 +51,7 @@ SCRIPT_CSP = (
     "img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; "
     "frame-ancestors 'none'"
 )
-"""Citizen pages (ADR 0020): own scripts only, which may fetch the same pages; still no
+"""Participant pages (ADR 0020): own scripts only, which may fetch the same pages; still no
 inline scripts or styles, so injected markup cannot run."""
 
 
