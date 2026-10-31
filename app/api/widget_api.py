@@ -305,7 +305,7 @@ async def group_info(request: Request, org: str, group: str, locale: Locale) -> 
     return WidgetGroup(
         name=found.name,
         locale=locale.code,
-        intro=locale.for_organisation(found.organisation_id).gettext(
+        intro=locale.for_scope(found.organisation_id, found.id).gettext(
             "group.intro", minutes=found.slot_minutes
         ),
         page_url=f"{base}/g/{found.slug}",

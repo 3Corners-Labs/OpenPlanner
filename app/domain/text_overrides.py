@@ -13,6 +13,7 @@ placeholders of the shipped nl and en texts.
 from dataclasses import dataclass
 from enum import StrEnum
 
+from app.domain.agent_term import MAX_TERM_LENGTH, TERM_KEYS, clean_term
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.message_texts import (
     MAX_BODY_LENGTH,
@@ -27,6 +28,7 @@ class Area(StrEnum):
 
     MESSAGES = "messages"
     PAGES = "pages"
+    TERMS = "terms"
 
 
 @dataclass(frozen=True)
@@ -72,14 +74,23 @@ PAGE_TEXTS: tuple[EditableText, ...] = (
 """Participant-page texts, in the order the editor shows them. Each is rendered by a template of a
 group page, so it reaches the visitor with the group's organisation (``api.participant``)."""
 
+TERM_TEXTS: tuple[EditableText, ...] = tuple(
+    EditableText(key, Area.TERMS, frozenset(), MAX_TERM_LENGTH, single_line=True)
+    for key in TERM_KEYS
+)
+"""The words of the agent term (ADR 0077): singular first, then plural. The same keys hold a
+group's own words in ``group_texts``."""
+
 EDITABLE_TEXTS: tuple[EditableText, ...] = (
     *(
         EditableText(b.key, Area.MESSAGES, b.placeholders, b.max_length, b.single_line)
         for b in MESSAGE_BLOCKS
     ),
     *PAGE_TEXTS,
+    *TERM_TEXTS,
 )
-"""Every editable text; the message blocks come first, as in the group editor."""
+"""Every editable text; the message blocks come first, as in the group editor, and the words
+of the agent term last."""
 
 EDITABLE_BY_KEY = {text.key: text for text in EDITABLE_TEXTS}
 
@@ -97,4 +108,6 @@ def clean_override(key: str, text: str) -> str:
     spec = EDITABLE_BY_KEY.get(key)
     if spec is None:
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "key")
+    if spec.area is Area.TERMS:
+        return clean_term(key, text)
     return check_text(key, text, spec.placeholders, spec.max_length, single_line=spec.single_line)

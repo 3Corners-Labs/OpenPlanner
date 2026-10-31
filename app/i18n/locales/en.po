@@ -27,7 +27,7 @@ msgid "home.title"
 msgstr "Schedule a video call"
 
 msgid "home.intro"
-msgstr "The website of your organisation links you to the booking page of the right team. There you choose a time for a video call with an employee."
+msgstr "The website of your organisation links you to the booking page of the right team. There you choose a time for a video call with one of our {agents}."
 
 msgid "home.how.title"
 msgstr "How it works"
@@ -70,7 +70,7 @@ msgid "message.team_invite.greeting"
 msgstr "Dear colleagues,"
 
 msgid "message.team_invite.intro"
-msgstr "A video appointment was booked with {group_name}: {first_name}, reference {reference}. An agent picks it up in OpenPlanner's queue."
+msgstr "A video appointment was booked with {group_name}: {first_name}, reference {reference}. One of our {agents} picks it up in OpenPlanner's queue."
 
 msgid "message.team_invite.queue"
 msgstr "You get the link to the call when you pick up the appointment."
@@ -97,7 +97,7 @@ msgid "message.confirmation.subject"
 msgstr "Confirmation of your video call on {date}"
 
 msgid "message.confirmation.intro"
-msgstr "Your video call with {group_name} has been scheduled. An employee will contact you at the agreed time."
+msgstr "Your video call with {group_name} has been scheduled. One of our {agents} will contact you at the agreed time."
 
 msgid "message.change.subject"
 msgstr "Your video call has moved to {date}"
@@ -121,7 +121,7 @@ msgid "message.reason"
 msgstr "Reason"
 
 msgid "message.reason.staffing"
-msgstr "Not enough staff are available at that time."
+msgstr "Not enough {agents} are available at that time."
 
 msgid "message.reason.technical"
 msgstr "There is a technical failure."
@@ -178,7 +178,7 @@ msgid "admin.messages.purpose_reason"
 msgstr "Reasons for changes by a planner"
 
 msgid "admin.messages.part_reason_staffing"
-msgstr "Not enough agents"
+msgstr "Not enough {agents}"
 
 msgid "admin.messages.part_reason_technical"
 msgstr "Technical failure"
@@ -900,7 +900,7 @@ msgid "authz.role.auditor"
 msgstr "Compliance and privacy (read-only)"
 
 msgid "authz.role.agent"
-msgstr "Agent"
+msgstr "{Agent}"
 
 msgid "authz.level.global"
 msgstr "Portal"
@@ -1068,7 +1068,7 @@ msgid "admin.new_group.title"
 msgstr "New group"
 
 msgid "admin.new_group.lead"
-msgstr "A group is a team with one queue in the contact centre. After creating it you set its staffing: the number of agents per block."
+msgstr "A group is a team with one queue in the contact centre. After creating it you set its staffing: the number of {agents} per block."
 
 msgid "admin.new_group.create"
 msgstr "Create group"
@@ -1119,10 +1119,10 @@ msgid "admin.field.dispatch_lead_minutes_hint"
 msgstr "From this moment the participant can no longer change the appointment. 0 to 60."
 
 msgid "admin.field.dispatch_kind"
-msgstr "How appointments reach staff"
+msgstr "How appointments reach {agents}"
 
 msgid "admin.field.dispatch_kind_hint"
-msgstr "Contact center: a task in the team's queue, shortly before the start. Own queue: staff sign in to OpenPlanner and pick up an appointment. Applies to appointments not yet dispatched."
+msgstr "Contact center: a task in the team's queue, shortly before the start. Own queue: {agents} sign in to OpenPlanner and pick up an appointment. Applies to appointments not yet dispatched."
 
 msgid "admin.field.max_bookings_per_email"
 msgstr "Appointments per email address"
@@ -1143,10 +1143,10 @@ msgid "admin.field.queue_visible_from_minutes_hint"
 msgstr "How many minutes before the start an appointment appears in the queue. 0 to 120."
 
 msgid "admin.field.queue_free_pick_allowed"
-msgstr "Agents may choose an appointment (own queue)"
+msgstr "{Agents} may choose an appointment (own queue)"
 
 msgid "admin.field.queue_free_pick_allowed_hint"
-msgstr "No: agents always pick up the next one. Yes: they can also pick up another appointment from the list."
+msgstr "No: {agents} always pick up the next one. Yes: they can also pick up another appointment from the list."
 
 msgid "admin.field.citizen_change_lead_minutes"
 msgstr "Participant can move until (minutes ahead)"
@@ -1229,7 +1229,7 @@ msgid "admin.field.closes"
 msgstr "Until"
 
 msgid "admin.field.capacity"
-msgstr "Number of agents"
+msgstr "Number of {agents}"
 
 msgid "admin.field.capacity_hint"
 msgstr "That many participants can book the same time slot. Enter 0 for lunch, for example: then there are no time slots."
@@ -1295,7 +1295,7 @@ msgid "admin.form.error.booking_limit_reached"
 msgstr "This email address already has an appointment in that slot, or already the maximum number of appointments with this team (see Appointments per email address in the settings). Choose another slot."
 
 msgid "admin.form.error.move_causes_shortfall"
-msgstr "This slot would then have more bookings than agents. Confirm that you accept the shortfall, or choose another slot."
+msgstr "This slot would then have more bookings than {agents}. Confirm that you accept the shortfall, or choose another slot."
 
 msgid "admin.form.error.max_bookings_per_email"
 msgstr "Enter a number from 1 to 10."
@@ -1347,7 +1347,7 @@ msgid "admin.hours.title"
 msgstr "Weekly staffing"
 
 msgid "admin.hours.lead"
-msgstr "One or more blocks per day, each with a number of agents; 0 for lunch, for example. Touching blocks with agents are divided together into time slots of the call duration; participants book a time slot."
+msgstr "One or more blocks per day, each with a number of {agents}; 0 for lunch, for example. Touching blocks with {agents} are divided together into time slots of the call duration; participants book a time slot."
 
 msgid "admin.hours.manage"
 msgstr "Manage staffing"
@@ -1356,13 +1356,13 @@ msgid "admin.hours.closed"
 msgstr "No staff"
 
 msgid "admin.hours.capacity"
-msgstr "{count} agents"
+msgstr "{count} {agents}"
 
 msgid "admin.hours.capacity_one"
-msgstr "1 agent"
+msgstr "1 {agent}"
 
 msgid "admin.hours.capacity_none"
-msgstr "no agents"
+msgstr "no {agents}"
 
 msgid "admin.hours.validity"
 msgstr "{start} to {end}"
@@ -1404,7 +1404,7 @@ msgid "admin.hours.split_title"
 msgstr "Split a block"
 
 msgid "admin.hours.split_lead"
-msgstr "{block}. The block becomes two touching blocks: the first part keeps its number of agents and label; choose them for the second part here, for example 0 and Lunch."
+msgstr "{block}. The block becomes two touching blocks: the first part keeps its number of {agents} and label; choose them for the second part here, for example 0 and Lunch."
 
 msgid "admin.hours.split_button"
 msgstr "Split"
@@ -1500,7 +1500,7 @@ msgid "admin.field.video_host_email"
 msgstr "Webex host (email address)"
 
 msgid "admin.field.video_host_email_hint"
-msgstr "Licensed account the meetings are scheduled on. Staff with an organisation account become cohost."
+msgstr "Licensed account the meetings are scheduled on. {Agents} with an organisation account become cohost."
 
 msgid "admin.field.wxcc_business_address"
 msgstr "WxCC business address"
@@ -1527,13 +1527,13 @@ msgid "admin.field.not_picked_up_minutes"
 msgstr "Not picked up after (minutes)"
 
 msgid "admin.field.not_picked_up_minutes_hint"
-msgstr "How long a call may stay without an agent before it is flagged. 1 to 120."
+msgstr "How long a call may stay with no {agent} before it is flagged. 1 to 120."
 
 msgid "admin.field.direct_call_max_concurrent"
 msgstr "Maximum number of direct calls at once"
 
 msgid "admin.field.direct_call_max_concurrent_hint"
-msgstr "Usually the number of agents for direct calls. Counts calls that wait and calls with an agent. Empty: no limit, WxCC distributes."
+msgstr "Usually the number of {agents} for direct calls. Counts calls that wait and calls being answered. Empty: no limit, WxCC distributes."
 
 msgid "admin.form.error.video_host_email"
 msgstr "Enter a valid email address."
@@ -1596,7 +1596,7 @@ msgid "join.tips.devices"
 msgstr "Allow your browser to use the camera and microphone when it asks."
 
 msgid "join.tips.lobby"
-msgstr "You first wait in a lobby. The agent lets you in."
+msgstr "You first wait in a lobby. Our {agent} lets you in."
 
 msgid "join.too_early"
 msgstr "You can join from {time}."
@@ -1614,13 +1614,13 @@ msgid "error.direct_call_unavailable"
 msgstr "Starting a call is not possible right now. Please book an appointment."
 
 msgid "error.direct_call_full"
-msgstr "All agents have just become busy. Please try again in a few minutes or book an appointment."
+msgstr "All {agents} have just become busy. Please try again in a few minutes or book an appointment."
 
 msgid "direct.title"
 msgstr "Start a video call now"
 
 msgid "direct.intro"
-msgstr "Enter your details. You go straight to the lobby of {group_name}; an agent lets you in."
+msgstr "Enter your details. You go straight to the lobby of {group_name}; one of our {agents} lets you in."
 
 msgid "direct.submit"
 msgstr "Start the call"
@@ -1641,7 +1641,7 @@ msgid "direct.card.button"
 msgstr "Start a call now"
 
 msgid "direct.full"
-msgstr "All agents are busy right now. Please try again in a few minutes or book an appointment."
+msgstr "All {agents} are busy right now. Please try again in a few minutes or book an appointment."
 
 msgid "queue.position"
 msgstr "Your place in line: {position}."
@@ -1653,22 +1653,22 @@ msgid "queue.nobody"
 msgstr "Nobody is waiting right now."
 
 msgid "queue.typical_wait"
-msgstr "An agent usually answers within about {minutes} min."
+msgstr "One of our {agents} usually answers within about {minutes} min."
 
 msgid "wait.title"
 msgstr "Your video call"
 
 msgid "wait.searching"
-msgstr "We are looking for an agent for you."
+msgstr "We are looking for one of our {agents} for you."
 
 msgid "wait.accepted"
-msgstr "An agent has accepted your call and will come to the lobby shortly."
+msgstr "One of our {agents} has accepted your call and will come to the lobby shortly."
 
 msgid "wait.in_call"
-msgstr "The agent is in the call."
+msgstr "Our {agent} is in the call."
 
 msgid "wait.unavailable"
-msgstr "Unfortunately no agent is available right now. Book an appointment for a moment that suits you."
+msgstr "Unfortunately none of our {agents} is available right now. Book an appointment for a moment that suits you."
 
 msgid "call.state.none"
 msgstr "No meeting"
@@ -1719,7 +1719,7 @@ msgid "call.event.task_failed"
 msgstr "Task failed"
 
 msgid "call.event.task_connected"
-msgstr "Agent accepted the task"
+msgstr "{Agent} accepted the task"
 
 msgid "call.event.task_ended"
 msgstr "Task ended"
@@ -1728,7 +1728,7 @@ msgid "call.event.meeting_started"
 msgstr "Meeting started"
 
 msgid "call.event.host_joined"
-msgstr "Agent joined"
+msgstr "{Agent} joined"
 
 msgid "call.event.guest_joined"
 msgstr "Participant joined"
@@ -1791,7 +1791,7 @@ msgid "admin.queue.title"
 msgstr "Waiting appointments"
 
 msgid "admin.queue.lead"
-msgstr "Today's appointments that start soon or are still going on. Pick up the next one; the participant always gets the first free agent."
+msgstr "Today's appointments that start soon or are still going on. Pick up the next one; the participant always gets the first free {agent}."
 
 msgid "admin.queue.announcement"
 msgstr "{count} appointments in the queue, {waiting} with a waiting participant."
@@ -1878,7 +1878,7 @@ msgid "admin.agenda.task"
 msgstr "Contact centre task"
 
 msgid "admin.agenda.agent"
-msgstr "Agent joined"
+msgstr "{Agent} joined"
 
 msgid "admin.agenda.participants"
 msgstr "Participants"
@@ -1920,7 +1920,7 @@ msgid "admin.agenda.next_week"
 msgstr "Next week"
 
 msgid "admin.agenda.slot_staffing"
-msgstr "Agents: {agents}, bookings: {booked}"
+msgstr "{Agents}: {agents}, bookings: {booked}"
 
 msgid "admin.agenda.shortfall"
 msgstr "Short: {count}"
@@ -1941,13 +1941,13 @@ msgid "admin.agenda.week_title"
 msgstr "Week of {day}"
 
 msgid "admin.agenda.week_caption"
-msgstr "Agents and bookings per slot, {week}"
+msgstr "{Agents} and bookings per slot, {week}"
 
 msgid "admin.agenda.week_shortfalls"
-msgstr "Slots with more bookings than agents this week: {count}."
+msgstr "Slots with more bookings than {agents} this week: {count}."
 
 msgid "admin.agenda.week_no_shortfalls"
-msgstr "Every slot this week has enough agents."
+msgstr "Every slot this week has enough {agents}."
 
 msgid "admin.agenda.week_empty"
 msgstr "No slots in this week."
@@ -1956,7 +1956,7 @@ msgid "admin.agenda.no_slot"
 msgstr "No slot"
 
 msgid "admin.shortfall.some"
-msgstr "Slots with more bookings than agents in the next {days} days: {count}."
+msgstr "Slots with more bookings than {agents} in the next {days} days: {count}."
 
 msgid "admin.shortfall.first"
 msgstr "First shortfall: {when}"
@@ -1995,7 +1995,7 @@ msgid "admin.planner.move_none"
 msgstr "There is no free slot in the coming weeks. Raise the staffing or cancel the booking."
 
 msgid "admin.planner.accept_shortfall"
-msgstr "I accept that the new slot will then have more bookings than agents"
+msgstr "I accept that the new slot will then have more bookings than {agents}"
 
 msgid "admin.planner.accept_shortfall_hint"
 msgstr "Only needed if the chosen slot gets a shortfall as a result."
@@ -2019,7 +2019,7 @@ msgid "admin.planner.reason_hint"
 msgstr "A fixed text; the organisation can change the wording under Message texts."
 
 msgid "admin.planner.reason_staffing"
-msgstr "Not enough agents"
+msgstr "Not enough {agents}"
 
 msgid "admin.planner.reason_technical"
 msgstr "Technical failure"
@@ -2061,7 +2061,7 @@ msgid "admin.planner.slot_title"
 msgstr "Ask for a new time: slot {when}"
 
 msgid "admin.planner.slot_lead"
-msgstr "This slot has more bookings than agents. These most recently made bookings ({count}) get a request to choose a new time; their places are freed at once. Without a new time they lapse {days} days after this time."
+msgstr "This slot has more bookings than {agents}. These most recently made bookings ({count}) get a request to choose a new time; their places are freed at once. Without a new time they lapse {days} days after this time."
 
 msgid "admin.planner.slot_bookings"
 msgstr "Bookings concerned"
@@ -3567,7 +3567,7 @@ msgid "admin.holidays.group_choice"
 msgstr "Which calendars apply"
 
 msgid "admin.holidays.group_choice_lead"
-msgstr "A staffing exception of the group's own on a holiday always wins; that way agents can still be scheduled on a holiday."
+msgstr "A staffing exception of the group's own on a holiday always wins; that way {agents} can still be scheduled on a holiday."
 
 msgid "admin.holidays.source"
 msgstr "Calendars for this group"
@@ -6429,7 +6429,7 @@ msgid "admin.form_fields.classification"
 msgstr "Personal data"
 
 msgid "admin.form_fields.classification_hint"
-msgstr "Personal data never appears in logs, exports, messages or the agents' queue."
+msgstr "Personal data never appears in logs, exports, messages or the queue of the {agents}."
 
 msgid "admin.form_fields.classification.pii"
 msgstr "Personal data"
@@ -6995,7 +6995,7 @@ msgid "admin.settings.data_fields.field.guest_join_url"
 msgstr "Join link of the participant"
 
 msgid "admin.settings.data_fields.field.host_join_url"
-msgstr "Join link of the agent"
+msgstr "Join link of the {agent}"
 
 msgid "admin.settings.data_fields.field.trial_join_url"
 msgstr "Join link of the trial call"
@@ -7381,7 +7381,7 @@ msgid "wait.leave.question.waiting"
 msgstr "Are you sure you want to stop? You lose your place in line and we tell the team you are no longer waiting. You can start a new call or book an appointment afterwards."
 
 msgid "wait.leave.question.agent"
-msgstr "An agent has already accepted your call. If you stop, this link no longer works. The agent stays in the call and is told. You can start a new call or book an appointment afterwards."
+msgstr "One of our {agents} has already accepted your call. If you stop, this link no longer works. Our {agent} stays in the call and is told. You can start a new call or book an appointment afterwards."
 
 msgid "wait.leave.confirm"
 msgstr "Yes, stop waiting"
@@ -7806,3 +7806,24 @@ msgstr "Public page"
 
 msgid "admin.groups.search_active"
 msgstr "A search is active. Clear the filters to see everything again."
+
+msgid "term.agent"
+msgstr "agent"
+
+msgid "term.agents"
+msgstr "agents"
+
+msgid "admin.org_texts.term.singular"
+msgstr "One member of staff who takes the call"
+
+msgid "admin.org_texts.term.plural"
+msgstr "More than one member of staff who take the call"
+
+msgid "admin.org_texts.section_terms"
+msgstr "What you call the person who takes the call"
+
+msgid "admin.form.error.agent_term"
+msgstr "Enter a word of {min} to {max} characters, without braces. Change the singular and the plural together."
+
+msgid "admin.org_texts.term.use"
+msgstr "In a text, use {{agent}}, {{agents}}, {{Agent}} and {{Agents}} for this word."
