@@ -404,7 +404,7 @@
   },
   "enterprise": {
     "title": "Enterprise-klaar, vanaf de eerste commit",
-    "lead": "De eerste klant is een overheidscontactcenter. Dat zie je terug in elke regel van de pipeline.",
+    "lead": "Gebouwd voor organisaties met strenge eisen aan beveiliging, privacy en toegankelijkheid. Dat zie je terug in elke regel van de pipeline.",
     "items": [
       {
         "title": "Eén autorisatiematrix",

@@ -404,7 +404,7 @@
   },
   "enterprise": {
     "title": "Enterprise-ready from the first commit",
-    "lead": "The first client is a government contact center. You see that in every line of the pipeline.",
+    "lead": "Built for organisations with strict requirements on security, privacy and accessibility. You see that in every line of the pipeline.",
     "items": [
       {
         "title": "One authorisation matrix",
