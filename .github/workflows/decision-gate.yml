@@ -1,0 +1,45 @@
+name: decision gate
+
+# ADR 0078: build work merges on green; a decision (an ADR outside its Build status table,
+# CLAUDE.md, the authorisation matrix, the workflows, the gates themselves, a release PR) waits
+# for the product owner's label `po:approved`. The check runs `scripts/decision_gate.py` from
+# `main`, not from the pull request: `pull_request_target` takes the workflow and the checkout
+# from the base, and the pull request's commits are only fetched as git objects to diff them.
+# Nothing from the pull request is executed here, and the job holds no secrets.
+#
+# `merge_group` is listed so the required check reports (as skipped, which counts as passed)
+# in the merge queue, where there is no pull request and no label.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: decision-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: decision gate
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+      - name: fetch the pull request's commits (objects only, nothing is checked out or run)
+        env:
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: git fetch --no-tags origin "$HEAD"
+      - name: build work or decision?
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          TITLE: ${{ github.event.pull_request.title }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --title "$TITLE" --labels "$LABELS"
