@@ -1,0 +1,756 @@
+{
+  "lang": "nl",
+  "path": "/",
+  "other": {
+    "lang": "en",
+    "path": "/en/",
+    "label": "English",
+    "aria": "Switch to English"
+  },
+  "meta": {
+    "title": "OpenPlanner – video-afspraken met je team, in seconden geboekt",
+    "description": "OpenPlanner is de open-source planner voor videogesprekken via Webex. Deelnemers kiezen een vrij moment op een pagina in jouw huisstijl, het gesprek landt in Webex Contact Center en persoonsgegevens zijn 24 uur na het gesprek weg."
+  },
+  "skip": "Direct naar de inhoud",
+  "nav": [
+    {
+      "href": "#tour",
+      "label": "Tour"
+    },
+    {
+      "href": "#features",
+      "label": "Functies"
+    },
+    {
+      "href": "#integrations",
+      "label": "Integraties"
+    },
+    {
+      "href": "#enterprise",
+      "label": "Enterprise"
+    },
+    {
+      "href": "#standards",
+      "label": "Standaarden"
+    },
+    {
+      "href": "#open-source",
+      "label": "Open source"
+    },
+    {
+      "href": "#roadmap",
+      "label": "Roadmap"
+    },
+    {
+      "href": "#releases",
+      "label": "Releases"
+    }
+  ],
+  "nav_github": "GitHub",
+  "hero": {
+    "eyebrow": "Open source · EUPL-1.2 · WCAG 2.2 AA",
+    "title_a": "Video-afspraken met je team,",
+    "title_b": "in seconden geboekt.",
+    "lead": "OpenPlanner is de planner voor videogesprekken via Webex. Een deelnemer kiest een vrij moment op een pagina in jouw huisstijl, krijgt een bevestiging met agenda-uitnodiging en belt vanuit de browser. Geen account, geen app, geen login. Jouw team krijgt het gesprek op het juiste moment in Webex Contact Center, en persoonsgegevens zijn 24 uur na het gesprek weg.",
+    "cta_demo": "Probeer de demo",
+    "cta_install": "Installeren",
+    "cta_source": "Bekijk de broncode",
+    "facts": [
+      {
+        "value": "0",
+        "label": "cookies op deze site en op de boekingspagina"
+      },
+      {
+        "value": "24 u",
+        "label": "na het gesprek zijn persoonsgegevens gewist"
+      },
+      {
+        "value": "2",
+        "label": "containers en één SQLite-bestand, meer niet"
+      }
+    ]
+  },
+  "demo": {
+    "title": "Zo voelt boeken voor een deelnemer",
+    "lead": "Een echte afspraakpagina, zonder de echte afspraak. Alles werkt met het toetsenbord. Er wordt niets opgeslagen of verstuurd.",
+    "nojs": "Deze interactieve demo heeft JavaScript nodig. De echte boekingsflow bekijk je in de demo-installatie uit de README.",
+    "step_day": "1. Kies een dag",
+    "step_time": "2. Kies een tijd",
+    "step_form": "3. Jouw gegevens",
+    "step_done": "Geboekt",
+    "today": "vandaag",
+    "free": "{n} vrij",
+    "full": "vol",
+    "back": "Terug",
+    "first_name": "Voornaam",
+    "last_name": "Achternaam",
+    "email": "E-mailadres",
+    "submit": "Afspraak bevestigen",
+    "done_title": "Je afspraak staat vast",
+    "done_text": "Je ontvangt een bevestiging met agenda-uitnodiging en een persoonlijke link om te verzetten of te annuleren. Een paar minuten voor de start landt het gesprek bij het team.",
+    "done_meeting": "Webex-meeting aangemaakt",
+    "done_task": "Werkitem gepland voor T−5",
+    "done_purge": "Gegevens gewist 24 u na het gesprek",
+    "restart": "Opnieuw",
+    "announce_day": "Dag gekozen: {day}. Kies een tijd.",
+    "announce_time": "Tijd gekozen: {time}. Vul je gegevens in.",
+    "announce_done": "Afspraak bevestigd voor {day} om {time}.",
+    "weekdays": [
+      "ma",
+      "di",
+      "wo",
+      "do",
+      "vr",
+      "za",
+      "zo"
+    ],
+    "months": [
+      "januari",
+      "februari",
+      "maart",
+      "april",
+      "mei",
+      "juni",
+      "juli",
+      "augustus",
+      "september",
+      "oktober",
+      "november",
+      "december"
+    ],
+    "closed": "gesloten"
+  },
+  "tour": {
+    "title": "Van klik tot gesprek, en alles wat erachter zit",
+    "lead": "Twee sporen door het product: wat de deelnemer meemaakt, van tijd kiezen tot het gesprek, en wat het team en de beheerders in handen hebben, van organisatie tot de medewerker die het gesprek oppakt.",
+    "tracks": [
+      {
+        "key": "participant",
+        "title": "De deelnemer",
+        "steps": [
+          {
+            "key": "book",
+            "title": "Een tijd kiezen",
+            "text": "Maandkalender, vrije tijden van de dag, een kort formulier met drie velden en de eigen vragen van de groep. Op jouw domein, in jouw huisstijl."
+          },
+          {
+            "key": "direct",
+            "title": "Of nu praten",
+            "text": "Is de groep open, dan kan de deelnemer direct bellen. Een plafond op het aantal wachtenden en eerlijke wachtrijfeedback houden het netjes."
+          },
+          {
+            "key": "mail",
+            "title": "Bevestiging in de mail",
+            "text": "Bevestiging met agenda-uitnodiging (.ics), de persoonlijke beheerlink en later de herinnering. Per sms als de groep dat wil. SPF, DKIM en DMARC gecontroleerd."
+          },
+          {
+            "key": "manage",
+            "title": "Verzetten of annuleren",
+            "text": "Via de persoonlijke link, zonder account. Annuleren kan tot de start, verzetten tot een uur ervoor; bekende gegevens staan al ingevuld."
+          },
+          {
+            "key": "trial",
+            "title": "Video vooraf testen",
+            "text": "Een echt proefgesprek op Webex: camera, microfoon en geluid gecontroleerd voordat het ertoe doet, met het resultaat zichtbaar in de agenda van het team."
+          },
+          {
+            "key": "join",
+            "title": "Het gesprek starten",
+            "text": "Deelnemen vanuit de browser, zonder app of account. Elke afspraak is een eigen Webex-meeting; de deelnemer wacht in de lobby tot de medewerker er is."
+          }
+        ]
+      },
+      {
+        "key": "team",
+        "title": "Het team en de beheerders",
+        "steps": [
+          {
+            "key": "orgs",
+            "title": "Eén installatie, meerdere organisaties",
+            "text": "Elke organisatie met eigen groepen, huisstijl, teksten, kanalen en identity provider. Rollen uit de IdP: superuser, organisatiebeheerder, groepsbeheerder, planner, agent, auditor."
+          },
+          {
+            "key": "groups",
+            "title": "Groepen als skills",
+            "text": "Een groep is een vaardigheid: een onderwerp, een team, een wachtrij, eigen openingstijden en formulier. De deelnemer kiest nooit een persoon; het gesprek gaat naar de eerste vrije medewerker."
+          },
+          {
+            "key": "staffing",
+            "title": "Bezetting per blok",
+            "text": "Blokken per dag met het aantal medewerkers, feestdagen, uitzonderingen en nood-sluiting in één handeling. De capaciteit bepaalt wat de deelnemer te zien krijgt."
+          },
+          {
+            "key": "agenda",
+            "title": "Agenda en planner, live",
+            "text": "Elk gesprek met zijn status: gepland, proefgesprek gedaan, in gesprek, afgerond. De planner verzet of annuleert namens de deelnemer en ziet de reden van elke storing."
+          },
+          {
+            "key": "queue",
+            "title": "Het werkitem op T−5",
+            "text": "Vijf minuten voor de start landt het gesprek als werkitem in Webex Contact Center, of in de eigen wachtrij van OpenPlanner. Per groep te kiezen, en te wisselen als het contact center uitvalt."
+          },
+          {
+            "key": "agent",
+            "title": "De medewerker neemt op",
+            "text": "Met de agent-rol pakt de medewerker het gesprek uit de wachtrij, ziet alleen voornaam en onderwerp en stapt als cohost in de meeting. 24 uur na het gesprek zijn de gegevens weg."
+          }
+        ]
+      }
+    ],
+    "play": "Afspelen",
+    "pause": "Pauzeren",
+    "scene_label": "Animatie van de deelnemers- en beheerflow",
+    "video_title": "Schermopname van de echte interface",
+    "video_text": "Bij elke release neemt de pipeline de boekingsflow, het portaal en de agenda opnieuw op, zodat wat je hier ziet ook is wat je installeert.",
+    "video_soon": "Komt met de eerstvolgende release.",
+    "art": {
+      "direct_btn": "Nu praten",
+      "direct_wait": "2 wachtenden · ± 3 min",
+      "mail_subject": "Je afspraak staat vast",
+      "mail_btn": "Verzetten of annuleren",
+      "manage_move": "Verzetten",
+      "manage_cancel": "Annuleren",
+      "trial_cam": "camera",
+      "trial_mic": "microfoon",
+      "trial_ok": "proefgesprek geslaagd",
+      "join_btn": "Deelnemen vanuit de browser",
+      "lobby": "lobby",
+      "orgs": [
+        "Organisatie A",
+        "Organisatie B",
+        "Organisatie C"
+      ],
+      "roles": [
+        "superuser",
+        "org-beheer",
+        "groep",
+        "agent",
+        "auditor"
+      ],
+      "groups": [
+        [
+          "Intake",
+          "4 agents"
+        ],
+        [
+          "Advies",
+          "6 agents"
+        ],
+        [
+          "Support",
+          "3 agents"
+        ]
+      ],
+      "skill": "skill",
+      "days": [
+        "ma",
+        "di",
+        "wo",
+        "do",
+        "vr"
+      ],
+      "agenda": [
+        [
+          "09:00",
+          "gepland"
+        ],
+        [
+          "09:30",
+          "proef ok"
+        ],
+        [
+          "10:00",
+          "live"
+        ],
+        [
+          "10:30",
+          "afgerond"
+        ]
+      ],
+      "queue_cc": "Contact center",
+      "queue_own": "Eigen wachtrij",
+      "cohost": "cohost"
+    }
+  },
+  "how": {
+    "title": "Hoe het werkt",
+    "steps": [
+      {
+        "title": "Jij richt een groep in",
+        "text": "Een team is een groep: openingstijden, bezetting per blok, feestdagen, uitzonderingen, teksten en huisstijl. Alles in het beheerportaal, zonder code."
+      },
+      {
+        "title": "Je website linkt naar de pagina",
+        "text": "Elke groep heeft een eigen pagina op jouw domein. Of je plaatst de kalender als Web Component midden in je eigen site."
+      },
+      {
+        "title": "Het gesprek komt vanzelf binnen",
+        "text": "Als werkitem in Webex Contact Center, of in de eigen wachtrij van OpenPlanner waar medewerkers met de agent-rol het gesprek zelf oppakken. Per groep te kiezen."
+      }
+    ]
+  },
+  "features": {
+    "title": "Alles wat een gesprek nodig heeft, niets wat afleidt",
+    "lead": "Gebouwd voor teams die veel mensen per video helpen: klantenservice, adviesbalies, intake, helpdesks.",
+    "items": [
+      {
+        "icon": "calendar",
+        "title": "Boeken zonder drempel",
+        "text": "Maandkalender, vrije tijden, drie velden. Verzetten of annuleren via een persoonlijke link. Werkt zonder JavaScript en volledig met het toetsenbord."
+      },
+      {
+        "icon": "video",
+        "title": "Webex ingebouwd",
+        "text": "Elke afspraak krijgt een eigen Webex-meeting. De deelnemer belt vanuit de browser, zonder app of account; je team stapt in als cohost."
+      },
+      {
+        "icon": "queue",
+        "title": "Landt waar je team werkt",
+        "text": "Het gesprek gaat als werkitem naar de wachtrij in Webex Contact Center. De eerste vrije medewerker neemt op. Niemand hoeft naar een agenda te kijken."
+      },
+      {
+        "icon": "bolt",
+        "title": "Nu praten",
+        "text": "Een groep die open is kan een direct gesprek aanbieden, met een plafond op het aantal wachtenden en eerlijke wachtrijfeedback."
+      },
+      {
+        "icon": "grid",
+        "title": "Multitenant met echte rollen",
+        "text": "Eén installatie, meerdere organisaties, elk met eigen groepen, huisstijl, teksten en identity provider. Rollen en scope komen uit jouw IdP; één autorisatiematrix bepaalt wat iedereen ziet en doet."
+      },
+      {
+        "icon": "queue",
+        "title": "Groepen als skills",
+        "text": "Een groep is een vaardigheid met een onderwerp, een team en een wachtrij. De deelnemer kiest nooit een persoon; de eerste vrije medewerker neemt op. Eén medewerker kan in meerdere groepen staan."
+      },
+      {
+        "icon": "shield",
+        "title": "Privacy by design",
+        "text": "Persoonsgegevens staan alleen op de boeking en zijn 24 uur na het gesprek weg. Nooit in logs, URL's, jobs of foutmeldingen."
+      },
+      {
+        "icon": "brush",
+        "title": "Jouw merk, jouw woorden",
+        "text": "Kleuren, logo en lettertype per organisatie. Elke tekst is aanpasbaar in het portaal. Nederlands en Engels standaard, meer talen mogelijk."
+      },
+      {
+        "icon": "message",
+        "title": "Berichten die aankomen",
+        "text": "Bevestiging, wijziging, herinnering en annulering per e-mail (met .ics) en sms. SPF, DKIM en DMARC worden voor je gecontroleerd."
+      },
+      {
+        "icon": "grid",
+        "title": "Agenda en planner",
+        "text": "Beheerders volgen elk gesprek live, plannen bezetting per blok en sluiten bij nood een groep in één handeling, waarna deelnemers zelf een nieuw moment kiezen."
+      }
+    ]
+  },
+  "integrations": {
+    "title": "Webex Meetings is het hart. De rest sluit erop aan.",
+    "lead": "OpenPlanner is geen videoplatform en geen contact center. Het is de planner die de Webex-producten die je al hebt aan elkaar knoopt, en die elk ander systeem achter een nette adapter houdt.",
+    "center": "OpenPlanner",
+    "items": [
+      {
+        "key": "meetings",
+        "name": "Webex Meetings",
+        "tag": "het hart",
+        "text": "Elke afspraak is een echte Webex-meeting via de Meetings API. Browser-direct deelnemen, proefgesprek vooraf, live meetingstatus in de agenda.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0017-video-through-webex-meetings-api.md",
+        "link": "ADR 0017"
+      },
+      {
+        "key": "wxcc",
+        "name": "Webex Contact Center",
+        "tag": "dispatch",
+        "text": "Vijf minuten voor de start wordt het gesprek een werkitem in de wachtrij van het team, met alleen voornaam, join-link en routeringskenmerken. Webex Contact Center is de eerste koppeling; de laag erachter is leverancieronafhankelijk, en een groep kan ook zonder contact center werken met de eigen wachtrij van OpenPlanner.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0018-wxcc-work-items.md",
+        "link": "ADR 0018"
+      },
+      {
+        "key": "messaging",
+        "name": "Webex Messaging",
+        "tag": "alerts",
+        "text": "Een bot meldt beheerders in Webex wanneer de koppeling hapert, een wachtrij volloopt of een controle faalt. Nooit persoonsgegevens, altijd een link naar het portaal.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0082-contact-center-verification-health-alerts-and-fallback.md",
+        "link": "ADR 0082"
+      },
+      {
+        "key": "idp",
+        "name": "Jouw identity provider",
+        "tag": "OIDC",
+        "text": "Beheerders loggen in via jullie eigen IdP (PingFederate, Keycloak, Entra ID, elke OIDC-provider), per organisatie, met rollen uit de claims.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0083-identity-providers-per-organisation-chosen-by-email-domain.md",
+        "link": "ADR 0083"
+      },
+      {
+        "key": "mail",
+        "name": "E-mail en sms",
+        "tag": "kanalen",
+        "text": "SMTP en een providerneutrale sms-gateway per organisatie. Teksten per kanaal en per groep aanpasbaar in het portaal.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0022-message-channels-reminders-and-texts.md",
+        "link": "ADR 0022"
+      },
+      {
+        "key": "bot",
+        "name": "AI-agents en bots",
+        "tag": "machine-API",
+        "text": "Een contact-center-bot (zoals de Webex AI Agent) vraagt vrije tijden op en boekt namens de deelnemer via een API met scopes en per-client sleutels.",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/agent-api.md",
+        "link": "docs/agent-api.md"
+      }
+    ],
+    "roadmap_title": "Op de roadmap",
+    "roadmap": "Andere contact-centerplatforms op dezelfde adapterlaag (ADR 0032), de agenda-uitnodiging als derde dispatchvorm (ADR 0043), wijzigen via de bot-API (ADR 0023) en medewerkers via SCIM (ADR 0046)."
+  },
+  "enterprise": {
+    "title": "Waarom we OpenPlanner enterprise-klaar noemen",
+    "lead": "Niet door een lijst vinkjes, maar door de opbouw: een kern zonder framework, elke externe dienst achter een poort, en regels die de pipeline afdwingt in plaats van een reviewer.",
+    "arch_title": "Architectuur en bouwblokken",
+    "arch_caption": "De pijlen lopen één kant op. import-linter weigert bij elke pull request een import die deze lagen doorbreekt.",
+    "layers": [
+      {
+        "name": "Kanalen",
+        "items": [
+          "Deelnemerspagina's en widget",
+          "Beheerportaal",
+          "Machine-API voor bots",
+          "Worker voor geplande taken"
+        ]
+      },
+      {
+        "name": "Gedeelde bouwblokken",
+        "items": [
+          "Autorisatiematrix",
+          "Vertalingen nl en en",
+          "Instellingenregister",
+          "Auditlog en events"
+        ]
+      },
+      {
+        "name": "Domein",
+        "items": [
+          "Boeken en capaciteit",
+          "Groepen en bezetting",
+          "Rechten en scope",
+          "Privacyregels"
+        ],
+        "note": "Pure Python, geen framework, ≥ 90% testdekking"
+      }
+    ],
+    "ports_title": "Poorten en adapters",
+    "ports": [
+      {
+        "port": "VideoProvider",
+        "adapters": "Webex Meetings"
+      },
+      {
+        "port": "ContactCenterDispatcher",
+        "adapters": "Webex Contact Center, eigen wachtrij"
+      },
+      {
+        "port": "MessageSender",
+        "adapters": "SMTP, sms-gateway"
+      },
+      {
+        "port": "IdentityProvider",
+        "adapters": "OIDC: PingFederate, Keycloak, Entra ID"
+      },
+      {
+        "port": "EventSink",
+        "adapters": "syslog, Splunk, Elastic"
+      },
+      {
+        "port": "Transaction",
+        "adapters": "SQLite"
+      }
+    ],
+    "pillars": [
+      {
+        "title": "Eén kern, vervangbare randen",
+        "text": "Een ander contact center of videoplatform is een nieuwe adapter achter een bestaande poort. Domein, schermen en teksten veranderen niet."
+      },
+      {
+        "title": "Afgedwongen, niet afgesproken",
+        "text": "Lagen, typen, rechten en privacyregels worden bij elke pull request gecontroleerd. Wat niet klopt, komt niet op main."
+      },
+      {
+        "title": "Eén bron per onderwerp",
+        "text": "Rechten, instellingen en de structuur van het portaal staan elk op één plek; de documentatie daarvan wordt uit de code gegenereerd."
+      },
+      {
+        "title": "Besluit voor besluit vastgelegd",
+        "text": "Meer dan tachtig ADR's met context, keuze, instellingen en bouwstatus. Een architect leest waarom iets zo is, en wat nog niet draait."
+      }
+    ],
+    "scale_title": "Schaalbaar, eerlijk gezegd",
+    "scale": [
+      {
+        "state": "now",
+        "title": "Nu: één host, ruim boven de ontwerpdoelstelling",
+        "text": "Proxy, web en worker op één VM met SQLite in WAL-modus. Lezers blokkeren elkaar niet, een boeking is een paar rijen onder een schrijfslot, meerdere workers delen de takenwachtrij. Eén installatie bedient vele organisaties. Opschalen gaat eerst verticaal: meer CPU, geheugen en snellere schijf."
+      },
+      {
+        "state": "now",
+        "title": "Vastgelegde grens",
+        "text": "De ontwerpdoelstelling is zo'n 80 boekingen per werkdag. ADR 0036 legt vast wanneer we verder gaan: boven 2.000 boekingen per werkdag, bij een p95 boven 1 seconde, bij een strengere beschikbaarheidseis of als een klant beheerde Postgres eist."
+      },
+      {
+        "state": "designed",
+        "title": "Daarna: ontworpen, nog niet gebouwd",
+        "text": "Postgres met rijvergrendeling, meerdere webinstanties achter de proxy, workers op elke host en een gedeelde opslag voor rate limits. Alle databasetoegang zit al achter één poort in één adaptermodule, dus domein, routes en schermen blijven gelijk."
+      }
+    ],
+    "scale_state": {
+      "now": "draait nu",
+      "designed": "ontworpen"
+    },
+    "scale_link": {
+      "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0036-scaling-envelope-and-path-beyond-one-vm.md",
+      "label": "ADR 0036: schaalgrenzen en het pad voorbij één VM"
+    },
+    "arch_link": {
+      "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/architecture.md",
+      "label": "Architectuur met diagrammen"
+    },
+    "security_title": "Beveiliging en beheer",
+    "items": [
+      {
+        "title": "Eén autorisatiematrix",
+        "text": "Rol × recht × niveau op één plek. Elke beheerroute declareert één recht, elke query filtert op scope, elke weigering staat in het auditlog. Geen uitzondering voor superusers."
+      },
+      {
+        "title": "Multitenant, gescheiden per organisatie",
+        "text": "Elke query filtert op de scope van de rol; een organisatiebeheerder ziet nooit een andere organisatie, een groepsbeheerder nooit een andere groep. Dezelfde matrix stuurt menu, knoppen en de API."
+      },
+      {
+        "title": "Single sign-on, geen omweg",
+        "text": "OIDC met PKCE, state en nonce, alleen asymmetrische algoritmes, sessie van acht uur. Geen lokale accounts, geen break-glass login, bewust."
+      },
+      {
+        "title": "Auditlog dat je kunt doorsturen",
+        "text": "Logins, wijzigingen en weigeringen als gestructureerde events, naar syslog, Splunk of Elastic. Zonder persoonsgegevens."
+      },
+      {
+        "title": "Getekende releases",
+        "text": "Images keyless getekend met cosign, SBOM (CycloneDX) bij elke release, CVE-scan met trivy en grype, hashes in de lockfile. De installatie controleert de handtekening."
+      },
+      {
+        "title": "Een strenge pipeline",
+        "text": "mypy strict, ruff, bandit, semgrep, gitleaks, mutatietesten, schemathesis, OWASP ZAP, Playwright met axe-core en Lighthouse. Alles blokkeert de merge."
+      },
+      {
+        "title": "Licht in beheer",
+        "text": "Twee containers, één SQLite-bestand, HTTPS met automatische certificaten of je eigen proxy. Updates en releasekanaal vanuit het portaal. Back-up is één bestand."
+      },
+      {
+        "title": "Toegankelijk, aantoonbaar",
+        "text": "WCAG 2.2 AA op elke publieke pagina, in elke taal, elke pull request opnieuw getest. Geen tijdslimieten, geen CAPTCHA-puzzels."
+      },
+      {
+        "title": "Configureerbaar, niet hard-coded",
+        "text": "Elke drempel, limiet en termijn is een instelling met een klasse, een default en grenzen. Wat een beveiliging is, zet je niet uit vanuit het portaal."
+      }
+    ]
+  },
+  "opensource": {
+    "title": "Open source, open besluiten",
+    "lead": "OpenPlanner is gepubliceerd onder de EUPL-1.2, de open-source-licentie van de Europese Commissie. Niet alleen de code is open: elk ontwerpbesluit staat als ADR in de repository, met wat er van gebouwd is.",
+    "points": [
+      {
+        "title": "EUPL-1.2",
+        "text": "Gebruik, wijzig en verspreid, ook commercieel. Compatibel met GPL, AGPL en de meeste Europese aanbestedingsregels."
+      },
+      {
+        "title": "Architecture Decision Records",
+        "text": "Meer dan tachtig besluiten, elk met context, keuze, instellingen en bouwstatus. Je leest wat waarom zo is, en wat nog niet draait."
+      },
+      {
+        "title": "Beveiliging op de voorgrond",
+        "text": "Dreigingsmodel per flow, misbruikscenario per endpoint, elk met een test. Responsible disclosure via SECURITY.md."
+      },
+      {
+        "title": "Bijdragen is welkom",
+        "text": "Issues, discussies en pull requests op GitHub. Een CLA houdt de licentie schoon. Elke PR beantwoordt dezelfde zeven reviewvragen."
+      }
+    ],
+    "cta_github": "Bekijk op GitHub",
+    "cta_contribute": "Bijdragen",
+    "cta_security": "Kwetsbaarheid melden"
+  },
+  "releases": {
+    "title": "Releases",
+    "lead": "Elke merge naar main wordt een release candidate op het rc-kanaal. Een release is een getekende image, een SBOM en deze website, in één trein.",
+    "latest": "Laatste release",
+    "candidate": "Laatste release candidate",
+    "none": "Nog geen release op dit kanaal.",
+    "all": "Alle releases op GitHub",
+    "install": "Installatiehandleiding",
+    "prerelease": "release candidate",
+    "built": "Deze pagina is gebouwd uit commit {commit}.",
+    "no_data": "De releaselijst wordt bij elke bouw uit GitHub ingelezen; in deze lokale bouw is die er niet.",
+    "fresh": "Bij elke merge naar main en bij elke release wordt deze pagina opnieuw gebouwd met de releases van dat moment. Je browser praat niet met GitHub; dat houdt deze site vrij van derden."
+  },
+  "cta": {
+    "title": "Zet 'm vanmiddag op een testserver",
+    "text": "Eén installatiescript, een Let's Encrypt-certificaat en een demo-groep. Of start lokaal met docker compose en loop als elke rol door het portaal.",
+    "primary": "Lees de installatiehandleiding",
+    "secondary": "Snelstart in de README"
+  },
+  "footer": {
+    "tagline": "Video-afspraken met je team, in seconden geboekt, privacy standaard.",
+    "nocookies": "Deze website plaatst geen cookies, gebruikt geen trackers en laadt niets van derden.",
+    "license": "Broncode onder EUPL-1.2. Gemaakt door 3Corners en de OpenPlanner-bijdragers.",
+    "links": [
+      {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner",
+        "label": "GitHub"
+      },
+      {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md",
+        "label": "Installeren"
+      },
+      {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/tree/main/docs/adr",
+        "label": "ADR's"
+      },
+      {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/SECURITY.md",
+        "label": "Security"
+      },
+      {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/CONTRIBUTING.md",
+        "label": "Bijdragen"
+      },
+      {
+        "href": "https://3corners.nl",
+        "label": "3Corners"
+      }
+    ]
+  },
+  "standards": {
+    "title": "Kwaliteit en standaarden, aantoonbaar",
+    "lead": "Wat we beweren, staat in de code, in een test of in de pipeline. Per standaard zie je hoe ver het is en waar het bewijs staat.",
+    "col_standard": "Standaard",
+    "col_what": "Wat het betekent",
+    "col_status": "Status",
+    "col_proof": "Bewijs",
+    "status": {
+      "ci": "getest in CI",
+      "built": "ingebouwd",
+      "partly": "deels",
+      "planned": "gepland"
+    },
+    "code_title": "Codestandaarden",
+    "code": [
+      "Python 3.12 met volledige typecontrole (mypy strict) en ruff voor stijl en veelgemaakte fouten.",
+      "Een gelaagde architectuur, afgedwongen met import-linter: het domein kent geen framework.",
+      "Elke module en functie met een docstring in Google-stijl, leesbaar voor documentatietools.",
+      "Testdekking ≥ 90% op domein en vertalingen, mutatiescore ≥ 80%, misbruikscenario's als tests.",
+      "Conventional Commits, één ADR per besluit met bouwstatus, en elke PR beantwoordt zeven reviewvragen.",
+      "bandit, semgrep, gitleaks, pip-audit en een licentiecontrole bij elke pull request."
+    ],
+    "update_title": "Automatisch bijwerken",
+    "update": [
+      "De superuser kiest in het portaal het kanaal: stabiel, of release candidate voor een testomgeving.",
+      "Een nieuwe versie installeer je met één klik in het portaal, of laat je de installatie zelf doen.",
+      "De host controleert de handtekening van elke image vóór de update; een ongetekende image draait niet.",
+      "Renovate houdt afhankelijkheden wekelijks bij, beveiligingsupdates meteen; een PR ouder dan 14 dagen alarmeert.",
+      "Database-migraties lopen automatisch en zijn altijd terug te draaien."
+    ],
+    "items": [
+      {
+        "name": "WCAG 2.2 AA (EN 301 549)",
+        "what": "Toetsenbord-flow, axe-core zonder fouten en Lighthouse ≥ 95 op elke publieke pagina, in elke taal, bij elke pull request. Handmatige audit met NVDA en VoiceOver vóór livegang.",
+        "status": "ci",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/e2e/pages.json",
+        "link": "e2e/pages.json"
+      },
+      {
+        "name": "NL Design System",
+        "what": "Kleuren, typografie en spacing van de deelnemerspagina's komen uit NL Design System-tokens; organisaties passen ze aan binnen die tokens.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/widget.md",
+        "link": "docs/widget.md"
+      },
+      {
+        "name": "HTTPS, HSTS en NCSC TLS-richtlijnen",
+        "what": "HTTPS met HSTS (pas-toe-of-leg-uit van Forum Standaardisatie), TLS 1.2 en 1.3 volgens de NCSC-richtlijnen. Een controle in CI en internet.nl in de go-live-checklist zijn gepland.",
+        "status": "partly",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0086-public-address-and-reverse-proxy-visible-verified-and-by-the-standards.md",
+        "link": "ADR 0086"
+      },
+      {
+        "name": "SPF, DKIM en DMARC",
+        "what": "Pas-toe-of-leg-uit-standaarden voor e-mail. Het portaal controleert het afzenderdomein van elke organisatie en toont wat ontbreekt.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0073-email-deliverability-sender-domain-check-and-system-mail-headers.md",
+        "link": "ADR 0073"
+      },
+      {
+        "name": "OpenID Connect",
+        "what": "Beheerders loggen in via de eigen identity provider: PKCE, state en nonce, alleen asymmetrische algoritmes. Getest tegen Keycloak, in productie PingFederate.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0013-admin-login-with-oidc.md",
+        "link": "ADR 0013"
+      },
+      {
+        "name": "OpenAPI 3",
+        "what": "De API-specificatie wordt uit de code gegenereerd, bij elke pull request vergeleken en met schemathesis aangevallen.",
+        "status": "ci",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/api.md",
+        "link": "docs/api.md"
+      },
+      {
+        "name": "AVG en privacy by design",
+        "what": "Persoonsgegevens alleen op de boeking, gewist 24 uur na het gesprek, nooit in logs. Het datastroomschema is de input voor de DPIA van de organisatie.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/dataflow.md",
+        "link": "docs/dataflow.md"
+      },
+      {
+        "name": "Bouwstenen voor de BIO",
+        "what": "Auditlog van elke wijziging en weigering, beveiligingsevents bij aanvallen, een auditor-rol en export naar je logplatform. De BIO zelf blijft de verantwoordelijkheid van de organisatie.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0053-security-events-for-attacks-on-public-entry-points.md",
+        "link": "ADR 0053"
+      },
+      {
+        "name": "security.txt (RFC 9116)",
+        "what": "Een vast meldpunt voor kwetsbaarheden op elke installatie, met SECURITY.md in de repository.",
+        "status": "built",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/SECURITY.md",
+        "link": "SECURITY.md"
+      },
+      {
+        "name": "Software supply chain",
+        "what": "Elke image keyless getekend met cosign, een CycloneDX-SBOM bij elke release, CVE-scans met trivy en grype, afhankelijkheden met hashes vastgezet.",
+        "status": "ci",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0006-ci-tooling-and-image-signing.md",
+        "link": "ADR 0006"
+      },
+      {
+        "name": "Standaard voor Publieke Code",
+        "what": "EUPL-1.2, licentie per bestand via REUSE, besluiten openbaar als ADR, en een publiccode.yml die CI valideert en die elke release bijwerkt. De aanmelding bij developer.overheid.nl staat nog open.",
+        "status": "partly",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/publiccode.yml",
+        "link": "publiccode.yml"
+      },
+      {
+        "name": "Penetratietest",
+        "what": "Een externe pentest vóór livegang en daarna jaarlijks. Tot die tijd: OWASP ZAP bij elke merge en misbruikscenario's als tests.",
+        "status": "planned",
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/threat-model.md",
+        "link": "docs/threat-model.md"
+      }
+    ]
+  },
+  "roadmap": {
+    "title": "Roadmap",
+    "lead": "Rechtstreeks uit GitHub: elke openstaande stap van een besluit is een issue. Wat hier staat is besloten maar nog niet gebouwd.",
+    "steps": "{n} open stappen",
+    "step": "1 open stap",
+    "all": "Alle open stappen op GitHub",
+    "no_data": "De roadmap wordt bij elke bouw uit de GitHub-issues gelezen; in deze lokale bouw is die er niet.",
+    "total": "{n} open stappen in {m} besluiten"
+  }
+}

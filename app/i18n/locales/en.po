@@ -7983,3 +7983,273 @@ msgstr "The portal refuses while the organisation is not empty."
 
 msgid "admin.audit.detail.deleted"
 msgstr "deleted"
+
+msgid "admin.tab.login"
+msgstr "Login"
+
+msgid "authz.permission.identity_providers_view"
+msgstr "See the organisation's identity providers"
+
+msgid "authz.permission.identity_providers_manage"
+msgstr "Register and change identity providers"
+
+msgid "settings.field.idp_max_per_organisation.label"
+msgstr "Identity providers per organisation (maximum)"
+
+msgid "admin.done.idp_created"
+msgstr "The identity provider is registered and still off. Do a test login first, then switch it on."
+
+msgid "admin.done.idp_enabled"
+msgstr "The identity provider is on."
+
+msgid "admin.done.idp_disabled"
+msgstr "The identity provider is off."
+
+msgid "admin.done.idp_key_rotated"
+msgstr "A new key was generated. The old one stays published for 24 hours."
+
+msgid "admin.form.error.client_secret"
+msgstr "Enter the client secret (at most 512 characters, no control characters)."
+
+msgid "admin.form.error.discovery_refused"
+msgstr "The discovery document could not be fetched or does not qualify: check the address (https, publicly reachable, no redirect), the issuer, the code flow with PKCE S256, an asymmetric signature and the chosen client authentication."
+
+msgid "admin.form.error.discovery_url"
+msgstr "Enter an https address ending in /.well-known/openid-configuration."
+
+msgid "admin.form.error.entitlement_claim"
+msgstr "Enter a claim name: letters, digits, dot, hyphen or underscore, at most 64 characters."
+
+msgid "admin.form.error.entitlement_prefix"
+msgstr "Enter a prefix of 2 to 31 lowercase letters, digits or hyphens, starting with a letter."
+
+msgid "admin.form.error.identity_provider_limit"
+msgstr "This organisation has reached its maximum number of identity providers. Remove one first, or raise the maximum under Advanced settings."
+
+msgid "admin.form.error.issuer_taken"
+msgstr "This issuer is already registered, at this organisation, another one or as the platform provider."
+
+msgid "admin.idp.title"
+msgstr "Login"
+
+msgid "admin.idp.lead"
+msgstr "The identity providers where this organisation's staff log in. An organisation's own provider grants rights inside this organisation only; the email domains that choose the provider follow in a next step."
+
+msgid "admin.idp.providers"
+msgstr "Identity providers"
+
+msgid "admin.idp.none"
+msgstr "This organisation has no identity provider of its own; staff log in with a platform account."
+
+msgid "admin.idp.limit"
+msgstr "An organisation may register at most {limit} identity providers."
+
+msgid "admin.idp.limit_reached"
+msgstr "The maximum is reached. Remove a provider first to add a new one."
+
+msgid "admin.idp.add"
+msgstr "Add identity provider"
+
+msgid "admin.idp.create"
+msgstr "Register"
+
+msgid "admin.idp.name"
+msgstr "Name"
+
+msgid "admin.idp.name_hint"
+msgstr "As staff know the login service, for example the organisation's name."
+
+msgid "admin.idp.key"
+msgstr "Key"
+
+msgid "admin.idp.key_hint"
+msgstr "Lowercase letters, digits and hyphens; unique on this installation and fixed after registration. Every identity of this provider starts with it."
+
+msgid "admin.idp.discovery_url"
+msgstr "Discovery address"
+
+msgid "admin.idp.discovery_url_hint"
+msgstr "The address of the OpenID Connect discovery document, ending in /.well-known/openid-configuration. It is fetched and checked when you save."
+
+msgid "admin.idp.client_id"
+msgstr "Client id"
+
+msgid "admin.idp.client_id_hint"
+msgstr "OpenPlanner's registration at the provider."
+
+msgid "admin.idp.client_auth"
+msgstr "Client authentication"
+
+msgid "admin.idp.client_auth_hint"
+msgstr "By default a signed assertion with a key pair of its own (NL GOV profile). Choose a client secret only when the provider does not support private_key_jwt."
+
+msgid "admin.idp.auth.private_key_jwt"
+msgstr "Key pair (private_key_jwt)"
+
+msgid "admin.idp.auth.client_secret_basic"
+msgstr "Client secret (client_secret_basic)"
+
+msgid "admin.idp.client_secret"
+msgstr "Client secret"
+
+msgid "admin.idp.client_secret_hint"
+msgstr "Only with a client secret. Stored encrypted and never shown; leaving it empty keeps the stored secret."
+
+msgid "admin.idp.scopes"
+msgstr "Scopes"
+
+msgid "admin.idp.scopes_hint"
+msgstr "Separated by spaces; openid is required, email is needed to confirm the domain."
+
+msgid "admin.idp.entitlement_claim"
+msgstr "Entitlement claim"
+
+msgid "admin.idp.entitlement_claim_hint"
+msgstr "The claim in the ID token that carries the staff member's rights."
+
+msgid "admin.idp.entitlement_prefix"
+msgstr "Entitlement prefix"
+
+msgid "admin.idp.entitlement_prefix_hint"
+msgstr "Only values starting with it count."
+
+msgid "admin.idp.state"
+msgstr "Status"
+
+msgid "admin.idp.status"
+msgstr "Status"
+
+msgid "admin.idp.on"
+msgstr "On"
+
+msgid "admin.idp.off"
+msgstr "Off"
+
+msgid "admin.idp.issuer"
+msgstr "Issuer"
+
+msgid "admin.idp.checked"
+msgstr "Discovery checked"
+
+msgid "admin.idp.updated"
+msgstr "Last changed"
+
+msgid "admin.idp.never"
+msgstr "Not yet"
+
+msgid "admin.idp.callback_url"
+msgstr "Redirect URI at the provider"
+
+msgid "admin.idp.jwks_url"
+msgstr "JWKS address (public keys)"
+
+msgid "admin.idp.current_key"
+msgstr "Current key (kid)"
+
+msgid "admin.idp.no_key"
+msgstr "No key"
+
+msgid "admin.idp.retired_keys"
+msgstr "Retired keys"
+
+msgid "admin.idp.secret_set"
+msgstr "Stored (never shown)"
+
+msgid "admin.idp.secret_missing"
+msgstr "Not stored"
+
+msgid "admin.idp.test"
+msgstr "Test login"
+
+msgid "admin.idp.enable"
+msgstr "Switch on"
+
+msgid "admin.idp.disable"
+msgstr "Switch off"
+
+msgid "admin.idp.rotate_key"
+msgstr "Rotate key"
+
+msgid "admin.idp.delete"
+msgstr "Remove"
+
+msgid "admin.idp.actions_hint"
+msgstr "A test login sends you to the provider and shows which claims and rights come back, without logging in. Removing also erases the secret and the keys. Every action is in the audit log."
+
+msgid "admin.idp.registration"
+msgstr "Registration"
+
+msgid "admin.idp.registration_lead"
+msgstr "Register OpenPlanner at the provider first, with the redirect URI and, for a key pair, the JWKS address above."
+
+msgid "admin.idp.testing.title"
+msgstr "Test login started"
+
+msgid "admin.idp.testing.text"
+msgstr "You are going to {name}. After logging in you will see what the provider returned; no session is started."
+
+msgid "admin.idp.testing.continue"
+msgstr "Continue to the provider"
+
+msgid "admin.idp.test_result.title"
+msgstr "Result of the test login"
+
+msgid "admin.idp.test_result.succeeded"
+msgstr "The test login succeeded: the ID token was received and verified. Your own session is unchanged."
+
+msgid "admin.idp.test_result.token"
+msgstr "The ID token"
+
+msgid "admin.idp.test_result.claims"
+msgstr "Claims received (names)"
+
+msgid "admin.idp.test_result.email_verified"
+msgstr "Email address verified"
+
+msgid "admin.idp.test_result.email_domain"
+msgstr "Domain of the email address"
+
+msgid "admin.idp.test_result.entitlements"
+msgstr "Entitlement values with the prefix"
+
+msgid "admin.idp.test_result.yes"
+msgstr "Yes"
+
+msgid "admin.idp.test_result.no"
+msgstr "No"
+
+msgid "admin.idp.test_result.absent"
+msgstr "Absent"
+
+msgid "admin.idp.test_result.hint"
+msgstr "Only names and verdicts are shown, never values. For real logins email_verified must be true and the domain must belong to a verified domain of the provider."
+
+msgid "admin.idp.test_result.grants"
+msgstr "Rights the values resolve to"
+
+msgid "admin.idp.test_result.no_grants"
+msgstr "No rights: the values are missing, carry another prefix or name unknown organisations or groups."
+
+msgid "admin.idp.test_result.refused"
+msgstr "Refused values"
+
+msgid "admin.idp.test_result.back"
+msgstr "Back to the provider"
+
+msgid "admin.idp.test_failed.generic"
+msgstr "The test login failed. Check the discovery address and the registration at the provider; the reason is in the audit log."
+
+msgid "admin.idp.test_failed.discovery_failed"
+msgstr "The test login failed: the discovery document could not be fetched."
+
+msgid "admin.idp.test_failed.token_exchange_failed"
+msgstr "The test login failed: the provider refused the code exchange. Check the client id, the client authentication and the redirect URI."
+
+msgid "admin.idp.test_failed.invalid_token"
+msgstr "The test login failed: the ID token was invalid (signature, issuer, audience or nonce)."
+
+msgid "admin.idp.test_failed.no_signing_key"
+msgstr "The test login failed: this provider has no key. Rotate the key to generate one."
+
+msgid "admin.idp.test_failed.too_many_entitlements"
+msgstr "The test login failed: the token holds more entitlement values than allowed."
