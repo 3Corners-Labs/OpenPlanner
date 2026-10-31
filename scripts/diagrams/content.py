@@ -29,7 +29,7 @@ LEGEND_TEXT = (
 class Family(StrEnum):
     """The colour family of a block; the same on every plate and in the register."""
 
-    CITIZEN = "citizen"
+    PARTICIPANT = "participant"
     CORE = "core"
     ADMIN = "admin"
     PLATFORM = "platform"
@@ -38,7 +38,7 @@ class Family(StrEnum):
 
 
 FAMILY_NAMES = {
-    Family.CITIZEN: "Burgerkanaal",
+    Family.PARTICIPANT: "Burgerkanaal",
     Family.CORE: "Kern (domein)",
     Family.ADMIN: "Beheer",
     Family.PLATFORM: "Platform",
@@ -92,18 +92,18 @@ class Block:
 BLOCKS = (
     Block(
         "B1",
-        Family.CITIZEN,
+        Family.PARTICIPANT,
         "Burgerportaal",
         "groepspagina /g/slug, maandkalender, beheerpagina /b/token, join-pagina",
         "Groepspagina /g/{slug}, maandkalender als progressive enhancement, beheerpagina "
         "/b/{token} voor verzetten en annuleren, join-pagina. Werkt zonder JavaScript en zonder "
         "muis.",
-        "api/booking_pages · citizen · slot_picker · join_pages · web/static/calendar.js",
+        "api/booking_pages · participant · slot_picker · join_pages · web/static/calendar.js",
         "0020",
     ),
     Block(
         "B2",
-        Family.CITIZEN,
+        Family.PARTICIPANT,
         "Widget",
         "Web Component, dezelfde tokens",
         "Dezelfde boekflow als Web Component in Shadow DOM, gestyled via --booking-*-tokens en "
@@ -114,7 +114,7 @@ BLOCKS = (
     ),
     Block(
         "B3",
-        Family.CITIZEN,
+        Family.PARTICIPANT,
         "Direct videobellen",
         "nu bellen, plafond per groep, plek in de rij",
         "'Nu bellen' per groep: meeting en work item direct, plafond op open gesprekken, plek in "
@@ -325,9 +325,14 @@ LAYERS = (
         "Ingangen",
         "api · admin · jobs · cli",
         (
-            C(Family.CITIZEN, "B1", "Burgerpagina's", "api/booking_pages · citizen · slot_picker"),
-            C(Family.CITIZEN, "B1 B7", "Join-pagina", "api/join_pages"),
-            C(Family.CITIZEN, "B3", "Direct bellen", "api/direct_pages"),
+            C(
+                Family.PARTICIPANT,
+                "B1",
+                "Burgerpagina's",
+                "api/booking_pages · participant · slot_picker",
+            ),
+            C(Family.PARTICIPANT, "B1 B7", "Join-pagina", "api/join_pages"),
+            C(Family.PARTICIPANT, "B3", "Direct bellen", "api/direct_pages"),
             C(Family.CORE, "B7", "Webhooks in", "api/webhooks"),
             C(Family.ADMIN, "B11", "Machine-API", "api/agent/ (token, RequireScope)"),
             C(Family.ADMIN, "B9 B10", "Beheerportaal", "admin/*_routes · authz · session"),

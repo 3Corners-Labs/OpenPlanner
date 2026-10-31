@@ -8,7 +8,7 @@ deduplication, timeline and call status. No tunnel or network is involved.
 
     task_connected   WxCC task:connected       an agent accepted the work item
     host_joined      Webex participant joined  the agent (host) is in the meeting
-    guest_joined     Webex participant joined  the citizen is in the meeting
+    guest_joined     Webex participant joined  the participant is in the meeting
     participant_left Webex participant left
     meeting_started  Webex meeting started
     meeting_ended    Webex meeting ended

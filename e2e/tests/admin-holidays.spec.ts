@@ -5,7 +5,7 @@
  *
  * The three browsers run in parallel against one database: filling a year skips dates that
  * exist and every browser ticks the same calendar, so the runs do not disturb each other.
- * Only the "andere" organisation follows the calendar, so the citizen specs on "demo" keep
+ * Only the "andere" organisation follows the calendar, so the participant specs on "demo" keep
  * their opening hours.
  */
 import { expect, test } from '@playwright/test';

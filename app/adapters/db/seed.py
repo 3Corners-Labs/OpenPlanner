@@ -81,8 +81,8 @@ EXAMPLE_CONTACTS = ContactBlock(
         ContactOption.create(ContactKind.ADDRESS, "Stadhuis\nAmstel 1\n1011 PN Amsterdam"),
     )
 )
-# A made-up citizen: the booking on hold exists only in development and test databases.
-EXAMPLE_CITIZEN = Contact.create(
+# A made-up participant: the booking on hold exists only in development and test databases.
+EXAMPLE_PARTICIPANT = Contact.create(
     first_name="Voorbeeld",
     last_name="Inwoner",
     email="inwoner@example.org",
@@ -283,7 +283,7 @@ async def _suspended_booking(
             start=start,
             end=end,
             status=BookingStatus.CONFIRMED,
-            contact=EXAMPLE_CITIZEN,
+            contact=EXAMPLE_PARTICIPANT,
             locale="nl",
             token_hash=hash_token(token),
             created_at=now,
@@ -323,7 +323,7 @@ async def _pending_booking(
             status=BookingStatus.PENDING_CONFIRMATION,
             # Its own address each run, so repeated seeds stay under the address limit
             # (ADR 0059) when the e2e flow moves the confirmed one.
-            contact=replace(EXAMPLE_CITIZEN, email=f"wacht-{salt[:8].lower()}@example.org"),
+            contact=replace(EXAMPLE_PARTICIPANT, email=f"wacht-{salt[:8].lower()}@example.org"),
             locale="nl",
             token_hash=hash_token(token),
             created_at=now,

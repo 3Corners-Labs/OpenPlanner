@@ -5,7 +5,7 @@
  * (ADR 0041) contains it.
  *
  * The three browsers run in parallel against one database: each uses its own colour on the
- * "andere" organisation, so the citizen specs on "demo" are not affected.
+ * "andere" organisation, so the participant specs on "demo" are not affected.
  */
 import { expect, test } from '@playwright/test';
 

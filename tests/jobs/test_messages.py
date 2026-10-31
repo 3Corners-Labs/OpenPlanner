@@ -484,7 +484,7 @@ def test_the_product_footer_follows_the_organisations_setting(composer: MessageC
     assert "OpenPlanner" not in (message.html or "") + message.text
 
 
-def test_the_product_footer_speaks_the_citizens_language(composer: MessageComposer) -> None:
+def test_the_product_footer_speaks_the_participants_language(composer: MessageComposer) -> None:
     message = composer.compose(JobType.SEND_CONFIRMATION, replace(BOOKING, locale="en"), GROUP, NOW)
 
     assert "Appointments via" in (message.html or "")

@@ -1,5 +1,5 @@
 /**
- * The citizen's booking flow with the keyboard only (no mouse), checked with axe at every
+ * The participant's booking flow with the keyboard only (no mouse), checked with axe at every
  * step: choose a day in the calendar grid (arrow keys, ADR 0020) and a time, fill in the form,
  * book, confirm by the emailed link (ADR 0056), move and cancel the appointment. The link is
  * only in the email, so the confirming part starts from a seeded booking that awaits
@@ -8,7 +8,7 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { citizenEmail, expectNoAxeViolations, tabTo } from '../helpers';
+import { participantEmail, expectNoAxeViolations, tabTo } from '../helpers';
 import { fixture } from '../pages';
 
 test('book, confirm, move and cancel with the keyboard only', async ({ page }, testInfo) => {
@@ -31,7 +31,7 @@ test('book, confirm, move and cancel with the keyboard only', async ({ page }, t
   await expect(page.locator('[data-announce]')).toContainText('vrij');
   await expectNoAxeViolations(page);
 
-  // A time button takes the citizen to the form.
+  // A time button takes the participant to the form.
   await tabTo(page, page.locator('#times .time-button').first());
   await page.keyboard.press('Enter');
 
@@ -58,11 +58,11 @@ test('book, confirm, move and cancel with the keyboard only', async ({ page }, t
 
   await page.getByLabel('E-mailadres').focus();
   await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.type(citizenEmail(testInfo));
+  await page.keyboard.type(participantEmail(testInfo));
   await tabTo(page, page.getByRole('button', { name: 'Afspraak maken' }));
   await page.keyboard.press('Enter');
 
-  // ADR 0056: the citizen is asked to confirm by the link in the email.
+  // ADR 0056: the participant is asked to confirm by the link in the email.
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bevestig uw afspraak');
   await expect(page.getByRole('status')).toContainText('We hebben u een e-mail gestuurd');
   await expectNoAxeViolations(page);

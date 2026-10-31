@@ -121,7 +121,7 @@ async def test_deleting_a_calendar_removes_its_holidays(engine: AsyncEngine) -> 
 
 
 async def test_a_national_holiday_closes_every_inheriting_group(engine: AsyncEngine) -> None:
-    # The whole chain on SQL: superuser calendar → organisation choice → citizen availability.
+    # The whole chain on SQL: superuser calendar → organisation choice → participant availability.
     await seed_demo(engine)
     uow = SqlUnitOfWork(engine)
     clock = FixedClock(NOW)

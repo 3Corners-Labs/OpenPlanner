@@ -22,7 +22,7 @@ from scripts.diagrams.content import (
 )
 
 FAMILY_HEX = {
-    Family.CITIZEN: ("0F7A6E", "E3F3F0"),
+    Family.PARTICIPANT: ("0F7A6E", "E3F3F0"),
     Family.CORE: ("154273", "E4ECF5"),
     Family.ADMIN: ("9A5B00", "FBEFDC"),
     Family.PLATFORM: ("5B4B8A", "ECE8F6"),
@@ -83,7 +83,7 @@ th {{ background: #154273; color: #fff; }}
 td:nth-child(3) {{ font-family: Menlo, Consolas, monospace; font-size: 7.5pt; }}
 td.b {{ font-weight: bold; white-space: nowrap; }}
 td.b span {{ display: block; font-family: Menlo, monospace; font-size: 7.5pt; }}
-.citizen {{ color: #0f7a6e; }} .core {{ color: #154273; }}
+.participant {{ color: #0f7a6e; }} .core {{ color: #154273; }}
 .admin {{ color: #9a5b00; }} .platform {{ color: #5b4b8a; }}
 tr {{ page-break-inside: avoid; }}
 </style>
