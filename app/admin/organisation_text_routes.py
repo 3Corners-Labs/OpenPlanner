@@ -24,6 +24,7 @@ from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import Field, FormData, done_message, raise_refusal, read_form, redirect_done
 from app.admin.message_routes import PART_LABELS, PURPOSE_LABELS, LocaleTab
 from app.admin.pages import Locale, SameOrigin, organisation_header, page
+from app.domain.agent_term import MAX_TERM_LENGTH, MIN_TERM_LENGTH, TERM_SINGULAR
 from app.domain.authorization import Permission
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
@@ -66,6 +67,12 @@ PAGE_LABELS: dict[str, str] = {
 }
 """The field label of each participant-page text."""
 
+TERM_LABELS: dict[str, str] = {
+    "term.agent": "admin.org_texts.term.singular",
+    "term.agents": "admin.org_texts.term.plural",
+}
+"""The field label of each word of the agent term."""
+
 
 @dataclass(frozen=True)
 class TextSection:
@@ -96,6 +103,8 @@ def _label(spec: EditableText, _: BoundGettext) -> str:
     """Return the field label of an editable text."""
     if spec.area is Area.PAGES:
         return _(PAGE_LABELS[spec.key])
+    if spec.area is Area.TERMS:
+        return _(TERM_LABELS[spec.key])
     block = BLOCKS_BY_KEY[spec.key]
     return _(
         "admin.messages.part_sms" if block.channel is ChannelKind.SMS else PART_LABELS[block.part]
@@ -106,6 +115,8 @@ def _section_title(spec: EditableText, _: BoundGettext) -> tuple[str, str]:
     """Return the id and title of the card an editable text belongs to."""
     if spec.area is Area.PAGES:
         return "pages", _("admin.org_texts.section_pages")
+    if spec.area is Area.TERMS:
+        return "terms", _("admin.org_texts.section_terms")
     purpose = BLOCKS_BY_KEY[spec.key].purpose
     return purpose, _(PURPOSE_LABELS[purpose])
 
@@ -113,6 +124,8 @@ def _section_title(spec: EditableText, _: BoundGettext) -> tuple[str, str]:
 def _hint(spec: EditableText, custom: bool, _: BoundGettext) -> str:
     """Return whether the organisation changed the text and which placeholders it may use."""
     state = _("admin.org_texts.custom") if custom else _("admin.messages.default")
+    if spec.area is Area.TERMS:
+        return f"{state} {_('admin.org_texts.term.use')}" if spec.key == TERM_SINGULAR else state
     if not spec.placeholders:
         return state
     names = ", ".join(f"{{{name}}}" for name in sorted(spec.placeholders))
@@ -231,6 +244,10 @@ async def save_texts(
             raise
         names = ", ".join(f"{{{name}}}" for name in sorted(spec.placeholders)) or "–"
         message = locale.gettext("admin.form.error.message_text", max=spec.max_length, names=names)
+        if spec.area is Area.TERMS:
+            message = locale.gettext(
+                "admin.form.error.agent_term", min=MIN_TERM_LENGTH, max=MAX_TERM_LENGTH
+            )
         form.errors.append(FormError(spec.key, message))
         return await _editor(request, locale, context, org, code, form, 422)
     return redirect_done(_url(org, code), "texts_saved")

@@ -873,6 +873,10 @@ class Transaction(Protocol):
         """Return every organisation's texts by ``(organisation id, locale, key)``."""
         ...
 
+    async def get_all_group_terms(self) -> dict[tuple[int, str, str], str]:
+        """Return every group's own agent term words by ``(group id, locale, key)`` (ADR 0077)."""
+        ...
+
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[SlotUsage]:

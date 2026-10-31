@@ -30,7 +30,7 @@ from app.domain.message_texts import GroupTexts
 from app.domain.ports import Attachment, OutboundMessage
 from app.domain.scheduling import Group, JoinClient
 from app.domain.tokens import derive_token
-from app.i18n import BoundGettext, Translator, format_message
+from app.i18n import BoundGettext, Translator
 from app.i18n.dates import format_clock, format_day, local_day
 from app.jobs.calendar import build_ics
 from app.web.contact_labels import block_view
@@ -188,7 +188,7 @@ class _Texts:
     def __call__(self, key: str, /, **params: object) -> str:
         """Return the group's text for ``key`` if it has one, else the i18n text."""
         own = self._texts.get((self._.locale, key))
-        return format_message(own, params) if own is not None else self._(key, **params)
+        return self._.format(own, **params) if own is not None else self._(key, **params)
 
 
 REASON_KEYS: dict[ChangeReason, str] = {
@@ -274,7 +274,7 @@ class MessageComposer:
             raise ValueError("booking has no contact details")
         if kind.closure_notice and closure is None:
             raise ValueError("closure message without a closure")
-        gettext = self._translator.bind(booking.locale, group.organisation_id)
+        gettext = self._translator.bind(booking.locale, group.organisation_id, group.id)
         _ = _Texts(gettext, texts or {})
         if channel is ChannelKind.SMS:
             return self._sms(kind, booking, group, _)
@@ -379,7 +379,7 @@ class MessageComposer:
         if not group.sends_team_invite or address is None or booking.contact is None:
             raise ValueError("no team invite for this booking")
         cancel = job_type is JobType.SEND_TEAM_CANCEL
-        _ = self._translator.bind(locale, group.organisation_id)
+        _ = self._translator.bind(locale, group.organisation_id, group.id)
         tz = group.tz
         date = format_day(local_day(booking.start, tz), locale)
         start_time = format_clock(booking.start, tz, locale)

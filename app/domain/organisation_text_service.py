@@ -14,6 +14,7 @@ from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change, require
+from app.domain.agent_term import check_term_pair
 from app.domain.authorization import Permission, Principal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.organisations import organisation_by_slug
@@ -83,7 +84,8 @@ class OrganisationTextService:
         Raises:
             DomainError: ``not_permitted`` or ``organisation_not_found``;
                 ``invalid_configuration`` with field ``locale``, ``key`` (a key off the
-                allow-list) or the key of the first invalid text.
+                allow-list) or the key of the first invalid text; a form that sets only one of the
+                two words of the agent term names the other.
         """
         await self._authorize(principal, slug)
         if locale not in self._locales:
@@ -93,6 +95,7 @@ class OrganisationTextService:
             if key not in EDITABLE_BY_KEY:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "key")
             cleaned[key] = clean_override(key, text) if text is not None else None
+        check_term_pair(cleaned)
         async with self._uow.locked() as tx:
             organisation = await organisation_by_slug(tx, slug)
             current = await tx.get_organisation_texts(organisation.id)

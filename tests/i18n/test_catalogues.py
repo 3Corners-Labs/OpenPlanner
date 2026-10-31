@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.i18n import CATALOGUE_DIR, DEFAULT_LOCALE, load_catalogues, placeholders
+from app.i18n.terms import AgentTermPlaceholders
 
 APP = Path(__file__).resolve().parents[2] / "app"
 REQUIRED = ("nl", "en")
@@ -42,11 +43,18 @@ def test_other_locales_only_contain_known_keys(catalogues: dict[str, dict[str, s
         assert set(messages) <= reference, locale
 
 
+TERM = AgentTermPlaceholders.names
+"""The agent term is available in every text, so two locales may use different forms of it."""
+
+
 def test_placeholders_match_across_locales(catalogues: dict[str, dict[str, str]]) -> None:
     for key, source in catalogues[DEFAULT_LOCALE].items():
         for locale, messages in catalogues.items():
             if key in messages:
-                assert placeholders(messages[key]) == placeholders(source), (locale, key)
+                assert placeholders(messages[key]) - TERM == placeholders(source) - TERM, (
+                    locale,
+                    key,
+                )
 
 
 def test_every_key_used_in_code_exists(catalogues: dict[str, dict[str, str]]) -> None:

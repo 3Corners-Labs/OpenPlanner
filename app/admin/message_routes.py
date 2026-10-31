@@ -25,10 +25,15 @@ from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import Field, FormData, Option, raise_refusal, read_form, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin
+from app.domain.agent_term import MAX_TERM_LENGTH, MIN_TERM_LENGTH, TERM_KEYS, TERM_SINGULAR
 from app.domain.authorization import Permission
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.message_texts import BLOCKS_BY_KEY, MESSAGE_BLOCKS, TextBlock
+from app.domain.message_texts import (
+    BLOCKS_BY_KEY,
+    MESSAGE_BLOCKS,
+    TextBlock,
+)
 from app.domain.messaging_service import MessagingService, Reminders
 from app.i18n import BoundGettext, Translator
 from app.web.errors import FormError
@@ -301,7 +306,47 @@ def _sections(
         )
         title = _(PURPOSE_LABELS[block.purpose])
         sections.setdefault(block.purpose, TextSection(title, [])).fields.append(field)
+    sections["terms"] = TextSection(
+        _("admin.org_texts.section_terms"),
+        [
+            _term_field(key, text_locale, stored, organisation_id, translator, form, _)
+            for key in TERM_KEYS
+        ],
+    )
     return list(sections.values())
+
+
+def _term_hint(key: str, custom: bool, _: BoundGettext) -> str:
+    """Return whether the word is the group's own, and for the singular how a text uses the term."""
+    state = _("admin.messages.custom") if custom else _("admin.messages.default")
+    return f"{state} {_('admin.org_texts.term.use')}" if key == TERM_SINGULAR else state
+
+
+def _term_field(
+    key: str,
+    text_locale: str,
+    stored: dict[tuple[str, str], str],
+    organisation_id: int,
+    translator: Translator,
+    form: FormData,
+    _: BoundGettext,
+) -> Field:
+    """Return the field of one word of the agent term: the group's own, else the organisation's."""
+    own = stored.get((text_locale, key))
+    default = translator.lookup(text_locale, key, organisation_id)
+    label = (
+        "admin.org_texts.term.singular" if key == TERM_SINGULAR else "admin.org_texts.term.plural"
+    )
+    return Field(
+        key,
+        _(label),
+        "text",
+        form.values.get(key, own if own is not None else default),
+        hint=_term_hint(key, own is not None, _),
+        error=form.error_for(key),
+        required=False,
+        attributes={"maxlength": str(MAX_TERM_LENGTH), "spellcheck": "true"},
+    )
 
 
 async def _texts_response(
@@ -373,7 +418,7 @@ async def save_messages(
     translator = _translator(request)
     organisation_id = context.group.group.organisation_id
     texts: dict[str, str | None] = {}
-    for key in BLOCKS_BY_KEY:
+    for key in (*BLOCKS_BY_KEY, *TERM_KEYS):
         if key not in form.values:
             continue
         submitted = form.values[key].replace("\r\n", "\n")
@@ -383,7 +428,15 @@ async def save_messages(
         await messaging_service(request).save_texts(context.principal, slug, code, texts)
     except DomainError as error:
         raise_refusal(error)
-        if error.code is not ErrorCode.INVALID_CONFIGURATION or error.field not in BLOCKS_BY_KEY:
+        if error.code is not ErrorCode.INVALID_CONFIGURATION:
+            raise
+        if error.field in TERM_KEYS:
+            message = locale.gettext(
+                "admin.form.error.agent_term", min=MIN_TERM_LENGTH, max=MAX_TERM_LENGTH
+            )
+            form.errors.append(FormError(error.field, message))
+            return await _texts_response(request, locale, context, code, form, 422)
+        if error.field not in BLOCKS_BY_KEY:
             raise
         block = BLOCKS_BY_KEY[error.field]
         names = ", ".join(f"{{{name}}}" for name in sorted(block.placeholders))

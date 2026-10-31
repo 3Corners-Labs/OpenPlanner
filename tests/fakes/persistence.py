@@ -9,6 +9,7 @@ from datetime import date, datetime
 
 from app.domain import holidays as holiday_model
 from app.domain.agenda import ShortfallAcceptance
+from app.domain.agent_term import TERM_KEYS
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import CustomRole, RoleCatalogue, Scope
@@ -670,6 +671,14 @@ class InMemoryTransaction:
             (org, locale, key): text
             for org, texts in self.state.organisation_texts.items()
             for (locale, key), text in texts.items()
+        }
+
+    async def get_all_group_terms(self) -> dict[tuple[int, str, str], str]:
+        return {
+            (group, locale, key): text
+            for group, texts in self.state.group_texts.items()
+            for (locale, key), text in texts.items()
+            if key in TERM_KEYS
         }
 
     async def get_slot_usage(

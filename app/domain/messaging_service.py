@@ -11,9 +11,11 @@ New and removed rules apply to bookings made afterwards; planned reminders of ex
 bookings are kept, so a participant never misses a reminder they were promised.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change, require
+from app.domain.agent_term import TERM_KEYS, check_term_pair, clean_term
 from app.domain.authorization import Permission, Principal
 from app.domain.channel_settings import CONFIGURABLE_CHANNELS
 from app.domain.channels import ChannelKind, ReminderRule
@@ -52,9 +54,16 @@ class MessagingService:
     """
 
     def __init__(
-        self, uow: UnitOfWork, clock: Clock, admin: AdminService, locales: tuple[str, ...]
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        admin: AdminService,
+        locales: tuple[str, ...],
+        *,
+        on_change: Callable[[], None] | None = None,
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators; ``on_change`` runs after a group's agent term was stored."""
+        self._on_change = on_change
         self._uow = uow
         self._clock = clock
         self._admin = admin
@@ -133,7 +142,8 @@ class MessagingService:
         """Store the group's texts of one locale; ``None`` brings a block's default back.
 
         Every text is validated before anything is stored, so a form is saved whole or not
-        at all. Returns the keys of the blocks that changed.
+        at all. The two words of the agent term (ADR 0077) change together. Returns the keys of
+        the blocks that changed.
 
         Raises:
             DomainError: ``not_permitted``; ``invalid_configuration`` with ``locale`` or
@@ -141,9 +151,13 @@ class MessagingService:
         """
         if locale not in self._locales:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "locale")
-        cleaned = {
-            key: clean_text(key, text) if text is not None else None for key, text in texts.items()
-        }
+        cleaned: dict[str, str | None] = {}
+        for key, text in texts.items():
+            if text is None:
+                cleaned[key] = None
+            else:
+                cleaned[key] = clean_term(key, text) if key in TERM_KEYS else clean_text(key, text)
+        check_term_pair(cleaned)
         group = await self._group(principal, Permission.TEXTS_MANAGE, slug)
         async with self._uow.locked() as tx:
             current = await tx.get_group_texts(group.group.id)
@@ -153,6 +167,8 @@ class MessagingService:
             if changed:
                 detail = f"texts.{locale}:" + ",".join(sorted(changed))
                 await self._audit(tx, principal, Permission.TEXTS_MANAGE, group, detail[:255])
+        if any(key in TERM_KEYS for key in changed) and self._on_change is not None:
+            self._on_change()
         return changed
 
     async def _group(self, principal: Principal, permission: Permission, slug: str) -> GroupSummary:

@@ -35,8 +35,17 @@ class RequestLocale:
 
     def for_organisation(self, organisation_id: int) -> "RequestLocale":
         """Return the same locale with the organisation's own texts applied (ADR 0004 §4)."""
+        return self.for_scope(organisation_id, None)
+
+    def for_scope(self, organisation_id: int, group_id: int | None) -> "RequestLocale":
+        """Return the same locale with the texts of the organisation and the group applied.
+
+        The group's own words for the agent term win over the organisation's (ADR 0077).
+        """
         return RequestLocale(
-            self.translator.bind(self.code, organisation_id), self.remember, self.translator
+            self.translator.bind(self.code, organisation_id, group_id),
+            self.remember,
+            self.translator,
         )
 
     def apply_to(self, request: Request, response: Response) -> None:
