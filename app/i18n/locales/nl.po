@@ -7938,3 +7938,69 @@ msgstr "Gearchiveerde groepen: alleen-lezen, zonder pagina voor deelnemers."
 
 msgid "admin.audit.detail.archived"
 msgstr "gearchiveerd"
+
+msgid "admin.done.organisation_deleted"
+msgstr "De organisatie is verwijderd."
+
+msgid "admin.form.error.organisation_has_groups"
+msgstr "Deze organisatie heeft nog groepen, gearchiveerde meegerekend. Verwijderen kan pas als die weg zijn."
+
+msgid "admin.form.error.organisation_has_api_clients"
+msgstr "Deze organisatie heeft nog API-clients. Verwijder die eerst."
+
+msgid "admin.organisation.delete.title"
+msgstr "Organisatie verwijderen"
+
+msgid "admin.organisation.delete.form_lead"
+msgstr "Een organisatie zonder groepen en API-clients kan worden verwijderd, met alles wat bij haar hoort."
+
+msgid "admin.organisation.delete.open"
+msgstr "Organisatie verwijderen…"
+
+msgid "admin.organisation.delete.lead"
+msgstr "Verwijderen kan niet ongedaan worden gemaakt. Lees wat er gebeurt en typ dan de naam van de organisatie over."
+
+msgid "admin.organisation.delete.what_happens"
+msgstr "Wat er gebeurt"
+
+msgid "admin.organisation.delete.effect_data"
+msgstr "Huisstijl, kanalen en hun geheimen, websites voor de widget, contactopties, teksten, instellingen, sluitingsscenario's en identity providers van de organisatie worden gewist."
+
+msgid "admin.organisation.delete.effect_staff"
+msgstr "Beheerders houden hun rol bij de identity provider, maar een rol die deze organisatie noemt geeft geen rechten meer."
+
+msgid "admin.organisation.delete.effect_audit"
+msgstr "Het logboek houdt het webadres van de organisatie als tekst."
+
+msgid "admin.organisation.delete.not_empty"
+msgstr "De organisatie is nog niet leeg:"
+
+msgid "admin.organisation.delete.groups_left"
+msgstr "{count} groepen, gearchiveerde meegerekend. Een gearchiveerde groep verdwijnt vanzelf na de wistermijn."
+
+msgid "admin.organisation.delete.see_archived"
+msgstr "Bekijk de groepen."
+
+msgid "admin.organisation.delete.api_clients_left"
+msgstr "{count} API-clients."
+
+msgid "admin.organisation.delete.see_api"
+msgstr "Bekijk de API-clients."
+
+msgid "admin.organisation.delete.confirm_heading"
+msgstr "Bevestigen"
+
+msgid "admin.organisation.delete.confirmation"
+msgstr "Naam van de organisatie"
+
+msgid "admin.organisation.delete.confirmation_hint"
+msgstr "Typ “{name}” over om te bevestigen."
+
+msgid "admin.organisation.delete.button"
+msgstr "Organisatie verwijderen"
+
+msgid "admin.organisation.delete.blocked_hint"
+msgstr "Het portaal weigert zolang de organisatie niet leeg is."
+
+msgid "admin.audit.detail.deleted"
+msgstr "verwijderd"

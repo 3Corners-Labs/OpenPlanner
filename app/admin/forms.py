@@ -50,6 +50,7 @@ _ISO_DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 DONE_MESSAGES: dict[str, str] = {
     "created": "admin.done.created",
     "archived": "admin.done.archived",
+    "organisation_deleted": "admin.done.organisation_deleted",
     "retried": "admin.done.retried",
     "retry_not_possible": "admin.done.retry_not_possible",
     "diagnostics_on": "admin.done.diagnostics_on",
@@ -217,6 +218,8 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
     ErrorCode.GROUP_ARCHIVED: "admin.form.error.group_archived",
     ErrorCode.CONFIRMATION_MISMATCH: "admin.form.error.confirmation_mismatch",
+    ErrorCode.ORGANISATION_HAS_GROUPS: "admin.form.error.organisation_has_groups",
+    ErrorCode.ORGANISATION_HAS_API_CLIENTS: "admin.form.error.organisation_has_api_clients",
     ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
     ErrorCode.ORGANISATION_NOT_FOUND: "admin.form.error.organisation",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",

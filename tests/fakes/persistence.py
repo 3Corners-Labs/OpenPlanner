@@ -336,6 +336,19 @@ class InMemoryTransaction:
         self.state.organisation_slugs[stored.id] = stored.slug
         return stored
 
+    async def count_groups(self, organisation_id: int) -> int:
+        return sum(1 for g in self.state.groups.values() if g.organisation_id == organisation_id)
+
+    async def count_api_clients(self, organisation_id: int) -> int:
+        slug = self.state.organisation_slugs.get(organisation_id)
+        return sum(1 for c in self.state.api_clients.values() if c.organisation == slug)
+
+    async def delete_organisation(self, organisation_id: int) -> None:
+        del self.state.organisations[organisation_id]
+        self.state.organisation_slugs.pop(organisation_id, None)
+        for table in (self.state.contact_blocks, self.state.allowed_origins, self.state.logos):
+            table.pop(organisation_id, None)
+
     async def save_organisation(self, organisation: Organisation) -> None:
         current = self.state.organisations[organisation.id]
         self.state.organisations[organisation.id] = replace(

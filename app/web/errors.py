@@ -31,6 +31,8 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
     ErrorCode.GROUP_ARCHIVED: "admin.form.error.group_archived",
     ErrorCode.CONFIRMATION_MISMATCH: "admin.form.error.confirmation_mismatch",
+    ErrorCode.ORGANISATION_HAS_GROUPS: "admin.form.error.organisation_has_groups",
+    ErrorCode.ORGANISATION_HAS_API_CLIENTS: "admin.form.error.organisation_has_api_clients",
     ErrorCode.INTEGRATION_NOT_READY: "error.invalid_request",
     ErrorCode.DIRECT_CALL_UNAVAILABLE: "error.direct_call_unavailable",
     ErrorCode.DIRECT_CALL_FULL: "error.direct_call_full",

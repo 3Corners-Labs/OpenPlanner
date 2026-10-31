@@ -64,6 +64,7 @@ TOPICS = (
             "/admin/organisations/{org}",
             "/admin/organisations/new",
             "/admin/organisations/{org}/edit",
+            "/admin/organisations/{org}/delete",
         ),
         Permission.ORGANISATION_VIEW,
     ),

@@ -604,6 +604,18 @@ class Transaction(Protocol):
         """Insert an organisation (default branding) and return it with its ID."""
         ...
 
+    async def count_groups(self, organisation_id: int) -> int:
+        """Return how many groups the organisation has, archived ones included (ADR 0084)."""
+        ...
+
+    async def count_api_clients(self, organisation_id: int) -> int:
+        """Return how many API clients belong to the organisation (ADR 0084)."""
+        ...
+
+    async def delete_organisation(self, organisation_id: int) -> None:
+        """Erase the organisation's row; branding, channels, texts and settings go with it."""
+        ...
+
     async def save_organisation(self, organisation: Organisation) -> None:
         """Store name and default locale; slug and branding are left alone."""
         ...

@@ -41,9 +41,10 @@ PERMANENT_HOLIDAY_DATE = Gap("ADR 0084 context: a holiday date is its identity, 
 PERMANENT_HOLIDAY_RANGE = Gap("ADR 0084 context: the Dutch holidays are dates, each removed alone")
 
 CREATABLES: dict[str, Creatable] = {
+    # ADR 0084 step 4: an empty organisation is deleted from its edit form.
     "/admin/organisations": Creatable(
         change="/admin/organisations/{org}",
-        delete=Gap("ADR 0084 step 4: delete an empty organisation"),
+        delete="/admin/organisations/{org}/delete",
     ),
     # ADR 0084 step 2: a group is archived, from its settings.
     "/admin/groups": Creatable(
@@ -145,8 +146,8 @@ def test_a_gap_names_the_decision_that_allows_it() -> None:
     ]
 
     assert all(gap.decision.startswith("ADR ") for gap in gaps)
-    # ADR 0084 steps 4, 5 and 6 close five of these; three are the decision's own exceptions.
-    assert len(gaps) == 8
+    # ADR 0084 steps 5 and 6 close four of these; three are the decision's own exceptions.
+    assert len(gaps) == 7
 
 
 def test_the_heuristic_finds_the_known_creators() -> None:

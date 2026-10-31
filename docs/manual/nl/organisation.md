@@ -39,3 +39,19 @@ beperkt tot die organisatie. Alleen de superuser kan een organisatie aanmaken.
 
 Het pad bovenaan elke pagina (**Organisaties › organisatie**) en op de pagina van een groep
 (**Groepen › organisatie › groep**) laat zien waar u bent; elke stap is een link.
+
+## Organisatie verwijderen
+
+Onderaan het bewerkformulier staat **Organisatie verwijderen…**, alleen voor de superuser
+(het recht `organisation.delete` staat los van het beheren van organisaties). De
+bevestigingspagina zegt wat er gebeurt en vraagt u de naam van de organisatie over te typen;
+zonder recente login vraagt het portaal eerst opnieuw om in te loggen.
+
+Verwijderen kan alleen als de organisatie leeg is: geen groepen (gearchiveerde meegerekend; die
+verdwijnen vanzelf na de wistermijn) en geen API-clients. De pagina zegt wat er nog in de weg
+staat en linkt ernaar.
+
+Met de organisatie verdwijnen haar huisstijl, kanalen en hun geheimen, websites voor de widget,
+contactopties, teksten, instellingen, sluitingsscenario's en identity providers. Beheerders
+houden hun rol bij de identity provider, maar een rol die deze organisatie noemt geeft geen
+rechten meer. Het logboek houdt het webadres als tekst. Verwijderen is niet ongedaan te maken.
