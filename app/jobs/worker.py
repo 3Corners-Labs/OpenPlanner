@@ -20,12 +20,13 @@ import httpx
 import structlog
 
 from app.adapters.clock import SystemClock
-from app.adapters.db.engine import create_engine, is_reachable
+from app.adapters.db.engine import create_engine, is_reachable, set_slow_query_ms
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.maintenance import storage_limits
 from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
+from app.adapters.http_trace import traced_transport
 from app.adapters.integrations import (
     Integrations,
     build_integrations,
@@ -86,7 +87,7 @@ async def run_worker(
     """
     configure_clock(settings.time_format)
     engine = create_engine(settings.database_url)
-    http = httpx.AsyncClient(timeout=15.0, transport=transport)
+    http = httpx.AsyncClient(timeout=15.0, transport=traced_transport(transport))
     # ADR 0034: committed audit events also go to stdout for the log platform.
     uow = SqlUnitOfWork(engine, secret_box(settings), StdoutEventSink(settings.event_envelope))
     # ADR 0042 §6: portal values, reloaded once per loop when settings_version moved; the
@@ -240,6 +241,7 @@ async def run_worker(
 def _apply(current: Settings) -> None:
     """Follow changed portal values that live outside the services: log level, clock style."""
     set_log_level(current.log_level)
+    set_slow_query_ms(current.sql_slow_ms)
     configure_clock(current.time_format)
 
 
