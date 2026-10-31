@@ -629,9 +629,10 @@ html {
     gap: 0.25rem 0.5rem;
   }
 
-  /* The bar keeps its icons and the avatar; the words stay for screen readers. */
-  .page-help > span,
-  .admin-topbar__link > span,
+  /* The bar keeps the mark, its icons, the counts and the avatar; the words stay for screen
+     readers (the product name is visually hidden on a phone, ADR 0060). */
+  .admin-brand > span,
+  .admin-topbar__label,
   .admin-profile__name {
     position: absolute;
     width: 1px;

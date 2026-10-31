@@ -190,6 +190,7 @@ DETAIL_LABELS: dict[str, str] = {
     "direct_call_enabled": "admin.field.direct_call_enabled",
     "embedding_enabled": "admin.field.embedding_enabled",
     "trial_call_enabled": "admin.field.trial_call_enabled",
+    "join_client": "admin.field.join_client",
     "trial_call_minutes": "admin.field.trial_call_minutes",
     "trial_calls_per_booking": "admin.field.trial_calls_per_booking",
     "not_picked_up_minutes": "admin.field.not_picked_up_minutes",

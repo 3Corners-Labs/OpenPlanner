@@ -11,7 +11,6 @@ from datetime import timedelta
 import httpx
 import structlog
 from fastapi import Depends, FastAPI
-from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.adapters.certificate_pem import CryptographyPemReader
@@ -104,7 +103,7 @@ from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
 from app.web.organisation_settings import ClockScopeMiddleware
 from app.web.protection import configure_rate_limits, limiter, set_rate_limits
-from app.web.templates import STATIC_DIR
+from app.web.static_assets import ASSETS, VersionedStaticFiles
 
 
 def _public_host(public_base_url: str) -> str | None:
@@ -510,5 +509,5 @@ def create_app(
         app.include_router(public_router, dependencies=gate)
     if agent_api is not None:
         app.mount(AGENT_API_PREFIX, agent_api)
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.mount("/static", VersionedStaticFiles(ASSETS), name="static")
     return app

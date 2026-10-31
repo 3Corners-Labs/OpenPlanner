@@ -21,15 +21,17 @@ from app.admin.authz import can_function, return_path, session_principal
 from app.admin.forms import Field, moment_label
 from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
 from app.admin.session import THEMES, session_alert_prefs, session_theme
+from app.admin.top_bar import top_links
 from app.domain.authorization import Principal, Role, Scope
 from app.i18n import BoundGettext
 from app.web.authz_labels import ROLE_LABELS
 from app.web.help import HelpTopic, shipped_manual, topic_for_path
 from app.web.locale import RequestLocale, request_locale
-from app.web.navigation import BOTTOM_BAR_ENTRIES, SECTIONS, TOP_BAR, Home, Screen, home_of
+from app.web.navigation import BOTTOM_BAR_ENTRIES, SECTIONS, Home, Screen, home_of
 from app.web.organisation_settings import settings_for
 from app.web.protection import require_same_origin
 from app.web.templates import create_templates, kept_query, render
+from app.web.widgets import visible
 
 templates = create_templates([Path(__file__).parent / "templates"])
 
@@ -202,7 +204,9 @@ def page(
         for section in SECTIONS
     ]
     nav = [section for section in sections if section.entries]
-    top_links = [_nav_view(locale, link, home) for link in TOP_BAR if can(link.permission)]
+    on_overview = {item.key for item in visible(principal, can)}
+    topic: object = context["help_topic"] if "help_topic" in context else page_topic(request)
+    help_topic = topic if isinstance(topic, HelpTopic) else None
     bar, more = bottom_bar(nav)
     theme = session_theme(request)
     maintenance = getattr(request.state, "maintenance_notice", None)
@@ -215,7 +219,7 @@ def page(
             **context,
             "principal": principal,
             "nav": nav,
-            "top_links": top_links,
+            "top_links": top_links(request, locale.gettext, can, on_overview, home, help_topic),
             "bottom_bar": bar,
             "bottom_more": more,
             "can": can,
@@ -229,7 +233,7 @@ def page(
                 (key, locale.gettext(label)) for key, label in ALERT_POPUP_LABELS.items()
             ],
             # A message page (refusal, not found) keeps ``help_topic`` None: no help link.
-            "help_topic": context["help_topic"] if "help_topic" in context else page_topic(request),
+            "help_topic": help_topic,
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
             "update_banner": getattr(request.state, "update_notice", None),
             # Set by ``maintenance_routes.load_maintenance_notice`` (ADR 0038).
