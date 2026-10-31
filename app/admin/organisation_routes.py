@@ -1,22 +1,26 @@
-"""Admin routes for managing organisations (superuser only, HANDOVER §6).
+"""Admin routes for the organisations list and the organisation's own page (ADR 0047 step 3).
 
-Every route depends on exactly one ``RequirePermission(organisation.manage)``; forms and
-changes are ``fresh``. Changes are POST forms with the Fetch Metadata check, answered with a
-redirect and a confirmation. ``OrganisationService`` authorises again, validates and audits.
+Reading goes through ``organisation.view`` within the admin's reach: the superuser sees every
+organisation, an organisation admin and the auditor their own. An admin who may open exactly
+one organisation is sent straight to it from the list (ADR 0047 §2). Creating and editing
+stay with the superuser (``organisation.manage``, HANDOVER §6); those forms and changes are
+``fresh``. Changes are POST forms with the Fetch Metadata check, answered with a redirect and
+a confirmation. ``OrganisationService`` authorises again, validates and audits.
 
-    GET  /admin/organisations        organisation.manage   list
-    GET  /admin/organisations/new    organisation.manage   form for a new organisation
-    POST /admin/organisations        organisation.manage   create
-    GET  /admin/organisations/{org}  organisation.manage   edit form
-    POST /admin/organisations/{org}  organisation.manage   save name and default language
+    GET  /admin/organisations             organisation.view     list, or straight to the one
+    GET  /admin/organisations/new         organisation.manage   form for a new organisation
+    POST /admin/organisations             organisation.manage   create
+    GET  /admin/organisations/{org}       organisation.view     overview: groups and profile
+    GET  /admin/organisations/{org}/edit  organisation.manage   edit form
+    POST /admin/organisations/{org}       organisation.manage   save name and default language
 """
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, Response
+from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.admin.authz import AdminContext, RequirePermission
+from app.admin.authz import AdminContext, RequirePermission, admin_service
 from app.admin.forms import (
     Field,
     FormData,
@@ -26,8 +30,8 @@ from app.admin.forms import (
     read_form,
     redirect_done,
 )
-from app.admin.pages import Locale, SameOrigin, page
-from app.domain.authorization import Permission
+from app.admin.pages import Locale, SameOrigin, organisation_header, page
+from app.domain.authorization import Permission, scope_for
 from app.domain.errors import DomainError
 from app.domain.organisations import NewOrganisation, OrganisationService, OrganisationSettings
 from app.domain.scheduling import Organisation
@@ -37,8 +41,14 @@ router = APIRouter(prefix="/admin", include_in_schema=False)
 
 LIST_URL = "/admin/organisations"
 
-View = Annotated[AdminContext, Depends(RequirePermission(Permission.ORGANISATION_MANAGE))]
-"""Reading the list."""
+View = Annotated[AdminContext, Depends(RequirePermission(Permission.ORGANISATION_VIEW))]
+"""Reading the list: at least one organisation in reach."""
+
+Read = Annotated[
+    AdminContext,
+    Depends(RequirePermission(Permission.ORGANISATION_VIEW, organisation_param="org")),
+]
+"""Reading one organisation's page."""
 
 Manage = Annotated[
     AdminContext, Depends(RequirePermission(Permission.ORGANISATION_MANAGE, fresh=True))
@@ -107,6 +117,11 @@ def _form_page(
     status: int = 200,
 ) -> HTMLResponse:
     """Render the form for a new (``current`` is ``None``) or an existing organisation."""
+    header = (
+        organisation_header(request, locale, context.principal, current.name, current.slug)
+        if current
+        else None
+    )
     response = page(
         request,
         locale,
@@ -114,6 +129,7 @@ def _form_page(
         context.principal,
         {
             "organisation": current,
+            "org_header": header,
             "heading": current.name if current else locale.gettext("admin.new_organisation.title"),
             "fields": _fields(form, locale, current),
             "errors": form.errors,
@@ -125,9 +141,12 @@ def _form_page(
 
 
 @router.get("/organisations", response_class=HTMLResponse)
-async def organisations(request: Request, locale: Locale, context: View) -> HTMLResponse:
-    """List every organisation with links to its settings and branding."""
+async def organisations(request: Request, locale: Locale, context: View) -> Response:
+    """List the organisations in reach; an admin of exactly one goes straight to it."""
     found = await organisation_service(request).organisations(context.principal)
+    scope = scope_for(context.principal, Permission.ORGANISATION_VIEW)
+    if not scope.everything and len(found) == 1:
+        return RedirectResponse(f"{LIST_URL}/{found[0].slug}", status_code=303)
     names = {o.value: o.label for o in _languages(locale)}
     return page(
         request,
@@ -161,10 +180,34 @@ async def create_organisation(
 
 
 @router.get("/organisations/{org}", response_class=HTMLResponse)
+async def organisation(request: Request, locale: Locale, org: str, context: Read) -> HTMLResponse:
+    """The organisation's overview tab: its groups in the admin's reach, and its profile."""
+    principal = context.principal
+    current = await organisation_service(request).view(principal, org)
+    groups = [
+        g for g in await admin_service(request).groups(principal) if g.organisation_slug == org
+    ]
+    names = {o.value: o.label for o in _languages(locale)}
+    return page(
+        request,
+        locale,
+        "admin/organisation.html",
+        principal,
+        {
+            "organisation": current,
+            "org_header": organisation_header(request, locale, principal, current.name, org),
+            "groups": groups,
+            "language_name": names.get(current.default_locale, current.default_locale),
+            "done": done_message(request, locale.gettext),
+        },
+    )
+
+
+@router.get("/organisations/{org}/edit", response_class=HTMLResponse)
 async def organisation_form(
     request: Request, locale: Locale, org: str, context: Manage
 ) -> HTMLResponse:
-    """Show the settings of one organisation."""
+    """Show the edit form of one organisation (name and default language)."""
     current = await organisation_service(request).get(context.principal, org)
     return _form_page(request, locale, context, FormData({}, locale.gettext), current)
 

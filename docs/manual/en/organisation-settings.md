@@ -1,7 +1,7 @@
 # Organisation settings
 
 An organisation can set its own time format, time zone and periods. Open the screen with
-**Organisation settings** in the menu and choose the organisation. Organisation admins change
+**Organisations → organisation → Overview → Settings**. Organisation admins change
 the settings of their own organisations; the superuser can change every organisation's.
 
 Without a value of its own, an organisation follows the platform value, which the superuser

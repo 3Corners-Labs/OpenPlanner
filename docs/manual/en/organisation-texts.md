@@ -1,7 +1,7 @@
 # Texts for participants
 
 An organisation can change the texts that participants see on the pages of its groups and in
-emails and text messages. You open the screen with **Organisation settings** in the menu: choose
+emails and text messages. You open the screen with **Organisations → organisation → Overview → Texts**: choose
 the organisation and then **Change texts**. Organisation admins change the texts of their own
 organisations; the superuser can change those of any organisation.
 

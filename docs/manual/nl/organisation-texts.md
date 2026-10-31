@@ -1,7 +1,7 @@
 # Teksten voor deelnemers
 
 Een organisatie kan de teksten aanpassen die deelnemers zien op de pagina's van haar groepen en in
-de mails en sms'jes. U opent het scherm via **Organisatie-instellingen** in het menu: kies de
+de mails en sms'jes. U opent het scherm via **Organisaties → organisatie → Overzicht → Teksten**: kies de
 organisatie en dan **Teksten aanpassen**. Organisatiebeheerders passen de teksten van hun eigen
 organisaties aan; de superuser die van elke organisatie.
 

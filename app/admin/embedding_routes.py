@@ -19,11 +19,18 @@ import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import Field, FormData, done_message, raise_refusal, read_form, redirect_done
-from app.admin.pages import Locale, SameOrigin, page, with_manual
+from app.admin.pages import (
+    Locale,
+    SameOrigin,
+    organisation_header,
+    organisation_redirect,
+    page,
+    with_manual,
+)
 from app.domain.authorization import Permission
 from app.domain.embedding import MAX_ORIGIN_LENGTH
 from app.domain.embedding_service import EmbeddingService
@@ -112,6 +119,9 @@ async def _form_page(
         context.principal,
         {
             "organisation": found.organisation,
+            "org_header": organisation_header(
+                request, locale, context.principal, found.organisation.name, found.organisation.slug
+            ),
             "origins": found.allowed.origins,
             "groups": found.groups,
             "embedded": found.embedded_groups,
@@ -126,13 +136,10 @@ async def _form_page(
     return response
 
 
-@router.get("/embedding", response_class=HTMLResponse)
-async def organisations(request: Request, locale: Locale, context: List) -> HTMLResponse:
-    """List the organisations whose embedding the admin may manage, with their counts."""
-    found = await embedding_service(request).organisations(context.principal)
-    return page(
-        request, locale, "admin/embedding_list.html", context.principal, {"organisations": found}
-    )
+@router.get("/embedding")
+async def organisations(context: List) -> RedirectResponse:
+    """Send the old embedding list to the organisation's Embedding sub-tab (ADR 0047 §4)."""
+    return organisation_redirect(context.principal, Permission.EMBEDDING_MANAGE, "embedding")
 
 
 @router.get("/organisations/{org}/embedding", response_class=HTMLResponse)

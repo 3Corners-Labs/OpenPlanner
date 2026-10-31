@@ -571,6 +571,9 @@ msgstr "Beheermenu"
 msgid "admin.nav.more"
 msgstr "Meer"
 
+msgid "admin.nav.toggle"
+msgstr "Menu in- of uitklappen"
+
 msgid "admin.nav.section.monitor"
 msgstr "Bewaken"
 
@@ -916,6 +919,9 @@ msgstr "Eigen rechten bekijken"
 
 msgid "authz.permission.matrix_view"
 msgstr "Rechtenmatrix bekijken"
+
+msgid "authz.permission.organisation_view"
+msgstr "Organisatie bekijken"
 
 msgid "authz.permission.organisation_manage"
 msgstr "Organisaties beheren"
@@ -2176,9 +2182,6 @@ msgstr "De afspraak is geannuleerd en de taak is via de v2-API als geannuleerd g
 msgid "authz.permission.branding_manage"
 msgstr "Huisstijl van een organisatie beheren"
 
-msgid "admin.nav.branding"
-msgstr "Huisstijl"
-
 msgid "admin.done.logo_saved"
 msgstr "Het logo is opgeslagen."
 
@@ -2199,15 +2202,6 @@ msgstr "Logo verwijderd"
 
 msgid "admin.branding.title"
 msgstr "Huisstijl"
-
-msgid "admin.branding.lead"
-msgstr "Logo, naam, kleuren, lettertypen en kop van de afspraakpagina's van een organisatie."
-
-msgid "admin.branding.organisations"
-msgstr "Organisaties"
-
-msgid "admin.branding.none"
-msgstr "U beheert geen huisstijl van een organisatie."
 
 msgid "admin.branding.page_lead"
 msgstr "Zo zien deelnemers de afspraakpagina's van deze organisatie. Het beheerportaal zelf houdt één vaste stijl."
@@ -2544,9 +2538,6 @@ msgstr "met de beheerlink, zolang de afspraak opgeschort is"
 msgid "admin.tab.closure"
 msgstr "Noodsluiting"
 
-msgid "admin.nav.closures"
-msgstr "Noodsluiting"
-
 msgid "admin.done.closure_started"
 msgstr "De noodsluiting is ingesteld. Opgeschorte afspraken: {count}. De burgers krijgen een e-mail."
 
@@ -2771,15 +2762,6 @@ msgstr "Terug naar de noodsluiting"
 
 msgid "admin.closures.title"
 msgstr "Noodsluiting"
-
-msgid "admin.closures.lead"
-msgstr "Sluit alle teams van een organisatie tegelijk, bijvoorbeeld bij een storing of een gesloten gebouw."
-
-msgid "admin.closures.organisations"
-msgstr "Organisaties"
-
-msgid "admin.closures.none"
-msgstr "U kunt geen organisatie als geheel sluiten."
 
 msgid "admin.closures.organisation_title"
 msgstr "Noodsluiting {name}"
@@ -3153,12 +3135,6 @@ msgstr "Alle organisaties"
 msgid "admin.organisations.none"
 msgstr "Er zijn nog geen organisaties."
 
-msgid "admin.organisations.branding"
-msgstr "Huisstijl"
-
-msgid "admin.organisations.branding_of"
-msgstr "Huisstijl van {name}"
-
 msgid "admin.new_organisation.title"
 msgstr "Nieuwe organisatie"
 
@@ -3465,7 +3441,7 @@ msgid "agent_docs.spec_link"
 msgstr "OpenAPI-specificatie (JSON)"
 
 msgid "admin.nav.holidays"
-msgstr "Feestdagen"
+msgstr "Feestdagkalenders"
 
 msgid "admin.tab.holidays"
 msgstr "Feestdagen"
@@ -3502,12 +3478,6 @@ msgstr "Kalender maken"
 
 msgid "admin.holidays.slug_hint"
 msgstr "Korte naam voor in de adresbalk, bijvoorbeeld nationaal. Kan later niet meer veranderen."
-
-msgid "admin.holidays.organisations"
-msgstr "Keuze per organisatie"
-
-msgid "admin.holidays.organisations_lead"
-msgstr "Groepen volgen de kalenders van hun organisatie, tenzij een groep zelf iets anders kiest."
 
 msgid "admin.holidays.holiday_name"
 msgstr "Naam"
@@ -4793,7 +4763,7 @@ msgid "admin.simulator.lead"
 msgstr "Speel na wat Webex en Webex Contact Center zouden melden, zonder agent of tunnel. Elk event gaat ondertekend door het echte webhook-endpoint en komt op de tijdlijn. Deze kaart bestaat niet in productie."
 
 msgid "admin.simulator.prepare_lead"
-msgstr "Deze boeking heeft nog geen meeting of work item. Geef haar eerst nep-id's, dan kunnen de events haar vinden."
+msgstr "Deze boeking heeft nog geen meeting of work item. Geef haar eerst nep-id's, dan kunnen de events haar vinden. Biedt de groep een proefgesprek aan, dan krijgt de boeking ook een open nep-proefgesprek."
 
 msgid "admin.simulator.prepare"
 msgstr "Nep-meeting en -taak aanmaken"
@@ -4822,11 +4792,17 @@ msgstr "Taak niet opgepakt"
 msgid "admin.simulator.event.task_ended"
 msgstr "Taak beëindigd"
 
+msgid "admin.simulator.event.trial_entered"
+msgstr "Deelnemer komt het proefgesprek binnen"
+
+msgid "admin.simulator.event.trial_left"
+msgstr "Deelnemer verlaat het proefgesprek"
+
 msgid "admin.done.simulated"
 msgstr "Het event is afgeleverd en staat op de tijdlijn."
 
 msgid "admin.done.simulated_prepared"
-msgstr "De boeking heeft nu een nep-meeting en een nep-taak."
+msgstr "De boeking heeft nu een nep-meeting en een nep-taak, en een open nep-proefgesprek als de groep er een aanbiedt."
 
 msgid "admin.done.simulator_no_ids"
 msgstr "Deze boeking heeft daarvoor geen meeting of taak. Maak eerst een nep-meeting en -taak aan."
@@ -4859,9 +4835,6 @@ msgstr "Bewaartermijnen bekijken"
 
 msgid "authz.permission.embedding_manage"
 msgstr "Insluiten op websites beheren"
-
-msgid "admin.nav.embedding"
-msgstr "Insluiten"
 
 msgid "authz.permission.queue_work"
 msgstr "Afspraken oppakken in de eigen wachtrij"
@@ -5761,21 +5734,6 @@ msgstr "Geen activiteit binnen uw organisaties of groepen."
 msgid "admin.embedding.title"
 msgstr "Insluiten op websites"
 
-msgid "admin.embedding.lead"
-msgstr "Op welke websites de groepen van een organisatie als widget mogen staan."
-
-msgid "admin.embedding.organisations"
-msgstr "Organisaties"
-
-msgid "admin.embedding.col.origins"
-msgstr "Toegestane websites"
-
-msgid "admin.embedding.col.groups"
-msgstr "Groepen ingesloten"
-
-msgid "admin.embedding.none"
-msgstr "Er zijn geen organisaties die u mag beheren."
-
 msgid "admin.embedding.org_lead"
 msgstr "De websites waarop de groepen van {name} als widget mogen staan. Een groep verschijnt pas als die in haar eigen instellingen insluiten aanzet."
 
@@ -6273,21 +6231,6 @@ msgstr "Deze waarde spreekt een andere instelling tegen (bijvoorbeeld kritieke o
 
 msgid "admin.form.error.setting_expiry"
 msgstr "Geef het aantal uren op waarna het logniveau terugvalt: 1 tot en met 24."
-
-msgid "admin.nav.organisation_settings"
-msgstr "Organisatie-instellingen"
-
-msgid "admin.org_settings.title"
-msgstr "Organisatie-instellingen"
-
-msgid "admin.org_settings.lead"
-msgstr "Tijdnotatie, tijdzone en termijnen per organisatie. Zonder eigen waarde geldt de waarde van het platform."
-
-msgid "admin.org_settings.organisations"
-msgstr "Organisaties"
-
-msgid "admin.org_settings.none"
-msgstr "Er zijn geen organisaties waarvan u de instellingen kunt wijzigen."
 
 msgid "admin.org_settings.page_title"
 msgstr "Instellingen van {name}"
@@ -7326,15 +7269,6 @@ msgstr "Maak een veld leeg om de standaardtekst terug te zetten. Teksten zijn ge
 msgid "admin.org_texts.section_pages"
 msgstr "Pagina's voor burgers"
 
-msgid "admin.org_texts.link_title"
-msgstr "Teksten voor burgers"
-
-msgid "admin.org_texts.link_lead"
-msgstr "Pas de teksten op de pagina's van de groepen en in de mails en sms'jes aan voor de hele organisatie."
-
-msgid "admin.org_texts.link_button"
-msgstr "Teksten aanpassen"
-
 msgid "admin.org_texts.page.group_intro"
 msgstr "Inleiding op de pagina van de groep"
 
@@ -7505,3 +7439,99 @@ msgstr "De DKIM-sleutel is leeg (ingetrokken). Laat uw mailbeheerder een nieuwe 
 
 msgid "admin.channels.domain_reason.dmarc_policy_none"
 msgstr "DMARC staat op p=none: ontvangers rapporteren alleen, maar weren niets. Zet het beleid op quarantine of reject zodra SPF en DKIM kloppen."
+
+msgid "admin.nav.groups"
+msgstr "Groepen"
+
+msgid "admin.nav.object.organisation"
+msgstr "Organisatie"
+
+msgid "admin.tab.texts"
+msgstr "Teksten"
+
+msgid "admin.tab.embedding"
+msgstr "Inbedding"
+
+msgid "admin.tab.branding"
+msgstr "Huisstijl"
+
+msgid "admin.tab.channels"
+msgstr "Kanalen"
+
+msgid "admin.tab.contact"
+msgstr "Contact"
+
+msgid "admin.organisation.sections"
+msgstr "Onderdelen van de organisatie"
+
+msgid "admin.organisation.subsections"
+msgstr "Onderdelen van dit tabblad"
+
+msgid "admin.organisation.groups"
+msgstr "Groepen"
+
+msgid "admin.organisation.groups_lead"
+msgstr "De groepen van deze organisatie waar u rechten op heeft. Een groep opent op haar eigen pagina."
+
+msgid "admin.organisation.no_groups"
+msgstr "Deze organisatie heeft nog geen groepen waar u rechten op heeft."
+
+msgid "admin.organisation.all_groups"
+msgstr "Deze groepen in de lijst Groepen"
+
+msgid "admin.organisation.profile"
+msgstr "Profiel"
+
+msgid "admin.organisation.edit"
+msgstr "Naam en taal wijzigen"
+
+msgid "admin.organisations.groups"
+msgstr "Groepen"
+
+msgid "admin.organisations.groups_of"
+msgstr "Groepen van {name}"
+
+msgid "admin.groups.title"
+msgstr "Groepen"
+
+msgid "admin.groups.lead"
+msgstr "Alle groepen waar u rechten op heeft, met hun organisatie. Een groep opent op haar eigen pagina."
+
+msgid "admin.groups.filter"
+msgstr "Filteren"
+
+msgid "admin.groups.search"
+msgstr "Zoeken op naam"
+
+msgid "admin.groups.organisation"
+msgstr "Organisatie"
+
+msgid "admin.groups.apply"
+msgstr "Filteren"
+
+msgid "admin.groups.clear"
+msgstr "Wis filters"
+
+msgid "admin.groups.count"
+msgstr "Aantal groepen: {count}"
+
+msgid "admin.groups.of_total"
+msgstr "Van {total} groepen in totaal."
+
+msgid "admin.groups.none"
+msgstr "Geen groepen gevonden."
+
+msgid "admin.groups.duration"
+msgstr "Duur"
+
+msgid "admin.groups.shortfalls"
+msgstr "Tekorten"
+
+msgid "admin.groups.no_shortfall"
+msgstr "Geen"
+
+msgid "admin.groups.public_page"
+msgstr "Openbare pagina"
+
+msgid "admin.groups.search_active"
+msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."

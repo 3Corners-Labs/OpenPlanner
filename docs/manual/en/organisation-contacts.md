@@ -3,7 +3,7 @@
 When participants cannot book an appointment, they want to know how else to reach the
 organisation. On this screen you record that once for the whole organisation. The block is
 shown on the page of an emergency closure and on the maintenance page (ADR 0037 and 0038). You
-open it through **Closures → organisation → Manage alternative contact options**. An
+open it through **Organisations → organisation → Contact**. An
 organisation admin or superuser can change it.
 
 Set this up before something goes wrong. In an emergency there is no time to look up and

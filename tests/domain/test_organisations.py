@@ -1,4 +1,4 @@
-"""OrganisationService: only the superuser creates and edits organisations, and it is audited."""
+"""OrganisationService: the superuser creates and edits (audited); reading follows the scope."""
 
 from dataclasses import replace
 
@@ -17,6 +17,9 @@ from tests.support.domain import NOW
 
 SUPER = Principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 ORG_ADMIN = Principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
+OTHER_ADMIN = Principal("o-2", "P", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
+AUDITOR = Principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
+GROUP_ADMIN = Principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
 LOCALES = ("nl", "en")
 
 
@@ -88,13 +91,53 @@ async def test_org_admin_may_not_create_or_edit_organisations(
         await service.create(ORG_ADMIN, NewOrganisation("Noord", "noord", "nl"))
     with pytest.raises(DomainError) as updated:
         await service.update(ORG_ADMIN, "demo", OrganisationSettings("Eigen naam", "nl"))
-    with pytest.raises(DomainError) as listed:
-        await service.organisations(ORG_ADMIN)
+    with pytest.raises(DomainError) as edit_form:
+        await service.get(ORG_ADMIN, "demo")
 
-    for error in (created, updated, listed):
+    for error in (created, updated, edit_form):
         assert error.value.code is ErrorCode.NOT_PERMITTED
     assert uow.state.organisations[1].name == "Demo-gemeente"
     assert [e.outcome for e in uow.state.audit] == [Outcome.DENIED] * 3
+
+
+def _add_other_organisation(uow: InMemoryUnitOfWork) -> None:
+    """Add a second organisation, so a scope has something to leave out."""
+    uow.state.organisation_slugs[2] = "andere"
+    uow.state.organisations[2] = Organisation(2, "Andere gemeente", "andere")
+
+
+async def test_reading_follows_the_scope_of_organisation_view(
+    service: OrganisationService, uow: InMemoryUnitOfWork
+) -> None:
+    _add_other_organisation(uow)
+    everything = await service.organisations(SUPER)
+    own = await service.organisations(ORG_ADMIN)
+    other = await service.organisations(OTHER_ADMIN)
+    auditor = await service.organisations(AUDITOR)
+
+    assert [o.slug for o in everything] == ["andere", "demo"]
+    assert [o.slug for o in own] == ["demo"]
+    assert [o.slug for o in other] == ["andere"]
+    assert [o.slug for o in auditor] == ["demo"]
+    assert (await service.view(ORG_ADMIN, "demo")).name == "Demo-gemeente"
+    assert (await service.view(AUDITOR, "demo")).slug == "demo"
+
+
+async def test_an_organisation_outside_the_scope_cannot_be_opened_and_the_denial_is_audited(
+    service: OrganisationService, uow: InMemoryUnitOfWork
+) -> None:
+    _add_other_organisation(uow)
+    with pytest.raises(DomainError) as outside:
+        await service.view(ORG_ADMIN, "andere")
+    with pytest.raises(DomainError) as no_reach:
+        await service.organisations(GROUP_ADMIN)
+    with pytest.raises(DomainError) as unknown:
+        await service.view(SUPER, "nope")
+
+    assert outside.value.code is ErrorCode.NOT_PERMITTED
+    assert no_reach.value.code is ErrorCode.NOT_PERMITTED
+    assert unknown.value.code is ErrorCode.ORGANISATION_NOT_FOUND
+    assert [e.outcome for e in uow.state.audit] == [Outcome.DENIED] * 2
 
 
 async def test_update_changes_name_and_locale_and_names_the_fields(
