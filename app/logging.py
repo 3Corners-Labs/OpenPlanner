@@ -8,6 +8,12 @@ Lines use the envelope of ``openplanner.event/2`` (ADR 0040, part 2), so a log p
 them without mapping: ``@timestamp`` (RFC 3339 UTC, milliseconds), ``log.level``, ``message``,
 ``service.name``, ``service.version``, ``installation``, and, inside a request or job,
 ``trace.id``, ``organisation`` and ``group`` from ``app.domain.event_context``.
+
+``TRACE`` (ADR 0085 part 2) sits below ``DEBUG``. Trace lines come only from the fixed points
+in ``TRACE_POINTS``, through ``tracer.trace(point, **fields)``: a point takes its registered
+fields and nothing else, so a raw path, a URL, a body or a PII field cannot slip in; the mask
+still runs over the line as the safety net. ``docs/logging.md`` lists the points; a test
+keeps it in step with the registry.
 """
 
 import logging
@@ -28,6 +34,59 @@ PII_FIELDS = PII_COLUMNS | ALIASES
 """Every personal-data field of ``Booking`` (``app.domain.privacy``, the one home of the
 list, ADR 0063) plus the other names the same data travels by (``name``, ``answers``)."""
 MASK = "***"
+
+TRACE = 5
+"""The level below ``DEBUG`` (ADR 0085 point 8); syslog's numbering leaves it free."""
+logging.addLevelName(TRACE, "TRACE")
+
+TRACE_LOGGER = "openplanner.trace"
+"""The stdlib logger every trace line goes through, so it shares the root's level and format."""
+
+TRACE_POINTS: Mapping[str, tuple[str, ...]] = {
+    "http.request": ("method", "route", "status", "ms"),
+    "job.run": ("type", "attempt", "ms"),
+    "job.step": ("type", "step", "ms"),
+    "outbound.request": ("method", "host", "status", "ms", "error"),
+    "sql.slow": ("statement", "table", "ms"),
+    "template.render": ("template", "ms"),
+}
+"""The trace points of ADR 0085 point 9 and the only fields each may carry.
+
+``http.request`` takes the route template, never the raw path (``/b/{token}`` carries the
+management token); ``outbound.request`` the host, never a URL, query, header or body;
+``sql.slow`` the statement kind and table, never the text.
+"""
+
+
+class Tracer:
+    """Writes trace lines for the registered points.
+
+    The registry is the guard: a call with a field the point does not take is a
+    ``ValueError`` in the tests, so a PII field cannot be added at a call site. (The semgrep
+    rule ``no-pii-in-log-call`` does not match ``trace``; adding it is a ``.semgrep/`` change,
+    a decision PR of its own.)
+    """
+
+    def trace(self, point: str, **fields: object) -> None:
+        """Write one trace line for ``point``, when the level allows it.
+
+        Raises:
+            ValueError: An unregistered point or a field the point does not take: a
+                programming error, caught by the tests, never by the mask.
+        """
+        allowed = TRACE_POINTS.get(point)
+        if allowed is None:
+            raise ValueError(f"unknown trace point: {point}")
+        for name in fields:
+            if name not in allowed:
+                raise ValueError(f"{name} is not a field of trace point {point}")
+        logger = logging.getLogger(TRACE_LOGGER)
+        if logger.isEnabledFor(TRACE):
+            logger.log(TRACE, point, extra=fields)
+
+
+tracer = Tracer()
+"""The one tracer; adapters, middleware and the worker call ``tracer.trace``."""
 
 
 def _mask(value: Any) -> Any:
@@ -107,6 +166,8 @@ def _schema_names(_logger: WrappedLogger, _method: str, event_dict: EventDict) -
 
 # Standard LogRecord attributes, plus uvicorn's ANSI-coloured duplicate of the message.
 _IGNORED_RECORD_ATTRS = frozenset(vars(logging.makeLogRecord({}))) | {"message", "color_message"}
+_TRACE_RECORD_ATTRS = frozenset({"taskName"})
+"""Attributes Python adds to a record that are noise on a trace line."""
 
 
 _CONFIGURED: list[tuple[TextIO, Envelope | None]] = []
@@ -152,7 +213,11 @@ def configure_logging(
 
     structlog.configure(
         processors=[*shared, *finalize],
-        wrapper_class=structlog.make_filtering_bound_logger(logging.getLevelNamesMapping()[level]),
+        # structlog's filtering logger knows no level below DEBUG; trace lines take the
+        # stdlib route (``tracer``), which the root logger's level filters.
+        wrapper_class=structlog.make_filtering_bound_logger(
+            max(logging.getLevelNamesMapping()[level], logging.DEBUG)
+        ),
         logger_factory=structlog.WriteLoggerFactory(file=out),
         cache_logger_on_first_use=False,
     )
@@ -175,6 +240,9 @@ def configure_logging(
         uvicorn_logger.propagate = True
     # Access lines contain request paths, which will carry management tokens (/b/{token}).
     logging.getLogger("uvicorn.access").disabled = True
+    # httpx logs every outgoing request at INFO with its full URL, query string included; the
+    # ``outbound.request`` trace point (ADR 0085) carries method, host and status instead.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def warn_loose_secret_files(variables: list[str]) -> None:
